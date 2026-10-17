@@ -141,6 +141,16 @@ The Windows Standalone support directory is present. AssetRipper 2.0.0 is also a
 - Historical clone smoke results above remain separate from the later Steam-launched startup; do not use those clone runs as evidence for Steam integration. The Steam run touched only the temporary loader deployment, which was rolled back as described above. The separately installed BepInEx MCP bridge remains available for another read-only Steam session.
 - `origin` is `https://github.com/Jorge-desing/Rogue-Evolution.git`; local `main` tracks `origin/main`. The user asked to commit and push important or batched changes. Before each push, fetch and compare the remote head, review `.gitignore`, and stage only task-owned paths; do not create a PR unless asked. Git uses Windows Schannel for certificate validation.
 
+## Code review follow-ups (static source inspection, 2026-10-17)
+
+Three findings from earlier parallel reviews were rechecked against the current source and are closed in code; the original review snapshots are stale for these points:
+
+- **Unit prefab identity:** both the native-template clone and the custom-prefab clone now call `EntityControllerIdentity.Assign` with the namespaced unit ID before registering their resource path. This addresses the reviewed risk that `EntityController.Init` would see an empty or unrelated `entityId`. It is source evidence only; custom-prefab instantiation has not been observed in-game.
+- **Stage map preflight:** `BuildLandscapeCandidate` now carries each map's `restrictedToWorlds`, and `HasUsableRestrictedWorld` accounts for how `CreateLevelMap` chooses map/world restrictions. Null, deactivated, or demo-ineligible restricted Worlds are rejected when the game will enumerate that list. This is a static compatibility check, not proof that a generated stage map succeeds at runtime.
+- **AI cleanup reporting:** composite AI initialization rollback and destruction now retain module cleanup exceptions, aggregate multiple failures, and the loader logs cleanup errors. The review concern that cleanup exceptions were silently discarded is no longer present in the inspected source. Runtime callbacks remain unverified in a match.
+
+One **conditional lifecycle note remains**: `RogueCommandExpansionPlugin.OnDestroy` unsubscribes scene diagnostics but does not call `RuntimePatchInstaller.Uninstall`. The regular process-long BepInEx session has not shown a failure; if hot unload or early plugin-object destruction is supported, add explicit patch and bound-AI teardown and verify it. The earlier AI review also observed this path, but did not test it.
+
 ## Next steps
 
 1. **Author original unit content.** Replace the sample's block model with user-authored geometry, give it an intentional role and balance, and check whether the native template preserves the required movement and weapon behavior. The current static overlay does not retarget rigs or animations.
