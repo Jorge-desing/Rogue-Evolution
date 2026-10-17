@@ -136,6 +136,12 @@ def parse_args():
     parser.add_argument("--sponsons", action="store_true", help="Include armored external side sponsons")
     parser.add_argument("--locators", action="store_true", default=True, help="Generate Unity locator sockets")
     parser.add_argument("--dirt", action="store_true", default=True, help="Bake procedural vertex ambient dirt/cavity shading")
+    parser.add_argument("--wear", default="field_tested", choices=["pristine", "field_tested", "battle_hardened"], help="Procedural surface wear level")
+    parser.add_argument("--lods", action="store_true", help="Generate multi-level LOD chain (LOD0, LOD1, LOD2) and export _LODs.fbx")
+    parser.add_argument("--colliders", action="store_true", help="Generate low-poly physics collision hulls")
+    parser.add_argument("--gameplay-json", action="store_true", help="Export companion .gameplay.json specification")
+    parser.add_argument("--wreckage", action="store_true", help="Export burned / dislodged turret wreckage variant")
+    parser.add_argument("--target-budget", type=int, default=4000, help="Target polygon budget for profiling")
     parser.add_argument("--lod", action="store_true", help="Calculate polygon budget and recommend LOD reductions")
     parser.add_argument("--smooth-angle", type=float, default=38.0, help="Smart angle-weighted auto-smooth threshold in degrees")
     parser.add_argument("--multiview", action="store_true", help="Render 4 orthographic views")
@@ -188,6 +194,11 @@ def main():
     card_path = None
 
     builder = rmk.RogueVehicleBuilder(args.name, faction=args.faction, camo=args.camo)
+    builder.set_archetype(args.archetype)
+    builder.set_wear_level(args.wear)
+
+    gameplay_meta_path = (fbx_path.parent / f"{args.name}.gameplay.json") if args.gameplay_json else None
+    wreckage_fbx_path = (fbx_path.parent / f"{args.name}_Wreckage.fbx") if args.wreckage else None
 
     # 1. Mobility and Chassis by Archetype
     if args.archetype == "walker":
@@ -451,6 +462,12 @@ def main():
         smooth_angle_deg=args.smooth_angle,
         bake_vertex_dirt=args.dirt,
         include_locators=args.locators,
+        generate_lods=args.lods,
+        generate_colliders=args.colliders,
+        wear_level=args.wear,
+        gameplay_meta_path=gameplay_meta_path,
+        wreckage_fbx_path=wreckage_fbx_path,
+        target_budget=args.target_budget,
     )
 
     if args.lod:

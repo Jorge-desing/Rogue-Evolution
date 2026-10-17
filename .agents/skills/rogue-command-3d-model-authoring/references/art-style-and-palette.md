@@ -193,3 +193,46 @@ To maintain 60+ FPS in dense RTS battles with 50+ units on screen:
 - **Material-Based Mesh Unification for Export**: Group and join static submeshes by their PBR material slot (`batch_and_join_by_material`).
 - **Target Submesh Count**: A completed vehicle should contain **4 to 6 unified mesh objects** (one per material, plus any independent animated pivots like `TurretBase` or `MainBarrel`).
 
+---
+
+## 8. Multi-Channel Procedural Vertex Shading
+
+Rogue Command models avoid heavy, noisy textures by encoding tactile shading directly into vertex attributes (`Color` / `Mesh.colors32`):
+
+| Channel | Shader Role | Visual Impact | Technical Mapping |
+|---|---|---|---|
+| **R (Red)** | Ambient Occlusion & Cavity Dirt | Deep contact shadows in wheel wells, engine louvers, and undercarriages | Values $0.35$–$0.65$ on undersides and crevices; $0.88$–$1.0$ on upper plates |
+| **G (Green)** | Curvature & Edge Wear | Bright scratch glints on 45°/90° chamfer edges, simulating chipped paint | Values $0.55$–$1.0$ on sharp bevels; $0.0$–$0.15$ on flat armor planes |
+| **B (Blue)** | Thermal Soot & Weathering | Darkening gradient from exhaust manifolds and cannon muzzles | Values $0.25$–$0.65$ near exhaust tips and muzzle brakes; $1.0$ elsewhere |
+| **A (Alpha)** | Team Color Mask | Allows Unity shaders to tint team colors dynamically | $1.0$ for primary and light armor plates; $0.0$ for fixed gunmetal and treads |
+
+---
+
+## 9. Multi-Level LOD Hierarchy & Collision Geometry
+
+### A. LOD Triangle Budgets
+- **LOD0 (Combat View, 100%)**: Full fidelity ($1,500$–$5,000$ triangles), complete chamfers, road wheel lugs, and sensor antennas.
+- **LOD1 (Mid-Range View, 50%)**: Preserved planar boundaries, decimated fine bevels ($800$–$2,000$ triangles).
+- **LOD2 (Tactical Far View, 22%)**: Coarse blockout silhouette ($300$–$700$ triangles) for extreme RTS camera zoom.
+
+### B. Physics Collision Hulls
+- Flat-shaded bounding boxes `<Prefix>_COLLIDER_Hull` and `<Prefix>_COLLIDER_Turret` matching vehicle chassis and turret volumes, tagged with `is_collider = True` and unrendered in runtime graphics.
+
+---
+
+## 10. Standardized Gameplay Sockets & Kinematics
+
+Every vehicle model includes standardized empty locators in the FBX hierarchy:
+1. `Socket_MuzzlePrimary`: Main weapon muzzle tip & forward projectile vector.
+2. `Socket_MuzzleSecondary`: Secondary coaxial/pintle weapon socket.
+3. `Socket_TurretYaw`: Azimuth rotation axis for turret traversing.
+4. `Socket_TurretPitch`: Elevation pitch axis for weapon elevation.
+5. `Socket_RecoilPrimary`: Linear slide impulse axis for recoil animation.
+6. `Socket_SensorOptics`: Targeting ray / FLIR visor origin.
+7. `Socket_Exhaust_L` / `Socket_Exhaust_R`: Exhaust particle spawners.
+8. `Socket_DamageSmoke`: 50% HP threshold damage smoke emitter.
+9. `Socket_DamageFire`: 25% HP threshold catastrophic fire emitter.
+10. `Socket_CenterOfMass`: Physics center of mass.
+11. `Socket_GroundContact`: Ground projection ($Z=0$) for selection rings.
+
+

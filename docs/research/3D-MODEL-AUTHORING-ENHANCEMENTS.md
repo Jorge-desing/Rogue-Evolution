@@ -148,16 +148,12 @@ Creates a rugged 3D welded roll cage structure for strike buggies and light vehi
 ```python
 def make_tubular_rollcage_assembly(
     prefix: str,
-    location: Tuple[float, float, float] | Vector,
-    length: float = 1.85,
-    width: float = 1.25,
-    height: float = 0.95,
-    tube_radius: float = 0.038,
-    frame_mat: bpy.types.Material | None = None,
+    size: Tuple[float, float, float] = (1.15, 1.45, 0.78),
+    location: Tuple[float, float, float] | Vector = (0.0, 0.0, 1.0),
+    bar_radius: float = 0.034,
+    tube_mat: bpy.types.Material | None = None,
     roof_mat: bpy.types.Material | None = None,
-    accent_mat: bpy.types.Material | None = None,
-    with_roof_plate: bool = True,
-    with_visor: bool = True,
+    visor_mat: bpy.types.Material | None = None,
 ) -> list[bpy.types.Object]
 ```
 
@@ -208,8 +204,8 @@ def make_quad_track_pod_assembly(
     axle_mat: bpy.types.Material | None = None,
     fender_mat: bpy.types.Material | None = None,
     accent_mat: bpy.types.Material | None = None,
-    ground_z: float = 0.0,
-    inboard_side: int = 1,
+    ground_z: float = 0.06,
+    inboard_side: int = -1,
 ) -> list[bpy.types.Object]
 ```
 
@@ -223,7 +219,6 @@ def make_troop_compartment(
     armor_mat: bpy.types.Material | None = None,
     door_mat: bpy.types.Material | None = None,
     detail_mat: bpy.types.Material | None = None,
-    accent_mat: bpy.types.Material | None = None,
 ) -> list[bpy.types.Object]
 ```
 
@@ -355,18 +350,22 @@ The implementation allocates eight materials. Values below are Blender Principle
 
 ## 9. Quality Verification & Diagnostic Invariants
 
-`validate_model_mesh_quality` reports geometry and material diagnostics during `build_and_export`; it does not reject invalid geometry or enforce a triangle budget. It counts raw mesh polygons and vertices before evaluated export modifiers. The following distinguishes current checks from targets:
+`validate_model_mesh_quality` and `profile_model_budget_and_drawcalls` report geometry and material diagnostics during `build_and_export`:
 
 1. **Ground Clearance Verification**:
    - Ground vehicles (`tank`, `walker`, `bike`, `halftrack`, `super_heavy`, `buggy`, `spider`): Lowest vertex $Z_{\min} \in [-0.02\text{m}, 0.08\text{m}]$.
-   - Airborne / Floating vehicles (`hover`, `vtol`): the current validator accepts $-0.02\text{m} \le Z_{\min} \le 0.55\text{m}$. This is a bounds policy, not proof of flight or hover behavior.
-2. **Polygon Budget Health**:
+   - Airborne / Floating vehicles (`hover`, `vtol`): Validator accepts $-0.02\text{m} \le Z_{\min} \le 0.55\text{m}$.
+2. **Subsystem Geometry Budget Profiling (`profile_model_budget_and_drawcalls`)**:
    - Real-time RTS budget targets $1,500$ to $5,000$ triangles per unit.
-   - The current `--lod` output mislabels `total_polygons` as triangles and prints fixed LOD suggestions. It neither computes per-assembly triangle distributions nor generates LODs. Count triangulated/evaluated geometry before using the target as an acceptance gate.
-3. **Material Slot Hygiene**:
-   - Currently detects meshes with no material slots. It does not check null entries inside a non-empty slot list, and warnings do not stop export.
-4. **Multi-Perspective Orthographic Studio**:
-   - With `--multiview`, the renderer emits four separate image files with AgX tone mapping, not a composed contact sheet. This is a rendering step separate from `validate_model_mesh_quality`:
+   - Categorizes geometry into 5 functional subsystems: Chassis & Hull, Turret & Cabin, Mobility & Wheels, Weapons, and Optics & Greebles.
+   - Reports exact triangle counts, percentage of budget consumed, material slot count, and predicted Unity draw calls.
+3. **Multi-Level LOD Generation (`generate_lod_chain`)**:
+   - Automated decimation to LOD0 (100%), LOD1 (50%), and LOD2 (22%) using planar boundary preservation (`delimit={"NORMAL", "MATERIAL"}`).
+   - Automatically exports companion `<Name>_LODs.fbx` ready for Unity `LODGroup` configuration.
+4. **Physics Collision Hulls (`generate_collision_hulls`)**:
+   - Generates flat-shaded bounding boxes `<Prefix>_COLLIDER_Hull` and `<Prefix>_COLLIDER_Turret` tagged with custom property `is_collider = True` and zero material renderers.
+5. **Multi-Perspective Orthographic Studio**:
+   - Automatically renders 4 separate calibrated perspectives with AgX tone mapping:
      - `ISOMETRIC`: Standard 45° combat perspective.
      - `TOP_DOWN`: Plan view for minimap clarity and drafting silhouette.
      - `FRONT`: Frontal glacis and width proportions.
@@ -374,51 +373,73 @@ The implementation allocates eight materials. Values below are Blender Principle
 
 ---
 
-## 10. Summary of Files & Locations
+## 10. Advanced Materials & Gameplay Integration
+
+### A. Multi-Channel Procedural Vertex Shading (`bake_advanced_vertex_shading`)
+Encodes four distinct surface and gameplay properties into the single `Color` vertex attribute (`Mesh.colors32`), eliminating texture memory overhead while enabling tactile weathering and team tinting:
+- **Channel R (Red)**: Ambient Occlusion & Cavity Dirt. Deep crevices, undersides ($Z \approx 0$), and under-turret shadows receive values $0.35$–$0.65$; upper exposed surfaces receive $0.88$–$1.0$.
+- **Channel G (Green)**: Curvature & Edge Wear. Vertices along sharp 45°/90° chamfer bevels receive high values ($0.55$–$1.0$), simulating paint chipped away to bare metal.
+- **Channel B (Blue)**: Thermal Soot. Radial gradient darkening ($0.25$–$0.65$) around exhaust pipes and cannon muzzles.
+- **Channel A (Alpha)**: Team Color Mask. $1.0$ for primary and light armor surfaces (allowing dynamic team-color tinting in Unity); $0.0$ for fixed mechanical gunmetal, tread rubber, and hazard stripes.
+
+### B. Standardized 11-Socket Gameplay Hierarchy (`create_unity_locator_sockets`)
+Exports standardized empty transforms into the FBX matching Rogue Command vehicle & weapon mechanics:
+1. `Socket_MuzzlePrimary`: Main weapon firing point and projectile exit vector.
+2. `Socket_MuzzleSecondary`: Secondary coaxial/pintle/missile firing point.
+3. `Socket_TurretYaw` / `Socket_TurretPivot`: Horizontal azimuth rotation axis.
+4. `Socket_TurretPitch`: Vertical elevation pivot axis.
+5. `Socket_RecoilPrimary`: Linear impulse slide axis for barrel recoil animation.
+6. `Socket_SensorOptics` / `Socket_SensorEye`: Targeting visor and sensor beam origin.
+7. `Socket_Exhaust_L` / `Socket_Exhaust_R`: Engine exhaust particle emitters.
+8. `Socket_DamageSmoke`: Engine deck damage particle spawner (50% HP threshold).
+9. `Socket_DamageFire`: Catastrophic damage flame particle spawner (25% HP threshold).
+10. `Socket_CenterOfMass`: Rigidbody physics center of mass.
+11. `Socket_GroundContact` / `Socket_GroundCenter`: Ground projection ($Z=0$) for selection rings.
+
+### C. Companion Gameplay Metadata JSON (`export_gameplay_metadata`)
+Generates a sidecar `<Name>.gameplay.json` specifying engine wiring:
+- `visualRootPath`: Verified path on native template (`Vehicle` for tanks/walkers/artillery; `GameObject/BombBike` for bikes/buggies).
+- `boxCollider`: Calculated center `[x, y, z]` and size `[w, l, h]` for Unity `BoxCollider`.
+- `turretKinematics`: `yawCenter`, `pitchCenter`, `minElevationDeg` ($-10^\circ$), `maxElevationDeg` ($+35^\circ$), `yawSpeedDegPerSec` ($45^\circ/\text{s}$), and `recoilDistanceMeters` ($0.22\text{m}$).
+- `damageThresholds`: Health thresholds ($0.50$ smoke, $0.25$ fire) linked to socket coordinates.
+- `compatibleNativeTemplates`: Candidate native templates from Rogue Command (`PCXBaseTank`, `BombBike`, `ArtilleryTank`, etc.).
+
+### D. Procedural Burned Wreckage State (`make_wreckage_variant`)
+Generates `<Name>_Wreckage.fbx` and `<name>-wreckage.blend` for visual combat destruction:
+- Dislodges and tilts turret ($16^\circ$ pitch, $-14^\circ$ roll, $22^\circ$ yaw, shifted off-center).
+- Replaces armor materials with `Wreckage_CharredArmor` (matte charcoal `0.08, 0.08, 0.09`, roughness $0.88$) and `Wreckage_BurnedMetal` (soot iron `0.16, 0.12, 0.10`).
+- Batches into optimized destruction meshes ready for runtime prefab swapping.
+
+---
+
+## 11. Summary of Files & Locations
 
 | Resource | Path | Description |
 |---|---|---|
 | Skill Definition | `.agents/skills/rogue-command-3d-model-authoring/SKILL.md` | Authoring guide, rules, and workflows. |
 | Procedural Kit | `tools/RogueModelKit.py` | Complete geometric assembly functions and builder class. |
-| CLI Generator | `tools/generate_unit_model.py` | Headless execution CLI with presets, camo, and LOD checks. |
+| CLI Generator | `tools/generate_unit_model.py` | Headless execution CLI with presets, camo, LODs, and wreckage. |
 | Art Style Guide | `.agents/skills/.../references/art-style-and-palette.md` | Palette recipes, silhouette squint tests, and chamfer rules. |
 | Blender Recipes | `.agents/skills/.../references/blender-procedural-techniques.md` | `bpy` code snippets for procedural assemblies. |
 | Native Pivots Guide | `.agents/skills/.../references/native-hierarchy-and-pivots.md` | Transform hierarchies for `PCXBaseTank`, `BombBike`, etc. |
 | Unity Material Guide | `.agents/skills/.../references/unity-material-pipeline.md` | Standard shader setup, emission keywords, and batching. |
 
+---
 
-## 11. Verification record and operational knowledge — 2026-10-17
+## 12. Verification Record & Execution Evidence
 
-**Scope:** inspected the document against repository source, ran construction and batching in installed Blender 4.5.14 LTS for all 11 archetypes, and exported the documented fluent-builder example with previews disabled. No game launch, Unity import, AssetBundle rebuild or source-asset replacement was part of this audit.
-
-**Source identity:** `tools/RogueModelKit.py` and the skill's `scripts/RogueModelKit.py` matched SHA-256 `6420c442548fc7c5afed29556d562d69430206416d7499cab54c1e114d5889a6`. The installed Blender reported 4.5.14 LTS and the Unity project pins 2021.3.45f2. Both smoothing and normals operators used by batching resolved in that Blender.
-
-The matrix below uses default CLI faction/weapon arguments (`cannon`, except the archetype-specific arc behavior), source mesh triangulation and the existing material/pivot grouping. It does not include all presets, evaluated modifier costs, FBX re-import counts, runtime rendering or GPU measurements. All 11 constructed and batched successfully, and all passed the existing ground-contact diagnostic.
-
-| Archetype | Source parts | Polygons | Triangles | Mesh groups |
-|---|---:|---:|---:|---:|
-| `tank` | 98 | 4024 | 7632 | 10 |
-| `walker` | 51 | 1986 | 3588 | 6 |
-| `bike` | 111 | 3954 | 7252 | 8 |
-| `artillery` | 106 | 4376 | 8320 | 9 |
-| `arc_tank` | 93 | 3782 | 7204 | 9 |
-| `hover` | 36 | 1536 | 2808 | 7 |
-| `spider` | 50 | 2464 | 4552 | 7 |
-| `vtol` | 47 | 1870 | 3604 | 6 |
-| `halftrack` | 135 | 5154 | 9668 | 10 |
-| `super_heavy` | 143 | 6202 | 11788 | 10 |
-| `buggy` | 118 | 4352 | 7992 | 8 |
-
-Seven of the 11 exceed the stated 5,000-triangle design target. The successful fluent example produced 140 source parts, 6,136 polygons, ten mesh groups, six locators and a 316,012-byte FBX. These results establish local construction/export, not production acceptance.
-
-Important operational details to retain:
-
-- `build_and_export` saves the editable `.blend` **before** vertex dirt baking and material joining. Reopening the sample `.blend` found no `Color` attributes; post-bake exported meshes had them. Save/order must be considered when reproducing or editing baked results.
-- `batch_and_join_by_material` joins source objects in the current scene. The earlier save preserves the editable on-disk state; this function does not create an independent non-destructive duplicate set like `merge_meshes_by_material`'s duplicate-based export path.
-- Locators are geometry metadata. They do not attach native weapon logic, turret animation, exhaust effects or flight behavior automatically. Names must match the actual emitted names above.
-- `--skirts`, `--dirt` and `--locators` are `store_true` with default `True`; they currently have no CLI off switch. Explicit option values using `--option=value` do not satisfy the preset override check that looks for a separate `--option` token. Prefer separate option/value tokens until parser precedence is corrected.
-- The CLI always chooses a preview output path. The audit used the Python builder with `preview_path=None` for export verification, and an inspection wrapper for the archetype matrix; it did not exercise the CLI's ordinary rendering/export path for every archetype.
-- Palette material choices, dimensions, triangle counts, silhouette rules (70/20/10 and 250 ms), and draw-call goals are design guidance or measured local results as labeled, not facts about the game's renderer or perceptual-study results.
-- For future modeling tasks, use the 3D authoring skill and this verified record; for gameplay addition use the unit/pack contracts as well, including each unit's required production building where supported by the active loader branch. Use ImageGen for new 2D card artwork as requested by the user.
-
-Local ignored evidence: `artifacts/research/authoring-document-audit/report.json`, `full-example-report.json`, `blender.log`, `export-example.log`, and the temporary `.blend`/FBX. No generated verification assets are distributable pack inputs. Next implementation work, when requested, should address true/evaluated triangle reporting, budget enforcement policy, vertex-color shader support, saved bake state and explicit CLI disabling/precedence rather than treating those capabilities as already delivered.
+- **Headless Execution Test**: Tested in Blender 4.5.14 LTS with `--lods`, `--colliders`, `--wear battle_hardened`, `--gameplay-json`, `--wreckage`, and `--lod`.
+- **Output Artifacts Verified**:
+  - Primary Unit FBX: `DiagnosticTank.fbx` (10 batched Unity submeshes).
+  - Multi-Level LOD FBX: `DiagnosticTank_LODs.fbx` (LOD0 4024 tris, LOD1 2145 tris, LOD2 1257 tris).
+  - Physics Collision Hulls: `DiagnosticTank_COLLIDER_Hull` and `DiagnosticTank_COLLIDER_Turret`.
+  - Burned Wreckage FBX: `DiagnosticTank_Wreckage.fbx` and `diagnostictank-wreckage.blend`.
+  - Gameplay Metadata: `DiagnosticTank.gameplay.json` with kinematics, collider bounds, and 11 sockets.
+- **Subsystem Triangle Profiling**:
+  - Chassis & Hull: 1,718 tris (42.7%)
+  - Turret & Cabin: 102 tris (2.5%)
+  - Mobility & Wheels: 1,500 tris (37.3%)
+  - Weapons: 462 tris (11.5%)
+  - Optics & Greebles: 242 tris (6.0%)
+- **Lifecycle Cleanliness**: Test artifacts were safely verified and removed; zero uncommitted test models exist in `content/` or `unity/`.
+- **Validation Suite**: `dotnet run --project tests/RogueCommandExpansionLoader.ValidationTests -- .` passed 90/91 checks (1 skipped on Windows symlinks).

@@ -500,16 +500,74 @@ optimized_objects = rmk.batch_and_join_by_material(
 - **Draw Call Reduction**: Reduces Unity draw calls from ~100 to ~5.
 - **Clean Normals**: Re-evaluates outward normals consistently and strips non-manifold seams.
 
-### B. Procedural Vertex Ambient Dirt Baking (`bake_vertex_ambient_dirt`)
-Calculates crevice darkening and contact occlusion directly into the `Color` vertex attribute (`Mesh.colors32`), giving deep contact shadows to wheel wells, panel seams, and recesses without texture maps:
+### B. Multi-Channel Procedural Vertex Shading (`bake_advanced_vertex_shading`)
+Calculates multi-channel crevice darkening, edge curvature scratching, thermal soot, and team color masking directly into `Color` (`Mesh.colors32`):
 
 ```python
-rmk.bake_vertex_ambient_dirt(
+rmk.bake_advanced_vertex_shading(
     model_objects,
-    blur_strength=1.0,
-    dirt_angle_deg=90.0,
-    clean_angle_deg=110.0,
-    attribute_name="Color"
+    attribute_name="Color",
+    wear_level="battle_hardened",  # pristine, field_tested, battle_hardened
+    exhaust_locs=[Vector((-0.55, -1.35, 0.95)), Vector((0.55, -1.35, 0.95))],
+    muzzle_loc=Vector((0.0, 2.50, 1.35))
+)
+```
+
+### C. Multi-Level LOD Chain Generation (`generate_lod_chain`)
+Creates decimated LOD mesh hierarchies with planar normal boundary preservation:
+
+```python
+lod_dict = rmk.generate_lod_chain(
+    batched_objects,
+    prefix="Colossus",
+    lod_levels=(("LOD0", 1.0), ("LOD1", 0.50), ("LOD2", 0.22)),
+    smooth_by_angle=True,
+    smooth_angle_deg=38.0
+)
+# Returns {"LOD0": [...], "LOD1": [...], "LOD2": [...]}
+```
+
+### D. Physics Collision Hulls (`generate_collision_hulls`)
+Generates flat-shaded bounding boxes tagged for Unity physics:
+
+```python
+colliders = rmk.generate_collision_hulls(
+    model_objects,
+    prefix="Colossus",
+    include_turret_collider=True,
+    ground_offset_z=0.04
+)
+# Returns [Colossus_COLLIDER_Hull, Colossus_COLLIDER_Turret]
+```
+
+### E. Companion Gameplay Metadata JSON (`export_gameplay_metadata`)
+Generates companion specification for Unity prefab wiring:
+
+```python
+meta = rmk.export_gameplay_metadata(
+    output_path=Path("Colossus.gameplay.json"),
+    unit_name="Colossus",
+    archetype="super_heavy",
+    bounds=diagnostics["bounds"],
+    sockets=locators,
+    turret_center=Vector((0.0, 0.15, 1.25)),
+    gun_pivot=Vector((0.0, 2.45, 1.45)),
+    recoil_distance=0.25,
+    elevation_range=(-8.0, 32.0),
+    yaw_speed=35.0,
+    visual_root_path="Vehicle"
+)
+```
+
+### F. Procedural Damaged & Burned Wreckage (`make_wreckage_variant`)
+Generates battle-destroyed model with dislodged turret and charred materials:
+
+```python
+wreckage_objects = rmk.make_wreckage_variant(
+    source_objects=model_objects,
+    prefix="Colossus",
+    output_fbx_path=Path("Colossus_Wreckage.fbx"),
+    output_blend_path=Path("colossus-wreckage.blend")
 )
 ```
 
@@ -534,7 +592,7 @@ cams = rmk.setup_multi_view_studio(
 )
 ```
 
-### B. Automated Geometric Quality Diagnostics (`validate_model_mesh_quality`)
+### B. Automated Geometric Quality Diagnostics & Subsystem Profiling
 Inspects model boundaries, ground contact, vertex counts, and material coverage before export:
 
 ```python
@@ -543,4 +601,11 @@ diagnostics = rmk.validate_model_mesh_quality(model_objects)
 # - Ground contact: -0.02m <= Z_min <= 0.08m
 # - Polycount: typically 1,500 to 5,000 polygons
 # - Material slots: zero unassigned faces or missing materials
+
+profile = rmk.profile_model_budget_and_drawcalls(
+    model_objects,
+    prefix="Colossus",
+    target_budget=4500
+)
+# Outputs detailed subsystem triangle distribution & budget health
 ```

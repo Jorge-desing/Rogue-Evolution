@@ -8,6 +8,7 @@ and Unity 2021.3.45f2 FBX export.
 """
 
 from __future__ import annotations
+import json
 import math
 from pathlib import Path
 from typing import Any, Dict, Sequence, Tuple
@@ -1473,12 +1474,34 @@ def create_unity_locator_sockets(
     name_prefix: str,
     muzzle_loc: Tuple[float, float, float] | Vector | None = None,
     muzzle_dir: Tuple[float, float, float] | Vector | None = None,
+    muzzle_secondary_loc: Tuple[float, float, float] | Vector | None = None,
+    muzzle_secondary_dir: Tuple[float, float, float] | Vector | None = None,
     turret_loc: Tuple[float, float, float] | Vector | None = None,
+    turret_pitch_loc: Tuple[float, float, float] | Vector | None = None,
+    recoil_loc: Tuple[float, float, float] | Vector | None = None,
+    recoil_dir: Tuple[float, float, float] | Vector | None = None,
     sensor_loc: Tuple[float, float, float] | Vector | None = None,
     exhaust_left: Tuple[float, float, float] | Vector | None = None,
     exhaust_right: Tuple[float, float, float] | Vector | None = None,
+    damage_smoke_loc: Tuple[float, float, float] | Vector | None = None,
+    damage_fire_loc: Tuple[float, float, float] | Vector | None = None,
+    center_of_mass_loc: Tuple[float, float, float] | Vector | None = None,
+    ground_contact_loc: Tuple[float, float, float] | Vector | None = None,
 ) -> list[bpy.types.Object]:
-    """Generates standard Unity empty sockets (MuzzlePoint, TurretPivot, Exhausts) for engine binding."""
+    """Generates standard Unity empty sockets matching Rogue Command vehicle & weapon mechanics:
+
+    1. Socket_MuzzlePrimary: Main weapon firing point and projectile exit vector.
+    2. Socket_MuzzleSecondary: Secondary weapon (coax/pintle/missile) firing point.
+    3. Socket_TurretYaw / Socket_TurretPivot: Horizontal azimuth rotation axis.
+    4. Socket_TurretPitch: Vertical elevation pivot axis.
+    5. Socket_RecoilPrimary: Linear impulse slide axis for barrel recoil animation.
+    6. Socket_SensorOptics / Socket_SensorEye: Targeting visor and sensor beam origin.
+    7. Socket_Exhaust_L / Socket_Exhaust_R: Engine exhaust particle emitters.
+    8. Socket_DamageSmoke: Engine deck damage particle spawner (50% HP threshold).
+    9. Socket_DamageFire: Catastrophic damage flame particle spawner (25% HP threshold).
+    10. Socket_CenterOfMass: Rigidbody physics center of mass.
+    11. Socket_GroundContact / Socket_GroundCenter: Ground contact projection (Z=0) for selection rings.
+    """
     empties = []
     def _add_empty(socket_name: str, loc: Vector, rot: Tuple[float, float, float] = (0.0, 0.0, 0.0)):
         bpy.ops.object.empty_add(type="PLAIN_AXES", radius=0.15, location=loc)
@@ -1487,25 +1510,78 @@ def create_unity_locator_sockets(
         e.rotation_euler = rot
         empties.append(e)
 
+    # 1. Primary Muzzle
     if muzzle_loc is not None:
         m_loc = Vector(muzzle_loc)
         m_dir = Vector(muzzle_dir if muzzle_dir is not None else (0.0, 1.0, 0.0)).normalized()
         rot = m_dir.to_track_quat("Z", "Y").to_euler()
         _add_empty("Socket_MuzzlePrimary", m_loc, rot)
 
+    # 2. Secondary Muzzle
+    if muzzle_secondary_loc is not None:
+        m2_loc = Vector(muzzle_secondary_loc)
+        m2_dir = Vector(muzzle_secondary_dir if muzzle_secondary_dir is not None else (0.0, 1.0, 0.0)).normalized()
+        rot2 = m2_dir.to_track_quat("Z", "Y").to_euler()
+        _add_empty("Socket_MuzzleSecondary", m2_loc, rot2)
+
+    # 3. Turret Yaw
     if turret_loc is not None:
-        _add_empty("Socket_TurretPivot", Vector(turret_loc))
+        t_loc = Vector(turret_loc)
+        _add_empty("Socket_TurretYaw", t_loc)
+        _add_empty("Socket_TurretPivot", t_loc)
 
+    # 4. Turret Pitch
+    if turret_pitch_loc is not None:
+        _add_empty("Socket_TurretPitch", Vector(turret_pitch_loc))
+    elif turret_loc is not None:
+        _add_empty("Socket_TurretPitch", Vector(turret_loc) + Vector((0.0, 0.25, 0.15)))
+
+    # 5. Recoil
+    if recoil_loc is not None:
+        r_loc = Vector(recoil_loc)
+        r_dir = Vector(recoil_dir if recoil_dir is not None else (0.0, -1.0, 0.0)).normalized()
+        r_rot = r_dir.to_track_quat("Z", "Y").to_euler()
+        _add_empty("Socket_RecoilPrimary", r_loc, r_rot)
+    elif muzzle_loc is not None:
+        _add_empty("Socket_RecoilPrimary", Vector(muzzle_loc) - Vector((0.0, 0.45, 0.0)))
+
+    # 6. Sensor Optics
     if sensor_loc is not None:
-        _add_empty("Socket_SensorEye", Vector(sensor_loc))
+        s_loc = Vector(sensor_loc)
+        _add_empty("Socket_SensorOptics", s_loc)
+        _add_empty("Socket_SensorEye", s_loc)
 
+    # 7. Exhausts
     if exhaust_left is not None:
         _add_empty("Socket_Exhaust_L", Vector(exhaust_left))
-
     if exhaust_right is not None:
         _add_empty("Socket_Exhaust_R", Vector(exhaust_right))
 
-    _add_empty("Socket_GroundCenter", Vector((0.0, 0.0, 0.0)))
+    # 8. Damage Threshold Sockets (Smoke & Fire)
+    if damage_smoke_loc is not None:
+        _add_empty("Socket_DamageSmoke", Vector(damage_smoke_loc))
+    elif exhaust_left is not None:
+        _add_empty("Socket_DamageSmoke", Vector(exhaust_left) + Vector((0.0, 0.15, 0.25)))
+
+    if damage_fire_loc is not None:
+        _add_empty("Socket_DamageFire", Vector(damage_fire_loc))
+    elif turret_loc is not None:
+        _add_empty("Socket_DamageFire", Vector(turret_loc) + Vector((0.20, -0.20, 0.30)))
+
+    # 9. Center of Mass
+    if center_of_mass_loc is not None:
+        _add_empty("Socket_CenterOfMass", Vector(center_of_mass_loc))
+    else:
+        _add_empty("Socket_CenterOfMass", Vector((0.0, 0.0, 0.45)))
+
+    # 10. Ground Contact / Selection Ring
+    if ground_contact_loc is not None:
+        _add_empty("Socket_GroundContact", Vector(ground_contact_loc))
+        _add_empty("Socket_GroundCenter", Vector(ground_contact_loc))
+    else:
+        _add_empty("Socket_GroundContact", Vector((0.0, 0.0, 0.0)))
+        _add_empty("Socket_GroundCenter", Vector((0.0, 0.0, 0.0)))
+
     return empties
 
 
@@ -1628,6 +1704,276 @@ def bake_vertex_ambient_dirt(
         except Exception as ex:
             print(f"Warning: vertex dirt bake skipped for {obj.name}: {ex}")
             bpy.ops.object.mode_set(mode="OBJECT")
+
+
+def bake_advanced_vertex_shading(
+    objects: Sequence[bpy.types.Object],
+    attribute_name: str = "Color",
+    wear_level: str = "field_tested",
+    team_mask_materials: Sequence[bpy.types.Material] | None = None,
+    exhaust_locs: Sequence[Vector | Tuple[float, float, float]] | None = None,
+    muzzle_loc: Vector | Tuple[float, float, float] | None = None,
+) -> None:
+    """Calculates multi-channel procedural vertex shading:
+
+    Channel R: Ambient Occlusion / Cavity Dirt (contact shadows in wheel wells, louvers, undersides).
+    Channel G: Curvature / Edge Wear (bright glints on sharp chamfers simulating chipped paint).
+    Channel B: Thermal Soot / Weathering (darkening gradient around exhausts and muzzles).
+    Channel A: Team Color Mask (1.0 for tintable primary armor, 0.0 for fixed gunmetal/rubber).
+    """
+    wear_mult = 1.4 if wear_level == "battle_hardened" else (0.8 if wear_level == "field_tested" else 0.1)
+
+    team_mat_names = set()
+    if team_mask_materials:
+        team_mat_names = {m.name for m in team_mask_materials if m}
+
+    ex_v = [Vector(e) for e in (exhaust_locs or [])]
+    muz_v = Vector(muzzle_loc) if muzzle_loc is not None else None
+
+    for obj in objects:
+        if obj.type != "MESH" or not obj.data.polygons:
+            continue
+
+        mesh = obj.data
+        color_attr = mesh.color_attributes.get(attribute_name)
+        if color_attr is None:
+            color_attr = mesh.color_attributes.new(name=attribute_name, type="BYTE_COLOR", domain="CORNER")
+        mesh.color_attributes.active_color = color_attr
+
+        # Determine team color mask from material
+        mat = obj.data.materials[0] if obj.data.materials else None
+        if team_mat_names and mat:
+            is_team_surface = mat.name in team_mat_names
+        else:
+            is_team_surface = mat and any(a in mat.name for a in ("PrimaryArmor", "LightArmor"))
+        team_alpha = 1.0 if is_team_surface else 0.0
+
+        world_mat = obj.matrix_world
+        for poly in mesh.polygons:
+            # R: Cavity / AO
+            norm_w = (world_mat.to_3x3() @ poly.normal).normalized()
+            is_belly = norm_w.z < -0.1
+            cavity_val = 0.35 if is_belly else (0.88 if norm_w.z > 0.4 else 0.65)
+
+            # G: Edge Wear (steep angled bevels catch more wear)
+            bevel_factor = 0.55 if (0.15 < abs(norm_w.z) < 0.85) else 0.15
+            edge_val = min(1.0, bevel_factor * wear_mult)
+
+            # B: Thermal Soot
+            soot_val = 1.0
+            if ex_v or muz_v:
+                poly_center = world_mat @ poly.center
+                min_dist = float("inf")
+                for e_pos in ex_v:
+                    min_dist = min(min_dist, (poly_center - e_pos).length)
+                if muz_v:
+                    min_dist = min(min_dist, (poly_center - muz_v).length)
+                if min_dist < 0.65:
+                    soot_val = max(0.25, min_dist / 0.65)
+
+            for loop_idx in poly.loop_indices:
+                color_attr.data[loop_idx].color = (cavity_val, edge_val, soot_val, team_alpha)
+
+
+def generate_lod_chain(
+    batched_objects: Sequence[bpy.types.Object],
+    prefix: str = "Unit",
+    lod_levels: Sequence[Tuple[str, float]] = (("LOD0", 1.0), ("LOD1", 0.50), ("LOD2", 0.22)),
+    smooth_by_angle: bool = True,
+    smooth_angle_deg: float = 38.0,
+) -> Dict[str, list[bpy.types.Object]]:
+    """Generates an automated multi-level LOD hierarchy (LOD0, LOD1, LOD2) for Unity LODGroup.
+
+    LOD0 retains 100% geometry and detail.
+    LOD1 decimate target ~50% polygons (collapsing fine chamfers while preserving silhouette).
+    LOD2 decimate target ~22% polygons (coarse blockout silhouette for far RTS distance).
+    All levels preserve material slot assignments and angle-weighted normal smoothing.
+    """
+    lod_dict: Dict[str, list[bpy.types.Object]] = {}
+
+    for lod_name, ratio in lod_levels:
+        lod_objects: list[bpy.types.Object] = []
+        for obj in batched_objects:
+            if obj.type != "MESH":
+                continue
+
+            dup = obj.copy()
+            dup.data = obj.data.copy()
+            mat_suffix = obj.name.replace(f"{prefix}_", "")
+            dup.name = f"{prefix}_{lod_name}_{mat_suffix}"
+            dup.data.name = f"{prefix}_{lod_name}_{mat_suffix}_Mesh"
+            bpy.context.collection.objects.link(dup)
+
+            if ratio < 0.99:
+                bpy.context.view_layer.objects.active = dup
+                bpy.ops.object.select_all(action="DESELECT")
+                dup.select_set(True)
+                mod = dup.modifiers.new(f"Decimate_{lod_name}", "DECIMATE")
+                mod.ratio = ratio
+                mod.delimit = {"NORMAL", "MATERIAL"}
+                bpy.ops.object.modifier_apply(modifier=mod.name)
+
+            if smooth_by_angle and hasattr(bpy.ops.object, "shade_smooth_by_angle"):
+                bpy.context.view_layer.objects.active = dup
+                bpy.ops.object.select_all(action="DESELECT")
+                dup.select_set(True)
+                bpy.ops.object.shade_smooth_by_angle(angle=math.radians(smooth_angle_deg))
+
+            lod_objects.append(dup)
+        lod_dict[lod_name] = lod_objects
+
+    return lod_dict
+
+
+def generate_collision_hulls(
+    model_objects: Sequence[bpy.types.Object],
+    prefix: str = "Unit",
+    include_turret_collider: bool = True,
+    ground_offset_z: float = 0.04,
+) -> list[bpy.types.Object]:
+    """Generates low-poly physics collision hulls tagged for Unity BoxCollider / MeshCollider ingestion.
+
+    Produces simplified, optimized bounding meshes:
+    - `<Prefix>_COLLIDER_Hull`: Box/convex hull encompassing chassis and mobility components.
+    - `<Prefix>_COLLIDER_Turret`: Box encompassing turret and weapon housings.
+    Tagged with custom property `is_collider = True` and flat shading.
+    """
+    collider_objects: list[bpy.types.Object] = []
+    mesh_objects = [o for o in model_objects if o.type == "MESH"]
+    if not mesh_objects:
+        return collider_objects
+
+    turret_keywords = ("Turret", "Cannon", "Barrel", "Howitzer", "Gatling", "Missile", "Gun", "Visor")
+    hull_objs = [o for o in mesh_objects if not any(t in o.name for t in turret_keywords)]
+    turret_objs = [o for o in mesh_objects if any(t in o.name for t in turret_keywords)]
+
+    if not hull_objs:
+        hull_objs = mesh_objects
+
+    def _compute_bounds(objs: list[bpy.types.Object]):
+        min_v = Vector((float("inf"), float("inf"), float("inf")))
+        max_v = Vector((float("-inf"), float("-inf"), float("-inf")))
+        for o in objs:
+            for corner in o.bound_box:
+                w_co = o.matrix_world @ Vector(corner)
+                min_v.x = min(min_v.x, w_co.x)
+                min_v.y = min(min_v.y, w_co.y)
+                min_v.z = min(min_v.z, w_co.z)
+                max_v.x = max(max_v.x, w_co.x)
+                max_v.y = max(max_v.y, w_co.y)
+                max_v.z = max(max_v.z, w_co.z)
+        center = (min_v + max_v) * 0.5
+        size = (max_v - min_v)
+        return center, size
+
+    # 1. Hull Collider Box
+    h_center, h_size = _compute_bounds(hull_objs)
+    adj_h_center = Vector((h_center.x, h_center.y, h_center.z + ground_offset_z * 0.5))
+    adj_h_size = Vector((max(0.4, h_size.x * 0.96), max(0.4, h_size.y * 0.96), max(0.2, h_size.z - ground_offset_z)))
+
+    bpy.ops.mesh.primitive_cube_add(size=1.0, location=adj_h_center)
+    hull_col = bpy.context.object
+    hull_col.name = f"{prefix}_COLLIDER_Hull"
+    hull_col.scale = adj_h_size
+    bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+    hull_col["is_collider"] = True
+    hull_col["collider_type"] = "Box"
+    for poly in hull_col.data.polygons:
+        poly.use_smooth = False
+    collider_objects.append(hull_col)
+
+    # 2. Turret Collider Box
+    if include_turret_collider and turret_objs:
+        t_center, t_size = _compute_bounds(turret_objs)
+        if t_size.length > 0.3:
+            bpy.ops.mesh.primitive_cube_add(size=1.0, location=t_center)
+            turret_col = bpy.context.object
+            turret_col.name = f"{prefix}_COLLIDER_Turret"
+            turret_col.scale = Vector((max(0.3, t_size.x * 0.94), max(0.3, t_size.y * 0.94), max(0.2, t_size.z * 0.94)))
+            bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+            turret_col["is_collider"] = True
+            turret_col["collider_type"] = "Box"
+            for poly in turret_col.data.polygons:
+                poly.use_smooth = False
+            collider_objects.append(turret_col)
+
+    return collider_objects
+
+
+def profile_model_budget_and_drawcalls(
+    objects: Sequence[bpy.types.Object],
+    prefix: str = "Unit",
+    target_budget: int = 4000,
+    lod_dict: Dict[str, list[bpy.types.Object]] | None = None,
+) -> Dict[str, Any]:
+    """Provides granular polygon and draw-call diagnostics categorized by mechanical subsystem."""
+    subsystems = {
+        "Chassis & Hull": 0,
+        "Turret & Cabin": 0,
+        "Mobility & Wheels": 0,
+        "Weapons": 0,
+        "Optics & Greebles": 0,
+    }
+    total_verts = 0
+    total_tris = 0
+    materials_used = set()
+
+    for obj in objects:
+        if obj.type != "MESH":
+            continue
+        tris = len(obj.data.polygons)
+        verts = len(obj.data.vertices)
+        total_tris += tris
+        total_verts += verts
+        for m in obj.data.materials:
+            if m:
+                materials_used.add(m.name)
+
+        name = obj.name
+        if any(k in name for k in ("Track", "Wheel", "Tire", "Leg", "Skimmer", "Thruster", "TiltRotor")):
+            subsystems["Mobility & Wheels"] += tris
+        elif any(k in name for k in ("Cannon", "Barrel", "Howitzer", "Gatling", "Missile", "Gun", "Emitter", "Muzzle")):
+            subsystems["Weapons"] += tris
+        elif any(k in name for k in ("Turret", "Troop", "RollCage", "Cab")):
+            subsystems["Turret & Cabin"] += tris
+        elif any(k in name for k in ("Sensor", "Visor", "Antenna", "Radar", "Smoke", "Sponson", "Applique", "Grille", "Bolt")):
+            subsystems["Optics & Greebles"] += tris
+        else:
+            subsystems["Chassis & Hull"] += tris
+
+    pct_of_budget = round((total_tris / max(1, target_budget)) * 100, 1)
+
+    lod_summary = {}
+    if lod_dict:
+        for lod_name, lod_objs in lod_dict.items():
+            l_tris = sum(len(o.data.polygons) for o in lod_objs if o.type == "MESH")
+            lod_summary[lod_name] = l_tris
+
+    report = {
+        "prefix": prefix,
+        "total_triangles": total_tris,
+        "total_vertices": total_verts,
+        "materials_count": len(materials_used),
+        "predicted_draw_calls": len(materials_used),
+        "target_budget": target_budget,
+        "budget_percentage": pct_of_budget,
+        "subsystems": subsystems,
+        "lod_levels": lod_summary,
+    }
+
+    print(f"\n================ [ {prefix} Subsystem Budget & Profiling ] ================")
+    print(f"Total Triangles: {total_tris} | Vertices: {total_verts} | Materials: {len(materials_used)}")
+    print(f"Budget Health: {total_tris}/{target_budget} tris ({pct_of_budget}%)")
+    print("Subsystem Breakdown:")
+    for sub, count in subsystems.items():
+        sub_pct = round((count / max(1, total_tris)) * 100, 1)
+        print(f"  - {sub:20s}: {count:5d} tris ({sub_pct:4.1f}%)")
+    if lod_summary:
+        print("LOD Chain Hierarchy:")
+        for lod_name, l_tris in lod_summary.items():
+            print(f"  - {lod_name}: {l_tris} tris")
+    print("========================================================================\n")
+    return report
 
 
 def merge_meshes_by_material(
@@ -2010,6 +2356,143 @@ def export_unity_fbx(
         add_leaf_bones=False,
         use_custom_props=False,
     )
+
+
+def export_gameplay_metadata(
+    output_path: Path,
+    unit_name: str,
+    archetype: str,
+    bounds: Dict[str, Any],
+    sockets: Sequence[bpy.types.Object],
+    turret_center: Vector | Tuple[float, float, float] | None = None,
+    gun_pivot: Vector | Tuple[float, float, float] | None = None,
+    recoil_distance: float = 0.22,
+    elevation_range: Tuple[float, float] = (-10.0, 35.0),
+    yaw_speed: float = 45.0,
+    visual_root_path: str = "Vehicle",
+) -> Dict[str, Any]:
+    """Generates a companion JSON specification with exact Unity engine bindings and kinematics."""
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    socket_dict = {}
+    for s in sockets:
+        clean_name = s.name.replace(f"{unit_name}_", "")
+        fwd = Vector((0.0, 1.0, 0.0))
+        fwd.rotate(s.rotation_euler)
+        socket_dict[clean_name] = {
+            "position": [round(s.location.x, 3), round(s.location.y, 3), round(s.location.z, 3)],
+            "forward": [round(fwd.x, 3), round(fwd.y, 3), round(fwd.z, 3)],
+        }
+
+    tc = Vector(turret_center) if turret_center is not None else Vector((0.0, 0.0, 1.0))
+    gp = Vector(gun_pivot) if gun_pivot is not None else Vector((0.0, 1.5, 1.2))
+
+    dim_w = bounds.get("width_x", 2.4)
+    dim_l = bounds.get("length_y", 3.0)
+    dim_h = bounds.get("height_z", 1.6)
+
+    template_map = {
+        "tank": ["PCXBaseTank"],
+        "walker": ["GatlingWalker"],
+        "bike": ["BombBike"],
+        "artillery": ["ArtilleryTank"],
+        "arc_tank": ["LightningTank"],
+        "hover": ["PCXBaseTank"],
+        "spider": ["GatlingWalker"],
+        "vtol": ["PCXBaseTank"],
+        "halftrack": ["PCXBaseTank"],
+        "super_heavy": ["ArtilleryTank"],
+        "buggy": ["BombBike"],
+    }
+
+    if archetype in ("bike", "buggy"):
+        resolved_root_path = "GameObject/BombBike"
+    else:
+        resolved_root_path = visual_root_path
+
+    meta = {
+        "unitName": unit_name,
+        "archetype": archetype,
+        "visualRootPath": resolved_root_path,
+        "compatibleNativeTemplates": template_map.get(archetype, ["PCXBaseTank"]),
+        "boxCollider": {
+            "center": [0.0, 0.0, round(dim_h * 0.5, 3)],
+            "size": [round(dim_w, 3), round(dim_l, 3), round(dim_h, 3)],
+        },
+        "turretKinematics": {
+            "yawCenter": [round(tc.x, 3), round(tc.y, 3), round(tc.z, 3)],
+            "pitchCenter": [round(gp.x, 3), round(gp.y, 3), round(gp.z, 3)],
+            "minElevationDeg": elevation_range[0],
+            "maxElevationDeg": elevation_range[1],
+            "yawSpeedDegPerSec": yaw_speed,
+            "recoilDistanceMeters": recoil_distance,
+        },
+        "damageThresholds": {
+            "smokeHpFraction": 0.50,
+            "fireHpFraction": 0.25,
+        },
+        "sockets": socket_dict,
+    }
+
+    output_path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
+    return meta
+
+
+def make_wreckage_variant(
+    source_objects: Sequence[bpy.types.Object],
+    prefix: str,
+    output_fbx_path: Path,
+    output_blend_path: Path | None = None,
+    turret_keywords: Sequence[str] = ("Turret", "Cannon", "Barrel", "Howitzer", "Gatling", "Missile", "Gun", "Visor"),
+    smooth_by_angle: bool = True,
+    smooth_angle_deg: float = 38.0,
+) -> list[bpy.types.Object]:
+    """Generates a battle-destroyed / burned wreckage model variant for RTS destruction feedback."""
+    charred_armor = make_material(f"{prefix}_Wreckage_CharredArmor", (0.08, 0.08, 0.09), metallic=0.05, roughness=0.88)
+    burned_metal = make_material(f"{prefix}_Wreckage_BurnedMetal", (0.16, 0.12, 0.10), metallic=0.35, roughness=0.78)
+
+    wreck_objs = []
+    turret_objs = []
+
+    for obj in source_objects:
+        if obj.type != "MESH":
+            continue
+        dup = obj.copy()
+        dup.data = obj.data.copy()
+        dup.name = f"{prefix}_Wreck_{obj.name}"
+        bpy.context.collection.objects.link(dup)
+
+        orig_mat = obj.data.materials[0] if obj.data.materials else None
+        dup.data.materials.clear()
+        if orig_mat and any(m in orig_mat.name for m in ("PrimaryArmor", "LightArmor", "Warning", "Emissive")):
+            dup.data.materials.append(charred_armor)
+        else:
+            dup.data.materials.append(burned_metal)
+
+        is_turret_part = any(k in dup.name for k in turret_keywords)
+        if is_turret_part:
+            turret_objs.append(dup)
+        else:
+            wreck_objs.append(dup)
+
+    for t_obj in turret_objs:
+        t_obj.rotation_euler = Vector((math.radians(16.0), math.radians(-14.0), math.radians(22.0)))
+        t_obj.location += Vector((0.18, -0.25, 0.08))
+        wreck_objs.append(t_obj)
+
+    batched_wreckage = batch_and_join_by_material(
+        wreck_objs,
+        prefix=f"{prefix}_Wreckage",
+        smooth_by_angle=smooth_by_angle,
+        smooth_angle_deg=smooth_angle_deg,
+    )
+
+    if output_blend_path is not None:
+        output_blend_path.parent.mkdir(parents=True, exist_ok=True)
+        bpy.ops.wm.save_as_mainfile(filepath=str(output_blend_path))
+
+    export_unity_fbx(output_fbx_path, batched_wreckage, include_empties=False)
+    return batched_wreckage
 
 
 # ---------------------------------------------------------------------------
@@ -2737,11 +3220,36 @@ class RogueVehicleBuilder:
         self.hull_width: float = 2.4
         self.gun_pivot: Vector | None = None
         self.gun_dir: Vector | None = None
+        self.secondary_gun_pivot: Vector | None = None
+        self.secondary_gun_dir: Vector | None = None
+        self.turret_pitch_loc: Vector | None = None
+        self.recoil_loc: Vector | None = None
+        self.recoil_dir: Vector | None = None
         self.sensor_loc: Vector | None = None
         self.exhaust_l: Vector | None = None
         self.exhaust_r: Vector | None = None
+        self.damage_smoke_loc: Vector | None = None
+        self.damage_fire_loc: Vector | None = None
+        self.center_of_mass_loc: Vector | None = None
         self.locator_sockets: list[bpy.types.Object] = []
+        self.collider_objects: list[bpy.types.Object] = []
         self.is_hover: bool = False
+        self.archetype: str = "tank"
+        self.wear_level: str = "field_tested"
+
+    def set_archetype(self, archetype: str) -> "RogueVehicleBuilder":
+        self.archetype = archetype
+        return self
+
+    def set_wear_level(self, wear_level: str) -> "RogueVehicleBuilder":
+        self.wear_level = wear_level
+        return self
+
+    def add_colliders(self, include_turret: bool = True) -> "RogueVehicleBuilder":
+        self.collider_objects = generate_collision_hulls(
+            self.objects, prefix=self.name, include_turret_collider=include_turret
+        )
+        return self
 
     def add_sloped_hull(
         self,
@@ -3359,10 +3867,18 @@ class RogueVehicleBuilder:
             name_prefix=self.name,
             muzzle_loc=self.gun_pivot,
             muzzle_dir=self.gun_dir,
+            muzzle_secondary_loc=self.secondary_gun_pivot,
+            muzzle_secondary_dir=self.secondary_gun_dir,
             turret_loc=self.turret_center,
+            turret_pitch_loc=self.turret_pitch_loc,
+            recoil_loc=self.recoil_loc,
+            recoil_dir=self.recoil_dir,
             sensor_loc=self.sensor_loc,
             exhaust_left=self.exhaust_l,
             exhaust_right=self.exhaust_r,
+            damage_smoke_loc=self.damage_smoke_loc,
+            damage_fire_loc=self.damage_fire_loc,
+            center_of_mass_loc=self.center_of_mass_loc,
         )
         return self
 
@@ -3382,6 +3898,15 @@ class RogueVehicleBuilder:
         smooth_angle_deg: float = 38.0,
         bake_vertex_dirt: bool = True,
         include_locators: bool = True,
+        generate_lods: bool = False,
+        lod_ratios: Sequence[Tuple[str, float]] = (("LOD0", 1.0), ("LOD1", 0.50), ("LOD2", 0.22)),
+        generate_colliders: bool = False,
+        wear_level: str | None = None,
+        gameplay_meta_path: Path | None = None,
+        wreckage_fbx_path: Path | None = None,
+        visual_root_path: str = "Vehicle",
+        profile_budget: bool = True,
+        target_budget: int = 4000,
     ) -> Dict[str, Any]:
         """Runs diagnostics, smart UV unwrapping, preview rendering, batching, and FBX export."""
         blend_path.parent.mkdir(parents=True, exist_ok=True)
@@ -3413,11 +3938,35 @@ class RogueVehicleBuilder:
         # 5. Save editable source .blend
         bpy.ops.wm.save_as_mainfile(filepath=str(blend_path))
 
-        # 6. Procedural vertex ambient dirt baking (cavity shading)
-        if bake_vertex_dirt:
+        # 6. Procedural multi-channel vertex shading & cavity AO
+        effective_wear = wear_level or self.wear_level
+        if effective_wear:
+            exhausts = [e for e in (self.exhaust_l, self.exhaust_r) if e is not None]
+            bake_advanced_vertex_shading(
+                self.objects,
+                wear_level=effective_wear,
+                exhaust_locs=exhausts if exhausts else None,
+                muzzle_loc=self.gun_pivot,
+            )
+        elif bake_vertex_dirt:
             bake_vertex_ambient_dirt(self.objects)
 
-        # 7. Material batching for FBX with smart angle-weighted smoothing
+        # 7. Subsystem Budget & Profiling on raw source objects
+        if profile_budget:
+            profile_report = profile_model_budget_and_drawcalls(
+                self.objects,
+                prefix=self.name,
+                target_budget=target_budget,
+            )
+            diagnostics["profile_report"] = profile_report
+
+        # 8. Physics Collision Hulls (generated on raw unjoined objects)
+        if generate_colliders:
+            if not self.collider_objects:
+                self.add_colliders(include_turret=True)
+            diagnostics["colliders"] = [c.name for c in self.collider_objects]
+
+        # 9. Material batching for FBX with smart angle-weighted smoothing
         batched_objects = batch_and_join_by_material(
             self.objects,
             prefix=self.name,
@@ -3426,15 +3975,70 @@ class RogueVehicleBuilder:
             smooth_angle_deg=smooth_angle_deg,
         )
 
-        # 8. Create Unity locator sockets if requested
+        # 10. Multi-Level LOD Chain generation
+        lod_dict: Dict[str, list[bpy.types.Object]] | None = None
+        if generate_lods:
+            lod_dict = generate_lod_chain(
+                batched_objects,
+                prefix=self.name,
+                lod_levels=lod_ratios,
+                smooth_by_angle=smooth_by_angle,
+                smooth_angle_deg=smooth_angle_deg,
+            )
+            diagnostics["lod_levels"] = {k: len(v) for k, v in lod_dict.items()}
+
+        # 11. Create Unity locator sockets if requested
         export_objects = list(batched_objects)
         if include_locators:
             if not self.locator_sockets:
                 self.add_unity_locators()
             export_objects.extend(self.locator_sockets)
 
-        # 9. Export FBX for Unity
+        if generate_colliders and self.collider_objects:
+            export_objects.extend(self.collider_objects)
+
+        # 12. Export Primary FBX for Unity
         export_unity_fbx(fbx_path, export_objects, include_empties=include_locators)
+
+        # 13. Export Dedicated LOD FBX if requested
+        if generate_lods and lod_dict:
+            lod_fbx_path = fbx_path.parent / f"{fbx_path.stem}_LODs.fbx"
+            all_lod_objs = []
+            for lod_objs in lod_dict.values():
+                all_lod_objs.extend(lod_objs)
+            if include_locators:
+                all_lod_objs.extend(self.locator_sockets)
+            export_unity_fbx(lod_fbx_path, all_lod_objs, include_empties=include_locators)
+            diagnostics["lod_fbx_path"] = str(lod_fbx_path)
+
+        # 14. Export Companion Gameplay Metadata JSON
+        if gameplay_meta_path is not None:
+            meta = export_gameplay_metadata(
+                output_path=gameplay_meta_path,
+                unit_name=self.name,
+                archetype=self.archetype,
+                bounds=diagnostics.get("bounds", {}),
+                sockets=self.locator_sockets,
+                turret_center=self.turret_center,
+                gun_pivot=self.gun_pivot,
+                visual_root_path=visual_root_path,
+            )
+            diagnostics["gameplay_metadata"] = meta
+
+        # 15. Export Wreckage Variant if requested
+        if wreckage_fbx_path is not None:
+            bpy.ops.wm.open_mainfile(filepath=str(blend_path))
+            loaded_mesh_objects = [o for o in bpy.context.scene.objects if o.type == "MESH"]
+            wreckage_blend = fbx_path.parent.parent.parent / "content" / "source-art" / f"{self.name.lower()}-wreckage.blend"
+            make_wreckage_variant(
+                source_objects=loaded_mesh_objects,
+                prefix=self.name,
+                output_fbx_path=wreckage_fbx_path,
+                output_blend_path=wreckage_blend,
+                smooth_by_angle=smooth_by_angle,
+                smooth_angle_deg=smooth_angle_deg,
+            )
+            diagnostics["wreckage_fbx_path"] = str(wreckage_fbx_path)
 
         diagnostics["exported_batched_objects"] = len(batched_objects)
         diagnostics["locator_sockets"] = len(self.locator_sockets) if include_locators else 0

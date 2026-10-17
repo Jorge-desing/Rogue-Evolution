@@ -125,13 +125,23 @@ Use the tested, high-readability procedural assemblies rather than ad-hoc mesh p
 | | `make_armor_applique_array` | Array of Explosive Reactive Armor (ERA) tiles with standoff mounting bolts |
 | | `make_hex_bolt_array` | Low-poly 6-sided bolt heads placed along armor seams and flanges |
 | | `make_dozer_blade` | Heavy frontal ram blade with hydraulic push rams |
-| | `create_unity_locator_sockets`| Procedural Unity empty sockets (`Socket_MuzzlePrimary`, `Socket_TurretPivot`, `Socket_Exhaust_L/R`) |
+| | `create_unity_locator_sockets`| Procedural 11-socket Unity hierarchy (Muzzles, TurretYaw/Pitch, Recoil, Exhausts, Optics, DamageSmoke/Fire, CenterOfMass, Ground) |
+| | `generate_collision_hulls` | Low-poly physics collision hulls (`<Prefix>_COLLIDER_Hull`, `<Prefix>_COLLIDER_Turret`) |
+| | `generate_lod_chain` | Multi-level LOD mesh hierarchy (LOD0 100%, LOD1 50%, LOD2 22%) for Unity `LODGroup` |
+| | `make_wreckage_variant` | Procedural burned wreckage model with dislodged turret, drooped barrel, and charred armor |
+| | `export_gameplay_metadata` | Companion `.gameplay.json` with `visualRootPath`, collider bounds, turret kinematics, and sockets |
 
 ### Draw-Call Optimization via Material Batching & Smart Smoothing
 Kitbashing produces 50–120 individual objects. In Unity, each object creates a separate GameObject and draw call unless unified. Always pass models through `batch_and_join_by_material(objects, prefix, preserve_names, smooth_by_angle=True, smooth_angle_deg=38.0)` before export:
 - **Draw Call Reduction**: Combines meshes by their PBR material slot into 4–6 unified submeshes while preserving essential animated pivots (`TurretBase`, `MainBarrel`).
 - **Smart Angle-Weighted Smoothing**: Uses Blender 4.5's `shade_smooth_by_angle` to produce silky smooth round barrels, road wheels, hubs, and exhaust pipes, while preserving razor-sharp 45°/90° chamfers on flat armor plates.
-- **Procedural Vertex Ambient Dirt Baking**: Invokes `bake_vertex_ambient_dirt(objects)` to calculate ambient occlusion and cavity crevice darkening directly into the `Color` vertex attribute (`Mesh.colors32`), giving deep contact shadows to wheel wells, panel seams, and recesses without texture maps.
+- **Multi-Channel Procedural Vertex Shading**: Invokes `bake_advanced_vertex_shading(objects, wear_level, exhaust_locs, muzzle_loc)` storing RGBA directly into the `Color` vertex attribute (`Mesh.colors32`):
+  - **R (Red)**: Ambient Occlusion / Cavity Dirt (contact shadows in wheel wells, louvers, and undersides).
+  - **G (Green)**: Curvature / Edge Wear (bright scratch glints on 45°/90° chamfer edges, simulating chipped paint).
+  - **B (Blue)**: Thermal Soot / Weathering (darkening gradient around exhausts and weapon muzzles).
+  - **A (Alpha)**: Team Color Mask (1.0 for dynamic team-tintable primary/light armor, 0.0 for fixed gunmetal/treads).
+- **Multi-Level LOD Chains**: Invokes `generate_lod_chain(batched_objects)` with planar boundary preservation (`delimit={"NORMAL", "MATERIAL"}`), exporting a companion `_LODs.fbx` with LOD0 (100%), LOD1 (50%), and LOD2 (22%) meshes.
+- **Physics Collision Hulls**: Invokes `generate_collision_hulls(objects)` to export flat-shaded bounding boxes `<Prefix>_COLLIDER_Hull` and `<Prefix>_COLLIDER_Turret` tagged with `is_collider = True`.
 
 ### Fluent Assembly with `RogueVehicleBuilder`
 For rapid, reproducible vehicle generation without manual coordinate arithmetic, use the declarative `RogueVehicleBuilder`:
@@ -141,6 +151,8 @@ import RogueModelKit as rmk
 
 builder = (
     rmk.RogueVehicleBuilder("ColossusFortress", faction="siege", camo="desert")
+    .set_archetype("super_heavy")
+    .set_wear_level("battle_hardened")
     .add_sloped_hull(length=3.8, width=2.8, height=1.05)
     .add_quad_track_pods(pod_length=1.65, pod_height=0.62)
     .add_engine_deck(slat_count=5, with_exhausts=True)
@@ -151,6 +163,7 @@ builder = (
     .add_side_sponsons()
     .add_smoke_launchers(tube_count=3)
     .add_spring_antenna()
+    .add_colliders(include_turret=True)
     .add_unity_locators()
 )
 
@@ -163,7 +176,15 @@ diagnostics = builder.build_and_export(
     smooth_by_angle=True,
     smooth_angle_deg=38.0,
     bake_vertex_dirt=True,
-    include_locators=True
+    include_locators=True,
+    generate_lods=True,
+    generate_colliders=True,
+    wear_level="battle_hardened",
+    gameplay_meta_path=GAMEPLAY_JSON_PATH,
+    wreckage_fbx_path=WRECKAGE_FBX_PATH,
+    visual_root_path="Vehicle",
+    profile_budget=True,
+    target_budget=4500,
 )
 ```
 
@@ -177,11 +198,16 @@ Run headless vehicle generation directly from the command line using Blender and
     --faction siege `
     --camo desert `
     --weapon dual_cannon `
+    --wear battle_hardened `
     --sponsons `
     --smoke `
     --radar `
     --dirt `
     --locators `
+    --lods `
+    --colliders `
+    --gameplay-json `
+    --wreckage `
     --lod `
     --multiview
 ```
@@ -190,14 +216,21 @@ Run headless vehicle generation directly from the command line using Blender and
 - **Weapons**: `cannon` (ballistic), `gatling` (rotary 6-barrel), `missile` (honeycomb pod), `arc` (plasma cathode & prongs), `howitzer` (heavy siege mortar), `dual_cannon` (synchronized twin barrels).
 - **Factions**: `vanguard` (slate teal), `siege` (rust ochre), `syndicate` (deep cobalt), `arctic` (tundra navy).
 - **Camouflage Variants**: `none`, `desert` (khaki sand), `urban` (asphalt grey), `arctic` (tundra white), `woodland` (olive drab).
+- **Surface Wear Levels**: `pristine` (factory clean), `field_tested` (moderate edge scratches and road grime), `battle_hardened` (heavy combat gouges, exhaust soot, and cavity dirt).
+- **Optimization & Engine Flags**:
+  - `--lods`: Generates multi-level LOD chain (LOD0 100%, LOD1 50%, LOD2 22%) and exports `_LODs.fbx`.
+  - `--colliders`: Generates low-poly physics collision boxes (`_COLLIDER_Hull`, `_COLLIDER_Turret`).
+  - `--gameplay-json`: Exports companion `.gameplay.json` with kinematics, collider bounds, sockets, and damage triggers.
+  - `--wreckage`: Exports battle-damaged / burned wreckage variant `_Wreckage.fbx` and `-wreckage.blend`.
+  - `--target-budget <int>`: Sets target triangle budget for subsystem profiling (default: 4000).
 - **Presets**: `siege_breaker` (super-heavy dual-cannon), `recon_interceptor` (strike buggy gatling), `gunship_alpha` (VTOL missile), `apc_enforcer` (halftrack support), `dune_raider` (strike bike).
-- **Subsystem Flags**: `--rollcage` (tubular frame), `--quad-tracks` (4-corner pods), `--tilt-rotors` (ducted thrusters), `--dozer` (frontal ram), `--smoke` (grenade dischargers), `--radar` (command dish), `--sponsons` (auxiliary cells), `--dirt` (vertex cavity AO), `--locators` (Unity sockets), `--lod` (polygon budget report).
-- **Outputs**: Generates editable `.blend`, Unity-optimized `.fbx` with lightmap UVs, vertex color cavity shading, socket empties, batched submeshes, and a 4-view orthographic preview sheet. For each 2D card, use the installed `imagegen` skill; this 3D generator does not create card images.
+- **Outputs**: Generates editable `.blend`, Unity-optimized `.fbx` with lightmap UVs, 4-channel vertex color shading, 11-socket empties, batched submeshes, collision hulls, companion `.gameplay.json`, and 4-view orthographic preview sheet.
 
-### Automated Quality Diagnostics
-Always invoke `validate_model_mesh_quality(model_objects)` prior to export. It verifies:
-- **Ground Contact Check**: Confirms $Z_{\min} \in [-0.02\text{m}, 0.08\text{m}]$.
-- **Polycount Verification**: Confirms vertex and triangle counts match the low-poly RTS budget ($1,500$–$5,000$ triangles).
+### Automated Quality & Subsystem Profiling Diagnostics
+Always invoke `validate_model_mesh_quality(model_objects)` and `profile_model_budget_and_drawcalls(model_objects)` prior to export. They verify:
+- **Ground Contact Check**: Confirms $Z_{\min} \in [-0.02\text{m}, 0.08\text{m}]$ for ground units ($Z_{\min} \le 0.55\text{m}$ for hover/vtol).
+- **Subsystem Triangle Distribution**: Categorizes geometry into Chassis, Turret, Mobility, Weapons, and Optics/Greebles, reporting percentage of budget consumed.
+- **Material Slot Hygiene**: Flags any object with missing or null PBR material assignments.
 - **Material Slot Hygiene**: Flags any object with missing or null PBR material assignments.
 
 ### Multi-Perspective RTS Studio
