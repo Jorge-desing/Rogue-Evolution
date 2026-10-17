@@ -5,6 +5,7 @@ using System.Globalization;
 using System.IO;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Win32.SafeHandles;
 using Newtonsoft.Json;
@@ -19,7 +20,8 @@ namespace RogueCommandExpansionLoader.Content
     /// Discovers and validates data-only packs after the native entity registry is ready, then
     /// keeps their AssetBundles and Unity objects alive for the whole game session.
     /// </summary>
-    public sealed class ContentPackRuntimeLoader : IRuntimeContentProvider, IStageLandscapeRuntimeProvider
+    public sealed class ContentPackRuntimeLoader : IRuntimeContentProvider, IStageLandscapeRuntimeProvider,
+        IBlueprintPoolRuntimeProvider
     {
         private const int MaxManifestBytes = 1024 * 1024;
         private const uint GenericRead = 0x80000000;
@@ -76,6 +78,7 @@ namespace RogueCommandExpansionLoader.Content
         private readonly FieldInfo _progressionAisField;
         private readonly FieldInfo _progressionLandscapesField;
         private readonly FieldInfo _stageParametersWorldListField;
+        private readonly FieldInfo _stageParametersBlueprintPoolListField;
         private readonly FieldInfo _aiAllowedForDemoField;
         private readonly FieldInfo _aiStageRangeField;
         private readonly FieldInfo _aiAscensionRangeField;
@@ -104,7 +107,9 @@ namespace RogueCommandExpansionLoader.Content
         private readonly FieldInfo _worldGeneratorField;
         private readonly FieldInfo _blueprintPoolsField;
         private readonly FieldInfo _blueprintPoolIdField;
+        private readonly FieldInfo _blueprintPoolExclusiveField;
         private readonly FieldInfo _blueprintFilterField;
+        private readonly MethodInfo _blueprintPoolBlueprintsMethod;
 
         private readonly List<object> _entityRows = new List<object>();
         private readonly List<ProgressionContentContribution> _contributions =
@@ -114,7 +119,10 @@ namespace RogueCommandExpansionLoader.Content
         private readonly List<GameObject> _nativePrefabClones = new List<GameObject>();
         private readonly List<ScriptableObject> _stageParameterClones = new List<ScriptableObject>();
         private readonly List<ScriptableObject> _landscapeClones = new List<ScriptableObject>();
+        private readonly List<ScriptableObject> _blueprintPoolClones = new List<ScriptableObject>();
         private readonly List<object> _blueprintPools = new List<object>();
+        private readonly BlueprintPoolScopeRegistry _blueprintPoolScopeRegistry =
+            new BlueprintPoolScopeRegistry();
         private readonly Dictionary<string, UnityEngine.Object> _resourceAssets =
             new Dictionary<string, UnityEngine.Object>(StringComparer.Ordinal);
         private readonly Dictionary<string, LoadedAiProfile> _aiProfiles =
@@ -262,6 +270,8 @@ namespace RogueCommandExpansionLoader.Content
                 throw new InvalidOperationException(
                     "StageParametersScriptableObject.worldList is not WorldList.");
             }
+            _stageParametersBlueprintPoolListField = RequireField(
+                _stageParametersType, "blueprintPoolList", _blueprintPoolListType);
 
             _aiDeactivatedField = RequireField(_aiBehaviourType, "isDeactivated", typeof(bool));
             _aiAllowedForDemoField = RequireField(_aiBehaviourType, "isAllowedForDemo", typeof(bool));
@@ -329,7 +339,24 @@ namespace RogueCommandExpansionLoader.Content
                 throw new InvalidOperationException("BlueprintPoolList.blueprintPools is not List<BlueprintPool>.");
             }
             _blueprintPoolIdField = RequireField(_blueprintPoolType, "poolId", typeof(string));
+            _blueprintPoolExclusiveField = RequireField(
+                _blueprintPoolType, "blueprintsAreExclusive", typeof(bool));
             _blueprintFilterField = FindField(_blueprintPoolType, "blueprintFilter", InstanceFields);
+            if (!typeof(ScriptableObject).IsAssignableFrom(_blueprintPoolListType) ||
+                !typeof(ScriptableObject).IsAssignableFrom(_blueprintPoolType))
+            {
+                throw new InvalidOperationException(
+                    "BlueprintPoolList and BlueprintPool must remain ScriptableObjects to create stage-scoped clones.");
+            }
+            _blueprintPoolBlueprintsMethod = RuntimeReflection.FindUniqueMethod(
+                _blueprintPoolType, "BlueprintsInPool", delegate(MethodInfo method)
+                {
+                    ParameterInfo[] parameters = method.GetParameters();
+                    return !method.IsStatic && parameters.Length == 2 &&
+                        parameters[0].ParameterType == typeof(int?) &&
+                        parameters[1].ParameterType == typeof(bool) &&
+                        method.ReturnType == typeof(List<string>);
+                });
 
             Type entityStoreType = FindUniqueType("EntityBalancingStore");
             _entityIndexField = FindField(entityStoreType, "ParameterListIndexOf", StaticFields);
@@ -444,6 +471,31 @@ namespace RogueCommandExpansionLoader.Content
         {
             lock (_gate)
             {
+                // Cache filtered mod IDs once per pool so ExclusiveBlueprints does not rescan the
+                // complete entity registry every time a random card list is assembled.
+                for (int i = 0; i < _blueprintPools.Count; i++)
+                {
+                    object pool = _blueprintPools[i];
+                    if (pool == null || !_blueprintPoolScopeRegistry.IsExclusivePool(pool))
+                    {
+                        continue;
+                    }
+
+                    try
+                    {
+                        object value = _blueprintPoolBlueprintsMethod.Invoke(pool,
+                            new object[] { null, false });
+                        _blueprintPoolScopeRegistry.SetEligibleExclusiveUnitIds(
+                            pool, value as List<string>);
+                    }
+                    catch (Exception exception)
+                    {
+                        _blueprintPoolScopeRegistry.SetEligibleExclusiveUnitIds(pool, null);
+                        Log("No se pudo calcular la elegibilidad exclusiva de un BlueprintPool: " +
+                            exception.GetBaseException().Message);
+                    }
+                }
+
                 for (int i = 0; i < _blueprintPools.Count; i++)
                 {
                     object pool = _blueprintPools[i];
@@ -468,6 +520,42 @@ namespace RogueCommandExpansionLoader.Content
                         Log("No se pudo recalcular un BlueprintPool de contenido: " + exception.GetBaseException().Message);
                     }
                 }
+            }
+        }
+
+        public bool TryFindBlueprintPool(string poolId, out object pool)
+        {
+            lock (_gate)
+            {
+                return _blueprintPoolScopeRegistry.TryFind(poolId, out pool);
+            }
+        }
+
+        public bool TryGetBlueprintPoolDecision(object pool, string unitId, out bool runOriginal)
+        {
+            lock (_gate)
+            {
+                if (String.IsNullOrEmpty(unitId) || !_units.ContainsKey(unitId))
+                {
+                    runOriginal = true;
+                    return false;
+                }
+
+                runOriginal = _blueprintPoolScopeRegistry.AllowsModUnitInPool(pool, unitId);
+                return true;
+            }
+        }
+
+        public void AddExclusiveBlueprints(string otherThanPoolId, HashSet<string> result)
+        {
+            if (result == null)
+            {
+                return;
+            }
+
+            lock (_gate)
+            {
+                _blueprintPoolScopeRegistry.AddExclusiveModUnits(otherThanPoolId, result);
             }
         }
 
@@ -1660,10 +1748,12 @@ namespace RogueCommandExpansionLoader.Content
             var temporaryResources = new Dictionary<string, UnityEngine.Object>(StringComparer.Ordinal);
             var temporaryNativePrefabs = new List<GameObject>();
             var temporaryStageParameterClones = new List<ScriptableObject>();
+            var temporaryBlueprintPoolClones = new List<ScriptableObject>();
             var temporaryLandscapeClones = new List<ScriptableObject>();
             var temporaryUnits = new List<LoadedUnit>();
             var temporaryStages = new List<LoadedStage>();
             var temporaryProfiles = new List<LoadedAiProfile>();
+            HashSet<string> reservedBlueprintPoolIds = null;
             AssetBundle manifestBundle = null;
             FileStream manifestStream = null;
             long packBundleBytes = 0;
@@ -1871,6 +1961,12 @@ namespace RogueCommandExpansionLoader.Content
                     temporaryUnits.Add(new LoadedUnit(unit.id, definition.packId, prefabKey, imageKey, row, unit));
                 }
 
+                var currentPackUnitIds = new HashSet<string>(StringComparer.Ordinal);
+                for (int i = 0; i < temporaryUnits.Count; i++)
+                {
+                    currentPackUnitIds.Add(temporaryUnits[i].Id);
+                }
+
                 for (int i = 0; i < definition.stages.Length; i++)
                 {
                     ContentStageDefinition stage = definition.stages[i];
@@ -1909,13 +2005,27 @@ namespace RogueCommandExpansionLoader.Content
                     List<object> stageWorlds;
                     List<object> pools = ValidateStageParameters(parameters, packageName, stage.id,
                         out stageWorlds);
+                    HashSet<string> scopedUnitIds = GetStageModUnitIds(stage, currentPackUnitIds);
+                    var stagePoolScopes = new List<BlueprintPoolScopeRegistration>();
+                    if (scopedUnitIds.Count > 0)
+                    {
+                        if (reservedBlueprintPoolIds == null)
+                        {
+                            reservedBlueprintPoolIds = LoadNativeBlueprintPoolIds();
+                        }
+
+                        pools = CloneStageBlueprintPools(parameters, definition.packId, stage,
+                            packageName, pools, scopedUnitIds, reservedBlueprintPoolIds,
+                            temporaryBlueprintPoolClones, stagePoolScopes);
+                    }
+
                     LoadedLandscape landscape = stage.landscape == null
                         ? null
                         : CreateStageLandscape(stage, packageName, stageWorlds, temporaryResources,
                             temporaryLandscapeClones);
                     object runtimeStage = CreateStage(stage, parameters, packageName);
                     temporaryStages.Add(new LoadedStage(stage, definition.packId, runtimeStage,
-                        pools, stageWorlds, landscape));
+                        pools, stageWorlds, landscape, stagePoolScopes));
                 }
 
                 Dictionary<string, Vector2Int> scopedAiStageRanges = BuildScopedAiStageRanges(
@@ -2116,6 +2226,7 @@ namespace RogueCommandExpansionLoader.Content
                     temporaryUnits, temporaryStages, temporaryProfiles);
                 _nativePrefabClones.AddRange(temporaryNativePrefabs);
                 _stageParameterClones.AddRange(temporaryStageParameterClones);
+                _blueprintPoolClones.AddRange(temporaryBlueprintPoolClones);
                 _landscapeClones.AddRange(temporaryLandscapeClones);
                 candidate.LoadedBytes = packBundleBytes;
                 return true;
@@ -2138,6 +2249,15 @@ namespace RogueCommandExpansionLoader.Content
                     if (stageParameters != null)
                     {
                         UnityEngine.Object.Destroy(stageParameters);
+                    }
+                }
+
+                for (int poolIndex = 0; poolIndex < temporaryBlueprintPoolClones.Count; poolIndex++)
+                {
+                    ScriptableObject poolClone = temporaryBlueprintPoolClones[poolIndex];
+                    if (poolClone != null)
+                    {
+                        UnityEngine.Object.Destroy(poolClone);
                     }
                 }
 
@@ -2328,6 +2448,7 @@ namespace RogueCommandExpansionLoader.Content
 
             var contributionStages = new List<object>();
             var contributionAi = new List<object>();
+            var poolScopeRegistrations = new List<BlueprintPoolScopeRegistration>();
             var blueprintUnitIds = new HashSet<string>(StringComparer.Ordinal);
             var localUnitIds = new HashSet<string>(StringComparer.Ordinal);
             for (int i = 0; i < units.Count; i++)
@@ -2340,6 +2461,7 @@ namespace RogueCommandExpansionLoader.Content
             {
                 LoadedStage stage = stages[i];
                 contributionStages.Add(stage.RuntimeStage);
+                poolScopeRegistrations.AddRange(stage.BlueprintPoolScopes);
                 string[] profileIds = stage.Definition.aiProfileIds ?? new string[0];
                 for (int profileIndex = 0; profileIndex < profileIds.Length; profileIndex++)
                 {
@@ -2414,12 +2536,16 @@ namespace RogueCommandExpansionLoader.Content
                 }
             }
 
+            _blueprintPoolScopeRegistry.ValidateCanRegister(poolScopeRegistrations);
+
             // All checks above complete before any pack-owned runtime registry is updated.
             for (int i = 0; i < units.Count; i++)
             {
                 _units.Add(units[i].Id, units[i]);
                 _entityRows.Add(units[i].BalanceRow);
             }
+
+            _blueprintPoolScopeRegistry.Register(poolScopeRegistrations);
 
             for (int i = 0; i < profiles.Count; i++)
             {
@@ -2496,6 +2622,146 @@ namespace RogueCommandExpansionLoader.Content
                     _allowedBlueprintField.SetValue(unit.BalanceRow, true);
                 }
             }
+        }
+
+        private HashSet<string> GetStageModUnitIds(
+            ContentStageDefinition stage,
+            HashSet<string> currentPackUnitIds)
+        {
+            var result = new HashSet<string>(StringComparer.Ordinal);
+            string[] unitIds = stage.unitIds ?? new string[0];
+            for (int i = 0; i < unitIds.Length; i++)
+            {
+                if (currentPackUnitIds.Contains(unitIds[i]) || _units.ContainsKey(unitIds[i]))
+                {
+                    result.Add(unitIds[i]);
+                }
+            }
+
+            return result;
+        }
+
+        private HashSet<string> LoadNativeBlueprintPoolIds()
+        {
+            var result = new HashSet<string>(StringComparer.Ordinal);
+            UnityEngine.Object[] pools = Resources.LoadAll("BlueprintPools", _blueprintPoolType);
+            for (int i = 0; pools != null && i < pools.Length; i++)
+            {
+                UnityEngine.Object pool = pools[i];
+                if (pool == null || pool.GetType() != _blueprintPoolType)
+                {
+                    continue;
+                }
+
+                string poolId = _blueprintPoolIdField.GetValue(pool) as string;
+                if (!String.IsNullOrWhiteSpace(poolId))
+                {
+                    result.Add(poolId);
+                }
+            }
+
+            return result;
+        }
+
+        private List<object> CloneStageBlueprintPools(
+            UnityEngine.Object stageParameters,
+            string packId,
+            ContentStageDefinition stage,
+            string packageName,
+            List<object> validatedPools,
+            HashSet<string> scopedUnitIds,
+            HashSet<string> reservedPoolIds,
+            List<ScriptableObject> temporaryClones,
+            List<BlueprintPoolScopeRegistration> registrations)
+        {
+            ScriptableObject sourceList = _stageParametersBlueprintPoolListField.GetValue(stageParameters)
+                as ScriptableObject;
+            if (sourceList == null || sourceList.GetType() != _blueprintPoolListType)
+            {
+                throw new InvalidDataException("Etapa " + stage.id + " en '" + packageName +
+                    "' no tiene una BlueprintPoolList clonable.");
+            }
+
+            ScriptableObject clonedList = UnityEngine.Object.Instantiate(sourceList);
+            if (clonedList == null || clonedList.GetType() != _blueprintPoolListType)
+            {
+                throw new InvalidDataException("No se pudo clonar la lista de BlueprintPool de " + stage.id + ".");
+            }
+
+            temporaryClones.Add(clonedList);
+            clonedList.name = "RCL_BlueprintPoolList_" + stage.id.Replace(':', '_');
+            clonedList.hideFlags = HideFlags.HideAndDontSave;
+            IList clonedPools = _blueprintPoolsField.GetValue(clonedList) as IList;
+            if (clonedPools == null || clonedPools.Count != validatedPools.Count)
+            {
+                throw new InvalidDataException("La lista de BlueprintPool clonada para " + stage.id +
+                    " cambió de forma inesperada.");
+            }
+
+            var result = new List<object>(clonedPools.Count);
+            for (int i = 0; i < clonedPools.Count; i++)
+            {
+                UnityEngine.Object sourcePool = clonedPools[i] as UnityEngine.Object;
+                if (sourcePool == null || sourcePool.GetType() != _blueprintPoolType)
+                {
+                    throw new InvalidDataException("La lista clonada de la etapa " + stage.id +
+                        " contiene un BlueprintPool inválido.");
+                }
+
+                UnityEngine.Object clonedPool = UnityEngine.Object.Instantiate(sourcePool);
+                if (clonedPool == null || clonedPool.GetType() != _blueprintPoolType)
+                {
+                    throw new InvalidDataException("No se pudo clonar un BlueprintPool de la etapa " + stage.id + ".");
+                }
+
+                var poolClone = (ScriptableObject)clonedPool;
+                temporaryClones.Add(poolClone);
+                string originalPoolId = _blueprintPoolIdField.GetValue(sourcePool) as string;
+                string scopedPoolId = CreateScopedBlueprintPoolId(
+                    packId, stage.id, originalPoolId, reservedPoolIds);
+                poolClone.name = "RCL_BlueprintPool_" + scopedPoolId.Substring("RCL_POOL_".Length, 16);
+                poolClone.hideFlags = HideFlags.HideAndDontSave;
+                _blueprintPoolIdField.SetValue(poolClone, scopedPoolId);
+                clonedPools[i] = poolClone;
+
+                bool exclusive = (bool)_blueprintPoolExclusiveField.GetValue(poolClone);
+                registrations.Add(new BlueprintPoolScopeRegistration(
+                    scopedPoolId, stage.id, poolClone, scopedUnitIds, exclusive));
+                result.Add(poolClone);
+            }
+
+            _stageParametersBlueprintPoolListField.SetValue(stageParameters, clonedList);
+            return result;
+        }
+
+        private string CreateScopedBlueprintPoolId(
+            string packId,
+            string stageId,
+            string originalPoolId,
+            HashSet<string> reservedPoolIds)
+        {
+            string identity = (packId ?? String.Empty) + "\n" + (stageId ?? String.Empty) + "\n" +
+                (originalPoolId ?? String.Empty);
+            byte[] digest;
+            using (SHA256 sha256 = SHA256.Create())
+            {
+                digest = sha256.ComputeHash(Encoding.UTF8.GetBytes(identity));
+            }
+
+            var token = new StringBuilder(digest.Length * 2);
+            for (int i = 0; i < digest.Length; i++)
+            {
+                token.Append(digest[i].ToString("x2", CultureInfo.InvariantCulture));
+            }
+
+            string poolId = "RCL_POOL_" + token;
+            if (_blueprintPoolScopeRegistry.ContainsPoolId(poolId) || !reservedPoolIds.Add(poolId))
+            {
+                throw new InvalidDataException("El ID de BlueprintPool generado " + poolId +
+                    " ya está ocupado por otro pool.");
+            }
+
+            return poolId;
         }
 
         private object ReadSingleBalanceRow(UnityEngine.Object balanceAsset, string packageName, string unitId)
@@ -4588,7 +4854,8 @@ namespace RogueCommandExpansionLoader.Content
                 object runtimeStage,
                 List<object> blueprintPools,
                 List<object> worlds,
-                LoadedLandscape landscape)
+                LoadedLandscape landscape,
+                List<BlueprintPoolScopeRegistration> blueprintPoolScopes)
             {
                 Definition = definition;
                 PackId = packId;
@@ -4596,6 +4863,7 @@ namespace RogueCommandExpansionLoader.Content
                 BlueprintPools = blueprintPools;
                 Worlds = worlds;
                 Landscape = landscape;
+                BlueprintPoolScopes = blueprintPoolScopes;
             }
 
             public ContentStageDefinition Definition { get; private set; }
@@ -4604,6 +4872,7 @@ namespace RogueCommandExpansionLoader.Content
             public List<object> BlueprintPools { get; private set; }
             public List<object> Worlds { get; private set; }
             public LoadedLandscape Landscape { get; private set; }
+            public List<BlueprintPoolScopeRegistration> BlueprintPoolScopes { get; private set; }
         }
 
         private sealed class LoadedLandscape

@@ -68,6 +68,11 @@ public sealed class StageParametersScriptableObject
 {
 }
 
+// RuntimeHarmonyPatches binds this typed return to Rogue Command's global BlueprintPool type.
+public sealed class BlueprintPool
+{
+}
+
 public sealed class DefaultAiBehaviour
 {
 }

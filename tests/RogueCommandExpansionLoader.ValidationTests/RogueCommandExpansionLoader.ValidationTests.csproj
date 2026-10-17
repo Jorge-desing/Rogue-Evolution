@@ -27,6 +27,8 @@
              Link="Runtime/DiagnosticsContracts.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeContentContracts.cs"
              Link="Runtime/RuntimeContentContracts.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/BlueprintPoolScopeRegistry.cs"
+             Link="Runtime/BlueprintPoolScopeRegistry.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeReflection.cs"
              Link="Runtime/RuntimeReflection.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeContentMutator.cs"

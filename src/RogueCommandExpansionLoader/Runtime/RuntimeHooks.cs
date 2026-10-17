@@ -134,6 +134,84 @@ namespace RogueCommandExpansionLoader.Runtime
             }
         }
 
+        public static bool BlueprintPoolIsInPoolPrefix(object __instance, string __0, ref bool __result)
+        {
+            IBlueprintPoolRuntimeProvider poolProvider = GetBlueprintPoolProvider();
+            if (poolProvider == null)
+            {
+                return true;
+            }
+
+            try
+            {
+                bool runOriginal;
+                if (!poolProvider.TryGetBlueprintPoolDecision(__instance, __0, out runOriginal) || runOriginal)
+                {
+                    return true;
+                }
+
+                __result = false;
+                return false;
+            }
+            catch (Exception exception)
+            {
+                Log("Could not scope blueprint pool eligibility for unit '" + __0 + "': " +
+                    exception.GetBaseException().Message);
+                return true;
+            }
+        }
+
+        public static bool BlueprintPoolFindPrefix(string __0, ref global::BlueprintPool __result)
+        {
+            IBlueprintPoolRuntimeProvider poolProvider = GetBlueprintPoolProvider();
+            if (poolProvider == null)
+            {
+                return true;
+            }
+
+            try
+            {
+                object pool;
+                if (!poolProvider.TryFindBlueprintPool(__0, out pool))
+                {
+                    return true;
+                }
+
+                global::BlueprintPool typedPool = pool as global::BlueprintPool;
+                if (typedPool == null)
+                {
+                    return true;
+                }
+
+                __result = typedPool;
+                return false;
+            }
+            catch (Exception exception)
+            {
+                Log("Could not resolve scoped BlueprintPool '" + __0 + "': " +
+                    exception.GetBaseException().Message);
+                return true;
+            }
+        }
+
+        public static void BlueprintPoolExclusiveBlueprintsPostfix(string __0, HashSet<string> __result)
+        {
+            IBlueprintPoolRuntimeProvider poolProvider = GetBlueprintPoolProvider();
+            if (poolProvider == null || __result == null)
+            {
+                return;
+            }
+
+            try
+            {
+                poolProvider.AddExclusiveBlueprints(__0, __result);
+            }
+            catch (Exception exception)
+            {
+                Log("Could not add scoped exclusive blueprints: " + exception.GetBaseException().Message);
+            }
+        }
+
         public static void BeginLevelMapScope(object stage, out object __state)
         {
             __state = null;
@@ -318,6 +396,14 @@ namespace RogueCommandExpansionLoader.Runtime
             }
         }
 
+        private static IBlueprintPoolRuntimeProvider GetBlueprintPoolProvider()
+        {
+            lock (Gate)
+            {
+                return _provider as IBlueprintPoolRuntimeProvider;
+            }
+        }
+
         private static void SafeCall(Action action)
         {
             try
@@ -419,6 +505,21 @@ namespace RogueCommandExpansionLoader.Runtime
         public static bool LandscapeLocalizationPrefix(string __0, ref string __result)
         {
             return RuntimeHooks.LandscapeLocalizationPrefix(__0, ref __result);
+        }
+
+        public static bool BlueprintPoolIsInPoolPrefix(object __instance, string __0, ref bool __result)
+        {
+            return RuntimeHooks.BlueprintPoolIsInPoolPrefix(__instance, __0, ref __result);
+        }
+
+        public static bool BlueprintPoolFindPrefix(string __0, ref global::BlueprintPool __result)
+        {
+            return RuntimeHooks.BlueprintPoolFindPrefix(__0, ref __result);
+        }
+
+        public static void BlueprintPoolExclusiveBlueprintsPostfix(string __0, HashSet<string> __result)
+        {
+            RuntimeHooks.BlueprintPoolExclusiveBlueprintsPostfix(__0, __result);
         }
     }
 

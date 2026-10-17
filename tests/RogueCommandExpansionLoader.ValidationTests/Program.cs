@@ -55,7 +55,10 @@ var tests = new (string Name, Action Run)[]
             "AiBehaviourDestroyPostfix",
             "BlueprintNamePrefix",
             "BlueprintDescriptionPrefix",
-            "LandscapeLocalizationPrefix"
+            "LandscapeLocalizationPrefix",
+            "BlueprintPoolIsInPoolPrefix",
+            "BlueprintPoolFindPrefix",
+            "BlueprintPoolExclusiveBlueprintsPostfix"
         ];
 
         foreach (string hookName in hookNames)
@@ -82,6 +85,37 @@ var tests = new (string Name, Action Run)[]
             }
         }
 
+        MethodInfo? poolEligibilityHook = typeof(RuntimeHarmonyPatches).GetMethod(
+            "BlueprintPoolIsInPoolPrefix", BindingFlags.Public | BindingFlags.Static);
+        ParameterInfo[] eligibilityParameters = poolEligibilityHook?.GetParameters() ?? Array.Empty<ParameterInfo>();
+        if (poolEligibilityHook == null || poolEligibilityHook.ReturnType != typeof(bool) ||
+            eligibilityParameters.Length != 3 || eligibilityParameters[0].ParameterType != typeof(object) ||
+            eligibilityParameters[1].ParameterType != typeof(string) ||
+            eligibilityParameters[2].ParameterType != typeof(bool).MakeByRefType())
+        {
+            throw new InvalidOperationException("BlueprintPool.IsInPool hook has an invalid Harmony signature.");
+        }
+
+        MethodInfo? poolFindHook = typeof(RuntimeHarmonyPatches).GetMethod(
+            "BlueprintPoolFindPrefix", BindingFlags.Public | BindingFlags.Static);
+        ParameterInfo[] findParameters = poolFindHook?.GetParameters() ?? Array.Empty<ParameterInfo>();
+        if (poolFindHook == null || poolFindHook.ReturnType != typeof(bool) || findParameters.Length != 2 ||
+            findParameters[0].ParameterType != typeof(string) ||
+            findParameters[1].ParameterType != typeof(global::BlueprintPool).MakeByRefType())
+        {
+            throw new InvalidOperationException("BlueprintPool.FindBlueprintPool hook has an invalid Harmony signature.");
+        }
+
+        MethodInfo? exclusiveHook = typeof(RuntimeHarmonyPatches).GetMethod(
+            "BlueprintPoolExclusiveBlueprintsPostfix", BindingFlags.Public | BindingFlags.Static);
+        ParameterInfo[] exclusiveParameters = exclusiveHook?.GetParameters() ?? Array.Empty<ParameterInfo>();
+        if (exclusiveHook == null || exclusiveHook.ReturnType != typeof(void) || exclusiveParameters.Length != 2 ||
+            exclusiveParameters[0].ParameterType != typeof(string) ||
+            exclusiveParameters[1].ParameterType != typeof(HashSet<string>))
+        {
+            throw new InvalidOperationException("BlueprintPool.ExclusiveBlueprints hook has an invalid Harmony signature.");
+        }
+
         if (typeof(UnityResourcesLoadTypedPatch).GetMethod("Prefix",
                 BindingFlags.Public | BindingFlags.Static) == null)
         {
@@ -92,6 +126,78 @@ var tests = new (string Name, Action Run)[]
                 BindingFlags.Public | BindingFlags.Static) == null)
         {
             throw new InvalidOperationException("The untyped Resources.Load patch prefix is missing.");
+        }
+    }),
+    ("stage-scoped blueprint pools use object identity and isolate mod eligibility", () =>
+    {
+        var registry = new BlueprintPoolScopeRegistry();
+        var firstPool = new object();
+        var secondPool = new object();
+        var otherStagePool = new object();
+        registry.Register(new[]
+        {
+            new BlueprintPoolScopeRegistration("RCL_POOL_FIRST", "sample:stage-one", firstPool,
+                new[] { "sample:first-unit" }, blueprintsAreExclusive: true),
+            new BlueprintPoolScopeRegistration("RCL_POOL_SECOND", "sample:stage-one", secondPool,
+                new[] { "sample:second-unit" }, blueprintsAreExclusive: true),
+            new BlueprintPoolScopeRegistration("RCL_POOL_OTHER_STAGE", "sample:stage-two", otherStagePool,
+                new[] { "sample:other-stage-unit" }, blueprintsAreExclusive: true)
+        });
+
+        if (!registry.TryFind("RCL_POOL_FIRST", out object? resolved) ||
+            !ReferenceEquals(resolved, firstPool) ||
+            !registry.AllowsModUnitInPool(firstPool, "sample:first-unit") ||
+            registry.AllowsModUnitInPool(firstPool, "sample:second-unit") ||
+            registry.AllowsModUnitInPool(new object(), "sample:first-unit"))
+        {
+            throw new InvalidOperationException("Scoped unit eligibility escaped its exact cloned pool instance.");
+        }
+
+        registry.SetEligibleExclusiveUnitIds(firstPool, new[] { "sample:first-unit" });
+        registry.SetEligibleExclusiveUnitIds(secondPool, new[] { "sample:second-unit", "native:unit" });
+        registry.SetEligibleExclusiveUnitIds(otherStagePool, new[] { "sample:other-stage-unit" });
+        var exclusive = new HashSet<string>(StringComparer.Ordinal);
+        registry.AddExclusiveModUnits("RCL_POOL_FIRST", exclusive);
+        if (!exclusive.SetEquals(new[] { "sample:second-unit" }))
+        {
+            throw new InvalidOperationException(
+                "Exclusive scopes leaked a native unit, another stage's unit, or the current pool's unit.");
+        }
+
+        var nativePoolExclusives = new HashSet<string>(StringComparer.Ordinal);
+        registry.AddExclusiveModUnits("native:pool", nativePoolExclusives);
+        if (nativePoolExclusives.Count != 0)
+        {
+            throw new InvalidOperationException("A cloned stage's exclusive IDs leaked into a native pool.");
+        }
+
+        var globalFallbackExclusives = new HashSet<string>(StringComparer.Ordinal);
+        registry.AddExclusiveModUnits(null, globalFallbackExclusives);
+        if (!globalFallbackExclusives.SetEquals(new[]
+            { "sample:first-unit", "sample:second-unit", "sample:other-stage-unit" }))
+        {
+            throw new InvalidOperationException("The no-pool reward fallback omitted eligible exclusive mod units.");
+        }
+
+        bool duplicateRejected = false;
+        try
+        {
+            registry.Register(new[]
+            {
+                new BlueprintPoolScopeRegistration("RCL_POOL_UNCOMMITTED", "sample:stage-three", new object(),
+                    new[] { "sample:third-unit" }, blueprintsAreExclusive: false),
+                new BlueprintPoolScopeRegistration("RCL_POOL_FIRST", "sample:stage-three", new object(),
+                    new[] { "sample:fourth-unit" }, blueprintsAreExclusive: false)
+            });
+        }
+        catch (InvalidOperationException)
+        {
+            duplicateRejected = true;
+        }
+
+        if (!duplicateRejected || registry.ContainsPoolId("RCL_POOL_UNCOMMITTED"))
+        {
+            throw new InvalidOperationException("A duplicate scoped pool registration was not rejected atomically.");
         }
     }),
     ("sample manifest passes package-local validation", () =>

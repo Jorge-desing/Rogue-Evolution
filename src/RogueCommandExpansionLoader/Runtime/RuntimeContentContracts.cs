@@ -58,6 +58,23 @@ namespace RogueCommandExpansionLoader.Runtime
     }
 
     /// <summary>
+    /// Optional bridge for stage-owned clones of the game's existing BlueprintPools. Implementations
+    /// scope only mod-unit rows; the game's authored pool filter remains responsible for eligibility.
+    /// </summary>
+    public interface IBlueprintPoolRuntimeProvider
+    {
+        bool TryFindBlueprintPool(string poolId, out object pool);
+
+        /// <summary>
+        /// Returns true when the unit is loader-owned and sets whether the game's IsInPool method
+        /// should run for this exact pool instance.
+        /// </summary>
+        bool TryGetBlueprintPoolDecision(object pool, string unitId, out bool runOriginal);
+
+        void AddExclusiveBlueprints(string otherThanPoolId, HashSet<string> result);
+    }
+
+    /// <summary>
     /// Runtime references to objects loaded by the content pipeline. Values are kept
     /// object-typed here so this layer does not bind to Assembly-CSharp at compile time.
     /// </summary>

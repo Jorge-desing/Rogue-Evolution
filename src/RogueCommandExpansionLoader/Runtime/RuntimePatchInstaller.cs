@@ -188,6 +188,7 @@ namespace RogueCommandExpansionLoader.Runtime
             Type aiBehaviour = RuntimeReflection.FindUniqueType(gameAssembly, "AiBehaviour");
             Type defaultAiBehaviour = RuntimeReflection.FindUniqueType(gameAssembly, "DefaultAiBehaviour");
             Type loca = RuntimeReflection.FindUniqueType(gameAssembly, "Loca");
+            Type blueprintPool = RuntimeReflection.FindUniqueType(gameAssembly, "BlueprintPool");
 
             MethodInfo init = RuntimeReflection.FindUniqueMethod(entityStore, "Init",
                 delegate(MethodInfo method) { return method.GetParameters().Length == 0; });
@@ -241,6 +242,12 @@ namespace RogueCommandExpansionLoader.Runtime
                     return method.IsStatic && method.ReturnType == typeof(string) && parameters.Length == 2 &&
                         parameters[0].ParameterType == typeof(string) && parameters[1].ParameterType == typeof(string[]);
                 });
+            MethodInfo blueprintPoolEligibility = RuntimeReflection.FindUniqueMethod(
+                blueprintPool, "IsInPool", HasBlueprintPoolEligibilityShape);
+            MethodInfo blueprintPoolFind = RuntimeReflection.FindUniqueMethod(
+                blueprintPool, "FindBlueprintPool", HasBlueprintPoolFindShape);
+            MethodInfo blueprintPoolExclusive = RuntimeReflection.FindUniqueMethod(
+                blueprintPool, "ExclusiveBlueprints", HasBlueprintPoolExclusiveShape);
             MethodInfo resourcesLoadTyped = FindResourcesLoadTyped();
             MethodInfo resourcesLoadUntyped = FindResourcesLoadUntyped();
 
@@ -257,6 +264,9 @@ namespace RogueCommandExpansionLoader.Runtime
             MethodInfo blueprintNamePrefix = Hook("BlueprintNamePrefix");
             MethodInfo blueprintDescriptionPrefix = Hook("BlueprintDescriptionPrefix");
             MethodInfo globalLocalizationPrefix = Hook("LandscapeLocalizationPrefix");
+            MethodInfo blueprintPoolEligibilityPrefix = Hook("BlueprintPoolIsInPoolPrefix");
+            MethodInfo blueprintPoolFindPrefix = Hook("BlueprintPoolFindPrefix");
+            MethodInfo blueprintPoolExclusivePostfix = Hook("BlueprintPoolExclusiveBlueprintsPostfix");
             MethodInfo loadPrefix = typeof(UnityResourcesLoadTypedPatch).GetMethod("Prefix",
                 BindingFlags.Public | BindingFlags.Static);
             if (loadPrefix == null)
@@ -283,6 +293,9 @@ namespace RogueCommandExpansionLoader.Runtime
             plan.Add(new PatchPlan(blueprintName, blueprintNamePrefix, null));
             plan.Add(new PatchPlan(blueprintDescription, blueprintDescriptionPrefix, null));
             plan.Add(new PatchPlan(globalLocalization, globalLocalizationPrefix, null));
+            plan.Add(new PatchPlan(blueprintPoolEligibility, blueprintPoolEligibilityPrefix, null));
+            plan.Add(new PatchPlan(blueprintPoolFind, blueprintPoolFindPrefix, null));
+            plan.Add(new PatchPlan(blueprintPoolExclusive, null, blueprintPoolExclusivePostfix));
             plan.Add(new PatchPlan(resourcesLoadTyped, loadPrefix, null));
             plan.Add(new PatchPlan(resourcesLoadUntyped, untypedLoadPrefix, null));
             return plan;
@@ -293,6 +306,29 @@ namespace RogueCommandExpansionLoader.Runtime
             ParameterInfo[] parameters = method.GetParameters();
             return method.IsStatic && method.ReturnType == typeof(string) && parameters.Length == 1 &&
                 parameters[0].ParameterType == typeof(string);
+        }
+
+        private static bool HasBlueprintPoolEligibilityShape(MethodInfo method)
+        {
+            ParameterInfo[] parameters = method.GetParameters();
+            return !method.IsStatic && method.ReturnType == typeof(bool) && parameters.Length == 1 &&
+                parameters[0].ParameterType == typeof(string);
+        }
+
+        private static bool HasBlueprintPoolFindShape(MethodInfo method)
+        {
+            ParameterInfo[] parameters = method.GetParameters();
+            return method.IsStatic && parameters.Length == 1 &&
+                parameters[0].ParameterType == typeof(string) &&
+                RuntimeReflection.HasSimpleName(method.ReturnType, "BlueprintPool");
+        }
+
+        private static bool HasBlueprintPoolExclusiveShape(MethodInfo method)
+        {
+            ParameterInfo[] parameters = method.GetParameters();
+            return method.IsStatic && parameters.Length == 1 &&
+                parameters[0].ParameterType == typeof(string) &&
+                method.ReturnType == typeof(HashSet<string>);
         }
 
         private static bool HasInstantiateEntityShape(MethodInfo method)
