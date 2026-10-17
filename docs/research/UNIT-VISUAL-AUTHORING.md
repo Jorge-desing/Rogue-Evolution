@@ -12,12 +12,13 @@
 | `sample-native:skirmish-bike` | `BombBike` / `GameObject/BombBike` | `content/source-art/skirmish-strike-bike.blend` | `tools/Build-SkirmishStrikeBikeModel.py` | `SkirmishStrikeBike.fbx` | 59 → 7 | 1.20 × 2.20 × 1.37 m |
 | `sample-native:heavy-artillery` | `ArtilleryTank` / `Vehicle` | `content/source-art/colossus-siege.blend` | `tools/Build-ColossusSiegeModel.py` | `ColossusSiegePlatform.fbx` | 104 → 8 | 2.58 × 4.74 × 1.86 m |
 | `sample-native:assault-walker` | `GatlingWalker` / `Vehicle` | `content/source-art/ironclad-walker.blend` | `tools/Build-IroncladWalkerModel.py` | `IroncladWalker.fbx` | 74 → 5 | 1.83 × 1.98 × 2.45 m |
+| `sample-native:surge-tank` | `LightningTank` / `Vehicle` | `content/source-art/surge-arc-tank.blend` | `tools/Build-SurgeArcTankModel.py` | `SurgeArcTank.fbx` | 94 → 6 | 1.99 × 2.78 × 1.52 m |
 
-All Blender sources keep individually editable parts. Export builders duplicate and merge those parts by material, producing five to eight FBX batches. Blender's local quality checks confirmed ground contact and assigned materials for all four models. The Ironclad uses a reinforced torso, shoulder armor, recessed optics, and paired waist-height Gatling cannons; its 1.83 × 1.98 × 2.45 m bounds fit the approximate `GatlingWalker` envelope. The Colossus retains a long siege cannon that extends beyond the approximate 3.60 m `ArtilleryTank` length; verify spacing and clipping in a Steam-launched match before calling it runtime-ready.
+All Blender sources keep individually editable parts. Export builders duplicate and merge those parts by material, producing five to eight FBX batches. Blender's local quality checks confirmed ground contact and assigned materials for all five models. The Ironclad uses a reinforced torso, shoulder armor, recessed optics, and paired waist-height Gatling cannons; its 1.83 × 1.98 × 2.45 m bounds fit the approximate `GatlingWalker` envelope. The Surge Arc Tank adds an insulated generator, twin capacitors, and a forward-facing induction ring centered at the documented LightningTank weapon pivot; its 1.99 × 2.78 × 1.52 m bounds fit the approximate 2.3 × 2.8 × 1.6 m LightningTank envelope. The Colossus retains a long siege cannon that extends beyond the approximate 3.60 m `ArtilleryTank` length; verify spacing and clipping in a Steam-launched match before calling it runtime-ready.
 
 ## ImageGen card sprites
 
-The Unity visual bundle includes three tracked ImageGen-authored PNGs. Each final Blender preview was used as the image reference. Unity imports each as a single Sprite with Point filtering, no mipmaps, Clamp wrap mode, Uncompressed texture data, and a 128 × 128 maximum size. The scaffolder contains no procedural card drawing code and fails if a source PNG is missing or does not import as a 128 × 128 Sprite. Ironclad deliberately keeps the native `GatlingWalker` card: its manifest entry omits `cardImageAssetName`, and this visual update generated no new 2D image.
+The Unity visual bundle includes three tracked ImageGen-authored PNGs. Each final Blender preview was used as the image reference. Unity imports each as a single Sprite with Point filtering, no mipmaps, Clamp wrap mode, Uncompressed texture data, and a 128 × 128 maximum size. The scaffolder contains no procedural card drawing code and fails if a source PNG is missing or does not import as a 128 × 128 Sprite. Ironclad and Surge Arc Tank deliberately keep the native `GatlingWalker` and `LightningTank` cards: their manifest entries omit `cardImageAssetName`; the Surge model update generated no new 2D image.
 
 Final prompts used:
 
@@ -34,9 +35,10 @@ Run the model builders from the repository root with Blender 4.5.14 LTS:
 & .\.tools\Blender-4.5.14\blender-4.5.14-windows-x64\blender.exe --background --python tools\Build-SkirmishStrikeBikeModel.py
 & .\.tools\Blender-4.5.14\blender-4.5.14-windows-x64\blender.exe --background --python tools\Build-ColossusSiegeModel.py
 & .\.tools\Blender-4.5.14\blender-4.5.14-windows-x64\blender.exe --background --python tools\Build-IroncladWalkerModel.py
+& .\.tools\Blender-4.5.14\blender-4.5.14-windows-x64\blender.exe --background --python tools\Build-SurgeArcTankModel.py
 ```
 
-The Ironclad builder validates its mesh and bounds, saves the editable source and FBX, and skips preview rendering so it does not alter any existing renders or framing.
+The Ironclad and Surge Arc Tank builders validate their meshes and bounds, save the editable sources and FBXs, and skip preview rendering so they do not alter existing renders or framing.
 
 The previews go to ignored `artifacts/previews/`. Rebuild the script-free overlays and pack bundle with the pinned Unity Editor:
 
@@ -48,6 +50,6 @@ The previews go to ignored `artifacts/previews/`. Rebuild the script-free overla
 .\.venv\Scripts\python.exe .\tools\validate_content_bundle_references.py .\content\packs\sample-native-expansion
 ```
 
-The 2026-10-17 Ironclad build reopened the bundle in Unity and validated four script-free prefabs, all renderers/materials/components, and the three card Sprites. UnityPy found 35 GameObjects and Transforms, 27 MeshFilters/MeshRenderers/meshes, 27 materials, and three 128 × 128 textures/Sprites. The bundle is 646,572 bytes, SHA-256 `27b94573816e2d610b651f123886b19393369113fe30041544e58061f6296242`; its 1,588-byte manifest AssetBundle has SHA-256 `e7f6fdf2ef8558e353e7bb9e9dbcae87968ca749942d7df727a609238623cc8e`. The offline reference validator resolved all seven manifest bundle references.
+The 2026-10-17 Surge Arc Tank build reopened the bundle in Unity and validated five script-free prefabs, all renderers/materials/components, and the three card Sprites. UnityPy found 43 GameObjects/Transforms, 33 MeshFilters, 33 MeshRenderers/meshes, 33 materials, zero MonoBehaviours, and three 128 × 128 textures/Sprites. The bundle is 774,549 bytes, SHA-256 `856873b3b92e0c65eb59c42753d130a93baa04ab24978b8e26a88063891f4fef`; its 1,588-byte manifest AssetBundle has SHA-256 `8e10a57f635c91c973d6348622baa902ba520a3901d4609fe838a38cdc97835b`. The offline reference validator resolved all eight manifest bundle references.
 
-This is local authoring evidence. No Steam-launched match has validated the current Ironclad bundle or its visual alignment. These overlays retain native gameplay hierarchies and do not retarget native animations or rigs.
+This is local authoring evidence. No Steam-launched match has validated the current bundle or the Surge Arc Tank's visual alignment. These overlays retain native gameplay hierarchies and do not retarget native animations or rigs.

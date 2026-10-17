@@ -1,0 +1,120 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &8862403677199898555
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 9103667001432771576}
+  m_Layer: 0
+  m_Name: SurgeArcTankVisual
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &9103667001432771576
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8862403677199898555}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 7059074917471917807}
+  m_Father: {fileID: 0}
+  m_RootOrder: 0
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1001 &7384889922038395140
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    m_TransformParent: {fileID: 9103667001432771576}
+    m_Modifications:
+    - target: {fileID: -8679921383154817045, guid: 0622294a18b6fbf45b01cd6263b1af93, type: 3}
+      propertyPath: m_RootOrder
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 0622294a18b6fbf45b01cd6263b1af93, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 0622294a18b6fbf45b01cd6263b1af93, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 0622294a18b6fbf45b01cd6263b1af93, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 0622294a18b6fbf45b01cd6263b1af93, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 0622294a18b6fbf45b01cd6263b1af93, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 0622294a18b6fbf45b01cd6263b1af93, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 0622294a18b6fbf45b01cd6263b1af93, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 0622294a18b6fbf45b01cd6263b1af93, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 0622294a18b6fbf45b01cd6263b1af93, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 0622294a18b6fbf45b01cd6263b1af93, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -7138288368953340021, guid: 0622294a18b6fbf45b01cd6263b1af93, type: 3}
+      propertyPath: m_Materials.Array.data[0]
+      value: ""
+      objectReference: {fileID: 2100000, guid: 743233375534d6043a45c2c14de41b72, type: 2}
+    - target: {fileID: -2997159700183434538, guid: 0622294a18b6fbf45b01cd6263b1af93, type: 3}
+      propertyPath: m_Materials.Array.data[0]
+      value: ""
+      objectReference: {fileID: 2100000, guid: 61470b8e74b19d74099e4a1f5d34a12d, type: 2}
+    - target: {fileID: -2730991317556895570, guid: 0622294a18b6fbf45b01cd6263b1af93, type: 3}
+      propertyPath: m_Materials.Array.data[0]
+      value: ""
+      objectReference: {fileID: 2100000, guid: bea02b8af7bfa974590f6f1a53eb910b, type: 2}
+    - target: {fileID: -1488852115089095462, guid: 0622294a18b6fbf45b01cd6263b1af93, type: 3}
+      propertyPath: m_Materials.Array.data[0]
+      value: ""
+      objectReference: {fileID: 2100000, guid: cb42e9d4249dbc24598d5e8f72fcfac2, type: 2}
+    - target: {fileID: 919132149155446097, guid: 0622294a18b6fbf45b01cd6263b1af93, type: 3}
+      propertyPath: m_Name
+      value: SurgeArcTankModel
+      objectReference: {fileID: 0}
+    - target: {fileID: 928740318302895823, guid: 0622294a18b6fbf45b01cd6263b1af93, type: 3}
+      propertyPath: m_Materials.Array.data[0]
+      value: ""
+      objectReference: {fileID: 2100000, guid: 45754fa01ccaa664bbf92615bd3118f8, type: 2}
+    - target: {fileID: 7262077569894567199, guid: 0622294a18b6fbf45b01cd6263b1af93, type: 3}
+      propertyPath: m_Materials.Array.data[0]
+      value: ""
+      objectReference: {fileID: 2100000, guid: 26a2c85dd3432e44981fe3b0cf1f7967, type: 2}
+    m_RemovedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: 0622294a18b6fbf45b01cd6263b1af93, type: 3}
+--- !u!4 &7059074917471917807 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 0622294a18b6fbf45b01cd6263b1af93, type: 3}
+  m_PrefabInstance: {fileID: 7384889922038395140}
+  m_PrefabAsset: {fileID: 0}

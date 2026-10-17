@@ -223,12 +223,15 @@ sample-reactive-ai pack is data-only. Other packs must include every AssetBundle
 declared by content.json and its manifest.
 Use the adjacent schema directory when authoring content.json.
 
-The native sample registers a localized Sandlance Scout balance variant with its
-own card Sprite and script-free model overlay, while keeping the native unit
-controller, stage, and AI templates. The reactive AI stage references that unit
-from the native sample and uses a native AI template with a bounded compiled
-counterattack module. Both keep native map layouts; blueprint eligibility remains
-global to the unit because the game filters shared pools against the global registry.
+The native sample adds five localized native-template units with script-free
+visual overlays: Sandlance Scout, Skirmish Strike Bike, Colossus Siege Platform,
+Ironclad Walker, and Surge Arc Tank. The first three have custom card Sprites;
+Ironclad and Surge Arc Tank keep their native cards. All five keep native gameplay
+controllers, while the pack also adds a stage variant and scheduled-build AI module.
+The reactive AI stage references Sandlance and uses a native AI template with a
+bounded compiled counterattack module. Both packs keep native map layouts; blueprint
+eligibility remains global to each unit because the game filters shared pools against
+the global registry.
 '@ | Set-Content -LiteralPath (Join-Path $packsDirectory 'README.txt') -Encoding UTF8
 
     @"
@@ -237,9 +240,12 @@ Rogue Command Expansion Loader $pluginVersion
 Install:
 1. Install BepInEx 5.4.23.5 win-x64 Mono into the Rogue Command game folder.
 2. Extract this archive into the Rogue Command game folder, preserving its BepInEx directory.
-3. The included sample-native-expansion pack demonstrates a localized Sandlance Scout
-   balance variant with its own card Sprite and bundled model overlay, plus a native
-   stage variant and scheduled-build AI module. It retains the native unit controller.
+3. The included sample-native-expansion pack adds five localized native-template units
+   with bundled model overlays: Sandlance Scout, Skirmish Strike Bike, Colossus Siege
+   Platform, Ironclad Walker, and Surge Arc Tank. The first three have custom card
+   Sprites; Ironclad and Surge Arc Tank retain their native cards. The pack also adds a
+   native stage variant and scheduled-build AI module; every unit keeps its native
+   gameplay controller.
    The sample-reactive-ai pack demonstrates a native stage variant that references
    the Sandlance Scout from sample-native-expansion and an AI module that sends up
    to two nearby units to counterattack an active attacker. Unit blueprint

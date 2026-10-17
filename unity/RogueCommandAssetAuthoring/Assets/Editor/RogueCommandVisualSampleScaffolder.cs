@@ -26,6 +26,8 @@ namespace RogueCommandExpansion.Authoring
         private const string ColossusModelPath = AssetRoot + "/Models/ColossusSiegePlatform.fbx";
         private const string IroncladPrefabPath = AssetRoot + "/IroncladWalkerVisual.prefab";
         private const string IroncladModelPath = AssetRoot + "/Models/IroncladWalker.fbx";
+        private const string SurgeArcTankPrefabPath = AssetRoot + "/SurgeArcTankVisual.prefab";
+        private const string SurgeArcTankModelPath = AssetRoot + "/Models/SurgeArcTank.fbx";
         private const string MaterialRoot = AssetRoot + "/Materials";
         private const string BundleOutputPath = "../../artifacts/asset-bundles";
         private const string BundleName = "sample-native-expansion.bundle";
@@ -55,6 +57,7 @@ namespace RogueCommandExpansion.Authoring
                 string colossusPrefabPath = CreateColossusVisual();
                 ImportCardSprite(ColossusCardSpritePath);
                 string ironcladPrefabPath = CreateIroncladVisual();
+                string surgeArcTankPrefabPath = CreateSurgeArcTankVisual();
                 string projectRoot = Directory.GetParent(Application.dataPath).FullName;
                 string outputPath = Path.GetFullPath(Path.Combine(projectRoot, BundleOutputPath));
                 Directory.CreateDirectory(outputPath);
@@ -67,7 +70,7 @@ namespace RogueCommandExpansion.Authoring
                         prefabPath, CardSpritePath,
                         bikePrefabPath, BikeCardSpritePath,
                         colossusPrefabPath, ColossusCardSpritePath,
-                        ironcladPrefabPath
+                        ironcladPrefabPath, surgeArcTankPrefabPath
                     }
                 };
                 AssetBundleManifest manifest = BuildPipeline.BuildAssetBundles(outputPath,
@@ -99,9 +102,9 @@ namespace RogueCommandExpansion.Authoring
                     Path.Combine(packBundles, "assetbundle-manifest.bundle"));
 
                 AssetDatabase.Refresh();
-                Debug.Log("Built script-free Sandlance, Skirmish Bike, Colossus, and Ironclad visual overlays in " +
-                    BundleName + " at " + packBundles + ". Ironclad retains its native card and all units retain " +
-                    "their native gameplay prefabs.");
+                Debug.Log("Built script-free Sandlance, Skirmish Bike, Colossus, Ironclad, and Surge Arc Tank " +
+                    "visual overlays in " + BundleName + " at " + packBundles + ". Ironclad and Surge Arc Tank " +
+                    "retain their native cards, and all units retain their native gameplay prefabs.");
             }
             catch (Exception exception)
             {
@@ -365,6 +368,71 @@ namespace RogueCommandExpansion.Authoring
             return IroncladPrefabPath;
         }
 
+        private static string CreateSurgeArcTankVisual()
+        {
+            string projectRoot = Directory.GetParent(Application.dataPath).FullName;
+            Directory.CreateDirectory(Path.GetFullPath(Path.Combine(projectRoot, AssetRoot)));
+            AssetDatabase.Refresh();
+
+            GameObject modelAsset = AssetDatabase.LoadAssetAtPath<GameObject>(SurgeArcTankModelPath);
+            if (modelAsset == null)
+            {
+                throw new FileNotFoundException("Import the authored Surge Arc Tank FBX before building the " +
+                    "sample bundle.", SurgeArcTankModelPath);
+            }
+
+            Dictionary<string, Material> materials = CreateSurgeArcTankMaterials();
+            var root = new GameObject("SurgeArcTankVisual");
+            try
+            {
+                GameObject modelInstance = PrefabUtility.InstantiatePrefab(modelAsset) as GameObject;
+                if (modelInstance == null)
+                {
+                    throw new InvalidOperationException("Unity could not instantiate the authored Surge Arc Tank.");
+                }
+
+                modelInstance.name = "SurgeArcTankModel";
+                modelInstance.transform.SetParent(root.transform, false);
+                modelInstance.transform.localPosition = Vector3.zero;
+                modelInstance.transform.localRotation = Quaternion.identity;
+                modelInstance.transform.localScale = Vector3.one;
+                AssignSurgeArcTankMaterials(modelInstance, materials);
+
+                bool success;
+                PrefabUtility.SaveAsPrefabAsset(root, SurgeArcTankPrefabPath, out success);
+                if (!success)
+                {
+                    throw new InvalidOperationException("Unity could not save " + SurgeArcTankPrefabPath + ".");
+                }
+
+                string prefabPath = Path.GetFullPath(Path.Combine(projectRoot, SurgeArcTankPrefabPath));
+                NormalizeEmptyUnityYamlStrings(prefabPath);
+                string prefabMetadataPath = prefabPath + ".meta";
+                if (File.Exists(prefabMetadataPath))
+                {
+                    NormalizeEmptyUnityYamlStrings(prefabMetadataPath);
+                }
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(root);
+            }
+
+            AssetImporter importer = AssetImporter.GetAtPath(SurgeArcTankPrefabPath);
+            if (importer == null)
+            {
+                throw new FileNotFoundException("Unity did not import " + SurgeArcTankPrefabPath + ".");
+            }
+
+            importer.assetBundleName = BundleName;
+            importer.assetBundleVariant = String.Empty;
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+            NormalizeGeneratedUnityMetaFiles(projectRoot);
+            NormalizeEmptyUnityYamlStrings(Path.GetFullPath(Path.Combine(projectRoot, SurgeArcTankPrefabPath)) + ".meta");
+            return SurgeArcTankPrefabPath;
+        }
+
         private static void ValidateBuiltVisualBundle(string bundlePath)
         {
             AssetBundle bundle = AssetBundle.LoadFromFile(bundlePath);
@@ -384,6 +452,8 @@ namespace RogueCommandExpansion.Authoring
                     "colossussiegecard.png", "ColossusSiegeCard", 8, "Colossus Siege Platform");
                 ValidateVisualBundleAssets(bundle, assetNames, "ironcladwalkervisual.prefab", "IroncladWalkerVisual",
                     null, null, 5, "Ironclad Walker");
+                ValidateVisualBundleAssets(bundle, assetNames, "surgearctankvisual.prefab", "SurgeArcTankVisual",
+                    null, null, 6, "Surge Arc Tank");
             }
             finally
             {
@@ -578,6 +648,24 @@ namespace RogueCommandExpansion.Authoring
             return materials;
         }
 
+        private static Dictionary<string, Material> CreateSurgeArcTankMaterials()
+        {
+            string projectRoot = Directory.GetParent(Application.dataPath).FullName;
+            Directory.CreateDirectory(Path.GetFullPath(Path.Combine(projectRoot, MaterialRoot)));
+            var materials = new Dictionary<string, Material>(StringComparer.Ordinal)
+            {
+                { "armor", CreateOrUpdateMaterial("SurgeArcTankArmor", new Color32(20, 36, 59, 255), 0.55f, 0.68f) },
+                { "lightArmor", CreateOrUpdateMaterial("SurgeArcTankLightArmor", new Color32(82, 96, 112, 255), 0.60f, 0.72f) },
+                { "gunmetal", CreateOrUpdateMaterial("SurgeArcTankGunmetal", new Color32(18, 22, 28, 255), 0.78f, 0.75f) },
+                { "tread", CreateOrUpdateMaterial("SurgeArcTankTread", new Color32(11, 15, 20, 255), 0.12f, 0.32f) },
+                { "magenta", CreateOrUpdateMaterial("SurgeArcTankWarningMagenta", new Color32(212, 24, 118, 255), 0.20f, 0.70f) },
+                { "arc", CreateOrUpdateMaterial("SurgeArcTankArcCyan", new Color32(0, 240, 255, 255), 0.15f, 0.88f, new Color(0.0f, 0.94f, 1.0f) * 2.2f) }
+            };
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+            return materials;
+        }
+
         private static void AssignSkirmishBikeMaterials(
             GameObject model,
             IDictionary<string, Material> materials)
@@ -597,6 +685,13 @@ namespace RogueCommandExpansion.Authoring
             IDictionary<string, Material> materials)
         {
             AssignBatchedMaterials(model, "IroncladWalker", materials);
+        }
+
+        private static void AssignSurgeArcTankMaterials(
+            GameObject model,
+            IDictionary<string, Material> materials)
+        {
+            AssignBatchedMaterials(model, "SurgeArcTank", materials);
         }
 
         private static void AssignBatchedMaterials(
