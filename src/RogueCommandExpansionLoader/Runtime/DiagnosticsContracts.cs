@@ -45,13 +45,17 @@ namespace RogueCommandExpansionLoader.Runtime
             string packId,
             string prefabKey,
             string imageKey,
-            bool isAllowedAsBlueprint)
+            bool isAllowedAsBlueprint,
+            bool isAllowedAsStartingBlueprint = false,
+            bool isAllowedForAi = false)
         {
             UnitId = unitId ?? string.Empty;
             PackId = packId ?? string.Empty;
             PrefabKey = prefabKey ?? string.Empty;
             ImageKey = imageKey ?? string.Empty;
             IsAllowedAsBlueprint = isAllowedAsBlueprint;
+            IsAllowedAsStartingBlueprint = isAllowedAsStartingBlueprint;
+            IsAllowedForAi = isAllowedForAi;
         }
 
         public string UnitId { get; private set; }
@@ -59,6 +63,8 @@ namespace RogueCommandExpansionLoader.Runtime
         public string PrefabKey { get; private set; }
         public string ImageKey { get; private set; }
         public bool IsAllowedAsBlueprint { get; private set; }
+        public bool IsAllowedAsStartingBlueprint { get; private set; }
+        public bool IsAllowedForAi { get; private set; }
     }
 
     public sealed class StageDiagnosticReport

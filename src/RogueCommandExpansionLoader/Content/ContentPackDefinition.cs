@@ -36,6 +36,8 @@ namespace RogueCommandExpansionLoader.Content
         public string visualAssetName;
         public string visualRootPath;
         public string nativeTemplateId;
+        public bool isAllowedAsStartingBlueprint;
+        public bool isAllowedForAi;
         public ContentBalanceOverride[] balanceOverrides;
         public ContentUnitLocalizationDefinition[] localizations;
     }
@@ -191,6 +193,8 @@ namespace RogueCommandExpansionLoader.Content
                 visualAssetName = source.visualAssetName,
                 visualRootPath = source.visualRootPath,
                 nativeTemplateId = source.nativeTemplateId,
+                isAllowedAsStartingBlueprint = source.isAllowedAsStartingBlueprint,
+                isAllowedForAi = source.isAllowedForAi,
                 balanceOverrides = CloneArray(source.balanceOverrides, CloneBalanceOverride),
                 localizations = CloneArray(source.localizations, CloneUnitLocalization)
             };

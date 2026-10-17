@@ -57,6 +57,11 @@ namespace RogueCommandExpansionLoader.Runtime
         bool TryGetLandscapeLocalization(string localizationId, out string value);
     }
 
+    public interface IStageFallbackRuntimeProvider
+    {
+        object GetFallbackLandscapeSnapshot(object nativeFallbacks);
+    }
+
     /// <summary>
     /// Optional bridge for stage-owned clones of the game's existing BlueprintPools. Implementations
     /// scope only mod-unit rows; the game's authored pool filter remains responsible for eligibility.
@@ -64,6 +69,8 @@ namespace RogueCommandExpansionLoader.Runtime
     public interface IBlueprintPoolRuntimeProvider
     {
         bool TryFindBlueprintPool(string poolId, out object pool);
+
+        bool TryGetBlueprintPoolLocalizationId(string poolId, out string sourcePoolId);
 
         /// <summary>
         /// Returns true when the unit is loader-owned and sets whether the game's IsInPool method

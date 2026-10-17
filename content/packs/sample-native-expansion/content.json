@@ -16,6 +16,8 @@
       "cardImageAssetName": "assets/roguecommandexpansionsample/sandlancescoutcard.png",
       "visualAssetName": "assets/roguecommandexpansionsample/scouttankvisual.prefab",
       "visualRootPath": "Vehicle",
+      "isAllowedAsStartingBlueprint": true,
+      "isAllowedForAi": true,
       "localizations": [
         {
           "language": "en-US",
@@ -43,7 +45,7 @@
       "assetBundleId": "sample-native:assets",
       "cardImageAssetName": "assets/roguecommandexpansionsample/colossussiegecard.png",
       "visualAssetName": "assets/roguecommandexpansionsample/colossussiegevisual.prefab",
-      "visualRootPath": "Vehicle",
+      "visualRootPath": "Tank",
       "localizations": [
         {
           "language": "en-US",
@@ -72,7 +74,7 @@
       "nativeTemplateId": "GatlingWalker",
       "assetBundleId": "sample-native:assets",
       "visualAssetName": "assets/roguecommandexpansionsample/ironcladwalkervisual.prefab",
-      "visualRootPath": "Vehicle",
+      "visualRootPath": "RoboMarine_Mesh",
       "localizations": [
         {
           "language": "en-US",
@@ -102,6 +104,7 @@
       "cardImageAssetName": "assets/roguecommandexpansionsample/skirmishbikecard.png",
       "visualAssetName": "assets/roguecommandexpansionsample/skirmishbikevisual.prefab",
       "visualRootPath": "GameObject/BombBike",
+      "isAllowedForAi": true,
       "localizations": [
         {
           "language": "en-US",
@@ -127,7 +130,7 @@
       "nativeTemplateId": "LightningTank",
       "assetBundleId": "sample-native:assets",
       "visualAssetName": "assets/roguecommandexpansionsample/surgearctankvisual.prefab",
-      "visualRootPath": "Vehicle",
+      "visualRootPath": "PCX TankHolder",
       "localizations": [
         {
           "language": "en-US",
@@ -161,7 +164,9 @@
         { "name": "coinReward", "value": "160" },
         { "name": "twoWayBranchingProbability", "value": "0.6" },
         { "name": "shopWeight", "value": "1.8" },
-        { "name": "cardRewardWeight", "value": "3.5" }
+        { "name": "cardRewardWeight", "value": "3.5" },
+        { "name": "fillFirstLevelWithCardRewards", "value": "true" },
+        { "name": "putDefaultCardRewardInCenter", "value": "true" }
       ],
       "mapSizeMin": 20,
       "mapSizeMax": 60,
@@ -194,7 +199,8 @@
         { "name": "startCrystalReward", "value": "80" },
         { "name": "twoWayBranchingProbability", "value": "0.75" },
         { "name": "upgradeRewardWeight", "value": "3.0" },
-        { "name": "shopWeight", "value": "2.0" }
+        { "name": "shopWeight", "value": "2.0" },
+        { "name": "fillLastLevelWithShops", "value": "true" }
       ],
       "mapSizeMin": 35,
       "mapSizeMax": 80,
@@ -284,6 +290,16 @@
             { "name": "intervalSeconds", "value": "10" },
             { "name": "maxSuccessfulBuilds", "value": "2" },
             { "name": "maxAttempts", "value": "3" }
+          ]
+        },
+        {
+          "moduleId": "sample:harvester-raider",
+          "parameters": [
+            { "name": "baseIndex", "value": "0" },
+            { "name": "scanIntervalSeconds", "value": "12" },
+            { "name": "cooldownSeconds", "value": "25" },
+            { "name": "raidSquadSize", "value": "3" },
+            { "name": "minGameTimeSeconds", "value": "15" }
           ]
         }
       ]

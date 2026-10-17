@@ -257,6 +257,12 @@ namespace RogueCommandExpansionLoader.Runtime
                     return method.IsStatic && method.ReturnType == typeof(string) && parameters.Length == 2 &&
                         parameters[0].ParameterType == typeof(string) && parameters[1].ParameterType == typeof(string[]);
                 });
+            MethodInfo fallbackLandscapes = RuntimeReflection.FindUniqueMethod(gameBalancingStore,
+                "get_FallbackLandscapeGenerators", delegate(MethodInfo method)
+                {
+                    return method.IsStatic && method.GetParameters().Length == 0 &&
+                        method.ReturnType == typeof(List<global::LandscapeGenerator>);
+                });
             MethodInfo blueprintPoolEligibility = RuntimeReflection.FindUniqueMethod(
                 blueprintPool, "IsInPool", HasBlueprintPoolEligibilityShape);
             MethodInfo blueprintPoolFind = RuntimeReflection.FindUniqueMethod(
@@ -279,6 +285,7 @@ namespace RogueCommandExpansionLoader.Runtime
             MethodInfo blueprintNamePrefix = Hook("BlueprintNamePrefix");
             MethodInfo blueprintDescriptionPrefix = Hook("BlueprintDescriptionPrefix");
             MethodInfo globalLocalizationPrefix = Hook("LandscapeLocalizationPrefix");
+            MethodInfo fallbackLandscapesPostfix = Hook("FallbackLandscapeGeneratorsPostfix");
             MethodInfo blueprintPoolEligibilityPrefix = Hook("BlueprintPoolIsInPoolPrefix");
             MethodInfo blueprintPoolFindPrefix = Hook("BlueprintPoolFindPrefix");
             MethodInfo blueprintPoolExclusivePostfix = Hook("BlueprintPoolExclusiveBlueprintsPostfix");
@@ -308,6 +315,7 @@ namespace RogueCommandExpansionLoader.Runtime
             plan.Add(new PatchPlan(blueprintName, blueprintNamePrefix, null));
             plan.Add(new PatchPlan(blueprintDescription, blueprintDescriptionPrefix, null));
             plan.Add(new PatchPlan(globalLocalization, globalLocalizationPrefix, null));
+            plan.Add(new PatchPlan(fallbackLandscapes, null, fallbackLandscapesPostfix));
             plan.Add(new PatchPlan(blueprintPoolEligibility, blueprintPoolEligibilityPrefix, null));
             plan.Add(new PatchPlan(blueprintPoolFind, blueprintPoolFindPrefix, null));
             plan.Add(new PatchPlan(blueprintPoolExclusive, null, blueprintPoolExclusivePostfix));

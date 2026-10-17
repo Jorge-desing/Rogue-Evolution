@@ -69,6 +69,34 @@ namespace RogueCommandExpansionLoader.Content
     {
         public const int SupportedSchemaVersion = 1;
 
+        internal static bool DeclaresAiUnitDependency(ContentAiProfileDefinition profile, string unitId)
+        {
+            if (profile == null || String.IsNullOrWhiteSpace(unitId))
+            {
+                return false;
+            }
+
+            foreach (string dependency in profile.unitDependencies ?? new string[0])
+            {
+                if (String.Equals(dependency, unitId, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            // unitEntries already establishes pack load order, before these entries
+            // are appended to the cloned native deck and the complete deck is checked.
+            foreach (ContentAiUnitEntryDefinition entry in profile.unitEntries ?? new ContentAiUnitEntryDefinition[0])
+            {
+                if (entry != null && String.Equals(entry.unitId, unitId, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         internal static bool PrefabReferenceMatchesObjectName(string assetReference, string objectName)
         {
             if (String.IsNullOrWhiteSpace(assetReference) || String.IsNullOrWhiteSpace(objectName))
@@ -983,6 +1011,10 @@ namespace RogueCommandExpansionLoader.Content
                     return Single.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture,
                         out floatValue) && !Single.IsNaN(floatValue) && !Single.IsInfinity(floatValue) &&
                         floatValue >= 0f;
+                case "rarity":
+                    return String.Equals(value, "Common", StringComparison.Ordinal) ||
+                           String.Equals(value, "Rare", StringComparison.Ordinal) ||
+                           String.Equals(value, "UltraRare", StringComparison.Ordinal);
                 default:
                     return false;
             }
@@ -1034,6 +1066,11 @@ namespace RogueCommandExpansionLoader.Content
 
             switch (name)
             {
+                case "fillFirstLevelWithCardRewards":
+                case "putDefaultCardRewardInCenter":
+                case "fillLastLevelWithShops":
+                    return String.Equals(value, "true", StringComparison.Ordinal) ||
+                           String.Equals(value, "false", StringComparison.Ordinal);
                 case "levelCount":
                 case "maxWidth":
                 case "coinReward":

@@ -73,6 +73,10 @@ public sealed class BlueprintPool
 {
 }
 
+public sealed class LandscapeGenerator
+{
+}
+
 public sealed class DefaultAiBehaviour
 {
 }

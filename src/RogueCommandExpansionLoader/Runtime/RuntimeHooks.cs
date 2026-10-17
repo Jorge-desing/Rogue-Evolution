@@ -97,17 +97,46 @@ namespace RogueCommandExpansionLoader.Runtime
             return TryResolveUnitLocalization(__0, false, ref __result);
         }
 
+        public static object ResolveFallbackLandscapes(object nativeFallbacks)
+        {
+            IStageFallbackRuntimeProvider fallbackProvider;
+            lock (Gate) { fallbackProvider = _provider as IStageFallbackRuntimeProvider; }
+            if (fallbackProvider == null || nativeFallbacks == null) return nativeFallbacks;
+            try
+            {
+                object snapshot = fallbackProvider.GetFallbackLandscapeSnapshot(nativeFallbacks);
+                if (snapshot != null && snapshot.GetType() == nativeFallbacks.GetType()) return snapshot;
+                Log("The stage fallback provider returned an incompatible list.");
+            }
+            catch (Exception exception)
+            {
+                Log("Could not resolve appended stage fallbacks: " + exception.GetBaseException().Message);
+            }
+
+            return nativeFallbacks;
+        }
+
         public static bool BlueprintDescriptionPrefix(string __0, ref string __result)
         {
             return TryResolveUnitLocalization(__0, true, ref __result);
         }
 
-        public static bool LandscapeLocalizationPrefix(string __0, ref string __result)
+        public static bool LandscapeLocalizationPrefix(ref string __0, ref string __result)
         {
             IRuntimeContentProvider provider;
             lock (Gate)
             {
                 provider = _provider;
+            }
+
+            IBlueprintPoolRuntimeProvider poolProvider = provider as IBlueprintPoolRuntimeProvider;
+            string sourcePoolId;
+            if (poolProvider != null && poolProvider.TryGetBlueprintPoolLocalizationId(__0, out sourcePoolId))
+            {
+                // Let the game's localization resolve language, variables, and fallback
+                // using the source pool's authored key instead of the generated registry ID.
+                __0 = sourcePoolId;
+                return true;
             }
 
             IStageLandscapeRuntimeProvider landscapeProvider = provider as IStageLandscapeRuntimeProvider;
@@ -442,6 +471,11 @@ namespace RogueCommandExpansionLoader.Runtime
 
     internal static class RuntimeHarmonyPatches
     {
+        public static void FallbackLandscapeGeneratorsPostfix(ref List<global::LandscapeGenerator> __result)
+        {
+            __result = (List<global::LandscapeGenerator>)RuntimeHooks.ResolveFallbackLandscapes(__result);
+        }
+
         public static void EntityBalancingStoreInitPostfix()
         {
             RuntimeHooks.AfterEntityBalancingInit();
@@ -502,9 +536,9 @@ namespace RogueCommandExpansionLoader.Runtime
             return RuntimeHooks.BlueprintDescriptionPrefix(__0, ref __result);
         }
 
-        public static bool LandscapeLocalizationPrefix(string __0, ref string __result)
+        public static bool LandscapeLocalizationPrefix(ref string __0, ref string __result)
         {
-            return RuntimeHooks.LandscapeLocalizationPrefix(__0, ref __result);
+            return RuntimeHooks.LandscapeLocalizationPrefix(ref __0, ref __result);
         }
 
         public static bool BlueprintPoolIsInPoolPrefix(object __instance, string __0, ref bool __result)

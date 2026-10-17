@@ -92,6 +92,8 @@
         "visualAssetName": { "type": "string", "minLength": 1, "pattern": "\\S", "description": "Unity AssetBundle address, preferably the project-relative path including extension." },
         "visualRootPath": { "type": "string", "minLength": 1, "pattern": "\\S" },
         "nativeTemplateId": { "type": "string", "minLength": 1, "pattern": "\\S" },
+        "isAllowedAsStartingBlueprint": { "type": "boolean" },
+        "isAllowedForAi": { "type": "boolean" },
         "localizations": {
           "type": "array",
           "minItems": 1,
@@ -164,11 +166,21 @@
       "required": ["name", "value"],
       "properties": {
         "name": {
-          "enum": ["coinsAmount", "cost", "maxCapacity", "combatValue", "maxHealth", "maxShield", "maxMana", "maxRank", "sightRadius", "skillRange", "firePointCount", "neededExperienceLevel", "gridSize", "productionDuration", "cardModelScalingFactor", "maxArmor", "armorProtection", "moveSpeed", "damage1", "damage2", "weaponRange", "attackCooldown", "attack2Cooldown", "effectRadius1", "effectRadius2", "healAmount1", "healAmount2", "gainCreditsAmount", "skillManaCost", "duration1", "duration2"]
+          "enum": ["coinsAmount", "cost", "maxCapacity", "combatValue", "maxHealth", "maxShield", "maxMana", "maxRank", "sightRadius", "skillRange", "firePointCount", "neededExperienceLevel", "gridSize", "productionDuration", "cardModelScalingFactor", "maxArmor", "armorProtection", "moveSpeed", "damage1", "damage2", "weaponRange", "attackCooldown", "attack2Cooldown", "effectRadius1", "effectRadius2", "healAmount1", "healAmount2", "gainCreditsAmount", "skillManaCost", "duration1", "duration2", "rarity"]
         },
-        "value": { "type": "string", "pattern": "^(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?$" }
+        "value": { "type": "string" }
       },
       "allOf": [
+        {
+          "if": {
+            "properties": {
+              "name": { "enum": ["rarity"] }
+            },
+            "required": ["name"]
+          },
+          "then": { "properties": { "value": { "pattern": "^(?:Common|Rare|UltraRare)$" } } },
+          "else": { "properties": { "value": { "pattern": "^(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?$" } } }
+        },
         {
           "if": {
             "properties": {
@@ -225,11 +237,21 @@
       "required": ["name", "value"],
       "properties": {
         "name": {
-          "enum": ["levelCount", "maxWidth", "coinReward", "startCrystalReward", "researchPointsReward", "twoWayBranchingProbability", "shopWeight", "restSiteWeight", "cardRewardWeight", "upgradeRewardWeight", "relicRewardWeight", "researchRewardWeight", "coinRewardWeight", "startCrystalRewardWeight", "researchPointsRewardWeight", "dropRewardWeight"]
+          "enum": ["levelCount", "maxWidth", "coinReward", "startCrystalReward", "researchPointsReward", "twoWayBranchingProbability", "shopWeight", "restSiteWeight", "cardRewardWeight", "upgradeRewardWeight", "relicRewardWeight", "researchRewardWeight", "coinRewardWeight", "startCrystalRewardWeight", "researchPointsRewardWeight", "dropRewardWeight", "fillFirstLevelWithCardRewards", "putDefaultCardRewardInCenter", "fillLastLevelWithShops"]
         },
-        "value": { "type": "string", "pattern": "^(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?$" }
+        "value": { "type": "string" }
       },
       "allOf": [
+        {
+          "if": {
+            "properties": {
+              "name": { "enum": ["fillFirstLevelWithCardRewards", "putDefaultCardRewardInCenter", "fillLastLevelWithShops"] }
+            },
+            "required": ["name"]
+          },
+          "then": { "properties": { "value": { "pattern": "^(?:true|false)$" } } },
+          "else": { "properties": { "value": { "pattern": "^(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?$" } } }
+        },
         {
           "if": {
             "properties": {

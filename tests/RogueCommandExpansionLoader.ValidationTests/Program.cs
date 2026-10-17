@@ -56,6 +56,7 @@ var tests = new (string Name, Action Run)[]
             "BlueprintNamePrefix",
             "BlueprintDescriptionPrefix",
             "LandscapeLocalizationPrefix",
+            "FallbackLandscapeGeneratorsPostfix",
             "BlueprintPoolIsInPoolPrefix",
             "BlueprintPoolFindPrefix",
             "BlueprintPoolExclusiveBlueprintsPostfix"
@@ -199,6 +200,61 @@ var tests = new (string Name, Action Run)[]
         {
             throw new InvalidOperationException("A duplicate scoped pool registration was not rejected atomically.");
         }
+    }),
+    ("scoped blueprint pool tooltips retain their source localization key", () =>
+    {
+        var registry = new BlueprintPoolScopeRegistry();
+        registry.Register(new[]
+        {
+            new BlueprintPoolScopeRegistration("RCL_POOL_TEST", "sample:stage", new object(),
+                new[] { "sample:unit" }, false, "NativePool")
+        });
+        if (!registry.TryGetSourcePoolLocalizationId("rcl_pool_test", out string sourceKey) ||
+            sourceKey != "NativePool" ||
+            registry.TryGetSourcePoolLocalizationId("NativePool", out _) ||
+            registry.TryGetSourcePoolLocalizationId(null, out _))
+        {
+            throw new InvalidOperationException("A scoped pool lost its source tooltip key or rewrote an unrelated key.");
+        }
+
+        MethodInfo hook = typeof(RuntimeHarmonyPatches).GetMethod("LandscapeLocalizationPrefix")!;
+        if (hook.GetParameters()[0].ParameterType != typeof(string).MakeByRefType())
+        {
+            throw new InvalidOperationException("The localization hook cannot pass its source key to the original game method.");
+        }
+    }),
+    ("appended stage fallbacks preserve the native prefix and follow each active progression", () =>
+    {
+        var nativeFirst = new object();
+        var nativeSecond = new object();
+        var addedFallback = new object();
+        var firstStage = new object();
+        var secondStage = new object();
+        var native = new List<object> { nativeFirst, nativeSecond };
+        var firstProfile = new List<object> { new object(), new object(), firstStage, secondStage };
+        var secondProfile = new List<object> { new object(), new object(), secondStage };
+        object Resolve(object stage) => stage == firstStage || stage == secondStage ? addedFallback : null!;
+        var first = StageFallbackSnapshot.Build(native, firstProfile, Resolve);
+        var second = StageFallbackSnapshot.Build(native, secondProfile, Resolve);
+        var repeated = StageFallbackSnapshot.Build(native, firstProfile, Resolve);
+        if (native.Count != 2 || first.Count != 4 || second.Count != 3 || repeated.Count != 4 ||
+            !ReferenceEquals(first[0], nativeFirst) || !ReferenceEquals(first[1], nativeSecond) ||
+            !ReferenceEquals(first[2], addedFallback) || !ReferenceEquals(first[3], addedFallback) ||
+            !ReferenceEquals(second[2], addedFallback) || ReferenceEquals(first, native))
+        {
+            throw new InvalidOperationException("Fallback snapshots mutated native slots, deduplicated positional entries, or leaked progression state.");
+        }
+
+        bool missingRejected = false;
+        try { StageFallbackSnapshot.Build(native, firstProfile, _ => null!); }
+        catch (InvalidOperationException) { missingRejected = true; }
+        if (!missingRejected || native.Count != 2)
+            throw new InvalidOperationException("An unknown appended stage was accepted or changed native fallbacks.");
+
+        MethodInfo hook = typeof(RuntimeHarmonyPatches).GetMethod("FallbackLandscapeGeneratorsPostfix")!;
+        if (hook.ReturnType != typeof(void) || hook.GetParameters()[0].ParameterType !=
+            typeof(List<global::LandscapeGenerator>).MakeByRefType())
+            throw new InvalidOperationException("The fallback getter hook has an incompatible typed result.");
     }),
     ("sample manifest passes package-local validation", () =>
     {
@@ -374,6 +430,25 @@ var tests = new (string Name, Action Run)[]
             pack.aiProfiles[0].unitDependencies = ["foreign:unit"];
             ExpectValid(pack, root, new EmptySnapshot("foreign:unit"), new KnownModuleValidator());
         });
+    }),
+    ("AI deck checks accept unitEntries dependencies without redundant unitDependencies", () =>
+    {
+        ContentAiProfileDefinition profile = reactiveAiSample.aiProfiles[0];
+        if (!ContentPackValidator.DeclaresAiUnitDependency(profile, "sample-native:skirmish-bike") ||
+            ContentPackValidator.DeclaresAiUnitDependency(profile, "foreign:undeclared") ||
+            ContentPackValidator.DeclaresAiUnitDependency(profile, "SAMPLE-NATIVE:skirmish-bike") ||
+            ContentPackValidator.DeclaresAiUnitDependency(profile, "") ||
+            ContentPackValidator.DeclaresAiUnitDependency(null!, "sample-native:skirmish-bike"))
+        {
+            throw new InvalidOperationException("AI deck validation lost the explicit unitEntries dependency or admitted an undeclared ID.");
+        }
+
+        var customProfile = new ContentAiProfileDefinition { unitDependencies = ["foreign:unit"] };
+        if (!ContentPackValidator.DeclaresAiUnitDependency(customProfile, "foreign:unit") ||
+            ContentPackValidator.DeclaresAiUnitDependency(customProfile, "foreign:undeclared"))
+        {
+            throw new InvalidOperationException("AI deck validation no longer enforces custom prefab unitDependencies.");
+        }
     }),
     ("AI profiles reject unresolved cross-pack unit dependencies", () =>
     {
@@ -1804,6 +1879,114 @@ var tests = new (string Name, Action Run)[]
             ExpectDiagnostic(pack, root, registry, new KnownModuleValidator(), "id.collision");
         });
     }),
+    ("Sandlance Scout declares starting blueprint eligibility and AI allowed flag", () =>
+    {
+        ContentUnitDefinition sandlance = nativeSample.units.Single(unit => unit.id == "sample-native:scout-tank");
+        if (!sandlance.isAllowedAsStartingBlueprint)
+        {
+            throw new InvalidOperationException("Sandlance Scout should be marked as allowed as starting blueprint.");
+        }
+        if (!sandlance.isAllowedForAi)
+        {
+            throw new InvalidOperationException("Sandlance Scout should be marked as allowed for AI.");
+        }
+    }),
+    ("Skirmish Strike Bike declares isAllowedForAi", () =>
+    {
+        ContentUnitDefinition bike = nativeSample.units.Single(unit => unit.id == "sample-native:skirmish-bike");
+        if (!bike.isAllowedForAi)
+        {
+            throw new InvalidOperationException("Skirmish Strike Bike should be marked as allowed for AI.");
+        }
+    }),
+    ("stage parameter overrides accept boolean flags and reject invalid values", () =>
+    {
+        WithPackage(nativeSample, (pack, root) =>
+        {
+            pack.stages[0].parameterOverrides =
+            [
+                new ContentStageParameterOverride { name = "fillFirstLevelWithCardRewards", value = "true" },
+                new ContentStageParameterOverride { name = "putDefaultCardRewardInCenter", value = "false" },
+                new ContentStageParameterOverride { name = "fillLastLevelWithShops", value = "true" }
+            ];
+            ExpectValid(pack, root, new EmptySnapshot(), new KnownModuleValidator());
+
+            pack.stages[0].parameterOverrides =
+            [
+                new ContentStageParameterOverride { name = "fillFirstLevelWithCardRewards", value = "not-a-bool" }
+            ];
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "stage.parameter-override-invalid");
+        });
+    }),
+    ("balance overrides accept rarity enum and reject invalid enum values", () =>
+    {
+        WithPackage(nativeSample, (pack, root) =>
+        {
+            pack.units[0].balanceOverrides =
+            [
+                new ContentBalanceOverride { name = "rarity", value = "Rare" }
+            ];
+            ExpectValid(pack, root, new EmptySnapshot(), new KnownModuleValidator());
+
+            pack.units[0].balanceOverrides =
+            [
+                new ContentBalanceOverride { name = "rarity", value = "Mythic" }
+            ];
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "unit.balance-override-invalid");
+        });
+    }),
+    ("harvester-raider AI parameter parser supplies bounded defaults and validates limits", () =>
+    {
+        if (!HarvesterRaiderParameterParser.TryParse(null, out HarvesterRaiderSettings defaults,
+            out string diagnostic) || diagnostic != null || defaults.BaseIndex != 0 ||
+            defaults.ScanIntervalSeconds != 10f || defaults.CooldownSeconds != 25f ||
+            defaults.RaidSquadSize != 3 || defaults.MinGameTimeSeconds != 15f)
+        {
+            throw new InvalidOperationException("The harvester-raider AI parser did not return its documented defaults.");
+        }
+
+        ContentModuleParameter[] boundaries =
+        [
+            new ContentModuleParameter { name = "baseIndex", value = "31" },
+            new ContentModuleParameter { name = "scanIntervalSeconds", value = "120" },
+            new ContentModuleParameter { name = "cooldownSeconds", value = "300" },
+            new ContentModuleParameter { name = "raidSquadSize", value = "8" },
+            new ContentModuleParameter { name = "minGameTimeSeconds", value = "600" }
+        ];
+        if (!HarvesterRaiderParameterParser.TryParse(boundaries, out HarvesterRaiderSettings maximums,
+            out diagnostic) || diagnostic != null || maximums.BaseIndex != 31 ||
+            maximums.ScanIntervalSeconds != 120f || maximums.CooldownSeconds != 300f ||
+            maximums.RaidSquadSize != 8 || maximums.MinGameTimeSeconds != 600f)
+        {
+            throw new InvalidOperationException("The harvester-raider AI parser rejected valid upper-bound values.");
+        }
+    }),
+    ("harvester-raider AI parameter parser rejects invalid values and unknown parameters", () =>
+    {
+        ContentModuleParameter[][] invalidInputs =
+        [
+            [new ContentModuleParameter { name = "unknownParam", value = "1" }],
+            [new ContentModuleParameter { name = "baseIndex", value = "0" }, new ContentModuleParameter { name = "baseIndex", value = "1" }],
+            [null!],
+            [new ContentModuleParameter { name = "baseIndex", value = "32" }],
+            [new ContentModuleParameter { name = "raidSquadSize", value = "9" }],
+            [new ContentModuleParameter { name = "raidSquadSize", value = "0" }],
+            [new ContentModuleParameter { name = "scanIntervalSeconds", value = "1.5" }],
+            [new ContentModuleParameter { name = "cooldownSeconds", value = "NaN" }],
+            [new ContentModuleParameter { name = "minGameTimeSeconds", value = "Infinity" }]
+        ];
+
+        for (int i = 0; i < invalidInputs.Length; i++)
+        {
+            if (HarvesterRaiderParameterParser.TryParse(invalidInputs[i], out _, out string diagnostic) ||
+                diagnostic == null)
+            {
+                throw new InvalidOperationException("The harvester-raider AI parser accepted invalid input " + i + ".");
+            }
+        }
+    }),
     ("managed assemblies are rejected from content packs", () =>
     {
         WithPackage(sample, (pack, root) =>
@@ -2109,6 +2292,11 @@ sealed class KnownModuleValidator : IAiModuleValidator
 {
     public bool TryValidate(string moduleId, ContentModuleParameter[] parameters, out string diagnostic)
     {
+        if (moduleId == "sample:harvester-raider")
+        {
+            return HarvesterRaiderParameterParser.TryParse(parameters, out _, out diagnostic);
+        }
+
         bool known = moduleId is "sample:scheduled-base-build" or "sample:reactive-base-defense" or "sample:trace-default";
         diagnostic = known ? string.Empty : "Unknown compiled AI module: " + moduleId;
         return known;

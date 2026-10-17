@@ -21,7 +21,7 @@ namespace RogueCommandExpansionLoader.Content
     /// keeps their AssetBundles and Unity objects alive for the whole game session.
     /// </summary>
     public sealed class ContentPackRuntimeLoader : IRuntimeContentProvider, IStageLandscapeRuntimeProvider,
-        IBlueprintPoolRuntimeProvider
+        IBlueprintPoolRuntimeProvider, IStageFallbackRuntimeProvider
     {
         private const int MaxManifestBytes = 1024 * 1024;
         private const uint GenericRead = 0x80000000;
@@ -67,10 +67,14 @@ namespace RogueCommandExpansionLoader.Content
         private readonly FieldInfo _imageLocationField;
         private readonly FieldInfo _inactiveField;
         private readonly FieldInfo _allowedBlueprintField;
+        private readonly FieldInfo _allowedStartingBlueprintField;
+        private readonly FieldInfo _allowedForAiField;
         private readonly FieldInfo _stageParametersField;
         private readonly FieldInfo _stageMapSizeField;
         private readonly FieldInfo _stageDemoField;
         private readonly FieldInfo _gameBalancingAssetField;
+        private readonly FieldInfo _fallbackLandscapeGeneratorsField;
+        private readonly PropertyInfo _currentProgressionProperty;
         private readonly FieldInfo _gameIsDemoField;
         private readonly FieldInfo _gameMaxAscensionLevelField;
         private readonly FieldInfo[] _progressionFields;
@@ -138,6 +142,7 @@ namespace RogueCommandExpansionLoader.Content
         private readonly HashSet<string> _knownIds = new HashSet<string>(StringComparer.Ordinal);
         private readonly HashSet<string> _nativeUnitIds = new HashSet<string>(StringComparer.Ordinal);
         private readonly HashSet<string> _blueprintUnitIds = new HashSet<string>(StringComparer.Ordinal);
+        private readonly HashSet<string> _startingBlueprintUnitIds = new HashSet<string>(StringComparer.Ordinal);
         private readonly List<LoadedStage> _stages = new List<LoadedStage>();
         private readonly List<PackCandidate> _packCandidates = new List<PackCandidate>();
         private readonly Queue<string> _recentLogs = new Queue<string>();
@@ -226,12 +231,24 @@ namespace RogueCommandExpansionLoader.Content
             _imageLocationField = RequireField(_entityRowType, "imageLocation", typeof(string));
             _inactiveField = RequireField(_entityRowType, "inactive", typeof(bool));
             _allowedBlueprintField = RequireField(_entityRowType, "isAllowedAsBlueprint", typeof(bool));
+            _allowedStartingBlueprintField = RequireField(_entityRowType, "isAllowedAsStartingBlueprint", typeof(bool));
+            _allowedForAiField = RequireField(_entityRowType, "isAllowedForAi", typeof(bool));
             _stageParametersField = RequireField(_stageType, "stageParameters", _stageParametersType);
             _stageMapSizeField = RequireField(_stageType, "mapSizeRange", typeof(Vector2Int));
             _stageDemoField = RequireField(_stageType, "isPartOfDemo", typeof(bool));
             Type gameBalancingStoreType = FindUniqueType("GameBalancingStore");
             _gameBalancingAssetField = FindField(gameBalancingStoreType,
                 "_gameBalancingScriptableObject", StaticFields);
+            _fallbackLandscapeGeneratorsField = RequireField(gameBalancingType,
+                "fallbackLandscapeGenerators", typeof(List<>).MakeGenericType(_landscapeGeneratorType));
+            _currentProgressionProperty = gameBalancingStoreType.GetProperty(
+                "CurrentLevelProgressionParameters", StaticFields);
+            if (_currentProgressionProperty == null || _currentProgressionProperty.PropertyType != progressionType ||
+                _currentProgressionProperty.GetGetMethod(true) == null ||
+                !_currentProgressionProperty.GetGetMethod(true).IsStatic)
+            {
+                throw new InvalidOperationException("GameBalancingStore.CurrentLevelProgressionParameters has an unexpected shape.");
+            }
             if (!_gameBalancingAssetField.IsStatic || _gameBalancingAssetField.FieldType != gameBalancingType)
             {
                 throw new InvalidOperationException(
@@ -531,6 +548,32 @@ namespace RogueCommandExpansionLoader.Content
             }
         }
 
+        public bool TryGetBlueprintPoolLocalizationId(string poolId, out string sourcePoolId)
+        {
+            return _blueprintPoolScopeRegistry.TryGetSourcePoolLocalizationId(poolId, out sourcePoolId);
+        }
+
+        public object GetFallbackLandscapeSnapshot(object nativeFallbacks)
+        {
+            lock (_gate)
+            {
+                object progression = _currentProgressionProperty.GetValue(null, null);
+                IList stages = progression == null ? null : _progressionStagesField.GetValue(progression) as IList;
+                return StageFallbackSnapshot.Build(nativeFallbacks as IList, stages, delegate(object stage)
+                {
+                    for (int i = 0; i < _stages.Count; i++)
+                    {
+                        if (System.Object.ReferenceEquals(_stages[i].RuntimeStage, stage))
+                        {
+                            return _stages[i].FallbackLandscape;
+                        }
+                    }
+
+                    return null;
+                });
+            }
+        }
+
         public bool TryGetBlueprintPoolDecision(object pool, string unitId, out bool runOriginal)
         {
             lock (_gate)
@@ -821,10 +864,16 @@ namespace RogueCommandExpansionLoader.Content
                 foreach (LoadedUnit unit in _units.Values)
                 {
                     bool allowedAsBlueprint = false;
+                    bool allowedAsStartingBlueprint = false;
+                    bool allowedForAi = false;
                     try { allowedAsBlueprint = (bool)_allowedBlueprintField.GetValue(unit.BalanceRow); }
                     catch { }
+                    try { allowedAsStartingBlueprint = (bool)_allowedStartingBlueprintField.GetValue(unit.BalanceRow); }
+                    catch { }
+                    try { allowedForAi = (bool)_allowedForAiField.GetValue(unit.BalanceRow); }
+                    catch { }
                     units.Add(new UnitDiagnosticReport(
-                        unit.Id, unit.PackId, unit.PrefabKey, unit.ImageKey, allowedAsBlueprint));
+                        unit.Id, unit.PackId, unit.PrefabKey, unit.ImageKey, allowedAsBlueprint, allowedAsStartingBlueprint, allowedForAi));
                 }
                 units.Sort((left, right) => StringComparer.Ordinal.Compare(left.UnitId, right.UnitId));
 
@@ -1940,6 +1989,7 @@ namespace RogueCommandExpansionLoader.Content
                         _prefabLocationField.SetValue(row, prefabKey);
                         _imageLocationField.SetValue(row, imageKey);
                         _inactiveField.SetValue(row, false);
+                        _allowedForAiField.SetValue(row, unit.isAllowedForAi);
                     }
                     else
                     {
@@ -1974,6 +2024,7 @@ namespace RogueCommandExpansionLoader.Content
                         _prefabLocationField.SetValue(row, prefabKey);
                         _imageLocationField.SetValue(row, imageKey);
                         _inactiveField.SetValue(row, false);
+                        _allowedForAiField.SetValue(row, unit.isAllowedForAi);
 
                         temporaryResources.Add(prefabKey, customPrefabClone);
                         temporaryResources.Add(imageKey, cardImage);
@@ -1992,10 +2043,12 @@ namespace RogueCommandExpansionLoader.Content
                 {
                     ContentStageDefinition stage = definition.stages[i];
                     UnityEngine.Object parameters;
+                    UnityEngine.Object nativeSourceParameters = null;
                     if (!String.IsNullOrWhiteSpace(stage.nativeTemplateId))
                     {
                         UnityEngine.Object nativeParameters = FindNativeStageTemplate(
                             stage.nativeTemplateId, packageName, stage.id);
+                        nativeSourceParameters = nativeParameters;
                         parameters = UnityEngine.Object.Instantiate(nativeParameters);
                         if (parameters == null || !_stageParametersType.IsInstanceOfType(parameters))
                         {
@@ -2045,8 +2098,9 @@ namespace RogueCommandExpansionLoader.Content
                         : CreateStageLandscape(stage, packageName, stageWorlds, temporaryResources,
                             temporaryLandscapeClones);
                     object runtimeStage = CreateStage(stage, parameters, packageName);
+                    UnityEngine.Object fallback = ResolveStageFallback(stage, nativeSourceParameters, stageWorlds, packageName);
                     temporaryStages.Add(new LoadedStage(stage, definition.packId, runtimeStage,
-                        pools, stageWorlds, landscape, stagePoolScopes));
+                        pools, stageWorlds, landscape, stagePoolScopes, fallback));
                 }
 
                 Dictionary<string, Vector2Int> scopedAiStageRanges = BuildScopedAiStageRanges(
@@ -2196,11 +2250,11 @@ namespace RogueCommandExpansionLoader.Content
                             }
 
                             if (!IsNativeOrPackLocalUnit(deckEntityId, temporaryUnits) &&
-                                !ContainsString(profile.unitDependencies, deckEntityId))
+                                !ContentPackValidator.DeclaresAiUnitDependency(profile, deckEntityId))
                             {
                                 throw new InvalidDataException("Perfil AI " + profile.id +
                                     ": la unidad de deck externa '" + deckEntityId +
-                                    "' debe declararse en unitDependencies para fijar su orden de carga.");
+                                    "' debe declararse en unitDependencies o unitEntries para fijar su orden de carga.");
                             }
 
                             if (!IsUnitAvailable(deckEntityId, temporaryUnits))
@@ -2471,10 +2525,16 @@ namespace RogueCommandExpansionLoader.Content
             var contributionAi = new List<object>();
             var poolScopeRegistrations = new List<BlueprintPoolScopeRegistration>();
             var blueprintUnitIds = new HashSet<string>(StringComparer.Ordinal);
+            var startingBlueprintUnitIds = new HashSet<string>(StringComparer.Ordinal);
             var localUnitIds = new HashSet<string>(StringComparer.Ordinal);
             for (int i = 0; i < units.Count; i++)
             {
                 localUnitIds.Add(units[i].Id);
+                if (units[i].Definition.isAllowedAsStartingBlueprint)
+                {
+                    startingBlueprintUnitIds.Add(units[i].Id);
+                    blueprintUnitIds.Add(units[i].Id);
+                }
             }
 
             var seenBehaviourReferences = new HashSet<object>(ReferenceComparer.Instance);
@@ -2627,6 +2687,11 @@ namespace RogueCommandExpansionLoader.Content
                 _blueprintUnitIds.Add(unitId);
             }
 
+            foreach (string unitId in startingBlueprintUnitIds)
+            {
+                _startingBlueprintUnitIds.Add(unitId);
+            }
+
             _contributions.Add(new ProgressionContentContribution(
                 definition.packId, contributionStages, contributionAi));
             Log("Paquete '" + definition.packId + "' cargado: " + units.Count + " unidad(es), " +
@@ -2641,6 +2706,15 @@ namespace RogueCommandExpansionLoader.Content
                 if (_units.TryGetValue(unitId, out unit))
                 {
                     _allowedBlueprintField.SetValue(unit.BalanceRow, true);
+                }
+            }
+
+            foreach (string unitId in _startingBlueprintUnitIds)
+            {
+                LoadedUnit unit;
+                if (_units.TryGetValue(unitId, out unit))
+                {
+                    _allowedStartingBlueprintField.SetValue(unit.BalanceRow, true);
                 }
             }
         }
@@ -2747,7 +2821,7 @@ namespace RogueCommandExpansionLoader.Content
 
                 bool exclusive = (bool)_blueprintPoolExclusiveField.GetValue(poolClone);
                 registrations.Add(new BlueprintPoolScopeRegistration(
-                    scopedPoolId, stage.id, poolClone, scopedUnitIds, exclusive));
+                    scopedPoolId, stage.id, poolClone, scopedUnitIds, exclusive, originalPoolId));
                 result.Add(poolClone);
             }
 
@@ -2899,10 +2973,22 @@ namespace RogueCommandExpansionLoader.Content
                     }
                     value = parsed;
                 }
+                else if (field.FieldType.IsEnum)
+                {
+                    try
+                    {
+                        value = Enum.Parse(field.FieldType, balanceOverride.value, true);
+                    }
+                    catch
+                    {
+                        throw new InvalidDataException("Unidad " + unitId + " en '" + packageName +
+                            "': valor de enum inválido para " + balanceOverride.name + ".");
+                    }
+                }
                 else
                 {
                     throw new InvalidDataException("Unidad " + unitId + " en '" + packageName +
-                        "': el campo " + balanceOverride.name + " no es un override numérico compatible.");
+                        "': el campo " + balanceOverride.name + " no es un override compatible.");
                 }
 
                 field.SetValue(row, value);
@@ -3224,6 +3310,87 @@ namespace RogueCommandExpansionLoader.Content
                     UnityEngine.Object.Destroy(inactiveHolder);
                 }
             }
+        }
+
+        private UnityEngine.Object ResolveStageFallback(ContentStageDefinition stage,
+            UnityEngine.Object nativeSourceParameters, List<object> worlds, string packageName)
+        {
+            object balancing = _gameBalancingAssetField.GetValue(null);
+            IList fallbacks = balancing == null ? null : _fallbackLandscapeGeneratorsField.GetValue(balancing) as IList;
+            if (fallbacks == null || fallbacks.Count == 0)
+            {
+                throw new InvalidDataException("Etapa " + stage.id + ": no hay generadores de respaldo nativos.");
+            }
+
+            bool isDemo = (bool)_gameIsDemoField.GetValue(balancing);
+            if (nativeSourceParameters != null)
+            {
+                foreach (FieldInfo profileField in _progressionFields)
+                {
+                    object profile = profileField.GetValue(balancing);
+                    IList nativeStages = profile == null ? null : _progressionStagesField.GetValue(profile) as IList;
+                    if (nativeStages == null) continue;
+                    for (int i = 0; i < nativeStages.Count && i < fallbacks.Count; i++)
+                    {
+                        if (nativeStages[i] != null && System.Object.ReferenceEquals(
+                            _stageParametersField.GetValue(nativeStages[i]), nativeSourceParameters) &&
+                            IsCompatibleStageFallback(fallbacks[i], stage, worlds, isDemo))
+                        {
+                            return (UnityEngine.Object)fallbacks[i];
+                        }
+                    }
+                }
+            }
+
+            // Bundled stages and templates absent from the progression use a native
+            // fallback of compatible size/worlds, with stable list order breaking ties.
+            UnityEngine.Object selected = null;
+            double bestDistance = Double.MaxValue;
+            double midpoint = (stage.mapSizeMin + stage.mapSizeMax) / 2.0;
+            foreach (object candidate in fallbacks)
+            {
+                if (!IsCompatibleStageFallback(candidate, stage, worlds, isDemo)) continue;
+                double distance = Math.Abs((int)_landscapeMapSizeField.GetValue(candidate) - midpoint);
+                if (distance < bestDistance)
+                {
+                    selected = (UnityEngine.Object)candidate;
+                    bestDistance = distance;
+                }
+            }
+
+            if (selected == null)
+            {
+                throw new InvalidDataException("Etapa " + stage.id + " en '" + packageName +
+                    "': ningún generador de respaldo nativo respeta su tamaño, demo y Worlds.");
+            }
+
+            return selected;
+        }
+
+        private bool IsCompatibleStageFallback(object candidate, ContentStageDefinition stage,
+            List<object> worlds, bool isDemo)
+        {
+            if (!(candidate is UnityEngine.Object) || candidate.GetType() != _landscapeGeneratorType)
+                return false;
+            int size = (int)_landscapeMapSizeField.GetValue(candidate);
+            if (size < stage.mapSizeMin || size > stage.mapSizeMax || size % 2 == 0 ||
+                (isDemo && !(bool)_landscapeAllowedForDemoField.GetValue(candidate)))
+                return false;
+
+            IList restrictions = _landscapeRestrictedWorldsField.GetValue(candidate) as IList;
+            if (restrictions == null) return false;
+            if (restrictions.Count == 0) return true;
+            foreach (object world in worlds)
+            {
+                if ((bool)_worldDeactivatedField.GetValue(world) ||
+                    (isDemo && !(bool)_worldAllowedForDemoField.GetValue(world))) continue;
+                bool found = false;
+                foreach (object allowed in restrictions)
+                    if (System.Object.ReferenceEquals(allowed, world)) { found = true; break; }
+                if (!found) return false;
+            }
+
+            return true;
         }
 
         private UnityEngine.Object FindNativeStageTemplate(string templateId, string packageName, string stageId)
@@ -4276,10 +4443,21 @@ namespace RogueCommandExpansionLoader.Content
 
                     value = parsed;
                 }
+                else if (field.FieldType == typeof(bool))
+                {
+                    bool parsed;
+                    if (!Boolean.TryParse(stageOverride.value, out parsed))
+                    {
+                        throw new InvalidDataException("Etapa " + stageId + " en '" + packageName +
+                            "': valor booleano inválido para " + stageOverride.name + ".");
+                    }
+
+                    value = parsed;
+                }
                 else
                 {
                     throw new InvalidDataException("Etapa " + stageId + " en '" + packageName +
-                        "': el campo " + stageOverride.name + " no es un parámetro numérico compatible.");
+                        "': el campo " + stageOverride.name + " no es un parámetro compatible.");
                 }
 
                 field.SetValue(parameters, value);
@@ -4876,7 +5054,8 @@ namespace RogueCommandExpansionLoader.Content
                 List<object> blueprintPools,
                 List<object> worlds,
                 LoadedLandscape landscape,
-                List<BlueprintPoolScopeRegistration> blueprintPoolScopes)
+                List<BlueprintPoolScopeRegistration> blueprintPoolScopes,
+                UnityEngine.Object fallbackLandscape)
             {
                 Definition = definition;
                 PackId = packId;
@@ -4885,6 +5064,7 @@ namespace RogueCommandExpansionLoader.Content
                 Worlds = worlds;
                 Landscape = landscape;
                 BlueprintPoolScopes = blueprintPoolScopes;
+                FallbackLandscape = fallbackLandscape;
             }
 
             public ContentStageDefinition Definition { get; private set; }
@@ -4894,6 +5074,7 @@ namespace RogueCommandExpansionLoader.Content
             public List<object> Worlds { get; private set; }
             public LoadedLandscape Landscape { get; private set; }
             public List<BlueprintPoolScopeRegistration> BlueprintPoolScopes { get; private set; }
+            public UnityEngine.Object FallbackLandscape { get; private set; }
         }
 
         private sealed class LoadedLandscape

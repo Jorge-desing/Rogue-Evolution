@@ -11,6 +11,7 @@ Use this skill when adding or reviewing a unit in this repository. Read `AGENTS.
 
 - A `nativeTemplateId` unit copies a registered game balance row and clones the native prefab. Use `balanceOverrides` only for allowlisted numeric fields. It keeps the native controller and gameplay components.
 - A native visual overlay can set `visualAssetName` and `visualRootPath` with an AssetBundle. The root path must resolve to one native renderer subtree. The loader replaces those renderers and retains the native gameplay hierarchy; it does not retarget rigs or animations.
+- Before installing a native visual overlay, run `.venv\Scripts\python.exe tools/validate_native_visual_roots.py <pack-directory>` against the pinned game. Do not copy a visual path between different native templates: ArtilleryTank uses `Tank`, GatlingWalker uses `RoboMarine_Mesh`, and LightningTank uses `PCX TankHolder` on the currently verified asset identity. This static check does not prove live resource selection or rendering.
 - A custom-prefab unit needs a complete bundled balance asset, prefab, and card Sprite with the game-required serialized components and references. The Unity Editor's inability to attach the precompiled game scripts is an authoring constraint; fail closed when a complete prefab cannot be produced.
 - AssetBundles hold serialized Unity assets, not new executable `MonoBehaviour` code. Put new code in the compiled loader only when the task requires it.
 
