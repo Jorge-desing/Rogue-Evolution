@@ -52,6 +52,10 @@ Every unit must pass the **Squint Test**: when zoomed out or viewed as a solid b
 | **Surge / Arc Tank** | `LightningTank` | Segmented tracked hull, central toroidal reactor/induction coil, forward emitter prongs | ~2.3m × 2.8m × 1.6m | Central reactor core |
 | **Hover Skimmer** | `PCXBaseTank` | Anti-grav repulsor cushion, ventral thruster bells, lateral stabilizer fins | ~2.5m × 2.9m × 1.6m | Floating ~0.24m–0.45m above ground |
 | **Siege Spider / Quad** | `GatlingWalker` | 4 wide outrigger crawler legs, central turret, heavy hydraulic knee knuckles | ~4.6m × 4.8m × 1.8m | Low, stable wide 4-point footprint |
+| **VTOL Gunship** | `PCXBaseTank` | Sleek lifting body, swept wing sponsons, dual ducted tilt-rotors, canted V-tail | ~3.8m × 4.7m × 1.5m | Central / wing-biased |
+| **Half-Track APC** | `PCXBaseTank` | Front steerable wheels, rear continuous tracks, armored troop cabin with clamshell doors | ~2.2m × 3.8m × 2.2m | Mid-chassis / troop bay |
+| **Super-Heavy Fortress**| `ArtilleryTank` | 4 independent heavy track pods, massive superstructure, dual heavy cannons or howitzer | ~3.3m × 4.6m × 2.4m | Broad, heavy 4-point ground base |
+| **Recon Strike Buggy**| `BombBike` | Wide stance all-terrain tires, tubular roll cage, exposed rear engine, top pintle gun | ~2.3m × 3.2m × 2.2m | Low, agile off-road stance |
 
 ---
 
@@ -72,7 +76,7 @@ Do not use random color assortments or muddy textures. Rogue Command units use c
 +-------------------------------------------------------------------------+
 ```
 
-### Recommended Faction / Palette Sets
+### Recommended Faction & Camouflage Sets
 
 #### Palette A: Standard Vanguard (Sample-Native Expansion Default)
 - **Primary Armor**: Slate Teal (`#244552` / `RGB(36, 69, 82)`)
@@ -112,7 +116,11 @@ Do not use random color assortments or muddy textures. Rogue Command units use c
 - **Emissive Optics**: Overload Plasma Cyan (`#00f0ff` / `RGB(0, 240, 255)`)
   - *Metallic*: 0.15 | *Smoothness*: 0.88 | *Emissive*: Enabled (HDR ×2.5)
 
----
+#### Camouflage Modifier Presets (`--camo`)
+- **`desert`**: Sun-bleached coyote tan primary (`#6b522e`), desert khaki secondary (`#8c7042`), matte finish with high-visibility signal markings.
+- **`urban`**: Concrete slate primary (`#383d42`), asphalt grey secondary (`#5c636b`), dark tungsten mechanics with cool electric cyan optics.
+- **`arctic`**: Glacial tundra white primary (`#c2d1e0`), frost grey secondary (`#8494a8`), dark carbon rubber, and crimson hazard accents.
+- **`woodland`**: Low-reflectance olive drab primary (`#2e4024`), forest green secondary (`#475c38`), dark gunmetal, and high-visibility yellow bands.
 
 ## 4. Edge Beveling & The Specular Highlight Rule
 

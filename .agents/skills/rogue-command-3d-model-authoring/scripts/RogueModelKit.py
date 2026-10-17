@@ -302,6 +302,7 @@ def make_continuous_track_belt(
     width: float,
     tread_mat: bpy.types.Material | None,
     ground_z: float = 0.08,
+    y_pos: float = 0.0,
 ) -> bpy.types.Object:
     """Creates a continuous articulated track belt with sloped front climb and rounded return idlers."""
     hw = width * 0.5
@@ -316,22 +317,22 @@ def make_continuous_track_belt(
 
     vertices = [
         # Ground contact run
-        (-hw, rear_approach_y, ground_z),   # 0
-        ( hw, rear_approach_y, ground_z),   # 1
-        ( hw, approach_y, ground_z),        # 2
-        (-hw, approach_y, ground_z),        # 3
+        (-hw, rear_approach_y + y_pos, ground_z),   # 0
+        ( hw, rear_approach_y + y_pos, ground_z),   # 1
+        ( hw, approach_y + y_pos, ground_z),        # 2
+        (-hw, approach_y + y_pos, ground_z),        # 3
         # Front climb
-        ( hw, front_apex_y, front_apex_z),  # 4
-        (-hw, front_apex_y, front_apex_z),  # 5
+        ( hw, front_apex_y + y_pos, front_apex_z),  # 4
+        (-hw, front_apex_y + y_pos, front_apex_z),  # 5
         # Front top curve
-        ( hw, half_l * 0.82, height),       # 6
-        (-hw, half_l * 0.82, height),       # 7
+        ( hw, half_l * 0.82 + y_pos, height),       # 6
+        (-hw, half_l * 0.82 + y_pos, height),       # 7
         # Top return run
-        ( hw, -half_l * 0.80, height),      # 8
-        (-hw, -half_l * 0.80, height),      # 9
+        ( hw, -half_l * 0.80 + y_pos, height),      # 8
+        (-hw, -half_l * 0.80 + y_pos, height),      # 9
         # Rear over curve
-        ( hw, rear_apex_y, rear_apex_z),    # 10
-        (-hw, rear_apex_y, rear_apex_z),    # 11
+        ( hw, rear_apex_y + y_pos, rear_apex_z),    # 10
+        (-hw, rear_apex_y + y_pos, rear_apex_z),    # 11
     ]
 
     faces = [
@@ -413,6 +414,7 @@ def make_continuous_track_assembly(
     skirt_mat: bpy.types.Material | None = None,
     accent_mat: bpy.types.Material | None = None,
     ground_z: float = 0.06,
+    center_y: float = 0.0,
 ) -> list[bpy.types.Object]:
     """Generates a complete parametric continuous track assembly with wheels, cleats, and fenders."""
     objects = []
@@ -423,7 +425,7 @@ def make_continuous_track_assembly(
     belt = make_continuous_track_belt(
         f"{prefix}_Belt_{side_tag}",
         x_pos=x_pos, length=length, height=height, width=belt_width,
-        tread_mat=tread_mat, ground_z=ground_z
+        tread_mat=tread_mat, ground_z=ground_z, y_pos=center_y
     )
     objects.append(belt)
 
@@ -435,7 +437,7 @@ def make_continuous_track_assembly(
     wheel_center_z = ground_z + wheel_radius + 0.02
 
     for idx in range(roadwheel_count):
-        y = -usable_l + idx * step_y
+        y = center_y - usable_l + idx * step_y
         wheel_loc = (x_pos + sign * 0.015, y, wheel_center_z)
         wheels = make_stepped_roadwheel(
             f"{prefix}_RoadWheel_{side_tag}_{idx+1}",
@@ -445,10 +447,10 @@ def make_continuous_track_assembly(
         objects.extend(wheels)
 
     # 3. Drive sprocket (rear) & Front idler wheel
-    for y_pos, name_tag in [(-half_l * 0.88, "DriveSprocket"), (half_l * 0.88, "FrontIdler")]:
+    for y_rel, name_tag in [(-half_l * 0.88, "DriveSprocket"), (half_l * 0.88, "FrontIdler")]:
         idler_wheels = make_stepped_roadwheel(
             f"{prefix}_{name_tag}_{side_tag}",
-            location=(x_pos + sign * 0.015, y_pos, ground_z + (height - ground_z) * 0.48),
+            location=(x_pos + sign * 0.015, center_y + y_rel, ground_z + (height - ground_z) * 0.48),
             radius=wheel_radius * 0.95, width=belt_width * 0.36,
             rim_mat=axle_mat, hub_mat=rim_mat, axle_mat=axle_mat, vertices=12
         )
@@ -457,7 +459,7 @@ def make_continuous_track_assembly(
     # 4. Top run track cleats for mechanical rhythm
     cleat_count = max(6, int(length * 3.0))
     cleat_step = (length * 0.72) / (cleat_count - 1)
-    cleat_start_y = -length * 0.36
+    cleat_start_y = center_y - length * 0.36
     for c_idx in range(cleat_count):
         cy = cleat_start_y + c_idx * cleat_step
         objects.append(make_box(
@@ -472,13 +474,13 @@ def make_continuous_track_assembly(
         objects.append(make_box(
             f"{prefix}_FenderTop_{side_tag}",
             (fender_w, length * 0.96, 0.06),
-            (x_pos, 0.0, height + 0.08), fender_mat, bevel=0.02
+            (x_pos, center_y, height + 0.08), fender_mat, bevel=0.02
         ))
         # Front angled splash guard
         objects.append(make_box(
             f"{prefix}_FenderSplash_{side_tag}",
             (fender_w, length * 0.16, 0.05),
-            (x_pos, length * 0.52, height + 0.02), fender_mat, bevel=0.015,
+            (x_pos, center_y + length * 0.52, height + 0.02), fender_mat, bevel=0.015,
             rotation=(math.radians(35), 0.0, 0.0)
         ))
 
@@ -487,13 +489,13 @@ def make_continuous_track_assembly(
         objects.append(make_box(
             f"{prefix}_ArmorSkirt_{side_tag}",
             (0.04, length * 0.88, height * 0.55),
-            (skirt_x, 0.0, ground_z + height * 0.52), skirt_mat, bevel=0.015
+            (skirt_x, center_y, ground_z + height * 0.52), skirt_mat, bevel=0.015
         ))
         if accent_mat is not None:
             objects.append(make_box(
                 f"{prefix}_SkirtStripe_{side_tag}",
                 (0.015, length * 0.55, 0.065),
-                (skirt_x + sign * 0.022, 0.0, ground_z + height * 0.58),
+                (skirt_x + sign * 0.022, center_y, ground_z + height * 0.58),
                 accent_mat, bevel=0.006
             ))
 
@@ -2123,6 +2125,525 @@ def make_dozer_blade(
     return objects
 
 
+def make_ducted_tiltrotor_assembly(
+    prefix: str,
+    location: Tuple[float, float, float] | Vector,
+    radius: float = 0.44,
+    depth: float = 0.26,
+    tilt_deg: float = 14.0,
+    duct_mat: bpy.types.Material | None = None,
+    rotor_mat: bpy.types.Material | None = None,
+    hub_mat: bpy.types.Material | None = None,
+    pylon_mat: bpy.types.Material | None = None,
+    glow_mat: bpy.types.Material | None = None,
+    blade_count: int = 3,
+    pylon_inboard_x: float = -0.32,
+) -> list[bpy.types.Object]:
+    """Generates an aerodynamic ducted tilt-rotor pod with shroud, spinner hub, blades, and swivel mount."""
+    objects = []
+    loc_v = Vector(location)
+    rot_tilt = (math.radians(tilt_deg), 0.0, 0.0)
+
+    # 1. Main outer aerodynamic cowl shroud
+    objects.append(make_cylinder(
+        f"{prefix}_DuctCowl",
+        radius=radius, depth=depth,
+        location=loc_v, material=duct_mat,
+        rotation=rot_tilt, vertices=14, bevel=0.025
+    ))
+
+    # 2. Intake lip ring
+    tilt_r = math.radians(tilt_deg)
+    lip_offset = Vector((0.0, -math.sin(tilt_r) * (depth * 0.45), math.cos(tilt_r) * (depth * 0.45)))
+    objects.append(make_cylinder(
+        f"{prefix}_IntakeLip",
+        radius=radius * 1.05, depth=0.04,
+        location=loc_v + lip_offset, material=hub_mat,
+        rotation=rot_tilt, vertices=14, bevel=0.012
+    ))
+
+    # 3. Inner recessed cavity duct wall
+    objects.append(make_cylinder(
+        f"{prefix}_InnerDuct",
+        radius=radius * 0.82, depth=depth * 0.95,
+        location=loc_v, material=hub_mat,
+        rotation=rot_tilt, vertices=14, bevel=0.015
+    ))
+
+    # 4. Central aerodynamic spinner hub
+    objects.append(make_cylinder(
+        f"{prefix}_SpinnerHub",
+        radius=radius * 0.28, depth=depth * 1.25,
+        location=loc_v, material=hub_mat,
+        rotation=rot_tilt, vertices=10, bevel=0.02
+    ))
+
+    # 5. Rotor blades radiating from spinner hub
+    inner_span = radius * 0.54
+    blade_width = radius * 0.22
+    for b_idx in range(blade_count):
+        angle = (2.0 * math.pi * b_idx) / blade_count
+        rx = math.cos(angle)
+        rz = math.sin(angle)
+        ry_tilted = -rz * math.sin(tilt_r)
+        rz_tilted = rz * math.cos(tilt_r)
+        blade_center = loc_v + Vector((rx * inner_span * 0.5, ry_tilted * inner_span * 0.5, rz_tilted * inner_span * 0.5))
+
+        objects.append(make_box(
+            f"{prefix}_Blade_{b_idx+1}",
+            (inner_span, blade_width, 0.025),
+            blade_center, rotor_mat, bevel=0.006,
+            rotation=(rot_tilt[0], math.radians(18), angle)
+        ))
+
+    # 6. Swivel pivot bracket / inboard pylon
+    pylon_start = loc_v + Vector((pylon_inboard_x, 0.0, 0.0))
+    objects.append(make_rod(
+        f"{prefix}_MountPylon",
+        pylon_start, loc_v,
+        radius * 0.12, pylon_mat, vertices=8
+    ))
+    objects.append(make_cylinder(
+        f"{prefix}_SwivelBearing",
+        radius * 0.22, 0.08,
+        loc_v + Vector((pylon_inboard_x * 0.35, 0.0, 0.0)),
+        pylon_mat, rotation=(0.0, math.radians(90), 0.0), vertices=10, bevel=0.01
+    ))
+
+    # 7. Optional glowing exhaust core ring
+    if glow_mat is not None:
+        exhaust_offset = Vector((0.0, math.sin(tilt_r) * (depth * 0.45), -math.cos(tilt_r) * (depth * 0.45)))
+        objects.append(make_cylinder(
+            f"{prefix}_GlowCore",
+            radius=radius * 0.52, depth=0.03,
+            location=loc_v + exhaust_offset, material=glow_mat,
+            rotation=rot_tilt, vertices=12, bevel=0.005
+        ))
+
+    return objects
+
+
+def make_tubular_rollcage_assembly(
+    prefix: str,
+    size: Tuple[float, float, float] = (1.15, 1.45, 0.78),
+    location: Tuple[float, float, float] | Vector = (0.0, 0.0, 1.0),
+    bar_radius: float = 0.034,
+    tube_mat: bpy.types.Material | None = None,
+    roof_mat: bpy.types.Material | None = None,
+    visor_mat: bpy.types.Material | None = None,
+) -> list[bpy.types.Object]:
+    """Generates an off-road tubular roll cage with A/B pillars, roof crossbars, and armored sun-visor plate."""
+    objects = []
+    loc_v = Vector(location)
+    hx = size[0] * 0.5
+    hy = size[1] * 0.5
+    hz = size[2] * 0.5
+
+    # 1. Main B-pillar roll hoop (central arch)
+    hoop_y = loc_v.y - hy * 0.15
+    for sx in (-1, 1):
+        tag = "L" if sx < 0 else "R"
+        objects.append(make_rod(
+            f"{prefix}_BPillar_{tag}",
+            (loc_v.x + sx * hx, hoop_y, loc_v.z - hz),
+            (loc_v.x + sx * (hx * 0.85), hoop_y, loc_v.z + hz),
+            bar_radius, tube_mat, vertices=8
+        ))
+    objects.append(make_rod(
+        f"{prefix}_BRoofBar",
+        (loc_v.x - hx * 0.85, hoop_y, loc_v.z + hz),
+        (loc_v.x + hx * 0.85, hoop_y, loc_v.z + hz),
+        bar_radius, tube_mat, vertices=8
+    ))
+
+    # 2. Sloped front A-pillars (windshield posts)
+    front_y = loc_v.y + hy
+    for sx in (-1, 1):
+        tag = "L" if sx < 0 else "R"
+        objects.append(make_rod(
+            f"{prefix}_APillar_{tag}",
+            (loc_v.x + sx * (hx * 0.92), front_y, loc_v.z - hz),
+            (loc_v.x + sx * (hx * 0.78), loc_v.y + hy * 0.40, loc_v.z + hz),
+            bar_radius, tube_mat, vertices=8
+        ))
+        objects.append(make_rod(
+            f"{prefix}_RoofRail_{tag}",
+            (loc_v.x + sx * (hx * 0.78), loc_v.y + hy * 0.40, loc_v.z + hz),
+            (loc_v.x + sx * (hx * 0.85), hoop_y, loc_v.z + hz),
+            bar_radius, tube_mat, vertices=8
+        ))
+
+    # 3. Windshield cross header bar
+    objects.append(make_rod(
+        f"{prefix}_WindshieldHeader",
+        (loc_v.x - hx * 0.78, loc_v.y + hy * 0.40, loc_v.z + hz),
+        (loc_v.x + hx * 0.78, loc_v.y + hy * 0.40, loc_v.z + hz),
+        bar_radius, tube_mat, vertices=8
+    ))
+
+    # 4. Rear diagonal stays (C-pillars down to rear deck)
+    rear_y = loc_v.y - hy
+    for sx in (-1, 1):
+        tag = "L" if sx < 0 else "R"
+        objects.append(make_rod(
+            f"{prefix}_CStay_{tag}",
+            (loc_v.x + sx * (hx * 0.85), hoop_y, loc_v.z + hz),
+            (loc_v.x + sx * (hx * 0.88), rear_y, loc_v.z - hz),
+            bar_radius * 0.92, tube_mat, vertices=8
+        ))
+
+    # 5. Armored roof sun-visor plate
+    if roof_mat is not None:
+        roof_l = (loc_v.y + hy * 0.40) - hoop_y
+        roof_cy = hoop_y + roof_l * 0.5
+        objects.append(make_box(
+            f"{prefix}_RoofPlate",
+            (size[0] * 0.80, roof_l * 1.08, 0.035),
+            (loc_v.x, roof_cy, loc_v.z + hz + 0.02),
+            roof_mat, bevel=0.012
+        ))
+
+    # 6. Windshield sun-visor brow shield
+    if visor_mat is not None:
+        objects.append(make_box(
+            f"{prefix}_SunVisor",
+            (size[0] * 0.76, 0.14, 0.05),
+            (loc_v.x, loc_v.y + hy * 0.44, loc_v.z + hz - 0.02),
+            visor_mat, bevel=0.01,
+            rotation=(math.radians(24), 0.0, 0.0)
+        ))
+
+    return objects
+
+
+def make_heavy_howitzer_assembly(
+    prefix: str,
+    gun_pivot: Tuple[float, float, float] | Vector,
+    direction: Tuple[float, float, float] | Vector,
+    caliber_radius: float = 0.135,
+    barrel_length: float = 1.15,
+    armor_mat: bpy.types.Material | None = None,
+    barrel_mat: bpy.types.Material | None = None,
+    accent_mat: bpy.types.Material | None = None,
+) -> list[bpy.types.Object]:
+    """Generates a heavy siege mortar / howitzer with reinforced breech, recoil cylinders, and sector elevation plates."""
+    objects = []
+    p_vec = Vector(gun_pivot)
+    d_vec = Vector(direction).normalized()
+    u_vec, v_vec, _ = get_orthonormal_basis(d_vec)
+    rot_euler = d_vec.to_track_quat("Z", "Y").to_euler()
+
+    # 1. Heavy cylindrical breech housing collar
+    breech_loc = p_vec + d_vec * 0.14
+    objects.append(make_cylinder(
+        f"{prefix}_BreechCollar",
+        radius=caliber_radius * 2.35, depth=0.42,
+        location=breech_loc, material=armor_mat,
+        rotation=rot_euler, vertices=12, bevel=0.035
+    ))
+
+    # 2. Main heavy-caliber barrel tube
+    barrel_center = p_vec + d_vec * (barrel_length * 0.5 + 0.22)
+    objects.append(make_cylinder(
+        f"{prefix}_BarrelTube",
+        radius=caliber_radius * 1.55, depth=barrel_length,
+        location=barrel_center, material=barrel_mat,
+        rotation=rot_euler, vertices=14, bevel=0.02
+    ))
+
+    # 3. Massive muzzle blast ring / collar
+    muzzle_loc = p_vec + d_vec * (barrel_length + 0.22)
+    objects.append(make_cylinder(
+        f"{prefix}_MuzzleCollar",
+        radius=caliber_radius * 1.95, depth=0.18,
+        location=muzzle_loc, material=armor_mat,
+        rotation=rot_euler, vertices=14, bevel=0.025
+    ))
+    if accent_mat is not None:
+        objects.append(make_cylinder(
+            f"{prefix}_MuzzleWarningBand",
+            radius=caliber_radius * 1.98, depth=0.045,
+            location=muzzle_loc - d_vec * 0.05, material=accent_mat,
+            rotation=rot_euler, vertices=14, bevel=0.008
+        ))
+
+    # 4. Massive hollow bore opening (dark cavity)
+    objects.append(make_cylinder(
+        f"{prefix}_BoreCavity",
+        radius=caliber_radius * 1.05, depth=0.12,
+        location=muzzle_loc + d_vec * 0.05, material=barrel_mat,
+        rotation=rot_euler, vertices=12, bevel=0.005
+    ))
+
+    # 5. Dual hydraulic recoil recuperator cylinders flanking the breech
+    recoil_spacing = caliber_radius * 2.6
+    for side in (-1, 1):
+        cyl_center = p_vec + u_vec * (side * recoil_spacing) + d_vec * 0.28
+        objects.append(make_cylinder(
+            f"{prefix}_RecoilCylinder_{'L' if side < 0 else 'R'}",
+            radius=caliber_radius * 0.55, depth=0.55,
+            location=cyl_center, material=barrel_mat,
+            rotation=rot_euler, vertices=10, bevel=0.015
+        ))
+        objects.append(make_cylinder(
+            f"{prefix}_RecoilPiston_{'L' if side < 0 else 'R'}",
+            radius=caliber_radius * 0.35, depth=0.35,
+            location=cyl_center + d_vec * 0.25, material=armor_mat,
+            rotation=rot_euler, vertices=8, bevel=0.01
+        ))
+
+    # 6. Sector elevation quadrant plates
+    for side in (-1, 1):
+        quad_loc = p_vec + u_vec * (side * (recoil_spacing + 0.12)) - v_vec * 0.12
+        objects.append(make_box(
+            f"{prefix}_ElevationQuadrant_{'L' if side < 0 else 'R'}",
+            (0.04, 0.38, 0.24), quad_loc, barrel_mat, bevel=0.01,
+            rotation=rot_euler
+        ))
+
+    return objects
+
+
+def make_dual_cannon_assembly(
+    prefix: str,
+    gun_pivot: Tuple[float, float, float] | Vector,
+    direction: Tuple[float, float, float] | Vector,
+    caliber_radius: float = 0.082,
+    barrel_length: float = 1.65,
+    barrel_spacing: float = 0.38,
+    armor_mat: bpy.types.Material | None = None,
+    barrel_mat: bpy.types.Material | None = None,
+    accent_mat: bpy.types.Material | None = None,
+) -> list[bpy.types.Object]:
+    """Generates a twin-cannon mantlet assembly with dual synchronized barrels, thermal sleeves, and muzzle brakes."""
+    objects = []
+    p_vec = Vector(gun_pivot)
+    d_vec = Vector(direction).normalized()
+    u_vec, v_vec, _ = get_orthonormal_basis(d_vec)
+    rot_euler = d_vec.to_track_quat("Z", "Y").to_euler()
+
+    # 1. Common armored mantlet block
+    mantlet_width = barrel_spacing + caliber_radius * 4.4
+    objects.append(make_box(
+        f"{prefix}_MantletBlock",
+        (mantlet_width, 0.44, 0.36),
+        p_vec + d_vec * 0.15, armor_mat, bevel=0.035,
+        rotation=rot_euler
+    ))
+
+    # 2. Dual gun barrels
+    for side in (-1, 1):
+        side_tag = "L" if side < 0 else "R"
+        barrel_pivot = p_vec + u_vec * (side * barrel_spacing * 0.5)
+        # Breech collar
+        objects.append(make_cylinder(
+            f"{prefix}_Breech_{side_tag}",
+            radius=caliber_radius * 1.85, depth=0.38,
+            location=barrel_pivot + d_vec * 0.32, material=armor_mat,
+            rotation=rot_euler, vertices=12, bevel=0.02
+        ))
+        # Thermal sleeve
+        objects.append(make_cylinder(
+            f"{prefix}_ThermalSleeve_{side_tag}",
+            radius=caliber_radius * 1.45, depth=barrel_length * 0.42,
+            location=barrel_pivot + d_vec * (barrel_length * 0.28 + 0.38), material=armor_mat,
+            rotation=rot_euler, vertices=12, bevel=0.015
+        ))
+        # Bore evacuator
+        evac_loc = barrel_pivot + d_vec * (barrel_length * 0.58 + 0.38)
+        objects.append(make_cylinder(
+            f"{prefix}_BoreEvacuator_{side_tag}",
+            radius=caliber_radius * 1.62, depth=0.22,
+            location=evac_loc, material=armor_mat,
+            rotation=rot_euler, vertices=12, bevel=0.015
+        ))
+        if accent_mat is not None:
+            objects.append(make_cylinder(
+                f"{prefix}_EvacuatorStripe_{side_tag}",
+                radius=caliber_radius * 1.65, depth=0.045,
+                location=evac_loc, material=accent_mat,
+                rotation=rot_euler, vertices=12, bevel=0.006
+            ))
+        # Main barrel tube
+        objects.append(make_cylinder(
+            f"{prefix}_BarrelTube_{side_tag}",
+            radius=caliber_radius, depth=barrel_length,
+            location=barrel_pivot + d_vec * (barrel_length * 0.5 + 0.38), material=barrel_mat,
+            rotation=rot_euler, vertices=12, bevel=0.01
+        ))
+        # Muzzle brake
+        muzzle_loc = barrel_pivot + d_vec * (barrel_length + 0.38)
+        objects.append(make_box(
+            f"{prefix}_MuzzleBrake_{side_tag}",
+            (caliber_radius * 2.8, caliber_radius * 2.8, caliber_radius * 2.2),
+            muzzle_loc, barrel_mat, bevel=0.015,
+            rotation=rot_euler
+        ))
+        objects.append(make_cylinder(
+            f"{prefix}_MuzzleBore_{side_tag}",
+            radius=caliber_radius * 0.85, depth=0.08,
+            location=muzzle_loc + d_vec * (caliber_radius * 1.2), material=barrel_mat,
+            rotation=rot_euler, vertices=10, bevel=0.005
+        ))
+
+    return objects
+
+
+def make_quad_track_pod_assembly(
+    prefix: str,
+    location: Tuple[float, float, float] | Vector,
+    length: float = 1.55,
+    height: float = 0.56,
+    belt_width: float = 0.32,
+    roadwheel_count: int = 3,
+    tread_mat: bpy.types.Material | None = None,
+    rim_mat: bpy.types.Material | None = None,
+    hub_mat: bpy.types.Material | None = None,
+    axle_mat: bpy.types.Material | None = None,
+    fender_mat: bpy.types.Material | None = None,
+    accent_mat: bpy.types.Material | None = None,
+    ground_z: float = 0.06,
+    inboard_side: int = -1,
+) -> list[bpy.types.Object]:
+    """Generates an independent continuous track pod for 4-track super-heavy crawlers."""
+    objects = []
+    loc_v = Vector(location)
+
+    # 1. Continuous track belt
+    belt = make_continuous_track_belt(
+        f"{prefix}_Belt",
+        x_pos=loc_v.x, length=length, height=height, width=belt_width,
+        tread_mat=tread_mat, ground_z=ground_z, y_pos=loc_v.y
+    )
+    objects.append(belt)
+
+    # 2. Stepped road wheels along ground run
+    half_l = length * 0.5
+    usable_l = half_l * 0.65
+    step_y = (usable_l * 2.0) / (roadwheel_count - 1) if roadwheel_count > 1 else 0.0
+    wheel_radius = (height - ground_z) * 0.34
+    wheel_center_z = ground_z + wheel_radius + 0.02
+    sign = 1.0 if inboard_side < 0 else -1.0
+
+    for idx in range(roadwheel_count):
+        y = loc_v.y - usable_l + idx * step_y
+        wheel_loc = (loc_v.x + sign * 0.015, y, wheel_center_z)
+        wheels = make_stepped_roadwheel(
+            f"{prefix}_RoadWheel_{idx+1}",
+            location=wheel_loc, radius=wheel_radius, width=belt_width * 0.38,
+            rim_mat=rim_mat, hub_mat=hub_mat, axle_mat=axle_mat, vertices=12
+        )
+        objects.extend(wheels)
+
+    # 3. Drive sprocket & idler wheel
+    for y_offset, name_tag in [(-half_l * 0.85, "DriveSprocket"), (half_l * 0.85, "FrontIdler")]:
+        idlers = make_stepped_roadwheel(
+            f"{prefix}_{name_tag}",
+            location=(loc_v.x + sign * 0.015, loc_v.y + y_offset, ground_z + (height - ground_z) * 0.48),
+            radius=wheel_radius * 0.95, width=belt_width * 0.36,
+            rim_mat=axle_mat, hub_mat=rim_mat, axle_mat=axle_mat, vertices=12
+        )
+        objects.extend(idlers)
+
+    # 4. Armored upper pod fender
+    if fender_mat is not None:
+        objects.append(make_box(
+            f"{prefix}_Fender",
+            (belt_width * 1.15, length * 0.92, 0.08),
+            (loc_v.x, loc_v.y, ground_z + height + 0.04),
+            fender_mat, bevel=0.02
+        ))
+
+    # 5. Inboard swivel mounting sponson arm (connecting pod to vehicle main hull)
+    arm_x_span = 0.32
+    arm_x = loc_v.x + (inboard_side * arm_x_span * 0.5)
+    objects.append(make_box(
+        f"{prefix}_MountArm",
+        (arm_x_span, length * 0.45, 0.24),
+        (arm_x, loc_v.y, ground_z + height * 0.65),
+        fender_mat, bevel=0.03
+    ))
+    objects.append(make_cylinder(
+        f"{prefix}_PivotKnuckle",
+        radius=0.14, depth=0.18,
+        location=(arm_x, loc_v.y, ground_z + height * 0.65),
+        material=axle_mat, rotation=(math.radians(90), 0.0, 0.0), vertices=10, bevel=0.015
+    ))
+
+    return objects
+
+
+def make_troop_compartment(
+    prefix: str,
+    location: Tuple[float, float, float] | Vector,
+    size: Tuple[float, float, float] = (1.45, 1.65, 0.76),
+    armor_mat: bpy.types.Material | None = None,
+    door_mat: bpy.types.Material | None = None,
+    detail_mat: bpy.types.Material | None = None,
+) -> list[bpy.types.Object]:
+    """Generates an armored troop compartment / rear cabin for APCs and halftracks."""
+    objects = []
+    loc_v = Vector(location)
+    sx, sy, sz = size
+
+    # 1. Main cabin box with sloped chamfers
+    objects.append(make_box(
+        f"{prefix}_CabinShell",
+        size, loc_v, armor_mat, bevel=0.04
+    ))
+
+    # 2. Roof observation cupola / hatch
+    cupola_z = loc_v.z + sz * 0.5 + 0.05
+    objects.append(make_cylinder(
+        f"{prefix}_RoofCupola",
+        radius=sx * 0.22, depth=0.10,
+        location=(loc_v.x, loc_v.y + sy * 0.15, cupola_z),
+        material=detail_mat, vertices=12, bevel=0.015
+    ))
+    objects.append(make_cylinder(
+        f"{prefix}_HatchCover",
+        radius=sx * 0.18, depth=0.035,
+        location=(loc_v.x, loc_v.y + sy * 0.15, cupola_z + 0.06),
+        material=door_mat, vertices=10, bevel=0.008
+    ))
+
+    # 3. Rear clamshell access doors
+    door_w = sx * 0.36
+    door_h = sz * 0.68
+    rear_y = loc_v.y - sy * 0.5 - 0.01
+    door_z = loc_v.z - sz * 0.08
+    for side in (-1, 1):
+        door_x = loc_v.x + side * (door_w * 0.52)
+        objects.append(make_box(
+            f"{prefix}_RearDoor_{'L' if side < 0 else 'R'}",
+            (door_w, 0.04, door_h),
+            (door_x, rear_y, door_z),
+            door_mat, bevel=0.012
+        ))
+        # Grab handles
+        handle_x = loc_v.x + side * 0.08
+        objects.append(make_rod(
+            f"{prefix}_DoorHandle_{'L' if side < 0 else 'R'}",
+            (handle_x, rear_y - 0.02, door_z - 0.08),
+            (handle_x, rear_y - 0.02, door_z + 0.08),
+            0.012, detail_mat, vertices=6
+        ))
+
+    # 4. Lateral armored vision slits / firing ports
+    for side in (-1, 1):
+        slit_x = loc_v.x + side * (sx * 0.5 + 0.01)
+        for y_offset in (-sy * 0.22, sy * 0.22):
+            tag = "F" if y_offset > 0 else "R"
+            objects.append(make_box(
+                f"{prefix}_VisionSlit_{'L' if side < 0 else 'R'}_{tag}",
+                (0.035, 0.22, 0.06),
+                (slit_x, loc_v.y + y_offset, loc_v.z + sz * 0.12),
+                detail_mat, bevel=0.008
+            ))
+
+    return objects
+
+
 class FactionPalette:
     """Pre-calibrated 5-tone PBR material set for a Rogue Command faction."""
 
@@ -2150,14 +2671,33 @@ class FactionPalette:
         )
 
 
-def get_faction_palette(faction: str = "vanguard", prefix: str = "Unit") -> FactionPalette:
+def get_faction_palette(faction: str = "vanguard", prefix: str = "Unit", camo: str = "none") -> FactionPalette:
     """Returns a pre-calibrated 5-tone PBR material set.
     Factions:
       - 'vanguard': Slate teal, seafoam, charcoal gunmetal, amber accent, arc cyan emission
       - 'siege': Rust ochre, desert sand, cast iron, hazard yellow, molten orange emission
       - 'syndicate': Deep cobalt, titanium grey, anodized black, electric magenta, plasma cyan emission
       - 'arctic': Frost white, slate blue, dark tungsten, crimson warning, bright blue emission
+    Camo styles:
+      - 'desert': Ochre sand / khaki two-tone with matte finish
+      - 'urban': Neutral slate / asphalt ash grey with cool cyan accents
+      - 'arctic': Glacial white / blue-grey with high-visibility signal markings
+      - 'woodland': Olive drab / forest green tactical split
     """
+    c = camo.lower()
+    if c == "desert":
+        return FactionPalette(prefix, (0.42, 0.32, 0.18), (0.55, 0.44, 0.26), (0.07, 0.08, 0.09),
+                              (0.04, 0.045, 0.05), (0.92, 0.52, 0.10), (0.98, 0.42, 0.08), 2.0)
+    elif c == "urban":
+        return FactionPalette(prefix, (0.22, 0.24, 0.26), (0.36, 0.39, 0.42), (0.05, 0.06, 0.07),
+                              (0.03, 0.035, 0.04), (0.85, 0.85, 0.20), (0.0, 0.85, 1.0), 2.2)
+    elif c == "arctic":
+        return FactionPalette(prefix, (0.76, 0.82, 0.88), (0.52, 0.58, 0.66), (0.08, 0.10, 0.14),
+                              (0.05, 0.06, 0.08), (0.92, 0.15, 0.18), (0.15, 0.85, 1.0), 2.2)
+    elif c in ("woodland", "jungle"):
+        return FactionPalette(prefix, (0.18, 0.25, 0.14), (0.28, 0.36, 0.22), (0.06, 0.07, 0.08),
+                              (0.04, 0.045, 0.05), (0.90, 0.65, 0.12), (0.20, 0.95, 0.45), 2.0)
+
     f = faction.lower()
     if f == "siege":
         return FactionPalette(prefix, (0.26, 0.14, 0.075), (0.43, 0.30, 0.16), (0.065, 0.072, 0.078),
@@ -2185,9 +2725,9 @@ class RogueVehicleBuilder:
     - Automated quality diagnostics and multi-perspective studio previews
     """
 
-    def __init__(self, name: str, faction: str = "vanguard", ground_clearance: float = 0.06):
+    def __init__(self, name: str, faction: str = "vanguard", ground_clearance: float = 0.06, camo: str = "none"):
         self.name = name
-        self.palette = get_faction_palette(faction, name)
+        self.palette = get_faction_palette(faction, name, camo=camo)
         self.ground_clearance = ground_clearance
         self.objects: list[bpy.types.Object] = []
         self.preserved_pivots: list[str] = []
@@ -2265,12 +2805,13 @@ class RogueVehicleBuilder:
         wheel_radius: float = 0.38,
         wheel_width: float = 0.28,
     ) -> "RogueVehicleBuilder":
+        effective_z = self.ground_clearance + wheel_radius + 0.035
         for side in (-1, 1):
             x = side * (track_width_x * 0.5)
             for y_pos, label in [(-wheelbase_y * 0.5, "Rear"), (wheelbase_y * 0.5, "Front")]:
                 w = make_all_terrain_wheel_assembly(
                     f"{self.name}Wheel_{label}_{'L' if side < 0 else 'R'}",
-                    location=(x, y_pos, self.ground_clearance + wheel_radius),
+                    location=(x, y_pos, effective_z),
                     radius=wheel_radius, width=wheel_width,
                     tire_mat=self.palette.tread, rim_mat=self.palette.wheel_rim,
                     hub_mat=self.palette.gunmetal, accent_mat=self.palette.warning
@@ -2661,6 +3202,156 @@ class RogueVehicleBuilder:
                 accent_mat=self.palette.warning
             )
             self.objects.extend(sponson)
+        return self
+
+    def add_tiltrotors(
+        self,
+        location_offset: Tuple[float, float, float] = (1.35, 0.15, 0.72),
+        radius: float = 0.44,
+        tilt_deg: float = 14.0,
+    ) -> "RogueVehicleBuilder":
+        self.is_hover = True
+        for side in (-1, 1):
+            side_tag = "L" if side < 0 else "R"
+            pod = make_ducted_tiltrotor_assembly(
+                f"{self.name}TiltRotor_{side_tag}",
+                location=(side * location_offset[0], location_offset[1], location_offset[2]),
+                radius=radius,
+                depth=0.26,
+                tilt_deg=tilt_deg,
+                duct_mat=self.palette.primary_armor,
+                rotor_mat=self.palette.gunmetal,
+                hub_mat=self.palette.light_armor,
+                pylon_mat=self.palette.gunmetal,
+                glow_mat=self.palette.emissive,
+                blade_count=3,
+                pylon_inboard_x=-side * 0.32,
+            )
+            self.objects.extend(pod)
+        return self
+
+    def add_rollcage(
+        self,
+        size: Tuple[float, float, float] = (1.15, 1.45, 0.78),
+        location: Tuple[float, float, float] | None = None,
+        bar_radius: float = 0.034,
+    ) -> "RogueVehicleBuilder":
+        if location is None:
+            loc = (0.0, -self.hull_length * 0.05, self.hull_deck_z + size[2] * 0.5 + 0.02)
+        else:
+            loc = location
+        cage = make_tubular_rollcage_assembly(
+            f"{self.name}RollCage",
+            size=size,
+            location=loc,
+            bar_radius=bar_radius,
+            tube_mat=self.palette.gunmetal,
+            roof_mat=self.palette.primary_armor,
+            visor_mat=self.palette.light_armor,
+        )
+        self.objects.extend(cage)
+        return self
+
+    def add_howitzer(
+        self,
+        caliber: float = 0.135,
+        length: float = 1.15,
+        elevation_deg: float = 26.0,
+    ) -> "RogueVehicleBuilder":
+        gun_pivot = self.turret_center + Vector((0.0, 0.40, 0.02))
+        elev_rad = math.radians(elevation_deg)
+        gun_dir = Vector((0.0, math.cos(elev_rad), math.sin(elev_rad))).normalized()
+        self.gun_pivot = gun_pivot + gun_dir * (length + 0.28)
+        self.gun_dir = gun_dir
+        howitzer = make_heavy_howitzer_assembly(
+            f"{self.name}Howitzer",
+            gun_pivot=gun_pivot,
+            direction=gun_dir,
+            caliber_radius=caliber,
+            barrel_length=length,
+            armor_mat=self.palette.light_armor,
+            barrel_mat=self.palette.gunmetal,
+            accent_mat=self.palette.warning,
+        )
+        self.objects.extend(howitzer)
+        self.preserved_pivots.append(f"{self.name}Howitzer_BreechCollar")
+        return self
+
+    def add_dual_cannon(
+        self,
+        caliber: float = 0.082,
+        length: float = 1.65,
+        spacing: float = 0.38,
+        elevation_deg: float = 11.0,
+    ) -> "RogueVehicleBuilder":
+        gun_pivot = self.turret_center + Vector((0.0, 0.42, 0.02))
+        elev_rad = math.radians(elevation_deg)
+        gun_dir = Vector((0.0, math.cos(elev_rad), math.sin(elev_rad))).normalized()
+        self.gun_pivot = gun_pivot + gun_dir * (length + 0.38)
+        self.gun_dir = gun_dir
+        cannons = make_dual_cannon_assembly(
+            f"{self.name}DualGun",
+            gun_pivot=gun_pivot,
+            direction=gun_dir,
+            caliber_radius=caliber,
+            barrel_length=length,
+            barrel_spacing=spacing,
+            armor_mat=self.palette.light_armor,
+            barrel_mat=self.palette.gunmetal,
+            accent_mat=self.palette.warning,
+        )
+        self.objects.extend(cannons)
+        self.preserved_pivots.append(f"{self.name}DualGun_MantletBlock")
+        return self
+
+    def add_quad_track_pods(
+        self,
+        pod_length: float = 1.55,
+        pod_height: float = 0.56,
+        track_spacing_x: float = 2.4,
+        pod_spacing_y: float = 1.9,
+    ) -> "RogueVehicleBuilder":
+        for sx in (-1, 1):
+            for sy in (-1, 1):
+                tag = f"{'L' if sx < 0 else 'R'}_{'F' if sy > 0 else 'R'}"
+                pod_loc = (sx * (track_spacing_x * 0.5), sy * (pod_spacing_y * 0.5), 0.0)
+                pod = make_quad_track_pod_assembly(
+                    f"{self.name}TrackPod_{tag}",
+                    location=pod_loc,
+                    length=pod_length,
+                    height=pod_height,
+                    belt_width=0.34,
+                    roadwheel_count=3,
+                    tread_mat=self.palette.tread,
+                    rim_mat=self.palette.wheel_rim,
+                    hub_mat=self.palette.wheel_hub,
+                    axle_mat=self.palette.gunmetal,
+                    fender_mat=self.palette.primary_armor,
+                    accent_mat=self.palette.warning,
+                    ground_z=self.ground_clearance,
+                    inboard_side=-sx,
+                )
+                self.objects.extend(pod)
+        return self
+
+    def add_troop_compartment(
+        self,
+        size: Tuple[float, float, float] = (1.45, 1.65, 0.76),
+        location: Tuple[float, float, float] | None = None,
+    ) -> "RogueVehicleBuilder":
+        if location is None:
+            loc = (0.0, -self.hull_length * 0.18, self.hull_deck_z + size[2] * 0.45)
+        else:
+            loc = location
+        cabin = make_troop_compartment(
+            f"{self.name}TroopBay",
+            location=loc,
+            size=size,
+            armor_mat=self.palette.primary_armor,
+            door_mat=self.palette.light_armor,
+            detail_mat=self.palette.gunmetal,
+        )
+        self.objects.extend(cabin)
         return self
 
     def add_unity_locators(self) -> "RogueVehicleBuilder":

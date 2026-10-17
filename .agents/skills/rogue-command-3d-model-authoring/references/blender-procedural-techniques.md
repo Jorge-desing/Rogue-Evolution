@@ -96,6 +96,38 @@ turret_parts = rmk.make_faceted_turret_housing(
 )
 ```
 
+### C. Armored Troop Cabin (`make_troop_compartment`)
+Generates an enclosed rear personnel compartment for APCs and halftracks:
+- Sloped armored crew shell with single-segment chamfers.
+- Twin rear clamshell access doors with grab handles and recessed seams.
+- Roof observation hatch / commander cupola.
+- Flank armored vision slits and firing ports.
+
+```python
+cabin = rmk.make_troop_compartment(
+    prefix="APC_TroopBay",
+    location=(0.0, -0.95, 0.88),
+    size=(1.42, 1.65, 0.74),
+    armor_mat=armor_primary, door_mat=armor_light, detail_mat=gunmetal
+)
+```
+
+### D. Off-Road Tubular Roll Cage (`make_tubular_rollcage_assembly`)
+Generates an exo-skeleton welded tubular frame for strike buggies and scout vehicles:
+- A-pillars (windshield posts) with cross-header bar.
+- B-pillar main roll hoop and diagonal rear C-stays.
+- Armored roof sun-visor plate and brow shield.
+
+```python
+rollcage = rmk.make_tubular_rollcage_assembly(
+    prefix="Buggy_RollCage",
+    size=(1.15, 1.45, 0.78),
+    location=(0.0, 0.02, 1.02),
+    bar_radius=0.034,
+    tube_mat=gunmetal, roof_mat=armor_primary, visor_mat=armor_light
+)
+```
+
 ---
 
 ## 4. High-Fidelity Mobility & Suspension Systems
@@ -197,6 +229,44 @@ skimmer = rmk.make_hover_skimmer_assembly(
 model_objects.extend(skimmer)
 ```
 
+### F. Ducted Tilt-Rotor Pod (`make_ducted_tiltrotor_assembly`)
+Creates an aerodynamic ducted propulsion fan for VTOL gunships and aerial assault drones:
+- Cylindrical outer shroud cowl with beveled intake lip.
+- Inner recessed duct wall with aerodynamic bullet spinner hub.
+- Angled pitch rotor blades radiating from hub.
+- Transverse mounting pylon with swivel pivot bearing.
+- Ventral glowing plasma core exhaust.
+
+```python
+tilt_rotor = rmk.make_ducted_tiltrotor_assembly(
+    prefix="Gunship_TiltRotor_L",
+    location=(-1.45, 0.15, 0.75),
+    radius=0.44, depth=0.26, tilt_deg=14.0,
+    duct_mat=armor_primary, rotor_mat=gunmetal,
+    hub_mat=armor_light, pylon_mat=gunmetal, glow_mat=emissive_cyan
+)
+model_objects.extend(tilt_rotor)
+```
+
+### G. Independent Quad-Track Pod (`make_quad_track_pod_assembly`)
+Generates 4-corner independent continuous track assemblies for mobile fortresses and super-heavy siege platforms:
+- Self-contained continuous track belt with front and rear climb approach slopes.
+- Stepped road wheels array and idler/sprocket units.
+- Armored top mudguard fender.
+- Inboard swivel mounting sponson arm connecting directly to the vehicle superstructure.
+
+```python
+track_pod = rmk.make_quad_track_pod_assembly(
+    prefix="Fortress_TrackPod_FL",
+    location=(-1.25, 1.0, 0.0),
+    length=1.65, height=0.62, belt_width=0.34,
+    tread_mat=tread_mat, rim_mat=wheel_rim, hub_mat=wheel_hub,
+    axle_mat=gunmetal, fender_mat=armor_primary, accent_mat=warning_amber,
+    ground_z=0.06, inboard_side=1
+)
+model_objects.extend(track_pod)
+```
+
 ---
 
 ## 5. Heavy Weapon System Generators
@@ -272,6 +342,40 @@ arc_weapon = rmk.make_arc_energy_emitter(
     forward_dir=(0.0, 1.0, 0.10),
     core_radius=0.22, core_length=0.48, prong_count=3, prong_length=0.55,
     housing_mat=armor_primary, gunmetal_mat=gunmetal, arc_mat=emissive_cyan
+)
+```
+
+### E. Heavy Siege Howitzer / Mortar (`make_heavy_howitzer_assembly`)
+Generates a massive large-bore ballistic artillery weapon:
+- Heavy cylindrical breech collar with armored reinforcements.
+- Large-caliber short barrel with rifled profile.
+- Massive reinforced muzzle blast ring with high-visibility warning stripe.
+- Dual hydraulic recoil recuperator cylinders flanking the breech.
+- Sector elevation quadrant gear plates.
+
+```python
+howitzer = rmk.make_heavy_howitzer_assembly(
+    prefix="Siege_Howitzer",
+    gun_pivot=(0.0, 0.40, 1.20),
+    direction=(0.0, math.cos(math.radians(26)), math.sin(math.radians(26))),
+    caliber_radius=0.135, barrel_length=1.15,
+    armor_mat=armor_light, barrel_mat=gunmetal, accent_mat=warning_amber
+)
+```
+
+### F. Synchronized Dual Coaxial Cannon (`make_dual_cannon_assembly`)
+Generates twin heavy autocannons on a unified mantlet:
+- Armored mantlet block spanning both barrels.
+- Dual parallel rifled barrels mathematically spaced along local transverse axis $\vec{u}$.
+- Individual thermal shroud sleeves, mid-barrel bore evacuators, and double-baffle muzzle brakes.
+
+```python
+dual_cannons = rmk.make_dual_cannon_assembly(
+    prefix="Fortress_DualGun",
+    gun_pivot=(0.0, 0.42, 1.22),
+    direction=(0.0, math.cos(math.radians(11)), math.sin(math.radians(11))),
+    caliber_radius=0.082, barrel_length=1.65, barrel_spacing=0.38,
+    armor_mat=armor_light, barrel_mat=gunmetal, accent_mat=warning_amber
 )
 ```
 
@@ -356,6 +460,20 @@ locators = rmk.create_unity_locator_sockets(
     muzzle_loc=(0.0, 2.45, 1.25), muzzle_dir=(0.0, 1.0, 0.1),
     turret_loc=(0.0, 0.05, 1.15),
     exhaust_left=(-0.52, -1.35, 0.98), exhaust_right=(0.52, -1.35, 0.98)
+)
+```
+
+### I. Heavy Frontal Dozer Ram Blade (`make_dozer_blade`)
+Generates an armored obstacle-clearing ram blade:
+- Angled primary shield plate with heavy bottom cutting edge.
+- Twin hydraulic push rams with spherical anchor brackets.
+
+```python
+dozer = rmk.make_dozer_blade(
+    prefix="Breaker_Dozer",
+    location=(0.0, 1.85, 0.42),
+    width=2.6, height=0.45,
+    armor_mat=armor_primary, ram_mat=gunmetal
 )
 ```
 

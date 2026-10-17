@@ -97,12 +97,18 @@ Use the tested, high-readability procedural assemblies rather than ad-hoc mesh p
 |---|---|---|
 | **Chassis & Turret** | `make_sloped_glacis_hull` | Armored wedge chassis with sloped frontal glacis and belly clearance |
 | | `make_faceted_turret_housing` | Octagonal turret shell with sloped mantlet cradle and rear bustle counterweight |
+| | `make_troop_compartment` | Armored rear troop cabin for APCs and halftracks with clamshell doors and cupola |
+| | `make_tubular_rollcage_assembly` | Heavy tubular roll cage frame with A/B pillars, roof crossbars, and sun visor |
 | **Mobility & Legs** | `make_continuous_track_assembly` | Full track unit (articulated belt, road wheels, sprockets, cleats, and fenders) |
+| | `make_quad_track_pod_assembly` | Independent continuous track pod for 4-track super-heavy crawlers |
 | | `make_all_terrain_wheel_assembly` | Rugged chevron-lug tactical tire, deep-dish rim, planetary hub, and coilover shock |
 | | `make_bipedal_digitigrade_leg` | Kinematic walker leg: hip joint, hydraulic thigh, knee armor, ankle struts, 3-toed foot |
 | | `make_quad_crawler_leg` | Articulated spider/crawler leg: hip actuator, femur ram, knee knuckle, tibia strut, ground pad |
 | | `make_hover_skimmer_assembly` | Anti-grav repulsor cushion, ventral thruster bells, stabilizer strakes, vectoring exhausts |
+| | `make_ducted_tiltrotor_assembly` | Aerodynamic ducted tilt-rotor pod with shroud cowl, spinner hub, blades, and swivel mount |
 | **Heavy Weapons** | `make_coaxial_cannon_assembly` | Coaxially aligned tank gun with breech collar, thermal sleeve, bore evacuator, and muzzle brake |
+| | `make_dual_cannon_assembly` | Synchronized twin cannon mantlet with dual rifled barrels, thermal sleeves, and muzzle brakes |
+| | `make_heavy_howitzer_assembly` | Large-bore siege mortar / howitzer with reinforced breech, recoil cylinders, and sector elevation gear |
 | | `make_rotary_gatling_cannon` | 6-barrel circular Gatling cluster with drive axle, clamp collars, and ammo feed chute |
 | | `make_missile_launcher_pod` | Armored pod with upward elevation, recessed tube array, warheads, and backblast vents |
 | | `make_arc_energy_emitter` | Futuristic weapon with glowing plasma cathode, induction coils, and convergent discharge prongs |
@@ -114,6 +120,7 @@ Use the tested, high-readability procedural assemblies rather than ad-hoc mesh p
 | | `make_engine_deck_grille` | Armored engine intake frame with angled cooling louvers |
 | | `make_armor_applique_array` | Array of Explosive Reactive Armor (ERA) tiles with standoff mounting bolts |
 | | `make_hex_bolt_array` | Low-poly 6-sided bolt heads placed along armor seams and flanges |
+| | `make_dozer_blade` | Heavy frontal ram blade with hydraulic push rams |
 | | `create_unity_locator_sockets`| Procedural Unity empty sockets (`Socket_MuzzlePrimary`, `Socket_TurretPivot`, `Socket_Exhaust_L/R`) |
 
 ### Draw-Call Optimization via Material Batching & Smart Smoothing
@@ -129,17 +136,17 @@ For rapid, reproducible vehicle generation without manual coordinate arithmetic,
 import RogueModelKit as rmk
 
 builder = (
-    rmk.RogueVehicleBuilder("HeavySiegeTank", faction="siege")
-    .add_sloped_hull(length=3.2, width=2.5, height=0.92)
-    .add_continuous_tracks(length=3.0, height=0.64, roadwheels=6, with_skirts=True)
-    .add_engine_deck(slat_count=4, with_exhausts=True)
-    .add_turret(size=(1.5, 1.7, 0.48), center_y=0.10)
-    .add_cannon(caliber=0.10, length=1.85, elevation_deg=14.0)
+    rmk.RogueVehicleBuilder("ColossusFortress", faction="siege", camo="desert")
+    .add_sloped_hull(length=3.8, width=2.8, height=1.05)
+    .add_quad_track_pods(pod_length=1.65, pod_height=0.62)
+    .add_engine_deck(slat_count=5, with_exhausts=True)
+    .add_turret(size=(1.85, 2.1, 0.58), center_y=0.15)
+    .add_dual_cannon(caliber=0.082, length=1.65, spacing=0.38, elevation_deg=11.0)
     .add_sensor_visor()
+    .add_radar_dish()
+    .add_side_sponsons()
     .add_smoke_launchers(tube_count=3)
     .add_spring_antenna()
-    .add_dozer_blade(width=2.6, height=0.44)
-    .add_side_sponsons()
     .add_unity_locators()
 )
 
@@ -161,22 +168,26 @@ Run headless vehicle generation directly from the command line using Blender and
 
 ```powershell
 .\.tools\Blender-4.5.14\blender-4.5.14-windows-x64\blender.exe --background --python tools\generate_unit_model.py -- `
-    --name ColossusTank `
-    --archetype tank `
+    --name ColossusFortress `
+    --archetype super_heavy `
     --faction siege `
-    --weapon cannon `
-    --dozer `
+    --camo desert `
+    --weapon dual_cannon `
+    --sponsons `
     --smoke `
     --radar `
     --dirt `
     --locators `
+    --lod `
     --multiview
 ```
 
-- **Archetypes**: `tank`, `walker`, `bike`, `artillery`, `arc_tank`, `hover`, `spider`.
+- **Archetypes**: `tank`, `walker`, `bike`, `artillery`, `arc_tank`, `hover`, `spider`, `vtol` (gunship/drone), `halftrack` (APC), `super_heavy` (mobile fortress), `buggy` (recon strike).
+- **Weapons**: `cannon` (ballistic), `gatling` (rotary 6-barrel), `missile` (honeycomb pod), `arc` (plasma cathode & prongs), `howitzer` (heavy siege mortar), `dual_cannon` (synchronized twin barrels).
 - **Factions**: `vanguard` (slate teal), `siege` (rust ochre), `syndicate` (deep cobalt), `arctic` (tundra navy).
-- **Weapons**: `cannon` (ballistic), `gatling` (rotary 6-barrel), `missile` (honeycomb pod), `arc` (plasma cathode & prongs).
-- **Subsystem Flags**: `--dozer` (frontal ram), `--smoke` (grenade dischargers), `--radar` (command dish), `--sponsons` (auxiliary cells), `--dirt` (vertex cavity AO), `--locators` (Unity sockets).
+- **Camouflage Variants**: `none`, `desert` (khaki sand), `urban` (asphalt grey), `arctic` (tundra white), `woodland` (olive drab).
+- **Presets**: `siege_breaker` (super-heavy dual-cannon), `recon_interceptor` (strike buggy gatling), `gunship_alpha` (VTOL missile), `apc_enforcer` (halftrack support), `dune_raider` (strike bike).
+- **Subsystem Flags**: `--rollcage` (tubular frame), `--quad-tracks` (4-corner pods), `--tilt-rotors` (ducted thrusters), `--dozer` (frontal ram), `--smoke` (grenade dischargers), `--radar` (command dish), `--sponsons` (auxiliary cells), `--dirt` (vertex cavity AO), `--locators` (Unity sockets), `--lod` (polygon budget report).
 - **Outputs**: Generates editable `.blend`, Unity-optimized `.fbx` with lightmap UVs, vertex color cavity shading, socket empties, batched submeshes, and a 4-view orthographic preview sheet. For each 2D card, use the installed `imagegen` skill; this 3D generator does not create card images.
 
 ### Automated Quality Diagnostics
