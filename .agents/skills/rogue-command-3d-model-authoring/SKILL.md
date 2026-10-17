@@ -361,9 +361,54 @@ Follow this strict progression when creating or modifying 3D models:
 
 ---
 
+## 9. Advanced Procedural Capabilities (Atlas Baking, Rigging, VFX & Unity Bridge)
+
+The extended authoring pipeline provides four production-grade optimization and gameplay pillars:
+
+### A. Texture Atlas Baking & 1-Draw-Call Optimization (`--bake-atlas`, `--single-material`)
+- **Non-Overlapping Atlas UV Unwrapping**: `unwrap_atlas_uvs(objects, margin=0.04)` projects smart UV coordinates with parameterized island padding.
+- **Fast Cycles PBR Baking**: Headless 1-sample Cycles baking generates four synchronized PBR texture maps in `<Project>/Models/Textures/`:
+  - `<Name>_Albedo.png`: Diffuse color map with faction palette, camouflage patterns, and wear baked in.
+  - `<Name>_MetallicGloss.png`: RGB metallic and smoothness channels matching Unity Standard shader layout.
+  - `<Name>_Normal.png`: Tangent-space normal map baking geometric bevels and surface relief.
+  - `<Name>_Emission.png`: Isolated emissive mask for glowing sensors, plasma cores, and optics.
+- **1-Draw-Call Mesh Output**: `--single-material` merges all batched objects into `<Name>_Atlas.fbx` with a single unified material slot, collapsing vehicle draw calls from 8–10 down to exactly **1 draw call** per unit on screen.
+
+### B. Skeletal Armature Rigging & Procedural Animation Clips (`--rig`, `--animate`)
+- **Kinematic Bone Hierarchy**: `generate_procedural_armature(model_name, objects)` builds a complete mechanical armature:
+  `Bone_Root` $\rightarrow$ `Bone_Hull` $\rightarrow$ `Bone_TurretYaw` $\rightarrow$ `Bone_TurretPitch` $\rightarrow$ `Bone_BarrelRecoil` (with suspension bones when applicable).
+- **Zero-Stretching Rigid Vertex Weights**: Vertices for each mechanical assembly are assigned strictly to their corresponding vertex group with weight `1.0`, ensuring zero elastic deformation during weapon traverse or chassis recoil.
+- **Baked NLA Action Clips**: Keyframes four procedural RTS animations directly inside the FBX:
+  1. `Action_Idle`: Subtle engine vibration and idle chassis breathing.
+  2. `Action_Drive`: Longitudinal chassis pitch suspension sway and track bounce.
+  3. `Action_FireRecoil`: Instantaneous backward barrel recoil slide with progressive damper recovery.
+  4. `Action_Death`: Catastrophic chassis sag, suspension collapse, and turret tilt.
+
+### C. Procedural VFX & Energy Shields (`--vfx-flash`, `--vfx-thruster`, `--shield-bubble`)
+- **Muzzle Flash Meshes (`make_muzzle_flash_mesh`)**: 12-vertex star-spike conical blast geometry with high-intensity emissive material aligned to `Socket_MuzzlePrimary`.
+- **Exhaust Plumes (`make_thruster_plume_mesh`)**: Conical emissive jet plumes for hovercraft cushions, VTOL lift ducts, and rocket boosters.
+- **Geodesic Shield Bubble Envelopes (`make_shield_bubble_mesh`)**: Subdivided geodesic bubble envelope tagged as `<Name>_ShieldBubble` for energy barrier visuals. Automatically excluded from ground contact tests.
+
+### D. Unity Prefab & AssetBundle Bridge (`VehiclePrefabBuilder.cs`)
+- **Automated C# Editor Scaffolder**: `unity/RogueCommandAssetAuthoring/Assets/Editor/VehiclePrefabBuilder.cs` bridges procedural Blender output and `.gameplay.json` into game-ready Unity prefabs.
+- **Automatic Asset Wiring**:
+  - Automatically locates `<Name>_Atlas.fbx` or `<Name>.fbx`.
+  - Configures TextureImporters (e.g. `TextureImporterType.NormalMap`).
+  - Creates Standard PBR material with `enableInstancing = true` and emission keywords.
+  - Adds `BoxCollider` sized and centered from `.gameplay.json` (translating Blender Z-up to Unity Y-up).
+  - Instantiates child socket transforms for weapon muzzles, pivots, and particle points.
+  - Generates `LODGroup` with transition thresholds (0.50, 0.20, 0.05) if multi-level LOD meshes are present.
+- **Headless Batchmode Execution**:
+  ```powershell
+  & "C:\Program Files\Unity\Hub\Editor\2021.3.45f2\Editor\Unity.exe" -batchmode -quit -projectPath "unity\RogueCommandAssetAuthoring" -executeMethod RogueCommandExpansion.Authoring.VehiclePrefabBuilder.BuildPrefabFromCommandLine -gameplayJson "artifacts\<Name>.gameplay.json"
+  ```
+
+---
+
 ## References & Specialized Guides
 
 - [Art Style & Palette Guide](references/art-style-and-palette.md) — 3-tier silhouette hierarchy, 5-tone palette sets, bevel physics, and greeble standards.
 - [Blender Procedural Techniques](references/blender-procedural-techniques.md) — Parametric `bpy` recipes for chamfered hulls, continuous tracks, stepped road wheels, and engine grilles.
 - [Unity Material Pipeline](references/unity-material-pipeline.md) — Standard shader configuration, emission keywords, GPU instancing, and card sprite rules.
 - [Native Hierarchy & Pivots](references/native-hierarchy-and-pivots.md) — Transform hierarchy maps for `PCXBaseTank`, `BombBike`, `ArtilleryTank`, `GatlingWalker`, and `LightningTank`.
+

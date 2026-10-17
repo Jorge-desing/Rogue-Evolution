@@ -529,3 +529,55 @@ The procedural weapon suite includes 9 distinct weapon assemblies:
   }
   ```
 
+---
+
+## 14. Advanced Optimization, Rigging, VFX & Unity Prefab Bridge (2026-10-17)
+
+To elevate procedural unit models to commercial RTS asset parity, four new core pillars were implemented across `tools/RogueModelKit.py`, `tools/generate_unit_model.py`, and `unity/RogueCommandAssetAuthoring/`:
+
+### A. Texture Atlas Baking & 1-Draw-Call Mesh Optimization
+- **Unified Atlas UV Unwrapping**: `unwrap_atlas_uvs(objects, margin=0.04)` performs parameterized Smart UV projection across all individual subassemblies, packing non-overlapping UV islands into a single $[0, 1] \times [0, 1]$ coordinate square.
+- **Ultra-Fast Cycles PBR Texture Baking**: `bake_pbr_texture_atlas(...)` switches Blender's render engine to Cycles (CPU, 1 sample, < 1s) to bake complete PBR texture sets directly into `Assets/RogueCommandExpansionSample/Models/Textures/`:
+  - `Albedo` (BaseColor with faction colors and camouflage).
+  - `MetallicGloss` (Metallic in RGB, Smoothness in Alpha).
+  - `Normal` (Tangent-space normal vector map).
+  - `Emission` (Optics, plasma coils, and indicator lights).
+- **Single-Material Mesh Collapse**: `create_single_material_atlas_model(...)` joins all batched parts into a unified mesh `<Name>_Atlas.fbx` with exactly **1 material slot**. In dense combat with 40+ units on screen, this reduces GPU draw call pressure from ~400 draw calls down to ~40 draw calls.
+
+### B. Skeletal Armature Rigging & Procedural Animation System
+- **Kinematic Armature Creation**: `generate_procedural_armature(model_name, objects)` builds a complete hierarchical bone skeleton:
+  - `Bone_Root` (ground center anchor).
+  - `Bone_Hull` (chassis pitch/roll suspension).
+  - `Bone_TurretYaw` (360° azimuth traverse).
+  - `Bone_TurretPitch` (elevation/depression).
+  - `Bone_BarrelRecoil` (linear slide along barrel axis).
+- **Zero-Stretching Rigid Vertex Weights**: Vertices of each assembly are bound to their respective bone vertex groups with weight `1.0`. This prevents elastic rubber-banding during weapon movement.
+- **Procedural NLA Action Baking**: `generate_procedural_action_clips(armature, builder)` bakes four essential RTS action clips:
+  1. `Action_Idle`: Subtle chassis engine rumble and idling breathing.
+  2. `Action_Drive`: Longitudinal chassis pitch suspension sway and road bounce.
+  3. `Action_FireRecoil`: Instantaneous backward barrel recoil slide with progressive damper recovery.
+  4. `Action_Death`: Catastrophic chassis sag, suspension collapse, and turret tilt.
+
+### C. Procedural VFX & Energy Shields
+- **Muzzle Flash Cones (`make_muzzle_flash_mesh`)**: Star-spiked 12-vertex muzzle blast mesh aligned with projectile exit vectors.
+- **Thruster Plumes (`make_thruster_plume_mesh`)**: Conical emissive propulsion plumes for hover cushions, VTOLs, and booster rockets.
+- **Geodesic Shield Bubble Envelopes (`make_shield_bubble_mesh`)**: Subdivided geodesic bubble envelope mesh tagged as `<Name>_ShieldBubble`. Excluded from ground contact validation to allow true spherical protective forcefields.
+
+### D. Unity Prefab & AssetBundle Bridge (`VehiclePrefabBuilder.cs`)
+- **Automated C# Editor Scaffolder**: Implemented in `unity/RogueCommandAssetAuthoring/Assets/Editor/VehiclePrefabBuilder.cs`.
+- **Batchmode Command Line Interface**:
+  ```powershell
+  & "C:\Program Files\Unity\Hub\Editor\2021.3.45f2\Editor\Unity.exe" -batchmode -quit `
+    -projectPath "unity\RogueCommandAssetAuthoring" `
+    -executeMethod RogueCommandExpansion.Authoring.VehiclePrefabBuilder.BuildPrefabFromCommandLine `
+    -gameplayJson "artifacts\CombatTank.gameplay.json"
+  ```
+- **Automated Hierarchy Assembly**:
+  - Locates FBX (`_Atlas.fbx`, `_LODs.fbx`, or `.fbx`).
+  - Configures textures and creates `Standard` PBR materials with `enableInstancing = true` and `_EMISSION` keywords.
+  - Adds `BoxCollider` from `colliderBounds` (converting Blender Z-up to Unity Y-up).
+  - Generates child Transforms for all sockets (`Socket_MuzzlePrimary`, `Socket_TurretPivot`, etc.).
+  - Configures `LODGroup` component if multi-resolution LODs are detected.
+  - Saves Prefab to `Assets/RogueCommandExpansionSample/Prefabs/<Name>Visual.prefab` and normalizes Unity YAML formatting.
+
+

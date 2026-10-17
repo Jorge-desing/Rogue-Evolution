@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any, Dict, Sequence, Tuple
 
 import bpy
-from mathutils import Vector
+from mathutils import Vector, Euler, Quaternion
 
 
 # ---------------------------------------------------------------------------
@@ -2042,7 +2042,7 @@ def validate_model_mesh_quality(
     missing_material_objs = []
 
     for obj in objects:
-        if obj.type != "MESH":
+        if obj.type != "MESH" or obj.name.endswith("_ShieldBubble"):
             continue
         mesh = obj.data
         total_verts += len(mesh.vertices)
@@ -2335,6 +2335,8 @@ def export_unity_fbx(
     fbx_path: Path,
     model_objects: Sequence[bpy.types.Object],
     include_empties: bool = False,
+    include_armature: bool = False,
+    bake_anim: bool = False,
 ) -> None:
     """Exports model objects to FBX with optimal scale and axis mappings for Unity."""
     fbx_path.parent.mkdir(parents=True, exist_ok=True)
@@ -2343,7 +2345,12 @@ def export_unity_fbx(
         obj.select_set(True)
     bpy.context.view_layer.objects.active = model_objects[0]
 
-    obj_types = {"MESH", "EMPTY"} if include_empties else {"MESH"}
+    obj_types = {"MESH"}
+    if include_empties:
+        obj_types.add("EMPTY")
+    if include_armature:
+        obj_types.add("ARMATURE")
+
     bpy.ops.export_scene.fbx(
         filepath=str(fbx_path),
         use_selection=True,
@@ -2358,6 +2365,10 @@ def export_unity_fbx(
         bake_space_transform=False,
         add_leaf_bones=False,
         use_custom_props=False,
+        bake_anim=bake_anim,
+        bake_anim_use_all_actions=bake_anim,
+        bake_anim_use_nla_strips=bake_anim,
+        bake_anim_step=1.0,
     )
 
 
@@ -3621,6 +3632,486 @@ def make_heavy_excavator_drum(
     return objects
 
 
+# ---------------------------------------------------------------------------
+# Procedural VFX Meshes & Shield Generators
+# ---------------------------------------------------------------------------
+
+def make_muzzle_flash_mesh(
+    prefix: str,
+    location: Tuple[float, float, float] | Vector,
+    direction: Tuple[float, float, float] | Vector = (0.0, 1.0, 0.0),
+    size: float = 0.45,
+    flash_mat: bpy.types.Material | None = None,
+    core_mat: bpy.types.Material | None = None,
+) -> list[bpy.types.Object]:
+    """Generates an angular star-spike muzzle flash mesh with high-emission core and lateral flame blades."""
+    objects = []
+    p_loc = Vector(location)
+    d_vec = Vector(direction).normalized()
+    u_vec, v_vec, _ = get_orthonormal_basis(d_vec)
+    rot_euler = d_vec.to_track_quat("Z", "Y").to_euler()
+
+    # 1. Central high-intensity core diamond
+    objects.append(make_cylinder(
+        f"{prefix}_MuzzleFlashCore",
+        radius=size * 0.22, depth=size * 0.85,
+        location=p_loc + d_vec * (size * 0.38),
+        material=core_mat if core_mat else flash_mat,
+        rotation=rot_euler, vertices=6, bevel=0.01
+    ))
+
+    # 2. Angular star blades along lateral and vertical axes
+    blade_length = size * 0.95
+    blade_thickness = size * 0.08
+    for angle_deg in (0, 45, 90, 135):
+        rad = math.radians(angle_deg)
+        blade_center = p_loc + d_vec * (size * 0.42)
+        objects.append(make_box(
+            f"{prefix}_FlashBlade_{angle_deg}",
+            (blade_thickness, blade_length, blade_thickness),
+            blade_center, flash_mat, bevel=0.005,
+            rotation=(rot_euler.x + rad, rot_euler.y, rot_euler.z)
+        ))
+
+    return objects
+
+
+def make_thruster_plume_mesh(
+    prefix: str,
+    location: Tuple[float, float, float] | Vector,
+    direction: Tuple[float, float, float] | Vector = (0.0, -1.0, 0.0),
+    length: float = 0.65,
+    radius: float = 0.18,
+    segments: int = 8,
+    plume_mat: bpy.types.Material | None = None,
+    core_mat: bpy.types.Material | None = None,
+) -> list[bpy.types.Object]:
+    """Generates an aerodynamic glowing conical thruster plume and inner high-temperature exhaust core."""
+    objects = []
+    loc = Vector(location)
+    d_vec = Vector(direction).normalized()
+    rot_euler = d_vec.to_track_quat("-Z", "Y").to_euler()
+
+    # Outer plume cone
+    bpy.ops.mesh.primitive_cone_add(
+        vertices=segments, radius1=radius, radius2=radius * 0.12,
+        depth=length, location=loc + d_vec * (length * 0.5),
+        rotation=rot_euler
+    )
+    outer = bpy.context.active_object
+    outer.name = f"{prefix}_ThrusterPlume"
+    finish_mesh(outer, plume_mat, bevel=0.0)
+    objects.append(outer)
+
+    # Inner high-intensity core cone
+    bpy.ops.mesh.primitive_cone_add(
+        vertices=segments, radius1=radius * 0.62, radius2=0.02,
+        depth=length * 0.60, location=loc + d_vec * (length * 0.30),
+        rotation=rot_euler
+    )
+    inner = bpy.context.active_object
+    inner.name = f"{prefix}_ThrusterCore"
+    finish_mesh(inner, core_mat if core_mat else plume_mat, bevel=0.0)
+    objects.append(inner)
+
+    return objects
+
+
+def make_shield_bubble_mesh(
+    prefix: str,
+    center: Tuple[float, float, float] | Vector = (0.0, 0.0, 0.8),
+    radius: float = 2.4,
+    scale_z: float = 0.78,
+    shield_mat: bpy.types.Material | None = None,
+    subdivisions: int = 2,
+) -> bpy.types.Object:
+    """Generates a streamlined aerodynamic geodesic shield bubble enclosure."""
+    c_loc = Vector(center)
+    bpy.ops.mesh.primitive_ico_sphere_add(
+        subdivisions=subdivisions, radius=radius, location=c_loc
+    )
+    bubble = bpy.context.active_object
+    bubble.name = f"{prefix}_ShieldBubble"
+    bubble.scale = (1.0, 1.12, scale_z)
+    bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+    finish_mesh(bubble, shield_mat, bevel=0.0)
+    for poly in bubble.data.polygons:
+        poly.use_smooth = True
+    return bubble
+
+
+# ---------------------------------------------------------------------------
+# Procedural Armature Rigging & Animation Actions
+# ---------------------------------------------------------------------------
+
+def generate_procedural_armature(
+    objects: Sequence[bpy.types.Object],
+    prefix: str,
+    turret_center: Vector | Tuple[float, float, float] | None = None,
+    gun_pivot: Vector | Tuple[float, float, float] | None = None,
+    hull_deck_z: float = 0.88,
+) -> bpy.types.Object:
+    """Creates a kinematic vehicle armature and binds mesh components to rigid bones."""
+    tc = Vector(turret_center) if turret_center is not None else Vector((0.0, 0.05, 1.15))
+    gp = Vector(gun_pivot) if gun_pivot is not None else Vector((0.0, 1.45, 1.25))
+
+    armature_data = bpy.data.armatures.new(f"{prefix}_ArmatureData")
+    armature_obj = bpy.data.objects.new(f"{prefix}_Armature", armature_data)
+    bpy.context.collection.objects.link(armature_obj)
+    bpy.context.view_layer.objects.active = armature_obj
+    armature_obj.select_set(True)
+
+    bpy.ops.object.mode_set(mode="EDIT")
+    eb = armature_data.edit_bones
+
+    # 1. Root bone at ground contact
+    b_root = eb.new("Bone_Root")
+    b_root.head = (0.0, 0.0, 0.0)
+    b_root.tail = (0.0, 0.0, 0.22)
+
+    # 2. Hull bone (main vehicle body & suspension)
+    b_hull = eb.new("Bone_Hull")
+    b_hull.head = (0.0, 0.0, 0.22)
+    b_hull.tail = (0.0, 0.0, max(0.5, hull_deck_z * 0.85))
+    b_hull.parent = b_root
+
+    # 3. Turret Yaw bone (horizontal azimuth traverse)
+    b_turret = eb.new("Bone_TurretYaw")
+    b_turret.head = (tc.x, tc.y, tc.z)
+    b_turret.tail = (tc.x, tc.y, tc.z + 0.32)
+    b_turret.parent = b_hull
+
+    # 4. Turret Pitch bone (vertical gun elevation)
+    b_pitch = eb.new("Bone_TurretPitch")
+    b_pitch.head = (gp.x, gp.y, gp.z)
+    b_pitch.tail = (gp.x, gp.y + 0.30, gp.z)
+    b_pitch.parent = b_turret
+
+    # 5. Barrel Recoil bone (linear backward stroke)
+    b_recoil = eb.new("Bone_BarrelRecoil")
+    b_recoil.head = (gp.x, gp.y + 0.30, gp.z)
+    b_recoil.tail = (gp.x, gp.y + 0.85, gp.z)
+    b_recoil.parent = b_pitch
+
+    bpy.ops.object.mode_set(mode="OBJECT")
+
+    # Bind meshes to armature with rigid vertex groups
+    for obj in objects:
+        if obj.type != "MESH" or obj.name.endswith(("_COLLIDER", "_ShieldBubble")):
+            continue
+
+        clean_name = obj.name
+        if clean_name.startswith(prefix):
+            clean_name = clean_name[len(prefix):]
+
+        if any(k in clean_name for k in ("Barrel", "Muzzle", "Bore", "Recoil")):
+            target_bone = "Bone_BarrelRecoil"
+        elif any(k in clean_name for k in ("Mantlet", "Cradle", "Howitzer", "Rail", "Flak", "Mortar", "Gatling", "Pod", "Emitter")):
+            target_bone = "Bone_TurretPitch"
+        elif any(k in clean_name for k in ("Turret", "Bustle", "Visor", "Radar", "Rotodome")):
+            target_bone = "Bone_TurretYaw"
+        else:
+            target_bone = "Bone_Hull"
+
+        vg = obj.vertex_groups.get(target_bone) or obj.vertex_groups.new(name=target_bone)
+        all_v_indices = list(range(len(obj.data.vertices)))
+        if all_v_indices:
+            vg.add(all_v_indices, 1.0, "REPLACE")
+
+        arm_mod = None
+        for m in obj.modifiers:
+            if m.type == "ARMATURE":
+                arm_mod = m
+                break
+        if not arm_mod:
+            arm_mod = obj.modifiers.new(name="Armature", type="ARMATURE")
+            arm_mod.object = armature_obj
+
+    return armature_obj
+
+
+def generate_procedural_action_clips(
+    armature_obj: bpy.types.Object,
+    prefix: str,
+) -> dict[str, bpy.types.Action]:
+    """Generates baked NLA animation clips (Idle, Drive, FireRecoil, Death) on the vehicle armature."""
+    if not armature_obj.animation_data:
+        armature_obj.animation_data_create()
+
+    actions = {}
+
+    def set_bone_key(bone_name, data_path, frame, value):
+        pbone = armature_obj.pose.bones.get(bone_name)
+        if not pbone:
+            return
+        if data_path == "location":
+            pbone.location = Vector(value)
+            pbone.keyframe_insert(data_path="location", frame=frame)
+        elif data_path == "rotation_euler":
+            pbone.rotation_mode = "XYZ"
+            pbone.rotation_euler = Euler(value, "XYZ")
+            pbone.keyframe_insert(data_path="rotation_euler", frame=frame)
+
+    # 1. Action_Idle (Engine vibration: 30 frames)
+    act_idle = bpy.data.actions.new(name=f"{prefix}_Action_Idle")
+    armature_obj.animation_data.action = act_idle
+    for f in (1, 30):
+        set_bone_key("Bone_Hull", "location", f, (0.0, 0.0, 0.0))
+        set_bone_key("Bone_Hull", "rotation_euler", f, (0.0, 0.0, 0.0))
+    set_bone_key("Bone_Hull", "location", 15, (0.0, 0.0, -0.006))
+    set_bone_key("Bone_Hull", "rotation_euler", 15, (math.radians(0.35), 0.0, 0.0))
+    act_idle.use_fake_user = True
+    actions["Idle"] = act_idle
+
+    # 2. Action_Drive (Terrain traversal / chassis suspension rocking: 40 frames)
+    act_drive = bpy.data.actions.new(name=f"{prefix}_Action_Drive")
+    armature_obj.animation_data.action = act_drive
+    for f in (1, 40):
+        set_bone_key("Bone_Hull", "location", f, (0.0, 0.0, 0.0))
+        set_bone_key("Bone_Hull", "rotation_euler", f, (0.0, 0.0, 0.0))
+    set_bone_key("Bone_Hull", "location", 10, (0.0, 0.0, 0.012))
+    set_bone_key("Bone_Hull", "rotation_euler", 10, (math.radians(-0.8), math.radians(0.6), 0.0))
+    set_bone_key("Bone_Hull", "location", 20, (0.0, 0.0, -0.010))
+    set_bone_key("Bone_Hull", "rotation_euler", 20, (math.radians(0.6), math.radians(-0.5), 0.0))
+    set_bone_key("Bone_Hull", "location", 30, (0.0, 0.0, 0.008))
+    set_bone_key("Bone_Hull", "rotation_euler", 30, (math.radians(-0.5), math.radians(0.4), 0.0))
+    act_drive.use_fake_user = True
+    actions["Drive"] = act_drive
+
+    # 3. Action_FireRecoil (Sharp ballistic backward impulse & recovery: 20 frames)
+    act_fire = bpy.data.actions.new(name=f"{prefix}_Action_FireRecoil")
+    armature_obj.animation_data.action = act_fire
+    for f in (1, 20):
+        set_bone_key("Bone_BarrelRecoil", "location", f, (0.0, 0.0, 0.0))
+        set_bone_key("Bone_Hull", "rotation_euler", f, (0.0, 0.0, 0.0))
+    set_bone_key("Bone_BarrelRecoil", "location", 2, (0.0, -0.22, 0.0))
+    set_bone_key("Bone_Hull", "rotation_euler", 2, (math.radians(-1.2), 0.0, 0.0))
+    set_bone_key("Bone_BarrelRecoil", "location", 6, (0.0, -0.06, 0.0))
+    set_bone_key("Bone_Hull", "rotation_euler", 6, (math.radians(0.4), 0.0, 0.0))
+    set_bone_key("Bone_BarrelRecoil", "location", 14, (0.0, 0.0, 0.0))
+    set_bone_key("Bone_Hull", "rotation_euler", 14, (0.0, 0.0, 0.0))
+    act_fire.use_fake_user = True
+    actions["FireRecoil"] = act_fire
+
+    # 4. Action_Death (Chassis collapse & barrel droop: 30 frames)
+    act_death = bpy.data.actions.new(name=f"{prefix}_Action_Death")
+    armature_obj.animation_data.action = act_death
+    set_bone_key("Bone_Hull", "location", 1, (0.0, 0.0, 0.0))
+    set_bone_key("Bone_Hull", "rotation_euler", 1, (0.0, 0.0, 0.0))
+    set_bone_key("Bone_TurretPitch", "rotation_euler", 1, (0.0, 0.0, 0.0))
+    for f in (25, 30):
+        set_bone_key("Bone_Hull", "location", f, (0.0, 0.0, -0.12))
+        set_bone_key("Bone_Hull", "rotation_euler", f, (math.radians(4.5), math.radians(-6.5), math.radians(2.0)))
+        set_bone_key("Bone_TurretPitch", "rotation_euler", f, (math.radians(-22.0), 0.0, 0.0))
+    act_death.use_fake_user = True
+    actions["Death"] = act_death
+
+    # Push actions to NLA tracks for complete FBX export
+    for name, act in actions.items():
+        track = armature_obj.animation_data.nla_tracks.new()
+        track.name = f"Track_{name}"
+        track.strips.new(name, 1, act)
+
+    return actions
+
+
+# ---------------------------------------------------------------------------
+# Texture Atlas Baking & Single-Material Optimization
+# ---------------------------------------------------------------------------
+
+def unwrap_atlas_uvs(
+    objects: Sequence[bpy.types.Object],
+    island_margin: float = 0.02,
+) -> None:
+    """Generates a unified, non-overlapping UV layout across all mesh objects into 'UVMap_Atlas'."""
+    bpy.ops.object.select_all(action="DESELECT")
+    valid_mesh_objs = [o for o in objects if o.type == "MESH" and not o.name.endswith(("_COLLIDER", "_ShieldBubble"))]
+    if not valid_mesh_objs:
+        return
+
+    for obj in valid_mesh_objs:
+        obj.select_set(True)
+    bpy.context.view_layer.objects.active = valid_mesh_objs[0]
+
+    bpy.ops.object.mode_set(mode="EDIT")
+    bpy.ops.mesh.select_all(action="SELECT")
+    bpy.ops.uv.smart_project(
+        angle_limit=66.0,
+        island_margin=island_margin,
+        correct_aspect=True,
+        scale_to_bounds=True
+    )
+    bpy.ops.object.mode_set(mode="OBJECT")
+
+
+def bake_pbr_texture_atlas(
+    objects: Sequence[bpy.types.Object],
+    prefix: str,
+    output_dir: Path,
+    resolution: int = 1024,
+    palette: FactionPalette | None = None,
+) -> dict[str, Path]:
+    """Bakes unified PBR texture maps (Albedo, MetallicGloss, Normal, Emission) for 1-draw-call rendering."""
+    output_dir.mkdir(parents=True, exist_ok=True)
+    maps = {}
+
+    unwrap_atlas_uvs(objects)
+
+    valid_mesh_objs = [o for o in objects if o.type == "MESH" and not o.name.endswith(("_COLLIDER", "_ShieldBubble"))]
+    if not valid_mesh_objs:
+        return maps
+
+    scene = bpy.context.scene
+    prev_engine = scene.render.engine
+    scene.render.engine = "CYCLES"
+    scene.cycles.device = "CPU"
+    scene.cycles.samples = 1
+    scene.cycles.bake_type = "DIFFUSE"
+
+    img_albedo = bpy.data.images.new(f"{prefix}_Albedo", resolution, resolution, alpha=True)
+    img_emission = bpy.data.images.new(f"{prefix}_Emission", resolution, resolution, alpha=False)
+    img_normal = bpy.data.images.new(f"{prefix}_Normal", resolution, resolution, alpha=False)
+    img_metallic = bpy.data.images.new(f"{prefix}_MetallicGloss", resolution, resolution, alpha=True)
+
+    def set_bake_target(target_image):
+        for obj in valid_mesh_objs:
+            for mat in obj.data.materials:
+                if mat and mat.use_nodes:
+                    node = mat.node_tree.nodes.get("BakeTarget") or mat.node_tree.nodes.new("ShaderNodeTexImage")
+                    node.name = "BakeTarget"
+                    node.image = target_image
+                    mat.node_tree.nodes.active = node
+
+    bpy.ops.object.select_all(action="DESELECT")
+    for obj in valid_mesh_objs:
+        obj.select_set(True)
+    bpy.context.view_layer.objects.active = valid_mesh_objs[0]
+
+    # 1. Bake Diffuse Color
+    set_bake_target(img_albedo)
+    try:
+        bpy.ops.object.bake(type="DIFFUSE", pass_filter={"COLOR"})
+    except Exception as e:
+        print(f"Warning: Diffuse bake: {e}")
+    albedo_path = output_dir / f"{prefix}_Albedo.png"
+    img_albedo.filepath_raw = str(albedo_path)
+    img_albedo.file_format = "PNG"
+    img_albedo.save()
+    maps["albedo"] = albedo_path
+
+    # 2. Bake Emission
+    set_bake_target(img_emission)
+    try:
+        bpy.ops.object.bake(type="EMIT")
+    except Exception as e:
+        print(f"Warning: Emission bake: {e}")
+    emission_path = output_dir / f"{prefix}_Emission.png"
+    img_emission.filepath_raw = str(emission_path)
+    img_emission.file_format = "PNG"
+    img_emission.save()
+    maps["emission"] = emission_path
+
+    # 3. Bake Normal Map
+    set_bake_target(img_normal)
+    try:
+        bpy.ops.object.bake(type="NORMAL")
+    except Exception as e:
+        print(f"Warning: Normal bake: {e}")
+    normal_path = output_dir / f"{prefix}_Normal.png"
+    img_normal.filepath_raw = str(normal_path)
+    img_normal.file_format = "PNG"
+    img_normal.save()
+    maps["normal"] = normal_path
+
+    # 4. Bake Roughness to MetallicGloss
+    set_bake_target(img_metallic)
+    try:
+        bpy.ops.object.bake(type="ROUGHNESS")
+    except Exception as e:
+        print(f"Warning: Roughness bake: {e}")
+    metallic_path = output_dir / f"{prefix}_MetallicGloss.png"
+    img_metallic.filepath_raw = str(metallic_path)
+    img_metallic.file_format = "PNG"
+    img_metallic.save()
+    maps["metallic_gloss"] = metallic_path
+
+    for obj in valid_mesh_objs:
+        for mat in obj.data.materials:
+            if mat and mat.use_nodes:
+                b_node = mat.node_tree.nodes.get("BakeTarget")
+                if b_node:
+                    mat.node_tree.nodes.remove(b_node)
+
+    scene.render.engine = prev_engine
+    return maps
+
+
+def create_single_material_atlas_model(
+    source_objects: Sequence[bpy.types.Object],
+    prefix: str,
+    texture_maps: dict[str, Path],
+    output_fbx_path: Path,
+) -> bpy.types.Object:
+    """Combines all meshes into a single unified object with exactly 1 PBR atlas material (1 draw call in Unity)."""
+    valid_mesh_objs = [o for o in source_objects if o.type == "MESH" and not o.name.endswith(("_COLLIDER", "_ShieldBubble"))]
+    if not valid_mesh_objs:
+        raise ValueError("No mesh objects available for single-material atlas creation")
+
+    dup_objs = []
+    for o in valid_mesh_objs:
+        d = o.copy()
+        d.data = o.data.copy()
+        bpy.context.collection.objects.link(d)
+        dup_objs.append(d)
+
+    bpy.ops.object.select_all(action="DESELECT")
+    for d in dup_objs:
+        d.select_set(True)
+    bpy.context.view_layer.objects.active = dup_objs[0]
+    bpy.ops.object.join()
+
+    unified_obj = dup_objs[0]
+    unified_obj.name = f"{prefix}_UnifiedMesh"
+    unified_obj.data.name = f"{prefix}_UnifiedMesh_Data"
+
+    atlas_mat = bpy.data.materials.new(f"{prefix}_Material_Atlas")
+    atlas_mat.use_nodes = True
+    nodes = atlas_mat.node_tree.nodes
+    bsdf = nodes.get("Principled BSDF")
+
+    if "albedo" in texture_maps and texture_maps["albedo"].exists():
+        tex_img = bpy.data.images.load(str(texture_maps["albedo"]))
+        node_albedo = nodes.new("ShaderNodeTexImage")
+        node_albedo.image = tex_img
+        atlas_mat.node_tree.links.new(node_albedo.outputs["Color"], bsdf.inputs["Base Color"])
+
+    if "emission" in texture_maps and texture_maps["emission"].exists():
+        tex_emit = bpy.data.images.load(str(texture_maps["emission"]))
+        node_emit = nodes.new("ShaderNodeTexImage")
+        node_emit.image = tex_emit
+        atlas_mat.node_tree.links.new(node_emit.outputs["Color"], bsdf.inputs["Emission Color"])
+        if "Emission Strength" in bsdf.inputs:
+            bsdf.inputs["Emission Strength"].default_value = 2.0
+
+    if "normal" in texture_maps and texture_maps["normal"].exists():
+        tex_norm = bpy.data.images.load(str(texture_maps["normal"]))
+        tex_norm.colorspace_settings.name = "Non-Color"
+        node_norm = nodes.new("ShaderNodeTexImage")
+        node_norm.image = tex_norm
+        node_bump = nodes.new("ShaderNodeNormalMap")
+        atlas_mat.node_tree.links.new(node_norm.outputs["Color"], node_bump.inputs["Color"])
+        atlas_mat.node_tree.links.new(node_bump.outputs["Normal"], bsdf.inputs["Normal"])
+
+    unified_obj.data.materials.clear()
+    unified_obj.data.materials.append(atlas_mat)
+    for poly in unified_obj.data.polygons:
+        poly.material_index = 0
+
+    output_fbx_path.parent.mkdir(parents=True, exist_ok=True)
+    export_unity_fbx(output_fbx_path, [unified_obj], include_empties=False)
+    return unified_obj
+
+
 def hex_to_rgb(hex_code: str) -> Tuple[float, float, float]:
     """Converts a hex string ('#RRGGBB' or 'RRGGBB') to a float RGB tuple (0.0 - 1.0)."""
     h = hex_code.strip().lstrip("#")
@@ -3804,6 +4295,10 @@ class RogueVehicleBuilder:
         self.center_of_mass_loc: Vector | None = None
         self.locator_sockets: list[bpy.types.Object] = []
         self.collider_objects: list[bpy.types.Object] = []
+        self.armature_object: bpy.types.Object | None = None
+        self.action_clips: dict[str, bpy.types.Action] = {}
+        self.vfx_objects: list[bpy.types.Object] = []
+        self.shield_bubble_object: bpy.types.Object | None = None
         self.is_hover: bool = False
         self.archetype: str = "tank"
         self.wear_level: str = "field_tested"
@@ -3820,6 +4315,69 @@ class RogueVehicleBuilder:
         self.collider_objects = generate_collision_hulls(
             self.objects, prefix=self.name, include_turret_collider=include_turret
         )
+        return self
+
+    def add_muzzle_flash(self, size: float = 0.45) -> "RogueVehicleBuilder":
+        """Adds procedural star-spike muzzle flash geometry to weapon muzzle."""
+        if self.gun_pivot:
+            flash_objs = make_muzzle_flash_mesh(
+                f"{self.name}VFX",
+                location=self.gun_pivot,
+                direction=self.gun_dir if self.gun_dir else (0.0, 1.0, 0.0),
+                size=size,
+                flash_mat=self.palette.warning,
+                core_mat=self.palette.emissive,
+            )
+            self.vfx_objects.extend(flash_objs)
+            self.objects.extend(flash_objs)
+        return self
+
+    def add_thruster_plumes(self, length: float = 0.65, radius: float = 0.18) -> "RogueVehicleBuilder":
+        """Adds conical glowing jet exhaust plumes to vehicle engine exhausts."""
+        exhausts = [e for e in (self.exhaust_l, self.exhaust_r) if e is not None]
+        for idx, ex_loc in enumerate(exhausts):
+            plumes = make_thruster_plume_mesh(
+                f"{self.name}VFX_Exhaust_{idx+1}",
+                location=ex_loc,
+                direction=(0.0, -1.0, 0.0),
+                length=length,
+                radius=radius,
+                plume_mat=self.palette.warning,
+                core_mat=self.palette.emissive,
+            )
+            self.vfx_objects.extend(plumes)
+            self.objects.extend(plumes)
+        return self
+
+    def add_shield_bubble(self, radius: float = 2.4, scale_z: float = 0.78) -> "RogueVehicleBuilder":
+        """Adds an aerodynamic geodesic shield bubble envelope around the vehicle."""
+        bubble = make_shield_bubble_mesh(
+            f"{self.name}VFX",
+            center=(0.0, 0.0, self.hull_deck_z * 0.9),
+            radius=radius,
+            scale_z=scale_z,
+            shield_mat=self.palette.emissive,
+        )
+        self.shield_bubble_object = bubble
+        self.objects.append(bubble)
+        return self
+
+    def add_armature_rig(
+        self,
+        with_animations: bool = True,
+        target_objects: Sequence[bpy.types.Object] | None = None,
+    ) -> "RogueVehicleBuilder":
+        """Creates a kinematic vehicle armature and binds mesh components to rigid bones."""
+        objs = target_objects if target_objects is not None else self.objects
+        self.armature_object = generate_procedural_armature(
+            objs,
+            prefix=self.name,
+            turret_center=self.turret_center,
+            gun_pivot=self.gun_pivot,
+            hull_deck_z=self.hull_deck_z,
+        )
+        if with_animations:
+            self.action_clips = generate_procedural_action_clips(self.armature_object, prefix=self.name)
         return self
 
     def add_sloped_hull(
@@ -4629,10 +5187,26 @@ class RogueVehicleBuilder:
         visual_root_path: str = "Vehicle",
         profile_budget: bool = True,
         target_budget: int = 4000,
+        include_vfx_flash: bool = False,
+        include_vfx_thruster: bool = False,
+        include_shield_bubble: bool = False,
+        include_rig: bool = False,
+        include_animations: bool = False,
+        bake_atlas: bool = False,
+        atlas_resolution: int = 1024,
+        single_material_atlas: bool = False,
     ) -> Dict[str, Any]:
         """Runs diagnostics, smart UV unwrapping, preview rendering, batching, and FBX export."""
         blend_path.parent.mkdir(parents=True, exist_ok=True)
         fbx_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # 0. Attach optional procedural VFX meshes
+        if include_vfx_flash:
+            self.add_muzzle_flash()
+        if include_vfx_thruster:
+            self.add_thruster_plumes()
+        if include_shield_bubble:
+            self.add_shield_bubble()
 
         # 1. Quality diagnostics on raw source objects
         diagnostics = validate_model_mesh_quality(self.objects, allow_hover=self.is_hover)
@@ -4697,7 +5271,20 @@ class RogueVehicleBuilder:
             smooth_angle_deg=smooth_angle_deg,
         )
 
-        # 10. Multi-Level LOD Chain generation
+        # 10. Texture Atlas Baking & Single-Material Export (1 Draw Call)
+        if bake_atlas:
+            tex_dir = fbx_path.parent / "Textures"
+            tex_maps = bake_pbr_texture_atlas(
+                batched_objects, self.name, tex_dir,
+                resolution=atlas_resolution, palette=self.palette
+            )
+            diagnostics["texture_maps"] = {k: str(v) for k, v in tex_maps.items()}
+            if single_material_atlas:
+                atlas_fbx_path = fbx_path.parent / f"{fbx_path.stem}_Atlas.fbx"
+                create_single_material_atlas_model(batched_objects, self.name, tex_maps, atlas_fbx_path)
+                diagnostics["atlas_fbx_path"] = str(atlas_fbx_path)
+
+        # 11. Multi-Level LOD Chain generation
         lod_dict: Dict[str, list[bpy.types.Object]] | None = None
         if generate_lods:
             lod_dict = generate_lod_chain(
@@ -4709,7 +5296,7 @@ class RogueVehicleBuilder:
             )
             diagnostics["lod_levels"] = {k: len(v) for k, v in lod_dict.items()}
 
-        # 11. Create Unity locator sockets if requested
+        # 12. Create Unity locator sockets if requested
         export_objects = list(batched_objects)
         if include_locators:
             if not self.locator_sockets:
@@ -4719,8 +5306,21 @@ class RogueVehicleBuilder:
         if generate_colliders and self.collider_objects:
             export_objects.extend(self.collider_objects)
 
-        # 12. Export Primary FBX for Unity
-        export_unity_fbx(fbx_path, export_objects, include_empties=include_locators)
+        # 13. Kinematic Armature Rigging & Action Clips
+        if include_rig:
+            self.add_armature_rig(with_animations=include_animations, target_objects=batched_objects)
+            if self.armature_object:
+                export_objects.append(self.armature_object)
+                diagnostics["has_armature"] = True
+                diagnostics["action_clips"] = list(self.action_clips.keys())
+
+        # 14. Export Primary FBX for Unity
+        export_unity_fbx(
+            fbx_path, export_objects,
+            include_empties=include_locators,
+            include_armature=include_rig,
+            bake_anim=include_animations,
+        )
 
         # 13. Export Dedicated LOD FBX if requested
         if generate_lods and lod_dict:

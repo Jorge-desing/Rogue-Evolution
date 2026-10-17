@@ -180,6 +180,14 @@ def parse_args():
     parser.add_argument("--outriggers", action="store_true", help="Include deployable hydraulic stabilizer outriggers")
     parser.add_argument("--flight-deck", action="store_true", help="Include flight / drone launch deck")
     parser.add_argument("--excavator-drum", action="store_true", help="Include front rotary cutting excavator drum")
+    parser.add_argument("--bake-atlas", action="store_true", help="Bake unified PBR texture maps (Albedo, MetallicGloss, Normal, Emission)")
+    parser.add_argument("--atlas-resolution", type=int, default=1024, choices=[512, 1024, 2048], help="Resolution for baked texture atlas")
+    parser.add_argument("--single-material", action="store_true", help="Export unified 1-material mesh (<Name>_Atlas.fbx) for 1 draw call in Unity")
+    parser.add_argument("--rig", action="store_true", help="Generate kinematic Armature bones and bind meshes with rigid vertex groups")
+    parser.add_argument("--animate", action="store_true", help="Bake procedural action animation clips (Idle, Drive, FireRecoil, Death) into FBX")
+    parser.add_argument("--vfx-flash", action="store_true", help="Attach star-spike muzzle flash mesh to weapon")
+    parser.add_argument("--vfx-thruster", action="store_true", help="Attach glowing conical exhaust plumes to engines")
+    parser.add_argument("--shield-bubble", action="store_true", help="Attach geodesic energy shield bubble envelope")
     parser.add_argument("--primary-color", default=None, help="Custom hex color for primary armor (e.g. #1f3a52)")
     parser.add_argument("--light-armor-color", default=None, help="Custom hex color for light armor (e.g. #3b5f78)")
     parser.add_argument("--emissive-color", default=None, help="Custom hex color for emissive glow (e.g. #00ffee)")
@@ -288,6 +296,14 @@ def build_vehicle_model(
     lod_diagnostics: bool = False,
     smooth_angle: float = 38.0,
     multiview: bool = False,
+    bake_atlas: bool = False,
+    atlas_resolution: int = 1024,
+    single_material: bool = False,
+    rig: bool = False,
+    animate: bool = False,
+    vfx_flash: bool = False,
+    vfx_thruster: bool = False,
+    shield_bubble: bool = False,
 ) -> dict:
     rmk.clear_scene()
 
@@ -672,6 +688,14 @@ def build_vehicle_model(
         gameplay_meta_path=gameplay_meta_path,
         wreckage_fbx_path=wreckage_fbx_path,
         target_budget=target_budget,
+        include_vfx_flash=vfx_flash,
+        include_vfx_thruster=vfx_thruster,
+        include_shield_bubble=shield_bubble,
+        include_rig=rig,
+        include_animations=animate,
+        bake_atlas=bake_atlas,
+        atlas_resolution=atlas_resolution,
+        single_material_atlas=single_material,
     )
 
     if lod_diagnostics:
@@ -726,6 +750,20 @@ def main():
             print(f"  Colliders: {args.name}_COLLIDER_Hull, {args.name}_COLLIDER_Turret")
         if args.wreckage:
             print(f"  Wreckage FBX: {args.name}_Wreckage.fbx")
+        if args.bake_atlas:
+            print(f"  Texture Atlas: {args.atlas_resolution}x{args.atlas_resolution} PBR (Albedo, MetallicGloss, Normal, Emission)")
+        if args.single_material:
+            print(f"  Unified Atlas FBX: {args.name}_Atlas.fbx (1 draw call)")
+        if args.rig:
+            print(f"  Armature Rig: {args.name}_Armature (Bone_Hull, Bone_TurretYaw, Bone_TurretPitch, Bone_BarrelRecoil)")
+        if args.animate:
+            print(f"  Baked Action Clips: Action_Idle, Action_Drive, Action_FireRecoil, Action_Death")
+        if args.vfx_flash:
+            print(f"  VFX: Muzzle flash star-spike")
+        if args.vfx_thruster:
+            print(f"  VFX: Exhaust thruster plume cones")
+        if args.shield_bubble:
+            print(f"  VFX: Geodesic shield bubble envelope")
         print("=== Dry run complete. No meshes created. ===\n")
         return
 
@@ -830,6 +868,14 @@ def main():
         lod_diagnostics=args.lod,
         smooth_angle=args.smooth_angle,
         multiview=args.multiview,
+        bake_atlas=args.bake_atlas,
+        atlas_resolution=args.atlas_resolution,
+        single_material=args.single_material,
+        rig=args.rig,
+        animate=args.animate,
+        vfx_flash=args.vfx_flash,
+        vfx_thruster=args.vfx_thruster,
+        shield_bubble=args.shield_bubble,
     )
 
     if args.report_json:
