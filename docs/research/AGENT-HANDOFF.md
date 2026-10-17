@@ -4,6 +4,10 @@
 **Repository:** project root (path varies by checkout)
 **Goal:** create a Rogue Command expansion mod with original playable units, stages, and AI. The external BepInEx loader is necessary infrastructure for registering and running that content, not the mod's end product. Prioritize playable content and Steam-launched validation over expanding loader diagnostics or infrastructure without a content need.
 
+## Procedural 3D authoring verification — 2026-10-17
+
+Read section 11 of [3D model authoring enhancements](3D-MODEL-AUTHORING-ENHANCEMENTS.md) before relying on that toolset's capability claims. A local Blender audit constructed/batched all 11 default archetypes and exported the fluent example, but measured 6–10 mesh groups and seven archetypes above 5,000 source triangles. The CLI currently labels polygon counts as triangles, generates no LOD meshes, and does not enforce quality gates. Vertex dirt has no verified Standard-shader rendering path; the source blend is saved before baking. Socket names, current palette values and CLI limitations are corrected in that document and linked from the 3D skill. No game or Unity runtime behavior was tested in this authoring audit.
+
 ## Current focus: unit creation
 
 Keep the next implementation slice on units. The sample-native-expansion pack now overlays custom Sandlance Scout, Skirmish Strike Bike, Colossus Siege, Ironclad Walker, and Surge Arc Tank visuals. It supplies ImageGen-authored card Sprites for the first three; Ironclad and Surge Arc Tank keep their native cards. The current Unity build is verified locally; the newest bundle has not been tested in a match. See UNIT-VISUAL-AUTHORING.md for model sources, dimensions, prompts, bundle hashes, and rebuild steps.

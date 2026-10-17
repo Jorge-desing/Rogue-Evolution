@@ -11,12 +11,12 @@
 
 This document records the design rationale, mathematical models, procedural assemblies, and CLI automation capabilities developed for the **Rogue Command 3D Model Authoring** pipeline across recent sessions.
 
-The primary objective of this authoring toolset is to produce original, production-grade 3D vehicle models and visual overlays that seamlessly blend with Rogue Command's chunky, low-poly hard-surface RTS aesthetic (**feneq** art direction). The authoring engine is completely deterministic, 100% script-driven in Python via Blender's `bpy` API, and runs locally without external cloud dependencies, paid services, or proprietary 3D generation subscriptions.
+The authoring toolset produces original procedural vehicle geometry for Rogue Command's chunky RTS aesthetic. It is local Python/Blender tooling with repeatable parameterized construction. Production readiness, visual fit, byte-for-byte export determinism, and runtime performance require separate evidence; the design goals below are not guarantees.
 
 ### Invariant & Scope Safeguards
 - **Zero Content Pollution**: Authoring enhancements, new archetypes, and CLI tools do not add unrequested unit balance rows, prefab registrations, or entries into `content.json`.
 - **Unity Project Integrity**: The Unity authoring project at `unity/RogueCommandAssetAuthoring/` is strictly preserved, including `ProjectSettings`, package manifests, and version control configurations.
-- **Draw Call Discipline**: The kitbashing procedural workflow combines 50–120 individual mechanical parts into 4–6 unified submeshes batched by material, ensuring low draw calls in Unity.
+- **Draw Call Discipline**: The kitbashing procedural workflow groups geometry by material while retaining selected pivot meshes. The local 11-archetype audit measured 36–143 source parts and 6–10 exported mesh groups; actual Unity draw calls also depend on passes, materials and rendering configuration.
 - **Evidence Boundaries**: Blender rendering and offline bundle building constitute local authoring evidence. Runtime viability is proven only during reversible Steam-launched game sessions.
 
 ---
@@ -67,23 +67,25 @@ In Blender 4.5.14 LTS, the pipeline integrates `bpy.ops.object.shade_smooth_by_a
 
 ### B. Procedural Vertex Ambient Dirt & Cavity Baking (`bake_vertex_ambient_dirt`)
 To provide deep contact shadows in wheel wells, panel crevices, and under heavy turrets without requiring high-resolution UV unwrapping or texture memory:
-- Calculates vertex normal angles against neighboring geometry and local ground clearance.
+- Calls Blender `paint.vertex_color_dirt` with angle and blur parameters on each mesh; it does not implement a separate ground-clearance or scene-contact AO calculation.
 - Darkens crevices and undercarriages, storing the shadow scalar directly into the `Color` vertex attribute (`Mesh.colors32`).
-- Seamlessly readable by Unity's Standard Shader or custom low-poly unlit shaders with zero runtime texture memory overhead.
+- Stores vertex data without an AO texture, but visible shading requires a shader that reads vertex colors. The current sample scaffolder selects `Standard`; this audit found no custom vertex-color shader or binding. Unity 2021.3 documents that most built-in shaders do not display vertex colors ([Mesh.colors](https://docs.unity3d.com/2021.3/Documentation/ScriptReference/Mesh-colors.html)). Do not claim this baked dirt is visible in-game until that path is implemented and verified.
 
 ### C. Standardized Unity Locator Sockets (`create_unity_locator_sockets`)
 To eliminate manual socket placement in Unity for weapons, effects, and pivots, the builder automatically generates standardized empty GameObjects exported into the FBX hierarchy:
-- `Socket_MuzzlePrimary`: Primary barrel tip / missile exit point oriented along firing vector.
-- `Socket_MuzzleSecondary`: Secondary coaxial or pintle weapon socket.
-- `Socket_TurretPivot`: Root transform for turret rotation and pitch controllers.
-- `Socket_Exhaust_L` / `Socket_Exhaust_R`: Engine exhaust pipe coordinates for smoke/fire particles.
-- `Socket_SensorOptics`: Targeting visor coordinates for gimbal rotation and scanning beams.
+- `<prefix>_Socket_MuzzlePrimary`: emitted when a muzzle position exists; local Z follows the firing direction.
+- `<prefix>_Socket_TurretPivot`: emitted when a turret position exists.
+- `<prefix>_Socket_Exhaust_L` / `<prefix>_Socket_Exhaust_R`: emitted when exhaust positions exist.
+- `<prefix>_Socket_SensorEye`: emitted when a sensor position exists.
+- `<prefix>_Socket_GroundCenter`: always emitted.
+
+`Socket_MuzzleSecondary` is not implemented. These are exported empty transforms, not an automatic connection to the game's weapon/animation controllers.
 
 ---
 
 ## 4. The 11 Classic RTS Combat Archetypes
 
-The procedural generator supports 11 distinct RTS combat archetypes, covering the full spectrum of armored warfare:
+The procedural generator constructs 11 visual archetypes. The native-template column below is an authoring candidate, not a verified gameplay compatibility matrix; the CLI does not register units, implement flight, or bind animation controllers. Dimensions are design sketches, not measured outputs; weapon selection changes bounds. See the measured audit table at the end.
 
 | Archetype | Native Template | Proportions (W × L × H) | Propulsion / Stance | Signature Visual Features |
 |---|---|---|---|---|
@@ -280,7 +282,7 @@ The CLI generator allows full headless vehicle generation from PowerShell or bas
 | `--name` | String | `CustomRogueVehicle` | Base name for exported files and hierarchy prefix. |
 | `--archetype` | `tank`, `walker`, `bike`, `artillery`, `arc_tank`, `hover`, `spider`, `vtol`, `halftrack`, `super_heavy`, `buggy` | `tank` | Base chassis and propulsion architecture. |
 | `--faction` | `vanguard`, `siege`, `syndicate`, `arctic` | `vanguard` | 5-tone faction PBR color scheme. |
-| `--camo` | `none`, `desert`, `urban`, `arctic`, `woodland` | `none` | Camouflage modifier applied to armor plates. |
+| `--camo` | `none`, `desert`, `urban`, `arctic`, `woodland` | `none` | Alternative palette; currently overrides the full faction material palette. |
 | `--weapon` | `cannon`, `gatling`, `missile`, `arc`, `howitzer`, `dual_cannon` | `cannon` | Primary offensive weapon system. |
 | `--preset` | `siege_breaker`, `recon_interceptor`, `gunship_alpha`, `apc_enforcer`, `dune_raider` | `none` | Quick preconfigured archetype + loadout combo. |
 | `--rollcage` | Flag | `False` | Attaches welded tubular roll cage frame. |
@@ -293,7 +295,7 @@ The CLI generator allows full headless vehicle generation from PowerShell or bas
 | `--sponsons` | Flag | `False` | Attaches external armored ammo panniers or fuel drums. |
 | `--dirt` | Flag | `True` | Bakes procedural vertex ambient cavity dirt. |
 | `--locators` | Flag | `True` | Exports standardized Unity locator sockets. |
-| `--lod` | Flag | `False` | Prints polygon budget analysis and LOD recommendations. |
+| `--lod` | Flag | `False` | Prints polygon counts and fixed LOD suggestions; does not generate LOD meshes. |
 | `--smooth-angle` | Float | `38.0` | Smart angle threshold in degrees for smooth shading. |
 | `--multiview` | Flag | `False` | Renders 4-view orthographic studio sheet. |
 
@@ -311,56 +313,60 @@ The CLI generator allows full headless vehicle generation from PowerShell or bas
 
 ## 8. Material System & Camouflage Integration
 
-### The 5-Tone Material Architecture
+### Tonal roles and actual Blender material parameters
 
-| Material Role | PBR Metallic | PBR Smoothness | Surface Description |
-|---|---|---|---|
-| **Primary Armor** | 0.35–0.45 | 0.60–0.65 | Main hull plates, sponsons, lower chassis. |
-| **Light Armor** | 0.30–0.35 | 0.58–0.62 | Turret cheeks, upper deck, hatch covers. |
-| **Mechanical Gunmetal** | 0.74–0.80 | 0.68–0.75 | Cannon barrels, roll bars, suspension, axles. |
-| **Tread / Rubber** | 0.08–0.18 | 0.28–0.34 | Track shoes, road wheels, tire rubber. |
-| **Warning Accent** | 0.16–0.20 | 0.60–0.65 | High-contrast identification stripes, battery rails. |
-| **Emissive Tech/Optics** | 0.15–0.25 | 0.75–0.85 | **HDR ×1.5–2.5** sensor lenses, headlamps, arc discharge rings. |
+The implementation allocates eight materials. Values below are Blender Principled BSDF metallic/roughness parameters, not Unity `_Glossiness`; Unity sample materials are assigned separately by the scaffolder.
+
+| Material | Metallic | Roughness |
+|---|---:|---:|
+| Primary Armor | 0.42 | 0.58 |
+| Light Armor | 0.34 | 0.60 |
+| Mechanical Gunmetal | 0.78 | 0.30 |
+| Tread / Rubber | 0.18 | 0.74 |
+| Wheel Rim | 0.62 | 0.40 |
+| Wheel Hub | 0.55 | 0.50 |
+| Warning Accent | 0.18 | 0.36 |
+| Emissive | 0.15 | 0.22 |
 
 ### Faction Palette Definitions
 
 - **Vanguard (Industrial Slate Teal)**:
-  - Primary Armor: `(0.18, 0.24, 0.28)`
-  - Light Armor: `(0.32, 0.38, 0.42)`
-  - Warning Accent: High-visibility hazard amber `(0.85, 0.52, 0.10)`
-  - Emissive Optics: Electric cyan `(0.12, 0.85, 0.95)`
+  - Primary Armor: `(0.12, 0.19, 0.24)`
+  - Light Armor: `(0.22, 0.32, 0.38)`
+  - Warning Accent: High-visibility hazard amber `(0.95, 0.32, 0.05)`
+  - Emissive Optics: Electric cyan `(0.04, 0.72, 0.88)`
 - **Siege (Heavy Rust Ochre)**:
-  - Primary Armor: `(0.28, 0.19, 0.14)`
-  - Light Armor: `(0.42, 0.30, 0.22)`
-  - Warning Accent: Safety caution yellow `(0.92, 0.72, 0.12)`
-  - Emissive Optics: High-intensity amber `(0.95, 0.48, 0.08)`
+  - Primary Armor: `(0.26, 0.14, 0.075)`
+  - Light Armor: `(0.43, 0.30, 0.16)`
+  - Warning Accent: Safety caution yellow `(0.92, 0.48, 0.08)`
+  - Emissive Optics: High-intensity amber `(0.98, 0.35, 0.05)`
 - **Syndicate (Covert Deep Cobalt)**:
-  - Primary Armor: `(0.12, 0.14, 0.22)`
-  - Light Armor: `(0.22, 0.26, 0.36)`
-  - Warning Accent: Crimson alert red `(0.88, 0.18, 0.15)`
-  - Emissive Optics: Plasma violet `(0.72, 0.25, 0.95)`
+  - Primary Armor: `(0.055, 0.11, 0.20)`
+  - Light Armor: `(0.28, 0.34, 0.42)`
+  - Warning Accent: Electric magenta `(0.77, 0.045, 0.31)`
+  - Emissive Optics: Plasma cyan `(0.0, 0.74, 1.0)`
 - **Arctic (Sub-Zero Tundra Navy)**:
-  - Primary Armor: `(0.35, 0.39, 0.44)`
-  - Light Armor: `(0.55, 0.58, 0.62)`
-  - Warning Accent: Safety orange `(0.90, 0.42, 0.08)`
-  - Emissive Optics: Glacial blue `(0.20, 0.65, 0.98)`
+  - Primary Armor: `(0.72, 0.78, 0.85)`
+  - Light Armor: `(0.45, 0.52, 0.62)`
+  - Warning Accent: Warning red `(0.90, 0.12, 0.15)`
+  - Emissive Optics: Glacial blue `(0.15, 0.85, 1.0)`
 
 ---
 
 ## 9. Quality Verification & Diagnostic Invariants
 
-Before any model is exported to FBX or built into an AssetBundle, `validate_model_mesh_quality` evaluates four geometric invariants:
+`validate_model_mesh_quality` reports geometry and material diagnostics during `build_and_export`; it does not reject invalid geometry or enforce a triangle budget. It counts raw mesh polygons and vertices before evaluated export modifiers. The following distinguishes current checks from targets:
 
 1. **Ground Clearance Verification**:
    - Ground vehicles (`tank`, `walker`, `bike`, `halftrack`, `super_heavy`, `buggy`, `spider`): Lowest vertex $Z_{\min} \in [-0.02\text{m}, 0.08\text{m}]$.
-   - Airborne / Floating vehicles (`hover`, `vtol`): Lowest vertex $Z_{\min} \le 0.55\text{m}$.
+   - Airborne / Floating vehicles (`hover`, `vtol`): the current validator accepts $-0.02\text{m} \le Z_{\min} \le 0.55\text{m}$. This is a bounds policy, not proof of flight or hover behavior.
 2. **Polygon Budget Health**:
    - Real-time RTS budget targets $1,500$ to $5,000$ triangles per unit.
-   - The `--lod` CLI flag computes triangle distributions across chassis, weapons, and wheels, warning if any assembly exceeds budget.
+   - The current `--lod` output mislabels `total_polygons` as triangles and prints fixed LOD suggestions. It neither computes per-assembly triangle distributions nor generates LODs. Count triangulated/evaluated geometry before using the target as an acceptance gate.
 3. **Material Slot Hygiene**:
-   - Verifies that zero meshes contain empty or unassigned material slots.
+   - Currently detects meshes with no material slots. It does not check null entries inside a non-empty slot list, and warnings do not stop export.
 4. **Multi-Perspective Orthographic Studio**:
-   - Automatically renders 4 perspectives with AgX tone mapping:
+   - With `--multiview`, the renderer emits four separate image files with AgX tone mapping, not a composed contact sheet. This is a rendering step separate from `validate_model_mesh_quality`:
      - `ISOMETRIC`: Standard 45° combat perspective.
      - `TOP_DOWN`: Plan view for minimap clarity and drafting silhouette.
      - `FRONT`: Frontal glacis and width proportions.
@@ -379,3 +385,40 @@ Before any model is exported to FBX or built into an AssetBundle, `validate_mode
 | Blender Recipes | `.agents/skills/.../references/blender-procedural-techniques.md` | `bpy` code snippets for procedural assemblies. |
 | Native Pivots Guide | `.agents/skills/.../references/native-hierarchy-and-pivots.md` | Transform hierarchies for `PCXBaseTank`, `BombBike`, etc. |
 | Unity Material Guide | `.agents/skills/.../references/unity-material-pipeline.md` | Standard shader setup, emission keywords, and batching. |
+
+
+## 11. Verification record and operational knowledge — 2026-10-17
+
+**Scope:** inspected the document against repository source, ran construction and batching in installed Blender 4.5.14 LTS for all 11 archetypes, and exported the documented fluent-builder example with previews disabled. No game launch, Unity import, AssetBundle rebuild or source-asset replacement was part of this audit.
+
+**Source identity:** `tools/RogueModelKit.py` and the skill's `scripts/RogueModelKit.py` matched SHA-256 `6420c442548fc7c5afed29556d562d69430206416d7499cab54c1e114d5889a6`. The installed Blender reported 4.5.14 LTS and the Unity project pins 2021.3.45f2. Both smoothing and normals operators used by batching resolved in that Blender.
+
+The matrix below uses default CLI faction/weapon arguments (`cannon`, except the archetype-specific arc behavior), source mesh triangulation and the existing material/pivot grouping. It does not include all presets, evaluated modifier costs, FBX re-import counts, runtime rendering or GPU measurements. All 11 constructed and batched successfully, and all passed the existing ground-contact diagnostic.
+
+| Archetype | Source parts | Polygons | Triangles | Mesh groups |
+|---|---:|---:|---:|---:|
+| `tank` | 98 | 4024 | 7632 | 10 |
+| `walker` | 51 | 1986 | 3588 | 6 |
+| `bike` | 111 | 3954 | 7252 | 8 |
+| `artillery` | 106 | 4376 | 8320 | 9 |
+| `arc_tank` | 93 | 3782 | 7204 | 9 |
+| `hover` | 36 | 1536 | 2808 | 7 |
+| `spider` | 50 | 2464 | 4552 | 7 |
+| `vtol` | 47 | 1870 | 3604 | 6 |
+| `halftrack` | 135 | 5154 | 9668 | 10 |
+| `super_heavy` | 143 | 6202 | 11788 | 10 |
+| `buggy` | 118 | 4352 | 7992 | 8 |
+
+Seven of the 11 exceed the stated 5,000-triangle design target. The successful fluent example produced 140 source parts, 6,136 polygons, ten mesh groups, six locators and a 316,012-byte FBX. These results establish local construction/export, not production acceptance.
+
+Important operational details to retain:
+
+- `build_and_export` saves the editable `.blend` **before** vertex dirt baking and material joining. Reopening the sample `.blend` found no `Color` attributes; post-bake exported meshes had them. Save/order must be considered when reproducing or editing baked results.
+- `batch_and_join_by_material` joins source objects in the current scene. The earlier save preserves the editable on-disk state; this function does not create an independent non-destructive duplicate set like `merge_meshes_by_material`'s duplicate-based export path.
+- Locators are geometry metadata. They do not attach native weapon logic, turret animation, exhaust effects or flight behavior automatically. Names must match the actual emitted names above.
+- `--skirts`, `--dirt` and `--locators` are `store_true` with default `True`; they currently have no CLI off switch. Explicit option values using `--option=value` do not satisfy the preset override check that looks for a separate `--option` token. Prefer separate option/value tokens until parser precedence is corrected.
+- The CLI always chooses a preview output path. The audit used the Python builder with `preview_path=None` for export verification, and an inspection wrapper for the archetype matrix; it did not exercise the CLI's ordinary rendering/export path for every archetype.
+- Palette material choices, dimensions, triangle counts, silhouette rules (70/20/10 and 250 ms), and draw-call goals are design guidance or measured local results as labeled, not facts about the game's renderer or perceptual-study results.
+- For future modeling tasks, use the 3D authoring skill and this verified record; for gameplay addition use the unit/pack contracts as well, including each unit's required production building where supported by the active loader branch. Use ImageGen for new 2D card artwork as requested by the user.
+
+Local ignored evidence: `artifacts/research/authoring-document-audit/report.json`, `full-example-report.json`, `blender.log`, `export-example.log`, and the temporary `.blend`/FBX. No generated verification assets are distributable pack inputs. Next implementation work, when requested, should address true/evaluated triangle reporting, budget enforcement policy, vertex-color shader support, saved bake state and explicit CLI disabling/precedence rather than treating those capabilities as already delivered.

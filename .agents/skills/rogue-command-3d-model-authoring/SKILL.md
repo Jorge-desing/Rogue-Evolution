@@ -9,6 +9,10 @@ Use this skill to design, model, texture, and export original, high-readability 
 
 ---
 
+## Verified implementation limits
+
+Before using the procedural kit, read `docs/research/3D-MODEL-AUTHORING-ENHANCEMENTS.md`, especially section 11's local audit. Treat code and fresh measurements as authoritative. The existing `--lod` text counts polygons as triangles; it generates no LOD meshes or budget enforcement. The eleven default archetypes measured 6–10 mesh groups, not a guaranteed 4–6 draw calls. Vertex dirt needs a vertex-color-aware Unity shader, and the sample Standard material path has no verified binding. The editable blend is saved before dirt baking. Socket names are prefixed and use `Socket_SensorEye`/`Socket_GroundCenter`; secondary muzzle binding is absent. Archetype visuals do not imply flight, animation or native controller compatibility. These limits override broader design claims below until implementation and evidence change.
+
 ## 1. Preserve and Use the Established Authoring Path
 
 Before making any changes, review the project rules and handoffs:
