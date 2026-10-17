@@ -10,7 +10,7 @@ The repository has a functional development foundation: a version-guarded loader
 
 The next content milestone should deliver one coherent, original gameplay slice: a distinct unit identity and balance, a stage with an intentional challenge and suitable pool/world setup, and an AI module/profile that changes decisions in a measurable way. First verify whether each desired asset can be authored under the Editor's precompiled-game-assembly limitation. Record any unsupported custom map, rig, or AI behavior as a blocker instead of substituting a template variant and calling it original content. Run the eventual match through Steam and label the result as in-game runtime evidence.
 
-Read [the content authoring tools assessment](CONTENT-AUTHORING-TOOLS.md) for current skills, utilities, and recommended use. Blender 4.5.14 LTS, UnityExplorer 4.8.2, and Runtime Unity Editor 6.3.2.1 are staged in ignored `.tools/`; neither runtime inspector is deployed to the game. `tools/Setup-ContentAuthoringTools.ps1` recreates Blender/UnityExplorer, and `tools/Setup-BackendTools.ps1 -RuntimeUnityEditor` recreates Runtime Unity Editor with SHA-256 checks. These scripts do not modify or launch Rogue Command. Use only one runtime inspector in a reversible Steam-launched test profile.
+Read [the content authoring tools assessment](CONTENT-AUTHORING-TOOLS.md) for current skills, utilities, and recommended use. Blender 4.5.14 LTS, UnityExplorer 4.8.2, Runtime Unity Editor 6.3.2.1, and UnityDataTool 2.4.0 are staged in ignored `.tools/`; neither runtime inspector is deployed to the game. `tools/Setup-ContentAuthoringTools.ps1` recreates Blender/UnityExplorer, `tools/Setup-BackendTools.ps1 -RuntimeUnityEditor` recreates Runtime Unity Editor, and `tools/Setup-UnityDataTool.ps1` stages UnityDataTool with SHA-256 checks. These scripts do not modify or launch Rogue Command. Use only one runtime inspector in a reversible Steam-launched test profile.
 
 ## Start here
 
@@ -53,6 +53,7 @@ The game assembly is PE32 CIL even though the player is x64; this is expected fo
 | `content/packs/sample-reactive-ai/content.json` | Data-only stage and native AI overlay that chooses the reactive base-defense module. |
 | `tests/RogueCommandExpansionLoader.ValidationTests/` | Offline sample-pack, path/reference, compatibility-guard, real registry-mutator, and progression-idempotency harness; uses fake game-shaped types and temporary fixtures without loading Unity assets. |
 | `tools/Package-Loader.ps1` | Builds Release and writes a staged install ZIP under ignored `artifacts/packages/`. |
+| `tools/Setup-UnityDataTool.ps1` | Stages the official UnityDataTool 2.4.0 CLI under ignored `.tools/` after hash and safe archive-path checks; useful for offline AssetBundle inspection. |
 | `unity/RogueCommandAssetAuthoring/` | Unity 2021.3.45f2 project with a pack bundle builder, fail-closed full-prefab preflight, and `RogueCommandVisualSampleScaffolder.cs` for the script-free native visual overlay sample. Game DLL references are local-only under `Assets/Plugins/GameAssemblies/`. |
 | `docs/research/BASELINE.md` and `ASSET-CATALOG.md` | Reverse-engineering evidence, coverage, and explicit limits. Generated large inventories are ignored and can be regenerated. |
 
@@ -81,6 +82,8 @@ The package script builds the current plugin before staging the ZIP and copies t
 Use `unity/RogueCommandAssetAuthoring/` with Unity **2021.3.45f2**, including the Windows Build Support module. This standalone project is distinct from the user's `Rogue Evolution` Hub project. Preserve its `ProjectSettings`, `Packages/manifest.json`, Plastic/Unity Version Control data, and Cloud configuration.
 
 The authoring project imports local development DLLs to `Assets/Plugins/GameAssemblies/`. The root `.gitignore` exclusion was verified with `git check-ignore`; `ignore.conf` contains matching Unity Version Control patterns, but this machine has no Plastic CLI to evaluate them. Do not add the DLLs to bundles or releases. The scaffolder pins the verified `Assembly-CSharp.dll` SHA-256 and checks MVID when resolving game types. It can draw the example card Sprite, but it requires authored `ScoutTankBalance.asset` and `TrainingStage.asset` templates: it does not create sparse default balance rows or stage ScriptableObjects.
+
+UnityDataTool 2.4.0 is an additional offline inspector for Unity Archives and serialized files. For the committed visual sample, `archive list <bundle>` reports the bundle's SerializedFile and `sf objectlist <bundle> -f json` enumerates serialized object types. This supplements UnityPy and the Unity Editor re-open check; it does not prove Unity runtime loading or mod behavior.
 
 **Current sample-pack blocker and root-cause resolution:**
 1. **MonoManager and Plugin Resolution:** In batch runs 4–8, Unity's MonoManager unloaded `Assembly-CSharp.dll` due to missing references. Staging all 32 managed game dependencies under `Assets/Plugins/GameAssemblies/` with `validateReferences: 0` completely resolved the broken assembly errors (0 CS errors, 0 broken assemblies loaded).
