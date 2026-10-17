@@ -27,6 +27,16 @@ dotnet build src/RogueCommandExpansionLoader/RogueCommandExpansionLoader.csproj 
 
 El ensamblado se genera en `artifacts/plugin/RogueCommandExpansionLoader.dll`. El proyecto apunta a `netstandard2.1`: el `Assembly-CSharp.dll` de esta instalación referencia esa versión y la compilación `netstandard2.0` fallaba con `CS1705`. El plugin usa BepInEx y Harmony del paquete local, y no copia esas bibliotecas ni las ensambladas del juego al directorio de salida.
 
+## Herramientas de contenido
+
+Unity 2021.3.45f2 ya está instalado para compilar AssetBundles. Blender 4.5.14 LTS y UnityExplorer 4.8.2 se guardan bajo `.tools/` para modelar y hacer inspección runtime; esta carpeta está ignorada por Git. Para volver a preparar las copias locales en otro checkout:
+
+```powershell
+.\tools\Setup-ContentAuthoringTools.ps1 -Blender -UnityExplorer
+```
+
+El script verifica SHA-256 y solo prepara las herramientas bajo `.tools/`. No copia archivos al juego ni lo inicia. UnityExplorer requiere BepInEx 5 Mono y se añadirá a la instalación de Steam solo durante una prueba reversible.
+
 El validador de paquetes y guardas de compatibilidad se puede ejecutar sin iniciar el juego ni cargar AssetBundles:
 
 ```powershell
