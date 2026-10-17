@@ -156,91 +156,147 @@ def build_colossus_siege_model():
         ))
 
     # 5. Heavy Siege Turret & Ballistic Cannon Assembly
-    # Octagonal low-profile armored turret base
+    # Octagonal low-profile armored turret base with rear bustle ammo compartment
+    turret_center = Vector((0.0, 0.05, 1.15))
     model_objects.append(rmk.make_cylinder(
         "ColossusArmor_TurretBase",
-        radius=0.72, depth=0.36,
-        location=(0.0, 0.05, 1.15),
+        radius=0.74, depth=0.34,
+        location=turret_center,
         material=armor_primary,
         vertices=8, bevel=0.04
     ))
-    # Turret sloped mantlet
+    # Rear bustle ammo compartment (counterweights the heavy cannon)
+    model_objects.append(rmk.make_box(
+        "ColossusArmor_TurretBustle",
+        (0.92, 0.55, 0.28), (0.0, -0.48, 1.18),
+        armor_primary, bevel=0.035
+    ))
+    # Sloped front mantlet cradle housing
     model_objects.append(rmk.make_box(
         "ColossusArmor_TurretMantlet",
-        (0.96, 0.72, 0.32), (0.0, 0.45, 1.18),
+        (0.88, 0.48, 0.30), (0.0, 0.42, 1.17),
         armor_light, bevel=0.035,
         rotation=(math.radians(-6), 0.0, 0.0)
     ))
 
-    # Massive Siege Cannon Barrel (Elevated ~12° for ballistic trajectory)
-    elev_angle = math.radians(12)
-    model_objects += [
-        # Heavy breech collar
-        rmk.make_cylinder(
-            "ColossusGun_BreechCollar",
-            radius=0.18, depth=0.48,
-            location=(0.0, 0.85, 1.25),
-            material=gunmetal,
-            rotation=(math.radians(90) - elev_angle, 0.0, 0.0),
-            vertices=10
-        ),
-        # Main heavy barrel (Length 1.65m)
-        rmk.make_cylinder(
-            "ColossusGun_MainBarrel",
-            radius=0.11, depth=1.65,
-            location=(0.0, 1.70, 1.42),
-            material=gunmetal,
-            rotation=(math.radians(90) - elev_angle, 0.0, 0.0),
-            vertices=12
-        ),
-        # Muzzle Brake / Recoil Compensator
-        rmk.make_box(
-            "ColossusGun_MuzzleBrake",
-            (0.32, 0.34, 0.28), (0.0, 2.52, 1.60),
-            armor_light, bevel=0.025,
-            rotation=(math.radians(-12), 0.0, 0.0)
-        ),
-        # Barrel Muzzle Bore Hole
-        rmk.make_cylinder(
-            "ColossusGun_MuzzleBore",
-            radius=0.075, depth=0.15,
-            location=(0.0, 2.68, 1.63),
-            material=gunmetal,
-            rotation=(math.radians(90) - elev_angle, 0.0, 0.0),
-            vertices=10
-        )
-    ]
+    # Coaxial Cannon Parameterization:
+    # All barrel components stem precisely along gun_dir from gun_pivot!
+    elev_angle = math.radians(4.5)  # Sleek, grounded, purposeful siege elevation
+    gun_pivot = Vector((0.0, 0.52, 1.18))
+    gun_dir = Vector((0.0, math.cos(elev_angle), math.sin(elev_angle))).normalized()
+    gun_rot = gun_dir.to_track_quat("Z", "Y").to_euler()
 
-    # Recoil shock cylinders flanking the main gun
+    # Heavy breech collar
+    breech_loc = gun_pivot + gun_dir * 0.22
+    model_objects.append(rmk.make_cylinder(
+        "ColossusGun_BreechCollar",
+        radius=0.17, depth=0.42,
+        location=breech_loc,
+        material=gunmetal,
+        rotation=gun_rot,
+        vertices=10, bevel=0.02
+    ))
+
+    # Reinforced thermal shroud / barrel sleeve
+    sleeve_loc = gun_pivot + gun_dir * 0.68
+    model_objects.append(rmk.make_cylinder(
+        "ColossusGun_BarrelSleeve",
+        radius=0.13, depth=0.54,
+        location=sleeve_loc,
+        material=armor_light,
+        rotation=gun_rot,
+        vertices=8, bevel=0.025
+    ))
+
+    # Main rifled cannon barrel (Length: 1.55m)
+    barrel_loc = gun_pivot + gun_dir * 1.52
+    model_objects.append(rmk.make_cylinder(
+        "ColossusGun_MainBarrel",
+        radius=0.095, depth=1.55,
+        location=barrel_loc,
+        material=gunmetal,
+        rotation=gun_rot,
+        vertices=12, bevel=0.012
+    ))
+
+    # Double-baffle muzzle brake (Mounted snugly on the barrel tip)
+    muzzle_loc = gun_pivot + gun_dir * 2.32
+    model_objects.append(rmk.make_box(
+        "ColossusGun_MuzzleBrake",
+        (0.24, 0.30, 0.22), muzzle_loc,
+        armor_light, bevel=0.02,
+        rotation=gun_rot
+    ))
+    # Muzzle bore hole opening
+    bore_loc = gun_pivot + gun_dir * 2.47
+    model_objects.append(rmk.make_cylinder(
+        "ColossusGun_MuzzleBore",
+        radius=0.065, depth=0.10,
+        location=bore_loc,
+        material=gunmetal,
+        rotation=gun_rot,
+        vertices=10
+    ))
+
+    # Twin hydraulic recoil recuperators (Snugly flanking the mantlet, parallel to gun_dir)
+    recoil_offset_x = 0.22
     for side in (-1, 1):
         side_tag = "L" if side < 0 else "R"
+        recoil_loc = gun_pivot + gun_dir * 0.28 + Vector((side * recoil_offset_x, 0.0, 0.0))
         model_objects.append(rmk.make_cylinder(
             f"ColossusGun_RecoilCylinder_{side_tag}",
-            radius=0.055, depth=0.62,
-            location=(side * 0.24, 0.95, 1.24),
+            radius=0.05, depth=0.52,
+            location=recoil_loc,
             material=gunmetal,
-            rotation=(math.radians(90) - elev_angle, 0.0, 0.0),
-            vertices=8
+            rotation=gun_rot,
+            vertices=8, bevel=0.008
+        ))
+        # Mounting bracket attaching cylinder to mantlet
+        model_objects.append(rmk.make_box(
+            f"ColossusGun_RecoilBracket_{side_tag}",
+            (0.06, 0.16, 0.12), recoil_loc - gun_dir * 0.18,
+            armor_primary, bevel=0.01
         ))
 
-    # 6. Recessed Glowing Optic Sensors & Targeting Mast
-    optic_parts = rmk.make_recessed_sensor_visor(
-        "ColossusSensor_OpticVisor",
-        location=(0.0, 0.58, 1.38),
-        size=(0.42, 0.16, 0.14),
-        armor_mat=armor_primary,
-        lens_mat=sensor_cyan,
-        cavity_mat=gunmetal
-    )
-    model_objects.extend(optic_parts)
+    # 6. Integrated Optics, Commander Cupola & Clean Antenna Mast
+    # Commander's low-profile observation cupola on rear-left of turret
+    cupola_loc = Vector((-0.34, -0.08, 1.35))
+    model_objects.append(rmk.make_cylinder(
+        "ColossusArmor_CommanderCupola",
+        radius=0.22, depth=0.14,
+        location=cupola_loc,
+        material=armor_light,
+        vertices=8, bevel=0.02
+    ))
+    # Armored periscope visor slit on cupola
+    model_objects.append(rmk.make_box(
+        "ColossusSensor_CupolaVisionSlit",
+        (0.26, 0.04, 0.05), cupola_loc + Vector((0.0, 0.15, 0.03)),
+        sensor_cyan, bevel=0.008
+    ))
 
-    # Elevated targeting radar mast
+    # Integrated Transverse Targeting Rangefinder (Mounted on turret roof, flush and armored)
+    rangefinder_loc = Vector((0.0, 0.24, 1.34))
+    model_objects.append(rmk.make_box(
+        "ColossusSensor_RangefinderBar",
+        (0.86, 0.14, 0.12), rangefinder_loc,
+        armor_primary, bevel=0.018
+    ))
+    # Twin recessed rangefinder optical lenses on the bar tips
+    for side in (-1, 1):
+        side_tag = "L" if side < 0 else "R"
+        lens_loc = rangefinder_loc + Vector((side * 0.38, 0.075, 0.0))
+        model_objects.append(rmk.make_box(
+            f"ColossusSensor_RangefinderLens_{side_tag}",
+            (0.08, 0.02, 0.07), lens_loc,
+            sensor_cyan, bevel=0.005
+        ))
+
+    # Clean Military Spring-Base Antenna on rear-right corner
+    antenna_base = Vector((0.36, -0.48, 1.32))
     model_objects += [
-        rmk.make_rod("ColossusSensor_MastPylon", (0.34, -0.32, 1.32), (0.34, -0.32, 1.68), 0.035, gunmetal),
-        rmk.make_box("ColossusSensor_RadarHead", (0.36, 0.12, 0.22), (0.34, -0.32, 1.76), armor_light, bevel=0.02),
-        rmk.make_box("ColossusSensor_RadarLens", (0.28, 0.025, 0.14), (0.34, -0.26, 1.76), sensor_cyan, bevel=0.005),
-        # Antenna whip
-        rmk.make_rod("ColossusSensor_AntennaWhip", (0.42, -0.32, 1.86), (0.46, -0.36, 2.35), 0.012, gunmetal, vertices=6),
+        rmk.make_cylinder("ColossusSensor_AntennaBase", 0.04, 0.08, antenna_base, gunmetal, vertices=8, bevel=0.01),
+        rmk.make_rod("ColossusSensor_AntennaMast", antenna_base, antenna_base + Vector((0.0, -0.04, 0.75)), 0.012, gunmetal, vertices=6),
     ]
 
     # Frontal hull headlights
