@@ -19,7 +19,8 @@ namespace RogueCommandExpansionLoader.Runtime
             string scopeId,
             object pool,
             IEnumerable<string> unitIds,
-            bool blueprintsAreExclusive)
+            bool blueprintsAreExclusive,
+            string sourcePoolId = null)
         {
             if (String.IsNullOrWhiteSpace(poolId))
             {
@@ -37,6 +38,7 @@ namespace RogueCommandExpansionLoader.Runtime
             }
 
             PoolId = poolId;
+            SourcePoolId = sourcePoolId;
             ScopeId = scopeId;
             Pool = pool;
             BlueprintsAreExclusive = blueprintsAreExclusive;
@@ -59,6 +61,8 @@ namespace RogueCommandExpansionLoader.Runtime
         }
 
         public string PoolId { get; private set; }
+
+        public string SourcePoolId { get; private set; }
 
         public string ScopeId { get; private set; }
 
@@ -108,6 +112,8 @@ namespace RogueCommandExpansionLoader.Runtime
             new Dictionary<string, BlueprintPoolScopeRegistration>(StringComparer.Ordinal);
         private readonly Dictionary<object, BlueprintPoolScopeRegistration> _byReference =
             new Dictionary<object, BlueprintPoolScopeRegistration>(ReferenceComparer.Instance);
+        private readonly Dictionary<string, string> _localizationAliases =
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         private readonly List<BlueprintPoolScopeRegistration> _ordered =
             new List<BlueprintPoolScopeRegistration>();
 
@@ -139,6 +145,10 @@ namespace RogueCommandExpansionLoader.Runtime
                     _byId.Add(registration.PoolId, registration);
                     _byReference.Add(registration.Pool, registration);
                     _ordered.Add(registration);
+                    if (!String.IsNullOrWhiteSpace(registration.SourcePoolId))
+                    {
+                        _localizationAliases.Add(registration.PoolId, registration.SourcePoolId);
+                    }
                 }
             }
         }
@@ -149,6 +159,20 @@ namespace RogueCommandExpansionLoader.Runtime
             {
                 return !String.IsNullOrEmpty(poolId) && _byId.ContainsKey(poolId);
             }
+        }
+
+        public bool TryGetSourcePoolLocalizationId(string poolId, out string sourcePoolId)
+        {
+            lock (_gate)
+            {
+                if (!String.IsNullOrEmpty(poolId) && _localizationAliases.TryGetValue(poolId, out sourcePoolId))
+                {
+                    return true;
+                }
+            }
+
+            sourcePoolId = null;
+            return false;
         }
 
         public bool TryFind(string poolId, out object pool)
@@ -240,6 +264,7 @@ namespace RogueCommandExpansionLoader.Runtime
         {
             var ids = new HashSet<string>(_byId.Keys, StringComparer.Ordinal);
             var pools = new HashSet<object>(_byReference.Keys, ReferenceComparer.Instance);
+            var localizationIds = new HashSet<string>(_localizationAliases.Keys, StringComparer.OrdinalIgnoreCase);
             if (registrations == null)
             {
                 return;
@@ -247,7 +272,8 @@ namespace RogueCommandExpansionLoader.Runtime
 
             foreach (BlueprintPoolScopeRegistration registration in registrations)
             {
-                if (registration == null || !ids.Add(registration.PoolId) || !pools.Add(registration.Pool))
+                if (registration == null || !ids.Add(registration.PoolId) || !pools.Add(registration.Pool) ||
+                    (!String.IsNullOrWhiteSpace(registration.SourcePoolId) && !localizationIds.Add(registration.PoolId)))
                 {
                     throw new InvalidOperationException("A scoped blueprint pool ID or object is already registered.");
                 }

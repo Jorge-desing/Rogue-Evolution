@@ -1,6 +1,6 @@
 # Rogue Evolution — expansión de contenido para Rogue Command
 
-Este repositorio desarrolla un **mod de expansión para añadir unidades, etapas y AI a Rogue Command**. El cargador externo BepInEx 5 con Harmony es la infraestructura que permite registrar y ejecutar ese contenido; no es el objetivo final del mod. El paquete de muestra actual demuestra una unidad visual basada en una plantilla, una variante de etapa y un módulo compilado de AI, pero aún no es contenido aceptado dentro de una partida.
+Este repositorio desarrolla un **mod de expansión para añadir unidades, etapas y AI a Rogue Command**. El cargador externo BepInEx 5 con Harmony es la infraestructura que permite registrar y ejecutar ese contenido; no es el objetivo final del mod. Los paquetes de muestra incluyen cinco unidades, sus edificios de producción, cuatro etapas y cuatro perfiles AI. La sección de evidencia distingue lo observado en Steam de las rutas pendientes de aceptación.
 
 El trabajo prioriza contenido original que se pueda jugar: unidades con identidad visual y balance propios, etapas con una experiencia de mapa reconocible y perfiles de AI con decisiones nuevas. Cada entrega debe separar la inspección estática, la compilación local y la comprobación en una partida iniciada por Steam. Conserva `mod/manifest.json` para los ajustes TSV de balance que admite el juego de forma nativa.
 
@@ -61,9 +61,12 @@ Para comprobar que los nombres de assets declarados existen en los bundles y que
 
 ```powershell
 .\.venv\Scripts\python.exe .\tools\validate_content_bundle_references.py .\content\packs\sample-native-expansion
+.\.venv\Scripts\python.exe .\tools\validate_native_visual_roots.py .\content\packs\sample-native-expansion
 ```
 
 Este chequeo lee los AssetBundles con UnityPy y no modifica el pack ni la instalación del juego. Revisa las entradas de bundle, no valida que el contenido funcione dentro de una partida.
+
+El segundo comando requiere Python 3.11 o posterior y las dependencias fijadas en `requirements.txt`. Verifica versión, SHA-256 y MVID del juego, además del hash de `resources.assets`, y comprueba que cada ruta visual nativa sea única y contenga renderers. La selección del recurso y su aspecto dentro de una partida se comprueban por separado.
 
 Para crear un ZIP de instalación sin escribir en la carpeta del juego:
 
@@ -80,9 +83,31 @@ El paquete aparece en `artifacts/packages/` y conserva la estructura `BepInEx/pl
 3. Coloca cada paquete en `BepInEx/plugins/RogueCommandExpansionLoader/content/packs/<carpeta-del-pack>/` con su `content.json` y, cuando los use, sus AssetBundles.
 4. Conserva `Rogue Command/Mod/` para las sobrescrituras TSV nativas; el loader externo no reemplaza ese formato.
 
-`content/packs/sample-native-expansion/content.json` crea variantes de balance basadas en unidades nativas, sustituye la rama visual `Vehicle` Sandlance en PCXBaseTank/Vehicle, Bike en BombBike/GameObject/BombBike y Colossus en ArtilleryTank/Vehicle con prefabs del bundle, deriva etapas de plantillas nativas y añade un módulo de construcción programada al AI. La etapa `training-variant` demuestra además un LandscapeGenerator nativo clonado con semilla fija, tamaño 31 y nombre localizado; el loader lo expone solo mientras genera el mapa de esa etapa y restaura las listas temporales en un finalizer de Harmony. Es una variante procedural de reglas existentes, no un generador de terreno nuevo. `content/packs/sample-reactive-ai/content.json` referencia a `sample-native:scout-tank` desde su etapa `counterstrike-lane` y muestra un perfil de contraataque que detecta unidades del jugador atacando un edificio AI y envía hasta dos defensores con ataque y movimiento habilitados, dentro de 12 celdas, a la última posición del atacante. Solo interrumpe órdenes inactivas o de movimiento; después de llegar, el juego reanuda la orden guardada. Los perfiles nativos de muestra usan `scopeToReferencedStages`: el loader crea un alias clonado con el rango calculado de las etapas que lo referencian, sin modificar la plantilla global. Estas rutas tienen validación local y preflight estático; ninguna unidad, etapa o AI se ha confirmado en una partida. El overlay visual conserva la jerarquía de gameplay, hereda el primer material nativo si hace falta y no remapea animaciones o rigs. El flag global de elegibilidad permite que ofertas sin pool concreto sigan el fallback nativo; cuando el juego usa BlueprintPool, los clones limitan cada unidad a etapas que la declaran y conservan los filtros nativos. `sample-expansion` muestra además la ruta para paquetes con prefabs Unity completos. Los AssetBundles no pueden distribuir código ejecutable.
+`content/packs/sample-native-expansion/content.json` añade cinco unidades con balance y modelos propios sobre controladores nativos: Sandlance en `PCXBaseTank/Vehicle`, Bike en `BombBike/GameObject/BombBike`, Colossus en `ArtilleryTank/Tank`, Ironclad en `GatlingWalker/RoboMarine_Mesh` y Surge en `LightningTank/PCX TankHolder`. El overlay conserva la jerarquía de gameplay y no remapea animaciones o rigs. Cada unidad tiene una nueva fábrica, según la tabla siguiente.
 
-El perfil `sample-reactive-ai:base-defense` añade la Moto de Asalto Rápido al roster de la base 0 de una copia AI aislada, y su etapa también la añade a la elegibilidad blueprint aleatoria. El loader valida el ID y carga primero el paquete propietario de la unidad. Es evidencia de manifiesto y validación local; aún falta confirmar su aparición en una partida de Steam.
+La etapa `training-variant` añade una variante procedural del LandscapeGenerator nativo, con semilla fija, tamaño 31 y nombre localizado. El loader la expone durante la generación de esa etapa y restaura las listas temporales mediante un finalizer de Harmony. Los perfiles AI nativos se clonan con un rango calculado a partir de sus etapas, preservando sus plantillas globales. Las nuevas etapas reciben también un fallback nativo validado en un snapshot que conserva los nueve slots originales.
+
+Los pools clonados conservan los filtros nativos y admiten los planos de las fábricas correspondientes a los productos declarados por cada etapa. El fallback genérico sin pool sigue la elegibilidad global del juego. `sample-expansion` documenta la ruta de prefabs Unity completos y permanece fuera del instalador hasta disponer de esos assets. Los AssetBundles contienen recursos serializados; los módulos AI se compilan en el plugin.
+
+El perfil `sample-reactive-ai:base-defense` añade la Moto de Asalto Rápido al roster de la base 0 de una copia AI aislada. En la prueba dirigida por Steam del 17 de octubre, anterior a la integración de edificios propios, esa unidad apareció activa con tag `AI` en la etapa añadida 12; también se observaron 13 mapas de etapa, la AI inicializada y los tooltips localizados de sus 20 pools. Ese acceso usó un salto de diagnóstico a la etapa. La producción desde los edificios y una decisión de contraataque efectiva requieren su propia comprobación.
+
+## Unidades y edificios de producción
+
+Cada unidad del mod declara un edificio propio en `productionBuilding`. El edificio y la unidad tienen IDs nuevos y se registran como pareja: el edificio produce exclusivamente esa unidad. Las recompensas aleatorias ofrecen el plano del edificio y aplican al producto los filtros nativos del pool; los manifiestos de etapa y los rosters AI siguen usando el ID de la unidad.
+
+| Unidad | Edificio | ID del edificio |
+|---|---|---|
+| Sandlance Scout | Planta de ensamblaje Sandlance | `sample-native:scout-tank-factory` |
+| Colossus Siege Platform | Fábrica de asedio Coloso | `sample-native:heavy-artillery-factory` |
+| Ironclad Gatling Walker | Fundición de caminantes Ironclad | `sample-native:assault-walker-factory` |
+| Skirmish Strike Bike | Taller de motos de asalto | `sample-native:skirmish-bike-factory` |
+| Surge Arc Tank | Planta de tanques Surge Arc | `sample-native:surge-tank-factory` |
+
+Estos edificios parten de los prefabs de sus fábricas nativas, con identidad, balance y localización propios. El registro conserva las relaciones originales del juego. El campo es obligatorio para todas las unidades añadidas, incluidas las de prefab completo; el contrato detallado está en `content/schema/README.md`. Los cambios de producción deben verificarse colocando el edificio y observando la unidad producida durante una partida por Steam.
+
+**Comprobación por Steam (2026-10-17):** las cinco parejas se registraron, conservaron las relaciones de las fábricas originales y resolvieron sus nombres en español. La prueba colocó los cinco edificios mediante la API nativa y ordenó producción no instantánea sin coste: las cinco colas terminaron y aparecieron sus cinco productos activos con tag `Player`. Los pools de las cuatro etapas devolvieron los planos de fábrica correspondientes a sus productos. La selección aleatoria y compra/colocación completas por interfaz siguen pendientes de una partida ordinaria. Detalles, migración y evidencia en [PRODUCTION-BUILDINGS.md](docs/research/PRODUCTION-BUILDINGS.md).
+
+El paquete final también adapta la distancia de edificios AI para etapas propias añadidas: en Steam, el índice 12 usó la franja nativa configurada (29 celdas) y dejó de emitir `Unknown stage`. La lista de fallbacks conserva nueve entradas nativas y devuelve un snapshot de 13 para la progresión ampliada.
 
 ## Diagnóstico e Inspector en el Juego (F8 / F10)
 

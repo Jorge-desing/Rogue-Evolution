@@ -57,6 +57,53 @@ namespace RogueCommandExpansionLoader.Runtime
         bool TryGetLandscapeLocalization(string localizationId, out string value);
     }
 
+    public interface IStageFallbackRuntimeProvider
+    {
+        object GetFallbackLandscapeSnapshot(object nativeFallbacks);
+    }
+
+    /// <summary>
+    /// Optional bridge for extending the native outlying AI building spacing band only when the
+    /// active progression stage is owned by this content provider.
+    /// </summary>
+    public interface IStageOwnedAiPlacementDistanceRuntimeProvider
+    {
+        bool TryGetOutlyingStartAiBuildingsDistance(out int distance);
+    }
+
+    /// <summary>Pure policy helper for the native stage-distance bands and appended pack stages.</summary>
+    internal static class StageOwnedAiPlacementDistanceResolver
+    {
+        public const int FirstAppendedStageIndex = 9;
+
+        public static bool TryResolve<TLoadedStage>(
+            int stageIndex,
+            object activeStage,
+            IEnumerable<TLoadedStage> loadedStages,
+            Func<TLoadedStage, object> getRuntimeStage,
+            int finalNativeBandDistance,
+            out int distance)
+        {
+            distance = 0;
+            if (stageIndex < FirstAppendedStageIndex || activeStage == null || loadedStages == null ||
+                getRuntimeStage == null)
+            {
+                return false;
+            }
+
+            foreach (TLoadedStage loadedStage in loadedStages)
+            {
+                if (object.ReferenceEquals(activeStage, getRuntimeStage(loadedStage)))
+                {
+                    distance = finalNativeBandDistance;
+                    return true;
+                }
+            }
+
+            return false;
+        }
+    }
+
     /// <summary>
     /// Optional bridge for stage-owned clones of the game's existing BlueprintPools. Implementations
     /// scope only mod-unit rows; the game's authored pool filter remains responsible for eligibility.
@@ -64,6 +111,8 @@ namespace RogueCommandExpansionLoader.Runtime
     public interface IBlueprintPoolRuntimeProvider
     {
         bool TryFindBlueprintPool(string poolId, out object pool);
+
+        bool TryGetBlueprintPoolLocalizationId(string poolId, out string sourcePoolId);
 
         /// <summary>
         /// Returns true when the unit is loader-owned and sets whether the game's IsInPool method

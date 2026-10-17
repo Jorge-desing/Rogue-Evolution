@@ -82,7 +82,7 @@
     "unit": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id"],
+      "required": ["id", "productionBuilding"],
       "properties": {
         "id": { "$ref": "#/$defs/namespacedId" },
         "assetBundleId": { "$ref": "#/$defs/namespacedId" },
@@ -92,13 +92,16 @@
         "visualAssetName": { "type": "string", "minLength": 1, "pattern": "\\S", "description": "Unity AssetBundle address, preferably the project-relative path including extension." },
         "visualRootPath": { "type": "string", "minLength": 1, "pattern": "\\S" },
         "nativeTemplateId": { "type": "string", "minLength": 1, "pattern": "\\S" },
+        "productionBuilding": { "$ref": "#/$defs/productionBuilding" },
         "localizations": {
           "type": "array",
           "minItems": 1,
+          "maxItems": 10,
           "items": { "$ref": "#/$defs/unitLocalization" }
         },
         "balanceOverrides": {
           "type": "array",
+          "maxItems": 64,
           "items": { "$ref": "#/$defs/balanceOverride" }
         }
       },
@@ -158,6 +161,39 @@
         "description": { "type": "string", "pattern": "\\S" }
       }
     },
+    "productionBuilding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "nativeTemplateId", "localizations"],
+      "properties": {
+        "id": { "$ref": "#/$defs/namespacedId" },
+        "nativeTemplateId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "\\S",
+          "description": "Native entity template ID. Runtime must reject templates that do not have the game's Factory role."
+        },
+        "balanceOverrides": {
+          "type": "array",
+          "maxItems": 64,
+          "items": { "$ref": "#/$defs/balanceOverride" }
+        },
+        "localizations": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 10,
+          "items": { "$ref": "#/$defs/unitLocalization" },
+          "contains": {
+            "properties": {
+              "language": { "const": "en-US" },
+              "name": { "type": "string", "minLength": 1, "pattern": "\\S" }
+            },
+            "required": ["language", "name"]
+          }
+        }
+      }
+    },
     "balanceOverride": {
       "type": "object",
       "additionalProperties": false,
@@ -177,6 +213,13 @@
             "required": ["name"]
           },
           "then": { "properties": { "value": { "pattern": "^[0-9]+$" } } }
+        },
+        {
+          "if": {
+            "properties": { "name": { "const": "neededExperienceLevel" } },
+            "required": ["name"]
+          },
+          "then": { "properties": { "value": { "pattern": "^(?:[0-9]{1,4}|10000)$" } } }
         }
       ]
     },

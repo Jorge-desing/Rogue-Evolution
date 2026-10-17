@@ -73,12 +73,26 @@ public sealed class BlueprintPool
 {
 }
 
+public sealed class LandscapeGenerator
+{
+}
+
 public sealed class DefaultAiBehaviour
 {
 }
 
-internal sealed class RuntimeMutatorTestProvider : IRuntimeContentProvider
+internal sealed class RuntimeMutatorTestProvider : IRuntimeContentProvider, IBlueprintPoolRuntimeProvider
 {
+    public Dictionary<string, string> PoolLocalizationAliases { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public bool TryGetBlueprintPoolLocalizationId(string poolId, out string sourcePoolId)
+    {
+        sourcePoolId = null;
+        return poolId != null && PoolLocalizationAliases.TryGetValue(poolId, out sourcePoolId);
+    }
+    public bool TryFindBlueprintPool(string poolId, out object pool) { pool = null; return false; }
+    public bool TryGetBlueprintPoolDecision(object pool, string unitId, out bool runOriginal) { runOriginal = true; return false; }
+    public void AddExclusiveBlueprints(string otherThanPoolId, HashSet<string> result) { }
+
     public List<object> EntityRows { get; } = new();
     public List<ProgressionContentContribution> Contributions { get; } = new();
     public int EntityRowsRegisteredCount { get; private set; }

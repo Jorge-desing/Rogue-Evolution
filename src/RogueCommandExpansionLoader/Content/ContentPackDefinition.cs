@@ -38,6 +38,16 @@ namespace RogueCommandExpansionLoader.Content
         public string nativeTemplateId;
         public ContentBalanceOverride[] balanceOverrides;
         public ContentUnitLocalizationDefinition[] localizations;
+        public ContentProductionBuildingDefinition productionBuilding;
+    }
+
+    [Serializable]
+    public sealed class ContentProductionBuildingDefinition
+    {
+        public string id;
+        public string nativeTemplateId;
+        public ContentBalanceOverride[] balanceOverrides;
+        public ContentUnitLocalizationDefinition[] localizations;
     }
 
     [Serializable]
@@ -190,6 +200,19 @@ namespace RogueCommandExpansionLoader.Content
                 cardImageAssetName = source.cardImageAssetName,
                 visualAssetName = source.visualAssetName,
                 visualRootPath = source.visualRootPath,
+                nativeTemplateId = source.nativeTemplateId,
+                balanceOverrides = CloneArray(source.balanceOverrides, CloneBalanceOverride),
+                localizations = CloneArray(source.localizations, CloneUnitLocalization),
+                productionBuilding = CloneProductionBuilding(source.productionBuilding)
+            };
+        }
+
+        private static ContentProductionBuildingDefinition CloneProductionBuilding(
+            ContentProductionBuildingDefinition source)
+        {
+            return source == null ? null : new ContentProductionBuildingDefinition
+            {
+                id = source.id,
                 nativeTemplateId = source.nativeTemplateId,
                 balanceOverrides = CloneArray(source.balanceOverrides, CloneBalanceOverride),
                 localizations = CloneArray(source.localizations, CloneUnitLocalization)

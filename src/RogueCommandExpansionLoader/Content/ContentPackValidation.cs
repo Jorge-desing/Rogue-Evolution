@@ -69,6 +69,34 @@ namespace RogueCommandExpansionLoader.Content
     {
         public const int SupportedSchemaVersion = 1;
 
+        internal static bool DeclaresAiUnitDependency(ContentAiProfileDefinition profile, string unitId)
+        {
+            if (profile == null || String.IsNullOrWhiteSpace(unitId))
+            {
+                return false;
+            }
+
+            foreach (string dependency in profile.unitDependencies ?? new string[0])
+            {
+                if (String.Equals(dependency, unitId, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            // unitEntries already establishes pack load order, before these entries
+            // are appended to the cloned native deck and the complete deck is checked.
+            foreach (ContentAiUnitEntryDefinition entry in profile.unitEntries ?? new ContentAiUnitEntryDefinition[0])
+            {
+                if (entry != null && String.Equals(entry.unitId, unitId, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         internal static bool PrefabReferenceMatchesObjectName(string assetReference, string objectName)
         {
             if (String.IsNullOrWhiteSpace(assetReference) || String.IsNullOrWhiteSpace(objectName))
@@ -87,6 +115,9 @@ namespace RogueCommandExpansionLoader.Content
             return String.Equals(assetReference, objectName, StringComparison.Ordinal);
         }
         public const int MaxAssetBundlesPerPack = 128;
+        public const int MaxBalanceOverridesPerDefinition = 64;
+        public const int MaxLocalizationsPerDefinition = 10;
+        public const int MaxNeededExperienceLevel = 10000;
         public const int MaxAiModulesPerProfile = 8;
         public const int MaxAiUnitEntriesPerProfile = 32;
         public const int MaxAiUnitDependenciesPerProfile = 64;
@@ -153,6 +184,7 @@ namespace RogueCommandExpansionLoader.Content
             var allIds = new HashSet<string>(IdComparer);
             var bundleIds = new HashSet<string>(IdComparer);
             var unitIds = new HashSet<string>(IdComparer);
+            var productionBuildingIds = new HashSet<string>(IdComparer);
             var aiProfileIds = new HashSet<string>(IdComparer);
             var aiResourceNames = new HashSet<string>(StringComparer.Ordinal);
             var landscapeResourceNames = new HashSet<string>(StringComparer.Ordinal);
@@ -302,7 +334,9 @@ namespace RogueCommandExpansionLoader.Content
                 }
 
                 ValidateUnitLocalizations(unit, itemPath + ".localizations", hasNativeTemplate, diagnostics);
-                ValidateBalanceOverrides(unit.balanceOverrides, itemPath + ".balanceOverrides", diagnostics);
+                ValidateBalanceOverrides(unit.balanceOverrides, itemPath + ".balanceOverrides", "unit", "unit", diagnostics);
+                ValidateProductionBuilding(unit.productionBuilding, itemPath + ".productionBuilding",
+                    allIds, productionBuildingIds, registrySnapshot, diagnostics);
             }
 
             for (int i = 0; i < aiProfiles.Length; i++)
@@ -728,6 +762,88 @@ namespace RogueCommandExpansionLoader.Content
             }
         }
 
+        private static void RegisterProductionBuildingId(
+            string id,
+            string path,
+            HashSet<string> allIds,
+            HashSet<string> productionBuildingIds,
+            IContentRegistrySnapshot registrySnapshot,
+            List<ContentDiagnostic> diagnostics)
+        {
+            ValidateNamespacedId(id, path, diagnostics);
+            if (!IsNamespacedId(id))
+            {
+                return;
+            }
+
+            bool repeatedProductionBuildingId = !productionBuildingIds.Add(id);
+            if (!allIds.Add(id))
+            {
+                if (repeatedProductionBuildingId)
+                {
+                    Add(diagnostics, "production-building.id-shared", path,
+                        "Each unit must declare a distinct production building ID; production buildings cannot be shared between units.");
+                }
+                else
+                {
+                    Add(diagnostics, "id.duplicate-in-package", path,
+                        "The ID is already used by another definition in this package.");
+                }
+            }
+
+            if (registrySnapshot != null)
+            {
+                try
+                {
+                    if (registrySnapshot.ContainsId(id))
+                    {
+                        Add(diagnostics, "id.collision", path,
+                            "The production building ID is already present in the registry snapshot.");
+                    }
+                }
+                catch (Exception exception)
+                {
+                    Add(diagnostics, "registry.snapshot-failed", path,
+                        "Could not query the registry snapshot: " + exception.Message);
+                }
+            }
+        }
+
+        private static void ValidateProductionBuilding(
+            ContentProductionBuildingDefinition productionBuilding,
+            string path,
+            HashSet<string> allIds,
+            HashSet<string> productionBuildingIds,
+            IContentRegistrySnapshot registrySnapshot,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (productionBuilding == null)
+            {
+                Add(diagnostics, "production-building.required", path,
+                    "Every unit must declare its own production building.");
+                return;
+            }
+
+            RegisterProductionBuildingId(productionBuilding.id, path + ".id", allIds,
+                productionBuildingIds, registrySnapshot, diagnostics);
+
+            // Whether this native template is actually a Factory-role entity can only
+            // be checked against the live game registry by ContentPackRuntimeLoader.
+            ValidateAssetName(productionBuilding.nativeTemplateId,
+                path + ".nativeTemplateId", diagnostics);
+            if (!String.IsNullOrWhiteSpace(productionBuilding.nativeTemplateId) &&
+                productionBuilding.nativeTemplateId.Length > 256)
+            {
+                Add(diagnostics, "production-building.template-id-too-long",
+                    path + ".nativeTemplateId", "Native production building template IDs cannot exceed 256 characters.");
+            }
+
+            ValidateBalanceOverrides(productionBuilding.balanceOverrides,
+                path + ".balanceOverrides", "production-building", "production building", diagnostics);
+            ValidateLocalizations(productionBuilding.localizations, path + ".localizations",
+                false, "production-building", "Production building", diagnostics);
+        }
+
         private static void ValidateNamespacedId(string id, string path, List<ContentDiagnostic> diagnostics)
         {
             if (!IsNamespacedId(id))
@@ -841,11 +957,19 @@ namespace RogueCommandExpansionLoader.Content
         private static void ValidateBalanceOverrides(
             ContentBalanceOverride[] overrides,
             string path,
+            string codePrefix,
+            string ownerLabel,
             List<ContentDiagnostic> diagnostics)
         {
             if (overrides == null)
             {
                 return;
+            }
+
+            if (overrides.Length > MaxBalanceOverridesPerDefinition)
+            {
+                Add(diagnostics, codePrefix + ".balance-overrides-limit", path,
+                    "A " + ownerLabel + " can declare at most " + MaxBalanceOverridesPerDefinition + " balance overrides.");
             }
 
             var names = new HashSet<string>(StringComparer.Ordinal);
@@ -855,20 +979,21 @@ namespace RogueCommandExpansionLoader.Content
                 string itemPath = path + "[" + i + "]";
                 if (balanceOverride == null)
                 {
-                    Add(diagnostics, "entry.null", itemPath, "Balance override entries cannot be null.");
+                    Add(diagnostics, "entry.null", itemPath,
+                        "Balance override entries for a " + ownerLabel + " cannot be null.");
                     continue;
                 }
 
                 if (String.IsNullOrWhiteSpace(balanceOverride.name) ||
                     !names.Add(balanceOverride.name))
                 {
-                    Add(diagnostics, "unit.balance-override-name-invalid", itemPath + ".name",
-                        "Balance override names must be non-empty and unique within the unit.");
+                    Add(diagnostics, codePrefix + ".balance-override-name-invalid", itemPath + ".name",
+                        "Balance override names must be non-empty and unique within the " + ownerLabel + ".");
                 }
 
                 if (!TryValidateBalanceOverrideValue(balanceOverride.name, balanceOverride.value))
                 {
-                    Add(diagnostics, "unit.balance-override-invalid", itemPath,
+                    Add(diagnostics, codePrefix + ".balance-override-invalid", itemPath,
                         "The override must target an allowlisted numeric balance field and contain a finite, non-negative invariant-culture value.");
                 }
             }
@@ -880,16 +1005,33 @@ namespace RogueCommandExpansionLoader.Content
             bool hasNativeTemplate,
             List<ContentDiagnostic> diagnostics)
         {
-            ContentUnitLocalizationDefinition[] localizations = unit.localizations;
+            ValidateLocalizations(unit.localizations, path, hasNativeTemplate,
+                "unit", "Unit", diagnostics);
+        }
+
+        private static void ValidateLocalizations(
+            ContentUnitLocalizationDefinition[] localizations,
+            string path,
+            bool hasNativeTemplate,
+            string codePrefix,
+            string ownerLabel,
+            List<ContentDiagnostic> diagnostics)
+        {
             if (localizations == null || localizations.Length == 0)
             {
                 if (!hasNativeTemplate)
                 {
-                    Add(diagnostics, "unit.localization-required", path,
-                        "A custom unit must declare an en-US display name; native-template units may inherit their template localization.");
+                    Add(diagnostics, codePrefix + ".localization-required", path,
+                        "A " + ownerLabel.ToLowerInvariant() + " must declare an en-US display name.");
                 }
 
                 return;
+            }
+
+            if (localizations.Length > MaxLocalizationsPerDefinition)
+            {
+                Add(diagnostics, codePrefix + ".localization-limit", path,
+                    "A " + ownerLabel.ToLowerInvariant() + " can declare at most " + MaxLocalizationsPerDefinition + " localizations.");
             }
 
             var languages = new HashSet<string>(StringComparer.Ordinal);
@@ -900,37 +1042,44 @@ namespace RogueCommandExpansionLoader.Content
                 string itemPath = path + "[" + i + "]";
                 if (localization == null)
                 {
-                    Add(diagnostics, "entry.null", itemPath, "Unit localization entries cannot be null.");
+                    Add(diagnostics, "entry.null", itemPath,
+                        ownerLabel + " localization entries cannot be null.");
                     continue;
                 }
 
                 if (String.IsNullOrWhiteSpace(localization.language) ||
                     !SupportedUnitLocalizationLanguages.Contains(localization.language))
                 {
-                    Add(diagnostics, "unit.localization-language-unsupported", itemPath + ".language",
-                        "Unit localization language must match one of the game's supported language IDs exactly.");
+                    Add(diagnostics, codePrefix + ".localization-language-unsupported", itemPath + ".language",
+                        ownerLabel + " localization language must match one of the game's supported language IDs exactly.");
                 }
                 else if (!languages.Add(localization.language))
                 {
-                    Add(diagnostics, "unit.localization-language-duplicate", itemPath + ".language",
-                        "A unit can declare at most one localization for each language.");
+                    Add(diagnostics, codePrefix + ".localization-language-duplicate", itemPath + ".language",
+                        "A " + ownerLabel.ToLowerInvariant() + " can declare at most one localization for each language.");
                 }
 
                 if (String.IsNullOrWhiteSpace(localization.name))
                 {
-                    Add(diagnostics, "unit.localization-name-required", itemPath + ".name",
-                        "Every unit localization must include a non-empty display name.");
+                    Add(diagnostics, codePrefix + ".localization-name-required", itemPath + ".name",
+                        "Every " + ownerLabel.ToLowerInvariant() + " localization must include a non-empty display name.");
                 }
                 else if (String.Equals(localization.language, "en-US", StringComparison.Ordinal))
                 {
                     hasEnglishName = true;
                 }
+
+                if (localization.description != null && String.IsNullOrWhiteSpace(localization.description))
+                {
+                    Add(diagnostics, codePrefix + ".localization-description-invalid", itemPath + ".description",
+                        "Optional localization descriptions must be non-empty when provided.");
+                }
             }
 
             if (!hasEnglishName)
             {
-                Add(diagnostics, "unit.localization-english-name-required", path,
-                    "Unit localizations must include a non-empty en-US display name for fallback.");
+                Add(diagnostics, codePrefix + ".localization-english-name-required", path,
+                    ownerLabel + " localizations must include a non-empty en-US display name for fallback.");
             }
         }
 
@@ -956,11 +1105,15 @@ namespace RogueCommandExpansionLoader.Content
                 case "sightRadius":
                 case "skillRange":
                 case "firePointCount":
-                case "neededExperienceLevel":
                 case "gridSize":
                     int integerValue;
                     return Int32.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture,
                         out integerValue) && integerValue >= 0;
+                case "neededExperienceLevel":
+                    int experienceLevel;
+                    return Int32.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture,
+                        out experienceLevel) && experienceLevel >= 0 &&
+                        experienceLevel <= MaxNeededExperienceLevel;
                 case "productionDuration":
                 case "cardModelScalingFactor":
                 case "maxArmor":

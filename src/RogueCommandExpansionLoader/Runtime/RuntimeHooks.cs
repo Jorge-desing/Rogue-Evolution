@@ -97,17 +97,76 @@ namespace RogueCommandExpansionLoader.Runtime
             return TryResolveUnitLocalization(__0, false, ref __result);
         }
 
+        public static object ResolveFallbackLandscapes(object nativeFallbacks)
+        {
+            IStageFallbackRuntimeProvider fallbackProvider;
+            lock (Gate) { fallbackProvider = _provider as IStageFallbackRuntimeProvider; }
+            if (fallbackProvider == null || nativeFallbacks == null) return nativeFallbacks;
+            try
+            {
+                object snapshot = fallbackProvider.GetFallbackLandscapeSnapshot(nativeFallbacks);
+                if (snapshot != null && snapshot.GetType() == nativeFallbacks.GetType()) return snapshot;
+                Log("The stage fallback provider returned an incompatible list.");
+            }
+            catch (Exception exception)
+            {
+                Log("Could not resolve appended stage fallbacks: " + exception.GetBaseException().Message);
+            }
+
+            return nativeFallbacks;
+        }
+
+        public static bool OutlyingStartAiBuildingDistancePrefix(ref int __result)
+        {
+            IStageOwnedAiPlacementDistanceRuntimeProvider distanceProvider;
+            lock (Gate)
+            {
+                distanceProvider = _provider as IStageOwnedAiPlacementDistanceRuntimeProvider;
+            }
+
+            if (distanceProvider == null)
+            {
+                return true;
+            }
+
+            try
+            {
+                int distance;
+                if (distanceProvider.TryGetOutlyingStartAiBuildingsDistance(out distance))
+                {
+                    __result = distance;
+                    return false;
+                }
+            }
+            catch (Exception exception)
+            {
+                Log("Could not resolve spacing for a loader-owned appended stage: " +
+                    exception.GetBaseException().Message);
+            }
+
+            return true;
+        }
+
         public static bool BlueprintDescriptionPrefix(string __0, ref string __result)
         {
             return TryResolveUnitLocalization(__0, true, ref __result);
         }
 
-        public static bool LandscapeLocalizationPrefix(string __0, ref string __result)
+        public static bool LandscapeLocalizationPrefix(ref string __0, ref string __result)
         {
             IRuntimeContentProvider provider;
             lock (Gate)
             {
                 provider = _provider;
+            }
+
+            IBlueprintPoolRuntimeProvider poolProvider = provider as IBlueprintPoolRuntimeProvider;
+            string sourcePoolId;
+            if (poolProvider != null && poolProvider.TryGetBlueprintPoolLocalizationId(__0, out sourcePoolId))
+            {
+                // Preserve the game's language, variables, and fallback handling.
+                __0 = sourcePoolId;
+                return true;
             }
 
             IStageLandscapeRuntimeProvider landscapeProvider = provider as IStageLandscapeRuntimeProvider;
@@ -452,6 +511,16 @@ namespace RogueCommandExpansionLoader.Runtime
             RuntimeHooks.AfterSetScriptableObject(__args);
         }
 
+        public static void FallbackLandscapeGeneratorsPostfix(ref List<global::LandscapeGenerator> __result)
+        {
+            __result = (List<global::LandscapeGenerator>)RuntimeHooks.ResolveFallbackLandscapes(__result);
+        }
+
+        public static bool OutlyingStartAiBuildingDistancePrefix(ref int __result)
+        {
+            return RuntimeHooks.OutlyingStartAiBuildingDistancePrefix(ref __result);
+        }
+
         public static void CreateStageMapPrefix()
         {
             RuntimeHooks.BeforeProgressionMap();
@@ -502,9 +571,9 @@ namespace RogueCommandExpansionLoader.Runtime
             return RuntimeHooks.BlueprintDescriptionPrefix(__0, ref __result);
         }
 
-        public static bool LandscapeLocalizationPrefix(string __0, ref string __result)
+        public static bool LandscapeLocalizationPrefix(ref string __0, ref string __result)
         {
-            return RuntimeHooks.LandscapeLocalizationPrefix(__0, ref __result);
+            return RuntimeHooks.LandscapeLocalizationPrefix(ref __0, ref __result);
         }
 
         public static bool BlueprintPoolIsInPoolPrefix(object __instance, string __0, ref bool __result)

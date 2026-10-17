@@ -15,12 +15,12 @@ Use this skill when implementing an AI profile, adding a compiled module, or cha
 
 ## Choose profile scope deliberately
 
-- A native-template profile overlays the named native `DefaultAiBehaviour`; its modules may run for every use of that template.
-- Use `scopeToReferencedStages: true` only when a profile should be limited to same-pack stage references. The loader creates an `RCL_` alias and calculates the contiguous stage range; validation rejects missing, cross-pack, or non-contiguous references.
+- A native-template profile must set `scopeToReferencedStages: true`. The loader creates an isolated `RCL_` alias and calculates the contiguous stage range; validation rejects missing, cross-pack, or non-contiguous references. Native templates stay unchanged.
 - Custom AI prefabs must satisfy the schema's active state, reserved `RCL_` name, single `DefaultAiBehaviour`, and serialized data requirements. Do not infer that the Unity Editor can author these components from precompiled game assemblies.
 
 ## Be precise about behavior
 
 - `AiBase.entitiesInAiDeck` can contain mobile units as well as buildings. Static inspection of the pinned 1.0.9 assembly found that `AiBehaviour.BuildBaseStartSetup` sends non-building entries through `EntityFactory.InstantiateEntity`, tags them as AI, and assigns their AI base index. Add mod units through `unitEntries` on a `scopeToReferencedStages: true` native profile so only its isolated clone changes; the loader validates the unit reference and target base index and resolves cross-pack unit dependencies. `countAtStart` controls starting units; `maxLiving` preserves the native deck field and is bounded against it. This is static and offline-validation evidence, not in-game proof.
+- `unitEntries` establishes cross-pack load order itself. The full runtime deck check must accept that declaration after appending those entries; do not require the same ID again in `unitDependencies`. External IDs authored directly into a custom AI prefab's serialized deck still require `unitDependencies`.
 
 The scheduled-build sample constructs buildings already present in the native AI deck; it does not add a deck. The reactive-defense sample dispatches bounded counterattacks; it does not prove a new strategy works. Treat every module as unverified in-game until a Steam-launched match shows the intended decision and lifecycle. Use static inspection and offline parser/registry checks first, then a reversible test profile for authorized runtime validation.
