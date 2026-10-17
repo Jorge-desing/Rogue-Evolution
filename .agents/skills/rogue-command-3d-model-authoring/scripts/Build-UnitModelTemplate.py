@@ -296,7 +296,7 @@ def build_colossus_siege_model():
     antenna_base = Vector((0.36, -0.48, 1.32))
     model_objects += [
         rmk.make_cylinder("ColossusSensor_AntennaBase", 0.04, 0.08, antenna_base, gunmetal, vertices=8, bevel=0.01),
-        rmk.make_rod("ColossusSensor_AntennaMast", antenna_base, antenna_base + Vector((0.0, -0.04, 0.75)), 0.012, gunmetal, vertices=6),
+        rmk.make_rod("ColossusSensor_AntennaMast", antenna_base, antenna_base + Vector((0.0, -0.04, 0.60)), 0.012, gunmetal, vertices=6),
     ]
 
     # Frontal hull headlights
@@ -320,18 +320,36 @@ def build_colossus_siege_model():
 
     # 8. Automated Quality Diagnostics & Validation
     diagnostics = rmk.validate_model_mesh_quality(model_objects)
+    if not diagnostics["ground_contact_valid"] or diagnostics["missing_materials"]:
+        raise ValueError("Colossus model failed ground-contact or material validation")
+    bounds = diagnostics["bounds"]
+    if bounds["width_x"] > 2.8 or bounds["height_z"] > 1.9:
+        raise ValueError("Colossus model exceeds the ArtilleryTank width or height")
+    if bounds["length_y"] > 3.6:
+        print("Note: the siege cannon intentionally extends beyond the approximate ArtilleryTank length; verify unit spacing in-game.")
 
     # 9. Studio Preview Setup, AgX Rendering, and FBX Export
     rmk.setup_preview_studio(model_objects, PREVIEW_PATH, ortho_scale=6.4)
     bpy.ops.wm.save_as_mainfile(filepath=str(BLEND_PATH))
     bpy.ops.render.render(write_still=True)
 
-    rmk.export_unity_fbx(FBX_PATH, model_objects)
+    export_batches = rmk.merge_meshes_by_material(model_objects, "Colossus", {
+        armor_primary: "armor",
+        armor_light: "lightArmor",
+        gunmetal: "gunmetal",
+        tread_mat: "tread",
+        wheel_rim: "wheelRim",
+        wheel_hub: "wheelHub",
+        warning_amber: "amber",
+        sensor_cyan: "sensor",
+    })
+    rmk.export_unity_fbx(FBX_PATH, export_batches)
 
     print(f"Created source model: {BLEND_PATH}")
     print(f"Created Unity model: {FBX_PATH}")
     print(f"Created preview render: {PREVIEW_PATH}")
-    print(f"Exported mesh objects: {len(model_objects)}")
+    print(f"Editable source parts: {len(model_objects)}")
+    print(f"Exported material batches: {len(export_batches)}")
     print(f"Total polygons: {diagnostics['total_polygons']}, Vertices: {diagnostics['total_vertices']}")
 
 

@@ -17,6 +17,25 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import RogueModelKit as modelkit
 
 
+def fit_length_to_native_footprint(model_objects, max_length=2.2):
+    diagnostics = modelkit.validate_model_mesh_quality(model_objects)
+    current_length = diagnostics["bounds"]["length_y"]
+    if current_length <= max_length:
+        return
+
+    factor = max_length / current_length
+    for obj in model_objects:
+        if obj.type != "MESH":
+            continue
+        local_to_world = obj.matrix_world.copy()
+        world_to_local = local_to_world.inverted()
+        for vertex in obj.data.vertices:
+            world_position = local_to_world @ vertex.co
+            world_position.y *= factor
+            vertex.co = world_to_local @ world_position
+        obj.data.update()
+
+
 def clear_scene():
     bpy.ops.object.select_all(action="SELECT")
     bpy.ops.object.delete(use_global=False)
@@ -291,6 +310,14 @@ def main():
     model_objects.append(make_box(
         "StrikeBikeArmor_FrontCrashBar", (0.70, 0.085, 0.095),
         (0.0, 0.98, 0.76), gunmetal, 0.025))
+
+    fit_length_to_native_footprint(model_objects)
+    diagnostics = modelkit.validate_model_mesh_quality(model_objects)
+    if not diagnostics["ground_contact_valid"] or diagnostics["missing_materials"]:
+        raise ValueError("Strike bike model failed ground-contact or material validation")
+    bounds = diagnostics["bounds"]
+    if bounds["width_x"] > 1.2 or bounds["height_z"] > 1.4 or bounds["length_y"] > 2.2:
+        raise ValueError("Strike bike model exceeds the BombBike native footprint")
 
     add_preview_stage(model_objects)
     bpy.ops.wm.save_as_mainfile(filepath=str(BLEND_PATH))

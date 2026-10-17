@@ -21,6 +21,9 @@ namespace RogueCommandExpansion.Authoring
         private const string BikePrefabPath = AssetRoot + "/SkirmishBikeVisual.prefab";
         private const string BikeCardSpritePath = AssetRoot + "/SkirmishBikeCard.png";
         private const string BikeModelPath = AssetRoot + "/Models/SkirmishStrikeBike.fbx";
+        private const string ColossusPrefabPath = AssetRoot + "/ColossusSiegeVisual.prefab";
+        private const string ColossusCardSpritePath = AssetRoot + "/ColossusSiegeCard.png";
+        private const string ColossusModelPath = AssetRoot + "/Models/ColossusSiegePlatform.fbx";
         private const string MaterialRoot = AssetRoot + "/Materials";
         private const string BundleOutputPath = "../../artifacts/asset-bundles";
         private const string BundleName = "sample-native-expansion.bundle";
@@ -44,9 +47,11 @@ namespace RogueCommandExpansion.Authoring
                 }
 
                 string prefabPath = CreateSampleVisual();
-                CreateScoutCardSprite();
+                ImportCardSprite(CardSpritePath);
                 string bikePrefabPath = CreateSkirmishBikeVisual();
-                CreateSkirmishBikeCardSprite();
+                ImportCardSprite(BikeCardSpritePath);
+                string colossusPrefabPath = CreateColossusVisual();
+                ImportCardSprite(ColossusCardSpritePath);
                 string projectRoot = Directory.GetParent(Application.dataPath).FullName;
                 string outputPath = Path.GetFullPath(Path.Combine(projectRoot, BundleOutputPath));
                 Directory.CreateDirectory(outputPath);
@@ -54,7 +59,12 @@ namespace RogueCommandExpansion.Authoring
                 var build = new AssetBundleBuild
                 {
                     assetBundleName = BundleName,
-                    assetNames = new[] { prefabPath, CardSpritePath, bikePrefabPath, BikeCardSpritePath }
+                    assetNames = new[]
+                    {
+                        prefabPath, CardSpritePath,
+                        bikePrefabPath, BikeCardSpritePath,
+                        colossusPrefabPath, ColossusCardSpritePath
+                    }
                 };
                 AssetBundleManifest manifest = BuildPipeline.BuildAssetBundles(outputPath,
                     new[] { build }, BuildAssetBundleOptions.ChunkBasedCompression |
@@ -85,8 +95,8 @@ namespace RogueCommandExpansion.Authoring
                     Path.Combine(packBundles, "assetbundle-manifest.bundle"));
 
                 AssetDatabase.Refresh();
-                Debug.Log("Built the script-free Sandlance and Skirmish Bike visual overlays in " + BundleName +
-                    " at " + packBundles + ". Both units retain their native gameplay prefabs.");
+                Debug.Log("Built script-free Sandlance, Skirmish Bike, and Colossus visual overlays in " +
+                    BundleName + " at " + packBundles + ". All units retain their native gameplay prefabs.");
             }
             catch (Exception exception)
             {
@@ -221,6 +231,70 @@ namespace RogueCommandExpansion.Authoring
             return BikePrefabPath;
         }
 
+        private static string CreateColossusVisual()
+        {
+            string projectRoot = Directory.GetParent(Application.dataPath).FullName;
+            Directory.CreateDirectory(Path.GetFullPath(Path.Combine(projectRoot, AssetRoot)));
+            AssetDatabase.Refresh();
+
+            GameObject modelAsset = AssetDatabase.LoadAssetAtPath<GameObject>(ColossusModelPath);
+            if (modelAsset == null)
+            {
+                throw new FileNotFoundException("Import the authored Colossus Siege Platform FBX before building the " +
+                    "sample bundle.", ColossusModelPath);
+            }
+
+            Dictionary<string, Material> materials = CreateColossusMaterials();
+            var root = new GameObject("ColossusSiegeVisual");
+            try
+            {
+                GameObject modelInstance = PrefabUtility.InstantiatePrefab(modelAsset) as GameObject;
+                if (modelInstance == null)
+                {
+                    throw new InvalidOperationException("Unity could not instantiate the authored Colossus Siege Platform.");
+                }
+
+                modelInstance.name = "ColossusSiegePlatformModel";
+                modelInstance.transform.SetParent(root.transform, false);
+                modelInstance.transform.localPosition = Vector3.zero;
+                modelInstance.transform.localRotation = Quaternion.identity;
+                modelInstance.transform.localScale = Vector3.one;
+                AssignColossusMaterials(modelInstance, materials);
+
+                bool success;
+                PrefabUtility.SaveAsPrefabAsset(root, ColossusPrefabPath, out success);
+                if (!success)
+                {
+                    throw new InvalidOperationException("Unity could not save " + ColossusPrefabPath + ".");
+                }
+
+                string prefabPath = Path.GetFullPath(Path.Combine(projectRoot, ColossusPrefabPath));
+                NormalizeEmptyUnityYamlStrings(prefabPath);
+                string prefabMetadataPath = prefabPath + ".meta";
+                if (File.Exists(prefabMetadataPath))
+                {
+                    NormalizeEmptyUnityYamlStrings(prefabMetadataPath);
+                }
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(root);
+            }
+
+            AssetImporter importer = AssetImporter.GetAtPath(ColossusPrefabPath);
+            if (importer == null)
+            {
+                throw new FileNotFoundException("Unity did not import " + ColossusPrefabPath + ".");
+            }
+
+            importer.assetBundleName = BundleName;
+            importer.assetBundleVariant = String.Empty;
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+            NormalizeGeneratedUnityMetaFiles(projectRoot);
+            return ColossusPrefabPath;
+        }
+
         private static void ValidateBuiltVisualBundle(string bundlePath)
         {
             AssetBundle bundle = AssetBundle.LoadFromFile(bundlePath);
@@ -233,9 +307,11 @@ namespace RogueCommandExpansion.Authoring
             {
                 string[] assetNames = bundle.GetAllAssetNames();
                 ValidateVisualBundleAssets(bundle, assetNames, "scouttankvisual.prefab", "ScoutTankVisual",
-                    "sandlancescoutcard.png", "SandlanceScoutCard", 20, "Sandlance Scout");
+                    "sandlancescoutcard.png", "SandlanceScoutCard", 7, "Sandlance Scout");
                 ValidateVisualBundleAssets(bundle, assetNames, "skirmishbikevisual.prefab", "SkirmishBikeVisual",
-                    "skirmishbikecard.png", "SkirmishBikeCard", 20, "Skirmish Strike Bike");
+                    "skirmishbikecard.png", "SkirmishBikeCard", 7, "Skirmish Strike Bike");
+                ValidateVisualBundleAssets(bundle, assetNames, "colossussiegevisual.prefab", "ColossusSiegeVisual",
+                    "colossussiegecard.png", "ColossusSiegeCard", 8, "Colossus Siege Platform");
             }
             finally
             {
@@ -383,86 +459,69 @@ namespace RogueCommandExpansion.Authoring
             return materials;
         }
 
+        private static Dictionary<string, Material> CreateColossusMaterials()
+        {
+            string projectRoot = Directory.GetParent(Application.dataPath).FullName;
+            Directory.CreateDirectory(Path.GetFullPath(Path.Combine(projectRoot, MaterialRoot)));
+            var materials = new Dictionary<string, Material>(StringComparer.Ordinal)
+            {
+                { "armor", CreateOrUpdateMaterial("ColossusArmor", new Color32(31, 48, 61, 255), 0.42f, 0.58f) },
+                { "lightArmor", CreateOrUpdateMaterial("ColossusLightArmor", new Color32(56, 82, 97, 255), 0.34f, 0.60f) },
+                { "gunmetal", CreateOrUpdateMaterial("ColossusGunmetal", new Color32(18, 26, 31, 255), 0.78f, 0.70f) },
+                { "tread", CreateOrUpdateMaterial("ColossusTread", new Color32(11, 14, 15, 255), 0.18f, 0.30f) },
+                { "wheelRim", CreateOrUpdateMaterial("ColossusWheelRim", new Color32(41, 56, 66, 255), 0.62f, 0.60f) },
+                { "wheelHub", CreateOrUpdateMaterial("ColossusWheelHub", new Color32(26, 38, 46, 255), 0.55f, 0.50f) },
+                { "amber", CreateOrUpdateMaterial("ColossusSignalAmber", new Color32(242, 82, 13, 255), 0.18f, 0.64f, new Color(0.95f, 0.32f, 0.05f) * 1.5f) },
+                { "sensor", CreateOrUpdateMaterial("ColossusSensorCyan", new Color32(10, 184, 224, 255), 0.20f, 0.78f, new Color(0.04f, 0.72f, 0.88f) * 1.8f) }
+            };
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+            return materials;
+        }
+
         private static void AssignSkirmishBikeMaterials(
             GameObject model,
+            IDictionary<string, Material> materials)
+        {
+            AssignBatchedMaterials(model, "StrikeBike", materials);
+        }
+
+        private static void AssignColossusMaterials(
+            GameObject model,
+            IDictionary<string, Material> materials)
+        {
+            AssignBatchedMaterials(model, "Colossus", materials);
+        }
+
+        private static void AssignBatchedMaterials(
+            GameObject model,
+            string modelPrefix,
             IDictionary<string, Material> materials)
         {
             Renderer[] renderers = model.GetComponentsInChildren<Renderer>(true);
             if (renderers.Length == 0)
             {
-                throw new InvalidDataException("The authored Skirmish Strike Bike FBX contains no renderers.");
+                throw new InvalidDataException("The authored " + modelPrefix + " FBX contains no renderers.");
             }
 
+            string batchPrefix = modelPrefix + "_Batch_";
             for (int i = 0; i < renderers.Length; i++)
             {
-                string name = renderers[i].gameObject.name;
-                string materialKey;
-                if (name.StartsWith("StrikeBikeTire_", StringComparison.Ordinal))
+                string rendererName = renderers[i].gameObject.name;
+                if (!rendererName.StartsWith(batchPrefix, StringComparison.Ordinal))
                 {
-                    materialKey = "rubber";
-                }
-                else if (name.StartsWith("StrikeBikeWheel_Hub_", StringComparison.Ordinal))
-                {
-                    materialKey = "wheel";
-                }
-                else if (name.StartsWith("StrikeBikeFork_Clamp", StringComparison.Ordinal))
-                {
-                    materialKey = "warning";
-                }
-                else if (name.StartsWith("StrikeBikeFrame_", StringComparison.Ordinal) ||
-                    name.StartsWith("StrikeBikeFork_", StringComparison.Ordinal) ||
-                    name.StartsWith("StrikeBikeWheel_AxleCap_", StringComparison.Ordinal) ||
-                    String.Equals(name, "StrikeBikeHandlebar", StringComparison.Ordinal) ||
-                    String.Equals(name, "StrikeBikeArmor_LowerFrame", StringComparison.Ordinal))
-                {
-                    materialKey = "gunmetal";
-                }
-                else if (name.StartsWith("StrikeBikePayload_ChargeCap_", StringComparison.Ordinal))
-                {
-                    materialKey = "gunmetal";
-                }
-                else if (name.StartsWith("StrikeBikePayload_RackRail_", StringComparison.Ordinal))
-                {
-                    materialKey = "wheel";
-                }
-                else if (name.StartsWith("StrikeBikePayload_ChargeBand", StringComparison.Ordinal) ||
-                    name.StartsWith("StrikeBikeSensor_", StringComparison.Ordinal) ||
-                    name.StartsWith("StrikeBikeArc_", StringComparison.Ordinal) ||
-                    name.StartsWith("StrikeBikeAccent_ChargeWarning_", StringComparison.Ordinal))
-                {
-                    materialKey = "arc";
-                }
-                else if (name.StartsWith("StrikeBikePayload_", StringComparison.Ordinal) ||
-                    name.StartsWith("StrikeBikeAccent_", StringComparison.Ordinal))
-                {
-                    materialKey = "warning";
-                }
-                else if (name.StartsWith("StrikeBikeArmor_", StringComparison.Ordinal))
-                {
-                    materialKey = name.Contains("BatteryPod") || name.Contains("FootPlate")
-                        ? "lightArmor" : "armor";
-                }
-                else if (name.StartsWith("StrikeBikeWheel_", StringComparison.Ordinal))
-                {
-                    materialKey = "wheel";
-                }
-                else
-                {
-                    throw new InvalidDataException("No authored material mapping exists for model part '" +
-                        name + "'.");
+                    throw new InvalidDataException("Unexpected mesh batch name '" + rendererName + "' for " + modelPrefix + ".");
                 }
 
-                Material material = materials[materialKey];
-                Material[] assigned = renderers[i].sharedMaterials;
-                if (assigned == null || assigned.Length == 0)
+                string materialKey = rendererName.Substring(batchPrefix.Length);
+                Material material;
+                if (!materials.TryGetValue(materialKey, out material) || material == null)
                 {
-                    assigned = new Material[1];
+                    throw new InvalidDataException("No authored material mapping exists for model batch '" +
+                        rendererName + "'.");
                 }
-                for (int materialIndex = 0; materialIndex < assigned.Length; materialIndex++)
-                {
-                    assigned[materialIndex] = material;
-                }
-                renderers[i].sharedMaterials = assigned;
+
+                renderers[i].sharedMaterials = new[] { material };
             }
         }
 
@@ -496,266 +555,58 @@ namespace RogueCommandExpansion.Authoring
             }
         }
 
-        private static void CreateScoutCardSprite()
+        private static void ImportCardSprite(string assetPath)
         {
-            Sprite existing = AssetDatabase.LoadAssetAtPath<Sprite>(CardSpritePath);
-            if (existing != null)
-            {
-                TextureImporter existingImporter = AssetImporter.GetAtPath(CardSpritePath) as TextureImporter;
-                if (existingImporter == null)
-                {
-                    throw new InvalidDataException("Unity did not create a TextureImporter for " + CardSpritePath + ".");
-                }
-
-                existingImporter.assetBundleName = BundleName;
-                existingImporter.assetBundleVariant = String.Empty;
-                existingImporter.SaveAndReimport();
-                return;
-            }
-
             string projectRoot = Directory.GetParent(Application.dataPath).FullName;
             string absolutePath = Path.GetFullPath(Path.Combine(projectRoot,
-                CardSpritePath.Replace('/', Path.DirectorySeparatorChar)));
-            if (File.Exists(absolutePath))
+                assetPath.Replace('/', Path.DirectorySeparatorChar)));
+            if (!File.Exists(absolutePath))
             {
-                throw new InvalidDataException("SandlanceScoutCard.png exists but Unity did not import it as a Sprite; preserving the file.");
+                throw new FileNotFoundException(
+                    "Add the ImageGen-authored card PNG before building the visual bundle.", absolutePath);
             }
 
-            const int size = 128;
-            var texture = new Texture2D(size, size, TextureFormat.RGBA32, false);
-            for (int y = 0; y < size; y++)
-            {
-                byte shade = (byte)(22 + y / 8);
-                for (int x = 0; x < size; x++)
-                {
-                    texture.SetPixel(x, y, new Color32((byte)(10 + shade / 3), shade, (byte)(shade + 10), 255));
-                }
-            }
-
-            for (int x = 10; x < 119; x++)
-            {
-                texture.SetPixel(x, 16, new Color32(26, 49, 61, 255));
-                texture.SetPixel(x, 112, new Color32(26, 49, 61, 255));
-            }
-
-            DrawPolygon(texture, new[] { new Vector2Int(18, 31), new Vector2Int(111, 31),
-                new Vector2Int(104, 47), new Vector2Int(24, 47) }, new Color32(19, 28, 34, 255));
-            for (int wheel = 0; wheel < 5; wheel++)
-            {
-                DrawCircle(texture, 31 + wheel * 17, 39, 7, new Color32(47, 65, 69, 255));
-                DrawCircle(texture, 31 + wheel * 17, 39, 3, new Color32(25, 38, 43, 255));
-            }
-
-            DrawPolygon(texture, new[] { new Vector2Int(21, 47), new Vector2Int(39, 68),
-                new Vector2Int(84, 68), new Vector2Int(107, 55), new Vector2Int(108, 47) },
-                new Color32(75, 131, 139, 255));
-            DrawPolygon(texture, new[] { new Vector2Int(34, 53), new Vector2Int(42, 63),
-                new Vector2Int(79, 63), new Vector2Int(91, 54) }, new Color32(104, 166, 169, 255));
-            DrawPolygon(texture, new[] { new Vector2Int(47, 67), new Vector2Int(54, 82),
-                new Vector2Int(83, 82), new Vector2Int(91, 69), new Vector2Int(81, 65) },
-                new Color32(95, 150, 153, 255));
-            DrawPolygon(texture, new[] { new Vector2Int(76, 73), new Vector2Int(119, 77),
-                new Vector2Int(119, 82), new Vector2Int(74, 79) }, new Color32(178, 194, 182, 255));
-            DrawPolygon(texture, new[] { new Vector2Int(58, 82), new Vector2Int(61, 95),
-                new Vector2Int(65, 95), new Vector2Int(66, 82) }, new Color32(205, 116, 48, 255));
-            DrawPolygon(texture, new[] { new Vector2Int(53, 95), new Vector2Int(53, 100),
-                new Vector2Int(70, 100), new Vector2Int(70, 95) }, new Color32(242, 170, 72, 255));
-            DrawPolygon(texture, new[] { new Vector2Int(28, 49), new Vector2Int(40, 54),
-                new Vector2Int(31, 57) }, new Color32(37, 206, 191, 255));
-            texture.SetPixel(61, 86, new Color32(37, 206, 191, 255));
-            texture.SetPixel(62, 86, new Color32(37, 206, 191, 255));
-            texture.Apply();
-
-            byte[] png = texture.EncodeToPNG();
-            UnityEngine.Object.DestroyImmediate(texture);
-            Directory.CreateDirectory(Path.GetDirectoryName(absolutePath));
-            File.WriteAllBytes(absolutePath, png);
-            AssetDatabase.ImportAsset(CardSpritePath, ImportAssetOptions.ForceUpdate);
-
-            TextureImporter importer = AssetImporter.GetAtPath(CardSpritePath) as TextureImporter;
+            AssetDatabase.ImportAsset(assetPath, ImportAssetOptions.ForceUpdate);
+            TextureImporter importer = AssetImporter.GetAtPath(assetPath) as TextureImporter;
             if (importer == null)
             {
-                throw new InvalidOperationException("Unity did not create a TextureImporter for " + CardSpritePath + ".");
+                throw new InvalidDataException("Unity did not create a TextureImporter for " + assetPath + ".");
             }
 
             importer.textureType = TextureImporterType.Sprite;
             importer.spriteImportMode = SpriteImportMode.Single;
             importer.filterMode = FilterMode.Point;
             importer.mipmapEnabled = false;
+            importer.wrapMode = TextureWrapMode.Clamp;
+            importer.maxTextureSize = 128;
+            importer.textureCompression = TextureImporterCompression.Uncompressed;
             importer.assetBundleName = BundleName;
             importer.assetBundleVariant = String.Empty;
             importer.SaveAndReimport();
-            if (AssetDatabase.LoadAssetAtPath<Sprite>(CardSpritePath) == null)
-            {
-                throw new InvalidDataException("Unity failed to import the Sandlance Scout card as a Sprite.");
-            }
-        }
 
-        private static void CreateSkirmishBikeCardSprite()
-        {
-            Sprite existing = AssetDatabase.LoadAssetAtPath<Sprite>(BikeCardSpritePath);
-            if (existing != null)
+            Sprite sprite = AssetDatabase.LoadAssetAtPath<Sprite>(assetPath);
+            if (sprite == null || sprite.texture.width != 128 || sprite.texture.height != 128)
             {
-                TextureImporter existingImporter = AssetImporter.GetAtPath(BikeCardSpritePath) as TextureImporter;
-                if (existingImporter == null)
-                {
-                    throw new InvalidDataException("Unity did not create a TextureImporter for " +
-                        BikeCardSpritePath + ".");
-                }
-
-                existingImporter.assetBundleName = BundleName;
-                existingImporter.assetBundleVariant = String.Empty;
-                existingImporter.SaveAndReimport();
-                return;
+                throw new InvalidDataException("Unity failed to import a 128x128 card Sprite from " + assetPath + ".");
             }
 
-            string projectRoot = Directory.GetParent(Application.dataPath).FullName;
-            string absolutePath = Path.GetFullPath(Path.Combine(projectRoot,
-                BikeCardSpritePath.Replace('/', Path.DirectorySeparatorChar)));
-            if (File.Exists(absolutePath))
+            string metadataPath = absolutePath + ".meta";
+            if (File.Exists(metadataPath))
             {
-                throw new InvalidDataException("SkirmishBikeCard.png exists but Unity did not import it as a Sprite; " +
-                    "preserving the file.");
-            }
-
-            const int size = 128;
-            var texture = new Texture2D(size, size, TextureFormat.RGBA32, false);
-            for (int y = 0; y < size; y++)
-            {
-                byte shade = (byte)(15 + y / 10);
-                for (int x = 0; x < size; x++)
-                {
-                    texture.SetPixel(x, y, new Color32((byte)(8 + shade / 3), shade,
-                        (byte)(shade + 17), 255));
-                }
-            }
-
-            for (int x = 9; x < 119; x++)
-            {
-                texture.SetPixel(x, 13, new Color32(19, 57, 77, 255));
-                texture.SetPixel(x, 114, new Color32(19, 57, 77, 255));
-            }
-
-            DrawPolygon(texture, new[] { new Vector2Int(14, 31), new Vector2Int(33, 34),
-                new Vector2Int(48, 48), new Vector2Int(94, 47), new Vector2Int(111, 39),
-                new Vector2Int(117, 45), new Vector2Int(101, 59), new Vector2Int(43, 60),
-                new Vector2Int(19, 49) }, new Color32(24, 34, 43, 255));
-            DrawCircle(texture, 34, 38, 13, new Color32(11, 17, 23, 255));
-            DrawCircle(texture, 34, 38, 7, new Color32(54, 76, 91, 255));
-            DrawCircle(texture, 34, 38, 3, new Color32(20, 31, 40, 255));
-            DrawCircle(texture, 94, 43, 13, new Color32(11, 17, 23, 255));
-            DrawCircle(texture, 94, 43, 7, new Color32(54, 76, 91, 255));
-            DrawCircle(texture, 94, 43, 3, new Color32(20, 31, 40, 255));
-
-            DrawPolygon(texture, new[] { new Vector2Int(17, 50), new Vector2Int(38, 55),
-                new Vector2Int(78, 54), new Vector2Int(100, 48), new Vector2Int(94, 62),
-                new Vector2Int(36, 64), new Vector2Int(20, 58) }, new Color32(48, 89, 110, 255));
-            DrawPolygon(texture, new[] { new Vector2Int(54, 58), new Vector2Int(62, 78),
-                new Vector2Int(93, 84), new Vector2Int(111, 71), new Vector2Int(103, 57),
-                new Vector2Int(82, 62) }, new Color32(26, 60, 84, 255));
-            DrawPolygon(texture, new[] { new Vector2Int(23, 57), new Vector2Int(37, 59),
-                new Vector2Int(37, 80), new Vector2Int(26, 85), new Vector2Int(18, 76) },
-                new Color32(185, 60, 23, 255));
-            DrawPolygon(texture, new[] { new Vector2Int(26, 61), new Vector2Int(34, 63),
-                new Vector2Int(34, 72), new Vector2Int(26, 75) }, new Color32(25, 184, 230, 255));
-            DrawPolygon(texture, new[] { new Vector2Int(66, 69), new Vector2Int(76, 92),
-                new Vector2Int(94, 94), new Vector2Int(108, 81), new Vector2Int(104, 70) },
-                new Color32(79, 119, 139, 255));
-            DrawPolygon(texture, new[] { new Vector2Int(82, 60), new Vector2Int(91, 67),
-                new Vector2Int(111, 62), new Vector2Int(115, 55), new Vector2Int(107, 51) },
-                new Color32(151, 183, 191, 255));
-            DrawCircle(texture, 80, 69, 9, new Color32(20, 189, 243, 255));
-            DrawCircle(texture, 80, 69, 4, new Color32(31, 54, 69, 255));
-            DrawPolygon(texture, new[] { new Vector2Int(69, 80), new Vector2Int(73, 85),
-                new Vector2Int(105, 72), new Vector2Int(111, 68), new Vector2Int(109, 65) },
-                new Color32(248, 81, 20, 255));
-            DrawPolygon(texture, new[] { new Vector2Int(9, 19), new Vector2Int(119, 19),
-                new Vector2Int(119, 23), new Vector2Int(9, 23) }, new Color32(19, 59, 78, 255));
-            texture.Apply();
-
-            byte[] png = texture.EncodeToPNG();
-            UnityEngine.Object.DestroyImmediate(texture);
-            Directory.CreateDirectory(Path.GetDirectoryName(absolutePath));
-            File.WriteAllBytes(absolutePath, png);
-            AssetDatabase.ImportAsset(BikeCardSpritePath, ImportAssetOptions.ForceUpdate);
-
-            TextureImporter importer = AssetImporter.GetAtPath(BikeCardSpritePath) as TextureImporter;
-            if (importer == null)
-            {
-                throw new InvalidOperationException("Unity did not create a TextureImporter for " +
-                    BikeCardSpritePath + ".");
-            }
-
-            importer.textureType = TextureImporterType.Sprite;
-            importer.spriteImportMode = SpriteImportMode.Single;
-            importer.filterMode = FilterMode.Point;
-            importer.mipmapEnabled = false;
-            importer.assetBundleName = BundleName;
-            importer.assetBundleVariant = String.Empty;
-            importer.SaveAndReimport();
-            if (AssetDatabase.LoadAssetAtPath<Sprite>(BikeCardSpritePath) == null)
-            {
-                throw new InvalidDataException("Unity failed to import the Skirmish Strike Bike card as a Sprite.");
-            }
-        }
-
-        private static void DrawPolygon(Texture2D texture, Vector2Int[] vertices, Color32 color)
-        {
-            int minimumY = texture.height;
-            int maximumY = 0;
-            for (int i = 0; i < vertices.Length; i++)
-            {
-                minimumY = Math.Min(minimumY, vertices[i].y);
-                maximumY = Math.Max(maximumY, vertices[i].y);
-            }
-
-            for (int y = minimumY; y <= maximumY; y++)
-            {
-                for (int x = 0; x < texture.width; x++)
-                {
-                    bool inside = false;
-                    for (int i = 0, previous = vertices.Length - 1; i < vertices.Length; previous = i++)
-                    {
-                        Vector2Int a = vertices[i];
-                        Vector2Int b = vertices[previous];
-                        bool crosses = (a.y > y) != (b.y > y) &&
-                            x < (b.x - a.x) * (y - a.y) / (float)(b.y - a.y) + a.x;
-                        if (crosses)
-                        {
-                            inside = !inside;
-                        }
-                    }
-
-                    if (inside)
-                    {
-                        texture.SetPixel(x, y, color);
-                    }
-                }
-            }
-        }
-
-        private static void DrawCircle(Texture2D texture, int centerX, int centerY, int radius, Color32 color)
-        {
-            int radiusSquared = radius * radius;
-            for (int y = centerY - radius; y <= centerY + radius; y++)
-            {
-                for (int x = centerX - radius; x <= centerX + radius; x++)
-                {
-                    int offsetX = x - centerX;
-                    int offsetY = y - centerY;
-                    if (offsetX * offsetX + offsetY * offsetY <= radiusSquared &&
-                        x >= 0 && x < texture.width && y >= 0 && y < texture.height)
-                    {
-                        texture.SetPixel(x, y, color);
-                    }
-                }
+                NormalizeEmptyUnityYamlStrings(metadataPath);
             }
         }
 
         private static void NormalizeEmptyUnityYamlStrings(string filePath)
         {
             string contents = File.ReadAllText(filePath);
-            string normalized = Regex.Replace(contents,
+            string normalized = contents;
+            if (String.Equals(Path.GetExtension(filePath), ".meta", StringComparison.OrdinalIgnoreCase))
+            {
+                normalized = Regex.Replace(normalized, @"(?m)[ \t]+(?=\r?$)", String.Empty);
+            }
+
+            normalized = Regex.Replace(normalized,
                 @"(?m)^([ \t]*(?:value|userData|assetBundleName|assetBundleVariant|motionNodeName|" +
                 @"rigImportErrors|rigImportWarnings|animationImportErrors|animationImportWarnings|" +
                 @"animationRetargetingWarnings|rootMotionBoneName):)[ \t]*(\r?)$",
@@ -816,75 +667,8 @@ namespace RogueCommandExpansion.Authoring
 
         private static void AssignScoutMaterials(GameObject model, IDictionary<string, Material> materials)
         {
-            Renderer[] renderers = model.GetComponentsInChildren<Renderer>(true);
-            if (renderers.Length == 0)
-            {
-                throw new InvalidDataException("The authored Sandlance FBX contains no renderers.");
-            }
-
-            for (int i = 0; i < renderers.Length; i++)
-            {
-                string name = renderers[i].gameObject.name;
-                string materialKey;
-                if (name.StartsWith("ScoutArmor_", StringComparison.Ordinal))
-                {
-                    materialKey = name.Contains("Deck") || name.Contains("LowTurret")
-                        ? "lightArmor" : "armor";
-                }
-                else if (name.StartsWith("ScoutTreads_", StringComparison.Ordinal))
-                {
-                    materialKey = "tread";
-                }
-                else if (name.StartsWith("ScoutWheel_", StringComparison.Ordinal))
-                {
-                    materialKey = name.Contains("Road") ? "wheel" : "gunmetal";
-                }
-                else if (name.StartsWith("ScoutGun_", StringComparison.Ordinal) ||
-                    name.StartsWith("ScoutSensor_Mast", StringComparison.Ordinal))
-                {
-                    materialKey = "gunmetal";
-                }
-                else if (name.StartsWith("ScoutSensor_Lens", StringComparison.Ordinal) ||
-                    name.StartsWith("ScoutAccent_FrontLight", StringComparison.Ordinal))
-                {
-                    materialKey = "sensor";
-                }
-                else if (name.StartsWith("ScoutSensor_DorsalPodMount", StringComparison.Ordinal))
-                {
-                    materialKey = "gunmetal";
-                }
-                else if (name.StartsWith("ScoutSensor_DorsalPod", StringComparison.Ordinal))
-                {
-                    materialKey = "sensor";
-                }
-                else if (name.StartsWith("ScoutSensor_Array", StringComparison.Ordinal))
-                {
-                    materialKey = "lightArmor";
-                }
-                else if (name.StartsWith("ScoutAccent_", StringComparison.Ordinal))
-                {
-                    materialKey = "amber";
-                }
-                else
-                {
-                    throw new InvalidDataException("No authored material mapping exists for model part '" +
-                        name + "'.");
-                }
-
-                Material material = materials[materialKey];
-                Material[] assigned = renderers[i].sharedMaterials;
-                if (assigned == null || assigned.Length == 0)
-                {
-                    assigned = new Material[1];
-                }
-                for (int materialIndex = 0; materialIndex < assigned.Length; materialIndex++)
-                {
-                    assigned[materialIndex] = material;
-                }
-                renderers[i].sharedMaterials = assigned;
-            }
+            AssignBatchedMaterials(model, "Scout", materials);
         }
-
         private static string ResolvePackRoot(string projectRoot)
         {
             string configuredRoot = Environment.GetEnvironmentVariable("RCL_PACK_ROOT");

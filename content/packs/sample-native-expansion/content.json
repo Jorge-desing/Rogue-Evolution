@@ -40,6 +40,10 @@
     {
       "id": "sample-native:heavy-artillery",
       "nativeTemplateId": "ArtilleryTank",
+      "assetBundleId": "sample-native:assets",
+      "cardImageAssetName": "assets/roguecommandexpansionsample/colossussiegecard.png",
+      "visualAssetName": "assets/roguecommandexpansionsample/colossussiegevisual.prefab",
+      "visualRootPath": "Vehicle",
       "localizations": [
         {
           "language": "en-US",

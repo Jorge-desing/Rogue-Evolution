@@ -269,6 +269,13 @@ def main():
             "ScoutAccent_RearMarker_{0}".format(side_name),
             (0.12, 0.16, 0.035), (side * 0.45, -0.56, 0.92), amber, 0.012))
 
+    diagnostics = modelkit.validate_model_mesh_quality(model_objects)
+    if not diagnostics["ground_contact_valid"] or diagnostics["missing_materials"]:
+        raise ValueError("Scout model failed ground-contact or material validation")
+    bounds = diagnostics["bounds"]
+    if bounds["width_x"] > 2.4 or bounds["height_z"] > 1.6 or bounds["length_y"] > 2.8:
+        raise ValueError("Scout model exceeds the PCXBaseTank native footprint")
+
     add_preview_stage(model_objects)
     bpy.ops.wm.save_as_mainfile(filepath=str(BLEND_PATH))
     bpy.ops.render.render(write_still=True)
