@@ -89,6 +89,7 @@ namespace RogueCommandExpansionLoader.Content
         public const int MaxAssetBundlesPerPack = 128;
         public const int MaxAiModulesPerProfile = 8;
         public const int MaxAiUnitEntriesPerProfile = 32;
+        public const int MaxAiUnitDependenciesPerProfile = 64;
         public const int MaxAiUnitCountAtStart = 8;
         public const int MaxAiUnitMaxLiving = 32;
         public const int MaxAiBaseIndex = 31;
@@ -394,6 +395,17 @@ namespace RogueCommandExpansionLoader.Content
                     Add(diagnostics, "ai-profile.resource-name-duplicate", itemPath,
                         "AI resource names must be unique within a content pack.");
                 }
+
+                string[] unitDependencies = profile.unitDependencies ?? new string[0];
+                if (unitDependencies.Length > MaxAiUnitDependenciesPerProfile)
+                {
+                    Add(diagnostics, "ai-profile.unit-dependencies-limit", itemPath + ".unitDependencies",
+                        "An AI profile can declare at most " + MaxAiUnitDependenciesPerProfile +
+                        " unit dependencies.");
+                }
+
+                ValidateReferences(unitDependencies, itemPath + ".unitDependencies",
+                    unitIds, registrySnapshot, true, diagnostics);
 
                 ContentAiUnitEntryDefinition[] unitEntries = profile.unitEntries ??
                     new ContentAiUnitEntryDefinition[0];

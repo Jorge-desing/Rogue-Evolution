@@ -1525,14 +1525,33 @@ namespace RogueCommandExpansionLoader.Content
             for (int i = 0; i < profiles.Length; i++)
             {
                 ContentAiProfileDefinition profile = profiles[i];
-                if (profile == null || profile.unitEntries == null)
+                if (profile == null)
                 {
                     continue;
                 }
 
-                for (int j = 0; j < profile.unitEntries.Length; j++)
+                string[] unitDependencies = profile.unitDependencies ?? new string[0];
+                for (int j = 0; j < unitDependencies.Length; j++)
                 {
-                    ContentAiUnitEntryDefinition unitEntry = profile.unitEntries[j];
+                    string unitId = unitDependencies[j];
+                    if (String.IsNullOrWhiteSpace(unitId))
+                    {
+                        continue;
+                    }
+
+                    PackCandidate owner;
+                    if (unitOwners.TryGetValue(unitId, out owner) &&
+                        !System.Object.ReferenceEquals(owner, candidate))
+                    {
+                        candidate.Dependencies.Add(owner);
+                    }
+                }
+
+                ContentAiUnitEntryDefinition[] unitEntries = profile.unitEntries ??
+                    new ContentAiUnitEntryDefinition[0];
+                for (int j = 0; j < unitEntries.Length; j++)
+                {
+                    ContentAiUnitEntryDefinition unitEntry = unitEntries[j];
                     if (unitEntry == null || String.IsNullOrWhiteSpace(unitEntry.unitId))
                     {
                         continue;
@@ -2039,7 +2058,21 @@ namespace RogueCommandExpansionLoader.Content
                             }
 
                             string deckEntityId = _aiDeckEntryEntityIdField.GetValue(entry) as string;
-                            if (String.IsNullOrWhiteSpace(deckEntityId) || !IsUnitAvailable(deckEntityId, temporaryUnits))
+                            if (String.IsNullOrWhiteSpace(deckEntityId))
+                            {
+                                throw new InvalidDataException("Perfil AI " + profile.id +
+                                    ": la unidad de deck '" + deckEntityId + "' no está registrada ni se declara en este paquete.");
+                            }
+
+                            if (!IsNativeOrPackLocalUnit(deckEntityId, temporaryUnits) &&
+                                !ContainsString(profile.unitDependencies, deckEntityId))
+                            {
+                                throw new InvalidDataException("Perfil AI " + profile.id +
+                                    ": la unidad de deck externa '" + deckEntityId +
+                                    "' debe declararse en unitDependencies para fijar su orden de carga.");
+                            }
+
+                            if (!IsUnitAvailable(deckEntityId, temporaryUnits))
                             {
                                 throw new InvalidDataException("Perfil AI " + profile.id +
                                     ": la unidad de deck '" + deckEntityId + "' no está registrada ni se declara en este paquete.");
@@ -3095,6 +3128,42 @@ namespace RogueCommandExpansionLoader.Content
             for (int i = 0; i < temporaryUnits.Count; i++)
             {
                 if (String.Equals(temporaryUnits[i].Id, entityId, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private bool IsNativeOrPackLocalUnit(string entityId, List<LoadedUnit> temporaryUnits)
+        {
+            if (_nativeUnitIds.Contains(entityId))
+            {
+                return true;
+            }
+
+            for (int i = 0; i < temporaryUnits.Count; i++)
+            {
+                if (String.Equals(temporaryUnits[i].Id, entityId, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool ContainsString(string[] values, string expected)
+        {
+            if (values == null)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < values.Length; i++)
+            {
+                if (String.Equals(values[i], expected, StringComparison.Ordinal))
                 {
                     return true;
                 }

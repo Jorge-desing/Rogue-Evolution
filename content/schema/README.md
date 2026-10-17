@@ -22,6 +22,8 @@
 
 An AI profile may optionally declare `unitEntries` to append namespaced units to one `AiBase` in an isolated, stage-scoped native profile. Each entry selects the `aiBases` index, the starting ascension level, the number of units spawned at base setup, and the native `maxLiving` value. The referenced unit must be declared by this pack or another loaded/declared pack; the loader resolves that dependency before loading the profile. Custom AI prefabs and unscoped templates cannot use `unitEntries`, so the native AI template remains unchanged. `unitEntries` may be omitted when unused; sample manifests include an empty array for clarity.
 
+Custom AI prefabs may optionally declare `unitDependencies` for namespaced units referenced by serialized `AiBase.entitiesInAiDeck` entries. Cross-pack IDs must be declared here so the loader loads the owning unit pack first, independent of pack-directory order. Native game IDs and units declared in the same pack need no dependency entry. The loader rejects a custom prefab whose external deck IDs omit this declaration, even if another pack happened to load first. Dependencies are references only; they do not replace or edit native AI templates.
+
 Static REA inspection of the pinned 1.0.9 assembly found that `AiBehaviour.BuildBaseStartSetup` creates each eligible `EntityInAiDeck` entry at its AI base. Non-building entries flow through `EntityFactory.InstantiateEntity` with the AI tag and receive the base index, so a mod unit added to the isolated profile can join that AI's starting roster. This is static inspection only; the sample pack has not yet been verified in a Steam-launched match.
 
 ## Unit localization

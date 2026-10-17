@@ -103,6 +103,7 @@ namespace RogueCommandExpansionLoader.Content
         public string prefabAssetName;
         public string nativeTemplateId;
         public bool scopeToReferencedStages;
+        public string[] unitDependencies;
         public ContentAiUnitEntryDefinition[] unitEntries;
         public ContentAiModuleDefinition[] modules;
     }
@@ -265,6 +266,9 @@ namespace RogueCommandExpansionLoader.Content
                 prefabAssetName = source.prefabAssetName,
                 nativeTemplateId = source.nativeTemplateId,
                 scopeToReferencedStages = source.scopeToReferencedStages,
+                unitDependencies = source.unitDependencies == null
+                    ? null
+                    : (string[])source.unitDependencies.Clone(),
                 unitEntries = CloneArray(source.unitEntries, CloneAiUnitEntry),
                 modules = CloneArray(source.modules, CloneAiModule)
             };

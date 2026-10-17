@@ -387,7 +387,6 @@ namespace RogueCommandExpansionLoader.Runtime
                     return false;
                 }
 
-                bool alreadyRegistered;
                 if (index.Contains(entityId))
                 {
                     if (!IsIndexedRow(index, rows, entityId))
@@ -397,30 +396,10 @@ namespace RogueCommandExpansionLoader.Runtime
                         return false;
                     }
 
-                    int indexedPosition = Convert.ToInt32(index[entityId]);
-                    object registeredRow = rows[indexedPosition];
-                    bool registeredHasProduct;
-                    string registeredProduct;
-                    bool incomingHasProduct;
-                    string incomingProduct;
-                    if (!TryReadFactoryProduct(registeredRow, entityId,
-                            out registeredHasProduct, out registeredProduct) ||
-                        !TryReadFactoryProduct(row, entityId,
-                            out incomingHasProduct, out incomingProduct))
-                    {
-                        return false;
-                    }
-
-                    if (registeredHasProduct != incomingHasProduct ||
-                        !String.Equals(registeredProduct, incomingProduct, StringComparison.Ordinal))
-                    {
-                        Log("Entity row '" + entityId +
-                            "' already exists with a different factory/product relation; " +
-                            "the batch was not registered.");
-                        return false;
-                    }
-
-                    alreadyRegistered = true;
+                    Log("Entity ID '" + entityId +
+                        "' is already registered by the game or another content source; " +
+                        "the batch was not registered.");
+                    return false;
                 }
                 else
                 {
@@ -434,30 +413,18 @@ namespace RogueCommandExpansionLoader.Runtime
                             return false;
                         }
                     }
-
-                    alreadyRegistered = false;
                 }
 
-                if (!alreadyRegistered)
+                if (intValueCache.Contains(entityId) || floatValueCache.Contains(entityId))
                 {
-                    if (intValueCache.Contains(entityId) || floatValueCache.Contains(entityId))
-                    {
-                        Log("Entity value cache already contains unregistered ID '" + entityId +
-                            "'; the batch was not registered.");
-                        return false;
-                    }
-
-                    rowsToAppend.Add(row);
-                    entityIdsToAppend.Add(entityId);
-                    availableEntityIds.Add(entityId);
-                }
-                else if (!HasValueCacheEntry(intValueCache, entityId, _intValueCacheEntryType) ||
-                    !HasValueCacheEntry(floatValueCache, entityId, _floatValueCacheEntryType))
-                {
-                    Log("Registered entity '" + entityId +
-                        "' is missing a valid changeable-value cache entry; the batch was not registered.");
+                    Log("Entity value cache already contains unregistered ID '" + entityId +
+                        "'; the batch was not registered.");
                     return false;
                 }
+
+                rowsToAppend.Add(row);
+                entityIdsToAppend.Add(entityId);
+                availableEntityIds.Add(entityId);
 
                 bool hasProduct;
                 string productId;

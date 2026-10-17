@@ -261,6 +261,44 @@ var tests = new (string Name, Action Run)[]
         WithPackage(reactiveAiSample, (pack, root) =>
             ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(), "reference.unresolved"));
     }),
+    ("AI profiles accept declared cross-pack unit dependencies", () =>
+    {
+        WithPackage(sample, (pack, root) =>
+        {
+            pack.aiProfiles[0].unitDependencies = ["foreign:unit"];
+            ExpectValid(pack, root, new EmptySnapshot("foreign:unit"), new KnownModuleValidator());
+        });
+    }),
+    ("AI profiles reject unresolved cross-pack unit dependencies", () =>
+    {
+        WithPackage(sample, (pack, root) =>
+        {
+            pack.aiProfiles[0].unitDependencies = ["foreign:unit"];
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(), "reference.unresolved");
+        });
+    }),
+    ("AI profiles reject duplicate cross-pack unit dependencies", () =>
+    {
+        WithPackage(sample, (pack, root) =>
+        {
+            pack.aiProfiles[0].unitDependencies = ["foreign:unit", "foreign:unit"];
+            ExpectDiagnostic(pack, root, new EmptySnapshot("foreign:unit"), new KnownModuleValidator(),
+                "reference.duplicate");
+        });
+    }),
+    ("content pack deep clone preserves AI unit dependency declarations", () =>
+    {
+        ContentPackDefinition source = Clone(sample);
+        source.aiProfiles[0].unitDependencies = ["foreign:unit"];
+        ContentPackDefinition clone = ContentPackCopy.DeepClone(source);
+        source.aiProfiles[0].unitDependencies[0] = "foreign:changed";
+        if (clone.aiProfiles[0].unitDependencies == null ||
+            clone.aiProfiles[0].unitDependencies.Length != 1 ||
+            clone.aiProfiles[0].unitDependencies[0] != "foreign:unit")
+        {
+            throw new InvalidOperationException("Deep cloning an AI profile did not preserve an independent dependency array.");
+        }
+    }),
     ("stage-scoped native AI samples use unique reserved resource aliases", () =>
     {
         var resourceNames = new HashSet<string>(StringComparer.Ordinal);
@@ -1401,6 +1439,43 @@ var tests = new (string Name, Action Run)[]
                 provider.EntityRowsRegisteredCount != 1)
             {
                 throw new InvalidOperationException("The runtime mutator left inconsistent registry rows, indices, factory mappings, or stat caches.");
+            }
+        }
+        finally
+        {
+            EntityBalancingStore.Reset();
+        }
+    }),
+    ("runtime entity mutator rejects an ID collision without partially changing the registry", () =>
+    {
+        EntityBalancingStore.Reset();
+        try
+        {
+            EntityBalancingStore.EntityBalancingParametersList.Add(RuntimeMutatorTestData.Row("sample:existing"));
+            EntityBalancingStore.ParameterListIndexOf.Add("sample:existing", 0);
+            EntityBalancingStore.ChangeableIntValueCache.Add("sample:existing",
+                new Dictionary<EntityBalancingStore.ChangeableValue, int>());
+            EntityBalancingStore.ChangeableFloatValueCache.Add("sample:existing",
+                new Dictionary<EntityBalancingStore.ChangeableValue, float>());
+
+            var provider = new RuntimeMutatorTestProvider();
+            provider.EntityRows.Add(RuntimeMutatorTestData.Row("sample:new"));
+            provider.EntityRows.Add(RuntimeMutatorTestData.Row("sample:existing"));
+            var mutator = new RuntimeContentMutator(typeof(EntityBalancingStore).Assembly, provider, null);
+
+            if (mutator.RegisterEntityRows() ||
+                EntityBalancingStore.EntityBalancingParametersList.Count != 1 ||
+                EntityBalancingStore.EntityBalancingParametersList[0].entityId != "sample:existing" ||
+                EntityBalancingStore.ParameterListIndexOf.Count != 1 ||
+                EntityBalancingStore.ParameterListIndexOf["sample:existing"] != 0 ||
+                EntityBalancingStore.FactoryEntityIdOf.Count != 0 ||
+                EntityBalancingStore.ChangeableIntValueCache.Count != 1 ||
+                EntityBalancingStore.ChangeableFloatValueCache.Count != 1 ||
+                !EntityBalancingStore.ChangeableIntValueCache.ContainsKey("sample:existing") ||
+                !EntityBalancingStore.ChangeableFloatValueCache.ContainsKey("sample:existing") ||
+                provider.EntityRowsRegisteredCount != 0)
+            {
+                throw new InvalidOperationException("A duplicate entity ID changed existing registry state or partially appended its batch.");
             }
         }
         finally

@@ -280,6 +280,11 @@
         "prefabAssetName": { "type": "string", "pattern": "^RCL_[A-Za-z0-9_]{1,92}$" },
         "nativeTemplateId": { "type": "string", "minLength": 1, "pattern": "\\S" },
         "scopeToReferencedStages": { "type": "boolean" },
+        "unitDependencies": {
+          "type": "array",
+          "maxItems": 64,
+          "items": { "$ref": "#/$defs/namespacedId" }
+        },
         "unitEntries": {
           "type": "array",
           "maxItems": 32,
