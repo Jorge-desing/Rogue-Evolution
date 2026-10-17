@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <UseSharedCompilation>false</UseSharedCompilation>
+    <UseAppHost>false</UseAppHost>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="../../src/RogueCommandExpansionLoader/Content/ContentPackDefinition.cs"
+             Link="Content/ContentPackDefinition.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Content/ContentPackValidation.cs"
+             Link="Content/ContentPackValidation.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Content/StageGenerationCompatibility.cs"
+             Link="Content/StageGenerationCompatibility.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Compatibility/GameCompatibility.cs"
+             Link="Compatibility/GameCompatibility.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeBuildGuard.cs"
+             Link="Runtime/RuntimeBuildGuard.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/DiagnosticsContracts.cs"
+             Link="Runtime/DiagnosticsContracts.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeContentContracts.cs"
+             Link="Runtime/RuntimeContentContracts.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeReflection.cs"
+             Link="Runtime/RuntimeReflection.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeContentMutator.cs"
+             Link="Runtime/RuntimeContentMutator.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Modules/ScheduledBaseBuildParameters.cs"
+             Link="Modules/ScheduledBaseBuildParameters.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Contracts/IRogueCommandAiModule.cs"
+             Link="Contracts/IRogueCommandAiModule.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Modules/AiModuleRegistry.cs"
+             Link="Modules/AiModuleRegistry.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Modules/CompositeAiRuntimeBehaviour.cs"
+             Link="Modules/CompositeAiRuntimeBehaviour.cs" />
+  </ItemGroup>
+</Project>

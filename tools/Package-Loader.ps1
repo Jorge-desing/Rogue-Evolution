@@ -1,0 +1,358 @@
+[CmdletBinding()]
+param(
+    [string]$GameRoot = 'C:\Program Files (x86)\Steam\steamapps\common\Rogue Command',
+    [string]$BepInExCorePath = ''
+)
+
+$ErrorActionPreference = 'Stop'
+
+$repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
+$projectPath = Join-Path $repositoryRoot 'src\RogueCommandExpansionLoader\RogueCommandExpansionLoader.csproj'
+$pluginSourcePath = Join-Path $repositoryRoot 'src\RogueCommandExpansionLoader\RogueCommandExpansionPlugin.cs'
+$pluginAssemblyPath = Join-Path $repositoryRoot 'artifacts\plugin\RogueCommandExpansionLoader.dll'
+$schemaPath = Join-Path $repositoryRoot 'content\schema\content.schema.json'
+$schemaReadmePath = Join-Path $repositoryRoot 'content\schema\README.md'
+$nativeSamplePath = Join-Path $repositoryRoot 'content\packs\sample-native-expansion\content.json'
+
+if ([string]::IsNullOrWhiteSpace($BepInExCorePath)) {
+    $BepInExCorePath = Join-Path $repositoryRoot '.tools\bepinex-dist-5.4.23.5\BepInEx\core'
+}
+
+foreach ($pathValue in @($GameRoot, $BepInExCorePath)) {
+    if ($pathValue.IndexOf(';') -ge 0 -or $pathValue.IndexOf("`r") -ge 0 -or
+        $pathValue.IndexOf("`n") -ge 0) {
+        throw 'GameRoot and BepInExCorePath cannot contain semicolons or line breaks when passed to MSBuild.'
+    }
+}
+
+$pluginSource = Get-Content -LiteralPath $pluginSourcePath -Raw
+$versionMatch = [regex]::Match($pluginSource, 'PluginVersion\s*=\s*"([0-9]+\.[0-9]+\.[0-9]+)"')
+if (-not $versionMatch.Success) {
+    throw "Could not read PluginVersion from $pluginSourcePath."
+}
+$pluginVersion = $versionMatch.Groups[1].Value
+
+$buildArguments = @(
+    'build',
+    $projectPath,
+    '--configuration', 'Release',
+    '--verbosity', 'minimal',
+    "-p:GameRoot=$GameRoot",
+    "-p:BepInExCorePath=$BepInExCorePath"
+)
+
+Write-Host 'Building Rogue Command Expansion Loader...'
+& dotnet @buildArguments
+if ($LASTEXITCODE -ne 0) {
+    throw "dotnet build failed with exit code $LASTEXITCODE."
+}
+
+if (-not (Test-Path -LiteralPath $pluginAssemblyPath -PathType Leaf)) {
+    throw "The plugin assembly was not produced: $pluginAssemblyPath"
+}
+if (-not (Test-Path -LiteralPath $schemaPath -PathType Leaf) -or
+    -not (Test-Path -LiteralPath $schemaReadmePath -PathType Leaf)) {
+    throw 'The content schema files are missing; refusing to create an incomplete package.'
+}
+if (-not (Test-Path -LiteralPath $nativeSamplePath -PathType Leaf)) {
+    throw 'The native-template sample pack is missing; refusing to create an incomplete package.'
+}
+
+$nativeSampleRoot = Split-Path -Parent $nativeSamplePath
+$nativeSampleBundleDirectory = Join-Path $nativeSampleRoot 'bundles'
+$nativeSampleDefinition = Get-Content -LiteralPath $nativeSamplePath -Raw | ConvertFrom-Json
+if ($nativeSampleDefinition.packId -ne 'sample-native:expansion' -or
+    @($nativeSampleDefinition.assetBundles).Count -lt 1 -or
+    [string]::IsNullOrWhiteSpace($nativeSampleDefinition.assetBundleManifestPath)) {
+    throw 'The native sample pack must declare its bundle and Unity bundle manifest.'
+}
+
+foreach ($inputDirectory in @($nativeSampleRoot, $nativeSampleBundleDirectory)) {
+    if (-not (Test-Path -LiteralPath $inputDirectory -PathType Container)) {
+        throw "A required native sample content directory is missing: $inputDirectory"
+    }
+    $inputDirectoryItem = Get-Item -LiteralPath $inputDirectory -Force
+    if (($inputDirectoryItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+        throw "Refusing to package native sample content through a reparse point: $inputDirectory"
+    }
+}
+
+$nativeSampleBundlePaths = @($nativeSampleDefinition.assetBundleManifestPath)
+$nativeSampleBundlePaths += @($nativeSampleDefinition.assetBundles | ForEach-Object { $_.path })
+$nativeSampleBundleSources = @()
+$nativeSampleBundlePathSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+$nativeSampleRootPrefix = [System.IO.Path]::GetFullPath($nativeSampleRoot).TrimEnd(
+    [System.IO.Path]::DirectorySeparatorChar,
+    [System.IO.Path]::AltDirectorySeparatorChar) + [System.IO.Path]::DirectorySeparatorChar
+foreach ($relativeBundlePath in $nativeSampleBundlePaths) {
+    if ($relativeBundlePath -notmatch '^bundles/[a-z0-9][a-z0-9._-]*\.bundle$') {
+        throw "The native sample contains an invalid bundle path: $relativeBundlePath"
+    }
+    if (-not $nativeSampleBundlePathSet.Add($relativeBundlePath)) {
+        throw "The native sample declares a bundle path more than once: $relativeBundlePath"
+    }
+
+    $bundleSourcePath = [System.IO.Path]::GetFullPath((Join-Path $nativeSampleRoot ($relativeBundlePath.Replace('/', '\'))))
+    if (-not $bundleSourcePath.StartsWith($nativeSampleRootPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "Refusing to package a native sample bundle outside the pack: $bundleSourcePath"
+    }
+    if (-not (Test-Path -LiteralPath $bundleSourcePath -PathType Leaf)) {
+        throw "A bundle declared by the native sample is missing: $relativeBundlePath"
+    }
+
+    $bundleSourceItem = Get-Item -LiteralPath $bundleSourcePath -Force
+    if (($bundleSourceItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+        throw "Refusing to package a native sample bundle through a reparse point: $relativeBundlePath"
+    }
+
+    $maximumBytes = if ($relativeBundlePath -eq $nativeSampleDefinition.assetBundleManifestPath) {
+        64MB
+    } else {
+        512MB
+    }
+    if ($bundleSourceItem.Length -le 0 -or $bundleSourceItem.Length -gt $maximumBytes) {
+        throw "Native sample bundle is empty or exceeds its limit: $relativeBundlePath"
+    }
+
+    $nativeSampleBundleSources += [pscustomobject]@{
+        RelativePath = $relativeBundlePath
+        SourcePath = $bundleSourcePath
+        FileName = [System.IO.Path]::GetFileName($bundleSourcePath)
+    }
+}
+
+$packageRoot = Join-Path $repositoryRoot 'artifacts\packages'
+$archivePath = Join-Path $packageRoot "RogueCommandExpansionLoader-$pluginVersion.zip"
+$temporaryArchivePath = Join-Path $packageRoot (
+    "RogueCommandExpansionLoader-$pluginVersion-" + [guid]::NewGuid().ToString('N') + '.tmp.zip')
+$replacementBackupPath = Join-Path $packageRoot (
+    "RogueCommandExpansionLoader-$pluginVersion-" + [guid]::NewGuid().ToString('N') + '.bak.zip')
+$repositoryPrefix = $repositoryRoot.TrimEnd([System.IO.Path]::DirectorySeparatorChar) +
+    [System.IO.Path]::DirectorySeparatorChar
+$packageRootFullPath = [System.IO.Path]::GetFullPath($packageRoot)
+if (-not $packageRootFullPath.StartsWith($repositoryPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+    throw "Refusing to write outside the repository: $packageRootFullPath"
+}
+
+$currentOutputPath = $repositoryRoot
+$relativeOutputPath = $packageRootFullPath.Substring($repositoryPrefix.Length)
+foreach ($segment in $relativeOutputPath.Split([System.IO.Path]::DirectorySeparatorChar)) {
+    $currentOutputPath = Join-Path $currentOutputPath $segment
+    if (Test-Path -LiteralPath $currentOutputPath) {
+        $outputItem = Get-Item -LiteralPath $currentOutputPath -Force
+        if (($outputItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+            throw "Refusing to write through a junction or symbolic link: $currentOutputPath"
+        }
+        if (-not $outputItem.PSIsContainer) {
+            throw "Expected an output directory but found a file: $currentOutputPath"
+        }
+    }
+}
+
+$temporaryRoot = [System.IO.Path]::GetFullPath([System.IO.Path]::GetTempPath())
+$stagePath = [System.IO.Path]::GetFullPath((Join-Path $temporaryRoot (
+    'rc-expansion-loader-package-' + [guid]::NewGuid().ToString('N'))))
+$temporaryPrefix = $temporaryRoot.TrimEnd([System.IO.Path]::DirectorySeparatorChar) +
+    [System.IO.Path]::DirectorySeparatorChar
+
+if (-not $stagePath.StartsWith($temporaryPrefix, [System.StringComparison]::OrdinalIgnoreCase) -or
+    -not [System.IO.Path]::GetFileName($stagePath).StartsWith('rc-expansion-loader-package-',
+        [System.StringComparison]::Ordinal)) {
+    throw "Refusing to use an unexpected temporary staging path: $stagePath"
+}
+
+$stageCreated = $false
+$temporaryArchiveOwned = $false
+try {
+    if (Test-Path -LiteralPath $stagePath) {
+        throw "Temporary staging path already exists; refusing to reuse it: $stagePath"
+    }
+    New-Item -ItemType Directory -Path $stagePath -ErrorAction Stop | Out-Null
+    $stageCreated = $true
+    $stageItem = Get-Item -LiteralPath $stagePath -Force
+    if (-not $stageItem.PSIsContainer -or
+        ($stageItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+        throw "Temporary staging path is not a normal directory: $stagePath"
+    }
+
+    $pluginDirectory = Join-Path $stagePath 'BepInEx\plugins'
+    $contentDirectory = Join-Path $pluginDirectory 'RogueCommandExpansionLoader\content'
+    $packsDirectory = Join-Path $contentDirectory 'packs'
+    $schemaDirectory = Join-Path $contentDirectory 'schema'
+    $samplePackDirectory = Join-Path $packsDirectory 'sample-native-expansion'
+    $samplePackBundleDirectory = Join-Path $samplePackDirectory 'bundles'
+    New-Item -ItemType Directory -Path $packsDirectory -Force | Out-Null
+    New-Item -ItemType Directory -Path $schemaDirectory -Force | Out-Null
+    New-Item -ItemType Directory -Path $samplePackDirectory -Force | Out-Null
+    New-Item -ItemType Directory -Path $samplePackBundleDirectory -Force | Out-Null
+
+    Copy-Item -LiteralPath $pluginAssemblyPath -Destination $pluginDirectory
+    Copy-Item -LiteralPath $schemaPath -Destination $schemaDirectory
+    Copy-Item -LiteralPath $schemaReadmePath -Destination $schemaDirectory
+    Copy-Item -LiteralPath $nativeSamplePath -Destination $samplePackDirectory
+    foreach ($bundleSource in $nativeSampleBundleSources) {
+        Copy-Item -LiteralPath $bundleSource.SourcePath -Destination (Join-Path $samplePackBundleDirectory $bundleSource.FileName)
+    }
+
+    @'
+Rogue Command Expansion Loader content packs
+
+Place each content pack in its own folder under this directory. The included
+sample-native-expansion pack includes a Unity AssetBundle and its manifest. Other
+packs must include every AssetBundle declared by content.json and its manifest.
+Use the adjacent schema directory when authoring content.json.
+
+The sample reuses native unit gameplay, stage, and AI templates and overlays a
+script-free model prefab. It keeps the native stage layout.
+'@ | Set-Content -LiteralPath (Join-Path $packsDirectory 'README.txt') -Encoding UTF8
+
+    @"
+Rogue Command Expansion Loader $pluginVersion
+
+Install:
+1. Install BepInEx 5.4.23.5 win-x64 Mono into the Rogue Command game folder.
+2. Extract this archive into the Rogue Command game folder, preserving its BepInEx directory.
+3. The included sample-native-expansion pack demonstrates a unit balance variant,
+   a bundled visual model, a native stage variant, and compiled AI modules on a
+   native AI template.
+4. Add other packs under BepInEx/plugins/RogueCommandExpansionLoader/content/packs/;
+   custom models and map layouts require valid Unity AssetBundles.
+
+Compatibility is limited to Rogue Command 1.0.9, Unity 2021.3.45f2, and the verified
+Assembly-CSharp.dll build. The plugin logs a compatibility diagnostic and skips its
+Harmony patches when those checks fail.
+
+This package contains the loader, content schema, and a sample pack with a
+script-free Unity AssetBundle.
+It does not include the game, BepInEx, Harmony, or game assemblies.
+"@ | Set-Content -LiteralPath (Join-Path $stagePath 'INSTALL.txt') -Encoding UTF8
+
+    New-Item -ItemType Directory -Path $packageRoot -Force | Out-Null
+    if (Test-Path -LiteralPath $temporaryArchivePath) {
+        throw "Temporary archive path already exists; refusing to reuse it: $temporaryArchivePath"
+    }
+    Add-Type -AssemblyName System.IO.Compression
+    $archiveStream = [System.IO.File]::Open(
+        $temporaryArchivePath,
+        [System.IO.FileMode]::CreateNew,
+        [System.IO.FileAccess]::ReadWrite,
+        [System.IO.FileShare]::None)
+    $temporaryArchiveOwned = $true
+    $zipArchive = $null
+    try {
+        $zipArchive = [System.IO.Compression.ZipArchive]::new(
+            $archiveStream,
+            [System.IO.Compression.ZipArchiveMode]::Create,
+            $true)
+
+        $stagePrefix = [System.IO.Path]::GetFullPath($stagePath).TrimEnd(
+            [System.IO.Path]::DirectorySeparatorChar,
+            [System.IO.Path]::AltDirectorySeparatorChar) + [System.IO.Path]::DirectorySeparatorChar
+        $stagedFiles = @(Get-ChildItem -LiteralPath $stagePath -File -Recurse -Force | Sort-Object -Property FullName)
+        if ($stagedFiles.Count -eq 0) {
+            throw "Refusing to create an empty install archive from $stagePath."
+        }
+
+        foreach ($stagedFile in $stagedFiles) {
+            if (($stagedFile.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+                throw "Refusing to package a reparse-point file: $($stagedFile.FullName)"
+            }
+
+            $stagedFilePath = [System.IO.Path]::GetFullPath($stagedFile.FullName)
+            if (-not $stagedFilePath.StartsWith($stagePrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+                throw "Refusing to package a file outside the staging directory: $stagedFilePath"
+            }
+
+            $entryName = $stagedFilePath.Substring($stagePrefix.Length).Replace('\', '/')
+            $entrySegments = $entryName.Split('/')
+            if ([System.IO.Path]::IsPathRooted($entryName) -or $entrySegments -contains '' -or
+                $entrySegments -contains '.' -or $entrySegments -contains '..') {
+                throw "Refusing an invalid ZIP entry path: $entryName"
+            }
+
+            $entry = $zipArchive.CreateEntry($entryName, [System.IO.Compression.CompressionLevel]::Optimal)
+            $inputStream = [System.IO.File]::OpenRead($stagedFilePath)
+            $entryStream = $null
+            try {
+                $entryStream = $entry.Open()
+                $inputStream.CopyTo($entryStream)
+            }
+            finally {
+                if ($entryStream) {
+                    $entryStream.Dispose()
+                }
+                $inputStream.Dispose()
+            }
+        }
+    }
+    finally {
+        if ($zipArchive) {
+            $zipArchive.Dispose()
+        }
+        if ($archiveStream) {
+            $archiveStream.Dispose()
+        }
+    }
+
+    if (Test-Path -LiteralPath $archivePath) {
+        $existingArchive = Get-Item -LiteralPath $archivePath -Force
+        if ($existingArchive.PSIsContainer -or
+            ($existingArchive.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+            throw "Refusing to replace a directory, junction, or symbolic link: $archivePath"
+        }
+        if (Test-Path -LiteralPath $replacementBackupPath) {
+            throw "Replacement backup path already exists; refusing to reuse it: $replacementBackupPath"
+        }
+        [System.IO.File]::Replace($temporaryArchivePath, $archivePath, $replacementBackupPath)
+        $backupArchive = Get-Item -LiteralPath $replacementBackupPath -Force
+        if ($backupArchive.PSIsContainer -or
+            ($backupArchive.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+            Write-Warning "Package replaced, but the previous archive backup needs manual inspection: $replacementBackupPath"
+        }
+        else {
+            try {
+                Remove-Item -LiteralPath $replacementBackupPath -Force -ErrorAction Stop
+            }
+            catch {
+                Write-Warning "Package replaced, but the previous archive backup could not be removed: $replacementBackupPath"
+            }
+        }
+    }
+    else {
+        [System.IO.File]::Move($temporaryArchivePath, $archivePath)
+    }
+    $temporaryArchiveOwned = $false
+    Write-Host "Package created: $archivePath"
+}
+finally {
+    if ($temporaryArchiveOwned) {
+        try {
+            if (Test-Path -LiteralPath $temporaryArchivePath) {
+                $temporaryArchiveItem = Get-Item -LiteralPath $temporaryArchivePath -Force
+                if ($temporaryArchiveItem.PSIsContainer -or
+                    ($temporaryArchiveItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+                    throw "Refusing to remove a replaced temporary archive directory or link: $temporaryArchivePath"
+                }
+                Remove-Item -LiteralPath $temporaryArchivePath -Force -ErrorAction Stop
+            }
+        }
+        catch {
+            Write-Warning "Could not safely clean the temporary archive '$temporaryArchivePath': $($_.Exception.Message)"
+        }
+    }
+
+    if ($stageCreated) {
+        try {
+            if (Test-Path -LiteralPath $stagePath) {
+                $stageItem = Get-Item -LiteralPath $stagePath -Force
+                if (($stageItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+                    throw "Refusing recursive cleanup of a replaced staging junction or symbolic link: $stagePath"
+                }
+                Remove-Item -LiteralPath $stagePath -Recurse -Force -ErrorAction Stop
+            }
+        }
+        catch {
+            Write-Warning "Could not safely clean the package staging directory '$stagePath': $($_.Exception.Message)"
+        }
+    }
+}

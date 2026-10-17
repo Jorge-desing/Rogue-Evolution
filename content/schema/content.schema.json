@@ -1,0 +1,263 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "content.schema.json",
+  "title": "Rogue Command Content Pack v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "packId",
+    "assetBundles",
+    "units",
+    "stages",
+    "aiProfiles"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "packId": {
+      "$ref": "#/$defs/namespacedId"
+    },
+    "assetBundleManifestPath": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^bundles/(?!(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\\.|$))[a-z0-9][a-z0-9._-]*\\.bundle$"
+    },
+    "assetBundles": {
+      "type": "array",
+      "minItems": 0,
+      "maxItems": 128,
+      "items": {
+        "$ref": "#/$defs/assetBundle"
+      }
+    },
+    "units": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/unit"
+      }
+    },
+    "stages": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/stage"
+      }
+    },
+    "aiProfiles": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/aiProfile"
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "assetBundles": { "minItems": 1 } }, "required": ["assetBundles"] },
+      "then": { "required": ["assetBundleManifestPath"] },
+      "else": { "not": { "required": ["assetBundleManifestPath"] } }
+    },
+    {
+      "anyOf": [
+        { "properties": { "units": { "minItems": 1 } } },
+        { "properties": { "stages": { "minItems": 1 } } },
+        { "properties": { "aiProfiles": { "minItems": 1 } } }
+      ]
+    }
+  ],
+  "$defs": {
+    "namespacedId": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9._-]*:[a-z0-9][a-z0-9._-]*$"
+    },
+    "assetBundle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "path"],
+      "properties": {
+        "id": { "$ref": "#/$defs/namespacedId" },
+        "path": { "type": "string", "pattern": "^bundles/(?!(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\\.|$))[a-z0-9][a-z0-9._-]*\\.bundle$" }
+      }
+    },
+    "unit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id"],
+      "properties": {
+        "id": { "$ref": "#/$defs/namespacedId" },
+        "assetBundleId": { "$ref": "#/$defs/namespacedId" },
+        "balanceAssetName": { "type": "string", "minLength": 1, "pattern": "\\S" },
+        "prefabAssetName": { "type": "string", "minLength": 1, "pattern": "\\S" },
+        "cardImageAssetName": { "type": "string", "minLength": 1, "pattern": "\\S" },
+        "visualAssetName": { "type": "string", "minLength": 1, "pattern": "\\S" },
+        "visualRootPath": { "type": "string", "minLength": 1, "pattern": "\\S" },
+        "nativeTemplateId": { "type": "string", "minLength": 1, "pattern": "\\S" },
+        "balanceOverrides": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/balanceOverride" }
+        }
+      },
+      "oneOf": [
+        {
+          "required": ["nativeTemplateId"],
+          "not": { "anyOf": [{ "required": ["balanceAssetName"] }, { "required": ["prefabAssetName"] }] }
+        },
+        {
+          "required": ["assetBundleId", "balanceAssetName", "prefabAssetName", "cardImageAssetName"],
+          "not": { "anyOf": [{ "required": ["nativeTemplateId"] }, { "required": ["visualAssetName"] }, { "required": ["visualRootPath"] }] }
+        }
+      ],
+      "allOf": [
+        {
+          "if": { "required": ["cardImageAssetName"] },
+          "then": { "required": ["assetBundleId"] }
+        },
+        {
+          "if": { "required": ["nativeTemplateId", "assetBundleId"] },
+          "then": { "anyOf": [{ "required": ["cardImageAssetName"] }, { "required": ["visualAssetName"] }] }
+        },
+        {
+          "if": { "required": ["visualAssetName"] },
+          "then": { "required": ["nativeTemplateId", "assetBundleId", "visualRootPath"] }
+        },
+        {
+          "if": { "required": ["visualRootPath"] },
+          "then": { "required": ["nativeTemplateId", "visualAssetName"] }
+        }
+      ]
+    },
+    "balanceOverride": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "value"],
+      "properties": {
+        "name": {
+          "enum": ["coinsAmount", "cost", "maxCapacity", "combatValue", "maxHealth", "maxShield", "maxMana", "maxRank", "sightRadius", "skillRange", "firePointCount", "neededExperienceLevel", "gridSize", "productionDuration", "cardModelScalingFactor", "maxArmor", "armorProtection", "moveSpeed", "damage1", "damage2", "weaponRange", "attackCooldown", "attack2Cooldown", "effectRadius1", "effectRadius2", "healAmount1", "healAmount2", "gainCreditsAmount", "skillManaCost", "duration1", "duration2"]
+        },
+        "value": { "type": "string", "pattern": "^(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?$" }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "name": { "enum": ["coinsAmount", "cost", "maxCapacity", "combatValue", "maxHealth", "maxShield", "maxMana", "maxRank", "sightRadius", "skillRange", "firePointCount", "neededExperienceLevel", "gridSize"] }
+            },
+            "required": ["name"]
+          },
+          "then": { "properties": { "value": { "pattern": "^[0-9]+$" } } }
+        }
+      ]
+    },
+    "stage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "mapSizeMin", "mapSizeMax", "unitIds", "aiProfileIds"],
+      "properties": {
+        "id": { "$ref": "#/$defs/namespacedId" },
+        "assetBundleId": { "$ref": "#/$defs/namespacedId" },
+        "assetName": { "type": "string", "minLength": 1, "pattern": "\\S" },
+        "nativeTemplateId": { "type": "string", "minLength": 1, "pattern": "\\S" },
+        "parameterOverrides": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/stageParameterOverride" }
+        },
+        "mapSizeMin": { "type": "integer", "minimum": 1, "maximum": 256 },
+        "mapSizeMax": { "type": "integer", "minimum": 1, "maximum": 256 },
+        "isPartOfDemo": { "type": "boolean", "default": false },
+        "unitIds": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/namespacedId" },
+          "uniqueItems": true
+        },
+        "aiProfileIds": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/namespacedId" },
+          "uniqueItems": true
+        }
+      },
+      "oneOf": [
+        {
+          "required": ["nativeTemplateId"],
+          "not": { "anyOf": [{ "required": ["assetBundleId"] }, { "required": ["assetName"] }] }
+        },
+        {
+          "required": ["assetBundleId", "assetName"],
+          "not": { "required": ["nativeTemplateId"] }
+        }
+      ]
+    },
+    "stageParameterOverride": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "value"],
+      "properties": {
+        "name": {
+          "enum": ["levelCount", "maxWidth", "coinReward", "startCrystalReward", "researchPointsReward", "twoWayBranchingProbability", "shopWeight", "restSiteWeight", "cardRewardWeight", "upgradeRewardWeight", "relicRewardWeight", "researchRewardWeight", "coinRewardWeight", "startCrystalRewardWeight", "researchPointsRewardWeight", "dropRewardWeight"]
+        },
+        "value": { "type": "string", "pattern": "^(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?$" }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "name": { "enum": ["levelCount", "maxWidth", "coinReward", "startCrystalReward", "researchPointsReward"] }
+            },
+            "required": ["name"]
+          },
+          "then": { "properties": { "value": { "pattern": "^[0-9]+$" } } }
+        }
+      ]
+    },
+    "aiProfile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "modules"],
+      "properties": {
+        "id": { "$ref": "#/$defs/namespacedId" },
+        "assetBundleId": { "$ref": "#/$defs/namespacedId" },
+        "prefabAssetName": { "type": "string", "pattern": "^RCL_[A-Za-z0-9_]{1,92}$" },
+        "nativeTemplateId": { "type": "string", "minLength": 1, "pattern": "\\S" },
+        "modules": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "items": { "$ref": "#/$defs/aiModule" }
+        }
+      },
+      "oneOf": [
+        {
+          "required": ["nativeTemplateId"],
+          "not": { "anyOf": [{ "required": ["assetBundleId"] }, { "required": ["prefabAssetName"] }] }
+        },
+        {
+          "required": ["assetBundleId", "prefabAssetName"],
+          "not": { "required": ["nativeTemplateId"] }
+        }
+      ]
+    },
+    "aiModule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["moduleId", "parameters"],
+      "properties": {
+        "moduleId": { "$ref": "#/$defs/namespacedId" },
+        "parameters": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/moduleParameter" }
+        }
+      }
+    },
+    "moduleParameter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "value"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9._-]*$"
+        },
+        "value": { "type": "string" }
+      }
+    }
+  }
+}

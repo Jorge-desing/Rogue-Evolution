@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "packId": "sample-native:expansion",
+  "assetBundleManifestPath": "bundles/assetbundle-manifest.bundle",
+  "assetBundles": [
+    {
+      "id": "sample-native:assets",
+      "path": "bundles/sample-native-expansion.bundle"
+    }
+  ],
+  "units": [
+    {
+      "id": "sample-native:scout-tank",
+      "nativeTemplateId": "PCXBaseTank",
+      "assetBundleId": "sample-native:assets",
+      "visualAssetName": "ScoutTankVisual",
+      "visualRootPath": "Vehicle",
+      "balanceOverrides": [
+        { "name": "cost", "value": "70" },
+        { "name": "maxHealth", "value": "130" },
+        { "name": "moveSpeed", "value": "1.1" }
+      ]
+    }
+  ],
+  "stages": [
+    {
+      "id": "sample-native:training-variant",
+      "nativeTemplateId": "StageParameters_Pools_Level1SimpleRoleChoiceWithPriceLimit",
+      "parameterOverrides": [
+        { "name": "levelCount", "value": "8" },
+        { "name": "maxWidth", "value": "5" },
+        { "name": "coinReward", "value": "150" }
+      ],
+      "mapSizeMin": 20,
+      "mapSizeMax": 120,
+      "isPartOfDemo": false,
+      "unitIds": ["sample-native:scout-tank"],
+      "aiProfileIds": ["sample-native:quick-hunter-extension"]
+    }
+  ],
+  "aiProfiles": [
+    {
+      "id": "sample-native:quick-hunter-extension",
+      "nativeTemplateId": "_01_ Quick Hunter Enemy Var",
+      "modules": [
+        {
+          "moduleId": "sample:scheduled-base-build",
+          "parameters": [
+            { "name": "intervalSeconds", "value": "8" },
+            { "name": "maxSuccessfulBuilds", "value": "1" },
+            { "name": "maxAttempts", "value": "3" }
+          ]
+        }
+      ]
+    }
+  ]
+}

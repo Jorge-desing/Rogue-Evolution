@@ -1,0 +1,1196 @@
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
+
+namespace RogueCommandExpansionLoader.Content
+{
+    /// <summary>
+    /// Read-only view of IDs already known to the loader. Implementations must
+    /// represent a stable snapshot for the duration of one validation call.
+    /// </summary>
+    public interface IContentRegistrySnapshot
+    {
+        bool ContainsId(string id);
+        bool ContainsUnit(string id);
+        bool ContainsAiProfile(string id);
+    }
+
+    /// <summary>
+    /// Validates one AI module and its string parameters against the runtime's
+    /// registered module definitions. Returning false rejects this package.
+    /// The diagnostic should explain the unknown module or invalid parameter.
+    /// </summary>
+    public interface IAiModuleValidator
+    {
+        bool TryValidate(string moduleId, ContentModuleParameter[] parameters, out string diagnostic);
+    }
+
+    public sealed class ContentDiagnostic
+    {
+        public ContentDiagnostic(string code, string path, string message)
+        {
+            Code = code;
+            Path = path;
+            Message = message;
+        }
+
+        public string Code { get; private set; }
+        public string Path { get; private set; }
+        public string Message { get; private set; }
+
+        public override string ToString()
+        {
+            return Code + " at " + Path + ": " + Message;
+        }
+    }
+
+    public sealed class ContentPackValidationResult
+    {
+        private readonly ContentPackDefinition pack;
+        private readonly List<ContentDiagnostic> diagnostics;
+
+        internal ContentPackValidationResult(ContentPackDefinition pack, List<ContentDiagnostic> diagnostics)
+        {
+            this.pack = ContentPackCopy.DeepClone(pack);
+            this.diagnostics = diagnostics;
+        }
+
+        public ContentPackDefinition Pack { get { return ContentPackCopy.DeepClone(pack); } }
+        public bool IsValid { get { return diagnostics.Count == 0; } }
+        public IReadOnlyList<ContentDiagnostic> Diagnostics { get { return diagnostics.AsReadOnly(); } }
+    }
+
+    /// <summary>
+    /// Performs package-local validation only. It never writes to, or mutates,
+    /// the supplied registry snapshot and does not load AssetBundles or code.
+    /// </summary>
+    public static class ContentPackValidator
+    {
+        public const int SupportedSchemaVersion = 1;
+        public const int MaxAssetBundlesPerPack = 128;
+        public const int MaxAiModulesPerProfile = 8;
+        public const long MaxManifestBundleBytes = 64L * 1024L * 1024L;
+        public const long MaxAssetBundleBytes = 512L * 1024L * 1024L;
+        public const long MaxTotalContentBundleBytes = 2L * 1024L * 1024L * 1024L;
+
+        private static readonly StringComparer IdComparer = StringComparer.Ordinal;
+        private static readonly StringComparer PathComparer = StringComparer.OrdinalIgnoreCase;
+
+        public static ContentPackValidationResult Validate(
+            ContentPackDefinition pack,
+            string packageRoot,
+            IContentRegistrySnapshot registrySnapshot,
+            IAiModuleValidator aiModuleValidator)
+        {
+            var diagnostics = new List<ContentDiagnostic>();
+            if (pack == null)
+            {
+                Add(diagnostics, "pack.required", "content.json", "The content pack definition is missing.");
+                return new ContentPackValidationResult(null, diagnostics);
+            }
+
+            if (registrySnapshot == null)
+            {
+                Add(diagnostics, "registry.snapshot-required", "content.json", "A read-only registry snapshot is required to check ID collisions and external references.");
+            }
+
+            if (pack.schemaVersion != SupportedSchemaVersion)
+            {
+                Add(diagnostics, "schema.unsupported-version", "schemaVersion", "Only content schema version " + SupportedSchemaVersion + " is supported.");
+            }
+
+            var assetBundles = RequireArray(pack.assetBundles, "assetBundles", diagnostics);
+            var units = RequireArray(pack.units, "units", diagnostics);
+            var stages = RequireArray(pack.stages, "stages", diagnostics);
+            var aiProfiles = RequireArray(pack.aiProfiles, "aiProfiles", diagnostics);
+
+            if (units.Length == 0 && stages.Length == 0 && aiProfiles.Length == 0)
+            {
+                Add(diagnostics, "content.empty", "content.json",
+                    "A content pack must declare at least one unit, stage, or AI profile.");
+            }
+
+            if (assetBundles.Length > MaxAssetBundlesPerPack)
+            {
+                Add(diagnostics, "bundle.count-exceeds-limit", "assetBundles",
+                    "A content pack can declare at most " + MaxAssetBundlesPerPack + " AssetBundles.");
+            }
+
+            string normalizedRoot = GetPackageRoot(packageRoot, diagnostics);
+            if (normalizedRoot != null)
+            {
+                ScanForDllsAndReparsePoints(normalizedRoot, diagnostics);
+            }
+
+            var allIds = new HashSet<string>(IdComparer);
+            var bundleIds = new HashSet<string>(IdComparer);
+            var unitIds = new HashSet<string>(IdComparer);
+            var aiProfileIds = new HashSet<string>(IdComparer);
+            var aiResourceNames = new HashSet<string>(StringComparer.Ordinal);
+            var bundlePaths = new HashSet<string>(PathComparer);
+
+            RegisterId(pack.packId, "packId", "package", allIds, registrySnapshot, diagnostics);
+
+            if (assetBundles.Length == 0)
+            {
+                if (!String.IsNullOrWhiteSpace(pack.assetBundleManifestPath))
+                {
+                    Add(diagnostics, "bundle.manifest-unexpected", "assetBundleManifestPath",
+                        "A data-only pack must omit assetBundleManifestPath when it declares no AssetBundles.");
+                }
+            }
+            else
+            {
+                ValidateBundleOutputPath(pack.assetBundleManifestPath, "assetBundleManifestPath", diagnostics);
+                string manifestResolvedPath;
+                if (TryResolvePackageFile(normalizedRoot, pack.assetBundleManifestPath,
+                        "assetBundleManifestPath", diagnostics, out manifestResolvedPath))
+                {
+                    string canonicalManifestPath = ToCanonicalRelativePath(normalizedRoot, manifestResolvedPath);
+                    if (!bundlePaths.Add(canonicalManifestPath))
+                    {
+                        Add(diagnostics, "bundle.manifest-path-duplicate", "assetBundleManifestPath",
+                            "The AssetBundle manifest bundle must use a different file path from every content bundle.");
+                    }
+
+                    if (ContainsReparsePoint(normalizedRoot, manifestResolvedPath))
+                    {
+                        Add(diagnostics, "path.reparse-point", "assetBundleManifestPath",
+                            "The AssetBundle manifest path cannot traverse symbolic links, junctions, or other reparse points.");
+                    }
+                    else if (!File.Exists(manifestResolvedPath))
+                    {
+                        Add(diagnostics, "bundle.manifest-missing", "assetBundleManifestPath",
+                            "The Unity AssetBundle manifest file does not exist inside the package.");
+                    }
+                }
+            }
+
+            for (int i = 0; i < assetBundles.Length; i++)
+            {
+                var bundle = assetBundles[i];
+                string itemPath = "assetBundles[" + i + "]";
+                if (bundle == null)
+                {
+                    Add(diagnostics, "entry.null", itemPath, "Asset bundle entries cannot be null.");
+                    continue;
+                }
+
+                RegisterId(bundle.id, itemPath + ".id", "asset bundle", allIds, registrySnapshot, diagnostics);
+                if (IsNamespacedId(bundle.id))
+                {
+                    bundleIds.Add(bundle.id);
+                }
+
+                string resolvedPath;
+                ValidateBundleOutputPath(bundle.path, itemPath + ".path", diagnostics);
+                if (TryResolvePackageFile(normalizedRoot, bundle.path, itemPath + ".path", diagnostics, out resolvedPath))
+                {
+                    string canonicalRelativePath = ToCanonicalRelativePath(normalizedRoot, resolvedPath);
+                    if (!bundlePaths.Add(canonicalRelativePath))
+                    {
+                        Add(diagnostics, "bundle.path-duplicate", itemPath + ".path", "Each asset bundle must use a distinct package file path.");
+                    }
+
+                    if (ContainsReparsePoint(normalizedRoot, resolvedPath))
+                    {
+                        Add(diagnostics, "path.reparse-point", itemPath + ".path", "Asset bundle paths cannot traverse symbolic links, junctions, or other reparse points.");
+                    }
+                    else if (!File.Exists(resolvedPath))
+                    {
+                        Add(diagnostics, "bundle.file-missing", itemPath + ".path", "The asset bundle file does not exist inside the package.");
+                    }
+                }
+            }
+
+            for (int i = 0; i < units.Length; i++)
+            {
+                var unit = units[i];
+                string itemPath = "units[" + i + "]";
+                if (unit == null)
+                {
+                    Add(diagnostics, "entry.null", itemPath, "Unit entries cannot be null.");
+                    continue;
+                }
+
+                RegisterId(unit.id, itemPath + ".id", "unit", allIds, registrySnapshot, diagnostics);
+                if (IsNamespacedId(unit.id))
+                {
+                    unitIds.Add(unit.id);
+                }
+
+                bool hasNativeTemplate = !String.IsNullOrWhiteSpace(unit.nativeTemplateId);
+                if (hasNativeTemplate)
+                {
+                    ValidateAssetName(unit.nativeTemplateId, itemPath + ".nativeTemplateId", diagnostics);
+                    if (!String.IsNullOrWhiteSpace(unit.balanceAssetName) ||
+                        !String.IsNullOrWhiteSpace(unit.prefabAssetName))
+                    {
+                        Add(diagnostics, "unit.source-conflict", itemPath,
+                            "Choose either nativeTemplateId or the balance/prefab bundle assets, not both.");
+                    }
+
+                    bool hasVisualAsset = !String.IsNullOrWhiteSpace(unit.visualAssetName);
+                    bool hasVisualRoot = !String.IsNullOrWhiteSpace(unit.visualRootPath);
+                    if (hasVisualAsset != hasVisualRoot)
+                    {
+                        Add(diagnostics, "unit.visual-source-invalid", itemPath,
+                            "A native-template visual requires both visualAssetName and visualRootPath.");
+                    }
+
+                    if (hasVisualAsset)
+                    {
+                        ValidateAssetName(unit.visualAssetName, itemPath + ".visualAssetName", diagnostics);
+                        ValidateVisualRootPath(unit.visualRootPath, itemPath + ".visualRootPath", diagnostics);
+                    }
+
+                    if (!String.IsNullOrWhiteSpace(unit.cardImageAssetName) || hasVisualAsset)
+                    {
+                        ValidateBundleReference(unit.assetBundleId, itemPath + ".assetBundleId", bundleIds, diagnostics);
+                        if (!String.IsNullOrWhiteSpace(unit.cardImageAssetName))
+                        {
+                            ValidateAssetName(unit.cardImageAssetName, itemPath + ".cardImageAssetName", diagnostics);
+                        }
+                    }
+                    else if (!String.IsNullOrWhiteSpace(unit.assetBundleId))
+                    {
+                        Add(diagnostics, "unit.bundle-unused", itemPath + ".assetBundleId",
+                            "A native-template unit only declares a bundle when it supplies cardImageAssetName or a visual overlay.");
+                    }
+                }
+                else
+                {
+                    ValidateBundleReference(unit.assetBundleId, itemPath + ".assetBundleId", bundleIds, diagnostics);
+                    ValidateAssetName(unit.balanceAssetName, itemPath + ".balanceAssetName", diagnostics);
+                    ValidateAssetName(unit.prefabAssetName, itemPath + ".prefabAssetName", diagnostics);
+                    ValidateAssetName(unit.cardImageAssetName, itemPath + ".cardImageAssetName", diagnostics);
+                    if (!String.IsNullOrWhiteSpace(unit.visualAssetName) ||
+                        !String.IsNullOrWhiteSpace(unit.visualRootPath))
+                    {
+                        Add(diagnostics, "unit.visual-source-conflict", itemPath,
+                            "visualAssetName and visualRootPath are only valid with nativeTemplateId.");
+                    }
+                }
+
+                ValidateBalanceOverrides(unit.balanceOverrides, itemPath + ".balanceOverrides", diagnostics);
+            }
+
+            for (int i = 0; i < aiProfiles.Length; i++)
+            {
+                var profile = aiProfiles[i];
+                string itemPath = "aiProfiles[" + i + "]";
+                if (profile == null)
+                {
+                    Add(diagnostics, "entry.null", itemPath, "AI profile entries cannot be null.");
+                    continue;
+                }
+
+                RegisterId(profile.id, itemPath + ".id", "AI profile", allIds, registrySnapshot, diagnostics);
+                if (IsNamespacedId(profile.id))
+                {
+                    aiProfileIds.Add(profile.id);
+                }
+
+                bool hasNativeTemplate = !String.IsNullOrWhiteSpace(profile.nativeTemplateId);
+                string resourceName;
+                if (hasNativeTemplate)
+                {
+                    ValidateAssetName(profile.nativeTemplateId, itemPath + ".nativeTemplateId", diagnostics);
+                    if (!String.IsNullOrWhiteSpace(profile.assetBundleId) ||
+                        !String.IsNullOrWhiteSpace(profile.prefabAssetName))
+                    {
+                        Add(diagnostics, "ai-profile.source-conflict", itemPath,
+                            "Choose either nativeTemplateId or the bundle prefab source, not both.");
+                    }
+
+                    resourceName = profile.nativeTemplateId;
+                }
+                else
+                {
+                    ValidateBundleReference(profile.assetBundleId, itemPath + ".assetBundleId", bundleIds, diagnostics);
+                    ValidateAssetName(profile.prefabAssetName, itemPath + ".prefabAssetName", diagnostics);
+                    if (!IsAiResourceName(profile.prefabAssetName))
+                    {
+                        Add(diagnostics, "ai-profile.resource-name-invalid", itemPath + ".prefabAssetName",
+                            "AI prefab names must start with reserved prefix RCL_ and contain only ASCII letters, digits, and underscores.");
+                    }
+
+                    resourceName = profile.prefabAssetName;
+                }
+
+                if (!String.IsNullOrWhiteSpace(resourceName) && !aiResourceNames.Add(resourceName))
+                {
+                    Add(diagnostics, "ai-profile.resource-name-duplicate", itemPath,
+                        "AI resource names must be unique within a content pack.");
+                }
+
+                var modules = RequireArray(profile.modules, itemPath + ".modules", diagnostics);
+                if (modules.Length == 0)
+                {
+                    Add(diagnostics, "ai-profile.modules-empty", itemPath + ".modules",
+                        "AI profiles must declare at least one compiled module.");
+                }
+                else if (modules.Length > MaxAiModulesPerProfile)
+                {
+                    Add(diagnostics, "ai-profile.modules-limit", itemPath + ".modules",
+                        "An AI profile can declare at most " + MaxAiModulesPerProfile + " compiled modules.");
+                }
+
+                for (int moduleIndex = 0; moduleIndex < modules.Length; moduleIndex++)
+                {
+                    ValidateAiModule(modules[moduleIndex], itemPath + ".modules[" + moduleIndex + "]", aiModuleValidator, diagnostics);
+                }
+            }
+
+            for (int i = 0; i < stages.Length; i++)
+            {
+                var stage = stages[i];
+                string itemPath = "stages[" + i + "]";
+                if (stage == null)
+                {
+                    Add(diagnostics, "entry.null", itemPath, "Stage entries cannot be null.");
+                    continue;
+                }
+
+                RegisterId(stage.id, itemPath + ".id", "stage", allIds, registrySnapshot, diagnostics);
+                bool hasNativeTemplate = !String.IsNullOrWhiteSpace(stage.nativeTemplateId);
+                if (hasNativeTemplate)
+                {
+                    ValidateAssetName(stage.nativeTemplateId, itemPath + ".nativeTemplateId", diagnostics);
+                    if (!String.IsNullOrWhiteSpace(stage.assetBundleId) ||
+                        !String.IsNullOrWhiteSpace(stage.assetName))
+                    {
+                        Add(diagnostics, "stage.source-conflict", itemPath,
+                            "Choose either nativeTemplateId or the bundle asset source, not both.");
+                    }
+                }
+                else
+                {
+                    ValidateBundleReference(stage.assetBundleId, itemPath + ".assetBundleId", bundleIds, diagnostics);
+                    ValidateAssetName(stage.assetName, itemPath + ".assetName", diagnostics);
+                }
+
+                ValidateStageParameterOverrides(stage.parameterOverrides, itemPath + ".parameterOverrides", diagnostics);
+                if (stage.mapSizeMin < 1 || stage.mapSizeMin > 256)
+                {
+                    Add(diagnostics, "stage.map-size-min-invalid", itemPath + ".mapSizeMin", "mapSizeMin must be between 1 and 256.");
+                }
+
+                if (stage.mapSizeMax < 1 || stage.mapSizeMax > 256 || stage.mapSizeMax < stage.mapSizeMin)
+                {
+                    Add(diagnostics, "stage.map-size-max-invalid", itemPath + ".mapSizeMax", "mapSizeMax must be between mapSizeMin and 256.");
+                }
+
+                var stageUnits = RequireArray(stage.unitIds, itemPath + ".unitIds", diagnostics);
+                ValidateReferences(stageUnits, itemPath + ".unitIds", unitIds, registrySnapshot, true, diagnostics);
+
+                var stageAiProfiles = RequireArray(stage.aiProfileIds, itemPath + ".aiProfileIds", diagnostics);
+                ValidateReferences(stageAiProfiles, itemPath + ".aiProfileIds", aiProfileIds, registrySnapshot, false, diagnostics);
+            }
+
+            return new ContentPackValidationResult(pack, diagnostics);
+        }
+
+        private static T[] RequireArray<T>(T[] value, string path, List<ContentDiagnostic> diagnostics)
+        {
+            if (value != null)
+            {
+                return value;
+            }
+
+            Add(diagnostics, "array.required", path, "This field is required; use an empty array when there are no entries.");
+            return new T[0];
+        }
+
+        private static void RegisterId(
+            string id,
+            string path,
+            string itemKind,
+            HashSet<string> allIds,
+            IContentRegistrySnapshot registrySnapshot,
+            List<ContentDiagnostic> diagnostics)
+        {
+            ValidateNamespacedId(id, path, diagnostics);
+            if (!IsNamespacedId(id))
+            {
+                return;
+            }
+
+            if (!allIds.Add(id))
+            {
+                Add(diagnostics, "id.duplicate-in-package", path, "The ID is already used by another definition in this package.");
+            }
+
+            if (registrySnapshot != null)
+            {
+                try
+                {
+                    if (registrySnapshot.ContainsId(id))
+                    {
+                        Add(diagnostics, "id.collision", path, "The " + itemKind + " ID is already present in the registry snapshot.");
+                    }
+                }
+                catch (Exception exception)
+                {
+                    Add(diagnostics, "registry.snapshot-failed", path, "Could not query the registry snapshot: " + exception.Message);
+                }
+            }
+        }
+
+        private static void ValidateNamespacedId(string id, string path, List<ContentDiagnostic> diagnostics)
+        {
+            if (!IsNamespacedId(id))
+            {
+                Add(diagnostics, "id.invalid", path, "IDs must use the form namespace:local-id with lowercase ASCII letters, digits, dots, underscores, or hyphens.");
+            }
+        }
+
+        private static bool IsNamespacedId(string id)
+        {
+            if (string.IsNullOrEmpty(id))
+            {
+                return false;
+            }
+
+            int separator = id.IndexOf(':');
+            if (separator < 1 || separator != id.LastIndexOf(':') || separator == id.Length - 1)
+            {
+                return false;
+            }
+
+            if (!IsAsciiLowerLetter(id[0]) || !IsNamespaceTail(id, 1, separator))
+            {
+                return false;
+            }
+
+            if (!IsIdCharacter(id[separator + 1], true))
+            {
+                return false;
+            }
+
+            for (int i = separator + 2; i < id.Length; i++)
+            {
+                if (!IsIdCharacter(id[i], false))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static bool IsNamespaceTail(string value, int start, int end)
+        {
+            for (int i = start; i < end; i++)
+            {
+                char c = value[i];
+                if (!IsAsciiLowerLetter(c) && !IsAsciiDigit(c) && c != '.' && c != '_' && c != '-')
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static bool IsIdCharacter(char value, bool firstLocalCharacter)
+        {
+            return IsAsciiLowerLetter(value) || IsAsciiDigit(value) || (!firstLocalCharacter && (value == '.' || value == '_' || value == '-'));
+        }
+
+        private static bool IsAsciiLowerLetter(char value)
+        {
+            return value >= 'a' && value <= 'z';
+        }
+
+        private static bool IsAsciiDigit(char value)
+        {
+            return value >= '0' && value <= '9';
+        }
+
+        private static void ValidateBundleReference(string bundleId, string path, HashSet<string> bundleIds, List<ContentDiagnostic> diagnostics)
+        {
+            ValidateNamespacedId(bundleId, path, diagnostics);
+            if (IsNamespacedId(bundleId) && !bundleIds.Contains(bundleId))
+            {
+                Add(diagnostics, "reference.bundle-unresolved", path, "Asset bundle references must resolve to a bundle declared in this package.");
+            }
+        }
+
+        private static void ValidateAssetName(string assetName, string path, List<ContentDiagnostic> diagnostics)
+        {
+            if (string.IsNullOrWhiteSpace(assetName))
+            {
+                Add(diagnostics, "asset-name.required", path, "Asset names must be non-empty.");
+            }
+        }
+
+        private static void ValidateVisualRootPath(string value, string path, List<ContentDiagnostic> diagnostics)
+        {
+            if (String.IsNullOrWhiteSpace(value) || value.StartsWith("/", StringComparison.Ordinal) ||
+                value.EndsWith("/", StringComparison.Ordinal) || value.IndexOf('\\') >= 0)
+            {
+                Add(diagnostics, "unit.visual-root-path-invalid", path,
+                    "visualRootPath must be a relative Unity Transform path using forward slashes.");
+                return;
+            }
+
+            string[] segments = value.Split('/');
+            for (int i = 0; i < segments.Length; i++)
+            {
+                if (String.IsNullOrWhiteSpace(segments[i]) || segments[i] == "." || segments[i] == "..")
+                {
+                    Add(diagnostics, "unit.visual-root-path-invalid", path,
+                        "visualRootPath cannot contain empty, current-directory, or parent-directory segments.");
+                    return;
+                }
+            }
+        }
+
+        private static void ValidateBalanceOverrides(
+            ContentBalanceOverride[] overrides,
+            string path,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (overrides == null)
+            {
+                return;
+            }
+
+            var names = new HashSet<string>(StringComparer.Ordinal);
+            for (int i = 0; i < overrides.Length; i++)
+            {
+                ContentBalanceOverride balanceOverride = overrides[i];
+                string itemPath = path + "[" + i + "]";
+                if (balanceOverride == null)
+                {
+                    Add(diagnostics, "entry.null", itemPath, "Balance override entries cannot be null.");
+                    continue;
+                }
+
+                if (String.IsNullOrWhiteSpace(balanceOverride.name) ||
+                    !names.Add(balanceOverride.name))
+                {
+                    Add(diagnostics, "unit.balance-override-name-invalid", itemPath + ".name",
+                        "Balance override names must be non-empty and unique within the unit.");
+                }
+
+                if (!TryValidateBalanceOverrideValue(balanceOverride.name, balanceOverride.value))
+                {
+                    Add(diagnostics, "unit.balance-override-invalid", itemPath,
+                        "The override must target an allowlisted numeric balance field and contain a finite, non-negative invariant-culture value.");
+                }
+            }
+        }
+
+        private static bool TryValidateBalanceOverrideValue(string name, string value)
+        {
+            if (String.IsNullOrWhiteSpace(name) || String.IsNullOrEmpty(value) ||
+                !String.Equals(value, value.Trim(), StringComparison.Ordinal) ||
+                value[0] == '+' || value[0] == '-')
+            {
+                return false;
+            }
+
+            switch (name)
+            {
+                case "coinsAmount":
+                case "cost":
+                case "maxCapacity":
+                case "combatValue":
+                case "maxHealth":
+                case "maxShield":
+                case "maxMana":
+                case "maxRank":
+                case "sightRadius":
+                case "skillRange":
+                case "firePointCount":
+                case "neededExperienceLevel":
+                case "gridSize":
+                    int integerValue;
+                    return Int32.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture,
+                        out integerValue) && integerValue >= 0;
+                case "productionDuration":
+                case "cardModelScalingFactor":
+                case "maxArmor":
+                case "armorProtection":
+                case "moveSpeed":
+                case "damage1":
+                case "damage2":
+                case "weaponRange":
+                case "attackCooldown":
+                case "attack2Cooldown":
+                case "effectRadius1":
+                case "effectRadius2":
+                case "healAmount1":
+                case "healAmount2":
+                case "gainCreditsAmount":
+                case "skillManaCost":
+                case "duration1":
+                case "duration2":
+                    float floatValue;
+                    return Single.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture,
+                        out floatValue) && !Single.IsNaN(floatValue) && !Single.IsInfinity(floatValue) &&
+                        floatValue >= 0f;
+                default:
+                    return false;
+            }
+        }
+
+        private static void ValidateStageParameterOverrides(
+            ContentStageParameterOverride[] overrides,
+            string path,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (overrides == null)
+            {
+                return;
+            }
+
+            var names = new HashSet<string>(StringComparer.Ordinal);
+            for (int i = 0; i < overrides.Length; i++)
+            {
+                ContentStageParameterOverride stageOverride = overrides[i];
+                string itemPath = path + "[" + i + "]";
+                if (stageOverride == null)
+                {
+                    Add(diagnostics, "entry.null", itemPath, "Stage parameter overrides cannot be null.");
+                    continue;
+                }
+
+                if (String.IsNullOrWhiteSpace(stageOverride.name) || !names.Add(stageOverride.name))
+                {
+                    Add(diagnostics, "stage.parameter-override-name-invalid", itemPath + ".name",
+                        "Stage parameter override names must be non-empty and unique within the stage.");
+                }
+
+                if (!TryValidateStageParameterOverrideValue(stageOverride.name, stageOverride.value))
+                {
+                    Add(diagnostics, "stage.parameter-override-invalid", itemPath,
+                        "The override must target an allowlisted finite, non-negative stage parameter and use invariant-culture text.");
+                }
+            }
+        }
+
+        private static bool TryValidateStageParameterOverrideValue(string name, string value)
+        {
+            if (String.IsNullOrWhiteSpace(name) || String.IsNullOrEmpty(value) ||
+                !String.Equals(value, value.Trim(), StringComparison.Ordinal) ||
+                value[0] == '+' || value[0] == '-')
+            {
+                return false;
+            }
+
+            switch (name)
+            {
+                case "levelCount":
+                case "maxWidth":
+                case "coinReward":
+                case "startCrystalReward":
+                case "researchPointsReward":
+                    int integerValue;
+                    if (!Int32.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out integerValue))
+                    {
+                        return false;
+                    }
+
+                    if (name == "levelCount") return integerValue >= 1 && integerValue <= 32;
+                    if (name == "maxWidth") return integerValue >= 1 && integerValue <= 64;
+                    return integerValue >= 0 && integerValue <= 1000000;
+                case "twoWayBranchingProbability":
+                case "shopWeight":
+                case "restSiteWeight":
+                case "cardRewardWeight":
+                case "upgradeRewardWeight":
+                case "relicRewardWeight":
+                case "researchRewardWeight":
+                case "coinRewardWeight":
+                case "startCrystalRewardWeight":
+                case "researchPointsRewardWeight":
+                case "dropRewardWeight":
+                    float floatValue;
+                    if (!Single.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out floatValue) ||
+                        Single.IsNaN(floatValue) || Single.IsInfinity(floatValue) || floatValue < 0f)
+                    {
+                        return false;
+                    }
+
+                    if (name == "twoWayBranchingProbability") return floatValue <= 1f;
+                    return floatValue <= 1000f;
+                default:
+                    return false;
+            }
+        }
+
+        private static bool IsAiResourceName(string value)
+        {
+            if (String.IsNullOrWhiteSpace(value) || !value.StartsWith("RCL_", StringComparison.Ordinal) ||
+                value.Length <= 4 || value.Length > 96)
+            {
+                return false;
+            }
+
+            for (int i = 4; i < value.Length; i++)
+            {
+                char character = value[i];
+                bool valid = character >= 'A' && character <= 'Z' ||
+                    character >= 'a' && character <= 'z' ||
+                    character >= '0' && character <= '9' || character == '_';
+                if (!valid)
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static void ValidateReferences(
+            string[] references,
+            string path,
+            HashSet<string> localIds,
+            IContentRegistrySnapshot registrySnapshot,
+            bool units,
+            List<ContentDiagnostic> diagnostics)
+        {
+            var seen = new HashSet<string>(IdComparer);
+            for (int i = 0; i < references.Length; i++)
+            {
+                string id = references[i];
+                string itemPath = path + "[" + i + "]";
+                ValidateNamespacedId(id, itemPath, diagnostics);
+                if (!IsNamespacedId(id))
+                {
+                    continue;
+                }
+
+                if (!seen.Add(id))
+                {
+                    Add(diagnostics, "reference.duplicate", itemPath, "The same reference appears more than once in this list.");
+                }
+
+                if (localIds.Contains(id))
+                {
+                    continue;
+                }
+
+                bool exists = false;
+                if (registrySnapshot != null)
+                {
+                    try
+                    {
+                        exists = units ? registrySnapshot.ContainsUnit(id) : registrySnapshot.ContainsAiProfile(id);
+                    }
+                    catch (Exception exception)
+                    {
+                        Add(diagnostics, "registry.snapshot-failed", itemPath, "Could not resolve the reference in the registry snapshot: " + exception.Message);
+                    }
+                }
+
+                if (!exists)
+                {
+                    Add(diagnostics, "reference.unresolved", itemPath, "The reference does not resolve to a matching definition in this package or registry snapshot.");
+                }
+            }
+        }
+
+        private static void ValidateAiModule(ContentAiModuleDefinition module, string path, IAiModuleValidator validator, List<ContentDiagnostic> diagnostics)
+        {
+            if (module == null)
+            {
+                Add(diagnostics, "entry.null", path, "AI module entries cannot be null.");
+                return;
+            }
+
+            ValidateNamespacedId(module.moduleId, path + ".moduleId", diagnostics);
+            var parameters = RequireArray(module.parameters, path + ".parameters", diagnostics);
+            var names = new HashSet<string>(StringComparer.Ordinal);
+            for (int i = 0; i < parameters.Length; i++)
+            {
+                var parameter = parameters[i];
+                string parameterPath = path + ".parameters[" + i + "]";
+                if (parameter == null)
+                {
+                    Add(diagnostics, "entry.null", parameterPath, "Module parameter entries cannot be null.");
+                    continue;
+                }
+
+                if (!IsParameterName(parameter.name))
+                {
+                    Add(diagnostics, "module.parameter-name-invalid", parameterPath + ".name", "Parameter names must start with an ASCII letter and contain only letters, digits, dots, underscores, or hyphens.");
+                }
+                else if (!names.Add(parameter.name))
+                {
+                    Add(diagnostics, "module.parameter-duplicate", parameterPath + ".name", "Parameter names must be unique within a module.");
+                }
+
+                if (parameter.value == null)
+                {
+                    Add(diagnostics, "module.parameter-value-required", parameterPath + ".value", "Parameter values must be strings; use an empty string when the module permits it.");
+                }
+            }
+
+            if (validator == null)
+            {
+                Add(diagnostics, "module.validator-required", path + ".moduleId", "An AI module validator is required to verify module IDs and parameters.");
+                return;
+            }
+
+            try
+            {
+                string message;
+                if (!validator.TryValidate(module.moduleId, parameters, out message))
+                {
+                    Add(diagnostics, "module.invalid", path, string.IsNullOrWhiteSpace(message) ? "The module ID or its parameters were rejected." : message);
+                }
+            }
+            catch (Exception exception)
+            {
+                Add(diagnostics, "module.validator-failed", path, "AI module validation failed: " + exception.Message);
+            }
+        }
+
+        private static bool IsParameterName(string value)
+        {
+            if (string.IsNullOrEmpty(value) || !IsAsciiLetter(value[0]))
+            {
+                return false;
+            }
+
+            for (int i = 1; i < value.Length; i++)
+            {
+                char c = value[i];
+                if (!IsAsciiLetter(c) && !IsAsciiDigit(c) && c != '.' && c != '_' && c != '-')
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static bool IsAsciiLetter(char value)
+        {
+            return (value >= 'a' && value <= 'z') || (value >= 'A' && value <= 'Z');
+        }
+
+        private static string GetPackageRoot(string packageRoot, List<ContentDiagnostic> diagnostics)
+        {
+            if (string.IsNullOrWhiteSpace(packageRoot))
+            {
+                Add(diagnostics, "package-root.required", "packageRoot", "A package directory is required.");
+                return null;
+            }
+
+            string fullPath;
+            try
+            {
+                fullPath = Path.GetFullPath(packageRoot);
+            }
+            catch (Exception exception)
+            {
+                Add(diagnostics, "package-root.invalid", "packageRoot", "The package directory path is invalid: " + exception.Message);
+                return null;
+            }
+
+            if (!Directory.Exists(fullPath))
+            {
+                Add(diagnostics, "package-root.missing", "packageRoot", "The package directory does not exist.");
+                return null;
+            }
+
+            return fullPath;
+        }
+
+        private static bool TryResolvePackageFile(string packageRoot, string relativePath, string diagnosticPath, List<ContentDiagnostic> diagnostics, out string resolvedPath)
+        {
+            resolvedPath = null;
+            string pathError;
+            if (!IsSafeRelativePath(relativePath, out pathError))
+            {
+                Add(diagnostics, "path.invalid", diagnosticPath, pathError);
+                return false;
+            }
+
+            if (packageRoot == null)
+            {
+                return false;
+            }
+
+            try
+            {
+                string platformRelativePath = relativePath.Replace('/', Path.DirectorySeparatorChar);
+                string candidate = Path.GetFullPath(Path.Combine(packageRoot, platformRelativePath));
+                string rootPrefix = EnsureTrailingSeparator(packageRoot);
+                if (!candidate.StartsWith(rootPrefix, StringComparison.OrdinalIgnoreCase))
+                {
+                    Add(diagnostics, "path.outside-package", diagnosticPath, "The resolved path must remain inside the package directory.");
+                    return false;
+                }
+
+                resolvedPath = candidate;
+                return true;
+            }
+            catch (Exception exception)
+            {
+                Add(diagnostics, "path.invalid", diagnosticPath, "Could not resolve the package-relative path: " + exception.Message);
+                return false;
+            }
+        }
+
+        private static bool IsSafeRelativePath(string path, out string error)
+        {
+            error = null;
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                error = "Asset bundle paths must be non-empty relative paths.";
+                return false;
+            }
+
+            if (path.IndexOf('\\') >= 0 || path[0] == '/' || Path.IsPathRooted(path))
+            {
+                error = "Use a relative path with forward slashes; rooted paths and backslashes are not allowed.";
+                return false;
+            }
+
+            string[] segments = path.Split('/');
+            for (int i = 0; i < segments.Length; i++)
+            {
+                string segment = segments[i];
+                if (segment.Length == 0 || segment == "." || segment == "..")
+                {
+                    error = "Paths cannot contain empty, current-directory, or parent-directory segments.";
+                    return false;
+                }
+
+                if (segment[segment.Length - 1] == '.' || segment[segment.Length - 1] == ' ')
+                {
+                    error = "Path segments cannot end in a dot or space.";
+                    return false;
+                }
+
+                for (int characterIndex = 0; characterIndex < segment.Length; characterIndex++)
+                {
+                    char character = segment[characterIndex];
+                    if (char.IsControl(character) || character == ':' || character == '<' || character == '>' || character == '"' || character == '|' || character == '?' || character == '*')
+                    {
+                        error = "Path segments contain a character that is unsafe or invalid on Windows.";
+                        return false;
+                    }
+                }
+
+                if (IsReservedWindowsDeviceName(segment))
+                {
+                    error = "Windows device names cannot be used as path segments.";
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static void ValidateBundleOutputPath(string path, string diagnosticPath, List<ContentDiagnostic> diagnostics)
+        {
+            string fileName;
+            if (!TryGetBundleFileName(path, out fileName))
+            {
+                Add(diagnostics, "bundle.path-format-invalid", diagnosticPath,
+                    "Bundle files must use the exact form 'bundles/<lowercase-name>.bundle' with no extra directories or backslashes.");
+            }
+        }
+
+        internal static bool TryGetBundleFileName(string path, out string fileName)
+        {
+            fileName = null;
+            const string bundleDirectory = "bundles/";
+            const string extension = ".bundle";
+            if (string.IsNullOrEmpty(path) || path.IndexOf('\\') >= 0 ||
+                !path.StartsWith(bundleDirectory, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            string candidate = path.Substring(bundleDirectory.Length);
+            if (candidate.IndexOf('/') >= 0 || candidate.Length <= extension.Length ||
+                !candidate.EndsWith(extension, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            if (!IsAsciiLowerLetter(candidate[0]) && !IsAsciiDigit(candidate[0]))
+            {
+                return false;
+            }
+
+            int stemLength = candidate.Length - extension.Length;
+            for (int i = 0; i < stemLength; i++)
+            {
+                char value = candidate[i];
+                if (!IsAsciiLowerLetter(value) && !IsAsciiDigit(value) && value != '.' && value != '_' && value != '-')
+                {
+                    return false;
+                }
+            }
+
+            if (IsReservedWindowsDeviceName(candidate))
+            {
+                return false;
+            }
+
+            fileName = candidate;
+            return true;
+        }
+
+        private static bool IsReservedWindowsDeviceName(string segment)
+        {
+            int dotIndex = segment.IndexOf('.');
+            string stem = (dotIndex >= 0 ? segment.Substring(0, dotIndex) : segment).ToUpperInvariant();
+            if (stem == "CON" || stem == "PRN" || stem == "AUX" || stem == "NUL")
+            {
+                return true;
+            }
+
+            if (stem.Length == 4 && (stem.StartsWith("COM", StringComparison.Ordinal) || stem.StartsWith("LPT", StringComparison.Ordinal)) && stem[3] >= '1' && stem[3] <= '9')
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool ContainsReparsePoint(string packageRoot, string fullPath)
+        {
+            try
+            {
+                FileAttributes rootAttributes = File.GetAttributes(packageRoot);
+                if ((rootAttributes & FileAttributes.ReparsePoint) != 0)
+                {
+                    return true;
+                }
+
+                string prefix = EnsureTrailingSeparator(packageRoot);
+                if (!fullPath.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+
+                string remaining = fullPath.Substring(prefix.Length);
+                string[] segments = remaining.Split(new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar }, StringSplitOptions.RemoveEmptyEntries);
+                string current = packageRoot;
+                for (int i = 0; i < segments.Length; i++)
+                {
+                    current = Path.Combine(current, segments[i]);
+                    if (!File.Exists(current) && !Directory.Exists(current))
+                    {
+                        return false;
+                    }
+
+                    FileAttributes attributes = File.GetAttributes(current);
+                    if ((attributes & FileAttributes.ReparsePoint) != 0)
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+            catch
+            {
+                // A missing/unreadable target is diagnosed by the file-presence
+                // check; treat uncertainty here as unsafe and fail closed.
+                return true;
+            }
+        }
+
+        private static void ScanForDllsAndReparsePoints(string packageRoot, List<ContentDiagnostic> diagnostics)
+        {
+            try
+            {
+                if ((File.GetAttributes(packageRoot) & FileAttributes.ReparsePoint) != 0)
+                {
+                    Add(diagnostics, "path.reparse-root", "packageRoot", "The package directory cannot itself be a symbolic link, junction, or other reparse point.");
+                    return;
+                }
+
+                var directories = new Stack<string>();
+                directories.Push(packageRoot);
+                while (directories.Count > 0)
+                {
+                    string directory = directories.Pop();
+                    IEnumerable<string> entries;
+                    try
+                    {
+                        entries = Directory.EnumerateFileSystemEntries(directory);
+                    }
+                    catch (Exception exception)
+                    {
+                        Add(diagnostics, "package.scan-failed", ToCanonicalRelativePath(packageRoot, directory), "Could not inspect package contents: " + exception.Message);
+                        continue;
+                    }
+
+                    foreach (string entry in entries)
+                    {
+                        FileAttributes attributes;
+                        try
+                        {
+                            attributes = File.GetAttributes(entry);
+                        }
+                        catch (Exception exception)
+                        {
+                            Add(diagnostics, "package.scan-failed", ToCanonicalRelativePath(packageRoot, entry), "Could not inspect package entry: " + exception.Message);
+                            continue;
+                        }
+
+                        string relativePath = ToCanonicalRelativePath(packageRoot, entry);
+                        if ((attributes & FileAttributes.ReparsePoint) != 0)
+                        {
+                            Add(diagnostics, "path.reparse-point", relativePath, "Package contents cannot contain symbolic links, junctions, or other reparse points.");
+                            continue;
+                        }
+
+                        if ((attributes & FileAttributes.Directory) != 0)
+                        {
+                            directories.Push(entry);
+                        }
+                        else if (string.Equals(Path.GetExtension(entry), ".dll", StringComparison.OrdinalIgnoreCase))
+                        {
+                            Add(diagnostics, "package.dll-forbidden", relativePath, "Content packs cannot contain DLL files.");
+                        }
+                    }
+                }
+            }
+            catch (Exception exception)
+            {
+                Add(diagnostics, "package.scan-failed", "packageRoot", "Could not inspect package contents: " + exception.Message);
+            }
+        }
+
+        private static string ToCanonicalRelativePath(string packageRoot, string fullPath)
+        {
+            if (string.IsNullOrEmpty(packageRoot) || string.IsNullOrEmpty(fullPath))
+            {
+                return string.Empty;
+            }
+
+            string prefix = EnsureTrailingSeparator(packageRoot);
+            if (fullPath.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            {
+                return fullPath.Substring(prefix.Length).Replace(Path.DirectorySeparatorChar, '/').Replace(Path.AltDirectorySeparatorChar, '/');
+            }
+
+            return fullPath;
+        }
+
+        private static string EnsureTrailingSeparator(string path)
+        {
+            string trimmed = path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            return trimmed + Path.DirectorySeparatorChar;
+        }
+
+        private static void Add(List<ContentDiagnostic> diagnostics, string code, string path, string message)
+        {
+            diagnostics.Add(new ContentDiagnostic(code, path, message));
+        }
+    }
+}

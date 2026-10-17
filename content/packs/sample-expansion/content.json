@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "packId": "sample:expansion",
+  "assetBundleManifestPath": "bundles/assetbundle-manifest.bundle",
+  "assetBundles": [
+    {
+      "id": "sample:assets",
+      "path": "bundles/sample-expansion.bundle"
+    }
+  ],
+  "units": [
+    {
+      "id": "sample:scout-tank",
+      "assetBundleId": "sample:assets",
+      "balanceAssetName": "ScoutTankBalance",
+      "prefabAssetName": "ScoutTank",
+      "cardImageAssetName": "ScoutTankCard"
+    }
+  ],
+  "stages": [
+    {
+      "id": "sample:training-stage",
+      "assetBundleId": "sample:assets",
+      "assetName": "TrainingStage",
+      "mapSizeMin": 8,
+      "mapSizeMax": 12,
+      "isPartOfDemo": false,
+      "unitIds": [
+        "sample:scout-tank"
+      ],
+      "aiProfileIds": [
+        "sample:base-builder"
+      ]
+    }
+  ],
+  "aiProfiles": [
+    {
+      "id": "sample:base-builder",
+      "assetBundleId": "sample:assets",
+      "prefabAssetName": "RCL_SampleBaseBuilderAI",
+      "modules": [
+        {
+          "moduleId": "sample:scheduled-base-build",
+          "parameters": [
+            {
+              "name": "intervalSeconds",
+              "value": "8"
+            },
+            {
+              "name": "maxSuccessfulBuilds",
+              "value": "1"
+            },
+            {
+              "name": "maxAttempts",
+              "value": "3"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

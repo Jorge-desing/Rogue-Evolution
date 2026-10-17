@@ -1,0 +1,18 @@
+# Content asset conventions
+
+Create or import the Unity assets referenced by a pack's `content.json` here. Assign each bundle's exact lower-case `.bundle` file name as its AssetBundle label. The menu `Rogue Command > Asset Bundles > Build Sample Native Visual Pack` creates a script-free `ScoutTankVisual` prefab and builds/copies `sample-native-expansion.bundle` plus its Unity manifest into `content/packs/sample-native-expansion/bundles/`. It targets Unity 2021.3.45f2 and Windows Standalone x64.
+
+That sample prefab contains only a cube Mesh and MeshRenderers, with no material or scripts. At runtime, the loader inherits a material from the native model subtree when no bundle material exists. Replace the sample geometry with authored meshes under the same prefab name, then rebuild the bundle. The sample native unit currently targets the native `Vehicle` Transform; its Renderer subtree is disabled and the new model is attached at the same local origin.
+
+The scaffolder can create the sample card Sprite. It does not synthesize balance or stage ScriptableObjects: author `ScoutTankBalance.asset` from a complete native balance template and `TrainingStage.asset` from a complete native stage template. The balance row must retain meaningful game values, and the stage must retain its generation/reward settings while referencing the bundled `SampleMap` through its `WorldList`.
+
+The loader expects the following Unity asset types and names from the sample manifest:
+
+- `EntityBalancingScriptableObject` named `ScoutTankBalance`, with exactly one balance row whose `entityId` is `sample:scout-tank`.
+- A `GameObject` prefab named `ScoutTank`, based on a valid Rogue Command unit prefab, including `EntityController` on the root, a rendered visual hierarchy, and every game-specific component and reference required by `EntityFactory`.
+- A `Sprite` named `ScoutTankCard`.
+- `StageParametersScriptableObject` named `TrainingStage`, with non-null world and blueprint-pool data.
+- An active AI `GameObject` prefab named `RCL_SampleBaseBuilderAI`, with exactly one game-native `DefaultAiBehaviour`, `AiBehaviour.isDeactivated` set to `false`, a configured `aiBases` list, and a serialized AI deck containing `sample:scout-tank`. The compiled sample module selects a building from that deck, waits until the native AI tick starts, then requests a bounded build through Rogue Command's public AI helper. Rogue Command tags the spawned instance `AI` before its first `Update`; the prefab does not need the tag saved in the bundle. Its active state is required so that instance can run its Unity lifecycle; registration retains the prefab asset and does not create or activate a separate host object.
+- A `SampleMap` prefab with a valid `InitMap` component and non-null `WorldGenerator` reference. A bare GameObject with only `InitMap` is not a usable world.
+
+The full `sample-expansion` scaffold still validates the exact game assembly SHA-256/MVID and refuses to generate unit, stage, AI, or map assets when Unity cannot attach the native scripts or find complete templates. In the current local Editor test, the imported precompiled `Assembly-CSharp.dll` could not attach `EntityController`, even after copying its custom managed dependencies. The native visual-overlay workflow avoids that Editor limitation for models: it keeps the game's native controller and adds a script-free mesh prefab at runtime. A static bundle inspection and a Unity Editor reopen check passed for the current sample bundle; this is not in-game runtime proof. The former placeholder outputs are quarantined under `artifacts/unverified-authoring-output/2026-10-17/`. Keep game managed assemblies out of bundles; the bundle builder rejects DLL assets.
