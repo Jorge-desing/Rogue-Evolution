@@ -100,7 +100,7 @@ Run commands from the repository root in PowerShell. The plugin targets `netstan
 
 ```powershell
 dotnet build src/RogueCommandExpansionLoader/RogueCommandExpansionLoader.csproj --configuration Release --verbosity minimal
-dotnet run --project tests/RogueCommandExpansionLoader.ValidationTests -- .
+dotnet run --artifacts-path artifacts/validation-tests --project tests/RogueCommandExpansionLoader.ValidationTests/RogueCommandExpansionLoader.ValidationTests.csproj -- .
 .\tools\Package-Loader.ps1
 ```
 

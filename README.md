@@ -52,10 +52,10 @@ Esto enumera archivos y tipos serializados offline; no sustituye la carga del bu
 El validador de paquetes y guardas de compatibilidad se puede ejecutar sin iniciar el juego ni cargar AssetBundles:
 
 ```powershell
-dotnet run --project tests/RogueCommandExpansionLoader.ValidationTests -- .
+dotnet run --artifacts-path artifacts/validation-tests --project tests/RogueCommandExpansionLoader.ValidationTests/RogueCommandExpansionLoader.ValidationTests.csproj -- .
 ```
 
-El ejecutable enlaza los DTO y validadores del plugin. Comprueba directamente ambos manifiestos de muestra, crea fixtures temporales para los casos de rutas, referencias, IDs y DLLs, y verifica el rechazo de versión de Rogue Command/Unity, SHA-256 y MVID incompatibles. Usa un stub local para `Application.unityVersion`; no carga el juego ni comprueba tipos Unity serializados, AssetBundles reales, Harmony o decisiones AI durante una partida.
+El ejecutable enlaza los DTO y validadores del plugin. `--artifacts-path` deja los binarios e intermediarios en `artifacts/` y ejecuta la salida que acaba de compilarse. Comprueba directamente ambos manifiestos de muestra, crea fixtures temporales para los casos de rutas, referencias, IDs y DLLs, y verifica el rechazo de versión de Rogue Command/Unity, SHA-256 y MVID incompatibles. Usa un stub local para `Application.unityVersion`; no carga el juego ni comprueba tipos Unity serializados, AssetBundles reales, Harmony o decisiones AI durante una partida.
 
 Para comprobar que los nombres de assets declarados existen en los bundles y que sus tipos serializados coinciden con lo esperado:
 
