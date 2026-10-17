@@ -146,6 +146,25 @@ namespace RogueCommandExpansionLoader.Content
             IList<StageGenerationLandscapeCandidate> landscapes,
             out string diagnostic)
         {
+            return TryValidate(stageId, progressionName, stageIndex, mapSizeMin, mapSizeMax,
+                isDemo, heatIsActive, maxAscensionLevel, ais, worlds, landscapes, null, out diagnostic);
+        }
+
+        public static bool TryValidate(
+            string stageId,
+            string progressionName,
+            int stageIndex,
+            int mapSizeMin,
+            int mapSizeMax,
+            bool isDemo,
+            bool heatIsActive,
+            int maxAscensionLevel,
+            IList<StageGenerationAiCandidate> ais,
+            IList<StageGenerationWorldCandidate> worlds,
+            IList<StageGenerationLandscapeCandidate> landscapes,
+            StageGenerationLandscapeCandidate additionalLandscape,
+            out string diagnostic)
+        {
             diagnostic = null;
             if (String.IsNullOrWhiteSpace(stageId) || String.IsNullOrWhiteSpace(progressionName))
             {
@@ -221,7 +240,8 @@ namespace RogueCommandExpansionLoader.Content
                     for (int worldIndex = 0; worldIndex < eligibleWorlds.Count; worldIndex++)
                     {
                         StageGenerationWorldCandidate world = eligibleWorlds[worldIndex];
-                        if (!HasCompatibleLandscape(ai, world, landscapes, mapSizeMin, mapSizeMax, isDemo))
+                        if (!HasCompatibleLandscape(ai, world, landscapes, additionalLandscape,
+                            mapSizeMin, mapSizeMax, isDemo))
                         {
                             diagnostic = "No hay LandscapeGenerator compatible con mapSizeRange [" +
                                 mapSizeMin + ", " + mapSizeMax + "] para " + context +
@@ -273,7 +293,7 @@ namespace RogueCommandExpansionLoader.Content
 
                 if (!TryValidate(stage.Id, progressionName, stage.StageIndex,
                     stage.MapSizeMin, stage.MapSizeMax, isDemo, heatIsActive, maxAscensionLevel,
-                    ais, stage.Worlds, landscapes, out diagnostic))
+                    ais, stage.Worlds, landscapes, stage.Landscape, out diagnostic))
                 {
                     return false;
                 }
@@ -314,27 +334,54 @@ namespace RogueCommandExpansionLoader.Content
             StageGenerationAiCandidate ai,
             StageGenerationWorldCandidate world,
             IList<StageGenerationLandscapeCandidate> landscapes,
+            StageGenerationLandscapeCandidate additionalLandscape,
             int mapSizeMin,
             int mapSizeMax,
             bool isDemo)
         {
             IList<StageGenerationLandscapeCandidate> selectedMaps = ai.RestrictedMaps;
-            bool explicitMapRestriction = selectedMaps != null && selectedMaps.Count > 0;
-            if (!explicitMapRestriction)
+            bool explicitMapRestriction;
+            if (additionalLandscape != null)
             {
-                selectedMaps = world.RestrictedMaps;
+                // The runtime scope appends the stage-owned landscape to every AI map list.
+                // Even an originally empty list becomes an explicit [additionalLandscape] list,
+                // so CreateLevelMap does not fall through to World/global map candidates.
+                if (selectedMaps == null)
+                {
+                    selectedMaps = new List<StageGenerationLandscapeCandidate>();
+                }
+                explicitMapRestriction = true;
+            }
+            else
+            {
                 explicitMapRestriction = selectedMaps != null && selectedMaps.Count > 0;
+                if (!explicitMapRestriction)
+                {
+                    selectedMaps = world.RestrictedMaps;
+                    explicitMapRestriction = selectedMaps != null && selectedMaps.Count > 0;
+                }
+
+                if (!explicitMapRestriction)
+                {
+                    selectedMaps = landscapes;
+                }
             }
 
-            if (!explicitMapRestriction)
+            var mapsToCheck = new List<StageGenerationLandscapeCandidate>(selectedMaps.Count + 1);
+            for (int i = 0; i < selectedMaps.Count; i++)
             {
-                selectedMaps = landscapes;
+                mapsToCheck.Add(selectedMaps[i]);
+            }
+
+            if (additionalLandscape != null && !mapsToCheck.Contains(additionalLandscape))
+            {
+                mapsToCheck.Add(additionalLandscape);
             }
 
             bool foundCompatibleMap = false;
-            for (int i = 0; i < selectedMaps.Count; i++)
+            for (int i = 0; i < mapsToCheck.Count; i++)
             {
-                StageGenerationLandscapeCandidate landscape = selectedMaps[i];
+                StageGenerationLandscapeCandidate landscape = mapsToCheck[i];
                 if (landscape == null)
                 {
                     return false;
@@ -432,6 +479,7 @@ namespace RogueCommandExpansionLoader.Content
         public int MapSizeMax;
         public bool IsPartOfDemo;
         public IList<StageGenerationWorldCandidate> Worlds;
+        public StageGenerationLandscapeCandidate Landscape = null;
     }
 
     internal sealed class StageGenerationAiBaseCandidate

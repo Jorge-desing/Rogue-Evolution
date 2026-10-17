@@ -100,7 +100,8 @@ namespace RogueCommandExpansionLoader.Runtime
                         PatchPlan patch = patches[i];
                         HarmonyMethod prefix = patch.Prefix == null ? null : new HarmonyMethod(patch.Prefix);
                         HarmonyMethod postfix = patch.Postfix == null ? null : new HarmonyMethod(patch.Postfix);
-                        harmony.Patch(patch.Target, prefix, postfix);
+                        HarmonyMethod finalizer = patch.Finalizer == null ? null : new HarmonyMethod(patch.Finalizer);
+                        harmony.Patch(patch.Target, prefix, postfix, null, finalizer, null);
                     }
 
                     _harmony = harmony;
@@ -233,12 +234,21 @@ namespace RogueCommandExpansionLoader.Runtime
                 HasSingleStringArgumentReturningString);
             MethodInfo blueprintDescription = RuntimeReflection.FindUniqueMethod(loca, "BlueprintDescription",
                 HasSingleStringArgumentReturningString);
+            MethodInfo globalLocalization = RuntimeReflection.FindUniqueMethod(loca, "Global",
+                delegate(MethodInfo method)
+                {
+                    ParameterInfo[] parameters = method.GetParameters();
+                    return method.IsStatic && method.ReturnType == typeof(string) && parameters.Length == 2 &&
+                        parameters[0].ParameterType == typeof(string) && parameters[1].ParameterType == typeof(string[]);
+                });
             MethodInfo resourcesLoadTyped = FindResourcesLoadTyped();
+            MethodInfo resourcesLoadUntyped = FindResourcesLoadUntyped();
 
             MethodInfo entityInitPostfix = Hook("EntityBalancingStoreInitPostfix");
             MethodInfo setScriptableObjectPostfix = Hook("SetScriptableObjectPostfix");
             MethodInfo stageMapPrefix = Hook("CreateStageMapPrefix");
             MethodInfo levelMapPrefix = Hook("CreateLevelMapPrefix");
+            MethodInfo levelMapFinalizer = Hook("CreateLevelMapFinalizer");
             MethodInfo instantiatePrefix = Hook("InstantiateEntityPrefix");
             MethodInfo entityMeshPrefix = Hook("CreateEntityMeshPrefix");
             MethodInfo aiUpdatePostfix = Hook("AiBehaviourUpdatePostfix");
@@ -246,18 +256,25 @@ namespace RogueCommandExpansionLoader.Runtime
             MethodInfo aiDestroyPostfix = Hook("AiBehaviourDestroyPostfix");
             MethodInfo blueprintNamePrefix = Hook("BlueprintNamePrefix");
             MethodInfo blueprintDescriptionPrefix = Hook("BlueprintDescriptionPrefix");
+            MethodInfo globalLocalizationPrefix = Hook("LandscapeLocalizationPrefix");
             MethodInfo loadPrefix = typeof(UnityResourcesLoadTypedPatch).GetMethod("Prefix",
                 BindingFlags.Public | BindingFlags.Static);
             if (loadPrefix == null)
             {
                 throw new InvalidOperationException("Unity Resources.Load(string, Type) prefix method was not found.");
             }
+            MethodInfo untypedLoadPrefix = typeof(UnityResourcesLoadUntypedPatch).GetMethod("Prefix",
+                BindingFlags.Public | BindingFlags.Static);
+            if (untypedLoadPrefix == null)
+            {
+                throw new InvalidOperationException("Unity Resources.Load(string) prefix method was not found.");
+            }
 
             List<PatchPlan> plan = new List<PatchPlan>();
             plan.Add(new PatchPlan(init, null, entityInitPostfix));
             plan.Add(new PatchPlan(setScriptableObject, null, setScriptableObjectPostfix));
             plan.Add(new PatchPlan(createStageMap, stageMapPrefix, null));
-            plan.Add(new PatchPlan(createLevelMap, levelMapPrefix, null));
+            plan.Add(new PatchPlan(createLevelMap, levelMapPrefix, null, levelMapFinalizer));
             plan.Add(new PatchPlan(instantiateEntity, instantiatePrefix, null));
             plan.Add(new PatchPlan(createEntityMesh, entityMeshPrefix, null));
             plan.Add(new PatchPlan(aiUpdate, null, aiUpdatePostfix));
@@ -265,7 +282,9 @@ namespace RogueCommandExpansionLoader.Runtime
             plan.Add(new PatchPlan(aiDestroy, null, aiDestroyPostfix));
             plan.Add(new PatchPlan(blueprintName, blueprintNamePrefix, null));
             plan.Add(new PatchPlan(blueprintDescription, blueprintDescriptionPrefix, null));
+            plan.Add(new PatchPlan(globalLocalization, globalLocalizationPrefix, null));
             plan.Add(new PatchPlan(resourcesLoadTyped, loadPrefix, null));
+            plan.Add(new PatchPlan(resourcesLoadUntyped, untypedLoadPrefix, null));
             return plan;
         }
 
@@ -327,6 +346,31 @@ namespace RogueCommandExpansionLoader.Runtime
             return matches[0];
         }
 
+        private static MethodInfo FindResourcesLoadUntyped()
+        {
+            MethodInfo[] methods = typeof(Resources).GetMethods(BindingFlags.Public | BindingFlags.Static);
+            List<MethodInfo> matches = new List<MethodInfo>();
+            for (int i = 0; i < methods.Length; i++)
+            {
+                ParameterInfo[] parameters = methods[i].GetParameters();
+                if (String.Equals(methods[i].Name, "Load", StringComparison.Ordinal) &&
+                    !methods[i].IsGenericMethodDefinition && parameters.Length == 1 &&
+                    parameters[0].ParameterType == typeof(string) &&
+                    methods[i].ReturnType == typeof(UnityEngine.Object))
+                {
+                    matches.Add(methods[i]);
+                }
+            }
+
+            if (matches.Count != 1)
+            {
+                throw new InvalidOperationException("Expected one UnityEngine.Resources.Load(string) " +
+                    "returning UnityEngine.Object, found " + matches.Count + ".");
+            }
+
+            return matches[0];
+        }
+
         private static MethodInfo Hook(string name)
         {
             MethodInfo method = typeof(RuntimeHarmonyPatches).GetMethod(name,
@@ -372,11 +416,12 @@ namespace RogueCommandExpansionLoader.Runtime
 
         private sealed class PatchPlan
         {
-            public PatchPlan(MethodBase target, MethodInfo prefix, MethodInfo postfix)
+            public PatchPlan(MethodBase target, MethodInfo prefix, MethodInfo postfix, MethodInfo finalizer = null)
             {
                 Target = target;
                 Prefix = prefix;
                 Postfix = postfix;
+                Finalizer = finalizer;
             }
 
             public MethodBase Target { get; private set; }
@@ -384,6 +429,8 @@ namespace RogueCommandExpansionLoader.Runtime
             public MethodInfo Prefix { get; private set; }
 
             public MethodInfo Postfix { get; private set; }
+
+            public MethodInfo Finalizer { get; private set; }
         }
     }
 }

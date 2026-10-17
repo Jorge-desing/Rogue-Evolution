@@ -154,6 +154,7 @@ namespace RogueCommandExpansionLoader.Content
             var unitIds = new HashSet<string>(IdComparer);
             var aiProfileIds = new HashSet<string>(IdComparer);
             var aiResourceNames = new HashSet<string>(StringComparer.Ordinal);
+            var landscapeResourceNames = new HashSet<string>(StringComparer.Ordinal);
             var bundlePaths = new HashSet<string>(PathComparer);
 
             RegisterId(pack.packId, "packId", "package", allIds, registrySnapshot, diagnostics);
@@ -509,6 +510,18 @@ namespace RogueCommandExpansionLoader.Content
                     Add(diagnostics, "stage.map-size-max-invalid", itemPath + ".mapSizeMax", "mapSizeMax must be between mapSizeMin and 256.");
                 }
 
+                ValidateStageLandscape(stage, itemPath + ".landscape", diagnostics);
+                if (stage.landscape != null)
+                {
+                    string landscapeResourceName;
+                    if (TryBuildLandscapeResourceName(stage.id, out landscapeResourceName) &&
+                        !landscapeResourceNames.Add(landscapeResourceName))
+                    {
+                        Add(diagnostics, "stage.landscape-resource-name-duplicate", itemPath + ".landscape",
+                            "Stage IDs must produce unique LandscapeGenerator resource names within a pack.");
+                    }
+                }
+
                 var stageUnits = RequireArray(stage.unitIds, itemPath + ".unitIds", diagnostics);
                 ValidateReferences(stageUnits, itemPath + ".unitIds", unitIds, registrySnapshot, true, diagnostics);
 
@@ -543,6 +556,118 @@ namespace RogueCommandExpansionLoader.Content
 
             resourceName = builder.ToString();
             return true;
+        }
+
+        internal static bool TryBuildLandscapeResourceName(string stageId, out string resourceName)
+        {
+            resourceName = null;
+            if (String.IsNullOrWhiteSpace(stageId))
+            {
+                return false;
+            }
+
+            var builder = new System.Text.StringBuilder("RCL_Landscape_");
+            for (int i = 0; i < stageId.Length; i++)
+            {
+                char value = stageId[i];
+                bool asciiLetter = (value >= 'a' && value <= 'z') || (value >= 'A' && value <= 'Z');
+                bool asciiDigit = value >= '0' && value <= '9';
+                builder.Append(asciiLetter || asciiDigit ? value : '_');
+            }
+
+            if (builder.Length < 16 || builder.Length > 96)
+            {
+                return false;
+            }
+
+            resourceName = builder.ToString();
+            return true;
+        }
+
+        private static void ValidateStageLandscape(
+            ContentStageDefinition stage,
+            string path,
+            List<ContentDiagnostic> diagnostics)
+        {
+            ContentStageLandscapeDefinition landscape = stage.landscape;
+            if (landscape == null)
+            {
+                return;
+            }
+
+            ValidateAssetName(landscape.nativeTemplateId, path + ".nativeTemplateId", diagnostics);
+            string resourceName;
+            if (!TryBuildLandscapeResourceName(stage.id, out resourceName))
+            {
+                Add(diagnostics, "stage.landscape-resource-name-invalid", path,
+                    "The stage ID must produce a reserved RCL_Landscape_ resource name of at most 96 ASCII characters.");
+            }
+
+            if (landscape.randomSeed < 0 || landscape.randomSeed > 99998)
+            {
+                Add(diagnostics, "stage.landscape-seed-invalid", path + ".randomSeed",
+                    "Landscape seeds must be between 0 and 99998.");
+            }
+
+            if (landscape.mapSize < 1 || landscape.mapSize > 255 || landscape.mapSize % 2 == 0)
+            {
+                Add(diagnostics, "stage.landscape-map-size-invalid", path + ".mapSize",
+                    "Landscape mapSize must be an odd integer between 1 and 255.");
+            }
+            else if (landscape.mapSize < stage.mapSizeMin || landscape.mapSize > stage.mapSizeMax)
+            {
+                Add(diagnostics, "stage.landscape-map-size-out-of-range", path + ".mapSize",
+                    "Landscape mapSize must fit the containing stage's mapSizeMin and mapSizeMax.");
+            }
+
+            ContentLandscapeLocalizationDefinition[] localizations = landscape.localizations;
+            if (localizations == null || localizations.Length == 0)
+            {
+                Add(diagnostics, "stage.landscape-localization-required", path + ".localizations",
+                    "A custom landscape must declare an en-US display name.");
+                return;
+            }
+
+            var languages = new HashSet<string>(StringComparer.Ordinal);
+            bool hasEnglishName = false;
+            for (int i = 0; i < localizations.Length; i++)
+            {
+                ContentLandscapeLocalizationDefinition localization = localizations[i];
+                string itemPath = path + ".localizations[" + i + "]";
+                if (localization == null)
+                {
+                    Add(diagnostics, "entry.null", itemPath, "Landscape localization entries cannot be null.");
+                    continue;
+                }
+
+                if (String.IsNullOrWhiteSpace(localization.language) ||
+                    !SupportedUnitLocalizationLanguages.Contains(localization.language))
+                {
+                    Add(diagnostics, "stage.landscape-localization-language-unsupported", itemPath + ".language",
+                        "Landscape localization language must match one of the game's supported language IDs exactly.");
+                }
+                else if (!languages.Add(localization.language))
+                {
+                    Add(diagnostics, "stage.landscape-localization-language-duplicate", itemPath + ".language",
+                        "A landscape can declare at most one localization for each language.");
+                }
+
+                if (String.IsNullOrWhiteSpace(localization.name))
+                {
+                    Add(diagnostics, "stage.landscape-localization-name-required", itemPath + ".name",
+                        "Every landscape localization must include a non-empty display name.");
+                }
+                else if (String.Equals(localization.language, "en-US", StringComparison.Ordinal))
+                {
+                    hasEnglishName = true;
+                }
+            }
+
+            if (!hasEnglishName)
+            {
+                Add(diagnostics, "stage.landscape-localization-english-name-required", path + ".localizations",
+                    "Landscape localizations must include a non-empty en-US display name for fallback.");
+            }
         }
 
         private static T[] RequireArray<T>(T[] value, string path, List<ContentDiagnostic> diagnostics)

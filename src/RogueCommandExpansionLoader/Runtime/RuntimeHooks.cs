@@ -102,6 +102,85 @@ namespace RogueCommandExpansionLoader.Runtime
             return TryResolveUnitLocalization(__0, true, ref __result);
         }
 
+        public static bool LandscapeLocalizationPrefix(string __0, ref string __result)
+        {
+            IRuntimeContentProvider provider;
+            lock (Gate)
+            {
+                provider = _provider;
+            }
+
+            IStageLandscapeRuntimeProvider landscapeProvider = provider as IStageLandscapeRuntimeProvider;
+            if (landscapeProvider == null)
+            {
+                return true;
+            }
+
+            try
+            {
+                string value;
+                if (!landscapeProvider.TryGetLandscapeLocalization(__0, out value))
+                {
+                    return true;
+                }
+
+                __result = value ?? String.Empty;
+                return false;
+            }
+            catch (Exception exception)
+            {
+                Log("Could not resolve landscape localization '" + __0 + "': " + exception.Message);
+                return true;
+            }
+        }
+
+        public static void BeginLevelMapScope(object stage, out object __state)
+        {
+            __state = null;
+            BeforeProgressionMap();
+
+            IRuntimeContentProvider provider;
+            lock (Gate)
+            {
+                provider = _provider;
+            }
+
+            IStageLandscapeRuntimeProvider landscapeProvider = provider as IStageLandscapeRuntimeProvider;
+            if (landscapeProvider == null)
+            {
+                return;
+            }
+
+            try
+            {
+                __state = landscapeProvider.BeginStageLandscapeScope(stage);
+            }
+            catch (Exception exception)
+            {
+                Log("Could not apply stage-scoped landscape additions: " + exception.Message);
+            }
+        }
+
+        public static Exception EndLevelMapScope(Exception __exception, object __state)
+        {
+            IDisposable scope = __state as IDisposable;
+            if (scope == null)
+            {
+                return __exception;
+            }
+
+            try
+            {
+                scope.Dispose();
+            }
+            catch (Exception exception)
+            {
+                Log("Could not restore stage-scoped landscape additions: " + exception.Message);
+            }
+
+            return __exception;
+        }
+
         private static bool TryResolveUnitLocalization(string unitId, bool description, ref string result)
         {
             IRuntimeContentProvider provider;
@@ -292,9 +371,14 @@ namespace RogueCommandExpansionLoader.Runtime
             RuntimeHooks.BeforeProgressionMap();
         }
 
-        public static void CreateLevelMapPrefix()
+        public static void CreateLevelMapPrefix(object __0, out object __state)
         {
-            RuntimeHooks.BeforeProgressionMap();
+            RuntimeHooks.BeginLevelMapScope(__0, out __state);
+        }
+
+        public static Exception CreateLevelMapFinalizer(Exception __exception, object __state)
+        {
+            return RuntimeHooks.EndLevelMapScope(__exception, __state);
         }
 
         public static void InstantiateEntityPrefix()
@@ -330,6 +414,38 @@ namespace RogueCommandExpansionLoader.Runtime
         public static bool BlueprintDescriptionPrefix(string __0, ref string __result)
         {
             return RuntimeHooks.BlueprintDescriptionPrefix(__0, ref __result);
+        }
+
+        public static bool LandscapeLocalizationPrefix(string __0, ref string __result)
+        {
+            return RuntimeHooks.LandscapeLocalizationPrefix(__0, ref __result);
+        }
+    }
+
+    internal static class UnityResourcesLoadUntypedPatch
+    {
+        public static bool Prefix(string path, ref UnityEngine.Object __result)
+        {
+            if (String.IsNullOrEmpty(path) || !ResourceLoadRecursionGuard.TryEnter(path))
+            {
+                return true;
+            }
+
+            try
+            {
+                UnityEngine.Object asset;
+                if (RuntimeHooks.TryLoadResource(path, out asset) && asset != null)
+                {
+                    __result = asset;
+                    return false;
+                }
+
+                return true;
+            }
+            finally
+            {
+                ResourceLoadRecursionGuard.Exit(path);
+            }
         }
     }
 

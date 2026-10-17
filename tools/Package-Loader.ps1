@@ -227,11 +227,13 @@ The native sample adds five localized native-template units with script-free
 visual overlays: Sandlance Scout, Skirmish Strike Bike, Colossus Siege Platform,
 Ironclad Walker, and Surge Arc Tank. The first three have custom card Sprites;
 Ironclad and Surge Arc Tank keep their native cards. All five keep native gameplay
-controllers, while the pack also adds a stage variant and scheduled-build AI module.
+controllers, while the pack adds a stage variant, a seeded native landscape variant,
+and a scheduled-build AI module.
 The reactive AI stage references Sandlance and uses a native AI template with a
-bounded compiled counterattack module. Both packs keep native map layouts; blueprint
-eligibility remains global to each unit because the game filters shared pools against
-the global registry.
+bounded compiled counterattack module. The landscape reuses native 27 Circles rules
+with a fixed seed and is scoped to its stage; it does not add new terrain logic.
+Blueprint eligibility remains global to each unit because the game filters shared
+pools against the global registry.
 '@ | Set-Content -LiteralPath (Join-Path $packsDirectory 'README.txt') -Encoding UTF8
 
     @"
@@ -244,14 +246,14 @@ Install:
    with bundled model overlays: Sandlance Scout, Skirmish Strike Bike, Colossus Siege
    Platform, Ironclad Walker, and Surge Arc Tank. The first three have custom card
    Sprites; Ironclad and Surge Arc Tank retain their native cards. The pack also adds a
-   native stage variant and scheduled-build AI module; every unit keeps its native
-   gameplay controller.
+   native stage variant, a fixed-seed landscape variant, and a scheduled-build AI
+   module; every unit keeps its native gameplay controller.
    The sample-reactive-ai pack demonstrates a native stage variant that references
    the Sandlance Scout from sample-native-expansion and an AI module that sends up
    to two nearby units to counterattack an active attacker. Unit blueprint
    eligibility is global and may affect other native pools that accept the unit.
 4. Add other packs under BepInEx/plugins/RogueCommandExpansionLoader/content/packs/;
-   custom models and map layouts require valid Unity AssetBundles.
+   custom models and original terrain-generation assets require valid Unity AssetBundles.
 
 Compatibility is limited to Rogue Command 1.0.9, Unity 2021.3.45f2, and the verified
 Assembly-CSharp.dll build. The plugin logs a compatibility diagnostic and skips its

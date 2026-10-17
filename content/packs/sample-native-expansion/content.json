@@ -166,6 +166,16 @@
       "mapSizeMin": 20,
       "mapSizeMax": 60,
       "isPartOfDemo": false,
+      "landscape": {
+        "nativeTemplateId": "27 Circles",
+        "randomSeed": 41021,
+        "alwaysUseSameSeed": true,
+        "mapSize": 31,
+        "localizations": [
+          { "language": "en-US", "name": "Sandlance Training Ground" },
+          { "language": "es-XL", "name": "Campo de Entrenamiento Sandlance" }
+        ]
+      },
       "unitIds": [
         "sample-native:scout-tank",
         "sample-native:skirmish-bike"

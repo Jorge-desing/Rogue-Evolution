@@ -47,13 +47,15 @@ var tests = new (string Name, Action Run)[]
             "SetScriptableObjectPostfix",
             "CreateStageMapPrefix",
             "CreateLevelMapPrefix",
+            "CreateLevelMapFinalizer",
             "InstantiateEntityPrefix",
             "CreateEntityMeshPrefix",
             "AiBehaviourUpdatePostfix",
             "DefaultAiBehaviourInitPostfix",
             "AiBehaviourDestroyPostfix",
             "BlueprintNamePrefix",
-            "BlueprintDescriptionPrefix"
+            "BlueprintDescriptionPrefix",
+            "LandscapeLocalizationPrefix"
         ];
 
         foreach (string hookName in hookNames)
@@ -85,6 +87,12 @@ var tests = new (string Name, Action Run)[]
         {
             throw new InvalidOperationException("The typed Resources.Load patch prefix is missing.");
         }
+
+        if (typeof(UnityResourcesLoadUntypedPatch).GetMethod("Prefix",
+                BindingFlags.Public | BindingFlags.Static) == null)
+        {
+            throw new InvalidOperationException("The untyped Resources.Load patch prefix is missing.");
+        }
     }),
     ("sample manifest passes package-local validation", () =>
     {
@@ -95,6 +103,48 @@ var tests = new (string Name, Action Run)[]
     {
         WithPackage(nativeSample, (pack, root) =>
             ExpectValid(pack, root, new EmptySnapshot(), new KnownModuleValidator()));
+    }),
+    ("training stage declares a deterministic, localized native landscape variant", () =>
+    {
+        ContentStageDefinition stage = nativeSample.stages.Single(
+            candidate => candidate.id == "sample-native:training-variant");
+        ContentStageLandscapeDefinition landscape = stage.landscape;
+        if (landscape == null || landscape.nativeTemplateId != "27 Circles" ||
+            landscape.mapSize != 31 || landscape.randomSeed != 41021 || !landscape.alwaysUseSameSeed ||
+            landscape.localizations == null ||
+            !landscape.localizations.Any(item => item.language == "en-US" && item.name == "Sandlance Training Ground") ||
+            !landscape.localizations.Any(item => item.language == "es-XL" && item.name == "Campo de Entrenamiento Sandlance"))
+        {
+            throw new InvalidOperationException("The training stage's procedural landscape definition is incomplete.");
+        }
+
+        WithPackage(nativeSample, (pack, root) =>
+            ExpectValid(pack, root, new EmptySnapshot(), new KnownModuleValidator()));
+    }),
+    ("stage landscape rejects unsafe size, seed, and localization values", () =>
+    {
+        ContentPackDefinition invalid = Clone(nativeSample);
+        ContentStageDefinition stage = invalid.stages.Single(
+            candidate => candidate.id == "sample-native:training-variant");
+        stage.landscape.mapSize = 32;
+        WithPackage(invalid, (pack, root) => ExpectDiagnostic(pack, root, new EmptySnapshot(),
+            new KnownModuleValidator(), "stage.landscape-map-size-invalid"));
+
+        invalid = Clone(nativeSample);
+        stage = invalid.stages.Single(candidate => candidate.id == "sample-native:training-variant");
+        stage.landscape.randomSeed = 99999;
+        WithPackage(invalid, (pack, root) => ExpectDiagnostic(pack, root, new EmptySnapshot(),
+            new KnownModuleValidator(), "stage.landscape-seed-invalid"));
+
+        invalid = Clone(nativeSample);
+        stage = invalid.stages.Single(candidate => candidate.id == "sample-native:training-variant");
+        stage.landscape.localizations = [new ContentLandscapeLocalizationDefinition
+        {
+            language = "es-XL",
+            name = "Campo de Entrenamiento"
+        }];
+        WithPackage(invalid, (pack, root) => ExpectDiagnostic(pack, root, new EmptySnapshot(),
+            new KnownModuleValidator(), "stage.landscape-localization-english-name-required"));
     }),
     ("Sandlance declares its own localized name, description, and card Sprite", () =>
     {
@@ -812,6 +862,28 @@ var tests = new (string Name, Action Run)[]
             !diagnostic.Contains("sample-world", StringComparison.Ordinal))
         {
             throw new InvalidOperationException("A stage with no matching landscape size was not rejected precisely.");
+        }
+    }),
+    ("stage-scoped landscape candidate participates in generation preflight", () =>
+    {
+        StageGenerationAiCandidate[] ais = [ValidStageAi("sample-ai")];
+        StageGenerationWorldCandidate[] worlds = [ValidStageWorld("sample-world")];
+        StageGenerationLandscapeCandidate[] nativeLandscapes = [ValidStageLandscape("native-map", 53)];
+        StageGenerationLandscapeCandidate stageLandscape = ValidStageLandscape("RCL_Landscape_sample_stage", 31);
+
+        if (!StageGenerationCompatibility.TryValidate("sample:stage", "default", 4,
+                31, 31, false, false, 19, ais, worlds, nativeLandscapes,
+                stageLandscape, out string diagnostic) || diagnostic != null)
+        {
+            throw new InvalidOperationException("The stage-owned landscape was not included in preflight: " + diagnostic);
+        }
+
+        stageLandscape = ValidStageLandscape("RCL_Landscape_sample_stage", 29);
+        if (StageGenerationCompatibility.TryValidate("sample:stage", "default", 4,
+                31, 31, false, false, 19, ais, worlds, nativeLandscapes,
+                stageLandscape, out diagnostic) || diagnostic == null)
+        {
+            throw new InvalidOperationException("An out-of-range stage-owned landscape passed preflight.");
         }
     }),
     ("progression profiles retain fallback and explicit aliases", () =>

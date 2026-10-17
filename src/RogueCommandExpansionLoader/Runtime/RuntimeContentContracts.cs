@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System;
 using UnityEngine;
 
 namespace RogueCommandExpansionLoader.Runtime
@@ -44,6 +45,16 @@ namespace RogueCommandExpansionLoader.Runtime
 
         /// <summary>Returns an immutable diagnostic snapshot of all discovered packs and runtime content.</summary>
         LoaderDiagnosticsSnapshot GetDiagnosticsSnapshot();
+    }
+
+    /// <summary>
+    /// Optional bridge for a stage-owned procedural landscape. The returned scope is temporary
+    /// and must be ended from a Harmony finalizer so game collections are restored after failures.
+    /// </summary>
+    public interface IStageLandscapeRuntimeProvider
+    {
+        IDisposable BeginStageLandscapeScope(object stage);
+        bool TryGetLandscapeLocalization(string localizationId, out string value);
     }
 
     /// <summary>

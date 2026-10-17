@@ -19,7 +19,7 @@ namespace RogueCommandExpansionLoader.Content
     /// Discovers and validates data-only packs after the native entity registry is ready, then
     /// keeps their AssetBundles and Unity objects alive for the whole game session.
     /// </summary>
-    public sealed class ContentPackRuntimeLoader : IRuntimeContentProvider
+    public sealed class ContentPackRuntimeLoader : IRuntimeContentProvider, IStageLandscapeRuntimeProvider
     {
         private const int MaxManifestBytes = 1024 * 1024;
         private const uint GenericRead = 0x80000000;
@@ -86,6 +86,9 @@ namespace RogueCommandExpansionLoader.Content
         private readonly FieldInfo _worldAllowedForDemoField;
         private readonly FieldInfo _worldRestrictedMapsField;
         private readonly FieldInfo _landscapeMapSizeField;
+        private readonly FieldInfo _landscapeRandomSeedField;
+        private readonly FieldInfo _landscapeAlwaysUseSameSeedField;
+        private readonly FieldInfo _landscapeNameLocaIdField;
         private readonly FieldInfo _landscapeDeactivatedField;
         private readonly FieldInfo _landscapeAllowedForDemoField;
         private readonly FieldInfo _landscapeRestrictedWorldsField;
@@ -110,6 +113,7 @@ namespace RogueCommandExpansionLoader.Content
         private readonly List<FileStream> _assetBundleStreams = new List<FileStream>();
         private readonly List<GameObject> _nativePrefabClones = new List<GameObject>();
         private readonly List<ScriptableObject> _stageParameterClones = new List<ScriptableObject>();
+        private readonly List<ScriptableObject> _landscapeClones = new List<ScriptableObject>();
         private readonly List<object> _blueprintPools = new List<object>();
         private readonly Dictionary<string, UnityEngine.Object> _resourceAssets =
             new Dictionary<string, UnityEngine.Object>(StringComparer.Ordinal);
@@ -117,6 +121,8 @@ namespace RogueCommandExpansionLoader.Content
             new Dictionary<string, LoadedAiProfile>(StringComparer.Ordinal);
         private readonly Dictionary<string, LoadedAiProfile> _aiProfilesByResourceName =
             new Dictionary<string, LoadedAiProfile>(StringComparer.Ordinal);
+        private readonly Dictionary<string, LoadedLandscape> _landscapesByLocalizationId =
+            new Dictionary<string, LoadedLandscape>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<object, BoundAiRuntimeBehaviour> _boundAiBehaviours =
             new Dictionary<object, BoundAiRuntimeBehaviour>(ReferenceComparer.Instance);
         private readonly Dictionary<string, LoadedUnit> _units =
@@ -300,6 +306,10 @@ namespace RogueCommandExpansionLoader.Content
                 throw new InvalidOperationException("InitMap.restrictedToMaps is not List<LandscapeGenerator>.");
             }
             _landscapeMapSizeField = RequireField(landscapeGeneratorType, "mapSize", typeof(int));
+            _landscapeRandomSeedField = RequireField(landscapeGeneratorType, "randomSeed", typeof(int));
+            _landscapeAlwaysUseSameSeedField = RequireField(landscapeGeneratorType,
+                "alwaysUseSameSeed", typeof(bool));
+            _landscapeNameLocaIdField = RequireField(landscapeGeneratorType, "nameLocaId", typeof(string));
             _landscapeDeactivatedField = RequireField(landscapeGeneratorType, "isDeactivated", typeof(bool));
             _landscapeAllowedForDemoField = RequireField(landscapeGeneratorType,
                 "isAllowedForDemo", typeof(bool));
@@ -484,6 +494,195 @@ namespace RogueCommandExpansionLoader.Content
 
             asset = null;
             return false;
+        }
+
+        public bool TryGetLandscapeLocalization(string localizationId, out string value)
+        {
+            lock (_gate)
+            {
+                LoadedLandscape landscape;
+                if (!String.IsNullOrWhiteSpace(localizationId) &&
+                    _landscapesByLocalizationId.TryGetValue(localizationId, out landscape))
+                {
+                    string language = _localizationLanguageProperty.GetValue(null, null) as string;
+                    value = FindLandscapeLocalization(landscape.Definition.localizations, language);
+                    if (String.IsNullOrWhiteSpace(value))
+                    {
+                        value = FindLandscapeLocalization(landscape.Definition.localizations, "en-US");
+                    }
+
+                    return !String.IsNullOrWhiteSpace(value);
+                }
+            }
+
+            value = null;
+            return false;
+        }
+
+        public IDisposable BeginStageLandscapeScope(object stage)
+        {
+            if (stage == null)
+            {
+                return null;
+            }
+
+            lock (_gate)
+            {
+                LoadedStage loadedStage = null;
+                for (int i = 0; i < _stages.Count; i++)
+                {
+                    if (System.Object.ReferenceEquals(_stages[i].RuntimeStage, stage))
+                    {
+                        loadedStage = _stages[i];
+                        break;
+                    }
+                }
+
+                if (loadedStage == null || loadedStage.Landscape == null)
+                {
+                    return null;
+                }
+
+                object balancing = _gameBalancingAssetField.GetValue(null);
+                if (balancing == null)
+                {
+                    throw new InvalidOperationException("GameBalancingStore no contiene una progresión activa.");
+                }
+
+                var scope = new StageLandscapeMutation(this);
+                bool matchedProgression = false;
+                try
+                {
+                    UnityEngine.Object landscape = loadedStage.Landscape.Asset;
+                    for (int progressionIndex = 0; progressionIndex < _progressionFields.Length;
+                        progressionIndex++)
+                    {
+                        object progression = _progressionFields[progressionIndex].GetValue(balancing);
+                        if (progression == null)
+                        {
+                            continue;
+                        }
+
+                        IList stages = _progressionStagesField.GetValue(progression) as IList;
+                        if (stages == null || !ContainsReference(stages, stage))
+                        {
+                            continue;
+                        }
+
+                        matchedProgression = true;
+                        IList landscapes = _progressionLandscapesField.GetValue(progression) as IList;
+                        AppendScopedLandscape(landscapes, landscape, scope,
+                            "defaultLandscapeGenerators de " + _progressionFields[progressionIndex].Name);
+
+                        IList ais = _progressionAisField.GetValue(progression) as IList;
+                        if (ais == null)
+                        {
+                            throw new InvalidOperationException("defaultAis es nulo en " +
+                                _progressionFields[progressionIndex].Name + ".");
+                        }
+
+                        for (int aiIndex = 0; aiIndex < ais.Count; aiIndex++)
+                        {
+                            object ai = ais[aiIndex];
+                            if (ai == null)
+                            {
+                                throw new InvalidOperationException("defaultAis contiene una entrada nula.");
+                            }
+
+                            IList restrictedMaps = _aiRestrictedMapsField.GetValue(ai) as IList;
+                            AppendScopedLandscape(restrictedMaps, landscape, scope,
+                                "restrictedToMaps de AI " + GetObjectName(ai));
+                        }
+                    }
+
+                    if (!matchedProgression)
+                    {
+                        throw new InvalidOperationException("La etapa " + loadedStage.Definition.id +
+                            " no pertenece a ninguna progresión cargada.");
+                    }
+
+                    return scope;
+                }
+                catch
+                {
+                    scope.Dispose();
+                    throw;
+                }
+            }
+        }
+
+        private static string FindLandscapeLocalization(
+            ContentLandscapeLocalizationDefinition[] localizations,
+            string language)
+        {
+            if (localizations == null || String.IsNullOrWhiteSpace(language))
+            {
+                return null;
+            }
+
+            for (int i = 0; i < localizations.Length; i++)
+            {
+                ContentLandscapeLocalizationDefinition localization = localizations[i];
+                if (localization != null && String.Equals(localization.language, language, StringComparison.Ordinal))
+                {
+                    return localization.name;
+                }
+            }
+
+            return null;
+        }
+
+        private static bool ContainsReference(IList list, object value)
+        {
+            for (int i = 0; i < list.Count; i++)
+            {
+                if (System.Object.ReferenceEquals(list[i], value))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static void AppendScopedLandscape(
+            IList list,
+            UnityEngine.Object landscape,
+            StageLandscapeMutation scope,
+            string source)
+        {
+            if (list == null)
+            {
+                throw new InvalidOperationException(source + " es nulo.");
+            }
+
+            if (ContainsReference(list, landscape))
+            {
+                return;
+            }
+
+            list.Add(landscape);
+            scope.Record(list, landscape);
+        }
+
+        private void RestoreStageLandscapeMutation(StageLandscapeMutation scope)
+        {
+            lock (_gate)
+            {
+                for (int i = scope.Entries.Count - 1; i >= 0; i--)
+                {
+                    ScopedLandscapeListEntry entry = scope.Entries[i];
+                    for (int itemIndex = entry.List.Count - 1; itemIndex >= 0; itemIndex--)
+                    {
+                        if (System.Object.ReferenceEquals(entry.List[itemIndex], entry.Landscape))
+                        {
+                            entry.List.RemoveAt(itemIndex);
+                        }
+                    }
+                }
+
+                scope.Entries.Clear();
+            }
         }
 
         public LoaderDiagnosticsSnapshot GetDiagnosticsSnapshot()
@@ -1442,6 +1641,7 @@ namespace RogueCommandExpansionLoader.Content
             var temporaryResources = new Dictionary<string, UnityEngine.Object>(StringComparer.Ordinal);
             var temporaryNativePrefabs = new List<GameObject>();
             var temporaryStageParameterClones = new List<ScriptableObject>();
+            var temporaryLandscapeClones = new List<ScriptableObject>();
             var temporaryUnits = new List<LoadedUnit>();
             var temporaryStages = new List<LoadedStage>();
             var temporaryProfiles = new List<LoadedAiProfile>();
@@ -1690,9 +1890,13 @@ namespace RogueCommandExpansionLoader.Content
                     List<object> stageWorlds;
                     List<object> pools = ValidateStageParameters(parameters, packageName, stage.id,
                         out stageWorlds);
+                    LoadedLandscape landscape = stage.landscape == null
+                        ? null
+                        : CreateStageLandscape(stage, packageName, stageWorlds, temporaryResources,
+                            temporaryLandscapeClones);
                     object runtimeStage = CreateStage(stage, parameters, packageName);
                     temporaryStages.Add(new LoadedStage(stage, definition.packId, runtimeStage,
-                        pools, stageWorlds));
+                        pools, stageWorlds, landscape));
                 }
 
                 Dictionary<string, Vector2Int> scopedAiStageRanges = BuildScopedAiStageRanges(
@@ -1879,6 +2083,7 @@ namespace RogueCommandExpansionLoader.Content
                     temporaryUnits, temporaryStages, temporaryProfiles);
                 _nativePrefabClones.AddRange(temporaryNativePrefabs);
                 _stageParameterClones.AddRange(temporaryStageParameterClones);
+                _landscapeClones.AddRange(temporaryLandscapeClones);
                 candidate.LoadedBytes = packBundleBytes;
                 return true;
             }
@@ -1900,6 +2105,15 @@ namespace RogueCommandExpansionLoader.Content
                     if (stageParameters != null)
                     {
                         UnityEngine.Object.Destroy(stageParameters);
+                    }
+                }
+
+                for (int landscapeIndex = 0; landscapeIndex < temporaryLandscapeClones.Count; landscapeIndex++)
+                {
+                    ScriptableObject landscape = temporaryLandscapeClones[landscapeIndex];
+                    if (landscape != null)
+                    {
+                        UnityEngine.Object.Destroy(landscape);
                     }
                 }
 
@@ -2183,6 +2397,12 @@ namespace RogueCommandExpansionLoader.Content
             for (int i = 0; i < stages.Count; i++)
             {
                 _stages.Add(stages[i]);
+                if (stages[i].Landscape != null)
+                {
+                    _landscapesByLocalizationId.Add(stages[i].Landscape.LocalizationId,
+                        stages[i].Landscape);
+                }
+
                 List<object> stagePools = stages[i].BlueprintPools;
                 for (int poolIndex = 0; poolIndex < stagePools.Count; poolIndex++)
                 {
@@ -2974,6 +3194,125 @@ namespace RogueCommandExpansionLoader.Content
             return result;
         }
 
+        private LoadedLandscape CreateStageLandscape(
+            ContentStageDefinition stage,
+            string packageName,
+            IList<object> stageWorlds,
+            Dictionary<string, UnityEngine.Object> temporaryResources,
+            List<ScriptableObject> temporaryLandscapeClones)
+        {
+            ContentStageLandscapeDefinition definition = stage.landscape;
+            string resourceName;
+            if (!ContentPackValidator.TryBuildLandscapeResourceName(stage.id, out resourceName))
+            {
+                throw new InvalidDataException("La etapa " + stage.id + " no produce un nombre Landscape RCL_ válido.");
+            }
+
+            string resourcePath = "LandscapeGenerators/" + resourceName;
+            if (temporaryResources.ContainsKey(resourcePath) || _resourceAssets.ContainsKey(resourcePath) ||
+                Resources.Load(resourcePath, _landscapeGeneratorType) != null)
+            {
+                throw new InvalidDataException("La ruta de recurso Landscape '" + resourcePath +
+                    "' ya existe en el juego o en otro paquete.");
+            }
+
+            UnityEngine.Object template = FindNativeLandscapeTemplate(
+                definition.nativeTemplateId, packageName, stage.id);
+            UnityEngine.Object landscapeObject = UnityEngine.Object.Instantiate(template);
+            if (landscapeObject == null || landscapeObject.GetType() != _landscapeGeneratorType)
+            {
+                if (landscapeObject != null)
+                {
+                    UnityEngine.Object.Destroy(landscapeObject);
+                }
+                throw new InvalidDataException("No se pudo clonar el LandscapeGenerator para " + stage.id + ".");
+            }
+
+            ScriptableObject landscapeClone = landscapeObject as ScriptableObject;
+            if (landscapeClone == null)
+            {
+                UnityEngine.Object.Destroy(landscapeObject);
+                throw new InvalidDataException("LandscapeGenerator no deriva de ScriptableObject en este build.");
+            }
+
+            temporaryLandscapeClones.Add(landscapeClone);
+            landscapeClone.name = resourceName;
+            landscapeClone.hideFlags = HideFlags.HideAndDontSave;
+            _landscapeMapSizeField.SetValue(landscapeClone, definition.mapSize);
+            _landscapeRandomSeedField.SetValue(landscapeClone, definition.randomSeed);
+            _landscapeAlwaysUseSameSeedField.SetValue(landscapeClone, definition.alwaysUseSameSeed);
+            _landscapeDeactivatedField.SetValue(landscapeClone, false);
+            _landscapeAllowedForDemoField.SetValue(landscapeClone, stage.isPartOfDemo);
+            string localizationId = LandscapeLocalizationId(resourceName);
+            _landscapeNameLocaIdField.SetValue(landscapeClone, localizationId);
+
+            IList restrictedWorlds = _landscapeRestrictedWorldsField.GetValue(landscapeClone) as IList;
+            if (restrictedWorlds == null)
+            {
+                throw new InvalidDataException("LandscapeGenerator " + resourceName +
+                    " contiene restrictedToWorlds nulo.");
+            }
+            restrictedWorlds.Clear();
+
+            if (stageWorlds == null || stageWorlds.Count == 0)
+            {
+                throw new InvalidDataException("La etapa " + stage.id + " no tiene Worlds para validar su mapa.");
+            }
+
+            temporaryResources.Add(resourcePath, landscapeClone);
+            return new LoadedLandscape(resourceName, resourcePath, localizationId,
+                landscapeClone, definition);
+        }
+
+        private UnityEngine.Object FindNativeLandscapeTemplate(
+            string templateId,
+            string packageName,
+            string stageId)
+        {
+            object balancing = _gameBalancingAssetField.GetValue(null);
+            object progression = balancing == null ? null : _progressionFields[0].GetValue(balancing);
+            IList landscapes = progression == null ? null :
+                _progressionLandscapesField.GetValue(progression) as IList;
+            if (landscapes == null)
+            {
+                throw new InvalidDataException("No se pudo leer la lista nativa de LandscapeGenerator para " +
+                    "resolver " + templateId + " en " + stageId + ".");
+            }
+
+            UnityEngine.Object match = null;
+            for (int i = 0; i < landscapes.Count; i++)
+            {
+                UnityEngine.Object candidate = landscapes[i] as UnityEngine.Object;
+                if (candidate == null || candidate.GetType() != _landscapeGeneratorType ||
+                    !String.Equals(candidate.name, templateId, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                if (match != null && !System.Object.ReferenceEquals(match, candidate))
+                {
+                    throw new InvalidDataException("La plantilla nativa Landscape '" + templateId +
+                        "' es ambigua en la progresión default para la etapa " + stageId + ".");
+                }
+
+                match = candidate;
+            }
+
+            if (match == null)
+            {
+                throw new InvalidDataException("La etapa " + stageId + " en '" + packageName +
+                    "' referencia un LandscapeGenerator nativo que no existe en la progresión default: '" +
+                    templateId + "'.");
+            }
+
+            return match;
+        }
+
+        private static string LandscapeLocalizationId(string resourceName)
+        {
+            return resourceName.ToLowerInvariant() + "_name";
+        }
+
         private void ValidateStageGenerationCompatibility(
             List<LoadedStage> candidateStages,
             List<LoadedAiProfile> candidateProfiles,
@@ -3242,7 +3581,10 @@ namespace RogueCommandExpansionLoader.Content
                     MapSizeMin = stage.Definition.mapSizeMin,
                     MapSizeMax = stage.Definition.mapSizeMax,
                     IsPartOfDemo = stage.Definition.isPartOfDemo,
-                    Worlds = BuildWorldCandidates(stage.Worlds, stage.Definition.id)
+                    Worlds = BuildWorldCandidates(stage.Worlds, stage.Definition.id),
+                    Landscape = stage.Landscape == null
+                        ? null
+                        : BuildLandscapeCandidate(stage.Landscape.Asset)
                 });
             }
 
@@ -4176,13 +4518,15 @@ namespace RogueCommandExpansionLoader.Content
                 string packId,
                 object runtimeStage,
                 List<object> blueprintPools,
-                List<object> worlds)
+                List<object> worlds,
+                LoadedLandscape landscape)
             {
                 Definition = definition;
                 PackId = packId;
                 RuntimeStage = runtimeStage;
                 BlueprintPools = blueprintPools;
                 Worlds = worlds;
+                Landscape = landscape;
             }
 
             public ContentStageDefinition Definition { get; private set; }
@@ -4190,6 +4534,72 @@ namespace RogueCommandExpansionLoader.Content
             public object RuntimeStage { get; private set; }
             public List<object> BlueprintPools { get; private set; }
             public List<object> Worlds { get; private set; }
+            public LoadedLandscape Landscape { get; private set; }
+        }
+
+        private sealed class LoadedLandscape
+        {
+            public LoadedLandscape(
+                string resourceName,
+                string resourcePath,
+                string localizationId,
+                UnityEngine.Object asset,
+                ContentStageLandscapeDefinition definition)
+            {
+                ResourceName = resourceName;
+                ResourcePath = resourcePath;
+                LocalizationId = localizationId;
+                Asset = asset;
+                Definition = definition;
+            }
+
+            public string ResourceName { get; private set; }
+            public string ResourcePath { get; private set; }
+            public string LocalizationId { get; private set; }
+            public UnityEngine.Object Asset { get; private set; }
+            public ContentStageLandscapeDefinition Definition { get; private set; }
+        }
+
+        private sealed class StageLandscapeMutation : IDisposable
+        {
+            private ContentPackRuntimeLoader _owner;
+
+            public StageLandscapeMutation(ContentPackRuntimeLoader owner)
+            {
+                _owner = owner;
+                Entries = new List<ScopedLandscapeListEntry>();
+            }
+
+            public List<ScopedLandscapeListEntry> Entries { get; private set; }
+
+            public void Record(IList list, UnityEngine.Object landscape)
+            {
+                Entries.Add(new ScopedLandscapeListEntry(list, landscape));
+            }
+
+            public void Dispose()
+            {
+                ContentPackRuntimeLoader owner = _owner;
+                if (owner == null)
+                {
+                    return;
+                }
+
+                _owner = null;
+                owner.RestoreStageLandscapeMutation(this);
+            }
+        }
+
+        private sealed class ScopedLandscapeListEntry
+        {
+            public ScopedLandscapeListEntry(IList list, UnityEngine.Object landscape)
+            {
+                List = list;
+                Landscape = landscape;
+            }
+
+            public IList List { get; private set; }
+            public UnityEngine.Object Landscape { get; private set; }
         }
 
         private sealed class LoadedAiProfile

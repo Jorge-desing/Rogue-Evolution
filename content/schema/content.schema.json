@@ -196,6 +196,7 @@
         "mapSizeMin": { "type": "integer", "minimum": 1, "maximum": 256 },
         "mapSizeMax": { "type": "integer", "minimum": 1, "maximum": 256 },
         "isPartOfDemo": { "type": "boolean", "default": false },
+        "landscape": { "$ref": "#/$defs/stageLandscape" },
         "unitIds": {
           "type": "array",
           "items": { "$ref": "#/$defs/namespacedId" },
@@ -239,6 +240,35 @@
           "then": { "properties": { "value": { "pattern": "^[0-9]+$" } } }
         }
       ]
+    },
+    "stageLandscape": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["nativeTemplateId", "randomSeed", "alwaysUseSameSeed", "mapSize", "localizations"],
+      "properties": {
+        "nativeTemplateId": { "type": "string", "minLength": 1, "pattern": "\\S" },
+        "randomSeed": { "type": "integer", "minimum": 0, "maximum": 99998 },
+        "alwaysUseSameSeed": { "type": "boolean" },
+        "mapSize": { "type": "integer", "minimum": 1, "maximum": 255, "not": { "multipleOf": 2 } },
+        "localizations": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/landscapeLocalization" },
+          "contains": {
+            "properties": { "language": { "const": "en-US" }, "name": { "type": "string", "minLength": 1, "pattern": "\\S" } },
+            "required": ["language", "name"]
+          }
+        }
+      }
+    },
+    "landscapeLocalization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["language", "name"],
+      "properties": {
+        "language": { "enum": ["en-US", "de-DE", "ja-JP", "ko-KR", "zh-CN", "zh-TW", "fr-FR", "es-XL", "pt-BR", "ru-RU"] },
+        "name": { "type": "string", "minLength": 1, "pattern": "\\S" }
+      }
     },
     "aiProfile": {
       "type": "object",

@@ -68,6 +68,24 @@ namespace RogueCommandExpansionLoader.Content
         public bool isPartOfDemo;
         public string[] unitIds;
         public string[] aiProfileIds;
+        public ContentStageLandscapeDefinition landscape;
+    }
+
+    [Serializable]
+    public sealed class ContentStageLandscapeDefinition
+    {
+        public string nativeTemplateId;
+        public int randomSeed;
+        public bool alwaysUseSameSeed;
+        public int mapSize;
+        public ContentLandscapeLocalizationDefinition[] localizations;
+    }
+
+    [Serializable]
+    public sealed class ContentLandscapeLocalizationDefinition
+    {
+        public string language;
+        public string name;
     }
 
     [Serializable]
@@ -206,7 +224,30 @@ namespace RogueCommandExpansionLoader.Content
                 mapSizeMax = source.mapSizeMax,
                 isPartOfDemo = source.isPartOfDemo,
                 unitIds = source.unitIds == null ? null : (string[])source.unitIds.Clone(),
-                aiProfileIds = source.aiProfileIds == null ? null : (string[])source.aiProfileIds.Clone()
+                aiProfileIds = source.aiProfileIds == null ? null : (string[])source.aiProfileIds.Clone(),
+                landscape = CloneLandscape(source.landscape)
+            };
+        }
+
+        private static ContentStageLandscapeDefinition CloneLandscape(ContentStageLandscapeDefinition source)
+        {
+            return source == null ? null : new ContentStageLandscapeDefinition
+            {
+                nativeTemplateId = source.nativeTemplateId,
+                randomSeed = source.randomSeed,
+                alwaysUseSameSeed = source.alwaysUseSameSeed,
+                mapSize = source.mapSize,
+                localizations = CloneArray(source.localizations, CloneLandscapeLocalization)
+            };
+        }
+
+        private static ContentLandscapeLocalizationDefinition CloneLandscapeLocalization(
+            ContentLandscapeLocalizationDefinition source)
+        {
+            return source == null ? null : new ContentLandscapeLocalizationDefinition
+            {
+                language = source.language,
+                name = source.name
             };
         }
 
