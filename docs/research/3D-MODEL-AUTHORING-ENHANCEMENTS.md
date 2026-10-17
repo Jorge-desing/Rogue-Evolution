@@ -580,4 +580,66 @@ To elevate procedural unit models to commercial RTS asset parity, four new core 
   - Configures `LODGroup` component if multi-resolution LODs are detected.
   - Saves Prefab to `Assets/RogueCommandExpansionSample/Prefabs/<Name>Visual.prefab` and normalizes Unity YAML formatting.
 
+---
+
+## 15. Novel Procedural Capabilities: Base Structures, Modular Attachments, Battle Damage & Tactical Icon Baker (2026-10-17)
+
+To satisfy the mod architectural rule that *every added unit requires a dedicated production building* and expand authoring into dynamic tactical RTS assets, four novel procedural systems were engineered:
+
+### A. Tactical Structures & Production Factories Suite (`RogueStructureBuilder`)
+- **Motivation**: Eliminates dependency on static placeholder cubes for mod factories while adhering to the core modding contract.
+- **Architectural Design**:
+  - `RogueStructureBuilder` shares the vehicle material palette (`TacticalPalette`), chamfer physics, LOD decimation, and collider generation.
+  - Guarantees strict ground clearance invariance ($Z_{\min} = 0.0000\text{m}$) via foundation slab centering at $Z = \text{height}/2$.
+- **4 Procedural Structure Types**:
+  1. `factory`: Concrete slab base, ribbed industrial production hall, recessed roller bay door, heavy yellow gantry crane with structural crossbeam, dual roof exhaust stacks with ventilation caps, and `Socket_Deploy_Unit` locator.
+  2. `defense_turret`: Stepped octagonal concrete bunker pillbox, armored 360° traverse collar, beveled turret cap with vision slit, and integrated weapon mount (`cannon`, `quad_flak`, `railgun`).
+  3. `radar_station`: Octagonal comms bunker, roof mounting collar, 4-leg structural lattice mast, and motorized parabolic radar dish with central transceiver feed horn.
+  4. `energy_silo`: Heavy reactor vessel, 4 diagonal buttress foundation legs, cylindrical core tank, 3 stepped magnetic containment rings, and 4 high-luminance emissive plasma conduits.
+- **CLI Command**:
+  ```powershell
+  python tools/generate_unit_model.py --structure --building-type factory --name VanguardFactory --colliders --gameplay-json
+  ```
+
+### B. Modular Attachments & Hardpoint Customization System
+- **Motivation**: Enables procedural unit variations and supports future runtime attachment systems in Unity where players upgrade armor or weapons without replacing the underlying base model prefab.
+- **4 Procedural Attachment Assemblies**:
+  - `make_era_armor_tiles`: Explosive Reactive Armor (ERA) brick array with standoff bracket mountings (`--attachments era`).
+  - `make_aps_hardkill_system`: Active Protection System (APS) dual millimeter-wave radar sensor pods and twin 3-tube countermeasure mortar launchers (`--attachments aps`).
+  - `make_sponson_pod`: Armored sponson pod with protective mantlet housing and twin auxiliary autocannons (`--attachments sponson`).
+  - `make_aux_fuel_drums`: Rear-mounted cylindrical fuel drums / power cells with dual retaining bracket straps and feed lines (`--attachments fuel_drums`).
+- **Detached Asset Export (`--export-detached-attachments`)**:
+  - Automatically exports individual attachment models to separate FBXs: `<Name>_Attachment_<Type>.fbx`.
+- **CLI Command**:
+  ```powershell
+  python tools/generate_unit_model.py --name VanguardTank --attachments era,aps,sponson,fuel_drums --export-detached-attachments
+  ```
+
+### C. Progressive Battle Damage States (`make_damaged_state`)
+- **Motivation**: Fills the visual fidelity gap between pristine undamaged units ($100\%$ HP) and complete destruction wreckage ($0\%$ HP).
+- **Procedural Degradation Pipeline**:
+  - Clones base vehicle model and applies randomized, bounded combat deformation:
+    - Armor plates receive localized inward vertex dents and angular twists simulating heavy kinetic impacts.
+    - Turret ring receives a jammed $4^\circ - 6^\circ$ off-axis tilt and traverse disruption.
+    - Road wheels and idler sprockets sustain camber displacement and skewed rotation.
+    - Damaged parts swap materials to `Combat_Scorched` (roughness 0.92, charred soot albedo) and `Combat_DamagedMetal`.
+  - Exports `<Name>_Damaged.fbx` and editable `<name>-damaged.blend`.
+- **CLI Command**:
+  ```powershell
+  python tools/generate_unit_model.py --name VanguardTank --damaged-state
+  ```
+
+### D. Tactical Minimap & UI Silhouette Icon Auto-Generator (`render_tactical_icons`)
+- **Motivation**: Automatically creates crisp, transparent-background 2D graphical assets for radar minimaps, tactical HUDs, and unit production cards directly from 3D models.
+- **Headless Dual-Angle Rendering Engine**:
+  - Configures headless Cycles/Eevee render camera with `film_transparent = True`, RGBA color mode, and isolated lighting.
+  - **Top-Down Zenith (90°)**: Pure vertical orthographic view isolating vehicle footprint for radar pings and minimap blips (`<Name>_Icon_TopDown_<Size>.png`).
+  - **Isometric RTS (45°)**: 45° RTS elevation and azimuth perspective highlighting silhouette and weapon posture for unit selection cards (`<Name>_Icon_Isometric_<Size>.png`).
+  - Supports `--icon-size 64` and `--icon-size 128` exported directly into `Assets/.../Models/Textures/Icons/`.
+- **CLI Command**:
+  ```powershell
+  python tools/generate_unit_model.py --name VanguardTank --render-icons --icon-size 64
+  ```
+
+
 

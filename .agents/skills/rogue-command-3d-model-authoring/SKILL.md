@@ -405,10 +405,67 @@ The extended authoring pipeline provides four production-grade optimization and 
 
 ---
 
+## 10. Novel Authoring Capabilities (Tactical Structures, Attachments, Damage States & Icon Baker)
+
+The toolchain introduces four novel procedural capabilities expanding authoring beyond mobile vehicle units into RTS base infrastructure, modular unit customization, battle degradation, and tactical UI assets:
+
+### A. Tactical Structures & Production Factories Suite (`--structure`, `--building-type`)
+Addresses the strict modding rule: *Every added unit must declare its own namespaced `productionBuilding`*.
+- **`RogueStructureBuilder`**: Procedural construction system sharing the core PBR material engine, bevel physics, and batching pipeline with strict ground contact invariance ($Z_{\min} = 0.0000\text{m}$).
+- **Supported Building Types**:
+  1. `factory`: Heavy industrial production facility featuring a reinforced concrete foundation slab, primary factory hall with corrugated siding, blast-resistant rolling bay door, heavy yellow gantry crane with structural crossbeam, and dual roof ventilation/exhaust stacks with rain caps. Includes `Socket_Deploy_Unit` spawn empty.
+  2. `defense_turret`: Static defense installation featuring a stepped octagonal concrete bunker base, armored traverse collar, rotating turret cap with sensor slit, and integrated heavy weapon mount (`cannon`, `quad_flak`, `railgun`).
+  3. `radar_station`: Strategic recon and intelligence installation featuring an octagonal command bunker, reinforced roof collar, four-leg structural lattice mast, and motorized parabolic radar dish array with feeder horn.
+  4. `energy_silo`: Heavy reactor and resource containment vessel featuring a foundation slab, 4 heavy diagonal buttress support legs, central cylindrical reactor vessel, 3 stepped magnetic containment rings, and quad emissive plasma conduit channels.
+- **CLI Usage**:
+  ```powershell
+  python tools/generate_unit_model.py --structure --building-type factory --name VanguardFactory --colliders --gameplay-json
+  ```
+
+### B. Modular Attachments & Hardpoint Customization System (`--attachments`, `--export-detached-attachments`)
+Parametric armor and tactical upgrade assemblies designed for runtime modularity or static unit variants:
+- **Available Attachment Types**:
+  - `era`: Explosive Reactive Armor (ERA) brick matrix mounted on angled standoff brackets along glacis plates or turret cheeks (`make_era_armor_tiles`).
+  - `aps`: Active Protection System (APS) hardkill suite comprising dual multi-angle millimeter-wave radar detection pods and twin 3-tube rapid countermeasure mortar launchers (`make_aps_hardkill_system`).
+  - `sponson`: Flank-mounted armored weapon sponson pod with protective mantlet housing and auxiliary autocannon barrels (`make_sponson_pod`).
+  - `fuel_drums`: Rear-mounted twin cylindrical auxiliary fuel drums or high-capacity capacitor cells with armored retaining straps and feeder fuel lines (`make_aux_fuel_drums`).
+- **Detached Asset Export (`--export-detached-attachments`)**: In addition to baking into the base vehicle mesh, exports individual modular FBXs (`<Name>_Attachment_<Type>.fbx`), enabling dynamic runtime equip systems in Unity without reloading base meshes.
+- **CLI Usage**:
+  ```powershell
+  python tools/generate_unit_model.py --name VanguardTank --attachments era,aps,sponson,fuel_drums --export-detached-attachments
+  ```
+
+### C. Progressive Battle Damage States (`--damaged-state`)
+Provides visual representation of combat degradation at intermediate health ($25\% - 50\%$ HP) prior to complete wreckage:
+- **`make_damaged_state`**: Generates `<Name>_Damaged.fbx` and editable `<name>-damaged.blend`:
+  - **Dented & Distorted Armor Plates**: Glacis and side skirt panels receive randomized angular deformation and inward vertex displacements representing heavy kinetic impact craters.
+  - **Jammed & Tilted Turret**: Turret ring sustains traumatic yaw jam with a $4^\circ - 6^\circ$ off-axis tilt and traverse disruption.
+  - **Displaced Suspension & Road Wheels**: Road wheels or idlers receive lateral camber distortion and track pin displacement.
+  - **Procedural Scorched & Fractured Materials**: Overwrites damaged surfaces with `Combat_Scorched` (charred soot, darkened albedo, heightened roughness) and `Combat_DamagedMetal` materials while preserving intact components.
+- **CLI Usage**:
+  ```powershell
+  python tools/generate_unit_model.py --name VanguardTank --damaged-state
+  ```
+
+### D. Tactical Minimap & UI Silhouette Icon Auto-Generator (`--render-icons`, `--icon-size`)
+Automated headless rendering pipeline generating transparent alpha PNG tactical icons for RTS HUDs, unit production cards, and minimap blips:
+- **`render_tactical_icons`**: Sets headless Cycles/Eevee camera with `film_transparent = True` and RGBA output.
+- **Dual Orthographic Projections**:
+  1. `Top-Down Zenith (90°)`: Pure vertical orthographic projection highlighting the vehicle's planar perimeter footprint, ideal for minimap blips, radar sweeps, and tactical map tactical symbols.
+  2. `Isometric RTS (45°)`: Standard RTS tactical viewing angle (45° elevation, 45° azimuth) framing the complete silhouette, ideal for unit cards, selection HUDs, and tech tree icons.
+- **Resolution Scaling**: Supports `--icon-size 64` (minimap) and `--icon-size 128` (HUD card) exported directly to `<Project>/Models/Textures/Icons/`.
+- **CLI Usage**:
+  ```powershell
+  python tools/generate_unit_model.py --name VanguardTank --render-icons --icon-size 64
+  ```
+
+---
+
 ## References & Specialized Guides
 
 - [Art Style & Palette Guide](references/art-style-and-palette.md) — 3-tier silhouette hierarchy, 5-tone palette sets, bevel physics, and greeble standards.
 - [Blender Procedural Techniques](references/blender-procedural-techniques.md) — Parametric `bpy` recipes for chamfered hulls, continuous tracks, stepped road wheels, and engine grilles.
 - [Unity Material Pipeline](references/unity-material-pipeline.md) — Standard shader configuration, emission keywords, GPU instancing, and card sprite rules.
 - [Native Hierarchy & Pivots](references/native-hierarchy-and-pivots.md) — Transform hierarchy maps for `PCXBaseTank`, `BombBike`, `ArtilleryTank`, `GatlingWalker`, and `LightningTank`.
+
 

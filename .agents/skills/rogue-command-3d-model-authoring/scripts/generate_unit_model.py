@@ -198,6 +198,13 @@ def parse_args():
     parser.add_argument("--colliders", action="store_true", help="Generate low-poly physics collision hulls")
     parser.add_argument("--gameplay-json", action="store_true", help="Export companion .gameplay.json specification")
     parser.add_argument("--wreckage", action="store_true", help="Export burned / dislodged turret wreckage variant")
+    parser.add_argument("--damaged-state", action="store_true", help="Export combat-damaged <Name>_Damaged.fbx variant with distorted plates and scorch marks")
+    parser.add_argument("--structure", action="store_true", help="Generate a static building or factory instead of a mobile vehicle")
+    parser.add_argument("--building-type", default="factory", choices=["factory", "defense_turret", "radar_station", "energy_silo"], help="Structure building type")
+    parser.add_argument("--attachments", default=None, help="Comma-separated list of modular attachments to apply (e.g. 'era,aps,sponson,fuel_drums')")
+    parser.add_argument("--export-detached-attachments", action="store_true", help="Export separate <Name>_Attachment_<Type>.fbx meshes for modular attachment in Unity")
+    parser.add_argument("--render-icons", action="store_true", help="Render dual orthographic 2D tactical icons (Top-Down and Isometric) with transparent alpha")
+    parser.add_argument("--icon-size", type=int, default=128, choices=[64, 128], help="Resolution for rendered tactical icons")
     parser.add_argument("--target-budget", type=int, default=4000, help="Target polygon budget for profiling")
     parser.add_argument("--lod", action="store_true", help="Calculate polygon budget and recommend LOD reductions")
     parser.add_argument("--smooth-angle", type=float, default=38.0, help="Smart angle-weighted auto-smooth threshold in degrees")
@@ -304,6 +311,11 @@ def build_vehicle_model(
     vfx_flash: bool = False,
     vfx_thruster: bool = False,
     shield_bubble: bool = False,
+    attachments: str | None = None,
+    export_detached_attachments: bool = False,
+    damaged_state: bool = False,
+    render_icons: bool = False,
+    icon_size: int = 128,
 ) -> dict:
     rmk.clear_scene()
 
@@ -337,6 +349,7 @@ def build_vehicle_model(
 
     gameplay_meta_path = (fbx_file.parent / f"{name}.gameplay.json") if gameplay_json else None
     wreckage_fbx_path = (fbx_file.parent / f"{name}_Wreckage.fbx") if wreckage else None
+    damaged_fbx_path = (fbx_file.parent / f"{name}_Damaged.fbx") if damaged_state else None
 
     # 1. Mobility and Chassis by Archetype
     if archetype == "walker":
@@ -667,6 +680,11 @@ def build_vehicle_model(
     if excavator_drum and archetype not in ("combat_harvester",):
         builder.add_excavator_drum()
 
+    # 3. Modular Attachments
+    if attachments:
+        att_list = [a.strip() for a in attachments.split(",") if a.strip()]
+        builder.add_attachments(att_list)
+
     # 4. Build, Validate, and Export
     res = builder.build_and_export(
         fbx_path=fbx_file,
@@ -687,6 +705,7 @@ def build_vehicle_model(
         wear_level=wear,
         gameplay_meta_path=gameplay_meta_path,
         wreckage_fbx_path=wreckage_fbx_path,
+        damaged_fbx_path=damaged_fbx_path,
         target_budget=target_budget,
         include_vfx_flash=vfx_flash,
         include_vfx_thruster=vfx_thruster,
@@ -696,6 +715,9 @@ def build_vehicle_model(
         bake_atlas=bake_atlas,
         atlas_resolution=atlas_resolution,
         single_material_atlas=single_material,
+        export_detached_attachments=export_detached_attachments,
+        render_icons=render_icons,
+        icon_resolutions=(icon_size,),
     )
 
     if lod_diagnostics:
@@ -721,17 +743,124 @@ def build_vehicle_model(
     return res
 
 
+def build_structure_model(
+    name: str,
+    building_type: str = "factory",
+    faction: str = "vanguard",
+    camo: str = "none",
+    out_root: Path = REPO_ROOT,
+    blend_path: Path | None = None,
+    fbx_path: Path | None = None,
+    preview_path: Path | None = None,
+    primary_color: str | None = None,
+    light_armor_color: str | None = None,
+    emissive_color: str | None = None,
+    lods: bool = False,
+    colliders: bool = False,
+    gameplay_json: bool = False,
+    render_icons: bool = False,
+    icon_size: int = 128,
+) -> dict:
+    rmk.clear_scene()
+
+    blend_file = blend_path or (out_root / "content" / "source-art" / f"{name.lower()}.blend")
+    fbx_file = fbx_path or (
+        out_root
+        / "unity"
+        / "RogueCommandAssetAuthoring"
+        / "Assets"
+        / "RogueCommandExpansionSample"
+        / "Models"
+        / f"{name}.fbx"
+    )
+    preview_file = preview_path or (out_root / "artifacts" / "previews" / f"{name.lower()}.png")
+
+    p_override = rmk.hex_to_rgb(primary_color) if primary_color else None
+    l_override = rmk.hex_to_rgb(light_armor_color) if light_armor_color else None
+    e_override = rmk.hex_to_rgb(emissive_color) if emissive_color else None
+
+    builder = rmk.RogueStructureBuilder(
+        name,
+        building_type=building_type,
+        faction=faction,
+        camo=camo,
+        primary_override=p_override,
+        light_override=l_override,
+        emissive_override=e_override,
+    )
+
+    bt = building_type.lower()
+    if bt == "factory":
+        builder.build_factory()
+    elif bt in ("defense_turret", "turret"):
+        builder.build_defense_turret()
+    elif bt in ("radar_station", "radar"):
+        builder.build_radar_station()
+    elif bt in ("energy_silo", "silo", "reactor"):
+        builder.build_energy_silo()
+    else:
+        builder.build_factory()
+
+    gameplay_meta_path = (fbx_file.parent / f"{name}.gameplay.json") if gameplay_json else None
+
+    res = builder.build_and_export(
+        fbx_path=fbx_file,
+        blend_path=blend_file,
+        preview_path=preview_file,
+        generate_lods=lods,
+        generate_colliders=colliders,
+        gameplay_meta_path=gameplay_meta_path,
+        render_icons=render_icons,
+        icon_resolutions=(icon_size,),
+    )
+
+    print("\n========================================================")
+    print(f"Generated Rogue Command Structure: {name}")
+    print(f"  Building Type: {building_type} | Faction: {faction} | Camo: {camo}")
+    print(f"  Polygons: {res['total_polygons']} | Vertices: {res['total_vertices']}")
+    print(f"  Batched Unity Meshes: {res['exported_batched_objects']}")
+    print(f"  Ground Contact Valid: {res['ground_contact_valid']}")
+    print(f"  Source Blend: {blend_file}")
+    print(f"  Unity FBX: {fbx_file}")
+    print(f"  Preview Image: {preview_file}")
+    print("========================================================\n")
+
+    return res
+
+
 def main():
     args = parse_args()
     out_root = resolve_path(args.out_dir, REPO_ROOT) or REPO_ROOT
 
     if args.dry_run:
+        if args.structure:
+            print("\n=== DRY RUN: Rogue Command Structure Planning ===")
+            print(f"Structure Name: {args.name}")
+            print(f"Building Type: {args.building_type}")
+            print(f"Faction: {args.faction} | Camo: {args.camo}")
+            print("Outputs Planned:")
+            print(f"  FBX: {args.fbx_path or (out_root / 'unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/Models' / f'{args.name}.fbx')}")
+            print(f"  Blend: {args.blend_path or (out_root / 'content/source-art' / f'{args.name.lower()}.blend')}")
+            print(f"  Preview: {args.preview_path or (out_root / 'artifacts/previews' / f'{args.name.lower()}.png')}")
+            if args.gameplay_json:
+                print(f"  Gameplay JSON: {args.name}.gameplay.json (visualRootPath: 'Building')")
+            if args.lods:
+                print(f"  LOD FBX: {args.name}_LODs.fbx")
+            if args.colliders:
+                print(f"  Colliders: {args.name}_COLLIDER_Base, {args.name}_COLLIDER_Roof")
+            if args.render_icons:
+                print(f"  Tactical Icons: {args.icon_size}x{args.icon_size} Top-Down and Isometric")
+            print("=== Dry run complete. No meshes created. ===\n")
+            return
+
         print("\n=== DRY RUN: Rogue Command Vehicle Planning ===")
         print(f"Unit Name: {args.name}")
         print(f"Archetype: {args.archetype}")
         print(f"Faction: {args.faction} | Camo: {args.camo} | Wear: {args.wear}")
         print(f"Primary Weapon: {args.weapon}")
         print(f"Subsystems: Skirts={args.skirts}, Rollcage={args.rollcage}, QuadTracks={args.quad_tracks}, TiltRotors={args.tilt_rotors}, Dozer={args.dozer}, Smoke={args.smoke}, Radar={args.radar}, Sponsons={args.sponsons}, Outriggers={args.outriggers}, FlightDeck={args.flight_deck}, ExcavatorDrum={args.excavator_drum}")
+        if args.attachments:
+            print(f"Modular Attachments: {args.attachments} (Detached FBX: {args.export_detached_attachments})")
         if args.primary_color:
             print(f"Custom Primary Color: {args.primary_color}")
         if args.light_armor_color:
@@ -750,6 +879,8 @@ def main():
             print(f"  Colliders: {args.name}_COLLIDER_Hull, {args.name}_COLLIDER_Turret")
         if args.wreckage:
             print(f"  Wreckage FBX: {args.name}_Wreckage.fbx")
+        if args.damaged_state:
+            print(f"  Damaged State FBX: {args.name}_Damaged.fbx")
         if args.bake_atlas:
             print(f"  Texture Atlas: {args.atlas_resolution}x{args.atlas_resolution} PBR (Albedo, MetallicGloss, Normal, Emission)")
         if args.single_material:
@@ -764,6 +895,8 @@ def main():
             print(f"  VFX: Exhaust thruster plume cones")
         if args.shield_bubble:
             print(f"  VFX: Geodesic shield bubble envelope")
+        if args.render_icons:
+            print(f"  Tactical Icons: {args.icon_size}x{args.icon_size} Top-Down and Isometric")
         print("=== Dry run complete. No meshes created. ===\n")
         return
 
@@ -828,55 +961,81 @@ def main():
         print("========================================================\n")
         return
 
-    # Single vehicle generation
+    # Single unit/structure generation
     blend_path = resolve_path(args.blend_path, REPO_ROOT)
     fbx_path = resolve_path(args.fbx_path, REPO_ROOT)
     preview_path = resolve_path(args.preview_path, REPO_ROOT)
 
-    res = build_vehicle_model(
-        name=args.name,
-        archetype=args.archetype,
-        faction=args.faction,
-        camo=args.camo,
-        weapon=args.weapon,
-        wear=args.wear,
-        out_root=out_root,
-        blend_path=blend_path,
-        fbx_path=fbx_path,
-        preview_path=preview_path,
-        skirts=args.skirts,
-        rollcage=args.rollcage,
-        quad_tracks=args.quad_tracks,
-        tilt_rotors=args.tilt_rotors,
-        dozer=args.dozer,
-        smoke=args.smoke,
-        radar=args.radar,
-        sponsons=args.sponsons,
-        outriggers=args.outriggers,
-        flight_deck=args.flight_deck,
-        excavator_drum=args.excavator_drum,
-        primary_color=args.primary_color,
-        light_armor_color=args.light_armor_color,
-        emissive_color=args.emissive_color,
-        locators=args.locators,
-        dirt=args.dirt,
-        lods=args.lods,
-        colliders=args.colliders,
-        gameplay_json=args.gameplay_json,
-        wreckage=args.wreckage,
-        target_budget=args.target_budget,
-        lod_diagnostics=args.lod,
-        smooth_angle=args.smooth_angle,
-        multiview=args.multiview,
-        bake_atlas=args.bake_atlas,
-        atlas_resolution=args.atlas_resolution,
-        single_material=args.single_material,
-        rig=args.rig,
-        animate=args.animate,
-        vfx_flash=args.vfx_flash,
-        vfx_thruster=args.vfx_thruster,
-        shield_bubble=args.shield_bubble,
-    )
+    # Execution: Structure or Vehicle
+    if args.structure:
+        res = build_structure_model(
+            name=args.name,
+            building_type=args.building_type,
+            faction=args.faction,
+            camo=args.camo,
+            out_root=out_root,
+            blend_path=blend_path,
+            fbx_path=fbx_path,
+            preview_path=preview_path,
+            primary_color=args.primary_color,
+            light_armor_color=args.light_armor_color,
+            emissive_color=args.emissive_color,
+            lods=args.lods,
+            colliders=args.colliders,
+            gameplay_json=args.gameplay_json,
+            render_icons=args.render_icons,
+            icon_size=args.icon_size,
+        )
+    else:
+        res = build_vehicle_model(
+            name=args.name,
+            archetype=args.archetype,
+            faction=args.faction,
+            camo=args.camo,
+            weapon=args.weapon,
+            wear=args.wear,
+            out_root=out_root,
+            blend_path=blend_path,
+            fbx_path=fbx_path,
+            preview_path=preview_path,
+            skirts=args.skirts,
+            rollcage=args.rollcage,
+            quad_tracks=args.quad_tracks,
+            tilt_rotors=args.tilt_rotors,
+            dozer=args.dozer,
+            smoke=args.smoke,
+            radar=args.radar,
+            sponsons=args.sponsons,
+            outriggers=args.outriggers,
+            flight_deck=args.flight_deck,
+            excavator_drum=args.excavator_drum,
+            primary_color=args.primary_color,
+            light_armor_color=args.light_armor_color,
+            emissive_color=args.emissive_color,
+            locators=args.locators,
+            dirt=args.dirt,
+            lods=args.lods,
+            colliders=args.colliders,
+            gameplay_json=args.gameplay_json,
+            wreckage=args.wreckage,
+            target_budget=args.target_budget,
+            lod_diagnostics=args.lod,
+            smooth_angle=args.smooth_angle,
+            multiview=args.multiview,
+            bake_atlas=args.bake_atlas,
+            atlas_resolution=args.atlas_resolution,
+            single_material=args.single_material,
+            rig=args.rig,
+            animate=args.animate,
+            vfx_flash=args.vfx_flash,
+            vfx_thruster=args.vfx_thruster,
+            shield_bubble=args.shield_bubble,
+            attachments=args.attachments,
+            export_detached_attachments=args.export_detached_attachments,
+            damaged_state=args.damaged_state,
+            render_icons=args.render_icons,
+            icon_size=args.icon_size,
+        )
 
     if args.report_json:
         report_path = resolve_path(args.report_json, REPO_ROOT)
