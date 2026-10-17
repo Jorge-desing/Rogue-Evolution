@@ -1930,13 +1930,16 @@ def profile_model_budget_and_drawcalls(
                 materials_used.add(m.name)
 
         name = obj.name
-        if any(k in name for k in ("Track", "Wheel", "Tire", "Leg", "Skimmer", "Thruster", "TiltRotor")):
+        if prefix and name.startswith(prefix):
+            name = name[len(prefix):]
+
+        if any(k in name for k in ("Track", "Wheel", "Tire", "Leg", "Skimmer", "Thruster", "TiltRotor", "Outrigger")):
             subsystems["Mobility & Wheels"] += tris
-        elif any(k in name for k in ("Cannon", "Barrel", "Howitzer", "Gatling", "Missile", "Gun", "Emitter", "Muzzle")):
+        elif any(k in name for k in ("Cannon", "Barrel", "Howitzer", "Gatling", "Missile", "Gun", "Emitter", "Muzzle", "Railgun", "Flak", "Plasma", "Mortar")):
             subsystems["Weapons"] += tris
-        elif any(k in name for k in ("Turret", "Troop", "RollCage", "Cab")):
+        elif any(k in name for k in ("Turret", "Troop", "RollCage", "Cab", "FlightDeck", "Bridge")):
             subsystems["Turret & Cabin"] += tris
-        elif any(k in name for k in ("Sensor", "Visor", "Antenna", "Radar", "Smoke", "Sponson", "Applique", "Grille", "Bolt")):
+        elif any(k in name for k in ("Sensor", "Visor", "Antenna", "Radar", "Smoke", "Sponson", "Applique", "Grille", "Bolt", "Excavator", "Drum")):
             subsystems["Optics & Greebles"] += tris
         else:
             subsystems["Chassis & Hull"] += tris
@@ -2403,6 +2406,11 @@ def export_gameplay_metadata(
         "halftrack": ["PCXBaseTank"],
         "super_heavy": ["ArtilleryTank"],
         "buggy": ["BombBike"],
+        "flak_anti_air": ["PCXBaseTank"],
+        "siege_crawler": ["ArtilleryTank", "GatlingWalker"],
+        "drone_carrier": ["PCXBaseTank"],
+        "quad_mech": ["GatlingWalker"],
+        "combat_harvester": ["PCXBaseTank"],
     }
 
     if archetype in ("bike", "buggy"):
@@ -2469,7 +2477,10 @@ def make_wreckage_variant(
         else:
             dup.data.materials.append(burned_metal)
 
-        is_turret_part = any(k in dup.name for k in turret_keywords)
+        part_name = obj.name
+        if prefix and part_name.startswith(prefix):
+            part_name = part_name[len(prefix):]
+        is_turret_part = any(k in part_name for k in turret_keywords)
         if is_turret_part:
             turret_objs.append(dup)
         else:
@@ -3127,6 +3138,505 @@ def make_troop_compartment(
     return objects
 
 
+def make_railgun_assembly(
+    prefix: str,
+    gun_pivot: Tuple[float, float, float] | Vector,
+    direction: Tuple[float, float, float] | Vector = (0.0, 1.0, 0.0),
+    rail_length: float = 2.40,
+    rail_height: float = 0.28,
+    rail_width: float = 0.40,
+    bore_gap: float = 0.09,
+    armor_mat: bpy.types.Material | None = None,
+    rail_mat: bpy.types.Material | None = None,
+    glow_mat: bpy.types.Material | None = None,
+    capacitor_mat: bpy.types.Material | None = None,
+    accent_mat: bpy.types.Material | None = None,
+) -> list[bpy.types.Object]:
+    """Generates an electromagnetic railgun assembly with dual parallel guide rails, central accelerator slit, capacitor bank, and magnetic coil clamps."""
+    objects = []
+    p_vec = Vector(gun_pivot)
+    d_vec = Vector(direction).normalized()
+    u_vec, v_vec, _ = get_orthonormal_basis(d_vec)
+    rot_euler = d_vec.to_track_quat("Z", "Y").to_euler()
+
+    # 1. Armored breech housing block
+    breech_loc = p_vec + d_vec * 0.20
+    objects.append(make_box(
+        f"{prefix}_BreechHousing",
+        (rail_width * 1.25, 0.52, rail_height * 1.35),
+        breech_loc, armor_mat, bevel=0.035, rotation=rot_euler
+    ))
+
+    # 2. Capacitor energy bank on top of breech
+    cap_mat = capacitor_mat or rail_mat
+    for side in (-1, 1):
+        cap_loc = breech_loc + u_vec * (side * rail_width * 0.32) + v_vec * (rail_height * 0.72)
+        objects.append(make_cylinder(
+            f"{prefix}_CapacitorCell_{'L' if side < 0 else 'R'}",
+            radius=0.075, depth=0.42,
+            location=cap_loc, material=cap_mat,
+            rotation=rot_euler, vertices=10, bevel=0.015
+        ))
+
+    # 3. Dual parallel kinetic rails
+    single_rail_w = (rail_width - bore_gap) * 0.5
+    rail_center_y = p_vec + d_vec * (rail_length * 0.5 + 0.42)
+    for side in (-1, 1):
+        tag = "L" if side < 0 else "R"
+        rail_offset = u_vec * (side * (bore_gap * 0.5 + single_rail_w * 0.5))
+        objects.append(make_box(
+            f"{prefix}_Rail_{tag}",
+            (single_rail_w, rail_length, rail_height),
+            rail_center_y + rail_offset, rail_mat,
+            bevel=0.02, rotation=rot_euler
+        ))
+        # Outer armor shield / reinforcement spine
+        objects.append(make_box(
+            f"{prefix}_RailShield_{tag}",
+            (single_rail_w * 0.45, rail_length * 0.75, rail_height * 0.65),
+            rail_center_y + rail_offset + u_vec * (side * single_rail_w * 0.48),
+            armor_mat, bevel=0.018, rotation=rot_euler
+        ))
+
+    # 4. Central glowing accelerator channel / coil core
+    if glow_mat is not None:
+        glow_core_loc = p_vec + d_vec * (rail_length * 0.5 + 0.42)
+        objects.append(make_box(
+            f"{prefix}_AcceleratorCore",
+            (bore_gap * 0.75, rail_length * 0.95, rail_height * 0.45),
+            glow_core_loc, glow_mat, rotation=rot_euler
+        ))
+
+    # 5. Magnetic containment sleeve clamps
+    clamp_count = 4
+    clamp_step = (rail_length - 0.40) / max(1, clamp_count - 1)
+    for i in range(clamp_count):
+        clamp_dist = 0.55 + i * clamp_step
+        clamp_loc = p_vec + d_vec * clamp_dist
+        objects.append(make_box(
+            f"{prefix}_CoilClamp_{i+1}",
+            (rail_width * 1.14, 0.12, rail_height * 1.18),
+            clamp_loc, armor_mat, bevel=0.015, rotation=rot_euler
+        ))
+        if accent_mat is not None:
+            objects.append(make_box(
+                f"{prefix}_CoilAccent_{i+1}",
+                (rail_width * 1.16, 0.04, rail_height * 0.35),
+                clamp_loc + v_vec * (rail_height * 0.45),
+                accent_mat, bevel=0.008, rotation=rot_euler
+            ))
+
+    # 6. Muzzle guide prongs
+    muzzle_loc = p_vec + d_vec * (rail_length + 0.46)
+    for side in (-1, 1):
+        tag = "L" if side < 0 else "R"
+        prong_loc = muzzle_loc + u_vec * (side * (bore_gap * 0.5 + single_rail_w * 0.5))
+        objects.append(make_box(
+            f"{prefix}_MuzzleProng_{tag}",
+            (single_rail_w * 0.82, 0.14, rail_height * 0.88),
+            prong_loc, rail_mat, bevel=0.015, rotation=rot_euler
+        ))
+
+    return objects
+
+
+def make_quad_flak_autocannon_assembly(
+    prefix: str,
+    gun_pivot: Tuple[float, float, float] | Vector,
+    direction: Tuple[float, float, float] | Vector = (0.0, 0.85, 0.52),  # ~32 deg elevation
+    barrel_length: float = 1.65,
+    caliber_radius: float = 0.038,
+    spacing_x: float = 0.24,
+    spacing_z: float = 0.20,
+    cradle_mat: bpy.types.Material | None = None,
+    barrel_mat: bpy.types.Material | None = None,
+    mag_mat: bpy.types.Material | None = None,
+    accent_mat: bpy.types.Material | None = None,
+) -> list[bpy.types.Object]:
+    """Generates an anti-air quad flak autocannon assembly in a 2x2 cluster with flash hiders, ammo feed boxes, and elevation cradle."""
+    objects = []
+    p_vec = Vector(gun_pivot)
+    d_vec = Vector(direction).normalized()
+    u_vec, v_vec, _ = get_orthonormal_basis(d_vec)
+    rot_euler = d_vec.to_track_quat("Z", "Y").to_euler()
+
+    # 1. Armored elevation cradle trunnion block
+    cradle_w = spacing_x + caliber_radius * 5.5
+    cradle_h = spacing_z + caliber_radius * 5.0
+    cradle_loc = p_vec + d_vec * 0.18
+    objects.append(make_box(
+        f"{prefix}_ElevationCradle",
+        (cradle_w, 0.48, cradle_h),
+        cradle_loc, cradle_mat, bevel=0.035, rotation=rot_euler
+    ))
+
+    # 2. Dual high-capacity ammo drums / magazines flanking cradle
+    m_mat = mag_mat or barrel_mat
+    for side in (-1, 1):
+        mag_loc = cradle_loc + u_vec * (side * (cradle_w * 0.5 + 0.16))
+        objects.append(make_cylinder(
+            f"{prefix}_AmmoDrum_{'L' if side < 0 else 'R'}",
+            radius=0.18, depth=0.36,
+            location=mag_loc, material=m_mat,
+            rotation=rot_euler, vertices=12, bevel=0.02
+        ))
+        if accent_mat is not None:
+            objects.append(make_box(
+                f"{prefix}_FeedChute_{'L' if side < 0 else 'R'}",
+                (0.14, 0.24, 0.10),
+                mag_loc - u_vec * (side * 0.10) + d_vec * 0.12,
+                accent_mat, bevel=0.01, rotation=rot_euler
+            ))
+
+    # 3. 2x2 Synchronized Autocannon Barrels
+    offsets = [
+        (-1, 1, "TopL"), (1, 1, "TopR"),
+        (-1, -1, "BotL"), (1, -1, "BotR"),
+    ]
+    for sx, sz, tag in offsets:
+        b_pivot = p_vec + u_vec * (sx * spacing_x * 0.5) + v_vec * (sz * spacing_z * 0.5)
+        # Breech sleeve
+        objects.append(make_cylinder(
+            f"{prefix}_Breech_{tag}",
+            radius=caliber_radius * 1.85, depth=0.35,
+            location=b_pivot + d_vec * 0.35, material=cradle_mat,
+            rotation=rot_euler, vertices=10, bevel=0.015
+        ))
+        # Cooling jacket / perforated shroud
+        objects.append(make_cylinder(
+            f"{prefix}_CoolingJacket_{tag}",
+            radius=caliber_radius * 1.40, depth=barrel_length * 0.45,
+            location=b_pivot + d_vec * (barrel_length * 0.28 + 0.38), material=barrel_mat,
+            rotation=rot_euler, vertices=10, bevel=0.012
+        ))
+        # Main barrel tube
+        objects.append(make_cylinder(
+            f"{prefix}_BarrelTube_{tag}",
+            radius=caliber_radius, depth=barrel_length,
+            location=b_pivot + d_vec * (barrel_length * 0.5 + 0.38), material=barrel_mat,
+            rotation=rot_euler, vertices=10, bevel=0.008
+        ))
+        # Conical flash hider muzzle
+        muzzle_loc = b_pivot + d_vec * (barrel_length + 0.44)
+        objects.append(make_cylinder(
+            f"{prefix}_FlashHider_{tag}",
+            radius=caliber_radius * 1.65, depth=0.18,
+            location=muzzle_loc, material=barrel_mat,
+            rotation=rot_euler, vertices=10, bevel=0.015
+        ))
+        if accent_mat is not None and sz > 0:
+            objects.append(make_cylinder(
+                f"{prefix}_MuzzleRing_{tag}",
+                radius=caliber_radius * 1.70, depth=0.04,
+                location=muzzle_loc - d_vec * 0.05, material=accent_mat,
+                rotation=rot_euler, vertices=10
+            ))
+
+    return objects
+
+
+def make_plasma_mortar_assembly(
+    prefix: str,
+    gun_pivot: Tuple[float, float, float] | Vector,
+    direction: Tuple[float, float, float] | Vector = (0.0, 0.70, 0.70),  # 45 deg elevation
+    caliber_radius: float = 0.175,
+    barrel_length: float = 0.95,
+    ring_count: int = 3,
+    armor_mat: bpy.types.Material | None = None,
+    barrel_mat: bpy.types.Material | None = None,
+    glow_mat: bpy.types.Material | None = None,
+    accent_mat: bpy.types.Material | None = None,
+) -> list[bpy.types.Object]:
+    """Generates a heavy plasma siege mortar with magnetic accelerator rings and reinforced hydraulic trunnions."""
+    objects = []
+    p_vec = Vector(gun_pivot)
+    d_vec = Vector(direction).normalized()
+    u_vec, v_vec, _ = get_orthonormal_basis(d_vec)
+    rot_euler = d_vec.to_track_quat("Z", "Y").to_euler()
+
+    # 1. Heavy reinforced trunnion base & sector gear
+    trunnion_loc = p_vec + d_vec * 0.14
+    objects.append(make_box(
+        f"{prefix}_MortarTrunnion",
+        (caliber_radius * 4.6, 0.44, caliber_radius * 3.8),
+        trunnion_loc, armor_mat, bevel=0.04, rotation=rot_euler
+    ))
+    # Sector elevation gear arc
+    gear_loc = trunnion_loc - v_vec * (caliber_radius * 1.7)
+    objects.append(make_box(
+        f"{prefix}_SectorGearArc",
+        (caliber_radius * 1.8, 0.32, 0.14),
+        gear_loc, barrel_mat, bevel=0.015, rotation=rot_euler
+    ))
+
+    # 2. Main short mortar barrel
+    barrel_loc = p_vec + d_vec * (barrel_length * 0.5 + 0.22)
+    objects.append(make_cylinder(
+        f"{prefix}_MortarBarrel",
+        radius=caliber_radius * 1.35, depth=barrel_length,
+        location=barrel_loc, material=barrel_mat,
+        rotation=rot_euler, vertices=14, bevel=0.02
+    ))
+    # Bore hole
+    bore_loc = p_vec + d_vec * (barrel_length + 0.24)
+    objects.append(make_cylinder(
+        f"{prefix}_MortarBoreHole",
+        radius=caliber_radius, depth=0.12,
+        location=bore_loc, material=barrel_mat,
+        rotation=rot_euler, vertices=14
+    ))
+
+    # 3. Magnetic accelerator toroid rings & glowing coils
+    step = (barrel_length * 0.65) / max(1, ring_count)
+    for i in range(ring_count):
+        r_dist = 0.35 + i * step
+        r_loc = p_vec + d_vec * r_dist
+        # Heavy outer ring
+        objects.append(make_torus(
+            f"{prefix}_MagRing_{i+1}",
+            major_radius=caliber_radius * 1.55,
+            minor_radius=0.045,
+            location=r_loc, material=armor_mat,
+            rotation=rot_euler, major_segments=14, minor_segments=8
+        ))
+        # Glowing inner coil slit
+        if glow_mat is not None:
+            objects.append(make_cylinder(
+                f"{prefix}_PlasmaCoil_{i+1}",
+                radius=caliber_radius * 1.42, depth=0.04,
+                location=r_loc, material=glow_mat,
+                rotation=rot_euler, vertices=12
+            ))
+
+    # 4. Flare muzzle bell
+    muzzle_loc = p_vec + d_vec * (barrel_length + 0.18)
+    objects.append(make_cylinder(
+        f"{prefix}_MuzzleBell",
+        radius=caliber_radius * 1.72, depth=0.16,
+        location=muzzle_loc, material=armor_mat,
+        rotation=rot_euler, vertices=14, bevel=0.02
+    ))
+    if accent_mat is not None:
+        objects.append(make_cylinder(
+            f"{prefix}_MuzzleAccent",
+            radius=caliber_radius * 1.75, depth=0.04,
+            location=muzzle_loc - d_vec * 0.04, material=accent_mat,
+            rotation=rot_euler, vertices=14
+        ))
+
+    return objects
+
+
+def make_flight_deck_assembly(
+    prefix: str,
+    size: Tuple[float, float, float] = (2.10, 3.20, 0.22),
+    location: Tuple[float, float, float] | Vector = (0.0, 0.0, 1.10),
+    deck_mat: bpy.types.Material | None = None,
+    guideline_mat: bpy.types.Material | None = None,
+    glow_mat: bpy.types.Material | None = None,
+    rail_mat: bpy.types.Material | None = None,
+) -> list[bpy.types.Object]:
+    """Generates an aircraft/drone flight and launch deck with guide light rails, blast deflector ramp, and perimeter safety catwalks."""
+    objects = []
+    loc = Vector(location)
+    sx, sy, sz = size
+
+    # 1. Main flat flight deck slab
+    objects.append(make_box(
+        f"{prefix}_DeckSlab",
+        (sx, sy, sz),
+        loc, deck_mat, bevel=0.025
+    ))
+
+    # 2. Angled frontal blast deflector / ski-jump ramp
+    ramp_l = sy * 0.18
+    ramp_loc = loc + Vector((0.0, sy * 0.5 - ramp_l * 0.45, sz * 0.40))
+    objects.append(make_box(
+        f"{prefix}_BlastRamp",
+        (sx * 0.88, ramp_l, 0.08),
+        ramp_loc, deck_mat, bevel=0.015,
+        rotation=(math.radians(-14), 0.0, 0.0)
+    ))
+
+    # 3. Centerline runway landing guide strip
+    g_mat = guideline_mat or deck_mat
+    objects.append(make_box(
+        f"{prefix}_RunwayStrip",
+        (0.18, sy * 0.72, 0.02),
+        loc + Vector((0.0, -sy * 0.08, sz * 0.5 + 0.01)),
+        g_mat, bevel=0.005
+    ))
+
+    # 4. Runway guidance light dots (emissive)
+    if glow_mat is not None:
+        dot_count = 5
+        step_y = (sy * 0.70) / max(1, dot_count - 1)
+        for i in range(dot_count):
+            dot_y = loc.y - (sy * 0.35) + i * step_y
+            for side in (-1, 1):
+                dot_x = loc.x + side * (sx * 0.38)
+                objects.append(make_cylinder(
+                    f"{prefix}_GuideLight_{'L' if side < 0 else 'R'}_{i+1}",
+                    radius=0.025, depth=0.03,
+                    location=(dot_x, dot_y, loc.z + sz * 0.5 + 0.015),
+                    material=glow_mat, vertices=8
+                ))
+
+    # 5. Side perimeter catwalk railings
+    r_mat = rail_mat or deck_mat
+    for side in (-1, 1):
+        catwalk_x = loc.x + side * (sx * 0.5 + 0.08)
+        objects.append(make_box(
+            f"{prefix}_Catwalk_{'L' if side < 0 else 'R'}",
+            (0.14, sy * 0.90, 0.05),
+            (catwalk_x, loc.y, loc.z + sz * 0.20),
+            r_mat, bevel=0.01
+        ))
+        for post_y in (-sy * 0.35, 0.0, sy * 0.35):
+            objects.append(make_rod(
+                f"{prefix}_RailPost_{'L' if side < 0 else 'R'}_{int(post_y*10)}",
+                (catwalk_x + side * 0.05, loc.y + post_y, loc.z + sz * 0.20),
+                (catwalk_x + side * 0.05, loc.y + post_y, loc.z + sz * 0.5 + 0.12),
+                0.012, r_mat, vertices=6
+            ))
+
+    return objects
+
+
+def make_outrigger_stabilizer_legs(
+    prefix: str,
+    hull_length: float = 3.2,
+    hull_width: float = 2.4,
+    ground_z: float = 0.06,
+    reach_x: float = 0.65,
+    count: int = 4,  # 2 or 4
+    armor_mat: bpy.types.Material | None = None,
+    piston_mat: bpy.types.Material | None = None,
+    pad_mat: bpy.types.Material | None = None,
+) -> list[bpy.types.Object]:
+    """Generates deployable hydraulic stabilizer outrigger jacks with wide ground foot pads for firing stability."""
+    objects = []
+    pad_m = pad_mat or armor_mat
+    pis_m = piston_mat or armor_mat
+
+    y_positions = [-hull_length * 0.35, hull_length * 0.35] if count == 4 else [-hull_length * 0.38]
+    for side in (-1, 1):
+        side_tag = "L" if side < 0 else "R"
+        for idx, y_pos in enumerate(y_positions):
+            tag = f"{side_tag}_{idx+1}"
+            hinge_loc = Vector((side * (hull_width * 0.50), y_pos, ground_z + 0.42))
+            foot_loc = Vector((side * (hull_width * 0.50 + reach_x), y_pos, ground_z + 0.04))
+
+            # 1. Hinge housing on hull flank
+            objects.append(make_box(
+                f"{prefix}_OutriggerHinge_{tag}",
+                (0.18, 0.22, 0.22),
+                hinge_loc, armor_mat, bevel=0.02
+            ))
+            # 2. Diagonal hydraulic ram arm
+            objects.append(make_rod(
+                f"{prefix}_OutriggerArm_{tag}",
+                hinge_loc, foot_loc,
+                0.042, pis_m, vertices=8
+            ))
+            # 3. Heavy circular ground stabilizer pad
+            objects.append(make_cylinder(
+                f"{prefix}_OutriggerPad_{tag}",
+                radius=0.18, depth=0.06,
+                location=foot_loc, material=pad_m,
+                vertices=10, bevel=0.012
+            ))
+
+    return objects
+
+
+def make_heavy_excavator_drum(
+    prefix: str,
+    location: Tuple[float, float, float] | Vector,
+    width: float = 2.2,
+    radius: float = 0.32,
+    drum_mat: bpy.types.Material | None = None,
+    tooth_mat: bpy.types.Material | None = None,
+    arm_mat: bpy.types.Material | None = None,
+) -> list[bpy.types.Object]:
+    """Generates an industrial rotary cutting excavator drum with carbide teeth, hydraulic push arms, and overhead rock guard."""
+    objects = []
+    loc = Vector(location)
+    d_mat = drum_mat or arm_mat
+    t_mat = tooth_mat or d_mat
+
+    # 1. Central rotary cutting drum (oriented along X axis)
+    drum_rot = (0.0, math.radians(90), 0.0)
+    objects.append(make_cylinder(
+        f"{prefix}_ExcavatorDrumCore",
+        radius=radius, depth=width,
+        location=loc, material=d_mat,
+        rotation=drum_rot, vertices=16, bevel=0.02
+    ))
+
+    # 2. Rows of helical cutting teeth
+    tooth_rows = 6
+    teeth_per_row = 7
+    tooth_step_x = (width * 0.85) / max(1, teeth_per_row - 1)
+    for r in range(tooth_rows):
+        angle = (2.0 * math.pi / tooth_rows) * r
+        for c in range(teeth_per_row):
+            t_x = loc.x - width * 0.425 + c * tooth_step_x
+            t_y = loc.y + math.cos(angle) * (radius + 0.05)
+            t_z = loc.z + math.sin(angle) * (radius + 0.05)
+            objects.append(make_box(
+                f"{prefix}_CutterTooth_{r+1}_{c+1}",
+                (0.045, 0.07, 0.07),
+                (t_x, t_y, t_z), t_mat, bevel=0.008,
+                rotation=(angle, 0.0, 0.0)
+            ))
+
+    # 3. Left and right heavy hydraulic lift/push arms
+    a_mat = arm_mat or d_mat
+    for side in (-1, 1):
+        arm_x = loc.x + side * (width * 0.52)
+        arm_start = Vector((arm_x, loc.y - 0.75, loc.z + 0.30))
+        arm_end = Vector((arm_x, loc.y, loc.z))
+        objects.append(make_rod(
+            f"{prefix}_LiftArm_{'L' if side < 0 else 'R'}",
+            arm_start, arm_end,
+            0.055, a_mat, vertices=8
+        ))
+        objects.append(make_cylinder(
+            f"{prefix}_ArmHubCap_{'L' if side < 0 else 'R'}",
+            radius=0.12, depth=0.08,
+            location=(arm_x, loc.y, loc.z), material=d_mat,
+            rotation=drum_rot, vertices=10, bevel=0.015
+        ))
+
+    # 4. Overhead protective debris deflector cowl
+    objects.append(make_box(
+        f"{prefix}_DebrisDeflectorCowl",
+        (width * 1.08, 0.45, 0.08),
+        loc + Vector((0.0, -radius * 0.35, radius + 0.12)),
+        a_mat, bevel=0.02,
+        rotation=(math.radians(18), 0.0, 0.0)
+    ))
+
+    return objects
+
+
+def hex_to_rgb(hex_code: str) -> Tuple[float, float, float]:
+    """Converts a hex string ('#RRGGBB' or 'RRGGBB') to a float RGB tuple (0.0 - 1.0)."""
+    h = hex_code.strip().lstrip("#")
+    if len(h) == 6:
+        r = int(h[0:2], 16) / 255.0
+        g = int(h[2:4], 16) / 255.0
+        b = int(h[4:6], 16) / 255.0
+        return (r, g, b)
+    elif len(h) == 3:
+        r = int(h[0] * 2, 16) / 255.0
+        g = int(h[1] * 2, 16) / 255.0
+        b = int(h[2] * 2, 16) / 255.0
+        return (r, g, b)
+    return (0.5, 0.5, 0.5)
+
+
 class FactionPalette:
     """Pre-calibrated 5-tone PBR material set for a Rogue Command faction."""
 
@@ -3154,46 +3664,91 @@ class FactionPalette:
         )
 
 
-def get_faction_palette(faction: str = "vanguard", prefix: str = "Unit", camo: str = "none") -> FactionPalette:
-    """Returns a pre-calibrated 5-tone PBR material set.
-    Factions:
-      - 'vanguard': Slate teal, seafoam, charcoal gunmetal, amber accent, arc cyan emission
-      - 'siege': Rust ochre, desert sand, cast iron, hazard yellow, molten orange emission
-      - 'syndicate': Deep cobalt, titanium grey, anodized black, electric magenta, plasma cyan emission
-      - 'arctic': Frost white, slate blue, dark tungsten, crimson warning, bright blue emission
-    Camo styles:
-      - 'desert': Ochre sand / khaki two-tone with matte finish
-      - 'urban': Neutral slate / asphalt ash grey with cool cyan accents
-      - 'arctic': Glacial white / blue-grey with high-visibility signal markings
-      - 'woodland': Olive drab / forest green tactical split
-    """
+def get_faction_palette(
+    faction: str = "vanguard",
+    prefix: str = "Unit",
+    camo: str = "none",
+    primary_override: Tuple[float, float, float] | None = None,
+    light_override: Tuple[float, float, float] | None = None,
+    emissive_override: Tuple[float, float, float] | None = None,
+) -> FactionPalette:
+    """Returns a pre-calibrated 5-tone PBR material set with optional custom color overrides."""
     c = camo.lower()
     if c == "desert":
-        return FactionPalette(prefix, (0.42, 0.32, 0.18), (0.55, 0.44, 0.26), (0.07, 0.08, 0.09),
-                              (0.04, 0.045, 0.05), (0.92, 0.52, 0.10), (0.98, 0.42, 0.08), 2.0)
+        p_col = (0.42, 0.32, 0.18)
+        l_col = (0.55, 0.44, 0.26)
+        g_col = (0.07, 0.08, 0.09)
+        t_col = (0.04, 0.045, 0.05)
+        w_col = (0.92, 0.52, 0.10)
+        e_col = (0.98, 0.42, 0.08)
+        e_str = 2.0
     elif c == "urban":
-        return FactionPalette(prefix, (0.22, 0.24, 0.26), (0.36, 0.39, 0.42), (0.05, 0.06, 0.07),
-                              (0.03, 0.035, 0.04), (0.85, 0.85, 0.20), (0.0, 0.85, 1.0), 2.2)
+        p_col = (0.22, 0.24, 0.26)
+        l_col = (0.36, 0.39, 0.42)
+        g_col = (0.05, 0.06, 0.07)
+        t_col = (0.03, 0.035, 0.04)
+        w_col = (0.85, 0.85, 0.20)
+        e_col = (0.0, 0.85, 1.0)
+        e_str = 2.2
     elif c == "arctic":
-        return FactionPalette(prefix, (0.76, 0.82, 0.88), (0.52, 0.58, 0.66), (0.08, 0.10, 0.14),
-                              (0.05, 0.06, 0.08), (0.92, 0.15, 0.18), (0.15, 0.85, 1.0), 2.2)
+        p_col = (0.76, 0.82, 0.88)
+        l_col = (0.52, 0.58, 0.66)
+        g_col = (0.08, 0.10, 0.14)
+        t_col = (0.05, 0.06, 0.08)
+        w_col = (0.92, 0.15, 0.18)
+        e_col = (0.15, 0.85, 1.0)
+        e_str = 2.2
     elif c in ("woodland", "jungle"):
-        return FactionPalette(prefix, (0.18, 0.25, 0.14), (0.28, 0.36, 0.22), (0.06, 0.07, 0.08),
-                              (0.04, 0.045, 0.05), (0.90, 0.65, 0.12), (0.20, 0.95, 0.45), 2.0)
-
-    f = faction.lower()
-    if f == "siege":
-        return FactionPalette(prefix, (0.26, 0.14, 0.075), (0.43, 0.30, 0.16), (0.065, 0.072, 0.078),
-                              (0.035, 0.040, 0.043), (0.92, 0.48, 0.08), (0.98, 0.35, 0.05), 2.2)
-    elif f == "syndicate":
-        return FactionPalette(prefix, (0.055, 0.11, 0.20), (0.28, 0.34, 0.42), (0.035, 0.042, 0.055),
-                              (0.025, 0.031, 0.038), (0.77, 0.045, 0.31), (0.0, 0.74, 1.0), 2.4)
-    elif f == "arctic":
-        return FactionPalette(prefix, (0.72, 0.78, 0.85), (0.45, 0.52, 0.62), (0.08, 0.10, 0.14),
-                              (0.05, 0.06, 0.08), (0.90, 0.12, 0.15), (0.15, 0.85, 1.0), 2.0)
+        p_col = (0.18, 0.25, 0.14)
+        l_col = (0.28, 0.36, 0.22)
+        g_col = (0.06, 0.07, 0.08)
+        t_col = (0.04, 0.045, 0.05)
+        w_col = (0.90, 0.65, 0.12)
+        e_col = (0.20, 0.95, 0.45)
+        e_str = 2.0
     else:
-        return FactionPalette(prefix, (0.12, 0.19, 0.24), (0.22, 0.32, 0.38), (0.07, 0.10, 0.12),
-                              (0.045, 0.055, 0.06), (0.95, 0.32, 0.05), (0.04, 0.72, 0.88), 1.9)
+        f = faction.lower()
+        if f == "siege":
+            p_col = (0.26, 0.14, 0.075)
+            l_col = (0.43, 0.30, 0.16)
+            g_col = (0.065, 0.072, 0.078)
+            t_col = (0.035, 0.040, 0.043)
+            w_col = (0.92, 0.48, 0.08)
+            e_col = (0.98, 0.35, 0.05)
+            e_str = 2.2
+        elif f == "syndicate":
+            p_col = (0.055, 0.11, 0.20)
+            l_col = (0.28, 0.34, 0.42)
+            g_col = (0.035, 0.042, 0.055)
+            t_col = (0.025, 0.031, 0.038)
+            w_col = (0.77, 0.045, 0.31)
+            e_col = (0.0, 0.74, 1.0)
+            e_str = 2.4
+        elif f == "arctic":
+            p_col = (0.72, 0.78, 0.85)
+            l_col = (0.45, 0.52, 0.62)
+            g_col = (0.08, 0.10, 0.14)
+            t_col = (0.05, 0.06, 0.08)
+            w_col = (0.90, 0.12, 0.15)
+            e_col = (0.15, 0.85, 1.0)
+            e_str = 2.0
+        else:
+            p_col = (0.12, 0.19, 0.24)
+            l_col = (0.22, 0.32, 0.38)
+            g_col = (0.07, 0.10, 0.12)
+            t_col = (0.045, 0.055, 0.06)
+            w_col = (0.95, 0.32, 0.05)
+            e_col = (0.04, 0.72, 0.88)
+            e_str = 1.9
+
+    if primary_override is not None:
+        p_col = primary_override
+    if light_override is not None:
+        l_col = light_override
+    if emissive_override is not None:
+        e_col = emissive_override
+
+    return FactionPalette(prefix, p_col, l_col, g_col, t_col, w_col, e_col, e_str)
 
 
 class RogueVehicleBuilder:
@@ -3208,9 +3763,25 @@ class RogueVehicleBuilder:
     - Automated quality diagnostics and multi-perspective studio previews
     """
 
-    def __init__(self, name: str, faction: str = "vanguard", ground_clearance: float = 0.06, camo: str = "none"):
+    def __init__(
+        self,
+        name: str,
+        faction: str = "vanguard",
+        ground_clearance: float = 0.06,
+        camo: str = "none",
+        primary_override: Tuple[float, float, float] | None = None,
+        light_override: Tuple[float, float, float] | None = None,
+        emissive_override: Tuple[float, float, float] | None = None,
+    ):
         self.name = name
-        self.palette = get_faction_palette(faction, name, camo=camo)
+        self.palette = get_faction_palette(
+            faction,
+            name,
+            camo=camo,
+            primary_override=primary_override,
+            light_override=light_override,
+            emissive_override=emissive_override,
+        )
         self.ground_clearance = ground_clearance
         self.objects: list[bpy.types.Object] = []
         self.preserved_pivots: list[str] = []
@@ -3860,6 +4431,157 @@ class RogueVehicleBuilder:
             detail_mat=self.palette.gunmetal,
         )
         self.objects.extend(cabin)
+        return self
+
+    def add_railgun(
+        self,
+        rail_length: float = 2.40,
+        rail_height: float = 0.28,
+        rail_width: float = 0.40,
+        bore_gap: float = 0.09,
+        elevation_deg: float = 8.0,
+    ) -> "RogueVehicleBuilder":
+        gun_pivot = self.turret_center + Vector((0.0, 0.44, 0.02))
+        elev_rad = math.radians(elevation_deg)
+        gun_dir = Vector((0.0, math.cos(elev_rad), math.sin(elev_rad))).normalized()
+        self.gun_pivot = gun_pivot + gun_dir * (rail_length + 0.46)
+        self.gun_dir = gun_dir
+        gun = make_railgun_assembly(
+            f"{self.name}Railgun",
+            gun_pivot=gun_pivot,
+            direction=gun_dir,
+            rail_length=rail_length,
+            rail_height=rail_height,
+            rail_width=rail_width,
+            bore_gap=bore_gap,
+            armor_mat=self.palette.light_armor,
+            rail_mat=self.palette.gunmetal,
+            glow_mat=self.palette.emissive,
+            capacitor_mat=self.palette.primary_armor,
+            accent_mat=self.palette.warning,
+        )
+        self.objects.extend(gun)
+        self.preserved_pivots.append(f"{self.name}Railgun_BreechHousing")
+        return self
+
+    def add_quad_flak(
+        self,
+        barrel_length: float = 1.65,
+        caliber_radius: float = 0.038,
+        spacing_x: float = 0.24,
+        spacing_z: float = 0.20,
+        elevation_deg: float = 34.0,
+    ) -> "RogueVehicleBuilder":
+        gun_pivot = self.turret_center + Vector((0.0, 0.38, 0.04))
+        elev_rad = math.radians(elevation_deg)
+        gun_dir = Vector((0.0, math.cos(elev_rad), math.sin(elev_rad))).normalized()
+        self.gun_pivot = gun_pivot + gun_dir * (barrel_length + 0.44)
+        self.gun_dir = gun_dir
+        flak = make_quad_flak_autocannon_assembly(
+            f"{self.name}QuadFlak",
+            gun_pivot=gun_pivot,
+            direction=gun_dir,
+            barrel_length=barrel_length,
+            caliber_radius=caliber_radius,
+            spacing_x=spacing_x,
+            spacing_z=spacing_z,
+            cradle_mat=self.palette.light_armor,
+            barrel_mat=self.palette.gunmetal,
+            mag_mat=self.palette.primary_armor,
+            accent_mat=self.palette.warning,
+        )
+        self.objects.extend(flak)
+        self.preserved_pivots.append(f"{self.name}QuadFlak_ElevationCradle")
+        return self
+
+    def add_plasma_mortar(
+        self,
+        caliber: float = 0.175,
+        length: float = 0.95,
+        elevation_deg: float = 42.0,
+    ) -> "RogueVehicleBuilder":
+        gun_pivot = self.turret_center + Vector((0.0, 0.40, 0.02))
+        elev_rad = math.radians(elevation_deg)
+        gun_dir = Vector((0.0, math.cos(elev_rad), math.sin(elev_rad))).normalized()
+        self.gun_pivot = gun_pivot + gun_dir * (length + 0.24)
+        self.gun_dir = gun_dir
+        mortar = make_plasma_mortar_assembly(
+            f"{self.name}PlasmaMortar",
+            gun_pivot=gun_pivot,
+            direction=gun_dir,
+            caliber_radius=caliber,
+            barrel_length=length,
+            ring_count=3,
+            armor_mat=self.palette.light_armor,
+            barrel_mat=self.palette.gunmetal,
+            glow_mat=self.palette.emissive,
+            accent_mat=self.palette.warning,
+        )
+        self.objects.extend(mortar)
+        self.preserved_pivots.append(f"{self.name}PlasmaMortar_MortarTrunnion")
+        return self
+
+    def add_flight_deck(
+        self,
+        size: Tuple[float, float, float] = (2.10, 3.20, 0.22),
+        location: Tuple[float, float, float] | None = None,
+    ) -> "RogueVehicleBuilder":
+        if location is None:
+            loc = Vector((0.0, 0.0, self.hull_deck_z + size[2] * 0.5 + 0.02))
+        else:
+            loc = Vector(location)
+        deck = make_flight_deck_assembly(
+            f"{self.name}FlightDeck",
+            size=size,
+            location=loc,
+            deck_mat=self.palette.primary_armor,
+            guideline_mat=self.palette.light_armor,
+            glow_mat=self.palette.emissive,
+            rail_mat=self.palette.gunmetal,
+        )
+        self.objects.extend(deck)
+        return self
+
+    def add_outriggers(
+        self,
+        reach_x: float = 0.65,
+        count: int = 4,
+    ) -> "RogueVehicleBuilder":
+        outriggers = make_outrigger_stabilizer_legs(
+            f"{self.name}Outrigger",
+            hull_length=self.hull_length,
+            hull_width=self.hull_width,
+            ground_z=self.ground_clearance,
+            reach_x=reach_x,
+            count=count,
+            armor_mat=self.palette.primary_armor,
+            piston_mat=self.palette.gunmetal,
+            pad_mat=self.palette.light_armor,
+        )
+        self.objects.extend(outriggers)
+        return self
+
+    def add_excavator_drum(
+        self,
+        width: float = 2.4,
+        radius: float = 0.34,
+        location: Tuple[float, float, float] | None = None,
+    ) -> "RogueVehicleBuilder":
+        if location is None:
+            front_y = self.hull_length * 0.52 + radius
+            loc = Vector((0.0, front_y, self.ground_clearance + radius + 0.02))
+        else:
+            loc = Vector(location)
+        drum = make_heavy_excavator_drum(
+            f"{self.name}Excavator",
+            location=loc,
+            width=width,
+            radius=radius,
+            drum_mat=self.palette.gunmetal,
+            tooth_mat=self.palette.warning,
+            arm_mat=self.palette.primary_armor,
+        )
+        self.objects.extend(drum)
         return self
 
     def add_unity_locators(self) -> "RogueVehicleBuilder":

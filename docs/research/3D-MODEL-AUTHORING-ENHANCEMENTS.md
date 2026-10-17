@@ -442,4 +442,90 @@ Generates `<Name>_Wreckage.fbx` and `<name>-wreckage.blend` for visual combat de
   - Weapons: 462 tris (11.5%)
   - Optics & Greebles: 242 tris (6.0%)
 - **Lifecycle Cleanliness**: Test artifacts were safely verified and removed; zero uncommitted test models exist in `content/` or `unity/`.
-- **Validation Suite**: `dotnet run --project tests/RogueCommandExpansionLoader.ValidationTests -- .` passed 90/91 checks (1 skipped on Windows symlinks).
+- **Validation Suite**: `dotnet run --project tests/RogueCommandExpansionLoader.ValidationTests -- .` passed 101/102 checks (1 skipped on Windows symlinks).
+
+---
+
+## 13. Archetype & CLI Expansion: 16 Iconic Archetypes, 9 Weapons, and Batch/Dry-Run Tools
+
+### A. The 16 Tactical Archetypes Matrix
+The generator suite supports 16 distinct tactical vehicle classes covering ground, hover, walker, airborne, and super-heavy combat roles:
+
+| Archetype | Primary Role | Default Chassis & Mobility | Key Features & Assemblies | Default Weapon |
+|---|---|---|---|---|
+| `tank` / `medium_tank` | Frontline combat | Sloped glacis hull, continuous tracks, skirts | Faceted turret, sensor visor, antenna | `cannon` |
+| `light_tank` | Rapid response | Compact sloped hull, high-speed tracks | Low-profile turret, sensor visor | `autocannon` |
+| `heavy_tank` | Breakthrough armor | Heavy glacis hull, wide continuous tracks | Reinforced turret, side skirts, smoke banks | `dual_cannon` |
+| `super_heavy` | Mobile fortress | Massive hull, 4 independent track pods | Twin citadels, sponsons, smoke, outriggers | `dual_cannon` |
+| `artillery` | Long-range siege | Elongated hull, recoil spade, continuous tracks | Elevated rear turret, hydraulic stabilizers | `howitzer` |
+| `missile_launcher` | Indirect fire support | Armored hull, continuous tracks | Elevated missile pod array (honeycomb) | `missile` |
+| `halftrack` / `amphibious_apc` | Armored personnel carrier | Front all-terrain wheels + rear track assembly | Armored cab, troop compartment, cupola | `gatling` |
+| `bike` | Fast strike / raider | Lightweight bike frame, dual inline wheels | Exposed engine block, low silhouette | `gatling` |
+| `scout_buggy` / `buggy` | Reconnaissance & flanking | Tubular roll cage, 4 all-terrain wheels | Exposed engine, twin exhausts, dual guns | `gatling` |
+| `hover` / `hover_skiff` | All-terrain skimmer | Aerodynamic hull, repulsor cushions | Ventral thruster bells, vectoring exhausts | `cannon` |
+| `mobile_radar` | Battlefield reconnaissance | Light tracked chassis, mast mounts | Rotating command radar dish / rotodome | `gatling` |
+| `walker` / `biped_walker` | Urban/rough terrain mech | Compact torso, digitigrade bipedal legs | Armored hip actuators, hydraulic knee rams | `gatling` |
+| `spider` | All-terrain weapons platform | Low-slung chassis, 4 crawler legs | Articulated femur/tibia joints, ground pads | `missile` |
+| `vtol` / `vtol_gunship` | Close air support gunship | Aerodynamic fuselage, landing skids | Dual ducted tilt-rotors, sensor chin pod | `missile` |
+| `flak_anti_air` | Mobile air defense | Sloped hull, continuous tracks, outriggers | Elevated flak turret, tracking radar dish | `quad_flak` |
+| `siege_crawler` | Super-heavy siege platform | Heavy citadel hull, 4 independent track pods | Outriggers, ammo sponsons, heavy mantlet | `railgun` |
+| `drone_carrier` | Fleet command & deployment | Super-wide hull, continuous tracks | Flight launch deck, bridge tower, rotodome | `missile` |
+| `quad_mech` | Heavy quadruped combat walker | Pelvis core block, 4 heavy crawler legs | Articulated crawler knees, heavy turret | `gatling` |
+| `combat_harvester` | Armed resource extraction | Heavy industrial hull, continuous tracks | Front rotary excavator drum, ore hoppers | `cannon` |
+
+### B. Expanded Procedural Weapon Assemblies
+The procedural weapon suite includes 9 distinct weapon assemblies:
+
+1. **`make_railgun_assembly`**: Dual parallel kinetic rails with armored breech block, top capacitor energy bank, 4 magnetic containment sleeve clamps, and glowing central accelerator core slit.
+2. **`make_quad_flak_autocannon_assembly`**: High-cadence anti-air 2x2 flak autocannon cluster with flash hiders, ammo feed boxes, and dual elevation trunnion cradle.
+3. **`make_plasma_mortar_assembly`**: Heavy siege mortar with 3 magnetic toroidal accelerator rings, radiator cooling coils, and reinforced base collar.
+4. **`make_coaxial_cannon_assembly`**: Rifled tank gun with breech collar, thermal sleeve, bore evacuator, and multi-baffle muzzle brake.
+5. **`make_dual_cannon_assembly`**: Synchronized twin cannon mantlet with dual rifled barrels and muzzle brakes.
+6. **`make_heavy_howitzer_assembly`**: Large-bore siege mortar with reinforced breech, dual hydraulic recoil cylinders, and sector elevation gear.
+7. **`make_rotary_gatling_cannon`**: 6-barrel circular Gatling cluster with drive axle, clamp collars, and ammo feed chute.
+8. **`make_missile_launcher_pod`**: Armored box pod with upward elevation, honeycomb launch tubes, warheads, and backblast vents.
+9. **`make_arc_energy_emitter`**: Futuristic weapon with glowing plasma cathode, induction coils, and convergent discharge prongs.
+
+### C. Advanced Tactical Procedural Assemblies
+1. **`make_flight_deck_assembly`**: Armored flight and launch deck with landing guidance centerline hazard stripes, tie-down pockets, safety catwalks, and perimeter floodlight pylons.
+2. **`make_outrigger_stabilizer_legs`**: Deployable hydraulic stabilizer outrigger arms with telescoping vertical rams, pivot knuckles, and swiveling circular footpads.
+3. **`make_heavy_excavator_drum`**: Heavy industrial rotary cutting drum with helical tungsten carbide cutting teeth, armored debris hood, and hydraulic mounting arms.
+
+### D. CLI & Workflow Tooling (`generate_unit_model.py`)
+- **Direct Hex Color Overrides**: `--primary-color <hex>`, `--light-armor-color <hex>`, `--emissive-color <hex>` for custom faction palettes and elite unit branding.
+- **Subsystem Toggles**: `--outriggers`, `--flight-deck`, `--excavator-drum`.
+- **Validation Dry Run**: `--dry-run` validates CLI arguments, resolves presets, and verifies compatibility without launching Blender meshing operations.
+- **Batch Archetype Generation**: `--batch-all-archetypes` builds all 16 archetypes sequentially with a consolidated tabular report:
+  ```
+  ========================================================
+   BATCH GENERATION COMPLETE - 16 ARCHETYPES REPORT
+  ========================================================
+  Archetype          | Unit Name                    | Tris    | DrawCalls | GroundValid
+  ---------------------------------------------------------------------------
+  tank               | Batch_tank                   | 4120    | 9         | True
+  walker             | Batch_walker                 | 3890    | 8         | True
+  ...
+  ========================================================
+  ```
+- **Structural JSON Export**: `--report-json <path>` exports comprehensive structural and budget health diagnostics:
+  ```json
+  {
+    "name": "SkySweeper",
+    "archetype": "flak_anti_air",
+    "weapon": "quad_flak",
+    "total_triangles": 5636,
+    "total_vertices": 5596,
+    "predicted_draw_calls": 10,
+    "ground_contact_valid": true,
+    "subsystem_breakdown": {
+      "Chassis & Hull": 1770,
+      "Turret & Cabin": 102,
+      "Mobility & Wheels": 1776,
+      "Weapons": 1270,
+      "Optics & Greebles": 718
+    },
+    "lod_levels": { "LOD0": 10, "LOD1": 10, "LOD2": 10 },
+    "colliders": [ "SkySweeper_COLLIDER_Hull", "SkySweeper_COLLIDER_Turret" ]
+  }
+  ```
+

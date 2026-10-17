@@ -110,13 +110,19 @@ Use the tested, high-readability procedural assemblies rather than ad-hoc mesh p
 | | `make_quad_crawler_leg` | Articulated spider/crawler leg: hip actuator, femur ram, knee knuckle, tibia strut, ground pad |
 | | `make_hover_skimmer_assembly` | Anti-grav repulsor cushion, ventral thruster bells, stabilizer strakes, vectoring exhausts |
 | | `make_ducted_tiltrotor_assembly` | Aerodynamic ducted tilt-rotor pod with shroud cowl, spinner hub, blades, and swivel mount |
+| | `make_outrigger_stabilizer_legs` | Deployable hydraulic stabilizer outrigger arms with vertical rams and pivoting footpads |
 | **Heavy Weapons** | `make_coaxial_cannon_assembly` | Coaxially aligned tank gun with breech collar, thermal sleeve, bore evacuator, and muzzle brake |
 | | `make_dual_cannon_assembly` | Synchronized twin cannon mantlet with dual rifled barrels, thermal sleeves, and muzzle brakes |
 | | `make_heavy_howitzer_assembly` | Large-bore siege mortar / howitzer with reinforced breech, recoil cylinders, and sector elevation gear |
 | | `make_rotary_gatling_cannon` | 6-barrel circular Gatling cluster with drive axle, clamp collars, and ammo feed chute |
 | | `make_missile_launcher_pod` | Armored pod with upward elevation, recessed tube array, warheads, and backblast vents |
 | | `make_arc_energy_emitter` | Futuristic weapon with glowing plasma cathode, induction coils, and convergent discharge prongs |
-| **Optics & Greebles** | `make_gimbal_sensor_turret` | 2-axis FLIR targeting pod with azimuth base, elevation yoke, and dual optical lenses |
+| | `make_railgun_assembly` | Dual parallel electromagnetic kinetic rails with capacitor energy bank and accelerator core |
+| | `make_quad_flak_autocannon_assembly` | High-cadence anti-air 2x2 flak autocannon cluster with flash hiders, ammo feed boxes, and cradle |
+| | `make_plasma_mortar_assembly` | Heavy siege mortar with 3 magnetic toroidal accelerator rings, radiator coils, and base collar |
+| **Optics & Greebles** | `make_flight_deck_assembly` | Armored flight / launch deck with landing guidance centerline stripes, tie-downs, and catwalks |
+| | `make_heavy_excavator_drum` | Industrial rotary cutting excavator drum with tungsten carbide teeth and hydraulic mounting arms |
+| | `make_gimbal_sensor_turret` | 2-axis FLIR targeting pod with azimuth base, elevation yoke, and dual optical lenses |
 | | `make_recessed_sensor_visor` | Armored brow hood with deep cavity and glowing HDR sensor slit lenses |
 | | `make_smoke_launcher_rack` | Angled multi-tube defensive smoke grenade discharger bank on mounting bracket |
 | | `make_radar_dish_or_rotodome` | Command/recon radar antenna: parabolic dish with feed horn or elliptical rotodome |
@@ -212,25 +218,49 @@ Run headless vehicle generation directly from the command line using Blender and
     --multiview
 ```
 
-- **Archetypes**: `tank`, `walker`, `bike`, `artillery`, `arc_tank`, `hover`, `spider`, `vtol` (gunship/drone), `halftrack` (APC), `super_heavy` (mobile fortress), `buggy` (recon strike).
-- **Weapons**: `cannon` (ballistic), `gatling` (rotary 6-barrel), `missile` (honeycomb pod), `arc` (plasma cathode & prongs), `howitzer` (heavy siege mortar), `dual_cannon` (synchronized twin barrels).
+- **Archetypes (16 Total)**:
+  - *Main Battle & Armored*: `tank` (`medium_tank`), `light_tank`, `heavy_tank`, `super_heavy`, `artillery`, `missile_launcher`, `halftrack`, `amphibious_apc`.
+  - *Fast Recon & Skimmers*: `bike`, `scout_buggy` (`buggy`), `hover` (`hover_skiff`), `mobile_radar`.
+  - *Mechs & Walkers*: `walker` (`biped_walker`), `spider`, `quad_mech`.
+  - *Airborne & Drone*: `vtol` (`vtol_gunship`).
+  - *Heavy Tactical Platforms*: `flak_anti_air` (mobile air defense with radar & outriggers), `siege_crawler` (super-heavy siege citadel with 4 track pods & outriggers), `drone_carrier` (wide hull with flight deck, bridge tower & rotodome), `combat_harvester` (industrial combat mining platform with rotary cutter drum & ore hoppers).
+- **Weapons (9 Total)**: `cannon` (ballistic tank gun), `autocannon` / `gatling` (rotary 6-barrel), `dual_autocannon` / `dual_cannon` (twin synchronized barrels), `missile` / `missile_pod` (honeycomb pod), `howitzer` (siege howitzer), `arc` / `energy_beam` (plasma cathode & prongs), `railgun` (electromagnetic kinetic rails with capacitor energy bank), `quad_flak` (anti-air 2x2 flak autocannon cluster with flash hiders), `plasma_mortar` (heavy siege mortar with 3 magnetic toroidal accelerator rings).
 - **Factions**: `vanguard` (slate teal), `siege` (rust ochre), `syndicate` (deep cobalt), `arctic` (tundra navy).
 - **Camouflage Variants**: `none`, `desert` (khaki sand), `urban` (asphalt grey), `arctic` (tundra white), `woodland` (olive drab).
 - **Surface Wear Levels**: `pristine` (factory clean), `field_tested` (moderate edge scratches and road grime), `battle_hardened` (heavy combat gouges, exhaust soot, and cavity dirt).
+- **Presets (10 Total)**:
+  - `sky_sweeper`: Flak anti-air with quad flak autocannons, radar dish, and outriggers.
+  - `dreadnought_crawler`: Siege crawler with heavy electromagnetic railgun and 4 outriggers.
+  - `hive_carrier`: Drone carrier with wide flight deck, bridge tower, rotodome, and missile defense.
+  - `titan_quad`: Quad mech with heavy rotary gatling guns and articulated spider legs.
+  - `resource_behemoth`: Combat harvester with front rotary excavator drum and ore hoppers.
+  - `scout`: Fast recon buggy with dual rotary gatlings.
+  - `brawler`: Armored medium tank with main cannon and side skirts.
+  - `artillery_battery`: Long-range artillery platform with heavy siege howitzer and stabilizers.
+  - `missile_support`: Mobile missile launcher with elevated missile pod.
+  - `vtol_patrol`: Agile ducted tilt-rotor gunship with chin gatling and missile pods.
 - **Optimization & Engine Flags**:
   - `--lods`: Generates multi-level LOD chain (LOD0 100%, LOD1 50%, LOD2 22%) and exports `_LODs.fbx`.
   - `--colliders`: Generates low-poly physics collision boxes (`_COLLIDER_Hull`, `_COLLIDER_Turret`).
   - `--gameplay-json`: Exports companion `.gameplay.json` with kinematics, collider bounds, sockets, and damage triggers.
   - `--wreckage`: Exports battle-damaged / burned wreckage variant `_Wreckage.fbx` and `-wreckage.blend`.
   - `--target-budget <int>`: Sets target triangle budget for subsystem profiling (default: 4000).
-- **Presets**: `siege_breaker` (super-heavy dual-cannon), `recon_interceptor` (strike buggy gatling), `gunship_alpha` (VTOL missile), `apc_enforcer` (halftrack support), `dune_raider` (strike bike).
+  - `--report-json <path>`: Exports comprehensive structural report JSON with polygon counts, draw calls, LODs, colliders, and subsystem breakdown.
+  - `--dry-run`: Validates CLI parameters and prints planned vehicle configuration without running Blender meshing operations.
+  - `--batch-all-archetypes`: Builds all 16 archetypes sequentially into the output directory with a tabular console summary.
+- **Subsystem & Palette CLI Flags**:
+  - `--outriggers`: Adds deployable hydraulic stabilizer outriggers.
+  - `--flight-deck`: Adds armored flight / drone launch deck with guidance stripes.
+  - `--excavator-drum`: Adds heavy front rotary cutting excavator drum.
+  - `--primary-color <hex>`: Custom hex override for primary armor (e.g. `#1f3a52`).
+  - `--light-armor-color <hex>`: Custom hex override for light armor (e.g. `#3b5f78`).
+  - `--emissive-color <hex>`: Custom hex override for emissive glow (e.g. `#00ffee`).
 - **Outputs**: Generates editable `.blend`, Unity-optimized `.fbx` with lightmap UVs, 4-channel vertex color shading, 11-socket empties, batched submeshes, collision hulls, companion `.gameplay.json`, and 4-view orthographic preview sheet.
 
 ### Automated Quality & Subsystem Profiling Diagnostics
 Always invoke `validate_model_mesh_quality(model_objects)` and `profile_model_budget_and_drawcalls(model_objects)` prior to export. They verify:
 - **Ground Contact Check**: Confirms $Z_{\min} \in [-0.02\text{m}, 0.08\text{m}]$ for ground units ($Z_{\min} \le 0.55\text{m}$ for hover/vtol).
-- **Subsystem Triangle Distribution**: Categorizes geometry into Chassis, Turret, Mobility, Weapons, and Optics/Greebles, reporting percentage of budget consumed.
-- **Material Slot Hygiene**: Flags any object with missing or null PBR material assignments.
+- **Subsystem Triangle Distribution**: Categorizes geometry into Chassis & Hull, Turret & Cabin, Mobility & Wheels, Weapons, and Optics & Greebles, reporting percentage of budget consumed.
 - **Material Slot Hygiene**: Flags any object with missing or null PBR material assignments.
 
 ### Multi-Perspective RTS Studio
