@@ -26,6 +26,20 @@ On this machine, BepInEx 5.4.23.5 Mono x64 and the community BepInEx MCP bridge 
 
 Read [the project README](../../README.md), then [the content schema guide](../../content/schema/README.md). Use [the baseline research](BASELINE.md) and [asset catalog](ASSET-CATALOG.md) for evidence about the installed game. This handoff describes the implementation after the original investigation baseline; the product goal is new game content, and the loader and Unity project support that goal.
 
+## Repository-local skills
+
+Task-specific Codex skills live under `.agents/skills/` and are versioned with this repository:
+
+| Skill | Use it for |
+|---|---|
+| `rogue-command-unit-authoring` | Unit construction paths, balance, visuals, cards, and localization. |
+| `rogue-command-stage-authoring` | Progression variants, world/map references, and blueprint-pool eligibility. |
+| `rogue-command-ai-authoring` | Compiled AI modules, parameter validation, lifecycle, and profile scope. |
+| `rogue-command-game-research` | REA/Unity inspection, compatibility identity, and evidence quality. |
+| `rogue-command-pack-validation` | Offline schema/harness checks, bundle builds, and install ZIP audits. |
+
+The skills summarize this repository's verified workflows and limitations. They do not establish that any unit, stage, or AI works in-game.
+
 ## Compatibility identity
 
 The currently verified local target is:

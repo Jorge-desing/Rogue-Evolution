@@ -1,0 +1,3 @@
+interface:
+  display_name: "Rogue Command Stage Authoring"
+  short_description: "Create and validate Rogue Command stages and map references"

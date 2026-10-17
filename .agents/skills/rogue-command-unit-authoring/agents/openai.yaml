@@ -1,0 +1,3 @@
+interface:
+  display_name: "Rogue Command Unit Authoring"
+  short_description: "Create Rogue Command unit models, balance, icons, and names"

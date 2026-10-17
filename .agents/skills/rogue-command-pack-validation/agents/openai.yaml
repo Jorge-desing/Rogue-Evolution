@@ -1,0 +1,3 @@
+interface:
+  display_name: "Rogue Command Pack Validation"
+  short_description: "Validate Rogue Command packs, bundles, and release ZIPs"

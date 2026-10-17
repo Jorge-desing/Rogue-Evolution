@@ -29,6 +29,8 @@ El ensamblado se genera en `artifacts/plugin/RogueCommandExpansionLoader.dll`. E
 
 ## Herramientas de contenido
 
+Las skills del repositorio en `.agents/skills/` orientan a agentes por área: `rogue-command-unit-authoring`, `rogue-command-stage-authoring`, `rogue-command-ai-authoring`, `rogue-command-game-research` y `rogue-command-pack-validation`. Se basan en el contrato y la evidencia del handoff; no elevan una validación local a prueba de juego.
+
 Unity 2021.3.45f2 ya está instalado para compilar AssetBundles. Blender 4.5.14 LTS y los inspectores de runtime UnityExplorer 4.8.2 y Runtime Unity Editor 6.3.2.1 se guardan bajo `.tools/`; esta carpeta está ignorada por Git. Para volver a preparar las copias locales en otro checkout:
 
 ```powershell
