@@ -93,6 +93,8 @@ namespace RogueCommandExpansionLoader.Content
         private readonly FieldInfo _nativeEntityRowsField;
         private readonly FieldInfo _aiDeactivatedField;
         private readonly FieldInfo _aiDeckEntryEntityIdField;
+        private readonly FieldInfo _aiDeckEntryStartingInAscensionLevelField;
+        private readonly FieldInfo _aiDeckEntryCountPerStageField;
         private readonly FieldInfo _aiBasesField;
         private readonly FieldInfo _aiBaseEntitiesInDeckField;
         private readonly FieldInfo _worldsField;
@@ -265,6 +267,13 @@ namespace RogueCommandExpansionLoader.Content
                 throw new InvalidOperationException("AiBehaviour.restrictedToMaps is not List<LandscapeGenerator>.");
             }
             _aiDeckEntryEntityIdField = RequireField(_aiDeckEntryType, "entityId", typeof(string));
+            _aiDeckEntryStartingInAscensionLevelField = RequireField(
+                _aiDeckEntryType, "startingInAscensionLevel", typeof(int));
+            _aiDeckEntryCountPerStageField = FindField(_aiDeckEntryType, "countPerStage", InstanceFields);
+            if (!IsExactList(_aiDeckEntryCountPerStageField.FieldType, typeof(Vector2Int)))
+            {
+                throw new InvalidOperationException("EntityInAiDeck.countPerStage is not List<Vector2Int>.");
+            }
             _aiBasesField = FindField(_aiBehaviourType, "aiBases", InstanceFields);
             if (!IsExactList(_aiBasesField.FieldType, FindUniqueType("AiBase")))
             {
@@ -1312,6 +1321,32 @@ namespace RogueCommandExpansionLoader.Content
                     }
                 }
             }
+
+            ContentAiProfileDefinition[] profiles = candidate.ValidatedDefinition.aiProfiles;
+            for (int i = 0; i < profiles.Length; i++)
+            {
+                ContentAiProfileDefinition profile = profiles[i];
+                if (profile == null || profile.unitEntries == null)
+                {
+                    continue;
+                }
+
+                for (int j = 0; j < profile.unitEntries.Length; j++)
+                {
+                    ContentAiUnitEntryDefinition unitEntry = profile.unitEntries[j];
+                    if (unitEntry == null || String.IsNullOrWhiteSpace(unitEntry.unitId))
+                    {
+                        continue;
+                    }
+
+                    PackCandidate owner;
+                    if (unitOwners.TryGetValue(unitEntry.unitId, out owner) &&
+                        !System.Object.ReferenceEquals(owner, candidate))
+                    {
+                        candidate.Dependencies.Add(owner);
+                    }
+                }
+            }
         }
 
         private void LoadPacksInDependencyOrder(List<PackCandidate> candidates)
@@ -1769,6 +1804,8 @@ namespace RogueCommandExpansionLoader.Content
                         throw new InvalidDataException("Perfil AI " + profile.id +
                             ": AiBehaviour.aiBases debe contener al menos una base configurada.");
                     }
+
+                    AppendAiUnitEntries(profile, aiBases, temporaryUnits, packageName);
 
                     int totalDeckEntries = 0;
                     for (int baseIndex = 0; baseIndex < aiBases.Count; baseIndex++)
@@ -2721,6 +2758,110 @@ namespace RogueCommandExpansionLoader.Content
                     throw new InvalidDataException(owner + " en '" + packageName +
                         "': el prefab contiene un script sin resolver en un componente de su jerarquía.");
                 }
+            }
+        }
+
+        private void AppendAiUnitEntries(
+            ContentAiProfileDefinition profile,
+            IList aiBases,
+            List<LoadedUnit> temporaryUnits,
+            string packageName)
+        {
+            ContentAiUnitEntryDefinition[] unitEntries = profile.unitEntries ??
+                new ContentAiUnitEntryDefinition[0];
+            if (unitEntries.Length == 0)
+            {
+                return;
+            }
+
+            if (String.IsNullOrWhiteSpace(profile.nativeTemplateId) || !profile.scopeToReferencedStages)
+            {
+                throw new InvalidDataException("Perfil AI " + profile.id + " en '" + packageName +
+                    "': las entradas de unidad requieren un clon nativo aislado y limitado a sus etapas.");
+            }
+
+            for (int i = 0; i < unitEntries.Length; i++)
+            {
+                ContentAiUnitEntryDefinition definition = unitEntries[i];
+                if (definition == null || String.IsNullOrWhiteSpace(definition.unitId))
+                {
+                    throw new InvalidDataException("Perfil AI " + profile.id + " en '" + packageName +
+                        "': la entrada de unidad " + i + " está vacía.");
+                }
+
+                if (!IsUnitAvailable(definition.unitId, temporaryUnits))
+                {
+                    throw new InvalidDataException("Perfil AI " + profile.id + " en '" + packageName +
+                        "': la unidad " + definition.unitId + " no está registrada ni disponible.");
+                }
+
+                if (definition.baseIndex < 0 || definition.baseIndex >= aiBases.Count)
+                {
+                    throw new InvalidDataException("Perfil AI " + profile.id + " en '" + packageName +
+                        "': baseIndex " + definition.baseIndex + " no existe en la plantilla nativa.");
+                }
+
+                if (definition.startingInAscensionLevel < 0 ||
+                    definition.startingInAscensionLevel > ContentPackValidator.MaxAiUnitStartingAscensionLevel ||
+                    definition.countAtStart < 1 ||
+                    definition.countAtStart > ContentPackValidator.MaxAiUnitCountAtStart ||
+                    definition.maxLiving < definition.countAtStart ||
+                    definition.maxLiving > ContentPackValidator.MaxAiUnitMaxLiving)
+                {
+                    throw new InvalidDataException("Perfil AI " + profile.id + " en '" + packageName +
+                        "': la configuración de cantidad o ascensión de " + definition.unitId + " no es válida.");
+                }
+
+                object aiBase = aiBases[definition.baseIndex];
+                if (aiBase == null || aiBase.GetType() != _aiBaseType)
+                {
+                    throw new InvalidDataException("Perfil AI " + profile.id + " en '" + packageName +
+                        "': la base " + definition.baseIndex + " tiene un tipo inesperado.");
+                }
+
+                IList deckEntries = _aiBaseEntitiesInDeckField.GetValue(aiBase) as IList;
+                if (deckEntries == null)
+                {
+                    throw new InvalidDataException("Perfil AI " + profile.id + " en '" + packageName +
+                        "': entitiesInAiDeck es nulo en la base " + definition.baseIndex + ".");
+                }
+
+                for (int deckIndex = 0; deckIndex < deckEntries.Count; deckIndex++)
+                {
+                    object current = deckEntries[deckIndex];
+                    if (current == null || current.GetType() != _aiDeckEntryType)
+                    {
+                        throw new InvalidDataException("Perfil AI " + profile.id + " en '" + packageName +
+                            "': una entrada nativa de entitiesInAiDeck tiene un tipo inesperado.");
+                    }
+
+                    string existingId = _aiDeckEntryEntityIdField.GetValue(current) as string;
+                    if (String.Equals(existingId, definition.unitId, StringComparison.Ordinal))
+                    {
+                        throw new InvalidDataException("Perfil AI " + profile.id + " en '" + packageName +
+                            "': la unidad " + definition.unitId + " ya aparece en el deck de la base " +
+                            definition.baseIndex + ".");
+                    }
+                }
+
+                object newEntry = Activator.CreateInstance(_aiDeckEntryType);
+                _aiDeckEntryEntityIdField.SetValue(newEntry, definition.unitId);
+                _aiDeckEntryStartingInAscensionLevelField.SetValue(
+                    newEntry, definition.startingInAscensionLevel);
+
+                object countPerStage = Activator.CreateInstance(_aiDeckEntryCountPerStageField.FieldType);
+                IList counts = countPerStage as IList;
+                if (counts == null)
+                {
+                    throw new InvalidDataException("Perfil AI " + profile.id + " en '" + packageName +
+                        "': no se pudo crear la lista countPerStage de EntityInAiDeck.");
+                }
+
+                // EntityInAiDeck clamps stage access to the last list item. A single pair therefore
+                // supplies the same starting/max-living values throughout this scoped AI profile.
+                counts.Add(new Vector2Int(definition.countAtStart, definition.maxLiving));
+                _aiDeckEntryCountPerStageField.SetValue(newEntry, countPerStage);
+                deckEntries.Add(newEntry);
             }
         }
 

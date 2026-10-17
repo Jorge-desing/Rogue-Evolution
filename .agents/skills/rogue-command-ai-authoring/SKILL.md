@@ -21,4 +21,6 @@ Use this skill when implementing an AI profile, adding a compiled module, or cha
 
 ## Be precise about behavior
 
+- `AiBase.entitiesInAiDeck` can contain mobile units as well as buildings. Static inspection of the pinned 1.0.9 assembly found that `AiBehaviour.BuildBaseStartSetup` sends non-building entries through `EntityFactory.InstantiateEntity`, tags them as AI, and assigns their AI base index. Add mod units through `unitEntries` on a `scopeToReferencedStages: true` native profile so only its isolated clone changes; the loader validates the unit reference and target base index and resolves cross-pack unit dependencies. `countAtStart` controls starting units; `maxLiving` preserves the native deck field and is bounded against it. This is static and offline-validation evidence, not in-game proof.
+
 The scheduled-build sample constructs buildings already present in the native AI deck; it does not add a deck. The reactive-defense sample dispatches bounded counterattacks; it does not prove a new strategy works. Treat every module as unverified in-game until a Steam-launched match shows the intended decision and lifecycle. Use static inspection and offline parser/registry checks first, then a reversible test profile for authorized runtime validation.

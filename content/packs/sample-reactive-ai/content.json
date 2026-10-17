@@ -17,7 +17,10 @@
       "mapSizeMin": 35,
       "mapSizeMax": 80,
       "isPartOfDemo": false,
-      "unitIds": ["sample-native:scout-tank"],
+      "unitIds": [
+        "sample-native:scout-tank",
+        "sample-native:skirmish-bike"
+      ],
       "aiProfileIds": ["sample-reactive-ai:base-defense"]
     }
   ],
@@ -26,6 +29,15 @@
       "id": "sample-reactive-ai:base-defense",
       "nativeTemplateId": "_01_Enemy - Melee Poker PCXPoker Variant",
       "scopeToReferencedStages": true,
+      "unitEntries": [
+        {
+          "unitId": "sample-native:skirmish-bike",
+          "baseIndex": 0,
+          "startingInAscensionLevel": 0,
+          "countAtStart": 1,
+          "maxLiving": 1
+        }
+      ],
       "modules": [
         {
           "moduleId": "sample:reactive-base-defense",

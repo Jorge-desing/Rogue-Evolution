@@ -88,6 +88,11 @@ namespace RogueCommandExpansionLoader.Content
         }
         public const int MaxAssetBundlesPerPack = 128;
         public const int MaxAiModulesPerProfile = 8;
+        public const int MaxAiUnitEntriesPerProfile = 32;
+        public const int MaxAiUnitCountAtStart = 8;
+        public const int MaxAiUnitMaxLiving = 32;
+        public const int MaxAiBaseIndex = 31;
+        public const int MaxAiUnitStartingAscensionLevel = 19;
         public const long MaxManifestBundleBytes = 64L * 1024L * 1024L;
         public const long MaxAssetBundleBytes = 512L * 1024L * 1024L;
         public const long MaxTotalContentBundleBytes = 2L * 1024L * 1024L * 1024L;
@@ -388,6 +393,64 @@ namespace RogueCommandExpansionLoader.Content
                     Add(diagnostics, "ai-profile.resource-name-duplicate", itemPath,
                         "AI resource names must be unique within a content pack.");
                 }
+
+                ContentAiUnitEntryDefinition[] unitEntries = profile.unitEntries ??
+                    new ContentAiUnitEntryDefinition[0];
+                if (unitEntries.Length > MaxAiUnitEntriesPerProfile)
+                {
+                    Add(diagnostics, "ai-profile.unit-entries-limit", itemPath + ".unitEntries",
+                        "An AI profile can add at most " + MaxAiUnitEntriesPerProfile + " unit entries.");
+                }
+
+                if (unitEntries.Length > 0 && (!hasNativeTemplate || !profile.scopeToReferencedStages))
+                {
+                    Add(diagnostics, "ai-profile.unit-entries-require-scoped-native",
+                        itemPath + ".unitEntries",
+                        "AI unit entries can only extend an isolated, stage-scoped native-template profile.");
+                }
+
+                var referencedAiUnits = new List<string>(unitEntries.Length);
+                for (int unitIndex = 0; unitIndex < unitEntries.Length; unitIndex++)
+                {
+                    ContentAiUnitEntryDefinition unitEntry = unitEntries[unitIndex];
+                    string unitPath = itemPath + ".unitEntries[" + unitIndex + "]";
+                    if (unitEntry == null)
+                    {
+                        Add(diagnostics, "entry.null", unitPath, "AI unit entries cannot be null.");
+                        continue;
+                    }
+
+                    referencedAiUnits.Add(unitEntry.unitId);
+                    if (unitEntry.baseIndex < 0 || unitEntry.baseIndex > MaxAiBaseIndex)
+                    {
+                        Add(diagnostics, "ai-unit-entry.base-index-invalid", unitPath + ".baseIndex",
+                            "AI base indices must be between 0 and " + MaxAiBaseIndex + ".");
+                    }
+
+                    if (unitEntry.startingInAscensionLevel < 0 ||
+                        unitEntry.startingInAscensionLevel > MaxAiUnitStartingAscensionLevel)
+                    {
+                        Add(diagnostics, "ai-unit-entry.ascension-invalid",
+                            unitPath + ".startingInAscensionLevel",
+                            "Starting ascension must be between 0 and " + MaxAiUnitStartingAscensionLevel + ".");
+                    }
+
+                    if (unitEntry.countAtStart < 1 || unitEntry.countAtStart > MaxAiUnitCountAtStart)
+                    {
+                        Add(diagnostics, "ai-unit-entry.count-at-start-invalid", unitPath + ".countAtStart",
+                            "AI unit entries must start with 1 to " + MaxAiUnitCountAtStart + " units.");
+                    }
+
+                    if (unitEntry.maxLiving < unitEntry.countAtStart ||
+                        unitEntry.maxLiving > MaxAiUnitMaxLiving)
+                    {
+                        Add(diagnostics, "ai-unit-entry.max-living-invalid", unitPath + ".maxLiving",
+                            "maxLiving must be at least countAtStart and at most " + MaxAiUnitMaxLiving + ".");
+                    }
+                }
+
+                ValidateReferences(referencedAiUnits.ToArray(), itemPath + ".unitEntries",
+                    unitIds, registrySnapshot, true, diagnostics);
 
                 var modules = RequireArray(profile.modules, itemPath + ".modules", diagnostics);
                 if (modules.Length == 0)

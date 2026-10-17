@@ -228,6 +228,7 @@
       "id": "sample-native:quick-hunter-extension",
       "nativeTemplateId": "_01_ Quick Hunter Enemy Var",
       "scopeToReferencedStages": true,
+      "unitEntries": [],
       "modules": [
         {
           "moduleId": "sample:scheduled-base-build",
@@ -243,6 +244,7 @@
       "id": "sample-native:horde-swarm-assault",
       "nativeTemplateId": "_01_CF Hordes Enemy - constant weak attacks, some big waves, learn crowd control and AoE Variant",
       "scopeToReferencedStages": true,
+      "unitEntries": [],
       "modules": [
         {
           "moduleId": "sample:scheduled-base-build",
@@ -258,6 +260,7 @@
       "id": "sample-native:raider-patrol-strike",
       "nativeTemplateId": "_01_ Jeeps",
       "scopeToReferencedStages": true,
+      "unitEntries": [],
       "modules": [
         {
           "moduleId": "sample:scheduled-base-build",

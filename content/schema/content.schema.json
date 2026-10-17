@@ -250,6 +250,11 @@
         "prefabAssetName": { "type": "string", "pattern": "^RCL_[A-Za-z0-9_]{1,92}$" },
         "nativeTemplateId": { "type": "string", "minLength": 1, "pattern": "\\S" },
         "scopeToReferencedStages": { "type": "boolean" },
+        "unitEntries": {
+          "type": "array",
+          "maxItems": 32,
+          "items": { "$ref": "#/$defs/aiUnitEntry" }
+        },
         "modules": {
           "type": "array",
           "minItems": 1,
@@ -283,6 +288,18 @@
           "then": { "required": ["nativeTemplateId"] }
         }
       ]
+    },
+    "aiUnitEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["unitId", "baseIndex", "startingInAscensionLevel", "countAtStart", "maxLiving"],
+      "properties": {
+        "unitId": { "$ref": "#/$defs/namespacedId" },
+        "baseIndex": { "type": "integer", "minimum": 0, "maximum": 31 },
+        "startingInAscensionLevel": { "type": "integer", "minimum": 0, "maximum": 19 },
+        "countAtStart": { "type": "integer", "minimum": 1, "maximum": 8 },
+        "maxLiving": { "type": "integer", "minimum": 1, "maximum": 32 }
+      }
     },
     "aiModule": {
       "type": "object",

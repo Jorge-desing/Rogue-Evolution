@@ -189,18 +189,25 @@ var tests = new (string Name, Action Run)[]
             throw new InvalidOperationException("A native-template unit did not retain its template localization fallback.");
         }
     }),
-    ("reactive AI sample links Sandlance through a validated cross-pack unit reference", () =>
+    ("reactive AI sample adds a cross-pack unit to its isolated AI roster", () =>
     {
         ContentStageDefinition stage = reactiveAiSample.stages.Single(
             candidate => candidate.id == "sample-reactive-ai:counterstrike-lane");
+        ContentAiProfileDefinition profile = reactiveAiSample.aiProfiles.Single(
+            candidate => candidate.id == "sample-reactive-ai:base-defense");
         if (stage.unitIds == null || !stage.unitIds.Contains("sample-native:scout-tank") ||
+            !stage.unitIds.Contains("sample-native:skirmish-bike") ||
+            profile.unitEntries == null || !profile.unitEntries.Any(entry =>
+                entry != null && entry.unitId == "sample-native:skirmish-bike" && entry.baseIndex == 0 &&
+                entry.countAtStart == 1 && entry.maxLiving == 1) ||
             stage.aiProfileIds == null || !stage.aiProfileIds.Contains("sample-reactive-ai:base-defense"))
         {
-            throw new InvalidOperationException("The counterstrike stage does not link Sandlance and its scoped AI profile.");
+            throw new InvalidOperationException("The counterstrike stage does not add the bike to its player and AI rosters.");
         }
 
         WithPackage(reactiveAiSample, (pack, root) =>
-            ExpectValid(pack, root, new EmptySnapshot("sample-native:scout-tank"), new KnownModuleValidator()));
+            ExpectValid(pack, root, new EmptySnapshot("sample-native:scout-tank", "sample-native:skirmish-bike"),
+                new KnownModuleValidator()));
         WithPackage(reactiveAiSample, (pack, root) =>
             ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(), "reference.unresolved"));
     }),
@@ -509,6 +516,75 @@ var tests = new (string Name, Action Run)[]
             pack.aiProfiles[0].nativeTemplateId = "_01_ Quick Hunter Enemy Var";
             pack.aiProfiles[0].scopeToReferencedStages = true;
             ExpectValid(pack, root, new EmptySnapshot(), new KnownModuleValidator());
+        });
+    }),
+    ("scoped native AI can add a unit declared by the same pack", () =>
+    {
+        WithPackage(sample, (pack, root) =>
+        {
+            ContentAiProfileDefinition profile = pack.aiProfiles[0];
+            profile.assetBundleId = null;
+            profile.prefabAssetName = null;
+            profile.nativeTemplateId = "_01_ Quick Hunter Enemy Var";
+            profile.scopeToReferencedStages = true;
+            profile.unitEntries =
+            [
+                new ContentAiUnitEntryDefinition
+                {
+                    unitId = pack.units[0].id,
+                    baseIndex = 0,
+                    startingInAscensionLevel = 0,
+                    countAtStart = 1,
+                    maxLiving = 1
+                }
+            ];
+
+            ExpectValid(pack, root, new EmptySnapshot(), new KnownModuleValidator());
+        });
+    }),
+    ("AI unit entries reject custom prefabs that are not isolated clones", () =>
+    {
+        WithPackage(sample, (pack, root) =>
+        {
+            pack.aiProfiles[0].unitEntries =
+            [
+                new ContentAiUnitEntryDefinition
+                {
+                    unitId = pack.units[0].id,
+                    baseIndex = 0,
+                    startingInAscensionLevel = 0,
+                    countAtStart = 1,
+                    maxLiving = 1
+                }
+            ];
+
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "ai-profile.unit-entries-require-scoped-native");
+        });
+    }),
+    ("AI unit entries enforce a valid maximum living count", () =>
+    {
+        WithPackage(sample, (pack, root) =>
+        {
+            ContentAiProfileDefinition profile = pack.aiProfiles[0];
+            profile.assetBundleId = null;
+            profile.prefabAssetName = null;
+            profile.nativeTemplateId = "_01_ Quick Hunter Enemy Var";
+            profile.scopeToReferencedStages = true;
+            profile.unitEntries =
+            [
+                new ContentAiUnitEntryDefinition
+                {
+                    unitId = pack.units[0].id,
+                    baseIndex = 0,
+                    startingInAscensionLevel = 0,
+                    countAtStart = 1,
+                    maxLiving = 0
+                }
+            ];
+
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "ai-unit-entry.max-living-invalid");
         });
     }),
     ("native AI modules require an isolated stage-scoped clone", () =>

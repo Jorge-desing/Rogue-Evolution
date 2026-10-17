@@ -85,7 +85,18 @@ namespace RogueCommandExpansionLoader.Content
         public string prefabAssetName;
         public string nativeTemplateId;
         public bool scopeToReferencedStages;
+        public ContentAiUnitEntryDefinition[] unitEntries;
         public ContentAiModuleDefinition[] modules;
+    }
+
+    [Serializable]
+    public sealed class ContentAiUnitEntryDefinition
+    {
+        public string unitId;
+        public int baseIndex;
+        public int startingInAscensionLevel;
+        public int countAtStart;
+        public int maxLiving;
     }
 
     [Serializable]
@@ -213,7 +224,20 @@ namespace RogueCommandExpansionLoader.Content
                 prefabAssetName = source.prefabAssetName,
                 nativeTemplateId = source.nativeTemplateId,
                 scopeToReferencedStages = source.scopeToReferencedStages,
+                unitEntries = CloneArray(source.unitEntries, CloneAiUnitEntry),
                 modules = CloneArray(source.modules, CloneAiModule)
+            };
+        }
+
+        private static ContentAiUnitEntryDefinition CloneAiUnitEntry(ContentAiUnitEntryDefinition source)
+        {
+            return source == null ? null : new ContentAiUnitEntryDefinition
+            {
+                unitId = source.unitId,
+                baseIndex = source.baseIndex,
+                startingInAscensionLevel = source.startingInAscensionLevel,
+                countAtStart = source.countAtStart,
+                maxLiving = source.maxLiving
             };
         }
 
