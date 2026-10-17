@@ -6,7 +6,15 @@
 
 ## Procedural 3D authoring verification — 2026-10-17
 
-Read section 11 of [3D model authoring enhancements](3D-MODEL-AUTHORING-ENHANCEMENTS.md) before relying on that toolset's capability claims. A local Blender audit constructed/batched all 11 default archetypes and exported the fluent example, but measured 6–10 mesh groups and seven archetypes above 5,000 source triangles. The CLI currently labels polygon counts as triangles, generates no LOD meshes, and does not enforce quality gates. Vertex dirt has no verified Standard-shader rendering path; the source blend is saved before baking. Socket names, current palette values and CLI limitations are corrected in that document and linked from the 3D skill. No game or Unity runtime behavior was tested in this authoring audit.
+Read sections 9–12 of [3D model authoring enhancements](3D-MODEL-AUTHORING-ENHANCEMENTS.md) for the verified capabilities and procedural architecture of the kit. The authoring pipeline in `tools/RogueModelKit.py` and `tools/generate_unit_model.py` (mirrored in `.agents/skills/rogue-command-3d-model-authoring/`) provides:
+1. **Subsystem Geometry Budget Profiling (`profile_model_budget_and_drawcalls`)**: Calculates true triangle counts and profiles distribution across 5 functional subsystems (Chassis, Turret, Mobility, Weapons, Optics/Greebles) with draw call predictions.
+2. **Multi-Level LOD Generation (`generate_lod_chain`)**: Automated decimation to LOD0 (100%), LOD1 (50%), and LOD2 (22–25%) preserving planar boundaries and material boundaries (`delimit={"NORMAL", "MATERIAL"}`), exporting companion `<Name>_LODs.fbx`.
+3. **Physics Collision Hulls (`generate_collision_hulls`)**: Flat-shaded low-poly box colliders (`<Prefix>_COLLIDER_Hull`, `<Prefix>_COLLIDER_Turret`) tagged with `is_collider = True` for Unity physics.
+4. **Multi-Channel Procedural Vertex Shading (`bake_advanced_vertex_shading`)**: Encodes 4 properties into RGBA vertex colors (`Mesh.colors32`): R = Cavity AO/dirt, G = Curvature edge wear, B = Thermal soot on exhausts/muzzles, A = Team tint mask. Surface wear levels `pristine`, `field_tested`, and `battle_hardened` control intensity.
+5. **Standardized 11-Socket Gameplay Hierarchy (`create_unity_locator_sockets`)**: Exports empty locators oriented to Unity conventions (+Z forward, +Y up): `Socket_MuzzlePrimary/Secondary`, `Socket_TurretYaw/Pitch`, `Socket_RecoilPrimary`, `Socket_SensorOptics`, `Socket_Exhaust_L/R`, `Socket_DamageSmoke/Fire`, `Socket_CenterOfMass`, `Socket_GroundContact`.
+6. **Companion Gameplay Metadata JSON (`export_gameplay_metadata`)**: Generates sidecar `<Name>.gameplay.json` declaring `visualRootPath` for native templates (`Vehicle` vs `GameObject/BombBike`), `BoxCollider` bounds, kinematics, and damage particle thresholds.
+7. **Procedural Burned Wreckage State (`make_wreckage_variant`)**: Exports `<Name>_Wreckage.fbx` and `.blend` with dislodged/tilted turret, charred armor materials, and severe vertex damage.
+8. **Headless CLI Generator**: `tools/generate_unit_model.py` supports `--lods`, `--colliders`, `--wear`, `--gameplay-json`, `--wreckage`, and `--target-budget`. Verified in headless Blender 4.5.14 LTS; no game or Unity runtime behavior was tested in this authoring audit.
 
 ## Unit production-building invariant (2026-10-17)
 
