@@ -318,7 +318,10 @@ def build_colossus_siege_model():
                          rotation=(math.radians(22), 0.0, 0.0)),
         ]
 
-    # 8. Studio Preview Setup, AgX Rendering, and FBX Export
+    # 8. Automated Quality Diagnostics & Validation
+    diagnostics = rmk.validate_model_mesh_quality(model_objects)
+
+    # 9. Studio Preview Setup, AgX Rendering, and FBX Export
     rmk.setup_preview_studio(model_objects, PREVIEW_PATH, ortho_scale=6.4)
     bpy.ops.wm.save_as_mainfile(filepath=str(BLEND_PATH))
     bpy.ops.render.render(write_still=True)
@@ -329,6 +332,7 @@ def build_colossus_siege_model():
     print(f"Created Unity model: {FBX_PATH}")
     print(f"Created preview render: {PREVIEW_PATH}")
     print(f"Exported mesh objects: {len(model_objects)}")
+    print(f"Total polygons: {diagnostics['total_polygons']}, Vertices: {diagnostics['total_vertices']}")
 
 
 if __name__ == "__main__":

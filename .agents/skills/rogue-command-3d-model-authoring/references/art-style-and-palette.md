@@ -155,3 +155,31 @@ Do not add random visual noise. Every mechanical detail on a Rogue Command unit 
    - Add stepped muzzle brakes or heat-dissipation collars at the barrel tip to give weapons visual punch.
 6. **Battery Rails & Conduit Tubes**:
    - For energy or explosive units, route visible conduit pipes or insulated charge rails along the flanks to telegraph volatility.
+7. **Explosive Reactive Armor (ERA) & Applique Tiles**:
+   - Spaced armor tiles on frontal glacis or turret cheeks angled at 20°–35° to reflect incoming fire and break up broad, flat expanses.
+8. **Hexagonal Bolt Seams**:
+   - 6-sided bolt heads placed along structural seams or suspension knuckles to convey industrial rigidity without mesh complexity.
+
+---
+
+## 6. Weapon Hardpoints & Mobility Kinematics Standards
+
+### A. Weapon Silhouette & Caliber Ratios
+- **Heavy Ballistic Cannons**: Barrel length should be $1.4\times$ to $2.2\times$ the turret length with a prominent breech collar and double-baffle muzzle brake. Recoil dampers should sit parallel to the barrel vector.
+- **Rotary Gatling Clusters**: 6-barrel circular bundles with clamp collars at 45% and 95% of barrel length. Always include a central drive axle and an offset ammo feed chute to sell mechanical operation.
+- **Missile / Rocket Pods**: Multi-cell honeycomb arrays ($2\times 3$, $2\times 2$, or $3\times 3$) recessed inside an armored box tilted upward by $10^\circ–20^\circ$. Bright conical warheads peeking out provide high-contrast focal points.
+- **Electromagnetic Arc Weapons**: Twin or triple toroidal induction coils surrounding a central glowing plasma cathode, ending in convergent prongs angled inward toward a focal arc convergence zone.
+
+### B. Bipedal Walker Kinematics
+- **Digitigrade Stance**: Upper thigh angled backwards ($-15^\circ$ to $-25^\circ$), lower shin angled forwards ($+20^\circ$ to $+35^\circ$), with heavy hydraulic pistons bridging the joints.
+- **Ground Contact Footprint**: Multi-toed stabilizer foot with a wide center toe, an angled lateral outrigger, and a rear heel claw. The lowest vertex must rest precisely on the ground ($Z \ge 0.0\text{m}$) to eliminate floating or clipping into terrain.
+
+---
+
+## 7. Draw-Call Batching & Performance Guidelines
+
+To maintain 60+ FPS in dense RTS battles with 50+ units on screen:
+- **Modular Kitbashing during Authoring**: Author with clean geometric primitives, separate objects, and explicit materials.
+- **Material-Based Mesh Unification for Export**: Group and join static submeshes by their PBR material slot (`batch_and_join_by_material`).
+- **Target Submesh Count**: A completed vehicle should contain **4 to 6 unified mesh objects** (one per material, plus any independent animated pivots like `TurretBase` or `MainBarrel`).
+

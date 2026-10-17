@@ -81,14 +81,50 @@ Do not use random palettes or noisy textures. Every vehicle must follow the disc
 
 ## 4. Blender Procedural & Deterministic Modeling
 
-All production models must be script-reproducible using Blender's Python API (`bpy`).
+All production models must be script-reproducible using Blender's Python API (`bpy`) and the authoritative toolkit in `tools/RogueModelKit.py` (and `.agents/skills/rogue-command-3d-model-authoring/scripts/RogueModelKit.py`).
 
 ### Coordinate System Invariants
 - **Forward**: Blender `+Y` $\rightarrow$ Unity `+Z`
 - **Up**: Blender `+Z` $\rightarrow$ Unity `+Y`
 - **Right / Starboard**: Blender `+X` $\rightarrow$ Unity `+X`
-- **Ground Contact**: Lowest vertex of treads/tires must rest exactly on `Z = 0.0`.
+- **Ground Contact**: Lowest vertex of treads/tires/feet must rest exactly on $Z \ge 0.0$ ($0.0\text{m} \le Z_{\min} \le 0.08\text{m}$).
 - **Local Origin**: `(0.0, 0.0, 0.0)` at ground center.
+
+### Core Procedural Generator Suite (`RogueModelKit`)
+Use the tested, high-readability procedural assemblies rather than ad-hoc mesh primitives:
+
+| Category | Generator Function | Visual Subsystem Produced |
+|---|---|---|
+| **Chassis & Turret** | `make_sloped_glacis_hull` | Armored wedge chassis with sloped frontal glacis and belly clearance |
+| | `make_faceted_turret_housing` | Octagonal turret shell with sloped mantlet cradle and rear bustle counterweight |
+| **Mobility & Legs** | `make_continuous_track_assembly` | Full track unit (articulated belt, road wheels, sprockets, cleats, and fenders) |
+| | `make_all_terrain_wheel_assembly` | Rugged chevron-lug tactical tire, deep-dish rim, planetary hub, and coilover shock |
+| | `make_bipedal_digitigrade_leg` | Kinematic walker leg: hip joint, hydraulic thigh, knee armor, ankle struts, 3-toed foot |
+| **Heavy Weapons** | `make_coaxial_cannon_assembly` | Coaxially aligned tank gun with breech collar, thermal sleeve, bore evacuator, and muzzle brake |
+| | `make_rotary_gatling_cannon` | 6-barrel circular Gatling cluster with drive axle, clamp collars, and ammo feed chute |
+| | `make_missile_launcher_pod` | Armored pod with upward elevation, recessed tube array, warheads, and backblast vents |
+| | `make_arc_energy_emitter` | Futuristic weapon with glowing plasma cathode, induction coils, and convergent discharge prongs |
+| **Optics & Greebles** | `make_gimbal_sensor_turret` | 2-axis FLIR targeting pod with azimuth base, elevation yoke, and dual optical lenses |
+| | `make_recessed_sensor_visor` | Armored brow hood with deep cavity and glowing HDR sensor slit lenses |
+| | `make_engine_deck_grille` | Armored engine intake frame with angled cooling louvers |
+| | `make_armor_applique_array` | Array of Explosive Reactive Armor (ERA) tiles with standoff mounting bolts |
+| | `make_hex_bolt_array` | Low-poly 6-sided bolt heads placed along armor seams and flanges |
+
+### Draw-Call Optimization via Material Batching
+Kitbashing produces 50–120 individual objects. In Unity, each object creates a separate GameObject and draw call unless unified. Always pass models through `batch_and_join_by_material(objects, prefix, preserve_names)` before export to combine meshes by their PBR material slot into 4–6 unified submeshes while preserving essential animated pivots.
+
+### Automated Quality Diagnostics
+Always invoke `validate_model_mesh_quality(model_objects)` prior to export. It verifies:
+- **Ground Contact Check**: Confirms $Z_{\min} \in [-0.02\text{m}, 0.08\text{m}]$.
+- **Polycount Verification**: Confirms vertex and triangle counts match the low-poly RTS budget ($1,500$–$5,000$ triangles).
+- **Material Slot Hygiene**: Flags any object with missing or null PBR material assignments.
+
+### Multi-Perspective RTS Studio
+Use `setup_multi_view_studio(model_objects, preview_dir, base_name, ortho_scale, render_all=True)` to render 4 calibrated orthographic perspectives simultaneously:
+- **`ISOMETRIC`**: $45^\circ$ RTS combat camera (the gameplay primary read).
+- **`TOP_DOWN`**: Direct vertical plan view (minimap readability and deck balance).
+- **`FRONT`**: Head-on silhouette readability and glacis slope verification.
+- **`SIDE`**: Profile balance, ground clearance, and suspension proportions.
 
 ### FBX Export Parameters
 In your Python builder script, export selected meshes with:
@@ -148,6 +184,9 @@ When the Unity project scaffolds the prefab and builds the AssetBundle:
 ## 7. Card Sprite Authoring Standards
 
 Each playable unit requires a matching `128 × 128` pixel card Sprite referenced by `cardImageAssetName`.
+
+- For every new or refreshed 2D raster card, icon, or sprite, use the installed built-in `imagegen` skill. Use the final Blender preview as a visual reference and preserve the authored model's silhouette and palette. Do not draw these images procedurally in C#, Python, SVG, canvas, or Pillow.
+- Keep the generated PNG in the Unity authoring project's tracked `Assets/RogueCommandExpansionSample/` tree. Unity import settings may cap the runtime texture at 128 × 128; validate that the Sprite in the built AssetBundle uses that size. Record the final ImageGen prompt with the asset change so another agent can reproduce the intent.
 
 - **Texture Import**: `FilterMode.Point`, `mipmapEnabled = false`, `spriteImportMode = Single`.
 - **Composition**: Angled profile of the vehicle rendered or drawn against a deep tactical dark gradient (`#0a1216` to `#162a34`).

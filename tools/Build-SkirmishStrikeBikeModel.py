@@ -2,6 +2,7 @@
 
 from pathlib import Path
 import math
+import sys
 
 import bpy
 from mathutils import Vector
@@ -12,6 +13,8 @@ BLEND_PATH = REPO_ROOT / "content" / "source-art" / "skirmish-strike-bike.blend"
 FBX_PATH = (REPO_ROOT / "unity" / "RogueCommandAssetAuthoring" / "Assets" /
             "RogueCommandExpansionSample" / "Models" / "SkirmishStrikeBike.fbx")
 PREVIEW_PATH = REPO_ROOT / "artifacts" / "previews" / "skirmish-strike-bike.png"
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import RogueModelKit as modelkit
 
 
 def clear_scene():
@@ -227,14 +230,30 @@ def main():
         make_box("StrikeBikePayload_ChargeBand", (0.90, 0.10, 0.10),
                  (0.0, -0.74, 1.12), sensor, 0.02),
         make_box("StrikeBikeHandlebar", (0.72, 0.13, 0.075), (0.0, 0.48, 1.23), gunmetal, 0.025),
-        make_cylinder("StrikeBikeSensor_Headlamp", 0.105, 0.055, (0.0, 0.94, 0.91),
-                      sensor, (math.radians(90), 0.0, 0.0), 10),
         make_torus("StrikeBikeArc_InductionRing", (0.0, -0.12, 1.28), 0.26, 0.045, sensor),
         make_box("StrikeBikeArmor_FootPlate_L", (0.27, 0.25, 0.08), (-0.46, -0.04, 0.43), armor_light, 0.025),
         make_box("StrikeBikeArmor_FootPlate_R", (0.27, 0.25, 0.08), (0.46, -0.04, 0.43), armor_light, 0.025),
         make_box("StrikeBikeAccent_FrontMarker_L", (0.07, 0.08, 0.045), (-0.27, 0.82, 0.72), warning, 0.015),
         make_box("StrikeBikeAccent_FrontMarker_R", (0.07, 0.08, 0.045), (0.27, 0.82, 0.72), warning, 0.015),
     ]
+
+    # A narrow saddle and visible suspension struts clarify the rider-facing
+    # layout while keeping the model inside the BombBike collider width.
+    model_objects.append(make_box(
+        "StrikeBikeArmor_Saddle", (0.34, 0.31, 0.085),
+        (0.0, -0.48, 1.275), gunmetal, 0.035,
+        (math.radians(-4), 0.0, 0.0)))
+    for side in (-1, 1):
+        side_name = "L" if side < 0 else "R"
+        model_objects.append(modelkit.make_rod(
+            "StrikeBikeFrame_RearShock_{0}".format(side_name),
+            (side * 0.12, -0.72, 0.46), (side * 0.20, -0.39, 0.91),
+            0.027, wheel, 8))
+
+    # The headlamp lens sits in a dark, armored recess at the front of the fairing.
+    model_objects.extend(modelkit.make_recessed_sensor_visor(
+        "StrikeBikeSensor_Headlamp", (0.0, 0.90, 0.91), (0.28, 0.12, 0.15),
+        armor, sensor, gunmetal))
 
     # Keep the existing bomb-bike cage and controller silhouette. The twin
     # external charge canisters make its hit-and-run role readable in profile.
@@ -277,20 +296,16 @@ def main():
     bpy.ops.wm.save_as_mainfile(filepath=str(BLEND_PATH))
     bpy.ops.render.render(write_still=True)
 
-    bpy.ops.object.select_all(action="DESELECT")
-    for obj in model_objects:
-        obj.select_set(True)
-    bpy.context.view_layer.objects.active = model_objects[0]
-    bpy.ops.export_scene.fbx(
-        filepath=str(FBX_PATH), use_selection=True, object_types={"MESH"},
-        apply_unit_scale=True, apply_scale_options="FBX_SCALE_NONE",
-        use_mesh_modifiers=True, mesh_smooth_type="OFF", path_mode="AUTO",
-        axis_forward="-Z", axis_up="Y", bake_space_transform=False,
-        add_leaf_bones=False, use_custom_props=False)
+    batched_objects = modelkit.merge_meshes_by_material(model_objects, "StrikeBike", {
+        armor: "armor", armor_light: "lightArmor", rubber: "rubber", wheel: "wheel",
+        gunmetal: "gunmetal", warning: "warning", sensor: "arc"
+    })
+    modelkit.export_unity_fbx(FBX_PATH, batched_objects)
     print("Created source model: {0}".format(BLEND_PATH))
     print("Created Unity model: {0}".format(FBX_PATH))
     print("Created preview: {0}".format(PREVIEW_PATH))
-    print("Exported mesh objects: {0}".format(len(model_objects)))
+    print("Editable source parts: {0}".format(len(model_objects)))
+    print("Exported material batches: {0}".format(len(batched_objects)))
 
 
 if __name__ == "__main__":

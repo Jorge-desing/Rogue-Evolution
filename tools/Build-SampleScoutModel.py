@@ -2,6 +2,7 @@
 
 from pathlib import Path
 import math
+import sys
 
 import bpy
 from mathutils import Vector
@@ -12,6 +13,8 @@ BLEND_PATH = REPO_ROOT / "content" / "source-art" / "sandlance-scout.blend"
 FBX_PATH = (REPO_ROOT / "unity" / "RogueCommandAssetAuthoring" / "Assets" /
             "RogueCommandExpansionSample" / "Models" / "SandlanceScout.fbx")
 PREVIEW_PATH = REPO_ROOT / "artifacts" / "previews" / "sandlance-scout.png"
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import RogueModelKit as modelkit
 
 
 def clear_scene():
@@ -183,11 +186,12 @@ def main():
                  (math.radians(-7), 0.0, 0.0)),
         make_box("ScoutArmor_SidePod_R", (0.16, 1.18, 0.30), (0.72, -0.02, 0.56), armor, 0.055,
                  (math.radians(-7), 0.0, 0.0)),
-        make_box("ScoutTreads_Belt_L", (0.25, 2.28, 0.56), (-0.91, -0.02, 0.34), tread, 0.12),
-        make_box("ScoutTreads_Belt_R", (0.25, 2.28, 0.56), (0.91, -0.02, 0.34), tread, 0.12),
     ]
 
     for side in (-1, 1):
+        model_objects.append(modelkit.make_continuous_track_belt(
+            "ScoutTreads_Belt_{0}".format("L" if side < 0 else "R"),
+            side * 0.91, 2.45, 0.62, 0.25, tread, ground_z=0.055))
         for index, y in enumerate((-0.89, -0.39, 0.15, 0.68), start=1):
             model_objects.append(make_cylinder(
                 "ScoutWheel_Road_{0}_{1}".format("L" if side < 0 else "R", index),
@@ -212,24 +216,36 @@ def main():
         make_cylinder("ScoutGun_Barrel_R", 0.055, 0.90, (0.14, 0.78, 1.01), gunmetal,
                       (math.radians(90), 0.0, 0.0), 10),
         make_cylinder("ScoutSensor_Mast", 0.035, 0.43, (0.0, -0.64, 1.25), gunmetal, vertices=8),
-        make_box("ScoutSensor_Array", (0.50, 0.11, 0.18), (0.0, -0.64, 1.49), armor_light, 0.035),
-        make_box("ScoutSensor_Lens_L", (0.12, 0.035, 0.09), (-0.13, -0.574, 1.50), sensor, 0.012),
-        make_box("ScoutSensor_Lens_R", (0.12, 0.035, 0.09), (0.13, -0.574, 1.50), sensor, 0.012),
         make_box("ScoutAccent_FrontLight_L", (0.12, 0.07, 0.06), (-0.37, 1.08, 0.66), sensor, 0.015),
         make_box("ScoutAccent_FrontLight_R", (0.12, 0.07, 0.06), (0.37, 1.08, 0.66), sensor, 0.015),
         make_box("ScoutAccent_TopPanel", (0.28, 0.34, 0.055), (0.0, -0.75, 0.93), amber, 0.025),
     ]
 
-    # Individual tread shoes make the propulsion system read at the game's zoom.
+    # Recess the paired optics inside an armored visor so the sensor array reads
+    # cleanly at RTS zoom instead of appearing as two flat lights on a slab.
+    model_objects.extend(modelkit.make_recessed_sensor_visor(
+        "ScoutSensor_Array", (0.0, -0.64, 1.49), (0.50, 0.12, 0.18),
+        armor_light, sensor, gunmetal))
+
+    # Individual shoes follow the upper and ground-contact runs of the closed
+    # belt loop; two angled pads mark the sloped front and rear climbs.
     for side in (-1, 1):
         side_name = "L" if side < 0 else "R"
         for index, y in enumerate((-1.02, -0.74, -0.46, -0.18, 0.10, 0.38, 0.66, 0.94), start=1):
             model_objects.append(make_box(
                 "ScoutTreads_ShoeTop_{0}_{1}".format(side_name, index),
-                (0.22, 0.15, 0.075), (side * 0.91, y, 0.63), tread, 0.018))
+                (0.22, 0.15, 0.075), (side * 0.91, y, 0.625), tread, 0.018))
             model_objects.append(make_box(
                 "ScoutTreads_ShoeBottom_{0}_{1}".format(side_name, index),
-                (0.22, 0.15, 0.075), (side * 0.91, y, 0.05), tread, 0.018))
+                (0.22, 0.15, 0.075), (side * 0.91, y, 0.045), tread, 0.018))
+        model_objects.append(make_box(
+            "ScoutTreads_ShoeFrontClimb_{0}".format(side_name),
+            (0.22, 0.15, 0.065), (side * 0.91, 1.00, 0.34), tread, 0.015,
+            (math.radians(35), 0.0, 0.0)))
+        model_objects.append(make_box(
+            "ScoutTreads_ShoeRearClimb_{0}".format(side_name),
+            (0.22, 0.15, 0.065), (side * 0.91, -1.00, 0.34), tread, 0.015,
+            (math.radians(-35), 0.0, 0.0)))
 
     # Armored collars and a braced sensor mast add readable mechanical structure
     # without changing the original hull, turret, weapon or prefab references.
@@ -257,20 +273,16 @@ def main():
     bpy.ops.wm.save_as_mainfile(filepath=str(BLEND_PATH))
     bpy.ops.render.render(write_still=True)
 
-    bpy.ops.object.select_all(action="DESELECT")
-    for obj in model_objects:
-        obj.select_set(True)
-    bpy.context.view_layer.objects.active = model_objects[0]
-    bpy.ops.export_scene.fbx(
-        filepath=str(FBX_PATH), use_selection=True, object_types={"MESH"},
-        apply_unit_scale=True, apply_scale_options="FBX_SCALE_NONE",
-        use_mesh_modifiers=True, mesh_smooth_type="OFF", path_mode="AUTO",
-        axis_forward="-Z", axis_up="Y", bake_space_transform=False,
-        add_leaf_bones=False, use_custom_props=False)
+    batched_objects = modelkit.merge_meshes_by_material(model_objects, "Scout", {
+        armor: "armor", armor_light: "lightArmor", tread: "tread", wheel: "wheel",
+        gunmetal: "gunmetal", amber: "amber", sensor: "sensor"
+    })
+    modelkit.export_unity_fbx(FBX_PATH, batched_objects)
     print("Created source model: {0}".format(BLEND_PATH))
     print("Created Unity model: {0}".format(FBX_PATH))
     print("Created preview: {0}".format(PREVIEW_PATH))
-    print("Exported mesh objects: {0}".format(len(model_objects)))
+    print("Editable source parts: {0}".format(len(model_objects)))
+    print("Exported material batches: {0}".format(len(batched_objects)))
 
 
 if __name__ == "__main__":

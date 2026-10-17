@@ -1,6 +1,8 @@
 # Blender Procedural Modeling Techniques for Rogue Command
 
-This reference provides tested Python (`bpy`) recipes and geometric algorithms to generate high-quality, production-ready low-poly vehicle models deterministically in Blender 4.5.14 LTS.
+This reference provides tested Python (`bpy`) recipes, mathematical foundations, and geometric algorithms to generate production-ready low-poly vehicle models deterministically in Blender 4.5.14 LTS.
+
+All recipes are implemented in `tools/RogueModelKit.py` and `.agents/skills/rogue-command-3d-model-authoring/scripts/RogueModelKit.py`.
 
 ---
 
@@ -28,7 +30,7 @@ bpy.ops.export_scene.fbx(
     apply_unit_scale=True,
     apply_scale_options="FBX_SCALE_NONE",
     use_mesh_modifiers=True,
-    mesh_smooth_type="OFF",          # Flat shading preserved
+    mesh_smooth_type="OFF",          # Preserves hard-surface flat shading
     path_mode="AUTO",
     axis_forward="-Z",               # Maps Blender +Y to Unity +Z
     axis_up="Y",                     # Maps Blender +Z to Unity +Y
@@ -40,298 +42,289 @@ bpy.ops.export_scene.fbx(
 
 ---
 
-## 2. Core Geometric Helper Functions
+## 2. Orthonormal Vector Framing & Directional Alignment
 
-### A. Chamfered Box (Machined Hard-Surface Block)
+When aligning cylinders, barrels, or pods along arbitrary 3D vectors $\vec{d}$ (e.g., cannon elevation, rotary axles, angled outriggers), naive Euler rotations suffer from gimbal lock or sign inversion.
+
+Always construct a right-handed orthonormal basis $(\vec{u}, \vec{v}, \vec{d})$:
+
+$$\vec{u} = \frac{\vec{d} \times \vec{k}}{\|\vec{d} \times \vec{k}\|}, \quad \vec{v} = \frac{\vec{d} \times \vec{u}}{\|\vec{d} \times \vec{u}\|}$$
 
 ```python
-import bpy
-import math
-from mathutils import Vector
-
-def finish_mesh(obj, material, bevel=0.0):
-    """Assigns material, enforces flat shading, and applies 1-segment bevel."""
-    if material:
-        obj.data.materials.append(material)
-    for polygon in obj.data.polygons:
-        polygon.use_smooth = False
-    if bevel > 0.0:
-        modifier = obj.modifiers.new("machined chamfers", "BEVEL")
-        modifier.width = bevel
-        modifier.segments = 1
-        modifier.limit_method = "ANGLE"
-        modifier.angle_limit = math.radians(35)
-        bpy.context.view_layer.objects.active = obj
-        bpy.ops.object.modifier_apply(modifier=modifier.name)
-        for polygon in obj.data.polygons:
-            polygon.use_smooth = False
-    obj.select_set(False)
-    return obj
-
-def make_box(name, size, location, material, bevel=0.025, rotation=(0.0, 0.0, 0.0)):
-    """Creates a dimensionally accurate box with baked scale and optional bevel."""
-    bpy.ops.mesh.primitive_cube_add(size=1.0, location=location)
-    obj = bpy.context.object
-    obj.name = name
-    obj.dimensions = size
-    obj.rotation_euler = rotation
-    bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
-    return finish_mesh(obj, material, bevel)
+def get_orthonormal_basis(direction: Vector) -> tuple[Vector, Vector, Vector]:
+    """Constructs a right-handed orthonormal basis (u_vec, v_vec, dir_vec) around direction."""
+    dir_vec = direction.normalized()
+    if abs(dir_vec.z) < 0.92:
+        u_vec = dir_vec.cross(Vector((0.0, 0.0, 1.0))).normalized()
+    else:
+        u_vec = dir_vec.cross(Vector((1.0, 0.0, 0.0))).normalized()
+    v_vec = dir_vec.cross(u_vec).normalized()
+    return u_vec, v_vec, dir_vec
 ```
 
-### B. Stepped Cylinder (Barrels, Piston Arms, Axles)
+For Blender cylinders (which naturally align along local Z), compute rotation via:
+```python
+rot_euler = dir_vec.to_track_quat("Z", "Y").to_euler()
+```
+
+---
+
+## 3. Macro Hull & Chassis Generators
+
+### A. Sloped Armored Glacis Hull (`make_sloped_glacis_hull`)
+Generates an armored tank chassis with sloped frontal glacis, undercut belly clearance, and tapered sides.
 
 ```python
-def make_cylinder(name, radius, depth, location, material, rotation=(0.0, 0.0, 0.0), vertices=12, bevel=None):
-    """Creates a low-poly cylinder with proportional chamfers on rims."""
-    bpy.ops.mesh.primitive_cylinder_add(
-        vertices=vertices, radius=radius, depth=depth, location=location, rotation=rotation
+hull = rmk.make_sloped_glacis_hull(
+    name="Vehicle_Hull",
+    length_front=1.45, length_rear=1.40,
+    width_front=1.35, width_rear=1.42,
+    height_lower=0.24, height_upper=0.82,
+    material=armor_primary, bevel=0.045
+)
+```
+
+### B. Faceted Turret Shell with Bustle (`make_faceted_turret_housing`)
+Creates an octagonal/faceted armored turret shell with sloped gun mantlet cradle and rear counterweight bustle.
+
+```python
+turret_parts = rmk.make_faceted_turret_housing(
+    prefix="Vehicle_Turret",
+    location=(0.0, 0.10, 1.15),
+    size=(1.45, 1.65, 0.42),
+    armor_mat=armor_primary, roof_mat=armor_light, bevel=0.035
+)
+```
+
+---
+
+## 4. High-Fidelity Mobility & Suspension Systems
+
+### A. Parametric Continuous Track Assembly (`make_continuous_track_assembly`)
+Creates a complete track subsystem including:
+1. Articulated continuous track belt with sloped front approach angle (~25°–35° climb).
+2. Stepped road wheels array (outer tread rim, recessed hub dish, center axle cap).
+3. Rear drive sprocket and front idler wheel.
+4. Top-run cleats for mechanical surface rhythm.
+5. Optional armored upper mudguard/fender and chamfered side skirts with hazard stripes.
+
+```python
+for side in (-1, 1):
+    x_pos = side * 1.10
+    tracks = rmk.make_continuous_track_assembly(
+        prefix="Vehicle_Treads",
+        x_pos=x_pos, length=2.85, height=0.62, belt_width=0.34,
+        roadwheel_count=5, tread_mat=tread_mat, rim_mat=wheel_rim,
+        hub_mat=wheel_hub, axle_mat=gunmetal,
+        fender_mat=armor_light, skirt_mat=armor_primary, accent_mat=warning_amber
     )
-    obj = bpy.context.object
-    obj.name = name
-    bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
-    if bevel is None:
-        bevel = min(radius * 0.16, depth * 0.14)
-    return finish_mesh(obj, material, bevel)
+    model_objects.extend(tracks)
 ```
 
-### C. Sloped Armored Glacis (Wedge Chassis)
+### B. Heavy Tactical All-Terrain Wheel (`make_all_terrain_wheel_assembly`)
+Generates a rugged off-road tire for recon buggies, missile trucks, and strike bikes:
+- Directional chevron tread lugs around tire circumference.
+- Deep-dish steel rim recessed inside the rubber carcass.
+- Planetary gear reduction hub with 6-bolt hexagonal pattern.
+- Suspension wishbone and coilover shock strut.
 
 ```python
-def make_sloped_hull(name, length_front, length_rear, width_front, width_rear,
-                     height_lower, height_upper, material, bevel=0.045):
-    """Creates a faceted, sloped glacis tank chassis with angled lower hull."""
-    hw_f = width_front * 0.5
-    hw_r = width_rear * 0.5
-    vertices = [
-        # Lower hull (ground clearance z = height_lower)
-        (-hw_r * 0.85, -length_rear, height_lower),
-        ( hw_r * 0.85, -length_rear, height_lower),
-        ( hw_f * 0.85,  length_front * 0.7, height_lower),
-        (-hw_f * 0.85,  length_front * 0.7, height_lower),
-        # Upper hull deck (z = height_upper)
-        (-hw_r, -length_rear * 0.9, height_upper),
-        ( hw_r, -length_rear * 0.9, height_upper),
-        ( hw_f,  length_front, height_upper),
-        (-hw_f,  length_front, height_upper),
-    ]
-    faces = [
-        (3, 2, 1, 0),  # Bottom
-        (4, 5, 6, 7),  # Top Deck
-        (0, 4, 7, 3),  # Left Side
-        (1, 2, 6, 5),  # Right Side
-        (0, 1, 5, 4),  # Rear
-        (3, 7, 6, 2),  # Front Glacis Plate
-    ]
-    mesh = bpy.data.meshes.new(f"{name}_Mesh")
-    mesh.from_pydata(vertices, [], faces)
-    mesh.update()
-    obj = bpy.data.objects.new(name, mesh)
-    bpy.context.collection.objects.link(obj)
-    bpy.context.view_layer.objects.active = obj
-    obj.select_set(True)
-    bpy.ops.object.mode_set(mode="EDIT")
-    bpy.ops.mesh.select_all(action="SELECT")
-    bpy.ops.mesh.normals_make_consistent(inside=False)
-    bpy.ops.object.mode_set(mode="OBJECT")
-    return finish_mesh(obj, material, bevel)
+wheel = rmk.make_all_terrain_wheel_assembly(
+    prefix="Buggy_Wheel_FL",
+    location=(0.85, 0.95, 0.38),
+    radius=0.38, width=0.28,
+    tire_mat=tire_rubber, rim_mat=wheel_rim, hub_mat=gunmetal,
+    accent_mat=warning_amber, lug_count=10
+)
+```
+
+### C. Articulated Digitigrade Bipedal Leg (`make_bipedal_digitigrade_leg`)
+Generates a combat walker leg with mechanical joint kinematics:
+- Rotary hip actuator cylinder.
+- Armored thigh plate with hydraulic compression cylinder and chrome piston rod.
+- Knee hinge joint with protective armor cap.
+- Sloped shin armor plate with dual ankle damper struts.
+- 3-toed stabilizer foot (center toe, lateral outrigger, heel claw) resting flat on $Z \ge 0.0$.
+
+```python
+for side in (-1, 1):
+    leg = rmk.make_bipedal_digitigrade_leg(
+        prefix="Walker_Leg",
+        hip_location=(side * 0.42, -0.05, 1.45),
+        side=side,
+        armor_mat=armor_primary, joint_mat=gunmetal,
+        piston_mat=piston_chrome, accent_mat=warning_amber
+    )
+    model_objects.extend(leg)
 ```
 
 ---
 
-## 3. High-Fidelity Propulsion Recipes
+## 5. Heavy Weapon System Generators
 
-### A. Continuous Track Loop Assembly
-
-A flat rectangular box for tank treads looks cheap and unconvincing. Use an angled front climb and rear sprocket contour:
+### A. Coaxial Parametric Cannon (`make_coaxial_cannon_assembly`)
+Guarantees coaxial alignment along gun elevation and azimuth vectors without drift:
+- Heavy breech collar.
+- Thermal shroud / sleeve with chamfered profile.
+- Mid-barrel bore evacuator (fume extractor) with warning stripe.
+- Rifled main barrel rod.
+- Double-baffle muzzle brake with bore opening.
+- Twin hydraulic recoil recuperator cylinders flanking the mantlet.
 
 ```python
-def make_continuous_track_belt(name, side, length, height, width, tread_mat):
-    """Creates an articulated continuous track belt with sloped front approach."""
-    # side: -1 for Left, +1 for Right
-    x = side * (0.91)
-    hw = width * 0.5
-    # Angled front approach gives the tank aggressive forward movement telegraphed visually
-    vertices = [
-        # Left side vertices (in local belt space)
-        (-hw, -length * 0.5, 0.15),         # 0: Rear bottom
-        ( hw, -length * 0.5, 0.15),         # 1
-        ( hw,  length * 0.35, 0.15),        # 2: Front approach start
-        (-hw,  length * 0.35, 0.15),        # 3
-        ( hw,  length * 0.52, 0.35),        # 4: Front idler apex
-        (-hw,  length * 0.52, 0.35),        # 5
-        ( hw,  length * 0.45, height),      # 6: Front top return
-        (-hw,  length * 0.45, height),      # 7
-        ( hw, -length * 0.48, height),      # 8: Rear top return
-        (-hw, -length * 0.48, height),      # 9
-        ( hw, -length * 0.52, 0.35),        # 10: Rear sprocket apex
-        (-hw, -length * 0.52, 0.35),        # 11
-    ]
-    # Connect into loop faces
-    faces = [
-        (3, 2, 1, 0),     # Ground run
-        (5, 4, 2, 3),     # Front climb
-        (7, 6, 4, 5),     # Front over-curve
-        (9, 8, 6, 7),     # Top return run
-        (11, 10, 8, 9),   # Rear over-curve
-        (0, 1, 10, 11),   # Rear under-curve
-        # Side covers
-        (0, 11, 9, 7, 5, 3), # Outer/Inner side
-        (1, 2, 4, 6, 8, 10), # Inner/Outer side
-    ]
-    mesh = bpy.data.meshes.new(f"{name}_Mesh")
-    mesh.from_pydata(vertices, [], faces)
-    mesh.update()
-    obj = bpy.data.objects.new(name, mesh)
-    obj.location = (x, 0.0, 0.0)
-    bpy.context.collection.objects.link(obj)
-    bpy.context.view_layer.objects.active = obj
-    obj.select_set(True)
-    bpy.ops.object.mode_set(mode="EDIT")
-    bpy.ops.mesh.select_all(action="SELECT")
-    bpy.ops.mesh.normals_make_consistent(inside=False)
-    bpy.ops.object.mode_set(mode="OBJECT")
-    return finish_mesh(obj, tread_mat, 0.02)
+cannon = rmk.make_coaxial_cannon_assembly(
+    prefix="Colossus_Gun",
+    gun_pivot=(0.0, 0.52, 1.20),
+    direction=(0.0, math.cos(math.radians(12)), math.sin(math.radians(12))),
+    caliber_radius=0.095, barrel_length=1.65,
+    armor_mat=armor_light, barrel_mat=gunmetal, accent_mat=warning_amber,
+    has_thermal_sleeve=True, has_bore_evacuator=True, has_muzzle_brake=True
+)
 ```
 
-### B. Multi-Component Road Wheels with Hub Step
+### B. Rotary Gatling Cannon (`make_rotary_gatling_cannon`)
+Generates an articulated 6-barrel (or N-barrel) Gatling autocannon:
+- Cylindrical rotor housing / motor breech with ammo feed chute.
+- Central drive axle shaft.
+- Ring of N rifled barrels mathematically spaced at $\theta_i = \frac{2\pi i}{N}$.
+- Mid-barrel and muzzle clamp retaining collars with optional warning accent.
 
 ```python
-def make_stepped_roadwheel(prefix, location, radius, thickness, rim_mat, hub_mat, gunmetal_mat):
-    """Creates a 3-tier road wheel: outer rim, recessed dish, and center hex hub."""
-    objects = []
-    # 1. Main outer rim
-    objects.append(make_cylinder(
-        f"{prefix}_Rim", radius, thickness, location, rim_mat,
-        (0.0, math.radians(90), 0.0), vertices=12, bevel=radius * 0.12
-    ))
-    # 2. Recessed inner dish (both sides)
-    sign = 1 if location[0] > 0 else -1
-    dish_offset = sign * (thickness * 0.5 + 0.005)
-    objects.append(make_cylinder(
-        f"{prefix}_Dish", radius * 0.72, 0.015,
-        (location[0] + dish_offset, location[1], location[2]), hub_mat,
-        (0.0, math.radians(90), 0.0), vertices=10, bevel=0.008
-    ))
-    # 3. Center axle cap
-    cap_offset = sign * (thickness * 0.5 + 0.02)
-    objects.append(make_cylinder(
-        f"{prefix}_AxleCap", radius * 0.32, 0.03,
-        (location[0] + cap_offset, location[1], location[2]), gunmetal_mat,
-        (0.0, math.radians(90), 0.0), vertices=8, bevel=0.006
-    ))
-    return objects
+gatling = rmk.make_rotary_gatling_cannon(
+    prefix="Ironclad_Gatling_R",
+    pivot=(0.80, 0.45, 1.45),
+    direction=(0.0, 1.0, 0.0),
+    barrel_count=6, barrel_length=1.15,
+    barrel_radius=0.032, cluster_radius=0.10,
+    gunmetal_mat=gunmetal, housing_mat=armor_light, accent_mat=warning_amber
+)
+```
+
+### C. Armored Missile Launcher Pod (`make_missile_launcher_pod`)
+Generates a multi-cell rocket / missile pod:
+- Armored pod chassis with upward elevation angle ($10^\circ–20^\circ$).
+- Recessed dark launch cell well.
+- Grid array of $R \times C$ cylindrical launch tubes with conical warheads peeking out.
+- Rear backblast exhaust louvers / blast vents.
+- Flank identification stripes.
+
+```python
+pod = rmk.make_missile_launcher_pod(
+    prefix="Strike_RocketPod",
+    location=(0.0, 0.15, 1.40),
+    size=(0.72, 0.95, 0.48),
+    rows=2, cols=3, elevation_deg=14.0,
+    armor_mat=armor_primary, cavity_mat=gunmetal,
+    warhead_mat=warning_amber, accent_mat=warning_amber
+)
+```
+
+### D. Electromagnetic Arc Energy Emitter (`make_arc_energy_emitter`)
+Generates a futuristic high-voltage arc weapon:
+- Heavy generator base pedestal with heat sink housing.
+- Central glowing plasma cathode core.
+- Dual toroidal induction accelerator coils with dielectric insulator rings.
+- Forward convergent discharge prongs angled toward a focal arc point ahead.
+
+```python
+arc_weapon = rmk.make_arc_energy_emitter(
+    prefix="Surge_ArcEmitter",
+    base_location=(0.0, 0.20, 1.25),
+    forward_dir=(0.0, 1.0, 0.10),
+    core_radius=0.22, core_length=0.48, prong_count=3, prong_length=0.55,
+    housing_mat=armor_primary, gunmetal_mat=gunmetal, arc_mat=emissive_cyan
+)
 ```
 
 ---
 
-## 4. Mechanical Detailing & Focal Point Recipes
+## 6. Micro-Greebles & Optical Sensors
 
-### A. Slatted Engine Intake Deck
+### A. Recessed Sensor Visor (`make_recessed_sensor_visor`)
+Protective armored visor housing with recessed cavity and glowing HDR optical slits.
 
-```python
-def make_engine_deck_grille(prefix, location, size, slat_count, slat_mat, frame_mat):
-    """Creates an armored engine ventilation deck with angled slats."""
-    objects = []
-    # Recessed frame
-    objects.append(make_box(f"{prefix}_Frame", size, location, frame_mat, bevel=0.02))
-
-    # Angled louvers / slats
-    slat_spacing = (size[1] * 0.8) / slat_count
-    slat_width = size[0] * 0.85
-    slat_thickness = size[2] * 0.6
-    start_y = location[1] - (size[1] * 0.4) + (slat_spacing * 0.5)
-
-    for i in range(slat_count):
-        y = start_y + i * slat_spacing
-        objects.append(make_box(
-            f"{prefix}_Slat_{i+1}",
-            (slat_width, slat_spacing * 0.65, slat_thickness),
-            (location[0], y, location[2] + size[2] * 0.35),
-            slat_mat, bevel=0.008,
-            rotation=(math.radians(-25), 0.0, 0.0)
-        ))
-    return objects
-```
-
-### B. Recessed Optic Sensor Cluster (Glowing Visor)
+### B. Gimballed FLIR Sensor Turret (`make_gimbal_sensor_turret`)
+2-axis gimballed spherical targeting pod with:
+- Azimuth mounting pedestal and U-shaped elevation yoke.
+- Spherical sensor ball.
+- Primary circular thermal lens (with bezel ring).
+- Secondary optical slit / laser designator aperture.
 
 ```python
-def make_recessed_sensor_visor(prefix, location, size, armor_mat, sensor_mat, gunmetal_mat):
-    """Creates a hooded sensor cluster with deeply recessed glowing lenses."""
-    objects = []
-    # 1. Armored protective hood / eyebrow
-    objects.append(make_box(
-        f"{prefix}_Housing", size, location, armor_mat, bevel=0.025
-    ))
-    # 2. Dark recessed optic cavity
-    recess_size = (size[0] * 0.8, size[1] * 0.4, size[2] * 0.6)
-    cavity_loc = (location[0], location[1] + size[1] * 0.32, location[2])
-    objects.append(make_box(
-        f"{prefix}_Cavity", recess_size, cavity_loc, gunmetal_mat, bevel=0.01
-    ))
-    # 3. Glowing optical lenses (twin or triple slit)
-    lens_width = recess_size[0] * 0.35
-    for idx, side in enumerate((-1, 1), start=1):
-        lens_x = location[0] + side * (lens_width * 0.65)
-        objects.append(make_box(
-            f"{prefix}_Lens_{idx}",
-            (lens_width, 0.02, recess_size[2] * 0.7),
-            (lens_x, location[1] + size[1] * 0.45, location[2]),
-            sensor_mat, bevel=0.005
-        ))
-    return objects
+sensor_pod = rmk.make_gimbal_sensor_turret(
+    prefix="Scout_FLIR",
+    location=(0.42, 0.35, 1.35),
+    radius=0.18, look_dir=(0.0, 1.0, 0.15),
+    armor_mat=armor_light, lens_mat=emissive_cyan, gunmetal_mat=gunmetal
+)
 ```
+
+### C. Explosive Reactive Armor (ERA) Bricks (`make_armor_applique_array`)
+Array of modular armored tiles with corner standoff mounting bolts.
+
+```python
+era_tiles = rmk.make_armor_applique_array(
+    prefix="Glacis_ERA",
+    start=(-0.65, 0.75, 0.85), end=(0.65, 0.75, 0.85),
+    count=5, size=(0.20, 0.24, 0.05),
+    armor_mat=armor_light, standoff_mat=gunmetal,
+    rotation=(math.radians(-25), 0.0, 0.0)
+)
+```
+
+### D. Hexagonal Bolt Seams (`make_hex_bolt_array`)
+Places low-poly 6-sided bolt heads along armor seams or joint flanges without excess geometry.
 
 ---
 
-## 5. Preview Studio Setup & Multi-Angle Validation
+## 7. Draw-Call Batching & Performance Optimization
 
-To visually verify models before exporting FBX:
+Procedural kitbashing often produces 50–120 individual objects. In Unity, each object becomes an independent GameObject and draw call unless batched.
+
+`batch_and_join_by_material` unifies meshes sharing the same PBR material into 4–6 batched submeshes while preserving designated animated/gameplay pivots:
 
 ```python
-def setup_preview_studio(model_objects, preview_path):
-    """Creates standard 3-point studio lighting and isometric RTS camera."""
-    scene = bpy.context.scene
-    scene.render.engine = "BLENDER_EEVEE_NEXT"
-    scene.render.resolution_x = 900
-    scene.render.resolution_y = 760
-    scene.render.resolution_percentage = 100
-    scene.render.image_settings.file_format = "PNG"
-    scene.view_settings.view_transform = "AgX"
-    scene.render.filepath = str(preview_path)
-    scene.world.color = (0.035, 0.045, 0.065)
+# Unify all static armor, treads, and details, while preserving turret and gun pivots
+optimized_objects = rmk.batch_and_join_by_material(
+    model_objects,
+    prefix="Colossus",
+    preserve_names=["TurretBase", "MainBarrel"]
+)
+```
 
-    # Floor shadow catcher
-    bpy.ops.mesh.primitive_plane_add(size=200, location=(0.0, 0.0, -0.015))
-    floor = bpy.context.object
-    floor.name = "PreviewFloor"
-    floor_mat = bpy.data.materials.new("PreviewFloorMat")
-    floor_mat.diffuse_color = (0.035, 0.052, 0.065, 1.0)
-    floor.data.materials.append(finish_mesh(floor, floor_mat))
+Benefits:
+- Reduces Unity draw calls from ~100 to ~5.
+- Automatically recalculates consistent normals and preserves flat shading.
+- Maintains script-free prefab hygiene.
 
-    # Camera: Standard RTS orthographic angle (45° azimuth, ~35° elevation)
-    bpy.ops.object.camera_add(location=(4.8, 5.8, 3.6))
-    camera = bpy.context.object
-    camera.name = "RTS_IsometricCamera"
-    target = Vector((0.0, 0.0, 0.7))
-    camera.rotation_euler = (target - camera.location).to_track_quat("-Z", "Y").to_euler()
-    camera.data.type = "ORTHO"
-    camera.data.ortho_scale = 5.8
-    scene.camera = camera
+---
 
-    # 3-Point Studio Lights
-    lights = [
-        ("Key_Light", (3.5, 4.5, 6.0), 850, 4.0),
-        ("Fill_Light", (-4.2, 1.0, 3.5), 520, 3.5),
-        ("Rim_Light", (-1.5, -4.2, 4.5), 980, 3.0),
-    ]
-    for name, pos, energy, size in lights:
-        bpy.ops.object.light_add(type="AREA", location=pos)
-        l = bpy.context.object
-        l.name = name
-        l.data.energy = energy
-        l.data.shape = "DISK"
-        l.data.size = size
-        l.rotation_euler = (Vector((0.0, 0.0, 0.6)) - l.location).to_track_quat("-Z", "Y").to_euler()
+## 8. Multi-Perspective Studio & Quality Verification
+
+### A. Multi-Perspective RTS Studio (`setup_multi_view_studio`)
+Sets up AgX color management, 3-point area lighting, shadow-catcher ground plane, and 4 calibrated orthographic cameras:
+- `ISOMETRIC`: Standard $45^\circ$ RTS combat view.
+- `TOP_DOWN`: Direct vertical plan view (minimap/drafting evaluation).
+- `FRONT`: Head-on silhouette readability.
+- `SIDE`: Profile and suspension balance.
+
+```python
+cams = rmk.setup_multi_view_studio(
+    model_objects,
+    preview_dir=REPO_ROOT / "artifacts" / "previews",
+    base_name="colossus-siege",
+    ortho_scale=6.0,
+    render_all=True  # Renders all 4 views automatically!
+)
+```
+
+### B. Automated Geometric Quality Diagnostics (`validate_model_mesh_quality`)
+Inspects model boundaries, ground contact, vertex counts, and material coverage before export:
+
+```python
+diagnostics = rmk.validate_model_mesh_quality(model_objects)
+# Verifies:
+# - Ground contact: -0.02m <= Z_min <= 0.08m
+# - Polycount: typically 1,500 to 5,000 polygons
+# - Material slots: zero unassigned faces or missing materials
 ```
