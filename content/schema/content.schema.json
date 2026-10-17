@@ -94,6 +94,8 @@
         "nativeTemplateId": { "type": "string", "minLength": 1, "pattern": "\\S" },
         "isAllowedAsStartingBlueprint": { "type": "boolean" },
         "isAllowedForAi": { "type": "boolean" },
+        "isAllowedForDemo": { "type": "boolean" },
+        "isForSpecialists": { "type": "boolean" },
         "localizations": {
           "type": "array",
           "minItems": 1,
@@ -166,7 +168,7 @@
       "required": ["name", "value"],
       "properties": {
         "name": {
-          "enum": ["coinsAmount", "cost", "maxCapacity", "combatValue", "maxHealth", "maxShield", "maxMana", "maxRank", "sightRadius", "skillRange", "firePointCount", "neededExperienceLevel", "gridSize", "productionDuration", "cardModelScalingFactor", "maxArmor", "armorProtection", "moveSpeed", "damage1", "damage2", "weaponRange", "attackCooldown", "attack2Cooldown", "effectRadius1", "effectRadius2", "healAmount1", "healAmount2", "gainCreditsAmount", "skillManaCost", "duration1", "duration2", "rarity"]
+          "enum": ["coinsAmount", "cost", "maxCapacity", "combatValue", "maxHealth", "maxShield", "maxMana", "maxRank", "sightRadius", "skillRange", "firePointCount", "neededExperienceLevel", "gridSize", "productionDuration", "cardModelScalingFactor", "maxArmor", "armorProtection", "moveSpeed", "damage1", "damage2", "weaponRange", "attackCooldown", "attack2Cooldown", "effectRadius1", "effectRadius2", "healAmount1", "healAmount2", "gainCreditsAmount", "skillManaCost", "duration1", "duration2", "rarity", "attackType", "skillType"]
         },
         "value": { "type": "string" }
       },
@@ -178,8 +180,34 @@
             },
             "required": ["name"]
           },
-          "then": { "properties": { "value": { "pattern": "^(?:Common|Rare|UltraRare)$" } } },
-          "else": { "properties": { "value": { "pattern": "^(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?$" } } }
+          "then": { "properties": { "value": { "pattern": "^(?:Common|Rare|UltraRare)$" } } }
+        },
+        {
+          "if": {
+            "properties": {
+              "name": { "enum": ["attackType"] }
+            },
+            "required": ["name"]
+          },
+          "then": { "properties": { "value": { "pattern": "^(?:None|Single|AoE|Multi|MultiAoE|Beam|Artillery|MultiArtillery)$" } } }
+        },
+        {
+          "if": {
+            "properties": {
+              "name": { "enum": ["skillType"] }
+            },
+            "required": ["name"]
+          },
+          "then": { "properties": { "value": { "pattern": "^(?:None|Toggle|Location|LocationAoE|LocationMultiTargets|Self|SelfAoE|Target|TargetMultiTarget|TargetAoE|SelfMultiTarget)$" } } }
+        },
+        {
+          "if": {
+            "properties": {
+              "name": { "not": { "enum": ["rarity", "attackType", "skillType"] } }
+            },
+            "required": ["name"]
+          },
+          "then": { "properties": { "value": { "pattern": "^(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?$" } } }
         },
         {
           "if": {

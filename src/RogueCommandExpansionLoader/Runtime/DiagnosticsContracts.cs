@@ -47,7 +47,9 @@ namespace RogueCommandExpansionLoader.Runtime
             string imageKey,
             bool isAllowedAsBlueprint,
             bool isAllowedAsStartingBlueprint = false,
-            bool isAllowedForAi = false)
+            bool isAllowedForAi = false,
+            bool isAllowedForDemo = false,
+            bool isForSpecialists = false)
         {
             UnitId = unitId ?? string.Empty;
             PackId = packId ?? string.Empty;
@@ -56,6 +58,8 @@ namespace RogueCommandExpansionLoader.Runtime
             IsAllowedAsBlueprint = isAllowedAsBlueprint;
             IsAllowedAsStartingBlueprint = isAllowedAsStartingBlueprint;
             IsAllowedForAi = isAllowedForAi;
+            IsAllowedForDemo = isAllowedForDemo;
+            IsForSpecialists = isForSpecialists;
         }
 
         public string UnitId { get; private set; }
@@ -65,6 +69,8 @@ namespace RogueCommandExpansionLoader.Runtime
         public bool IsAllowedAsBlueprint { get; private set; }
         public bool IsAllowedAsStartingBlueprint { get; private set; }
         public bool IsAllowedForAi { get; private set; }
+        public bool IsAllowedForDemo { get; private set; }
+        public bool IsForSpecialists { get; private set; }
     }
 
     public sealed class StageDiagnosticReport

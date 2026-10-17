@@ -1015,6 +1015,27 @@ namespace RogueCommandExpansionLoader.Content
                     return String.Equals(value, "Common", StringComparison.Ordinal) ||
                            String.Equals(value, "Rare", StringComparison.Ordinal) ||
                            String.Equals(value, "UltraRare", StringComparison.Ordinal);
+                case "attackType":
+                    return String.Equals(value, "None", StringComparison.Ordinal) ||
+                           String.Equals(value, "Single", StringComparison.Ordinal) ||
+                           String.Equals(value, "AoE", StringComparison.Ordinal) ||
+                           String.Equals(value, "Multi", StringComparison.Ordinal) ||
+                           String.Equals(value, "MultiAoE", StringComparison.Ordinal) ||
+                           String.Equals(value, "Beam", StringComparison.Ordinal) ||
+                           String.Equals(value, "Artillery", StringComparison.Ordinal) ||
+                           String.Equals(value, "MultiArtillery", StringComparison.Ordinal);
+                case "skillType":
+                    return String.Equals(value, "None", StringComparison.Ordinal) ||
+                           String.Equals(value, "Toggle", StringComparison.Ordinal) ||
+                           String.Equals(value, "Location", StringComparison.Ordinal) ||
+                           String.Equals(value, "LocationAoE", StringComparison.Ordinal) ||
+                           String.Equals(value, "LocationMultiTargets", StringComparison.Ordinal) ||
+                           String.Equals(value, "Self", StringComparison.Ordinal) ||
+                           String.Equals(value, "SelfAoE", StringComparison.Ordinal) ||
+                           String.Equals(value, "Target", StringComparison.Ordinal) ||
+                           String.Equals(value, "TargetMultiTarget", StringComparison.Ordinal) ||
+                           String.Equals(value, "TargetAoE", StringComparison.Ordinal) ||
+                           String.Equals(value, "SelfMultiTarget", StringComparison.Ordinal);
                 default:
                     return false;
             }

@@ -1987,6 +1987,106 @@ var tests = new (string Name, Action Run)[]
             }
         }
     }),
+    ("Sandlance Scout declares demo and specialist flags", () =>
+    {
+        ContentUnitDefinition sandlance = nativeSample.units.Single(unit => unit.id == "sample-native:scout-tank");
+        if (!sandlance.isAllowedForDemo)
+        {
+            throw new InvalidOperationException("Sandlance Scout should be marked as allowed for demo.");
+        }
+        if (sandlance.isForSpecialists)
+        {
+            throw new InvalidOperationException("Sandlance Scout should not be restricted to specialists.");
+        }
+    }),
+    ("Skirmish Strike Bike declares demo and specialist flags", () =>
+    {
+        ContentUnitDefinition bike = nativeSample.units.Single(unit => unit.id == "sample-native:skirmish-bike");
+        if (bike.isAllowedForDemo)
+        {
+            throw new InvalidOperationException("Skirmish Strike Bike should not be allowed for demo.");
+        }
+        if (!bike.isForSpecialists)
+        {
+            throw new InvalidOperationException("Skirmish Strike Bike should be restricted to specialists.");
+        }
+    }),
+    ("balance overrides accept attackType and skillType enums and reject invalid values", () =>
+    {
+        WithPackage(nativeSample, (pack, root) =>
+        {
+            pack.units[0].balanceOverrides =
+            [
+                new ContentBalanceOverride { name = "attackType", value = "Single" },
+                new ContentBalanceOverride { name = "skillType", value = "LocationAoE" }
+            ];
+            ExpectValid(pack, root, new EmptySnapshot(), new KnownModuleValidator());
+
+            pack.units[0].balanceOverrides =
+            [
+                new ContentBalanceOverride { name = "attackType", value = "Nuclear" }
+            ];
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "unit.balance-override-invalid");
+
+            pack.units[0].balanceOverrides =
+            [
+                new ContentBalanceOverride { name = "skillType", value = "InvalidSkill" }
+            ];
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "unit.balance-override-invalid");
+        });
+    }),
+    ("siege-assault AI parameter parser supplies bounded defaults and validates limits", () =>
+    {
+        if (!SiegeAssaultParameterParser.TryParse(null, out SiegeAssaultSettings defaults,
+            out string diagnostic) || diagnostic != null || defaults.BaseIndex != 0 ||
+            defaults.CooldownSeconds != 40f || defaults.MinSquadSize != 4 ||
+            defaults.TargetPriority != "ClosestBuilding" || defaults.MinGameTimeSeconds != 30f)
+        {
+            throw new InvalidOperationException("The siege-assault AI parser did not return its documented defaults.");
+        }
+
+        ContentModuleParameter[] boundaries =
+        [
+            new ContentModuleParameter { name = "baseIndex", value = "31" },
+            new ContentModuleParameter { name = "cooldownSeconds", value = "300" },
+            new ContentModuleParameter { name = "minSquadSize", value = "12" },
+            new ContentModuleParameter { name = "targetPriority", value = "Hq" },
+            new ContentModuleParameter { name = "minGameTimeSeconds", value = "600" }
+        ];
+        if (!SiegeAssaultParameterParser.TryParse(boundaries, out SiegeAssaultSettings maximums,
+            out diagnostic) || diagnostic != null || maximums.BaseIndex != 31 ||
+            maximums.CooldownSeconds != 300f || maximums.MinSquadSize != 12 ||
+            maximums.TargetPriority != "Hq" || maximums.MinGameTimeSeconds != 600f)
+        {
+            throw new InvalidOperationException("The siege-assault AI parser rejected valid upper-bound values.");
+        }
+    }),
+    ("siege-assault AI parameter parser rejects invalid values and unknown parameters", () =>
+    {
+        ContentModuleParameter[][] invalidInputs =
+        [
+            [new ContentModuleParameter { name = "unknownParam", value = "1" }],
+            [new ContentModuleParameter { name = "baseIndex", value = "0" }, new ContentModuleParameter { name = "baseIndex", value = "1" }],
+            [null!],
+            [new ContentModuleParameter { name = "baseIndex", value = "32" }],
+            [new ContentModuleParameter { name = "minSquadSize", value = "0" }],
+            [new ContentModuleParameter { name = "minSquadSize", value = "13" }],
+            [new ContentModuleParameter { name = "targetPriority", value = "InvalidTarget" }],
+            [new ContentModuleParameter { name = "cooldownSeconds", value = "9" }],
+            [new ContentModuleParameter { name = "minGameTimeSeconds", value = "-1" }]
+        ];
+
+        for (int i = 0; i < invalidInputs.Length; i++)
+        {
+            if (SiegeAssaultParameterParser.TryParse(invalidInputs[i], out _, out string diagnostic) ||
+                diagnostic == null)
+            {
+                throw new InvalidOperationException("The siege-assault AI parser accepted invalid input " + i + ".");
+            }
+        }
+    }),
     ("managed assemblies are rejected from content packs", () =>
     {
         WithPackage(sample, (pack, root) =>
@@ -2295,6 +2395,10 @@ sealed class KnownModuleValidator : IAiModuleValidator
         if (moduleId == "sample:harvester-raider")
         {
             return HarvesterRaiderParameterParser.TryParse(parameters, out _, out diagnostic);
+        }
+        if (moduleId == "sample:siege-assault")
+        {
+            return SiegeAssaultParameterParser.TryParse(parameters, out _, out diagnostic);
         }
 
         bool known = moduleId is "sample:scheduled-base-build" or "sample:reactive-base-defense" or "sample:trace-default";

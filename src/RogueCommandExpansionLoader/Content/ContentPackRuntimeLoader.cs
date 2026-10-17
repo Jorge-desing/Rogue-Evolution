@@ -69,6 +69,8 @@ namespace RogueCommandExpansionLoader.Content
         private readonly FieldInfo _allowedBlueprintField;
         private readonly FieldInfo _allowedStartingBlueprintField;
         private readonly FieldInfo _allowedForAiField;
+        private readonly FieldInfo _allowedForDemoField;
+        private readonly FieldInfo _isForSpecialistsField;
         private readonly FieldInfo _stageParametersField;
         private readonly FieldInfo _stageMapSizeField;
         private readonly FieldInfo _stageDemoField;
@@ -233,6 +235,8 @@ namespace RogueCommandExpansionLoader.Content
             _allowedBlueprintField = RequireField(_entityRowType, "isAllowedAsBlueprint", typeof(bool));
             _allowedStartingBlueprintField = RequireField(_entityRowType, "isAllowedAsStartingBlueprint", typeof(bool));
             _allowedForAiField = RequireField(_entityRowType, "isAllowedForAi", typeof(bool));
+            _allowedForDemoField = RequireField(_entityRowType, "isAllowedForDemo", typeof(bool));
+            _isForSpecialistsField = RequireField(_entityRowType, "isForSpecialists", typeof(bool));
             _stageParametersField = RequireField(_stageType, "stageParameters", _stageParametersType);
             _stageMapSizeField = RequireField(_stageType, "mapSizeRange", typeof(Vector2Int));
             _stageDemoField = RequireField(_stageType, "isPartOfDemo", typeof(bool));
@@ -866,14 +870,20 @@ namespace RogueCommandExpansionLoader.Content
                     bool allowedAsBlueprint = false;
                     bool allowedAsStartingBlueprint = false;
                     bool allowedForAi = false;
+                    bool allowedForDemo = false;
+                    bool isForSpecialists = false;
                     try { allowedAsBlueprint = (bool)_allowedBlueprintField.GetValue(unit.BalanceRow); }
                     catch { }
                     try { allowedAsStartingBlueprint = (bool)_allowedStartingBlueprintField.GetValue(unit.BalanceRow); }
                     catch { }
                     try { allowedForAi = (bool)_allowedForAiField.GetValue(unit.BalanceRow); }
                     catch { }
+                    try { allowedForDemo = (bool)_allowedForDemoField.GetValue(unit.BalanceRow); }
+                    catch { }
+                    try { isForSpecialists = (bool)_isForSpecialistsField.GetValue(unit.BalanceRow); }
+                    catch { }
                     units.Add(new UnitDiagnosticReport(
-                        unit.Id, unit.PackId, unit.PrefabKey, unit.ImageKey, allowedAsBlueprint, allowedAsStartingBlueprint, allowedForAi));
+                        unit.Id, unit.PackId, unit.PrefabKey, unit.ImageKey, allowedAsBlueprint, allowedAsStartingBlueprint, allowedForAi, allowedForDemo, isForSpecialists));
                 }
                 units.Sort((left, right) => StringComparer.Ordinal.Compare(left.UnitId, right.UnitId));
 
@@ -1990,6 +2000,8 @@ namespace RogueCommandExpansionLoader.Content
                         _imageLocationField.SetValue(row, imageKey);
                         _inactiveField.SetValue(row, false);
                         _allowedForAiField.SetValue(row, unit.isAllowedForAi);
+                        _allowedForDemoField.SetValue(row, unit.isAllowedForDemo);
+                        _isForSpecialistsField.SetValue(row, unit.isForSpecialists);
                     }
                     else
                     {
@@ -2025,6 +2037,8 @@ namespace RogueCommandExpansionLoader.Content
                         _imageLocationField.SetValue(row, imageKey);
                         _inactiveField.SetValue(row, false);
                         _allowedForAiField.SetValue(row, unit.isAllowedForAi);
+                        _allowedForDemoField.SetValue(row, unit.isAllowedForDemo);
+                        _isForSpecialistsField.SetValue(row, unit.isForSpecialists);
 
                         temporaryResources.Add(prefabKey, customPrefabClone);
                         temporaryResources.Add(imageKey, cardImage);
