@@ -14,7 +14,19 @@
       "assetBundleId": "sample:assets",
       "balanceAssetName": "ScoutTankBalance",
       "prefabAssetName": "ScoutTank",
-      "cardImageAssetName": "ScoutTankCard"
+      "cardImageAssetName": "ScoutTankCard",
+      "localizations": [
+        {
+          "language": "en-US",
+          "name": "Scout Tank",
+          "description": "A lightly armored tank built for fast scouting and repositioning."
+        },
+        {
+          "language": "es-XL",
+          "name": "Tanque Explorador",
+          "description": "Un tanque con blindaje ligero diseñado para explorar y reposicionarse con rapidez."
+        }
+      ]
     }
   ],
   "stages": [

@@ -16,6 +16,7 @@ namespace RogueCommandExpansion.Authoring
         private const string RequiredUnityVersion = "2021.3.45f2";
         private const string AssetRoot = "Assets/RogueCommandExpansionSample";
         private const string PrefabPath = AssetRoot + "/ScoutTankVisual.prefab";
+        private const string CardSpritePath = AssetRoot + "/SandlanceScoutCard.png";
         private const string ModelPath = AssetRoot + "/Models/SandlanceScout.fbx";
         private const string MaterialRoot = AssetRoot + "/Materials";
         private const string BundleOutputPath = "../../artifacts/asset-bundles";
@@ -40,6 +41,7 @@ namespace RogueCommandExpansion.Authoring
                 }
 
                 string prefabPath = CreateSampleVisual();
+                CreateScoutCardSprite();
                 string projectRoot = Directory.GetParent(Application.dataPath).FullName;
                 string outputPath = Path.GetFullPath(Path.Combine(projectRoot, BundleOutputPath));
                 Directory.CreateDirectory(outputPath);
@@ -47,7 +49,7 @@ namespace RogueCommandExpansion.Authoring
                 var build = new AssetBundleBuild
                 {
                     assetBundleName = BundleName,
-                    assetNames = new[] { prefabPath }
+                    assetNames = new[] { prefabPath, CardSpritePath }
                 };
                 AssetBundleManifest manifest = BuildPipeline.BuildAssetBundles(outputPath,
                     new[] { build }, BuildAssetBundleOptions.ChunkBasedCompression |
@@ -167,12 +169,16 @@ namespace RogueCommandExpansion.Authoring
             {
                 string[] assetNames = bundle.GetAllAssetNames();
                 string prefabAssetPath = null;
+                string cardSpriteAssetPath = null;
                 for (int i = 0; i < assetNames.Length; i++)
                 {
                     if (assetNames[i].EndsWith("/scouttankvisual.prefab", StringComparison.OrdinalIgnoreCase))
                     {
                         prefabAssetPath = assetNames[i];
-                        break;
+                    }
+                    else if (assetNames[i].EndsWith("/sandlancescoutcard.png", StringComparison.OrdinalIgnoreCase))
+                    {
+                        cardSpriteAssetPath = assetNames[i];
                     }
                 }
 
@@ -185,6 +191,15 @@ namespace RogueCommandExpansion.Authoring
                 if (prefab == null || !String.Equals(prefab.name, "ScoutTankVisual", StringComparison.Ordinal))
                 {
                     throw new InvalidDataException("The sample visual prefab could not be loaded by its AssetBundle path.");
+                }
+
+                Sprite cardSprite = cardSpriteAssetPath == null
+                    ? null
+                    : bundle.LoadAsset<Sprite>(cardSpriteAssetPath);
+                if (cardSprite == null ||
+                    !String.Equals(cardSprite.name, "SandlanceScoutCard", StringComparison.Ordinal))
+                {
+                    throw new InvalidDataException("The Sandlance Scout card Sprite is missing or has the wrong asset name.");
                 }
 
                 Renderer[] renderers = prefab.GetComponentsInChildren<Renderer>(true);
@@ -288,6 +303,154 @@ namespace RogueCommandExpansion.Authoring
                 for (int metadataIndex = 0; metadataIndex < metadataFiles.Length; metadataIndex++)
                 {
                     NormalizeEmptyUnityYamlStrings(metadataFiles[metadataIndex]);
+                }
+            }
+        }
+
+        private static void CreateScoutCardSprite()
+        {
+            Sprite existing = AssetDatabase.LoadAssetAtPath<Sprite>(CardSpritePath);
+            if (existing != null)
+            {
+                TextureImporter existingImporter = AssetImporter.GetAtPath(CardSpritePath) as TextureImporter;
+                if (existingImporter == null)
+                {
+                    throw new InvalidDataException("Unity did not create a TextureImporter for " + CardSpritePath + ".");
+                }
+
+                existingImporter.assetBundleName = BundleName;
+                existingImporter.assetBundleVariant = String.Empty;
+                existingImporter.SaveAndReimport();
+                return;
+            }
+
+            string projectRoot = Directory.GetParent(Application.dataPath).FullName;
+            string absolutePath = Path.GetFullPath(Path.Combine(projectRoot,
+                CardSpritePath.Replace('/', Path.DirectorySeparatorChar)));
+            if (File.Exists(absolutePath))
+            {
+                throw new InvalidDataException("SandlanceScoutCard.png exists but Unity did not import it as a Sprite; preserving the file.");
+            }
+
+            const int size = 128;
+            var texture = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            for (int y = 0; y < size; y++)
+            {
+                byte shade = (byte)(22 + y / 8);
+                for (int x = 0; x < size; x++)
+                {
+                    texture.SetPixel(x, y, new Color32((byte)(10 + shade / 3), shade, (byte)(shade + 10), 255));
+                }
+            }
+
+            for (int x = 10; x < 119; x++)
+            {
+                texture.SetPixel(x, 16, new Color32(26, 49, 61, 255));
+                texture.SetPixel(x, 112, new Color32(26, 49, 61, 255));
+            }
+
+            DrawPolygon(texture, new[] { new Vector2Int(18, 31), new Vector2Int(111, 31),
+                new Vector2Int(104, 47), new Vector2Int(24, 47) }, new Color32(19, 28, 34, 255));
+            for (int wheel = 0; wheel < 5; wheel++)
+            {
+                DrawCircle(texture, 31 + wheel * 17, 39, 7, new Color32(47, 65, 69, 255));
+                DrawCircle(texture, 31 + wheel * 17, 39, 3, new Color32(25, 38, 43, 255));
+            }
+
+            DrawPolygon(texture, new[] { new Vector2Int(21, 47), new Vector2Int(39, 68),
+                new Vector2Int(84, 68), new Vector2Int(107, 55), new Vector2Int(108, 47) },
+                new Color32(75, 131, 139, 255));
+            DrawPolygon(texture, new[] { new Vector2Int(34, 53), new Vector2Int(42, 63),
+                new Vector2Int(79, 63), new Vector2Int(91, 54) }, new Color32(104, 166, 169, 255));
+            DrawPolygon(texture, new[] { new Vector2Int(47, 67), new Vector2Int(54, 82),
+                new Vector2Int(83, 82), new Vector2Int(91, 69), new Vector2Int(81, 65) },
+                new Color32(95, 150, 153, 255));
+            DrawPolygon(texture, new[] { new Vector2Int(76, 73), new Vector2Int(119, 77),
+                new Vector2Int(119, 82), new Vector2Int(74, 79) }, new Color32(178, 194, 182, 255));
+            DrawPolygon(texture, new[] { new Vector2Int(58, 82), new Vector2Int(61, 95),
+                new Vector2Int(65, 95), new Vector2Int(66, 82) }, new Color32(205, 116, 48, 255));
+            DrawPolygon(texture, new[] { new Vector2Int(53, 95), new Vector2Int(53, 100),
+                new Vector2Int(70, 100), new Vector2Int(70, 95) }, new Color32(242, 170, 72, 255));
+            DrawPolygon(texture, new[] { new Vector2Int(28, 49), new Vector2Int(40, 54),
+                new Vector2Int(31, 57) }, new Color32(37, 206, 191, 255));
+            texture.SetPixel(61, 86, new Color32(37, 206, 191, 255));
+            texture.SetPixel(62, 86, new Color32(37, 206, 191, 255));
+            texture.Apply();
+
+            byte[] png = texture.EncodeToPNG();
+            UnityEngine.Object.DestroyImmediate(texture);
+            Directory.CreateDirectory(Path.GetDirectoryName(absolutePath));
+            File.WriteAllBytes(absolutePath, png);
+            AssetDatabase.ImportAsset(CardSpritePath, ImportAssetOptions.ForceUpdate);
+
+            TextureImporter importer = AssetImporter.GetAtPath(CardSpritePath) as TextureImporter;
+            if (importer == null)
+            {
+                throw new InvalidOperationException("Unity did not create a TextureImporter for " + CardSpritePath + ".");
+            }
+
+            importer.textureType = TextureImporterType.Sprite;
+            importer.spriteImportMode = SpriteImportMode.Single;
+            importer.filterMode = FilterMode.Point;
+            importer.mipmapEnabled = false;
+            importer.assetBundleName = BundleName;
+            importer.assetBundleVariant = String.Empty;
+            importer.SaveAndReimport();
+            if (AssetDatabase.LoadAssetAtPath<Sprite>(CardSpritePath) == null)
+            {
+                throw new InvalidDataException("Unity failed to import the Sandlance Scout card as a Sprite.");
+            }
+        }
+
+        private static void DrawPolygon(Texture2D texture, Vector2Int[] vertices, Color32 color)
+        {
+            int minimumY = texture.height;
+            int maximumY = 0;
+            for (int i = 0; i < vertices.Length; i++)
+            {
+                minimumY = Math.Min(minimumY, vertices[i].y);
+                maximumY = Math.Max(maximumY, vertices[i].y);
+            }
+
+            for (int y = minimumY; y <= maximumY; y++)
+            {
+                for (int x = 0; x < texture.width; x++)
+                {
+                    bool inside = false;
+                    for (int i = 0, previous = vertices.Length - 1; i < vertices.Length; previous = i++)
+                    {
+                        Vector2Int a = vertices[i];
+                        Vector2Int b = vertices[previous];
+                        bool crosses = (a.y > y) != (b.y > y) &&
+                            x < (b.x - a.x) * (y - a.y) / (float)(b.y - a.y) + a.x;
+                        if (crosses)
+                        {
+                            inside = !inside;
+                        }
+                    }
+
+                    if (inside)
+                    {
+                        texture.SetPixel(x, y, color);
+                    }
+                }
+            }
+        }
+
+        private static void DrawCircle(Texture2D texture, int centerX, int centerY, int radius, Color32 color)
+        {
+            int radiusSquared = radius * radius;
+            for (int y = centerY - radius; y <= centerY + radius; y++)
+            {
+                for (int x = centerX - radius; x <= centerX + radius; x++)
+                {
+                    int offsetX = x - centerX;
+                    int offsetY = y - centerY;
+                    if (offsetX * offsetX + offsetY * offsetY <= radiusSquared &&
+                        x >= 0 && x < texture.width && y >= 0 && y < texture.height)
+                    {
+                        texture.SetPixel(x, y, color);
+                    }
                 }
             }
         }

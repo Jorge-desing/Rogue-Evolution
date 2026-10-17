@@ -186,6 +186,7 @@ namespace RogueCommandExpansionLoader.Runtime
             Type entityFactory = RuntimeReflection.FindUniqueType(gameAssembly, "EntityFactory");
             Type aiBehaviour = RuntimeReflection.FindUniqueType(gameAssembly, "AiBehaviour");
             Type defaultAiBehaviour = RuntimeReflection.FindUniqueType(gameAssembly, "DefaultAiBehaviour");
+            Type loca = RuntimeReflection.FindUniqueType(gameAssembly, "Loca");
 
             MethodInfo init = RuntimeReflection.FindUniqueMethod(entityStore, "Init",
                 delegate(MethodInfo method) { return method.GetParameters().Length == 0; });
@@ -228,6 +229,10 @@ namespace RogueCommandExpansionLoader.Runtime
                 {
                     return method.GetParameters().Length == 0 && method.ReturnType == typeof(void);
                 });
+            MethodInfo blueprintName = RuntimeReflection.FindUniqueMethod(loca, "BlueprintName",
+                HasSingleStringArgumentReturningString);
+            MethodInfo blueprintDescription = RuntimeReflection.FindUniqueMethod(loca, "BlueprintDescription",
+                HasSingleStringArgumentReturningString);
             MethodInfo resourcesLoadTyped = FindResourcesLoadTyped();
 
             MethodInfo entityInitPostfix = Hook("EntityBalancingStoreInitPostfix");
@@ -239,6 +244,8 @@ namespace RogueCommandExpansionLoader.Runtime
             MethodInfo aiUpdatePostfix = Hook("AiBehaviourUpdatePostfix");
             MethodInfo aiInitPostfix = Hook("DefaultAiBehaviourInitPostfix");
             MethodInfo aiDestroyPostfix = Hook("AiBehaviourDestroyPostfix");
+            MethodInfo blueprintNamePrefix = Hook("BlueprintNamePrefix");
+            MethodInfo blueprintDescriptionPrefix = Hook("BlueprintDescriptionPrefix");
             MethodInfo loadPrefix = typeof(UnityResourcesLoadTypedPatch).GetMethod("Prefix",
                 BindingFlags.Public | BindingFlags.Static);
             if (loadPrefix == null)
@@ -256,8 +263,17 @@ namespace RogueCommandExpansionLoader.Runtime
             plan.Add(new PatchPlan(aiUpdate, null, aiUpdatePostfix));
             plan.Add(new PatchPlan(aiInit, null, aiInitPostfix));
             plan.Add(new PatchPlan(aiDestroy, null, aiDestroyPostfix));
+            plan.Add(new PatchPlan(blueprintName, blueprintNamePrefix, null));
+            plan.Add(new PatchPlan(blueprintDescription, blueprintDescriptionPrefix, null));
             plan.Add(new PatchPlan(resourcesLoadTyped, loadPrefix, null));
             return plan;
+        }
+
+        private static bool HasSingleStringArgumentReturningString(MethodInfo method)
+        {
+            ParameterInfo[] parameters = method.GetParameters();
+            return method.IsStatic && method.ReturnType == typeof(string) && parameters.Length == 1 &&
+                parameters[0].ParameterType == typeof(string);
         }
 
         private static bool HasInstantiateEntityShape(MethodInfo method)

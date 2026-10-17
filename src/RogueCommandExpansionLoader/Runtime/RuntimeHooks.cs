@@ -92,6 +92,54 @@ namespace RogueCommandExpansionLoader.Runtime
             }
         }
 
+        public static bool BlueprintNamePrefix(string __0, ref string __result)
+        {
+            return TryResolveUnitLocalization(__0, false, ref __result);
+        }
+
+        public static bool BlueprintDescriptionPrefix(string __0, ref string __result)
+        {
+            return TryResolveUnitLocalization(__0, true, ref __result);
+        }
+
+        private static bool TryResolveUnitLocalization(string unitId, bool description, ref string result)
+        {
+            IRuntimeContentProvider provider;
+            Action<string> logger;
+            lock (Gate)
+            {
+                provider = _provider;
+                logger = _log;
+            }
+
+            if (provider == null)
+            {
+                return true;
+            }
+
+            try
+            {
+                string value;
+                if (!provider.TryGetUnitLocalization(unitId, description, out value))
+                {
+                    return true;
+                }
+
+                result = value ?? String.Empty;
+                return false;
+            }
+            catch (Exception exception)
+            {
+                if (logger != null)
+                {
+                    logger("Could not resolve localized text for unit '" + unitId + "': " +
+                        exception.GetType().Name + ": " + exception.Message);
+                }
+
+                return true;
+            }
+        }
+
         private static bool TryPrepareRuntimeContent(out RuntimeContentMutator mutator)
         {
             IRuntimeContentProvider provider;

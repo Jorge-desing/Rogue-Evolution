@@ -44,6 +44,9 @@ namespace RogueCommandExpansionLoader.Content
         private readonly Type _entityRowType;
         private readonly Type _entityBalanceAssetType;
         private readonly Type _entityControllerType;
+        private readonly PropertyInfo _localizationLanguageProperty;
+        private readonly MethodInfo _blueprintNameMethod;
+        private readonly MethodInfo _blueprintDescriptionMethod;
         private readonly Type _stageType;
         private readonly Type _stageParametersType;
         private readonly Type _aiBehaviourType;
@@ -151,6 +154,29 @@ namespace RogueCommandExpansionLoader.Content
             _entityRowType = FindUniqueType("EntityBalancingParameters");
             _entityBalanceAssetType = FindUniqueType("EntityBalancingScriptableObject");
             _entityControllerType = FindUniqueType("EntityController");
+            Type locaType = FindUniqueType("Loca");
+            _localizationLanguageProperty = locaType.GetProperty("Language", BindingFlags.Public | BindingFlags.Static);
+            if (_localizationLanguageProperty == null || _localizationLanguageProperty.PropertyType != typeof(string) ||
+                _localizationLanguageProperty.GetGetMethod() == null ||
+                !_localizationLanguageProperty.GetGetMethod().IsStatic)
+            {
+                throw new InvalidOperationException("Loca.Language must be a public static string property.");
+            }
+
+            _blueprintNameMethod = RuntimeReflection.FindUniqueMethod(locaType, "BlueprintName",
+                delegate(MethodInfo method)
+                {
+                    ParameterInfo[] parameters = method.GetParameters();
+                    return method.IsStatic && method.ReturnType == typeof(string) && parameters.Length == 1 &&
+                        parameters[0].ParameterType == typeof(string);
+                });
+            _blueprintDescriptionMethod = RuntimeReflection.FindUniqueMethod(locaType, "BlueprintDescription",
+                delegate(MethodInfo method)
+                {
+                    ParameterInfo[] parameters = method.GetParameters();
+                    return method.IsStatic && method.ReturnType == typeof(string) && parameters.Length == 1 &&
+                        parameters[0].ParameterType == typeof(string);
+                });
             _stageType = FindUniqueType("Stage");
             _stageParametersType = FindUniqueType("StageParametersScriptableObject");
             Type gameBalancingType = FindUniqueType("GameBalancingScriptableObject");
@@ -339,6 +365,53 @@ namespace RogueCommandExpansionLoader.Content
             lock (_gate)
             {
                 return _runtimeContentReady ? _entityRows.ToArray() : new object[0];
+            }
+        }
+
+        public bool TryGetUnitLocalization(string unitId, bool description, out string value)
+        {
+            lock (_gate)
+            {
+                LoadedUnit unit;
+                if (String.IsNullOrWhiteSpace(unitId) || !_units.TryGetValue(unitId, out unit))
+                {
+                    value = null;
+                    return false;
+                }
+
+                string language = null;
+                try
+                {
+                    language = _localizationLanguageProperty.GetValue(null, null) as string;
+                }
+                catch (Exception exception)
+                {
+                    Log("No se pudo leer Loca.Language para la unidad " + unitId + ": " +
+                        exception.GetBaseException().Message);
+                }
+
+                if (String.IsNullOrWhiteSpace(language))
+                {
+                    language = "en-US";
+                }
+
+                return UnitLocalizationResolver.TryResolve(unit.Definition, language, description,
+                    delegate(string templateId, bool lookupDescription)
+                    {
+                        MethodInfo lookup = lookupDescription
+                            ? _blueprintDescriptionMethod
+                            : _blueprintNameMethod;
+                        try
+                        {
+                            return lookup.Invoke(null, new object[] { templateId }) as string;
+                        }
+                        catch (Exception exception)
+                        {
+                            Log("No se pudo heredar la localización de " + templateId + " para " + unitId + ": " +
+                                exception.GetBaseException().Message);
+                            return null;
+                        }
+                    }, out value);
             }
         }
 
@@ -1535,7 +1608,7 @@ namespace RogueCommandExpansionLoader.Content
                         temporaryResources.Add(imageKey, cardImage);
                     }
 
-                    temporaryUnits.Add(new LoadedUnit(unit.id, definition.packId, prefabKey, imageKey, row));
+                    temporaryUnits.Add(new LoadedUnit(unit.id, definition.packId, prefabKey, imageKey, row, unit));
                 }
 
                 for (int i = 0; i < definition.stages.Length; i++)
@@ -3919,13 +3992,20 @@ namespace RogueCommandExpansionLoader.Content
 
         private sealed class LoadedUnit
         {
-            public LoadedUnit(string id, string packId, string prefabKey, string imageKey, object balanceRow)
+            public LoadedUnit(
+                string id,
+                string packId,
+                string prefabKey,
+                string imageKey,
+                object balanceRow,
+                ContentUnitDefinition definition)
             {
                 Id = id;
                 PackId = packId;
                 PrefabKey = prefabKey;
                 ImageKey = imageKey;
                 BalanceRow = balanceRow;
+                Definition = definition;
             }
 
             public string Id { get; private set; }
@@ -3933,6 +4013,7 @@ namespace RogueCommandExpansionLoader.Content
             public string PrefabKey { get; private set; }
             public string ImageKey { get; private set; }
             public object BalanceRow { get; private set; }
+            public ContentUnitDefinition Definition { get; private set; }
         }
 
         private sealed class LoadedStage

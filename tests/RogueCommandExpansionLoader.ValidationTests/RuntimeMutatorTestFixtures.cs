@@ -80,6 +80,12 @@ internal sealed class RuntimeMutatorTestProvider : IRuntimeContentProvider
 
     public IEnumerable<object> GetEntityParameterRows() => EntityRows;
 
+    public bool TryGetUnitLocalization(string unitId, bool description, out string value)
+    {
+        value = null;
+        return false;
+    }
+
     public IEnumerable<ProgressionContentContribution> GetProgressionContributions(object gameBalancingScriptableObject) => Contributions;
 
     public void OnAiBehaviourInitialized(object gameBehaviour)

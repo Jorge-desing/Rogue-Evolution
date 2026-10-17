@@ -27,6 +27,9 @@ namespace RogueCommandExpansionLoader.Runtime
 
         IEnumerable<object> GetEntityParameterRows();
 
+        /// <summary>Resolves a localized name or description for a registered mod unit.</summary>
+        bool TryGetUnitLocalization(string unitId, bool description, out string value);
+
         IEnumerable<ProgressionContentContribution> GetProgressionContributions(
             object gameBalancingScriptableObject);
 

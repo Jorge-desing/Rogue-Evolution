@@ -15,6 +15,10 @@
 `sample:reactive-base-defense` accepts `baseIndex` (integer 0–31), `cooldownSeconds` (finite 1–60 seconds), `defenseRadiusCells` (finite 1–64 map cells; default 12), and `maxResponders` (integer 1–4; default 2). It reacts only to player units whose attack and attack component are enabled, whose current target is an AI building at that base, and whose target is in range and targetable by the AI. It chooses nearby defenders with enabled movement and attack that are idle or moving, excludes units with pending skill commands or paused command chains, and counts naturally engaged or previously dispatched units toward the cap. It inserts a finite attack-move-to-position command before the selected unit's idle/move order, which the game resumes after that response reaches its destination. Both current native-template sample packs set `scopeToReferencedStages: true`; static inspection found their source AI templates only accept stages 0–1, while appended stages begin at index 9. The loader now derives an isolated alias range for the referenced stages instead of mutating the shared native template. This is a local-build/static-preflight hypothesis only; none of the unit, stage, or AI sample content has been confirmed in a live match.
 - Include empty arrays when a section has no entries. The validator reports package-local diagnostics and does not mutate the registry.
 
+## Unit localization
+
+Units may declare `localizations` entries with a game's language ID, a visible `name`, and an optional `description`. Custom-prefab units must provide an `en-US` name; native-template units may omit localizations and inherit the native template's name and description. If the active language has no pack translation, the loader falls back to `en-US`; additional supported game languages are `de-DE`, `ja-JP`, `ko-KR`, `zh-CN`, `zh-TW`, `fr-FR`, `pt-BR`, and `ru-RU`. Duplicate or unsupported language IDs disable the package. The loader intercepts `Loca.BlueprintName` and `Loca.BlueprintDescription` for registered mod-unit IDs, so namespaced IDs resolve without editing the game's localization resources.
+
 ## Example
 
 ```json
@@ -34,6 +38,10 @@
       "nativeTemplateId": "PCXBaseTank",
       "assetBundleId": "example:assets",
       "cardImageAssetName": "ScoutTankCard",
+      "localizations": [
+        { "language": "en-US", "name": "Sandlance Scout", "description": "A fast reconnaissance tank." },
+        { "language": "es-XL", "name": "Explorador Sandlance", "description": "Un tanque rápido de reconocimiento." }
+      ],
       "balanceOverrides": [
         { "name": "cost", "value": "70" },
         { "name": "maxHealth", "value": "130" },

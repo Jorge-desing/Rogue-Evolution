@@ -76,6 +76,9 @@ namespace RogueCommandExpansionLoader.Content
 
         private static readonly StringComparer IdComparer = StringComparer.Ordinal;
         private static readonly StringComparer PathComparer = StringComparer.OrdinalIgnoreCase;
+        private static readonly HashSet<string> SupportedUnitLocalizationLanguages = new HashSet<string>(
+            new[] { "en-US", "de-DE", "ja-JP", "ko-KR", "zh-CN", "zh-TW", "fr-FR", "es-XL", "pt-BR", "ru-RU" },
+            StringComparer.Ordinal);
 
         public static ContentPackValidationResult Validate(
             ContentPackDefinition pack,
@@ -273,6 +276,7 @@ namespace RogueCommandExpansionLoader.Content
                     }
                 }
 
+                ValidateUnitLocalizations(unit, itemPath + ".localizations", hasNativeTemplate, diagnostics);
                 ValidateBalanceOverrides(unit.balanceOverrides, itemPath + ".balanceOverrides", diagnostics);
             }
 
@@ -647,6 +651,66 @@ namespace RogueCommandExpansionLoader.Content
                     Add(diagnostics, "unit.balance-override-invalid", itemPath,
                         "The override must target an allowlisted numeric balance field and contain a finite, non-negative invariant-culture value.");
                 }
+            }
+        }
+
+        private static void ValidateUnitLocalizations(
+            ContentUnitDefinition unit,
+            string path,
+            bool hasNativeTemplate,
+            List<ContentDiagnostic> diagnostics)
+        {
+            ContentUnitLocalizationDefinition[] localizations = unit.localizations;
+            if (localizations == null || localizations.Length == 0)
+            {
+                if (!hasNativeTemplate)
+                {
+                    Add(diagnostics, "unit.localization-required", path,
+                        "A custom unit must declare an en-US display name; native-template units may inherit their template localization.");
+                }
+
+                return;
+            }
+
+            var languages = new HashSet<string>(StringComparer.Ordinal);
+            bool hasEnglishName = false;
+            for (int i = 0; i < localizations.Length; i++)
+            {
+                ContentUnitLocalizationDefinition localization = localizations[i];
+                string itemPath = path + "[" + i + "]";
+                if (localization == null)
+                {
+                    Add(diagnostics, "entry.null", itemPath, "Unit localization entries cannot be null.");
+                    continue;
+                }
+
+                if (String.IsNullOrWhiteSpace(localization.language) ||
+                    !SupportedUnitLocalizationLanguages.Contains(localization.language))
+                {
+                    Add(diagnostics, "unit.localization-language-unsupported", itemPath + ".language",
+                        "Unit localization language must match one of the game's supported language IDs exactly.");
+                }
+                else if (!languages.Add(localization.language))
+                {
+                    Add(diagnostics, "unit.localization-language-duplicate", itemPath + ".language",
+                        "A unit can declare at most one localization for each language.");
+                }
+
+                if (String.IsNullOrWhiteSpace(localization.name))
+                {
+                    Add(diagnostics, "unit.localization-name-required", itemPath + ".name",
+                        "Every unit localization must include a non-empty display name.");
+                }
+                else if (String.Equals(localization.language, "en-US", StringComparison.Ordinal))
+                {
+                    hasEnglishName = true;
+                }
+            }
+
+            if (!hasEnglishName)
+            {
+                Add(diagnostics, "unit.localization-english-name-required", path,
+                    "Unit localizations must include a non-empty en-US display name for fallback.");
             }
         }
 

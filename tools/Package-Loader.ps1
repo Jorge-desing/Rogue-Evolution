@@ -223,8 +223,9 @@ sample-reactive-ai pack is data-only. Other packs must include every AssetBundle
 declared by content.json and its manifest.
 Use the adjacent schema directory when authoring content.json.
 
-The native sample reuses native unit gameplay, stage, and AI templates and overlays
-a script-free model prefab. The reactive AI sample uses a native stage and AI
+The native sample registers a localized Sandlance Scout balance variant with its
+own card Sprite and script-free model overlay, while keeping the native unit
+controller, stage, and AI templates. The reactive AI sample uses a native stage and AI
 template with a bounded compiled counterattack module. Both keep native map layouts.
 '@ | Set-Content -LiteralPath (Join-Path $packsDirectory 'README.txt') -Encoding UTF8
 
@@ -234,8 +235,9 @@ Rogue Command Expansion Loader $pluginVersion
 Install:
 1. Install BepInEx 5.4.23.5 win-x64 Mono into the Rogue Command game folder.
 2. Extract this archive into the Rogue Command game folder, preserving its BepInEx directory.
-3. The included sample-native-expansion pack demonstrates a unit balance variant,
-   a bundled visual model, a native stage variant, and a scheduled-build AI module.
+3. The included sample-native-expansion pack demonstrates a localized Sandlance Scout
+   balance variant with its own card Sprite and bundled model overlay, plus a native
+   stage variant and scheduled-build AI module. It retains the native unit controller.
    The sample-reactive-ai pack demonstrates a native stage variant with an AI
    module that sends up to two nearby units to counterattack an active attacker.
 4. Add other packs under BepInEx/plugins/RogueCommandExpansionLoader/content/packs/;

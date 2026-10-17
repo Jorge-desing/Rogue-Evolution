@@ -13,8 +13,21 @@
       "id": "sample-native:scout-tank",
       "nativeTemplateId": "PCXBaseTank",
       "assetBundleId": "sample-native:assets",
+      "cardImageAssetName": "SandlanceScoutCard",
       "visualAssetName": "ScoutTankVisual",
       "visualRootPath": "Vehicle",
+      "localizations": [
+        {
+          "language": "en-US",
+          "name": "Sandlance Scout",
+          "description": "A fast reconnaissance tank with an extended sensor mast and a light cannon."
+        },
+        {
+          "language": "es-XL",
+          "name": "Explorador Sandlance",
+          "description": "Un tanque de reconocimiento rápido con mástil sensor extendido y cañón ligero."
+        }
+      ],
       "balanceOverrides": [
         { "name": "cost", "value": "70" },
         { "name": "maxHealth", "value": "130" },

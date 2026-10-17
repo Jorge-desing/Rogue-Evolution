@@ -37,6 +37,15 @@ namespace RogueCommandExpansionLoader.Content
         public string visualRootPath;
         public string nativeTemplateId;
         public ContentBalanceOverride[] balanceOverrides;
+        public ContentUnitLocalizationDefinition[] localizations;
+    }
+
+    [Serializable]
+    public sealed class ContentUnitLocalizationDefinition
+    {
+        public string language;
+        public string name;
+        public string description;
     }
 
     [Serializable]
@@ -152,7 +161,19 @@ namespace RogueCommandExpansionLoader.Content
                 visualAssetName = source.visualAssetName,
                 visualRootPath = source.visualRootPath,
                 nativeTemplateId = source.nativeTemplateId,
-                balanceOverrides = CloneArray(source.balanceOverrides, CloneBalanceOverride)
+                balanceOverrides = CloneArray(source.balanceOverrides, CloneBalanceOverride),
+                localizations = CloneArray(source.localizations, CloneUnitLocalization)
+            };
+        }
+
+        private static ContentUnitLocalizationDefinition CloneUnitLocalization(
+            ContentUnitLocalizationDefinition source)
+        {
+            return source == null ? null : new ContentUnitLocalizationDefinition
+            {
+                language = source.language,
+                name = source.name,
+                description = source.description
             };
         }
 

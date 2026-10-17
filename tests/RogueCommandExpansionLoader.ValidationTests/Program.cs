@@ -49,6 +49,48 @@ var tests = new (string Name, Action Run)[]
         WithPackage(nativeSample, (pack, root) =>
             ExpectValid(pack, root, new EmptySnapshot(), new KnownModuleValidator()));
     }),
+    ("Sandlance declares its own localized name, description, and card Sprite", () =>
+    {
+        ContentUnitDefinition sandlance = nativeSample.units.Single(unit => unit.id == "sample-native:scout-tank");
+        if (sandlance.cardImageAssetName != "SandlanceScoutCard" || sandlance.localizations == null ||
+            !sandlance.localizations.Any(localization => localization.language == "en-US" &&
+                localization.name == "Sandlance Scout" && !String.IsNullOrWhiteSpace(localization.description)))
+        {
+            throw new InvalidOperationException("Sandlance is missing its own card Sprite or visible English text.");
+        }
+    }),
+    ("unit localization resolves active language and English fallback", () =>
+    {
+        var unit = new ContentUnitDefinition
+        {
+            id = "sample-native:sandlance-scout",
+            localizations =
+            [
+                new ContentUnitLocalizationDefinition { language = "en-US", name = "Sandlance Scout", description = "Fast scout." },
+                new ContentUnitLocalizationDefinition { language = "es-XL", name = "Explorador Sandlance", description = "Explorador veloz." }
+            ]
+        };
+        if (!UnitLocalizationResolver.TryResolve(unit, "es-XL", false, null, out string spanishName) ||
+            spanishName != "Explorador Sandlance" ||
+            !UnitLocalizationResolver.TryResolve(unit, "de-DE", true, null, out string englishFallback) ||
+            englishFallback != "Fast scout.")
+        {
+            throw new InvalidOperationException("Unit localization did not use the active language and en-US fallback.");
+        }
+    }),
+    ("native unit localization inherits name and description from its template", () =>
+    {
+        var unit = new ContentUnitDefinition { id = "sample-native:variant", nativeTemplateId = "PCXBaseTank" };
+        if (!UnitLocalizationResolver.TryResolve(unit, "en-US", false,
+                (templateId, description) => templateId + (description ? " description" : " name"), out string name) ||
+            name != "PCXBaseTank name" ||
+            !UnitLocalizationResolver.TryResolve(unit, "es-XL", true,
+                (templateId, description) => templateId + (description ? " description" : " name"), out string text) ||
+            text != "PCXBaseTank description")
+        {
+            throw new InvalidOperationException("A native-template unit did not retain its template localization fallback.");
+        }
+    }),
     ("reactive AI sample pack passes package-local validation", () =>
     {
         WithPackage(reactiveAiSample, (pack, root) =>
@@ -167,6 +209,32 @@ var tests = new (string Name, Action Run)[]
                 new ContentBalanceOverride { name = "moveSpeed", value = "1.1" }
             ];
             ExpectValid(pack, root, new EmptySnapshot(), new KnownModuleValidator());
+        });
+    }),
+    ("custom unit requires an English display name", () =>
+    {
+        WithPackage(sample, (pack, root) =>
+        {
+            pack.units[0].localizations = [];
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "unit.localization-required");
+        });
+    }),
+    ("unit localization rejects duplicate and unsupported language IDs", () =>
+    {
+        WithPackage(nativeSample, (pack, root) =>
+        {
+            ContentUnitDefinition unit = pack.units[0];
+            unit.localizations =
+            [
+                new ContentUnitLocalizationDefinition { language = "en-US", name = "Scout" },
+                new ContentUnitLocalizationDefinition { language = "en-US", name = "Duplicate" },
+                new ContentUnitLocalizationDefinition { language = "zz-ZZ", name = "Unknown" }
+            ];
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "unit.localization-language-duplicate");
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "unit.localization-language-unsupported");
         });
     }),
     ("native-template unit accepts a bundle visual overlay", () =>
