@@ -10,6 +10,7 @@ Desktop.ini
 /build/
 /dist/
 /artifacts/
+content/source-art/*.blend1
 **/bin/
 **/obj/
 *.egg-info/
@@ -27,3 +28,5 @@ Desktop.ini
 /unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/BundleOutput/
 /unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/SandlanceScoutCard.png
 /unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/SandlanceScoutCard.png.meta
+/unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/SkirmishBikeCard.png
+/unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/SkirmishBikeCard.png.meta

@@ -152,6 +152,12 @@ namespace RogueCommandExpansionLoader.Content
             _log = logger;
 
             _entityRowType = FindUniqueType("EntityBalancingParameters");
+            if (!_entityRowType.IsValueType)
+            {
+                throw new InvalidOperationException(
+                    "EntityBalancingParameters must remain a value type so native-template unit rows can be copied before edits.");
+            }
+
             _entityBalanceAssetType = FindUniqueType("EntityBalancingScriptableObject");
             _entityControllerType = FindUniqueType("EntityController");
             Type locaType = FindUniqueType("Loca");
@@ -1497,7 +1503,7 @@ namespace RogueCommandExpansionLoader.Content
                     string imageKey;
                     if (usesNativeTemplate)
                     {
-                        row = ReadNativeBalanceRow(unit.nativeTemplateId, packageName, unit.id);
+                        row = CopyNativeBalanceRow(unit.nativeTemplateId, packageName, unit.id);
                         string nativePrefabPath = _prefabLocationField.GetValue(row) as string;
                         string nativeImagePath = _imageLocationField.GetValue(row) as string;
                         if (String.IsNullOrWhiteSpace(nativePrefabPath) || String.IsNullOrWhiteSpace(nativeImagePath))
@@ -2228,7 +2234,7 @@ namespace RogueCommandExpansionLoader.Content
             return row;
         }
 
-        private object ReadNativeBalanceRow(string templateId, string packageName, string unitId)
+        private object CopyNativeBalanceRow(string templateId, string packageName, string unitId)
         {
             IList rows = _nativeEntityRowsField.GetValue(null) as IList;
             IDictionary index = _entityIndexField.GetValue(null) as IDictionary;
@@ -2255,6 +2261,9 @@ namespace RogueCommandExpansionLoader.Content
                     "' sale de la lista de balance.");
             }
 
+            // EntityBalancingParameters is verified as a value type above; reading through non-generic IList
+            // boxes a copy. Overrides and namespaced identity fields are applied to that detached copy, which
+            // RuntimeContentMutator later appends as a new row without changing rows[rowIndex].
             object row = rows[rowIndex];
             if (row == null || row.GetType() != _entityRowType ||
                 !String.Equals(_entityIdField.GetValue(row) as string, templateId, StringComparison.Ordinal))

@@ -341,6 +341,8 @@ namespace RogueCommandExpansionLoader.Content
                     }
                     else
                     {
+                        Add(diagnostics, "ai-profile.native-scope-required", itemPath + ".scopeToReferencedStages",
+                            "A native-template AI profile must use scopeToReferencedStages so its compiled modules bind only to an isolated clone.");
                         resourceName = profile.nativeTemplateId;
                     }
                 }

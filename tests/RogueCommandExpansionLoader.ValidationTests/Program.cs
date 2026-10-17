@@ -59,6 +59,16 @@ var tests = new (string Name, Action Run)[]
             throw new InvalidOperationException("Sandlance is missing its own card Sprite or visible English text.");
         }
     }),
+    ("Skirmish Strike Bike declares its custom model, card Sprite, and native visual target", () =>
+    {
+        ContentUnitDefinition bike = nativeSample.units.Single(unit => unit.id == "sample-native:skirmish-bike");
+        if (bike.nativeTemplateId != "BombBike" || bike.assetBundleId != "sample-native:assets" ||
+            bike.visualAssetName != "SkirmishBikeVisual" || bike.cardImageAssetName != "SkirmishBikeCard" ||
+            bike.visualRootPath != "GameObject/BombBike")
+        {
+            throw new InvalidOperationException("Skirmish Strike Bike is missing its bundled visual declaration.");
+        }
+    }),
     ("expansion units declare distinct English and Spanish localizations", () =>
     {
         string[] expectedUnitIds =
@@ -417,6 +427,7 @@ var tests = new (string Name, Action Run)[]
             profile.assetBundleId = null;
             profile.prefabAssetName = null;
             profile.nativeTemplateId = "_01_ Quick Hunter Enemy Var";
+            profile.scopeToReferencedStages = true;
 
             ExpectValid(pack, root, new EmptySnapshot(), new KnownModuleValidator());
         });
@@ -438,6 +449,18 @@ var tests = new (string Name, Action Run)[]
             pack.aiProfiles[0].nativeTemplateId = "_01_ Quick Hunter Enemy Var";
             pack.aiProfiles[0].scopeToReferencedStages = true;
             ExpectValid(pack, root, new EmptySnapshot(), new KnownModuleValidator());
+        });
+    }),
+    ("native AI modules require an isolated stage-scoped clone", () =>
+    {
+        WithPackage(sample, (pack, root) =>
+        {
+            pack.aiProfiles[0].assetBundleId = null;
+            pack.aiProfiles[0].prefabAssetName = null;
+            pack.aiProfiles[0].nativeTemplateId = "_01_ Quick Hunter Enemy Var";
+            pack.aiProfiles[0].scopeToReferencedStages = false;
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "ai-profile.native-scope-required");
         });
     }),
     ("stage-scoped AI rejects custom prefabs", () =>

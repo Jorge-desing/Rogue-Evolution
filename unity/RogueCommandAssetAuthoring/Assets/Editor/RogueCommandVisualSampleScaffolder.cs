@@ -18,6 +18,9 @@ namespace RogueCommandExpansion.Authoring
         private const string PrefabPath = AssetRoot + "/ScoutTankVisual.prefab";
         private const string CardSpritePath = AssetRoot + "/SandlanceScoutCard.png";
         private const string ModelPath = AssetRoot + "/Models/SandlanceScout.fbx";
+        private const string BikePrefabPath = AssetRoot + "/SkirmishBikeVisual.prefab";
+        private const string BikeCardSpritePath = AssetRoot + "/SkirmishBikeCard.png";
+        private const string BikeModelPath = AssetRoot + "/Models/SkirmishStrikeBike.fbx";
         private const string MaterialRoot = AssetRoot + "/Materials";
         private const string BundleOutputPath = "../../artifacts/asset-bundles";
         private const string BundleName = "sample-native-expansion.bundle";
@@ -42,6 +45,8 @@ namespace RogueCommandExpansion.Authoring
 
                 string prefabPath = CreateSampleVisual();
                 CreateScoutCardSprite();
+                string bikePrefabPath = CreateSkirmishBikeVisual();
+                CreateSkirmishBikeCardSprite();
                 string projectRoot = Directory.GetParent(Application.dataPath).FullName;
                 string outputPath = Path.GetFullPath(Path.Combine(projectRoot, BundleOutputPath));
                 Directory.CreateDirectory(outputPath);
@@ -49,7 +54,7 @@ namespace RogueCommandExpansion.Authoring
                 var build = new AssetBundleBuild
                 {
                     assetBundleName = BundleName,
-                    assetNames = new[] { prefabPath, CardSpritePath }
+                    assetNames = new[] { prefabPath, CardSpritePath, bikePrefabPath, BikeCardSpritePath }
                 };
                 AssetBundleManifest manifest = BuildPipeline.BuildAssetBundles(outputPath,
                     new[] { build }, BuildAssetBundleOptions.ChunkBasedCompression |
@@ -80,8 +85,8 @@ namespace RogueCommandExpansion.Authoring
                     Path.Combine(packBundles, "assetbundle-manifest.bundle"));
 
                 AssetDatabase.Refresh();
-                Debug.Log("Built the script-free " + BundleName + " visual overlay for sample-native:expansion at " +
-                    packBundles + ". The game controller remains on the native unit prefab.");
+                Debug.Log("Built the script-free Sandlance and Skirmish Bike visual overlays in " + BundleName +
+                    " at " + packBundles + ". Both units retain their native gameplay prefabs.");
             }
             catch (Exception exception)
             {
@@ -157,6 +162,65 @@ namespace RogueCommandExpansion.Authoring
             return PrefabPath;
         }
 
+        private static string CreateSkirmishBikeVisual()
+        {
+            string projectRoot = Directory.GetParent(Application.dataPath).FullName;
+            Directory.CreateDirectory(Path.GetFullPath(Path.Combine(projectRoot, AssetRoot)));
+            AssetDatabase.Refresh();
+
+            GameObject modelAsset = AssetDatabase.LoadAssetAtPath<GameObject>(BikeModelPath);
+            if (modelAsset == null)
+            {
+                throw new FileNotFoundException("Import the authored Skirmish Strike Bike FBX before building the " +
+                    "sample bundle.", BikeModelPath);
+            }
+
+            Dictionary<string, Material> materials = CreateSkirmishBikeMaterials();
+            var root = new GameObject("SkirmishBikeVisual");
+            try
+            {
+                GameObject modelInstance = PrefabUtility.InstantiatePrefab(modelAsset) as GameObject;
+                if (modelInstance == null)
+                {
+                    throw new InvalidOperationException("Unity could not instantiate the authored Skirmish Strike Bike.");
+                }
+
+                modelInstance.name = "SkirmishStrikeBikeModel";
+                modelInstance.transform.SetParent(root.transform, false);
+                modelInstance.transform.localPosition = Vector3.zero;
+                modelInstance.transform.localRotation = Quaternion.identity;
+                modelInstance.transform.localScale = Vector3.one;
+                AssignSkirmishBikeMaterials(modelInstance, materials);
+
+                bool success;
+                PrefabUtility.SaveAsPrefabAsset(root, BikePrefabPath, out success);
+                if (!success)
+                {
+                    throw new InvalidOperationException("Unity could not save " + BikePrefabPath + ".");
+                }
+
+                NormalizeEmptyUnityYamlStrings(Path.GetFullPath(Path.Combine(
+                    Directory.GetParent(Application.dataPath).FullName, BikePrefabPath)));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(root);
+            }
+
+            AssetImporter importer = AssetImporter.GetAtPath(BikePrefabPath);
+            if (importer == null)
+            {
+                throw new FileNotFoundException("Unity did not import " + BikePrefabPath + ".");
+            }
+
+            importer.assetBundleName = BundleName;
+            importer.assetBundleVariant = String.Empty;
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+            NormalizeGeneratedUnityMetaFiles(projectRoot);
+            return BikePrefabPath;
+        }
+
         private static void ValidateBuiltVisualBundle(string bundlePath)
         {
             AssetBundle bundle = AssetBundle.LoadFromFile(bundlePath);
@@ -168,94 +232,117 @@ namespace RogueCommandExpansion.Authoring
             try
             {
                 string[] assetNames = bundle.GetAllAssetNames();
-                string prefabAssetPath = null;
-                string cardSpriteAssetPath = null;
-                for (int i = 0; i < assetNames.Length; i++)
-                {
-                    if (assetNames[i].EndsWith("/scouttankvisual.prefab", StringComparison.OrdinalIgnoreCase))
-                    {
-                        prefabAssetPath = assetNames[i];
-                    }
-                    else if (assetNames[i].EndsWith("/sandlancescoutcard.png", StringComparison.OrdinalIgnoreCase))
-                    {
-                        cardSpriteAssetPath = assetNames[i];
-                    }
-                }
-
-                if (prefabAssetPath == null)
-                {
-                    throw new InvalidDataException("The sample visual prefab is not listed in its AssetBundle.");
-                }
-
-                GameObject prefab = bundle.LoadAsset<GameObject>(prefabAssetPath);
-                if (prefab == null || !String.Equals(prefab.name, "ScoutTankVisual", StringComparison.Ordinal))
-                {
-                    throw new InvalidDataException("The sample visual prefab could not be loaded by its AssetBundle path.");
-                }
-
-                Sprite cardSprite = cardSpriteAssetPath == null
-                    ? null
-                    : bundle.LoadAsset<Sprite>(cardSpriteAssetPath);
-                if (cardSprite == null ||
-                    !String.Equals(cardSprite.name, "SandlanceScoutCard", StringComparison.Ordinal))
-                {
-                    throw new InvalidDataException("The Sandlance Scout card Sprite is missing or has the wrong asset name.");
-                }
-
-                Renderer[] renderers = prefab.GetComponentsInChildren<Renderer>(true);
-                if (renderers.Length == 0)
-                {
-                    throw new InvalidDataException("The sample visual prefab has no renderers.");
-                }
-
-                MeshFilter[] meshFilters = prefab.GetComponentsInChildren<MeshFilter>(true);
-                if (meshFilters.Length < 20)
-                {
-                    throw new InvalidDataException("The authored Sandlance model is missing expected independent " +
-                        "mesh parts. Expected at least 20 MeshFilters, found " + meshFilters.Length + ".");
-                }
-
-                for (int i = 0; i < meshFilters.Length; i++)
-                {
-                    if (meshFilters[i] == null || meshFilters[i].sharedMesh == null ||
-                        meshFilters[i].sharedMesh.vertexCount < 3)
-                    {
-                        throw new InvalidDataException("The Sandlance visual contains an empty mesh.");
-                    }
-                }
-
-                for (int i = 0; i < renderers.Length; i++)
-                {
-                    Material[] assignedMaterials = renderers[i].sharedMaterials;
-                    if (assignedMaterials == null || assignedMaterials.Length == 0)
-                    {
-                        throw new InvalidDataException("The Sandlance visual renderer '" + renderers[i].name +
-                            "' has no material.");
-                    }
-
-                    for (int materialIndex = 0; materialIndex < assignedMaterials.Length; materialIndex++)
-                    {
-                        if (assignedMaterials[materialIndex] == null)
-                        {
-                            throw new InvalidDataException("The Sandlance visual renderer '" + renderers[i].name +
-                                "' has a missing material.");
-                        }
-                    }
-                }
-
-                Component[] components = prefab.GetComponentsInChildren<Component>(true);
-                for (int i = 0; i < components.Length; i++)
-                {
-                    if (components[i] == null || components[i] is MonoBehaviour)
-                    {
-                        throw new InvalidDataException("The sample visual bundle contains a missing or scripted component.");
-                    }
-                }
+                ValidateVisualBundleAssets(bundle, assetNames, "scouttankvisual.prefab", "ScoutTankVisual",
+                    "sandlancescoutcard.png", "SandlanceScoutCard", 20, "Sandlance Scout");
+                ValidateVisualBundleAssets(bundle, assetNames, "skirmishbikevisual.prefab", "SkirmishBikeVisual",
+                    "skirmishbikecard.png", "SkirmishBikeCard", 20, "Skirmish Strike Bike");
             }
             finally
             {
                 bundle.Unload(true);
             }
+        }
+
+        private static void ValidateVisualBundleAssets(
+            AssetBundle bundle,
+            string[] assetNames,
+            string prefabSuffix,
+            string prefabName,
+            string cardSuffix,
+            string cardName,
+            int minimumMeshFilters,
+            string visualLabel)
+        {
+            string prefabAssetPath = FindUniqueAssetPath(assetNames, prefabSuffix, visualLabel + " prefab");
+            string cardSpriteAssetPath = FindUniqueAssetPath(assetNames, cardSuffix, visualLabel + " card Sprite");
+            GameObject prefab = bundle.LoadAsset<GameObject>(prefabAssetPath);
+            if (prefab == null || !String.Equals(prefab.name, prefabName, StringComparison.Ordinal))
+            {
+                throw new InvalidDataException(visualLabel + " prefab could not be loaded by its AssetBundle path.");
+            }
+
+            Sprite cardSprite = bundle.LoadAsset<Sprite>(cardSpriteAssetPath);
+            if (cardSprite == null || !String.Equals(cardSprite.name, cardName, StringComparison.Ordinal))
+            {
+                throw new InvalidDataException(visualLabel + " card Sprite is missing or has the wrong asset name.");
+            }
+
+            Renderer[] renderers = prefab.GetComponentsInChildren<Renderer>(true);
+            if (renderers.Length == 0)
+            {
+                throw new InvalidDataException(visualLabel + " prefab has no renderers.");
+            }
+
+            MeshFilter[] meshFilters = prefab.GetComponentsInChildren<MeshFilter>(true);
+            if (meshFilters.Length < minimumMeshFilters)
+            {
+                throw new InvalidDataException(visualLabel + " model is missing expected independent mesh parts. " +
+                    "Expected at least " + minimumMeshFilters + " MeshFilters, found " + meshFilters.Length + ".");
+            }
+
+            for (int i = 0; i < meshFilters.Length; i++)
+            {
+                if (meshFilters[i] == null || meshFilters[i].sharedMesh == null ||
+                    meshFilters[i].sharedMesh.vertexCount < 3)
+                {
+                    throw new InvalidDataException(visualLabel + " visual contains an empty mesh.");
+                }
+            }
+
+            for (int i = 0; i < renderers.Length; i++)
+            {
+                Material[] assignedMaterials = renderers[i].sharedMaterials;
+                if (assignedMaterials == null || assignedMaterials.Length == 0)
+                {
+                    throw new InvalidDataException(visualLabel + " renderer '" + renderers[i].name +
+                        "' has no material.");
+                }
+
+                for (int materialIndex = 0; materialIndex < assignedMaterials.Length; materialIndex++)
+                {
+                    if (assignedMaterials[materialIndex] == null)
+                    {
+                        throw new InvalidDataException(visualLabel + " renderer '" + renderers[i].name +
+                            "' has a missing material.");
+                    }
+                }
+            }
+
+            Component[] components = prefab.GetComponentsInChildren<Component>(true);
+            for (int i = 0; i < components.Length; i++)
+            {
+                if (components[i] == null || components[i] is MonoBehaviour)
+                {
+                    throw new InvalidDataException(visualLabel +
+                        " visual bundle contains a missing or scripted component.");
+                }
+            }
+        }
+
+        private static string FindUniqueAssetPath(string[] assetNames, string suffix, string description)
+        {
+            string result = null;
+            for (int i = 0; i < assetNames.Length; i++)
+            {
+                if (!assetNames[i].EndsWith("/" + suffix, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                if (result != null)
+                {
+                    throw new InvalidDataException("The AssetBundle contains multiple entries for " + description + ".");
+                }
+
+                result = assetNames[i];
+            }
+
+            if (result == null)
+            {
+                throw new InvalidDataException("The AssetBundle does not contain " + description + ".");
+            }
+
+            return result;
         }
 
         private static Dictionary<string, Material> CreateScoutMaterials()
@@ -275,6 +362,95 @@ namespace RogueCommandExpansion.Authoring
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
             return materials;
+        }
+
+        private static Dictionary<string, Material> CreateSkirmishBikeMaterials()
+        {
+            string projectRoot = Directory.GetParent(Application.dataPath).FullName;
+            Directory.CreateDirectory(Path.GetFullPath(Path.Combine(projectRoot, MaterialRoot)));
+            var materials = new Dictionary<string, Material>(StringComparer.Ordinal)
+            {
+                { "armor", CreateOrUpdateMaterial("StrikeBikeArmor", new Color32(20, 48, 70, 255), 0.46f, 0.66f) },
+                { "lightArmor", CreateOrUpdateMaterial("StrikeBikeLightArmor", new Color32(57, 91, 111, 255), 0.34f, 0.61f) },
+                { "rubber", CreateOrUpdateMaterial("StrikeBikeTire", new Color32(18, 23, 28, 255), 0.08f, 0.28f) },
+                { "wheel", CreateOrUpdateMaterial("StrikeBikeWheel", new Color32(49, 70, 84, 255), 0.62f, 0.62f) },
+                { "gunmetal", CreateOrUpdateMaterial("StrikeBikeGunmetal", new Color32(27, 38, 49, 255), 0.76f, 0.70f) },
+                { "warning", CreateOrUpdateMaterial("StrikeBikeWarningOrange", new Color32(245, 69, 12, 255), 0.16f, 0.64f) },
+                { "arc", CreateOrUpdateMaterial("StrikeBikeArcCyan", new Color32(16, 173, 235, 255), 0.22f, 0.80f) }
+            };
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+            return materials;
+        }
+
+        private static void AssignSkirmishBikeMaterials(
+            GameObject model,
+            IDictionary<string, Material> materials)
+        {
+            Renderer[] renderers = model.GetComponentsInChildren<Renderer>(true);
+            if (renderers.Length == 0)
+            {
+                throw new InvalidDataException("The authored Skirmish Strike Bike FBX contains no renderers.");
+            }
+
+            for (int i = 0; i < renderers.Length; i++)
+            {
+                string name = renderers[i].gameObject.name;
+                string materialKey;
+                if (name.StartsWith("StrikeBikeTire_", StringComparison.Ordinal))
+                {
+                    materialKey = "rubber";
+                }
+                else if (name.StartsWith("StrikeBikeWheel_Hub_", StringComparison.Ordinal))
+                {
+                    materialKey = "wheel";
+                }
+                else if (name.StartsWith("StrikeBikeFrame_", StringComparison.Ordinal) ||
+                    name.StartsWith("StrikeBikeFork_", StringComparison.Ordinal) ||
+                    name.StartsWith("StrikeBikeWheel_AxleCap_", StringComparison.Ordinal) ||
+                    String.Equals(name, "StrikeBikeHandlebar", StringComparison.Ordinal) ||
+                    String.Equals(name, "StrikeBikeArmor_LowerFrame", StringComparison.Ordinal))
+                {
+                    materialKey = "gunmetal";
+                }
+                else if (name.StartsWith("StrikeBikePayload_ChargeBand", StringComparison.Ordinal) ||
+                    name.StartsWith("StrikeBikeSensor_", StringComparison.Ordinal) ||
+                    name.StartsWith("StrikeBikeArc_", StringComparison.Ordinal))
+                {
+                    materialKey = "arc";
+                }
+                else if (name.StartsWith("StrikeBikePayload_", StringComparison.Ordinal) ||
+                    name.StartsWith("StrikeBikeAccent_", StringComparison.Ordinal))
+                {
+                    materialKey = "warning";
+                }
+                else if (name.StartsWith("StrikeBikeArmor_", StringComparison.Ordinal))
+                {
+                    materialKey = name.Contains("BatteryPod") || name.Contains("FootPlate")
+                        ? "lightArmor" : "armor";
+                }
+                else if (name.StartsWith("StrikeBikeWheel_", StringComparison.Ordinal))
+                {
+                    materialKey = "wheel";
+                }
+                else
+                {
+                    throw new InvalidDataException("No authored material mapping exists for model part '" +
+                        name + "'.");
+                }
+
+                Material material = materials[materialKey];
+                Material[] assigned = renderers[i].sharedMaterials;
+                if (assigned == null || assigned.Length == 0)
+                {
+                    assigned = new Material[1];
+                }
+                for (int materialIndex = 0; materialIndex < assigned.Length; materialIndex++)
+                {
+                    assigned[materialIndex] = material;
+                }
+                renderers[i].sharedMaterials = assigned;
+            }
         }
 
         private static void NormalizeGeneratedUnityMetaFiles(string projectRoot)
@@ -399,6 +575,114 @@ namespace RogueCommandExpansion.Authoring
             if (AssetDatabase.LoadAssetAtPath<Sprite>(CardSpritePath) == null)
             {
                 throw new InvalidDataException("Unity failed to import the Sandlance Scout card as a Sprite.");
+            }
+        }
+
+        private static void CreateSkirmishBikeCardSprite()
+        {
+            Sprite existing = AssetDatabase.LoadAssetAtPath<Sprite>(BikeCardSpritePath);
+            if (existing != null)
+            {
+                TextureImporter existingImporter = AssetImporter.GetAtPath(BikeCardSpritePath) as TextureImporter;
+                if (existingImporter == null)
+                {
+                    throw new InvalidDataException("Unity did not create a TextureImporter for " +
+                        BikeCardSpritePath + ".");
+                }
+
+                existingImporter.assetBundleName = BundleName;
+                existingImporter.assetBundleVariant = String.Empty;
+                existingImporter.SaveAndReimport();
+                return;
+            }
+
+            string projectRoot = Directory.GetParent(Application.dataPath).FullName;
+            string absolutePath = Path.GetFullPath(Path.Combine(projectRoot,
+                BikeCardSpritePath.Replace('/', Path.DirectorySeparatorChar)));
+            if (File.Exists(absolutePath))
+            {
+                throw new InvalidDataException("SkirmishBikeCard.png exists but Unity did not import it as a Sprite; " +
+                    "preserving the file.");
+            }
+
+            const int size = 128;
+            var texture = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            for (int y = 0; y < size; y++)
+            {
+                byte shade = (byte)(15 + y / 10);
+                for (int x = 0; x < size; x++)
+                {
+                    texture.SetPixel(x, y, new Color32((byte)(8 + shade / 3), shade,
+                        (byte)(shade + 17), 255));
+                }
+            }
+
+            for (int x = 9; x < 119; x++)
+            {
+                texture.SetPixel(x, 13, new Color32(19, 57, 77, 255));
+                texture.SetPixel(x, 114, new Color32(19, 57, 77, 255));
+            }
+
+            DrawPolygon(texture, new[] { new Vector2Int(14, 31), new Vector2Int(33, 34),
+                new Vector2Int(48, 48), new Vector2Int(94, 47), new Vector2Int(111, 39),
+                new Vector2Int(117, 45), new Vector2Int(101, 59), new Vector2Int(43, 60),
+                new Vector2Int(19, 49) }, new Color32(24, 34, 43, 255));
+            DrawCircle(texture, 34, 38, 13, new Color32(11, 17, 23, 255));
+            DrawCircle(texture, 34, 38, 7, new Color32(54, 76, 91, 255));
+            DrawCircle(texture, 34, 38, 3, new Color32(20, 31, 40, 255));
+            DrawCircle(texture, 94, 43, 13, new Color32(11, 17, 23, 255));
+            DrawCircle(texture, 94, 43, 7, new Color32(54, 76, 91, 255));
+            DrawCircle(texture, 94, 43, 3, new Color32(20, 31, 40, 255));
+
+            DrawPolygon(texture, new[] { new Vector2Int(17, 50), new Vector2Int(38, 55),
+                new Vector2Int(78, 54), new Vector2Int(100, 48), new Vector2Int(94, 62),
+                new Vector2Int(36, 64), new Vector2Int(20, 58) }, new Color32(48, 89, 110, 255));
+            DrawPolygon(texture, new[] { new Vector2Int(54, 58), new Vector2Int(62, 78),
+                new Vector2Int(93, 84), new Vector2Int(111, 71), new Vector2Int(103, 57),
+                new Vector2Int(82, 62) }, new Color32(26, 60, 84, 255));
+            DrawPolygon(texture, new[] { new Vector2Int(23, 57), new Vector2Int(37, 59),
+                new Vector2Int(37, 80), new Vector2Int(26, 85), new Vector2Int(18, 76) },
+                new Color32(185, 60, 23, 255));
+            DrawPolygon(texture, new[] { new Vector2Int(26, 61), new Vector2Int(34, 63),
+                new Vector2Int(34, 72), new Vector2Int(26, 75) }, new Color32(25, 184, 230, 255));
+            DrawPolygon(texture, new[] { new Vector2Int(66, 69), new Vector2Int(76, 92),
+                new Vector2Int(94, 94), new Vector2Int(108, 81), new Vector2Int(104, 70) },
+                new Color32(79, 119, 139, 255));
+            DrawPolygon(texture, new[] { new Vector2Int(82, 60), new Vector2Int(91, 67),
+                new Vector2Int(111, 62), new Vector2Int(115, 55), new Vector2Int(107, 51) },
+                new Color32(151, 183, 191, 255));
+            DrawCircle(texture, 80, 69, 9, new Color32(20, 189, 243, 255));
+            DrawCircle(texture, 80, 69, 4, new Color32(31, 54, 69, 255));
+            DrawPolygon(texture, new[] { new Vector2Int(69, 80), new Vector2Int(73, 85),
+                new Vector2Int(105, 72), new Vector2Int(111, 68), new Vector2Int(109, 65) },
+                new Color32(248, 81, 20, 255));
+            DrawPolygon(texture, new[] { new Vector2Int(9, 19), new Vector2Int(119, 19),
+                new Vector2Int(119, 23), new Vector2Int(9, 23) }, new Color32(19, 59, 78, 255));
+            texture.Apply();
+
+            byte[] png = texture.EncodeToPNG();
+            UnityEngine.Object.DestroyImmediate(texture);
+            Directory.CreateDirectory(Path.GetDirectoryName(absolutePath));
+            File.WriteAllBytes(absolutePath, png);
+            AssetDatabase.ImportAsset(BikeCardSpritePath, ImportAssetOptions.ForceUpdate);
+
+            TextureImporter importer = AssetImporter.GetAtPath(BikeCardSpritePath) as TextureImporter;
+            if (importer == null)
+            {
+                throw new InvalidOperationException("Unity did not create a TextureImporter for " +
+                    BikeCardSpritePath + ".");
+            }
+
+            importer.textureType = TextureImporterType.Sprite;
+            importer.spriteImportMode = SpriteImportMode.Single;
+            importer.filterMode = FilterMode.Point;
+            importer.mipmapEnabled = false;
+            importer.assetBundleName = BundleName;
+            importer.assetBundleVariant = String.Empty;
+            importer.SaveAndReimport();
+            if (AssetDatabase.LoadAssetAtPath<Sprite>(BikeCardSpritePath) == null)
+            {
+                throw new InvalidDataException("Unity failed to import the Skirmish Strike Bike card as a Sprite.");
             }
         }
 

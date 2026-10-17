@@ -1,5 +1,7 @@
 # Content asset conventions
 
+The sample-native bundle contains two script-free unit models and their card Sprites: Sandlance Scout and Skirmish Strike Bike. The bike model overlays the native BombBike renderer subtree at GameObject/BombBike; its unit controller and native bomb behavior remain on the cloned game prefab.
+
 Create or import the Unity assets referenced by a pack's `content.json` here. Assign each bundle's exact lower-case `.bundle` file name as its AssetBundle label. The menu `Rogue Command > Asset Bundles > Build Sample Native Visual Pack` builds/copies `sample-native-expansion.bundle` plus its Unity manifest into `content/packs/sample-native-expansion/bundles/`. It targets Unity 2021.3.45f2 and Windows Standalone x64. The bundle contains both the script-free `ScoutTankVisual` model prefab and the `SandlanceScoutCard` Sprite referenced by `sample-native-expansion/content.json`.
 
 `ScoutTankVisual` is the low-poly Sandlance scout exported from `content/source-art/sandlance-scout.blend`; it contains 31 mesh parts and seven authored materials, with no game scripts. At runtime, the loader replaces the renderers beneath the native `Vehicle` Transform and attaches this model at that subtree's local origin while keeping the native controller and gameplay hierarchy. Renderers without authored materials can inherit a material from the native subtree.
