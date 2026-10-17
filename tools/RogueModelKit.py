@@ -1403,6 +1403,45 @@ def validate_model_mesh_quality(objects: Sequence[bpy.types.Object]) -> Dict[str
 # 8. Rendering & Multi-View Studio
 # ---------------------------------------------------------------------------
 
+def frame_camera_to_model(
+    camera: bpy.types.Object,
+    model_objects: Sequence[bpy.types.Object],
+    reference_target: Vector,
+    margin: float = 1.15,
+) -> Vector:
+    """Aim an orthographic camera at the model bounds and expand it if needed."""
+    mesh_objects = [obj for obj in model_objects if obj.type == "MESH"]
+    if not mesh_objects:
+        raise ValueError("Cannot frame a model without mesh objects")
+
+    corners = [
+        obj.matrix_world @ Vector(corner)
+        for obj in mesh_objects
+        for corner in obj.bound_box
+    ]
+    minimum = Vector(tuple(min(point[axis] for point in corners) for axis in range(3)))
+    maximum = Vector(tuple(max(point[axis] for point in corners) for axis in range(3)))
+    target = (minimum + maximum) * 0.5
+
+    camera_offset = camera.location - reference_target
+    camera.location = target + camera_offset
+    camera.rotation_euler = (target - camera.location).to_track_quat("-Z", "Y").to_euler()
+    bpy.context.view_layer.update()
+
+    camera_space_corners = [camera.matrix_world.inverted() @ point for point in corners]
+    projected_width = max(point.x for point in camera_space_corners) - min(
+        point.x for point in camera_space_corners
+    )
+    projected_height = max(point.y for point in camera_space_corners) - min(
+        point.y for point in camera_space_corners
+    )
+    scene = bpy.context.scene
+    aspect = scene.render.resolution_x / max(1, scene.render.resolution_y)
+    required_scale = max(projected_width, projected_height * aspect) * margin
+    camera.data.ortho_scale = max(camera.data.ortho_scale, required_scale)
+    return target
+
+
 def setup_preview_studio(
     model_objects: Sequence[bpy.types.Object],
     preview_path: Path,
@@ -1418,6 +1457,11 @@ def setup_preview_studio(
     floor_mat = make_material("PreviewFloorMat", (0.035, 0.052, 0.065), 0.0, 0.92)
     finish_mesh(floor, floor_mat)
 
+    scene = bpy.context.scene
+    scene.render.resolution_x = 900
+    scene.render.resolution_y = 760
+    scene.render.resolution_percentage = 100
+
     # Camera: Standard RTS orthographic view
     bpy.ops.object.camera_add(location=(4.8, 5.8, 3.6))
     camera = bpy.context.object
@@ -1426,6 +1470,7 @@ def setup_preview_studio(
     camera.rotation_euler = (target - camera.location).to_track_quat("-Z", "Y").to_euler()
     camera.data.type = "ORTHO"
     camera.data.ortho_scale = ortho_scale
+    frame_camera_to_model(camera, model_objects, target)
     bpy.context.scene.camera = camera
 
     # 3-Point Area Lights
@@ -1466,6 +1511,9 @@ def setup_multi_view_studio(
     """Sets up AgX studio lighting, floor shadow plane, and calibrated cameras for multiple perspectives."""
     preview_dir.mkdir(parents=True, exist_ok=True)
     scene = bpy.context.scene
+    scene.render.resolution_x = 900
+    scene.render.resolution_y = 760
+    scene.render.resolution_percentage = 100
 
     # 1. Floor shadow plane
     bpy.ops.mesh.primitive_plane_add(size=200, location=(0.0, 0.0, -0.015))
@@ -1510,6 +1558,7 @@ def setup_multi_view_studio(
         cam.data.ortho_scale = scale
         direction = target - cam.location
         cam.rotation_euler = direction.to_track_quat("-Z", "Y").to_euler()
+        frame_camera_to_model(cam, model_objects, target)
         cameras[view_name] = cam
 
     if "ISOMETRIC" in cameras:

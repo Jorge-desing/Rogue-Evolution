@@ -11,7 +11,6 @@ Options:
     --dozer                    Attach frontal heavy dozer ram blade (tanks/artillery)
     --skirts                   Attach armored side skirts over track run
     --multiview                Render 4-perspective orthographic sheet (ISO, TOP, FRONT, SIDE)
-    --card                     Render 128x128 point-filtered tactical card sprite
     --out-dir <path>           Base output directory (default: repo root)
 """
 
@@ -62,12 +61,10 @@ def parse_args():
     parser.add_argument("--dozer", action="store_true", help="Include frontal dozer ram blade")
     parser.add_argument("--skirts", action="store_true", default=True, help="Include armored side skirts")
     parser.add_argument("--multiview", action="store_true", help="Render 4 orthographic views")
-    parser.add_argument("--card", action="store_true", default=True, help="Render 128x128 tactical card sprite")
     parser.add_argument("--out-dir", default=None, help="Base root directory for outputs")
     parser.add_argument("--blend-path", default=None, help="Explicit .blend output file path")
     parser.add_argument("--fbx-path", default=None, help="Explicit .fbx output file path")
     parser.add_argument("--preview-path", default=None, help="Explicit preview render output file path")
-    parser.add_argument("--card-path", default=None, help="Explicit card sprite output file path")
 
     return parser.parse_args(script_args)
 
@@ -95,17 +92,7 @@ def main():
         / f"{args.name}.fbx"
     )
     preview_path = resolve_path(args.preview_path, REPO_ROOT) or (out_root / "artifacts" / "previews" / f"{args.name.lower()}.png")
-    if args.card:
-        card_path = resolve_path(args.card_path, REPO_ROOT) or (
-            out_root
-            / "unity"
-            / "RogueCommandAssetAuthoring"
-            / "Assets"
-            / "RogueCommandExpansionSample"
-            / f"{args.name}Card.png"
-        )
-    else:
-        card_path = None
+    card_path = None
 
     builder = rmk.RogueVehicleBuilder(args.name, faction=args.faction)
 
@@ -203,8 +190,6 @@ def main():
     print(f"  Source Blend: {blend_path}")
     print(f"  Unity FBX: {fbx_path}")
     print(f"  Preview Image: {preview_path}")
-    if card_path:
-        print(f"  Tactical Card Sprite: {card_path}")
     print("========================================================\n")
 
 

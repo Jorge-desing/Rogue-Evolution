@@ -5,7 +5,7 @@ description: "Design, create, or refine original 3D vehicle and unit visuals for
 
 # Rogue Command 3D Model Authoring
 
-Use this skill to design, model, texture, and export original, high-readability 3D vehicle models and visual overlays for Rogue Command. It guides the entire visual pipeline—from procedural low-poly blockout in Blender 4.5.14 LTS to Unity 2021.3.45f2 AssetBundle authoring, material assignment, card sprite creation, and multi-tier verification.
+Use this skill to design, model, texture, and export original, high-readability 3D vehicle models and visual overlays for Rogue Command. It guides the visual pipeline—from procedural low-poly blockout in Blender 4.5.14 LTS to Unity 2021.3.45f2 AssetBundle authoring, material assignment, ImageGen card handoff, and multi-tier verification.
 
 ---
 
@@ -131,12 +131,11 @@ builder = (
     .add_dozer_blade(width=2.6, height=0.44)
 )
 
-# Automated validation, lightmap UVs, card sprite, .blend, batched FBX
+# Automated validation, lightmap UVs, .blend, batched FBX
 diagnostics = builder.build_and_export(
     fbx_path=FBX_PATH,
     blend_path=BLEND_PATH,
     preview_path=PREVIEW_PATH,
-    card_path=CARD_PATH,
     render_multiview=True
 )
 ```
@@ -151,14 +150,13 @@ Run headless vehicle generation directly from the command line using Blender and
     --faction siege `
     --weapon cannon `
     --dozer `
-    --multiview `
-    --card
+    --multiview
 ```
 
 - **Archetypes**: `tank`, `walker`, `bike`, `artillery`, `arc_tank`.
 - **Factions**: `vanguard` (slate teal), `siege` (rust ochre), `syndicate` (deep cobalt), `arctic` (tundra navy).
 - **Weapons**: `cannon` (ballistic), `gatling` (rotary 6-barrel), `missile` (honeycomb pod), `arc` (plasma cathode & prongs).
-- **Outputs**: Generates editable `.blend`, Unity-optimized `.fbx` with lightmap UVs and batched submeshes, 4-view orthographic preview sheet, and 128x128 point-filtered tactical card sprite.
+- **Outputs**: Generates editable `.blend`, Unity-optimized `.fbx` with lightmap UVs and batched submeshes, and a 4-view orthographic preview sheet. For each 2D card, use the installed `imagegen` skill; this 3D generator does not create card images.
 
 ### Automated Quality Diagnostics
 Always invoke `validate_model_mesh_quality(model_objects)` prior to export. It verifies:
@@ -167,7 +165,7 @@ Always invoke `validate_model_mesh_quality(model_objects)` prior to export. It v
 - **Material Slot Hygiene**: Flags any object with missing or null PBR material assignments.
 
 ### Multi-Perspective RTS Studio
-Use `setup_multi_view_studio(model_objects, preview_dir, base_name, ortho_scale, render_all=True)` to render 4 calibrated orthographic perspectives simultaneously:
+Use `setup_multi_view_studio(model_objects, preview_dir, base_name, ortho_scale, render_all=True)` to render 4 calibrated orthographic perspectives simultaneously. The cameras center on the model bounds and expand the orthographic scale when needed so the full unit remains inside the frame:
 - **`ISOMETRIC`**: $45^\circ$ RTS combat camera (the gameplay primary read).
 - **`TOP_DOWN`**: Direct vertical plan view (minimap readability and deck balance).
 - **`FRONT`**: Head-on silhouette readability and glacis slope verification.
@@ -251,7 +249,7 @@ Follow this strict progression when creating or modifying 3D models:
      ```powershell
      .\.tools\Blender-4.5.14\blender-4.5.14-windows-x64\blender.exe --background --python tools\Build-<UnitName>Model.py
      ```
-   - Inspect `artifacts/previews/<unit-name>.png` for silhouette clarity, ground contact, bevel specular highlights, and emissive accents.
+   - Inspect `artifacts/previews/<unit-name>.png` for a complete uncropped silhouette, ground contact, bevel specular highlights, and emissive accents.
 2. **Unity Scaffolding & AssetBundle Build**:
    - Run the visual scaffolder to build and reopen the bundle in Unity 2021.3.45f2.
    - Verify zero missing scripts, valid mesh renderers, and zero null material slots.
