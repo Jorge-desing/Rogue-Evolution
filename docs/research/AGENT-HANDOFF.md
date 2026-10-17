@@ -8,6 +8,12 @@
 
 Read section 11 of [3D model authoring enhancements](3D-MODEL-AUTHORING-ENHANCEMENTS.md) before relying on that toolset's capability claims. A local Blender audit constructed/batched all 11 default archetypes and exported the fluent example, but measured 6–10 mesh groups and seven archetypes above 5,000 source triangles. The CLI currently labels polygon counts as triangles, generates no LOD meshes, and does not enforce quality gates. Vertex dirt has no verified Standard-shader rendering path; the source blend is saved before baking. Socket names, current palette values and CLI limitations are corrected in that document and linked from the 3D skill. No game or Unity runtime behavior was tested in this authoring audit.
 
+## Unit production-building invariant (2026-10-17)
+
+Every added unit declares its own `productionBuilding`. The loader registers a distinct namespaced factory row and dormant prefab clone, maps that factory to exactly one produced unit, and offers the factory blueprint in stage-scoped random pools. Stage `unitIds` and AI `unitEntries` continue to reference the product ID. Native factories and unit rows are retained. The sample pack contains five product/factory pairs; see [Production buildings](PRODUCTION-BUILDINGS.md) for schema migration, exact mapping, and evidence.
+
+The isolated `codex/unit-production-buildings` package passed a Steam-launched directed production check for all five pairs (factory placements were diagnostic calls and production was free). The production feature is now being integrated with newer `main` changes. Rebuild and re-run the acceptance flow against the merged `main` package before treating the merged result as runtime-verified; ordinary random reward purchase/placement and reactive AI decision execution are still separate checks.
+
 ## Current focus: unit creation
 
 Keep the next implementation slice on units. The sample-native-expansion pack now overlays custom Sandlance Scout, Skirmish Strike Bike, Colossus Siege, Ironclad Walker, and Surge Arc Tank visuals. It supplies ImageGen-authored card Sprites for the first three; Ironclad and Surge Arc Tank keep their native cards. The current Unity build is verified locally; the newest bundle has not been tested in a match. See UNIT-VISUAL-AUTHORING.md for model sources, dimensions, prompts, bundle hashes, and rebuild steps.

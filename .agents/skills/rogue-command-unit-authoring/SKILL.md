@@ -10,6 +10,7 @@ Use this skill when adding or reviewing a unit in this repository. Read `AGENTS.
 ## Choose the unit construction path
 
 - A `nativeTemplateId` unit copies a registered game balance row and clones the native prefab. Use `balanceOverrides` only for allowlisted numeric fields. It keeps the native controller and gameplay components.
+- Every added unit requires its own `productionBuilding` with a distinct namespaced ID, a native factory template, and an English name. Keep Spanish names in the localization array. The loader must clone and register a new factory row/prefab, set its `factoryForEntityId` to the new unit, and leave native mappings intact. Reward pools offer this new building's blueprint; stage manifests and AI rosters continue to refer to the produced unit. Verify building placement and actual production in Steam before claiming this path works.
 - A native visual overlay can set `visualAssetName` and `visualRootPath` with an AssetBundle. The root path must resolve to one native renderer subtree. The loader replaces those renderers and retains the native gameplay hierarchy; it does not retarget rigs or animations.
 - Before installing a native visual overlay, run `.venv\Scripts\python.exe tools/validate_native_visual_roots.py <pack-directory>` against the pinned game. Do not copy a visual path between different native templates: ArtilleryTank uses `Tank`, GatlingWalker uses `RoboMarine_Mesh`, and LightningTank uses `PCX TankHolder` on the currently verified asset identity. This static check does not prove live resource selection or rendering.
 - A custom-prefab unit needs a complete bundled balance asset, prefab, and card Sprite with the game-required serialized components and references. The Unity Editor's inability to attach the precompiled game scripts is an authoring constraint; fail closed when a complete prefab cannot be produced.
@@ -19,7 +20,7 @@ Use this skill when adding or reviewing a unit in this repository. Read `AGENTS.
 
 - Use a namespaced unit ID and provide an `en-US` display name for custom-prefab units. Pack translations use the exact language IDs in `content/schema/README.md`; runtime resolution tries the active language, then English, then native-template text, and finally a safe ID-derived name.
 - Use `cardImageAssetName` for a bundle Sprite when the unit needs its own card image. The current Sandlance sample demonstrates a model overlay, icon, balance overrides, and localization; it still inherits `PCXBaseTank` gameplay.
-- A stage's `unitIds` makes a unit blueprint-eligible by changing a game-wide entity-row flag. Check how shared native pools filter blueprints; this is not guaranteed to be isolated to one stage.
+- A stage's `unitIds` names produced units. The loader translates those IDs to their own factory IDs for blueprint eligibility and cloned pool scopes; product rows stay ineligible as blueprint rewards. Check generic rewards without a pool ID separately because they use the game's global eligibility fallback.
 - Before relying on reflected game methods, recheck the compatibility identity as a whole: Rogue Command version, `Assembly-CSharp.dll` SHA-256, and MVID. Unity/bundle authoring must use the pinned Editor version documented in the handoff.
 
 ## Verify honestly

@@ -225,17 +225,18 @@ Use the adjacent schema directory when authoring content.json.
 
 The native sample adds five localized native-template units with script-free
 visual overlays: Sandlance Scout, Skirmish Strike Bike, Colossus Siege Platform,
-Ironclad Walker, and Surge Arc Tank. The first three have custom card Sprites;
+Ironclad Walker, and Surge Arc Tank. Every unit declares its own new production
+building; random blueprint rewards offer that building to produce its unit.
+The first three units have custom card Sprites;
 Ironclad and Surge Arc Tank keep their native cards. All five keep native gameplay
 controllers, while the pack adds a stage variant, a seeded native landscape variant,
 and a scheduled-build AI module.
 The reactive AI stage references Sandlance and uses a native AI template with a
 bounded compiled counterattack module. The landscape reuses native 27 Circles rules
 with a fixed seed and is scoped to its stage; it does not add new terrain logic.
-The game keeps a global blueprint eligibility flag on each custom unit row. Stage
-reward pools are cloned and admit only custom units listed by that stage, while
-rewards created without a pool ID use the game's global fallback and may offer any
-declared custom unit.
+The game keeps a global blueprint eligibility flag on each custom factory row.
+Stage reward pools are cloned and admit factories for products listed by that stage.
+Rewards created without a pool ID use the game's global eligibility fallback.
 '@ | Set-Content -LiteralPath (Join-Path $packsDirectory 'README.txt') -Encoding UTF8
 
     @"
@@ -246,15 +247,18 @@ Install:
 2. Extract this archive into the Rogue Command game folder, preserving its BepInEx directory.
 3. The included sample-native-expansion pack adds five localized native-template units
    with bundled model overlays: Sandlance Scout, Skirmish Strike Bike, Colossus Siege
-   Platform, Ironclad Walker, and Surge Arc Tank. The first three have custom card
+   Platform, Ironclad Walker, and Surge Arc Tank. Each unit has a separately registered
+   production building with its own ID, native factory prefab, and localized name.
+   Random rewards offer the new building blueprint; that building produces its unit.
+   The first three units have custom card
    Sprites; Ironclad and Surge Arc Tank retain their native cards. The pack also adds a
    native stage variant, a fixed-seed landscape variant, and a scheduled-build AI
    module; every unit keeps its native gameplay controller.
    The sample-reactive-ai pack demonstrates a native stage variant that references
    the Sandlance Scout from sample-native-expansion and an AI module that sends up
    to two nearby units to counterattack an active attacker. Stage reward pools are
-   scoped to their declared custom units; rewards without a pool ID use the global
-   card fallback and may offer any declared custom unit.
+   scoped to factories for their declared products; rewards without a pool ID use
+   the global eligibility fallback.
 4. Add other packs under BepInEx/plugins/RogueCommandExpansionLoader/content/packs/;
    custom models and original terrain-generation assets require valid Unity AssetBundles.
 

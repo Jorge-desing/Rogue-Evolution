@@ -21,7 +21,8 @@ namespace RogueCommandExpansionLoader.Content
     /// keeps their AssetBundles and Unity objects alive for the whole game session.
     /// </summary>
     public sealed class ContentPackRuntimeLoader : IRuntimeContentProvider, IStageLandscapeRuntimeProvider,
-        IBlueprintPoolRuntimeProvider, IStageFallbackRuntimeProvider
+        IBlueprintPoolRuntimeProvider, IStageFallbackRuntimeProvider,
+        IStageOwnedAiPlacementDistanceRuntimeProvider
     {
         private const int MaxManifestBytes = 1024 * 1024;
         private const uint GenericRead = 0x80000000;
@@ -62,6 +63,10 @@ namespace RogueCommandExpansionLoader.Content
         private readonly Type _blueprintPoolType;
         private readonly FieldInfo _entityParametersField;
         private readonly FieldInfo _entityIdField;
+        private readonly FieldInfo _factoryForEntityIdField;
+        private readonly FieldInfo _nullableStringValueField;
+        private readonly FieldInfo _nullableStringHasValueField;
+        private readonly FieldInfo _entityRolesField;
         private readonly FieldInfo _entityControllerIdField;
         private readonly FieldInfo _prefabLocationField;
         private readonly FieldInfo _imageLocationField;
@@ -76,6 +81,9 @@ namespace RogueCommandExpansionLoader.Content
         private readonly FieldInfo _stageDemoField;
         private readonly FieldInfo _gameBalancingAssetField;
         private readonly FieldInfo _fallbackLandscapeGeneratorsField;
+        private readonly FieldInfo _gameStageMapField;
+        private readonly FieldInfo _lastNativeAiStartBuildingDistanceField;
+        private readonly PropertyInfo _stageMapCurrentStageProperty;
         private readonly PropertyInfo _currentProgressionProperty;
         private readonly FieldInfo _gameIsDemoField;
         private readonly FieldInfo _gameMaxAscensionLevelField;
@@ -143,6 +151,7 @@ namespace RogueCommandExpansionLoader.Content
             new Dictionary<string, LoadedUnit>(StringComparer.Ordinal);
         private readonly HashSet<string> _knownIds = new HashSet<string>(StringComparer.Ordinal);
         private readonly HashSet<string> _nativeUnitIds = new HashSet<string>(StringComparer.Ordinal);
+        private readonly HashSet<string> _nativeFactoryIds = new HashSet<string>(StringComparer.Ordinal);
         private readonly HashSet<string> _blueprintUnitIds = new HashSet<string>(StringComparer.Ordinal);
         private readonly HashSet<string> _startingBlueprintUnitIds = new HashSet<string>(StringComparer.Ordinal);
         private readonly List<LoadedStage> _stages = new List<LoadedStage>();
@@ -157,6 +166,7 @@ namespace RogueCommandExpansionLoader.Content
         private bool _registryUnavailableLogged;
         private bool _runtimeContentReady;
         private bool _loaded;
+        private bool _aiStartDistanceFailureLogged;
 
         public ContentPackRuntimeLoader(
             string packsRoot,
@@ -228,6 +238,25 @@ namespace RogueCommandExpansionLoader.Content
             }
 
             _entityIdField = RequireField(_entityRowType, "entityId", typeof(string));
+            _factoryForEntityIdField = FindField(_entityRowType, "factoryForEntityId", InstanceFields);
+            Type nullableStringType = _factoryForEntityIdField.FieldType;
+            if (_factoryForEntityIdField.IsStatic || !nullableStringType.IsValueType ||
+                _factoryForEntityIdField.IsInitOnly ||
+                !String.Equals(nullableStringType.Name, "NullableString", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    "EntityBalancingParameters.factoryForEntityId is not the verified NullableString value type.");
+            }
+            _nullableStringValueField = RequireField(nullableStringType, "value", typeof(string));
+            _nullableStringHasValueField = RequireField(nullableStringType, "hasValue", typeof(bool));
+            _entityRolesField = FindField(_entityRowType, "roles", InstanceFields);
+            if (_entityRolesField.IsStatic || !_entityRolesField.FieldType.IsEnum ||
+                !EnumHasName(_entityRolesField.FieldType, "Factory") ||
+                !EnumHasName(_entityRolesField.FieldType, "Building"))
+            {
+                throw new InvalidOperationException(
+                    "EntityBalancingParameters.roles must remain an enum containing Building and Factory.");
+            }
             _entityControllerIdField = RequireField(_entityControllerType, "entityId", typeof(string));
             _prefabLocationField = RequireField(_entityRowType, "prefabLocation", typeof(string));
             _imageLocationField = RequireField(_entityRowType, "imageLocation", typeof(string));
@@ -241,10 +270,32 @@ namespace RogueCommandExpansionLoader.Content
             _stageMapSizeField = RequireField(_stageType, "mapSizeRange", typeof(Vector2Int));
             _stageDemoField = RequireField(_stageType, "isPartOfDemo", typeof(bool));
             Type gameBalancingStoreType = FindUniqueType("GameBalancingStore");
+            // The game also ships Shapes2D.Game; resolve the verified global type exactly.
+            Type gameType = _gameAssembly.GetType("Game", true, false);
+            Type stageMapType = FindUniqueType("StageMap");
             _gameBalancingAssetField = FindField(gameBalancingStoreType,
                 "_gameBalancingScriptableObject", StaticFields);
+            _gameStageMapField = FindField(gameType, "StageMap", StaticFields);
+            if (!_gameStageMapField.IsStatic || _gameStageMapField.FieldType != stageMapType)
+            {
+                throw new InvalidOperationException("Game.StageMap has an unexpected field shape.");
+            }
+
+            _stageMapCurrentStageProperty = stageMapType.GetProperty("CurrentStage", InstanceFields);
+            MethodInfo currentStageGetter = _stageMapCurrentStageProperty == null
+                ? null
+                : _stageMapCurrentStageProperty.GetGetMethod(true);
+            if (_stageMapCurrentStageProperty == null || _stageMapCurrentStageProperty.PropertyType != typeof(int) ||
+                currentStageGetter == null || currentStageGetter.IsStatic ||
+                currentStageGetter.GetParameters().Length != 0)
+            {
+                throw new InvalidOperationException("StageMap.CurrentStage has an unexpected property shape.");
+            }
+
             _fallbackLandscapeGeneratorsField = RequireField(gameBalancingType,
                 "fallbackLandscapeGenerators", typeof(List<>).MakeGenericType(_landscapeGeneratorType));
+            _lastNativeAiStartBuildingDistanceField = RequireField(gameBalancingType,
+                "minDistanceOfOutlyingStartAiBuildingsToPlayerStartStage789", typeof(int));
             _currentProgressionProperty = gameBalancingStoreType.GetProperty(
                 "CurrentLevelProgressionParameters", StaticFields);
             if (_currentProgressionProperty == null || _currentProgressionProperty.PropertyType != progressionType ||
@@ -575,6 +626,73 @@ namespace RogueCommandExpansionLoader.Content
 
                     return null;
                 });
+            }
+        }
+
+        public bool TryGetOutlyingStartAiBuildingsDistance(out int distance)
+        {
+            distance = 0;
+            try
+            {
+                lock (_gate)
+                {
+                    if (!_runtimeContentReady || _stages.Count == 0)
+                    {
+                        return false;
+                    }
+
+                    object stageMap = _gameStageMapField.GetValue(null);
+                    if (stageMap == null)
+                    {
+                        return false;
+                    }
+
+                    int stageIndex = (int)_stageMapCurrentStageProperty.GetValue(stageMap, null);
+                    if (stageIndex < StageOwnedAiPlacementDistanceResolver.FirstAppendedStageIndex)
+                    {
+                        return false;
+                    }
+
+                    object progression = _currentProgressionProperty.GetValue(null, null);
+                    IList stages = progression == null ? null : _progressionStagesField.GetValue(progression) as IList;
+                    if (stages == null || stageIndex >= stages.Count || stages[stageIndex] == null)
+                    {
+                        return false;
+                    }
+
+                    object balancing = _gameBalancingAssetField.GetValue(null);
+                    if (balancing == null)
+                    {
+                        return false;
+                    }
+
+                    int finalNativeBandDistance =
+                        (int)_lastNativeAiStartBuildingDistanceField.GetValue(balancing);
+                    return StageOwnedAiPlacementDistanceResolver.TryResolve(
+                        stageIndex,
+                        stages[stageIndex],
+                        _stages,
+                        delegate(LoadedStage loadedStage) { return loadedStage.RuntimeStage; },
+                        finalNativeBandDistance,
+                        out distance);
+                }
+            }
+            catch (Exception exception)
+            {
+                bool shouldLog;
+                lock (_gate)
+                {
+                    shouldLog = !_aiStartDistanceFailureLogged;
+                    _aiStartDistanceFailureLogged = true;
+                }
+
+                if (shouldLog)
+                {
+                    Log("Could not inspect active progression for appended-stage AI building spacing: " +
+                        exception.GetBaseException().Message);
+                }
+
+                return false;
             }
         }
 
@@ -1303,6 +1421,7 @@ namespace RogueCommandExpansionLoader.Content
         private void RefreshNativeUnitIds()
         {
             _nativeUnitIds.Clear();
+            _nativeFactoryIds.Clear();
             IDictionary index = _entityIndexField.GetValue(null) as IDictionary;
             if (index == null)
             {
@@ -1318,6 +1437,7 @@ namespace RogueCommandExpansionLoader.Content
 
             _nativeRegistryReady = true;
             _registryUnavailableLogged = false;
+            IList rows = _nativeEntityRowsField.GetValue(null) as IList;
 
             foreach (object key in index.Keys)
             {
@@ -1325,6 +1445,37 @@ namespace RogueCommandExpansionLoader.Content
                 if (!String.IsNullOrWhiteSpace(id))
                 {
                     _nativeUnitIds.Add(id);
+                    try
+                    {
+                        if (rows == null || !index.Contains(id))
+                        {
+                            continue;
+                        }
+
+                        int rowIndex = Convert.ToInt32(index[id], CultureInfo.InvariantCulture);
+                        if (rowIndex < 0 || rowIndex >= rows.Count)
+                        {
+                            continue;
+                        }
+
+                        object row = rows[rowIndex];
+                        if (row == null || row.GetType() != _entityRowType)
+                        {
+                            continue;
+                        }
+
+                        object nullableString = _factoryForEntityIdField.GetValue(row);
+                        if (nullableString != null &&
+                            (bool)_nullableStringHasValueField.GetValue(nullableString))
+                        {
+                            _nativeFactoryIds.Add(id);
+                        }
+                    }
+                    catch (Exception exception)
+                    {
+                        Log("No se pudo clasificar el ID nativo " + id + " como producto o fábrica: " +
+                            exception.GetBaseException().Message);
+                    }
                 }
             }
         }
@@ -1558,7 +1709,17 @@ namespace RogueCommandExpansionLoader.Content
             {
                 for (int i = 0; i < definition.units.Length; i++)
                 {
-                    if (definition.units[i] != null) yield return definition.units[i].id;
+                    ContentUnitDefinition unit = definition.units[i];
+                    if (unit == null)
+                    {
+                        continue;
+                    }
+
+                    yield return unit.id;
+                    if (unit.productionBuilding != null)
+                    {
+                        yield return unit.productionBuilding.id;
+                    }
                 }
             }
 
@@ -1921,6 +2082,12 @@ namespace RogueCommandExpansionLoader.Content
                 for (int i = 0; i < definition.units.Length; i++)
                 {
                     ContentUnitDefinition unit = definition.units[i];
+                    if (unit.productionBuilding == null)
+                    {
+                        throw new InvalidDataException("La unidad " + unit.id + " en '" + packageName +
+                            "' debe declarar productionBuilding.");
+                    }
+
                     bool usesNativeTemplate = !String.IsNullOrWhiteSpace(unit.nativeTemplateId);
                     object row;
                     string prefabKey;
@@ -2044,13 +2211,19 @@ namespace RogueCommandExpansionLoader.Content
                         temporaryResources.Add(imageKey, cardImage);
                     }
 
-                    temporaryUnits.Add(new LoadedUnit(unit.id, definition.packId, prefabKey, imageKey, row, unit));
-                }
+                    if (HasRoleFlag(row, "Factory"))
+                    {
+                        throw new InvalidDataException("La fila de unidad " + unit.id + " en '" + packageName +
+                            "' tiene el rol Factory; debe ser un producto. Declara la fábrica en productionBuilding.");
+                    }
 
-                var currentPackUnitIds = new HashSet<string>(StringComparer.Ordinal);
-                for (int i = 0; i < temporaryUnits.Count; i++)
-                {
-                    currentPackUnitIds.Add(temporaryUnits[i].Id);
+                    _factoryForEntityIdField.SetValue(row, CreateEmptyNullableString());
+                    _allowedBlueprintField.SetValue(row, false);
+                    _allowedStartingBlueprintField.SetValue(row, false);
+                    temporaryUnits.Add(new LoadedUnit(unit.id, definition.packId, prefabKey, imageKey,
+                        row, unit, false, unit.productionBuilding.id));
+                    temporaryUnits.Add(CreateProductionBuilding(unit, unit.productionBuilding, definition.packId,
+                        packageName, temporaryNativePrefabs, temporaryResources));
                 }
 
                 for (int i = 0; i < definition.stages.Length; i++)
@@ -2093,7 +2266,7 @@ namespace RogueCommandExpansionLoader.Content
                     List<object> stageWorlds;
                     List<object> pools = ValidateStageParameters(parameters, packageName, stage.id,
                         out stageWorlds);
-                    HashSet<string> scopedUnitIds = GetStageModUnitIds(stage, currentPackUnitIds);
+                    HashSet<string> scopedUnitIds = GetStageModUnitIds(stage, temporaryUnits);
                     var stagePoolScopes = new List<BlueprintPoolScopeRegistration>();
                     if (scopedUnitIds.Count > 0)
                     {
@@ -2263,7 +2436,7 @@ namespace RogueCommandExpansionLoader.Content
                                     ": la unidad de deck '" + deckEntityId + "' no está registrada ni se declara en este paquete.");
                             }
 
-                            if (!IsNativeOrPackLocalUnit(deckEntityId, temporaryUnits) &&
+                            if (!IsDeckEntityNativeOrPackLocal(deckEntityId, temporaryUnits) &&
                                 !ContentPackValidator.DeclaresAiUnitDependency(profile, deckEntityId))
                             {
                                 throw new InvalidDataException("Perfil AI " + profile.id +
@@ -2271,7 +2444,7 @@ namespace RogueCommandExpansionLoader.Content
                                     "' debe declararse en unitDependencies o unitEntries para fijar su orden de carga.");
                             }
 
-                            if (!IsUnitAvailable(deckEntityId, temporaryUnits))
+                            if (!IsDeckEntityAvailable(deckEntityId, temporaryUnits))
                             {
                                 throw new InvalidDataException("Perfil AI " + profile.id +
                                     ": la unidad de deck '" + deckEntityId + "' no está registrada ni se declara en este paquete.");
@@ -2540,10 +2713,8 @@ namespace RogueCommandExpansionLoader.Content
             var poolScopeRegistrations = new List<BlueprintPoolScopeRegistration>();
             var blueprintUnitIds = new HashSet<string>(StringComparer.Ordinal);
             var startingBlueprintUnitIds = new HashSet<string>(StringComparer.Ordinal);
-            var localUnitIds = new HashSet<string>(StringComparer.Ordinal);
             for (int i = 0; i < units.Count; i++)
             {
-                localUnitIds.Add(units[i].Id);
                 if (units[i].Definition.isAllowedAsStartingBlueprint)
                 {
                     startingBlueprintUnitIds.Add(units[i].Id);
@@ -2593,12 +2764,29 @@ namespace RogueCommandExpansionLoader.Content
                 string[] unitIds = stage.Definition.unitIds ?? new string[0];
                 for (int unitIndex = 0; unitIndex < unitIds.Length; unitIndex++)
                 {
-                    if (localUnitIds.Contains(unitIds[unitIndex]) || _units.ContainsKey(unitIds[unitIndex]))
+                    LoadedUnit unit;
+                    if (TryGetLoadedUnit(unitIds[unitIndex], units, out unit))
                     {
-                        blueprintUnitIds.Add(unitIds[unitIndex]);
+                        if (unit.IsProductionBuilding)
+                        {
+                            throw new InvalidDataException("La etapa " + stage.Definition.id +
+                                " debe declarar IDs de producto; no puede declarar directamente el edificio " +
+                                unit.Id + ".");
+                        }
+
+                        blueprintUnitIds.Add(String.IsNullOrWhiteSpace(unit.ProductionFactoryId)
+                            ? unit.Id
+                            : unit.ProductionFactoryId);
                     }
                     else if (_nativeUnitIds.Contains(unitIds[unitIndex]))
                     {
+                        if (_nativeFactoryIds.Contains(unitIds[unitIndex]))
+                        {
+                            throw new InvalidDataException("La etapa " + stage.Definition.id +
+                                " debe declarar IDs de producto; no puede declarar directamente la fábrica nativa " +
+                                unitIds[unitIndex] + ".");
+                        }
+
                         // Existing game rows keep their authored flags; the stage pool still decides eligibility.
                     }
                     else
@@ -2708,7 +2896,18 @@ namespace RogueCommandExpansionLoader.Content
 
             _contributions.Add(new ProgressionContentContribution(
                 definition.packId, contributionStages, contributionAi));
-            Log("Paquete '" + definition.packId + "' cargado: " + units.Count + " unidad(es), " +
+            int productionBuildingCount = 0;
+            for (int i = 0; i < units.Count; i++)
+            {
+                if (units[i].IsProductionBuilding)
+                {
+                    productionBuildingCount++;
+                }
+            }
+
+            Log("Paquete '" + definition.packId + "' cargado: " +
+                (units.Count - productionBuildingCount) + " unidad(es), " + productionBuildingCount +
+                " edificio(s) de producción, " +
                 stages.Count + " etapa(s), " + profiles.Count + " perfil(es) AI.");
         }
 
@@ -2735,19 +2934,39 @@ namespace RogueCommandExpansionLoader.Content
 
         private HashSet<string> GetStageModUnitIds(
             ContentStageDefinition stage,
-            HashSet<string> currentPackUnitIds)
+            List<LoadedUnit> currentPackUnits)
         {
             var result = new HashSet<string>(StringComparer.Ordinal);
             string[] unitIds = stage.unitIds ?? new string[0];
             for (int i = 0; i < unitIds.Length; i++)
             {
-                if (currentPackUnitIds.Contains(unitIds[i]) || _units.ContainsKey(unitIds[i]))
+                LoadedUnit unit;
+                if (TryGetLoadedUnit(unitIds[i], currentPackUnits, out unit) && !unit.IsProductionBuilding)
                 {
-                    result.Add(unitIds[i]);
+                    result.Add(String.IsNullOrWhiteSpace(unit.ProductionFactoryId)
+                        ? unit.Id
+                        : unit.ProductionFactoryId);
                 }
             }
 
             return result;
+        }
+
+        private bool TryGetLoadedUnit(string unitId, List<LoadedUnit> temporaryUnits, out LoadedUnit unit)
+        {
+            if (temporaryUnits != null)
+            {
+                for (int i = 0; i < temporaryUnits.Count; i++)
+                {
+                    if (String.Equals(temporaryUnits[i].Id, unitId, StringComparison.Ordinal))
+                    {
+                        unit = temporaryUnits[i];
+                        return true;
+                    }
+                }
+            }
+
+            return _units.TryGetValue(unitId, out unit);
         }
 
         private HashSet<string> LoadNativeBlueprintPoolIds()
@@ -2938,6 +3157,167 @@ namespace RogueCommandExpansionLoader.Content
             }
 
             return row;
+        }
+
+        private LoadedUnit CreateProductionBuilding(
+            ContentUnitDefinition product,
+            ContentProductionBuildingDefinition building,
+            string packId,
+            string packageName,
+            List<GameObject> temporaryNativePrefabs,
+            Dictionary<string, UnityEngine.Object> temporaryResources)
+        {
+            if (product == null || building == null || String.IsNullOrWhiteSpace(product.id) ||
+                String.IsNullOrWhiteSpace(building.id) || String.IsNullOrWhiteSpace(building.nativeTemplateId) ||
+                String.Equals(product.id, building.id, StringComparison.Ordinal))
+            {
+                throw new InvalidDataException("La unidad o su productionBuilding contiene una referencia vacía o IDs " +
+                    "iguales en '" + packageName + "'.");
+            }
+
+            object row = CopyNativeBalanceRow(building.nativeTemplateId, packageName, building.id);
+            if (!HasProductionBuildingRoles(row))
+            {
+                throw new InvalidDataException("El nativeTemplateId '" + building.nativeTemplateId + "' de " +
+                    building.id + " en '" + packageName + "' no tiene los roles Building y Factory.");
+            }
+
+            string nativeProductId = ReadFactoryProductId(row);
+            if (String.IsNullOrWhiteSpace(nativeProductId) || !_nativeUnitIds.Contains(nativeProductId))
+            {
+                throw new InvalidDataException("La plantilla de fábrica " + building.nativeTemplateId +
+                    " no declara un factoryForEntityId de producto nativo registrado.");
+            }
+
+            string nativePrefabPath = _prefabLocationField.GetValue(row) as string;
+            string nativeImagePath = _imageLocationField.GetValue(row) as string;
+            if (String.IsNullOrWhiteSpace(nativePrefabPath) || String.IsNullOrWhiteSpace(nativeImagePath))
+            {
+                throw new InvalidDataException("El edificio plantilla '" + building.nativeTemplateId +
+                    "' no contiene rutas nativas de prefab e imagen válidas.");
+            }
+
+            GameObject nativeTemplate = Resources.Load<GameObject>(nativePrefabPath);
+            if (nativeTemplate == null)
+            {
+                nativeTemplate = Resources.Load<GameObject>(nativePrefabPath.ToLowerInvariant());
+            }
+
+            if (nativeTemplate == null)
+            {
+                throw new InvalidDataException("El edificio " + building.id + " no pudo cargar el prefab nativo '" +
+                    nativePrefabPath + "' de la plantilla " + building.nativeTemplateId + ".");
+            }
+
+            var localizationDefinition = new ContentUnitDefinition
+            {
+                id = building.id,
+                nativeTemplateId = building.nativeTemplateId,
+                localizations = building.localizations
+            };
+            ValidateUnitPrefab(nativeTemplate, localizationDefinition, packageName, false);
+
+            GameObject nativePrefabClone = InstantiateDormantPrefab(nativeTemplate);
+            if (nativePrefabClone == null)
+            {
+                throw new InvalidDataException("No se pudo clonar el prefab del edificio " + building.id + ".");
+            }
+
+            temporaryNativePrefabs.Add(nativePrefabClone);
+            EntityController clonedController = nativePrefabClone.GetComponent<EntityController>();
+            if (clonedController == null)
+            {
+                throw new InvalidDataException("El clon nativo del edificio " + building.id +
+                    " perdió su EntityController raíz.");
+            }
+
+            EntityControllerIdentity.Assign(_entityControllerIdField, clonedController, building.id,
+                "Edificio de producción " + building.id + " en '" + packageName + "'");
+            nativePrefabClone.name = "RCL_NativeFactory_" + building.id.Replace(':', '_');
+            nativePrefabClone.SetActive(false);
+            nativePrefabClone.hideFlags = HideFlags.HideAndDontSave;
+            UnityEngine.Object.DontDestroyOnLoad(nativePrefabClone);
+
+            string prefabKey = ResourceKey(building.id, "prefab");
+            ApplyBalanceOverrides(row, building.balanceOverrides, packageName, building.id);
+            _entityIdField.SetValue(row, building.id);
+            _prefabLocationField.SetValue(row, prefabKey);
+            _imageLocationField.SetValue(row, nativeImagePath);
+            _inactiveField.SetValue(row, false);
+            _allowedBlueprintField.SetValue(row, false);
+            _allowedStartingBlueprintField.SetValue(row, false);
+            _factoryForEntityIdField.SetValue(row, CreateNullableString(product.id));
+            temporaryResources.Add(prefabKey, nativePrefabClone);
+
+            return new LoadedUnit(building.id, packId, prefabKey, nativeImagePath,
+                row, localizationDefinition, true, null);
+        }
+
+        private object CreateNullableString(string value)
+        {
+            object nullableString = Activator.CreateInstance(_factoryForEntityIdField.FieldType);
+            _nullableStringValueField.SetValue(nullableString, value);
+            _nullableStringHasValueField.SetValue(nullableString, true);
+            return nullableString;
+        }
+
+        private object CreateEmptyNullableString()
+        {
+            return Activator.CreateInstance(_factoryForEntityIdField.FieldType);
+        }
+
+        private string ReadFactoryProductId(object row)
+        {
+            object nullableString = _factoryForEntityIdField.GetValue(row);
+            if (nullableString == null ||
+                !(bool)_nullableStringHasValueField.GetValue(nullableString))
+            {
+                return null;
+            }
+
+            return _nullableStringValueField.GetValue(nullableString) as string;
+        }
+
+        private bool HasProductionBuildingRoles(object row)
+        {
+            if (row == null || row.GetType() != _entityRowType)
+            {
+                return false;
+            }
+
+            object value = _entityRolesField.GetValue(row);
+            if (!(value is Enum))
+            {
+                return false;
+            }
+
+            return HasRoleFlag(row, "Factory") && HasRoleFlag(row, "Building");
+        }
+
+        private bool HasRoleFlag(object row, string roleName)
+        {
+            if (row == null || row.GetType() != _entityRowType)
+            {
+                return false;
+            }
+
+            object value = _entityRolesField.GetValue(row);
+            if (!(value is Enum))
+            {
+                return false;
+            }
+
+            try
+            {
+                Enum roles = (Enum)value;
+                Enum requiredRole = (Enum)Enum.Parse(_entityRolesField.FieldType, roleName, false);
+                return roles.HasFlag(requiredRole);
+            }
+            catch (Exception exception)
+            {
+                throw new InvalidDataException("No se pudo interpretar el rol " + roleName +
+                    " en EntityBalancingParameters.", exception);
+            }
         }
 
         private void ApplyBalanceOverrides(
@@ -3336,7 +3716,7 @@ namespace RogueCommandExpansionLoader.Content
                 throw new InvalidDataException("Etapa " + stage.id + ": no hay generadores de respaldo nativos.");
             }
 
-            bool isDemo = (bool)_gameIsDemoField.GetValue(balancing);
+            bool isDemo = (bool)_gameIsDemoField.GetValue(balancing) && stage.isPartOfDemo;
             if (nativeSourceParameters != null)
             {
                 foreach (FieldInfo profileField in _progressionFields)
@@ -3510,7 +3890,7 @@ namespace RogueCommandExpansionLoader.Content
                         "': la entrada de unidad " + i + " está vacía.");
                 }
 
-                if (!IsUnitAvailable(definition.unitId, temporaryUnits))
+                if (!IsProductUnitAvailable(definition.unitId, temporaryUnits))
                 {
                     throw new InvalidDataException("Perfil AI " + profile.id + " en '" + packageName +
                         "': la unidad " + definition.unitId + " no está registrada ni disponible.");
@@ -3586,29 +3966,38 @@ namespace RogueCommandExpansionLoader.Content
             }
         }
 
-        private bool IsUnitAvailable(string entityId, List<LoadedUnit> temporaryUnits)
+        private bool IsProductUnitAvailable(string entityId, List<LoadedUnit> temporaryUnits)
         {
-            if (_nativeUnitIds.Contains(entityId) || _units.ContainsKey(entityId))
+            if (_nativeUnitIds.Contains(entityId) && !_nativeFactoryIds.Contains(entityId))
             {
                 return true;
             }
 
-            for (int i = 0; i < temporaryUnits.Count; i++)
-            {
-                if (String.Equals(temporaryUnits[i].Id, entityId, StringComparison.Ordinal))
-                {
-                    return true;
-                }
-            }
-
-            return false;
+            LoadedUnit unit;
+            return TryGetLoadedUnit(entityId, temporaryUnits, out unit) && !unit.IsProductionBuilding;
         }
 
-        private bool IsNativeOrPackLocalUnit(string entityId, List<LoadedUnit> temporaryUnits)
+        private bool IsDeckEntityAvailable(string entityId, List<LoadedUnit> temporaryUnits)
         {
             if (_nativeUnitIds.Contains(entityId))
             {
                 return true;
+            }
+
+            LoadedUnit unit;
+            return TryGetLoadedUnit(entityId, temporaryUnits, out unit);
+        }
+
+        private bool IsDeckEntityNativeOrPackLocal(string entityId, List<LoadedUnit> temporaryUnits)
+        {
+            if (_nativeUnitIds.Contains(entityId))
+            {
+                return true;
+            }
+
+            if (temporaryUnits == null)
+            {
+                return false;
             }
 
             for (int i = 0; i < temporaryUnits.Count; i++)
@@ -3912,6 +4301,24 @@ namespace RogueCommandExpansionLoader.Content
                     BuildLandscapeCandidates(nativeLandscapes, "progresión " + progressionField.Name);
                 List<StageGenerationStageCandidate> stageCandidates =
                     BuildProgressionStageCandidates(nativeStages, loadedStages, packageName, progressionField.Name);
+                var projectedStages = new ArrayList(nativeStages);
+                foreach (LoadedStage loadedStage in loadedStages)
+                {
+                    bool exists = false;
+                    foreach (object existingStage in projectedStages)
+                        if (System.Object.ReferenceEquals(existingStage, loadedStage.RuntimeStage)) { exists = true; break; }
+                    if (!exists) projectedStages.Add(loadedStage.RuntimeStage);
+                }
+                // Reject the pack before publishing any objects if an appended slot
+                // could reach the game's positional fallback lookup without a mapping.
+                StageFallbackSnapshot.Build(_fallbackLandscapeGeneratorsField.GetValue(balancing) as IList,
+                    projectedStages, delegate(object runtimeStage)
+                    {
+                        foreach (LoadedStage loadedStage in loadedStages)
+                            if (System.Object.ReferenceEquals(loadedStage.RuntimeStage, runtimeStage))
+                                return loadedStage.FallbackLandscape;
+                        return null;
+                    });
                 bool heatIsActive = progressionFieldIndex == 1;
                 string diagnostic;
                 if (!StageGenerationCompatibility.TryValidateStages(
@@ -4900,6 +5307,12 @@ namespace RogueCommandExpansionLoader.Content
             return field;
         }
 
+        private static bool EnumHasName(Type enumType, string name)
+        {
+            return enumType != null && enumType.IsEnum &&
+                Array.IndexOf(Enum.GetNames(enumType), name) >= 0;
+        }
+
         private Type FindUniqueType(string name)
         {
             Type[] types;
@@ -5001,8 +5414,14 @@ namespace RogueCommandExpansionLoader.Content
 
             public bool ContainsUnit(string id)
             {
-                return _owner._nativeUnitIds.Contains(id) || _owner._units.ContainsKey(id) ||
-                    _declaredUnitIds.Contains(id);
+                if ((_owner._nativeUnitIds.Contains(id) && !_owner._nativeFactoryIds.Contains(id)) ||
+                    _declaredUnitIds.Contains(id))
+                {
+                    return true;
+                }
+
+                LoadedUnit unit;
+                return _owner._units.TryGetValue(id, out unit) && !unit.IsProductionBuilding;
             }
 
             public bool ContainsAiProfile(string id)
@@ -5041,7 +5460,9 @@ namespace RogueCommandExpansionLoader.Content
                 string prefabKey,
                 string imageKey,
                 object balanceRow,
-                ContentUnitDefinition definition)
+                ContentUnitDefinition definition,
+                bool isProductionBuilding,
+                string productionFactoryId)
             {
                 Id = id;
                 PackId = packId;
@@ -5049,6 +5470,8 @@ namespace RogueCommandExpansionLoader.Content
                 ImageKey = imageKey;
                 BalanceRow = balanceRow;
                 Definition = definition;
+                IsProductionBuilding = isProductionBuilding;
+                ProductionFactoryId = productionFactoryId;
             }
 
             public string Id { get; private set; }
@@ -5057,6 +5480,8 @@ namespace RogueCommandExpansionLoader.Content
             public string ImageKey { get; private set; }
             public object BalanceRow { get; private set; }
             public ContentUnitDefinition Definition { get; private set; }
+            public bool IsProductionBuilding { get; private set; }
+            public string ProductionFactoryId { get; private set; }
         }
 
         private sealed class LoadedStage

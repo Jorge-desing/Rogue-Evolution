@@ -116,6 +116,37 @@ namespace RogueCommandExpansionLoader.Runtime
             return nativeFallbacks;
         }
 
+        public static bool OutlyingStartAiBuildingDistancePrefix(ref int __result)
+        {
+            IStageOwnedAiPlacementDistanceRuntimeProvider distanceProvider;
+            lock (Gate)
+            {
+                distanceProvider = _provider as IStageOwnedAiPlacementDistanceRuntimeProvider;
+            }
+
+            if (distanceProvider == null)
+            {
+                return true;
+            }
+
+            try
+            {
+                int distance;
+                if (distanceProvider.TryGetOutlyingStartAiBuildingsDistance(out distance))
+                {
+                    __result = distance;
+                    return false;
+                }
+            }
+            catch (Exception exception)
+            {
+                Log("Could not resolve spacing for a loader-owned appended stage: " +
+                    exception.GetBaseException().Message);
+            }
+
+            return true;
+        }
+
         public static bool BlueprintDescriptionPrefix(string __0, ref string __result)
         {
             return TryResolveUnitLocalization(__0, true, ref __result);
@@ -484,6 +515,11 @@ namespace RogueCommandExpansionLoader.Runtime
         public static void SetScriptableObjectPostfix(object[] __args)
         {
             RuntimeHooks.AfterSetScriptableObject(__args);
+        }
+
+        public static bool OutlyingStartAiBuildingDistancePrefix(ref int __result)
+        {
+            return RuntimeHooks.OutlyingStartAiBuildingDistancePrefix(ref __result);
         }
 
         public static void CreateStageMapPrefix()

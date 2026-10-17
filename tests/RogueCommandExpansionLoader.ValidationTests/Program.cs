@@ -57,6 +57,7 @@ var tests = new (string Name, Action Run)[]
             "BlueprintDescriptionPrefix",
             "LandscapeLocalizationPrefix",
             "FallbackLandscapeGeneratorsPostfix",
+            "OutlyingStartAiBuildingDistancePrefix",
             "BlueprintPoolIsInPoolPrefix",
             "BlueprintPoolFindPrefix",
             "BlueprintPoolExclusiveBlueprintsPostfix"
@@ -95,6 +96,15 @@ var tests = new (string Name, Action Run)[]
             eligibilityParameters[2].ParameterType != typeof(bool).MakeByRefType())
         {
             throw new InvalidOperationException("BlueprintPool.IsInPool hook has an invalid Harmony signature.");
+        }
+
+        MethodInfo? outlyingStartDistanceHook = typeof(RuntimeHarmonyPatches).GetMethod(
+            "OutlyingStartAiBuildingDistancePrefix", BindingFlags.Public | BindingFlags.Static);
+        ParameterInfo[] distanceParameters = outlyingStartDistanceHook?.GetParameters() ?? Array.Empty<ParameterInfo>();
+        if (outlyingStartDistanceHook == null || outlyingStartDistanceHook.ReturnType != typeof(bool) ||
+            distanceParameters.Length != 1 || distanceParameters[0].ParameterType != typeof(int).MakeByRefType())
+        {
+            throw new InvalidOperationException("The appended-stage AI spacing hook has an invalid Harmony signature.");
         }
 
         MethodInfo? poolFindHook = typeof(RuntimeHarmonyPatches).GetMethod(
@@ -222,6 +232,23 @@ var tests = new (string Name, Action Run)[]
         {
             throw new InvalidOperationException("The localization hook cannot pass its source key to the original game method.");
         }
+
+        var provider = new RuntimeMutatorTestProvider();
+        provider.PoolLocalizationAliases.Add("RCL_POOL_TEST", "NativePool");
+        RuntimeHooks.Bind(null!, provider, null!);
+        try
+        {
+            string key = "RCL_POOL_TEST";
+            string result = "unchanged";
+            if (!RuntimeHarmonyPatches.LandscapeLocalizationPrefix(ref key, ref result) ||
+                key != "NativePool" || result != "unchanged")
+                throw new InvalidOperationException("The localization prefix did not forward the source key to the game.");
+            key = "UnrelatedKey";
+            if (!RuntimeHarmonyPatches.LandscapeLocalizationPrefix(ref key, ref result) ||
+                key != "UnrelatedKey" || result != "unchanged")
+                throw new InvalidOperationException("The localization prefix rewrote an unrelated key.");
+        }
+        finally { RuntimeHooks.Clear(null!); }
     }),
     ("appended stage fallbacks preserve the native prefix and follow each active progression", () =>
     {
@@ -255,6 +282,95 @@ var tests = new (string Name, Action Run)[]
         if (hook.ReturnType != typeof(void) || hook.GetParameters()[0].ParameterType !=
             typeof(List<global::LandscapeGenerator>).MakeByRefType())
             throw new InvalidOperationException("The fallback getter hook has an incompatible typed result.");
+    }),
+    ("AI start spacing override applies only to provider-owned appended stages", () =>
+    {
+        var loadedStage = new object();
+        var unrelatedStage = new object();
+        var loadedStages = new[] { loadedStage };
+        int distance;
+
+        if (StageOwnedAiPlacementDistanceResolver.TryResolve(8, loadedStage, loadedStages,
+                stage => stage, 37, out distance))
+        {
+            throw new InvalidOperationException("A native-band stage bypassed the game's original distance getter.");
+        }
+
+        if (StageOwnedAiPlacementDistanceResolver.TryResolve(12, unrelatedStage, loadedStages,
+                stage => stage, 37, out distance))
+        {
+            throw new InvalidOperationException("An unrelated appended stage received the loader's distance override.");
+        }
+
+        if (!StageOwnedAiPlacementDistanceResolver.TryResolve(12, loadedStage, loadedStages,
+                stage => stage, 37, out distance) || distance != 37)
+        {
+            throw new InvalidOperationException("A provider-owned appended stage did not use the configured final native band.");
+        }
+    }),
+    ("sample units declare unique localized production buildings", () =>
+    {
+        foreach (ContentPackDefinition pack in new[] { sample, nativeSample })
+        {
+            var buildingIds = new HashSet<string>(StringComparer.Ordinal);
+            foreach (ContentUnitDefinition unit in pack.units)
+            {
+                ContentProductionBuildingDefinition building = unit.productionBuilding;
+                if (building == null || building.id == unit.id || !buildingIds.Add(building.id) ||
+                    String.IsNullOrWhiteSpace(building.nativeTemplateId) ||
+                    !building.localizations.Any(text => text.language == "en-US" && !String.IsNullOrWhiteSpace(text.name)) ||
+                    !building.localizations.Any(text => text.language == "es-XL" && !String.IsNullOrWhiteSpace(text.name)))
+                    throw new InvalidOperationException("A unit is missing its own localized production building.");
+            }
+        }
+    }),
+    ("unit production buildings are mandatory and cannot share entity IDs", () =>
+    {
+        WithPackage(sample, (pack, root) =>
+        {
+            pack.units[0].productionBuilding = null!;
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(), "production-building.required");
+        });
+        WithPackage(sample, (pack, root) =>
+        {
+            pack.units[0].productionBuilding.id = pack.units[0].id;
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(), "id.duplicate-in-package");
+        });
+        WithPackage(nativeSample, (pack, root) =>
+        {
+            pack.units[1].productionBuilding.id = pack.units[0].productionBuilding.id;
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(), "production-building.id-shared");
+        });
+        WithPackage(sample, (pack, root) =>
+            ExpectDiagnostic(pack, root, new EmptySnapshot(pack.units[0].productionBuilding.id),
+                new KnownModuleValidator(), "id.collision"));
+    }),
+    ("production buildings validate localization and bounded balance overrides", () =>
+    {
+        WithPackage(sample, (pack, root) =>
+        {
+            pack.units[0].productionBuilding.localizations = [];
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "production-building.localization-required");
+        });
+        WithPackage(sample, (pack, root) =>
+        {
+            pack.units[0].productionBuilding.balanceOverrides =
+                [new ContentBalanceOverride { name = "neededExperienceLevel", value = "10001" }];
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "production-building.balance-override-invalid");
+        });
+    }),
+    ("production building deep clones preserve independent balance and localization", () =>
+    {
+        ContentPackDefinition copy = ContentPackCopy.DeepClone(nativeSample);
+        copy.units[0].productionBuilding.id = "test:changed-factory";
+        copy.units[0].productionBuilding.balanceOverrides[0].value = "9999";
+        copy.units[0].productionBuilding.localizations[0].name = "Changed";
+        if (nativeSample.units[0].productionBuilding.id == "test:changed-factory" ||
+            nativeSample.units[0].productionBuilding.balanceOverrides[0].value == "9999" ||
+            nativeSample.units[0].productionBuilding.localizations[0].name == "Changed")
+            throw new InvalidOperationException("Production building data shared mutable arrays with the source pack.");
     }),
     ("sample manifest passes package-local validation", () =>
     {
@@ -1626,6 +1742,42 @@ var tests = new (string Name, Action Run)[]
         {
             EntityBalancingStore.Reset();
         }
+    }),
+    ("five new production pairs append without replacing the native factory mapping", () =>
+    {
+        EntityBalancingStore.Reset();
+        try
+        {
+            var originals = new[]
+            {
+                RuntimeMutatorTestData.Row("NativeUnit"),
+                RuntimeMutatorTestData.Row("NativeFactory", "NativeUnit")
+            };
+            for (int i = 0; i < originals.Length; i++)
+            {
+                EntityBalancingStore.EntityBalancingParametersList.Add(originals[i]);
+                EntityBalancingStore.ParameterListIndexOf.Add(originals[i].entityId, i);
+                EntityBalancingStore.ChangeableIntValueCache.Add(originals[i].entityId, new());
+                EntityBalancingStore.ChangeableFloatValueCache.Add(originals[i].entityId, new());
+            }
+            EntityBalancingStore.FactoryEntityIdOf.Add("NativeUnit", "NativeFactory");
+            var provider = new RuntimeMutatorTestProvider();
+            foreach (ContentUnitDefinition unit in nativeSample.units)
+            {
+                provider.EntityRows.Add(RuntimeMutatorTestData.Row(unit.id));
+                provider.EntityRows.Add(RuntimeMutatorTestData.Row(unit.productionBuilding.id, unit.id));
+            }
+            var mutator = new RuntimeContentMutator(typeof(EntityBalancingStore).Assembly, provider, null);
+            if (!mutator.RegisterEntityRows() || !mutator.RegisterEntityRows() ||
+                EntityBalancingStore.EntityBalancingParametersList.Count != 12 ||
+                EntityBalancingStore.FactoryEntityIdOf.Count != 6 ||
+                EntityBalancingStore.FactoryEntityIdOf["NativeUnit"] != "NativeFactory")
+                throw new InvalidOperationException("New production pairs replaced native state or registered twice.");
+            foreach (ContentUnitDefinition unit in nativeSample.units)
+                if (EntityBalancingStore.FactoryEntityIdOf[unit.id] != unit.productionBuilding.id)
+                    throw new InvalidOperationException("A new production building points at the wrong product.");
+        }
+        finally { EntityBalancingStore.Reset(); }
     }),
     ("runtime entity mutator rejects an ID collision without partially changing the registry", () =>
     {
