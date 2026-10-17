@@ -162,7 +162,8 @@ namespace RogueCommandExpansionLoader.Modules
                 foreach (EntityController playerUnit in playerUnits)
                 {
                     if (playerUnit == null || playerUnit.IsDestroyed || playerUnit.DestroyHasBeenStarted ||
-                        !playerUnit.IsControlledByPlayer || !playerUnit.IsUnit || !playerUnit.CanAttack ||
+                        !playerUnit.IsControlledByPlayer || !playerUnit.IsUnit ||
+                        !playerUnit.CanAttackAndIsAttackEnabled ||
                         playerUnit.canNotBeAttacked || playerUnit.canNotBeTargetedByAi ||
                         playerUnit.doNotRegisterGlobally || !playerUnit.IsTargetInRange)
                     {
@@ -242,7 +243,8 @@ namespace RogueCommandExpansionLoader.Modules
 
                     EntityController currentTarget = candidate.CurrentAttackTarget;
                     EntityCommand.Command currentCommand = candidate.CurrentPlayerCommandName;
-                    if (currentTarget != null || !candidate.CanAttack || !candidate.IsCombatUnit ||
+                    if (currentTarget != null || !candidate.CanAttackAndIsAttackEnabled ||
+                        !candidate.CanMoveAndMovementIsEnabled || !candidate.IsCombatUnit ||
                         candidate.IsEngineer ||
                         candidate.HasRole(UnitRole.Spawn) || candidate.HasRole(UnitRole.Skill) ||
                         candidate.CommandChainExecutionIsPaused || candidate.HasSkillActivationInCommandChain ||
