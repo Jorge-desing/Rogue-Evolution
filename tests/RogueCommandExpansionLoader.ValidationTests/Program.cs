@@ -59,6 +59,34 @@ var tests = new (string Name, Action Run)[]
             throw new InvalidOperationException("Sandlance is missing its own card Sprite or visible English text.");
         }
     }),
+    ("expansion units declare distinct English and Spanish localizations", () =>
+    {
+        string[] expectedUnitIds =
+        [
+            "sample-native:scout-tank",
+            "sample-native:heavy-artillery",
+            "sample-native:assault-walker",
+            "sample-native:skirmish-bike",
+            "sample-native:surge-tank"
+        ];
+
+        foreach (string unitId in expectedUnitIds)
+        {
+            ContentUnitDefinition unit = nativeSample.units.Single(u => u.id == unitId);
+            if (unit.localizations == null || unit.localizations.Length < 2)
+            {
+                throw new InvalidOperationException($"Unit {unitId} is missing localized text entries.");
+            }
+
+            var en = unit.localizations.FirstOrDefault(l => l.language == "en-US");
+            var es = unit.localizations.FirstOrDefault(l => l.language == "es-XL");
+            if (en == null || string.IsNullOrWhiteSpace(en.name) || string.IsNullOrWhiteSpace(en.description) ||
+                es == null || string.IsNullOrWhiteSpace(es.name) || string.IsNullOrWhiteSpace(es.description))
+            {
+                throw new InvalidOperationException($"Unit {unitId} is missing valid en-US or es-XL name/description.");
+            }
+        }
+    }),
     ("unit localization resolves active language and English fallback", () =>
     {
         var unit = new ContentUnitDefinition

@@ -31,7 +31,7 @@
       "balanceOverrides": [
         { "name": "cost", "value": "70" },
         { "name": "maxHealth", "value": "130" },
-        { "name": "moveSpeed", "value": "1.2" },
+        { "name": "moveSpeed", "value": "14.5" },
         { "name": "sightRadius", "value": "8" },
         { "name": "weaponRange", "value": "6" },
         { "name": "attackCooldown", "value": "0.9" }
@@ -40,10 +40,22 @@
     {
       "id": "sample-native:heavy-artillery",
       "nativeTemplateId": "ArtilleryTank",
+      "localizations": [
+        {
+          "language": "en-US",
+          "name": "Colossus Siege Platform",
+          "description": "A heavily armored siege platform delivering destructive high-caliber shell barrages across extreme ranges."
+        },
+        {
+          "language": "es-XL",
+          "name": "Plataforma de Asedio Coloso",
+          "description": "Una plataforma de asedio fuertemente blindada que descarga devastadoras andanadas de alto calibre a distancias extremas."
+        }
+      ],
       "balanceOverrides": [
         { "name": "cost", "value": "280" },
         { "name": "maxHealth", "value": "160" },
-        { "name": "moveSpeed", "value": "0.9" },
+        { "name": "moveSpeed", "value": "9.0" },
         { "name": "damage1", "value": "55" },
         { "name": "weaponRange", "value": "16" },
         { "name": "attackCooldown", "value": "4.0" },
@@ -54,10 +66,22 @@
     {
       "id": "sample-native:assault-walker",
       "nativeTemplateId": "GatlingWalker",
+      "localizations": [
+        {
+          "language": "en-US",
+          "name": "Ironclad Gatling Walker",
+          "description": "A reinforced bipedal combat walker equipped with twin rotary cannons to shred infantry swarms and light armor."
+        },
+        {
+          "language": "es-XL",
+          "name": "Caminante Gatling Acorazado",
+          "description": "Un caminante bípedo de combate reforzado equipado con cañones rotativos dobles para triturar enjambres y blindaje ligero."
+        }
+      ],
       "balanceOverrides": [
         { "name": "cost", "value": "380" },
         { "name": "maxHealth", "value": "420" },
-        { "name": "moveSpeed", "value": "1.05" },
+        { "name": "moveSpeed", "value": "12.0" },
         { "name": "damage1", "value": "4" },
         { "name": "attackCooldown", "value": "0.4" },
         { "name": "weaponRange", "value": "6" },
@@ -67,12 +91,49 @@
     {
       "id": "sample-native:skirmish-bike",
       "nativeTemplateId": "BombBike",
+      "localizations": [
+        {
+          "language": "en-US",
+          "name": "Skirmish Strike Bike",
+          "description": "An ultra-fast suicide recon bike loaded with volatile high-explosive charges for rapid hit-and-run strikes."
+        },
+        {
+          "language": "es-XL",
+          "name": "Moto de Asalto Rápido",
+          "description": "Una moto de reconocimiento ultrarrápida cargada con cargas explosivas volátiles para ataques de choque y fuga."
+        }
+      ],
       "balanceOverrides": [
         { "name": "cost", "value": "55" },
         { "name": "maxHealth", "value": "75" },
-        { "name": "moveSpeed", "value": "1.8" },
+        { "name": "moveSpeed", "value": "24.0" },
         { "name": "damage1", "value": "32" },
         { "name": "effectRadius1", "value": "1.8" }
+      ]
+    },
+    {
+      "id": "sample-native:surge-tank",
+      "nativeTemplateId": "LightningTank",
+      "localizations": [
+        {
+          "language": "en-US",
+          "name": "Surge Arc Tank",
+          "description": "An advanced electromagnetic combat tank that discharges high-voltage electric arcs to stun and overload enemy circuits."
+        },
+        {
+          "language": "es-XL",
+          "name": "Tanque de Sobretensión de Arco",
+          "description": "Un tanque de combate electromagnético avanzado que descarga arcos eléctricos de alto voltaje para aturdir y sobrecargar circuitos enemigos."
+        }
+      ],
+      "balanceOverrides": [
+        { "name": "cost", "value": "210" },
+        { "name": "maxHealth", "value": "150" },
+        { "name": "moveSpeed", "value": "13.0" },
+        { "name": "damage1", "value": "12" },
+        { "name": "attackCooldown", "value": "1.8" },
+        { "name": "weaponRange", "value": "4.5" },
+        { "name": "armorProtection", "value": "2" }
       ]
     }
   ],
@@ -117,7 +178,8 @@
       "unitIds": [
         "sample-native:scout-tank",
         "sample-native:heavy-artillery",
-        "sample-native:assault-walker"
+        "sample-native:assault-walker",
+        "sample-native:surge-tank"
       ],
       "aiProfileIds": [
         "sample-native:quick-hunter-extension",
@@ -143,7 +205,8 @@
         "sample-native:scout-tank",
         "sample-native:heavy-artillery",
         "sample-native:assault-walker",
-        "sample-native:skirmish-bike"
+        "sample-native:skirmish-bike",
+        "sample-native:surge-tank"
       ],
       "aiProfileIds": [
         "sample-native:quick-hunter-extension",
