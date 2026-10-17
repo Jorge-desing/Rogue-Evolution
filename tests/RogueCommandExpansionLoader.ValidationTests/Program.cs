@@ -54,6 +54,38 @@ var tests = new (string Name, Action Run)[]
         WithPackage(reactiveAiSample, (pack, root) =>
             ExpectValid(pack, root, new EmptySnapshot(), new KnownModuleValidator()));
     }),
+    ("stage-scoped native AI samples use unique reserved resource aliases", () =>
+    {
+        var resourceNames = new HashSet<string>(StringComparer.Ordinal);
+        foreach (ContentAiProfileDefinition profile in nativeSample.aiProfiles.Concat(reactiveAiSample.aiProfiles))
+        {
+            if (profile == null || !profile.scopeToReferencedStages ||
+                !ContentPackValidator.TryBuildScopedAiResourceName(profile.id, out string resourceName) ||
+                !resourceName.StartsWith("RCL_", StringComparison.Ordinal) ||
+                !resourceNames.Add(resourceName))
+            {
+                throw new InvalidOperationException("A stage-scoped sample AI profile did not produce a unique RCL_ alias.");
+            }
+        }
+    }),
+    ("stage-scoped AI range requires unique contiguous stage indices", () =>
+    {
+        if (!StageGenerationCompatibility.TryBuildContiguousStageRange(new[] { 9, 10, 11 },
+            out int minimum, out int maximum, out string diagnostic) || minimum != 9 || maximum != 11 || diagnostic != null)
+        {
+            throw new InvalidOperationException("A contiguous stage-index sequence did not produce its exact inclusive range.");
+        }
+        if (StageGenerationCompatibility.TryBuildContiguousStageRange(new[] { 9, 11 },
+            out _, out _, out diagnostic) || diagnostic == null || !diagnostic.Contains("contiguous", StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("A stage-index gap was accepted for an AI range.");
+        }
+        if (StageGenerationCompatibility.TryBuildContiguousStageRange(new[] { 9, 9 },
+            out _, out _, out diagnostic) || diagnostic == null)
+        {
+            throw new InvalidOperationException("Duplicate stage indices were accepted for an AI range.");
+        }
+    }),
     ("game compatibility rejects an unsupported Unity version", () =>
     {
         string previousVersion = UnityEngine.Application.unityVersion;
@@ -274,7 +306,30 @@ var tests = new (string Name, Action Run)[]
             pack.aiProfiles[0].assetBundleId = null;
             pack.aiProfiles[0].prefabAssetName = null;
             pack.aiProfiles[0].nativeTemplateId = "_01_ Quick Hunter Enemy Var";
+            pack.aiProfiles[0].scopeToReferencedStages = true;
             ExpectValid(pack, root, new EmptySnapshot(), new KnownModuleValidator());
+        });
+    }),
+    ("stage-scoped AI rejects custom prefabs", () =>
+    {
+        WithPackage(sample, (pack, root) =>
+        {
+            pack.aiProfiles[0].scopeToReferencedStages = true;
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "ai-profile.scoped-native-required");
+        });
+    }),
+    ("stage-scoped native AI must be referenced by a stage in its pack", () =>
+    {
+        WithPackage(sample, (pack, root) =>
+        {
+            pack.aiProfiles[0].assetBundleId = null;
+            pack.aiProfiles[0].prefabAssetName = null;
+            pack.aiProfiles[0].nativeTemplateId = "_01_ Quick Hunter Enemy Var";
+            pack.aiProfiles[0].scopeToReferencedStages = true;
+            pack.stages[0].aiProfileIds = Array.Empty<string>();
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "ai-profile.scoped-stage-required");
         });
     }),
     ("scheduled base-build AI parser supplies bounded defaults", () =>

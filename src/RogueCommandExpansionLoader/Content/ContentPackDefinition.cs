@@ -75,6 +75,7 @@ namespace RogueCommandExpansionLoader.Content
         public string assetBundleId;
         public string prefabAssetName;
         public string nativeTemplateId;
+        public bool scopeToReferencedStages;
         public ContentAiModuleDefinition[] modules;
     }
 
@@ -190,6 +191,7 @@ namespace RogueCommandExpansionLoader.Content
                 assetBundleId = source.assetBundleId,
                 prefabAssetName = source.prefabAssetName,
                 nativeTemplateId = source.nativeTemplateId,
+                scopeToReferencedStages = source.scopeToReferencedStages,
                 modules = CloneArray(source.modules, CloneAiModule)
             };
         }

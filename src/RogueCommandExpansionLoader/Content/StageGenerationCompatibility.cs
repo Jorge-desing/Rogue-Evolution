@@ -20,6 +20,47 @@ namespace RogueCommandExpansionLoader.Content
             };
         }
 
+        public static bool TryBuildContiguousStageRange(
+            IList<int> stageIndices,
+            out int minimum,
+            out int maximum,
+            out string diagnostic)
+        {
+            minimum = -1;
+            maximum = -1;
+            diagnostic = null;
+            if (stageIndices == null || stageIndices.Count == 0)
+            {
+                diagnostic = "At least one referenced stage index is required.";
+                return false;
+            }
+
+            var sorted = new List<int>(stageIndices.Count);
+            for (int i = 0; i < stageIndices.Count; i++)
+            {
+                if (stageIndices[i] < 0)
+                {
+                    diagnostic = "Referenced stage indices cannot be negative.";
+                    return false;
+                }
+                sorted.Add(stageIndices[i]);
+            }
+
+            sorted.Sort();
+            for (int i = 1; i < sorted.Count; i++)
+            {
+                if (sorted[i] != sorted[i - 1] + 1)
+                {
+                    diagnostic = "Referenced stages must be unique and contiguous.";
+                    return false;
+                }
+            }
+
+            minimum = sorted[0];
+            maximum = sorted[sorted.Count - 1];
+            return true;
+        }
+
         public static bool TryBuildStageIndices(
             IList progressionStages,
             IList<object> loadedStageReferences,

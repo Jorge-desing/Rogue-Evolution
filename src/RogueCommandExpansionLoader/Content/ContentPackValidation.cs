@@ -304,10 +304,50 @@ namespace RogueCommandExpansionLoader.Content
                             "Choose either nativeTemplateId or the bundle prefab source, not both.");
                     }
 
-                    resourceName = profile.nativeTemplateId;
+                    if (profile.scopeToReferencedStages)
+                    {
+                        if (!TryBuildScopedAiResourceName(profile.id, out resourceName))
+                        {
+                            Add(diagnostics, "ai-profile.scoped-resource-name-invalid", itemPath + ".id",
+                                "A stage-scoped AI profile ID must produce a reserved RCL_ resource name of at most 96 ASCII characters.");
+                        }
+
+                        bool referencedByPackStage = false;
+                        for (int stageIndex = 0; stageIndex < stages.Length && !referencedByPackStage; stageIndex++)
+                        {
+                            ContentStageDefinition stage = stages[stageIndex];
+                            string[] stageProfileIds = stage == null || stage.aiProfileIds == null
+                                ? new string[0]
+                                : stage.aiProfileIds;
+                            for (int profileIndex = 0; profileIndex < stageProfileIds.Length; profileIndex++)
+                            {
+                                if (String.Equals(stageProfileIds[profileIndex], profile.id, StringComparison.Ordinal))
+                                {
+                                    referencedByPackStage = true;
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (!referencedByPackStage)
+                        {
+                            Add(diagnostics, "ai-profile.scoped-stage-required", itemPath + ".scopeToReferencedStages",
+                                "A stage-scoped native AI profile must be referenced by at least one stage in the same pack.");
+                        }
+                    }
+                    else
+                    {
+                        resourceName = profile.nativeTemplateId;
+                    }
                 }
                 else
                 {
+                    if (profile.scopeToReferencedStages)
+                    {
+                        Add(diagnostics, "ai-profile.scoped-native-required", itemPath + ".scopeToReferencedStages",
+                            "scopeToReferencedStages is only supported with nativeTemplateId.");
+                    }
+
                     ValidateBundleReference(profile.assetBundleId, itemPath + ".assetBundleId", bundleIds, diagnostics);
                     ValidateAssetName(profile.prefabAssetName, itemPath + ".prefabAssetName", diagnostics);
                     if (!IsAiResourceName(profile.prefabAssetName))
@@ -390,6 +430,32 @@ namespace RogueCommandExpansionLoader.Content
             }
 
             return new ContentPackValidationResult(pack, diagnostics);
+        }
+
+        internal static bool TryBuildScopedAiResourceName(string profileId, out string resourceName)
+        {
+            resourceName = null;
+            if (String.IsNullOrWhiteSpace(profileId))
+            {
+                return false;
+            }
+
+            var builder = new System.Text.StringBuilder("RCL_");
+            for (int i = 0; i < profileId.Length; i++)
+            {
+                char value = profileId[i];
+                bool asciiLetter = (value >= 'a' && value <= 'z') || (value >= 'A' && value <= 'Z');
+                bool asciiDigit = value >= '0' && value <= '9';
+                builder.Append(asciiLetter || asciiDigit ? value : '_');
+            }
+
+            if (builder.Length < 5 || builder.Length > 96)
+            {
+                return false;
+            }
+
+            resourceName = builder.ToString();
+            return true;
         }
 
         private static T[] RequireArray<T>(T[] value, string path, List<ContentDiagnostic> diagnostics)

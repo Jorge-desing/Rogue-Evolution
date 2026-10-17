@@ -1558,17 +1558,66 @@ namespace RogueCommandExpansionLoader.Content
                         pools, stageWorlds));
                 }
 
+                Dictionary<string, Vector2Int> scopedAiStageRanges = BuildScopedAiStageRanges(
+                    temporaryStages, definition.aiProfiles, packageName);
                 for (int i = 0; i < definition.aiProfiles.Length; i++)
                 {
                     ContentAiProfileDefinition profile = definition.aiProfiles[i];
                     GameObject prefab;
                     DefaultAiBehaviour[] nativeBehaviours;
+                    string resourceName;
                     if (!String.IsNullOrWhiteSpace(profile.nativeTemplateId))
                     {
                         DefaultAiBehaviour nativeBehaviour = FindNativeAiTemplate(
                             profile.nativeTemplateId, packageName, profile.id);
                         prefab = nativeBehaviour.gameObject;
                         nativeBehaviours = new[] { nativeBehaviour };
+                        resourceName = profile.nativeTemplateId;
+                        if (profile.scopeToReferencedStages)
+                        {
+                            Vector2Int stageRange;
+                            if (!scopedAiStageRanges.TryGetValue(profile.id, out stageRange))
+                            {
+                                throw new InvalidDataException("El perfil AI " + profile.id +
+                                    " no tiene un rango de etapas de pack calculado.");
+                            }
+
+                            if (!ContentPackValidator.TryBuildScopedAiResourceName(profile.id, out resourceName))
+                            {
+                                throw new InvalidDataException("El ID del perfil AI " + profile.id +
+                                    " no produce un alias de recurso RCL_ válido.");
+                            }
+
+                            string scopedResourcePath = "AI/" + resourceName;
+                            if (Resources.Load<GameObject>(scopedResourcePath) != null)
+                            {
+                                throw new InvalidDataException("El alias de recurso AI '" + scopedResourcePath +
+                                    "' ya existe en el juego.");
+                            }
+
+                            GameObject templateHolder;
+                            GameObject scopedPrefab = InstantiateResourceTemplate(prefab, out templateHolder);
+                            if (scopedPrefab == null || templateHolder == null)
+                            {
+                                throw new InvalidDataException("No se pudo clonar de forma aislada el template AI " +
+                                    profile.nativeTemplateId + " para " + profile.id + ".");
+                            }
+
+                            temporaryNativePrefabs.Add(templateHolder);
+                            scopedPrefab.name = resourceName;
+                            scopedPrefab.hideFlags = HideFlags.HideAndDontSave;
+                            DefaultAiBehaviour scopedBehaviour = scopedPrefab.GetComponent<DefaultAiBehaviour>();
+                            if (scopedBehaviour == null)
+                            {
+                                throw new InvalidDataException("El clon del perfil AI " + profile.id +
+                                    " perdió su DefaultAiBehaviour raíz.");
+                            }
+
+                            _aiStageRangeField.SetValue(scopedBehaviour, stageRange);
+                            prefab = scopedPrefab;
+                            nativeBehaviours = new[] { scopedBehaviour };
+                            UnityEngine.Object.DontDestroyOnLoad(templateHolder);
+                        }
                     }
                     else
                     {
@@ -1576,6 +1625,7 @@ namespace RogueCommandExpansionLoader.Content
                         prefab = LoadRequiredAsset(bundle, profile.prefabAssetName,
                             typeof(GameObject), "active AI GameObject prefab", packageName) as GameObject;
                         nativeBehaviours = prefab == null ? new DefaultAiBehaviour[0] : prefab.GetComponents<DefaultAiBehaviour>();
+                        resourceName = profile.prefabAssetName;
                     }
 
                     if (prefab == null || !prefab.activeSelf)
@@ -1584,9 +1634,6 @@ namespace RogueCommandExpansionLoader.Content
                             ": el prefab debe estar activo para que el clon creado por Rogue Command ejecute su ciclo de vida.");
                     }
 
-                    string resourceName = String.IsNullOrWhiteSpace(profile.nativeTemplateId)
-                        ? profile.prefabAssetName
-                        : profile.nativeTemplateId;
                     if (!String.Equals(prefab.name, resourceName, StringComparison.Ordinal))
                     {
                         throw new InvalidDataException("Perfil AI " + profile.id + ": el nombre interno del prefab '" +
@@ -1671,7 +1718,7 @@ namespace RogueCommandExpansionLoader.Content
                             ": la ruta de recurso " + resourcePath + " está duplicada en el paquete.");
                     }
 
-                    if (String.IsNullOrWhiteSpace(profile.nativeTemplateId))
+                    if (String.IsNullOrWhiteSpace(profile.nativeTemplateId) || profile.scopeToReferencedStages)
                     {
                         if (temporaryResources.ContainsKey(resourcePath))
                         {
@@ -1683,7 +1730,8 @@ namespace RogueCommandExpansionLoader.Content
                     }
 
                     var behaviours = new List<object> { nativeBehaviours[0] };
-                    temporaryProfiles.Add(new LoadedAiProfile(profile, definition.packId, behaviours, prefab));
+                    temporaryProfiles.Add(new LoadedAiProfile(profile, definition.packId, resourceName,
+                        behaviours, prefab));
                 }
 
                 ValidateStageGenerationCompatibility(temporaryStages, temporaryProfiles, packageName);
@@ -1919,6 +1967,14 @@ namespace RogueCommandExpansionLoader.Content
                     {
                         throw new InvalidDataException("El perfil AI " + profileIds[profileIndex] +
                             " no está cargado para la etapa " + stage.Definition.id + ".");
+                    }
+
+                    if (profile.ScopeToReferencedStages &&
+                        !String.Equals(profile.PackId, definition.packId, StringComparison.Ordinal))
+                    {
+                        throw new InvalidDataException("La etapa " + stage.Definition.id +
+                            " no puede ampliar el rango del perfil AI de etapa " + profile.Id +
+                            " porque pertenece a otro paquete. Incluya las etapas asociadas en el paquete del perfil.");
                     }
 
                     for (int behaviourIndex = 0; behaviourIndex < profile.Behaviours.Count; behaviourIndex++)
@@ -2407,6 +2463,45 @@ namespace RogueCommandExpansionLoader.Content
             }
         }
 
+        private static GameObject InstantiateResourceTemplate(GameObject template, out GameObject holder)
+        {
+            holder = null;
+            if (template == null)
+            {
+                return null;
+            }
+
+            holder = new GameObject("RCL_ResourceTemplateHolder");
+            holder.hideFlags = HideFlags.HideAndDontSave;
+            holder.SetActive(false);
+            try
+            {
+                // Keep activeSelf on the stored template so a game Instantiate produces an active AI,
+                // while its inactive parent suppresses Awake/OnEnable on this registry-only clone.
+                GameObject clone = UnityEngine.Object.Instantiate(template, holder.transform, false);
+                if (clone == null)
+                {
+                    UnityEngine.Object.Destroy(holder);
+                    holder = null;
+                    return null;
+                }
+
+                clone.transform.localPosition = Vector3.zero;
+                clone.transform.localRotation = Quaternion.identity;
+                clone.transform.localScale = Vector3.one;
+                return clone;
+            }
+            catch
+            {
+                if (holder != null)
+                {
+                    UnityEngine.Object.Destroy(holder);
+                }
+                holder = null;
+                throw;
+            }
+        }
+
         private static GameObject InstantiateDormantPrefab(GameObject template)
         {
             if (template == null)
@@ -2718,6 +2813,154 @@ namespace RogueCommandExpansionLoader.Content
                 throw new InvalidDataException("No hay una progresión activa para validar las etapas del paquete '" +
                     packageName + "'.");
             }
+        }
+
+        private Dictionary<string, Vector2Int> BuildScopedAiStageRanges(
+            List<LoadedStage> candidateStages,
+            ContentAiProfileDefinition[] profileDefinitions,
+            string packageName)
+        {
+            var targetStageIdsByProfile = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
+            if (profileDefinitions == null || candidateStages == null)
+            {
+                return new Dictionary<string, Vector2Int>(StringComparer.Ordinal);
+            }
+
+            for (int profileIndex = 0; profileIndex < profileDefinitions.Length; profileIndex++)
+            {
+                ContentAiProfileDefinition profile = profileDefinitions[profileIndex];
+                if (profile == null || !profile.scopeToReferencedStages)
+                {
+                    continue;
+                }
+
+                var targetStageIds = new HashSet<string>(StringComparer.Ordinal);
+                for (int stageIndex = 0; stageIndex < candidateStages.Count; stageIndex++)
+                {
+                    ContentStageDefinition stage = candidateStages[stageIndex].Definition;
+                    string[] profileIds = stage.aiProfileIds ?? new string[0];
+                    for (int referencedIndex = 0; referencedIndex < profileIds.Length; referencedIndex++)
+                    {
+                        if (String.Equals(profileIds[referencedIndex], profile.id, StringComparison.Ordinal))
+                        {
+                            targetStageIds.Add(stage.id);
+                            break;
+                        }
+                    }
+                }
+
+                if (targetStageIds.Count == 0)
+                {
+                    throw new InvalidDataException("El perfil AI de etapa " + profile.id + " en '" + packageName +
+                        "' debe estar asociado a una etapa declarada por el mismo paquete.");
+                }
+
+                targetStageIdsByProfile.Add(profile.id, targetStageIds);
+            }
+
+            var result = new Dictionary<string, Vector2Int>(StringComparer.Ordinal);
+            if (targetStageIdsByProfile.Count == 0)
+            {
+                return result;
+            }
+
+            object balancing = _gameBalancingAssetField.GetValue(null);
+            if (balancing == null)
+            {
+                throw new InvalidDataException("No se pudo calcular el rango de AI por etapa en '" + packageName +
+                    "': GameBalancingStore aún no tiene su GameBalancingScriptableObject.");
+            }
+
+            var allStages = new List<LoadedStage>(_stages.Count + candidateStages.Count);
+            allStages.AddRange(_stages);
+            allStages.AddRange(candidateStages);
+            var stageReferences = new List<object>(allStages.Count);
+            for (int i = 0; i < allStages.Count; i++)
+            {
+                stageReferences.Add(allStages[i].RuntimeStage);
+            }
+
+            object defaultProgression = _progressionFields[0].GetValue(balancing);
+            object[] progressionProfiles = StageGenerationCompatibility.ResolveProgressionProfiles(
+                defaultProgression,
+                _progressionFields[1].GetValue(balancing),
+                _progressionFields[2].GetValue(balancing));
+            int validatedProgressionCount = 0;
+            for (int progressionIndex = 0; progressionIndex < progressionProfiles.Length; progressionIndex++)
+            {
+                object progression = progressionProfiles[progressionIndex];
+                if (progression == null)
+                {
+                    continue;
+                }
+
+                IList progressionStages = _progressionStagesField.GetValue(progression) as IList;
+                int[] stageIndices;
+                string indexDiagnostic;
+                if (!StageGenerationCompatibility.TryBuildStageIndices(
+                    progressionStages,
+                    stageReferences,
+                    _progressionFields[progressionIndex].Name,
+                    out stageIndices,
+                    out indexDiagnostic))
+                {
+                    throw new InvalidDataException("No se pudo calcular el alcance de AI por etapa en '" + packageName +
+                        "': " + indexDiagnostic);
+                }
+
+                var indexByStageId = new Dictionary<string, int>(StringComparer.Ordinal);
+                for (int stageIndex = 0; stageIndex < allStages.Count; stageIndex++)
+                {
+                    indexByStageId.Add(allStages[stageIndex].Definition.id, stageIndices[stageIndex]);
+                }
+
+                foreach (KeyValuePair<string, HashSet<string>> scopedProfile in targetStageIdsByProfile)
+                {
+                    var eligibleIndices = new List<int>(scopedProfile.Value.Count);
+                    foreach (string stageId in scopedProfile.Value)
+                    {
+                        int stageIndex;
+                        if (!indexByStageId.TryGetValue(stageId, out stageIndex))
+                        {
+                            throw new InvalidDataException("La etapa '" + stageId + "' asociada al perfil AI " +
+                                scopedProfile.Key + " no aparece en la progresión '" +
+                                _progressionFields[progressionIndex].Name + "'.");
+                        }
+                        eligibleIndices.Add(stageIndex);
+                    }
+
+                    int minimumStage;
+                    int maximumStage;
+                    string rangeDiagnostic;
+                    if (!StageGenerationCompatibility.TryBuildContiguousStageRange(
+                        eligibleIndices, out minimumStage, out maximumStage, out rangeDiagnostic))
+                    {
+                        throw new InvalidDataException("Las etapas asociadas al perfil AI de etapa " +
+                            scopedProfile.Key + " no forman un rango válido: " + rangeDiagnostic);
+                    }
+
+                    var range = new Vector2Int(minimumStage, maximumStage);
+                    Vector2Int existingRange;
+                    if (result.TryGetValue(scopedProfile.Key, out existingRange) &&
+                        (existingRange.x != range.x || existingRange.y != range.y))
+                    {
+                        throw new InvalidDataException("Las progresiones default, heat y first-run asignan índices " +
+                            "distintos a las etapas del perfil AI " + scopedProfile.Key + ".");
+                    }
+
+                    result[scopedProfile.Key] = range;
+                }
+
+                validatedProgressionCount++;
+            }
+
+            if (validatedProgressionCount == 0)
+            {
+                throw new InvalidDataException("No hay una progresión activa para calcular los rangos AI en '" +
+                    packageName + "'.");
+            }
+
+            return result;
         }
 
         private List<StageGenerationStageCandidate> BuildProgressionStageCandidates(
@@ -3645,11 +3888,13 @@ namespace RogueCommandExpansionLoader.Content
             public LoadedAiProfile(
                 ContentAiProfileDefinition definition,
                 string packId,
+                string resourceName,
                 List<object> behaviours,
                 GameObject prefab)
             {
                 Definition = definition;
                 PackId = packId;
+                ResourceName = resourceName;
                 Behaviours = behaviours;
                 Prefab = prefab;
                 var moduleIds = new List<string>();
@@ -3667,15 +3912,8 @@ namespace RogueCommandExpansionLoader.Content
             public ContentAiProfileDefinition Definition { get; private set; }
             public string PackId { get; private set; }
             public string Id { get { return Definition.id; } }
-            public string ResourceName
-            {
-                get
-                {
-                    return String.IsNullOrWhiteSpace(Definition.nativeTemplateId)
-                        ? Definition.prefabAssetName
-                        : Definition.nativeTemplateId;
-                }
-            }
+            public string ResourceName { get; private set; }
+            public bool ScopeToReferencedStages { get { return Definition.scopeToReferencedStages; } }
             public string[] ModuleIds { get; private set; }
             public List<object> Behaviours { get; private set; }
             public GameObject Prefab { get; private set; }

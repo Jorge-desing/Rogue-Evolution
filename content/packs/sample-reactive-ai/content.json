@@ -25,6 +25,7 @@
     {
       "id": "sample-reactive-ai:base-defense",
       "nativeTemplateId": "_01_Enemy - Melee Poker PCXPoker Variant",
+      "scopeToReferencedStages": true,
       "modules": [
         {
           "moduleId": "sample:reactive-base-defense",
