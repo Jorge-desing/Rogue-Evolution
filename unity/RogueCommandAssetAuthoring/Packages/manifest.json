@@ -1,5 +1,6 @@
 {
   "dependencies": {
-    "com.unity.collab-proxy": "2.1.0"
+    "com.unity.collab-proxy": "2.1.0",
+    "com.unity.modules.assetbundle": "1.0.0"
   }
 }

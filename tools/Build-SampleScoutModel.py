@@ -1,0 +1,221 @@
+"""Build an original low-poly scout tank source model and Unity FBX asset."""
+
+from pathlib import Path
+import math
+
+import bpy
+from mathutils import Vector
+
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+BLEND_PATH = REPO_ROOT / "content" / "source-art" / "sandlance-scout.blend"
+FBX_PATH = (REPO_ROOT / "unity" / "RogueCommandAssetAuthoring" / "Assets" /
+            "RogueCommandExpansionSample" / "Models" / "SandlanceScout.fbx")
+PREVIEW_PATH = REPO_ROOT / "artifacts" / "previews" / "sandlance-scout.png"
+
+
+def clear_scene():
+    bpy.ops.object.select_all(action="SELECT")
+    bpy.ops.object.delete(use_global=False)
+    for datablocks in (bpy.data.meshes, bpy.data.materials, bpy.data.cameras, bpy.data.lights):
+        for datablock in list(datablocks):
+            if datablock.users == 0:
+                datablocks.remove(datablock)
+
+
+def make_material(name, color, metallic=0.0, roughness=0.55):
+    material = bpy.data.materials.new(name)
+    material.diffuse_color = (*color, 1.0)
+    material.use_nodes = True
+    shader = material.node_tree.nodes.get("Principled BSDF")
+    shader.inputs["Base Color"].default_value = (*color, 1.0)
+    shader.inputs["Metallic"].default_value = metallic
+    shader.inputs["Roughness"].default_value = roughness
+    return material
+
+
+def finish_mesh(obj, material, bevel=0.0):
+    obj.data.materials.append(material)
+    for polygon in obj.data.polygons:
+        polygon.use_smooth = False
+    if bevel > 0:
+        modifier = obj.modifiers.new("machined chamfers", "BEVEL")
+        modifier.width = bevel
+        modifier.segments = 1
+        bpy.context.view_layer.objects.active = obj
+        bpy.ops.object.modifier_apply(modifier=modifier.name)
+        for polygon in obj.data.polygons:
+            polygon.use_smooth = False
+    obj.select_set(False)
+    return obj
+
+
+def make_box(name, size, location, material, bevel=0.025, rotation=(0.0, 0.0, 0.0)):
+    bpy.ops.mesh.primitive_cube_add(size=1.0, location=location)
+    obj = bpy.context.object
+    obj.name = name
+    obj.dimensions = size
+    obj.rotation_euler = rotation
+    bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+    return finish_mesh(obj, material, bevel)
+
+
+def make_cylinder(name, radius, depth, location, material, rotation=(0.0, 0.0, 0.0), vertices=12):
+    bpy.ops.mesh.primitive_cylinder_add(
+        vertices=vertices, radius=radius, depth=depth, location=location, rotation=rotation)
+    obj = bpy.context.object
+    obj.name = name
+    bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+    return finish_mesh(obj, material, min(radius * 0.16, depth * 0.14))
+
+
+def make_hull(material):
+    vertices = [
+        (-0.66, -1.30, 0.20), (0.66, -1.30, 0.20),
+        (0.66, 0.76, 0.20), (-0.66, 0.76, 0.20),
+        (-0.56, -1.16, 0.72), (0.56, -1.16, 0.72),
+        (0.54, 1.18, 0.72), (-0.54, 1.18, 0.72),
+    ]
+    faces = [
+        (3, 2, 1, 0), (4, 5, 6, 7), (0, 4, 7, 3),
+        (1, 2, 6, 5), (0, 1, 5, 4), (3, 7, 6, 2),
+    ]
+    mesh = bpy.data.meshes.new("Sandlance sloped chassis")
+    mesh.from_pydata(vertices, [], faces)
+    mesh.update()
+    obj = bpy.data.objects.new("ScoutArmor_Hull", mesh)
+    bpy.context.collection.objects.link(obj)
+    bpy.context.view_layer.objects.active = obj
+    obj.select_set(True)
+    bpy.ops.object.mode_set(mode="EDIT")
+    bpy.ops.mesh.select_all(action="SELECT")
+    bpy.ops.mesh.normals_make_consistent(inside=False)
+    bpy.ops.object.mode_set(mode="OBJECT")
+    return finish_mesh(obj, material, 0.045)
+
+
+def add_preview_stage(model_objects):
+    bpy.ops.mesh.primitive_plane_add(size=200, location=(0.0, 0.0, -0.015))
+    floor = bpy.context.object
+    floor.name = "Preview floor"
+    floor.data.materials.append(make_material("Preview concrete", (0.035, 0.052, 0.065), 0.0, 0.92))
+
+    bpy.ops.object.camera_add(location=(4.6, 5.8, 3.5))
+    camera = bpy.context.object
+    camera.name = "Preview camera"
+    target = Vector((0.0, 0.0, 0.72))
+    camera.rotation_euler = (target - camera.location).to_track_quat("-Z", "Y").to_euler()
+    camera.data.type = "ORTHO"
+    camera.data.ortho_scale = 5.7
+    bpy.context.scene.camera = camera
+
+    for name, location, energy, size in (
+        ("Key", (3.5, 4.5, 6.0), 820, 4.0),
+        ("Fill", (-4.0, 1.0, 3.5), 500, 3.5),
+        ("Rim", (-1.5, -4.0, 4.5), 950, 3.0),
+    ):
+        bpy.ops.object.light_add(type="AREA", location=location)
+        light = bpy.context.object
+        light.name = "Preview " + name
+        light.data.energy = energy
+        light.data.shape = "DISK"
+        light.data.size = size
+        direction = Vector((0.0, 0.0, 0.6)) - light.location
+        light.rotation_euler = direction.to_track_quat("-Z", "Y").to_euler()
+
+    scene = bpy.context.scene
+    scene.render.engine = "BLENDER_EEVEE_NEXT"
+    scene.render.resolution_x = 900
+    scene.render.resolution_y = 760
+    scene.render.resolution_percentage = 100
+    scene.render.image_settings.file_format = "PNG"
+    scene.view_settings.view_transform = "AgX"
+    scene.render.filepath = str(PREVIEW_PATH)
+    scene.world.color = (0.035, 0.045, 0.065)
+
+    bpy.ops.object.select_all(action="DESELECT")
+    for obj in model_objects:
+        obj.select_set(True)
+    bpy.context.view_layer.objects.active = model_objects[0]
+
+
+def main():
+    clear_scene()
+    BLEND_PATH.parent.mkdir(parents=True, exist_ok=True)
+    FBX_PATH.parent.mkdir(parents=True, exist_ok=True)
+    PREVIEW_PATH.parent.mkdir(parents=True, exist_ok=True)
+
+    armor = make_material("Sandlance Armor", (0.105, 0.185, 0.225), 0.42, 0.37)
+    armor_light = make_material("Sandlance Light Armor", (0.24, 0.34, 0.36), 0.32, 0.4)
+    tread = make_material("Sandlance Tread", (0.045, 0.055, 0.06), 0.18, 0.74)
+    wheel = make_material("Sandlance Wheel Metal", (0.17, 0.23, 0.24), 0.6, 0.42)
+    gunmetal = make_material("Sandlance Gunmetal", (0.075, 0.105, 0.12), 0.74, 0.3)
+    amber = make_material("Sandlance Signal Amber", (0.95, 0.30, 0.055), 0.18, 0.36)
+    sensor = make_material("Sandlance Sensor Glass", (0.035, 0.72, 0.70), 0.2, 0.24)
+
+    model_objects = [make_hull(armor)]
+    model_objects += [
+        make_box("ScoutArmor_Deck", (1.14, 1.47, 0.28), (0.0, -0.06, 0.76), armor_light, 0.09),
+        make_box("ScoutArmor_SidePod_L", (0.16, 1.18, 0.30), (-0.72, -0.02, 0.56), armor, 0.055,
+                 (math.radians(-7), 0.0, 0.0)),
+        make_box("ScoutArmor_SidePod_R", (0.16, 1.18, 0.30), (0.72, -0.02, 0.56), armor, 0.055,
+                 (math.radians(-7), 0.0, 0.0)),
+        make_box("ScoutTreads_Belt_L", (0.25, 2.28, 0.56), (-0.91, -0.02, 0.34), tread, 0.12),
+        make_box("ScoutTreads_Belt_R", (0.25, 2.28, 0.56), (0.91, -0.02, 0.34), tread, 0.12),
+    ]
+
+    for side in (-1, 1):
+        for index, y in enumerate((-0.89, -0.39, 0.15, 0.68), start=1):
+            model_objects.append(make_cylinder(
+                "ScoutWheel_Road_{0}_{1}".format("L" if side < 0 else "R", index),
+                0.17, 0.095, (side * 1.035, y, 0.35), wheel,
+                (0.0, math.radians(90), 0.0), 12))
+        for index, y in enumerate((-1.10, 0.94), start=1):
+            model_objects.append(make_cylinder(
+                "ScoutWheel_Idler_{0}_{1}".format("L" if side < 0 else "R", index),
+                0.145, 0.105, (side * 1.035, y, 0.35), gunmetal,
+                (0.0, math.radians(90), 0.0), 12))
+        model_objects.append(make_box(
+            "ScoutAccent_IdentificationStripe_{0}".format("L" if side < 0 else "R"),
+            (0.045, 0.88, 0.075), (side * 0.817, -0.02, 0.63), amber, 0.018))
+
+    model_objects += [
+        make_cylinder("ScoutArmor_LowTurret", 0.53, 0.30, (0.0, -0.18, 0.97), armor_light,
+                      (0.0, 0.0, 0.0), 8),
+        make_box("ScoutArmor_TurretNose", (0.76, 0.38, 0.23), (0.0, 0.30, 0.98), armor, 0.07,
+                 (math.radians(-4), 0.0, 0.0)),
+        make_cylinder("ScoutGun_Barrel_L", 0.055, 0.90, (-0.14, 0.78, 1.01), gunmetal,
+                      (math.radians(90), 0.0, 0.0), 10),
+        make_cylinder("ScoutGun_Barrel_R", 0.055, 0.90, (0.14, 0.78, 1.01), gunmetal,
+                      (math.radians(90), 0.0, 0.0), 10),
+        make_cylinder("ScoutSensor_Mast", 0.035, 0.43, (0.0, -0.64, 1.25), gunmetal, vertices=8),
+        make_box("ScoutSensor_Array", (0.50, 0.11, 0.18), (0.0, -0.64, 1.49), armor_light, 0.035),
+        make_box("ScoutSensor_Lens_L", (0.12, 0.035, 0.09), (-0.13, -0.574, 1.50), sensor, 0.012),
+        make_box("ScoutSensor_Lens_R", (0.12, 0.035, 0.09), (0.13, -0.574, 1.50), sensor, 0.012),
+        make_box("ScoutAccent_FrontLight_L", (0.12, 0.07, 0.06), (-0.37, 1.08, 0.66), sensor, 0.015),
+        make_box("ScoutAccent_FrontLight_R", (0.12, 0.07, 0.06), (0.37, 1.08, 0.66), sensor, 0.015),
+        make_box("ScoutAccent_TopPanel", (0.28, 0.34, 0.055), (0.0, -0.75, 0.93), amber, 0.025),
+    ]
+
+    add_preview_stage(model_objects)
+    bpy.ops.wm.save_as_mainfile(filepath=str(BLEND_PATH))
+    bpy.ops.render.render(write_still=True)
+
+    bpy.ops.object.select_all(action="DESELECT")
+    for obj in model_objects:
+        obj.select_set(True)
+    bpy.context.view_layer.objects.active = model_objects[0]
+    bpy.ops.export_scene.fbx(
+        filepath=str(FBX_PATH), use_selection=True, object_types={"MESH"},
+        apply_unit_scale=True, apply_scale_options="FBX_SCALE_NONE",
+        use_mesh_modifiers=True, mesh_smooth_type="OFF", path_mode="AUTO",
+        axis_forward="-Z", axis_up="Y", bake_space_transform=False,
+        add_leaf_bones=False, use_custom_props=False)
+    print("Created source model: {0}".format(BLEND_PATH))
+    print("Created Unity model: {0}".format(FBX_PATH))
+    print("Created preview: {0}".format(PREVIEW_PATH))
+    print("Exported mesh objects: {0}".format(len(model_objects)))
+
+
+if __name__ == "__main__":
+    main()

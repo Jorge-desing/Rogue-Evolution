@@ -1,5 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Text;
+using System.Text.RegularExpressions;
 using UnityEditor;
 using UnityEngine;
 
@@ -13,8 +16,9 @@ namespace RogueCommandExpansion.Authoring
         private const string RequiredUnityVersion = "2021.3.45f2";
         private const string AssetRoot = "Assets/RogueCommandExpansionSample";
         private const string PrefabPath = AssetRoot + "/ScoutTankVisual.prefab";
-        private const string MeshPath = AssetRoot + "/ScoutTankVisualCube.asset";
-        private const string BundleOutputPath = AssetRoot + "/BundleOutput";
+        private const string ModelPath = AssetRoot + "/Models/SandlanceScout.fbx";
+        private const string MaterialRoot = AssetRoot + "/Materials";
+        private const string BundleOutputPath = "../../artifacts/asset-bundles";
         private const string BundleName = "sample-native-expansion.bundle";
 
         [MenuItem("Rogue Command/Asset Bundles/Build Sample Native Visual Pack")]
@@ -46,7 +50,8 @@ namespace RogueCommandExpansion.Authoring
                     assetNames = new[] { prefabPath }
                 };
                 AssetBundleManifest manifest = BuildPipeline.BuildAssetBundles(outputPath,
-                    new[] { build }, BuildAssetBundleOptions.ChunkBasedCompression,
+                    new[] { build }, BuildAssetBundleOptions.ChunkBasedCompression |
+                    BuildAssetBundleOptions.ForceRebuildAssetBundle,
                     BuildTarget.StandaloneWindows64);
                 if (manifest == null)
                 {
@@ -96,35 +101,30 @@ namespace RogueCommandExpansion.Authoring
             Directory.CreateDirectory(Path.GetFullPath(Path.Combine(projectRoot, AssetRoot)));
             AssetDatabase.Refresh();
 
-            Mesh cube = AssetDatabase.LoadAssetAtPath<Mesh>(MeshPath);
-            if (cube == null)
+            GameObject modelAsset = AssetDatabase.LoadAssetAtPath<GameObject>(ModelPath);
+            if (modelAsset == null)
             {
-                GameObject primitive = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                try
-                {
-                    cube = UnityEngine.Object.Instantiate(primitive.GetComponent<MeshFilter>().sharedMesh);
-                    cube.name = "ScoutTankVisualCube";
-                    AssetDatabase.CreateAsset(cube, MeshPath);
-                }
-                finally
-                {
-                    UnityEngine.Object.DestroyImmediate(primitive);
-                }
+                throw new FileNotFoundException("Import the authored Sandlance FBX before building the " +
+                    "sample bundle.", ModelPath);
             }
+
+            Dictionary<string, Material> materials = CreateScoutMaterials();
 
             var root = new GameObject("ScoutTankVisual");
             try
             {
-                AddBox(root.transform, cube, "Hull", new Vector3(0f, 0.45f, 0f),
-                    new Vector3(1.8f, 0.45f, 2.4f));
-                AddBox(root.transform, cube, "Turret", new Vector3(0f, 0.82f, -0.1f),
-                    new Vector3(0.95f, 0.36f, 0.95f));
-                AddBox(root.transform, cube, "Cannon", new Vector3(0f, 0.84f, 0.8f),
-                    new Vector3(0.18f, 0.18f, 1.35f));
-                AddBox(root.transform, cube, "LeftTrack", new Vector3(-0.98f, 0.32f, 0f),
-                    new Vector3(0.32f, 0.42f, 2.25f));
-                AddBox(root.transform, cube, "RightTrack", new Vector3(0.98f, 0.32f, 0f),
-                    new Vector3(0.32f, 0.42f, 2.25f));
+                GameObject modelInstance = PrefabUtility.InstantiatePrefab(modelAsset) as GameObject;
+                if (modelInstance == null)
+                {
+                    throw new InvalidOperationException("Unity could not instantiate the authored Sandlance FBX.");
+                }
+
+                modelInstance.name = "SandlanceScoutModel";
+                modelInstance.transform.SetParent(root.transform, false);
+                modelInstance.transform.localPosition = Vector3.zero;
+                modelInstance.transform.localRotation = Quaternion.identity;
+                modelInstance.transform.localScale = Vector3.one;
+                AssignScoutMaterials(modelInstance, materials);
 
                 bool success;
                 PrefabUtility.SaveAsPrefabAsset(root, PrefabPath, out success);
@@ -132,6 +132,9 @@ namespace RogueCommandExpansion.Authoring
                 {
                     throw new InvalidOperationException("Unity could not save " + PrefabPath + ".");
                 }
+
+                NormalizeEmptyUnityYamlStrings(Path.GetFullPath(Path.Combine(
+                    Directory.GetParent(Application.dataPath).FullName, PrefabPath)));
             }
             finally
             {
@@ -148,6 +151,7 @@ namespace RogueCommandExpansion.Authoring
             importer.assetBundleVariant = String.Empty;
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
+            NormalizeGeneratedUnityMetaFiles(projectRoot);
             return PrefabPath;
         }
 
@@ -189,6 +193,41 @@ namespace RogueCommandExpansion.Authoring
                     throw new InvalidDataException("The sample visual prefab has no renderers.");
                 }
 
+                MeshFilter[] meshFilters = prefab.GetComponentsInChildren<MeshFilter>(true);
+                if (meshFilters.Length < 20)
+                {
+                    throw new InvalidDataException("The authored Sandlance model is missing expected independent " +
+                        "mesh parts. Expected at least 20 MeshFilters, found " + meshFilters.Length + ".");
+                }
+
+                for (int i = 0; i < meshFilters.Length; i++)
+                {
+                    if (meshFilters[i] == null || meshFilters[i].sharedMesh == null ||
+                        meshFilters[i].sharedMesh.vertexCount < 3)
+                    {
+                        throw new InvalidDataException("The Sandlance visual contains an empty mesh.");
+                    }
+                }
+
+                for (int i = 0; i < renderers.Length; i++)
+                {
+                    Material[] assignedMaterials = renderers[i].sharedMaterials;
+                    if (assignedMaterials == null || assignedMaterials.Length == 0)
+                    {
+                        throw new InvalidDataException("The Sandlance visual renderer '" + renderers[i].name +
+                            "' has no material.");
+                    }
+
+                    for (int materialIndex = 0; materialIndex < assignedMaterials.Length; materialIndex++)
+                    {
+                        if (assignedMaterials[materialIndex] == null)
+                        {
+                            throw new InvalidDataException("The Sandlance visual renderer '" + renderers[i].name +
+                                "' has a missing material.");
+                        }
+                    }
+                }
+
                 Component[] components = prefab.GetComponentsInChildren<Component>(true);
                 for (int i = 0; i < components.Length; i++)
                 {
@@ -204,19 +243,162 @@ namespace RogueCommandExpansion.Authoring
             }
         }
 
-        private static void AddBox(
-            Transform parent,
-            Mesh cube,
-            string name,
-            Vector3 localPosition,
-            Vector3 localScale)
+        private static Dictionary<string, Material> CreateScoutMaterials()
         {
-            var part = new GameObject(name);
-            part.transform.SetParent(parent, false);
-            part.transform.localPosition = localPosition;
-            part.transform.localScale = localScale;
-            part.AddComponent<MeshFilter>().sharedMesh = cube;
-            part.AddComponent<MeshRenderer>();
+            string projectRoot = Directory.GetParent(Application.dataPath).FullName;
+            Directory.CreateDirectory(Path.GetFullPath(Path.Combine(projectRoot, MaterialRoot)));
+            var materials = new Dictionary<string, Material>(StringComparer.Ordinal)
+            {
+                { "armor", CreateOrUpdateMaterial("ScoutArmor", new Color32(36, 69, 82, 255), 0.42f, 0.63f) },
+                { "lightArmor", CreateOrUpdateMaterial("ScoutLightArmor", new Color32(67, 95, 98, 255), 0.32f, 0.60f) },
+                { "tread", CreateOrUpdateMaterial("ScoutTread", new Color32(22, 27, 30, 255), 0.18f, 0.34f) },
+                { "wheel", CreateOrUpdateMaterial("ScoutWheel", new Color32(48, 65, 69, 255), 0.60f, 0.58f) },
+                { "gunmetal", CreateOrUpdateMaterial("ScoutGunmetal", new Color32(27, 38, 43, 255), 0.74f, 0.70f) },
+                { "amber", CreateOrUpdateMaterial("ScoutSignalAmber", new Color32(232, 108, 32, 255), 0.18f, 0.64f) },
+                { "sensor", CreateOrUpdateMaterial("ScoutSensorGlass", new Color32(31, 205, 191, 255), 0.20f, 0.76f) }
+            };
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+            return materials;
+        }
+
+        private static void NormalizeGeneratedUnityMetaFiles(string projectRoot)
+        {
+            string[] assetDirectories =
+            {
+                MaterialRoot,
+                AssetRoot + "/Models"
+            };
+            for (int i = 0; i < assetDirectories.Length; i++)
+            {
+                string absoluteDirectory = Path.GetFullPath(Path.Combine(projectRoot, assetDirectories[i]));
+                string folderMetadataPath = absoluteDirectory + ".meta";
+                if (File.Exists(folderMetadataPath))
+                {
+                    NormalizeEmptyUnityYamlStrings(folderMetadataPath);
+                }
+
+                if (!Directory.Exists(absoluteDirectory))
+                {
+                    continue;
+                }
+
+                string[] metadataFiles = Directory.GetFiles(
+                    absoluteDirectory, "*.meta", SearchOption.TopDirectoryOnly);
+                for (int metadataIndex = 0; metadataIndex < metadataFiles.Length; metadataIndex++)
+                {
+                    NormalizeEmptyUnityYamlStrings(metadataFiles[metadataIndex]);
+                }
+            }
+        }
+
+        private static void NormalizeEmptyUnityYamlStrings(string filePath)
+        {
+            string contents = File.ReadAllText(filePath);
+            string normalized = Regex.Replace(contents,
+                @"(?m)^([ \t]*(?:value|userData|assetBundleName|assetBundleVariant|motionNodeName|" +
+                @"rigImportErrors|rigImportWarnings|animationImportErrors|animationImportWarnings|" +
+                @"animationRetargetingWarnings|rootMotionBoneName):)[ \t]*(\r?)$",
+                "$1 \"\"$2");
+            if (!String.Equals(contents, normalized, StringComparison.Ordinal))
+            {
+                File.WriteAllText(filePath, normalized, new UTF8Encoding(false));
+            }
+        }
+
+        private static Material CreateOrUpdateMaterial(
+            string name,
+            Color color,
+            float metallic,
+            float smoothness)
+        {
+            string path = MaterialRoot + "/" + name + ".mat";
+            Material material = AssetDatabase.LoadAssetAtPath<Material>(path);
+            Shader shader = Shader.Find("Standard");
+            if (shader == null)
+            {
+                throw new InvalidOperationException("Unity's Standard shader is unavailable for " + name + ".");
+            }
+
+            if (material == null)
+            {
+                material = new Material(shader);
+                material.name = name;
+                AssetDatabase.CreateAsset(material, path);
+            }
+            else
+            {
+                material.shader = shader;
+            }
+
+            material.color = color;
+            material.SetFloat("_Metallic", metallic);
+            material.SetFloat("_Glossiness", smoothness);
+            EditorUtility.SetDirty(material);
+            return material;
+        }
+
+        private static void AssignScoutMaterials(GameObject model, IDictionary<string, Material> materials)
+        {
+            Renderer[] renderers = model.GetComponentsInChildren<Renderer>(true);
+            if (renderers.Length == 0)
+            {
+                throw new InvalidDataException("The authored Sandlance FBX contains no renderers.");
+            }
+
+            for (int i = 0; i < renderers.Length; i++)
+            {
+                string name = renderers[i].gameObject.name;
+                string materialKey;
+                if (name.StartsWith("ScoutArmor_", StringComparison.Ordinal))
+                {
+                    materialKey = name.Contains("Deck") || name.Contains("LowTurret")
+                        ? "lightArmor" : "armor";
+                }
+                else if (name.StartsWith("ScoutTreads_", StringComparison.Ordinal))
+                {
+                    materialKey = "tread";
+                }
+                else if (name.StartsWith("ScoutWheel_", StringComparison.Ordinal))
+                {
+                    materialKey = name.Contains("Road") ? "wheel" : "gunmetal";
+                }
+                else if (name.StartsWith("ScoutGun_", StringComparison.Ordinal) ||
+                    name.StartsWith("ScoutSensor_Mast", StringComparison.Ordinal))
+                {
+                    materialKey = "gunmetal";
+                }
+                else if (name.StartsWith("ScoutSensor_Lens", StringComparison.Ordinal) ||
+                    name.StartsWith("ScoutAccent_FrontLight", StringComparison.Ordinal))
+                {
+                    materialKey = "sensor";
+                }
+                else if (name.StartsWith("ScoutSensor_Array", StringComparison.Ordinal))
+                {
+                    materialKey = "lightArmor";
+                }
+                else if (name.StartsWith("ScoutAccent_", StringComparison.Ordinal))
+                {
+                    materialKey = "amber";
+                }
+                else
+                {
+                    throw new InvalidDataException("No authored material mapping exists for model part '" +
+                        name + "'.");
+                }
+
+                Material material = materials[materialKey];
+                Material[] assigned = renderers[i].sharedMaterials;
+                if (assigned == null || assigned.Length == 0)
+                {
+                    assigned = new Material[1];
+                }
+                for (int materialIndex = 0; materialIndex < assigned.Length; materialIndex++)
+                {
+                    assigned[materialIndex] = material;
+                }
+                renderers[i].sharedMaterials = assigned;
+            }
         }
 
         private static string ResolvePackRoot(string projectRoot)
