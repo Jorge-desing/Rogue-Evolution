@@ -11,12 +11,13 @@
 | `sample-native:scout-tank` | `PCXBaseTank` / `Vehicle` | `content/source-art/sandlance-scout.blend` | `tools/Build-SampleScoutModel.py` | `SandlanceScout.fbx` | 78 → 7 | 2.17 × 2.52 × 1.57 m |
 | `sample-native:skirmish-bike` | `BombBike` / `GameObject/BombBike` | `content/source-art/skirmish-strike-bike.blend` | `tools/Build-SkirmishStrikeBikeModel.py` | `SkirmishStrikeBike.fbx` | 59 → 7 | 1.20 × 2.20 × 1.37 m |
 | `sample-native:heavy-artillery` | `ArtilleryTank` / `Vehicle` | `content/source-art/colossus-siege.blend` | `tools/Build-ColossusSiegeModel.py` | `ColossusSiegePlatform.fbx` | 104 → 8 | 2.58 × 4.74 × 1.86 m |
+| `sample-native:assault-walker` | `GatlingWalker` / `Vehicle` | `content/source-art/ironclad-walker.blend` | `tools/Build-IroncladWalkerModel.py` | `IroncladWalker.fbx` | 74 → 5 | 1.83 × 1.98 × 2.45 m |
 
-All Blender sources keep individually editable parts. Export builders duplicate and merge those parts by material so each FBX uses seven or eight mesh batches. Blender's local quality check confirmed ground contact and assigned materials for all three models. The bike was compressed along its forward axis to fit the approximate 2.20 m native length. The Colossus retains a long siege cannon that extends beyond the approximate 3.60 m `ArtilleryTank` length; verify spacing and clipping in a Steam-launched match before calling it runtime-ready.
+All Blender sources keep individually editable parts. Export builders duplicate and merge those parts by material, producing five to eight FBX batches. Blender's local quality checks confirmed ground contact and assigned materials for all four models. The Ironclad uses a reinforced torso, shoulder armor, recessed optics, and paired waist-height Gatling cannons; its 1.83 × 1.98 × 2.45 m bounds fit the approximate `GatlingWalker` envelope. The Colossus retains a long siege cannon that extends beyond the approximate 3.60 m `ArtilleryTank` length; verify spacing and clipping in a Steam-launched match before calling it runtime-ready.
 
 ## ImageGen card sprites
 
-The Unity visual bundle includes three tracked ImageGen-authored PNGs. Each final Blender preview was used as the image reference. Unity imports each as a single Sprite with Point filtering, no mipmaps, Clamp wrap mode, Uncompressed texture data, and a 128 × 128 maximum size. The scaffolder contains no procedural card drawing code and fails if a source PNG is missing or does not import as a 128 × 128 Sprite.
+The Unity visual bundle includes three tracked ImageGen-authored PNGs. Each final Blender preview was used as the image reference. Unity imports each as a single Sprite with Point filtering, no mipmaps, Clamp wrap mode, Uncompressed texture data, and a 128 × 128 maximum size. The scaffolder contains no procedural card drawing code and fails if a source PNG is missing or does not import as a 128 × 128 Sprite. Ironclad deliberately keeps the native `GatlingWalker` card: its manifest entry omits `cardImageAssetName`, and this visual update generated no new 2D image.
 
 Final prompts used:
 
@@ -32,7 +33,10 @@ Run the model builders from the repository root with Blender 4.5.14 LTS:
 & .\.tools\Blender-4.5.14\blender-4.5.14-windows-x64\blender.exe --background --python tools\Build-SampleScoutModel.py
 & .\.tools\Blender-4.5.14\blender-4.5.14-windows-x64\blender.exe --background --python tools\Build-SkirmishStrikeBikeModel.py
 & .\.tools\Blender-4.5.14\blender-4.5.14-windows-x64\blender.exe --background --python tools\Build-ColossusSiegeModel.py
+& .\.tools\Blender-4.5.14\blender-4.5.14-windows-x64\blender.exe --background --python tools\Build-IroncladWalkerModel.py
 ```
+
+The Ironclad builder validates its mesh and bounds, saves the editable source and FBX, and skips preview rendering so it does not alter any existing renders or framing.
 
 The previews go to ignored `artifacts/previews/`. Rebuild the script-free overlays and pack bundle with the pinned Unity Editor:
 
@@ -44,6 +48,6 @@ The previews go to ignored `artifacts/previews/`. Rebuild the script-free overla
 .\.venv\Scripts\python.exe .\tools\validate_content_bundle_references.py .\content\packs\sample-native-expansion
 ```
 
-The 2026-10-17 build reopened the bundle in Unity and validated three script-free prefabs, their renderers/materials, and three card Sprites. UnityPy found 28 GameObjects, 22 MeshFilters/MeshRenderers/meshes, 22 materials, and three 128 × 128 textures/Sprites. The bundle is 521,138 bytes, SHA-256 `234f39ee7824457b54b5abd56917f2b51fda6ddf60c292bf72e9d92bf4789b6f`; its 1,588-byte manifest AssetBundle has SHA-256 `746fbb0584b141bafc85c5e43f73c8176e5b2d976db56b1ad207b1d59dfcb652`. The offline reference validator resolved all six card/prefab paths.
+The 2026-10-17 Ironclad build reopened the bundle in Unity and validated four script-free prefabs, all renderers/materials/components, and the three card Sprites. UnityPy found 35 GameObjects and Transforms, 27 MeshFilters/MeshRenderers/meshes, 27 materials, and three 128 × 128 textures/Sprites. The bundle is 646,572 bytes, SHA-256 `27b94573816e2d610b651f123886b19393369113fe30041544e58061f6296242`; its 1,588-byte manifest AssetBundle has SHA-256 `e7f6fdf2ef8558e353e7bb9e9dbcae87968ca749942d7df727a609238623cc8e`. The offline reference validator resolved all seven manifest bundle references.
 
-This is local authoring evidence. The earlier Steam observation used a different, smaller bundle and does not validate these updated models or cards in a match. The models also retain native gameplay hierarchies and do not retarget native animations or rigs.
+This is local authoring evidence. No Steam-launched match has validated the current Ironclad bundle or its visual alignment. These overlays retain native gameplay hierarchies and do not retarget native animations or rigs.

@@ -24,6 +24,8 @@ namespace RogueCommandExpansion.Authoring
         private const string ColossusPrefabPath = AssetRoot + "/ColossusSiegeVisual.prefab";
         private const string ColossusCardSpritePath = AssetRoot + "/ColossusSiegeCard.png";
         private const string ColossusModelPath = AssetRoot + "/Models/ColossusSiegePlatform.fbx";
+        private const string IroncladPrefabPath = AssetRoot + "/IroncladWalkerVisual.prefab";
+        private const string IroncladModelPath = AssetRoot + "/Models/IroncladWalker.fbx";
         private const string MaterialRoot = AssetRoot + "/Materials";
         private const string BundleOutputPath = "../../artifacts/asset-bundles";
         private const string BundleName = "sample-native-expansion.bundle";
@@ -52,6 +54,7 @@ namespace RogueCommandExpansion.Authoring
                 ImportCardSprite(BikeCardSpritePath);
                 string colossusPrefabPath = CreateColossusVisual();
                 ImportCardSprite(ColossusCardSpritePath);
+                string ironcladPrefabPath = CreateIroncladVisual();
                 string projectRoot = Directory.GetParent(Application.dataPath).FullName;
                 string outputPath = Path.GetFullPath(Path.Combine(projectRoot, BundleOutputPath));
                 Directory.CreateDirectory(outputPath);
@@ -63,7 +66,8 @@ namespace RogueCommandExpansion.Authoring
                     {
                         prefabPath, CardSpritePath,
                         bikePrefabPath, BikeCardSpritePath,
-                        colossusPrefabPath, ColossusCardSpritePath
+                        colossusPrefabPath, ColossusCardSpritePath,
+                        ironcladPrefabPath
                     }
                 };
                 AssetBundleManifest manifest = BuildPipeline.BuildAssetBundles(outputPath,
@@ -95,8 +99,9 @@ namespace RogueCommandExpansion.Authoring
                     Path.Combine(packBundles, "assetbundle-manifest.bundle"));
 
                 AssetDatabase.Refresh();
-                Debug.Log("Built script-free Sandlance, Skirmish Bike, and Colossus visual overlays in " +
-                    BundleName + " at " + packBundles + ". All units retain their native gameplay prefabs.");
+                Debug.Log("Built script-free Sandlance, Skirmish Bike, Colossus, and Ironclad visual overlays in " +
+                    BundleName + " at " + packBundles + ". Ironclad retains its native card and all units retain " +
+                    "their native gameplay prefabs.");
             }
             catch (Exception exception)
             {
@@ -295,6 +300,71 @@ namespace RogueCommandExpansion.Authoring
             return ColossusPrefabPath;
         }
 
+        private static string CreateIroncladVisual()
+        {
+            string projectRoot = Directory.GetParent(Application.dataPath).FullName;
+            Directory.CreateDirectory(Path.GetFullPath(Path.Combine(projectRoot, AssetRoot)));
+            AssetDatabase.Refresh();
+
+            GameObject modelAsset = AssetDatabase.LoadAssetAtPath<GameObject>(IroncladModelPath);
+            if (modelAsset == null)
+            {
+                throw new FileNotFoundException("Import the authored Ironclad Walker FBX before building the " +
+                    "sample bundle.", IroncladModelPath);
+            }
+
+            Dictionary<string, Material> materials = CreateIroncladMaterials();
+            var root = new GameObject("IroncladWalkerVisual");
+            try
+            {
+                GameObject modelInstance = PrefabUtility.InstantiatePrefab(modelAsset) as GameObject;
+                if (modelInstance == null)
+                {
+                    throw new InvalidOperationException("Unity could not instantiate the authored Ironclad Walker.");
+                }
+
+                modelInstance.name = "IroncladWalkerModel";
+                modelInstance.transform.SetParent(root.transform, false);
+                modelInstance.transform.localPosition = Vector3.zero;
+                modelInstance.transform.localRotation = Quaternion.identity;
+                modelInstance.transform.localScale = Vector3.one;
+                AssignIroncladMaterials(modelInstance, materials);
+
+                bool success;
+                PrefabUtility.SaveAsPrefabAsset(root, IroncladPrefabPath, out success);
+                if (!success)
+                {
+                    throw new InvalidOperationException("Unity could not save " + IroncladPrefabPath + ".");
+                }
+
+                string prefabPath = Path.GetFullPath(Path.Combine(projectRoot, IroncladPrefabPath));
+                NormalizeEmptyUnityYamlStrings(prefabPath);
+                string prefabMetadataPath = prefabPath + ".meta";
+                if (File.Exists(prefabMetadataPath))
+                {
+                    NormalizeEmptyUnityYamlStrings(prefabMetadataPath);
+                }
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(root);
+            }
+
+            AssetImporter importer = AssetImporter.GetAtPath(IroncladPrefabPath);
+            if (importer == null)
+            {
+                throw new FileNotFoundException("Unity did not import " + IroncladPrefabPath + ".");
+            }
+
+            importer.assetBundleName = BundleName;
+            importer.assetBundleVariant = String.Empty;
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+            NormalizeGeneratedUnityMetaFiles(projectRoot);
+            NormalizeEmptyUnityYamlStrings(Path.GetFullPath(Path.Combine(projectRoot, IroncladPrefabPath)) + ".meta");
+            return IroncladPrefabPath;
+        }
+
         private static void ValidateBuiltVisualBundle(string bundlePath)
         {
             AssetBundle bundle = AssetBundle.LoadFromFile(bundlePath);
@@ -312,6 +382,8 @@ namespace RogueCommandExpansion.Authoring
                     "skirmishbikecard.png", "SkirmishBikeCard", 7, "Skirmish Strike Bike");
                 ValidateVisualBundleAssets(bundle, assetNames, "colossussiegevisual.prefab", "ColossusSiegeVisual",
                     "colossussiegecard.png", "ColossusSiegeCard", 8, "Colossus Siege Platform");
+                ValidateVisualBundleAssets(bundle, assetNames, "ironcladwalkervisual.prefab", "IroncladWalkerVisual",
+                    null, null, 5, "Ironclad Walker");
             }
             finally
             {
@@ -330,17 +402,27 @@ namespace RogueCommandExpansion.Authoring
             string visualLabel)
         {
             string prefabAssetPath = FindUniqueAssetPath(assetNames, prefabSuffix, visualLabel + " prefab");
-            string cardSpriteAssetPath = FindUniqueAssetPath(assetNames, cardSuffix, visualLabel + " card Sprite");
             GameObject prefab = bundle.LoadAsset<GameObject>(prefabAssetPath);
             if (prefab == null || !String.Equals(prefab.name, prefabName, StringComparison.Ordinal))
             {
                 throw new InvalidDataException(visualLabel + " prefab could not be loaded by its AssetBundle path.");
             }
 
-            Sprite cardSprite = bundle.LoadAsset<Sprite>(cardSpriteAssetPath);
-            if (cardSprite == null || !String.Equals(cardSprite.name, cardName, StringComparison.Ordinal))
+            bool requiresCard = !String.IsNullOrEmpty(cardSuffix) || !String.IsNullOrEmpty(cardName);
+            if (requiresCard && (String.IsNullOrEmpty(cardSuffix) || String.IsNullOrEmpty(cardName)))
             {
-                throw new InvalidDataException(visualLabel + " card Sprite is missing or has the wrong asset name.");
+                throw new InvalidDataException(visualLabel + " card validation requires both an asset suffix and a name.");
+            }
+
+            if (requiresCard)
+            {
+                string cardSpriteAssetPath = FindUniqueAssetPath(
+                    assetNames, cardSuffix, visualLabel + " card Sprite");
+                Sprite cardSprite = bundle.LoadAsset<Sprite>(cardSpriteAssetPath);
+                if (cardSprite == null || !String.Equals(cardSprite.name, cardName, StringComparison.Ordinal))
+                {
+                    throw new InvalidDataException(visualLabel + " card Sprite is missing or has the wrong asset name.");
+                }
             }
 
             Renderer[] renderers = prefab.GetComponentsInChildren<Renderer>(true);
@@ -479,6 +561,23 @@ namespace RogueCommandExpansion.Authoring
             return materials;
         }
 
+        private static Dictionary<string, Material> CreateIroncladMaterials()
+        {
+            string projectRoot = Directory.GetParent(Application.dataPath).FullName;
+            Directory.CreateDirectory(Path.GetFullPath(Path.Combine(projectRoot, MaterialRoot)));
+            var materials = new Dictionary<string, Material>(StringComparer.Ordinal)
+            {
+                { "armor", CreateOrUpdateMaterial("IroncladArmor", new Color32(34, 58, 72, 255), 0.44f, 0.62f) },
+                { "lightArmor", CreateOrUpdateMaterial("IroncladLightArmor", new Color32(71, 102, 113, 255), 0.34f, 0.60f) },
+                { "gunmetal", CreateOrUpdateMaterial("IroncladGunmetal", new Color32(18, 27, 34, 255), 0.78f, 0.70f) },
+                { "warning", CreateOrUpdateMaterial("IroncladWarningAmber", new Color32(239, 104, 24, 255), 0.18f, 0.64f, new Color(0.94f, 0.30f, 0.06f) * 1.5f) },
+                { "sensor", CreateOrUpdateMaterial("IroncladSensorCyan", new Color32(10, 184, 224, 255), 0.20f, 0.78f, new Color(0.04f, 0.72f, 0.88f) * 1.8f) }
+            };
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+            return materials;
+        }
+
         private static void AssignSkirmishBikeMaterials(
             GameObject model,
             IDictionary<string, Material> materials)
@@ -491,6 +590,13 @@ namespace RogueCommandExpansion.Authoring
             IDictionary<string, Material> materials)
         {
             AssignBatchedMaterials(model, "Colossus", materials);
+        }
+
+        private static void AssignIroncladMaterials(
+            GameObject model,
+            IDictionary<string, Material> materials)
+        {
+            AssignBatchedMaterials(model, "IroncladWalker", materials);
         }
 
         private static void AssignBatchedMaterials(

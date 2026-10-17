@@ -70,6 +70,9 @@
     {
       "id": "sample-native:assault-walker",
       "nativeTemplateId": "GatlingWalker",
+      "assetBundleId": "sample-native:assets",
+      "visualAssetName": "assets/roguecommandexpansionsample/ironcladwalkervisual.prefab",
+      "visualRootPath": "Vehicle",
       "localizations": [
         {
           "language": "en-US",

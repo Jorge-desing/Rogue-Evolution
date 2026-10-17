@@ -1,0 +1,116 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &3777809872997067482
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2155135518425363423}
+  m_Layer: 0
+  m_Name: IroncladWalkerVisual
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &2155135518425363423
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3777809872997067482}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 2148455125175811829}
+  m_Father: {fileID: 0}
+  m_RootOrder: 0
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1001 &1898937879955364126
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    m_TransformParent: {fileID: 2155135518425363423}
+    m_Modifications:
+    - target: {fileID: -8679921383154817045, guid: 80236cd873ec2ba4a9f1363c5d84d8ed, type: 3}
+      propertyPath: m_RootOrder
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 80236cd873ec2ba4a9f1363c5d84d8ed, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 80236cd873ec2ba4a9f1363c5d84d8ed, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 80236cd873ec2ba4a9f1363c5d84d8ed, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 80236cd873ec2ba4a9f1363c5d84d8ed, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 80236cd873ec2ba4a9f1363c5d84d8ed, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 80236cd873ec2ba4a9f1363c5d84d8ed, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 80236cd873ec2ba4a9f1363c5d84d8ed, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 80236cd873ec2ba4a9f1363c5d84d8ed, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 80236cd873ec2ba4a9f1363c5d84d8ed, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 80236cd873ec2ba4a9f1363c5d84d8ed, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8464243706479187939, guid: 80236cd873ec2ba4a9f1363c5d84d8ed, type: 3}
+      propertyPath: m_Materials.Array.data[0]
+      value: ""
+      objectReference: {fileID: 2100000, guid: 736a89d4a1d5345469a5b7f1c3a998c0, type: 2}
+    - target: {fileID: -7428730316627700717, guid: 80236cd873ec2ba4a9f1363c5d84d8ed, type: 3}
+      propertyPath: m_Materials.Array.data[0]
+      value: ""
+      objectReference: {fileID: 2100000, guid: cd47082172324b340a295a3991e82bcc, type: 2}
+    - target: {fileID: -1777236689148755727, guid: 80236cd873ec2ba4a9f1363c5d84d8ed, type: 3}
+      propertyPath: m_Materials.Array.data[0]
+      value: ""
+      objectReference: {fileID: 2100000, guid: 9017f578dd534e7428f6da47626192dc, type: 2}
+    - target: {fileID: 919132149155446097, guid: 80236cd873ec2ba4a9f1363c5d84d8ed, type: 3}
+      propertyPath: m_Name
+      value: IroncladWalkerModel
+      objectReference: {fileID: 0}
+    - target: {fileID: 2009762912159540452, guid: 80236cd873ec2ba4a9f1363c5d84d8ed, type: 3}
+      propertyPath: m_Materials.Array.data[0]
+      value: ""
+      objectReference: {fileID: 2100000, guid: 7909efa558680cb4183cc5e503a0320a, type: 2}
+    - target: {fileID: 6482273905563134588, guid: 80236cd873ec2ba4a9f1363c5d84d8ed, type: 3}
+      propertyPath: m_Materials.Array.data[0]
+      value: ""
+      objectReference: {fileID: 2100000, guid: 8179d0d5d0e178845ac1d21758a7dbd6, type: 2}
+    m_RemovedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: 80236cd873ec2ba4a9f1363c5d84d8ed, type: 3}
+--- !u!4 &2148455125175811829 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 80236cd873ec2ba4a9f1363c5d84d8ed, type: 3}
+  m_PrefabInstance: {fileID: 1898937879955364126}
+  m_PrefabAsset: {fileID: 0}
