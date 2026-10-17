@@ -318,38 +318,96 @@ namespace RogueCommandExpansionLoader.Content
             int mapSizeMax,
             bool isDemo)
         {
-            IList<int> restrictedMapSizes = ai.RestrictedMapSizes;
-            if (restrictedMapSizes == null || restrictedMapSizes.Count == 0)
+            IList<StageGenerationLandscapeCandidate> selectedMaps = ai.RestrictedMaps;
+            bool explicitMapRestriction = selectedMaps != null && selectedMaps.Count > 0;
+            if (!explicitMapRestriction)
             {
-                restrictedMapSizes = world.RestrictedMapSizes;
+                selectedMaps = world.RestrictedMaps;
+                explicitMapRestriction = selectedMaps != null && selectedMaps.Count > 0;
             }
 
-            if (restrictedMapSizes != null && restrictedMapSizes.Count > 0)
+            if (!explicitMapRestriction)
             {
-                for (int i = 0; i < restrictedMapSizes.Count; i++)
+                selectedMaps = landscapes;
+            }
+
+            bool foundCompatibleMap = false;
+            for (int i = 0; i < selectedMaps.Count; i++)
+            {
+                StageGenerationLandscapeCandidate landscape = selectedMaps[i];
+                if (landscape == null)
                 {
-                    int mapSize = restrictedMapSizes[i];
-                    if (mapSize >= mapSizeMin && mapSize <= mapSizeMax)
-                    {
-                        return true;
-                    }
+                    return false;
                 }
 
+                if (landscape.MapSize < mapSizeMin || landscape.MapSize > mapSizeMax)
+                {
+                    continue;
+                }
+
+                bool isEligibleInDefaultList = !landscape.IsDeactivated &&
+                    (!isDemo || landscape.IsAllowedForDemo);
+                if (!isEligibleInDefaultList)
+                {
+                    if (explicitMapRestriction)
+                    {
+                        // CreateLevelMap uses AI/World restricted maps directly; it does not
+                        // reapply the default activation and demo filters to those lists.
+                        return false;
+                    }
+
+                    continue;
+                }
+
+                // Every in-range map can be selected randomly, so each applicable World
+                // restriction must be safe rather than merely having one valid entry.
+                if (!HasUsableRestrictedWorld(landscape.RestrictedWorlds,
+                        world.RestrictedMaps == null || world.RestrictedMaps.Count == 0, isDemo))
+                {
+                    return false;
+                }
+
+                foundCompatibleMap = true;
+            }
+
+            return foundCompatibleMap;
+        }
+
+        private static bool HasUsableRestrictedWorld(
+            IList<StageGenerationWorldCandidate> restrictedWorlds,
+            bool mapWorldRestrictionIsUsed,
+            bool isDemo)
+        {
+            // A null list cannot be safely selected by the game's map-generation path.
+            if (restrictedWorlds == null)
+            {
                 return false;
             }
 
-            for (int i = 0; i < landscapes.Count; i++)
+            // CreateLevelMap reads Count before checking whether the stage World has
+            // its own restricted map list. A non-null list is only enumerated when
+            // that World-level restriction is absent.
+            if (!mapWorldRestrictionIsUsed)
             {
-                StageGenerationLandscapeCandidate landscape = landscapes[i];
-                if (landscape != null && !landscape.IsDeactivated &&
-                    (!isDemo || landscape.IsAllowedForDemo) &&
-                    landscape.MapSize >= mapSizeMin && landscape.MapSize <= mapSizeMax)
+                return true;
+            }
+
+            // An empty list means the LandscapeGenerator does not override the stage's WorldList.
+            if (restrictedWorlds.Count == 0)
+            {
+                return true;
+            }
+
+            for (int i = 0; i < restrictedWorlds.Count; i++)
+            {
+                StageGenerationWorldCandidate world = restrictedWorlds[i];
+                if (world == null || world.IsDeactivated || (isDemo && !world.IsAllowedForDemo))
                 {
-                    return true;
+                    return false;
                 }
             }
 
-            return false;
+            return true;
         }
     }
 
@@ -363,7 +421,7 @@ namespace RogueCommandExpansionLoader.Content
         public int AscensionMin;
         public int AscensionMax;
         public IList<StageGenerationAiBaseCandidate> Bases;
-        public IList<int> RestrictedMapSizes;
+        public IList<StageGenerationLandscapeCandidate> RestrictedMaps;
     }
 
     internal sealed class StageGenerationStageCandidate
@@ -387,7 +445,7 @@ namespace RogueCommandExpansionLoader.Content
         public string Id;
         public bool IsDeactivated;
         public bool IsAllowedForDemo;
-        public IList<int> RestrictedMapSizes;
+        public IList<StageGenerationLandscapeCandidate> RestrictedMaps;
     }
 
     internal sealed class StageGenerationLandscapeCandidate
@@ -396,5 +454,6 @@ namespace RogueCommandExpansionLoader.Content
         public int MapSize;
         public bool IsDeactivated;
         public bool IsAllowedForDemo;
+        public IList<StageGenerationWorldCandidate> RestrictedWorlds;
     }
 }

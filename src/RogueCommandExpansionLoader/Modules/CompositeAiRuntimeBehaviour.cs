@@ -76,18 +76,34 @@ namespace RogueCommandExpansionLoader.Modules
                 }
                 catch (Exception exception)
                 {
+                    var cleanupFailures = new List<Exception>();
                     if (!_destroyed)
                     {
                         _destroyed = true;
                         for (int cleanupIndex = _behaviours.Count - 1; cleanupIndex >= 0; cleanupIndex--)
                         {
-                            TryDestroyAt(cleanupIndex);
+                            Exception cleanupFailure = TryDestroyAt(cleanupIndex, "initialization rollback");
+                            if (cleanupFailure != null)
+                            {
+                                cleanupFailures.Add(cleanupFailure);
+                            }
                         }
                     }
 
-                    throw new InvalidOperationException(
+                    var initializationFailure = new InvalidOperationException(
                         "AI module '" + _moduleIds[i] + "' failed to initialize for profile '" +
                         _profileId + "'.", exception);
+                    if (cleanupFailures.Count == 0)
+                    {
+                        throw initializationFailure;
+                    }
+
+                    var failures = new List<Exception>(cleanupFailures.Count + 1);
+                    failures.Add(initializationFailure);
+                    failures.AddRange(cleanupFailures);
+                    throw new AggregateException(
+                        "AI module initialization failed and one or more modules also failed during cleanup.",
+                        failures);
                 }
             }
 
@@ -134,39 +150,41 @@ namespace RogueCommandExpansionLoader.Modules
             }
 
             _destroyed = true;
-            Exception firstFailure = null;
+            var cleanupFailures = new List<Exception>();
             for (int i = _behaviours.Count - 1; i >= 0; i--)
             {
-                try
+                Exception cleanupFailure = TryDestroyAt(i, "destruction");
+                if (cleanupFailure != null)
                 {
-                    _behaviours[i].OnDestroyed();
-                }
-                catch (Exception exception)
-                {
-                    if (firstFailure == null)
-                    {
-                        firstFailure = new InvalidOperationException(
-                            "AI module '" + _moduleIds[i] + "' failed to clean up for profile '" +
-                            _profileId + "'.", exception);
-                    }
+                    cleanupFailures.Add(cleanupFailure);
                 }
             }
 
-            if (firstFailure != null)
+            if (cleanupFailures.Count == 1)
             {
-                throw firstFailure;
+                throw cleanupFailures[0];
+            }
+
+            if (cleanupFailures.Count > 1)
+            {
+                throw new AggregateException(
+                    "Multiple AI modules failed to clean up for profile '" + _profileId + "'.",
+                    cleanupFailures);
             }
         }
 
-        private void TryDestroyAt(int index)
+        private Exception TryDestroyAt(int index, string phase)
         {
             try
             {
                 _behaviours[index].OnDestroyed();
+                return null;
             }
-            catch
+            catch (Exception exception)
             {
-                // Preserve the initialization error while still attempting every cleanup.
+                return new InvalidOperationException(
+                    "AI module '" + _moduleIds[index] + "' failed to clean up during " + phase +
+                    " for profile '" + _profileId + "'.", exception);
             }
         }
     }

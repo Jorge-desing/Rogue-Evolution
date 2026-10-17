@@ -11,6 +11,8 @@
   <ItemGroup>
     <Compile Include="../../src/RogueCommandExpansionLoader/Content/ContentPackDefinition.cs"
              Link="Content/ContentPackDefinition.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Content/EntityControllerIdentity.cs"
+             Link="Content/EntityControllerIdentity.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Content/ContentPackValidation.cs"
              Link="Content/ContentPackValidation.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Content/StageGenerationCompatibility.cs"

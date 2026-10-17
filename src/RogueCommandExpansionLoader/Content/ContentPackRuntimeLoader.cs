@@ -85,6 +85,7 @@ namespace RogueCommandExpansionLoader.Content
         private readonly FieldInfo _landscapeMapSizeField;
         private readonly FieldInfo _landscapeDeactivatedField;
         private readonly FieldInfo _landscapeAllowedForDemoField;
+        private readonly FieldInfo _landscapeRestrictedWorldsField;
         private readonly FieldInfo _entityIndexField;
         private readonly FieldInfo _nativeEntityRowsField;
         private readonly FieldInfo _aiDeactivatedField;
@@ -261,6 +262,13 @@ namespace RogueCommandExpansionLoader.Content
             _landscapeDeactivatedField = RequireField(landscapeGeneratorType, "isDeactivated", typeof(bool));
             _landscapeAllowedForDemoField = RequireField(landscapeGeneratorType,
                 "isAllowedForDemo", typeof(bool));
+            _landscapeRestrictedWorldsField = FindField(landscapeGeneratorType,
+                "restrictedToWorlds", InstanceFields);
+            if (!IsExactList(_landscapeRestrictedWorldsField.FieldType, _initMapType))
+            {
+                throw new InvalidOperationException(
+                    "LandscapeGenerator.restrictedToWorlds is not List<InitMap>.");
+            }
             _aiBaseStartingStageField = RequireField(_aiBaseType, "startingInStage", typeof(int));
             _aiBaseStartingAscensionField = RequireField(_aiBaseType,
                 "startingInAscensionLevel", typeof(int));
@@ -1465,7 +1473,8 @@ namespace RogueCommandExpansionLoader.Content
                                 " perdió su EntityController raíz.");
                         }
 
-                        _entityControllerIdField.SetValue(clonedController, unit.id);
+                        EntityControllerIdentity.Assign(_entityControllerIdField, clonedController, unit.id,
+                            "Unidad " + unit.id + " en '" + packageName + "'");
                         nativePrefabClone.name = "RCL_Native_" + unit.id.Replace(':', '_');
                         nativePrefabClone.SetActive(false);
                         nativePrefabClone.hideFlags = HideFlags.HideAndDontSave;
@@ -1500,6 +1509,20 @@ namespace RogueCommandExpansionLoader.Content
                         ValidateUnitPrefab(prefab, unit, packageName, true);
                         row = ReadSingleBalanceRow(balanceAsset, packageName, unit.id);
 
+                        GameObject customPrefabClone = InstantiateDormantPrefab(prefab);
+                        if (customPrefabClone == null)
+                        {
+                            throw new InvalidDataException("No se pudo clonar el prefab propio de " + unit.id + ".");
+                        }
+                        temporaryNativePrefabs.Add(customPrefabClone);
+                        EntityController customController = customPrefabClone.GetComponent<EntityController>();
+                        EntityControllerIdentity.Assign(_entityControllerIdField, customController, unit.id,
+                            "Unidad " + unit.id + " en '" + packageName + "'");
+                        customPrefabClone.name = "RCL_Custom_" + unit.id.Replace(':', '_');
+                        customPrefabClone.SetActive(false);
+                        customPrefabClone.hideFlags = HideFlags.HideAndDontSave;
+                        UnityEngine.Object.DontDestroyOnLoad(customPrefabClone);
+
                         prefabKey = ResourceKey(unit.id, "prefab");
                         imageKey = ResourceKey(unit.id, "image");
                         ApplyBalanceOverrides(row, unit.balanceOverrides, packageName, unit.id);
@@ -1508,7 +1531,7 @@ namespace RogueCommandExpansionLoader.Content
                         _imageLocationField.SetValue(row, imageKey);
                         _inactiveField.SetValue(row, false);
 
-                        temporaryResources.Add(prefabKey, prefab);
+                        temporaryResources.Add(prefabKey, customPrefabClone);
                         temporaryResources.Add(imageKey, cardImage);
                     }
 
@@ -3082,7 +3105,7 @@ namespace RogueCommandExpansionLoader.Content
                     AscensionMin = ascensionRange.x,
                     AscensionMax = ascensionRange.y,
                     Bases = baseCandidates,
-                    RestrictedMapSizes = ReadRestrictedMapSizes(restrictedMaps,
+                    RestrictedMaps = BuildRestrictedMapCandidates(restrictedMaps,
                         "AI " + GetObjectName(behaviour))
                 });
             }
@@ -3122,12 +3145,82 @@ namespace RogueCommandExpansionLoader.Content
                     throw new InvalidDataException(source + " contiene un LandscapeGenerator nulo o de tipo inesperado.");
                 }
 
-                candidates.Add(new StageGenerationLandscapeCandidate
+                candidates.Add(BuildLandscapeCandidate(landscape));
+            }
+
+            return candidates;
+        }
+
+        private StageGenerationLandscapeCandidate BuildLandscapeCandidate(object landscape)
+        {
+            string landscapeName = GetObjectName(landscape);
+            return new StageGenerationLandscapeCandidate
+            {
+                Id = landscapeName,
+                MapSize = (int)_landscapeMapSizeField.GetValue(landscape),
+                IsDeactivated = (bool)_landscapeDeactivatedField.GetValue(landscape),
+                IsAllowedForDemo = (bool)_landscapeAllowedForDemoField.GetValue(landscape),
+                RestrictedWorlds = BuildRestrictedWorldCandidates(
+                    _landscapeRestrictedWorldsField.GetValue(landscape) as IList,
+                    "LandscapeGenerator " + landscapeName)
+            };
+        }
+
+        private List<StageGenerationLandscapeCandidate> BuildRestrictedMapCandidates(
+            IList landscapes,
+            string source)
+        {
+            if (landscapes == null)
+            {
+                throw new InvalidDataException(source + " contiene una lista restrictedToMaps nula.");
+            }
+
+            var candidates = new List<StageGenerationLandscapeCandidate>(landscapes.Count);
+            for (int i = 0; i < landscapes.Count; i++)
+            {
+                object landscape = landscapes[i];
+                if (landscape == null || landscape.GetType() != _landscapeGeneratorType)
                 {
-                    Id = GetObjectName(landscape),
-                    MapSize = (int)_landscapeMapSizeField.GetValue(landscape),
-                    IsDeactivated = (bool)_landscapeDeactivatedField.GetValue(landscape),
-                    IsAllowedForDemo = (bool)_landscapeAllowedForDemoField.GetValue(landscape)
+                    throw new InvalidDataException(source +
+                        " contiene un LandscapeGenerator nulo o de tipo inesperado en restrictedToMaps.");
+                }
+
+                candidates.Add(BuildLandscapeCandidate(landscape));
+            }
+
+            return candidates;
+        }
+
+        private List<StageGenerationWorldCandidate> BuildRestrictedWorldCandidates(
+            IList worlds,
+            string source)
+        {
+            if (worlds == null)
+            {
+                return null;
+            }
+
+            var candidates = new List<StageGenerationWorldCandidate>(worlds.Count);
+            for (int i = 0; i < worlds.Count; i++)
+            {
+                object world = worlds[i];
+                if (world == null)
+                {
+                    candidates.Add(null);
+                    continue;
+                }
+
+                if (world.GetType() != _initMapType)
+                {
+                    throw new InvalidDataException(source +
+                        " contiene un World de tipo inesperado en restrictedToWorlds.");
+                }
+
+                candidates.Add(new StageGenerationWorldCandidate
+                {
+                    Id = GetObjectName(world),
+                    IsDeactivated = (bool)_worldDeactivatedField.GetValue(world),
+                    IsAllowedForDemo = (bool)_worldAllowedForDemoField.GetValue(world)
                 });
             }
 
@@ -3165,30 +3258,12 @@ namespace RogueCommandExpansionLoader.Content
                     Id = GetObjectName(world),
                     IsDeactivated = (bool)_worldDeactivatedField.GetValue(world),
                     IsAllowedForDemo = (bool)_worldAllowedForDemoField.GetValue(world),
-                    RestrictedMapSizes = ReadRestrictedMapSizes(restrictedMaps,
+                    RestrictedMaps = BuildRestrictedMapCandidates(restrictedMaps,
                         "World " + GetObjectName(world))
                 });
             }
 
             return candidates;
-        }
-
-        private IList<int> ReadRestrictedMapSizes(IList restrictedMaps, string source)
-        {
-            var mapSizes = new List<int>(restrictedMaps.Count);
-            for (int i = 0; i < restrictedMaps.Count; i++)
-            {
-                object landscape = restrictedMaps[i];
-                if (landscape == null || landscape.GetType() != _landscapeGeneratorType)
-                {
-                    throw new InvalidDataException(source +
-                        " contiene un LandscapeGenerator nulo o de tipo inesperado en restrictedToMaps.");
-                }
-
-                mapSizes.Add((int)_landscapeMapSizeField.GetValue(landscape));
-            }
-
-            return mapSizes;
         }
 
         private static string GetObjectName(object value)

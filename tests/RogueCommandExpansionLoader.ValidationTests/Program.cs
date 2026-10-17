@@ -225,6 +225,30 @@ var tests = new (string Name, Action Run)[]
                 "unit.visual-source-conflict");
         });
     }),
+    ("custom prefab controller receives the unit namespaced identity", () =>
+    {
+        var controller = new EntityControllerIdentityTestController { entityId = "native:template" };
+        FieldInfo entityIdField = typeof(EntityControllerIdentityTestController).GetField("entityId")!;
+        EntityControllerIdentity.Assign(entityIdField, controller, "sample:custom-unit", "Unidad sample:custom-unit");
+        if (!String.Equals(controller.entityId, "sample:custom-unit", StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("The custom prefab clone kept its original EntityController identity.");
+        }
+
+        try
+        {
+            EntityControllerIdentity.Assign(entityIdField, controller, " ", "Unidad inválida");
+            throw new InvalidOperationException("An empty custom unit identity was accepted.");
+        }
+        catch (InvalidOperationException exception) when (exception.Message.Contains("ID namespaced", StringComparison.Ordinal))
+        {
+        }
+
+        if (!String.Equals(controller.entityId, "sample:custom-unit", StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("A rejected empty identity changed the controller field.");
+        }
+    }),
     ("native-template unit rejects mixed bundle prefab and native sources", () =>
     {
         WithPackage(sample, (pack, root) =>
@@ -642,9 +666,9 @@ var tests = new (string Name, Action Run)[]
     ("stage generation validation follows AI and World restricted map selection", () =>
     {
         StageGenerationAiCandidate ai = ValidStageAi("restricted-ai");
-        ai.RestrictedMapSizes = [53];
         StageGenerationWorldCandidate world = ValidStageWorld("restricted-world");
-        world.RestrictedMapSizes = [81];
+        ai.RestrictedMaps = [ValidStageLandscape("ai-map", 53)];
+        world.RestrictedMaps = [ValidStageLandscape("world-map", 81)];
         StageGenerationLandscapeCandidate[] landscapes = [ValidStageLandscape("default-map", 101)];
 
         if (!StageGenerationCompatibility.TryValidate("sample:stage", "default", 4,
@@ -660,20 +684,112 @@ var tests = new (string Name, Action Run)[]
             throw new InvalidOperationException("A stage ignored the selected AI's map restriction.");
         }
 
-        ai.RestrictedMapSizes = [];
+        ai.RestrictedMaps = [];
         if (!StageGenerationCompatibility.TryValidate("sample:stage", "default", 4,
                 81, 81, false, false, 19, [ai], [world], landscapes, out diagnostic))
         {
             throw new InvalidOperationException("World restricted maps should be selected when AI has no map restriction: " +
                 diagnostic);
         }
+
+        ai.RestrictedMaps = [ValidStageLandscape("usable-ai-map", 53), new StageGenerationLandscapeCandidate
+        {
+            Id = "disabled-ai-map",
+            MapSize = 53,
+            IsDeactivated = true,
+            IsAllowedForDemo = true,
+            RestrictedWorlds = []
+        }];
+        if (StageGenerationCompatibility.TryValidate("sample:stage", "default", 4,
+                53, 53, false, false, 19, [ai], [world], landscapes, out diagnostic))
+        {
+            throw new InvalidOperationException("An explicit AI map restriction accepted a selectable deactivated map.");
+        }
+    }),
+    ("stage generation validation requires a usable LandscapeGenerator restricted world", () =>
+    {
+        StageGenerationAiCandidate[] ais = [ValidStageAi("sample-ai")];
+        StageGenerationWorldCandidate[] worlds = [ValidStageWorld("stage-world")];
+        StageGenerationLandscapeCandidate landscape = ValidStageLandscape("restricted-map", 53);
+        landscape.RestrictedWorlds = null;
+        if (StageGenerationCompatibility.TryValidate("sample:stage", "default", 4,
+                53, 53, false, false, 19, ais, worlds, [landscape], out string diagnostic))
+        {
+            throw new InvalidOperationException("A LandscapeGenerator with a null restricted World list was accepted.");
+        }
+
+        landscape.RestrictedWorlds = [null];
+
+        if (StageGenerationCompatibility.TryValidate("sample:stage", "default", 4,
+                53, 53, false, false, 19, ais, worlds, [landscape], out diagnostic) ||
+            diagnostic == null || !diagnostic.Contains("LandscapeGenerator", StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("A LandscapeGenerator with only a null restricted World was accepted.");
+        }
+
+        landscape.RestrictedWorlds = [new StageGenerationWorldCandidate
+        {
+            Id = "disabled-world",
+            IsDeactivated = true,
+            IsAllowedForDemo = true
+        }];
+        if (StageGenerationCompatibility.TryValidate("sample:stage", "default", 4,
+                53, 53, false, false, 19, ais, worlds, [landscape], out diagnostic))
+        {
+            throw new InvalidOperationException("A LandscapeGenerator with only a deactivated restricted World was accepted.");
+        }
+
+        landscape.RestrictedWorlds = [new StageGenerationWorldCandidate
+        {
+            Id = "demo-disallowed-world",
+            IsDeactivated = false,
+            IsAllowedForDemo = false
+        }];
+        if (StageGenerationCompatibility.TryValidate("sample:stage", "default", 4,
+                53, 53, true, false, 2, ais, worlds, [landscape], out diagnostic))
+        {
+            throw new InvalidOperationException("A demo stage accepted a restricted World excluded from demo.");
+        }
+
+        landscape.RestrictedWorlds = [ValidStageWorld("usable-world")];
+        if (!StageGenerationCompatibility.TryValidate("sample:stage", "default", 4,
+                53, 53, false, false, 19, ais, worlds, [landscape], out diagnostic))
+        {
+            throw new InvalidOperationException("A LandscapeGenerator with an active restricted World was rejected: " + diagnostic);
+        }
+
+        landscape.RestrictedWorlds = [ValidStageWorld("usable-world"), null];
+        if (StageGenerationCompatibility.TryValidate("sample:stage", "default", 4,
+                53, 53, false, false, 19, ais, worlds, [landscape], out diagnostic))
+        {
+            throw new InvalidOperationException("A random-selectable null restricted World was accepted beside a valid entry.");
+        }
+
+        landscape.RestrictedWorlds = [null];
+        worlds[0].RestrictedMaps = [landscape];
+        landscape.RestrictedWorlds = null;
+        if (StageGenerationCompatibility.TryValidate("sample:stage", "default", 4,
+                53, 53, false, false, 19, ais, worlds, [ValidStageLandscape("fallback-map", 101)], out diagnostic))
+        {
+            throw new InvalidOperationException("A selected map with a null restricted World list was accepted.");
+        }
+
+        landscape.RestrictedWorlds = [null];
+        if (!StageGenerationCompatibility.TryValidate("sample:stage", "default", 4,
+                53, 53, false, false, 19, ais, worlds, [ValidStageLandscape("fallback-map", 101)], out diagnostic))
+        {
+            throw new InvalidOperationException("An explicit World map restriction should supersede map World restrictions: " +
+                diagnostic);
+        }
     }),
     ("later pack AI compatibility is checked against already loaded stages", () =>
     {
         StageGenerationAiCandidate firstPackAi = ValidStageAi("pack-a:ai");
-        firstPackAi.RestrictedMapSizes = [53];
         StageGenerationAiCandidate secondPackAi = ValidStageAi("pack-b:ai");
-        secondPackAi.RestrictedMapSizes = [81];
+        StageGenerationLandscapeCandidate firstPackMap = ValidStageLandscape("pack-a:map", 53);
+        StageGenerationLandscapeCandidate secondPackMap = ValidStageLandscape("pack-b:map", 81);
+        firstPackAi.RestrictedMaps = [firstPackMap];
+        secondPackAi.RestrictedMaps = [secondPackMap];
         StageGenerationStageCandidate[] stages =
         [
             new StageGenerationStageCandidate
@@ -697,7 +813,7 @@ var tests = new (string Name, Action Run)[]
         ];
 
         if (StageGenerationCompatibility.TryValidateStages("default", false, false, 10,
-                stages, [firstPackAi, secondPackAi], [], out string diagnostic) ||
+                stages, [firstPackAi, secondPackAi], [firstPackMap, secondPackMap], out string diagnostic) ||
             diagnostic == null || !diagnostic.Contains("pack-a:stage", StringComparison.Ordinal) ||
             !diagnostic.Contains("pack-b:ai", StringComparison.Ordinal))
         {
@@ -839,12 +955,16 @@ var tests = new (string Name, Action Run)[]
             throw new InvalidOperationException("The composite AI lifecycle changed callback order or repeated a terminal callback.");
         }
     }),
-    ("composite AI initialization failure cleans every created module in reverse", () =>
+    ("composite AI initialization failure preserves cleanup failures and cleans every module in reverse", () =>
     {
         var events = new List<string>();
         var first = new RecordingAiRuntimeBehaviour(events, "first");
-        var failing = new RecordingAiRuntimeBehaviour(events, "failing") { ThrowOnInitialize = true };
-        var notInitialized = new RecordingAiRuntimeBehaviour(events, "not-initialized");
+        var failing = new RecordingAiRuntimeBehaviour(events, "failing")
+        {
+            ThrowOnInitialize = true,
+            ThrowOnDestroy = true
+        };
+        var notInitialized = new RecordingAiRuntimeBehaviour(events, "not-initialized") { ThrowOnDestroy = true };
         var composite = new CompositeAiRuntimeBehaviour("test:profile",
             new[] { "test:first", "test:failing", "test:last" },
             new IRogueCommandAiRuntimeBehaviour[] { first, failing, notInitialized });
@@ -854,9 +974,13 @@ var tests = new (string Name, Action Run)[]
             composite.OnInitialized();
             throw new InvalidOperationException("A failing AI module did not abort composite initialization.");
         }
-        catch (InvalidOperationException exception)
+        catch (AggregateException exception)
         {
-            if (!exception.Message.Contains("test:failing", StringComparison.Ordinal))
+            string details = exception.ToString();
+            if (!details.Contains("test:failing", StringComparison.Ordinal) ||
+                !details.Contains("test:last", StringComparison.Ordinal) ||
+                !details.Contains("Injected initialization failure", StringComparison.Ordinal) ||
+                !details.Contains("Injected cleanup failure", StringComparison.Ordinal))
             {
                 throw;
             }
@@ -871,6 +995,43 @@ var tests = new (string Name, Action Run)[]
         if (!events.SequenceEqual(expected))
         {
             throw new InvalidOperationException("Initialization failure did not clean every created module in reverse order.");
+        }
+    }),
+    ("composite AI destruction reports all cleanup failures and continues in reverse", () =>
+    {
+        var events = new List<string>();
+        var first = new RecordingAiRuntimeBehaviour(events, "first") { ThrowOnDestroy = true };
+        var second = new RecordingAiRuntimeBehaviour(events, "second");
+        var third = new RecordingAiRuntimeBehaviour(events, "third") { ThrowOnDestroy = true };
+        var composite = new CompositeAiRuntimeBehaviour("test:profile",
+            new[] { "test:first", "test:second", "test:third" },
+            new IRogueCommandAiRuntimeBehaviour[] { first, second, third });
+        composite.OnInitialized();
+
+        try
+        {
+            composite.OnDestroyed();
+            throw new InvalidOperationException("A failing AI cleanup did not report its errors.");
+        }
+        catch (AggregateException exception)
+        {
+            string details = exception.ToString();
+            if (!details.Contains("test:first", StringComparison.Ordinal) ||
+                !details.Contains("test:third", StringComparison.Ordinal) ||
+                !details.Contains("Injected cleanup failure", StringComparison.Ordinal))
+            {
+                throw;
+            }
+        }
+
+        composite.OnDestroyed();
+        string[] expected =
+        [
+            "first:init", "second:init", "third:init", "third:destroy", "second:destroy", "first:destroy"
+        ];
+        if (!events.SequenceEqual(expected))
+        {
+            throw new InvalidOperationException("Destruction failure repeated callbacks or skipped reverse cleanup.");
         }
     }),
     ("runtime entity mutator appends balancing rows indices and factory mappings idempotently", () =>
@@ -1127,7 +1288,7 @@ static StageGenerationAiCandidate ValidStageAi(string id)
             StartingInStage = 0,
             StartingInAscensionLevel = 0
         }],
-        RestrictedMapSizes = []
+        RestrictedMaps = []
     };
 }
 
@@ -1137,7 +1298,7 @@ static StageGenerationWorldCandidate ValidStageWorld(string id)
     {
         Id = id,
         IsAllowedForDemo = true,
-        RestrictedMapSizes = []
+        RestrictedMaps = []
     };
 }
 
@@ -1148,7 +1309,8 @@ static StageGenerationLandscapeCandidate ValidStageLandscape(string id, int mapS
         Id = id,
         MapSize = mapSize,
         IsDeactivated = false,
-        IsAllowedForDemo = true
+        IsAllowedForDemo = true,
+        RestrictedWorlds = []
     };
 }
 

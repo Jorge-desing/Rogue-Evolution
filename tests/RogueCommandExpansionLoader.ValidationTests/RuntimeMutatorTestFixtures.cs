@@ -17,6 +17,11 @@ public struct EntityBalancingParameters
     public NullableString factoryForEntityId;
 }
 
+public sealed class EntityControllerIdentityTestController
+{
+    public string entityId;
+}
+
 public static class EntityBalancingStore
 {
     public static List<EntityBalancingParameters> EntityBalancingParametersList = new();

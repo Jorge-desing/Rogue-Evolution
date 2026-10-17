@@ -1,0 +1,6 @@
+# BepInEx MCP currently pins the MCP Python SDK to 1.20.0. Pydantic 2.14
+# removed an internal symbol imported by that SDK, so keep this toolchain
+# below 2.14 until the upstream server/SDK compatibility is repaired.
+# Repair-BepInExMCP.ps1 also resolves the SDK's generic FastMCP Settings
+# forward reference locally before constructing the server.
+pydantic>=2.12,<2.14
