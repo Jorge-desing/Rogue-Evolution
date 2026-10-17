@@ -94,14 +94,27 @@ namespace RogueCommandExpansionLoader
 
         private void OnDestroy()
         {
-            if (!_sceneDiagnosticsSubscribed)
+            if (_sceneDiagnosticsSubscribed)
             {
-                return;
+                SceneManager.sceneLoaded -= OnSceneLoaded;
+                SceneManager.activeSceneChanged -= OnActiveSceneChanged;
+                _sceneDiagnosticsSubscribed = false;
             }
 
-            SceneManager.sceneLoaded -= OnSceneLoaded;
-            SceneManager.activeSceneChanged -= OnActiveSceneChanged;
-            _sceneDiagnosticsSubscribed = false;
+            if (_contentLoader != null)
+            {
+                string message;
+                if (RuntimePatchInstaller.Uninstall(_contentLoader, out message))
+                {
+                    Logger.LogInfo("[ExpansionLoader] Shutdown: " + message);
+                }
+                else
+                {
+                    Logger.LogError("[ExpansionLoader] Shutdown could not remove Harmony hooks: " + message);
+                }
+
+                _contentLoader.ShutdownRuntimeBehaviours();
+            }
         }
 
         private void ShowOverlay(

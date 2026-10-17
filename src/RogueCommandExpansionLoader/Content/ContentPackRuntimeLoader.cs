@@ -1152,6 +1152,27 @@ namespace RogueCommandExpansionLoader.Content
             SafeDestroyAiRuntimeBehaviour(bound, "<AI>");
         }
 
+        /// <summary>
+        /// Cleans compiled module state when the plugin component is destroyed. Loaded packs and
+        /// Unity assets remain game-session registrations; this does not promise hot-unload support.
+        /// </summary>
+        public void ShutdownRuntimeBehaviours()
+        {
+            var behaviours = new List<object>();
+            lock (_gate)
+            {
+                foreach (KeyValuePair<object, BoundAiRuntimeBehaviour> binding in _boundAiBehaviours)
+                {
+                    behaviours.Add(binding.Key);
+                }
+            }
+
+            for (int i = 0; i < behaviours.Count; i++)
+            {
+                OnAiBehaviourDestroyed(behaviours[i]);
+            }
+        }
+
         private void RemoveAiBehaviourBindingIfCurrentLocked(
             DefaultAiBehaviour behaviour,
             BoundAiRuntimeBehaviour expected)

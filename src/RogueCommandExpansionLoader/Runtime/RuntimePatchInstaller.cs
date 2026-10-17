@@ -147,7 +147,7 @@ namespace RogueCommandExpansionLoader.Runtime
             }
         }
 
-        public static bool Uninstall(out string message)
+        public static bool Uninstall(IRuntimeContentProvider expectedProvider, out string message)
         {
             lock (Gate)
             {
@@ -155,6 +155,13 @@ namespace RogueCommandExpansionLoader.Runtime
                 {
                     message = "Runtime hooks are not installed.";
                     return true;
+                }
+
+                if (!_cleanupPending && (expectedProvider == null ||
+                    !object.ReferenceEquals(_provider, expectedProvider)))
+                {
+                    message = "Runtime hooks are bound to a different provider; they were left installed.";
+                    return false;
                 }
 
                 try
@@ -167,6 +174,14 @@ namespace RogueCommandExpansionLoader.Runtime
                 }
                 catch (Exception exception)
                 {
+                    // A failed unpatch can leave Harmony callbacks installed. Detach their
+                    // provider immediately so any surviving hook falls through to game behavior;
+                    // retain only the owner-scoped Harmony state so a later Uninstall/Install can
+                    // retry cleanup without keeping a destroyed provider alive.
+                    RuntimeHooks.Clear(_mutator);
+                    _provider = null;
+                    _mutator = null;
+                    _gameAssembly = null;
                     _cleanupPending = true;
                     message = "Could not remove runtime hooks: " + exception.Message;
                     return false;
