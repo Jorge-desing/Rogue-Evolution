@@ -13,6 +13,7 @@ $pluginAssemblyPath = Join-Path $repositoryRoot 'artifacts\plugin\RogueCommandEx
 $schemaPath = Join-Path $repositoryRoot 'content\schema\content.schema.json'
 $schemaReadmePath = Join-Path $repositoryRoot 'content\schema\README.md'
 $nativeSamplePath = Join-Path $repositoryRoot 'content\packs\sample-native-expansion\content.json'
+$reactiveAiSamplePath = Join-Path $repositoryRoot 'content\packs\sample-reactive-ai\content.json'
 
 if ([string]::IsNullOrWhiteSpace($BepInExCorePath)) {
     $BepInExCorePath = Join-Path $repositoryRoot '.tools\bepinex-dist-5.4.23.5\BepInEx\core'
@@ -57,6 +58,9 @@ if (-not (Test-Path -LiteralPath $schemaPath -PathType Leaf) -or
 if (-not (Test-Path -LiteralPath $nativeSamplePath -PathType Leaf)) {
     throw 'The native-template sample pack is missing; refusing to create an incomplete package.'
 }
+if (-not (Test-Path -LiteralPath $reactiveAiSamplePath -PathType Leaf)) {
+    throw 'The reactive AI sample pack is missing; refusing to create an incomplete package.'
+}
 
 $nativeSampleRoot = Split-Path -Parent $nativeSamplePath
 $nativeSampleBundleDirectory = Join-Path $nativeSampleRoot 'bundles'
@@ -75,6 +79,19 @@ foreach ($inputDirectory in @($nativeSampleRoot, $nativeSampleBundleDirectory)) 
     if (($inputDirectoryItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
         throw "Refusing to package native sample content through a reparse point: $inputDirectory"
     }
+}
+
+$reactiveAiSampleRoot = Split-Path -Parent $reactiveAiSamplePath
+$reactiveAiSampleDefinition = Get-Content -LiteralPath $reactiveAiSamplePath -Raw | ConvertFrom-Json
+if ($reactiveAiSampleDefinition.packId -ne 'sample-reactive-ai:expansion' -or
+    @($reactiveAiSampleDefinition.assetBundles).Count -ne 0 -or
+    -not [string]::IsNullOrWhiteSpace($reactiveAiSampleDefinition.assetBundleManifestPath)) {
+    throw 'The reactive AI sample must be a data-only pack without an AssetBundle manifest.'
+}
+$reactiveAiSampleRootItem = Get-Item -LiteralPath $reactiveAiSampleRoot -Force
+if (-not $reactiveAiSampleRootItem.PSIsContainer -or
+    ($reactiveAiSampleRootItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+    throw "Refusing to package the reactive AI sample through a reparse point: $reactiveAiSampleRoot"
 }
 
 $nativeSampleBundlePaths = @($nativeSampleDefinition.assetBundleManifestPath)
@@ -181,15 +198,18 @@ try {
     $schemaDirectory = Join-Path $contentDirectory 'schema'
     $samplePackDirectory = Join-Path $packsDirectory 'sample-native-expansion'
     $samplePackBundleDirectory = Join-Path $samplePackDirectory 'bundles'
+    $reactiveAiSampleDirectory = Join-Path $packsDirectory 'sample-reactive-ai'
     New-Item -ItemType Directory -Path $packsDirectory -Force | Out-Null
     New-Item -ItemType Directory -Path $schemaDirectory -Force | Out-Null
     New-Item -ItemType Directory -Path $samplePackDirectory -Force | Out-Null
     New-Item -ItemType Directory -Path $samplePackBundleDirectory -Force | Out-Null
+    New-Item -ItemType Directory -Path $reactiveAiSampleDirectory -Force | Out-Null
 
     Copy-Item -LiteralPath $pluginAssemblyPath -Destination $pluginDirectory
     Copy-Item -LiteralPath $schemaPath -Destination $schemaDirectory
     Copy-Item -LiteralPath $schemaReadmePath -Destination $schemaDirectory
     Copy-Item -LiteralPath $nativeSamplePath -Destination $samplePackDirectory
+    Copy-Item -LiteralPath $reactiveAiSamplePath -Destination $reactiveAiSampleDirectory
     foreach ($bundleSource in $nativeSampleBundleSources) {
         Copy-Item -LiteralPath $bundleSource.SourcePath -Destination (Join-Path $samplePackBundleDirectory $bundleSource.FileName)
     }
@@ -198,12 +218,14 @@ try {
 Rogue Command Expansion Loader content packs
 
 Place each content pack in its own folder under this directory. The included
-sample-native-expansion pack includes a Unity AssetBundle and its manifest. Other
-packs must include every AssetBundle declared by content.json and its manifest.
+sample-native-expansion includes a Unity AssetBundle and its manifest. The
+sample-reactive-ai pack is data-only. Other packs must include every AssetBundle
+declared by content.json and its manifest.
 Use the adjacent schema directory when authoring content.json.
 
-The sample reuses native unit gameplay, stage, and AI templates and overlays a
-script-free model prefab. It keeps the native stage layout.
+The native sample reuses native unit gameplay, stage, and AI templates and overlays
+a script-free model prefab. The reactive AI sample uses a native stage and AI
+template with a bounded compiled counterattack module. Both keep native map layouts.
 '@ | Set-Content -LiteralPath (Join-Path $packsDirectory 'README.txt') -Encoding UTF8
 
     @"
@@ -213,8 +235,9 @@ Install:
 1. Install BepInEx 5.4.23.5 win-x64 Mono into the Rogue Command game folder.
 2. Extract this archive into the Rogue Command game folder, preserving its BepInEx directory.
 3. The included sample-native-expansion pack demonstrates a unit balance variant,
-   a bundled visual model, a native stage variant, and compiled AI modules on a
-   native AI template.
+   a bundled visual model, a native stage variant, and a scheduled-build AI module.
+   The sample-reactive-ai pack demonstrates a native stage variant with an AI
+   module that sends up to two nearby units to counterattack an active attacker.
 4. Add other packs under BepInEx/plugins/RogueCommandExpansionLoader/content/packs/;
    custom models and map layouts require valid Unity AssetBundles.
 
@@ -222,8 +245,8 @@ Compatibility is limited to Rogue Command 1.0.9, Unity 2021.3.45f2, and the veri
 Assembly-CSharp.dll build. The plugin logs a compatibility diagnostic and skips its
 Harmony patches when those checks fail.
 
-This package contains the loader, content schema, and a sample pack with a
-script-free Unity AssetBundle.
+This package contains the loader, content schema, one sample pack with a script-free
+Unity AssetBundle, and one data-only reactive-AI sample pack.
 It does not include the game, BepInEx, Harmony, or game assemblies.
 "@ | Set-Content -LiteralPath (Join-Path $stagePath 'INSTALL.txt') -Encoding UTF8
 

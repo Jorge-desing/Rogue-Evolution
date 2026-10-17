@@ -18,7 +18,48 @@
       "balanceOverrides": [
         { "name": "cost", "value": "70" },
         { "name": "maxHealth", "value": "130" },
-        { "name": "moveSpeed", "value": "1.1" }
+        { "name": "moveSpeed", "value": "1.2" },
+        { "name": "sightRadius", "value": "8" },
+        { "name": "weaponRange", "value": "6" },
+        { "name": "attackCooldown", "value": "0.9" }
+      ]
+    },
+    {
+      "id": "sample-native:heavy-artillery",
+      "nativeTemplateId": "ArtilleryTank",
+      "balanceOverrides": [
+        { "name": "cost", "value": "280" },
+        { "name": "maxHealth", "value": "160" },
+        { "name": "moveSpeed", "value": "0.9" },
+        { "name": "damage1", "value": "55" },
+        { "name": "weaponRange", "value": "16" },
+        { "name": "attackCooldown", "value": "4.0" },
+        { "name": "effectRadius1", "value": "1.5" },
+        { "name": "armorProtection", "value": "2" }
+      ]
+    },
+    {
+      "id": "sample-native:assault-walker",
+      "nativeTemplateId": "GatlingWalker",
+      "balanceOverrides": [
+        { "name": "cost", "value": "380" },
+        { "name": "maxHealth", "value": "420" },
+        { "name": "moveSpeed", "value": "1.05" },
+        { "name": "damage1", "value": "4" },
+        { "name": "attackCooldown", "value": "0.4" },
+        { "name": "weaponRange", "value": "6" },
+        { "name": "armorProtection", "value": "2" }
+      ]
+    },
+    {
+      "id": "sample-native:skirmish-bike",
+      "nativeTemplateId": "BombBike",
+      "balanceOverrides": [
+        { "name": "cost", "value": "55" },
+        { "name": "maxHealth", "value": "75" },
+        { "name": "moveSpeed", "value": "1.8" },
+        { "name": "damage1", "value": "32" },
+        { "name": "effectRadius1", "value": "1.8" }
       ]
     }
   ],
@@ -29,13 +70,73 @@
       "parameterOverrides": [
         { "name": "levelCount", "value": "8" },
         { "name": "maxWidth", "value": "5" },
-        { "name": "coinReward", "value": "150" }
+        { "name": "coinReward", "value": "160" },
+        { "name": "twoWayBranchingProbability", "value": "0.6" },
+        { "name": "shopWeight", "value": "1.8" },
+        { "name": "cardRewardWeight", "value": "3.5" }
       ],
       "mapSizeMin": 20,
-      "mapSizeMax": 120,
+      "mapSizeMax": 60,
       "isPartOfDemo": false,
-      "unitIds": ["sample-native:scout-tank"],
-      "aiProfileIds": ["sample-native:quick-hunter-extension"]
+      "unitIds": [
+        "sample-native:scout-tank",
+        "sample-native:skirmish-bike"
+      ],
+      "aiProfileIds": [
+        "sample-native:quick-hunter-extension"
+      ]
+    },
+    {
+      "id": "sample-native:fortified-frontline",
+      "nativeTemplateId": "StageParameters_Pools_Level3",
+      "parameterOverrides": [
+        { "name": "levelCount", "value": "10" },
+        { "name": "maxWidth", "value": "6" },
+        { "name": "coinReward", "value": "240" },
+        { "name": "startCrystalReward", "value": "80" },
+        { "name": "twoWayBranchingProbability", "value": "0.75" },
+        { "name": "upgradeRewardWeight", "value": "3.0" },
+        { "name": "shopWeight", "value": "2.0" }
+      ],
+      "mapSizeMin": 35,
+      "mapSizeMax": 80,
+      "isPartOfDemo": false,
+      "unitIds": [
+        "sample-native:scout-tank",
+        "sample-native:heavy-artillery",
+        "sample-native:assault-walker"
+      ],
+      "aiProfileIds": [
+        "sample-native:quick-hunter-extension",
+        "sample-native:horde-swarm-assault"
+      ]
+    },
+    {
+      "id": "sample-native:core-battleground",
+      "nativeTemplateId": "StageParameters_Pools_Level5to6",
+      "parameterOverrides": [
+        { "name": "levelCount", "value": "12" },
+        { "name": "maxWidth", "value": "7" },
+        { "name": "coinReward", "value": "350" },
+        { "name": "startCrystalReward", "value": "150" },
+        { "name": "twoWayBranchingProbability", "value": "0.85" },
+        { "name": "relicRewardWeight", "value": "2.5" },
+        { "name": "upgradeRewardWeight", "value": "3.5" }
+      ],
+      "mapSizeMin": 60,
+      "mapSizeMax": 115,
+      "isPartOfDemo": false,
+      "unitIds": [
+        "sample-native:scout-tank",
+        "sample-native:heavy-artillery",
+        "sample-native:assault-walker",
+        "sample-native:skirmish-bike"
+      ],
+      "aiProfileIds": [
+        "sample-native:quick-hunter-extension",
+        "sample-native:horde-swarm-assault",
+        "sample-native:raider-patrol-strike"
+      ]
     }
   ],
   "aiProfiles": [
@@ -47,7 +148,35 @@
           "moduleId": "sample:scheduled-base-build",
           "parameters": [
             { "name": "intervalSeconds", "value": "8" },
-            { "name": "maxSuccessfulBuilds", "value": "1" },
+            { "name": "maxSuccessfulBuilds", "value": "2" },
+            { "name": "maxAttempts", "value": "4" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sample-native:horde-swarm-assault",
+      "nativeTemplateId": "_01_CF Hordes Enemy - constant weak attacks, some big waves, learn crowd control and AoE Variant",
+      "modules": [
+        {
+          "moduleId": "sample:scheduled-base-build",
+          "parameters": [
+            { "name": "intervalSeconds", "value": "12" },
+            { "name": "maxSuccessfulBuilds", "value": "3" },
+            { "name": "maxAttempts", "value": "5" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sample-native:raider-patrol-strike",
+      "nativeTemplateId": "_01_ Jeeps",
+      "modules": [
+        {
+          "moduleId": "sample:scheduled-base-build",
+          "parameters": [
+            { "name": "intervalSeconds", "value": "10" },
+            { "name": "maxSuccessfulBuilds", "value": "2" },
             { "name": "maxAttempts", "value": "3" }
           ]
         }

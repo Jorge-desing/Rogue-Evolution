@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "packId": "sample-reactive-ai:expansion",
+  "assetBundles": [],
+  "units": [],
+  "stages": [
+    {
+      "id": "sample-reactive-ai:counterstrike-lane",
+      "nativeTemplateId": "StageParameters_Pools_Level3",
+      "parameterOverrides": [
+        { "name": "levelCount", "value": "9" },
+        { "name": "maxWidth", "value": "6" },
+        { "name": "coinReward", "value": "220" },
+        { "name": "startCrystalReward", "value": "80" },
+        { "name": "twoWayBranchingProbability", "value": "0.7" }
+      ],
+      "mapSizeMin": 35,
+      "mapSizeMax": 80,
+      "isPartOfDemo": false,
+      "unitIds": [],
+      "aiProfileIds": ["sample-reactive-ai:base-defense"]
+    }
+  ],
+  "aiProfiles": [
+    {
+      "id": "sample-reactive-ai:base-defense",
+      "nativeTemplateId": "_01_Enemy - Melee Poker PCXPoker Variant",
+      "modules": [
+        {
+          "moduleId": "sample:reactive-base-defense",
+          "parameters": [
+            { "name": "baseIndex", "value": "0" },
+            { "name": "cooldownSeconds", "value": "1" },
+            { "name": "defenseRadiusCells", "value": "12" },
+            { "name": "maxResponders", "value": "2" }
+          ]
+        }
+      ]
+    }
+  ]
+}

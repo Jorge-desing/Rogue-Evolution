@@ -17,10 +17,12 @@ if (args.Length != 1)
 string repositoryRoot = Path.GetFullPath(args[0]);
 string sampleManifestPath = Path.Combine(repositoryRoot, "content", "packs", "sample-expansion", "content.json");
 string nativeSampleManifestPath = Path.Combine(repositoryRoot, "content", "packs", "sample-native-expansion", "content.json");
-if (!File.Exists(sampleManifestPath) || !File.Exists(nativeSampleManifestPath))
+string reactiveAiSampleManifestPath = Path.Combine(repositoryRoot, "content", "packs", "sample-reactive-ai", "content.json");
+if (!File.Exists(sampleManifestPath) || !File.Exists(nativeSampleManifestPath) || !File.Exists(reactiveAiSampleManifestPath))
 {
     Console.Error.WriteLine("A required sample manifest was not found: " +
-        (!File.Exists(sampleManifestPath) ? sampleManifestPath : nativeSampleManifestPath));
+        (!File.Exists(sampleManifestPath) ? sampleManifestPath :
+            (!File.Exists(nativeSampleManifestPath) ? nativeSampleManifestPath : reactiveAiSampleManifestPath)));
     return 2;
 }
 
@@ -31,6 +33,9 @@ ContentPackDefinition sample = JsonSerializer.Deserialize<ContentPackDefinition>
 ContentPackDefinition nativeSample = JsonSerializer.Deserialize<ContentPackDefinition>(
     File.ReadAllText(nativeSampleManifestPath), jsonOptions)
     ?? throw new InvalidDataException("The native sample content manifest is empty.");
+ContentPackDefinition reactiveAiSample = JsonSerializer.Deserialize<ContentPackDefinition>(
+    File.ReadAllText(reactiveAiSampleManifestPath), jsonOptions)
+    ?? throw new InvalidDataException("The reactive AI sample content manifest is empty.");
 
 var tests = new (string Name, Action Run)[]
 {
@@ -42,6 +47,11 @@ var tests = new (string Name, Action Run)[]
     ("authored native sample pack passes package-local validation", () =>
     {
         WithPackage(nativeSample, (pack, root) =>
+            ExpectValid(pack, root, new EmptySnapshot(), new KnownModuleValidator()));
+    }),
+    ("reactive AI sample pack passes package-local validation", () =>
+    {
+        WithPackage(reactiveAiSample, (pack, root) =>
             ExpectValid(pack, root, new EmptySnapshot(), new KnownModuleValidator()));
     }),
     ("game compatibility rejects an unsupported Unity version", () =>
@@ -290,6 +300,51 @@ var tests = new (string Name, Action Run)[]
             maximums.MaximumAttempts != 128)
         {
             throw new InvalidOperationException("The scheduled AI parser rejected valid upper-bound values.");
+        }
+    }),
+    ("reactive base-defense AI parser supplies bounded defaults", () =>
+    {
+        if (!ReactiveBaseDefenseParameterParser.TryParse(null, out ReactiveBaseDefenseSettings defaults,
+            out string diagnostic) || diagnostic != null || defaults.BaseIndex != 0 ||
+            defaults.CooldownSeconds != 1f || defaults.DefenseRadiusCells != 12f || defaults.MaximumResponders != 2)
+        {
+            throw new InvalidOperationException("The reactive AI parser did not return its documented defaults.");
+        }
+
+        ContentModuleParameter[] boundaries =
+        [
+            new ContentModuleParameter { name = "baseIndex", value = "31" },
+            new ContentModuleParameter { name = "cooldownSeconds", value = "60" },
+            new ContentModuleParameter { name = "defenseRadiusCells", value = "64" },
+            new ContentModuleParameter { name = "maxResponders", value = "4" }
+        ];
+        if (!ReactiveBaseDefenseParameterParser.TryParse(boundaries, out ReactiveBaseDefenseSettings maximums,
+            out diagnostic) || diagnostic != null || maximums.BaseIndex != 31 || maximums.CooldownSeconds != 60f ||
+            maximums.DefenseRadiusCells != 64f || maximums.MaximumResponders != 4)
+        {
+            throw new InvalidOperationException("The reactive AI parser rejected valid upper-bound values.");
+        }
+    }),
+    ("reactive base-defense AI parser rejects unknown, duplicate, null, and out-of-range values", () =>
+    {
+        ContentModuleParameter[][] invalidInputs =
+        [
+            [new ContentModuleParameter { name = "unknown", value = "1" }],
+            [new ContentModuleParameter { name = "baseIndex", value = "0" }, new ContentModuleParameter { name = "baseIndex", value = "1" }],
+            [null!],
+            [new ContentModuleParameter { name = "baseIndex", value = "32" }],
+            [new ContentModuleParameter { name = "maxResponders", value = "5" }],
+            [new ContentModuleParameter { name = "cooldownSeconds", value = "NaN" }],
+            [new ContentModuleParameter { name = "defenseRadiusCells", value = "Infinity" }]
+        ];
+
+        for (int i = 0; i < invalidInputs.Length; i++)
+        {
+            if (ReactiveBaseDefenseParameterParser.TryParse(invalidInputs[i], out _, out string diagnostic) ||
+                diagnostic == null)
+            {
+                throw new InvalidOperationException("The reactive AI parser accepted invalid input " + i + ".");
+            }
         }
     }),
     ("scheduled base-build AI parser rejects unknown duplicate and null parameters", () =>
@@ -1270,7 +1325,7 @@ sealed class KnownModuleValidator : IAiModuleValidator
 {
     public bool TryValidate(string moduleId, ContentModuleParameter[] parameters, out string diagnostic)
     {
-        bool known = moduleId is "sample:scheduled-base-build" or "sample:trace-default";
+        bool known = moduleId is "sample:scheduled-base-build" or "sample:reactive-base-defense" or "sample:trace-default";
         diagnostic = known ? string.Empty : "Unknown compiled AI module: " + moduleId;
         return known;
     }

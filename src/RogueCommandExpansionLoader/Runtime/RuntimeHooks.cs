@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using UnityEngine;
 
 namespace RogueCommandExpansionLoader.Runtime
@@ -276,6 +277,8 @@ namespace RogueCommandExpansionLoader.Runtime
 
     internal static class UnityResourcesLoadTypedPatch
     {
+        private static UnityEngine.Object _fallbackTmpSettings;
+
         /// <summary>
         /// Patch the shared Resources.Load(string, Type) implementation used by generic and
         /// non-generic wrappers. Every requested asset type follows one type-checked path.
@@ -301,6 +304,99 @@ namespace RogueCommandExpansionLoader.Runtime
                 {
                     __result = asset;
                     return false;
+                }
+
+                if (String.Equals(path, "TMP Settings", StringComparison.Ordinal) ||
+                    String.Equals(path, "TMP Settings.asset", StringComparison.Ordinal))
+                {
+                    if (_fallbackTmpSettings == null && typeof(ScriptableObject).IsAssignableFrom(systemTypeInstance))
+                    {
+                        try
+                        {
+                            ScriptableObject settings = ScriptableObject.CreateInstance(systemTypeInstance);
+                            settings.name = "Fallback TMP Settings";
+                            settings.hideFlags = HideFlags.HideAndDontSave;
+
+                            // 1. m_defaultStyleSheet with "Normal" style initialized
+                            FieldInfo styleSheetField = systemTypeInstance.GetField("m_defaultStyleSheet",
+                                BindingFlags.NonPublic | BindingFlags.Instance);
+                            if (styleSheetField != null && typeof(ScriptableObject).IsAssignableFrom(styleSheetField.FieldType))
+                            {
+                                ScriptableObject sheet = ScriptableObject.CreateInstance(styleSheetField.FieldType);
+                                sheet.name = "Fallback TMP Style Sheet";
+                                sheet.hideFlags = HideFlags.HideAndDontSave;
+                                MethodInfo refreshStyles = styleSheetField.FieldType.GetMethod("RefreshStyles",
+                                    BindingFlags.Public | BindingFlags.Instance);
+                                if (refreshStyles != null)
+                                {
+                                    refreshStyles.Invoke(sheet, null);
+                                }
+                                styleSheetField.SetValue(settings, sheet);
+                            }
+
+                            // 2. m_linebreakingRules initialized with empty dictionaries
+                            FieldInfo linebreakingField = systemTypeInstance.GetField("m_linebreakingRules",
+                                BindingFlags.NonPublic | BindingFlags.Instance);
+                            if (linebreakingField != null)
+                            {
+                                Type tableType = linebreakingField.FieldType;
+                                object tableInstance = Activator.CreateInstance(tableType);
+                                FieldInfo leadingField = tableType.GetField("leadingCharacters", BindingFlags.Public | BindingFlags.Instance);
+                                FieldInfo followingField = tableType.GetField("followingCharacters", BindingFlags.Public | BindingFlags.Instance);
+                                if (leadingField != null)
+                                {
+                                    leadingField.SetValue(tableInstance, Activator.CreateInstance(leadingField.FieldType));
+                                }
+                                if (followingField != null)
+                                {
+                                    followingField.SetValue(tableInstance, Activator.CreateInstance(followingField.FieldType));
+                                }
+                                linebreakingField.SetValue(settings, tableInstance);
+                            }
+
+                            // 3. m_fallbackFontAssets non-null list
+                            FieldInfo fallbackFontsField = systemTypeInstance.GetField("m_fallbackFontAssets",
+                                BindingFlags.NonPublic | BindingFlags.Instance);
+                            if (fallbackFontsField != null)
+                            {
+                                fallbackFontsField.SetValue(settings, Activator.CreateInstance(fallbackFontsField.FieldType));
+                            }
+
+                            // 4. Safe non-null path strings
+                            FieldInfo fontPathField = systemTypeInstance.GetField("m_defaultFontAssetPath",
+                                BindingFlags.NonPublic | BindingFlags.Instance);
+                            if (fontPathField != null) fontPathField.SetValue(settings, string.Empty);
+                            FieldInfo spritePathField = systemTypeInstance.GetField("m_defaultSpriteAssetPath",
+                                BindingFlags.NonPublic | BindingFlags.Instance);
+                            if (spritePathField != null) spritePathField.SetValue(settings, string.Empty);
+                            FieldInfo stylePathField = systemTypeInstance.GetField("m_StyleSheetsResourcePath",
+                                BindingFlags.NonPublic | BindingFlags.Instance);
+                            if (stylePathField != null) stylePathField.SetValue(settings, string.Empty);
+                            FieldInfo gradPathField = systemTypeInstance.GetField("m_defaultColorGradientPresetsPath",
+                                BindingFlags.NonPublic | BindingFlags.Instance);
+                            if (gradPathField != null) gradPathField.SetValue(settings, string.Empty);
+
+                            // 5. Assign static s_Instance so TMP_Settings.instance returns immediately
+                            FieldInfo instanceField = systemTypeInstance.GetField("s_Instance",
+                                BindingFlags.NonPublic | BindingFlags.Static);
+                            if (instanceField != null)
+                            {
+                                instanceField.SetValue(null, settings);
+                            }
+
+                            _fallbackTmpSettings = settings;
+                        }
+                        catch
+                        {
+                            // Fallback creation failure passes through to engine.
+                        }
+                    }
+
+                    if (_fallbackTmpSettings != null && systemTypeInstance.IsInstanceOfType(_fallbackTmpSettings))
+                    {
+                        __result = _fallbackTmpSettings;
+                        return false;
+                    }
                 }
 
                 return true;

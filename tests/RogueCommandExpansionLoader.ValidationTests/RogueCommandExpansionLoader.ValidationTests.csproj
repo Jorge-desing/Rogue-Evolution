@@ -29,6 +29,8 @@
              Link="Runtime/RuntimeContentMutator.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Modules/ScheduledBaseBuildParameters.cs"
              Link="Modules/ScheduledBaseBuildParameters.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Modules/ReactiveBaseDefenseParameters.cs"
+             Link="Modules/ReactiveBaseDefenseParameters.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Contracts/IRogueCommandAiModule.cs"
              Link="Contracts/IRogueCommandAiModule.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Modules/AiModuleRegistry.cs"
