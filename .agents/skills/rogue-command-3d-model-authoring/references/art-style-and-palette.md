@@ -50,6 +50,8 @@ Every unit must pass the **Squint Test**: when zoomed out or viewed as a solid b
 | **Heavy Artillery** | `ArtilleryTank` | Broad tracked chassis, rear recoil spade/outriggers, massive elongated cannon barrel | ~2.8m × 3.6m × 1.9m | Rear-biased, heavy ground contact |
 | **Assault Walker** | `GatlingWalker` | Vertical bipedal stance, inverted knee (digitigrade), twin underslung rotary guns | ~2.2m × 2.0m × 2.7m | Upper torso, dynamic vertical |
 | **Surge / Arc Tank** | `LightningTank` | Segmented tracked hull, central toroidal reactor/induction coil, forward emitter prongs | ~2.3m × 2.8m × 1.6m | Central reactor core |
+| **Hover Skimmer** | `PCXBaseTank` | Anti-grav repulsor cushion, ventral thruster bells, lateral stabilizer fins | ~2.5m × 2.9m × 1.6m | Floating ~0.24m–0.45m above ground |
+| **Siege Spider / Quad** | `GatlingWalker` | 4 wide outrigger crawler legs, central turret, heavy hydraulic knee knuckles | ~4.6m × 4.8m × 1.8m | Low, stable wide 4-point footprint |
 
 ---
 

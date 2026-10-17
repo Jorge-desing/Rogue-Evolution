@@ -27,6 +27,7 @@ sys.path.insert(0, str(SCRIPT_DIR))
 sys.path.insert(0, str(REPO_ROOT / "tools"))
 
 import bpy
+from mathutils import Vector
 import RogueModelKit as rmk
 
 
@@ -43,7 +44,7 @@ def parse_args():
     parser.add_argument(
         "--archetype",
         default="tank",
-        choices=["tank", "walker", "bike", "artillery", "arc_tank"],
+        choices=["tank", "walker", "bike", "artillery", "arc_tank", "hover", "spider"],
         help="Vehicle archetype",
     )
     parser.add_argument(
@@ -60,6 +61,12 @@ def parse_args():
     )
     parser.add_argument("--dozer", action="store_true", help="Include frontal dozer ram blade")
     parser.add_argument("--skirts", action="store_true", default=True, help="Include armored side skirts")
+    parser.add_argument("--smoke", action="store_true", help="Include multi-tube smoke discharger banks")
+    parser.add_argument("--radar", action="store_true", help="Include command/recon radar dish")
+    parser.add_argument("--sponsons", action="store_true", help="Include armored external side sponsons")
+    parser.add_argument("--locators", action="store_true", default=True, help="Generate Unity locator sockets")
+    parser.add_argument("--dirt", action="store_true", default=True, help="Bake procedural vertex ambient dirt/cavity shading")
+    parser.add_argument("--smooth-angle", type=float, default=38.0, help="Smart angle-weighted auto-smooth threshold in degrees")
     parser.add_argument("--multiview", action="store_true", help="Render 4 orthographic views")
     parser.add_argument("--out-dir", default=None, help="Base root directory for outputs")
     parser.add_argument("--blend-path", default=None, help="Explicit .blend output file path")
@@ -99,7 +106,6 @@ def main():
     # 1. Mobility and Chassis by Archetype
     if args.archetype == "walker":
         builder.add_bipedal_legs(hip_height=1.45, hip_spacing_x=0.88)
-        # Torso chassis
         builder.objects.extend([
             rmk.make_box(f"{args.name}Armor_Pelvis", (0.92, 0.65, 0.42), (0.0, -0.02, 1.40), builder.palette.gunmetal, 0.08),
             rmk.make_box(f"{args.name}Armor_Torso", (1.14, 0.74, 0.78), (0.0, 0.02, 1.96), builder.palette.primary_armor, 0.09),
@@ -109,22 +115,31 @@ def main():
         builder.add_sensor_visor()
 
     elif args.archetype == "bike":
-        builder.add_all_terrain_wheels(wheelbase_y=1.9, track_width_x=0.0, wheel_radius=0.36, wheel_width=0.22)
-        # Spine frame and cockpit
+        builder.add_all_terrain_wheels(wheelbase_y=1.95, track_width_x=0.0, wheel_radius=0.38, wheel_width=0.22)
         builder.objects.extend([
-            rmk.make_box(f"{args.name}Armor_FrameSpine", (0.36, 1.95, 0.38), (0.0, 0.0, 0.72), builder.palette.primary_armor, 0.045),
-            rmk.make_box(f"{args.name}Armor_EngineBlock", (0.48, 0.72, 0.44), (0.0, -0.15, 0.85), builder.palette.gunmetal, 0.04),
-            rmk.make_box(f"{args.name}Armor_CowlVisor", (0.42, 0.52, 0.30), (0.0, 0.48, 1.05), builder.palette.light_armor, 0.035,
-                         (math.radians(-15), 0.0, 0.0)),
+            rmk.make_box(f"{args.name}Armor_SpineFrame", (0.34, 1.85, 0.38), (0.0, -0.05, 0.72), builder.palette.primary_armor, 0.04),
+            rmk.make_box(f"{args.name}Armor_EngineBlock", (0.46, 0.68, 0.42), (0.0, -0.18, 0.82), builder.palette.gunmetal, 0.035),
+            rmk.make_box(f"{args.name}Armor_CockpitCowl", (0.42, 0.58, 0.32), (0.0, 0.45, 1.05), builder.palette.light_armor, 0.03,
+                          (math.radians(-16), 0.0, 0.0)),
+            rmk.make_rod(f"{args.name}Joint_Fork_L", Vector((-0.18, 0.45, 1.05)), Vector((-0.16, 0.98, 0.38)), 0.035, builder.palette.gunmetal),
+            rmk.make_rod(f"{args.name}Joint_Fork_R", Vector((0.18, 0.45, 1.05)), Vector((0.16, 0.98, 0.38)), 0.035, builder.palette.gunmetal),
+            rmk.make_box(f"{args.name}Joint_Handlebars", (0.64, 0.06, 0.05), (0.0, 0.38, 1.18), builder.palette.gunmetal, 0.01),
+            rmk.make_rod(f"{args.name}Joint_Swingarm_L", Vector((-0.18, -0.18, 0.65)), Vector((-0.16, -0.98, 0.38)), 0.038, builder.palette.gunmetal),
+            rmk.make_rod(f"{args.name}Joint_Swingarm_R", Vector((0.18, -0.18, 0.65)), Vector((0.16, -0.98, 0.38)), 0.038, builder.palette.gunmetal),
         ])
         builder.add_sensor_visor()
+        for side in (-1, 1):
+            side_tag = "L" if side < 0 else "R"
+            builder.objects.append(rmk.make_box(
+                f"{args.name}Armor_SidePod_{side_tag}",
+                (0.18, 0.58, 0.28), (side * 0.36, -0.12, 0.72), builder.palette.primary_armor, 0.02
+            ))
 
     elif args.archetype == "artillery":
         builder.add_sloped_hull(length=3.4, width=2.6, height=0.96)
         builder.add_continuous_tracks(length=3.2, height=0.68, belt_width=0.36, roadwheels=6, with_skirts=args.skirts)
         builder.add_engine_deck(slat_count=4, with_exhausts=True)
         builder.add_turret(size=(1.5, 1.7, 0.48), center_y=0.12)
-        # Rear outrigger recoil spades
         for side in (-1, 1):
             side_tag = "L" if side < 0 else "R"
             builder.objects.extend([
@@ -144,6 +159,19 @@ def main():
         builder.add_arc_emitter(core_radius=0.22, prongs=3)
         builder.add_sensor_visor()
 
+    elif args.archetype == "hover":
+        builder.add_sloped_hull(length=2.9, width=2.5, height=0.78)
+        builder.add_hover_skimmer(float_height=0.48)
+        builder.add_turret(size=(1.35, 1.5, 0.42), center_y=0.06)
+        builder.add_sensor_visor()
+        builder.add_spring_antenna()
+
+    elif args.archetype == "spider":
+        builder.add_sloped_hull(length=2.6, width=2.4, height=0.82)
+        builder.add_quad_crawler_legs(knee_height=0.98, reach_x=1.12, reach_y=0.88)
+        builder.add_turret(size=(1.45, 1.55, 0.44), center_y=0.04)
+        builder.add_sensor_visor()
+
     else:  # standard tank
         builder.add_sloped_hull(length=3.0, width=2.4, height=0.88)
         builder.add_continuous_tracks(length=2.85, height=0.62, belt_width=0.34, roadwheels=5, with_skirts=args.skirts)
@@ -155,9 +183,9 @@ def main():
     # 2. Weapons
     if args.archetype not in ("arc_tank",):
         if args.weapon == "gatling":
-            if args.archetype == "walker":
-                builder.add_rotary_gatling(side=-1, pivot_offset=(0.80, 0.45, 1.45))
-                builder.add_rotary_gatling(side=1, pivot_offset=(0.80, 0.45, 1.45))
+            if args.archetype in ("walker", "bike"):
+                builder.add_rotary_gatling(side=-1, pivot_offset=(0.75, 0.35, 1.25))
+                builder.add_rotary_gatling(side=1, pivot_offset=(0.75, 0.35, 1.25))
             else:
                 builder.add_rotary_gatling(side=1)
         elif args.weapon == "missile":
@@ -167,9 +195,18 @@ def main():
         else:  # cannon
             builder.add_cannon(caliber=0.095, length=1.70, elevation_deg=11.0)
 
-    # 3. Optional Dozer Blade
+    # 3. Optional Subsystems & Greebles
     if args.dozer and args.archetype in ("tank", "artillery"):
         builder.add_dozer_blade(width=builder.hull_width * 1.05, height=0.44)
+
+    if args.smoke and args.archetype in ("tank", "artillery", "hover", "spider"):
+        builder.add_smoke_launchers(tube_count=3)
+
+    if args.radar:
+        builder.add_radar_dish()
+
+    if args.sponsons and args.archetype in ("tank", "artillery"):
+        builder.add_side_sponsons()
 
     # 4. Build, Validate, and Export
     res = builder.build_and_export(
@@ -178,7 +215,11 @@ def main():
         preview_path=preview_path,
         card_path=card_path,
         render_multiview=args.multiview,
-        ortho_scale=6.2 if args.archetype == "artillery" else 5.6,
+        ortho_scale=6.2 if args.archetype in ("artillery", "spider") else 5.6,
+        smooth_by_angle=True,
+        smooth_angle_deg=args.smooth_angle,
+        bake_vertex_dirt=args.dirt,
+        include_locators=args.locators,
     )
 
     print("\n========================================================")

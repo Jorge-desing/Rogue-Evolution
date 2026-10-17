@@ -158,6 +158,45 @@ for side in (-1, 1):
     model_objects.extend(leg)
 ```
 
+### D. Articulated Quad-Crawler Spider Leg (`make_quad_crawler_leg`)
+Generates heavy 4-legged walking artillery and siege spider platforms:
+- Heavy rotary hip knuckle actuator.
+- Reinforced upper femur boom with hydraulic support ram.
+- Knee hinge joint with protective knuckle armor.
+- Lower tibia strut angled towards ground contact.
+- Broad circular foot pad with rubber tread base and ankle shock sleeve resting exactly at $Z \ge 0.0\text{m}$.
+
+```python
+for sx in (-1, 1):
+    for sy in (-1, 1):
+        tag = f"{'L' if sx < 0 else 'R'}_{'F' if sy > 0 else 'R'}"
+        leg = rmk.make_quad_crawler_leg(
+            prefix=f"Spider_Leg_{tag}",
+            hip_location=(sx * 1.10, sy * 0.95, 0.72),
+            side_x=sx, side_y=sy,
+            reach_x=1.15, reach_y=0.90, knee_height=1.02,
+            armor_mat=armor_primary, joint_mat=gunmetal, damper_mat=armor_light
+        )
+        model_objects.extend(leg)
+```
+
+### E. Anti-Grav Repulsor Skimmer Assembly (`make_hover_skimmer_assembly`)
+Creates a futuristic hovering propulsion unit for skimmers and assault hovercraft:
+- Ventral repulsor cushion skirt with chamfered cowlings.
+- 4 downward-firing thruster bells with glowing plasma field emitter cores.
+- Lateral aerodynamic stabilizer strakes/fins angled for ground-effect lift.
+- Twin rear vectoring thrust ducts with glowing internal nozzles.
+
+```python
+skimmer = rmk.make_hover_skimmer_assembly(
+    prefix="Skimmer_Propulsion",
+    hull_length=2.9, hull_width=2.5, float_height=0.52,
+    skirt_mat=armor_primary, thruster_mat=gunmetal,
+    core_mat=armor_light, glow_mat=emissive_cyan
+)
+model_objects.extend(skimmer)
+```
+
 ---
 
 ## 5. Heavy Weapon System Generators
@@ -275,27 +314,86 @@ era_tiles = rmk.make_armor_applique_array(
 ### D. Hexagonal Bolt Seams (`make_hex_bolt_array`)
 Places low-poly 6-sided bolt heads along armor seams or joint flanges without excess geometry.
 
----
-
-## 7. Draw-Call Batching & Performance Optimization
-
-Procedural kitbashing often produces 50–120 individual objects. In Unity, each object becomes an independent GameObject and draw call unless batched.
-
-`batch_and_join_by_material` unifies meshes sharing the same PBR material into 4–6 batched submeshes while preserving designated animated/gameplay pivots:
-
+### E. Smoke Discharger Racks (`make_smoke_launcher_rack`)
+Multi-tube defensive grenade banks with angled bracket and recessed launch bores:
 ```python
-# Unify all static armor, treads, and details, while preserving turret and gun pivots
-optimized_objects = rmk.batch_and_join_by_material(
-    model_objects,
-    prefix="Colossus",
-    preserve_names=["TurretBase", "MainBarrel"]
+smoke_rack = rmk.make_smoke_launcher_rack(
+    prefix="Turret_Smoke",
+    location=(0.65, 0.25, 1.25),
+    tube_count=3,
+    direction=(0.7, 0.7, 0.4),
+    armor_mat=armor_primary, tube_mat=gunmetal, cap_mat=warning_amber
 )
 ```
 
-Benefits:
-- Reduces Unity draw calls from ~100 to ~5.
-- Automatically recalculates consistent normals and preserves flat shading.
-- Maintains script-free prefab hygiene.
+### F. Tactical Radar Dish & Rotodome (`make_radar_dish_or_rotodome`)
+Turntable-mounted parabolic dish or elliptical rotodome with feed horn and transceiver:
+```python
+radar = rmk.make_radar_dish_or_rotodome(
+    prefix="Command_Radar",
+    location=(0.0, -0.45, 1.35),
+    dish_radius=0.42, is_rotodome=False,
+    armor_mat=armor_primary, antenna_mat=gunmetal, accent_mat=warning_amber
+)
+```
+
+### G. Armored Side Sponsons (`make_side_sponson_assembly`)
+External armored ammo panniers or auxiliary fuel cells with retention straps:
+```python
+sponson = rmk.make_side_sponson_assembly(
+    prefix="Tank_FuelDrum",
+    location=(1.35, -0.20, 0.65),
+    side=1, size=(0.26, 0.82, 0.38),
+    armor_mat=armor_primary, strap_mat=gunmetal, accent_mat=warning_amber
+)
+```
+
+### H. Procedural Unity Socket Locators (`create_unity_locator_sockets`)
+Generates standardized empty transforms (`Socket_MuzzlePrimary`, `Socket_TurretPivot`, `Socket_Exhaust_L`, `Socket_Exhaust_R`, `Socket_SensorEye`) exported directly into the FBX hierarchy:
+```python
+locators = rmk.create_unity_locator_sockets(
+    name_prefix="SiegeTank",
+    muzzle_loc=(0.0, 2.45, 1.25), muzzle_dir=(0.0, 1.0, 0.1),
+    turret_loc=(0.0, 0.05, 1.15),
+    exhaust_left=(-0.52, -1.35, 0.98), exhaust_right=(0.52, -1.35, 0.98)
+)
+```
+
+---
+
+## 7. Draw-Call Batching, Smart Smoothing & Cavity Baking
+
+Procedural kitbashing produces 50–120 individual objects. In Unity, each object becomes an independent GameObject and draw call unless batched.
+
+### A. Material Batching with Smart Angle Smoothing
+`batch_and_join_by_material` unifies meshes sharing the same PBR material into 4–6 batched submeshes while preserving designated animated/gameplay pivots:
+
+```python
+optimized_objects = rmk.batch_and_join_by_material(
+    model_objects,
+    prefix="Colossus",
+    preserve_names=["TurretBase", "MainBarrel"],
+    smooth_by_angle=True,
+    smooth_angle_deg=38.0
+)
+```
+
+- **Smart Angle-Weighted Smoothing**: Uses Blender 4.5's `bpy.ops.object.shade_smooth_by_angle` to produce silky smooth round barrels, road wheels, hubs, and exhaust pipes, while preserving razor-sharp 45°/90° chamfers on flat armor plates.
+- **Draw Call Reduction**: Reduces Unity draw calls from ~100 to ~5.
+- **Clean Normals**: Re-evaluates outward normals consistently and strips non-manifold seams.
+
+### B. Procedural Vertex Ambient Dirt Baking (`bake_vertex_ambient_dirt`)
+Calculates crevice darkening and contact occlusion directly into the `Color` vertex attribute (`Mesh.colors32`), giving deep contact shadows to wheel wells, panel seams, and recesses without texture maps:
+
+```python
+rmk.bake_vertex_ambient_dirt(
+    model_objects,
+    blur_strength=1.0,
+    dirt_angle_deg=90.0,
+    clean_angle_deg=110.0,
+    attribute_name="Color"
+)
+```
 
 ---
 

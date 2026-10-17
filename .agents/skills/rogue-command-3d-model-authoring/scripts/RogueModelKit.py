@@ -1227,6 +1227,286 @@ def make_gimbal_sensor_turret(
     return objects
 
 
+def make_smoke_launcher_rack(
+    prefix: str,
+    location: Tuple[float, float, float] | Vector,
+    tube_count: int = 3,
+    direction: Tuple[float, float, float] | Vector = (0.5, 0.86, 0.38),
+    armor_mat: bpy.types.Material | None = None,
+    tube_mat: bpy.types.Material | None = None,
+    cap_mat: bpy.types.Material | None = None,
+) -> list[bpy.types.Object]:
+    """Generates an angled multi-tube defensive smoke grenade discharger bank."""
+    objects = []
+    loc_v = Vector(location)
+    dir_v = Vector(direction).normalized()
+    u_vec, v_vec, forward_v = get_orthonormal_basis(dir_v)
+    rot_euler = forward_v.to_track_quat("Z", "Y").to_euler()
+
+    spacing = 0.075
+    base_w = tube_count * spacing + 0.04
+    base_h = 0.08
+    base_d = 0.04
+    objects.append(make_box(
+        f"{prefix}_MountBase", (base_w, base_d, base_h), loc_v, armor_mat,
+        bevel=0.006, rotation=rot_euler
+    ))
+
+    start_u = -(tube_count - 1) * 0.5 * spacing
+    for i in range(tube_count):
+        offset = start_u + i * spacing
+        tube_center = loc_v + u_vec * offset + forward_v * 0.07 + v_vec * 0.02
+        objects.append(make_cylinder(
+            f"{prefix}_Tube_{i+1}", 0.026, 0.13, tube_center, tube_mat,
+            rotation=rot_euler, vertices=8, bevel=0.004
+        ))
+        cap_center = tube_center + forward_v * 0.07
+        objects.append(make_cylinder(
+            f"{prefix}_Cap_{i+1}", 0.022, 0.02, cap_center, cap_mat,
+            rotation=rot_euler, vertices=8
+        ))
+    return objects
+
+
+def make_radar_dish_or_rotodome(
+    prefix: str,
+    location: Tuple[float, float, float] | Vector,
+    dish_radius: float = 0.42,
+    tilt_deg: float = 18.0,
+    is_rotodome: bool = False,
+    armor_mat: bpy.types.Material | None = None,
+    antenna_mat: bpy.types.Material | None = None,
+    accent_mat: bpy.types.Material | None = None,
+) -> list[bpy.types.Object]:
+    """Generates a command/recon radar antenna: parabolic dish or elliptical rotodome."""
+    objects = []
+    loc_v = Vector(location)
+    objects.append(make_cylinder(
+        f"{prefix}_TurntableBase", 0.16, 0.08, loc_v + Vector((0.0, 0.0, 0.04)),
+        antenna_mat, vertices=10, bevel=0.008
+    ))
+    objects.append(make_cylinder(
+        f"{prefix}_PedestalMast", 0.065, 0.22, loc_v + Vector((0.0, 0.0, 0.18)),
+        antenna_mat, vertices=8, bevel=0.005
+    ))
+
+    dish_center = loc_v + Vector((0.0, 0.0, 0.32))
+    tilt_rad = math.radians(tilt_deg)
+    rot_euler = (tilt_rad, 0.0, 0.0)
+
+    if is_rotodome:
+        objects.append(make_cylinder(
+            f"{prefix}_RotodomeBody", dish_radius, 0.12, dish_center, armor_mat,
+            rotation=rot_euler, vertices=12, bevel=0.02
+        ))
+        objects.append(make_cylinder(
+            f"{prefix}_RadomeCap", dish_radius * 0.45, 0.16, dish_center, accent_mat,
+            rotation=rot_euler, vertices=10, bevel=0.01
+        ))
+    else:
+        objects.append(make_cylinder(
+            f"{prefix}_DishBacking", dish_radius, 0.04, dish_center, armor_mat,
+            rotation=rot_euler, vertices=12, bevel=0.008
+        ))
+        horn_pos = dish_center + Vector((0.0, math.cos(tilt_rad) * 0.24, math.sin(tilt_rad) * 0.24))
+        objects.append(make_rod(
+            f"{prefix}_FeedHornStrut", dish_center, horn_pos, 0.015,
+            antenna_mat, vertices=6
+        ))
+        objects.append(make_cylinder(
+            f"{prefix}_FeedTransceiver", 0.045, 0.06, horn_pos, accent_mat,
+            rotation=rot_euler, vertices=8
+        ))
+
+    return objects
+
+
+def make_quad_crawler_leg(
+    prefix: str,
+    hip_location: Tuple[float, float, float] | Vector,
+    side_x: int = 1,
+    side_y: int = 1,
+    reach_x: float = 0.95,
+    reach_y: float = 0.75,
+    knee_height: float = 0.95,
+    foot_radius: float = 0.22,
+    armor_mat: bpy.types.Material | None = None,
+    joint_mat: bpy.types.Material | None = None,
+    damper_mat: bpy.types.Material | None = None,
+    accent_mat: bpy.types.Material | None = None,
+) -> list[bpy.types.Object]:
+    """Generates an articulated heavy spider/crawler leg resting securely on Z >= 0.0m."""
+    objects = []
+    hip_v = Vector(hip_location)
+    foot_target = Vector((hip_v.x + side_x * reach_x, hip_v.y + side_y * reach_y, 0.0))
+    knee_v = Vector((
+        hip_v.x + side_x * (reach_x * 0.65),
+        hip_v.y + side_y * (reach_y * 0.60),
+        knee_height
+    ))
+
+    objects.append(make_cylinder(
+        f"{prefix}_HipActuator", 0.18, 0.22, hip_v, joint_mat,
+        rotation=(0.0, math.radians(90), 0.0), vertices=10, bevel=0.012
+    ))
+    objects.append(make_rod(
+        f"{prefix}_FemurBoom", hip_v, knee_v, 0.085, armor_mat, vertices=8
+    ))
+    damper_start = hip_v - Vector((0.0, 0.0, 0.10))
+    damper_mid = (damper_start + knee_v) * 0.5
+    objects.append(make_rod(
+        f"{prefix}_FemurRam", damper_start, damper_mid, 0.045, damper_mat, vertices=6
+    ))
+    objects.append(make_cylinder(
+        f"{prefix}_KneeKnuckle", 0.15, 0.20, knee_v, joint_mat,
+        rotation=(math.radians(90), 0.0, 0.0), vertices=10, bevel=0.01
+    ))
+    objects.append(make_rod(
+        f"{prefix}_TibiaStrut", knee_v, foot_target + Vector((0.0, 0.0, 0.10)),
+        0.075, joint_mat, vertices=8
+    ))
+    objects.append(make_cylinder(
+        f"{prefix}_FootPad", foot_radius, 0.08, foot_target + Vector((0.0, 0.0, 0.04)),
+        armor_mat, vertices=10, bevel=0.015
+    ))
+    objects.append(make_cylinder(
+        f"{prefix}_FootTread", foot_radius * 1.08, 0.03, foot_target + Vector((0.0, 0.0, 0.015)),
+        damper_mat, vertices=10
+    ))
+    objects.append(make_cylinder(
+        f"{prefix}_AnkleSleeve", 0.10, 0.16, foot_target + Vector((0.0, 0.0, 0.14)),
+        accent_mat, vertices=8, bevel=0.008
+    ))
+    return objects
+
+
+def make_hover_skimmer_assembly(
+    prefix: str,
+    hull_length: float = 3.0,
+    hull_width: float = 2.4,
+    float_height: float = 0.55,
+    skirt_mat: bpy.types.Material | None = None,
+    thruster_mat: bpy.types.Material | None = None,
+    core_mat: bpy.types.Material | None = None,
+    glow_mat: bpy.types.Material | None = None,
+) -> list[bpy.types.Object]:
+    """Generates an anti-grav repulsor cushion, ventral thruster bells, and stabilizer strakes."""
+    objects = []
+    objects.append(make_box(
+        f"{prefix}_RepulsorSkirt",
+        (hull_width * 0.92, hull_length * 0.88, 0.22),
+        (0.0, 0.0, float_height),
+        skirt_mat, bevel=0.04
+    ))
+    bell_rx = hull_width * 0.32
+    bell_ry = hull_length * 0.28
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            tag = f"{'L' if sx < 0 else 'R'}_{'F' if sy > 0 else 'R'}"
+            bell_loc = Vector((sx * bell_rx, sy * bell_ry, float_height - 0.04))
+            objects.append(make_cylinder(
+                f"{prefix}_ThrusterBell_{tag}", 0.24, 0.12, bell_loc,
+                thruster_mat, vertices=10, bevel=0.015
+            ))
+            objects.append(make_cylinder(
+                f"{prefix}_ThrusterCore_{tag}", 0.18, 0.03, bell_loc - Vector((0.0, 0.0, 0.05)),
+                glow_mat, vertices=10
+            ))
+
+    for side in (-1, 1):
+        side_tag = "L" if side < 0 else "R"
+        objects.append(make_box(
+            f"{prefix}_StabilizerStrake_{side_tag}",
+            (0.18, hull_length * 0.65, 0.06),
+            (side * (hull_width * 0.52), -hull_length * 0.05, float_height + 0.08),
+            core_mat, bevel=0.012, rotation=(0.0, math.radians(side * -14), 0.0)
+        ))
+
+    for side in (-1, 1):
+        side_tag = "L" if side < 0 else "R"
+        ex_loc = Vector((side * (hull_width * 0.26), -hull_length * 0.48, float_height + 0.12))
+        objects.append(make_box(
+            f"{prefix}_VectoringExhaust_{side_tag}",
+            (0.28, 0.35, 0.18), ex_loc, core_mat, bevel=0.018
+        ))
+        objects.append(make_box(
+            f"{prefix}_VectoringNozzle_{side_tag}",
+            (0.20, 0.04, 0.12), ex_loc - Vector((0.0, 0.16, 0.0)), glow_mat
+        ))
+    return objects
+
+
+def make_side_sponson_assembly(
+    prefix: str,
+    location: Tuple[float, float, float] | Vector,
+    side: int = 1,
+    size: Tuple[float, float, float] = (0.28, 0.85, 0.42),
+    armor_mat: bpy.types.Material | None = None,
+    strap_mat: bpy.types.Material | None = None,
+    accent_mat: bpy.types.Material | None = None,
+) -> list[bpy.types.Object]:
+    """Generates an armored external sponson, ammo pannier, or auxiliary fuel cell."""
+    objects = []
+    loc_v = Vector(location)
+    objects.append(make_box(
+        f"{prefix}_PannierBody", size, loc_v, armor_mat, bevel=0.02
+    ))
+    for sy in (-1, 1):
+        strap_y = loc_v.y + sy * (size[1] * 0.34)
+        objects.append(make_box(
+            f"{prefix}_Strap_{'F' if sy > 0 else 'R'}",
+            (size[0] * 1.05, 0.05, size[2] * 1.05),
+            (loc_v.x, strap_y, loc_v.z),
+            strap_mat, bevel=0.005
+        ))
+    objects.append(make_cylinder(
+        f"{prefix}_FuelCap", 0.04, 0.03,
+        loc_v + Vector((0.0, 0.0, size[2] * 0.51)),
+        accent_mat, vertices=8
+    ))
+    return objects
+
+
+def create_unity_locator_sockets(
+    name_prefix: str,
+    muzzle_loc: Tuple[float, float, float] | Vector | None = None,
+    muzzle_dir: Tuple[float, float, float] | Vector | None = None,
+    turret_loc: Tuple[float, float, float] | Vector | None = None,
+    sensor_loc: Tuple[float, float, float] | Vector | None = None,
+    exhaust_left: Tuple[float, float, float] | Vector | None = None,
+    exhaust_right: Tuple[float, float, float] | Vector | None = None,
+) -> list[bpy.types.Object]:
+    """Generates standard Unity empty sockets (MuzzlePoint, TurretPivot, Exhausts) for engine binding."""
+    empties = []
+    def _add_empty(socket_name: str, loc: Vector, rot: Tuple[float, float, float] = (0.0, 0.0, 0.0)):
+        bpy.ops.object.empty_add(type="PLAIN_AXES", radius=0.15, location=loc)
+        e = bpy.context.object
+        e.name = f"{name_prefix}_{socket_name}"
+        e.rotation_euler = rot
+        empties.append(e)
+
+    if muzzle_loc is not None:
+        m_loc = Vector(muzzle_loc)
+        m_dir = Vector(muzzle_dir if muzzle_dir is not None else (0.0, 1.0, 0.0)).normalized()
+        rot = m_dir.to_track_quat("Z", "Y").to_euler()
+        _add_empty("Socket_MuzzlePrimary", m_loc, rot)
+
+    if turret_loc is not None:
+        _add_empty("Socket_TurretPivot", Vector(turret_loc))
+
+    if sensor_loc is not None:
+        _add_empty("Socket_SensorEye", Vector(sensor_loc))
+
+    if exhaust_left is not None:
+        _add_empty("Socket_Exhaust_L", Vector(exhaust_left))
+
+    if exhaust_right is not None:
+        _add_empty("Socket_Exhaust_R", Vector(exhaust_right))
+
+    _add_empty("Socket_GroundCenter", Vector((0.0, 0.0, 0.0)))
+    return empties
+
+
 # ---------------------------------------------------------------------------
 # 7. Optimization, Batching & Mesh Quality
 # ---------------------------------------------------------------------------
@@ -1235,11 +1515,15 @@ def batch_and_join_by_material(
     objects: Sequence[bpy.types.Object],
     prefix: str = "Unit",
     preserve_names: Sequence[str] | None = None,
+    smooth_by_angle: bool = True,
+    smooth_angle_deg: float = 38.0,
 ) -> list[bpy.types.Object]:
     """Combines modular kitbashed objects by material into unified meshes.
     
     Dramatically reduces draw calls in Unity (e.g. from 80+ GameObjects to 4-6).
     Objects whose names match or contain strings in `preserve_names` remain separate.
+    When `smooth_by_angle` is True, applies Blender 4.5 angle-weighted auto-smoothing,
+    giving perfectly rounded cylinders/wheels/barrels while preserving crisp chamfers.
     """
     material_groups: Dict[bpy.types.Material | None, list[bpy.types.Object]] = {}
     preserved_objects: list[bpy.types.Object] = []
@@ -1262,31 +1546,86 @@ def batch_and_join_by_material(
         if not group:
             continue
         if len(group) == 1:
-            joined_objects.append(group[0])
-            continue
+            joined_obj = group[0]
+            joined_objects.append(joined_obj)
+        else:
+            bpy.ops.object.select_all(action="DESELECT")
+            for obj in group:
+                obj.select_set(True)
+            bpy.context.view_layer.objects.active = group[0]
 
-        bpy.ops.object.select_all(action="DESELECT")
-        for obj in group:
-            obj.select_set(True)
-        bpy.context.view_layer.objects.active = group[0]
+            bpy.ops.object.join()
+            joined_obj = bpy.context.view_layer.objects.active
+            mat_name = mat.name.replace(" ", "_") if mat else "Unassigned"
+            joined_obj.name = f"{prefix}_{mat_name}"
 
-        bpy.ops.object.join()
-        joined_obj = bpy.context.view_layer.objects.active
-        mat_name = mat.name.replace(" ", "_") if mat else "Unassigned"
-        joined_obj.name = f"{prefix}_{mat_name}"
+            # Clean up mesh normals
+            bpy.ops.object.mode_set(mode="EDIT")
+            bpy.ops.mesh.select_all(action="SELECT")
+            bpy.ops.mesh.normals_make_consistent(inside=False)
+            bpy.ops.object.mode_set(mode="OBJECT")
+            joined_objects.append(joined_obj)
 
-        # Clean up mesh normals
-        bpy.ops.object.mode_set(mode="EDIT")
-        bpy.ops.mesh.select_all(action="SELECT")
-        bpy.ops.mesh.normals_make_consistent(inside=False)
-        bpy.ops.object.mode_set(mode="OBJECT")
+        if smooth_by_angle and hasattr(bpy.ops.object, "shade_smooth_by_angle"):
+            bpy.ops.object.select_all(action="DESELECT")
+            joined_obj.select_set(True)
+            bpy.context.view_layer.objects.active = joined_obj
+            bpy.ops.object.shade_smooth_by_angle(angle=math.radians(smooth_angle_deg))
+        else:
+            for poly in joined_obj.data.polygons:
+                poly.use_smooth = False
 
-        for poly in joined_obj.data.polygons:
-            poly.use_smooth = False
-
-        joined_objects.append(joined_obj)
+    # Also smooth preserved objects if requested
+    if smooth_by_angle and hasattr(bpy.ops.object, "shade_smooth_by_angle"):
+        for p_obj in preserved_objects:
+            if p_obj.type == "MESH":
+                bpy.ops.object.select_all(action="DESELECT")
+                p_obj.select_set(True)
+                bpy.context.view_layer.objects.active = p_obj
+                bpy.ops.object.shade_smooth_by_angle(angle=math.radians(smooth_angle_deg))
 
     return joined_objects
+
+
+def bake_vertex_ambient_dirt(
+    objects: Sequence[bpy.types.Object],
+    blur_strength: float = 1.0,
+    dirt_angle_deg: float = 90.0,
+    clean_angle_deg: float = 110.0,
+    dirt_only: bool = False,
+    attribute_name: str = "Color",
+) -> None:
+    """Calculates procedural vertex ambient occlusion and crevice darkening (cavity shading).
+    
+    Generates subtle contact shadows in wheel wells, armor recesses, and undersides.
+    Stores the result in a standard vertex color attribute named `attribute_name` (default 'Color')
+    for direct ingestion into Unity Mesh.colors32.
+    """
+    for obj in objects:
+        if obj.type != "MESH" or not obj.data.polygons:
+            continue
+        bpy.ops.object.select_all(action="DESELECT")
+        obj.select_set(True)
+        bpy.context.view_layer.objects.active = obj
+
+        mesh = obj.data
+        color_attr = mesh.color_attributes.get(attribute_name)
+        if color_attr is None:
+            color_attr = mesh.color_attributes.new(name=attribute_name, type="BYTE_COLOR", domain="CORNER")
+        mesh.color_attributes.active_color = color_attr
+
+        try:
+            bpy.ops.object.mode_set(mode="VERTEX_PAINT")
+            bpy.ops.paint.vertex_color_dirt(
+                blur_strength=blur_strength,
+                dirt_angle=math.radians(dirt_angle_deg),
+                clean_angle=math.radians(clean_angle_deg),
+                dirt_only=dirt_only,
+            )
+            bpy.ops.object.mode_set(mode="OBJECT")
+        except Exception as ex:
+            print(f"Warning: vertex dirt bake skipped for {obj.name}: {ex}")
+            bpy.ops.object.mode_set(mode="OBJECT")
 
 
 def merge_meshes_by_material(
@@ -1339,7 +1678,10 @@ def merge_meshes_by_material(
 
 
 
-def validate_model_mesh_quality(objects: Sequence[bpy.types.Object]) -> Dict[str, Any]:
+def validate_model_mesh_quality(
+    objects: Sequence[bpy.types.Object],
+    allow_hover: bool = False,
+) -> Dict[str, Any]:
     """Inspects geometric quality, ground clearance, polycount, and material slots."""
     total_verts = 0
     total_faces = 0
@@ -1370,7 +1712,8 @@ def validate_model_mesh_quality(objects: Sequence[bpy.types.Object]) -> Dict[str
     dim_w = max_x - min_x if max_x >= min_x else 0.0
     dim_l = max_y - min_y if max_y >= min_y else 0.0
     dim_h = max_z - min_z if max_z >= min_z else 0.0
-    ground_ok = (-0.02 <= min_z <= 0.08)
+    max_ground = 0.55 if allow_hover else 0.08
+    ground_ok = (-0.02 <= min_z <= max_ground)
 
     results = {
         "object_count": len(objects),
@@ -1637,7 +1980,11 @@ def merge_meshes_by_material(
     return exported_objects
 
 
-def export_unity_fbx(fbx_path: Path, model_objects: Sequence[bpy.types.Object]) -> None:
+def export_unity_fbx(
+    fbx_path: Path,
+    model_objects: Sequence[bpy.types.Object],
+    include_empties: bool = False,
+) -> None:
     """Exports model objects to FBX with optimal scale and axis mappings for Unity."""
     fbx_path.parent.mkdir(parents=True, exist_ok=True)
     bpy.ops.object.select_all(action="DESELECT")
@@ -1645,10 +1992,11 @@ def export_unity_fbx(fbx_path: Path, model_objects: Sequence[bpy.types.Object]) 
         obj.select_set(True)
     bpy.context.view_layer.objects.active = model_objects[0]
 
+    obj_types = {"MESH", "EMPTY"} if include_empties else {"MESH"}
     bpy.ops.export_scene.fbx(
         filepath=str(fbx_path),
         use_selection=True,
-        object_types={"MESH"},
+        object_types=obj_types,
         apply_unit_scale=True,
         apply_scale_options="FBX_SCALE_NONE",
         use_mesh_modifiers=True,
@@ -1847,6 +2195,13 @@ class RogueVehicleBuilder:
         self.turret_center: Vector = Vector((0.0, 0.05, 1.15))
         self.hull_length: float = 3.0
         self.hull_width: float = 2.4
+        self.gun_pivot: Vector | None = None
+        self.gun_dir: Vector | None = None
+        self.sensor_loc: Vector | None = None
+        self.exhaust_l: Vector | None = None
+        self.exhaust_r: Vector | None = None
+        self.locator_sockets: list[bpy.types.Object] = []
+        self.is_hover: bool = False
 
     def add_sloped_hull(
         self,
@@ -1967,6 +2322,8 @@ class RogueVehicleBuilder:
         gun_pivot = self.turret_center + Vector((0.0, 0.45, 0.02))
         elev_rad = math.radians(elevation_deg)
         gun_dir = Vector((0.0, math.cos(elev_rad), math.sin(elev_rad))).normalized()
+        self.gun_pivot = gun_pivot + gun_dir * (length + 0.32)
+        self.gun_dir = gun_dir
         cannon = make_coaxial_cannon_assembly(
             f"{self.name}Gun",
             gun_pivot=gun_pivot,
@@ -1989,6 +2346,8 @@ class RogueVehicleBuilder:
         side: int = 1,
         pivot_offset: Tuple[float, float, float] = (0.75, 0.45, 1.35),
     ) -> "RogueVehicleBuilder":
+        self.gun_pivot = Vector((side * pivot_offset[0], pivot_offset[1] + 1.10, pivot_offset[2]))
+        self.gun_dir = Vector((0.0, 1.0, 0.0))
         gatling = make_rotary_gatling_cannon(
             f"{self.name}Gatling_{'L' if side < 0 else 'R'}",
             pivot=(side * pivot_offset[0], pivot_offset[1], pivot_offset[2]),
@@ -2006,6 +2365,9 @@ class RogueVehicleBuilder:
         elevation_deg: float = 14.0,
     ) -> "RogueVehicleBuilder":
         pod_loc = self.turret_center + Vector((0.0, 0.10, 0.35))
+        elev_rad = math.radians(elevation_deg)
+        self.gun_pivot = pod_loc + Vector((0.0, 0.45, 0.15))
+        self.gun_dir = Vector((0.0, math.cos(elev_rad), math.sin(elev_rad))).normalized()
         pod = make_missile_launcher_pod(
             f"{self.name}MissilePod",
             location=pod_loc,
@@ -2023,6 +2385,8 @@ class RogueVehicleBuilder:
         prongs: int = 3,
     ) -> "RogueVehicleBuilder":
         emitter_loc = self.turret_center + Vector((0.0, 0.35, 0.10))
+        self.gun_pivot = emitter_loc + Vector((0.0, 0.70, 0.05))
+        self.gun_dir = Vector((0.0, 1.0, 0.08)).normalized()
         emitter = make_arc_energy_emitter(
             f"{self.name}ArcEmitter",
             base_location=emitter_loc,
@@ -2038,6 +2402,7 @@ class RogueVehicleBuilder:
 
     def add_sensor_visor(self) -> "RogueVehicleBuilder":
         visor_loc = self.turret_center + Vector((0.0, 0.35, 0.28))
+        self.sensor_loc = visor_loc + Vector((0.0, 0.14, 0.0))
         visor = make_recessed_sensor_visor(
             f"{self.name}Sensor_Visor",
             location=visor_loc,
@@ -2073,6 +2438,8 @@ class RogueVehicleBuilder:
         if with_exhausts:
             exhaust_y = deck_y - size[1] * 0.5 - 0.12
             exhaust_spacing_x = self.hull_width * 0.22
+            self.exhaust_l = Vector((-exhaust_spacing_x, exhaust_y, deck_z + 0.20))
+            self.exhaust_r = Vector((exhaust_spacing_x, exhaust_y, deck_z + 0.20))
             for side in (-1, 1):
                 side_tag = "L" if side < 0 else "R"
                 ex_loc = (side * exhaust_spacing_x, exhaust_y, deck_z + 0.10)
@@ -2185,6 +2552,129 @@ class RogueVehicleBuilder:
         self.objects.extend(blade)
         return self
 
+    def add_hover_skimmer(
+        self,
+        float_height: float = 0.52,
+    ) -> "RogueVehicleBuilder":
+        self.is_hover = True
+        skimmer = make_hover_skimmer_assembly(
+            f"{self.name}Hover",
+            hull_length=self.hull_length,
+            hull_width=self.hull_width,
+            float_height=float_height,
+            skirt_mat=self.palette.primary_armor,
+            thruster_mat=self.palette.gunmetal,
+            core_mat=self.palette.light_armor,
+            glow_mat=self.palette.emissive
+        )
+        self.objects.extend(skimmer)
+        return self
+
+    def add_quad_crawler_legs(
+        self,
+        knee_height: float = 0.95,
+        reach_x: float = 1.05,
+        reach_y: float = 0.85,
+    ) -> "RogueVehicleBuilder":
+        half_w = self.hull_width * 0.46
+        half_l = self.hull_length * 0.40
+        for sx in (-1, 1):
+            for sy in (-1, 1):
+                tag = f"{'L' if sx < 0 else 'R'}_{'F' if sy > 0 else 'R'}"
+                hip = Vector((sx * half_w, sy * half_l, self.ground_clearance + 0.65))
+                leg = make_quad_crawler_leg(
+                    f"{self.name}CrawlerLeg_{tag}",
+                    hip_location=hip,
+                    side_x=sx, side_y=sy,
+                    reach_x=reach_x, reach_y=reach_y,
+                    knee_height=knee_height,
+                    armor_mat=self.palette.primary_armor,
+                    joint_mat=self.palette.gunmetal,
+                    damper_mat=self.palette.light_armor,
+                    accent_mat=self.palette.warning
+                )
+                self.objects.extend(leg)
+        return self
+
+    def add_smoke_launchers(
+        self,
+        tube_count: int = 3,
+    ) -> "RogueVehicleBuilder":
+        for side in (-1, 1):
+            side_tag = "L" if side < 0 else "R"
+            if hasattr(self, "turret_center") and self.turret_center is not None:
+                loc = self.turret_center + Vector((side * 0.72, 0.28, 0.15))
+                dir_v = Vector((side * 0.70, 0.70, 0.45)).normalized()
+            else:
+                loc = Vector((side * (self.hull_width * 0.48), self.hull_length * 0.25, self.hull_deck_z + 0.08))
+                dir_v = Vector((side * 0.70, 0.70, 0.40)).normalized()
+            rack = make_smoke_launcher_rack(
+                f"{self.name}Smoke_{side_tag}",
+                location=loc,
+                tube_count=tube_count,
+                direction=dir_v,
+                armor_mat=self.palette.primary_armor,
+                tube_mat=self.palette.gunmetal,
+                cap_mat=self.palette.warning
+            )
+            self.objects.extend(rack)
+        return self
+
+    def add_radar_dish(
+        self,
+        is_rotodome: bool = False,
+        location: Tuple[float, float, float] | None = None,
+    ) -> "RogueVehicleBuilder":
+        if location is None:
+            if hasattr(self, "turret_center") and self.turret_center is not None:
+                loc = self.turret_center + Vector((0.0, -0.35, 0.32))
+            else:
+                loc = Vector((0.0, -self.hull_length * 0.25, self.hull_deck_z + 0.14))
+        else:
+            loc = Vector(location)
+        radar = make_radar_dish_or_rotodome(
+            f"{self.name}Radar",
+            location=loc,
+            dish_radius=0.44,
+            is_rotodome=is_rotodome,
+            armor_mat=self.palette.primary_armor,
+            antenna_mat=self.palette.gunmetal,
+            accent_mat=self.palette.warning
+        )
+        self.objects.extend(radar)
+        return self
+
+    def add_side_sponsons(
+        self,
+        size: Tuple[float, float, float] = (0.24, 0.82, 0.38),
+    ) -> "RogueVehicleBuilder":
+        for side in (-1, 1):
+            side_tag = "L" if side < 0 else "R"
+            loc = (side * (self.hull_width * 0.54), -self.hull_length * 0.05, self.ground_clearance + size[2] * 0.8)
+            sponson = make_side_sponson_assembly(
+                f"{self.name}Sponson_{side_tag}",
+                location=loc,
+                side=side,
+                size=size,
+                armor_mat=self.palette.primary_armor,
+                strap_mat=self.palette.gunmetal,
+                accent_mat=self.palette.warning
+            )
+            self.objects.extend(sponson)
+        return self
+
+    def add_unity_locators(self) -> "RogueVehicleBuilder":
+        self.locator_sockets = create_unity_locator_sockets(
+            name_prefix=self.name,
+            muzzle_loc=self.gun_pivot,
+            muzzle_dir=self.gun_dir,
+            turret_loc=self.turret_center,
+            sensor_loc=self.sensor_loc,
+            exhaust_left=self.exhaust_l,
+            exhaust_right=self.exhaust_r,
+        )
+        return self
+
     def build(self) -> list[bpy.types.Object]:
         """Returns the raw list of editable kitbashed objects."""
         return self.objects
@@ -2197,13 +2687,17 @@ class RogueVehicleBuilder:
         card_path: Path | None = None,
         render_multiview: bool = False,
         ortho_scale: float = 5.8,
+        smooth_by_angle: bool = True,
+        smooth_angle_deg: float = 38.0,
+        bake_vertex_dirt: bool = True,
+        include_locators: bool = True,
     ) -> Dict[str, Any]:
         """Runs diagnostics, smart UV unwrapping, preview rendering, batching, and FBX export."""
         blend_path.parent.mkdir(parents=True, exist_ok=True)
         fbx_path.parent.mkdir(parents=True, exist_ok=True)
 
         # 1. Quality diagnostics on raw source objects
-        diagnostics = validate_model_mesh_quality(self.objects)
+        diagnostics = validate_model_mesh_quality(self.objects, allow_hover=self.is_hover)
 
         # 2. Smart UV Projection for lightmapping
         generate_lightmap_uvs(self.objects)
@@ -2228,15 +2722,31 @@ class RogueVehicleBuilder:
         # 5. Save editable source .blend
         bpy.ops.wm.save_as_mainfile(filepath=str(blend_path))
 
-        # 6. Material batching for FBX
+        # 6. Procedural vertex ambient dirt baking (cavity shading)
+        if bake_vertex_dirt:
+            bake_vertex_ambient_dirt(self.objects)
+
+        # 7. Material batching for FBX with smart angle-weighted smoothing
         batched_objects = batch_and_join_by_material(
-            self.objects, prefix=self.name, preserve_names=self.preserved_pivots
+            self.objects,
+            prefix=self.name,
+            preserve_names=self.preserved_pivots,
+            smooth_by_angle=smooth_by_angle,
+            smooth_angle_deg=smooth_angle_deg,
         )
 
-        # 7. Export FBX for Unity
-        export_unity_fbx(fbx_path, batched_objects)
+        # 8. Create Unity locator sockets if requested
+        export_objects = list(batched_objects)
+        if include_locators:
+            if not self.locator_sockets:
+                self.add_unity_locators()
+            export_objects.extend(self.locator_sockets)
+
+        # 9. Export FBX for Unity
+        export_unity_fbx(fbx_path, export_objects, include_empties=include_locators)
 
         diagnostics["exported_batched_objects"] = len(batched_objects)
+        diagnostics["locator_sockets"] = len(self.locator_sockets) if include_locators else 0
         diagnostics["blend_path"] = str(blend_path)
         diagnostics["fbx_path"] = str(fbx_path)
         print(f"[{self.name}] Build and export complete!")

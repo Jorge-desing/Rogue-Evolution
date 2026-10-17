@@ -100,18 +100,27 @@ Use the tested, high-readability procedural assemblies rather than ad-hoc mesh p
 | **Mobility & Legs** | `make_continuous_track_assembly` | Full track unit (articulated belt, road wheels, sprockets, cleats, and fenders) |
 | | `make_all_terrain_wheel_assembly` | Rugged chevron-lug tactical tire, deep-dish rim, planetary hub, and coilover shock |
 | | `make_bipedal_digitigrade_leg` | Kinematic walker leg: hip joint, hydraulic thigh, knee armor, ankle struts, 3-toed foot |
+| | `make_quad_crawler_leg` | Articulated spider/crawler leg: hip actuator, femur ram, knee knuckle, tibia strut, ground pad |
+| | `make_hover_skimmer_assembly` | Anti-grav repulsor cushion, ventral thruster bells, stabilizer strakes, vectoring exhausts |
 | **Heavy Weapons** | `make_coaxial_cannon_assembly` | Coaxially aligned tank gun with breech collar, thermal sleeve, bore evacuator, and muzzle brake |
 | | `make_rotary_gatling_cannon` | 6-barrel circular Gatling cluster with drive axle, clamp collars, and ammo feed chute |
 | | `make_missile_launcher_pod` | Armored pod with upward elevation, recessed tube array, warheads, and backblast vents |
 | | `make_arc_energy_emitter` | Futuristic weapon with glowing plasma cathode, induction coils, and convergent discharge prongs |
 | **Optics & Greebles** | `make_gimbal_sensor_turret` | 2-axis FLIR targeting pod with azimuth base, elevation yoke, and dual optical lenses |
 | | `make_recessed_sensor_visor` | Armored brow hood with deep cavity and glowing HDR sensor slit lenses |
+| | `make_smoke_launcher_rack` | Angled multi-tube defensive smoke grenade discharger bank on mounting bracket |
+| | `make_radar_dish_or_rotodome` | Command/recon radar antenna: parabolic dish with feed horn or elliptical rotodome |
+| | `make_side_sponson_assembly` | Armored external ammo panniers or auxiliary fuel drums with retention straps |
 | | `make_engine_deck_grille` | Armored engine intake frame with angled cooling louvers |
 | | `make_armor_applique_array` | Array of Explosive Reactive Armor (ERA) tiles with standoff mounting bolts |
 | | `make_hex_bolt_array` | Low-poly 6-sided bolt heads placed along armor seams and flanges |
+| | `create_unity_locator_sockets`| Procedural Unity empty sockets (`Socket_MuzzlePrimary`, `Socket_TurretPivot`, `Socket_Exhaust_L/R`) |
 
-### Draw-Call Optimization via Material Batching
-Kitbashing produces 50–120 individual objects. In Unity, each object creates a separate GameObject and draw call unless unified. Always pass models through `batch_and_join_by_material(objects, prefix, preserve_names)` before export to combine meshes by their PBR material slot into 4–6 unified submeshes while preserving essential animated pivots.
+### Draw-Call Optimization via Material Batching & Smart Smoothing
+Kitbashing produces 50–120 individual objects. In Unity, each object creates a separate GameObject and draw call unless unified. Always pass models through `batch_and_join_by_material(objects, prefix, preserve_names, smooth_by_angle=True, smooth_angle_deg=38.0)` before export:
+- **Draw Call Reduction**: Combines meshes by their PBR material slot into 4–6 unified submeshes while preserving essential animated pivots (`TurretBase`, `MainBarrel`).
+- **Smart Angle-Weighted Smoothing**: Uses Blender 4.5's `shade_smooth_by_angle` to produce silky smooth round barrels, road wheels, hubs, and exhaust pipes, while preserving razor-sharp 45°/90° chamfers on flat armor plates.
+- **Procedural Vertex Ambient Dirt Baking**: Invokes `bake_vertex_ambient_dirt(objects)` to calculate ambient occlusion and cavity crevice darkening directly into the `Color` vertex attribute (`Mesh.colors32`), giving deep contact shadows to wheel wells, panel seams, and recesses without texture maps.
 
 ### Fluent Assembly with `RogueVehicleBuilder`
 For rapid, reproducible vehicle generation without manual coordinate arithmetic, use the declarative `RogueVehicleBuilder`:
@@ -127,16 +136,23 @@ builder = (
     .add_turret(size=(1.5, 1.7, 0.48), center_y=0.10)
     .add_cannon(caliber=0.10, length=1.85, elevation_deg=14.0)
     .add_sensor_visor()
+    .add_smoke_launchers(tube_count=3)
     .add_spring_antenna()
     .add_dozer_blade(width=2.6, height=0.44)
+    .add_side_sponsons()
+    .add_unity_locators()
 )
 
-# Automated validation, lightmap UVs, .blend, batched FBX
+# Automated validation, lightmap UVs, vertex cavity dirt, smart smoothing, .blend, batched FBX
 diagnostics = builder.build_and_export(
     fbx_path=FBX_PATH,
     blend_path=BLEND_PATH,
     preview_path=PREVIEW_PATH,
-    render_multiview=True
+    render_multiview=True,
+    smooth_by_angle=True,
+    smooth_angle_deg=38.0,
+    bake_vertex_dirt=True,
+    include_locators=True
 )
 ```
 
@@ -150,13 +166,18 @@ Run headless vehicle generation directly from the command line using Blender and
     --faction siege `
     --weapon cannon `
     --dozer `
+    --smoke `
+    --radar `
+    --dirt `
+    --locators `
     --multiview
 ```
 
-- **Archetypes**: `tank`, `walker`, `bike`, `artillery`, `arc_tank`.
+- **Archetypes**: `tank`, `walker`, `bike`, `artillery`, `arc_tank`, `hover`, `spider`.
 - **Factions**: `vanguard` (slate teal), `siege` (rust ochre), `syndicate` (deep cobalt), `arctic` (tundra navy).
 - **Weapons**: `cannon` (ballistic), `gatling` (rotary 6-barrel), `missile` (honeycomb pod), `arc` (plasma cathode & prongs).
-- **Outputs**: Generates editable `.blend`, Unity-optimized `.fbx` with lightmap UVs and batched submeshes, and a 4-view orthographic preview sheet. For each 2D card, use the installed `imagegen` skill; this 3D generator does not create card images.
+- **Subsystem Flags**: `--dozer` (frontal ram), `--smoke` (grenade dischargers), `--radar` (command dish), `--sponsons` (auxiliary cells), `--dirt` (vertex cavity AO), `--locators` (Unity sockets).
+- **Outputs**: Generates editable `.blend`, Unity-optimized `.fbx` with lightmap UVs, vertex color cavity shading, socket empties, batched submeshes, and a 4-view orthographic preview sheet. For each 2D card, use the installed `imagegen` skill; this 3D generator does not create card images.
 
 ### Automated Quality Diagnostics
 Always invoke `validate_model_mesh_quality(model_objects)` prior to export. It verifies:
