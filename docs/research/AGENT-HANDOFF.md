@@ -10,7 +10,7 @@ The repository has a functional development foundation: a version-guarded loader
 
 The next content milestone should deliver one coherent, original gameplay slice: a distinct unit identity and balance, a stage with an intentional challenge and suitable pool/world setup, and an AI module/profile that changes decisions in a measurable way. First verify whether each desired asset can be authored under the Editor's precompiled-game-assembly limitation. Record any unsupported custom map, rig, or AI behavior as a blocker instead of substituting a template variant and calling it original content. Run the eventual match through Steam and label the result as in-game runtime evidence.
 
-Read [the content authoring tools assessment](CONTENT-AUTHORING-TOOLS.md) for current skills, utilities, and recommended use. Blender 4.5.14 LTS is installed in ignored `.tools/`; UnityExplorer 4.8.2 is staged there but not deployed to the game. `tools/Setup-ContentAuthoringTools.ps1` can recreate both copies with SHA-256 checks. It does not modify or launch Rogue Command.
+Read [the content authoring tools assessment](CONTENT-AUTHORING-TOOLS.md) for current skills, utilities, and recommended use. Blender 4.5.14 LTS, UnityExplorer 4.8.2, and Runtime Unity Editor 6.3.2.1 are staged in ignored `.tools/`; neither runtime inspector is deployed to the game. `tools/Setup-ContentAuthoringTools.ps1` recreates Blender/UnityExplorer, and `tools/Setup-BackendTools.ps1 -RuntimeUnityEditor` recreates Runtime Unity Editor with SHA-256 checks. These scripts do not modify or launch Rogue Command. Use only one runtime inspector in a reversible Steam-launched test profile.
 
 ## Start here
 

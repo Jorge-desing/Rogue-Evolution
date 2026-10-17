@@ -6,9 +6,9 @@
 
 ## Resultado de la búsqueda de skills
 
-No encontré una skill pública específica para crear contenido de Rogue Command ni una que cubra BepInEx 5 Mono y authoring de unidades, etapas y AI para Unity 2021.3. La skill de BepInEx para IL2CPP que aparece en GitHub no es compatible con este juego: Rogue Command usa Mono y la rama objetivo de BepInEx es 5. La skill comunitaria asociada a `bepinex-mcp` se centra en inspeccionar y modificar un juego que ya está ejecutándose; no crea modelos, mapas o datos de juego.
+No encontré una skill pública específica para crear contenido de Rogue Command ni para desarrollar su cargador. Sí encontré `bepinex-mono-modding`, una guía comunitaria de BepInEx 5/Mono, y una guía para IL2CPP. La segunda no se aplica a este juego. La primera cubre patching y diagnóstico general, pero se enfoca en trainers y menús; además, propone un cambio de ciclo de vida que no se ha comprobado para Rogue Command. No la instalé sin adaptar. La skill comunitaria de `bepinex-mcp` se centra en inspeccionar y modificar un juego que ya está ejecutándose; no crea modelos, mapas o datos de juego.
 
-La documentación oficial de BepInEx sí sirve para el trabajo de plugin y Harmony. La búsqueda en el catálogo local de `skill-installer` tampoco encontró una skill de creación de mods de Unity Mono que encaje con el contenido de este repositorio. Por eso no se instaló una skill de otra plataforma o backend como sustituto.
+La documentación oficial de BepInEx y HarmonyX sirve para el trabajo de plugin y Harmony. La búsqueda en el catálogo curado de `skill-installer` tampoco encontró una skill de creación de mods de Unity Mono que encaje con el contenido de este repositorio. Se mantienen como guía principal la documentación de este repo, `reverse-engineer-anything` para evidencia de binarios y `engineering:code-review` para revisar cambios; no se instaló una skill de otro backend como sustituto.
 
 ## Inventario local verificado
 
@@ -24,21 +24,34 @@ La documentación oficial de BepInEx sí sirve para el trabajo de plugin y Harmo
 
 La carpeta `.tools/` y `.venv/` están excluidas de Git por `.gitignore`. La salida distribuible vive bajo `content/packs/<id>/bundles/`, que sí se versiona.
 
+## Utilidades para backend y diagnóstico runtime
+
+| Herramienta | Estado | Uso adecuado |
+|---|---|---|
+| Runtime Unity Editor **6.3.2.1, BepInEx 5** | Release upstream descargada y verificada localmente; ZIP SHA-256 `b0f0f0ac89e50d31e542fbcdd611a482cf8fef7dc5abdd12501611aefa77e348`; queda bajo `.tools/RuntimeUnityEditor-6.3.2.1/` | Inspector de objetos/Componentes, consola C# y Harmony Patch Inspector. Es la opción preferida para observar estado real de unidades, etapas, AI y patches una vez que el juego llega a una escena. La consola permite mutar el estado: en pruebas iniciales usarla solo para leer y añadirla únicamente a un perfil/clon reversible iniciado por Steam. El ZIP local fue descargado del release oficial y su hash se fijó en este repositorio; upstream no publicó un digest de ese asset. |
+| UnityExplorer **4.8.2** | Sigue en `.tools/UnityExplorer-4.8.2/` como herramienta disponible, pero es una publicación de 2022 del proyecto original archivado | Fallback conocido. No instalar UnityExplorer y Runtime Unity Editor simultáneamente en el mismo perfil de prueba: ambos añaden herramientas de inspección y consola al runtime. |
+| ILSpy (`ilspycmd`) | Ya disponible bajo `.tools/ilspycmd/` | Fuente para leer tipos, firmas y lógica compilada offline. Mantener el control de identidad del juego antes de usar los resultados para nuevos patches. |
+| BepInEx ConfigurationManager | No preparado | No aporta valor inmediato porque el plugin todavía usa su overlay propio y no define entradas BepInEx `ConfigEntry`. Reconsiderar cuando el loader exponga opciones editables desde `ConfigFile`. |
+
+Preparar Runtime Unity Editor con `tools/Setup-BackendTools.ps1 -RuntimeUnityEditor`. El script comprueba el SHA-256, extrae solo el subdirectorio del plugin a `.tools/` y no instala nada en Rogue Command, no cambia su configuración y no inicia el juego.
+
+Para el backend, BepInEx 5 Mono y HarmonyX ya están presentes como referencias de compilación. No se requiere una segunda capa de patches. Mantener `RuntimeOverlayUi` como diagnóstico del loader y usar el inspector externo para confirmar objetos y estado nativos en runtime; son funciones distintas.
+
 Las copias locales se pueden preparar de nuevo con `tools/Setup-ContentAuthoringTools.ps1 -Blender -UnityExplorer`. El script fija las versiones, verifica SHA-256 antes de extraer y deja los programas bajo `.tools/`; no cambia la instalación del juego ni lo inicia. Para UnityExplorer, el juego todavía no tiene BepInEx instalado y el inspector no se ha probado en una partida.
 
 ## Recomendaciones de uso
 
-1. **Unidad:** empezar desde una plantilla nativa compatible para conservar la lógica de gameplay y crear una silueta original en Blender o con geometría de Unity. Importar el modelo a `unity/RogueCommandAssetAuthoring/`, compilarlo como AssetBundle Windows x64 y asignarlo a una ruta visual nativa validada. La ruta de overlay actual conserva los componentes nativos, pero no reasigna rigs o animaciones. Una nueva apariencia puede probarse en Editor; el control de movimiento, armas, sombras/materiales y renderizado se confirma dentro del juego.
+1. **Unidad:** empezar desde una plantilla nativa compatible para conservar la lógica de gameplay y crear una silueta original en Blender o con geometría de Unity. Importar el modelo a `unity/RogueCommandAssetAuthoring/`, compilarlo como AssetBundle Windows x64 y asignarlo a una ruta visual nativa validada. La ruta de overlay actual conserva los componentes nativos, pero no reasigna rigs o animaciones. Una nueva apariencia puede probarse en Editor; el control de movimiento, armas, sombras/materiales y renderizado se confirma dentro del juego. Si llega a escena, observar la jerarquía y los componentes con Runtime Unity Editor.
 2. **Etapa y mapa:** la variante de etapa actual clona `StageParametersScriptableObject` y reutiliza mundo y blueprint pools del juego. Esto es útil para probar progresión y balance, pero no crea por sí mismo un mapa original. Un mapa nuevo necesita las referencias serializadas completas de mundo, generador y pools que el juego espera; investigar y construir ese grafo forma parte del contenido, no se resuelve añadiendo campos numéricos al loader.
 3. **AI:** los paquetes eligen módulos compilados por ID; no distribuyen DLLs. El módulo de muestra actual solicita construir una unidad del deck nativo después de un intervalo y no aporta táctica nueva. Para contenido AI, implementar módulos C# que alteren una decisión observable, respeten la vida útil del AI nativo y tengan parámetros acotados; luego medir el resultado en una partida.
-4. **Validación:** hacer preflight del pack, inspeccionar el AssetBundle con Unity Editor/UnityPy y registrar hashes. Estos son checks offline. La aceptación requiere una ejecución reversible del juego **a través de Steam**, confirmando que la unidad se instancia y aparece en el pool, la etapa genera el mapa previsto y la AI ejecuta la nueva decisión.
+4. **Validación:** hacer preflight del pack, inspeccionar el AssetBundle con Unity Editor/UnityPy y registrar hashes. Estos son checks offline. La aceptación requiere una ejecución reversible del juego **a través de Steam**, confirmando que la unidad se instancia y aparece en el pool, la etapa genera el mapa previsto y la AI ejecuta la nueva decisión. Runtime Unity Editor ofrece una vista adicional del runtime, pero su presencia no cuenta por sí sola como prueba de integración.
 
 ## Herramientas que no añaden valor ahora
 
 - **Addressables:** el mod ya entrega bundles y el loader usa `AssetBundle` directamente. Addressables es una capa superior que genera catálogos, direcciones y flujo de dependencias; todavía no hay evidencia de que el juego tenga un catálogo Addressables utilizable por packs externos. No añadir esa dependencia sin una necesidad demostrada.
 - **Asset Bundle Browser:** Unity lo describe como herramienta auxiliar/pre-release y de alcance básico. El repo ya tiene `RogueCommandAssetBundleBuilder.cs`, que aplica las rutas y límites del pack; usar el builder existente da una salida más controlable.
 - **Habilidades BepInEx IL2CPP:** no aplicar sus instrucciones al juego Mono ni mover el plugin a BepInEx 6/Il2CppInterop sin que cambie y se verifique la identidad técnica del juego.
-- **Herramientas de runtime:** UnityExplorer ya está preparado bajo `.tools/`, pero el juego aún no tiene BepInEx. No desplegarlo hasta una prueba reversible iniciada por Steam; conservar los hashes/archivos originales y restaurarlos al cerrar esa prueba. Su publicación tiene varios años y su consola puede ejecutar código, así que limitar el uso inicial a inspección.
+- **Herramientas de runtime:** Runtime Unity Editor 6.3.2.1 y UnityExplorer ya están preparados bajo `.tools/`, pero el juego aún no tiene BepInEx instalado. No desplegar ninguno hasta una prueba reversible iniciada por Steam; conservar los hashes/archivos originales y restaurarlos al cerrar esa prueba. Empezar con observación de solo lectura; ambas herramientas ofrecen superficies que pueden cambiar estado o ejecutar código.
 
 ## Fuentes
 
@@ -51,6 +64,11 @@ Las copias locales se pueden preparar de nuevo con `tools/Setup-ContentAuthoring
 - [Blender 4.5.14 LTS: versión, soporte y descargas oficiales](https://www.blender.org/releases/4-5/)
 - [UnityExplorer: README de soporte Unity 2021+/BepInEx 5 Mono; repositorio archivado](https://github.com/sinai-dev/UnityExplorer)
 - [UnityExplorer 4.8.2 en Thunderstore, con fecha y archivos manuales](https://thunderstore.io/c/backpack-hero/p/sinai-dev/UnityExplorer/versions/)
+- [Runtime Unity Editor: inspector, consola y herramientas de depuración](https://github.com/ManlyMarco/RuntimeUnityEditor)
+- [Runtime Unity Editor v6.3.2.1: release de BepInEx 5](https://github.com/ManlyMarco/RuntimeUnityEditor/releases/tag/v6.3.2.1)
+- [BepInEx ConfigurationManager: soporte separado para BepInEx 5 Mono y BepInEx 6 IL2CPP](https://github.com/BepInEx/BepInEx.ConfigurationManager)
+- [Skill comunitaria BepInEx Mono](https://github.com/KaelLim/bepinex-modding/tree/main/skills/bepinex-mono-modding) — referencia general, no instalada sin adaptación al ciclo de vida/evidencia del juego.
+- [HarmonyX: documentación del patcher usado por BepInEx](https://github.com/BepInEx/HarmonyX)
 - [BepInEx MCP: puente de inspección en runtime](https://github.com/rkuhn153/bepinex-mcp)
 - [Skill de BepInEx IL2CPP encontrada durante la búsqueda](https://github.com/KaelLim/bepinex-modding/tree/main/skills/bepinex-il2cpp-modding) — referencia de descarte por backend incompatible.
 - [Unity AssetRipper: releases](https://github.com/AssetRipper/AssetRipper/releases)

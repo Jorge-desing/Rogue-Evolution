@@ -29,13 +29,13 @@ El ensamblado se genera en `artifacts/plugin/RogueCommandExpansionLoader.dll`. E
 
 ## Herramientas de contenido
 
-Unity 2021.3.45f2 ya está instalado para compilar AssetBundles. Blender 4.5.14 LTS y UnityExplorer 4.8.2 se guardan bajo `.tools/` para modelar y hacer inspección runtime; esta carpeta está ignorada por Git. Para volver a preparar las copias locales en otro checkout:
+Unity 2021.3.45f2 ya está instalado para compilar AssetBundles. Blender 4.5.14 LTS y los inspectores de runtime UnityExplorer 4.8.2 y Runtime Unity Editor 6.3.2.1 se guardan bajo `.tools/`; esta carpeta está ignorada por Git. Para volver a preparar las copias locales en otro checkout:
 
 ```powershell
 .\tools\Setup-ContentAuthoringTools.ps1 -Blender -UnityExplorer
 ```
 
-El script verifica SHA-256 y solo prepara las herramientas bajo `.tools/`. No copia archivos al juego ni lo inicia. UnityExplorer requiere BepInEx 5 Mono y se añadirá a la instalación de Steam solo durante una prueba reversible.
+El script verifica SHA-256 y solo prepara Blender y UnityExplorer bajo `.tools/`. Runtime Unity Editor se prepara por separado con `./tools/Setup-BackendTools.ps1 -RuntimeUnityEditor`; también verifica SHA-256. Ninguno de estos scripts copia archivos al juego ni lo inicia. Los inspectores requieren BepInEx 5 Mono y se añaden a la instalación de Steam solo durante una prueba reversible, usando uno por perfil de prueba.
 
 El validador de paquetes y guardas de compatibilidad se puede ejecutar sin iniciar el juego ni cargar AssetBundles:
 
