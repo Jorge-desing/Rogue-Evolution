@@ -80,6 +80,23 @@ La herramienta runtime solo cuenta como apoyo a una prueba. La evidencia de acep
 - **Habilidades BepInEx IL2CPP:** no aplicar sus instrucciones al juego Mono ni mover el plugin a BepInEx 6/Il2CppInterop sin que cambie y se verifique la identidad técnica del juego.
 - **Herramientas de runtime:** BepInEx 5.4.23.5 Mono x64 y BepInEx MCP están instalados en la carpeta Steam; se verificó una sesión iniciada por Steam y se observaron capacidades y jerarquía mediante llamadas MCP de solo lectura. Runtime Unity Editor 6.3.2.1 y UnityExplorer siguen solo en `.tools/`; desplegar como máximo uno por prueba reversible. Empezar con observación de solo lectura porque las herramientas ofrecen superficies que pueden cambiar estado o ejecutar código. Para retirar la instalación del bridge, usar `.tools/BepInExMCP/deployment/Restore-BepInExMcpDeployment.ps1`, que mueve solo los archivos instalados con hash intacto y deja intactos los modificados o adicionales.
 
+## Búsqueda ampliada para modelado e integración (2026-10-17)
+
+La secuencia de herramientas más directa ya está preparada en este repositorio: Blender crea la malla, Unity 2021.3.45f2 importa y empaqueta los recursos, el preflight valida las rutas y tipos declarados, y el runtime iniciado por Steam confirma si el juego realmente los registra. Las ocho skills locales son la guía principal porque incorporan la investigación estática, el esquema y los límites de evidencia propios de Rogue Command. No encontré una skill pública con unidades, etapas o AI verificadas en este juego.
+
+| Hallazgo | Uso potencial | Decisión para Rogue Evolution |
+|---|---|---|
+| [Create 3D Model for Codex](https://github.com/CheshireJCat/create-3d-model-skill) | Skill Codex para modelar con Blender; propone revisar la escena antes de mutarla, bloquear la silueta, inspeccionar imágenes y conservar checkpoints. Requiere BlenderMCP local y declara validación con Blender 5.2. | No instalar tal cual: aquí usamos Blender 4.5.14 y no tenemos BlenderMCP validado. Sus prácticas de diseño seguro y comprobación visual quedaron adaptadas a `.agents/skills/rogue-command-3d-model-authoring/SKILL.md`, que usa los scripts locales y las restricciones del juego. |
+| [Unity-Technologies/skills](https://github.com/Unity-Technologies/skills), en especial `unity-cli` | Colección pública de skills generales para flujos de Unity; la skill CLI puede automatizar operaciones del proyecto y del Editor. No conoce el contrato de este mod, y sus ejemplos actuales se orientan a instalaciones y proyectos Unity 6. | No instalar por ahora. Mantener las skills locales de Rogue Command como autoridad; evaluar la CLI por separado solo si confirma soporte real para el Editor fijado 2021.3.45f2 y reduce pasos manuales del builder actual. |
+| [Unity Asset Bundle Browser](https://github.com/Unity-Technologies/AssetBundles-Browser) | Herramienta de Editor para inspeccionar asignaciones, dependencias y duplicados, y realizar builds básicos de AssetBundles. | No añadirla: el proyecto ya tiene un builder para el formato del pack. El builder dedicado controla salida, plataforma y límites; una herramienta genérica de bundles no verifica los registros de Rogue Command. |
+| [UABEA](https://github.com/nesrak1/UABEA) | Lector/editor de bundles y archivos serializados; puede ayudar a abrir un objeto cuando UnityDataTool o UnityPy no explican su serialización. También puede escribir cambios. | No instalar ahora. La inspección de los bundles propios ya está cubierta por UnityDataTool y UnityPy; cualquier uso futuro debe ser de lectura y sobre una copia bajo `artifacts/`, nunca para editar la instalación del juego. |
+| [AssetRipper](https://github.com/AssetRipper/AssetRipper) | Analiza juegos Unity y exporta recursos para referencia; declara soporte desde Unity 3.5 hasta 6000.4, con calidad variable por versión. | Ya está disponible en `.tools/AssetRipper-2.0.0/`. Usarlo para referencias visuales o entender recursos; los exports no son assets originales ni prueban que una clase serializada se pueda reconstruir. |
+| `tools/validate_content_bundle_references.py` | Nuevo chequeo local con UnityPy: cruza cada referencia del manifest con la entrada serializada del bundle y el tipo requerido (`Sprite`, `GameObject` o ScriptableObject). Detecta nombres ausentes, ambiguos y rutas de bundle inseguras. | Usarlo antes de empaquetar. Es una barrera offline: la resolución del juego todavía debe comprobarse en una sesión iniciada por Steam. |
+
+Para producir una unidad: diseñar y conservar el `.blend`, exportar FBX al proyecto de authoring, asignar materiales y un prefab visual sin scripts, construir con el Editor fijado, correr el validador de referencias y comprobar el aspecto dentro de Rogue Command. Para ampliar etapas o AI, las mismas herramientas visuales no sustituyen la lectura del contrato, los registros y las decisiones observables del juego. Las listas de blueprint y las ofertas roguelite son aleatorias: una unidad elegible puede salir en ciertas selecciones; no se debe prometer que aparezca en cada partida.
+
+Para una referencia gráfica se puede usar `imagegen` durante la conversación o `anthropic-skills:algorithmic-art` para arte procedural 2D. Esos recursos generan imágenes o gráficos; no producen un FBX listo para cargar, no sustituyen la autoría en Blender y sus imágenes no deben copiarse a un pack como si ya fueran un modelo integrado.
+
 ## Fuentes
 
 - [BepInEx: documentación oficial y soporte Unity Mono/Harmony](https://docs.bepinex.dev/)
@@ -110,3 +127,9 @@ La herramienta runtime solo cuenta como apoyo a una prueba. La evidencia de acep
 - [BepInEx MCP: puente de inspección en runtime](https://github.com/rkuhn153/bepinex-mcp)
 - [Skill de BepInEx IL2CPP encontrada durante la búsqueda](https://github.com/KaelLim/bepinex-modding/tree/main/skills/bepinex-il2cpp-modding) — referencia de descarte por backend incompatible.
 - [Unity AssetRipper: releases](https://github.com/AssetRipper/AssetRipper/releases)
+- [Unity Technologies: skills para workflows Unity](https://github.com/Unity-Technologies/skills)
+- [Skill oficial `unity-cli`](https://github.com/Unity-Technologies/skills/blob/main/skills/unity-cli/SKILL.md)
+- [Create 3D Model for Codex: skill de Blender evaluada](https://github.com/CheshireJCat/create-3d-model-skill)
+- [Unity Technologies: Asset Bundle Browser](https://github.com/Unity-Technologies/AssetBundles-Browser)
+- [UABEA: lector/editor de AssetBundles y archivos serializados](https://github.com/nesrak1/UABEA)
+- [Unity 2021.3: API `AssetBundle.LoadAsset`](https://docs.unity3d.com/2021.3/Documentation/ScriptReference/AssetBundle.LoadAsset.html)

@@ -31,6 +31,8 @@
              Link="Runtime/RuntimeReflection.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeContentMutator.cs"
              Link="Runtime/RuntimeContentMutator.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeHooks.cs"
+             Link="Runtime/RuntimeHooks.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Modules/ScheduledBaseBuildParameters.cs"
              Link="Modules/ScheduledBaseBuildParameters.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Modules/ReactiveBaseDefenseParameters.cs"

@@ -39,6 +39,53 @@ ContentPackDefinition reactiveAiSample = JsonSerializer.Deserialize<ContentPackD
 
 var tests = new (string Name, Action Run)[]
 {
+    ("runtime Harmony patch installer hook names resolve to declared methods", () =>
+    {
+        string[] hookNames =
+        [
+            "EntityBalancingStoreInitPostfix",
+            "SetScriptableObjectPostfix",
+            "CreateStageMapPrefix",
+            "CreateLevelMapPrefix",
+            "InstantiateEntityPrefix",
+            "CreateEntityMeshPrefix",
+            "AiBehaviourUpdatePostfix",
+            "DefaultAiBehaviourInitPostfix",
+            "AiBehaviourDestroyPostfix",
+            "BlueprintNamePrefix",
+            "BlueprintDescriptionPrefix"
+        ];
+
+        foreach (string hookName in hookNames)
+        {
+            if (typeof(RuntimeHarmonyPatches).GetMethod(hookName,
+                    BindingFlags.Public | BindingFlags.Static) == null)
+            {
+                throw new InvalidOperationException($"RuntimePatchInstaller expects missing hook '{hookName}'.");
+            }
+        }
+
+        MethodInfo? nameHook = typeof(RuntimeHarmonyPatches).GetMethod("BlueprintNamePrefix",
+            BindingFlags.Public | BindingFlags.Static);
+        MethodInfo? descriptionHook = typeof(RuntimeHarmonyPatches).GetMethod("BlueprintDescriptionPrefix",
+            BindingFlags.Public | BindingFlags.Static);
+        foreach (MethodInfo? hook in new[] { nameHook, descriptionHook })
+        {
+            ParameterInfo[] parameters = hook?.GetParameters() ?? Array.Empty<ParameterInfo>();
+            if (hook == null || hook.ReturnType != typeof(bool) || parameters.Length != 2 ||
+                parameters[0].ParameterType != typeof(string) ||
+                parameters[1].ParameterType != typeof(string).MakeByRefType())
+            {
+                throw new InvalidOperationException("Blueprint localization hooks have an invalid Harmony signature.");
+            }
+        }
+
+        if (typeof(UnityResourcesLoadTypedPatch).GetMethod("Prefix",
+                BindingFlags.Public | BindingFlags.Static) == null)
+        {
+            throw new InvalidOperationException("The typed Resources.Load patch prefix is missing.");
+        }
+    }),
     ("sample manifest passes package-local validation", () =>
     {
         WithPackage(sample, (pack, root) =>
@@ -52,7 +99,8 @@ var tests = new (string Name, Action Run)[]
     ("Sandlance declares its own localized name, description, and card Sprite", () =>
     {
         ContentUnitDefinition sandlance = nativeSample.units.Single(unit => unit.id == "sample-native:scout-tank");
-        if (sandlance.cardImageAssetName != "SandlanceScoutCard" || sandlance.localizations == null ||
+        if (sandlance.cardImageAssetName !=
+                "assets/roguecommandexpansionsample/sandlancescoutcard.png" || sandlance.localizations == null ||
             !sandlance.localizations.Any(localization => localization.language == "en-US" &&
                 localization.name == "Sandlance Scout" && !String.IsNullOrWhiteSpace(localization.description)))
         {
@@ -63,10 +111,22 @@ var tests = new (string Name, Action Run)[]
     {
         ContentUnitDefinition bike = nativeSample.units.Single(unit => unit.id == "sample-native:skirmish-bike");
         if (bike.nativeTemplateId != "BombBike" || bike.assetBundleId != "sample-native:assets" ||
-            bike.visualAssetName != "SkirmishBikeVisual" || bike.cardImageAssetName != "SkirmishBikeCard" ||
+            bike.visualAssetName != "assets/roguecommandexpansionsample/skirmishbikevisual.prefab" ||
+            bike.cardImageAssetName != "assets/roguecommandexpansionsample/skirmishbikecard.png" ||
             bike.visualRootPath != "GameObject/BombBike")
         {
             throw new InvalidOperationException("Skirmish Strike Bike is missing its bundled visual declaration.");
+        }
+    }),
+    ("Unity prefab asset paths do not have to match the serialized root object name", () =>
+    {
+        if (!ContentPackValidator.PrefabReferenceMatchesObjectName(
+                "assets/roguecommandexpansionsample/scouttankvisual.prefab", "ScoutTankVisual") ||
+            !ContentPackValidator.PrefabReferenceMatchesObjectName("ScoutTankVisual.prefab", "ScoutTankVisual") ||
+            !ContentPackValidator.PrefabReferenceMatchesObjectName("ScoutTankVisual", "ScoutTankVisual") ||
+            ContentPackValidator.PrefabReferenceMatchesObjectName("ScoutTankVisual", "DifferentPrefab"))
+        {
+            throw new InvalidOperationException("Prefab asset references and object names were conflated.");
         }
     }),
     ("expansion units declare distinct English and Spanish localizations", () =>

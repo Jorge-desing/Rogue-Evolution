@@ -23,7 +23,7 @@ def clear_scene():
                 datablocks.remove(datablock)
 
 
-def make_material(name, color, metallic=0.0, roughness=0.55):
+def make_material(name, color, metallic=0.0, roughness=0.55, emission_color=None, emission_strength=1.0):
     material = bpy.data.materials.new(name)
     material.diffuse_color = (*color, 1.0)
     material.use_nodes = True
@@ -31,6 +31,13 @@ def make_material(name, color, metallic=0.0, roughness=0.55):
     shader.inputs["Base Color"].default_value = (*color, 1.0)
     shader.inputs["Metallic"].default_value = metallic
     shader.inputs["Roughness"].default_value = roughness
+    if emission_color is not None:
+        if "Emission Color" in shader.inputs:
+            shader.inputs["Emission Color"].default_value = (*emission_color, 1.0)
+        elif "Emission" in shader.inputs:
+            shader.inputs["Emission"].default_value = (*emission_color, 1.0)
+        if "Emission Strength" in shader.inputs:
+            shader.inputs["Emission Strength"].default_value = emission_strength
     return material
 
 
@@ -166,8 +173,10 @@ def main():
     rubber = make_material("Strike Bike Tire", (0.025, 0.033, 0.04), 0.08, 0.78)
     wheel = make_material("Strike Bike Wheel Metal", (0.19, 0.28, 0.33), 0.62, 0.38)
     gunmetal = make_material("Strike Bike Gunmetal", (0.07, 0.10, 0.13), 0.76, 0.30)
-    warning = make_material("Strike Bike Warning Orange", (0.96, 0.27, 0.045), 0.16, 0.36)
-    sensor = make_material("Strike Bike Arc Cyan", (0.035, 0.68, 0.92), 0.22, 0.20)
+    warning = make_material("Strike Bike Warning Orange", (0.96, 0.27, 0.045), 0.16, 0.36,
+                            emission_color=(0.96, 0.27, 0.045), emission_strength=1.5)
+    sensor = make_material("Strike Bike Arc Cyan", (0.035, 0.68, 0.92), 0.22, 0.20,
+                           emission_color=(0.035, 0.68, 0.92), emission_strength=1.8)
 
     model_objects = []
     wheel_rotation = (0.0, math.radians(90), 0.0)
@@ -186,6 +195,10 @@ def main():
                 "StrikeBikeWheel_AxleCap_{0}_{1}".format(axle, side_name),
                 0.10, 0.045, (side * 0.13, position[1], position[2]),
                 gunmetal, wheel_rotation, 8))
+            model_objects.append(make_torus(
+                "StrikeBikeWheel_RimTrim_{0}_{1}".format(axle, side_name),
+                (side * 0.105, position[1], position[2]), 0.285, 0.022,
+                wheel, (0.0, math.radians(90), 0.0)))
 
     # The narrow two-wheel chassis keeps the shape aligned with the native bike controller.
     for side in (-1, 1):
@@ -200,7 +213,7 @@ def main():
             make_box("StrikeBikeArmor_SidePod_{0}".format(side),
                      (0.18, 0.78, 0.30), (side * 0.48, -0.10, 0.69), armor, 0.045),
             make_box("StrikeBikeAccent_SideStripe_{0}".format(side),
-                     (0.04, 0.53, 0.055), (side * 0.581, -0.07, 0.76), warning, 0.012),
+                     (0.04, 0.53, 0.055), (side * 0.578, -0.07, 0.76), warning, 0.012),
         ]
 
     model_objects += [
@@ -217,11 +230,48 @@ def main():
         make_cylinder("StrikeBikeSensor_Headlamp", 0.105, 0.055, (0.0, 0.94, 0.91),
                       sensor, (math.radians(90), 0.0, 0.0), 10),
         make_torus("StrikeBikeArc_InductionRing", (0.0, -0.12, 1.28), 0.26, 0.045, sensor),
-        make_box("StrikeBikeArmor_FootPlate_L", (0.34, 0.25, 0.08), (-0.55, -0.04, 0.43), armor_light, 0.025),
-        make_box("StrikeBikeArmor_FootPlate_R", (0.34, 0.25, 0.08), (0.55, -0.04, 0.43), armor_light, 0.025),
+        make_box("StrikeBikeArmor_FootPlate_L", (0.27, 0.25, 0.08), (-0.46, -0.04, 0.43), armor_light, 0.025),
+        make_box("StrikeBikeArmor_FootPlate_R", (0.27, 0.25, 0.08), (0.46, -0.04, 0.43), armor_light, 0.025),
         make_box("StrikeBikeAccent_FrontMarker_L", (0.07, 0.08, 0.045), (-0.27, 0.82, 0.72), warning, 0.015),
         make_box("StrikeBikeAccent_FrontMarker_R", (0.07, 0.08, 0.045), (0.27, 0.82, 0.72), warning, 0.015),
     ]
+
+    # Keep the existing bomb-bike cage and controller silhouette. The twin
+    # external charge canisters make its hit-and-run role readable in profile.
+    for side in (-1, 1):
+        side_name = "L" if side < 0 else "R"
+        model_objects.append(make_cylinder(
+            "StrikeBikePayload_ExternalCharge_{0}".format(side_name),
+            0.12, 0.60, (side * 0.43, -0.75, 1.08), warning,
+            (math.radians(90), 0.0, 0.0), 10))
+        for end_name, y in (("Front", -0.43), ("Rear", -1.07)):
+            model_objects.append(make_cylinder(
+                "StrikeBikePayload_ChargeCap_{0}_{1}".format(side_name, end_name),
+                0.095, 0.055, (side * 0.43, y, 1.08), gunmetal,
+                (math.radians(90), 0.0, 0.0), 10))
+        model_objects.append(make_torus(
+            "StrikeBikePayload_ChargeBand_{0}".format(side_name),
+            (side * 0.43, -0.75, 1.08), 0.12, 0.018,
+            sensor, (math.radians(90), 0.0, 0.0)))
+        model_objects.append(make_rod(
+            "StrikeBikePayload_RackRail_{0}".format(side_name),
+            (side * 0.54, -1.02, 1.15), (side * 0.54, -0.48, 1.15),
+            0.028, wheel, 8))
+        model_objects.append(make_box(
+            "StrikeBikeAccent_ChargeWarning_{0}".format(side_name),
+            (0.03, 0.25, 0.055), (side * 0.57, -0.75, 1.08), sensor, 0.012))
+
+    # Reinforced fork clamps and the short crash bar sharpen the fast strike
+    # bike's front silhouette while staying within the native wheel footprint.
+    for side in (-1, 1):
+        side_name = "L" if side < 0 else "R"
+        model_objects.append(make_box(
+            "StrikeBikeFork_Clamp_{0}".format(side_name),
+            (0.17, 0.12, 0.12), (side * 0.25, 0.57, 0.89), warning, 0.025,
+            (math.radians(-12), 0.0, 0.0)))
+    model_objects.append(make_box(
+        "StrikeBikeArmor_FrontCrashBar", (0.70, 0.085, 0.095),
+        (0.0, 0.98, 0.76), gunmetal, 0.025))
 
     add_preview_stage(model_objects)
     bpy.ops.wm.save_as_mainfile(filepath=str(BLEND_PATH))

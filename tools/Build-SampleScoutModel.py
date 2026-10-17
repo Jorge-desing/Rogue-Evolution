@@ -23,7 +23,7 @@ def clear_scene():
                 datablocks.remove(datablock)
 
 
-def make_material(name, color, metallic=0.0, roughness=0.55):
+def make_material(name, color, metallic=0.0, roughness=0.55, emission_color=None, emission_strength=1.0):
     material = bpy.data.materials.new(name)
     material.diffuse_color = (*color, 1.0)
     material.use_nodes = True
@@ -31,6 +31,13 @@ def make_material(name, color, metallic=0.0, roughness=0.55):
     shader.inputs["Base Color"].default_value = (*color, 1.0)
     shader.inputs["Metallic"].default_value = metallic
     shader.inputs["Roughness"].default_value = roughness
+    if emission_color is not None:
+        if "Emission Color" in shader.inputs:
+            shader.inputs["Emission Color"].default_value = (*emission_color, 1.0)
+        elif "Emission" in shader.inputs:
+            shader.inputs["Emission"].default_value = (*emission_color, 1.0)
+        if "Emission Strength" in shader.inputs:
+            shader.inputs["Emission Strength"].default_value = emission_strength
     return material
 
 
@@ -67,6 +74,20 @@ def make_cylinder(name, radius, depth, location, material, rotation=(0.0, 0.0, 0
     obj.name = name
     bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
     return finish_mesh(obj, material, min(radius * 0.16, depth * 0.14))
+
+
+def make_rod(name, start, end, radius, material, vertices=8):
+    start = Vector(start)
+    end = Vector(end)
+    direction = end - start
+    bpy.ops.mesh.primitive_cylinder_add(
+        vertices=vertices, radius=radius, depth=direction.length,
+        location=(start + end) * 0.5)
+    obj = bpy.context.object
+    obj.name = name
+    obj.rotation_euler = direction.to_track_quat("Z", "Y").to_euler()
+    bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+    return finish_mesh(obj, material, min(radius * 0.18, direction.length * 0.025))
 
 
 def make_hull(material):
@@ -150,8 +171,10 @@ def main():
     tread = make_material("Sandlance Tread", (0.045, 0.055, 0.06), 0.18, 0.74)
     wheel = make_material("Sandlance Wheel Metal", (0.17, 0.23, 0.24), 0.6, 0.42)
     gunmetal = make_material("Sandlance Gunmetal", (0.075, 0.105, 0.12), 0.74, 0.3)
-    amber = make_material("Sandlance Signal Amber", (0.95, 0.30, 0.055), 0.18, 0.36)
-    sensor = make_material("Sandlance Sensor Glass", (0.035, 0.72, 0.70), 0.2, 0.24)
+    amber = make_material("Sandlance Signal Amber", (0.95, 0.30, 0.055), 0.18, 0.36,
+                          emission_color=(0.95, 0.30, 0.055), emission_strength=1.5)
+    sensor = make_material("Sandlance Sensor Glass", (0.035, 0.72, 0.70), 0.2, 0.24,
+                           emission_color=(0.035, 0.72, 0.70), emission_strength=1.8)
 
     model_objects = [make_hull(armor)]
     model_objects += [
@@ -196,6 +219,39 @@ def main():
         make_box("ScoutAccent_FrontLight_R", (0.12, 0.07, 0.06), (0.37, 1.08, 0.66), sensor, 0.015),
         make_box("ScoutAccent_TopPanel", (0.28, 0.34, 0.055), (0.0, -0.75, 0.93), amber, 0.025),
     ]
+
+    # Individual tread shoes make the propulsion system read at the game's zoom.
+    for side in (-1, 1):
+        side_name = "L" if side < 0 else "R"
+        for index, y in enumerate((-1.02, -0.74, -0.46, -0.18, 0.10, 0.38, 0.66, 0.94), start=1):
+            model_objects.append(make_box(
+                "ScoutTreads_ShoeTop_{0}_{1}".format(side_name, index),
+                (0.22, 0.15, 0.075), (side * 0.91, y, 0.63), tread, 0.018))
+            model_objects.append(make_box(
+                "ScoutTreads_ShoeBottom_{0}_{1}".format(side_name, index),
+                (0.22, 0.15, 0.075), (side * 0.91, y, 0.05), tread, 0.018))
+
+    # Armored collars and a braced sensor mast add readable mechanical structure
+    # without changing the original hull, turret, weapon or prefab references.
+    for side in (-1, 1):
+        side_name = "L" if side < 0 else "R"
+        model_objects.append(make_cylinder(
+            "ScoutGun_MuzzleCollar_{0}".format(side_name), 0.083, 0.13,
+            (side * 0.14, 0.54, 1.01), armor_light,
+            (math.radians(90), 0.0, 0.0), 10))
+        model_objects.append(make_rod(
+            "ScoutSensor_MastBrace_{0}".format(side_name),
+            (side * 0.16, -0.64, 1.22), (side * 0.18, -0.64, 1.42),
+            0.018, gunmetal, 6))
+        model_objects.append(make_cylinder(
+            "ScoutSensor_DorsalPod_{0}".format(side_name), 0.095, 0.055,
+            (side * 0.45, -0.75, 0.93), sensor, vertices=10))
+        model_objects.append(make_cylinder(
+            "ScoutSensor_DorsalPodMount_{0}".format(side_name), 0.071, 0.045,
+            (side * 0.45, -0.75, 0.91), gunmetal, vertices=8))
+        model_objects.append(make_box(
+            "ScoutAccent_RearMarker_{0}".format(side_name),
+            (0.12, 0.16, 0.035), (side * 0.45, -0.56, 0.92), amber, 0.012))
 
     add_preview_stage(model_objects)
     bpy.ops.wm.save_as_mainfile(filepath=str(BLEND_PATH))

@@ -86,10 +86,10 @@
       "properties": {
         "id": { "$ref": "#/$defs/namespacedId" },
         "assetBundleId": { "$ref": "#/$defs/namespacedId" },
-        "balanceAssetName": { "type": "string", "minLength": 1, "pattern": "\\S" },
-        "prefabAssetName": { "type": "string", "minLength": 1, "pattern": "\\S" },
-        "cardImageAssetName": { "type": "string", "minLength": 1, "pattern": "\\S" },
-        "visualAssetName": { "type": "string", "minLength": 1, "pattern": "\\S" },
+        "balanceAssetName": { "type": "string", "minLength": 1, "pattern": "\\S", "description": "Unity AssetBundle address, preferably the project-relative path including extension." },
+        "prefabAssetName": { "type": "string", "minLength": 1, "pattern": "\\S", "description": "Unity AssetBundle address, preferably the project-relative path including extension." },
+        "cardImageAssetName": { "type": "string", "minLength": 1, "pattern": "\\S", "description": "Unity AssetBundle address for a Sprite; prefer the project-relative path including extension." },
+        "visualAssetName": { "type": "string", "minLength": 1, "pattern": "\\S", "description": "Unity AssetBundle address, preferably the project-relative path including extension." },
         "visualRootPath": { "type": "string", "minLength": 1, "pattern": "\\S" },
         "nativeTemplateId": { "type": "string", "minLength": 1, "pattern": "\\S" },
         "localizations": {
@@ -187,7 +187,7 @@
       "properties": {
         "id": { "$ref": "#/$defs/namespacedId" },
         "assetBundleId": { "$ref": "#/$defs/namespacedId" },
-        "assetName": { "type": "string", "minLength": 1, "pattern": "\\S" },
+        "assetName": { "type": "string", "minLength": 1, "pattern": "\\S", "description": "Unity AssetBundle address, preferably the project-relative path including extension." },
         "nativeTemplateId": { "type": "string", "minLength": 1, "pattern": "\\S" },
         "parameterOverrides": {
           "type": "array",

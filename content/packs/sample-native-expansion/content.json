@@ -13,8 +13,8 @@
       "id": "sample-native:scout-tank",
       "nativeTemplateId": "PCXBaseTank",
       "assetBundleId": "sample-native:assets",
-      "cardImageAssetName": "SandlanceScoutCard",
-      "visualAssetName": "ScoutTankVisual",
+      "cardImageAssetName": "assets/roguecommandexpansionsample/sandlancescoutcard.png",
+      "visualAssetName": "assets/roguecommandexpansionsample/scouttankvisual.prefab",
       "visualRootPath": "Vehicle",
       "localizations": [
         {
@@ -92,8 +92,8 @@
       "id": "sample-native:skirmish-bike",
       "nativeTemplateId": "BombBike",
       "assetBundleId": "sample-native:assets",
-      "cardImageAssetName": "SkirmishBikeCard",
-      "visualAssetName": "SkirmishBikeVisual",
+      "cardImageAssetName": "assets/roguecommandexpansionsample/skirmishbikecard.png",
+      "visualAssetName": "assets/roguecommandexpansionsample/skirmishbikevisual.prefab",
       "visualRootPath": "GameObject/BombBike",
       "localizations": [
         {
@@ -192,7 +192,7 @@
     },
     {
       "id": "sample-native:core-battleground",
-      "nativeTemplateId": "StageParameters_Pools_Level5to6",
+      "nativeTemplateId": "StageParameters_Pools_Level3",
       "parameterOverrides": [
         { "name": "levelCount", "value": "12" },
         { "name": "maxWidth", "value": "7" },
@@ -202,8 +202,8 @@
         { "name": "relicRewardWeight", "value": "2.5" },
         { "name": "upgradeRewardWeight", "value": "3.5" }
       ],
-      "mapSizeMin": 60,
-      "mapSizeMax": 115,
+      "mapSizeMin": 35,
+      "mapSizeMax": 80,
       "isPartOfDemo": false,
       "unitIds": [
         "sample-native:scout-tank",

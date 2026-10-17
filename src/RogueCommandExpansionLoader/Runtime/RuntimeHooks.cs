@@ -321,6 +321,16 @@ namespace RogueCommandExpansionLoader.Runtime
         {
             RuntimeHooks.AiBehaviourDestroyPostfix(__instance);
         }
+
+        public static bool BlueprintNamePrefix(string __0, ref string __result)
+        {
+            return RuntimeHooks.BlueprintNamePrefix(__0, ref __result);
+        }
+
+        public static bool BlueprintDescriptionPrefix(string __0, ref string __result)
+        {
+            return RuntimeHooks.BlueprintDescriptionPrefix(__0, ref __result);
+        }
     }
 
     internal static class UnityResourcesLoadTypedPatch

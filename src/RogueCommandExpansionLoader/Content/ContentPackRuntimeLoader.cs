@@ -2348,7 +2348,8 @@ namespace RogueCommandExpansionLoader.Content
                 throw new InvalidDataException("Unidad " + unit.id + " en '" + packageName + "': el prefab está vacío.");
             }
 
-            if (validateAssetName && !String.Equals(prefab.name, unit.prefabAssetName, StringComparison.Ordinal))
+            if (validateAssetName && !ContentPackValidator.PrefabReferenceMatchesObjectName(
+                unit.prefabAssetName, prefab.name))
             {
                 throw new InvalidDataException("Unidad " + unit.id + " en '" + packageName + "': el nombre interno del prefab '" +
                     prefab.name + "' no coincide con prefabAssetName '" + unit.prefabAssetName + "'.");
@@ -2376,11 +2377,11 @@ namespace RogueCommandExpansionLoader.Content
                     "': el prefab visual está vacío.");
             }
 
-            if (!String.Equals(prefab.name, unit.visualAssetName, StringComparison.Ordinal))
+            if (!ContentPackValidator.PrefabReferenceMatchesObjectName(unit.visualAssetName, prefab.name))
             {
                 throw new InvalidDataException("Unidad " + unit.id + " en '" + packageName +
                     "': el nombre interno del prefab visual '" + prefab.name +
-                    "' no coincide con visualAssetName '" + unit.visualAssetName + "'.");
+                    "' no coincide con el alias visualAssetName '" + unit.visualAssetName + "'.");
             }
 
             ValidateNoMissingPrefabComponents(prefab, packageName, "Visual de unidad " + unit.id);
@@ -3456,7 +3457,9 @@ namespace RogueCommandExpansionLoader.Content
             UnityEngine.Object asset;
             try
             {
-                asset = bundle.LoadAsset(assetName);
+                // Request the expected type here instead of loading the bundle's main object
+                // first. Texture assets may expose a Sprite sub-object under the same file name.
+                asset = bundle.LoadAsset(assetName, expectedType);
             }
             catch (Exception exception)
             {

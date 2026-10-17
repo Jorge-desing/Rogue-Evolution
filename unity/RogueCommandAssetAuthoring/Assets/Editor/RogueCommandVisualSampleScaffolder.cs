@@ -356,8 +356,8 @@ namespace RogueCommandExpansion.Authoring
                 { "tread", CreateOrUpdateMaterial("ScoutTread", new Color32(22, 27, 30, 255), 0.18f, 0.34f) },
                 { "wheel", CreateOrUpdateMaterial("ScoutWheel", new Color32(48, 65, 69, 255), 0.60f, 0.58f) },
                 { "gunmetal", CreateOrUpdateMaterial("ScoutGunmetal", new Color32(27, 38, 43, 255), 0.74f, 0.70f) },
-                { "amber", CreateOrUpdateMaterial("ScoutSignalAmber", new Color32(232, 108, 32, 255), 0.18f, 0.64f) },
-                { "sensor", CreateOrUpdateMaterial("ScoutSensorGlass", new Color32(31, 205, 191, 255), 0.20f, 0.76f) }
+                { "amber", CreateOrUpdateMaterial("ScoutSignalAmber", new Color32(232, 108, 32, 255), 0.18f, 0.64f, new Color(0.95f, 0.35f, 0.08f) * 1.5f) },
+                { "sensor", CreateOrUpdateMaterial("ScoutSensorGlass", new Color32(31, 205, 191, 255), 0.20f, 0.76f, new Color(0.12f, 0.85f, 0.78f) * 1.8f) }
             };
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
@@ -375,8 +375,8 @@ namespace RogueCommandExpansion.Authoring
                 { "rubber", CreateOrUpdateMaterial("StrikeBikeTire", new Color32(18, 23, 28, 255), 0.08f, 0.28f) },
                 { "wheel", CreateOrUpdateMaterial("StrikeBikeWheel", new Color32(49, 70, 84, 255), 0.62f, 0.62f) },
                 { "gunmetal", CreateOrUpdateMaterial("StrikeBikeGunmetal", new Color32(27, 38, 49, 255), 0.76f, 0.70f) },
-                { "warning", CreateOrUpdateMaterial("StrikeBikeWarningOrange", new Color32(245, 69, 12, 255), 0.16f, 0.64f) },
-                { "arc", CreateOrUpdateMaterial("StrikeBikeArcCyan", new Color32(16, 173, 235, 255), 0.22f, 0.80f) }
+                { "warning", CreateOrUpdateMaterial("StrikeBikeWarningOrange", new Color32(245, 69, 12, 255), 0.16f, 0.64f, new Color(0.98f, 0.28f, 0.05f) * 1.5f) },
+                { "arc", CreateOrUpdateMaterial("StrikeBikeArcCyan", new Color32(16, 173, 235, 255), 0.22f, 0.80f, new Color(0.06f, 0.68f, 0.95f) * 1.8f) }
             };
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
@@ -405,6 +405,10 @@ namespace RogueCommandExpansion.Authoring
                 {
                     materialKey = "wheel";
                 }
+                else if (name.StartsWith("StrikeBikeFork_Clamp", StringComparison.Ordinal))
+                {
+                    materialKey = "warning";
+                }
                 else if (name.StartsWith("StrikeBikeFrame_", StringComparison.Ordinal) ||
                     name.StartsWith("StrikeBikeFork_", StringComparison.Ordinal) ||
                     name.StartsWith("StrikeBikeWheel_AxleCap_", StringComparison.Ordinal) ||
@@ -413,9 +417,18 @@ namespace RogueCommandExpansion.Authoring
                 {
                     materialKey = "gunmetal";
                 }
+                else if (name.StartsWith("StrikeBikePayload_ChargeCap_", StringComparison.Ordinal))
+                {
+                    materialKey = "gunmetal";
+                }
+                else if (name.StartsWith("StrikeBikePayload_RackRail_", StringComparison.Ordinal))
+                {
+                    materialKey = "wheel";
+                }
                 else if (name.StartsWith("StrikeBikePayload_ChargeBand", StringComparison.Ordinal) ||
                     name.StartsWith("StrikeBikeSensor_", StringComparison.Ordinal) ||
-                    name.StartsWith("StrikeBikeArc_", StringComparison.Ordinal))
+                    name.StartsWith("StrikeBikeArc_", StringComparison.Ordinal) ||
+                    name.StartsWith("StrikeBikeAccent_ChargeWarning_", StringComparison.Ordinal))
                 {
                     materialKey = "arc";
                 }
@@ -757,7 +770,8 @@ namespace RogueCommandExpansion.Authoring
             string name,
             Color color,
             float metallic,
-            float smoothness)
+            float smoothness,
+            Color? emissionColor = null)
         {
             string path = MaterialRoot + "/" + name + ".mat";
             Material material = AssetDatabase.LoadAssetAtPath<Material>(path);
@@ -781,6 +795,21 @@ namespace RogueCommandExpansion.Authoring
             material.color = color;
             material.SetFloat("_Metallic", metallic);
             material.SetFloat("_Glossiness", smoothness);
+            material.enableInstancing = true;
+
+            if (emissionColor.HasValue && emissionColor.Value != Color.black)
+            {
+                material.EnableKeyword("_EMISSION");
+                material.SetColor("_EmissionColor", emissionColor.Value);
+                material.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
+            }
+            else
+            {
+                material.DisableKeyword("_EMISSION");
+                material.SetColor("_EmissionColor", Color.black);
+                material.globalIlluminationFlags = MaterialGlobalIlluminationFlags.EmissiveIsBlack;
+            }
+
             EditorUtility.SetDirty(material);
             return material;
         }
@@ -817,6 +846,14 @@ namespace RogueCommandExpansion.Authoring
                 }
                 else if (name.StartsWith("ScoutSensor_Lens", StringComparison.Ordinal) ||
                     name.StartsWith("ScoutAccent_FrontLight", StringComparison.Ordinal))
+                {
+                    materialKey = "sensor";
+                }
+                else if (name.StartsWith("ScoutSensor_DorsalPodMount", StringComparison.Ordinal))
+                {
+                    materialKey = "gunmetal";
+                }
+                else if (name.StartsWith("ScoutSensor_DorsalPod", StringComparison.Ordinal))
                 {
                     materialKey = "sensor";
                 }

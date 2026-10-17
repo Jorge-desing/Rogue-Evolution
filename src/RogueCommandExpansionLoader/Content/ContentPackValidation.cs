@@ -68,6 +68,24 @@ namespace RogueCommandExpansionLoader.Content
     public static class ContentPackValidator
     {
         public const int SupportedSchemaVersion = 1;
+
+        internal static bool PrefabReferenceMatchesObjectName(string assetReference, string objectName)
+        {
+            if (String.IsNullOrWhiteSpace(assetReference) || String.IsNullOrWhiteSpace(objectName))
+            {
+                return false;
+            }
+
+            // AssetBundle paths identify an object independently from the GameObject's
+            // serialized root name. Unity has already resolved the typed asset by this point.
+            if (assetReference.IndexOf('/') >= 0 || assetReference.IndexOf('\\') >= 0 ||
+                assetReference.EndsWith(".prefab", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            return String.Equals(assetReference, objectName, StringComparison.Ordinal);
+        }
         public const int MaxAssetBundlesPerPack = 128;
         public const int MaxAiModulesPerProfile = 8;
         public const long MaxManifestBundleBytes = 64L * 1024L * 1024L;
