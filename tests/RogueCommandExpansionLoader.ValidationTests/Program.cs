@@ -91,10 +91,20 @@ var tests = new (string Name, Action Run)[]
             throw new InvalidOperationException("A native-template unit did not retain its template localization fallback.");
         }
     }),
-    ("reactive AI sample pack passes package-local validation", () =>
+    ("reactive AI sample links Sandlance through a validated cross-pack unit reference", () =>
     {
+        ContentStageDefinition stage = reactiveAiSample.stages.Single(
+            candidate => candidate.id == "sample-reactive-ai:counterstrike-lane");
+        if (stage.unitIds == null || !stage.unitIds.Contains("sample-native:scout-tank") ||
+            stage.aiProfileIds == null || !stage.aiProfileIds.Contains("sample-reactive-ai:base-defense"))
+        {
+            throw new InvalidOperationException("The counterstrike stage does not link Sandlance and its scoped AI profile.");
+        }
+
         WithPackage(reactiveAiSample, (pack, root) =>
-            ExpectValid(pack, root, new EmptySnapshot(), new KnownModuleValidator()));
+            ExpectValid(pack, root, new EmptySnapshot("sample-native:scout-tank"), new KnownModuleValidator()));
+        WithPackage(reactiveAiSample, (pack, root) =>
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(), "reference.unresolved"));
     }),
     ("stage-scoped native AI samples use unique reserved resource aliases", () =>
     {
@@ -1102,7 +1112,7 @@ var tests = new (string Name, Action Run)[]
             throw new InvalidOperationException("Destruction failure repeated callbacks or skipped reverse cleanup.");
         }
     }),
-    ("runtime entity mutator appends balancing rows indices and factory mappings idempotently", () =>
+    ("runtime entity mutator appends balancing rows indices factory mappings and stat caches idempotently", () =>
     {
         EntityBalancingStore.Reset();
         try
@@ -1123,9 +1133,15 @@ var tests = new (string Name, Action Run)[]
                 EntityBalancingStore.ParameterListIndexOf["sample:factory"] != 1 ||
                 EntityBalancingStore.FactoryEntityIdOf.Count != 1 ||
                 EntityBalancingStore.FactoryEntityIdOf["sample:product"] != "sample:factory" ||
+                EntityBalancingStore.ChangeableIntValueCache.Count != 2 ||
+                EntityBalancingStore.ChangeableFloatValueCache.Count != 2 ||
+                EntityBalancingStore.ChangeableIntValueCache["sample:product"].Count != 0 ||
+                EntityBalancingStore.ChangeableFloatValueCache["sample:product"].Count != 0 ||
+                EntityBalancingStore.ChangeableIntValueCache["sample:factory"].Count != 0 ||
+                EntityBalancingStore.ChangeableFloatValueCache["sample:factory"].Count != 0 ||
                 provider.EntityRowsRegisteredCount != 1)
             {
-                throw new InvalidOperationException("The runtime mutator left inconsistent registry rows, indices, or factory mappings.");
+                throw new InvalidOperationException("The runtime mutator left inconsistent registry rows, indices, factory mappings, or stat caches.");
             }
         }
         finally
@@ -1133,9 +1149,9 @@ var tests = new (string Name, Action Run)[]
             EntityBalancingStore.Reset();
         }
     }),
-    ("runtime entity mutator rolls back a partial row append after index insertion fails", () =>
+    ("runtime entity mutator rolls back rows and value caches after index insertion fails", () =>
     {
-        var comparer = new ThrowOnFirstProductHashComparer("sample:product");
+        var comparer = new ThrowOnFirstTargetHashComparer("sample:product");
         EntityBalancingStore.Reset(comparer);
         try
         {
@@ -1148,17 +1164,60 @@ var tests = new (string Name, Action Run)[]
             if (registered || !comparer.FailureTriggered ||
                 EntityBalancingStore.EntityBalancingParametersList.Count != 0 ||
                 EntityBalancingStore.ParameterListIndexOf.Count != 0 ||
-                EntityBalancingStore.FactoryEntityIdOf.Count != 0 || provider.EntityRowsRegisteredCount != 0)
+                EntityBalancingStore.FactoryEntityIdOf.Count != 0 ||
+                EntityBalancingStore.ChangeableIntValueCache.Count != 0 ||
+                EntityBalancingStore.ChangeableFloatValueCache.Count != 0 ||
+                provider.EntityRowsRegisteredCount != 0)
             {
                 throw new InvalidOperationException("A failed index commit did not roll back all appended registry state: " +
                     "registered=" + registered +
                     ", injectedFailure=" + comparer.FailureTriggered +
-                ", targetHashCalls=" + comparer.TargetHashCalls +
-                ", comparerAttached=" + ReferenceEquals(EntityBalancingStore.ParameterListIndexOf.Comparer, comparer) +
+                    ", targetHashCalls=" + comparer.TargetHashCalls +
+                    ", comparerAttached=" + ReferenceEquals(EntityBalancingStore.ParameterListIndexOf.Comparer, comparer) +
                     ", rows=" + EntityBalancingStore.EntityBalancingParametersList.Count +
                     ", indices=" + EntityBalancingStore.ParameterListIndexOf.Count +
                     ", factoryMappings=" + EntityBalancingStore.FactoryEntityIdOf.Count +
+                    ", intCache=" + EntityBalancingStore.ChangeableIntValueCache.Count +
+                    ", floatCache=" + EntityBalancingStore.ChangeableFloatValueCache.Count +
                     ", notifications=" + provider.EntityRowsRegisteredCount + ".");
+            }
+        }
+        finally
+        {
+            EntityBalancingStore.Reset();
+        }
+    }),
+    ("runtime entity mutator preserves rows index and both caches when cache rollback fails", () =>
+    {
+        var indexComparer = new ThrowOnFirstTargetHashComparer("sample:product");
+        var cacheComparer = new ThrowOnTargetHashCallComparer("sample:product", 3);
+        EntityBalancingStore.Reset(indexComparer);
+        EntityBalancingStore.ChangeableFloatValueCache =
+            new Dictionary<string, Dictionary<EntityBalancingStore.ChangeableValue, float>>(cacheComparer);
+        try
+        {
+            var provider = new RuntimeMutatorTestProvider();
+            provider.EntityRows.Add(RuntimeMutatorTestData.Row("sample:product"));
+            var mutator = new RuntimeContentMutator(typeof(EntityBalancingStore).Assembly, provider, null);
+
+            bool registered = mutator.RegisterEntityRows();
+            if (registered || !cacheComparer.FailureTriggered ||
+                EntityBalancingStore.EntityBalancingParametersList.Count != 1 ||
+                EntityBalancingStore.ParameterListIndexOf.Count != 1 ||
+                EntityBalancingStore.ParameterListIndexOf["sample:product"] != 0 ||
+                EntityBalancingStore.ChangeableIntValueCache.Count != 1 ||
+                EntityBalancingStore.ChangeableFloatValueCache.Count != 1 ||
+                EntityBalancingStore.ChangeableIntValueCache["sample:product"].Count != 0 ||
+                EntityBalancingStore.ChangeableFloatValueCache["sample:product"].Count != 0 ||
+                provider.EntityRowsRegisteredCount != 0)
+            {
+                throw new InvalidOperationException("The mutator did not preserve a consistent unit row, index, and cache pair after cleanup failed: " +
+                    "registered=" + registered +
+                    ", injectedFailure=" + cacheComparer.FailureTriggered +
+                    ", rows=" + EntityBalancingStore.EntityBalancingParametersList.Count +
+                    ", indices=" + EntityBalancingStore.ParameterListIndexOf.Count +
+                    ", intCache=" + EntityBalancingStore.ChangeableIntValueCache.Count +
+                    ", floatCache=" + EntityBalancingStore.ChangeableFloatValueCache.Count + ".");
             }
         }
         finally

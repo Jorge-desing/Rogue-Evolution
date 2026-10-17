@@ -24,15 +24,25 @@ public sealed class EntityControllerIdentityTestController
 
 public static class EntityBalancingStore
 {
+    public enum ChangeableValue
+    {
+        MaxHealth,
+        MoveSpeed
+    }
+
     public static List<EntityBalancingParameters> EntityBalancingParametersList = new();
     public static Dictionary<string, int> ParameterListIndexOf = new(StringComparer.Ordinal);
     public static Dictionary<string, string> FactoryEntityIdOf = new(StringComparer.Ordinal);
+    public static Dictionary<string, Dictionary<ChangeableValue, int>> ChangeableIntValueCache = new(StringComparer.Ordinal);
+    public static Dictionary<string, Dictionary<ChangeableValue, float>> ChangeableFloatValueCache = new(StringComparer.Ordinal);
 
     public static void Reset(IEqualityComparer<string> indexComparer = null)
     {
         EntityBalancingParametersList.Clear();
         ParameterListIndexOf = new Dictionary<string, int>(indexComparer ?? StringComparer.Ordinal);
         FactoryEntityIdOf.Clear();
+        ChangeableIntValueCache = new Dictionary<string, Dictionary<ChangeableValue, int>>(StringComparer.Ordinal);
+        ChangeableFloatValueCache = new Dictionary<string, Dictionary<ChangeableValue, float>>(StringComparer.Ordinal);
     }
 }
 
@@ -123,11 +133,11 @@ internal static class RuntimeMutatorTestData
     }
 }
 
-internal sealed class ThrowOnFirstProductHashComparer : IEqualityComparer<string>
+internal sealed class ThrowOnFirstTargetHashComparer : IEqualityComparer<string>
 {
     private readonly string _targetId;
 
-    public ThrowOnFirstProductHashComparer(string targetId)
+    public ThrowOnFirstTargetHashComparer(string targetId)
     {
         _targetId = targetId;
     }
@@ -146,6 +156,38 @@ internal sealed class ThrowOnFirstProductHashComparer : IEqualityComparer<string
             {
                 FailureTriggered = true;
                 throw new InvalidOperationException("Injected index insertion failure.");
+            }
+        }
+
+        return StringComparer.Ordinal.GetHashCode(value);
+    }
+}
+
+internal sealed class ThrowOnTargetHashCallComparer : IEqualityComparer<string>
+{
+    private readonly string _targetId;
+    private readonly int _failureCall;
+
+    public ThrowOnTargetHashCallComparer(string targetId, int failureCall)
+    {
+        _targetId = targetId;
+        _failureCall = failureCall;
+    }
+
+    public bool FailureTriggered { get; private set; }
+    public int TargetHashCalls { get; private set; }
+
+    public bool Equals(string left, string right) => StringComparer.Ordinal.Equals(left, right);
+
+    public int GetHashCode(string value)
+    {
+        if (String.Equals(value, _targetId, StringComparison.Ordinal))
+        {
+            TargetHashCalls++;
+            if (TargetHashCalls == _failureCall)
+            {
+                FailureTriggered = true;
+                throw new InvalidOperationException("Injected value-cache rollback failure.");
             }
         }
 

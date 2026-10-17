@@ -17,7 +17,7 @@
 
 ## Unit localization
 
-Units may declare `localizations` entries with a game's language ID, a visible `name`, and an optional `description`. Custom-prefab units must provide an `en-US` name; native-template units may omit localizations and inherit the native template's name and description. If the active language has no pack translation, the loader falls back to `en-US`; additional supported game languages are `de-DE`, `ja-JP`, `ko-KR`, `zh-CN`, `zh-TW`, `fr-FR`, `pt-BR`, and `ru-RU`. Duplicate or unsupported language IDs disable the package. The loader intercepts `Loca.BlueprintName` and `Loca.BlueprintDescription` for registered mod-unit IDs, so namespaced IDs resolve without editing the game's localization resources.
+Units may declare `localizations` entries with a game's language ID, a visible `name`, and an optional `description`. Custom-prefab units must provide an `en-US` name; native-template units may omit localizations and inherit the native template's name and description. If the active language has no pack translation, the loader falls back to `en-US`; additional supported game languages are `de-DE`, `ja-JP`, `ko-KR`, `zh-CN`, `zh-TW`, `fr-FR`, `es-XL`, `pt-BR`, and `ru-RU`. Duplicate or unsupported language IDs disable the package. The loader intercepts `Loca.BlueprintName` and `Loca.BlueprintDescription` for registered mod-unit IDs, so namespaced IDs resolve without editing the game's localization resources.
 
 ## Example
 

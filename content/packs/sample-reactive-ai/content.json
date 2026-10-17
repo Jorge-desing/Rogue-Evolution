@@ -17,7 +17,7 @@
       "mapSizeMin": 35,
       "mapSizeMax": 80,
       "isPartOfDemo": false,
-      "unitIds": [],
+      "unitIds": ["sample-native:scout-tank"],
       "aiProfileIds": ["sample-reactive-ai:base-defense"]
     }
   ],

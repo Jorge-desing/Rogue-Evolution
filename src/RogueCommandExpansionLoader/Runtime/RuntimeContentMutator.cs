@@ -9,7 +9,7 @@ namespace RogueCommandExpansionLoader.Runtime
 {
     /// <summary>
     /// Adds the game collections whose runtime shapes were verified for 1.0.9:
-    /// entity balancing rows/index/factory mappings, and progression stages/default AI.
+    /// entity balancing rows/index/factory mappings/value caches, and progression stages/default AI.
     /// It deliberately does not alter blueprint pools, worlds, or other game data.
     /// </summary>
     internal sealed class RuntimeContentMutator
@@ -29,6 +29,8 @@ namespace RogueCommandExpansionLoader.Runtime
         private readonly Type _stageType;
         private readonly Type _stageParametersType;
         private readonly Type _defaultAiType;
+        private readonly Type _intValueCacheEntryType;
+        private readonly Type _floatValueCacheEntryType;
 
         private readonly FieldInfo _entityIdField;
         private readonly FieldInfo _factoryForEntityIdField;
@@ -37,6 +39,8 @@ namespace RogueCommandExpansionLoader.Runtime
         private readonly FieldInfo _entityRowsField;
         private readonly FieldInfo _entityIndexField;
         private readonly FieldInfo _factoryEntityIdOfField;
+        private readonly FieldInfo _changeableIntValueCacheField;
+        private readonly FieldInfo _changeableFloatValueCacheField;
         private readonly FieldInfo[] _progressionFields;
         private readonly FieldInfo _stagesField;
         private readonly FieldInfo _defaultAisField;
@@ -142,6 +146,41 @@ namespace RogueCommandExpansionLoader.Runtime
                     "FactoryEntityIdOf is not Dictionary<string, string>.");
             }
 
+            Type changeableValueType = entityStoreType.GetNestedType("ChangeableValue",
+                BindingFlags.Public | BindingFlags.NonPublic);
+            if (changeableValueType == null || !changeableValueType.IsEnum)
+            {
+                throw new InvalidOperationException(
+                    "EntityBalancingStore.ChangeableValue is not the verified enum type.");
+            }
+
+            _intValueCacheEntryType = typeof(Dictionary<,>).MakeGenericType(
+                changeableValueType, typeof(int));
+            _floatValueCacheEntryType = typeof(Dictionary<,>).MakeGenericType(
+                changeableValueType, typeof(float));
+            Type intValueCacheType = typeof(Dictionary<,>).MakeGenericType(
+                typeof(string), _intValueCacheEntryType);
+            Type floatValueCacheType = typeof(Dictionary<,>).MakeGenericType(
+                typeof(string), _floatValueCacheEntryType);
+
+            _changeableIntValueCacheField = RuntimeReflection.FindField(entityStoreType,
+                "ChangeableIntValueCache", StaticFields);
+            if (!_changeableIntValueCacheField.IsStatic ||
+                _changeableIntValueCacheField.FieldType != intValueCacheType)
+            {
+                throw new InvalidOperationException(
+                    "ChangeableIntValueCache does not have the verified nested dictionary shape.");
+            }
+
+            _changeableFloatValueCacheField = RuntimeReflection.FindField(entityStoreType,
+                "ChangeableFloatValueCache", StaticFields);
+            if (!_changeableFloatValueCacheField.IsStatic ||
+                _changeableFloatValueCacheField.FieldType != floatValueCacheType)
+            {
+                throw new InvalidOperationException(
+                    "ChangeableFloatValueCache does not have the verified nested dictionary shape.");
+            }
+
             string[] progressionFieldNames =
             {
                 "levelProgressionParameters",
@@ -204,9 +243,12 @@ namespace RogueCommandExpansionLoader.Runtime
                 IList rowsList = _entityRowsField.GetValue(null) as IList;
                 IDictionary index = _entityIndexField.GetValue(null) as IDictionary;
                 IDictionary factoryMap = _factoryEntityIdOfField.GetValue(null) as IDictionary;
-                if (rowsList == null || index == null || factoryMap == null)
+                IDictionary intValueCache = _changeableIntValueCacheField.GetValue(null) as IDictionary;
+                IDictionary floatValueCache = _changeableFloatValueCacheField.GetValue(null) as IDictionary;
+                if (rowsList == null || index == null || factoryMap == null ||
+                    intValueCache == null || floatValueCache == null)
                 {
-                    Log("Entity balancing rows, index, or factory map are not initialized; " +
+                    Log("Entity balancing rows, index, factory map, or value caches are not initialized; " +
                         "content rows were not added.");
                     return false;
                 }
@@ -223,7 +265,8 @@ namespace RogueCommandExpansionLoader.Runtime
                         }
                     }
 
-                    if (!TryRegisterEntityRows(materializedRows, rowsList, index, factoryMap))
+                    if (!TryRegisterEntityRows(materializedRows, rowsList, index, factoryMap,
+                            intValueCache, floatValueCache))
                     {
                         return false;
                     }
@@ -299,7 +342,9 @@ namespace RogueCommandExpansionLoader.Runtime
             IList<object> suppliedRows,
             IList rows,
             IDictionary index,
-            IDictionary factoryMap)
+            IDictionary factoryMap,
+            IDictionary intValueCache,
+            IDictionary floatValueCache)
         {
             List<object> rowsToAppend = new List<object>();
             List<string> entityIdsToAppend = new List<string>();
@@ -395,9 +440,23 @@ namespace RogueCommandExpansionLoader.Runtime
 
                 if (!alreadyRegistered)
                 {
+                    if (intValueCache.Contains(entityId) || floatValueCache.Contains(entityId))
+                    {
+                        Log("Entity value cache already contains unregistered ID '" + entityId +
+                            "'; the batch was not registered.");
+                        return false;
+                    }
+
                     rowsToAppend.Add(row);
                     entityIdsToAppend.Add(entityId);
                     availableEntityIds.Add(entityId);
+                }
+                else if (!HasValueCacheEntry(intValueCache, entityId, _intValueCacheEntryType) ||
+                    !HasValueCacheEntry(floatValueCache, entityId, _floatValueCacheEntryType))
+                {
+                    Log("Registered entity '" + entityId +
+                        "' is missing a valid changeable-value cache entry; the batch was not registered.");
+                    return false;
                 }
 
                 bool hasProduct;
@@ -465,6 +524,14 @@ namespace RogueCommandExpansionLoader.Runtime
                 new List<KeyValuePair<string, string>>(factoryByProduct.Count);
             List<KeyValuePair<string, string>> attemptedFactoryMappings =
                 new List<KeyValuePair<string, string>>(factoryByProduct.Count);
+            List<KeyValuePair<string, object>> attemptedIntValueCacheEntries =
+                new List<KeyValuePair<string, object>>(rowsToAppend.Count);
+            List<KeyValuePair<string, object>> addedIntValueCacheEntries =
+                new List<KeyValuePair<string, object>>(rowsToAppend.Count);
+            List<KeyValuePair<string, object>> attemptedFloatValueCacheEntries =
+                new List<KeyValuePair<string, object>>(rowsToAppend.Count);
+            List<KeyValuePair<string, object>> addedFloatValueCacheEntries =
+                new List<KeyValuePair<string, object>>(rowsToAppend.Count);
             try
             {
                 for (int i = 0; i < rowsToAppend.Count; i++)
@@ -472,6 +539,23 @@ namespace RogueCommandExpansionLoader.Runtime
                     rows.Add(rowsToAppend[i]);
                     appendedRows.Add(rowsToAppend[i]);
                     appendedRowIds.Add(entityIdsToAppend[i]);
+                }
+
+                for (int i = 0; i < entityIdsToAppend.Count; i++)
+                {
+                    string entityId = entityIdsToAppend[i];
+                    object intEntry = Activator.CreateInstance(_intValueCacheEntryType);
+                    object floatEntry = Activator.CreateInstance(_floatValueCacheEntryType);
+                    var intCacheMapping = new KeyValuePair<string, object>(entityId, intEntry);
+                    var floatCacheMapping = new KeyValuePair<string, object>(entityId, floatEntry);
+
+                    attemptedIntValueCacheEntries.Add(intCacheMapping);
+                    intValueCache.Add(entityId, intEntry);
+                    addedIntValueCacheEntries.Add(intCacheMapping);
+
+                    attemptedFloatValueCacheEntries.Add(floatCacheMapping);
+                    floatValueCache.Add(entityId, floatEntry);
+                    addedFloatValueCacheEntries.Add(floatCacheMapping);
                 }
 
                 for (int i = 0; i < rowsToAppend.Count; i++)
@@ -500,8 +584,11 @@ namespace RogueCommandExpansionLoader.Runtime
             catch (Exception exception)
             {
                 bool rollbackComplete = RollbackEntityRegistration(rows, index, factoryMap,
+                    intValueCache, floatValueCache,
                     appendedRows, appendedRowIds, attemptedIndexMappings,
-                    addedIndexMappings, attemptedFactoryMappings, addedFactoryMappings);
+                    addedIndexMappings, attemptedFactoryMappings, addedFactoryMappings,
+                    attemptedIntValueCacheEntries, addedIntValueCacheEntries,
+                    attemptedFloatValueCacheEntries, addedFloatValueCacheEntries);
                 string rollbackStatus = rollbackComplete
                     ? "all loader changes were rolled back"
                     : "rollback could not be fully verified; a shared registration conflicted or could not be removed safely";
@@ -509,6 +596,219 @@ namespace RogueCommandExpansionLoader.Runtime
                     rollbackStatus + ": " + exception.Message);
                 return false;
             }
+        }
+
+        private bool HasValueCacheEntry(IDictionary cache, string entityId, Type expectedEntryType)
+        {
+            try
+            {
+                if (!cache.Contains(entityId))
+                {
+                    return false;
+                }
+
+                object entry = cache[entityId];
+                return entry != null && entry.GetType() == expectedEntryType && entry is IDictionary;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private bool RollbackValueCache(
+            IDictionary cache,
+            IList<KeyValuePair<string, object>> attemptedEntries,
+            IList<KeyValuePair<string, object>> addedEntries,
+            HashSet<string> preserveRegistrationIds,
+            string valueKind)
+        {
+            bool rollbackComplete = true;
+            var addedIds = new HashSet<string>(StringComparer.Ordinal);
+            for (int i = 0; i < addedEntries.Count; i++)
+            {
+                addedIds.Add(addedEntries[i].Key);
+            }
+
+            for (int i = attemptedEntries.Count - 1; i >= 0; i--)
+            {
+                KeyValuePair<string, object> attempted = attemptedEntries[i];
+                if (preserveRegistrationIds.Contains(attempted.Key))
+                {
+                    rollbackComplete = false;
+                    continue;
+                }
+
+                try
+                {
+                    if (!cache.Contains(attempted.Key))
+                    {
+                        continue;
+                    }
+
+                    object currentEntry = cache[attempted.Key];
+                    if (!ReferenceEquals(currentEntry, attempted.Value))
+                    {
+                        preserveRegistrationIds.Add(attempted.Key);
+                        rollbackComplete = false;
+                        Log("Preserved the " + valueKind + " value-cache entry for '" +
+                            attempted.Key + "' because its identity changed during registration rollback.");
+                        continue;
+                    }
+
+                    cache.Remove(attempted.Key);
+                    if (cache.Contains(attempted.Key))
+                    {
+                        preserveRegistrationIds.Add(attempted.Key);
+                        rollbackComplete = false;
+                        Log("The " + valueKind + " value-cache entry for '" + attempted.Key +
+                            "' remained after rollback attempted to remove it.");
+                    }
+                }
+                catch (Exception exception)
+                {
+                    preserveRegistrationIds.Add(attempted.Key);
+                    rollbackComplete = false;
+                    string commitStatus = addedIds.Contains(attempted.Key)
+                        ? "registered"
+                        : "attempted during registration";
+                    Log("Could not safely roll back the " + valueKind + " value-cache entry for '" +
+                        attempted.Key + "' that was " + commitStatus + "; its row will be preserved: " +
+                        exception.Message);
+                }
+            }
+
+            return rollbackComplete;
+        }
+
+        private bool RestorePreservedValueCacheEntries(
+            IDictionary cache,
+            IList<KeyValuePair<string, object>> attemptedEntries,
+            IList rows,
+            HashSet<string> appendedRowIdSet,
+            HashSet<string> preserveRegistrationIds,
+            Type expectedEntryType,
+            string valueKind)
+        {
+            bool restoreComplete = true;
+            for (int i = 0; i < attemptedEntries.Count; i++)
+            {
+                KeyValuePair<string, object> attempted = attemptedEntries[i];
+                string entityId = attempted.Key;
+                if (!preserveRegistrationIds.Contains(entityId) ||
+                    !appendedRowIdSet.Contains(entityId) || !ContainsEntityRow(rows, entityId))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    if (cache.Contains(entityId))
+                    {
+                        if (!HasValueCacheEntry(cache, entityId, expectedEntryType))
+                        {
+                            restoreComplete = false;
+                            Log("Could not verify the preserved " + valueKind +
+                                " value-cache entry for '" + entityId + "'.");
+                        }
+
+                        continue;
+                    }
+
+                    cache.Add(entityId, attempted.Value);
+                    if (!HasValueCacheEntry(cache, entityId, expectedEntryType))
+                    {
+                        restoreComplete = false;
+                        Log("Could not restore the " + valueKind + " value-cache entry for preserved row '" +
+                            entityId + "'.");
+                    }
+                }
+                catch (Exception exception)
+                {
+                    restoreComplete = false;
+                    Log("Could not restore the " + valueKind + " value-cache entry for preserved row '" +
+                        entityId + "': " + exception.Message);
+                }
+            }
+
+            return restoreComplete;
+        }
+
+        private bool RestorePreservedEntityIndexes(
+            IList rows,
+            IDictionary index,
+            IList<string> appendedRowIds,
+            HashSet<string> preserveRegistrationIds)
+        {
+            bool restoreComplete = true;
+            for (int i = 0; i < appendedRowIds.Count; i++)
+            {
+                string entityId = appendedRowIds[i];
+                if (!preserveRegistrationIds.Contains(entityId))
+                {
+                    continue;
+                }
+
+                int matchingRows = 0;
+                int matchingPosition = -1;
+                for (int rowIndex = 0; rowIndex < rows.Count; rowIndex++)
+                {
+                    if (!String.Equals(ReadEntityId(rows[rowIndex]), entityId,
+                            StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+
+                    matchingRows++;
+                    matchingPosition = rowIndex;
+                }
+
+                if (matchingRows == 0)
+                {
+                    continue;
+                }
+
+                if (matchingRows != 1)
+                {
+                    restoreComplete = false;
+                    Log("Could not restore the entity index for preserved row '" + entityId +
+                        "' because the row ID is not unique.");
+                    continue;
+                }
+
+                try
+                {
+                    if (index.Contains(entityId))
+                    {
+                        int currentPosition = Convert.ToInt32(index[entityId]);
+                        if (currentPosition != matchingPosition)
+                        {
+                            restoreComplete = false;
+                            Log("Could not restore the entity index for preserved row '" + entityId +
+                                "' because another mapping points to position " + currentPosition + ".");
+                        }
+
+                        continue;
+                    }
+
+                    index.Add(entityId, matchingPosition);
+                    if (!index.Contains(entityId) ||
+                        Convert.ToInt32(index[entityId]) != matchingPosition)
+                    {
+                        restoreComplete = false;
+                        Log("Could not verify the restored entity index for preserved row '" +
+                            entityId + "'.");
+                    }
+                }
+                catch (Exception exception)
+                {
+                    restoreComplete = false;
+                    Log("Could not restore the entity index for preserved row '" + entityId +
+                        "': " + exception.Message);
+                }
+            }
+
+            return restoreComplete;
         }
 
         private bool IsIndexedRow(IDictionary index, IList rows, string entityId)
@@ -582,12 +882,18 @@ namespace RogueCommandExpansionLoader.Runtime
             IList rows,
             IDictionary index,
             IDictionary factoryMap,
+            IDictionary intValueCache,
+            IDictionary floatValueCache,
             IList<object> appendedRows,
             IList<string> appendedRowIds,
             IList<KeyValuePair<string, int>> attemptedIndexMappings,
             IList<KeyValuePair<string, int>> addedIndexMappings,
             IList<KeyValuePair<string, string>> attemptedFactoryMappings,
-            IList<KeyValuePair<string, string>> addedFactoryMappings)
+            IList<KeyValuePair<string, string>> addedFactoryMappings,
+            IList<KeyValuePair<string, object>> attemptedIntValueCacheEntries,
+            IList<KeyValuePair<string, object>> addedIntValueCacheEntries,
+            IList<KeyValuePair<string, object>> attemptedFloatValueCacheEntries,
+            IList<KeyValuePair<string, object>> addedFloatValueCacheEntries)
         {
             bool rollbackComplete = true;
             var preserveRegistrationIds = new HashSet<string>(StringComparer.Ordinal);
@@ -709,6 +1015,13 @@ namespace RogueCommandExpansionLoader.Runtime
                         exception.Message);
                 }
             }
+
+            rollbackComplete &= RollbackValueCache(intValueCache,
+                attemptedIntValueCacheEntries, addedIntValueCacheEntries,
+                preserveRegistrationIds, "integer");
+            rollbackComplete &= RollbackValueCache(floatValueCache,
+                attemptedFloatValueCacheEntries, addedFloatValueCacheEntries,
+                preserveRegistrationIds, "float");
 
             for (int i = addedFactoryMappings.Count - 1; i >= 0; i--)
             {
@@ -946,6 +1259,15 @@ namespace RogueCommandExpansionLoader.Runtime
                         "': " + exception.Message);
                 }
             }
+
+            rollbackComplete &= RestorePreservedEntityIndexes(rows, index,
+                appendedRowIds, preserveRegistrationIds);
+            rollbackComplete &= RestorePreservedValueCacheEntries(intValueCache,
+                attemptedIntValueCacheEntries, rows, appendedRowIdSet,
+                preserveRegistrationIds, _intValueCacheEntryType, "integer");
+            rollbackComplete &= RestorePreservedValueCacheEntries(floatValueCache,
+                attemptedFloatValueCacheEntries, rows, appendedRowIdSet,
+                preserveRegistrationIds, _floatValueCacheEntryType, "float");
 
             return rollbackComplete;
         }
