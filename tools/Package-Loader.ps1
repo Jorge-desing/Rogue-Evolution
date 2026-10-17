@@ -232,8 +232,10 @@ and a scheduled-build AI module.
 The reactive AI stage references Sandlance and uses a native AI template with a
 bounded compiled counterattack module. The landscape reuses native 27 Circles rules
 with a fixed seed and is scoped to its stage; it does not add new terrain logic.
-Blueprint eligibility remains global to each unit because the game filters shared
-pools against the global registry.
+The game keeps a global blueprint eligibility flag on each custom unit row. Stage
+reward pools are cloned and admit only custom units listed by that stage, while
+rewards created without a pool ID use the game's global fallback and may offer any
+declared custom unit.
 '@ | Set-Content -LiteralPath (Join-Path $packsDirectory 'README.txt') -Encoding UTF8
 
     @"
@@ -250,8 +252,9 @@ Install:
    module; every unit keeps its native gameplay controller.
    The sample-reactive-ai pack demonstrates a native stage variant that references
    the Sandlance Scout from sample-native-expansion and an AI module that sends up
-   to two nearby units to counterattack an active attacker. Unit blueprint
-   eligibility is global and may affect other native pools that accept the unit.
+   to two nearby units to counterattack an active attacker. Stage reward pools are
+   scoped to their declared custom units; rewards without a pool ID use the global
+   card fallback and may offer any declared custom unit.
 4. Add other packs under BepInEx/plugins/RogueCommandExpansionLoader/content/packs/;
    custom models and original terrain-generation assets require valid Unity AssetBundles.
 
