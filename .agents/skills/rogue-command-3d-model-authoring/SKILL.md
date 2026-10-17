@@ -113,6 +113,53 @@ Use the tested, high-readability procedural assemblies rather than ad-hoc mesh p
 ### Draw-Call Optimization via Material Batching
 Kitbashing produces 50–120 individual objects. In Unity, each object creates a separate GameObject and draw call unless unified. Always pass models through `batch_and_join_by_material(objects, prefix, preserve_names)` before export to combine meshes by their PBR material slot into 4–6 unified submeshes while preserving essential animated pivots.
 
+### Fluent Assembly with `RogueVehicleBuilder`
+For rapid, reproducible vehicle generation without manual coordinate arithmetic, use the declarative `RogueVehicleBuilder`:
+
+```python
+import RogueModelKit as rmk
+
+builder = (
+    rmk.RogueVehicleBuilder("HeavySiegeTank", faction="siege")
+    .add_sloped_hull(length=3.2, width=2.5, height=0.92)
+    .add_continuous_tracks(length=3.0, height=0.64, roadwheels=6, with_skirts=True)
+    .add_engine_deck(slat_count=4, with_exhausts=True)
+    .add_turret(size=(1.5, 1.7, 0.48), center_y=0.10)
+    .add_cannon(caliber=0.10, length=1.85, elevation_deg=14.0)
+    .add_sensor_visor()
+    .add_spring_antenna()
+    .add_dozer_blade(width=2.6, height=0.44)
+)
+
+# Automated validation, lightmap UVs, card sprite, .blend, batched FBX
+diagnostics = builder.build_and_export(
+    fbx_path=FBX_PATH,
+    blend_path=BLEND_PATH,
+    preview_path=PREVIEW_PATH,
+    card_path=CARD_PATH,
+    render_multiview=True
+)
+```
+
+### Scriptable CLI Tool (`generate_unit_model.py`)
+Run headless vehicle generation directly from the command line using Blender and the CLI generator script:
+
+```powershell
+.\.tools\Blender-4.5.14\blender-4.5.14-windows-x64\blender.exe --background --python tools\generate_unit_model.py -- `
+    --name ColossusTank `
+    --archetype tank `
+    --faction siege `
+    --weapon cannon `
+    --dozer `
+    --multiview `
+    --card
+```
+
+- **Archetypes**: `tank`, `walker`, `bike`, `artillery`, `arc_tank`.
+- **Factions**: `vanguard` (slate teal), `siege` (rust ochre), `syndicate` (deep cobalt), `arctic` (tundra navy).
+- **Weapons**: `cannon` (ballistic), `gatling` (rotary 6-barrel), `missile` (honeycomb pod), `arc` (plasma cathode & prongs).
+- **Outputs**: Generates editable `.blend`, Unity-optimized `.fbx` with lightmap UVs and batched submeshes, 4-view orthographic preview sheet, and 128x128 point-filtered tactical card sprite.
+
 ### Automated Quality Diagnostics
 Always invoke `validate_model_mesh_quality(model_objects)` prior to export. It verifies:
 - **Ground Contact Check**: Confirms $Z_{\min} \in [-0.02\text{m}, 0.08\text{m}]$.

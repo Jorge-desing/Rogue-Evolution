@@ -1611,3 +1611,587 @@ def export_unity_fbx(fbx_path: Path, model_objects: Sequence[bpy.types.Object]) 
         add_leaf_bones=False,
         use_custom_props=False,
     )
+
+
+# ---------------------------------------------------------------------------
+# 10. Lightmap UVs, Card Sprites & Fluent Vehicle Builder
+# ---------------------------------------------------------------------------
+
+def generate_lightmap_uvs(
+    objects: Sequence[bpy.types.Object],
+    angle_limit_deg: float = 66.0,
+    island_margin: float = 0.02,
+) -> None:
+    """Generates clean, non-overlapping Smart UV coordinates across all mesh objects for Unity lightmapping."""
+    for obj in objects:
+        if obj.type != "MESH":
+            continue
+        bpy.ops.object.select_all(action="DESELECT")
+        obj.select_set(True)
+        bpy.context.view_layer.objects.active = obj
+        bpy.ops.object.mode_set(mode="EDIT")
+        bpy.ops.mesh.select_all(action="SELECT")
+        bpy.ops.uv.smart_project(
+            angle_limit=math.radians(angle_limit_deg),
+            island_margin=island_margin,
+            area_weight=0.0,
+            correct_aspect=True,
+            scale_to_bounds=False,
+        )
+        bpy.ops.object.mode_set(mode="OBJECT")
+        obj.select_set(False)
+
+
+def render_tactical_card_sprite(
+    model_objects: Sequence[bpy.types.Object],
+    output_path: Path,
+    resolution: Tuple[int, int] = (128, 128),
+    ortho_scale: float = 4.2,
+) -> None:
+    """Renders a 128x128 point-filtered tactical card sprite with a stylized dark gradient backdrop."""
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    scene = bpy.context.scene
+
+    # Card camera: 35° elevation angled toward front 3/4 profile
+    bpy.ops.object.camera_add(location=(3.8, -4.5, 3.2))
+    card_cam = bpy.context.object
+    card_cam.name = "TacticalCardCamera"
+    card_cam.data.type = "ORTHO"
+    card_cam.data.ortho_scale = ortho_scale
+    target = Vector((0.0, 0.0, 0.75))
+    card_cam.rotation_euler = (target - card_cam.location).to_track_quat("-Z", "Y").to_euler()
+    scene.camera = card_cam
+
+    # Dark tactical vignette background plane
+    bpy.ops.mesh.primitive_plane_add(size=30, location=(0.0, 0.0, -0.05))
+    card_floor = bpy.context.object
+    card_floor.name = "CardBackdrop"
+    card_mat = make_material("CardBackdropMat", (0.04, 0.07, 0.09), 0.0, 0.95)
+    finish_mesh(card_floor, card_mat)
+
+    # Dramatic rim lighting for card drafting clarity
+    lights = [
+        ("CardKey", (3.0, -3.5, 4.5), 900, 3.0),
+        ("CardRim", (-3.5, 3.5, 4.0), 1200, 2.5),
+        ("CardFill", (-2.5, -2.0, 2.0), 400, 3.0),
+    ]
+    for name, pos, energy, size in lights:
+        bpy.ops.object.light_add(type="AREA", location=pos)
+        l = bpy.context.object
+        l.name = name
+        l.data.energy = energy
+        l.data.shape = "DISK"
+        l.data.size = size
+        l.rotation_euler = (target - l.location).to_track_quat("-Z", "Y").to_euler()
+
+    scene.render.engine = "BLENDER_EEVEE_NEXT"
+    scene.render.resolution_x = resolution[0]
+    scene.render.resolution_y = resolution[1]
+    scene.render.resolution_percentage = 100
+    scene.render.image_settings.file_format = "PNG"
+    scene.view_settings.view_transform = "AgX"
+    scene.render.filepath = str(output_path)
+    scene.world.color = (0.04, 0.06, 0.08)
+
+    bpy.ops.render.render(write_still=True)
+
+
+def make_dozer_blade(
+    prefix: str,
+    location: Tuple[float, float, float] | Vector,
+    width: float = 2.4,
+    height: float = 0.45,
+    armor_mat: bpy.types.Material | None = None,
+    ram_mat: bpy.types.Material | None = None,
+) -> list[bpy.types.Object]:
+    """Generates a heavy armored dozer ram blade with hydraulic push rams."""
+    objects = []
+    loc_v = Vector(location)
+    # Main angled blade shield
+    objects.append(make_box(
+        f"{prefix}_Blade",
+        (width, 0.12, height),
+        loc_v, armor_mat, bevel=0.035,
+        rotation=(math.radians(-16), 0.0, 0.0)
+    ))
+    # Push rams (Left & Right)
+    for side in (-1, 1):
+        ram_x = loc_v.x + side * (width * 0.38)
+        objects.append(make_rod(
+            f"{prefix}_PushRam_{'L' if side < 0 else 'R'}",
+            (ram_x, loc_v.y - 0.48, loc_v.z + 0.12),
+            (ram_x, loc_v.y, loc_v.z),
+            0.045, ram_mat, vertices=8
+        ))
+    return objects
+
+
+class FactionPalette:
+    """Pre-calibrated 5-tone PBR material set for a Rogue Command faction."""
+
+    def __init__(
+        self,
+        name: str,
+        primary_color: Tuple[float, float, float],
+        light_color: Tuple[float, float, float],
+        gunmetal_color: Tuple[float, float, float],
+        tread_color: Tuple[float, float, float],
+        warning_color: Tuple[float, float, float],
+        emissive_color: Tuple[float, float, float],
+        emissive_strength: float = 2.0,
+    ):
+        self.primary_armor = make_material(f"{name}_PrimaryArmor", primary_color, metallic=0.42, roughness=0.58)
+        self.light_armor = make_material(f"{name}_LightArmor", light_color, metallic=0.34, roughness=0.60)
+        self.gunmetal = make_material(f"{name}_Gunmetal", gunmetal_color, metallic=0.78, roughness=0.30)
+        self.tread = make_material(f"{name}_Tread", tread_color, metallic=0.18, roughness=0.74)
+        self.wheel_rim = make_material(f"{name}_WheelRim", light_color, metallic=0.62, roughness=0.40)
+        self.wheel_hub = make_material(f"{name}_WheelHub", primary_color, metallic=0.55, roughness=0.50)
+        self.warning = make_material(f"{name}_Warning", warning_color, metallic=0.18, roughness=0.36)
+        self.emissive = make_material(
+            f"{name}_Emissive", emissive_color, metallic=0.15, roughness=0.22,
+            emission_color=emissive_color, emission_strength=emissive_strength
+        )
+
+
+def get_faction_palette(faction: str = "vanguard", prefix: str = "Unit") -> FactionPalette:
+    """Returns a pre-calibrated 5-tone PBR material set.
+    Factions:
+      - 'vanguard': Slate teal, seafoam, charcoal gunmetal, amber accent, arc cyan emission
+      - 'siege': Rust ochre, desert sand, cast iron, hazard yellow, molten orange emission
+      - 'syndicate': Deep cobalt, titanium grey, anodized black, electric magenta, plasma cyan emission
+      - 'arctic': Frost white, slate blue, dark tungsten, crimson warning, bright blue emission
+    """
+    f = faction.lower()
+    if f == "siege":
+        return FactionPalette(prefix, (0.26, 0.14, 0.075), (0.43, 0.30, 0.16), (0.065, 0.072, 0.078),
+                              (0.035, 0.040, 0.043), (0.92, 0.48, 0.08), (0.98, 0.35, 0.05), 2.2)
+    elif f == "syndicate":
+        return FactionPalette(prefix, (0.055, 0.11, 0.20), (0.28, 0.34, 0.42), (0.035, 0.042, 0.055),
+                              (0.025, 0.031, 0.038), (0.77, 0.045, 0.31), (0.0, 0.74, 1.0), 2.4)
+    elif f == "arctic":
+        return FactionPalette(prefix, (0.72, 0.78, 0.85), (0.45, 0.52, 0.62), (0.08, 0.10, 0.14),
+                              (0.05, 0.06, 0.08), (0.90, 0.12, 0.15), (0.15, 0.85, 1.0), 2.0)
+    else:
+        return FactionPalette(prefix, (0.12, 0.19, 0.24), (0.22, 0.32, 0.38), (0.07, 0.10, 0.12),
+                              (0.045, 0.055, 0.06), (0.95, 0.32, 0.05), (0.04, 0.72, 0.88), 1.9)
+
+
+class RogueVehicleBuilder:
+    """Fluent procedural builder for Rogue Command vehicles and units.
+    
+    Guarantees:
+    - 5-tone faction PBR material standard
+    - 1-segment chamfers on all hard edges for RTS specular highlights
+    - Exact ground contact at Z >= 0.0m
+    - Strict coaxial weapon alignment
+    - Automated draw-call batching to 4-6 submeshes
+    - Automated quality diagnostics and multi-perspective studio previews
+    """
+
+    def __init__(self, name: str, faction: str = "vanguard", ground_clearance: float = 0.06):
+        self.name = name
+        self.palette = get_faction_palette(faction, name)
+        self.ground_clearance = ground_clearance
+        self.objects: list[bpy.types.Object] = []
+        self.preserved_pivots: list[str] = []
+        self.hull_deck_z: float = 0.88
+        self.turret_center: Vector = Vector((0.0, 0.05, 1.15))
+        self.hull_length: float = 3.0
+        self.hull_width: float = 2.4
+
+    def add_sloped_hull(
+        self,
+        length: float = 3.0,
+        width: float = 2.4,
+        height: float = 0.88,
+        bevel: float = 0.045,
+    ) -> "RogueVehicleBuilder":
+        self.hull_length = length
+        self.hull_width = width
+        self.hull_deck_z = height
+        half_l = length * 0.5
+        half_w = width * 0.5
+        self.objects.append(make_sloped_glacis_hull(
+            f"{self.name}Armor_Hull",
+            length_front=half_l * 1.02, length_rear=half_l * 0.98,
+            width_front=half_w * 1.15, width_rear=half_w * 1.22,
+            height_lower=self.ground_clearance + 0.18, height_upper=height,
+            material=self.palette.primary_armor, bevel=bevel
+        ))
+        self.objects.append(make_box(
+            f"{self.name}Armor_UpperDeck",
+            (width * 0.65, length * 0.72, 0.24),
+            (0.0, -0.05, height + 0.10),
+            self.palette.light_armor, bevel=0.035
+        ))
+        return self
+
+    def add_continuous_tracks(
+        self,
+        length: float = 2.85,
+        height: float = 0.62,
+        belt_width: float = 0.34,
+        roadwheels: int = 5,
+        with_skirts: bool = True,
+    ) -> "RogueVehicleBuilder":
+        half_w = self.hull_width * 0.5
+        track_x = half_w * 0.90
+        for side in (-1, 1):
+            tracks = make_continuous_track_assembly(
+                f"{self.name}Treads",
+                x_pos=side * track_x,
+                length=length, height=height, belt_width=belt_width,
+                roadwheel_count=roadwheels,
+                tread_mat=self.palette.tread,
+                rim_mat=self.palette.wheel_rim,
+                hub_mat=self.palette.wheel_hub,
+                axle_mat=self.palette.gunmetal,
+                fender_mat=self.palette.light_armor,
+                skirt_mat=self.palette.primary_armor if with_skirts else None,
+                accent_mat=self.palette.warning,
+                ground_z=self.ground_clearance,
+            )
+            self.objects.extend(tracks)
+        return self
+
+    def add_all_terrain_wheels(
+        self,
+        wheelbase_y: float = 1.8,
+        track_width_x: float = 1.6,
+        wheel_radius: float = 0.38,
+        wheel_width: float = 0.28,
+    ) -> "RogueVehicleBuilder":
+        for side in (-1, 1):
+            x = side * (track_width_x * 0.5)
+            for y_pos, label in [(-wheelbase_y * 0.5, "Rear"), (wheelbase_y * 0.5, "Front")]:
+                w = make_all_terrain_wheel_assembly(
+                    f"{self.name}Wheel_{label}_{'L' if side < 0 else 'R'}",
+                    location=(x, y_pos, self.ground_clearance + wheel_radius),
+                    radius=wheel_radius, width=wheel_width,
+                    tire_mat=self.palette.tread, rim_mat=self.palette.wheel_rim,
+                    hub_mat=self.palette.gunmetal, accent_mat=self.palette.warning
+                )
+                self.objects.extend(w)
+        return self
+
+    def add_bipedal_legs(
+        self,
+        hip_height: float = 1.45,
+        hip_spacing_x: float = 0.84,
+    ) -> "RogueVehicleBuilder":
+        for side in (-1, 1):
+            leg = make_bipedal_digitigrade_leg(
+                f"{self.name}Leg",
+                hip_location=(side * (hip_spacing_x * 0.5), -0.05, hip_height),
+                side=side,
+                armor_mat=self.palette.primary_armor,
+                joint_mat=self.palette.gunmetal,
+                piston_mat=self.palette.light_armor,
+                accent_mat=self.palette.warning
+            )
+            self.objects.extend(leg)
+        return self
+
+    def add_turret(
+        self,
+        size: Tuple[float, float, float] = (1.4, 1.6, 0.45),
+        center_y: float = 0.08,
+    ) -> "RogueVehicleBuilder":
+        self.turret_center = Vector((0.0, center_y, self.hull_deck_z + 0.24 + size[2] * 0.5))
+        turret = make_faceted_turret_housing(
+            f"{self.name}Turret",
+            location=self.turret_center,
+            size=size,
+            armor_mat=self.palette.primary_armor,
+            roof_mat=self.palette.light_armor,
+        )
+        self.objects.extend(turret)
+        self.preserved_pivots.append(f"{self.name}Turret_BaseShell")
+        return self
+
+    def add_cannon(
+        self,
+        caliber: float = 0.095,
+        length: float = 1.65,
+        elevation_deg: float = 12.0,
+    ) -> "RogueVehicleBuilder":
+        gun_pivot = self.turret_center + Vector((0.0, 0.45, 0.02))
+        elev_rad = math.radians(elevation_deg)
+        gun_dir = Vector((0.0, math.cos(elev_rad), math.sin(elev_rad))).normalized()
+        cannon = make_coaxial_cannon_assembly(
+            f"{self.name}Gun",
+            gun_pivot=gun_pivot,
+            direction=gun_dir,
+            caliber_radius=caliber,
+            barrel_length=length,
+            armor_mat=self.palette.light_armor,
+            barrel_mat=self.palette.gunmetal,
+            accent_mat=self.palette.warning,
+            has_thermal_sleeve=True,
+            has_bore_evacuator=True,
+            has_muzzle_brake=True,
+        )
+        self.objects.extend(cannon)
+        self.preserved_pivots.append(f"{self.name}Gun_MainBarrel")
+        return self
+
+    def add_rotary_gatling(
+        self,
+        side: int = 1,
+        pivot_offset: Tuple[float, float, float] = (0.75, 0.45, 1.35),
+    ) -> "RogueVehicleBuilder":
+        gatling = make_rotary_gatling_cannon(
+            f"{self.name}Gatling_{'L' if side < 0 else 'R'}",
+            pivot=(side * pivot_offset[0], pivot_offset[1], pivot_offset[2]),
+            direction=(0.0, 1.0, 0.0),
+            barrel_count=6, barrel_length=1.10, barrel_radius=0.03, cluster_radius=0.09,
+            gunmetal_mat=self.palette.gunmetal, housing_mat=self.palette.light_armor, accent_mat=self.palette.warning
+        )
+        self.objects.extend(gatling)
+        return self
+
+    def add_missile_pod(
+        self,
+        rows: int = 2,
+        cols: int = 3,
+        elevation_deg: float = 14.0,
+    ) -> "RogueVehicleBuilder":
+        pod_loc = self.turret_center + Vector((0.0, 0.10, 0.35))
+        pod = make_missile_launcher_pod(
+            f"{self.name}MissilePod",
+            location=pod_loc,
+            size=(0.68, 0.90, 0.45),
+            rows=rows, cols=cols, elevation_deg=elevation_deg,
+            armor_mat=self.palette.primary_armor, cavity_mat=self.palette.gunmetal,
+            warhead_mat=self.palette.warning, accent_mat=self.palette.warning
+        )
+        self.objects.extend(pod)
+        return self
+
+    def add_arc_emitter(
+        self,
+        core_radius: float = 0.20,
+        prongs: int = 3,
+    ) -> "RogueVehicleBuilder":
+        emitter_loc = self.turret_center + Vector((0.0, 0.35, 0.10))
+        emitter = make_arc_energy_emitter(
+            f"{self.name}ArcEmitter",
+            base_location=emitter_loc,
+            forward_dir=(0.0, 1.0, 0.08),
+            core_radius=core_radius, core_length=0.45,
+            prong_count=prongs, prong_length=0.50,
+            housing_mat=self.palette.primary_armor,
+            gunmetal_mat=self.palette.gunmetal,
+            arc_mat=self.palette.emissive
+        )
+        self.objects.extend(emitter)
+        return self
+
+    def add_sensor_visor(self) -> "RogueVehicleBuilder":
+        visor_loc = self.turret_center + Vector((0.0, 0.35, 0.28))
+        visor = make_recessed_sensor_visor(
+            f"{self.name}Sensor_Visor",
+            location=visor_loc,
+            size=(0.48, 0.14, 0.16),
+            armor_mat=self.palette.light_armor,
+            lens_mat=self.palette.emissive,
+            cavity_mat=self.palette.gunmetal,
+        )
+        self.objects.extend(visor)
+        return self
+
+    def add_engine_deck(
+        self,
+        slat_count: int = 4,
+        with_exhausts: bool = True,
+        size: Tuple[float, float, float] | None = None,
+    ) -> "RogueVehicleBuilder":
+        deck_y = -self.hull_length * 0.30
+        deck_z = self.hull_deck_z + 0.10
+        if size is None:
+            size = (self.hull_width * 0.34, self.hull_length * 0.22, 0.07)
+
+        grille = make_engine_deck_grille(
+            f"{self.name}Armor_EngineDeck",
+            location=(0.0, deck_y, deck_z),
+            size=size,
+            slat_count=slat_count,
+            slat_mat=self.palette.gunmetal,
+            frame_mat=self.palette.primary_armor,
+        )
+        self.objects.extend(grille)
+
+        if with_exhausts:
+            exhaust_y = deck_y - size[1] * 0.5 - 0.12
+            exhaust_spacing_x = self.hull_width * 0.22
+            for side in (-1, 1):
+                side_tag = "L" if side < 0 else "R"
+                ex_loc = (side * exhaust_spacing_x, exhaust_y, deck_z + 0.10)
+                self.objects.append(make_cylinder(
+                    f"{self.name}Armor_Exhaust_{side_tag}",
+                    radius=0.065, depth=0.34,
+                    location=ex_loc,
+                    material=self.palette.gunmetal,
+                    rotation=(math.radians(-18), 0.0, 0.0),
+                    vertices=10, bevel=0.008
+                ))
+                self.objects.append(make_cylinder(
+                    f"{self.name}Armor_ExhaustShield_{side_tag}",
+                    radius=0.082, depth=0.18,
+                    location=(side * exhaust_spacing_x, exhaust_y + 0.02, deck_z + 0.04),
+                    material=self.palette.light_armor,
+                    rotation=(math.radians(-18), 0.0, 0.0),
+                    vertices=10, bevel=0.008
+                ))
+        return self
+
+    def add_spring_antenna(
+        self,
+        location: Tuple[float, float, float] | None = None,
+        length: float = 0.65,
+        lean_deg: float = 6.0,
+    ) -> "RogueVehicleBuilder":
+        if location is None:
+            if hasattr(self, "turret_center") and self.turret_center is not None:
+                base_pos = self.turret_center + Vector((0.38, -0.42, 0.22))
+            else:
+                base_pos = Vector((self.hull_width * 0.28, -self.hull_length * 0.38, self.hull_deck_z + 0.12))
+        else:
+            base_pos = Vector(location)
+
+        self.objects.append(make_cylinder(
+            f"{self.name}Sensor_AntennaBase",
+            0.038, 0.08, base_pos,
+            self.palette.gunmetal, vertices=8, bevel=0.008
+        ))
+        lean_rad = math.radians(lean_deg)
+        mast_end = base_pos + Vector((0.0, -math.sin(lean_rad) * length, math.cos(lean_rad) * length))
+        self.objects.append(make_rod(
+            f"{self.name}Sensor_AntennaMast",
+            base_pos + Vector((0.0, 0.0, 0.04)), mast_end,
+            0.012, self.palette.gunmetal, vertices=6
+        ))
+        self.objects.append(make_cylinder(
+            f"{self.name}Sensor_AntennaTip",
+            0.018, 0.04, mast_end,
+            self.palette.warning, vertices=8
+        ))
+        return self
+
+    def add_gimbal_sensor(
+        self,
+        location: Tuple[float, float, float] | None = None,
+        radius: float = 0.16,
+    ) -> "RogueVehicleBuilder":
+        if location is None:
+            if hasattr(self, "turret_center") and self.turret_center is not None:
+                loc = self.turret_center + Vector((-0.38, 0.24, 0.24))
+            else:
+                loc = Vector((-self.hull_width * 0.22, self.hull_length * 0.22, self.hull_deck_z + 0.18))
+        else:
+            loc = Vector(location)
+        sensor = make_gimbal_sensor_turret(
+            f"{self.name}GimbalSensor",
+            location=loc,
+            radius=radius,
+            armor_mat=self.palette.light_armor,
+            lens_mat=self.palette.emissive,
+            gunmetal_mat=self.palette.gunmetal
+        )
+        self.objects.extend(sensor)
+        return self
+
+    def add_armor_applique(
+        self,
+        start: Tuple[float, float, float],
+        end: Tuple[float, float, float],
+        count: int = 4,
+        size: Tuple[float, float, float] = (0.18, 0.22, 0.05),
+        rotation: Tuple[float, float, float] = (0.0, 0.0, 0.0),
+    ) -> "RogueVehicleBuilder":
+        tiles = make_armor_applique_array(
+            f"{self.name}Armor_ERA",
+            start=start, end=end, count=count, size=size,
+            armor_mat=self.palette.primary_armor,
+            standoff_mat=self.palette.gunmetal,
+            rotation=rotation
+        )
+        self.objects.extend(tiles)
+        return self
+
+    def add_dozer_blade(
+        self,
+        width: float = 2.4,
+        height: float = 0.42,
+    ) -> "RogueVehicleBuilder":
+        front_y = self.hull_length * 0.54
+        blade_z = self.ground_clearance + height * 0.5
+        blade = make_dozer_blade(
+            f"{self.name}Dozer",
+            (0.0, front_y, blade_z),
+            width=width, height=height,
+            armor_mat=self.palette.primary_armor,
+            ram_mat=self.palette.gunmetal
+        )
+        self.objects.extend(blade)
+        return self
+
+    def build(self) -> list[bpy.types.Object]:
+        """Returns the raw list of editable kitbashed objects."""
+        return self.objects
+
+    def build_and_export(
+        self,
+        fbx_path: Path,
+        blend_path: Path,
+        preview_path: Path | None = None,
+        card_path: Path | None = None,
+        render_multiview: bool = False,
+        ortho_scale: float = 5.8,
+    ) -> Dict[str, Any]:
+        """Runs diagnostics, smart UV unwrapping, preview rendering, batching, and FBX export."""
+        blend_path.parent.mkdir(parents=True, exist_ok=True)
+        fbx_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # 1. Quality diagnostics on raw source objects
+        diagnostics = validate_model_mesh_quality(self.objects)
+
+        # 2. Smart UV Projection for lightmapping
+        generate_lightmap_uvs(self.objects)
+
+        # 3. Studio preview rendering
+        if preview_path is not None:
+            if render_multiview:
+                setup_multi_view_studio(
+                    self.objects, preview_path.parent, self.name,
+                    ortho_scale=ortho_scale, render_all=True
+                )
+            else:
+                setup_preview_studio(self.objects, preview_path, ortho_scale=ortho_scale)
+                bpy.ops.render.render(write_still=True)
+
+        # 4. Tactical 128x128 card sprite
+        if card_path is not None:
+            render_tactical_card_sprite(
+                self.objects, card_path, resolution=(128, 128), ortho_scale=ortho_scale * 0.75
+            )
+
+        # 5. Save editable source .blend
+        bpy.ops.wm.save_as_mainfile(filepath=str(blend_path))
+
+        # 6. Material batching for FBX
+        batched_objects = batch_and_join_by_material(
+            self.objects, prefix=self.name, preserve_names=self.preserved_pivots
+        )
+
+        # 7. Export FBX for Unity
+        export_unity_fbx(fbx_path, batched_objects)
+
+        diagnostics["exported_batched_objects"] = len(batched_objects)
+        diagnostics["blend_path"] = str(blend_path)
+        diagnostics["fbx_path"] = str(fbx_path)
+        print(f"[{self.name}] Build and export complete!")
+        print(f"  Source parts: {diagnostics['object_count']} -> Batched Unity parts: {len(batched_objects)}")
+        print(f"  Polygons: {diagnostics['total_polygons']}, Ground valid: {diagnostics['ground_contact_valid']}")
+        return diagnostics
+
