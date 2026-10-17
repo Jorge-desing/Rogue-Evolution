@@ -1,12 +1,20 @@
-# Rogue Command loader — handoff for agents and future chats
+# Rogue Command content expansion — handoff for agents and future chats
 
 **Updated:** 2026-10-17
 **Repository:** project root (path varies by checkout)
-**Goal:** deliver an external BepInEx loader that can register units, stages, and compiled AI modules from validated content packs.
+**Goal:** create a Rogue Command expansion mod with original playable units, stages, and AI. The external BepInEx loader is necessary infrastructure for registering and running that content, not the mod's end product. Prioritize playable content and Steam-launched validation over expanding loader diagnostics or infrastructure without a content need.
+
+## Content-first status and next work
+
+The repository has a functional development foundation: a version-guarded loader, a version-1 content contract, a Unity 2021.3.45f2 authoring project, and a native-template sample pack. The sample proves Editor-side model-bundle creation and offline/static validation, not that a new unit, stage, or AI has worked in a Rogue Command match. Its unit is a static visual overlay on a native template, its stage reuses the template's map/world/pool references, and its AI module schedules a building already in the native deck. Treat it as a plumbing sample rather than finished expansion content.
+
+The next content milestone should deliver one coherent, original gameplay slice: a distinct unit identity and balance, a stage with an intentional challenge and suitable pool/world setup, and an AI module/profile that changes decisions in a measurable way. First verify whether each desired asset can be authored under the Editor's precompiled-game-assembly limitation. Record any unsupported custom map, rig, or AI behavior as a blocker instead of substituting a template variant and calling it original content. Run the eventual match through Steam and label the result as in-game runtime evidence.
+
+Read [the content authoring tools assessment](CONTENT-AUTHORING-TOOLS.md) for current skills, utilities, and recommended use. It distinguishes tools already installed from optional runtime inspectors.
 
 ## Start here
 
-Read [the project README](../../README.md), then [the content schema guide](../../content/schema/README.md). Use [the baseline research](BASELINE.md) and [asset catalog](ASSET-CATALOG.md) for evidence about the installed game. This handoff describes the implementation after the original investigation baseline.
+Read [the project README](../../README.md), then [the content schema guide](../../content/schema/README.md). Use [the baseline research](BASELINE.md) and [asset catalog](ASSET-CATALOG.md) for evidence about the installed game. This handoff describes the implementation after the original investigation baseline; the product goal is new game content, and the loader and Unity project support that goal.
 
 ## Compatibility identity
 
@@ -117,12 +125,14 @@ The Windows Standalone support directory is present. AssetRipper 2.0.0 is also a
 
 ## Next steps
 
-1. The earlier direct clone runs stall after the `EmptyBootUpScene` fade requests `MainMenu`, including a loader-disabled control; they are historical diagnostics and do not satisfy the user's requirement to launch through Steam. If runtime confirmation is still needed, start the game through Steam only after profile/save/Cloud state is isolated and can be restored; capture whether `MainMenu` becomes active and whether `SceneManager.sceneLoaded` fires.
-2. Once a run reaches an active scene, confirm `BeforeProgressionMap` fires and that `sample-native-expansion` loads after native Resources are available. Verify namespaced row/factory registration, stage-map creation, and AI module callbacks separately.
-3. If `Resources.Load<GameObject>(native prefabLocation)` is still null at `BeforeProgressionMap`, inspect the exact Unity load phase and resource path there. Do not claim deferred loading works until it has reached and passed that runtime hook.
-4. Replace the sample's block model with user-authored geometry in Unity and regenerate the bundle; confirm the chosen `visualRootPath` remains the intended native visual subtree. Full custom stages/maps and standalone custom controllers still require complete game-compatible serialized assets and runtime validation.
-5. Every runtime attempt in a clone must snapshot the clone's `Profiles` directory, `%LocalLow%\Feneq\Rogue Command`, and `HKCU\Software\Feneq\Rogue Command`. The latest tests copied six profile files but excluded `steam_autocloud.vdf`; `steam_appid.txt` was temporary and removed. Generated LocalLow/registry state is archived under ignored `artifacts/runtime-smoke/`. Do not publish those exports.
-6. After runtime code changes, rebuild, rerun manifest/schema validation, regenerate the ZIP, and inspect its exact entries and hashes. Keep static inspection, local validation, and runtime evidence separate.
+1. **Author original unit content.** Replace the sample's block model with user-authored geometry, give it an intentional role and balance, and check whether the native template preserves the required movement and weapon behavior. The current static overlay does not retarget rigs or animations.
+2. **Author an original stage experience.** Determine the complete game-compatible world, generator/map and blueprint-pool references needed for a new stage. A parameter clone is a progression variant, not a new map. Avoid placeholder bundles when a required serialized reference is missing.
+3. **Add a distinct AI decision.** Implement a bounded compiled module that makes a new observable strategic or tactical choice. The current module only schedules construction of an entity already in the active native deck.
+4. **Validate the content through Steam.** Earlier clone runs stalled after the `EmptyBootUpScene` fade requested `MainMenu`; they do not satisfy the user's requirement to launch through Steam. Before a Steam run, isolate and back up profile/save/Cloud state. Capture whether `MainMenu` becomes active, whether `SceneManager.sceneLoaded` fires, and separate evidence for unit instantiation, stage generation, and AI decisions.
+5. **Use loader debugging only to resolve content blockers.** If a Steam-launched run reaches an active scene, confirm `BeforeProgressionMap`, native resource availability, pack loading, registration, stage-map creation and AI callbacks. If `Resources.Load<GameObject>(native prefabLocation)` is null, inspect the exact phase and resource path rather than assuming deferred loading works.
+6. **Release after the content slice works.** Rebuild the plugin, rerun manifest/schema validation, regenerate the ZIP and inspect its exact entries and hashes. Keep static inspection, local validation, and in-game evidence distinct.
+
+Every runtime attempt that touches profiles or cloud-synced saves must preserve and restore the relevant state. Historical clone artifacts remain under ignored `artifacts/runtime-smoke/`; do not publish them.
 
 ## Research commands
 

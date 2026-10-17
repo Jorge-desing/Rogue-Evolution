@@ -1,8 +1,10 @@
-# Rogue Command Expansion Loader
+# Rogue Evolution — expansión de contenido para Rogue Command
 
-Cargador externo para **Rogue Command 1.0.9**, construido como plugin de BepInEx 5 con Harmony. Añade paquetes de datos con unidades, etapas y perfiles que seleccionan módulos de AI compilados. Conserva `mod/manifest.json` para los ajustes TSV de balance que admite el juego de forma nativa.
+Este repositorio desarrolla un **mod de expansión para añadir unidades, etapas y AI a Rogue Command**. El cargador externo BepInEx 5 con Harmony es la infraestructura que permite registrar y ejecutar ese contenido; no es el objetivo final del mod. El paquete de muestra actual demuestra una unidad visual basada en una plantilla, una variante de etapa y un módulo compilado de AI, pero aún no es contenido aceptado dentro de una partida.
 
-Para retomar el trabajo en otro chat o con otro agente, comienza por [docs/research/AGENT-HANDOFF.md](docs/research/AGENT-HANDOFF.md). Resume el estado del código, comandos de comprobación, proyecto Unity y límites de la evidencia.
+El trabajo prioriza contenido original que se pueda jugar: unidades con identidad visual y balance propios, etapas con una experiencia de mapa reconocible y perfiles de AI con decisiones nuevas. Cada entrega debe separar la inspección estática, la compilación local y la comprobación en una partida iniciada por Steam. Conserva `mod/manifest.json` para los ajustes TSV de balance que admite el juego de forma nativa.
+
+Para retomar el trabajo en otro chat o con otro agente, comienza por [docs/research/AGENT-HANDOFF.md](docs/research/AGENT-HANDOFF.md). Resume el estado del contenido, el cargador de soporte, comandos, proyecto Unity y límites de la evidencia. La búsqueda de herramientas y sus usos recomendados está en [docs/research/CONTENT-AUTHORING-TOOLS.md](docs/research/CONTENT-AUTHORING-TOOLS.md).
 
 ## Compatibilidad fijada
 
