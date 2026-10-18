@@ -1,0 +1,3 @@
+interface:
+  display_name: "Rogue Command VFX Authoring"
+  short_description: "Author and validate ParticleSystems, muzzle flashes, damage effects, and URP shaders for Rogue Command"

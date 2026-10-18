@@ -535,3 +535,15 @@ A static review found that `BlueprintPool.IsInPool` applies `inactive`, `isAllow
 The loader now reads the pinned build's static `Game.AtLeastOneBlueprintHasBeenAddedByPlayer` flag and applies each mod factory row's mirrored `isAllowedAsStartingBlueprint` value while that flag is false. Once the player has a blueprint, the normal stage-pool eligibility applies. Native rows and pools remain on the game path. A focused registry regression check covers allowed and rejected first-offer cases plus the later-offer case.
 
 **Evidence:** static inspection and local managed metadata for Rogue Command 1.0.9, Unity 2021.3.45f2; `Assembly-CSharp.dll` SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, MVID `db0e9462-128d-4296-9900-de18b4bd0c00`. No Steam runtime run has tested a first offer using a scoped stage pool yet.
+
+## VFX and ParticleSystem authoring skill — 2026-10-18
+
+Created `.agents/skills/rogue-command-vfx-authoring/` and validator `tools/validate_vfx_assets.py` (mirrored byte-identically in `scripts/validate_vfx_assets.py`).
+
+The skill integrates with native URP and game hooks discovered via REA:
+- **Zero-Code Muzzle Flashes (`ShootProjectile`)**: In `ShootProjectile.Init()`, the native engine automatically crawls firepoint children and binds `child.GetChild(0).GetComponent<ParticleSystem>()`, playing it upon firing. Authors nest muzzle flash particle emitters as child index 0 of firepoints under `Socket_MuzzlePrimary`.
+- **Tiered Physical Damage Degradation (`RuntimeVisualDirector`)**: Mounts `Socket_DamageSmoke` at $\le 50\%$ HP, `Socket_DamageFire` at $\le 25\%$ HP, and reactive hardpoint detonations (`Socket_Hardpoint_ERA`, `Socket_Hardpoint_APS`, `Socket_Hardpoint_FuelDrums`).
+- **URP Particle Shaders**: Enforces `Universal Render Pipeline/Particles/Unlit` or `Simple Lit` with GPU instancing, soft particle ground blending, and max particle caps ($\le 250$) to prevent RTS combat hitches.
+
+**Local validation:** `fc.exe /b` verified 100% byte-for-byte twin parity between `tools/validate_vfx_assets.py` and `.agents/skills/rogue-command-vfx-authoring/scripts/validate_vfx_assets.py`. All 131/132 loader validation tests pass.
+
