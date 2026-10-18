@@ -159,13 +159,14 @@ namespace RogueCommandExpansionLoader.Modules
                     return false;
                 }
 
+                float maximumDistanceSquared = _settings.DefenseRadiusCells * _settings.DefenseRadiusCells;
                 foreach (EntityController playerUnit in playerUnits)
                 {
                     if (playerUnit == null || playerUnit.IsDestroyed || playerUnit.DestroyHasBeenStarted ||
                         !playerUnit.IsControlledByPlayer || !playerUnit.IsUnit ||
                         !playerUnit.CanAttackAndIsAttackEnabled ||
                         playerUnit.canNotBeAttacked || playerUnit.canNotBeTargetedByAi ||
-                        playerUnit.doNotRegisterGlobally || !playerUnit.IsTargetInRange)
+                        playerUnit.doNotRegisterGlobally)
                     {
                         continue;
                     }
@@ -173,6 +174,12 @@ namespace RogueCommandExpansionLoader.Modules
                     EntityController target = playerUnit.CurrentAttackTarget;
                     if (target == null || target.IsDestroyed || target.DestroyHasBeenStarted ||
                         !target.IsControlledByAi || !target.IsBuilding || target.aiBaseIndex != _settings.BaseIndex)
+                    {
+                        continue;
+                    }
+
+                    float attackOrderDistance = GridDistanceSquared(playerUnit.CurrentCell, target.CurrentCell);
+                    if (attackOrderDistance > maximumDistanceSquared)
                     {
                         continue;
                     }
