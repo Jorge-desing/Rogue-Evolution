@@ -261,7 +261,8 @@ powershell -ExecutionPolicy Bypass -File tools/Package-Loader.ps1
 fc.exe /b tools\RogueModelKit.py .agents\skills\rogue-command-3d-model-authoring\scripts\RogueModelKit.py
 fc.exe /b tools\generate_unit_model.py .agents\skills\rogue-command-3d-model-authoring\scripts\generate_unit_model.py
 
-# 4. Blender 4.5.14 dry-run archetype preflight
+# 4. Blender 4.5.14 dry-run archetype preflight & procedural features
+# Supports --suspension-arms, --mantlet-boot, --spaced-skirts, and --wreckage-severity <light|medium|catastrophic>
 .tools\Blender-4.5.14\blender-4.5.14-windows-x64\blender.exe --background --python tools/generate_unit_model.py -- --batch-all-archetypes --dry-run
 ```
 

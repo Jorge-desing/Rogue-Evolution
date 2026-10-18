@@ -101,8 +101,10 @@ cabin = rmk.make_troop_compartment(
 
 | System Generator | Mobility Type & Ground Invariant | Key Subsystem Primitives |
 |---|---|---|
-| `make_continuous_track_assembly` | Continuous Track ($Z_{\min} = 0.0\text{m}$) | Articulated belt (~30° climb), 5–6 stepped road wheels, drive sprocket, return idler, cleats, skirts, catenary sag (`track_sag`) |
+| `make_continuous_track_assembly` | Continuous Track ($Z_{\min} = 0.0\text{m}$) | Articulated belt (~30° climb), 5–6 stepped road wheels, drive sprocket, return idler, cleats, skirts, catenary sag (`track_sag`), suspension arms (`with_suspension_arms`), spaced skirts (`with_spaced_skirts`) |
 | `make_quad_track_pod_assembly` | Independent 4-Track Pod ($Z_{\min} = 0.0\text{m}$) | Independent continuous track pod, catenary sag (`track_sag`), swivel mounting sponson arm, top mudguard fender |
+| `make_swing_arm_suspension_linkage` | Trailing Swing-Arm Linkage | Trailing swing arms, inboard torsion bar bosses on hull, upper coilover/hydraulic dampers |
+| `make_spaced_armor_side_skirts` | Standoff Composite Skirts | Multi-panel armor tiles, top mounting rail, standoff bracket struts, rear rubber mudflaps |
 | `make_all_terrain_wheel_assembly` | Tactical Wheeled ($Z_{\min} = 0.0\text{m}$) | Directional chevron tire lugs, deep-dish rim, planetary hub with 6 bolts, coilover shock |
 | `make_bipedal_digitigrade_leg` | Digitigrade Walker ($Z_{\min} = 0.0\text{m}$) | Rotary hip actuator, hydraulic thigh ram, knee armor cap, shin strut, 3-toed stabilizer foot |
 | `make_quad_crawler_leg` | Quad Spider Crawler ($Z_{\min} = 0.0\text{m}$) | Rotary hip knuckle, upper femur boom, knee knuckle, lower tibia strut, circular rubber foot pad |
@@ -112,11 +114,12 @@ cabin = rmk.make_troop_compartment(
 ```python
 # Bilateral track and walker leg instantiation patterns
 for side in (-1, 1):
-    # Continuous tracks: side * 1.10 spacing
+    # Continuous tracks: side * 1.10 spacing with suspension linkage & spaced skirts
     tracks = rmk.make_continuous_track_assembly(
         prefix="Vehicle_Treads", x_pos=side * 1.10, length=2.85, height=0.62, belt_width=0.34,
         roadwheel_count=5, tread_mat=tread_mat, rim_mat=wheel_rim, hub_mat=wheel_hub,
-        axle_mat=gunmetal, fender_mat=armor_light, skirt_mat=armor_primary, accent_mat=warning_amber
+        axle_mat=gunmetal, fender_mat=armor_light, skirt_mat=armor_primary, accent_mat=warning_amber,
+        with_suspension_arms=True, with_spaced_skirts=True
     )
     model_objects.extend(tracks)
 
@@ -134,7 +137,8 @@ for side in (-1, 1):
 
 | Weapon Generator | Weapon Class & Pivot Semantics | Key Mechanical Primitives |
 |---|---|---|
-| `make_coaxial_cannon_assembly` | Coaxial Cannon (`gun_pivot`, `direction`) | Breech collar, thermal sleeve, bore evacuator, rifled barrel, double-baffle muzzle brake, recoil rams |
+| `make_coaxial_cannon_assembly` | Coaxial Cannon (`gun_pivot`, `direction`) | Breech collar, thermal sleeve, bore evacuator, rifled barrel, double-baffle muzzle brake, recoil rams, accordion dust boot (`has_dust_boot`) |
+| `make_mantlet_dust_boot` | Concentric Accordion Bellows | Truncated frustum cylinders with alternating ridge radii ($1.14\times$ / $0.90\times$) and retention clamp bands |
 | `make_dual_cannon_assembly` | Twin Cannon (transverse offset $\vec{u}$) | Unified armored mantlet, dual parallel rifled barrels, dual bore evacuators, muzzle brakes |
 | `make_heavy_howitzer_assembly` | Ballistic Howitzer (`elevation_deg \approx 26^\circ`) | Massive breech collar, short large-bore barrel, reinforced blast ring, sector elevation gear |
 | `make_rotary_gatling_cannon` | Gatling Cluster (angle $\theta_i = \frac{2\pi i}{N}$) | Rotor housing, central drive axle, 6 rifled barrels with clamp retaining collars, ammo feed chute |
@@ -269,7 +273,9 @@ meta = rmk.export_gameplay_metadata(
 wreckage_objects = rmk.make_wreckage_variant(
     source_objects=model_objects, prefix="Colossus",
     output_fbx_path=Path("Colossus_Wreckage.fbx"),
-    output_blend_path=Path("colossus-wreckage.blend")
+    output_blend_path=Path("colossus-wreckage.blend"),
+    archetype="super_heavy",
+    severity="catastrophic"  # light, medium, catastrophic
 )
 ```
 

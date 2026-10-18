@@ -28,6 +28,10 @@ Options:
     --tilt-rotors              Attach dual aerodynamic ducted tilt-rotors
     --dozer                    Attach frontal heavy dozer ram blade
     --skirts                   Attach armored side skirts over track run (default: True)
+    --suspension-arms          Attach trailing swing-arm suspension linkage with torsion bosses
+    --mantlet-boot             Attach tiered concentric accordion dust boot on cannon mantlet
+    --spaced-skirts            Attach segmented multi-panel spaced armor skirts with standoff brackets
+    --wreckage-severity <sev>  Damage severity for wreckage: light, medium, catastrophic (default: catastrophic)
     --smoke                    Attach multi-tube smoke discharger banks
     --radar                    Attach command/recon radar dish
     --sponsons                 Attach armored external side sponsons
@@ -64,6 +68,9 @@ PRESETS = {
         "sponsons": True,
         "smoke": True,
         "radar": True,
+        "suspension_arms": True,
+        "spaced_skirts": True,
+        "mantlet_boot": True,
     },
     "recon_interceptor": {
         "archetype": "buggy",
@@ -94,6 +101,8 @@ PRESETS = {
         "faction": "vanguard",
         "radar": True,
         "outriggers": True,
+        "suspension_arms": True,
+        "mantlet_boot": True,
     },
     "dreadnought_crawler": {
         "archetype": "siege_crawler",
@@ -101,6 +110,7 @@ PRESETS = {
         "faction": "siege",
         "outriggers": True,
         "sponsons": True,
+        "suspension_arms": True,
     },
     "hive_carrier": {
         "archetype": "drone_carrier",
@@ -162,6 +172,8 @@ PRESETS = {
         "sponsons": True,
         "armor_plating": True,
         "track_sag": 0.05,
+        "suspension_arms": True,
+        "spaced_skirts": True,
     },
     "vls_missile_cruiser": {
         "archetype": "hover_cruiser",
@@ -233,6 +245,9 @@ def parse_args():
     parser.add_argument("--tilt-rotors", action="store_true", help="Include ducted tilt-rotors")
     parser.add_argument("--dozer", action="store_true", help="Include frontal dozer ram blade")
     parser.add_argument("--skirts", action="store_true", default=True, help="Include armored side skirts")
+    parser.add_argument("--suspension-arms", action="store_true", help="Attach trailing swing-arm suspension linkage with torsion bosses and coilover dampers")
+    parser.add_argument("--mantlet-boot", action="store_true", help="Attach tiered concentric accordion dust boot between gun mantlet and barrel")
+    parser.add_argument("--spaced-skirts", action="store_true", help="Attach segmented multi-panel spaced armor skirts with standoff brackets and mudflaps")
     parser.add_argument("--smoke", action="store_true", help="Include multi-tube smoke discharger banks")
     parser.add_argument("--radar", action="store_true", help="Include command/recon radar dish")
     parser.add_argument("--sponsons", action="store_true", help="Include armored external side sponsons")
@@ -268,6 +283,7 @@ def parse_args():
     parser.add_argument("--colliders", action="store_true", help="Generate low-poly physics collision hulls")
     parser.add_argument("--gameplay-json", action="store_true", help="Export companion .gameplay.json specification")
     parser.add_argument("--wreckage", action="store_true", help="Export burned / dislodged turret wreckage variant")
+    parser.add_argument("--wreckage-severity", default="catastrophic", choices=["light", "medium", "catastrophic"], help="Wreckage damage severity level (default: catastrophic)")
     parser.add_argument("--damaged-state", action="store_true", help="Export combat-damaged <Name>_Damaged.fbx variant with distorted plates and scorch marks")
     parser.add_argument("--structure", action="store_true", help="Generate a static building or factory instead of a mobile vehicle")
     parser.add_argument("--building-type", default="factory", choices=["factory", "defense_turret", "radar_station", "energy_silo", "orbital_silo"], help="Structure building type")
@@ -317,11 +333,18 @@ def parse_args():
             args.structure = True
         if "building_type" in p and not option_was_supplied("--building-type"):
             args.building_type = p["building_type"]
-        for flag in ("sponsons", "smoke", "radar", "rollcage", "dozer", "outriggers", "flight_deck", "excavator_drum", "antenna", "cupola", "rivets", "track_shoes", "armor_plating", "ik_rig"):
+        for flag in (
+            "sponsons", "smoke", "radar", "rollcage", "dozer", "outriggers",
+            "flight_deck", "excavator_drum", "antenna", "cupola", "rivets",
+            "track_shoes", "armor_plating", "ik_rig", "suspension_arms",
+            "mantlet_boot", "spaced_skirts",
+        ):
             if p.get(flag) and f"--{flag.replace('_', '-')}" not in script_args:
                 setattr(args, flag, True)
         if "track_sag" in p and not option_was_supplied("--track-sag"):
             args.track_sag = p["track_sag"]
+        if "wreckage_severity" in p and not option_was_supplied("--wreckage-severity"):
+            args.wreckage_severity = p["wreckage_severity"]
 
     return args
 
@@ -426,6 +449,10 @@ def build_vehicle_model(
     track_sag: float | None = None,
     armor_plating: bool = False,
     ik_rig: bool = False,
+    suspension_arms: bool = False,
+    mantlet_boot: bool = False,
+    spaced_skirts: bool = False,
+    wreckage_severity: str = "catastrophic",
 ) -> dict:
     rmk.clear_scene()
 
@@ -463,6 +490,10 @@ def build_vehicle_model(
     )
     builder.set_archetype(archetype)
     builder.set_wear_level(wear)
+    builder.suspension_arms = suspension_arms
+    builder.mantlet_boot = mantlet_boot
+    builder.spaced_skirts = spaced_skirts
+    builder.wreckage_severity = wreckage_severity
 
     if track_sag is not None:
         builder.track_sag = track_sag
@@ -932,6 +963,7 @@ def build_vehicle_model(
         render_icons=render_icons,
         icon_resolutions=(icon_size,),
         icon_elevation=icon_elevation,
+        wreckage_severity=wreckage_severity,
     )
 
     if lod_diagnostics:
@@ -1126,7 +1158,7 @@ def main():
         print(f"Surface Detail: camo scale={args.camo_scale}, camo contrast={args.camo_contrast}, panel relief={args.panel_lines}, normal intensity={args.normal_intensity}")
         print(f"Primary Weapon: {args.weapon}")
         print(f"Subsystems: Skirts={args.skirts}, Rollcage={args.rollcage}, QuadTracks={args.quad_tracks}, TiltRotors={args.tilt_rotors}, Dozer={args.dozer}, Smoke={args.smoke}, Radar={args.radar}, Sponsons={args.sponsons}, Outriggers={args.outriggers}, FlightDeck={args.flight_deck}, ExcavatorDrum={args.excavator_drum}")
-        print(f"Micro-Details: Antenna={args.antenna}, Cupola={args.cupola}, Rivets={args.rivets}, TrackShoes={args.track_shoes}")
+        print(f"Micro-Details: Antenna={args.antenna}, Cupola={args.cupola}, Rivets={args.rivets}, TrackShoes={args.track_shoes}, SuspensionArms={args.suspension_arms}, MantletBoot={args.mantlet_boot}, SpacedSkirts={args.spaced_skirts}")
         if args.attachments:
             print(f"Modular Attachments: {args.attachments} (Detached FBX: {args.export_detached_attachments})")
         if args.primary_color:
@@ -1146,7 +1178,7 @@ def main():
         if args.colliders:
             print(f"  Colliders: {args.name}_COLLIDER_Hull, {args.name}_COLLIDER_Turret")
         if args.wreckage:
-            print(f"  Wreckage FBX: {args.name}_Wreckage.fbx")
+            print(f"  Wreckage FBX: {args.name}_Wreckage.fbx (Severity: {args.wreckage_severity})")
         if args.damaged_state:
             print(f"  Damaged State FBX: {args.name}_Damaged.fbx")
         atlas_requested = args.bake_atlas or args.bake_normals or args.single_material or vehicle_camo != "none"
@@ -1241,6 +1273,10 @@ def main():
                 track_sag=args.track_sag,
                 armor_plating=args.armor_plating,
                 ik_rig=args.ik_rig,
+                suspension_arms=args.suspension_arms,
+                mantlet_boot=args.mantlet_boot,
+                spaced_skirts=args.spaced_skirts,
+                wreckage_severity=args.wreckage_severity,
             )
             results.append({
                 "archetype": arch,
@@ -1360,6 +1396,10 @@ def main():
             track_sag=args.track_sag,
             armor_plating=args.armor_plating,
             ik_rig=args.ik_rig,
+            suspension_arms=args.suspension_arms,
+            mantlet_boot=args.mantlet_boot,
+            spaced_skirts=args.spaced_skirts,
+            wreckage_severity=args.wreckage_severity,
         )
 
     if args.report_json:

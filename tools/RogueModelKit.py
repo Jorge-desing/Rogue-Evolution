@@ -521,6 +521,8 @@ def make_continuous_track_assembly(
     ground_z: float = 0.06,
     center_y: float = 0.0,
     track_sag: float = 0.0,
+    with_suspension_arms: bool = False,
+    with_spaced_skirts: bool = False,
 ) -> list[bpy.types.Object]:
     """Generates a complete parametric continuous track assembly with wheels, cleats, and fenders."""
     objects = []
@@ -542,16 +544,31 @@ def make_continuous_track_assembly(
     step_y = (usable_l * 2.0) / (roadwheel_count - 1) if roadwheel_count > 1 else 0.0
     wheel_radius = (height - ground_z) * 0.34
     wheel_center_z = ground_z + wheel_radius + 0.02
+    roadwheel_centers = []
 
     for idx in range(roadwheel_count):
         y = center_y - usable_l + idx * step_y
         wheel_loc = (x_pos + sign * 0.015, y, wheel_center_z)
+        roadwheel_centers.append(wheel_loc)
         wheels = make_stepped_roadwheel(
             f"{prefix}_RoadWheel_{side_tag}_{idx+1}",
             location=wheel_loc, radius=wheel_radius, width=belt_width * 0.38,
             rim_mat=rim_mat, hub_mat=hub_mat, axle_mat=axle_mat, vertices=12
         )
         objects.extend(wheels)
+
+    # 2b. Optional trailing-arm suspension linkages with torsion bosses and dampers
+    if with_suspension_arms and axle_mat is not None:
+        susp_objs = make_swing_arm_suspension_linkage(
+            f"{prefix}_Suspension_{side_tag}",
+            roadwheel_centers=roadwheel_centers,
+            side=int(sign),
+            arm_length=wheel_radius * 1.08,
+            material=axle_mat,
+            boss_mat=hub_mat or axle_mat,
+            with_coil_spring=True,
+        )
+        objects.extend(susp_objs)
 
     # 3. Drive sprocket (rear) & Front idler wheel
     for y_rel, name_tag in [(-half_l * 0.88, "DriveSprocket"), (half_l * 0.88, "FrontIdler")]:
@@ -600,7 +617,21 @@ def make_continuous_track_assembly(
             rotation=(math.radians(35), 0.0, 0.0)
         ))
 
-    if skirt_mat is not None:
+    if with_spaced_skirts and skirt_mat is not None:
+        skirt_objs = make_spaced_armor_side_skirts(
+            f"{prefix}_SpacedSkirt_{side_tag}",
+            x_pos=x_pos + sign * (belt_width * 0.58),
+            length=length * 0.90,
+            height=height * 0.58,
+            z_center=ground_z + height * 0.52,
+            center_y=center_y,
+            armor_mat=skirt_mat,
+            trim_mat=axle_mat,
+            rubber_mat=tread_mat,
+            with_mudflap=True,
+        )
+        objects.extend(skirt_objs)
+    elif skirt_mat is not None:
         skirt_x = x_pos + sign * (belt_width * 0.55)
         objects.append(make_box(
             f"{prefix}_ArmorSkirt_{side_tag}",
@@ -614,6 +645,195 @@ def make_continuous_track_assembly(
                 (skirt_x + sign * 0.022, center_y, ground_z + height * 0.58),
                 accent_mat, bevel=0.006
             ))
+
+    return objects
+
+
+def make_swing_arm_suspension_linkage(
+    prefix: str,
+    roadwheel_centers: Sequence[Tuple[float, float, float] | Vector],
+    side: int = 1,
+    arm_length: float = 0.26,
+    arm_width: float = 0.045,
+    arm_thickness: float = 0.035,
+    boss_radius: float = 0.048,
+    material: bpy.types.Material | None = None,
+    boss_mat: bpy.types.Material | None = None,
+    with_coil_spring: bool = True,
+) -> list[bpy.types.Object]:
+    """Generates trailing-arm suspension linkages with torsion bar pivot bosses linking roadwheels to hull."""
+    objects = []
+    sign = 1.0 if side >= 0 else -1.0
+    boss_rot = (0.0, math.radians(90.0), 0.0)
+
+    for idx, center in enumerate(roadwheel_centers, start=1):
+        c_v = Vector(center)
+        # Torsion bar boss pivot on the hull side (inboard and slightly forward/upward)
+        pivot_y = c_v.y + arm_length * 0.65
+        pivot_z = c_v.z + arm_length * 0.60
+        pivot_x = c_v.x - sign * 0.10
+        pivot_loc = Vector((pivot_x, pivot_y, pivot_z))
+
+        # 1. Torsion bar boss housing
+        objects.append(make_cylinder(
+            f"{prefix}_TorsionBoss_{idx}",
+            radius=boss_radius,
+            depth=0.08,
+            location=pivot_loc,
+            material=boss_mat or material,
+            rotation=boss_rot,
+            vertices=8,
+            bevel=0.008,
+        ))
+
+        # 2. Diagonal trailing swing arm connecting boss to wheel axle
+        arm_vec = c_v - pivot_loc
+        arm_mid = (pivot_loc + c_v) * 0.5
+        arm_dist = arm_vec.length
+        if arm_dist > 1e-4:
+            arm_dir = arm_vec.normalized()
+            arm_rot = arm_dir.to_track_quat("Z", "Y").to_euler()
+            objects.append(make_box(
+                f"{prefix}_SwingArm_{idx}",
+                (arm_width, arm_thickness, arm_dist * 0.95),
+                arm_mid,
+                material,
+                bevel=0.008,
+                rotation=arm_rot,
+            ))
+
+        # 3. Optional coilover / hydraulic damper connecting arm midpoint to upper hull sponson
+        if with_coil_spring:
+            shock_top = Vector((pivot_x, arm_mid.y, pivot_z + 0.16))
+            shock_vec = shock_top - arm_mid
+            shock_len = shock_vec.length
+            if shock_len > 1e-4:
+                shock_rot = shock_vec.normalized().to_track_quat("Z", "Y").to_euler()
+                objects.append(make_cylinder(
+                    f"{prefix}_ShockDamper_{idx}",
+                    radius=boss_radius * 0.55,
+                    depth=shock_len * 0.90,
+                    location=(arm_mid + shock_top) * 0.5,
+                    material=boss_mat or material,
+                    rotation=shock_rot,
+                    vertices=6,
+                    bevel=0.005,
+                ))
+
+    return objects
+
+
+def make_spaced_armor_side_skirts(
+    prefix: str,
+    x_pos: float,
+    length: float = 2.7,
+    height: float = 0.42,
+    thickness: float = 0.028,
+    z_center: float = 0.52,
+    center_y: float = 0.0,
+    panel_count: int = 4,
+    gap: float = 0.035,
+    standoff: float = 0.08,
+    armor_mat: bpy.types.Material | None = None,
+    trim_mat: bpy.types.Material | None = None,
+    rubber_mat: bpy.types.Material | None = None,
+    with_mudflap: bool = True,
+) -> list[bpy.types.Object]:
+    """Generates multi-panel spaced composite armor side skirts with mounting standoffs and rear rubber mudflaps."""
+    objects = []
+    sign = 1.0 if x_pos >= 0 else -1.0
+    usable_len = length - (panel_count - 1) * gap
+    panel_len = usable_len / max(1, panel_count)
+    start_y = center_y - length * 0.5 + panel_len * 0.5
+
+    # Top longitudinal mounting rail
+    objects.append(make_box(
+        f"{prefix}_MountRail",
+        (0.045, length * 1.02, 0.035),
+        (x_pos - sign * (standoff * 0.35), center_y, z_center + height * 0.50),
+        trim_mat or armor_mat,
+        bevel=0.006,
+    ))
+
+    for idx in range(panel_count):
+        py = start_y + idx * (panel_len + gap)
+        # Segmented armor plate
+        objects.append(make_box(
+            f"{prefix}_SkirtPanel_{idx+1}",
+            (thickness, panel_len, height),
+            (x_pos, py, z_center),
+            armor_mat,
+            bevel=0.012,
+        ))
+
+        # Standoff brackets connecting plate to hull sponson
+        for sy_offset in (-panel_len * 0.32, panel_len * 0.32):
+            bracket_loc = Vector((
+                x_pos - sign * (standoff * 0.5),
+                py + sy_offset,
+                z_center + height * 0.28
+            ))
+            objects.append(make_box(
+                f"{prefix}_Standoff_{idx+1}_{1 if sy_offset < 0 else 2}",
+                (standoff * 0.95, 0.035, 0.035),
+                bracket_loc,
+                trim_mat or armor_mat,
+                bevel=0.004,
+            ))
+
+    # Rear rubber mudflap
+    if with_mudflap and rubber_mat is not None:
+        flap_y = center_y - length * 0.5 - 0.08
+        flap_z = z_center - height * 0.15
+        objects.append(make_box(
+            f"{prefix}_MudFlap",
+            (thickness * 0.8, 0.018, height * 0.65),
+            (x_pos, flap_y, flap_z),
+            rubber_mat,
+            bevel=0.004,
+            rotation=(math.radians(14.0), 0.0, 0.0),
+        ))
+
+    return objects
+
+
+def make_thrown_track_debris(
+    prefix: str,
+    origin: Tuple[float, float, float] | Vector,
+    length: float = 1.8,
+    width: float = 0.32,
+    cleat_count: int = 8,
+    material: bpy.types.Material | None = None,
+    cleat_mat: bpy.types.Material | None = None,
+    undulation: float = 0.035,
+) -> list[bpy.types.Object]:
+    """Generates an uncoiled, crumpled section of thrown track shoes lying on terrain for wreckage."""
+    objects = []
+    orig_v = Vector(origin)
+    step_y = length / max(1, cleat_count - 1)
+
+    # Base track rubber/steel band strip on ground
+    objects.append(make_box(
+        f"{prefix}_BandStrip",
+        (width * 0.92, length * 1.02, 0.025),
+        (orig_v.x, orig_v.y + length * 0.5, orig_v.z + 0.015),
+        material,
+        bevel=0.005,
+    ))
+
+    # Individual cleats along the thrown band with slight height wave/crumple
+    for i in range(cleat_count):
+        y_pos = orig_v.y + i * step_y
+        z_wave = orig_v.z + 0.025 + undulation * math.sin(i * 1.2)
+        tilt_x = math.radians(math.sin(i * 0.9) * 8.0)
+        objects.append(make_box(
+            f"{prefix}_Cleat_{i+1}",
+            (width * 0.98, step_y * 0.50, 0.035),
+            (orig_v.x, y_pos, z_wave),
+            cleat_mat or material,
+            bevel=0.006,
+            rotation=(tilt_x, 0.0, 0.0),
+        ))
 
     return objects
 
@@ -1230,6 +1450,55 @@ def make_vls_vertical_missile_array(
     return objects
 
 
+def make_mantlet_dust_boot(
+    prefix: str,
+    pivot: Tuple[float, float, float] | Vector,
+    direction: Tuple[float, float, float] | Vector = (0.0, 1.0, 0.0),
+    collar_radius: float = 0.17,
+    taper_radius: float = 0.11,
+    length: float = 0.22,
+    stages: int = 3,
+    material: bpy.types.Material | None = None,
+    accent_mat: bpy.types.Material | None = None,
+) -> list[bpy.types.Object]:
+    """Generates a tiered accordion dust boot collar between gun mantlet faceplate and weapon barrel."""
+    objects = []
+    pivot_v = Vector(pivot)
+    dir_v = Vector(direction).normalized()
+    rot_euler = dir_v.to_track_quat("Z", "Y").to_euler()
+
+    stage_len = length / max(1, stages)
+    for i in range(stages):
+        t0 = i / stages
+        pleat_factor = 1.14 if i % 2 == 0 else 0.90
+        r_current = (collar_radius * (1.0 - t0) + taper_radius * t0) * pleat_factor
+        stage_center = pivot_v + dir_v * ((i + 0.5) * stage_len)
+
+        objects.append(make_cylinder(
+            f"{prefix}_Pleat_{i+1}",
+            radius=r_current,
+            depth=stage_len * 0.95,
+            location=stage_center,
+            material=material,
+            rotation=rot_euler,
+            vertices=10,
+            bevel=0.008,
+        ))
+
+    # Base clamp band at mantlet interface
+    objects.append(make_cylinder(
+        f"{prefix}_BaseClamp",
+        radius=collar_radius * 1.18,
+        depth=stage_len * 0.35,
+        location=pivot_v + dir_v * (stage_len * 0.18),
+        material=accent_mat or material,
+        rotation=rot_euler,
+        vertices=10,
+        bevel=0.005,
+    ))
+    return objects
+
+
 def make_coaxial_cannon_assembly(
     prefix: str,
     gun_pivot: Tuple[float, float, float] | Vector,
@@ -1243,12 +1512,29 @@ def make_coaxial_cannon_assembly(
     has_bore_evacuator: bool = True,
     has_muzzle_brake: bool = True,
     has_recoil_cylinders: bool = True,
+    has_dust_boot: bool = False,
+    dust_boot_mat: bpy.types.Material | None = None,
 ) -> list[bpy.types.Object]:
     """Generates a parametric, multi-stage tank gun with coaxial alignment."""
     objects = []
     pivot_v = Vector(gun_pivot)
     gun_dir = Vector(direction).normalized()
     gun_rot = gun_dir.to_track_quat("Z", "Y").to_euler()
+
+    # 0. Optional accordion dust boot at mantlet junction
+    if has_dust_boot:
+        boot_objs = make_mantlet_dust_boot(
+            f"{prefix}_DustBoot",
+            pivot=pivot_v - gun_dir * 0.04,
+            direction=gun_dir,
+            collar_radius=caliber_radius * 2.2,
+            taper_radius=caliber_radius * 1.5,
+            length=0.22,
+            stages=3,
+            material=dust_boot_mat or barrel_mat,
+            accent_mat=accent_mat,
+        )
+        objects.extend(boot_objs)
 
     # 1. Heavy breech collar
     breech_loc = pivot_v + gun_dir * 0.22
@@ -3041,16 +3327,32 @@ def make_wreckage_variant(
     prefix: str,
     output_fbx_path: Path,
     output_blend_path: Path | None = None,
-    turret_keywords: Sequence[str] = ("Turret", "Cannon", "Barrel", "Howitzer", "Gatling", "Missile", "Gun", "Visor"),
+    archetype: str = "tank",
+    severity: str = "catastrophic",
+    turret_keywords: Sequence[str] = (
+        "Turret", "Cannon", "Barrel", "Howitzer", "Gatling", "Missile", "Gun", "Visor", "BeamLaser", "VLS"
+    ),
     smooth_by_angle: bool = True,
     smooth_angle_deg: float = 38.0,
 ) -> list[bpy.types.Object]:
-    """Generates a battle-destroyed / burned wreckage model variant for RTS destruction feedback."""
-    charred_armor = make_material(f"{prefix}_Wreckage_CharredArmor", (0.08, 0.08, 0.09), metallic=0.05, roughness=0.88)
-    burned_metal = make_material(f"{prefix}_Wreckage_BurnedMetal", (0.16, 0.12, 0.10), metallic=0.35, roughness=0.78)
+    """Generates an archetype-aware battle-destroyed / burned wreckage model variant with severity scaling."""
+    # Material tuning by severity
+    if severity == "light":
+        charred_armor = make_material(f"{prefix}_Wreck_Charred", (0.16, 0.16, 0.18), metallic=0.15, roughness=0.72)
+        burned_metal = make_material(f"{prefix}_Wreck_Metal", (0.22, 0.18, 0.16), metallic=0.45, roughness=0.65)
+        soot_val = 0.65
+    elif severity == "medium":
+        charred_armor = make_material(f"{prefix}_Wreck_Charred", (0.11, 0.11, 0.12), metallic=0.08, roughness=0.82)
+        burned_metal = make_material(f"{prefix}_Wreck_Metal", (0.16, 0.13, 0.11), metallic=0.35, roughness=0.76)
+        soot_val = 0.85
+    else:  # catastrophic
+        charred_armor = make_material(f"{prefix}_Wreck_Charred", (0.05, 0.05, 0.06), metallic=0.04, roughness=0.92)
+        burned_metal = make_material(f"{prefix}_Wreck_Metal", (0.11, 0.09, 0.08), metallic=0.25, roughness=0.85)
+        soot_val = 1.0
 
     wreck_objs = []
     turret_objs = []
+    hull_objs = []
 
     for obj in source_objects:
         if obj.type != "MESH":
@@ -3074,12 +3376,90 @@ def make_wreckage_variant(
         if is_turret_part:
             turret_objs.append(dup)
         else:
-            wreck_objs.append(dup)
+            hull_objs.append(dup)
 
-    for t_obj in turret_objs:
-        t_obj.rotation_euler = Vector((math.radians(16.0), math.radians(-14.0), math.radians(22.0)))
-        t_obj.location += Vector((0.18, -0.25, 0.08))
-        wreck_objs.append(t_obj)
+    # Apply kinematic transformations based on severity and archetype
+    if severity == "light":
+        for t_obj in turret_objs:
+            t_obj.rotation_euler = Vector((math.radians(4.5), math.radians(-3.0), math.radians(6.5)))
+            t_obj.location += Vector((0.04, -0.05, 0.02))
+            wreck_objs.append(t_obj)
+        wreck_objs.extend(hull_objs)
+
+    elif severity == "medium":
+        for t_obj in turret_objs:
+            t_obj.rotation_euler = Vector((math.radians(12.5), math.radians(-9.0), math.radians(17.0)))
+            t_obj.location += Vector((0.14, -0.18, 0.05))
+            wreck_objs.append(t_obj)
+        roll = math.radians(3.2)
+        for h_obj in hull_objs:
+            h_obj.rotation_euler.y += roll
+            wreck_objs.append(h_obj)
+
+    else:  # catastrophic
+        if archetype in ("tank", "artillery", "flak_anti_air", "arc_tank", "beam_destroyer", "halftrack"):
+            roll = math.radians(5.5)
+            for h_obj in hull_objs:
+                h_obj.rotation_euler.y += roll
+                wreck_objs.append(h_obj)
+
+            turret_offset = Vector((1.70, -0.25, -0.55))
+            turret_rot = Vector((math.radians(24.0), math.radians(-16.0), math.radians(55.0)))
+            for t_obj in turret_objs:
+                t_obj.location += turret_offset
+                t_obj.rotation_euler = turret_rot
+                if t_obj.location.z < 0.05:
+                    t_obj.location.z = 0.05
+                wreck_objs.append(t_obj)
+
+            debris = make_thrown_track_debris(
+                f"{prefix}_ThrownTrack",
+                origin=(-1.40, -0.80, 0.0),
+                length=1.95,
+                width=0.34,
+                cleat_count=8,
+                material=burned_metal,
+                cleat_mat=charred_armor,
+            )
+            wreck_objs.extend(debris)
+
+        elif archetype in ("walker", "colossus_titan", "spider", "quad_mech", "siege_crawler"):
+            drop_z = 0.55 if archetype in ("colossus_titan", "quad_mech") else 0.35
+            for h_obj in hull_objs:
+                h_obj.location.z = max(0.04, h_obj.location.z - drop_z)
+                h_obj.rotation_euler.x += math.radians(-8.0)
+                wreck_objs.append(h_obj)
+            for t_obj in turret_objs:
+                t_obj.location.z = max(0.08, t_obj.location.z - drop_z)
+                t_obj.rotation_euler.x += math.radians(26.0)
+                wreck_objs.append(t_obj)
+
+        elif archetype in ("hover", "hover_cruiser", "vtol", "heavy_dropship"):
+            for h_obj in hull_objs:
+                h_obj.location.z = max(0.03, h_obj.location.z - 0.38)
+                h_obj.rotation_euler.x += math.radians(7.5)
+                h_obj.rotation_euler.y += math.radians(-5.5)
+                wreck_objs.append(h_obj)
+            for t_obj in turret_objs:
+                t_obj.location.z = max(0.05, t_obj.location.z - 0.38)
+                t_obj.rotation_euler = Vector((math.radians(18.0), math.radians(-12.0), math.radians(35.0)))
+                wreck_objs.append(t_obj)
+
+        else:
+            for h_obj in hull_objs:
+                h_obj.location.z = max(0.04, h_obj.location.z - 0.18)
+                h_obj.rotation_euler.y += math.radians(4.2)
+                wreck_objs.append(h_obj)
+            for t_obj in turret_objs:
+                t_obj.location += Vector((0.25, -0.22, 0.05))
+                t_obj.rotation_euler = Vector((math.radians(16.0), math.radians(-14.0), math.radians(22.0)))
+                wreck_objs.append(t_obj)
+
+    bake_advanced_vertex_shading(
+        wreck_objs,
+        wear_level="battle_hardened",
+        soot_intensity=soot_val,
+    )
 
     batched_wreckage = batch_and_join_by_material(
         wreck_objs,
@@ -6601,6 +6981,10 @@ class RogueVehicleBuilder:
         self.with_ik: bool = False
         self.track_sag: float = 0.0
         self.armor_plating: bool = False
+        self.suspension_arms: bool = False
+        self.mantlet_boot: bool = False
+        self.spaced_skirts: bool = False
+        self.wreckage_severity: str = "catastrophic"
 
     def set_archetype(self, archetype: str) -> "RogueVehicleBuilder":
         self.archetype = archetype
@@ -6608,6 +6992,42 @@ class RogueVehicleBuilder:
 
     def set_wear_level(self, wear_level: str) -> "RogueVehicleBuilder":
         self.wear_level = wear_level
+        return self
+
+    def set_wreckage_severity(self, severity: str = "catastrophic") -> "RogueVehicleBuilder":
+        self.wreckage_severity = severity
+        return self
+
+    def add_suspension_arms(self) -> "RogueVehicleBuilder":
+        self.suspension_arms = True
+        return self
+
+    def add_spaced_armor_side_skirts(self) -> "RogueVehicleBuilder":
+        self.spaced_skirts = True
+        return self
+
+    def add_mantlet_dust_boot(
+        self,
+        collar_radius: float = 0.18,
+        taper_radius: float = 0.12,
+        length: float = 0.22,
+        stages: int = 3,
+    ) -> "RogueVehicleBuilder":
+        self.mantlet_boot = True
+        if self.gun_pivot is not None and self.gun_dir is not None:
+            boot_loc = self.gun_pivot - self.gun_dir * (length + 0.02)
+            boot_objs = make_mantlet_dust_boot(
+                f"{self.name}DustBoot",
+                pivot=boot_loc,
+                direction=self.gun_dir,
+                collar_radius=collar_radius,
+                taper_radius=taper_radius,
+                length=length,
+                stages=stages,
+                material=self.palette.tread,
+                accent_mat=self.palette.gunmetal,
+            )
+            self.objects.extend(boot_objs)
         return self
 
     def set_camo(
@@ -6868,10 +7288,14 @@ class RogueVehicleBuilder:
         roadwheels: int = 5,
         with_skirts: bool = True,
         track_sag: float = 0.0,
+        with_suspension_arms: bool = False,
+        with_spaced_skirts: bool = False,
     ) -> "RogueVehicleBuilder":
         half_w = self.hull_width * 0.5
         track_x = half_w * 0.90
         eff_sag = track_sag if track_sag > 0.0 else getattr(self, "track_sag", 0.0)
+        eff_susp = with_suspension_arms or getattr(self, "suspension_arms", False)
+        eff_spaced = with_spaced_skirts or getattr(self, "spaced_skirts", False)
         for side in (-1, 1):
             tracks = make_continuous_track_assembly(
                 f"{self.name}Treads",
@@ -6887,6 +7311,8 @@ class RogueVehicleBuilder:
                 accent_mat=self.palette.warning,
                 ground_z=self.ground_clearance,
                 track_sag=eff_sag,
+                with_suspension_arms=eff_susp,
+                with_spaced_skirts=eff_spaced,
             )
             self.objects.extend(tracks)
         return self
@@ -6963,12 +7389,14 @@ class RogueVehicleBuilder:
         caliber: float = 0.095,
         length: float = 1.65,
         elevation_deg: float = 12.0,
+        with_dust_boot: bool = False,
     ) -> "RogueVehicleBuilder":
         gun_pivot = self.turret_center + Vector((0.0, 0.45, 0.02))
         elev_rad = math.radians(elevation_deg)
         gun_dir = Vector((0.0, math.cos(elev_rad), math.sin(elev_rad))).normalized()
         self.gun_pivot = gun_pivot + gun_dir * (length + 0.32)
         self.gun_dir = gun_dir
+        eff_boot = with_dust_boot or getattr(self, "mantlet_boot", False)
         cannon = make_coaxial_cannon_assembly(
             f"{self.name}Gun",
             gun_pivot=gun_pivot,
@@ -6981,6 +7409,8 @@ class RogueVehicleBuilder:
             has_thermal_sleeve=True,
             has_bore_evacuator=True,
             has_muzzle_brake=True,
+            has_dust_boot=eff_boot,
+            dust_boot_mat=self.palette.tread,
         )
         self.objects.extend(cannon)
         self.preserved_pivots.append(f"{self.name}Gun_MainBarrel")
@@ -7880,6 +8310,7 @@ class RogueVehicleBuilder:
         render_icons: bool = False,
         icon_resolutions: Sequence[int] = (64, 128),
         icon_elevation: float = 45.0,
+        wreckage_severity: str | None = None,
     ) -> Dict[str, Any]:
         """Runs diagnostics, smart UV unwrapping, preview rendering, batching, and FBX export."""
         blend_path.parent.mkdir(parents=True, exist_ok=True)
@@ -8085,11 +8516,14 @@ class RogueVehicleBuilder:
             bpy.ops.wm.open_mainfile(filepath=str(blend_path))
             loaded_mesh_objects = [o for o in bpy.context.scene.objects if o.type == "MESH"]
             wreckage_blend = fbx_path.parent.parent.parent / "content" / "source-art" / f"{self.name.lower()}-wreckage.blend"
+            eff_severity = wreckage_severity or getattr(self, "wreckage_severity", "catastrophic")
             make_wreckage_variant(
                 source_objects=loaded_mesh_objects,
                 prefix=self.name,
                 output_fbx_path=wreckage_fbx_path,
                 output_blend_path=wreckage_blend,
+                archetype=self.archetype,
+                severity=eff_severity,
                 smooth_by_angle=smooth_by_angle,
                 smooth_angle_deg=smooth_angle_deg,
             )

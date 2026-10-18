@@ -477,9 +477,11 @@ Execute via Blender 4.5.14 LTS background mode:
   ```
 - **PBR Texture Atlas Baking & Single-Material Export**:
   ```powershell
+- **Mechanical Suspension, Dust Boot & Spaced Skirts Authoring**:
+  ```powershell
   .tools\Blender-4.5.14\blender-4.5.14-windows-x64\blender.exe --background --python tools/generate_unit_model.py -- `
-    --archetype colossus_titan --name ColossusWarMech --camo digital --camo-scale 1.5 --camo-contrast 1.2 `
-    --bake-atlas --atlas-resolution 1024 --single-material
+    --preset siege_breaker --name SiegeDestroyer --suspension-arms --mantlet-boot --spaced-skirts `
+    --wreckage --wreckage-severity catastrophic --lods --colliders
   ```
 - **Content Pack Visual Overlay Binding (`content.json`)**:
   ```json
@@ -492,6 +494,39 @@ Execute via Blender 4.5.14 LTS background mode:
     "cardSprite": "Sprites/ColossusWarMechCard"
   }
   ```
+
+---
+
+## 17. Mechanical Articulation, Suspension Linkages & Archetype Wreckage (v2026.10)
+
+### 1. Trailing-Arm Suspension Linkage (`make_swing_arm_suspension_linkage`)
+Links each roadwheel axle to hull sponsons via diagonal swing arms, torsion bar pivot bosses, and upper coilover hydraulic dampers.
+- **Topology**: Torsion boss cylinder on inboard hull wall offset upward/forward ($Z + 0.60 L$, $Y + 0.65 L$). Planar trailing arm connects boss to wheel hub. Upper shock damper connects arm midpoint to sponson overhang.
+- **CLI Flag**: `--suspension-arms` (auto-enabled in presets `siege_breaker`, `sky_sweeper`, `dreadnought_crawler`, `beam_destroyer`).
+
+### 2. Tiered Concentric Mantlet Dust Boot (`make_mantlet_dust_boot`)
+Replaces rigid trunnion seams with flexible rubber/canvas accordion collars between gun mantlet faceplates and weapon barrels.
+- **Topology**: Concentric truncated frustum cylinders with alternating ridge radii ($1.14\times$ outer, $0.90\times$ inner) and retention clamp bands.
+- **CLI Flag**: `--mantlet-boot` (auto-enabled in presets `siege_breaker`, `sky_sweeper`).
+
+### 3. Segmented Spaced Armor Skirts (`make_spaced_armor_side_skirts`)
+Protects continuous track runs with segmented standoff composite armor plates.
+- **Topology**: Continuous top longitudinal mounting rail, $N$ independent armor tiles separated by vertical panel gaps, angular standoff mounting brackets, and rear flexible rubber mudflaps.
+- **CLI Flag**: `--spaced-skirts` (auto-enabled in presets `siege_breaker`, `beam_destroyer`).
+
+### 4. Archetype-Aware Wreckage Generator (`make_wreckage_variant`)
+Replaces generic turret detachment with archetype-specific combat destruction physics and damage severity control:
+- **Severity Levels (`--wreckage-severity <light|medium|catastrophic>`)**:
+  - `light`: Sub-5° turret yaw/pitch misalignment, scorching and combat soot ($0.65$).
+  - `medium`: Moderate turret tilt ($12.5^\circ$), hull list ($3.2^\circ$), soot ($0.85$).
+  - `catastrophic`: Full structural destruction based on vehicle mobility type:
+    - *Tracked / Wheeled Tanks & Artillery*: Decapitated turret thrown on ground at $24^\circ$ tilt; uncoiled crumpled track segment on terrain (`make_thrown_track_debris`); hull list ($5.5^\circ$).
+    - *Bipedal & Quad Walkers / Mechs*: Knee-joint buckle collapse; pelvis and torso lowered to terrain ($Z \ge 0.0$); decoupled dropped weapons.
+    - *Hover & VTOL*: Ventral crash-landing on terrain plane ($Z \approx 0.03$); tilted airframe.
+    - *Super-Heavy Crawlers*: Ground-settled hull; fractured track pods; popped hatches.
+- **Color Temperature Shading**: Scorched metal gradient, desaturated albedo ($0.45\times$), zero metallic reflectivity on burned facets, charred carbon soot ($1.0$).
+
+---
 
 ### Authoring Verification Commands
 ```powershell
