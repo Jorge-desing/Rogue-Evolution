@@ -1348,13 +1348,14 @@ namespace RogueCommandExpansionLoader.Runtime
                     continue;
                 }
 
-                ApplyToProgression(progression, contributions);
+                ApplyToProgression(progression, contributions, _progressionFields[i].Name);
             }
         }
 
         private void ApplyToProgression(
             object progression,
-            IList<ProgressionContentContribution> contributions)
+            IList<ProgressionContentContribution> contributions,
+            string progressionFieldName)
         {
             if (!_progressionType.IsInstanceOfType(progression))
             {
@@ -1400,9 +1401,17 @@ namespace RogueCommandExpansionLoader.Runtime
 
                     try
                     {
-                        AppendByReference(stages, contributionStages);
-                        AppendByReference(defaultAis, contributionAi);
+                        int firstStageSlot = stages.Count;
+                        int firstAiSlot = defaultAis.Count;
+                        int appendedStages = AppendByReference(stages, contributionStages);
+                        int appendedAiProfiles = AppendByReference(defaultAis, contributionAi);
                         appliedKeys.Add(contribution.Key);
+
+                        Log("Processed progression contribution '" + contribution.Key +
+                            "' to '" + progressionFieldName + "': progression list slots stages [" +
+                            firstStageSlot + ", " + stages.Count + "), DefaultAiBehaviour [" +
+                            firstAiSlot + ", " + defaultAis.Count + "); appendedStages=" +
+                            appendedStages + ", appendedAiProfiles=" + appendedAiProfiles + ".");
                     }
                     catch (Exception exception)
                     {
@@ -1450,8 +1459,9 @@ namespace RogueCommandExpansionLoader.Runtime
             return true;
         }
 
-        private static void AppendByReference(IList target, IList<object> source)
+        private static int AppendByReference(IList target, IList<object> source)
         {
+            int appendedCount = 0;
             for (int i = 0; i < source.Count; i++)
             {
                 bool alreadyPresent = false;
@@ -1467,8 +1477,11 @@ namespace RogueCommandExpansionLoader.Runtime
                 if (!alreadyPresent)
                 {
                     target.Add(source[i]);
+                    appendedCount++;
                 }
             }
+
+            return appendedCount;
         }
 
         private void Log(string message)
