@@ -494,3 +494,38 @@ Evidence below is separated into **local validation** and **in-game runtime**. T
 
 Next: keep the stage-0 offer rule in mind, collect positive traces from later eligible pools, and verify a custom stage and its AI profile in a run whose progression actually reaches their declared ranges. Then verify a mod unit through card offer, selection, production/placement, and rendering as separate observations. Leave the inactive 204-entity test spawner unused.
 
+## Persistent profile card unlock progression — 2026-10-18
+
+The user clarified that card unlock levels mean persistent **profile** experience after completing or losing a stage, not the in-run stage number or map node. The stage-0 first unit selection is separately limited to vehicles or small units regardless of the selected starting node; a missing large unit in that first offer says nothing about its profile unlock.
+
+Static inspection of the pinned Rogue Command 1.0.9 build (Unity 2021.3.45f2, `Assembly-CSharp.dll` SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, MVID `db0e9462-128d-4296-9900-de18b4bd0c00`) traced the persistent level through `MetaGame.CurrentExperienceLevel` and the experience-point total. `ChooseCard.PresentCardsToChoose` passes that profile level to `BlueprintPool.BlueprintsInPool` and to rarity candidate queries. The pool applies `EntityBalancingStore.NeededExperienceLevel` to product candidates. Some candidate paths inspect the factory row, so each added product and its production building must carry matching `neededExperienceLevel` and `rarity` values. The reward draw remains randomized; eligibility at the required profile level does not promise a card in a particular offer.
+
+The active `sample-native-expansion` card tiers are:
+
+| Profile level | Card | Rarity |
+|---:|---|---|
+| 0 | Sandlance Scout | Common |
+| 1 | Skirmish Strike Bike | Common |
+| 2 | Ironclad Gatling Walker | Common |
+| 3 | Surge Arc Tank | Common |
+| 4 | Colossus Siege Platform | Common |
+
+Each product now explicitly declares 29 balance values for cost, unlock, production, capacity, health/defense, movement/sight, weapons, and skill parameters. The Bike retains its AoE mine-summoning Location skill; the Colossus retains the native Toggle mode skill. `ContentUnitLocalizationDefinition.skillDescription` and the verified `Loca.SkillDescription(string)` Harmony prefix provide active-language text, English fallback, then the native-template skill text. Other units can keep the native template's name/description behavior without inventing a new skill. This hook only localizes existing compiled/native abilities; it does not add executable AI or skill code to content packs.
+
+**Local validation:** the fresh validation harness passed 131/132 checks; one Windows reparse-point test was skipped because the environment lacks symlink privileges. The Release package build had zero warnings and errors. The nine-entry ZIP is `artifacts/packages/RogueCommandExpansionLoader-0.1.0.zip`, SHA-256 `f264f951b657f5dd1acd7a8417bb43a3a8a98145ec3b9e39ee1a50b602c778b6`; its embedded loader DLL matches the local build, SHA-256 `4eb8d5c30b5a46b7a6a81de9630fd37a7d2832f1d84f22371035aa3cd717fa8f`. Archive inspection found no BepInEx core, Harmony, game assemblies, PDBs, or Unity Library files.
+
+These checks establish static unlock configuration and local package contents. No new Steam match was run, so card appearance in a randomized offer, post-stage profile XP timing in a fresh save, and in-game skill text remain runtime-unverified for this change.
+
+## Combat balance and Lanchester simulation skill — 2026-10-18
+
+Created `.agents/skills/rogue-command-balance-simulation/` and CLI tool `tools/simulate_combat_balance.py` (mirrored byte-identically in `scripts/simulate_combat_balance.py`).
+
+The tool models the exact combat rules discovered via REA in Rogue Command 1.0.9:
+- **Discrete Shield Charges**: In `EntityController.TakeDamage`, if `amount > 0 && HasShield && CurrentShield > 0`, it calls `ChargeShield(-1f)` absorbing 100% damage. Shields are discrete charges, not an HP pool. Rapid-fire weapons strip charges efficiently; heavy alpha-strike weapons lose disproportionate value.
+- **Flat Armor Subtraction with Floor**: `Mathf.Max(0.1f, amount - ArmorProtection)`. Damage subtraction is flat; attacks where $\text{Damage} \le \text{Armor}$ suffer an `ARMOR_LOCKOUT` flag and deal only 0.1 damage floor.
+- **26 Canonical Stats**: Harmonizes native values from `exampleEntityBalancing.tsv` (or embedded fallback dictionary) and mod overrides from `content.json`.
+- **Lanchester Dynamics**: Supports 1v1 duels, squad focus-fire ($N$ vs $M$ with Monte Carlo trials), Cost-Efficiency Index ($CEI$), and diagnostic flags for extreme low TTK, kiting envelopes, and asymmetric superiority.
+
+**Local validation:** `fc.exe /b` verified 100% byte-for-byte twin parity between `tools/simulate_combat_balance.py` and `.agents/skills/rogue-command-balance-simulation/scripts/simulate_combat_balance.py`. Full validation suite passed 131/132 tests (1 skipped).
+
+
