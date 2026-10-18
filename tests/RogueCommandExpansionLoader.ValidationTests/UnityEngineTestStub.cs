@@ -12,6 +12,20 @@ namespace UnityEngine
         }
     }
 
+    public struct Vector3
+    {
+        public float x;
+        public float y;
+        public float z;
+
+        public Vector3(float x, float y, float z)
+        {
+            this.x = x;
+            this.y = y;
+            this.z = z;
+        }
+    }
+
     public class Object
     {
     }
@@ -30,6 +44,27 @@ namespace UnityEngine
         {
             return (ScriptableObject)System.Activator.CreateInstance(type)!;
         }
+    }
+
+    public sealed class GameObject : Object
+    {
+        public string name { get; set; } = string.Empty;
+
+        public GameObject(string name = "")
+        {
+            this.name = name;
+        }
+    }
+
+    public static class Time
+    {
+        public static float time { get; set; }
+    }
+
+    public static class Debug
+    {
+        public static void Log(object message) { }
+        public static void LogWarning(object message) { }
     }
 
     public static class Resources

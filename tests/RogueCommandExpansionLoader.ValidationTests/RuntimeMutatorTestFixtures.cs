@@ -79,6 +79,10 @@ public sealed class LandscapeGenerator
 
 public sealed class DefaultAiBehaviour
 {
+    public UnityEngine.GameObject gameObject { get; set; } = new("test-ai");
+    public int instanceId { get; set; } = 1;
+
+    public int GetInstanceID() => instanceId;
 }
 
 internal sealed class RuntimeMutatorTestProvider : IRuntimeContentProvider, IBlueprintPoolRuntimeProvider,

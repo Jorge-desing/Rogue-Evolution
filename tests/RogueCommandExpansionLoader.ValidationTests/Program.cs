@@ -1456,6 +1456,134 @@ var tests = new (string Name, Action Run)[]
             throw new InvalidOperationException("An out-of-radius or invalid-radius threat was accepted.");
         }
     }),
+    ("reactive base-defense dispatches an in-range attack order before weapon range", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        UnityEngine.Time.time = 10f;
+
+        var target = new EntityController
+        {
+            IsControlledByAi = true,
+            IsBuilding = true,
+            aiBaseIndex = 0,
+            CurrentCell = new UnityEngine.Vector2Int(10, 10),
+            UniqueEntityId = 100,
+            gameObject = new UnityEngine.GameObject("AI Base Building")
+        };
+        var attacker = new EntityController
+        {
+            IsControlledByPlayer = true,
+            IsUnit = true,
+            CanAttackAndIsAttackEnabled = true,
+            IsTargetInRange = false,
+            CurrentAttackTarget = target,
+            CurrentCell = new UnityEngine.Vector2Int(15, 10),
+            Position = new UnityEngine.Vector3(15f, 0f, 10f),
+            UniqueEntityId = 200,
+            gameObject = new UnityEngine.GameObject("Approaching Player Unit")
+        };
+        var defender = new EntityController
+        {
+            IsControlledByAi = true,
+            IsUnit = true,
+            CanAttackAndIsAttackEnabled = true,
+            CanMoveAndMovementIsEnabled = true,
+            IsCombatUnit = true,
+            CurrentPlayerCommandName = EntityCommand.Command.DoNothing,
+            aiBaseIndex = 0,
+            CurrentCell = new UnityEngine.Vector2Int(12, 10),
+            UniqueEntityId = 300,
+            gameObject = new UnityEngine.GameObject("Idle AI Defender")
+        };
+        ExistingControllers.Instance.PlayerUnits().Add(attacker);
+        ExistingControllers.Instance.AiUnits().Add(target);
+        ExistingControllers.Instance.AiUnits().Add(defender);
+
+        var module = new ReactiveBaseDefenseAiModule();
+        var parameters = new ContentModuleParameter[]
+        {
+            new() { name = "baseIndex", value = "0" },
+            new() { name = "cooldownSeconds", value = "1" },
+            new() { name = "defenseRadiusCells", value = "12" },
+            new() { name = "maxResponders", value = "1" }
+        };
+        IRogueCommandAiRuntimeBehaviour behaviour = module.CreateBehaviour(
+            new DefaultAiBehaviour { gameObject = new UnityEngine.GameObject("Reactive Test AI"), instanceId = 10 },
+            parameters);
+        behaviour.OnInitialized();
+        behaviour.Tick();
+
+        if (defender.LastExecutedCommand == null ||
+            defender.LastExecutedCommand.description != "Reactive base defense" ||
+            defender.LastExecutedCommand.position.x != attacker.Position.x ||
+            defender.LastExecutedCommand.position.z != attacker.Position.z ||
+            defender.LastCommandProcessingType != EntityController.CommandProcessingType.ExecuteBeforeCurrentCommand ||
+            !defender.CurrentCommandIsTaggedWith(defender.LastExecutedCommand.tag))
+        {
+            throw new InvalidOperationException(
+                "The in-range attack order was not dispatched before the defender's current command.");
+        }
+
+        ExistingControllers.Instance.Reset();
+    }),
+    ("reactive base-defense rejects out-of-radius attacks and other AI bases", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        UnityEngine.Time.time = 10f;
+
+        var target = new EntityController
+        {
+            IsControlledByAi = true,
+            IsBuilding = true,
+            aiBaseIndex = 0,
+            CurrentCell = new UnityEngine.Vector2Int(10, 10),
+            UniqueEntityId = 101
+        };
+        var attacker = new EntityController
+        {
+            IsControlledByPlayer = true,
+            IsUnit = true,
+            CanAttackAndIsAttackEnabled = true,
+            IsTargetInRange = false,
+            CurrentAttackTarget = target,
+            CurrentCell = new UnityEngine.Vector2Int(23, 10),
+            UniqueEntityId = 201
+        };
+        var defender = new EntityController
+        {
+            IsControlledByAi = true,
+            IsUnit = true,
+            CanAttackAndIsAttackEnabled = true,
+            CanMoveAndMovementIsEnabled = true,
+            IsCombatUnit = true,
+            aiBaseIndex = 0,
+            CurrentCell = new UnityEngine.Vector2Int(10, 10),
+            UniqueEntityId = 301
+        };
+        ExistingControllers.Instance.PlayerUnits().Add(attacker);
+        ExistingControllers.Instance.AiUnits().Add(target);
+        ExistingControllers.Instance.AiUnits().Add(defender);
+
+        var module = new ReactiveBaseDefenseAiModule();
+        IRogueCommandAiRuntimeBehaviour behaviour = module.CreateBehaviour(new DefaultAiBehaviour(), null);
+        behaviour.OnInitialized();
+        behaviour.Tick();
+        if (defender.LastExecutedCommand != null)
+        {
+            throw new InvalidOperationException("An attacker outside the defense radius triggered a response.");
+        }
+
+        target.aiBaseIndex = 1;
+        attacker.CurrentCell = new UnityEngine.Vector2Int(12, 10);
+        UnityEngine.Time.time = 20f;
+        behaviour.Tick();
+        if (defender.LastExecutedCommand != null)
+        {
+            throw new InvalidOperationException("An attack on a different AI base triggered a response.");
+        }
+
+        ExistingControllers.Instance.Reset();
+    }),
     ("scheduled base-build AI parser rejects unknown duplicate and null parameters", () =>
     {
         ContentModuleParameter[][] invalidInputs =
