@@ -5460,6 +5460,17 @@ def apply_procedural_camouflage(
     if not math.isfinite(contrast) or contrast < 0.0 or contrast > 4.0:
         raise ValueError("Camouflage contrast must be finite and between 0.0 and 4.0.")
 
+    if not isinstance(camo_type, str):
+        raise ValueError("Camouflage type must be a supported string style.")
+    c = camo_type.strip().lower()
+    supported_camo_types = {
+        "arctic", "desert", "digital", "jungle", "splinter",
+        "tigerstripe", "urban", "woodland",
+    }
+    if c not in supported_camo_types:
+        supported = ", ".join(sorted(supported_camo_types))
+        raise ValueError(f"Unsupported camouflage type '{camo_type}'. Choose one of: {supported}.")
+
     if not material or not material.use_nodes:
         return
     tree = material.node_tree
@@ -5467,9 +5478,8 @@ def apply_procedural_camouflage(
     if not bsdf or "Base Color" not in bsdf.inputs:
         return
 
-    # Use Object coordinates for seamless 3D spatial coherence across adjacent parts
+    # Object coordinates avoid UV seams; alignment across separate meshes depends on compatible origins.
     tex_coord = tree.nodes.new("ShaderNodeTexCoord")
-    c = camo_type.lower()
     midpoint = tuple((base_color[i] + secondary_color[i]) * 0.5 for i in range(3))
 
     def contrast_adjusted(color: Tuple[float, float, float]) -> Tuple[float, float, float]:
@@ -5794,6 +5804,9 @@ class RogueVehicleBuilder:
         self.name = name
         self.faction = faction
         self.camo = camo
+        self.primary_override = primary_override
+        self.light_override = light_override
+        self.emissive_override = emissive_override
         self.camo_scale = camo_scale
         self.camo_contrast = camo_contrast
         self.enable_normal_relief = enable_normal_relief
@@ -5865,6 +5878,9 @@ class RogueVehicleBuilder:
             self.faction,
             self.name,
             camo=camo,
+            primary_override=self.primary_override,
+            light_override=self.light_override,
+            emissive_override=self.emissive_override,
             camo_scale=scale,
             camo_contrast=contrast,
             enable_normal_relief=self.enable_normal_relief,
@@ -5886,6 +5902,9 @@ class RogueVehicleBuilder:
             self.faction,
             self.name,
             camo=self.camo,
+            primary_override=self.primary_override,
+            light_override=self.light_override,
+            emissive_override=self.emissive_override,
             camo_scale=self.camo_scale,
             camo_contrast=self.camo_contrast,
             enable_normal_relief=enabled,
