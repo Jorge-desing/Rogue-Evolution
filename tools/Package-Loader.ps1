@@ -230,6 +230,9 @@ building; random blueprint rewards offer that building to produce its unit.
 All five units have unique custom card Sprites and keep native gameplay
 controllers, while the pack adds a stage variant, a seeded native landscape variant,
 and a scheduled-build AI module.
+The cards unlock at persistent profile levels 0 through 4 in order. Reaching a
+level makes that card eligible for randomized reward offers; it does not force
+the card into a particular offer.
 The reactive AI stage references Sandlance and uses a native AI template with a
 bounded compiled counterattack module. The landscape reuses native 27 Circles rules
 with a fixed seed and is scoped to its stage; it does not add new terrain logic.
@@ -248,6 +251,8 @@ Install:
    with bundled model overlays: Sandlance Scout, Skirmish Strike Bike, Colossus Siege
    Platform, Ironclad Walker, and Surge Arc Tank. Each unit has a separately registered
    production building with its own ID, native factory prefab, and localized name.
+   The cards unlock at persistent profile levels 0 through 4; reaching a threshold
+   makes that card eligible for randomized offers but does not guarantee a draw.
    Random rewards offer the new building blueprint; that building produces its unit.
    All five units have unique custom card Sprites. The pack also adds a
    native stage variant, a fixed-seed landscape variant, and a scheduled-build AI
