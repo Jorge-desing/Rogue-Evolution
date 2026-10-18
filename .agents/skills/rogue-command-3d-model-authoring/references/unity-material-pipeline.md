@@ -4,9 +4,11 @@ This guide explains how Unity 2021.3.45f2 handles materials, shaders, draw-call 
 
 ---
 
-## 1. The Unity Standard Shader Invariant
+## 1. Pipeline Architecture & Shader Bundling
 
-Rogue Command visual assets use Unity's built-in **Standard** shader (`Shader.Find("Standard")`). This ensures compatibility with the game's lighting passes, shadows, and post-processing stack without relying on custom shader bundles or pipeline mismatches.
+Rogue Command executes on Unity's **Universal Render Pipeline (URP)** (`UniversalRenderPipelineAsset` in `globalgamemanagers.assets`). Native game vehicles use untextured geometry rendered via `Shader Graphs/EntityColorShader` (which integrates URP Fog of War buffers and procedural glitter/noise).
+
+Because the standalone mod authoring project (`unity/RogueCommandAssetAuthoring/`) targets the game's visual layer additively, mod visual assets authored with `Standard` or `RogueCommand/VehiclePBR_VertexWear` have their compiled shader variants embedded directly into the mod's AssetBundle (`.bundle`). At runtime, Unity executes these self-contained bundled shaders alongside the game's URP environment. Calling `Shader.Find("Standard")` inside the running game targets the bundled shader definition rather than a native game asset.
 
 ### Material Property Matrix
 

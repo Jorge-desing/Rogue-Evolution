@@ -500,13 +500,13 @@ Combat particle systems (smoke, fire, muzzle flash) utilize a resilient dual-tie
 2. **Tier 2 (Self-Contained Procedural Fallback)**: If native prefabs are uninstantiated, dynamically generates standalone Unity `ParticleSystem` components with soft unlit alpha blending, upwards cone expansion, and color ramps.
 
 ### C. Binary Verification via REA
-Verified against `Assembly-CSharp.dll` (SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, MVID `db0e9462-128d-4296-9900-de18b4bd0c00`) and loader `RogueCommandExpansionLoader.dll` (SHA-256 `93d62cba0b1ac49db90736d303f6cd0a9b0b98f0d41237daf1265922af222f16`, MVID `a172fe22-39f6-446e-818e-36c240944af9`). Evidence IDs: `ev_c38acc530bb49ca3bf82a91df86a9c74c5d3ed78ffe88ea57c0aadb74226c975`, `ev_f6327eae071cf0725cfa35ac28bde2d57dff8528bdfd41a668fc7256edafdcf8`.
+Verified against `Assembly-CSharp.dll` (SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, MVID `db0e9462-128d-4296-9900-de18b4bd0c00`, Evidence ID: `ev_eea143512c436bb6579559b439d25e7356d59246194b33404955c85560424097`, Member Evidence: `ev_49344cfdc968be6996f6c1d4f83a49c8d853dd4ff305661523dda1b6e739fb6c`) and loader `RogueCommandExpansionLoader.dll` (SHA-256 `495b8f0666db0914893b5b28d9cb7dd8bf0ddfb9a020d3082359e9e6ce999b29`, MVID `77ebdb64-bfc5-4f52-a3b5-f442daf03949`, Evidence ID: `ev_dc9b898fc2552c8ab3b2e691082815ba0ad7e3db370fbc3c4a62fb397d5a28f8`).
 
 | Property / Method | Declaring Type | Verified CIL Token | Functionality in RuntimeVisualDirector |
 | :--- | :--- | :--- | :--- |
 | `Single HealthRatio` | `EntityController` | `0x060007e4` | Normalizes entity health to drive 50% smoke, 25% fire, and turret tilt damage states |
 | `Boolean DestroyHasBeenStarted` | `EntityController` | `0x0600077d` | Confirms catastrophic entity demise to trigger zero-allocation particle teardown |
-| `Int32 InProductionCount` | `EntityController` | `0x060007df` | Queries factory production queue to drive animated rollout bay doors |
+| `Nullable<Int32> InProductionCount` | `EntityController` | `0x060007df` | Queries factory production queue (`valuetype:173<i4>`) to drive animated rollout bay doors |
 | `EntityController CurrentAttackTarget` | `EntityController` | `0x060007fc` | Primary weapon target resolution for procedural turret traverse tracking |
 | `Boolean IsEnemy(EntityController)` | `EntityController` | `0x06000844` | Authoritative hostility check to ensure turrets only target hostile opposing entities |
 

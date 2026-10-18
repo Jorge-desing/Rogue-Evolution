@@ -883,3 +883,80 @@ The 3D authoring skill was audited against the ten commits that most recently ch
 - Structure generation now receives the same camo scale/contrast and panel-relief settings and can produce the requested PBR atlas and single-material FBX.
 
 **Evidence status:** static inspection confirmed the implementation paths. Blender 4.5.14 dry-runs parsed vehicle and structure controls without generating meshes; a Blender node check confirmed contrast changes the pattern-ramp colors and panel-relief toggles add/remove bump nodes for both builders. Python syntax checks passed. These checks do not establish atlas baking, Unity import, AssetBundle appearance, draw-call performance, or Steam gameplay.
+
+## 22. Reverse Engineer Anything (REA) Pipeline & Binary Verification (2026-10-18)
+
+To rigorously verify all authoring assumptions, shaders, reflection bindings, and recent improvements against actual shipped game assets and compiled binaries, REA (`inspect_managed_artifact`, `inspect_managed_members`) and Unity serialized asset inspection were executed across the Rogue Command installation (`C:\Program Files (x86)\Steam\steamapps\common\Rogue Command`).
+
+### A. Render Pipeline Architecture & Native Shading
+1. **Universal Render Pipeline (URP) Invariant**:
+   - `globalgamemanagers`: `GraphicsSettings.m_CustomRenderPipeline` references `{'m_FileID': 1, 'm_PathID': 2768}` in `globalgamemanagers.assets`.
+   - PathID 2768 is an instance of `UnityEngine.Rendering.Universal.UniversalRenderPipelineAsset` (assembly `Unity.RenderPipelines.Universal.Runtime.dll`, MonoScript PathID 2063).
+   - **Finding**: Rogue Command runs strictly on **Universal Render Pipeline (URP)**, not Unity's legacy Built-in Render Pipeline.
+2. **Native Entity Material & Shader Pipeline**:
+   - Inspection of `resources.assets` (e.g. `PCXBaseTank`, `RailgunTank_Mesh` PathID 16160, `PCXShieldingTruck` PathID 16419) revealed that native game vehicles do **not** use diffuse texture maps (`Textures: []`).
+   - Native meshes use untextured multi-material submeshes rendered via `Shader Graphs/EntityColorShader` (PathID 13562) with properties:
+     - `Color_72ECFA4B` (Desc: 'Color')
+     - `Color_49FF76E7` (Desc: 'Emission')
+     - `Vector1_F38281A6` (Desc: 'Metallic')
+     - `Vector1_75448599` (Desc: 'Smoothness')
+     - `BOOLEAN_770E1FCF` (Desc: 'UseVertexColor')
+     - Fog of War buffers: `PrimaryFogOfWar`, `SecondaryFogOfWar`, `LastPrimaryFogOfWar`, `LastSecondaryFogOfWar`, `WorldSize`, `OldFogOfWarBlendAmount`
+     - Distortion buffers: `Shockwave`, `ShockwaveAmplitude`, `ShockwaveTime`
+     - Procedural surface variation: `GlitterProbability`, `GlitterSize`, `SimpleNoiseScale`, `GradientNoiseScale`.
+3. **Modded AssetBundle Shader Bundling Reality**:
+   - Unity's Built-in `Standard` shader is **not** present in `resources.assets`.
+   - Inspection of `content/packs/sample-native-expansion/bundles/sample-native-expansion.bundle` confirmed that the authoring project embeds its own compiled copy of `Standard` (PathID `-4850512016903265157`) and `VehiclePBR_VertexWear` directly into the AssetBundle.
+   - Modded PBR materials are self-contained inside the bundle; they do not hook into native URP `PrimaryFogOfWar` or `Shockwave` passes.
+
+### B. REA Managed Assembly Member Verification
+Verified against `Assembly-CSharp.dll` (SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, MVID `db0e9462-128d-4296-9900-de18b4bd0c00`, Evidence ID: `ev_eea143512c436bb6579559b439d25e7356d59246194b33404955c85560424097`, Member Evidence: `ev_49344cfdc968be6996f6c1d4f83a49c8d853dd4ff305661523dda1b6e739fb6c`) and `RogueCommandExpansionLoader.dll` (SHA-256 `495b8f0666db0914893b5b28d9cb7dd8bf0ddfb9a020d3082359e9e6ce999b29`, MVID `77ebdb64-bfc5-4f52-a3b5-f442daf03949`, Evidence ID: `ev_dc9b898fc2552c8ab3b2e691082815ba0ad7e3db370fbc3c4a62fb397d5a28f8`):
+
+- **`EntityController` Properties**:
+  - `HealthRatio` (`0x060007e4`, return type `System.Single` / `r4`)
+  - `DestroyHasBeenStarted` (`0x0600077d`, return type `System.Boolean`)
+  - `InProductionCount` (`0x060007df`, return type `valuetype:173<i4>`, which is `System.Nullable<System.Int32>`)
+  - `CurrentAttackTarget` (`0x060007fc`, return type `EntityController`)
+  - `CurrentFollowTarget` (`0x060007f5`, return type `EntityController`)
+  - `EntityId` (`0x060007c6`, return type `System.String`, PascalCase)
+  - `UniqueEntityId` (`0x0600077f`, return type `System.Int32`)
+  - `IsEnemy(EntityController)` (`0x06000844`, return type `System.Boolean`)
+  - `CanAttackAndIsAttackEnabled` (`0x060007f7`, return type `System.Boolean`)
+  - `CanMoveAndMovementIsEnabled` (`0x060007cd`, return type `System.Boolean`)
+  - `IsCombatUnit` (`0x060007dc`, return type `System.Boolean`)
+  - `IsEngineer` (`0x060007db`, return type `System.Boolean`)
+  - `HasRole(UnitRole)` (`0x06000840`, return type `System.Boolean`)
+  - `CommandChainExecutionIsPaused` (`0x060007c2`, return type `System.Boolean`)
+  - `HasSkillActivationInCommandChain` (`0x060007b1`, return type `System.Boolean`)
+  - `CurrentPlayerCommandName` (`0x060007c1`, return type `EntityCommand.Command`)
+  - `ExecuteCommand(EntityCommand, CommandProcessingType)` (`0x0600087d`)
+- **`EntityController` Fields**:
+  - `_attack` (`0x04000561`, type `EntityAttack`)
+  - `_currentAttackTarget` (`0x04000565`, type `EntityController`)
+  - `_currentPlayerCommand` (`0x04000571`, type `EntityCommand`)
+  - `_lastAiCommand` (`0x04000570`, type `EntityCommand`)
+  - `onFireParticleSystem` (`0x040004e1`, type `UnityEngine.ParticleSystem`)
+  - `aiBaseIndex` (`0x04000520`, type `System.Int32`)
+  - `originEntityId` (`0x04000526`, type `System.String`)
+- **`EntityAttack` Fields**:
+  - `_attackTarget` (`0x040004a2`, type `EntityController`)
+  - `_timeOfLastShot` (`0x040004ab`, type `System.Single`)
+- **`ProductionInfo` Fields**:
+  - `entityId` (`0x04000603`, type `System.String`)
+  - `productionHasStarted` (`0x04000608`, type `System.Boolean`)
+  - `queuedCount` (`0x0400060a`, type `System.Int32`)
+- **`EntityCommand` Fields**:
+  - `target` (`0x04000426`, type `EntityController`)
+  - `command` (`0x04000423`, type `EntityCommand.Command`)
+  - `destination` (`0x04000424`, type `UnityEngine.Vector3`)
+  - `tag` (`0x0400042c`, type `System.String`)
+  - `role` (`0x0400042d`, type `EntityCommand.Role`)
+  - `intent` (`0x0400042e`, type `System.String`)
+- **`EntityInAiDeck` Fields**:
+  - `entityId` (`0x0400005b`, type `System.String`, lowercase)
+
+### C. Corrections Applied Based on REA Findings
+1. **`InProductionCount` Signature Correction**: Updated documentation in `SKILL.md` Section 11.C from plain `Int32` to `Nullable<Int32>` (`valuetype:173<i4>`). `RuntimeVisualDirector.cs` already correctly unwraps `object` via `val is int count && count > 0`.
+2. **Pipeline Reality Clarification in `unity-material-pipeline.md`**: Removed the claim that native game vehicles use Built-in Standard shader. Documented the verified URP architecture and that mod AssetBundles supply self-contained compiled shaders.
+3. **PascalCase `EntityId` Property Alignment**: Reconciled `EntityController.EntityId` (PascalCase property) vs `EntityInAiDeck.entityId` (camelCase field).
+
