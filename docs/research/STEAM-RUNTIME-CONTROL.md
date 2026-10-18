@@ -8,6 +8,14 @@ Usa el puente **BepInEx MCP** para inspeccionar y controlar una partida. En la s
 
 No inicies `RogueCommand.exe` directamente. La partida de aceptación debe venir de Steam. Si ya hay una instancia abierta, inspecciona esa instancia y no la reinicies para repetir una prueba.
 
+## Pausa segura y control de botones
+
+Cuando el usuario pida detener el avance, abre el menú nativo de pausa con Escape o, si el puente es el medio disponible, resuelve en la escena actual `InGameMenuCanvas` y llama una sola vez a `InGameMenu.Show()`. Lee `InGameMenu._isShowing` después de la acción. Ese campo confirma que el menú está visible; si es importante probar que la simulación se congeló, comprueba además el reloj/contador de juego o `Time.timeScale` disponible en esa build. No dejes correr la partida mientras inspeccionas o razonas.
+
+Antes de pulsar un botón del juego, vuelve a resolver su GameObject en la escena actual; los Instance IDs cambian al cargar otra escena o iniciar otra ejecución. Inspecciona componentes, `interactable`, texto visible (`UnityEngine.UI.Text.text` o el componente de texto presente) y listeners de Unity. Para controles nativos, `call_component_method` sobre `UnityEngine.UI.Button.Press()` ejecutó el evento normal del botón en la sesión observada. Pulsa solo una vez y comprueba de nuevo escena, paneles y estado de pausa. No trates una respuesta truncada como fallo de la operación: reduce el árbol o consulta el componente concreto.
+
+En el tutorial FirstRun, el menú contiene `AbandonGoToMenuPanel`. Su texto en vivo avisa: «Esto hará que pierdas la partida actual. Aún así recibirás experiencia por los niveles anteriores. Si sales entre niveles, se guardará tu partida.» El botón `Sí, abandonar.` descarta el run actual; `No, seguir jugando.` cierra solo la confirmación y conserva el menú de pausa. No confirmes el abandono para llegar a otro flujo sin autorización explícita. En la sesión del 2026-10-18 se eligió `No, seguir jugando.` y se verificó `AbandonGoToMenuPanel.active=false` junto con `InGameMenu._isShowing=true`.
+
 ## Antes de usar firmas o cambiar estado
 
 1. Comprueba el puente con `mcp__bepinex_mcp__ping_unity_bridge` y lee `mcp__bepinex_mcp__get_runtime_capabilities`. Anota runtime, versión de Unity, versión de BepInEx y arquitectura.
@@ -26,9 +34,21 @@ Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'Rogue Command.exe' }
 
 El puente se aloja dentro del proceso del juego. Si `Rogue Command.exe` está cerrado, `ping_unity_bridge` puede responder `Cannot connect to the Unity MCP bridge`; al iniciar la partida desde Steam, vuelve a comprobar ping, capacidades y una lectura Unity real. En la sesión del 18-10-2026, ese error desapareció tras el inicio por Steam (AppID `1461910`), y se confirmó tanto el PID `26220` durante la validación como el PID `36476` en `MainMenu` después de restaurar la instalación. No lo trates como fallo de instalación cuando no haya un proceso Unity activo.
 
+### Reparar el entorno MCP local
+
+Si el juego está abierto desde Steam pero el puente sigue sin responder, separa primero el estado del proceso de los errores del servidor MCP local. Desde la raíz del repositorio, ejecuta:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\tools\Repair-BepInExMCP.ps1
+```
+
+El script valida las rutas confinadas a `.tools/BepInExMCP`, instala una versión compatible de Pydantic con las restricciones del repositorio, ejecuta `pip check`, exige MCP SDK 1.20.0, comprueba la reconstrucción de `FastMCPSettings` y verifica `ModdersHelperApp.py --help`. Puede completar la reparación local idempotente de `FastMCPSettings.model_rebuild()`; no instala el puente en el juego, no modifica la configuración de Codex, no inicia Rogue Command y no llama herramientas de Unity. Tras el script, repite ping, capacidades y una consulta acotada de escena/componente antes de afirmar que se recuperó el puente.
+
+Un `ping` correcto solo demuestra que responde el endpoint. Si una lectura grande se trunca, reduce profundidad/número de nodos y consulta campos concretos. Si falla un helper PowerShell/C# local, clasifica primero si falló la compilación del helper o la llamada MCP; un error de `Add-Type` (por ejemplo, un `using System` ausente) no demuestra que BepInEx esté caído.
+
 ### Captura visual como respaldo de diagnóstico
 
-Si dos intentos independientes de inspección fallan o devuelven estados contradictorios, deja de repetir la misma llamada y usa la skill `screenshot` para inspeccionar la ventana objetivo. Para una captura que solo sirve al análisis, guárdala en temporal (`-Mode temp`); conserva una copia bajo `artifacts/runtime-smoke/` únicamente si aporta evidencia útil a la prueba. Verifica el título y el contenido de la captura antes de interpretarla: en Windows, capturar los límites de una ventana tapada muestra lo que está delante, no el contenido oculto de la aplicación. Si Rogue Command no está visible o la captura apunta a otra ventana, no la cuentes como evidencia; pide al usuario que ponga el juego al frente antes de intentarlo otra vez. Correlaciona la imagen con la escena, el log y las lecturas del puente; una captura no demuestra estado interno que no se vea.
+Si dos intentos independientes de inspección fallan o devuelven estados contradictorios, deja de repetir la misma llamada y usa la skill `screenshot` (`C:\Users\Alex\.codex\skills\screenshot\SKILL.md`) para inspeccionar la ventana objetivo. En Windows, el helper es `scripts/take_screenshot.ps1`; para una captura que solo sirve al análisis, usa `-Mode temp`. Conserva una copia bajo `artifacts/runtime-smoke/` únicamente si aporta evidencia útil a la prueba. Verifica el título y el contenido antes de interpretarla: una captura del escritorio puede mostrar Codex/Antigravity en primer plano con el juego detrás, y capturar los límites de una ventana tapada no revela su contenido. Si la ventana del juego no está visible, la imagen no es evidencia del estado del juego; pide al usuario que lo ponga al frente antes de repetir una captura visual. Correlaciona la imagen con escena, log y lecturas del puente; una captura no demuestra estado interno que no se vea.
 
 Identidad observada en esta sesión: Rogue Command 1.0.9; Unity 2021.3.45f2; BepInEx 5.4.23.5 Mono x64; `Assembly-CSharp.dll` SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`; MVID `db0e9462-128d-4296-9900-de18b4bd0c00`. Son valores de referencia, no sustituyen la comprobación de cada sesión.
 
@@ -96,6 +116,7 @@ Para afirmar que una carta apareció, registra la oferta que realmente se render
 
 - **Runtime:** el puente respondió; Mono, Unity 2021.3.45f2 y BepInEx 5.4.23.5 x64. El log del plugin indicó 26 hooks verificados y ambos paquetes de muestra cargados: cinco unidades más cinco fábricas en `sample-native-expansion`; paquete de AI/stage reactivo separado.
 - **Estado del run:** Profile 1, experiencia persistente nivel 0 y 0 XP; escena `Game`, modo `FirstRun`, nivel de run 4, mazo `RoboCrystalMill`, `BountyTankFactory`, `Tier0TankFactory`. Aún no se observó una pantalla `ChooseCard` ni una oferta aleatoria de unidades.
+- **Control en pausa:** en la continuación del tutorial se comprobó `InGameMenu._isShowing=true`. La lectura de jerarquía/textos expuso la advertencia de abandono; `UnityEngine.UI.Button.Press()` sobre `KeepPlaying` cerró el diálogo sin abandonar y se verificó `AbandonGoToMenuPanel.active=false`, manteniendo la pausa. Una captura de escritorio mostró Antigravity en primer plano y no se usó como evidencia visual del juego.
 - **Conclusión:** esto confirma carga del plugin/paquetes y estado de un run de prueba. No confirma que las cartas nuevas aparezcan en ofertas, que una unidad se produzca o renderice, ni que una etapa o AI modded se ejecute.
 - **Validación local:** 132/133 checks del harness pasaron; el único omitido fue la fixture de symlink por falta de privilegio de Windows. El validador resolvió 10/10 referencias de Sprite/prefab y el preflight estático resolvió 5/5 raíces visuales. Son pruebas locales, no de oferta o renderizado en partida.
 - **Sondas:** los componentes temporales `Rcl*Probe` usados en la lectura se destruyeron y se comprobó su ausencia del HUD. No se modificaron archivos versionados ni de instalación; las salidas de validación están bajo `artifacts/`.
