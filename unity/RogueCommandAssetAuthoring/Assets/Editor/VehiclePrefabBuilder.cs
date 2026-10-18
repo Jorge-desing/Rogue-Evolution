@@ -23,6 +23,7 @@ namespace RogueCommandExpansion.Authoring
         private const string ModelFolder = AssetRoot + "/Models";
         private const string TextureFolder = ModelFolder + "/Textures";
         private const string MaterialFolder = AssetRoot + "/Materials";
+        private static readonly char[] LodNameSeparators = { '_', '-', '.', ' ' };
 
         public class SocketData
         {
@@ -307,30 +308,15 @@ namespace RogueCommandExpansion.Authoring
 
         private static void SetupLodGroupIfAvailable(GameObject root, GameObject modelInstance)
         {
-            Renderer[] renderers = modelInstance.GetComponentsInChildren<Renderer>(true);
-            var lod0Renderers = new List<Renderer>();
-            var lod1Renderers = new List<Renderer>();
-            var lod2Renderers = new List<Renderer>();
+            Renderer[] lod0Renderers;
+            Renderer[] lod1Renderers;
+            Renderer[] lod2Renderers;
+            string failureReason;
+            bool hasRequiredLods = TryGetLodRendererGroups(
+                modelInstance, out lod0Renderers, out lod1Renderers, out lod2Renderers, out failureReason);
 
-            foreach (Renderer r in renderers)
-            {
-                string rName = r.name.ToLowerInvariant();
-                if (rName.Contains("lod0") || rName.Contains("_l0"))
-                {
-                    lod0Renderers.Add(r);
-                }
-                else if (rName.Contains("lod1") || rName.Contains("_l1"))
-                {
-                    lod1Renderers.Add(r);
-                }
-                else if (rName.Contains("lod2") || rName.Contains("_l2"))
-                {
-                    lod2Renderers.Add(r);
-                }
-            }
-
-            // Only construct LODGroup if we found distinct LOD meshes
-            if (lod0Renderers.Count > 0 && lod1Renderers.Count > 0)
+            // Only construct LODGroup if LOD0 and LOD1 are both present and distinct.
+            if (hasRequiredLods)
             {
                 LODGroup lodGroup = root.GetComponent<LODGroup>();
                 if (lodGroup == null)
@@ -339,17 +325,121 @@ namespace RogueCommandExpansion.Authoring
                 }
 
                 var lodList = new List<LOD>();
-                lodList.Add(new LOD(0.50f, lod0Renderers.ToArray()));
-                lodList.Add(new LOD(0.20f, lod1Renderers.ToArray()));
+                lodList.Add(new LOD(0.50f, lod0Renderers));
+                lodList.Add(new LOD(0.20f, lod1Renderers));
 
-                if (lod2Renderers.Count > 0)
+                if (lod2Renderers.Length > 0)
                 {
-                    lodList.Add(new LOD(0.05f, lod2Renderers.ToArray()));
+                    lodList.Add(new LOD(0.05f, lod2Renderers));
                 }
 
                 lodGroup.SetLODs(lodList.ToArray());
                 lodGroup.RecalculateBounds();
             }
+            else if (lod0Renderers.Length > 0 || lod1Renderers.Length > 0 || lod2Renderers.Length > 0)
+            {
+                Debug.LogWarning("[VehiclePrefabBuilder] Skipping LODGroup for " + modelInstance.name +
+                    ": " + failureReason + ".");
+            }
+        }
+
+        private static bool TryGetLodRendererGroups(
+            GameObject modelAsset,
+            out Renderer[] lod0Renderers,
+            out Renderer[] lod1Renderers,
+            out Renderer[] lod2Renderers,
+            out string failureReason)
+        {
+            var lod0 = new List<Renderer>();
+            var lod1 = new List<Renderer>();
+            var lod2 = new List<Renderer>();
+
+            Renderer[] renderers = modelAsset != null
+                ? modelAsset.GetComponentsInChildren<Renderer>(true)
+                : new Renderer[0];
+
+            foreach (Renderer renderer in renderers)
+            {
+                if (!HasRenderableLodMesh(renderer)) continue;
+                int lodLevel = GetLodLevel(renderer.name);
+                if (lodLevel == 0)
+                {
+                    lod0.Add(renderer);
+                }
+                else if (lodLevel == 1)
+                {
+                    lod1.Add(renderer);
+                }
+                else if (lodLevel == 2)
+                {
+                    lod2.Add(renderer);
+                }
+            }
+
+            lod0Renderers = lod0.ToArray();
+            lod1Renderers = lod1.ToArray();
+            lod2Renderers = lod2.ToArray();
+
+            if (lod0Renderers.Length > 0 && lod1Renderers.Length > 0)
+            {
+                failureReason = null;
+                return true;
+            }
+
+            var missing = new List<string>();
+            if (lod0Renderers.Length == 0) missing.Add("LOD0/_L0 renderer group is empty");
+            if (lod1Renderers.Length == 0) missing.Add("LOD1/_L1 renderer group is empty");
+            failureReason = string.Join(" and ", missing.ToArray());
+            return false;
+        }
+
+        private static int GetLodLevel(string rendererName)
+        {
+            if (string.IsNullOrEmpty(rendererName)) return -1;
+
+            string[] tokens = rendererName.ToUpperInvariant().Split(
+                LodNameSeparators, StringSplitOptions.RemoveEmptyEntries);
+            foreach (string token in tokens)
+            {
+                switch (token)
+                {
+                    case "LOD0":
+                    case "L0": return 0;
+                    case "LOD1":
+                    case "L1": return 1;
+                    case "LOD2":
+                    case "L2": return 2;
+                }
+            }
+
+            return -1;
+        }
+
+        private static bool HasRenderableLodMesh(Renderer renderer)
+        {
+            if (renderer == null || !renderer.enabled) return false;
+
+            for (Transform current = renderer.transform; current != null; current = current.parent)
+            {
+                if (!current.gameObject.activeSelf) return false;
+            }
+
+            MeshFilter meshFilter = renderer.GetComponent<MeshFilter>();
+            if (meshFilter != null && HasUsableLodMesh(meshFilter.sharedMesh)) return true;
+
+            SkinnedMeshRenderer skinnedRenderer = renderer as SkinnedMeshRenderer;
+            return skinnedRenderer != null && HasUsableLodMesh(skinnedRenderer.sharedMesh);
+        }
+
+        private static bool HasUsableLodMesh(Mesh mesh)
+        {
+            if (mesh == null || mesh.vertexCount == 0 || mesh.subMeshCount == 0) return false;
+            for (int subMeshIndex = 0; subMeshIndex < mesh.subMeshCount; subMeshIndex++)
+            {
+                if (mesh.GetIndexCount(subMeshIndex) > 0) return true;
+            }
+
+            return false;
         }
 
         private static void MountModularAttachmentsIfAvailable(GameObject root, string unitName)
@@ -383,11 +473,9 @@ namespace RogueCommandExpansion.Authoring
                     if (attInstance != null)
                     {
                         attInstance.name = attFileName;
+                        // Detached FBX exports preserve the authored object transform.
+                        // Reparenting with worldPositionStays=false keeps that local TRS.
                         attInstance.transform.SetParent(parentTransform, false);
-                        attInstance.transform.localPosition = Vector3.zero;
-                        attInstance.transform.localRotation = Quaternion.identity;
-                        attInstance.transform.localScale = Vector3.one;
-
                     }
                 }
             }
@@ -707,6 +795,27 @@ namespace RogueCommandExpansion.Authoring
         {
             string riggedModelPath = ModelFolder + "/" + unitName + ".fbx";
             GameObject riggedModel = AssetDatabase.LoadAssetAtPath<GameObject>(riggedModelPath);
+
+            string lodPath = ModelFolder + "/" + unitName + "_LODs.fbx";
+            GameObject lodAsset = AssetDatabase.LoadAssetAtPath<GameObject>(lodPath);
+            bool hasUsableLodAsset = false;
+            if (lodAsset != null)
+            {
+                Renderer[] lod0Renderers;
+                Renderer[] lod1Renderers;
+                Renderer[] lod2Renderers;
+                string failureReason;
+                hasUsableLodAsset = TryGetLodRendererGroups(
+                    lodAsset, out lod0Renderers, out lod1Renderers, out lod2Renderers, out failureReason);
+                if (!hasUsableLodAsset)
+                {
+                    Debug.LogWarning("[VehiclePrefabBuilder] LOD asset " + lodPath + " is invalid: " +
+                        failureReason + ". Falling back to a single-mesh source.");
+                }
+            }
+
+            // Preserve primary-FBX animation when it exists. The standalone LOD export is
+            // mesh-only, so it cannot replace that animated source without losing its rig.
             if (HasEmbeddedAnimationClips(riggedModel))
             {
                 ConfigureAnimationClipLooping(riggedModelPath);
@@ -716,10 +825,14 @@ namespace RogueCommandExpansion.Authoring
                 return riggedModel;
             }
 
-            // Preserve primary-FBX animation clips above; otherwise prioritize LOD chain, atlas mesh, then raw FBX.
+            if (hasUsableLodAsset)
+            {
+                return lodAsset;
+            }
+
+            // Prefer the atlas FBX and then the single-mesh source when no usable LOD chain exists.
             string[] candidatePaths = new[]
             {
-                ModelFolder + "/" + unitName + "_LODs.fbx",
                 ModelFolder + "/" + unitName + "_Atlas.fbx",
                 ModelFolder + "/" + unitName + ".fbx",
                 AssetRoot + "/" + unitName + ".fbx"
@@ -736,10 +849,19 @@ namespace RogueCommandExpansion.Authoring
 
             // Fallback: search by AssetDatabase filter
             string[] guids = AssetDatabase.FindAssets(unitName + " t:Model");
-            if (guids != null && guids.Length > 0)
+            if (guids != null)
             {
-                string foundPath = AssetDatabase.GUIDToAssetPath(guids[0]);
-                return AssetDatabase.LoadAssetAtPath<GameObject>(foundPath);
+                foreach (string guid in guids)
+                {
+                    string foundPath = AssetDatabase.GUIDToAssetPath(guid);
+                    string foundName = Path.GetFileNameWithoutExtension(foundPath);
+                    bool isSingleMeshSource = string.Equals(foundName, unitName, StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(foundName, unitName + "_Atlas", StringComparison.OrdinalIgnoreCase);
+                    if (!isSingleMeshSource) continue;
+
+                    GameObject foundAsset = AssetDatabase.LoadAssetAtPath<GameObject>(foundPath);
+                    if (foundAsset != null) return foundAsset;
+                }
             }
 
             return null;
