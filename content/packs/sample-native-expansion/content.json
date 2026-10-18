@@ -100,7 +100,7 @@
         }
       ],
       "balanceOverrides": [
-        { "name": "cost", "value": "280" },
+        { "name": "cost", "value": "300" },
         { "name": "maxHealth", "value": "160" },
         { "name": "moveSpeed", "value": "9.0" },
         { "name": "damage1", "value": "55" },
@@ -170,7 +170,7 @@
         { "name": "damage1", "value": "4" },
         { "name": "attackCooldown", "value": "0.4" },
         { "name": "weaponRange", "value": "6" },
-        { "name": "armorProtection", "value": "2" },
+        { "name": "armorProtection", "value": "1" },
         { "name": "rarity", "value": "Common" },
         { "name": "neededExperienceLevel", "value": "2" },
         { "name": "productionDuration", "value": "36" },

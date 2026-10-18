@@ -592,3 +592,9 @@ The skill integrates with native Rogue Command 1.0.9 mutator, relic, and status 
 - **Heat & Ascension Progression Scaling**: Mutators scale natively with pre-run Heat levels via `multiplyValueWithCurrentHeatLevel = true` and activate at specific thresholds (`startingOnHeat`, `startingOnAscensionLevel`). Authors must follow Lanchester combat scaling constraints ($\le 3\%$ major combat stat per level, maximum $+15\%$ `AttackRange`) to prevent exponential difficulty runaway.
 
 **Local validation:** `fc.exe /b` verified 100% byte-for-byte twin parity between `tools/validate_mutators_and_hazards.py` and `.agents/skills/rogue-command-mutator-hazard-authoring/scripts/validate_mutators_and_hazards.py`. Full validation suite passed 132/133 tests (1 skipped for Windows symlink privilege).
+
+## Unit balance calibration — 2026-10-18
+
+The Rogue Command balance simulator loaded all 651 native rows and the five `sample-native-expansion` units. It flagged the Ironclad Walker's 2.0 armor as an `ARMOR_LOCKOUT` against the native GatlingWalker's 2.0 damage, and gave the Colossus a CEI of 16.9, slightly above the siege/artillery calibration band. The sample now sets Ironclad armor to 1.0 and Colossus cost to 300.
+
+After the adjustments, the local simulator reports Ironclad CEI 14.9 with no armor-lockout flag; the native GatlingWalker matchup still favors Ironclad, but Ironclad ends at 83.6% health instead of 98.4%. Colossus CEI is 15.8, within the documented 6–16 siege band. Other product IDs, production buildings, stage declarations, and AI roster references remain unchanged. This is balance-model evidence only; no live match was used to assess gameplay balance.
