@@ -1,0 +1,4 @@
+interface:
+  display_name: "Rogue Command Mech Rigging & Armature Authoring"
+  short_description: "Author, rig, and animate bipedal and quadrupedal mechs and walkers for Rogue Command in Blender and Unity."
+  default_model: "inherit"

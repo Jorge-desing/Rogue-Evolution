@@ -98,6 +98,7 @@ Task-specific Codex skills live under `.agents/skills/` and are versioned with t
 | `rogue-command-balance-simulation` | Combat mechanics, damage formula, discrete shields, TTK, and Lanchester simulation. |
 | `rogue-command-vfx-authoring` | URP particle systems, muzzle flashes, tiered damage smoke/fire, and visual VFX sockets. |
 | `rogue-command-audio-authoring` | Mono 3D audio spatialization, weapon SFX, flocking engine audio, and audio asset validation. |
+| `rogue-command-mech-rigging-authoring` | Bipedal and quadrupedal mech armatures, in-place locomotion, and Generic Animators. |
 | `rogue-command-steam-runtime-validation` | Reversible Steam-launched runtime checks and evidence boundaries. |
 
 The skills summarize this repository's verified workflows and limitations. They do not establish that any unit, stage, or AI works in-game.
@@ -563,3 +564,15 @@ The skill integrates with native Rogue Command 1.0.9 audio systems and spatializ
 - **Reflection Guard Fix**: `ContentPackRuntimeLoader.cs` was updated to resolve `Game.AtLeastOneBlueprintHasBeenAddedByPlayer` via `FindField(..., StaticFields)` and enforce static bool constraints, avoiding reflection mismatch since `RequireField` defaults to instance fields.
 
 **Local validation:** `fc.exe /b` verified 100% byte-for-byte twin parity between `tools/validate_audio_assets.py` and `.agents/skills/rogue-command-audio-authoring/scripts/validate_audio_assets.py`. All 131/132 loader validation tests pass.
+
+## Mech and walker rigging authoring skill — 2026-10-18
+
+Created `.agents/skills/rogue-command-mech-rigging-authoring/` and validator CLI `tools/validate_mech_rigging.py` (mirrored byte-identically in `scripts/validate_mech_rigging.py`).
+
+The skill integrates with native Rogue Command 1.0.9 walker structures and visual director systems discovered via REA:
+- **Dual Rigging Paradigms**: Rogue Command natively supports both (1) Hierarchical Transform Rigs (seen in `GatlingWalker` with `RoboMarine_Mesh/RotHor/UltraBody/ROTVERT/LEGS/RightLeg/LeftLeg`), enabling zero-code procedural aiming and step dust, and (2) Skeletal Armature Rigs (`Bone_Root`, `Bone_Pelvis`, `Bone_Thigh_*`, `Bone_Shin_*`, `Bone_Foot_*`) with Mecanim Generic Avatars.
+- **The In-Place Locomotion Invariant**: In-game movement across the tactical grid is simulated by `EntityFlockingMovement`. Walk animations must be strictly in-place (Root Motion = false, $\Delta\text{pos} = (0, 0, 0)$ on `Bone_Root`), preventing severe double-stepping and cyclic snap-back artifacts.
+- **Rigid Vertex Weighting**: Mechanical metal plates and hydraulic cylinders require discrete $1.0$ vertex weights per bone, eliminating gelatinous rubbery distortion across mechanical joints.
+- **Generic Mecanim & Animator Contract**: Unity Model Importer must use Generic (not Humanoid) rigs with `Create From This Model`. `RuntimeVisualDirector` autonomously discovers and drives states via parameters `RCL_IsMoving` (Bool), `RCL_Fire` (Trigger), and `RCL_Death` (Trigger).
+
+**Local validation:** `fc.exe /b` verified 100% byte-for-byte twin parity between `tools/validate_mech_rigging.py` and `.agents/skills/rogue-command-mech-rigging-authoring/scripts/validate_mech_rigging.py`. All 132/133 loader validation tests pass.
