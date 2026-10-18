@@ -163,6 +163,8 @@ The repository equips 13 local skills under `.agents/skills/`:
 #### 1. 3D Model Authoring & BMesh Vertex Shading
 - **Topological BMesh Vertex Wear**: Dihedral angle analysis ($\ge 35^\circ$) and normal convexity projection ($\Delta = (v_{other} - v_{edge}) \cdot \vec{n}_{f1}$) maps bright steel wear $G \in [0.7, 1.0]$ to convex edges and cavity AO $R \in [0.25, 0.40]$ to concave seams.
 - **Soot Shading**: Channel B defaulted to $0.0$ (clean metal), scaling to $1.0$ at muzzles ($R = 0.60\text{m}$) and exhausts ($R = 0.45\text{m}$) with quadratic dropoff $(1 - d/R)^2$.
+- **Procedural Enhancements**: Parametric catenary track sag curve $z(t) = height - s \cdot \sin(\pi \cdot t)$ (`--track-sag`), procedural BMesh faceted armor paneling (`--armor-plating`), and automated 2-bone IK solver constraints on `Bone_Shin_*` (`--ik-rig`).
+- **Weapon & Preset Roster**: 16 CLI presets (including `beam_destroyer` and `vls_missile_cruiser`) and 11 procedural weapon assemblies (featuring `laser_beam` and `vls_missiles`).
 - **Multi-System Sockets**: Sockets use canonical names with nested `FirePoint_0` under `Socket_MuzzlePrimary`, `Socket_EngineAudio`, `Socket_WeaponAudio`, and `Socket_FootContact_*` at $Z = 0.0$.
 - Detailed architecture: [3D-MODEL-AUTHORING-ENHANCEMENTS.md](3D-MODEL-AUTHORING-ENHANCEMENTS.md).
 

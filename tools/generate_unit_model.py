@@ -114,6 +114,7 @@ PRESETS = {
         "weapon": "dual_cannon",
         "faction": "arctic",
         "smoke": True,
+        "ik_rig": True,
     },
     "resource_behemoth": {
         "archetype": "combat_harvester",
@@ -130,6 +131,7 @@ PRESETS = {
         "smoke": True,
         "radar": True,
         "antenna": True,
+        "ik_rig": True,
     },
     "sea_lance": {
         "archetype": "hover_cruiser",
@@ -150,6 +152,25 @@ PRESETS = {
         "structure": True,
         "building_type": "orbital_silo",
         "faction": "siege",
+    },
+    "beam_destroyer": {
+        "archetype": "super_heavy",
+        "weapon": "laser_beam",
+        "faction": "syndicate",
+        "radar": True,
+        "smoke": True,
+        "sponsons": True,
+        "armor_plating": True,
+        "track_sag": 0.05,
+    },
+    "vls_missile_cruiser": {
+        "archetype": "hover_cruiser",
+        "weapon": "vls_missiles",
+        "faction": "vanguard",
+        "radar": True,
+        "antenna": True,
+        "sponsons": True,
+        "armor_plating": True,
     },
 }
 
@@ -190,7 +211,7 @@ def parse_args():
     parser.add_argument(
         "--weapon",
         default="cannon",
-        choices=["cannon", "gatling", "missile", "arc", "howitzer", "dual_cannon", "railgun", "quad_flak", "plasma_mortar"],
+        choices=["cannon", "gatling", "missile", "arc", "howitzer", "dual_cannon", "railgun", "quad_flak", "plasma_mortar", "laser_beam", "vls_missiles"],
         help="Primary weapon subsystem",
     )
     parser.add_argument(
@@ -199,12 +220,16 @@ def parse_args():
         choices=[
             "none", "siege_breaker", "recon_interceptor", "gunship_alpha", "apc_enforcer", "dune_raider",
             "sky_sweeper", "dreadnought_crawler", "hive_carrier", "titan_quad", "resource_behemoth",
-            "colossus_titan", "sea_lance", "sky_dreadnought", "orbital_defense"
+            "colossus_titan", "sea_lance", "sky_dreadnought", "orbital_defense",
+            "beam_destroyer", "vls_missile_cruiser"
         ],
         help="Preconfigured vehicle or strategic-structure loadout",
     )
     parser.add_argument("--rollcage", action="store_true", help="Include tubular roll cage")
     parser.add_argument("--quad-tracks", action="store_true", help="Include 4 independent track pods")
+    parser.add_argument("--track-sag", type=float, default=None, help="Parametric catenary track sag depth between road wheels (default: auto for heavy tracks)")
+    parser.add_argument("--armor-plating", action="store_true", help="Apply procedural BMesh armor plating with recessed panel gutters")
+    parser.add_argument("--ik-rig", action="store_true", help="Configure automated Inverse Kinematics (IK) constraints on walker leg armatures")
     parser.add_argument("--tilt-rotors", action="store_true", help="Include ducted tilt-rotors")
     parser.add_argument("--dozer", action="store_true", help="Include frontal dozer ram blade")
     parser.add_argument("--skirts", action="store_true", default=True, help="Include armored side skirts")
@@ -292,9 +317,11 @@ def parse_args():
             args.structure = True
         if "building_type" in p and not option_was_supplied("--building-type"):
             args.building_type = p["building_type"]
-        for flag in ("sponsons", "smoke", "radar", "rollcage", "dozer", "outriggers", "flight_deck", "excavator_drum", "antenna", "cupola", "rivets", "track_shoes"):
+        for flag in ("sponsons", "smoke", "radar", "rollcage", "dozer", "outriggers", "flight_deck", "excavator_drum", "antenna", "cupola", "rivets", "track_shoes", "armor_plating", "ik_rig"):
             if p.get(flag) and f"--{flag.replace('_', '-')}" not in script_args:
                 setattr(args, flag, True)
+        if "track_sag" in p and not option_was_supplied("--track-sag"):
+            args.track_sag = p["track_sag"]
 
     return args
 
@@ -396,6 +423,9 @@ def build_vehicle_model(
     normal_intensity: float = 1.0,
     panel_lines: bool = True,
     bake_normals: bool = False,
+    track_sag: float | None = None,
+    armor_plating: bool = False,
+    ik_rig: bool = False,
 ) -> dict:
     rmk.clear_scene()
 
@@ -433,6 +463,15 @@ def build_vehicle_model(
     )
     builder.set_archetype(archetype)
     builder.set_wear_level(wear)
+
+    if track_sag is not None:
+        builder.track_sag = track_sag
+    elif archetype in ("super_heavy", "siege_crawler") or name.lower() in ("beam_destroyer", "siege_breaker", "dreadnought_crawler"):
+        builder.track_sag = 0.045
+    else:
+        builder.track_sag = 0.0
+
+    builder.with_ik = ik_rig
 
     gameplay_meta_path = (fbx_file.parent / f"{name}.gameplay.json") if gameplay_json else None
     wreckage_fbx_path = (fbx_file.parent / f"{name}_Wreckage.fbx") if wreckage else None
@@ -759,6 +798,10 @@ def build_vehicle_model(
     if archetype not in ("arc_tank",):
         if weapon == "railgun":
             builder.add_railgun(rail_length=2.40, rail_height=0.28, rail_width=0.40, elevation_deg=8.0)
+        elif weapon == "laser_beam":
+            builder.add_beam_laser(barrel_length=2.10, caliber=0.08, elevation_deg=6.0)
+        elif weapon == "vls_missiles":
+            builder.add_vls_missile_array(rows=2, cols=4)
         elif weapon == "quad_flak":
             builder.add_quad_flak(barrel_length=1.65, caliber_radius=0.038, elevation_deg=34.0)
         elif weapon == "plasma_mortar":
@@ -844,6 +887,9 @@ def build_vehicle_model(
     if track_shoes and archetype in ("tank", "artillery", "arc_tank", "halftrack", "super_heavy", "flak_anti_air", "drone_carrier", "combat_harvester"):
         builder.add_track_shoes()
 
+    if armor_plating:
+        builder.add_armor_plating()
+
     # 3. Modular Attachments
     if attachments:
         att_list = [a.strip() for a in attachments.split(",") if a.strip()]
@@ -876,7 +922,8 @@ def build_vehicle_model(
         include_vfx_flash=vfx_flash,
         include_vfx_thruster=vfx_thruster,
         include_shield_bubble=shield_bubble,
-        include_rig=rig,
+        include_rig=rig or ik_rig,
+        include_ik=ik_rig,
         include_animations=animate,
         bake_atlas=bake_atlas or bake_normals or single_material or (camo and camo != "none"),
         atlas_resolution=atlas_resolution,
@@ -1124,6 +1171,12 @@ def main():
             print(f"  VFX: Exhaust thruster plume cones")
         if args.shield_bubble:
             print(f"  VFX: Geodesic shield bubble envelope")
+        if args.track_sag is not None:
+            print(f"  Track Sag: {args.track_sag}m")
+        if args.armor_plating:
+            print("  Armor Plating: Procedural BMesh with recessed gutters")
+        if args.ik_rig:
+            print("  IK Rigging: Automated 2-bone IK constraints on leg chains")
         if args.render_icons:
             print(f"  Tactical Icons: {args.icon_size}x{args.icon_size} Top-Down and Isometric")
         print("=== Dry run complete. No meshes created. ===\n")
@@ -1185,6 +1238,9 @@ def main():
                 bake_atlas=args.bake_atlas,
                 atlas_resolution=args.atlas_resolution,
                 single_material=args.single_material,
+                track_sag=args.track_sag,
+                armor_plating=args.armor_plating,
+                ik_rig=args.ik_rig,
             )
             results.append({
                 "archetype": arch,
@@ -1301,6 +1357,9 @@ def main():
             render_icons=args.render_icons,
             icon_size=args.icon_size,
             icon_elevation=args.icon_elevation,
+            track_sag=args.track_sag,
+            armor_plating=args.armor_plating,
+            ik_rig=args.ik_rig,
         )
 
     if args.report_json:

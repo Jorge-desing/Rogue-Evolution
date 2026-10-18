@@ -11,7 +11,7 @@ Use this skill to design, model, texture, and export original, high-readability 
 
 ## Verified Implementation Boundaries
 
-- **Supported CLI Coverage**: 19 mobile archetypes, 5 strategic structure types, 14 presets, and 9 weapon choices. `--lod` reports polygon budgets; `--lods` builds the LOD chain.
+- **Supported CLI Coverage**: 19 mobile archetypes, 5 strategic structure types, 16 presets, and 11 weapon choices. `--track-sag`, `--armor-plating`, and `--ik-rig` provide parametric droop, BMesh panels, and 2-bone IK solver constraints. `--lod` reports polygon budgets; `--lods` builds the LOD chain.
 - **Node Patterns & Coordinates**: `--camo` uses procedural Object-coordinate nodes (Voronoi for `splinter`/`digital`, wave for `tigerstripe`, noise for `desert`/`urban`/`arctic`/`woodland`).
 - **Biome & Shaders**: `--biome` selects an authoring-time palette alias when `--camo` is `none` (no runtime adaptation). Atlas textures require baking and URP `VehiclePBR_VertexWear` shader.
 - **References**: Follow [Unity Material Pipeline](references/unity-material-pipeline.md), [Native Hierarchy & Pivots](references/native-hierarchy-and-pivots.md), and [3D-MODEL-AUTHORING-ENHANCEMENTS.md](../../../docs/research/3D-MODEL-AUTHORING-ENHANCEMENTS.md).
@@ -89,7 +89,7 @@ Use the tested, high-readability procedural assemblies rather than ad-hoc mesh p
 |---|---|---|
 | **Chassis & Cabins** | `make_sloped_glacis_hull`, `make_faceted_turret_housing`, `make_troop_compartment`, `make_tubular_rollcage_assembly` | Sloped wedge glacis, faceted turret bustles, armored troop bays, welded tubular roll cages |
 | **Mobility & Legs** | `make_continuous_track_assembly`, `make_quad_track_pod_assembly`, `make_all_terrain_wheel_assembly`, `make_bipedal_digitigrade_leg`, `make_quad_crawler_leg`, `make_hover_skimmer_assembly`, `make_ducted_tiltrotor_assembly`, `make_outrigger_stabilizer_legs` | Continuous tracks, 4-track pods, off-road chevron tires, biped/spider legs, hover skirts, tilt-rotors, outriggers |
-| **Weapons (9)** | `make_coaxial_cannon_assembly`, `make_dual_cannon_assembly`, `make_heavy_howitzer_assembly`, `make_rotary_gatling_cannon`, `make_missile_launcher_pod`, `make_arc_energy_emitter`, `make_railgun_assembly`, `make_quad_flak_autocannon_assembly`, `make_plasma_mortar_assembly` | Cannons, dual guns, siege mortars, 6-barrel gatlings, rocket arrays, arc prongs, railguns, flak clusters, plasma mortars |
+| **Weapons (11)** | `make_coaxial_cannon_assembly`, `make_dual_cannon_assembly`, `make_heavy_howitzer_assembly`, `make_rotary_gatling_cannon`, `make_missile_launcher_pod`, `make_arc_energy_emitter`, `make_railgun_assembly`, `make_quad_flak_autocannon_assembly`, `make_plasma_mortar_assembly`, `make_collimated_beam_laser_assembly`, `make_vls_vertical_missile_array` | Cannons, dual guns, siege mortars, 6-barrel gatlings, rocket arrays, arc prongs, railguns, flak clusters, plasma mortars, collimated beam lasers, VLS missile arrays |
 | **Greebles & Optics** | `make_recessed_sensor_visor`, `make_gimbal_sensor_turret`, `make_radar_dish_or_rotodome`, `make_smoke_launcher_rack`, `make_side_sponson_assembly`, `make_armor_applique_array`, `make_hex_bolt_array`, `make_dozer_blade`, `make_flight_deck_assembly`, `make_heavy_excavator_drum` | Recessed visor hoods, FLIR gimbals, radar rotodomes, smoke racks, sponsons, ERA bricks, dozer blades, flight decks |
 | **Pipeline & Rigging** | `batch_and_join_by_material`, `bake_advanced_vertex_shading`, `generate_lod_chain`, `generate_collision_hulls`, `export_gameplay_metadata`, `make_wreckage_variant`, `create_unity_locator_sockets` | Batched submeshes, RGBA wear baking, LOD0–2 chains, box colliders, `.gameplay.json`, wreckage models, sockets |
 
@@ -142,12 +142,12 @@ Run headless vehicle generation directly from the command line using Blender and
 
 - **Mobile Archetypes (19)**: `tank`, `walker`, `bike`, `artillery`, `arc_tank`, `hover`, `spider`, `vtol`, `halftrack`, `super_heavy`, `buggy`, `flak_anti_air`, `siege_crawler`, `drone_carrier`, `quad_mech`, `combat_harvester`, `colossus_titan`, `hover_cruiser`, and `heavy_dropship`.
 - **Strategic Structure Types (5)**: `factory`, `defense_turret`, `radar_station`, `energy_silo`, and `orbital_silo`. These are generated through the structure builder, separate from the 19 mobile archetypes.
-- **Weapons (9 CLI values)**: `cannon`, `gatling`, `missile`, `arc`, `howitzer`, `dual_cannon`, `railgun`, `quad_flak`, and `plasma_mortar`. These are the exact values accepted by `--weapon`; descriptive names such as autocannon or missile pod are not CLI aliases.
+- **Weapons (11 CLI values)**: `cannon`, `gatling`, `missile`, `arc`, `howitzer`, `dual_cannon`, `railgun`, `quad_flak`, `plasma_mortar`, `laser_beam`, and `vls_missiles`. These are the exact values accepted by `--weapon`; descriptive names such as autocannon or missile pod are not CLI aliases.
 - **Factions**: `vanguard` (slate teal), `siege` (rust ochre), `syndicate` (deep cobalt), `arctic` (tundra navy).
 - **Camouflage Variants**: `digital`, `splinter`, and `tigerstripe` build procedural Voronoi/wave color patterns; `desert`, `urban`, `arctic`, and `woodland` use a procedural noise pattern with faction colors. These Blender node graphs can be baked to the atlas. They do not adapt to the map's runtime biome.
 - **Biome Palette Alias**: `--biome desert|arctic|woodland|urban` applies the corresponding authoring-time color palette only when `--camo` remains `none`; it does not adapt to a map's runtime biome.
 - **Surface Wear Levels**: `pristine` (factory clean), `field_tested` (moderate edge scratches and road grime), `battle_hardened` (heavy combat gouges, exhaust soot, and cavity dirt).
-- **Presets (14 Total)**:
+- **Presets (16 Total)**:
 
 | Preset ID | Base Archetype | Weapons & Key Attachments | Tactical Visual Identity |
 |---|---|---|---|
@@ -156,18 +156,20 @@ Run headless vehicle generation directly from the command line using Blender and
 | `gunship_alpha` | `vtol` | Tilt-rotors, rotary gatling | Aerodynamic attack VTOL |
 | `apc_enforcer` | `halftrack` | Armored troop cabin, pintle | Mechanized infantry transport |
 | `dune_raider` | `buggy` | All-terrain tires, roll cage | Fast desert scout buggy |
-| `colossus_titan` | `colossus_titan` | Dual cannons, radar, whip antenna | Heavy bipedal combat titan |
+| `colossus_titan` | `colossus_titan` | Dual cannons, IK rig, radar, antenna | Heavy bipedal combat titan |
 | `sea_lance` | `hover_cruiser` | Railgun turret, sponsons | Heavy assault hovercraft |
 | `sky_dreadnought` | `heavy_dropship` | Missile pods, ducted tilt-rotors | Heavy gunship / airborne lander |
 | `orbital_defense` | `orbital_silo` | Orbital silo aperture, gantry | Strategic planetary defense base |
 | `sky_sweeper` | `flak_anti_air` | Quad flak autocannon, outriggers | Area denial anti-aircraft platform |
 | `dreadnought_crawler` | `siege_crawler`| Heavy railgun, quad track pods | Super-heavy mobile siege platform |
 | `hive_carrier` | `drone_carrier` | Flight deck, rotodome, bridge | Autonomous drone command carrier |
-| `titan_quad` | `quad_mech` | Rotary gatling, 4 spider legs | Articulated heavy quad walker |
+| `titan_quad` | `quad_mech` | Rotary gatling, 4 spider legs, IK rig | Articulated heavy quad walker |
 | `resource_behemoth` | `combat_harvester`| Rotary cutting drum, ore hoppers | Heavy armed resource excavator |
+| `beam_destroyer` | `tank` | Collimated beam laser, radiator fins | Direct-energy combat destroyer |
+| `vls_missile_cruiser`| `hover_cruiser`| Vertical launch missile array, conning tower | Guided stand-off missile cruiser |
 
 - **CLI Flag Groups**:
-  - *Geometry & Optimization*: `--lods` (LOD0-2 chain), `--colliders` (`_COLLIDER_Hull/Turret`), `--gameplay-json` (kinematic metadata), `--wreckage` (battle-destroyed model), `--target-budget <int>` (poly profiling).
+  - *Geometry & Optimization*: `--lods` (LOD0-2 chain), `--colliders` (`_COLLIDER_Hull/Turret`), `--gameplay-json` (kinematic metadata), `--wreckage` (battle-destroyed model), `--target-budget <int>` (poly profiling), `--track-sag` (parametric catenary track sag), `--armor-plating` (procedural BMesh faceted panels), `--ik-rig` (automated 2-bone IK solver controls).
   - *Textures & Shading*: `--bake-atlas` (PBR atlas bake), `--bake-normals`, `--single-material` (`<Name>_Atlas.fbx`), `--camo <type>`, `--camo-scale`, `--camo-contrast`, `--panel-lines` (procedural bump), `--normal-intensity`.
   - *Attachments & Greebles*: `--antenna` (whip antenna), `--cupola` (commander hatch), `--rivets` (seam bolts), `--track-shoes` (individual cleats), `--outriggers` (stabilizer rams), `--flight-deck`, `--excavator-drum`.
   - *Palette Overrides*: `--primary-color <hex>`, `--light-armor-color <hex>`, `--emissive-color <hex>`, `--biome <desert|arctic|woodland|urban>`.

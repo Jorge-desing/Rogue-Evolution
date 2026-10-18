@@ -295,6 +295,54 @@ def make_faceted_turret_housing(
     return objects
 
 
+def apply_procedural_armor_plating(
+    obj: bpy.types.Object,
+    thickness: float = 0.035,
+    inset_depth: float = 0.045,
+    bevel_width: float = 0.012,
+) -> bpy.types.Object:
+    """Applies procedural BMesh armor plating by creating recessed panel gutters and extruding armor facets."""
+    if obj is None or obj.type != "MESH" or not obj.data.polygons:
+        return obj
+
+    bm = bmesh.new()
+    bm.from_mesh(obj.data)
+    bm.faces.ensure_lookup_table()
+
+    # Identify candidate upward or outward facing planar faces suitable for modular plating
+    candidate_faces = [
+        f for f in bm.faces
+        if f.calc_area() > 0.08 and (f.normal.z > -0.2)
+    ]
+
+    if candidate_faces:
+        try:
+            # 1. Inset candidate faces to establish panel gutters/seams
+            res_inset = bmesh.ops.inset_individual(
+                bm, faces=candidate_faces, thickness=inset_depth, depth=0.0
+            )
+            inset_faces = [f for f in res_inset.get("faces", []) if f.is_valid]
+            if inset_faces:
+                # 2. Extrude the inset plates outward along their face normal
+                res_extrude = bmesh.ops.extrude_face_region(bm, geom=inset_faces)
+                extruded_verts = [v for v in res_extrude.get("geom", []) if isinstance(v, bmesh.types.BMVert)]
+                for f in inset_faces:
+                    for v in f.verts:
+                        v.co += f.normal * thickness
+        except Exception:
+            pass
+
+    bm.normal_update()
+    bm.to_mesh(obj.data)
+    bm.free()
+    obj.data.update()
+
+    if bevel_width > 0.0:
+        finish_mesh(obj, None, bevel=bevel_width)
+
+    return obj
+
+
 # ---------------------------------------------------------------------------
 # 4. Mobility Subsystems (Tracks, Wheels & Bipedal Legs)
 # ---------------------------------------------------------------------------
@@ -308,8 +356,9 @@ def make_continuous_track_belt(
     tread_mat: bpy.types.Material | None,
     ground_z: float = 0.08,
     y_pos: float = 0.0,
+    track_sag: float = 0.0,
 ) -> bpy.types.Object:
-    """Creates a continuous articulated track belt with sloped front climb and rounded return idlers."""
+    """Creates a continuous articulated track belt with sloped front climb, rounded return idlers, and optional catenary sag."""
     hw = width * 0.5
     half_l = length * 0.5
     approach_y = half_l * 0.68
@@ -320,36 +369,87 @@ def make_continuous_track_belt(
     rear_apex_z = ground_z + (height - ground_z) * 0.45
     rear_approach_y = -half_l * 0.72
 
-    vertices = [
-        # Ground contact run
-        (-hw, rear_approach_y + y_pos, ground_z),   # 0
-        ( hw, rear_approach_y + y_pos, ground_z),   # 1
-        ( hw, approach_y + y_pos, ground_z),        # 2
-        (-hw, approach_y + y_pos, ground_z),        # 3
-        # Front climb
-        ( hw, front_apex_y + y_pos, front_apex_z),  # 4
-        (-hw, front_apex_y + y_pos, front_apex_z),  # 5
-        # Front top curve
-        ( hw, half_l * 0.82 + y_pos, height),       # 6
-        (-hw, half_l * 0.82 + y_pos, height),       # 7
-        # Top return run
-        ( hw, -half_l * 0.80 + y_pos, height),      # 8
-        (-hw, -half_l * 0.80 + y_pos, height),      # 9
-        # Rear over curve
-        ( hw, rear_apex_y + y_pos, rear_apex_z),    # 10
-        (-hw, rear_apex_y + y_pos, rear_apex_z),    # 11
-    ]
+    if track_sag <= 0.001:
+        vertices = [
+            # Ground contact run
+            (-hw, rear_approach_y + y_pos, ground_z),   # 0
+            ( hw, rear_approach_y + y_pos, ground_z),   # 1
+            ( hw, approach_y + y_pos, ground_z),        # 2
+            (-hw, approach_y + y_pos, ground_z),        # 3
+            # Front climb
+            ( hw, front_apex_y + y_pos, front_apex_z),  # 4
+            (-hw, front_apex_y + y_pos, front_apex_z),  # 5
+            # Front top curve
+            ( hw, half_l * 0.82 + y_pos, height),       # 6
+            (-hw, half_l * 0.82 + y_pos, height),       # 7
+            # Top return run
+            ( hw, -half_l * 0.80 + y_pos, height),      # 8
+            (-hw, -half_l * 0.80 + y_pos, height),      # 9
+            # Rear over curve
+            ( hw, rear_apex_y + y_pos, rear_apex_z),    # 10
+            (-hw, rear_apex_y + y_pos, rear_apex_z),    # 11
+        ]
 
-    faces = [
-        (3, 2, 1, 0),        # Bottom ground run
-        (5, 4, 2, 3),        # Front approach climb
-        (7, 6, 4, 5),        # Front over-curve
-        (9, 8, 6, 7),        # Top return run
-        (11, 10, 8, 9),      # Rear over-curve
-        (0, 1, 10, 11),      # Rear under-curve
-        (0, 11, 9, 7, 5, 3), # Left side wall
-        (1, 2, 4, 6, 8, 10), # Right side wall
-    ]
+        faces = [
+            (3, 2, 1, 0),        # Bottom ground run
+            (5, 4, 2, 3),        # Front approach climb
+            (7, 6, 4, 5),        # Front over-curve
+            (9, 8, 6, 7),        # Top return run
+            (11, 10, 8, 9),      # Rear over-curve
+            (0, 1, 10, 11),      # Rear under-curve
+            (0, 11, 9, 7, 5, 3), # Left side wall
+            (1, 2, 4, 6, 8, 10), # Right side wall
+        ]
+    else:
+        # Catenary Sag Track: 4 stations across top return run
+        y_top_front = half_l * 0.82 + y_pos
+        y_top_rear = -half_l * 0.80 + y_pos
+        top_span = y_top_front - y_top_rear
+
+        sag_1 = height - track_sag * math.sin(math.pi * 0.67)
+        y_sag_1 = y_top_rear + top_span * 0.67
+
+        sag_2 = height - track_sag * math.sin(math.pi * 0.33)
+        y_sag_2 = y_top_rear + top_span * 0.33
+
+        vertices = [
+            # Ground contact run
+            (-hw, rear_approach_y + y_pos, ground_z),   # 0
+            ( hw, rear_approach_y + y_pos, ground_z),   # 1
+            ( hw, approach_y + y_pos, ground_z),        # 2
+            (-hw, approach_y + y_pos, ground_z),        # 3
+            # Front climb
+            ( hw, front_apex_y + y_pos, front_apex_z),  # 4
+            (-hw, front_apex_y + y_pos, front_apex_z),  # 5
+            # Front top curve
+            ( hw, y_top_front, height),                 # 6
+            (-hw, y_top_front, height),                 # 7
+            # Sag station 1
+            ( hw, y_sag_1, sag_1),                      # 8
+            (-hw, y_sag_1, sag_1),                      # 9
+            # Sag station 2
+            ( hw, y_sag_2, sag_2),                      # 10
+            (-hw, y_sag_2, sag_2),                      # 11
+            # Top return rear point
+            ( hw, y_top_rear, height),                  # 12
+            (-hw, y_top_rear, height),                  # 13
+            # Rear over curve
+            ( hw, rear_apex_y + y_pos, rear_apex_z),    # 14
+            (-hw, rear_apex_y + y_pos, rear_apex_z),    # 15
+        ]
+
+        faces = [
+            (3, 2, 1, 0),                # Bottom ground run
+            (5, 4, 2, 3),                # Front approach climb
+            (7, 6, 4, 5),                # Front over-curve
+            (9, 8, 6, 7),                # Top return run front segment
+            (11, 10, 8, 9),              # Top return run mid catenary segment
+            (13, 12, 10, 11),            # Top return run rear segment
+            (15, 14, 12, 13),            # Rear over-curve
+            (0, 1, 14, 15),              # Rear under-curve
+            (0, 15, 13, 11, 9, 7, 5, 3), # Left side wall
+            (1, 2, 4, 6, 8, 10, 12, 14), # Right side wall
+        ]
 
     mesh = bpy.data.meshes.new(f"{name}_Mesh")
     mesh.from_pydata(vertices, [], faces)
@@ -420,6 +520,7 @@ def make_continuous_track_assembly(
     accent_mat: bpy.types.Material | None = None,
     ground_z: float = 0.06,
     center_y: float = 0.0,
+    track_sag: float = 0.0,
 ) -> list[bpy.types.Object]:
     """Generates a complete parametric continuous track assembly with wheels, cleats, and fenders."""
     objects = []
@@ -430,7 +531,8 @@ def make_continuous_track_assembly(
     belt = make_continuous_track_belt(
         f"{prefix}_Belt_{side_tag}",
         x_pos=x_pos, length=length, height=height, width=belt_width,
-        tread_mat=tread_mat, ground_z=ground_z, y_pos=center_y
+        tread_mat=tread_mat, ground_z=ground_z, y_pos=center_y,
+        track_sag=track_sag,
     )
     objects.append(belt)
 
@@ -465,12 +567,21 @@ def make_continuous_track_assembly(
     cleat_count = max(6, int(length * 3.0))
     cleat_step = (length * 0.72) / (cleat_count - 1)
     cleat_start_y = center_y - length * 0.36
+    top_y_rear = center_y - half_l * 0.80
+    top_y_front = center_y + half_l * 0.82
+    top_span = top_y_front - top_y_rear
+
     for c_idx in range(cleat_count):
         cy = cleat_start_y + c_idx * cleat_step
+        if track_sag > 0.001 and top_span > 1e-4:
+            t_cleat = max(0.0, min(1.0, (cy - top_y_rear) / top_span))
+            cz = height + 0.02 - track_sag * math.sin(math.pi * t_cleat)
+        else:
+            cz = height + 0.02
         objects.append(make_box(
             f"{prefix}_Cleat_{side_tag}_{c_idx+1}",
             (belt_width * 0.88, cleat_step * 0.55, 0.045),
-            (x_pos, cy, height + 0.02), tread_mat, bevel=0.008
+            (x_pos, cy, cz), tread_mat, bevel=0.008
         ))
 
     # 5. Optional upper mudguard / fender and armored side skirts
@@ -959,6 +1070,162 @@ def make_arc_energy_emitter(
             core_radius * 0.18, 0.06, p_tip,
             arc_mat, rotation=rot_euler, vertices=8, bevel=0.005
         ))
+
+    return objects
+
+
+def make_collimated_beam_laser_assembly(
+    prefix: str,
+    gun_pivot: Tuple[float, float, float] | Vector,
+    direction: Tuple[float, float, float] | Vector = (0.0, 1.0, 0.08),
+    barrel_length: float = 2.10,
+    caliber_radius: float = 0.08,
+    housing_mat: bpy.types.Material | None = None,
+    gunmetal_mat: bpy.types.Material | None = None,
+    lens_mat: bpy.types.Material | None = None,
+    accent_mat: bpy.types.Material | None = None,
+    ring_count: int = 3,
+) -> list[bpy.types.Object]:
+    """Generates a heavy collimated beam laser assembly with power generator, radiator fins, and focus lens."""
+    objects = []
+    pivot_v = Vector(gun_pivot)
+    gun_dir = Vector(direction).normalized()
+    u_vec, v_vec, forward_dir = get_orthonormal_basis(gun_dir)
+    gun_rot = gun_dir.to_track_quat("Z", "Y").to_euler()
+
+    # 1. Rear power generator housing & accumulator block
+    gen_loc = pivot_v - gun_dir * 0.15
+    objects.append(make_box(
+        f"{prefix}_LaserGenerator",
+        (caliber_radius * 4.2, 0.55, caliber_radius * 3.8),
+        gen_loc, housing_mat, bevel=0.025, rotation=gun_rot
+    ))
+
+    # Cooling radiator fins on generator top/rear
+    fin_count = 4
+    fin_step = 0.35 / max(1, fin_count - 1)
+    for i in range(fin_count):
+        fin_loc = gen_loc - gun_dir * (0.15 - i * fin_step) + v_vec * (caliber_radius * 2.1)
+        objects.append(make_box(
+            f"{prefix}_RadiatorFin_{i+1}",
+            (caliber_radius * 3.6, 0.025, caliber_radius * 1.2),
+            fin_loc, gunmetal_mat, bevel=0.005, rotation=gun_rot
+        ))
+
+    # Dual high-voltage conduit tubes
+    for s in (-1, 1):
+        c_start = gen_loc + u_vec * (s * caliber_radius * 2.2)
+        c_end = pivot_v + gun_dir * 0.45 + u_vec * (s * caliber_radius * 1.3)
+        objects.append(make_rod(
+            f"{prefix}_PowerConduit_{'L' if s < 0 else 'R'}",
+            c_start, c_end, caliber_radius * 0.28, gunmetal_mat, vertices=8
+        ))
+
+    # 2. Main collimation barrel core
+    barrel_center = pivot_v + gun_dir * (barrel_length * 0.5 + 0.15)
+    objects.append(make_cylinder(
+        f"{prefix}_EmitterCore", caliber_radius, barrel_length,
+        barrel_center, gunmetal_mat, rotation=gun_rot, vertices=12, bevel=0.01
+    ))
+
+    # 3. Magnetic collimation rings along the barrel
+    step_r = (barrel_length * 0.70) / max(1, ring_count)
+    for idx in range(ring_count):
+        ring_loc = pivot_v + gun_dir * (0.35 + (idx + 0.5) * step_r)
+        objects.append(make_cylinder(
+            f"{prefix}_CollimatorRing_{idx+1}",
+            caliber_radius * 1.75, 0.10,
+            ring_loc, housing_mat, rotation=gun_rot, vertices=8, bevel=0.015
+        ))
+        if accent_mat is not None:
+            objects.append(make_cylinder(
+                f"{prefix}_RingCoil_{idx+1}",
+                caliber_radius * 1.82, 0.03,
+                ring_loc, accent_mat, rotation=gun_rot, vertices=8
+            ))
+
+    # 4. Front emitter muzzle shroud & recessed optical lens
+    shroud_loc = pivot_v + gun_dir * (barrel_length + 0.12)
+    objects.append(make_cylinder(
+        f"{prefix}_MuzzleShroud", caliber_radius * 1.60, 0.24,
+        shroud_loc, housing_mat, rotation=gun_rot, vertices=10, bevel=0.018
+    ))
+    lens_loc = pivot_v + gun_dir * (barrel_length + 0.22)
+    objects.append(make_cylinder(
+        f"{prefix}_FocusLens", caliber_radius * 0.88, 0.04,
+        lens_loc, lens_mat or accent_mat, rotation=gun_rot, vertices=12, bevel=0.005
+    ))
+
+    return objects
+
+
+def make_vls_vertical_missile_array(
+    prefix: str,
+    location: Tuple[float, float, float] | Vector,
+    size: Tuple[float, float, float] = (0.95, 1.35, 0.38),
+    rows: int = 2,
+    cols: int = 4,
+    armor_mat: bpy.types.Material | None = None,
+    cavity_mat: bpy.types.Material | None = None,
+    hatch_mat: bpy.types.Material | None = None,
+    missile_mat: bpy.types.Material | None = None,
+    accent_mat: bpy.types.Material | None = None,
+) -> list[bpy.types.Object]:
+    """Generates an armored Vertical Launch System (VLS) missile cell matrix."""
+    objects = []
+    loc_v = Vector(location)
+
+    # 1. Main armored silo deck module
+    objects.append(make_box(
+        f"{prefix}_SiloDeck", size, loc_v, armor_mat, bevel=0.03
+    ))
+
+    # Ventral exhaust gas deflector trough
+    exhaust_w = size[0] * 0.90
+    exhaust_l = size[1] * 0.12
+    objects.append(make_box(
+        f"{prefix}_ExhaustVent_Rear",
+        (exhaust_w, exhaust_l, 0.06),
+        loc_v + Vector((0.0, -size[1] * 0.44, size[2] * 0.5 + 0.015)),
+        cavity_mat, bevel=0.008
+    ))
+
+    # 2. Silo cell grid with individual split blast hatches and recessed warheads
+    cell_w = (size[0] * 0.82) / cols
+    cell_l = (size[1] * 0.72) / rows
+    cell_size = min(cell_w, cell_l) * 0.85
+    start_x = -(cols - 1) * 0.5 * cell_w
+    start_y = -(rows - 1) * 0.5 * cell_l + 0.04
+
+    cell_idx = 1
+    for r in range(rows):
+        for c in range(cols):
+            cx = loc_v.x + start_x + c * cell_w
+            cy = loc_v.y + start_y + r * cell_l
+            cz = loc_v.z + size[2] * 0.5
+
+            objects.append(make_box(
+                f"{prefix}_CellCavity_{cell_idx}",
+                (cell_size, cell_size, 0.12),
+                (cx, cy, cz - 0.04), cavity_mat, bevel=0.005
+            ))
+            hatch_w = cell_size * 0.46
+            objects.append(make_box(
+                f"{prefix}_HatchFlap_L_{cell_idx}",
+                (hatch_w, cell_size * 0.94, 0.025),
+                (cx - hatch_w * 0.52, cy, cz + 0.01), hatch_mat or armor_mat, bevel=0.004
+            ))
+            objects.append(make_box(
+                f"{prefix}_HatchFlap_R_{cell_idx}",
+                (hatch_w, cell_size * 0.94, 0.025),
+                (cx + hatch_w * 0.52, cy, cz + 0.01), hatch_mat or armor_mat, bevel=0.004
+            ))
+            objects.append(make_cylinder(
+                f"{prefix}_MissileTip_{cell_idx}",
+                cell_size * 0.28, 0.06,
+                (cx, cy, cz - 0.02), missile_mat or accent_mat, vertices=8, bevel=0.006
+            ))
+            cell_idx += 1
 
     return objects
 
@@ -3321,6 +3588,7 @@ def make_quad_track_pod_assembly(
     accent_mat: bpy.types.Material | None = None,
     ground_z: float = 0.06,
     inboard_side: int = -1,
+    track_sag: float = 0.0,
 ) -> list[bpy.types.Object]:
     """Generates an independent continuous track pod for 4-track super-heavy crawlers."""
     objects = []
@@ -3330,7 +3598,8 @@ def make_quad_track_pod_assembly(
     belt = make_continuous_track_belt(
         f"{prefix}_Belt",
         x_pos=loc_v.x, length=length, height=height, width=belt_width,
-        tread_mat=tread_mat, ground_z=ground_z, y_pos=loc_v.y
+        tread_mat=tread_mat, ground_z=ground_z, y_pos=loc_v.y,
+        track_sag=track_sag,
     )
     objects.append(belt)
 
@@ -4952,6 +5221,59 @@ def assign_rigid_mesh_weights(
         arm_mod.object = armature_obj
 
 
+def setup_walker_ik_armature(
+    armature_obj: bpy.types.Object,
+    leg_type: str | None = None,
+) -> bpy.types.Object:
+    """Configures 2-bone Inverse Kinematics (IK) constraints on walker leg chains."""
+    if armature_obj is None or armature_obj.type != "ARMATURE" or leg_type not in ("biped", "quad"):
+        return armature_obj
+
+    prev_active = bpy.context.view_layer.objects.active
+    bpy.context.view_layer.objects.active = armature_obj
+    armature_obj.select_set(True)
+    bpy.ops.object.mode_set(mode="POSE")
+    pb = armature_obj.pose.bones
+
+    if leg_type == "biped":
+        for side in ("L", "R"):
+            shin_bone = pb.get(f"Bone_Shin_{side}")
+            target_bone = f"IK_Target_Foot_{side}"
+            pole_bone = f"IK_Pole_Knee_{side}"
+            if shin_bone and target_bone in pb:
+                ik_con = next((c for c in shin_bone.constraints if c.type == "IK"), None)
+                if not ik_con:
+                    ik_con = shin_bone.constraints.new(type="IK")
+                ik_con.target = armature_obj
+                ik_con.subtarget = target_bone
+                if pole_bone in pb:
+                    ik_con.pole_target = armature_obj
+                    ik_con.pole_subtarget = pole_bone
+                    ik_con.pole_angle = math.radians(-90.0 if side == "L" else 90.0)
+                ik_con.chain_count = 2
+    elif leg_type == "quad":
+        for tag in ("FL", "FR", "RL", "RR"):
+            shin_bone = pb.get(f"Bone_Shin_{tag}")
+            target_bone = f"IK_Target_Foot_{tag}"
+            pole_bone = f"IK_Pole_Knee_{tag}"
+            if shin_bone and target_bone in pb:
+                ik_con = next((c for c in shin_bone.constraints if c.type == "IK"), None)
+                if not ik_con:
+                    ik_con = shin_bone.constraints.new(type="IK")
+                ik_con.target = armature_obj
+                ik_con.subtarget = target_bone
+                if pole_bone in pb:
+                    ik_con.pole_target = armature_obj
+                    ik_con.pole_subtarget = pole_bone
+                    ik_con.pole_angle = math.radians(-90.0 if "L" in tag else 90.0)
+                ik_con.chain_count = 2
+
+    bpy.ops.object.mode_set(mode="OBJECT")
+    if prev_active and prev_active.name in bpy.data.objects:
+        bpy.context.view_layer.objects.active = prev_active
+    return armature_obj
+
+
 def generate_procedural_armature(
     objects: Sequence[bpy.types.Object],
     prefix: str,
@@ -4969,6 +5291,7 @@ def generate_procedural_armature(
     quad_hips: Dict[str, Vector | Tuple[float, float, float]] | None = None,
     quad_knees: Dict[str, Vector | Tuple[float, float, float]] | None = None,
     quad_feet: Dict[str, Vector | Tuple[float, float, float]] | None = None,
+    with_ik: bool = False,
 ) -> bpy.types.Object:
     """Creates a kinematic vehicle or articulated mech armature and binds mesh components to rigid bones."""
     tc = Vector(turret_center) if turret_center is not None else Vector((0.0, 0.05, 1.15))
@@ -5023,6 +5346,19 @@ def generate_procedural_armature(
             b_foot.tail = Vector((foot_v.x, foot_v.y + 0.22, 0.0))
             b_foot.parent = b_shin
 
+            if with_ik:
+                b_ik_target = eb.new(f"IK_Target_Foot_{side}")
+                b_ik_target.head = Vector((foot_v.x, foot_v.y, max(0.04, foot_v.z)))
+                b_ik_target.tail = Vector((foot_v.x, foot_v.y + 0.24, max(0.04, foot_v.z)))
+                b_ik_target.parent = b_root
+                b_ik_target.use_deform = False
+
+                b_ik_pole = eb.new(f"IK_Pole_Knee_{side}")
+                b_ik_pole.head = knee_v + Vector((0.0, 0.45, 0.0))
+                b_ik_pole.tail = knee_v + Vector((0.0, 0.60, 0.0))
+                b_ik_pole.parent = b_root
+                b_ik_pole.use_deform = False
+
         turret_parent = b_pelvis
 
     elif leg_type == "quad":
@@ -5058,6 +5394,20 @@ def generate_procedural_armature(
             b_foot.head = Vector((f_v.x, f_v.y, f_v.z + 0.12))
             b_foot.tail = f_v
             b_foot.parent = b_shin
+
+            if with_ik:
+                b_ik_target = eb.new(f"IK_Target_Foot_{tag}")
+                b_ik_target.head = Vector((f_v.x, f_v.y, max(0.04, f_v.z)))
+                b_ik_target.tail = Vector((f_v.x, f_v.y + 0.22, max(0.04, f_v.z)))
+                b_ik_target.parent = b_root
+                b_ik_target.use_deform = False
+
+                b_ik_pole = eb.new(f"IK_Pole_Knee_{tag}")
+                pole_offset_y = 0.45 if "F" in tag else -0.45
+                b_ik_pole.head = k_v + Vector((0.0, pole_offset_y, 0.0))
+                b_ik_pole.tail = k_v + Vector((0.0, pole_offset_y * 1.3, 0.0))
+                b_ik_pole.parent = b_root
+                b_ik_pole.use_deform = False
 
         turret_parent = b_hull
 
@@ -5097,6 +5447,9 @@ def generate_procedural_armature(
 
     # Bind meshes to armature with rigid vertex groups
     assign_rigid_mesh_weights(objects, prefix, armature_obj, leg_type=leg_type)
+
+    if with_ik:
+        setup_walker_ik_armature(armature_obj, leg_type=leg_type)
 
     return armature_obj
 
@@ -6245,6 +6598,9 @@ class RogueVehicleBuilder:
         self.quad_knees: dict[str, Vector] = {}
         self.engine_audio_loc: Vector | None = None
         self.weapon_audio_loc: Vector | None = None
+        self.with_ik: bool = False
+        self.track_sag: float = 0.0
+        self.armor_plating: bool = False
 
     def set_archetype(self, archetype: str) -> "RogueVehicleBuilder":
         self.archetype = archetype
@@ -6361,10 +6717,12 @@ class RogueVehicleBuilder:
     def add_armature_rig(
         self,
         with_animations: bool = True,
+        with_ik: bool = False,
         target_objects: Sequence[bpy.types.Object] | None = None,
     ) -> "RogueVehicleBuilder":
         """Creates a kinematic vehicle armature and binds mesh components to rigid bones."""
         objs = target_objects if target_objects is not None else self.objects
+        effective_ik = with_ik or getattr(self, "with_ik", False)
         self.armature_object = generate_procedural_armature(
             objs,
             prefix=self.name,
@@ -6382,6 +6740,7 @@ class RogueVehicleBuilder:
             quad_hips=getattr(self, "quad_hips", None),
             quad_knees=getattr(self, "quad_knees", None),
             quad_feet=getattr(self, "quad_feet", None),
+            with_ik=effective_ik,
         )
         if with_animations:
             self.action_clips = generate_procedural_action_clips(
@@ -6508,9 +6867,11 @@ class RogueVehicleBuilder:
         belt_width: float = 0.34,
         roadwheels: int = 5,
         with_skirts: bool = True,
+        track_sag: float = 0.0,
     ) -> "RogueVehicleBuilder":
         half_w = self.hull_width * 0.5
         track_x = half_w * 0.90
+        eff_sag = track_sag if track_sag > 0.0 else getattr(self, "track_sag", 0.0)
         for side in (-1, 1):
             tracks = make_continuous_track_assembly(
                 f"{self.name}Treads",
@@ -6525,6 +6886,7 @@ class RogueVehicleBuilder:
                 skirt_mat=self.palette.primary_armor if with_skirts else None,
                 accent_mat=self.palette.warning,
                 ground_z=self.ground_clearance,
+                track_sag=eff_sag,
             )
             self.objects.extend(tracks)
         return self
@@ -6820,6 +7182,22 @@ class RogueVehicleBuilder:
         self.objects.extend(tiles)
         return self
 
+    def add_armor_plating(
+        self,
+        thickness: float = 0.035,
+        inset_depth: float = 0.045,
+    ) -> "RogueVehicleBuilder":
+        """Applies procedural BMesh armor plating with recessed gutters to hull and turret armor meshes."""
+        self.armor_plating = True
+        target_armor_objs = [
+            obj for obj in self.objects
+            if obj.type == "MESH" and any(k in obj.name for k in ("Hull", "Turret", "Torso", "Armor", "Chassis", "Glacis"))
+            and not obj.name.endswith(("_COLLIDER", "_ShieldBubble", "_TrackPod", "_Damper", "_Piston"))
+        ]
+        for obj in target_armor_objs:
+            apply_procedural_armor_plating(obj, thickness=thickness, inset_depth=inset_depth)
+        return self
+
     def add_dozer_blade(
         self,
         width: float = 2.4,
@@ -7059,13 +7437,68 @@ class RogueVehicleBuilder:
         self.preserved_pivots.append(f"{self.name}DualGun_MantletBlock")
         return self
 
+    def add_beam_laser(
+        self,
+        barrel_length: float = 2.10,
+        caliber: float = 0.08,
+        elevation_deg: float = 6.0,
+    ) -> "RogueVehicleBuilder":
+        """Adds a heavy collimated beam laser assembly with magnetic accelerator rings and optical lens."""
+        gun_pivot = self.turret_center + Vector((0.0, 0.45, 0.04))
+        elev_rad = math.radians(elevation_deg)
+        gun_dir = Vector((0.0, math.cos(elev_rad), math.sin(elev_rad))).normalized()
+        self.gun_pivot = gun_pivot + gun_dir * (barrel_length + 0.24)
+        self.gun_dir = gun_dir
+        laser = make_collimated_beam_laser_assembly(
+            f"{self.name}Laser",
+            gun_pivot=gun_pivot,
+            direction=gun_dir,
+            barrel_length=barrel_length,
+            caliber_radius=caliber,
+            housing_mat=self.palette.primary_armor,
+            gunmetal_mat=self.palette.gunmetal,
+            lens_mat=self.palette.emissive,
+            accent_mat=self.palette.warning,
+        )
+        self.objects.extend(laser)
+        self.preserved_pivots.append(f"{self.name}Laser_LaserGenerator")
+        return self
+
+    def add_vls_missile_array(
+        self,
+        rows: int = 2,
+        cols: int = 4,
+        size: Tuple[float, float, float] = (0.95, 1.35, 0.38),
+    ) -> "RogueVehicleBuilder":
+        """Adds an armored Vertical Launch System (VLS) missile cell matrix."""
+        silo_loc = self.turret_center + Vector((0.0, -0.05, 0.12))
+        self.gun_pivot = silo_loc + Vector((0.0, 0.25, size[2] * 0.5 + 0.15))
+        self.gun_dir = Vector((0.0, 0.35, 0.94)).normalized()
+        vls = make_vls_vertical_missile_array(
+            f"{self.name}VLS",
+            location=silo_loc,
+            size=size,
+            rows=rows,
+            cols=cols,
+            armor_mat=self.palette.primary_armor,
+            cavity_mat=self.palette.gunmetal,
+            hatch_mat=self.palette.light_armor,
+            missile_mat=self.palette.warning,
+            accent_mat=self.palette.warning,
+        )
+        self.objects.extend(vls)
+        self.preserved_pivots.append(f"{self.name}VLS_SiloDeck")
+        return self
+
     def add_quad_track_pods(
         self,
         pod_length: float = 1.55,
         pod_height: float = 0.56,
         track_spacing_x: float = 2.4,
         pod_spacing_y: float = 1.9,
+        track_sag: float = 0.0,
     ) -> "RogueVehicleBuilder":
+        eff_sag = track_sag if track_sag > 0.0 else getattr(self, "track_sag", 0.0)
         for sx in (-1, 1):
             for sy in (-1, 1):
                 tag = f"{'L' if sx < 0 else 'R'}_{'F' if sy > 0 else 'R'}"
@@ -7085,6 +7518,7 @@ class RogueVehicleBuilder:
                     accent_mat=self.palette.warning,
                     ground_z=self.ground_clearance,
                     inboard_side=-sx,
+                    track_sag=eff_sag,
                 )
                 self.objects.extend(pod)
         return self
@@ -7437,6 +7871,7 @@ class RogueVehicleBuilder:
         include_vfx_thruster: bool = False,
         include_shield_bubble: bool = False,
         include_rig: bool = False,
+        include_ik: bool = False,
         include_animations: bool = False,
         bake_atlas: bool = False,
         atlas_resolution: int = 1024,
@@ -7557,7 +7992,7 @@ class RogueVehicleBuilder:
 
         # 8b. Kinematic Armature Rigging & Rigid Vertex Weights (assigned before material batching)
         if include_rig:
-            self.add_armature_rig(with_animations=include_animations, target_objects=model_export_source_objects)
+            self.add_armature_rig(with_animations=include_animations, with_ik=include_ik, target_objects=model_export_source_objects)
 
         # 9. Material batching for FBX with smart angle-weighted smoothing
         batched_objects = batch_and_join_by_material(

@@ -97,7 +97,7 @@ Vehicles adhere to a disciplined 5-tone structural palette designed for maximum 
 
 ---
 
-## 4. Master Roster: The 19 Tactical Archetypes & 9 Weapons
+## 4. Master Roster: The 19 Tactical Archetypes & 11 Weapons
 
 | Archetype | Native Template | Proportions (W × L × H) | Stance / Mobility | Default Weapon | Rig Architecture | Signature Visual Features |
 |---|---|---|---|---|---|---|
@@ -121,7 +121,7 @@ Vehicles adhere to a disciplined 5-tone structural palette designed for maximum 
 | `hover_cruiser`| `PCXBaseTank` | 3.2m × 4.6m × 1.8m | Hydrodynamic skimmer | `railgun` | Standard Rig (6 bones) | Sloped bow prow (4.6m), flank repulsors, conning tower, railgun |
 | `heavy_dropship`| `PCXBaseTank` | 4.8m × 5.2m × 2.2m | High-wing VTOL transport | `missile` | Standard Rig (6 bones) | Cargo fuselage (3.8m), rear ramp, ducted tilt-rotors, missile pods |
 
-### The 9 Procedural Weapon Assemblies
+### The 11 Procedural Weapon Assemblies
 1. `cannon` (`make_coaxial_cannon_assembly`): Tank gun with breech collar, thermal sleeve, bore evacuator, and muzzle brake.
 2. `dual_cannon` (`make_dual_cannon_assembly`): Synchronized twin-cannon mantlet with dual rifled barrels.
 3. `howitzer` (`make_heavy_howitzer_assembly`): Large-bore siege mortar with recoil recuperators and elevation sector gear.
@@ -131,6 +131,8 @@ Vehicles adhere to a disciplined 5-tone structural palette designed for maximum 
 7. `railgun` (`make_railgun_assembly`): Dual parallel electromagnetic kinetic rails with capacitor bank and accelerator core.
 8. `quad_flak` (`make_quad_flak_autocannon_assembly`): High-cadence 2×2 autocannon cluster with flash hiders and ammo boxes.
 9. `plasma_mortar` (`make_plasma_mortar_assembly`): Heavy siege mortar with 3 toroidal accelerator rings and radiator coils.
+10. `laser_beam` (`make_collimated_beam_laser_assembly`): High-intensity directed-energy emitter with focal ring, collimator shroud, cooling radiator fins, and power conduits.
+11. `vls_missiles` (`make_vls_vertical_missile_array`): Armored vertical launch system missile cell silo array with recessed cells, beveled lip, and exhaust duct trenching.
 
 ---
 
@@ -152,16 +154,23 @@ turret_parts = rmk.make_faceted_turret_housing(
     prefix="Vehicle_Turret", location=(0.0, 0.10, 1.15),
     size=(1.45, 1.65, 0.42), armor_mat=armor_primary, roof_mat=armor_light, bevel=0.035
 )
+
+# Procedural BMesh faceted armor panels with individual face insets and chamfers
+rmk.apply_procedural_armor_plating(hull, thickness=0.035, inset_depth=0.04, bevel_width=0.015)
 ```
 
 ### Mobility & Locomotion Assemblies
-- `make_continuous_track_assembly`: Dual track units with drive sprockets, return idlers, road wheels, and track cleats.
-- `make_quad_track_pod_assembly`: Self-contained continuous track pods for super-heavy 4-track crawlers.
+- `make_continuous_track_assembly`: Dual track units with drive sprockets, return idlers, road wheels, track cleats, and parametric catenary sag (`track_sag`).
+- `make_quad_track_pod_assembly`: Self-contained continuous track pods with catenary sag for super-heavy 4-track crawlers.
 - `make_all_terrain_wheel_assembly`: Deep-lug tactical tire, rim dish, planetary gear hub, and coilover shock absorber.
 - `make_bipedal_digitigrade_leg`: Articulated 3-segment biped walker leg (hip actuator, hydraulic thigh, knee knuckle, shin strut, 3-toed ground pad).
 - `make_quad_crawler_leg`: Outrigger spider leg with horizontal hip traverse, femur piston, tibia ram, and swivel footpad.
 - `make_hover_skimmer_assembly`: Ventral repulsor cushion bells, lateral air-intake strakes, and vectoring exhaust nozzles.
 - `make_ducted_tiltrotor_assembly`: Swiveling ducted fan pod with aerodynamic shroud cowl, multi-blade rotor, and spinner cone.
+
+### Rigging & Kinematics Assemblies
+- `generate_procedural_armature`: Skeletal armatures for bipeds, quadrupeds, and tracked vehicles with optional IK control rig (`with_ik=True`).
+- `setup_walker_ik_armature`: Automated 2-bone IK solver constraints on `Bone_Shin_*` targeting non-deforming `IK_Target_Foot_*` and `IK_Pole_Knee_*` control bones.
 
 ### Micro-Detail & Accent Assemblies
 - `make_whip_antenna`: Armored mounting bracket, 3-tier helical spring coils, and angled mast with high-visibility tip.
@@ -355,9 +364,9 @@ Verified against `Assembly-CSharp.dll` (SHA-256 `d2da384df3318e7ac52db58eb13699e
 
 ---
 
-## 13. The 14 CLI Presets Table
+## 13. The 16 CLI Presets Table
 
-`tools/generate_unit_model.py` exposes 14 pre-calibrated presets:
+`tools/generate_unit_model.py` exposes 16 pre-calibrated presets:
 
 | Preset Name | Archetype | Default Weapon | Faction | Key Active Subsystems |
 |---|---|---|---|---|
@@ -371,10 +380,12 @@ Verified against `Assembly-CSharp.dll` (SHA-256 `d2da384df3318e7ac52db58eb13699e
 | `behemoth_crawler`| `super_heavy`| `dual_cannon` | `siege` | 4 track pods, massive slab citadel |
 | `flak_carrier` | `flak_anti_air`| `quad_flak` | `arctic` | High-elevation 2x2 flak, radar |
 | `resource_behemoth`| `combat_harvester`| `gatling` | `siege` | Dozer blade, sponsons, excavator drum |
-| `colossus_titan` | `colossus_titan` | `dual_cannon` | `vanguard`| Heavy biped legs, radar, antenna, smoke |
+| `colossus_titan` | `colossus_titan` | `dual_cannon` | `vanguard`| Heavy biped legs, IK rig, radar, antenna, smoke |
 | `sea_lance` | `hover_cruiser` | `railgun` | `syndicate`| Flank repulsors, sponsons, radar |
 | `sky_dreadnought`| `heavy_dropship`| `missile` | `siege` | Heavy VTOL wings, tilt-rotors, sponsons |
 | `orbital_defense`| `orbital_silo` (structure) | `railgun` | `vanguard`| Launch pit, gantry tower, blast doors |
+| `beam_destroyer` | `tank` | `laser_beam` | `syndicate`| Collimated beam laser, radiator fins, sensor visor, sloped glacis |
+| `vls_missile_cruiser`| `hover_cruiser`| `vls_missiles` | `siege` | Vertical launch missile array, conning tower, flank repulsors |
 
 ---
 
@@ -458,6 +469,11 @@ Execute via Blender 4.5.14 LTS background mode:
   ```powershell
   .tools\Blender-4.5.14\blender-4.5.14-windows-x64\blender.exe --background --python tools/generate_unit_model.py -- `
     --archetype tank --name HeavyBattleTank --target-budget 4500 --report-json artifacts/diagnostics/tank.json
+  ```
+- **Advanced Catenary Sag, Armor Plating & IK Rigging**:
+  ```powershell
+  .tools\Blender-4.5.14\blender-4.5.14-windows-x64\blender.exe --background --python tools/generate_unit_model.py -- `
+    --preset beam_destroyer --name HeavyBeamDestroyer --track-sag --armor-plating --lods --colliders
   ```
 - **PBR Texture Atlas Baking & Single-Material Export**:
   ```powershell
