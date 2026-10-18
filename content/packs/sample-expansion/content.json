@@ -15,12 +15,17 @@
       "balanceAssetName": "ScoutTankBalance",
       "prefabAssetName": "ScoutTank",
       "cardImageAssetName": "ScoutTankCard",
+      "balanceOverrides": [
+        { "name": "rarity", "value": "Common" },
+        { "name": "neededExperienceLevel", "value": "0" }
+      ],
       "productionBuilding": {
         "id": "sample:scout-tank-factory",
         "nativeTemplateId": "PCXBaseTankFactory",
         "balanceOverrides": [
           { "name": "maxCapacity", "value": "3" },
-          { "name": "neededExperienceLevel", "value": "0" }
+          { "name": "neededExperienceLevel", "value": "0" },
+          { "name": "rarity", "value": "Common" }
         ],
         "localizations": [
           { "language": "en-US", "name": "Scout Tank Assembly Plant", "description": "Produces Scout Tanks." },

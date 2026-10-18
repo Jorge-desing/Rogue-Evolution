@@ -297,9 +297,13 @@ namespace RogueCommandExpansionLoader.Content
             Type levelMapType = FindUniqueType("LevelMap");
             _gameBalancingAssetField = FindField(gameBalancingStoreType,
                 "_gameBalancingScriptableObject", StaticFields);
-            _gameAtLeastOneBlueprintAddedByPlayerField = RequireField(
-                gameType, "AtLeastOneBlueprintHasBeenAddedByPlayer", typeof(bool));
-            if (!_gameAtLeastOneBlueprintAddedByPlayerField.IsStatic)
+            // Game.AtLeastOneBlueprintHasBeenAddedByPlayer is a static field;
+            // RequireField defaults to instance fields for serialized data rows.
+            _gameAtLeastOneBlueprintAddedByPlayerField = FindField(
+                gameType, "AtLeastOneBlueprintHasBeenAddedByPlayer", StaticFields);
+            if (_gameAtLeastOneBlueprintAddedByPlayerField.FieldType != typeof(bool) ||
+                !_gameAtLeastOneBlueprintAddedByPlayerField.IsStatic ||
+                _gameAtLeastOneBlueprintAddedByPlayerField.IsInitOnly)
             {
                 throw new InvalidOperationException(
                     "Game.AtLeastOneBlueprintHasBeenAddedByPlayer must remain a static bool.");

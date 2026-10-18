@@ -349,6 +349,7 @@ namespace RogueCommandExpansionLoader.Content
                 ValidateBalanceOverrides(unit.balanceOverrides, itemPath + ".balanceOverrides", "unit", "unit", diagnostics);
                 ValidateProductionBuilding(unit.productionBuilding, itemPath + ".productionBuilding",
                     allIds, productionBuildingIds, registrySnapshot, diagnostics);
+                ValidateProfileCardEligibility(unit, itemPath, diagnostics);
             }
 
             for (int i = 0; i < aiProfiles.Length; i++)
@@ -918,6 +919,84 @@ namespace RogueCommandExpansionLoader.Content
                 path + ".balanceOverrides", "production-building", "production building", diagnostics);
             ValidateLocalizations(productionBuilding.localizations, path + ".localizations",
                 false, "production-building", "Production building", diagnostics);
+        }
+
+        private static void ValidateProfileCardEligibility(
+            ContentUnitDefinition unit,
+            string path,
+            List<ContentDiagnostic> diagnostics)
+        {
+            ContentProductionBuildingDefinition building = unit.productionBuilding;
+            if (building == null)
+            {
+                return;
+            }
+
+            string productLevel;
+            string buildingLevel;
+            bool hasProductLevel = TryGetBalanceOverride(
+                unit.balanceOverrides, "neededExperienceLevel", out productLevel);
+            bool hasBuildingLevel = TryGetBalanceOverride(
+                building.balanceOverrides, "neededExperienceLevel", out buildingLevel);
+            if (!hasProductLevel || !hasBuildingLevel)
+            {
+                Add(diagnostics, "unit.profile-unlock-required", path,
+                    "A unit and its production building must each declare neededExperienceLevel so both reward query paths use the profile unlock tier.");
+            }
+            else
+            {
+                int productLevelValue;
+                int buildingLevelValue;
+                bool productLevelValid = Int32.TryParse(productLevel, NumberStyles.Integer,
+                    CultureInfo.InvariantCulture, out productLevelValue);
+                bool buildingLevelValid = Int32.TryParse(buildingLevel, NumberStyles.Integer,
+                    CultureInfo.InvariantCulture, out buildingLevelValue);
+                if (productLevelValid && buildingLevelValid && productLevelValue != buildingLevelValue)
+                {
+                    Add(diagnostics, "unit.profile-unlock-mismatch",
+                        path + ".productionBuilding.balanceOverrides.neededExperienceLevel",
+                        "The production building and its unit must use the same persistent profile unlock level.");
+                }
+            }
+
+            string productRarity;
+            string buildingRarity;
+            bool hasProductRarity = TryGetBalanceOverride(unit.balanceOverrides, "rarity", out productRarity);
+            bool hasBuildingRarity = TryGetBalanceOverride(
+                building.balanceOverrides, "rarity", out buildingRarity);
+            if (!hasProductRarity || !hasBuildingRarity)
+            {
+                Add(diagnostics, "unit.card-rarity-required", path,
+                    "A unit and its production building must each declare rarity so both reward query paths use the same card tier.");
+            }
+            else if (!String.Equals(productRarity, buildingRarity, StringComparison.Ordinal))
+            {
+                Add(diagnostics, "unit.card-rarity-mismatch",
+                    path + ".productionBuilding.balanceOverrides.rarity",
+                    "The production building and its unit must use the same card rarity.");
+            }
+        }
+
+        private static bool TryGetBalanceOverride(
+            ContentBalanceOverride[] overrides,
+            string name,
+            out string value)
+        {
+            if (overrides != null)
+            {
+                for (int i = 0; i < overrides.Length; i++)
+                {
+                    ContentBalanceOverride entry = overrides[i];
+                    if (entry != null && String.Equals(entry.name, name, StringComparison.Ordinal))
+                    {
+                        value = entry.value;
+                        return true;
+                    }
+                }
+            }
+
+            value = null;
+            return false;
         }
 
         private static void ValidateNamespacedId(string id, string path, List<ContentDiagnostic> diagnostics)

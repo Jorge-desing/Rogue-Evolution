@@ -95,6 +95,9 @@ Task-specific Codex skills live under `.agents/skills/` and are versioned with t
 | `rogue-command-game-research` | REA/Unity inspection, compatibility identity, and evidence quality. |
 | `rogue-command-pack-validation` | Offline schema/harness checks, bundle builds, and install ZIP audits. |
 | `rogue-command-assetbundle-authoring` | Unity visual assets, unit model overlays, card Sprites, and bundle reopening. |
+| `rogue-command-balance-simulation` | Combat mechanics, damage formula, discrete shields, TTK, and Lanchester simulation. |
+| `rogue-command-vfx-authoring` | URP particle systems, muzzle flashes, tiered damage smoke/fire, and visual VFX sockets. |
+| `rogue-command-audio-authoring` | Mono 3D audio spatialization, weapon SFX, flocking engine audio, and audio asset validation. |
 | `rogue-command-steam-runtime-validation` | Reversible Steam-launched runtime checks and evidence boundaries. |
 
 The skills summarize this repository's verified workflows and limitations. They do not establish that any unit, stage, or AI works in-game.
@@ -496,9 +499,9 @@ Next: keep the stage-0 offer rule in mind, collect positive traces from later el
 
 ## Persistent profile card unlock progression — 2026-10-18
 
-The user clarified that card unlock levels mean persistent **profile** experience after completing or losing a stage, not the in-run stage number or map node. The stage-0 first unit selection is separately limited to vehicles or small units regardless of the selected starting node; a missing large unit in that first offer says nothing about its profile unlock.
+The user clarified that card unlock levels mean persistent **profile** experience, not the in-run stage number or map node. Static inspection shows experience is awarded when the run ends: losing a run grants XP for encounters already won and minibosses; winning the final encounter also grants the run-win bonus. Clearing an intermediate encounter advances the run but does not immediately update persistent profile XP. The stage-0 first unit selection is separately limited to vehicles or small units regardless of the selected starting node; a missing large unit in that first offer says nothing about its profile unlock.
 
-Static inspection of the pinned Rogue Command 1.0.9 build (Unity 2021.3.45f2, `Assembly-CSharp.dll` SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, MVID `db0e9462-128d-4296-9900-de18b4bd0c00`) traced the persistent level through `MetaGame.CurrentExperienceLevel` and the experience-point total. `ChooseCard.PresentCardsToChoose` passes that profile level to `BlueprintPool.BlueprintsInPool` and to rarity candidate queries. The pool applies `EntityBalancingStore.NeededExperienceLevel` to product candidates. Some candidate paths inspect the factory row, so each added product and its production building must carry matching `neededExperienceLevel` and `rarity` values. The reward draw remains randomized; eligibility at the required profile level does not promise a card in a particular offer.
+Static inspection of the pinned Rogue Command 1.0.9 build (Unity 2021.3.45f2, `Assembly-CSharp.dll` SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, MVID `db0e9462-128d-4296-9900-de18b4bd0c00`) traced the persistent level through `MetaGame.CurrentExperienceLevel` and the experience-point total. `ChooseCard.PresentCardsToChoose` passes that profile level to `BlueprintPool.BlueprintsInPool` and to rarity candidate queries. The pool applies `EntityBalancingStore.NeededExperienceLevel` to product candidates. Some candidate paths inspect the factory row, so each added product and its production building must explicitly declare matching `neededExperienceLevel` and `rarity`; the package validator now rejects missing or mismatched pairs before registration. The reward draw remains randomized; eligibility at the required profile level does not promise a card in a particular offer.
 
 The active `sample-native-expansion` card tiers are:
 
@@ -547,3 +550,16 @@ The skill integrates with native URP and game hooks discovered via REA:
 
 **Local validation:** `fc.exe /b` verified 100% byte-for-byte twin parity between `tools/validate_vfx_assets.py` and `.agents/skills/rogue-command-vfx-authoring/scripts/validate_vfx_assets.py`. All 131/132 loader validation tests pass.
 
+## Audio authoring and 3D spatialization skill — 2026-10-18
+
+Created `.agents/skills/rogue-command-audio-authoring/` and validator CLI `tools/validate_audio_assets.py` (mirrored byte-identically in `scripts/validate_audio_assets.py`).
+
+The skill integrates with native Rogue Command 1.0.9 audio systems and spatialization discovered via REA:
+- **Mono Channel Invariant for 3D Positional Audio**: Unity disables 3D spatialization and attenuation for stereo (2-channel) clips, causing them to play flat and unattenuated across the map. Verified against native assets: 100% of the 436 in-game audio clips in `resources.assets` and `sharedassets1.assets` are Mono (1-channel). Stereo is strictly reserved for 2D UI and non-diegetic music.
+- **Native Weapon SFX Pitch Jitter (`ShootProjectile`)**: When firing, `ShootProjectile.PlayShotSound()` automatically randomizes pitch `shotSoundAudioSource.pitch = 1f + Random.Range(-0.05f, 0.05f)` (+/- 5%) before playing. Mod authors wire an `AudioSource` to `shotSoundAudioSource` without custom code.
+- **Native Movement SFX Pitch Jitter (`EntityFlockingMovement`)**: `EntityFlockingMovement._movementSoundAudioSource` executes `PlayMovementSound()` with `pitch = 1f + Random.Range(-0.04f, 0.04f)` (+/- 4%) when moving and `StopMovementSound()` when idling.
+- **RTS 3D Audio Spatialization Parameters**: Enforces `spatialBlend = 1.0`, `rolloffMode = Logarithmic`, `minDistance = 3.0m`, `maxDistance = 60.0m`, and `dopplerLevel = 0.0` (eliminating jarring acoustic pitch warbles during high-speed RTS camera pans).
+- **ParticleSoundPlayer & SelectionSoundPlayer**: Leverages native sound players for particle-triggered audio bursts and dual-source (`sourceA`/`sourceB`) crossfading unit selection lines.
+- **Reflection Guard Fix**: `ContentPackRuntimeLoader.cs` was updated to resolve `Game.AtLeastOneBlueprintHasBeenAddedByPlayer` via `FindField(..., StaticFields)` and enforce static bool constraints, avoiding reflection mismatch since `RequireField` defaults to instance fields.
+
+**Local validation:** `fc.exe /b` verified 100% byte-for-byte twin parity between `tools/validate_audio_assets.py` and `.agents/skills/rogue-command-audio-authoring/scripts/validate_audio_assets.py`. All 131/132 loader validation tests pass.

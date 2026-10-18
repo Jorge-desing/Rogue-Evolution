@@ -26,9 +26,9 @@ All sample IDs above use `sample-native:`. The Sandlance factory explicitly perm
 
 ## Profile-level card unlocks
 
-`neededExperienceLevel` is compared with the persistent profile's experience level, which rises from profile XP when a stage is completed or lost. It is unrelated to the current in-run stage number or the selected map node. A card becomes eligible once the profile meets its threshold, but the roguelike reward draw remains random. The first selection at stage 0 is limited to vehicles or small units regardless of starting map node, so that offer is not a complete test of later unlock tiers.
+`neededExperienceLevel` is compared with the persistent profile's experience level, which rises when a run ends. A defeat grants profile XP for encounters already won and minibosses; winning the final encounter also adds the full-run victory bonus. Finishing an intermediate stage advances the run but does not immediately update profile XP. The profile level is unrelated to the current in-run stage number or selected map node. A card becomes eligible once the profile meets its threshold, but the roguelike reward draw remains random. The first selection at stage 0 is limited to vehicles or small units regardless of starting map node, so that offer is not a complete test of later unlock tiers.
 
-The product and its factory carry the same `neededExperienceLevel` and `rarity`. The static game path queries the product's level when building a pool, while some reward candidate paths inspect the factory row; keeping both values aligned avoids mismatched unlock behavior.
+The product and its factory must both explicitly declare the same `neededExperienceLevel` and `rarity`. The package validator rejects missing or mismatched values before registration. The static game path queries the product's level when building a pool, while some reward candidate paths inspect the factory row; keeping both values aligned avoids mismatched unlock behavior.
 
 | Profile level | Card | Rarity | Card cost | Durability | Attack and card ability |
 |---:|---|---|---:|---|---|

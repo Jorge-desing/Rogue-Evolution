@@ -1,0 +1,3 @@
+interface:
+  display_name: "Rogue Command Audio Authoring"
+  short_description: "Author, calibrate, and validate 3D spatial SFX, weapon audio, engine loops, and AudioSources for Rogue Command"

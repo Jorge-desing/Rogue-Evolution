@@ -973,6 +973,30 @@ var tests = new (string Name, Action Run)[]
                 "production-building.balance-override-invalid");
         });
     }),
+    ("unit and production building require matching profile unlock level and rarity", () =>
+    {
+        WithPackage(nativeSample, (pack, root) =>
+        {
+            pack.units[0].balanceOverrides.Single(entry => entry.name == "neededExperienceLevel").value = "1";
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "unit.profile-unlock-mismatch");
+        });
+        WithPackage(nativeSample, (pack, root) =>
+        {
+            pack.units[0].productionBuilding.balanceOverrides
+                .Single(entry => entry.name == "rarity").value = "Rare";
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "unit.card-rarity-mismatch");
+        });
+        WithPackage(sample, (pack, root) =>
+        {
+            pack.units[0].balanceOverrides = [];
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "unit.profile-unlock-required");
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "unit.card-rarity-required");
+        });
+    }),
     ("production building deep clones preserve independent balance and localization", () =>
     {
         ContentPackDefinition copy = ContentPackCopy.DeepClone(nativeSample);
@@ -1454,7 +1478,9 @@ var tests = new (string Name, Action Run)[]
             pack.units[0].balanceOverrides =
             [
                 new ContentBalanceOverride { name = "cost", value = "70" },
-                new ContentBalanceOverride { name = "moveSpeed", value = "1.1" }
+                new ContentBalanceOverride { name = "moveSpeed", value = "1.1" },
+                new ContentBalanceOverride { name = "neededExperienceLevel", value = "0" },
+                new ContentBalanceOverride { name = "rarity", value = "Common" }
             ];
             ExpectValid(pack, root, new EmptySnapshot(), new KnownModuleValidator());
         });
@@ -1615,7 +1641,12 @@ var tests = new (string Name, Action Run)[]
             unit.visualAssetName = null;
             unit.visualRootPath = null;
             unit.nativeTemplateId = "PCXBaseTank";
-            unit.balanceOverrides = [new ContentBalanceOverride { name = "cost", value = "70" }];
+            unit.balanceOverrides =
+            [
+                new ContentBalanceOverride { name = "cost", value = "70" },
+                new ContentBalanceOverride { name = "neededExperienceLevel", value = "0" },
+                new ContentBalanceOverride { name = "rarity", value = "Common" }
+            ];
 
             ContentStageDefinition stage = pack.stages[0];
             stage.assetBundleId = null;
@@ -3594,13 +3625,20 @@ var tests = new (string Name, Action Run)[]
         {
             pack.units[0].balanceOverrides =
             [
-                new ContentBalanceOverride { name = "rarity", value = "Rare" }
+                new ContentBalanceOverride { name = "rarity", value = "Rare" },
+                new ContentBalanceOverride { name = "neededExperienceLevel", value = "0" }
+            ];
+            pack.units[0].productionBuilding.balanceOverrides =
+            [
+                new ContentBalanceOverride { name = "rarity", value = "Rare" },
+                new ContentBalanceOverride { name = "neededExperienceLevel", value = "0" }
             ];
             ExpectValid(pack, root, new EmptySnapshot(), new KnownModuleValidator());
 
             pack.units[0].balanceOverrides =
             [
-                new ContentBalanceOverride { name = "rarity", value = "Mythic" }
+                new ContentBalanceOverride { name = "rarity", value = "Mythic" },
+                new ContentBalanceOverride { name = "neededExperienceLevel", value = "0" }
             ];
             ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
                 "unit.balance-override-invalid");
@@ -3687,20 +3725,26 @@ var tests = new (string Name, Action Run)[]
             pack.units[0].balanceOverrides =
             [
                 new ContentBalanceOverride { name = "attackType", value = "Single" },
-                new ContentBalanceOverride { name = "skillType", value = "LocationAoE" }
+                new ContentBalanceOverride { name = "skillType", value = "LocationAoE" },
+                new ContentBalanceOverride { name = "neededExperienceLevel", value = "0" },
+                new ContentBalanceOverride { name = "rarity", value = "Common" }
             ];
             ExpectValid(pack, root, new EmptySnapshot(), new KnownModuleValidator());
 
             pack.units[0].balanceOverrides =
             [
-                new ContentBalanceOverride { name = "attackType", value = "Nuclear" }
+                new ContentBalanceOverride { name = "attackType", value = "Nuclear" },
+                new ContentBalanceOverride { name = "neededExperienceLevel", value = "0" },
+                new ContentBalanceOverride { name = "rarity", value = "Common" }
             ];
             ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
                 "unit.balance-override-invalid");
 
             pack.units[0].balanceOverrides =
             [
-                new ContentBalanceOverride { name = "skillType", value = "InvalidSkill" }
+                new ContentBalanceOverride { name = "skillType", value = "InvalidSkill" },
+                new ContentBalanceOverride { name = "neededExperienceLevel", value = "0" },
+                new ContentBalanceOverride { name = "rarity", value = "Common" }
             ];
             ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
                 "unit.balance-override-invalid");

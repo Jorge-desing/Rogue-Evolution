@@ -136,7 +136,7 @@ Landscape `localizations` use the same supported language IDs and require an `en
 
 ## Profile-level card unlocks
 
-`neededExperienceLevel` on a unit is the minimum persistent profile experience level required before its card can enter reward candidates. This is the profile level advanced by profile experience when a stage is completed or lost; it is not the current stage index, map node, or run progression counter. Set the same `neededExperienceLevel` and `rarity` on the unit's `productionBuilding`: some candidate queries filter the factory row, while native stage pools validate the associated product row.
+`neededExperienceLevel` on a unit is the minimum persistent profile experience level required before its card can enter reward candidates. The game adds persistent profile experience when the run ends: losing a run awards experience from previously won encounters and minibosses, while a full victory also adds the run-win bonus. Clearing an intermediate stage advances the run but does not immediately change persistent profile experience. The profile level is not the current stage index, map node, or run progression counter. The package validator requires the unit and its `productionBuilding` to each declare the same `neededExperienceLevel` and `rarity`; some reward paths inspect the factory row, while stage pools validate the associated product row.
 
 An unlock makes the card eligible for randomized offers once the profile reaches its threshold. It does not guarantee that the card appears in the next offer. In particular, the first selection at stage 0 is constrained to vehicles or small units regardless of the chosen starting map node; validate later offers against their actual pool and the profile's current level.
 
