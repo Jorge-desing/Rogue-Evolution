@@ -52,8 +52,10 @@ namespace RogueCommandExpansionLoader.Modules
             private readonly float _intervalSeconds;
             private readonly int _maximumSuccessfulBuilds;
             private readonly int _maximumAttempts;
+            private readonly HashSet<EntityController> _createdBuildings = new HashSet<EntityController>();
 
             private string _entityId;
+            private int _deckMaxLiving;
             private float _nextAttemptAt;
             private int _successfulBuilds;
             private int _attempts;
@@ -119,6 +121,32 @@ namespace RogueCommandExpansionLoader.Modules
                 _nextAttemptAt = now + _intervalSeconds;
                 _attempts++;
 
+                if (!TryRefreshDeckMaxLiving())
+                {
+                    return;
+                }
+
+                int livingFactories;
+                string countDiagnostic;
+                if (!TryCountLivingFactories(out livingFactories, out countDiagnostic))
+                {
+                    Stop("could not verify the active AI factory count: " + countDiagnostic);
+                    return;
+                }
+
+                if (!ScheduledBaseBuildLimitPolicy.HasRemainingCapacity(livingFactories, _deckMaxLiving))
+                {
+                    Debug.LogWarning("[RogueCommandExpansionLoader] AI build attempt " + _attempts + "/" +
+                        _maximumAttempts + " for '" + _entityId + "' skipped because base " + _baseIndex +
+                        " already has " + livingFactories + " living factories (deck maxLiving " +
+                        _deckMaxLiving + ").");
+                    if (_attempts >= _maximumAttempts)
+                    {
+                        Stop("the configured attempt limit was reached.");
+                    }
+                    return;
+                }
+
                 EntityController created = null;
                 try
                 {
@@ -134,6 +162,7 @@ namespace RogueCommandExpansionLoader.Modules
                 if (created != null)
                 {
                     _successfulBuilds++;
+                    _createdBuildings.Add(created);
                     Debug.Log("[RogueCommandExpansionLoader] AI built '" + _entityId + "' at base " + _baseIndex +
                         " (" + _successfulBuilds + "/" + _maximumSuccessfulBuilds + ").");
                 }
@@ -155,38 +184,142 @@ namespace RogueCommandExpansionLoader.Modules
 
             public void OnDestroyed()
             {
+                _createdBuildings.Clear();
             }
 
             private bool TryResolveBuildOrder()
             {
-                List<EntityInAiDeck> constructableEntities = DefaultAiBehaviour.ConstructableEntities_Static();
-                if (constructableEntities == null || constructableEntities.Count == 0)
+                try
                 {
-                    Stop("the active AI has no constructable entities in its deck.");
-                    return false;
-                }
-
-                for (int i = 0; i < constructableEntities.Count; i++)
-                {
-                    EntityInAiDeck candidate = constructableEntities[i];
-                    string candidateId = candidate.entityId;
-                    if (String.IsNullOrWhiteSpace(candidateId) ||
-                        (_requestedEntityId != null && !String.Equals(candidateId, _requestedEntityId, StringComparison.Ordinal)) ||
-                        !EntityBalancingStore.IsBuilding(candidateId))
+                    List<EntityInAiDeck> constructableEntities = DefaultAiBehaviour.ConstructableEntities_Static();
+                    if (constructableEntities == null || constructableEntities.Count == 0)
                     {
-                        continue;
+                        Stop("the active AI has no constructable entities in its deck.");
+                        return false;
                     }
 
-                    _entityId = candidateId;
-                    _resolved = true;
-                    Debug.Log("[RogueCommandExpansionLoader] Scheduled base-build AI selected '" + _entityId + "'.");
+                    for (int i = 0; i < constructableEntities.Count; i++)
+                    {
+                        EntityInAiDeck candidate = constructableEntities[i];
+                        string candidateId = candidate.entityId;
+                        if (String.IsNullOrWhiteSpace(candidateId) ||
+                            (_requestedEntityId != null && !String.Equals(candidateId, _requestedEntityId, StringComparison.Ordinal)) ||
+                            !EntityBalancingStore.IsBuilding(candidateId))
+                        {
+                            continue;
+                        }
+
+                        _entityId = candidateId;
+                        _deckMaxLiving = candidate.MaxLiving;
+                        if (_deckMaxLiving < 1)
+                        {
+                            Stop("the requested building '" + _entityId + "' has no living capacity in the active AI deck.");
+                            return false;
+                        }
+
+                        _resolved = true;
+                        Debug.Log("[RogueCommandExpansionLoader] Scheduled base-build AI selected '" + _entityId + "'.");
+                        return true;
+                    }
+
+                    Stop(_requestedEntityId == null
+                        ? "the active AI deck contains no building that can be placed by the native helper."
+                        : "the requested entity '" + _requestedEntityId + "' is not a building in the active AI deck.");
+                    return false;
+                }
+                catch (Exception exception)
+                {
+                    Stop("could not resolve a building from the active AI deck: " +
+                        exception.GetBaseException().Message);
+                    return false;
+                }
+            }
+
+            private bool TryRefreshDeckMaxLiving()
+            {
+                try
+                {
+                    List<EntityInAiDeck> constructableEntities = DefaultAiBehaviour.ConstructableEntities_Static();
+                    if (constructableEntities != null)
+                    {
+                        for (int i = 0; i < constructableEntities.Count; i++)
+                        {
+                            EntityInAiDeck candidate = constructableEntities[i];
+                            if (!String.Equals(candidate.entityId, _entityId, StringComparison.Ordinal) ||
+                                !EntityBalancingStore.IsBuilding(candidate.entityId))
+                            {
+                                continue;
+                            }
+
+                            _deckMaxLiving = candidate.MaxLiving;
+                            if (_deckMaxLiving > 0)
+                            {
+                                return true;
+                            }
+                        }
+                    }
+
+                    Stop("the requested building '" + _entityId + "' is no longer constructable in the active AI deck.");
+                    return false;
+                }
+                catch (Exception exception)
+                {
+                    Stop("could not refresh the active AI deck capacity: " + exception.GetBaseException().Message);
+                    return false;
+                }
+            }
+
+            private bool TryCountLivingFactories(out int count, out string diagnostic)
+            {
+                count = 0;
+                diagnostic = null;
+                try
+                {
+                    ExistingControllers existing = ExistingControllers.Instance;
+                    if (existing == null)
+                    {
+                        diagnostic = "ExistingControllers is unavailable.";
+                        return false;
+                    }
+
+                    HashSet<EntityController> aiBuildings = existing.AiBuildings();
+                    if (aiBuildings == null)
+                    {
+                        diagnostic = "the AI building registry is unavailable.";
+                        return false;
+                    }
+
+                    var counted = new HashSet<EntityController>();
+                    foreach (EntityController building in aiBuildings)
+                    {
+                        if (IsLivingFactoryForBase(building) && counted.Add(building))
+                        {
+                            count++;
+                        }
+                    }
+
+                    foreach (EntityController building in _createdBuildings)
+                    {
+                        if (IsLivingFactoryForBase(building) && counted.Add(building))
+                        {
+                            count++;
+                        }
+                    }
+
                     return true;
                 }
+                catch (Exception exception)
+                {
+                    diagnostic = exception.GetBaseException().Message;
+                    return false;
+                }
+            }
 
-                Stop(_requestedEntityId == null
-                    ? "the active AI deck contains no building that can be placed by the native helper."
-                    : "the requested entity '" + _requestedEntityId + "' is not a building in the active AI deck.");
-                return false;
+            private bool IsLivingFactoryForBase(EntityController building)
+            {
+                return building != null && !building.IsDestroyed && !building.DestroyHasBeenStarted &&
+                    building.IsControlledByAi && building.aiBaseIndex == _baseIndex &&
+                    String.Equals(building.EntityId, _entityId, StringComparison.Ordinal);
             }
 
             private void Stop(string reason)

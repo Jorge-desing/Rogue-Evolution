@@ -172,4 +172,12 @@ namespace RogueCommandExpansionLoader.Modules
             return true;
         }
     }
+
+    internal static class ScheduledBaseBuildLimitPolicy
+    {
+        public static bool HasRemainingCapacity(int livingCount, int maxLiving)
+        {
+            return livingCount >= 0 && maxLiving > 0 && livingCount < maxLiving;
+        }
+    }
 }

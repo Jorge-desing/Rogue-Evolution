@@ -1563,6 +1563,18 @@ var tests = new (string Name, Action Run)[]
             throw new InvalidOperationException("The scheduled AI parser rejected valid upper-bound values.");
         }
     }),
+    ("scheduled base-build AI respects active deck maxLiving", () =>
+    {
+        if (!ScheduledBaseBuildLimitPolicy.HasRemainingCapacity(0, 1) ||
+            !ScheduledBaseBuildLimitPolicy.HasRemainingCapacity(1, 2) ||
+            ScheduledBaseBuildLimitPolicy.HasRemainingCapacity(1, 1) ||
+            ScheduledBaseBuildLimitPolicy.HasRemainingCapacity(2, 1) ||
+            ScheduledBaseBuildLimitPolicy.HasRemainingCapacity(-1, 1) ||
+            ScheduledBaseBuildLimitPolicy.HasRemainingCapacity(0, 0))
+        {
+            throw new InvalidOperationException("The scheduled AI build limit did not enforce the active deck capacity.");
+        }
+    }),
     ("reactive base-defense AI parser supplies bounded defaults", () =>
     {
         if (!ReactiveBaseDefenseParameterParser.TryParse(null, out ReactiveBaseDefenseSettings defaults,
