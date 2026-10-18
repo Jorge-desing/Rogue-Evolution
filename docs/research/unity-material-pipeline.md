@@ -4,10 +4,11 @@ This addendum records the Unity material and prefab authoring rules supplied for
 
 ## 6. PBR Texture Atlas Pipeline & Linear Importer Rules
 
-- The atlas exporter writes metallic and smoothness data to `_MetallicGloss.png`; smoothness is derived from roughness as `1 - roughness`.
-- Import packed material data as linear values. Disable sRGB color conversion for this data texture so the packed values are not gamma transformed.
-- Keep the material's shader mode, texture keyword state, and metallic/smoothness multipliers aligned with the packed atlas. Do not infer those settings from the filename alone; validate the generated material against the exporter configuration.
-- Keep albedo and emission handling separate from the linear material-data texture.
+- The atlas exporter writes `R = metallic` and `A = smoothness = 1 - roughness` to `_MetallicGloss.png`; G and B duplicate metallic for other consumers. The Unity Standard shader samples the red and alpha channels when `_METALLICGLOSSMAP` is enabled and `_SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A` is disabled. This matches `UnityStandardInput.cginc` in the pinned Unity 2021.3.45f2 Editor.
+- Import `_MetallicGloss.png` as a Default texture with sRGB disabled, alpha sourced from the input, and `alphaIsTransparency` disabled. These settings preserve the packed channel values. Import normal maps as NormalMap textures; import albedo and emission maps as Default textures with sRGB enabled.
+- Set `_GlossMapScale` to `1` to preserve the packed smoothness range. If `_SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A` is enabled, Standard reads smoothness from `_MainTex.a` instead of the metallic-gloss map alpha, so the atlas material builder disables that keyword.
+- `_Metallic` and `_Glossiness` are scalar fallback values when `_METALLICGLOSSMAP` is disabled; they are not multipliers on the metallic-gloss texture. The map path uses R for metallic and multiplies A by `_GlossMapScale` for smoothness.
+- When rebuilding a material without a metallic-gloss, normal, or emission map, clear the corresponding texture property and disable its keyword so an older material state cannot retain a stale map. Keep albedo and emission handling separate from the linear material-data texture.
 
 ## 7. Automated Prefab Construction
 

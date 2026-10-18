@@ -914,6 +914,68 @@ namespace RogueCommandExpansion.Authoring
             importer.SaveAndReimport();
         }
 
+        private static Texture2D LoadConfiguredAtlasTexture(
+            string assetPath,
+            TextureImporterType textureType,
+            bool sRgbTexture,
+            bool preserveInputAlpha)
+        {
+            Texture2D texture = AssetDatabase.LoadAssetAtPath<Texture2D>(assetPath);
+            if (texture == null)
+            {
+                return null;
+            }
+
+            TextureImporter importer = AssetImporter.GetAtPath(assetPath) as TextureImporter;
+            if (importer == null)
+            {
+                throw new InvalidDataException(
+                    "Unity did not create a TextureImporter for atlas texture " + assetPath + ".");
+            }
+
+            bool changed = false;
+            if (importer.textureType != textureType)
+            {
+                importer.textureType = textureType;
+                changed = true;
+            }
+
+            if (importer.sRGBTexture != sRgbTexture)
+            {
+                importer.sRGBTexture = sRgbTexture;
+                changed = true;
+            }
+
+            if (preserveInputAlpha)
+            {
+                if (importer.alphaSource != TextureImporterAlphaSource.FromInput)
+                {
+                    importer.alphaSource = TextureImporterAlphaSource.FromInput;
+                    changed = true;
+                }
+
+                if (importer.alphaIsTransparency)
+                {
+                    importer.alphaIsTransparency = false;
+                    changed = true;
+                }
+            }
+
+            if (changed)
+            {
+                importer.SaveAndReimport();
+                texture = AssetDatabase.LoadAssetAtPath<Texture2D>(assetPath);
+            }
+
+            if (texture == null)
+            {
+                throw new InvalidDataException(
+                    "Unity could not reload atlas texture after applying import settings: " + assetPath + ".");
+            }
+
+            return texture;
+        }
+
         private static Material SetupAtlasTexturesAndMaterial(string unitName)
         {
             string albedoPath = TextureFolder + "/" + unitName + "_Albedo.png";
@@ -921,46 +983,29 @@ namespace RogueCommandExpansion.Authoring
             string normalPath = TextureFolder + "/" + unitName + "_Normal.png";
             string emissionPath = TextureFolder + "/" + unitName + "_Emission.png";
 
-            Texture2D albedoTex = AssetDatabase.LoadAssetAtPath<Texture2D>(albedoPath);
+            Texture2D albedoTex = LoadConfiguredAtlasTexture(
+                albedoPath, TextureImporterType.Default, true, false);
             if (albedoTex == null)
             {
                 // No atlas texture found
                 return null;
             }
 
-            // Configure Normal Map importer if needed
-            Texture2D normalTex = AssetDatabase.LoadAssetAtPath<Texture2D>(normalPath);
-            if (normalTex != null)
-            {
-                TextureImporter normImporter = AssetImporter.GetAtPath(normalPath) as TextureImporter;
-                if (normImporter != null && normImporter.textureType != TextureImporterType.NormalMap)
-                {
-                    normImporter.textureType = TextureImporterType.NormalMap;
-                    normImporter.SaveAndReimport();
-                    normalTex = AssetDatabase.LoadAssetAtPath<Texture2D>(normalPath);
-                }
-            }
-
-            // Configure MetallicGloss Data Map importer (Linear Non-Color, Alpha from Input)
-            Texture2D metallicTex = AssetDatabase.LoadAssetAtPath<Texture2D>(metallicPath);
-            if (metallicTex != null)
-            {
-                TextureImporter metalImporter = AssetImporter.GetAtPath(metallicPath) as TextureImporter;
-                if (metalImporter != null && (metalImporter.sRGBTexture || metalImporter.alphaSource != TextureImporterAlphaSource.FromInput))
-                {
-                    metalImporter.sRGBTexture = false;
-                    metalImporter.alphaSource = TextureImporterAlphaSource.FromInput;
-                    metalImporter.SaveAndReimport();
-                    metallicTex = AssetDatabase.LoadAssetAtPath<Texture2D>(metallicPath);
-                }
-            }
-
-            Texture2D emissionTex = AssetDatabase.LoadAssetAtPath<Texture2D>(emissionPath);
+            Texture2D metallicTex = LoadConfiguredAtlasTexture(
+                metallicPath, TextureImporterType.Default, false, true);
+            Texture2D normalTex = LoadConfiguredAtlasTexture(
+                normalPath, TextureImporterType.NormalMap, false, false);
+            Texture2D emissionTex = LoadConfiguredAtlasTexture(
+                emissionPath, TextureImporterType.Default, true, false);
 
             // Create or load Atlas Material
             string matPath = MaterialFolder + "/" + unitName + "_Atlas.mat";
             Material mat = AssetDatabase.LoadAssetAtPath<Material>(matPath);
             Shader standardShader = Shader.Find("Standard");
+            if (standardShader == null)
+            {
+                throw new InvalidOperationException("Unity's Standard shader is unavailable for " + unitName + ".");
+            }
 
             if (mat == null)
             {
@@ -974,14 +1019,27 @@ namespace RogueCommandExpansion.Authoring
             }
 
             mat.mainTexture = albedoTex;
+            mat.color = Color.white;
             mat.enableInstancing = true;
 
             if (metallicTex != null)
             {
                 mat.EnableKeyword("_METALLICGLOSSMAP");
+                mat.DisableKeyword("_SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A");
                 mat.SetTexture("_MetallicGlossMap", metallicTex);
+                mat.SetFloat("_GlossMapScale", 1.0f);
+                // These scalars are Standard shader fallbacks when the map keyword is disabled.
                 mat.SetFloat("_Metallic", 1.0f);
                 mat.SetFloat("_Glossiness", 1.0f);
+            }
+            else
+            {
+                mat.DisableKeyword("_METALLICGLOSSMAP");
+                mat.DisableKeyword("_SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A");
+                mat.SetTexture("_MetallicGlossMap", null);
+                mat.SetFloat("_GlossMapScale", 1.0f);
+                mat.SetFloat("_Metallic", 0.0f);
+                mat.SetFloat("_Glossiness", 0.5f);
             }
 
             if (normalTex != null)
@@ -993,6 +1051,8 @@ namespace RogueCommandExpansion.Authoring
             else
             {
                 mat.DisableKeyword("_NORMALMAP");
+                mat.SetTexture("_BumpMap", null);
+                mat.SetFloat("_BumpScale", 1.0f);
             }
 
             if (emissionTex != null)
@@ -1005,6 +1065,9 @@ namespace RogueCommandExpansion.Authoring
             else
             {
                 mat.DisableKeyword("_EMISSION");
+                mat.SetTexture("_EmissionMap", null);
+                mat.SetColor("_EmissionColor", Color.black);
+                mat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.EmissiveIsBlack;
             }
 
             EditorUtility.SetDirty(mat);

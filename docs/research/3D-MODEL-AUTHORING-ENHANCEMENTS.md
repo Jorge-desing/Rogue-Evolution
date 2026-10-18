@@ -757,9 +757,12 @@ Following in-depth static and architectural code review of the 3D authoring pipe
 - **Resolution**:
   1. In `RogueModelKit.py`, `bake_pbr_texture_atlas` isolates metallic via emission shader rerouting and inverts roughness ($S = 1.0 - \text{roughness}$), packing $R=M, G=M, B=M, A=S$ into `_MetallicGloss.png`.
   2. In `VehiclePrefabBuilder.cs`, `SetupAtlasTexturesAndMaterial` explicitly configures `TextureImporter` for `_MetallicGloss.png` with:
+     - `textureType = TextureImporterType.Default` so the packed channels remain a data texture.
      - `sRGBTexture = false` (linear non-color data)
      - `alphaSource = TextureImporterAlphaSource.FromInput`
-  3. The Standard shader material enables the `_METALLICGLOSSMAP` keyword and sets scalar multipliers `_Metallic = 1.0f` and `_Glossiness = 1.0f`, allowing the material to sample the texture's full dynamic range without unwanted attenuation.
+     - `alphaIsTransparency = false` so alpha is preserved as smoothness data.
+  3. The Standard shader material enables `_METALLICGLOSSMAP`, disables `_SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A`, and sets `_GlossMapScale = 1.0f`, so the shader samples metallic from the map's red channel and smoothness from its alpha channel without scaling. In the pinned Unity 2021.3.45f2 Standard shader, `_Metallic` and `_Glossiness` are scalar fallbacks used when the map keyword is disabled; they do not multiply the map values.
+  4. Albedo and emission maps are imported as sRGB color textures, while normal maps use the NormalMap importer type. When an optional map is absent, the builder clears its texture property, disables its keyword, and resets the associated material state to prevent a prior build's texture from persisting.
 
 ### C. LOD Hierarchy Precedence, Atlas Material Binding & Multi-Asset DB Search
 - **Discrepancy**: When both an atlas FBX (`_Atlas.fbx`) and an LOD chain (`_LODs.fbx`) were exported, `VehiclePrefabBuilder.cs` prioritized `_Atlas.fbx`, preventing the creation of Unity's `LODGroup` component. Furthermore, detached attachments and damaged variants were not reliably located across varied folder structures.
