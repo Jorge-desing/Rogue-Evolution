@@ -133,6 +133,7 @@ namespace RogueCommandExpansion.Authoring
 
         public static string BuildPrefabFromGameplayJson(string jsonFilePath)
         {
+            RogueCommandVisualSampleScaffolder.EnsureUrpAuthoringPipeline();
             GameplayMetadata meta = ParseGameplayJson(jsonFilePath);
             string unitName = meta.UnitName;
             if (string.IsNullOrEmpty(unitName))
@@ -1035,11 +1036,9 @@ namespace RogueCommandExpansion.Authoring
             Shader targetShader = Shader.Find("RogueCommand/VehiclePBR_VertexWear");
             if (targetShader == null)
             {
-                targetShader = Shader.Find("Standard");
-            }
-            if (targetShader == null)
-            {
-                throw new InvalidOperationException("Neither RogueCommand/VehiclePBR_VertexWear nor Standard shader is available for " + unitName + ".");
+                throw new InvalidOperationException(
+                    "URP shader RogueCommand/VehiclePBR_VertexWear is unavailable for " + unitName + ". " +
+                    "Resolve the Unity URP package dependency before building atlas materials.");
             }
 
             if (mat == null)
@@ -1059,22 +1058,19 @@ namespace RogueCommandExpansion.Authoring
 
             if (metallicTex != null)
             {
-                mat.EnableKeyword("_METALLICGLOSSMAP");
-                mat.DisableKeyword("_SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A");
+                mat.EnableKeyword("_METALLICSPECGLOSSMAP");
                 mat.SetTexture("_MetallicGlossMap", metallicTex);
                 mat.SetFloat("_GlossMapScale", 1.0f);
-                // These scalars are Standard shader fallbacks when the map keyword is disabled.
                 mat.SetFloat("_Metallic", 1.0f);
-                mat.SetFloat("_Glossiness", 1.0f);
+                mat.SetFloat("_Smoothness", 1.0f);
             }
             else
             {
-                mat.DisableKeyword("_METALLICGLOSSMAP");
-                mat.DisableKeyword("_SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A");
+                mat.DisableKeyword("_METALLICSPECGLOSSMAP");
                 mat.SetTexture("_MetallicGlossMap", null);
                 mat.SetFloat("_GlossMapScale", 1.0f);
                 mat.SetFloat("_Metallic", 0.0f);
-                mat.SetFloat("_Glossiness", 0.5f);
+                mat.SetFloat("_Smoothness", 0.5f);
             }
 
             if (normalTex != null)

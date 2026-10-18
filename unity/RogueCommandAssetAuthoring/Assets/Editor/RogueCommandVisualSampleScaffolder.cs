@@ -1,10 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal;
 
 namespace RogueCommandExpansion.Authoring
 {
@@ -31,8 +34,201 @@ namespace RogueCommandExpansion.Authoring
         private const string SurgeArcTankCardSpritePath = AssetRoot + "/SurgeArcTankCard.png";
         private const string SurgeArcTankModelPath = AssetRoot + "/Models/SurgeArcTank.fbx";
         private const string MaterialRoot = AssetRoot + "/Materials";
+        private const string RenderingRoot = AssetRoot + "/Rendering";
+        private const string AuthoringPipelineAssetPath = RenderingRoot + "/RogueCommandURP.asset";
+        private const string DefaultRendererDataAssetPath =
+            "Packages/com.unity.render-pipelines.universal/Runtime/Data/UniversalRendererData.asset";
         private const string BundleOutputPath = "../../artifacts/asset-bundles";
         private const string BundleName = "sample-native-expansion.bundle";
+
+        [MenuItem("Rogue Command/Asset Bundles/Configure URP Authoring Pipeline")]
+        public static void ConfigureUrpAuthoringPipeline()
+        {
+            try
+            {
+                EnsureUrpAuthoringPipelineAsset();
+                ConfigureUrpMaterialUpgradeVersion();
+                AssetDatabase.SaveAssets();
+                Debug.Log("Configured the Unity authoring project to use its URP asset for Rogue Command bundle builds.");
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception);
+                if (Application.isBatchMode)
+                {
+                    EditorApplication.Exit(1);
+                }
+                else
+                {
+                    EditorUtility.DisplayDialog("URP authoring setup failed", exception.Message, "OK");
+                }
+            }
+        }
+
+        internal static void EnsureUrpAuthoringPipeline()
+        {
+            if (!(GraphicsSettings.currentRenderPipeline is UniversalRenderPipelineAsset))
+            {
+                throw new InvalidOperationException(
+                    "The Unity authoring project is not using URP. Run 'Rogue Command/Asset Bundles/Configure URP Authoring Pipeline', " +
+                    "then reopen the project before building game materials or bundles.");
+            }
+
+            ConfigureUrpMaterialUpgradeVersion();
+        }
+
+        private static void ConfigureUrpMaterialUpgradeVersion()
+        {
+            Type projectSettingsType = null;
+            Type materialPostprocessorType = null;
+            Assembly[] loadedAssemblies = AppDomain.CurrentDomain.GetAssemblies();
+            for (int i = 0; i < loadedAssemblies.Length; i++)
+            {
+                if (projectSettingsType == null)
+                {
+                    projectSettingsType = loadedAssemblies[i].GetType(
+                        "UnityEditor.Rendering.Universal.UniversalProjectSettings", false);
+                }
+
+                if (materialPostprocessorType == null)
+                {
+                    materialPostprocessorType = loadedAssemblies[i].GetType(
+                        "UnityEditor.Rendering.Universal.MaterialPostprocessor", false);
+                }
+
+                if (projectSettingsType != null && materialPostprocessorType != null)
+                {
+                    break;
+                }
+            }
+
+            const BindingFlags StaticMembers = BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
+            FieldInfo upgradersField = materialPostprocessorType == null
+                ? null
+                : materialPostprocessorType.GetField("k_Upgraders", StaticMembers);
+            Array upgraders = upgradersField == null ? null : upgradersField.GetValue(null) as Array;
+            PropertyInfo versionProperty = projectSettingsType == null
+                ? null
+                : projectSettingsType.GetProperty("materialVersionForUpgrade", StaticMembers);
+            MethodInfo saveMethod = projectSettingsType == null
+                ? null
+                : projectSettingsType.GetMethod("Save", StaticMembers);
+            if (upgraders == null || upgraders.Length == 0 || versionProperty == null || saveMethod == null)
+            {
+                throw new InvalidOperationException(
+                    "Could not resolve URP's material migration settings; refusing to create materials with an " +
+                    "uninitialized migration version.");
+            }
+
+            versionProperty.SetValue(null, upgraders.Length, null);
+            saveMethod.Invoke(null, null);
+            object savedVersion = versionProperty.GetValue(null, null);
+            if (!(savedVersion is int) || (int)savedVersion != upgraders.Length)
+            {
+                throw new InvalidOperationException("URP did not save its current material migration version.");
+            }
+
+            EnsureSampleMaterialsHaveCurrentVersion(materialPostprocessorType, upgraders.Length);
+        }
+
+        private static void EnsureSampleMaterialsHaveCurrentVersion(Type materialPostprocessorType, int version)
+        {
+            Type assetVersionType = materialPostprocessorType.Assembly.GetType(
+                "UnityEditor.Rendering.Universal.AssetVersion", false);
+            FieldInfo assetVersionField = assetVersionType == null
+                ? null
+                : assetVersionType.GetField("version", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            if (assetVersionField == null || assetVersionType == null)
+            {
+                throw new InvalidOperationException("Could not resolve URP's material asset version metadata.");
+            }
+
+            string[] materialGuids = AssetDatabase.FindAssets("t:Material", new[] { MaterialRoot });
+            int changedCount = 0;
+            for (int i = 0; i < materialGuids.Length; i++)
+            {
+                string assetPath = AssetDatabase.GUIDToAssetPath(materialGuids[i]);
+                Material material = AssetDatabase.LoadAssetAtPath<Material>(assetPath);
+                if (material == null)
+                {
+                    continue;
+                }
+
+                UnityEngine.Object assetVersion = null;
+                UnityEngine.Object[] subAssets = AssetDatabase.LoadAllAssetsAtPath(assetPath);
+                for (int subAssetIndex = 0; subAssetIndex < subAssets.Length; subAssetIndex++)
+                {
+                    if (assetVersionType.IsInstanceOfType(subAssets[subAssetIndex]))
+                    {
+                        assetVersion = subAssets[subAssetIndex];
+                        break;
+                    }
+                }
+
+                if (assetVersion == null)
+                {
+                    assetVersion = ScriptableObject.CreateInstance(assetVersionType);
+                    assetVersion.hideFlags = HideFlags.HideInHierarchy | HideFlags.HideInInspector | HideFlags.NotEditable;
+                    AssetDatabase.AddObjectToAsset(assetVersion, material);
+                }
+
+                object existingVersion = assetVersionField.GetValue(assetVersion);
+                if (!(existingVersion is int) || (int)existingVersion != version)
+                {
+                    assetVersionField.SetValue(assetVersion, version);
+                    EditorUtility.SetDirty(assetVersion);
+                    changedCount++;
+                }
+            }
+
+            if (changedCount > 0)
+            {
+                AssetDatabase.SaveAssets();
+                Debug.Log("Initialized the URP material migration metadata for " + changedCount +
+                    " sample materials at version " + version + ".");
+            }
+        }
+
+        private static void EnsureUrpAuthoringPipelineAsset()
+        {
+            RenderPipelineAsset configuredPipeline = GraphicsSettings.defaultRenderPipeline;
+            if (configuredPipeline != null && !(configuredPipeline is UniversalRenderPipelineAsset))
+            {
+                throw new InvalidOperationException(
+                    "Graphics Settings already uses a non-URP pipeline asset; it was left unchanged.");
+            }
+
+            if (configuredPipeline is UniversalRenderPipelineAsset)
+            {
+                return;
+            }
+
+            if (!AssetDatabase.IsValidFolder(RenderingRoot))
+            {
+                AssetDatabase.CreateFolder(AssetRoot, "Rendering");
+            }
+
+            UniversalRenderPipelineAsset pipeline =
+                AssetDatabase.LoadAssetAtPath<UniversalRenderPipelineAsset>(AuthoringPipelineAssetPath);
+            if (pipeline == null)
+            {
+                ScriptableRendererData rendererData =
+                    AssetDatabase.LoadAssetAtPath<ScriptableRendererData>(DefaultRendererDataAssetPath);
+                if (rendererData == null)
+                {
+                    throw new FileNotFoundException(
+                        "Unity URP package default renderer data is unavailable at " + DefaultRendererDataAssetPath + ".");
+                }
+
+                pipeline = UniversalRenderPipelineAsset.Create(rendererData);
+                pipeline.name = "RogueCommandURP";
+                AssetDatabase.CreateAsset(pipeline, AuthoringPipelineAssetPath);
+            }
+
+            GraphicsSettings.defaultRenderPipeline = pipeline;
+            EditorUtility.SetDirty(GraphicsSettings.GetGraphicsSettings());
+            AssetDatabase.SaveAssets();
+        }
 
         [MenuItem("Rogue Command/Asset Bundles/Build Sample Native Visual Pack")]
         public static void BuildSampleNativeExpansion()
@@ -51,6 +247,8 @@ namespace RogueCommandExpansion.Authoring
                     throw new InvalidOperationException(
                         "Install the Unity Windows Build Support module before building this sample.");
                 }
+
+                EnsureUrpAuthoringPipeline();
 
                 string prefabPath = CreateSampleVisual();
                 ImportCardSprite(CardSpritePath);
@@ -832,10 +1030,12 @@ namespace RogueCommandExpansion.Authoring
         {
             string path = MaterialRoot + "/" + name + ".mat";
             Material material = AssetDatabase.LoadAssetAtPath<Material>(path);
-            Shader shader = Shader.Find("Standard");
+            Shader shader = Shader.Find("Universal Render Pipeline/Lit");
             if (shader == null)
             {
-                throw new InvalidOperationException("Unity's Standard shader is unavailable for " + name + ".");
+                throw new InvalidOperationException(
+                    "The Universal Render Pipeline/Lit shader is unavailable for " + name + ". " +
+                    "Resolve the Unity URP package dependency before building sample visuals.");
             }
 
             if (material == null)
@@ -851,7 +1051,7 @@ namespace RogueCommandExpansion.Authoring
 
             material.color = color;
             material.SetFloat("_Metallic", metallic);
-            material.SetFloat("_Glossiness", smoothness);
+            material.SetFloat("_Smoothness", smoothness);
             material.enableInstancing = true;
 
             if (emissionColor.HasValue && emissionColor.Value != Color.black)

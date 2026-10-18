@@ -331,7 +331,7 @@ Rogue Command gameplay components (`EntityController`, weapons, combat physics) 
 
 When the Unity project scaffolds the prefab and builds the AssetBundle:
 
-1. **Standard Shader Compatibility**: Use `Shader.Find("Standard")` to ensure consistent lighting with game scenes.
+1. **URP Shader Compatibility**: Rogue Command uses URP. Use `Universal Render Pipeline/Lit` for simple sample materials and `RogueCommand/VehiclePBR_VertexWear` for atlas materials with RGBA vertex-wear channels. Never use Built-in `Standard` for a game-bound material.
 2. **The Emission Invariant**: Setting `_EmissionColor` is not enough; you must explicitly call `material.EnableKeyword("_EMISSION")` and set `globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive`.
 3. **GPU Instancing**: The prefab builder sets `material.enableInstancing = true` on materials without an atlas. This opts materials into Unity GPU instancing when the shader, render path, and renderer setup support it; it does not guarantee batching or a lower draw-call count.
 4. **Script-Free Prefabs**: Visual prefabs must contain **no** `MonoBehaviour` components. The loader enforces fail-closed rejection on any missing or custom scripts.
@@ -384,7 +384,7 @@ The extended authoring pipeline provides four production-grade optimization and 
 - **Non-Overlapping Atlas UV Unwrapping**: `unwrap_atlas_uvs(objects, island_margin=0.02)` projects smart UV coordinates with parameterized island padding.
 - **Fast Cycles PBR Baking**: Headless 1-sample Cycles baking generates four synchronized PBR texture maps in `<Project>/Models/Textures/`:
   - `<Name>_Albedo.png`: Diffuse color map with faction palette, camouflage patterns, and wear baked in.
-  - `<Name>_MetallicGloss.png`: RGB metallic and smoothness channels matching Unity Standard shader layout.
+  - `<Name>_MetallicGloss.png`: Linear PBR data with RGB metallic and alpha smoothness, consumed by the custom URP vehicle shader.
   - `<Name>_Normal.png`: Tangent-space normal map baking geometric bevels and surface relief.
   - `<Name>_Emission.png`: Isolated emissive mask for glowing sensors, plasma cores, and optics.
 - **Single-Material Mesh Output**: `--single-material` joins batched geometry into `<Name>_Atlas.fbx` with one material slot. This does not guarantee one draw call per unit: the prefab builder prefers an animated primary FBX, then a valid `_LODs.fbx`, and only then the atlas; Unity passes and render settings also affect runtime submissions.
@@ -516,7 +516,7 @@ Verified against `Assembly-CSharp.dll` (SHA-256 `d2da384df3318e7ac52db58eb13699e
 
 - [Art Style & Palette Guide](references/art-style-and-palette.md) — 3-tier silhouette hierarchy, 5-tone palette sets, bevel physics, and greeble standards.
 - [Blender Procedural Techniques](references/blender-procedural-techniques.md) — Parametric `bpy` recipes for chamfered hulls, continuous tracks, stepped road wheels, and engine grilles.
-- [Unity Material Pipeline](references/unity-material-pipeline.md) — Standard shader configuration, emission keywords, GPU instancing, and card sprite rules.
+- [Unity Material Pipeline](references/unity-material-pipeline.md) — URP material configuration, emission keywords, GPU instancing limits, and card sprite rules.
 - [Native Hierarchy & Pivots](references/native-hierarchy-and-pivots.md) — Transform hierarchy maps for `PCXBaseTank`, `BombBike`, `ArtilleryTank`, `GatlingWalker`, and `LightningTank`.
 
 

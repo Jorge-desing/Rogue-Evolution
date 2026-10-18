@@ -2,140 +2,198 @@ Shader "RogueCommand/VehiclePBR_VertexWear"
 {
     Properties
     {
-        _Color ("Main Tint", Color) = (1,1,1,1)
-        _MainTex ("Albedo (RGB)", 2D) = "white" {}
-        
-        [Toggle(_METALLICGLOSSMAP)] _EnableMetallicGloss ("Enable Metallic Gloss Map", Float) = 1.0
-        _MetallicGlossMap ("Metallic (R) Gloss (A)", 2D) = "white" {}
+        [MainTexture] _BaseMap ("Albedo (RGB)", 2D) = "white" {}
+        [MainColor] _BaseColor ("Main Tint", Color) = (1,1,1,1)
+
+        [NoScaleOffset] _MetallicGlossMap ("Metallic (R) Smoothness (A)", 2D) = "white" {}
         _GlossMapScale ("Smoothness Scale", Range(0.0, 1.0)) = 1.0
         _Metallic ("Metallic Fallback", Range(0.0, 1.0)) = 0.0
-        _Glossiness ("Smoothness Fallback", Range(0.0, 1.0)) = 0.5
-        
-        [Toggle(_NORMALMAP)] _EnableNormalMap ("Enable Normal Map", Float) = 0.0
-        _BumpMap ("Normal Map", 2D) = "bump" {}
+        _Smoothness ("Smoothness Fallback", Range(0.0, 1.0)) = 0.5
+
+        [Normal] _BumpMap ("Normal Map", 2D) = "bump" {}
         _BumpScale ("Normal Scale", Float) = 1.0
-        
-        [Toggle(_EMISSION)] _EnableEmission ("Enable Emission", Float) = 0.0
-        _EmissionMap ("Emission Map", 2D) = "black" {}
         [HDR] _EmissionColor ("Emission Color", Color) = (0,0,0,1)
+        _EmissionMap ("Emission Map", 2D) = "white" {}
 
         [Header(Vertex Wear Multipliers)]
         _AoStrength ("Cavity AO Strength (Red)", Range(0.0, 2.0)) = 1.0
         _WearStrength ("Edge Wear Strength (Green)", Range(0.0, 2.0)) = 1.0
         _SootStrength ("Thermal Soot Strength (Blue)", Range(0.0, 2.0)) = 1.0
         _TeamColor ("Team Color Tint (Alpha Mask)", Color) = (1,1,1,1)
+
+        _Cutoff ("Alpha Cutoff", Range(0.0, 1.0)) = 0.5
+        [Enum(UnityEngine.Rendering.CullMode)] _Cull ("Cull", Float) = 2
+        [HideInInspector] _Surface ("Surface", Float) = 0
+        [HideInInspector] _AlphaClip ("Alpha Clip", Float) = 0
     }
 
     SubShader
     {
-        Tags { "RenderType"="Opaque" "PerformanceChecks"="False" }
-        LOD 200
-
-        CGPROGRAM
-        #pragma surface surf Standard fullforwardshadows vertex:vert
-        #pragma target 3.0
-        #pragma multi_compile_instancing
-
-        #pragma shader_feature _METALLICGLOSSMAP
-        #pragma shader_feature _NORMALMAP
-        #pragma shader_feature _EMISSION
-
-        #include "UnityCG.cginc"
-
-        sampler2D _MainTex;
-        #ifdef _METALLICGLOSSMAP
-        sampler2D _MetallicGlossMap;
-        #endif
-        #ifdef _NORMALMAP
-        sampler2D _BumpMap;
-        #endif
-        #ifdef _EMISSION
-        sampler2D _EmissionMap;
-        #endif
-
-        struct Input
+        Tags
         {
-            float2 uv_MainTex;
-            fixed4 vertColor;
-        };
+            "RenderType"="Opaque"
+            "RenderPipeline"="UniversalPipeline"
+            "UniversalMaterialType"="Lit"
+            "IgnoreProjector"="True"
+        }
+        LOD 300
 
-        UNITY_INSTANCING_BUFFER_START(Props)
-            UNITY_DEFINE_INSTANCED_PROP(fixed4, _Color)
-            UNITY_DEFINE_INSTANCED_PROP(fixed4, _TeamColor)
-            UNITY_DEFINE_INSTANCED_PROP(fixed4, _EmissionColor)
-            UNITY_DEFINE_INSTANCED_PROP(half, _GlossMapScale)
-            UNITY_DEFINE_INSTANCED_PROP(half, _Metallic)
-            UNITY_DEFINE_INSTANCED_PROP(half, _Glossiness)
-            UNITY_DEFINE_INSTANCED_PROP(half, _BumpScale)
-            UNITY_DEFINE_INSTANCED_PROP(half, _AoStrength)
-            UNITY_DEFINE_INSTANCED_PROP(half, _WearStrength)
-            UNITY_DEFINE_INSTANCED_PROP(half, _SootStrength)
-        UNITY_INSTANCING_BUFFER_END(Props)
-
-        void vert(inout appdata_full v, out Input o)
+        Pass
         {
-            UNITY_INITIALIZE_OUTPUT(Input, o);
-            o.vertColor = v.color;
+            Name "ForwardLit"
+            Tags { "LightMode"="UniversalForward" }
+
+            HLSLPROGRAM
+            #pragma target 3.0
+            #pragma vertex VehicleVert
+            #pragma fragment VehicleFrag
+
+            #pragma shader_feature_local_fragment _METALLICSPECGLOSSMAP
+            #pragma shader_feature_local_fragment _NORMALMAP
+            #pragma shader_feature_local_fragment _EMISSION
+            #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE _MAIN_LIGHT_SHADOWS_SCREEN
+            #pragma multi_compile _ _ADDITIONAL_LIGHTS_VERTEX _ADDITIONAL_LIGHTS
+            #pragma multi_compile_fragment _ _ADDITIONAL_LIGHT_SHADOWS
+            #pragma multi_compile_fragment _ _SHADOWS_SOFT
+            #pragma multi_compile_fragment _ _SCREEN_SPACE_OCCLUSION
+            #pragma multi_compile _ LIGHTMAP_ON
+            #pragma multi_compile _ DIRLIGHTMAP_COMBINED
+            #pragma multi_compile _ LIGHTMAP_SHADOW_MIXING
+            #pragma multi_compile _ SHADOWS_SHADOWMASK
+            #pragma multi_compile_fog
+            #pragma multi_compile_instancing
+
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SurfaceInput.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
+
+            TEXTURE2D(_MetallicGlossMap);
+            SAMPLER(sampler_MetallicGlossMap);
+
+            CBUFFER_START(UnityPerMaterial)
+                float4 _BaseMap_ST;
+                half4 _BaseColor;
+                half4 _EmissionColor;
+                half4 _TeamColor;
+                half _Metallic;
+                half _Smoothness;
+                half _GlossMapScale;
+                half _BumpScale;
+                half _AoStrength;
+                half _WearStrength;
+                half _SootStrength;
+                half _Cutoff;
+                half _Surface;
+            CBUFFER_END
+
+            struct VehicleAttributes
+            {
+                float4 positionOS : POSITION;
+                float3 normalOS : NORMAL;
+                float4 tangentOS : TANGENT;
+                float2 uv : TEXCOORD0;
+                float4 color : COLOR;
+                UNITY_VERTEX_INPUT_INSTANCE_ID
+            };
+
+            struct VehicleVaryings
+            {
+                float2 uv : TEXCOORD0;
+                float3 positionWS : TEXCOORD1;
+                half3 normalWS : TEXCOORD2;
+                half4 tangentWS : TEXCOORD3;
+                half4 vertexColor : TEXCOORD4;
+                half3 vertexLighting : TEXCOORD5;
+                float4 positionCS : SV_POSITION;
+                UNITY_VERTEX_INPUT_INSTANCE_ID
+                UNITY_VERTEX_OUTPUT_STEREO
+            };
+
+            VehicleVaryings VehicleVert(VehicleAttributes input)
+            {
+                VehicleVaryings output = (VehicleVaryings)0;
+                UNITY_SETUP_INSTANCE_ID(input);
+                UNITY_TRANSFER_INSTANCE_ID(input, output);
+                UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(output);
+
+                VertexPositionInputs positionInputs = GetVertexPositionInputs(input.positionOS.xyz);
+                VertexNormalInputs normalInputs = GetVertexNormalInputs(input.normalOS, input.tangentOS);
+
+                output.positionCS = positionInputs.positionCS;
+                output.positionWS = positionInputs.positionWS;
+                output.normalWS = normalInputs.normalWS;
+                output.tangentWS = half4(normalInputs.tangentWS,
+                    input.tangentOS.w * GetOddNegativeScale());
+                output.uv = TRANSFORM_TEX(input.uv, _BaseMap);
+                output.vertexColor = input.color;
+                output.vertexLighting = VertexLighting(positionInputs.positionWS, normalInputs.normalWS);
+                return output;
+            }
+
+            half4 VehicleFrag(VehicleVaryings input) : SV_Target
+            {
+                UNITY_SETUP_INSTANCE_ID(input);
+                UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
+
+                half4 albedoAlpha = SampleAlbedoAlpha(input.uv, TEXTURE2D_ARGS(_BaseMap, sampler_BaseMap));
+                SurfaceData surfaceData = (SurfaceData)0;
+                surfaceData.alpha = Alpha(albedoAlpha.a, _BaseColor, _Cutoff);
+                surfaceData.albedo = albedoAlpha.rgb * _BaseColor.rgb;
+
+                #if defined(_METALLICSPECGLOSSMAP)
+                    half4 metallicGloss = SAMPLE_TEXTURE2D(_MetallicGlossMap, sampler_MetallicGlossMap, input.uv);
+                    surfaceData.metallic = metallicGloss.r;
+                    surfaceData.smoothness = metallicGloss.a * _GlossMapScale;
+                #else
+                    surfaceData.metallic = _Metallic;
+                    surfaceData.smoothness = _Smoothness;
+                #endif
+
+                half ao = saturate(lerp(1.0h, input.vertexColor.r, _AoStrength));
+                half wear = saturate(input.vertexColor.g * _WearStrength);
+                half soot = saturate(input.vertexColor.b * _SootStrength);
+                surfaceData.albedo = lerp(surfaceData.albedo,
+                    surfaceData.albedo * _TeamColor.rgb, input.vertexColor.a);
+                surfaceData.albedo *= ao * (1.0h - soot * 0.75h);
+                surfaceData.albedo = lerp(surfaceData.albedo, half3(0.72h, 0.74h, 0.76h), wear * 0.85h);
+                surfaceData.metallic = saturate(surfaceData.metallic + wear * 0.6h);
+                surfaceData.smoothness = saturate(lerp(surfaceData.smoothness, 0.82h, wear * 0.75h));
+
+                surfaceData.normalTS = SampleNormal(input.uv,
+                    TEXTURE2D_ARGS(_BumpMap, sampler_BumpMap), _BumpScale);
+                surfaceData.emission = SampleEmission(input.uv, _EmissionColor.rgb,
+                    TEXTURE2D_ARGS(_EmissionMap, sampler_EmissionMap));
+                surfaceData.occlusion = 1.0h;
+                surfaceData.specular = half3(0, 0, 0);
+                surfaceData.clearCoatMask = 0.0h;
+                surfaceData.clearCoatSmoothness = 0.0h;
+
+                half3 bitangentWS = input.tangentWS.w * cross(input.normalWS, input.tangentWS.xyz);
+                half3x3 tangentToWorld = half3x3(input.tangentWS.xyz, bitangentWS, input.normalWS);
+                InputData inputData = (InputData)0;
+                inputData.positionWS = input.positionWS;
+                inputData.normalWS = NormalizeNormalPerPixel(
+                    TransformTangentToWorld(surfaceData.normalTS, tangentToWorld));
+                inputData.viewDirectionWS = GetWorldSpaceNormalizeViewDir(input.positionWS);
+                inputData.shadowCoord = TransformWorldToShadowCoord(input.positionWS);
+                inputData.fogCoord = ComputeFogFactor(input.positionCS.z);
+                inputData.vertexLighting = input.vertexLighting;
+                inputData.bakedGI = SampleSH(inputData.normalWS);
+                inputData.normalizedScreenSpaceUV = GetNormalizedScreenSpaceUV(input.positionCS);
+                inputData.shadowMask = half4(1, 1, 1, 1);
+
+                half4 color = UniversalFragmentPBR(inputData, surfaceData);
+                color.rgb = MixFog(color.rgb, inputData.fogCoord);
+                color.a = OutputAlpha(color.a, _Surface);
+                return color;
+            }
+            ENDHLSL
         }
 
-        void surf(Input IN, inout SurfaceOutputStandard o)
-        {
-            fixed4 c = tex2D(_MainTex, IN.uv_MainTex) * UNITY_ACCESS_INSTANCED_PROP(Props, _Color);
-
-            // Decode 4-Channel Vertex Color:
-            // R: Ambient Occlusion / Cavity Dirt (darkens crevices)
-            // G: Curvature / Edge Wear (metallic edge scratches)
-            // B: Thermal Soot (exhaust and muzzle darkening)
-            // A: Team Color Mask (1.0 = tintable armor, 0.0 = fixed mechanics)
-            half ao = saturate(lerp(1.0, IN.vertColor.r, UNITY_ACCESS_INSTANCED_PROP(Props, _AoStrength)));
-            half wear = saturate(IN.vertColor.g * UNITY_ACCESS_INSTANCED_PROP(Props, _WearStrength));
-            half soot = saturate(IN.vertColor.b * UNITY_ACCESS_INSTANCED_PROP(Props, _SootStrength));
-            half teamMask = IN.vertColor.a;
-
-            // Apply Team Color modulation where masked
-            fixed3 teamTint = UNITY_ACCESS_INSTANCED_PROP(Props, _TeamColor).rgb;
-            fixed3 albedo = lerp(c.rgb, c.rgb * teamTint, teamMask);
-
-            // Apply Cavity AO and Thermal Soot
-            albedo *= ao * (1.0 - soot * 0.75);
-
-            // Bare chipped steel highlight on worn edges
-            fixed3 bareMetal = fixed3(0.72, 0.74, 0.76);
-            albedo = lerp(albedo, bareMetal, wear * 0.85);
-            o.Albedo = albedo;
-
-            // Metallic and Smoothness
-            #ifdef _METALLICGLOSSMAP
-            half4 mg = tex2D(_MetallicGlossMap, IN.uv_MainTex);
-            half metallic = mg.r;
-            half smoothness = mg.a * UNITY_ACCESS_INSTANCED_PROP(Props, _GlossMapScale);
-            #else
-            half metallic = UNITY_ACCESS_INSTANCED_PROP(Props, _Metallic);
-            half smoothness = UNITY_ACCESS_INSTANCED_PROP(Props, _Glossiness);
-            #endif
-
-            // Worn chipped edges reveal high-metallic, high-specular steel
-            metallic = saturate(metallic + wear * 0.6);
-            smoothness = saturate(lerp(smoothness, 0.82, wear * 0.75));
-
-            o.Metallic = metallic;
-            o.Smoothness = smoothness;
-
-            // Normal Map
-            #ifdef _NORMALMAP
-            half bumpScale = UNITY_ACCESS_INSTANCED_PROP(Props, _BumpScale);
-            o.Normal = UnpackScaleNormal(tex2D(_BumpMap, IN.uv_MainTex), bumpScale);
-            #endif
-
-            // Emission
-            #ifdef _EMISSION
-            fixed4 emit = tex2D(_EmissionMap, IN.uv_MainTex) * UNITY_ACCESS_INSTANCED_PROP(Props, _EmissionColor);
-            o.Emission = emit.rgb;
-            #endif
-
-            o.Alpha = c.a;
-        }
-        ENDCG
+        UsePass "Universal Render Pipeline/Lit/ShadowCaster"
+        UsePass "Universal Render Pipeline/Lit/DepthOnly"
+        UsePass "Universal Render Pipeline/Lit/DepthNormals"
     }
-    FallBack "Standard"
+
+    FallBack "Universal Render Pipeline/Lit"
 }

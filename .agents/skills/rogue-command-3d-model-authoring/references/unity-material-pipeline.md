@@ -8,24 +8,24 @@ This guide explains how Unity 2021.3.45f2 handles materials, shaders, draw-call 
 
 Rogue Command executes on Unity's **Universal Render Pipeline (URP)** (`UniversalRenderPipelineAsset` in `globalgamemanagers.assets`). Native game vehicles use untextured geometry rendered via `Shader Graphs/EntityColorShader` (which integrates URP Fog of War buffers and procedural glitter/noise).
 
-Because the standalone mod authoring project (`unity/RogueCommandAssetAuthoring/`) targets the game's visual layer additively, mod visual assets authored with `Standard` or `RogueCommand/VehiclePBR_VertexWear` have their compiled shader variants embedded directly into the mod's AssetBundle (`.bundle`). At runtime, Unity executes these self-contained bundled shaders alongside the game's URP environment. Calling `Shader.Find("Standard")` inside the running game targets the bundled shader definition rather than a native game asset.
+The authoring project resolves URP 12.1.15. Simple sample materials use `Universal Render Pipeline/Lit`; atlased vehicle materials use the custom URP shader `RogueCommand/VehiclePBR_VertexWear` to read vertex-wear channels. These shaders are included with the AssetBundle. The custom shader does not implement the native `EntityColorShader` fog, distortion, or glitter buffers, and runtime rendering must be confirmed in a Steam-launched game.
 
 ### Material Property Matrix
 
 | Property Name | Unity Property Key | Data Type | Value Range | Typical Use in Mod Models |
 |---|---|---|---|---|
-| **Albedo / Base Color** | `_Color` | `Color` (RGBA) | `0.0` to `1.0` | Primary armor, frame, tires, hazard stripes |
+| **Albedo / Base Color** | `_BaseColor` | `Color` (RGBA) | `0.0` to `1.0` | Primary armor, frame, tires, hazard stripes |
 | **Metallic** | `_Metallic` | `float` | `0.0` to `1.0` | `0.08` for rubber, `0.35–0.45` for armor, `0.75–0.80` for gunmetal |
-| **Smoothness** | `_Glossiness` | `float` | `0.0` to `1.0` | `0.28–0.34` for rubber, `0.60–0.65` for armor, `0.70–0.75` for machined metal |
+| **Smoothness** | `_Smoothness` | `float` | `0.0` to `1.0` | `0.28–0.34` for rubber, `0.60–0.65` for armor, `0.70–0.75` for machined metal |
 | **Emission Color** | `_EmissionColor` | `Color` (HDR) | `RGB * intensity` | Glowing lenses, arc coils, warning beacons |
-| **GPU Instancing** | `enableInstancing` | `bool` | `true` / `false` | Always set `true` to enable SRP/Standard batching |
+| **GPU Instancing** | `enableInstancing` | `bool` | `true` / `false` | Enables instancing only when the shader, mesh, and renderer setup support it |
 
 ---
 
 ## 2. The Critical Emission Activation Rule
 
 > [!IMPORTANT]
-> Simply setting `_EmissionColor` on a Unity `Material` does **not** make it glow! By default, the Standard shader optimizes out the emission pass if the `_EMISSION` shader keyword is not explicitly enabled.
+> Simply setting `_EmissionColor` on a Unity `Material` does **not** make it glow. The URP Lit and vehicle shaders require the `_EMISSION` keyword to enable emission sampling.
 
 In C# Unity Editor scripts (such as `RogueCommandVisualSampleScaffolder.cs`):
 
@@ -39,10 +39,10 @@ private static Material CreateOrUpdateMaterial(
 {
     string path = MaterialRoot + "/" + name + ".mat";
     Material material = AssetDatabase.LoadAssetAtPath<Material>(path);
-    Shader shader = Shader.Find("Standard");
+    Shader shader = Shader.Find("Universal Render Pipeline/Lit");
     if (shader == null)
     {
-        throw new InvalidOperationException("Unity's Standard shader is unavailable for " + name + ".");
+        throw new InvalidOperationException("The URP Lit shader is unavailable for " + name + ".");
     }
 
     if (material == null)
@@ -57,8 +57,8 @@ private static Material CreateOrUpdateMaterial(
 
     material.color = color;
     material.SetFloat("_Metallic", metallic);
-    material.SetFloat("_Glossiness", smoothness);
-    material.enableInstancing = true; // Crucial for RTS draw-call batching!
+    material.SetFloat("_Smoothness", smoothness);
+    material.enableInstancing = true; // Permits instancing when the renderer setup is eligible.
 
     if (emissionColor.HasValue && emissionColor.Value != Color.black)
     {
@@ -93,7 +93,7 @@ In a dense RTS match, 40 to 80 units may occupy the screen simultaneously.
 - **Good Pattern (Material Key Batching)**:
   1. The authoring project creates exactly 6–8 canonical `.mat` assets in `Assets/.../Materials/`.
   2. The scaffolder maps every imported sub-mesh renderer to one of those canonical materials by name prefix (`ScoutArmor_`, `ScoutGun_`, `ScoutSensor_`, etc.).
-  3. `material.enableInstancing = true` allows Unity's batcher to render all meshes sharing the same material in 1–2 GPU instanced calls.
+  3. `material.enableInstancing = true` permits instancing when mesh, renderer, shader, and property-block conditions are met; it does not guarantee a particular draw-call count.
 
 ---
 
@@ -142,23 +142,22 @@ The pipeline can bake multiple object materials into one PBR texture set and ass
 
 ### A. Texture Maps & Channel Layout
 
-| Texture File | Channels / Layout | Import Setting (`TextureImporter`) | Standard Shader Destination |
+| Texture File | Channels / Layout | Import Setting (`TextureImporter`) | URP Shader Destination |
 | :--- | :--- | :--- | :--- |
-| `<Name>_Albedo.png` | sRGB Color (Diffuse, Camo, Wear) | `sRGBTexture = true` | `_MainTex` |
-| `<Name>_MetallicGloss.png` | **Linear Non-Color**: Red/Green/Blue = Metallic, **Alpha = Smoothness** ($1.0 - \text{Roughness}$) | `sRGBTexture = false`, `alphaSource = TextureImporterAlphaSource.FromInput` | `_MetallicGlossMap` (Keyword: `_METALLICGLOSSMAP`) |
+| `<Name>_Albedo.png` | sRGB Color (Diffuse, Camo, Wear) | `sRGBTexture = true` | `_BaseMap` |
+| `<Name>_MetallicGloss.png` | **Linear Non-Color**: Red/Green/Blue = Metallic, **Alpha = Smoothness** ($1.0 - \text{Roughness}$) | `sRGBTexture = false`, `alphaSource = TextureImporterAlphaSource.FromInput` | `_MetallicGlossMap` (Keyword: `_METALLICSPECGLOSSMAP`) |
 | `<Name>_Normal.png` | Tangent-space Normal Vector | `textureType = TextureImporterType.NormalMap` | `_BumpMap` (Keyword: `_NORMALMAP`) |
 | `<Name>_Emission.png` | sRGB Color (Sensors, Coils, Beacons) | `sRGBTexture = true` | `_EmissionMap` (Keyword: `_EMISSION`) |
 
-### B. Standard Shader Keyword & Multiplier Invariants
+### B. Custom URP Atlas Shader Keyword & Multiplier Invariants
 
 When assigning `_MetallicGlossMap` in C# (`VehiclePrefabBuilder.cs`):
 ```csharp
 mat.SetTexture("_MetallicGlossMap", metallicGlossTex);
-mat.EnableKeyword("_METALLICGLOSSMAP");
-mat.SetFloat("_Metallic", 1.0f);     // MUST be 1.0f so texture Red is not attenuated
-mat.SetFloat("_Glossiness", 1.0f);   // MUST be 1.0f so texture Alpha is not attenuated
+mat.EnableKeyword("_METALLICSPECGLOSSMAP");
+mat.SetFloat("_GlossMapScale", 1.0f); // Preserve the packed Alpha smoothness.
 ```
-If `sRGBTexture` is left `true`, Unity applies gamma-to-linear conversion, destroying metallic reflectance and darkening midtone smoothness. If `_Metallic` or `_Glossiness` is set to `< 1.0`, it acts as an arithmetic multiplier on the sampled texture data.
+If `sRGBTexture` is left `true`, Unity applies gamma-to-linear conversion to the packed material data. The atlas shader reads metallic from R and multiplies A by `_GlossMapScale`; `_Metallic` and `_Smoothness` supply scalar fallback values when the map keyword is disabled.
 
 ---
 

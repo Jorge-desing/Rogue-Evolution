@@ -5079,7 +5079,7 @@ def bake_pbr_texture_atlas(
             mat.node_tree.links.new(saved_surface_links[mat], out_node.inputs["Surface"])
         mat.node_tree.nodes.remove(emit_node)
 
-    # 6. Pack into Unity Standard Shader MetallicGloss Map:
+    # 6. Pack metallic and smoothness into the atlas consumed by the Rogue Command URP shader:
     # Red = Metallic, Green = Metallic, Blue = Metallic, Alpha = Smoothness (1.0 - Roughness)
     try:
         import numpy as np

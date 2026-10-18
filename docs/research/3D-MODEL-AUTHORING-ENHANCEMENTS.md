@@ -69,7 +69,7 @@ In Blender 4.5.14 LTS, the pipeline integrates `bpy.ops.object.shade_smooth_by_a
 To provide deep contact shadows in wheel wells, panel crevices, and under heavy turrets without requiring high-resolution UV unwrapping or texture memory:
 - Calls Blender `paint.vertex_color_dirt` with angle and blur parameters on each mesh; it does not implement a separate ground-clearance or scene-contact AO calculation.
 - Darkens crevices and undercarriages, storing the shadow scalar directly into the `Color` vertex attribute (`Mesh.colors32`).
-- Stores vertex data without an AO texture, but visible shading requires a shader that reads vertex colors. The current sample scaffolder selects `Standard`; this audit found no custom vertex-color shader or binding. Unity 2021.3 documents that most built-in shaders do not display vertex colors ([Mesh.colors](https://docs.unity3d.com/2021.3/Documentation/ScriptReference/Mesh-colors.html)). Do not claim this baked dirt is visible in-game until that path is implemented and verified.
+- Stores vertex data without an AO texture, but visible shading requires a shader that reads vertex colors. The authoring code now uses the custom URP `RogueCommand/VehiclePBR_VertexWear` atlas shader, which reads AO, wear, soot, and team-mask channels; direct sample materials use URP Lit. This source change still requires Unity bundle inspection and Steam runtime rendering evidence before claiming the shading is visible in-game.
 
 ### C. Standardized Unity Locator Sockets (`create_unity_locator_sockets`)
 To eliminate manual socket placement in Unity for weapons, effects, and pivots, the builder automatically generates standardized empty GameObjects exported into the FBX hierarchy:
@@ -310,7 +310,7 @@ The CLI generator allows full headless vehicle generation from PowerShell or bas
 
 ### Tonal roles and actual Blender material parameters
 
-The implementation allocates eight materials. Values below are Blender Principled BSDF metallic/roughness parameters, not Unity `_Glossiness`; Unity sample materials are assigned separately by the scaffolder.
+The implementation allocates eight materials. Values below are Blender Principled BSDF metallic/roughness parameters, not Unity `_Smoothness`; Unity sample materials are assigned separately by the scaffolder.
 
 | Material | Metallic | Roughness |
 |---|---:|---:|
@@ -411,7 +411,7 @@ Generates `<Name>_Wreckage.fbx` and `<name>-wreckage.blend` for visual combat de
 | Art Style Guide | `.agents/skills/.../references/art-style-and-palette.md` | Palette recipes, silhouette squint tests, and chamfer rules. |
 | Blender Recipes | `.agents/skills/.../references/blender-procedural-techniques.md` | `bpy` code snippets for procedural assemblies. |
 | Native Pivots Guide | `.agents/skills/.../references/native-hierarchy-and-pivots.md` | Transform hierarchies for `PCXBaseTank`, `BombBike`, etc. |
-| Unity Material Guide | `.agents/skills/.../references/unity-material-pipeline.md` | Standard shader setup, emission keywords, and batching. |
+| Unity Material Guide | `.agents/skills/.../references/unity-material-pipeline.md` | URP shader setup, emission keywords, and batching limits. |
 
 ---
 
@@ -677,13 +677,13 @@ Following static code review of the 3D authoring and runtime visual subsystems, 
   1. **Dual-Pass Bake & Channel Packing (`bake_pbr_texture_atlas` in `RogueModelKit.py`)**:
      - Metallic is baked via temporary emission shader rerouting using Cycles `type="EMIT"`.
      - Roughness is baked via Cycles `type="ROUGHNESS"`.
-     - Output is packed directly into the Unity Standard Shader specification:
+     - Output is packed into the linear metallic/smoothness texture format consumed by `RogueCommand/VehiclePBR_VertexWear`:
        $$\text{RGB} = \text{Metallic}, \quad \text{Alpha} = \text{Smoothness} = 1.0 - \text{Roughness}$$
      - Output is saved as `<Prefix>_MetallicGloss.png`.
   2. **Atlas Material Shader Tree (`create_single_material_atlas_model`)**:
      - Connects `_MetallicGloss.png` texture image node with `colorspace = Non-Color`.
      - Feeds texture Color through `ShaderNodeSeparateColor` with Red channel linked to Principled BSDF `Metallic`.
-     - Feeds texture Alpha through `ShaderNodeInvert` linked to Principled BSDF `Roughness`, guaranteeing visual parity between Blender viewports and Unity Standard Shader rendering.
+     - Feeds texture Alpha through `ShaderNodeInvert` linked to Principled BSDF `Roughness`, so alpha stores smoothness as `1 - roughness`. The packed channel layout matches the URP atlas shader, but Blender preview and URP runtime rendering require separate visual validation.
 
 ### B. Unity Prefab Builder Collider Conversion & Animator Generation
 - **Review Finding**: The Unity prefab builder did not convert authoring collision geometry into Unity `BoxCollider` components, and did not set up `Animator` components for articulated meshes.
@@ -742,7 +742,7 @@ Following in-depth static and architectural code review of the 3D authoring pipe
   3. Runtime socket discovery is now centralized in `RogueCommandSocketCatalog`: it accepts exact canonical names and legacy `<ModelName>_Socket_<canonical-name>` suffixes only. `RuntimeVisualDirector` no longer chooses turret, radar, deploy, or hardpoint sockets by arbitrary substring matching; explicitly named `RCL_Visual_*` visuals remain a separate attachment signal. If two distinct transforms (including two aliases such as `Socket_TurretPivot` and `Socket_TurretYaw`) map to one behavior role, that role is disabled instead of depending on hierarchy traversal order; other roles on the prefab remain available. An ambiguous detached attachment group does not fall back to the physical hardpoint locator; the locator is used as a legacy visual only if no detached group was authored.
 
 ### B. PBR Metallic-Gloss Packing & Linear Importer Pipeline
-- **Discrepancy**: The baked `_MetallicGloss.png` texture previously contained roughness in place of packed data; Unity's Standard shader treats `_MetallicGlossMap` as linear data ($R = \text{Metallic}, A = \text{Smoothness}$). In Unity, missing `sRGB = false` flags caused gamma distortion, while omitting `_METALLICGLOSSMAP` prevented texture sampling.
+- **Discrepancy**: The baked `_MetallicGloss.png` texture previously contained roughness in place of packed data. The URP atlas shader expects linear data ($R = \text{Metallic}, A = \text{Smoothness}$). Missing `sRGB = false` flags caused gamma distortion, while omitting the metallic/specular-gloss map keyword prevented texture sampling.
 - **Resolution**:
   1. In `RogueModelKit.py`, `bake_pbr_texture_atlas` isolates metallic via emission shader rerouting and inverts roughness ($S = 1.0 - \text{roughness}$), packing $R=M, G=M, B=M, A=S$ into `_MetallicGloss.png`.
   2. In `VehiclePrefabBuilder.cs`, `SetupAtlasTexturesAndMaterial` explicitly configures `TextureImporter` for `_MetallicGloss.png` with:
@@ -750,7 +750,7 @@ Following in-depth static and architectural code review of the 3D authoring pipe
      - `sRGBTexture = false` (linear non-color data)
      - `alphaSource = TextureImporterAlphaSource.FromInput`
      - `alphaIsTransparency = false` so alpha is preserved as smoothness data.
-  3. The Standard shader material enables `_METALLICGLOSSMAP`, disables `_SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A`, and sets `_GlossMapScale = 1.0f`, so the shader samples metallic from the map's red channel and smoothness from its alpha channel without scaling. In the pinned Unity 2021.3.45f2 Standard shader, `_Metallic` and `_Glossiness` are scalar fallbacks used when the map keyword is disabled; they do not multiply the map values.
+  3. The custom URP shader enables `_METALLICSPECGLOSSMAP` and sets `_GlossMapScale = 1.0f`; it samples metallic from red and smoothness from alpha. `_Metallic` and `_Smoothness` are scalar fallbacks when the map keyword is disabled.
   4. Albedo and emission maps are imported as sRGB color textures, while normal maps use the NormalMap importer type. When an optional map is absent, the builder clears its texture property, disables its keyword, and resets the associated material state to prevent a prior build's texture from persisting.
 
 ### C. LOD Hierarchy Precedence, Atlas Material Binding & Multi-Asset DB Search
@@ -906,8 +906,8 @@ To rigorously verify all authoring assumptions, shaders, reflection bindings, an
      - Procedural surface variation: `GlitterProbability`, `GlitterSize`, `SimpleNoiseScale`, `GradientNoiseScale`.
 3. **Modded AssetBundle Shader Bundling Reality**:
    - Unity's Built-in `Standard` shader is **not** present in `resources.assets`.
-   - Inspection of `content/packs/sample-native-expansion/bundles/sample-native-expansion.bundle` confirmed that the authoring project embeds its own compiled copy of `Standard` (PathID `-4850512016903265157`) and `VehiclePBR_VertexWear` directly into the AssetBundle.
-   - Modded PBR materials are self-contained inside the bundle; they do not hook into native URP `PrimaryFogOfWar` or `Shockwave` passes.
+   - The previously inspected sample bundle contained its own compiled Built-in `Standard` and a Built-in Surface Shader copy of `VehiclePBR_VertexWear`. Their presence in a bundle does not make them compatible with the game's URP renderer.
+   - The custom vehicle shader and direct sample materials have since been moved to URP. Their implementation and bundle build require fresh local validation; they do not reproduce native `PrimaryFogOfWar` or `Shockwave` behavior.
 
 ### B. REA Managed Assembly Member Verification
 Verified against `Assembly-CSharp.dll` (SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, MVID `db0e9462-128d-4296-9900-de18b4bd0c00`, Evidence ID: `ev_eea143512c436bb6579559b439d25e7356d59246194b33404955c85560424097`, Member Evidence: `ev_49344cfdc968be6996f6c1d4f83a49c8d853dd4ff305661523dda1b6e739fb6c`) and `RogueCommandExpansionLoader.dll` (SHA-256 `495b8f0666db0914893b5b28d9cb7dd8bf0ddfb9a020d3082359e9e6ce999b29`, MVID `77ebdb64-bfc5-4f52-a3b5-f442daf03949`, Evidence ID: `ev_dc9b898fc2552c8ab3b2e691082815ba0ad7e3db370fbc3c4a62fb397d5a28f8`):

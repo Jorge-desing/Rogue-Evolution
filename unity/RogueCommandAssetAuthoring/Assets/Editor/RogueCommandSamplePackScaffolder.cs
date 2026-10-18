@@ -158,10 +158,36 @@ namespace RogueCommandExpansion.Authoring
                     throw new InvalidOperationException("Unity did not create a PluginImporter for " + rel + ".");
                 }
 
+                bool importerChanged = false;
                 if (importer.GetCompatibleWithAnyPlatform() || !importer.GetCompatibleWithEditor())
                 {
                     importer.SetCompatibleWithAnyPlatform(false);
                     importer.SetCompatibleWithEditor(true);
+                    importerChanged = true;
+                }
+
+                // These local game DLLs are loaded by reflection for sample data authoring.
+                // Do not auto-reference them into Unity's predefined assemblies: the game's
+                // bundled URP/Mathematics DLLs conflict with the matching UPM editor packages.
+                var importerSettings = new SerializedObject(importer);
+                SerializedProperty explicitReferenceSetting =
+                    importerSettings.FindProperty("isExplicitlyReferenced");
+                if (explicitReferenceSetting == null ||
+                    explicitReferenceSetting.propertyType != SerializedPropertyType.Boolean)
+                {
+                    throw new InvalidOperationException(
+                        "Unity did not expose the Plugin Importer's Auto Reference setting for " + rel + ".");
+                }
+
+                if (!explicitReferenceSetting.boolValue)
+                {
+                    explicitReferenceSetting.boolValue = true;
+                    importerSettings.ApplyModifiedProperties();
+                    importerChanged = true;
+                }
+
+                if (importerChanged)
+                {
                     importer.SaveAndReimport();
                     configured++;
                 }
@@ -185,7 +211,7 @@ namespace RogueCommandExpansion.Authoring
                 AssetDatabase.Refresh();
             }
 
-            string msg = $"Imported {copied} and configured {configured} assembly file(s) as Editor-only authoring references. " +
+            string msg = $"Imported {copied} and configured {configured} assembly file(s) as Editor-only, non-auto-referenced authoring dependencies. " +
                 "Assembly-CSharp SHA-256: " + copiedHash + ".";
             Debug.Log("[SamplePackScaffolder] " + msg);
 
