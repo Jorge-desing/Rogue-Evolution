@@ -105,7 +105,7 @@ cabin = rmk.make_troop_compartment(
 | `make_quad_track_pod_assembly` | Independent 4-Track Pod ($Z_{\min} = 0.0\text{m}$) | Independent continuous track pod, catenary sag (`track_sag`), swivel mounting sponson arm, top mudguard fender |
 | `make_swing_arm_suspension_linkage` | Trailing Swing-Arm Linkage | Trailing swing arms, inboard torsion bar bosses on hull, upper coilover/hydraulic dampers |
 | `make_spaced_armor_side_skirts` | Standoff Composite Skirts | Multi-panel armor tiles, top mounting rail, standoff bracket struts, rear rubber mudflaps |
-| `make_all_terrain_wheel_assembly` | Tactical Wheeled ($Z_{\min} = 0.0\text{m}$) | Directional chevron tire lugs, deep-dish rim, planetary hub with 6 bolts, coilover shock |
+| `make_all_terrain_wheel_assembly` | Tactical Wheeled ($Z_{\min} = 0.0\text{m}$) | Directional chevron tire lugs, deep-dish rim, planetary hub with 6 bolts, coilover shock (`add_all_terrain_wheels(..., middle_axle=True)` for 6x6 chassis) |
 | `make_bipedal_digitigrade_leg` | Digitigrade Walker ($Z_{\min} = 0.0\text{m}$) | Rotary hip actuator, hydraulic thigh ram, knee armor cap, shin strut, 3-toed stabilizer foot |
 | `make_quad_crawler_leg` | Quad Spider Crawler ($Z_{\min} = 0.0\text{m}$) | Rotary hip knuckle, upper femur boom, knee knuckle, lower tibia strut, circular rubber foot pad |
 | `make_hover_skimmer_assembly` | Repulsor Hover ($Z_{\min} \approx 0.24–0.52\text{m}$) | Ventral repulsor cushion skirt, 4 plasma thruster bells, lateral stabilizer fins, vectoring ducts |
@@ -138,7 +138,7 @@ for side in (-1, 1):
 | Weapon Generator | Weapon Class & Pivot Semantics | Key Mechanical Primitives |
 |---|---|---|
 | `make_coaxial_cannon_assembly` | Coaxial Cannon (`gun_pivot`, `direction`) | Breech collar, thermal sleeve, bore evacuator, rifled barrel, double-baffle muzzle brake, recoil rams, accordion dust boot (`has_dust_boot`) |
-| `make_mantlet_dust_boot` | Concentric Accordion Bellows | Truncated frustum cylinders with alternating ridge radii ($1.14\times$ / $0.90\times$) and retention clamp bands |
+| `make_mantlet_dust_boot` | Open Accordion Bellows | Hollow torus pleat rings with alternating radii ($1.14\times$ / $0.90\times$) and an open retention clamp, preserving the weapon bore |
 | `make_dual_cannon_assembly` | Twin Cannon (transverse offset $\vec{u}$) | Unified armored mantlet, dual parallel rifled barrels, dual bore evacuators, muzzle brakes |
 | `make_heavy_howitzer_assembly` | Ballistic Howitzer (`elevation_deg \approx 26^\circ`) | Massive breech collar, short large-bore barrel, reinforced blast ring, sector elevation gear |
 | `make_rotary_gatling_cannon` | Gatling Cluster (angle $\theta_i = \frac{2\pi i}{N}$) | Rotor housing, central drive axle, 6 rifled barrels with clamp retaining collars, ammo feed chute |
@@ -146,6 +146,8 @@ for side in (-1, 1):
 | `make_arc_energy_emitter` | Arc Plasma Emitter (`forward_dir`) | Generator base pedestal, glowing plasma cathode, dual toroidal induction coils, 3 convergent prongs |
 | `make_collimated_beam_laser_assembly` | Directed Energy Laser (`laser_pivot`, `direction`) | Heavy emitter shroud, radiator cooling fins, focal aperture ring, high-voltage conduit cables |
 | `make_vls_vertical_missile_array` | Vertical Launch Silo ($R \times C$ array) | Armored rectangular silo coaming, recessed missile cells with chamfered lips, exhaust duct trench |
+| `make_flamethrower_assembly` | Heavy Flame Projector (`pivot`, `direction`) | Pressurized fuel manifold block, dual side feed tanks, perforated heat shroud, ventral igniter pilot assembly (`has_dust_boot`) |
+| `make_emp_emitter_assembly` | Electromagnetic Pulse Array (`pivot`, `direction`) | Octagonal dielectric pedestal, 3 stepped concentric pulse rings, central waveguide mast, 4 dipole fins, glowing HDR pulse globe |
 
 ```python
 # Coaxial cannon and rotary gatling alignment patterns

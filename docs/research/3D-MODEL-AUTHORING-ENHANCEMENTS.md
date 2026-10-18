@@ -97,7 +97,7 @@ Vehicles adhere to a disciplined 5-tone structural palette designed for maximum 
 
 ---
 
-## 4. Master Roster: The 19 Tactical Archetypes & 11 Weapons
+## 4. Master Roster: The 24 Tactical Archetypes & 13 Weapons
 
 | Archetype | Native Template | Proportions (W × L × H) | Stance / Mobility | Default Weapon | Rig Architecture | Signature Visual Features |
 |---|---|---|---|---|---|---|
@@ -120,8 +120,13 @@ Vehicles adhere to a disciplined 5-tone structural palette designed for maximum 
 | `colossus_titan`| `GatlingWalker` | 3.2m × 3.0m × 3.6m | Heavy bipedal war walker | `dual_cannon` | Biped Armature (8 bones) | Digitigrade legs (2.3m hip), shoulder pauldrons, dual cannons |
 | `hover_cruiser`| `PCXBaseTank` | 3.2m × 4.6m × 1.8m | Hydrodynamic skimmer | `railgun` | Standard Rig (6 bones) | Sloped bow prow (4.6m), flank repulsors, conning tower, railgun |
 | `heavy_dropship`| `PCXBaseTank` | 4.8m × 5.2m × 2.2m | High-wing VTOL transport | `missile` | Standard Rig (6 bones) | Cargo fuselage (3.8m), rear ramp, ducted tilt-rotors, missile pods |
+| `shield_truck` | `PCXBaseTank` | 2.4m × 4.2m × 2.5m | 6x6 tactical wheels | `arc` | Standard Rig (6 bones) | Armored 6x6 chassis, dorsal shield projector pylon, toroidal rings, capacitor banks |
+| `demolition_breacher`| `BombBike` | 2.3m × 3.2m × 2.1m | Compact high-speed tracks | `plasma_mortar`| Standard Rig (6 bones) | Exposed volatile plasma core drum, containment hoops, forward detonator spikes |
+| `artillery_strider`| `GatlingWalker`| 3.2m × 4.7m × 4.2m | Tall digitigrade biped legs | `railgun` | Biped Armature (8 bones) | Elevated sniper walker, spinal long-barrel railgun, counter-recoil rear spade |
+| `thermobaric_tank`| `PCXBaseTank` | 2.6m × 3.4m × 1.9m | Heavy continuous tracks | `flamethrower`| Standard Rig (6 bones) | Twin dorsal pressurized fuel tanks, armored transfer pipes, flame projector turret |
+| `ew_jammer` | `PCXBaseTank` | 2.4m × 3.9m × 2.8m | 6x6 tactical wheels | `emp_emitter` | Standard Rig (6 bones) | Mobile EW command shelter, dual phased-array panels, EMP pulse mast |
 
-### The 11 Procedural Weapon Assemblies
+### The 13 Procedural Weapon Assemblies
 1. `cannon` (`make_coaxial_cannon_assembly`): Tank gun with breech collar, thermal sleeve, bore evacuator, and muzzle brake.
 2. `dual_cannon` (`make_dual_cannon_assembly`): Synchronized twin-cannon mantlet with dual rifled barrels.
 3. `howitzer` (`make_heavy_howitzer_assembly`): Large-bore siege mortar with recoil recuperators and elevation sector gear.
@@ -133,6 +138,8 @@ Vehicles adhere to a disciplined 5-tone structural palette designed for maximum 
 9. `plasma_mortar` (`make_plasma_mortar_assembly`): Heavy siege mortar with 3 toroidal accelerator rings and radiator coils.
 10. `laser_beam` (`make_collimated_beam_laser_assembly`): High-intensity directed-energy emitter with focal ring, collimator shroud, cooling radiator fins, and power conduits.
 11. `vls_missiles` (`make_vls_vertical_missile_array`): Armored vertical launch system missile cell silo array with recessed cells, beveled lip, and exhaust duct trenching.
+12. `flamethrower` (`make_flamethrower_assembly`): Heavy flame projector with pressurized fuel manifold block, dual side feed tanks, perforated heat shroud, and ventral igniter pilot assembly.
+13. `emp_emitter` (`make_emp_emitter_assembly`): Electromagnetic pulse array with octagonal dielectric pedestal, 3 stepped concentric pulse rings, central waveguide mast, 4 dipole fins, and glowing HDR pulse globe.
 
 ---
 
@@ -266,7 +273,7 @@ All sockets use canonical unprefixed names oriented to Unity conventions (+Z for
 ## 8. Skeletal Mech Armatures, Rigid Weighting & In-Place Locomotion
 
 ### Bone Hierarchies
-- **Bipedal Walkers (`walker`, `colossus_titan`)**: `Bone_Root` $\to$ `Bone_Pelvis` $\to$ `Bone_Hull` $\to$ `Bone_Thigh_L/R` $\to$ `Bone_Shin_L/R` $\to$ `Bone_Foot_L/R`, with `Bone_TurretYaw` $\to$ `Bone_TurretPitch` $\to$ `Bone_BarrelRecoil`.
+- **Bipedal Walkers (`walker`, `colossus_titan`, `artillery_strider`)**: `Bone_Root` $\to$ `Bone_Pelvis` $\to$ `Bone_Hull` $\to$ `Bone_Thigh_L/R` $\to$ `Bone_Shin_L/R` $\to$ `Bone_Foot_L/R`, with `Bone_TurretYaw` $\to$ `Bone_TurretPitch` $\to$ `Bone_BarrelRecoil`.
 - **Quadrupeds (`spider`, `quad_mech`, `siege_crawler`)**: `Bone_Root` $\to$ `Bone_Hull` $\to$ `Bone_Pelvis` $\to$ `Bone_Thigh_FL/FR/RL/RR` $\to$ `Bone_Shin_*` $\to$ `Bone_Foot_*`, plus turret bones.
 - **Tracked / Wheeled**: Standard 6-bone rig (`Bone_Root`, `Bone_Hull`, `Bone_Pelvis`, `Bone_TurretYaw`, `Bone_TurretPitch`, `Bone_BarrelRecoil`).
 
@@ -292,6 +299,8 @@ Supports the mod rule that *every added unit requires a dedicated production bui
 3. `radar_station`: Octagonal bunker, 4-leg lattice mast, and motorized parabolic dish.
 4. `energy_silo`: Reactor vessel, 4 buttress legs, magnetic containment rings, and emissive conduits.
 5. `orbital_silo`: Heavy missile launch silo with book-opening blast doors and umbilical gantry tower.
+6. `shield_dome`: Reinforced octagonal generator pad, 4 arched field-emitter ribs, central plasma pylon, 4 perimeter capacitor banks, and translucent faceted energy dome.
+7. `emp_obelisk`: Stepped octagonal pedestal, 4 diagonal grounding buttresses, tapered dielectric pylon, 4 stacked high-voltage Tesla toroid rings, and apex discharge globe.
 
 ### Modular Attachments & Auxiliary Assets
 - **Hardpoints (`--attachments`)**: `era` (Explosive Reactive Armor tiles), `aps` (Active Protection System radar/countermeasures), `sponson` (side autocannon pods), `fuel_drums` (jettisonable fuel cells). Detached FBX export (`--export-detached-attachments`) excludes meshes from primary atlas/LODs and outputs `<Name>_Attachment_<Type>.fbx`.
@@ -364,9 +373,9 @@ Verified against `Assembly-CSharp.dll` (SHA-256 `d2da384df3318e7ac52db58eb13699e
 
 ---
 
-## 13. The 16 CLI Presets Table
+## 13. The 23 CLI Presets Table
 
-`tools/generate_unit_model.py` exposes 16 pre-calibrated presets:
+`tools/generate_unit_model.py` exposes 23 pre-calibrated presets:
 
 | Preset Name | Archetype | Default Weapon | Faction | Key Active Subsystems |
 |---|---|---|---|---|
@@ -386,6 +395,13 @@ Verified against `Assembly-CSharp.dll` (SHA-256 `d2da384df3318e7ac52db58eb13699e
 | `orbital_defense`| `orbital_silo` (structure) | `railgun` | `vanguard`| Launch pit, gantry tower, blast doors |
 | `beam_destroyer` | `tank` | `laser_beam` | `syndicate`| Collimated beam laser, radiator fins, sensor visor, sloped glacis |
 | `vls_missile_cruiser`| `hover_cruiser`| `vls_missiles` | `siege` | Vertical launch missile array, conning tower, flank repulsors |
+| `aegis_bastion` | `shield_truck` | `arc` | `vanguard` | 6x6 wheels, dorsal shield pylon, radar, smoke, energy shield dome |
+| `volatile_runner` | `demolition_breacher`| `plasma_mortar`| `siege` | Volatile plasma core drum, dozer blade, rollcage, detonator spikes |
+| `longbow_strider` | `artillery_strider`| `railgun` | `syndicate`| Tall digitigrade biped legs, IK rig, spinal railgun, rear spade |
+| `inferno_purger` | `thermobaric_tank`| `flamethrower` | `siege` | Twin dorsal fuel tanks, flame projector, spaced skirts, sponsons |
+| `spectre_jammer` | `ew_jammer` | `emp_emitter` | `arctic` | 6x6 wheels, phased-array jammer panels, EMP mast, radar, antenna |
+| `bastion_shield_dome`| `shield_dome` (structure)| `arc` | `vanguard` | Octagonal generator pad, 4 arched ribs, faceted energy dome |
+| `tesla_obelisk` | `emp_obelisk` (structure)| `emp_emitter` | `syndicate`| Grounding buttresses, tapered dielectric pylon, 4 Tesla toroids |
 
 ---
 
@@ -505,9 +521,9 @@ Links each roadwheel axle to hull sponsons via diagonal swing arms, torsion bar 
 - **CLI Flag**: `--suspension-arms` (auto-enabled in presets `siege_breaker`, `sky_sweeper`, `dreadnought_crawler`, `beam_destroyer`).
 
 ### 2. Tiered Concentric Mantlet Dust Boot (`make_mantlet_dust_boot`)
-Replaces rigid trunnion seams with flexible rubber/canvas accordion collars between gun mantlet faceplates and weapon barrels.
-- **Topology**: Concentric truncated frustum cylinders with alternating ridge radii ($1.14\times$ outer, $0.90\times$ inner) and retention clamp bands.
-- **CLI Flag**: `--mantlet-boot` (auto-enabled in presets `siege_breaker`, `sky_sweeper`).
+Adds low-poly rubber/canvas accordion rings between the mantlet faceplate and each supported weapon barrel while keeping the bore open.
+- **Topology**: Hollow torus pleat rings with alternating major radii ($1.14\times$ outer, $0.90\times$ inner) and an open torus clamp. Dual cannons and quad flak emit one fitted boot per barrel.
+- **CLI Flag**: `--mantlet-boot` (auto-enabled in presets `siege_breaker`, `sky_sweeper`; supports cannon, dual cannon, howitzer, railgun, quad flak, and plasma mortar).
 
 ### 3. Segmented Spaced Armor Skirts (`make_spaced_armor_side_skirts`)
 Protects continuous track runs with segmented standoff composite armor plates.

@@ -11,7 +11,7 @@ Use this skill to design, model, texture, and export original, high-readability 
 
 ## Verified Implementation Boundaries
 
-- **Supported CLI Coverage**: 19 mobile archetypes, 5 strategic structure types, 16 presets, and 11 weapon choices. `--track-sag`, `--armor-plating`, and `--ik-rig` provide parametric droop, BMesh panels, and 2-bone IK solver constraints. `--lod` reports polygon budgets; `--lods` builds the LOD chain.
+- **Supported CLI Coverage**: 24 mobile archetypes, 7 strategic structure types, 23 presets, and 13 weapon choices. `--track-sag`, `--armor-plating`, and `--ik-rig` provide parametric droop, BMesh panels, and 2-bone IK solver constraints. `--lod` reports polygon budgets; `--lods` builds the LOD chain.
 - **Node Patterns & Coordinates**: `--camo` uses procedural Object-coordinate nodes (Voronoi for `splinter`/`digital`, wave for `tigerstripe`, noise for `desert`/`urban`/`arctic`/`woodland`).
 - **Biome & Shaders**: `--biome` selects an authoring-time palette alias when `--camo` is `none` (no runtime adaptation). Atlas textures require baking and URP `VehiclePBR_VertexWear` shader.
 - **References**: Follow [Unity Material Pipeline](references/unity-material-pipeline.md), [Native Hierarchy & Pivots](references/native-hierarchy-and-pivots.md), and [3D-MODEL-AUTHORING-ENHANCEMENTS.md](../../../docs/research/3D-MODEL-AUTHORING-ENHANCEMENTS.md).
@@ -88,9 +88,9 @@ Use the tested, high-readability procedural assemblies rather than ad-hoc mesh p
 | Subsystem | Key Assemblies in `RogueModelKit` | Geometric Output & Capabilities |
 |---|---|---|
 | **Chassis & Cabins** | `make_sloped_glacis_hull`, `make_faceted_turret_housing`, `make_troop_compartment`, `make_tubular_rollcage_assembly` | Sloped wedge glacis, faceted turret bustles, armored troop bays, welded tubular roll cages |
-| **Mobility & Legs** | `make_continuous_track_assembly`, `make_quad_track_pod_assembly`, `make_all_terrain_wheel_assembly`, `make_bipedal_digitigrade_leg`, `make_quad_crawler_leg`, `make_hover_skimmer_assembly`, `make_ducted_tiltrotor_assembly`, `make_outrigger_stabilizer_legs`, `make_swing_arm_suspension_linkage`, `make_spaced_armor_side_skirts` | Continuous tracks, 4-track pods, off-road chevron tires, biped/spider legs, hover skirts, tilt-rotors, outriggers, trailing suspension arms with torsion bosses, spaced armor skirts |
-| **Weapons (11)** | `make_coaxial_cannon_assembly`, `make_dual_cannon_assembly`, `make_heavy_howitzer_assembly`, `make_rotary_gatling_cannon`, `make_missile_launcher_pod`, `make_arc_energy_emitter`, `make_railgun_assembly`, `make_quad_flak_autocannon_assembly`, `make_plasma_mortar_assembly`, `make_collimated_beam_laser_assembly`, `make_vls_vertical_missile_array`, `make_mantlet_dust_boot` | Cannons, dual guns, siege mortars, 6-barrel gatlings, rocket arrays, arc prongs, railguns, flak clusters, plasma mortars, collimated beam lasers, VLS missile arrays, accordion mantlet boots |
-| **Greebles & Optics** | `make_recessed_sensor_visor`, `make_gimbal_sensor_turret`, `make_radar_dish_or_rotodome`, `make_smoke_launcher_rack`, `make_side_sponson_assembly`, `make_armor_applique_array`, `make_hex_bolt_array`, `make_dozer_blade`, `make_flight_deck_assembly`, `make_heavy_excavator_drum` | Recessed visor hoods, FLIR gimbals, radar rotodomes, smoke racks, sponsons, ERA bricks, dozer blades, flight decks |
+| **Mobility & Legs** | `make_continuous_track_assembly`, `make_quad_track_pod_assembly`, `make_all_terrain_wheel_assembly`, `make_bipedal_digitigrade_leg`, `make_quad_crawler_leg`, `make_hover_skimmer_assembly`, `make_ducted_tiltrotor_assembly`, `make_outrigger_stabilizer_legs`, `make_swing_arm_suspension_linkage`, `make_spaced_armor_side_skirts` | Continuous tracks, 4-track pods, 4x4/6x6 off-road chevron tires, biped/spider legs, hover skirts, tilt-rotors, outriggers, trailing suspension arms, spaced armor skirts |
+| **Weapons (13)** | `make_coaxial_cannon_assembly`, `make_dual_cannon_assembly`, `make_heavy_howitzer_assembly`, `make_rotary_gatling_cannon`, `make_missile_launcher_pod`, `make_arc_energy_emitter`, `make_railgun_assembly`, `make_quad_flak_autocannon_assembly`, `make_plasma_mortar_assembly`, `make_collimated_beam_laser_assembly`, `make_vls_vertical_missile_array`, `make_flamethrower_assembly`, `make_emp_emitter_assembly`, `make_mantlet_dust_boot` | Cannons, dual guns, siege mortars, 6-barrel gatlings, rocket arrays, arc prongs, railguns, flak clusters, plasma mortars, beam lasers, VLS missile arrays, thermobaric flamethrowers, directional EMP emitters, accordion mantlet boots |
+| **Greebles & Structures** | `make_recessed_sensor_visor`, `make_gimbal_sensor_turret`, `make_radar_dish_or_rotodome`, `make_smoke_launcher_rack`, `make_side_sponson_assembly`, `make_dozer_blade`, `make_flight_deck_assembly`, `make_heavy_excavator_drum`, `make_shield_dome_assembly`, `make_emp_obelisk_assembly` | Recessed visor hoods, FLIR gimbals, radar rotodomes, smoke racks, sponsons, ERA bricks, dozer blades, flight decks, tactical shield domes, EMP suppression obelisks |
 | **Pipeline & Rigging** | `batch_and_join_by_material`, `bake_advanced_vertex_shading`, `generate_lod_chain`, `generate_collision_hulls`, `export_gameplay_metadata`, `make_wreckage_variant`, `make_thrown_track_debris`, `create_unity_locator_sockets` | Batched submeshes, RGBA wear baking, LOD0–2 chains, box colliders, `.gameplay.json`, thrown track debris, archetype-aware wreckage models, sockets |
 
 *See exact arguments and recipes in [blender-procedural-techniques.md](references/blender-procedural-techniques.md).*
@@ -140,40 +140,47 @@ Run headless vehicle generation directly from the command line using Blender and
     --wear battle_hardened --sponsons --smoke --radar --dirt --locators --lods --colliders --gameplay-json --wreckage --multiview
 ```
 
-- **Mobile Archetypes (19)**: `tank`, `walker`, `bike`, `artillery`, `arc_tank`, `hover`, `spider`, `vtol`, `halftrack`, `super_heavy`, `buggy`, `flak_anti_air`, `siege_crawler`, `drone_carrier`, `quad_mech`, `combat_harvester`, `colossus_titan`, `hover_cruiser`, and `heavy_dropship`.
-- **Strategic Structure Types (5)**: `factory`, `defense_turret`, `radar_station`, `energy_silo`, and `orbital_silo`. These are generated through the structure builder, separate from the 19 mobile archetypes.
-- **Weapons (11 CLI values)**: `cannon`, `gatling`, `missile`, `arc`, `howitzer`, `dual_cannon`, `railgun`, `quad_flak`, `plasma_mortar`, `laser_beam`, and `vls_missiles`. These are the exact values accepted by `--weapon`; descriptive names such as autocannon or missile pod are not CLI aliases.
+- **Mobile Archetypes (24)**: `tank`, `walker`, `bike`, `artillery`, `arc_tank`, `hover`, `spider`, `vtol`, `halftrack`, `super_heavy`, `buggy`, `flak_anti_air`, `siege_crawler`, `drone_carrier`, `quad_mech`, `combat_harvester`, `colossus_titan`, `hover_cruiser`, `heavy_dropship`, `shield_truck`, `demolition_breacher`, `artillery_strider`, `thermobaric_tank`, and `ew_jammer`.
+- **Strategic Structure Types (7)**: `factory`, `defense_turret`, `radar_station`, `energy_silo`, `orbital_silo`, `shield_dome`, and `emp_obelisk`. These are generated through `RogueStructureBuilder`, separate from the 24 mobile archetypes.
+- **Weapons (13 CLI values)**: `cannon`, `gatling`, `missile`, `arc`, `howitzer`, `dual_cannon`, `railgun`, `quad_flak`, `plasma_mortar`, `laser_beam`, `vls_missiles`, `flamethrower`, and `emp_emitter`.
 - **Factions**: `vanguard` (slate teal), `siege` (rust ochre), `syndicate` (deep cobalt), `arctic` (tundra navy).
 - **Camouflage Variants**: `digital`, `splinter`, and `tigerstripe` build procedural Voronoi/wave color patterns; `desert`, `urban`, `arctic`, and `woodland` use a procedural noise pattern with faction colors. These Blender node graphs can be baked to the atlas. They do not adapt to the map's runtime biome.
 - **Biome Palette Alias**: `--biome desert|arctic|woodland|urban` applies the corresponding authoring-time color palette only when `--camo` remains `none`; it does not adapt to a map's runtime biome.
 - **Surface Wear Levels**: `pristine` (factory clean), `field_tested` (moderate edge scratches and road grime), `battle_hardened` (heavy combat gouges, exhaust soot, and cavity dirt).
-- **Presets (16 Total)**:
+- **Presets (23 Total)**:
 
-| Preset ID | Base Archetype | Weapons & Key Attachments | Tactical Visual Identity |
+| Preset ID | Base Archetype / Building | Weapons & Key Attachments | Tactical Visual Identity |
 |---|---|---|---|
 | `siege_breaker` | `super_heavy` | Dual cannon, dust boot, suspension arms, spaced skirts, sponsons | Breakthrough fortress tank |
-| `recon_interceptor` | `bike` | Twin missile pods, roll cage | High-mobility strike motorcycle |
-| `gunship_alpha` | `vtol` | Tilt-rotors, rotary gatling | Aerodynamic attack VTOL |
-| `apc_enforcer` | `halftrack` | Armored troop cabin, pintle | Mechanized infantry transport |
-| `dune_raider` | `buggy` | All-terrain tires, roll cage | Fast desert scout buggy |
+| `recon_interceptor` | `buggy` | Rotary gatling, roll cage, radar | High-mobility scout vehicle |
+| `gunship_alpha` | `vtol` | Missile pods, ducted tilt-rotors | Aerodynamic attack VTOL |
+| `apc_enforcer` | `halftrack` | Rotary gatling, troop cabin, smoke | Mechanized infantry transport |
+| `dune_raider` | `bike` | Rotary gatling, spine chassis | Fast strike motorcycle |
 | `colossus_titan` | `colossus_titan` | Dual cannons, IK rig, radar, antenna | Heavy bipedal combat titan |
-| `sea_lance` | `hover_cruiser` | Railgun turret, sponsons | Heavy assault hovercraft |
+| `sea_lance` | `hover_cruiser` | Railgun turret, sponsons, radar | Heavy assault hovercraft |
 | `sky_dreadnought` | `heavy_dropship` | Missile pods, ducted tilt-rotors | Heavy gunship / airborne lander |
 | `orbital_defense` | `orbital_silo` | Orbital silo aperture, gantry | Strategic planetary defense base |
 | `sky_sweeper` | `flak_anti_air` | Quad flak autocannon, dust boot, suspension arms, outriggers | Area denial anti-aircraft platform |
 | `dreadnought_crawler` | `siege_crawler`| Heavy railgun, quad track pods, suspension arms, outriggers | Super-heavy mobile siege platform |
 | `hive_carrier` | `drone_carrier` | Flight deck, rotodome, bridge | Autonomous drone command carrier |
-| `titan_quad` | `quad_mech` | Rotary gatling, 4 spider legs, IK rig | Articulated heavy quad walker |
+| `titan_quad` | `quad_mech` | Dual cannons, 4 spider legs, IK rig | Articulated heavy quad walker |
 | `resource_behemoth` | `combat_harvester`| Rotary cutting drum, ore hoppers | Heavy armed resource excavator |
 | `beam_destroyer` | `super_heavy` | Collimated beam laser, suspension arms, spaced skirts, sponsons | Direct-energy combat destroyer |
 | `vls_missile_cruiser`| `hover_cruiser`| Vertical launch missile array, conning tower | Guided stand-off missile cruiser |
+| `aegis_bastion` | `shield_truck` | Arc emitter, 6x6 chassis, projector dome, shield bubble | Mobile tactical shield generator truck |
+| `volatile_runner` | `demolition_breacher`| Plasma mortar, volatile core drum, detonator spikes, dozer | High-speed armored demolition breacher |
+| `longbow_strider` | `artillery_strider`| Railgun, long digitigrade legs, outriggers, IK rig | Long-range bipedal sniper walker |
+| `inferno_purger` | `thermobaric_tank` | Flamethrower, twin cryo/fuel tanks, spaced skirts, sponsons | Heavy thermobaric flame assault tank |
+| `spectre_jammer` | `ew_jammer` | EMP emitter, 6x6 chassis, phased-array panels, radar | Electronic warfare & EMP disruptor truck |
+| `bastion_shield_dome`| `shield_dome` | Converging emitter pylons, field coils, dome core | Stationary area shield generator |
+| `tesla_obelisk` | `emp_obelisk` | Segmented conductive spire, discharge rings, emitter crown | Fortified EMP suppression obelisk |
 
 - **CLI Flag Groups**:
   - *Geometry & Optimization*: `--lods` (LOD0-2 chain), `--colliders` (`_COLLIDER_Hull/Turret`), `--gameplay-json` (kinematic metadata), `--wreckage` (battle-destroyed model), `--wreckage-severity <light|medium|catastrophic>` (destruction severity), `--target-budget <int>` (poly profiling), `--track-sag` (parametric catenary track sag), `--armor-plating` (procedural BMesh faceted panels), `--ik-rig` (automated 2-bone IK solver controls).
   - *Textures & Shading*: `--bake-atlas` (PBR atlas bake), `--bake-normals`, `--single-material` (`<Name>_Atlas.fbx`), `--camo <type>`, `--camo-scale`, `--camo-contrast`, `--panel-lines` (procedural bump), `--normal-intensity`.
-  - *Attachments & Greebles*: `--suspension-arms` (trailing-arm torsion linkages), `--mantlet-boot` (concentric accordion dust boot), `--spaced-skirts` (segmented standoff composite skirts), `--antenna` (whip antenna), `--cupola` (commander hatch), `--rivets` (seam bolts), `--track-shoes` (individual cleats), `--outriggers` (stabilizer rams), `--flight-deck`, `--excavator-drum`.
+  - *Attachments & Greebles*: `--suspension-arms` (trailing-arm torsion linkages), `--mantlet-boot` (open torus pleat rings around cannon-family barrels; supports cannon, dual cannon, howitzer, railgun, quad flak, plasma mortar, and flamethrower), `--spaced-skirts` (segmented standoff composite skirts), `--antenna` (whip antenna), `--cupola` (commander hatch), `--rivets` (seam bolts), `--track-shoes` (individual cleats), `--outriggers` (stabilizer rams), `--flight-deck`, `--excavator-drum`.
   - *Palette Overrides*: `--primary-color <hex>`, `--light-armor-color <hex>`, `--emissive-color <hex>`, `--biome <desert|arctic|woodland|urban>`.
-  - *Execution Controls*: `--dry-run` (validation without meshing), `--batch-all-archetypes` (build all 19 archetypes), `--report-json <path>`, `--lod`, `--multiview`.
+  - *Execution Controls*: `--dry-run` (validation without meshing), `--batch-all-archetypes` (build all 24 archetypes), `--report-json <path>`, `--lod`, `--multiview`.
 - **Outputs**: Generates editable `.blend`, Unity-optimized `.fbx` with lightmap UVs, 4-channel vertex color shading, canonical unprefixed `Socket_*` empties, batched submeshes, collision hulls, companion `.gameplay.json`, and 4-view orthographic preview sheet.
 
 ### Automated Quality & Subsystem Profiling Diagnostics
