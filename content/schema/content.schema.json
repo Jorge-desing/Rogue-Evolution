@@ -160,7 +160,8 @@
       "properties": {
         "language": { "enum": ["en-US", "de-DE", "ja-JP", "ko-KR", "zh-CN", "zh-TW", "fr-FR", "es-XL", "pt-BR", "ru-RU"] },
         "name": { "type": "string", "minLength": 1, "pattern": "\\S" },
-        "description": { "type": "string", "pattern": "\\S" }
+        "description": { "type": "string", "pattern": "\\S" },
+        "skillDescription": { "type": "string", "minLength": 1, "pattern": "\\S" }
       }
     },
     "productionBuilding": {

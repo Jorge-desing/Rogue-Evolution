@@ -47,6 +47,12 @@ namespace RogueCommandExpansionLoader.Runtime
         LoaderDiagnosticsSnapshot GetDiagnosticsSnapshot();
     }
 
+    /// <summary>Optional bridge for localized ability text on mod units.</summary>
+    public interface IUnitSkillLocalizationRuntimeProvider
+    {
+        bool TryGetUnitSkillDescription(string unitId, out string value);
+    }
+
     /// <summary>
     /// Optional bridge for a stage-owned procedural landscape. The returned scope is temporary
     /// and must be ended from a Harmony finalizer so game collections are restored after failures.

@@ -258,6 +258,8 @@ namespace RogueCommandExpansionLoader.Runtime
                 HasSingleStringArgumentReturningString);
             MethodInfo blueprintDescription = RuntimeReflection.FindUniqueMethod(loca, "BlueprintDescription",
                 HasSingleStringArgumentReturningString);
+            MethodInfo skillDescription = RuntimeReflection.FindUniqueMethod(loca, "SkillDescription",
+                HasSingleStringArgumentReturningString);
             MethodInfo globalLocalization = RuntimeReflection.FindUniqueMethod(loca, "Global",
                 delegate(MethodInfo method)
                 {
@@ -311,6 +313,7 @@ namespace RogueCommandExpansionLoader.Runtime
             MethodInfo aiDestroyPostfix = Hook("AiBehaviourDestroyPostfix");
             MethodInfo blueprintNamePrefix = Hook("BlueprintNamePrefix");
             MethodInfo blueprintDescriptionPrefix = Hook("BlueprintDescriptionPrefix");
+            MethodInfo skillDescriptionPrefix = Hook("SkillDescriptionPrefix");
             MethodInfo globalLocalizationPrefix = Hook("LandscapeLocalizationPrefix");
             MethodInfo fallbackLandscapesPostfix = Hook("FallbackLandscapeGeneratorsPostfix");
             MethodInfo outlyingStartAiBuildingDistancePrefix = Hook("OutlyingStartAiBuildingDistancePrefix");
@@ -349,6 +352,7 @@ namespace RogueCommandExpansionLoader.Runtime
             plan.Add(new PatchPlan(aiDestroy, null, aiDestroyPostfix));
             plan.Add(new PatchPlan(blueprintName, blueprintNamePrefix, null));
             plan.Add(new PatchPlan(blueprintDescription, blueprintDescriptionPrefix, null));
+            plan.Add(new PatchPlan(skillDescription, skillDescriptionPrefix, null));
             plan.Add(new PatchPlan(globalLocalization, globalLocalizationPrefix, null));
             plan.Add(new PatchPlan(fallbackLandscapes, null, fallbackLandscapesPostfix));
             plan.Add(new PatchPlan(outlyingStartAiBuildingDistance,

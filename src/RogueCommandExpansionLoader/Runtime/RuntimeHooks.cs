@@ -396,6 +396,44 @@ namespace RogueCommandExpansionLoader.Runtime
             return TryResolveUnitLocalization(__0, true, ref __result);
         }
 
+        public static bool SkillDescriptionPrefix(string __0, ref string __result)
+        {
+            IUnitSkillLocalizationRuntimeProvider provider;
+            Action<string> logger;
+            lock (Gate)
+            {
+                provider = _provider as IUnitSkillLocalizationRuntimeProvider;
+                logger = _log;
+            }
+
+            if (provider == null)
+            {
+                return true;
+            }
+
+            try
+            {
+                string value;
+                if (!provider.TryGetUnitSkillDescription(__0, out value))
+                {
+                    return true;
+                }
+
+                __result = value ?? String.Empty;
+                return false;
+            }
+            catch (Exception exception)
+            {
+                if (logger != null)
+                {
+                    logger("Could not resolve localized skill text for unit '" + __0 + "': " +
+                        exception.GetType().Name + ": " + exception.Message);
+                }
+
+                return true;
+            }
+        }
+
         public static bool LandscapeLocalizationPrefix(ref string __0, ref string __result)
         {
             IRuntimeContentProvider provider;
@@ -886,6 +924,11 @@ namespace RogueCommandExpansionLoader.Runtime
         public static bool BlueprintDescriptionPrefix(string __0, ref string __result)
         {
             return RuntimeHooks.BlueprintDescriptionPrefix(__0, ref __result);
+        }
+
+        public static bool SkillDescriptionPrefix(string __0, ref string __result)
+        {
+            return RuntimeHooks.SkillDescriptionPrefix(__0, ref __result);
         }
 
         public static bool LandscapeLocalizationPrefix(ref string __0, ref string __result)

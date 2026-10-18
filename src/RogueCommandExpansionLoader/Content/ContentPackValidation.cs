@@ -1150,6 +1150,13 @@ namespace RogueCommandExpansionLoader.Content
                     Add(diagnostics, codePrefix + ".localization-description-invalid", itemPath + ".description",
                         "Optional localization descriptions must be non-empty when provided.");
                 }
+
+                if (localization.skillDescription != null && String.IsNullOrWhiteSpace(localization.skillDescription))
+                {
+                    Add(diagnostics, codePrefix + ".localization-skill-description-invalid",
+                        itemPath + ".skillDescription",
+                        "Optional skill descriptions must be non-empty when provided.");
+                }
             }
 
             if (!hasEnglishName)

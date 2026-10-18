@@ -38,7 +38,30 @@
         { "name": "moveSpeed", "value": "14.5" },
         { "name": "sightRadius", "value": "8" },
         { "name": "weaponRange", "value": "6" },
-        { "name": "attackCooldown", "value": "0.9" }
+        { "name": "attackCooldown", "value": "0.9" },
+        { "name": "rarity", "value": "Common" },
+        { "name": "neededExperienceLevel", "value": "0" },
+        { "name": "productionDuration", "value": "42" },
+        { "name": "maxCapacity", "value": "5" },
+        { "name": "maxShield", "value": "0" },
+        { "name": "maxMana", "value": "0" },
+        { "name": "maxArmor", "value": "0" },
+        { "name": "armorProtection", "value": "1" },
+        { "name": "attackType", "value": "AoE" },
+        { "name": "skillType", "value": "None" },
+        { "name": "damage1", "value": "8" },
+        { "name": "damage2", "value": "0" },
+        { "name": "firePointCount", "value": "2" },
+        { "name": "attack2Cooldown", "value": "0" },
+        { "name": "effectRadius1", "value": "0.2" },
+        { "name": "effectRadius2", "value": "0" },
+        { "name": "skillRange", "value": "0" },
+        { "name": "healAmount1", "value": "0" },
+        { "name": "healAmount2", "value": "0" },
+        { "name": "gainCreditsAmount", "value": "0" },
+        { "name": "skillManaCost", "value": "0" },
+        { "name": "duration1", "value": "0" },
+        { "name": "duration2", "value": "0" }
       ],
       "productionBuilding": {
         "id": "sample-native:scout-tank-factory",
@@ -46,7 +69,8 @@
         "balanceOverrides": [
           { "name": "cost", "value": "500" },
           { "name": "maxCapacity", "value": "3" },
-          { "name": "neededExperienceLevel", "value": "0" }
+          { "name": "neededExperienceLevel", "value": "0" },
+          { "name": "rarity", "value": "Common" }
         ],
         "localizations": [
           { "language": "en-US", "name": "Sandlance Assembly Plant", "description": "Produces Sandlance Scout units." },
@@ -65,12 +89,14 @@
         {
           "language": "en-US",
           "name": "Colossus Siege Platform",
-          "description": "A heavily armored siege platform delivering destructive high-caliber shell barrages across extreme ranges."
+          "description": "A heavily armored siege platform delivering destructive high-caliber shell barrages across extreme ranges.",
+          "skillDescription": "Toggle between movement and attack modes."
         },
         {
           "language": "es-XL",
           "name": "Plataforma de Asedio Coloso",
-          "description": "Una plataforma de asedio fuertemente blindada que descarga devastadoras andanadas de alto calibre a distancias extremas."
+          "description": "Una plataforma de asedio fuertemente blindada que descarga devastadoras andanadas de alto calibre a distancias extremas.",
+          "skillDescription": "Alterna entre los modos de movimiento y ataque."
         }
       ],
       "balanceOverrides": [
@@ -81,14 +107,36 @@
         { "name": "weaponRange", "value": "16" },
         { "name": "attackCooldown", "value": "4.0" },
         { "name": "effectRadius1", "value": "1.5" },
-        { "name": "armorProtection", "value": "2" }
+        { "name": "armorProtection", "value": "2" },
+        { "name": "rarity", "value": "Common" },
+        { "name": "neededExperienceLevel", "value": "4" },
+        { "name": "productionDuration", "value": "50" },
+        { "name": "maxCapacity", "value": "4" },
+        { "name": "maxShield", "value": "0" },
+        { "name": "maxMana", "value": "0" },
+        { "name": "maxArmor", "value": "0" },
+        { "name": "sightRadius", "value": "6" },
+        { "name": "attackType", "value": "Artillery" },
+        { "name": "skillType", "value": "Toggle" },
+        { "name": "damage2", "value": "0" },
+        { "name": "firePointCount", "value": "1" },
+        { "name": "attack2Cooldown", "value": "0" },
+        { "name": "effectRadius2", "value": "0" },
+        { "name": "skillRange", "value": "0" },
+        { "name": "healAmount1", "value": "0" },
+        { "name": "healAmount2", "value": "0" },
+        { "name": "gainCreditsAmount", "value": "0" },
+        { "name": "skillManaCost", "value": "0" },
+        { "name": "duration1", "value": "0" },
+        { "name": "duration2", "value": "0" }
       ],
       "productionBuilding": {
         "id": "sample-native:heavy-artillery-factory",
         "nativeTemplateId": "ArtilleryTankFactory",
         "balanceOverrides": [
           { "name": "cost", "value": "800" },
-          { "name": "neededExperienceLevel", "value": "0" }
+          { "name": "neededExperienceLevel", "value": "4" },
+          { "name": "rarity", "value": "Common" }
         ],
         "localizations": [
           { "language": "en-US", "name": "Colossus Siege Works", "description": "Produces Colossus Siege Platforms." },
@@ -122,14 +170,37 @@
         { "name": "damage1", "value": "4" },
         { "name": "attackCooldown", "value": "0.4" },
         { "name": "weaponRange", "value": "6" },
-        { "name": "armorProtection", "value": "2" }
+        { "name": "armorProtection", "value": "2" },
+        { "name": "rarity", "value": "Common" },
+        { "name": "neededExperienceLevel", "value": "2" },
+        { "name": "productionDuration", "value": "36" },
+        { "name": "maxCapacity", "value": "4" },
+        { "name": "maxShield", "value": "0" },
+        { "name": "maxMana", "value": "0" },
+        { "name": "maxArmor", "value": "1" },
+        { "name": "sightRadius", "value": "7" },
+        { "name": "attackType", "value": "Single" },
+        { "name": "skillType", "value": "None" },
+        { "name": "damage2", "value": "0" },
+        { "name": "firePointCount", "value": "6" },
+        { "name": "attack2Cooldown", "value": "0" },
+        { "name": "effectRadius1", "value": "0" },
+        { "name": "effectRadius2", "value": "0" },
+        { "name": "skillRange", "value": "0" },
+        { "name": "healAmount1", "value": "0" },
+        { "name": "healAmount2", "value": "0" },
+        { "name": "gainCreditsAmount", "value": "0" },
+        { "name": "skillManaCost", "value": "0" },
+        { "name": "duration1", "value": "0" },
+        { "name": "duration2", "value": "0" }
       ],
       "productionBuilding": {
         "id": "sample-native:assault-walker-factory",
         "nativeTemplateId": "GatlingWalkerFactory",
         "balanceOverrides": [
           { "name": "cost", "value": "1100" },
-          { "name": "neededExperienceLevel", "value": "0" }
+          { "name": "neededExperienceLevel", "value": "2" },
+          { "name": "rarity", "value": "Common" }
         ],
         "localizations": [
           { "language": "en-US", "name": "Ironclad Walker Foundry", "description": "Produces Ironclad Gatling Walkers." },
@@ -151,12 +222,14 @@
         {
           "language": "en-US",
           "name": "Skirmish Strike Bike",
-          "description": "An ultra-fast suicide recon bike loaded with volatile high-explosive charges for rapid hit-and-run strikes."
+          "description": "An ultra-fast suicide recon bike loaded with volatile high-explosive charges for rapid hit-and-run strikes.",
+          "skillDescription": "Dies and summons #LargeMine#."
         },
         {
           "language": "es-XL",
           "name": "Moto de Asalto Rápido",
-          "description": "Una moto de reconocimiento ultrarrápida cargada con cargas explosivas volátiles para ataques de choque y fuga."
+          "description": "Una moto de reconocimiento ultrarrápida cargada con cargas explosivas volátiles para ataques de choque y fuga.",
+          "skillDescription": "Muere e invoca una #LargeMine#."
         }
       ],
       "balanceOverrides": [
@@ -165,14 +238,38 @@
         { "name": "moveSpeed", "value": "24.0" },
         { "name": "damage1", "value": "32" },
         { "name": "effectRadius1", "value": "1.8" },
-        { "name": "attackType", "value": "Single" }
+        { "name": "attackType", "value": "AoE" },
+        { "name": "rarity", "value": "Common" },
+        { "name": "neededExperienceLevel", "value": "1" },
+        { "name": "productionDuration", "value": "10" },
+        { "name": "maxCapacity", "value": "10" },
+        { "name": "maxShield", "value": "0" },
+        { "name": "maxMana", "value": "0" },
+        { "name": "maxArmor", "value": "0" },
+        { "name": "armorProtection", "value": "0" },
+        { "name": "sightRadius", "value": "5" },
+        { "name": "skillType", "value": "Location" },
+        { "name": "damage2", "value": "0" },
+        { "name": "firePointCount", "value": "1" },
+        { "name": "weaponRange", "value": "0" },
+        { "name": "attackCooldown", "value": "0" },
+        { "name": "attack2Cooldown", "value": "0" },
+        { "name": "effectRadius2", "value": "0" },
+        { "name": "skillRange", "value": "4" },
+        { "name": "healAmount1", "value": "0" },
+        { "name": "healAmount2", "value": "0" },
+        { "name": "gainCreditsAmount", "value": "0" },
+        { "name": "skillManaCost", "value": "0" },
+        { "name": "duration1", "value": "0" },
+        { "name": "duration2", "value": "120" }
       ],
       "productionBuilding": {
         "id": "sample-native:skirmish-bike-factory",
         "nativeTemplateId": "BombBikeFactory",
         "balanceOverrides": [
           { "name": "cost", "value": "280" },
-          { "name": "neededExperienceLevel", "value": "0" }
+          { "name": "neededExperienceLevel", "value": "1" },
+          { "name": "rarity", "value": "Common" }
         ],
         "localizations": [
           { "language": "en-US", "name": "Skirmish Bike Garage", "description": "Produces Skirmish Strike Bikes." },
@@ -206,14 +303,37 @@
         { "name": "damage1", "value": "12" },
         { "name": "attackCooldown", "value": "1.8" },
         { "name": "weaponRange", "value": "4.5" },
-        { "name": "armorProtection", "value": "2" }
+        { "name": "armorProtection", "value": "2" },
+        { "name": "rarity", "value": "Common" },
+        { "name": "neededExperienceLevel", "value": "3" },
+        { "name": "productionDuration", "value": "30" },
+        { "name": "maxCapacity", "value": "5" },
+        { "name": "maxShield", "value": "5" },
+        { "name": "maxMana", "value": "0" },
+        { "name": "maxArmor", "value": "0" },
+        { "name": "sightRadius", "value": "6" },
+        { "name": "attackType", "value": "Beam" },
+        { "name": "skillType", "value": "None" },
+        { "name": "damage2", "value": "0" },
+        { "name": "firePointCount", "value": "1" },
+        { "name": "attack2Cooldown", "value": "0" },
+        { "name": "effectRadius1", "value": "0" },
+        { "name": "effectRadius2", "value": "0" },
+        { "name": "skillRange", "value": "0" },
+        { "name": "healAmount1", "value": "0" },
+        { "name": "healAmount2", "value": "0" },
+        { "name": "gainCreditsAmount", "value": "0" },
+        { "name": "skillManaCost", "value": "0" },
+        { "name": "duration1", "value": "0" },
+        { "name": "duration2", "value": "0" }
       ],
       "productionBuilding": {
         "id": "sample-native:surge-tank-factory",
         "nativeTemplateId": "LightningTankFactory",
         "balanceOverrides": [
           { "name": "cost", "value": "650" },
-          { "name": "neededExperienceLevel", "value": "0" }
+          { "name": "neededExperienceLevel", "value": "3" },
+          { "name": "rarity", "value": "Common" }
         ],
         "localizations": [
           { "language": "en-US", "name": "Surge Arc Foundry", "description": "Produces Surge Arc Tanks." },

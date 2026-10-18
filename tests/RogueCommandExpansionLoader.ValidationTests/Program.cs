@@ -138,6 +138,7 @@ var tests = new (string Name, Action Run)[]
             "AiBehaviourDestroyPostfix",
             "BlueprintNamePrefix",
             "BlueprintDescriptionPrefix",
+            "SkillDescriptionPrefix",
             "LandscapeLocalizationPrefix",
             "FallbackLandscapeGeneratorsPostfix",
             "OutlyingStartAiBuildingDistancePrefix",
@@ -186,7 +187,9 @@ var tests = new (string Name, Action Run)[]
             BindingFlags.Public | BindingFlags.Static);
         MethodInfo? descriptionHook = typeof(RuntimeHarmonyPatches).GetMethod("BlueprintDescriptionPrefix",
             BindingFlags.Public | BindingFlags.Static);
-        foreach (MethodInfo? hook in new[] { nameHook, descriptionHook })
+        MethodInfo? skillDescriptionHook = typeof(RuntimeHarmonyPatches).GetMethod("SkillDescriptionPrefix",
+            BindingFlags.Public | BindingFlags.Static);
+        foreach (MethodInfo? hook in new[] { nameHook, descriptionHook, skillDescriptionHook })
         {
             ParameterInfo[] parameters = hook?.GetParameters() ?? Array.Empty<ParameterInfo>();
             if (hook == null || hook.ReturnType != typeof(bool) || parameters.Length != 2 ||
@@ -967,9 +970,13 @@ var tests = new (string Name, Action Run)[]
         copy.units[0].productionBuilding.id = "test:changed-factory";
         copy.units[0].productionBuilding.balanceOverrides[0].value = "9999";
         copy.units[0].productionBuilding.localizations[0].name = "Changed";
+        copy.units.Single(unit => unit.id == "sample-native:skirmish-bike")
+            .localizations[0].skillDescription = "Changed skill text";
         if (nativeSample.units[0].productionBuilding.id == "test:changed-factory" ||
             nativeSample.units[0].productionBuilding.balanceOverrides[0].value == "9999" ||
-            nativeSample.units[0].productionBuilding.localizations[0].name == "Changed")
+            nativeSample.units[0].productionBuilding.localizations[0].name == "Changed" ||
+            nativeSample.units.Single(unit => unit.id == "sample-native:skirmish-bike")
+                .localizations[0].skillDescription == "Changed skill text")
             throw new InvalidOperationException("Production building data shared mutable arrays with the source pack.");
     }),
     ("sample manifest passes package-local validation", () =>
@@ -1084,6 +1091,103 @@ var tests = new (string Name, Action Run)[]
                 throw new InvalidOperationException($"Unit {unitId} is missing valid en-US or es-XL name/description.");
             }
         }
+    }),
+    ("expansion cards unlock by profile level and declare the card display stats", () =>
+    {
+        var expectedUnlockLevels = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["sample-native:scout-tank"] = "0",
+            ["sample-native:skirmish-bike"] = "1",
+            ["sample-native:assault-walker"] = "2",
+            ["sample-native:surge-tank"] = "3",
+            ["sample-native:heavy-artillery"] = "4"
+        };
+        string[] requiredCardStats =
+        [
+            "rarity", "neededExperienceLevel", "cost", "productionDuration", "maxCapacity", "maxHealth",
+            "maxShield", "maxMana", "armorProtection", "moveSpeed", "sightRadius", "attackType", "skillType",
+            "maxArmor", "damage1", "damage2", "firePointCount", "attackCooldown", "attack2Cooldown",
+            "weaponRange", "effectRadius1", "effectRadius2", "skillRange", "healAmount1", "healAmount2",
+            "gainCreditsAmount", "skillManaCost", "duration1", "duration2"
+        ];
+
+        foreach (KeyValuePair<string, string> expected in expectedUnlockLevels)
+        {
+            ContentUnitDefinition unit = nativeSample.units.Single(candidate => candidate.id == expected.Key);
+            foreach (string stat in requiredCardStats)
+            {
+                if (unit.balanceOverrides == null || !unit.balanceOverrides.Any(entry => entry.name == stat))
+                {
+                    throw new InvalidOperationException($"Card {unit.id} is missing its explicit {stat} value.");
+                }
+            }
+
+            string productLevel = unit.balanceOverrides.Single(entry => entry.name == "neededExperienceLevel").value;
+            string buildingLevel = unit.productionBuilding.balanceOverrides
+                .Single(entry => entry.name == "neededExperienceLevel").value;
+            string productRarity = unit.balanceOverrides.Single(entry => entry.name == "rarity").value;
+            string buildingRarity = unit.productionBuilding.balanceOverrides
+                .Single(entry => entry.name == "rarity").value;
+            if (productLevel != expected.Value || buildingLevel != expected.Value ||
+                productRarity != "Common" || buildingRarity != productRarity)
+            {
+                throw new InvalidOperationException(
+                    $"Card {unit.id} does not mirror its level {expected.Value} unlock and rarity on its factory.");
+            }
+        }
+
+        ContentUnitDefinition bike = nativeSample.units.Single(unit => unit.id == "sample-native:skirmish-bike");
+        ContentUnitDefinition artillery = nativeSample.units.Single(unit => unit.id == "sample-native:heavy-artillery");
+        if (bike.localizations.Single(item => item.language == "en-US").skillDescription !=
+                "Dies and summons #LargeMine#." ||
+            bike.localizations.Single(item => item.language == "es-XL").skillDescription !=
+                "Muere e invoca una #LargeMine#." ||
+            artillery.localizations.Single(item => item.language == "en-US").skillDescription !=
+                "Toggle between movement and attack modes." ||
+            artillery.localizations.Single(item => item.language == "es-XL").skillDescription !=
+                "Alterna entre los modos de movimiento y ataque.")
+        {
+            throw new InvalidOperationException("Sample ability cards are missing their localized skill text.");
+        }
+    }),
+    ("unit skill descriptions use pack text before native-template fallback", () =>
+    {
+        var unit = new ContentUnitDefinition
+        {
+            id = "sample-native:skirmish-bike",
+            nativeTemplateId = "BombBike",
+            localizations =
+            [
+                new ContentUnitLocalizationDefinition
+                {
+                    language = "en-US", skillDescription = "Dies and summons #LargeMine#."
+                },
+                new ContentUnitLocalizationDefinition
+                {
+                    language = "es-XL", skillDescription = "Muere e invoca una #LargeMine#."
+                }
+            ]
+        };
+        if (!UnitLocalizationResolver.TryResolveSkillDescription(unit, "es-XL", _ => "native skill", out string spanish) ||
+            spanish != "Muere e invoca una #LargeMine#." ||
+            !UnitLocalizationResolver.TryResolveSkillDescription(unit, "de-DE", _ => "native skill", out string english) ||
+            english != "Dies and summons #LargeMine#." ||
+            !UnitLocalizationResolver.TryResolveSkillDescription(
+                new ContentUnitDefinition { id = "sample-native:variant", nativeTemplateId = "BombBike" },
+                "es-XL", _ => "native localized skill", out string inherited) || inherited != "native localized skill")
+        {
+            throw new InvalidOperationException("Skill localization did not resolve active language, English, and native fallbacks.");
+        }
+    }),
+    ("unit skill descriptions reject whitespace-only localization", () =>
+    {
+        WithPackage(nativeSample, (pack, root) =>
+        {
+            ContentUnitDefinition bike = pack.units.Single(unit => unit.id == "sample-native:skirmish-bike");
+            bike.localizations.Single(item => item.language == "en-US").skillDescription = "   ";
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "unit.localization-skill-description-invalid");
+        });
     }),
     ("unit localization resolves active language and English fallback", () =>
     {

@@ -20,7 +20,8 @@ namespace RogueCommandExpansionLoader.Content
     /// Discovers and validates data-only packs after the native entity registry is ready, then
     /// keeps their AssetBundles and Unity objects alive for the whole game session.
     /// </summary>
-    public sealed class ContentPackRuntimeLoader : IRuntimeContentProvider, IStageLandscapeRuntimeProvider,
+    public sealed class ContentPackRuntimeLoader : IRuntimeContentProvider, IUnitSkillLocalizationRuntimeProvider,
+        IStageLandscapeRuntimeProvider,
         IBlueprintPoolRuntimeProvider, IStageFallbackRuntimeProvider,
         IStageOwnedAiPlacementDistanceRuntimeProvider, IBlueprintRewardFactoryScopeProvider
     {
@@ -50,6 +51,7 @@ namespace RogueCommandExpansionLoader.Content
         private readonly PropertyInfo _localizationLanguageProperty;
         private readonly MethodInfo _blueprintNameMethod;
         private readonly MethodInfo _blueprintDescriptionMethod;
+        private readonly MethodInfo _skillDescriptionMethod;
         private readonly Type _stageType;
         private readonly Type _stageParametersType;
         private readonly Type _aiBehaviourType;
@@ -221,6 +223,13 @@ namespace RogueCommandExpansionLoader.Content
                         parameters[0].ParameterType == typeof(string);
                 });
             _blueprintDescriptionMethod = RuntimeReflection.FindUniqueMethod(locaType, "BlueprintDescription",
+                delegate(MethodInfo method)
+                {
+                    ParameterInfo[] parameters = method.GetParameters();
+                    return method.IsStatic && method.ReturnType == typeof(string) && parameters.Length == 1 &&
+                        parameters[0].ParameterType == typeof(string);
+                });
+            _skillDescriptionMethod = RuntimeReflection.FindUniqueMethod(locaType, "SkillDescription",
                 delegate(MethodInfo method)
                 {
                     ParameterInfo[] parameters = method.GetParameters();
@@ -564,6 +573,50 @@ namespace RogueCommandExpansionLoader.Content
                         {
                             Log("No se pudo heredar la localización de " + templateId + " para " + unitId + ": " +
                                 exception.GetBaseException().Message);
+                            return null;
+                        }
+                    }, out value);
+            }
+        }
+
+        public bool TryGetUnitSkillDescription(string unitId, out string value)
+        {
+            lock (_gate)
+            {
+                LoadedUnit unit;
+                if (String.IsNullOrWhiteSpace(unitId) || !_units.TryGetValue(unitId, out unit))
+                {
+                    value = null;
+                    return false;
+                }
+
+                string language = null;
+                try
+                {
+                    language = _localizationLanguageProperty.GetValue(null, null) as string;
+                }
+                catch (Exception exception)
+                {
+                    Log("No se pudo leer Loca.Language para la habilidad de la unidad " + unitId + ": " +
+                        exception.GetBaseException().Message);
+                }
+
+                if (String.IsNullOrWhiteSpace(language))
+                {
+                    language = "en-US";
+                }
+
+                return UnitLocalizationResolver.TryResolveSkillDescription(unit.Definition, language,
+                    delegate(string templateId)
+                    {
+                        try
+                        {
+                            return _skillDescriptionMethod.Invoke(null, new object[] { templateId }) as string;
+                        }
+                        catch (Exception exception)
+                        {
+                            Log("No se pudo heredar la descripción de habilidad de " + templateId + " para " +
+                                unitId + ": " + exception.GetBaseException().Message);
                             return null;
                         }
                     }, out value);

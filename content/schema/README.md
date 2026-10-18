@@ -36,7 +36,7 @@ Static REA inspection of the pinned 1.0.9 assembly found that `AiBehaviour.Build
 
 ## Unit localization
 
-Units may declare `localizations` entries with a game's language ID, a visible `name`, and an optional `description`. Custom-prefab units must provide an `en-US` name; native-template units may omit localizations and inherit the native template's name and description. If the active language has no pack translation, the loader falls back to `en-US`; additional supported game languages are `de-DE`, `ja-JP`, `ko-KR`, `zh-CN`, `zh-TW`, `fr-FR`, `es-XL`, `pt-BR`, and `ru-RU`. Duplicate or unsupported language IDs disable the package. The loader intercepts `Loca.BlueprintName` and `Loca.BlueprintDescription` for registered mod-unit IDs, so namespaced IDs resolve without editing the game's localization resources.
+Units may declare `localizations` entries with a game's language ID, a visible `name`, and optional `description` and `skillDescription`. Custom-prefab units must provide an `en-US` name; native-template units may omit localizations and inherit the native template's name and description. If the active language has no pack translation, the loader falls back to `en-US`; additional supported game languages are `de-DE`, `ja-JP`, `ko-KR`, `zh-CN`, `zh-TW`, `fr-FR`, `es-XL`, `pt-BR`, and `ru-RU`. Duplicate or unsupported language IDs disable the package. The loader intercepts `Loca.BlueprintName`, `Loca.BlueprintDescription`, and `Loca.SkillDescription` for registered mod-unit IDs, so namespaced IDs resolve without editing the game's localization resources.
 
 Landscape `localizations` use the same supported language IDs and require an `en-US` name. The loader intercepts `Loca.Global` only for generated landscape localization keys; all other game localization calls continue through the original method.
 
@@ -133,3 +133,11 @@ Landscape `localizations` use the same supported language IDs and require an `en
   ]
 }
 ```
+
+## Profile-level card unlocks
+
+`neededExperienceLevel` on a unit is the minimum persistent profile experience level required before its card can enter reward candidates. This is the profile level that advances as the player earns profile experience by completing or losing a run; it is not the current stage index, map node, or run progression counter. Set the same `neededExperienceLevel` and `rarity` on the unit's `productionBuilding`: some candidate queries filter the factory row, while native stage pools validate the associated product row.
+
+An unlock makes the card eligible for randomized offers once the profile reaches its threshold. It does not guarantee that the card appears in the next offer. In particular, the first selection at stage 0 is constrained to vehicles or small units regardless of the chosen starting map node; validate later offers against their actual pool and the profile's current level.
+
+Every added product should explicitly set its card-facing balance values instead of inheriting unknown values from its native template. Include rarity, profile unlock level, card cost, production time, capacity, health/shield/armor, speed and sight, attack type, damage, firepoints, range, cooldown, effect radius, and relevant skill type/range/duration/cost fields. Use `localizations.name` and `localizations.description` for card copy. Optional `skillDescription` supplies localized ability text; the resolver tries the selected language, then `en-US`, then the native template's `Loca.SkillDescription` text. This field describes an existing compiled or native ability and cannot define new executable behavior.

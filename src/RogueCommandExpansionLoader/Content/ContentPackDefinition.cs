@@ -60,6 +60,7 @@ namespace RogueCommandExpansionLoader.Content
         public string language;
         public string name;
         public string description;
+        public string skillDescription;
     }
 
     [Serializable]
@@ -244,7 +245,8 @@ namespace RogueCommandExpansionLoader.Content
             {
                 language = source.language,
                 name = source.name,
-                description = source.description
+                description = source.description,
+                skillDescription = source.skillDescription
             };
         }
 

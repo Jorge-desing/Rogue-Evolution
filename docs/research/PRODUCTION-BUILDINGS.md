@@ -22,7 +22,23 @@ AI `unitEntries` names produced units. A native AI's existing serialized deck ca
 | `skirmish-bike` | `skirmish-bike-factory` | `BombBikeFactory` | 280 | 10 s |
 | `surge-tank` | `surge-tank-factory` | `LightningTankFactory` | 650 | 30 s |
 
-All sample IDs above use `sample-native:`. The Sandlance factory explicitly permits three buildings; other factory counts inherit their native templates. Both product and factory override `neededExperienceLevel` to 0 so inherited unlock levels do not silently exclude rewards. Costs, timings, and capacities remain balance work rather than a completed tuning pass.
+All sample IDs above use `sample-native:`. The Sandlance factory explicitly permits three buildings; other factory counts inherit their native templates. The product and factory unlock levels now match each other; see the profile-level progression below. Costs, timings, and capacities are explicit in the sample manifest but have not been tuned through a controlled gameplay balance pass.
+
+## Profile-level card unlocks
+
+`neededExperienceLevel` is compared with the persistent profile's experience level, which rises from profile XP when a stage/run is completed or lost. It is unrelated to the current in-run stage number or the selected map node. A card becomes eligible once the profile meets its threshold, but the roguelike reward draw remains random. The first selection at stage 0 is limited to vehicles or small units regardless of starting map node, so that offer is not a complete test of later unlock tiers.
+
+The product and its factory carry the same `neededExperienceLevel` and `rarity`. The static game path queries the product's level when building a pool, while some reward candidate paths inspect the factory row; keeping both values aligned avoids mismatched unlock behavior.
+
+| Profile level | Card | Rarity | Card cost | Durability | Attack and card ability |
+|---:|---|---|---:|---|---|
+| 0 | Sandlance Scout | Common | 70 | 130 health | AoE, 8 damage at range 6; fast scout |
+| 1 | Skirmish Strike Bike | Common | 55 | 75 health | AoE, 32 damage, radius 1.8; dies and summons a Large Mine |
+| 2 | Ironclad Gatling Walker | Common | 380 | 420 health, 1 max armor | Single attack, 4 damage, 6 firepoints at range 6 |
+| 3 | Surge Arc Tank | Common | 210 | 150 health, 5 shield | Beam, 12 damage at range 4.5 |
+| 4 | Colossus Siege Platform | Common | 280 | 160 health, armor protection 2 | Artillery, 55 damage at range 16; toggle movement/attack mode |
+
+The active sample manifest explicitly records 29 balance fields for each product, including zero values for unused shields, secondary weapons, and skill parameters. All five cards have English and Spanish names and descriptions; the Bike and Colossus also have English and Spanish skill text. This makes their card data deliberate rather than inherited from the native templates.
 
 ## Static evidence
 
