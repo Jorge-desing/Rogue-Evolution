@@ -6797,7 +6797,12 @@ class RogueVehicleBuilder:
             icons = render_tactical_icons(self.objects, icon_dir, self.name, resolutions=icon_resolutions, elevation_angle_deg=icon_elevation)
             diagnostics["tactical_icons"] = {k: str(v) for k, v in icons.items()}
 
-        # 5. Save editable source .blend
+        # 5. Create canonical sockets before saving so the editable source keeps
+        # the same locator names and antenna parenting as the exported FBX.
+        if include_locators and not self.locator_sockets:
+            self.add_unity_locators()
+
+        # Save the editable, unbatched source before vertex shading and export transforms.
         bpy.ops.wm.save_as_mainfile(filepath=str(blend_path))
 
         # 6. Procedural multi-channel vertex shading & cavity AO
@@ -6896,8 +6901,6 @@ class RogueVehicleBuilder:
         # 12. Create Unity locator sockets if requested
         export_objects = list(batched_objects)
         if include_locators:
-            if not self.locator_sockets:
-                self.add_unity_locators()
             export_objects.extend(self.locator_sockets)
 
         if generate_colliders and self.collider_objects:

@@ -197,7 +197,7 @@ def parse_args():
             "sky_sweeper", "dreadnought_crawler", "hive_carrier", "titan_quad", "resource_behemoth",
             "colossus_titan", "sea_lance", "sky_dreadnought", "orbital_defense"
         ],
-        help="Preconfigured vehicle loadout",
+        help="Preconfigured vehicle or strategic-structure loadout",
     )
     parser.add_argument("--rollcage", action="store_true", help="Include tubular roll cage")
     parser.add_argument("--quad-tracks", action="store_true", help="Include 4 independent track pods")
@@ -214,7 +214,7 @@ def parse_args():
     parser.add_argument("--cupola", action="store_true", help="Attach commander periscope cupola and split hatch")
     parser.add_argument("--rivets", action="store_true", help="Attach perimeter rivet rows and beveled weld seams")
     parser.add_argument("--track-shoes", action="store_true", help="Attach discrete articulated track shoe links along the ground run")
-    parser.add_argument("--biome", default="none", choices=["none", "desert", "arctic", "woodland", "urban"], help="Environmental biome weathering preset")
+    parser.add_argument("--biome", default="none", choices=["none", "desert", "arctic", "woodland", "urban"], help="Authoring-time palette alias when --camo is none; does not adapt to runtime map biomes")
     parser.add_argument("--bake-atlas", action="store_true", help="Bake unified PBR texture maps (Albedo, MetallicGloss, Normal, Emission)")
     parser.add_argument("--atlas-resolution", type=int, default=1024, choices=[512, 1024, 2048], help="Resolution for baked texture atlas")
     parser.add_argument("--single-material", action="store_true", help="Export unified 1-material mesh (<Name>_Atlas.fbx) for 1 draw call in Unity")
@@ -255,6 +255,20 @@ def parse_args():
 
     args = parser.parse_args(script_args)
 
+    def option_was_supplied(option: str) -> bool:
+        for argument in script_args:
+            supplied_option = argument.split("=", 1)[0]
+            if supplied_option == option:
+                return True
+            if supplied_option.startswith("--") and option.startswith(supplied_option):
+                return True
+        return False
+
+    # A building type selects the structure generator. Structure presets also
+    # select that path while still allowing an explicit --building-type override.
+    if option_was_supplied("--building-type"):
+        args.structure = True
+
     # Apply preset overrides for unspecified parameters
     if args.preset and args.preset != "none" and args.preset in PRESETS:
         p = PRESETS[args.preset]
@@ -264,6 +278,10 @@ def parse_args():
             args.weapon = p.get("weapon", args.weapon)
         if "--faction" not in script_args:
             args.faction = p.get("faction", args.faction)
+        if p.get("structure") and not option_was_supplied("--structure"):
+            args.structure = True
+        if "building_type" in p and not option_was_supplied("--building-type"):
+            args.building_type = p["building_type"]
         for flag in ("sponsons", "smoke", "radar", "rollcage", "dozer", "outriggers", "flight_deck", "excavator_drum", "antenna", "cupola", "rivets", "track_shoes"):
             if p.get(flag) and f"--{flag.replace('_', '-')}" not in script_args:
                 setattr(args, flag, True)
@@ -969,7 +987,8 @@ def main():
             print("\n=== DRY RUN: Rogue Command Structure Planning ===")
             print(f"Structure Name: {args.name}")
             print(f"Building Type: {args.building_type}")
-            print(f"Faction: {args.faction} | Camo: {args.camo}")
+            structure_camo = args.camo if args.camo != "none" else args.biome
+            print(f"Faction: {args.faction} | Palette: {structure_camo}")
             print("Outputs Planned:")
             print(f"  FBX: {args.fbx_path or (out_root / 'unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/Models' / f'{args.name}.fbx')}")
             print(f"  Blend: {args.blend_path or (out_root / 'content/source-art' / f'{args.name.lower()}.blend')}")
@@ -988,10 +1007,11 @@ def main():
         print("\n=== DRY RUN: Rogue Command Vehicle Planning ===")
         print(f"Unit Name: {args.name}")
         print(f"Archetype: {args.archetype}")
-        print(f"Faction: {args.faction} | Camo: {args.camo} | Wear: {args.wear}")
+        vehicle_camo = args.camo if args.camo != "none" else args.biome
+        print(f"Faction: {args.faction} | Palette: {vehicle_camo} | Wear: {args.wear}")
         print(f"Primary Weapon: {args.weapon}")
         print(f"Subsystems: Skirts={args.skirts}, Rollcage={args.rollcage}, QuadTracks={args.quad_tracks}, TiltRotors={args.tilt_rotors}, Dozer={args.dozer}, Smoke={args.smoke}, Radar={args.radar}, Sponsons={args.sponsons}, Outriggers={args.outriggers}, FlightDeck={args.flight_deck}, ExcavatorDrum={args.excavator_drum}")
-        print(f"Micro-Details: Antenna={args.antenna}, Cupola={args.cupola}, Rivets={args.rivets}, TrackShoes={args.track_shoes}, Biome={args.biome}")
+        print(f"Micro-Details: Antenna={args.antenna}, Cupola={args.cupola}, Rivets={args.rivets}, TrackShoes={args.track_shoes}")
         if args.attachments:
             print(f"Modular Attachments: {args.attachments} (Detached FBX: {args.export_detached_attachments})")
         if args.primary_color:
@@ -1106,11 +1126,12 @@ def main():
 
     # Execution: Structure or Vehicle
     if args.structure:
+        structure_camo = args.camo if args.camo != "none" else args.biome
         res = build_structure_model(
             name=args.name,
             building_type=args.building_type,
             faction=args.faction,
-            camo=args.camo,
+            camo=structure_camo,
             out_root=out_root,
             blend_path=blend_path,
             fbx_path=fbx_path,

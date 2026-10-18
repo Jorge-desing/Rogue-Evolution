@@ -9,9 +9,11 @@ Use this skill to design, model, texture, and export original, high-readability 
 
 ---
 
-## Verified implementation limits
+## Verified implementation boundaries
 
-Before using the procedural kit, read `docs/research/3D-MODEL-AUTHORING-ENHANCEMENTS.md`, especially section 11's local audit. Treat code and fresh measurements as authoritative. The existing `--lod` text counts polygons as triangles; it generates no LOD meshes or budget enforcement. The eleven default archetypes measured 6–10 mesh groups, not a guaranteed 4–6 draw calls. Vertex dirt needs a vertex-color-aware Unity shader, and the sample Standard material path has no verified binding. The editable blend is saved before dirt baking. Socket names are prefixed and use `Socket_SensorEye`/`Socket_GroundCenter`; secondary muzzle binding is absent. Archetype visuals do not imply flight, animation or native controller compatibility. These limits override broader design claims below until implementation and evidence change.
+Treat current source and pinned Unity import evidence as authoritative. The CLI exposes 19 mobile archetypes, five strategic structure types, 14 presets, and nine weapon choices. `--lod` reports polygon-budget diagnostics; `--lods` builds the LOD chain. The editable `.blend` retains canonical locator empties and antenna parenting, and is saved before vertex-wear baking and material batching. `--biome` is an authoring-time palette alias used when `--camo` is `none`; it does not apply dynamic in-game biome adaptation. The `digital`, `splinter`, and `tigerstripe` palette values select solid material colors rather than procedural camouflage masks. Vertex-color channels require a compatible Unity shader to produce their intended appearance. Authored archetypes and visual rigs do not grant flight, weapon logic, or native controller behavior to a cloned gameplay unit.
+
+For material import and prefab construction, follow sections 6–7 of [Unity Material Pipeline](references/unity-material-pipeline.md). For exact unprefixed socket names and runtime visual behavior, follow section 4 of [Native Hierarchy & Pivots](references/native-hierarchy-and-pivots.md). The procedural authoring changes and their runtime limits are recorded in sections 9–18 of `docs/research/3D-MODEL-AUTHORING-ENHANCEMENTS.md`.
 
 ## 1. Preserve and Use the Established Authoring Path
 
@@ -218,23 +220,18 @@ Run headless vehicle generation directly from the command line using Blender and
     --multiview
 ```
 
-- **Archetypes (19 Total Mobile + Strategic Structures)**:
-  - *Main Battle & Armored*: `tank` (`medium_tank`), `light_tank`, `heavy_tank`, `super_heavy`, `artillery`, `missile_launcher`, `halftrack`, `amphibious_apc`.
-  - *Fast Recon & Skimmers*: `bike`, `scout_buggy` (`buggy`), `hover` (`hover_skiff`), `mobile_radar`, `hover_cruiser` (heavy amphibious assault gunboat with hydro-prow, conning tower, twin jet nacelles, and superfiring turret).
-  - *Mechs & Walkers*: `walker` (`biped_walker`), `spider`, `quad_mech`, `colossus_titan` (colossal bipedal titan walker with heavy pelvis, citadel torso, pauldrons, cooling vents, and dorsal hardpoints).
-  - *Airborne & VTOL*: `vtol` (`vtol_gunship`), `heavy_dropship` (heavy VTOL transport gunship with cargo fuselage, rear loading ramp, high wings, ducted tilt-rotors, and landing skids).
-  - *Heavy Tactical Platforms*: `flak_anti_air` (mobile air defense with radar & outriggers), `siege_crawler` (super-heavy siege citadel with 4 track pods & outriggers), `drone_carrier` (wide hull with flight deck, bridge tower & rotodome), `combat_harvester` (industrial combat mining platform with rotary cutter drum & ore hoppers).
-  - *Strategic Structures*: `factory`, `defense_turret`, `radar_station`, `energy_silo`, `orbital_silo` (strategic launch platform with blast doors, umbilical gantry tower, and exhaust trench).
+- **Mobile Archetypes (19)**: `tank`, `walker`, `bike`, `artillery`, `arc_tank`, `hover`, `spider`, `vtol`, `halftrack`, `super_heavy`, `buggy`, `flak_anti_air`, `siege_crawler`, `drone_carrier`, `quad_mech`, `combat_harvester`, `colossus_titan`, `hover_cruiser`, and `heavy_dropship`.
+- **Strategic Structure Types (5)**: `factory`, `defense_turret`, `radar_station`, `energy_silo`, and `orbital_silo`. These are generated through the structure builder, separate from the 19 mobile archetypes.
 - **Weapons (9 Total)**: `cannon` (ballistic tank gun), `autocannon` / `gatling` (rotary 6-barrel), `dual_autocannon` / `dual_cannon` (twin synchronized barrels), `missile` / `missile_pod` (honeycomb pod), `howitzer` (siege howitzer), `arc` / `energy_beam` (plasma cathode & prongs), `railgun` (electromagnetic kinetic rails with capacitor energy bank), `quad_flak` (anti-air 2x2 flak autocannon cluster with flash hiders), `plasma_mortar` (heavy siege mortar with 3 magnetic toroidal accelerator rings).
 - **Factions**: `vanguard` (slate teal), `siege` (rust ochre), `syndicate` (deep cobalt), `arctic` (tundra navy).
-- **Camouflage Variants**: `none`, `desert` (khaki sand), `urban` (asphalt grey), `arctic` (tundra white), `woodland` (olive drab), `digital` (high-contrast pixelated dual-tone), `splinter` (angular geometric fracture camo), `tigerstripe` (horizontal brushstroke tactical camo).
-- **Biomes & Adaptive Weathering**: `desert`, `arctic`, `woodland`, `urban` (supports dynamic runtime material adaptation via `RuntimeVisualDirector.cs`).
+- **Palette Variants**: `none`, `desert`, `urban`, `arctic`, `woodland`, `digital`, `splinter`, and `tigerstripe` select solid material color sets. They do not generate camouflage patterns or runtime biome behavior.
+- **Biome Palette Alias**: `--biome desert|arctic|woodland|urban` applies the corresponding authoring-time color palette only when `--camo` remains `none`; it does not adapt to a map's runtime biome.
 - **Surface Wear Levels**: `pristine` (factory clean), `field_tested` (moderate edge scratches and road grime), `battle_hardened` (heavy combat gouges, exhaust soot, and cavity dirt).
 - **Presets (14 Total)**:
   - `colossus_titan`: Colossal bipedal war walker with dual heavy cannons, pauldrons, radar, and whip antenna.
   - `sea_lance`: Syndicate heavy hover cruiser gunboat with railgun turret, sponsons, and recon radar.
   - `sky_dreadnought`: Heavy VTOL assault dropship with multi-tube missile pods, tilt-rotors, and whip antenna.
-  - `orbital_defense`: Strategic planetary defense structure with orbital launch silo and gantry tower.
+  - `orbital_defense`: Strategic planetary defense structure with orbital launch silo and gantry tower; selects the structure route and defaults to `orbital_silo`.
   - `sky_sweeper`: Flak anti-air with quad flak autocannons, radar dish, and outriggers.
   - `dreadnought_crawler`: Siege crawler with heavy electromagnetic railgun and 4 outriggers.
   - `hive_carrier`: Drone carrier with wide flight deck, bridge tower, rotodome, and missile defense.
@@ -259,7 +256,7 @@ Run headless vehicle generation directly from the command line using Blender and
   - `--cupola`: Adds armored commander's vision cupola with periscopes and split hatch.
   - `--rivets`: Adds perimeter rivet rows and beveled weld seams along armor plate edges.
   - `--track-shoes`: Adds discrete geometric track shoe links along the ground run.
-  - `--biome <name>`: Sets environmental biome weathering preset (`desert`, `arctic`, `woodland`, `urban`).
+  - `--biome <name>`: Selects an authoring-time palette alias (`desert`, `arctic`, `woodland`, `urban`) when `--camo` is `none`; no runtime map adaptation is performed.
 - **Subsystem & Palette CLI Flags**:
   - `--outriggers`: Adds deployable hydraulic stabilizer outriggers.
   - `--flight-deck`: Adds armored flight / drone launch deck with guidance stripes.
