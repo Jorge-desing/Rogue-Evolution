@@ -651,13 +651,13 @@ To bridge the offline 3D authoring pipeline with live gameplay simulation, the e
 - **Injection Hook**: Intercepts `EntityFactory.InstantiateEntity` via Harmony postfix, dynamically attaching `RuntimeVisualDirector` to any spawned unit or structure possessing authoring sockets (`Socket_*`).
 - **Zero-Configuration Operation**:
   1. **Progressive Combat Damage States**:
-     - At $\le 50\%$ HP: Automatically mounts smoke particle emitters onto `Socket_DamageSmoke` and activates `<Name>_Damaged` mesh variants. Driven by native `HealthRatio` property (`get_HealthRatio` token `0x06000778`).
+     - At $\le 50\%$ HP: Automatically mounts smoke particle emitters onto `Socket_DamageSmoke` and activates `<Name>_Damaged` mesh variants. Driven by native `HealthRatio` property (`get_HealthRatio` token `0x060007e4`).
      - At $\le 25\%$ HP: Activates dynamic fire particles and point lighting on `Socket_DamageFire`, and introduces a mechanical tilt on `Socket_TurretPivot` to simulate traverse jamming.
-     - At $0\%$ HP: Cleans up transient particle emitters cleanly before garbage collection, confirmed via `StillExists == false`, `IsDestroyed == true`, and native property `DestroyHasBeenStarted == true` (token `0x06000780`).
+     - At $0\%$ HP: Cleans up transient particle emitters cleanly before garbage collection, confirmed via `StillExists == false`, `IsDestroyed == true`, and native property `DestroyHasBeenStarted == true` (token `0x0600077d`).
   2. **Structure Dynamics**:
-     - `radar_station`: Spins `Socket_RadarMast` at 30 RPM continuously.
-     - `factory`: Detects active unit production via `EntityController.InProductionCount > 0` (token `0x060007b8`) and `ProductionInfo.productionHasStarted` / `queuedCount > 0`, smoothly sliding `Socket_Deploy_Unit` bay door upward by 1.4 m during rollout.
-     - `defense_turret`: Dynamically tracks hostile combat targets in horizontal azimuth at 120°/s using authoritative targets `CurrentAttackTarget` (token `0x060007ec`), `EntityAttack._attackTarget`, and `CurrentFollowTarget`.
+     - `radar_station`: Spins `Socket_RadarMast` at true 30 RPM (180°/s) continuously.
+     - `factory`: Detects active unit production via `EntityController.InProductionCount > 0` (token `0x060007df`) and `ProductionInfo.productionHasStarted` / `queuedCount > 0`, smoothly sliding `Socket_Deploy_Unit` / `Socket_DeployRamp` bay door upward by 1.4 m during rollout.
+     - `defense_turret`: Dynamically tracks hostile combat targets in horizontal azimuth at 120°/s using authoritative targets `CurrentAttackTarget` (token `0x060007fc`), `EntityAttack._attackTarget`, and explicitly filters hostility via `EntityController.IsEnemy` (token `0x06000844`).
   3. **Autonomous Weapon Combat Feedback**:
      - Tracks `EntityAttack._timeOfLastShot` (`Single`) in real time. Whenever a unit fires:
        - `Socket_RecoilPrimary`: Simulates explosive barrel recoil slide with spring-damper recovery.
@@ -674,7 +674,59 @@ The runtime visual director was subjected to binary inspection against `Assembly
 - **Evidence IDs**: `ev_c38acc530bb49ca3bf82a91df86a9c74c5d3ed78ffe88ea57c0aadb74226c975` (loader assembly artifact), `ev_f6327eae071cf0725cfa35ac28bde2d57dff8528bdfd41a668fc7256edafdcf8` (RuntimeVisualDirector members).
 - **Corrected Assumptions**: Eliminated fictitious reflection fields (`isProducing`, `DestroyHasBeenStarted` as field) and replaced them with exact CIL properties and authoritative combat clocks (`_timeOfLastShot`).
 
+---
 
+## 17. Static Review Resolutions & Asset Pipeline Rigor (2026-10-17)
 
+Following comprehensive static code and architectural review of the 3D model authoring and runtime visual subsystems, four critical points were resolved to ensure seamless compatibility between Blender, Unity, and the in-game runtime:
 
+### A. PBR Metallic-Gloss Packing & Viewport Material Flow
+- **Review Finding**: The texture atlas baker did not bake true metallic maps from Principled BSDF inputs, and the roughness channel was improperly mapped as MetallicGloss without the required smoothness inversion.
+- **Solution & Implementation**:
+  1. **Dual-Pass Bake & Channel Packing (`bake_pbr_texture_atlas` in `RogueModelKit.py`)**:
+     - Metallic is baked via temporary emission shader rerouting using Cycles `type="EMIT"`.
+     - Roughness is baked via Cycles `type="ROUGHNESS"`.
+     - Output is packed directly into the Unity Standard Shader specification:
+       $$\text{RGB} = \text{Metallic}, \quad \text{Alpha} = \text{Smoothness} = 1.0 - \text{Roughness}$$
+     - Output is saved as `<Prefix>_MetallicGloss.png`.
+  2. **Atlas Material Shader Tree (`create_single_material_atlas_model`)**:
+     - Connects `_MetallicGloss.png` texture image node with `colorspace = Non-Color`.
+     - Feeds texture Color through `ShaderNodeSeparateColor` with Red channel linked to Principled BSDF `Metallic`.
+     - Feeds texture Alpha through `ShaderNodeInvert` linked to Principled BSDF `Roughness`, guaranteeing visual parity between Blender viewports and Unity Standard Shader rendering.
 
+### B. Unity Prefab Builder Collider Conversion & Animator Generation
+- **Review Finding**: The Unity prefab builder did not convert authoring collision geometry into Unity `BoxCollider` components, and did not set up `Animator` components for articulated meshes.
+- **Solution & Implementation (`VehiclePrefabBuilder.cs`)**:
+  1. **Collision Mesh Conversion**:
+     - Scans hierarchy for `_COLLIDER` meshes (`_COLLIDER_Hull`, `_COLLIDER_Turret`).
+     - Disables visible `Renderer` on collision objects (`r.enabled = false`) and excludes them from atlas material assignment.
+     - Adds native Unity `BoxCollider` sized to `MeshFilter.sharedMesh.bounds` to provide precise physics interaction without visual draw calls.
+  2. **Automated Animator Setup (`SetupAnimatorIfAvailable`)**:
+     - Detects articulated rigs (bones named `Bone_*`, `Armature`), `SkinnedMeshRenderer`, or embedded `AnimationClip`s in the imported FBX.
+     - Automatically attaches `Animator` component and binds the FBX avatar.
+     - Creates and wires `<UnitName>Controller.controller` in `Assets/.../Animations/`, adding states for all discovered clips with `Action_Idle` (or primary clip) configured as the default state.
+
+### C. Dynamic Combat Lifecycle for Modular Attachments & Damaged Variants
+- **Review Finding**: Modular hardpoint attachments and damaged mesh variants were static geometry that did not automatically react to unit health or combat damage.
+- **Solution & Implementation (`VehiclePrefabBuilder.cs` & `RuntimeVisualDirector.cs`)**:
+  1. **Prefab Hardpoint Auto-Mounting**:
+     - `MountModularAttachmentsIfAvailable`: Detects `<UnitName>_Attachment_<Type>.fbx` in the models directory and automatically mounts it under matching `Socket_Hardpoint_<Type>` with atlas materials.
+     - `MountDamagedVariantIfAvailable`: Detects `<UnitName>_Damaged.fbx` and instantiates it under the prefab root, initially inactive (`SetActive(false)`).
+  2. **Authoritative Health-Driven Lifecycle**:
+     - $\le 75\%$ HP: Reactive Armor (`ERA`) hardpoint detonate upon heavy impact, triggering explosive muzzle flash VFX and disabling the armor tile.
+     - $\le 50\%$ HP: Switches mesh visibility to `<UnitName>_Damaged` (or applies procedural soot tint via `MaterialPropertyBlock` when no variant is supplied); auxiliary `FuelDrums` jettison and emit smoke.
+     - $\le 25\%$ HP: Spawns fire particle emitters, applies mechanical $+4.5^\circ$ seizure tilt on `Socket_TurretPivot`, and burns out Active Protection Systems (`APS`).
+     - **Reversible Repairs**: When field repair mechanics restore unit health ($> 50\%$ and $> 75\%$), damaged meshes are deactivated, soot is cleared, turret tilt is reset, fire and smoke are extinguished, and ERA/APS subsystems are restored.
+
+### D. 3-Point RTS Studio Lighting & Calibrated Isometric Elevation
+- **Review Finding**: Tactical icon generation lacked dedicated lighting and used an approximate $\approx 30.8^\circ$ pitch angle instead of a true $45.0^\circ$ RTS elevation.
+- **Solution & Implementation (`render_tactical_icons` in `RogueModelKit.py` & `generate_unit_model.py`)**:
+  1. **Calibrated 3-Point RTS Studio Lighting Rig**:
+     - **Key Light**: Sun light from top-left/front (Energy 4.2, warm sunlight `(1.0, 0.98, 0.95)`) for crisp chamfer specular glints.
+     - **Fill Light**: Sun light from right/rear (Energy 1.8, cool sky ambient `(0.85, 0.92, 1.0)`) for tread and undercarriage fill.
+     - **Rim Light**: Sun light from rear/top (Energy 2.4, pure white `(1.0, 1.0, 1.0)`) for crisp silhouette separation.
+     - Cleaned up safely in a `finally` block to prevent lingering lights in user scenes.
+  2. **Exact Trigonometric RTS Elevation**:
+     - Replaced hardcoded vector offsets with mathematically exact trigonometric positioning:
+       $$D_{xy} = M \times 2.2, \quad X = D_{xy} \cos(45^\circ), \quad Y = -D_{xy} \sin(45^\circ), \quad Z = D_{xy} \tan(\theta_{\text{elevation}})$$
+     - Parameterized via `elevation_angle_deg` (default $45.0^\circ$ exact) and CLI flag `--icon-elevation <float>`.

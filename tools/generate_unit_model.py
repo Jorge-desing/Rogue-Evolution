@@ -205,6 +205,7 @@ def parse_args():
     parser.add_argument("--export-detached-attachments", action="store_true", help="Export separate <Name>_Attachment_<Type>.fbx meshes for modular attachment in Unity")
     parser.add_argument("--render-icons", action="store_true", help="Render dual orthographic 2D tactical icons (Top-Down and Isometric) with transparent alpha")
     parser.add_argument("--icon-size", type=int, default=128, choices=[64, 128], help="Resolution for rendered tactical icons")
+    parser.add_argument("--icon-elevation", type=float, default=45.0, help="Elevation angle for tactical isometric icon in degrees (default 45.0 for RTS 45-degree angle, or 35.26 for true isometric)")
     parser.add_argument("--target-budget", type=int, default=4000, help="Target polygon budget for profiling")
     parser.add_argument("--lod", action="store_true", help="Calculate polygon budget and recommend LOD reductions")
     parser.add_argument("--smooth-angle", type=float, default=38.0, help="Smart angle-weighted auto-smooth threshold in degrees")
@@ -316,6 +317,7 @@ def build_vehicle_model(
     damaged_state: bool = False,
     render_icons: bool = False,
     icon_size: int = 128,
+    icon_elevation: float = 45.0,
 ) -> dict:
     rmk.clear_scene()
 
@@ -718,6 +720,7 @@ def build_vehicle_model(
         export_detached_attachments=export_detached_attachments,
         render_icons=render_icons,
         icon_resolutions=(icon_size,),
+        icon_elevation=icon_elevation,
     )
 
     if lod_diagnostics:
@@ -760,6 +763,7 @@ def build_structure_model(
     gameplay_json: bool = False,
     render_icons: bool = False,
     icon_size: int = 128,
+    icon_elevation: float = 45.0,
 ) -> dict:
     rmk.clear_scene()
 
@@ -812,6 +816,7 @@ def build_structure_model(
         gameplay_meta_path=gameplay_meta_path,
         render_icons=render_icons,
         icon_resolutions=(icon_size,),
+        icon_elevation=icon_elevation,
     )
 
     print("\n========================================================")
@@ -985,6 +990,7 @@ def main():
             gameplay_json=args.gameplay_json,
             render_icons=args.render_icons,
             icon_size=args.icon_size,
+            icon_elevation=args.icon_elevation,
         )
     else:
         res = build_vehicle_model(
@@ -1035,6 +1041,7 @@ def main():
             damaged_state=args.damaged_state,
             render_icons=args.render_icons,
             icon_size=args.icon_size,
+            icon_elevation=args.icon_elevation,
         )
 
     if args.report_json:

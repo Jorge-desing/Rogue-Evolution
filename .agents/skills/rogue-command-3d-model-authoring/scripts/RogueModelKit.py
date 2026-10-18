@@ -1510,6 +1510,9 @@ def create_unity_locator_sockets(
     damage_fire_loc: Tuple[float, float, float] | Vector | None = None,
     center_of_mass_loc: Tuple[float, float, float] | Vector | None = None,
     ground_contact_loc: Tuple[float, float, float] | Vector | None = None,
+    radar_loc: Tuple[float, float, float] | Vector | None = None,
+    hardpoints: Dict[str, Tuple[float, float, float] | Vector] | None = None,
+    include_default_hardpoints: bool = True,
 ) -> list[bpy.types.Object]:
     """Generates standard Unity empty sockets matching Rogue Command vehicle & weapon mechanics:
 
@@ -1524,12 +1527,15 @@ def create_unity_locator_sockets(
     9. Socket_DamageFire: Catastrophic damage flame particle spawner (25% HP threshold).
     10. Socket_CenterOfMass: Rigidbody physics center of mass.
     11. Socket_GroundContact / Socket_GroundCenter: Ground contact projection (Z=0) for selection rings.
+    12. Socket_RadarMast / Socket_RadarDish: 360-degree radar mast sweep origin.
+    13. Socket_Hardpoint_<Type>: Modular equipment mounts (ERA, APS, Sponsons, FuelDrums).
     """
     empties = []
     def _add_empty(socket_name: str, loc: Vector, rot: Tuple[float, float, float] = (0.0, 0.0, 0.0)):
         bpy.ops.object.empty_add(type="PLAIN_AXES", radius=0.15, location=loc)
         e = bpy.context.object
-        e.name = f"{name_prefix}_{socket_name}"
+        # Use clean canonical socket name (e.g. Socket_DamageSmoke) for zero-config Unity discovery
+        e.name = socket_name
         e.rotation_euler = rot
         empties.append(e)
 
@@ -1591,13 +1597,38 @@ def create_unity_locator_sockets(
     elif turret_loc is not None:
         _add_empty("Socket_DamageFire", Vector(turret_loc) + Vector((0.20, -0.20, 0.30)))
 
-    # 9. Center of Mass
+    # 9. Radar Mast & Dish
+    if radar_loc is not None:
+        r_loc = Vector(radar_loc)
+        _add_empty("Socket_RadarMast", r_loc)
+        _add_empty("Socket_RadarDish", r_loc + Vector((0.0, 0.0, 0.35)))
+    elif turret_loc is not None:
+        r_loc = Vector(turret_loc) + Vector((-0.25, -0.30, 0.45))
+        _add_empty("Socket_RadarMast", r_loc)
+        _add_empty("Socket_RadarDish", r_loc + Vector((0.0, 0.0, 0.35)))
+
+    # 10. Modular Hardpoints
+    hp_dict = dict(hardpoints) if hardpoints else {}
+    if include_default_hardpoints:
+        if "ERA" not in hp_dict:
+            hp_dict["ERA"] = (Vector(turret_loc) + Vector((0.0, 0.40, 0.10))) if turret_loc is not None else Vector((0.0, 0.80, 0.50))
+        if "APS" not in hp_dict:
+            hp_dict["APS"] = (Vector(turret_loc) + Vector((0.35, -0.35, 0.40))) if turret_loc is not None else Vector((0.40, -0.60, 0.70))
+        if "Sponsons" not in hp_dict:
+            hp_dict["Sponsons"] = Vector((0.95, 0.0, 0.45))
+        if "FuelDrums" not in hp_dict:
+            hp_dict["FuelDrums"] = Vector((0.0, -1.25, 0.40))
+
+    for hp_name, hp_pos in hp_dict.items():
+        _add_empty(f"Socket_Hardpoint_{hp_name}", Vector(hp_pos))
+
+    # 11. Center of Mass
     if center_of_mass_loc is not None:
         _add_empty("Socket_CenterOfMass", Vector(center_of_mass_loc))
     else:
         _add_empty("Socket_CenterOfMass", Vector((0.0, 0.0, 0.45)))
 
-    # 10. Ground Contact / Selection Ring
+    # 12. Ground Contact / Selection Ring
     if ground_contact_loc is not None:
         _add_empty("Socket_GroundContact", Vector(ground_contact_loc))
         _add_empty("Socket_GroundCenter", Vector(ground_contact_loc))
@@ -4104,6 +4135,7 @@ def make_factory_assembly(
     )
     objects.append(door)
     sockets["Socket_DeployRamp"] = Vector((0.0, length * 0.55, slab_h))
+    sockets["Socket_Deploy_Unit"] = Vector((0.0, length * 0.55, slab_h))
 
     # Hazard chevron stripe bar above blast door
     if hazard_mat:
@@ -4804,17 +4836,94 @@ def bake_pbr_texture_atlas(
     img_normal.save()
     maps["normal"] = normal_path
 
-    # 4. Bake Roughness to MetallicGloss
-    set_bake_target(img_metallic)
+    # 4. Bake Roughness (Grayscale)
+    img_roughness = bpy.data.images.new(f"{prefix}_RoughnessTemp", resolution, resolution, alpha=False)
+    set_bake_target(img_roughness)
     try:
         bpy.ops.object.bake(type="ROUGHNESS")
     except Exception as e:
         print(f"Warning: Roughness bake: {e}")
+
+    # 5. Bake Metallic (Grayscale via temporary Emission shader reroute)
+    img_metallic_temp = bpy.data.images.new(f"{prefix}_MetallicTemp", resolution, resolution, alpha=False)
+    set_bake_target(img_metallic_temp)
+    saved_surface_links = {}
+    temp_emit_nodes = []
+
+    for obj in valid_mesh_objs:
+        for mat in obj.data.materials:
+            if mat and mat.use_nodes:
+                out_node = next((n for n in mat.node_tree.nodes if n.type == "OUTPUT_MATERIAL"), None)
+                bsdf_node = next((n for n in mat.node_tree.nodes if n.type == "BSDF_PRINCIPLED"), None)
+                if out_node and bsdf_node and "Metallic" in bsdf_node.inputs:
+                    # Save existing surface link
+                    for link in mat.node_tree.links:
+                        if link.to_node == out_node and link.to_socket.name == "Surface":
+                            saved_surface_links[mat] = link.from_socket
+                            break
+                    # Reroute metallic through emission
+                    emit_node = mat.node_tree.nodes.new("ShaderNodeEmission")
+                    temp_emit_nodes.append((mat, emit_node))
+                    if bsdf_node.inputs["Metallic"].is_linked:
+                        mat.node_tree.links.new(bsdf_node.inputs["Metallic"].links[0].from_socket, emit_node.inputs["Color"])
+                    else:
+                        m_val = float(bsdf_node.inputs["Metallic"].default_value)
+                        emit_node.inputs["Color"].default_value = (m_val, m_val, m_val, 1.0)
+                    mat.node_tree.links.new(emit_node.outputs["Emission"], out_node.inputs["Surface"])
+
+    try:
+        bpy.ops.object.bake(type="EMIT")
+    except Exception as e:
+        print(f"Warning: Metallic emit bake: {e}")
+
+    # Restore original surface links and remove temporary emission nodes
+    for mat, emit_node in temp_emit_nodes:
+        out_node = next((n for n in mat.node_tree.nodes if n.type == "OUTPUT_MATERIAL"), None)
+        if mat in saved_surface_links and out_node:
+            mat.node_tree.links.new(saved_surface_links[mat], out_node.inputs["Surface"])
+        mat.node_tree.nodes.remove(emit_node)
+
+    # 6. Pack into Unity Standard Shader MetallicGloss Map:
+    # Red = Metallic, Green = Metallic, Blue = Metallic, Alpha = Smoothness (1.0 - Roughness)
+    try:
+        import numpy as np
+        num_pixels = resolution * resolution
+        rough_arr = np.empty(num_pixels * 4, dtype=np.float32)
+        metal_arr = np.empty(num_pixels * 4, dtype=np.float32)
+        img_roughness.pixels.foreach_get(rough_arr)
+        img_metallic_temp.pixels.foreach_get(metal_arr)
+
+        metallic_vals = metal_arr[0::4]
+        roughness_vals = rough_arr[0::4]
+        smoothness_vals = np.clip(1.0 - roughness_vals, 0.0, 1.0)
+
+        packed_arr = np.empty(num_pixels * 4, dtype=np.float32)
+        packed_arr[0::4] = metallic_vals
+        packed_arr[1::4] = metallic_vals
+        packed_arr[2::4] = metallic_vals
+        packed_arr[3::4] = smoothness_vals
+
+        img_metallic.pixels.foreach_set(packed_arr)
+    except Exception as e:
+        print(f"Fallback to pure python pixel pack: {e}")
+        r_pix = list(img_roughness.pixels)
+        m_pix = list(img_metallic_temp.pixels)
+        packed = []
+        for i in range(0, len(r_pix), 4):
+            m = m_pix[i]
+            s = max(0.0, min(1.0, 1.0 - r_pix[i]))
+            packed.extend([m, m, m, s])
+        img_metallic.pixels = packed
+
     metallic_path = output_dir / f"{prefix}_MetallicGloss.png"
     img_metallic.filepath_raw = str(metallic_path)
     img_metallic.file_format = "PNG"
     img_metallic.save()
     maps["metallic_gloss"] = metallic_path
+
+    # Clean up temporary images
+    bpy.data.images.remove(img_roughness)
+    bpy.data.images.remove(img_metallic_temp)
 
     for obj in valid_mesh_objs:
         for mat in obj.data.materials:
@@ -4882,6 +4991,20 @@ def create_single_material_atlas_model(
         node_bump = nodes.new("ShaderNodeNormalMap")
         atlas_mat.node_tree.links.new(node_norm.outputs["Color"], node_bump.inputs["Color"])
         atlas_mat.node_tree.links.new(node_bump.outputs["Normal"], bsdf.inputs["Normal"])
+
+    if "metallic_gloss" in texture_maps and texture_maps["metallic_gloss"].exists():
+        tex_mg = bpy.data.images.load(str(texture_maps["metallic_gloss"]))
+        tex_mg.colorspace_settings.name = "Non-Color"
+        node_mg = nodes.new("ShaderNodeTexImage")
+        node_mg.image = tex_mg
+        # Red channel provides Metallic
+        node_sep = nodes.new("ShaderNodeSeparateColor")
+        atlas_mat.node_tree.links.new(node_mg.outputs["Color"], node_sep.inputs["Color"])
+        atlas_mat.node_tree.links.new(node_sep.outputs["Red"], bsdf.inputs["Metallic"])
+        # Alpha channel provides Smoothness -> Invert to Roughness for Blender's BSDF
+        node_inv = nodes.new("ShaderNodeInvert")
+        atlas_mat.node_tree.links.new(node_mg.outputs["Alpha"], node_inv.inputs["Color"])
+        atlas_mat.node_tree.links.new(node_inv.outputs["Color"], bsdf.inputs["Roughness"])
 
     unified_obj.data.materials.clear()
     unified_obj.data.materials.append(atlas_mat)
@@ -4981,8 +5104,9 @@ def render_tactical_icons(
     output_dir: Path,
     unit_name: str,
     resolutions: Sequence[int] = (64, 128),
+    elevation_angle_deg: float = 45.0,
 ) -> dict[str, Path]:
-    """Renders dual orthographic icons (Top-Down zenith and Isometric 45°) with transparent alpha background."""
+    """Renders dual orthographic icons (Top-Down zenith and Isometric 45°) with transparent alpha background and calibrated 3-point RTS lighting."""
     output_dir.mkdir(parents=True, exist_ok=True)
     mesh_objects = [o for o in model_objects if o.type == "MESH" and not o.name.endswith(("_COLLIDER", "_ShieldBubble"))]
     if not mesh_objects:
@@ -5016,6 +5140,41 @@ def render_tactical_icons(
     prev_cam = scene.camera
     scene.camera = cam_obj
 
+    # Calibrated 3-point RTS studio lighting for crisp icon rendering
+    lights_created = []
+    try:
+        # 1. Key Light: Sun from top-left/front (warm sunlight for chamfer specular glints)
+        key_data = bpy.data.lights.new("IconKeyLightData", "SUN")
+        key_data.energy = 4.2
+        key_data.color = (1.0, 0.98, 0.95)
+        key_obj = bpy.data.objects.new("IconKeyLight", key_data)
+        key_obj.location = center + Vector((-max_dim * 2, -max_dim * 2, max_dim * 3))
+        key_obj.rotation_euler = (center - key_obj.location).normalized().to_track_quat("-Z", "Y").to_euler()
+        bpy.context.collection.objects.link(key_obj)
+        lights_created.append(key_obj)
+
+        # 2. Fill Light: Sun from right/rear (soft cool sky ambient for tread/underside fill)
+        fill_data = bpy.data.lights.new("IconFillLightData", "SUN")
+        fill_data.energy = 1.8
+        fill_data.color = (0.85, 0.92, 1.0)
+        fill_obj = bpy.data.objects.new("IconFillLight", fill_data)
+        fill_obj.location = center + Vector((max_dim * 2, max_dim * 2, max_dim * 2))
+        fill_obj.rotation_euler = (center - fill_obj.location).normalized().to_track_quat("-Z", "Y").to_euler()
+        bpy.context.collection.objects.link(fill_obj)
+        lights_created.append(fill_obj)
+
+        # 3. Rim Light: Sun from behind/above (sharp silhouette outline)
+        rim_data = bpy.data.lights.new("IconRimLightData", "SUN")
+        rim_data.energy = 2.4
+        rim_data.color = (1.0, 1.0, 1.0)
+        rim_obj = bpy.data.objects.new("IconRimLight", rim_data)
+        rim_obj.location = center + Vector((0, max_dim * 3, max_dim * 2))
+        rim_obj.rotation_euler = (center - rim_obj.location).normalized().to_track_quat("-Z", "Y").to_euler()
+        bpy.context.collection.objects.link(rim_obj)
+        lights_created.append(rim_obj)
+    except Exception as e:
+        print(f"Warning: Icon lighting setup: {e}")
+
     generated_icons = {}
 
     try:
@@ -5032,12 +5191,16 @@ def render_tactical_icons(
             bpy.ops.render.render(write_still=True)
             generated_icons[f"topdown_{res}"] = icon_path
 
-        # 2. Tactical Isometric (45° RTS angle) View for Cards & Selection HUD
-        cam_offset = Vector((max_dim * 1.6, -max_dim * 1.6, max_dim * 1.35))
+        # 2. Tactical Isometric (Mathematically exact RTS elevation angle) View for Cards & Selection HUD
+        d_horizontal = max_dim * 2.2
+        x_off = d_horizontal * math.cos(math.radians(45.0))
+        y_off = -d_horizontal * math.sin(math.radians(45.0))
+        z_off = d_horizontal * math.tan(math.radians(elevation_angle_deg))
+        cam_offset = Vector((x_off, y_off, z_off))
         cam_obj.location = center + cam_offset
         direction = (center - cam_obj.location).normalized()
         cam_obj.rotation_euler = direction.to_track_quat("-Z", "Y").to_euler()
-        cam_data.ortho_scale = max_dim * 1.35
+        cam_data.ortho_scale = max_dim * 1.45
 
         for res in resolutions:
             scene.render.resolution_x = res
@@ -5058,6 +5221,14 @@ def render_tactical_icons(
             scene.camera = prev_cam
         bpy.data.objects.remove(cam_obj, do_unlink=True)
         bpy.data.cameras.remove(cam_data, do_unlink=True)
+
+        for l_obj in lights_created:
+            try:
+                l_data = l_obj.data
+                bpy.data.objects.remove(l_obj, do_unlink=True)
+                bpy.data.lights.remove(l_data, do_unlink=True)
+            except Exception:
+                pass
 
     return generated_icons
 
@@ -6233,6 +6404,7 @@ class RogueVehicleBuilder:
         export_detached_attachments: bool = False,
         render_icons: bool = False,
         icon_resolutions: Sequence[int] = (64, 128),
+        icon_elevation: float = 45.0,
     ) -> Dict[str, Any]:
         """Runs diagnostics, smart UV unwrapping, preview rendering, batching, and FBX export."""
         blend_path.parent.mkdir(parents=True, exist_ok=True)
@@ -6272,7 +6444,7 @@ class RogueVehicleBuilder:
         # 4b. Render 2D tactical icons (Top-Down zenith and Isometric 45°)
         if render_icons:
             icon_dir = fbx_path.parent / "Textures" / "Icons"
-            icons = render_tactical_icons(self.objects, icon_dir, self.name, resolutions=icon_resolutions)
+            icons = render_tactical_icons(self.objects, icon_dir, self.name, resolutions=icon_resolutions, elevation_angle_deg=icon_elevation)
             diagnostics["tactical_icons"] = {k: str(v) for k, v in icons.items()}
 
         # 4c. Export detached modular attachments if requested
@@ -6587,6 +6759,7 @@ class RogueStructureBuilder:
         smooth_angle_deg: float = 38.0,
         render_icons: bool = False,
         icon_resolutions: Sequence[int] = (64, 128),
+        icon_elevation: float = 45.0,
     ) -> dict[str, Any]:
         blend_path.parent.mkdir(parents=True, exist_ok=True)
         fbx_path.parent.mkdir(parents=True, exist_ok=True)
@@ -6611,7 +6784,7 @@ class RogueStructureBuilder:
 
         if render_icons:
             icon_dir = fbx_path.parent / "Textures" / "Icons"
-            icons = render_tactical_icons(self.objects, icon_dir, self.name, resolutions=icon_resolutions)
+            icons = render_tactical_icons(self.objects, icon_dir, self.name, resolutions=icon_resolutions, elevation_angle_deg=icon_elevation)
             diagnostics["tactical_icons"] = {k: str(v) for k, v in icons.items()}
 
         batched_objects = batch_and_join_by_material(

@@ -447,16 +447,16 @@ Provides visual representation of combat degradation at intermediate health ($25
   python tools/generate_unit_model.py --name VanguardTank --damaged-state
   ```
 
-### D. Tactical Minimap & UI Silhouette Icon Auto-Generator (`--render-icons`, `--icon-size`)
+### D. Tactical Minimap & UI Silhouette Icon Auto-Generator (`--render-icons`, `--icon-size`, `--icon-elevation`)
 Automated headless rendering pipeline generating transparent alpha PNG tactical icons for RTS HUDs, unit production cards, and minimap blips:
-- **`render_tactical_icons`**: Sets headless Cycles/Eevee camera with `film_transparent = True` and RGBA output.
+- **`render_tactical_icons`**: Sets headless Cycles/Eevee camera with `film_transparent = True`, RGBA output, and a calibrated 3-point RTS studio lighting rig (Key Sun 4.2 energy, Fill Sun 1.8 energy, Rim Sun 2.4 energy).
 - **Dual Orthographic Projections**:
-  1. `Top-Down Zenith (90°)`: Pure vertical orthographic projection highlighting the vehicle's planar perimeter footprint, ideal for minimap blips, radar sweeps, and tactical map tactical symbols.
-  2. `Isometric RTS (45°)`: Standard RTS tactical viewing angle (45° elevation, 45° azimuth) framing the complete silhouette, ideal for unit cards, selection HUDs, and tech tree icons.
+  1. `Top-Down Zenith (90°)`: Pure vertical orthographic projection highlighting the vehicle's planar perimeter footprint, ideal for minimap blips, radar sweeps, and tactical map symbols.
+  2. `Isometric RTS (Exact Elevation)`: Mathematically exact trigonometric RTS projection ($Z = D_{xy} \tan(\theta)$, default $45.0^\circ$ elevation, $45^\circ$ azimuth) framing the complete silhouette, ideal for unit cards, selection HUDs, and tech tree icons. Custom elevation angles can be configured with `--icon-elevation <float>`.
 - **Resolution Scaling**: Supports `--icon-size 64` (minimap) and `--icon-size 128` (HUD card) exported directly to `<Project>/Models/Textures/Icons/`.
 - **CLI Usage**:
   ```powershell
-  python tools/generate_unit_model.py --name VanguardTank --render-icons --icon-size 64
+  python tools/generate_unit_model.py --name VanguardTank --render-icons --icon-size 64 --icon-elevation 45.0
   ```
 
 ---
@@ -469,14 +469,14 @@ All models authored with the procedural toolchain come to life inside the runnin
 
 | Authored Socket | In-Game Runtime Behavior & Logic |
 | :--- | :--- |
-| `Socket_TurretPivot` / `Socket_TurretYaw` | **Procedural Target Tracking**: Smoothly tracks the entity's hostile target in horizontal azimuth at 120°/s using authoritative native target properties (`CurrentAttackTarget`, `EntityAttack._attackTarget`, and `CurrentFollowTarget`). |
+| `Socket_TurretPivot` / `Socket_TurretYaw` | **Procedural Target Tracking**: Smoothly tracks the entity's hostile target in horizontal azimuth at 120°/s using authoritative native target properties (`CurrentAttackTarget`, `EntityAttack._attackTarget`, and `CurrentFollowTarget`). Jams with $+4.5^\circ$ mechanical seizure tilt at $\le 25\%$ HP. |
 | `Socket_RadarMast` / `Socket_RadarDish` | **Continuous Radar Sweep**: Rotates continuously around its local up axis at 30 RPM during match uptime. |
-| `Socket_DamageSmoke` | **50% HP Damage Transition**: Spawns volumetric smoke particles when native `HealthRatio <= 0.50f` and enables `<Name>_Damaged` mesh. |
-| `Socket_DamageFire` | **25% HP Critical Seizure**: Spawns flame particles (cloning native `EntityController.onFireParticleSystem`) and dynamic point light, tilting `Socket_TurretPivot` ($+4.5^\circ$) to simulate mechanical turret ring jam. |
+| `Socket_DamageSmoke` | **50% HP Damage Transition**: Spawns volumetric smoke particles when native `HealthRatio <= 0.50f` and switches to `<Name>_Damaged` mesh (or applies procedural soot tint via `MaterialPropertyBlock` if no variant exists). Jettisons auxiliary `FuelDrums`. |
+| `Socket_DamageFire` | **25% HP Critical Seizure**: Spawns flame particles (cloning native `EntityController.onFireParticleSystem`) and dynamic point light, burns out APS, and tilts `Socket_TurretPivot` to simulate traverse ring seizure. |
 | `Socket_Deploy_Unit` | **Factory Rollout Animation**: Detects active unit production via `InProductionCount > 0` and `productionHasStarted` / `queuedCount > 0`, smoothly sliding bay door upward by 1.4 m during production rollout. |
 | `Socket_RecoilPrimary` | **Physical Barrel Recoil**: Autonomous explosive linear slide backward (0.22 m) upon weapon firing triggered by tracking `EntityAttack._timeOfLastShot`, recovering smoothly via spring-damper lerp. |
 | `Socket_MuzzlePrimary` | **Combat Flash Feedback**: Pulses the authored star-spike mesh (or procedural flash burst) for 0.07 s synchronously with `_timeOfLastShot`. |
-| `Socket_Hardpoint_<Type>` | **Modular Attachment Toggling**: Enables/disables or hot-swaps detached attachment sub-meshes (`ERA`, `APS`, `Sponson`, `FuelDrums`) at runtime. |
+| `Socket_Hardpoint_<Type>` | **Dynamic Armor & Hardpoint Lifecycle**: Automatically mounts detached attachments (`ERA`, `APS`, `Sponsons`, `FuelDrums`). Detonates ERA tiles on heavy impact ($\le 75\%$ HP) and restores them upon field repairs ($> 75\%$ HP). |
 
 ### B. Resilient Visual Particle Fallback (`RuntimeVisualVfxFallback`)
 Combat particle systems (smoke, fire, muzzle flash) utilize a resilient dual-tier engine:
@@ -485,6 +485,14 @@ Combat particle systems (smoke, fire, muzzle flash) utilize a resilient dual-tie
 
 ### C. Binary Verification via REA
 Verified against `Assembly-CSharp.dll` (SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, MVID `db0e9462-128d-4296-9900-de18b4bd0c00`) and loader `RogueCommandExpansionLoader.dll` (SHA-256 `93d62cba0b1ac49db90736d303f6cd0a9b0b98f0d41237daf1265922af222f16`, MVID `a172fe22-39f6-446e-818e-36c240944af9`). Evidence IDs: `ev_c38acc530bb49ca3bf82a91df86a9c74c5d3ed78ffe88ea57c0aadb74226c975`, `ev_f6327eae071cf0725cfa35ac28bde2d57dff8528bdfd41a668fc7256edafdcf8`.
+
+| Property / Method | Declaring Type | Verified CIL Token | Functionality in RuntimeVisualDirector |
+| :--- | :--- | :--- | :--- |
+| `Single HealthRatio` | `EntityController` | `0x060007e4` | Normalizes entity health to drive 50% smoke, 25% fire, and turret tilt damage states |
+| `Boolean DestroyHasBeenStarted` | `EntityController` | `0x0600077d` | Confirms catastrophic entity demise to trigger zero-allocation particle teardown |
+| `Int32 InProductionCount` | `EntityController` | `0x060007df` | Queries factory production queue to drive animated rollout bay doors |
+| `EntityController CurrentAttackTarget` | `EntityController` | `0x060007fc` | Primary weapon target resolution for procedural turret traverse tracking |
+| `Boolean IsEnemy(EntityController)` | `EntityController` | `0x06000844` | Authoritative hostility check to ensure turrets only target hostile opposing entities |
 
 ---
 

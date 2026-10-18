@@ -49,6 +49,7 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
         private static PropertyInfo _currentFollowTargetProp;
         private static PropertyInfo _inProductionCountProp;
         private static PropertyInfo _productionInfoProp;
+        private static MethodInfo _isEnemyMethod;
 
         private static FieldInfo _attackField;
         private static FieldInfo _timeOfLastShotField;
@@ -91,8 +92,8 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             {
                 Transform current = queue.Dequeue();
                 string name = current.name;
-                if (name.StartsWith("Socket_", StringComparison.OrdinalIgnoreCase) ||
-                    name.StartsWith("RCL_Visual_", StringComparison.OrdinalIgnoreCase) ||
+                if (name.IndexOf("Socket_", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    name.IndexOf("RCL_Visual_", StringComparison.OrdinalIgnoreCase) >= 0 ||
                     name.EndsWith("_Damaged", StringComparison.OrdinalIgnoreCase))
                 {
                     return true;
@@ -150,7 +151,9 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
                     if (_socketRadarMast == null) _socketRadarMast = current;
                 }
                 else if (name.IndexOf("Deploy_Unit", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                         name.IndexOf("DeployUnit", StringComparison.OrdinalIgnoreCase) >= 0)
+                         name.IndexOf("DeployUnit", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                         name.IndexOf("DeployRamp", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                         name.IndexOf("Deploy_Ramp", StringComparison.OrdinalIgnoreCase) >= 0)
                 {
                     if (_socketDeployUnit == null) _socketDeployUnit = current;
                 }
@@ -170,9 +173,10 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
                 {
                     if (_socketMuzzlePrimary == null) _socketMuzzlePrimary = current;
                 }
-                else if (name.StartsWith("Socket_Hardpoint_", StringComparison.OrdinalIgnoreCase))
+                else if (name.IndexOf("Socket_Hardpoint_", StringComparison.OrdinalIgnoreCase) >= 0)
                 {
-                    string hpType = name.Substring("Socket_Hardpoint_".Length);
+                    int hpIdx = name.IndexOf("Socket_Hardpoint_", StringComparison.OrdinalIgnoreCase);
+                    string hpType = name.Substring(hpIdx + "Socket_Hardpoint_".Length);
                     _socketHardpoints[hpType] = current;
                 }
                 else if (name.EndsWith("_Damaged", StringComparison.OrdinalIgnoreCase))
@@ -180,7 +184,7 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
                     _damagedMeshObject = current.gameObject;
                     _damagedMeshObject.SetActive(false); // Initially intact
                 }
-                else if (name.StartsWith("RCL_Visual_", StringComparison.OrdinalIgnoreCase) && _intactMeshObject == null)
+                else if (_intactMeshObject == null && (name.IndexOf("Model", StringComparison.OrdinalIgnoreCase) >= 0 || name.IndexOf("Visual", StringComparison.OrdinalIgnoreCase) >= 0 || name.IndexOf("Hull", StringComparison.OrdinalIgnoreCase) >= 0))
                 {
                     _intactMeshObject = current.gameObject;
                 }
@@ -188,6 +192,21 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
                 for (int i = 0; i < current.childCount; i++)
                 {
                     queue.Enqueue(current.GetChild(i));
+                }
+            }
+
+            if (_intactMeshObject == null && transform != null)
+            {
+                foreach (Transform t in transform.GetComponentsInChildren<Transform>(true))
+                {
+                    if (t != transform &&
+                        t.GetComponent<Renderer>() != null &&
+                        !t.name.StartsWith("Socket_", StringComparison.OrdinalIgnoreCase) &&
+                        !t.name.EndsWith("_Damaged", StringComparison.OrdinalIgnoreCase))
+                    {
+                        _intactMeshObject = t.gameObject;
+                        break;
+                    }
                 }
             }
         }
@@ -206,6 +225,7 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             _currentFollowTargetProp = ecType.GetProperty("CurrentFollowTarget", BindingFlags.Public | BindingFlags.Instance);
             _inProductionCountProp = ecType.GetProperty("InProductionCount", BindingFlags.Public | BindingFlags.Instance);
             _productionInfoProp = ecType.GetProperty("ProductionInfo", BindingFlags.Public | BindingFlags.Instance);
+            _isEnemyMethod = ecType.GetMethod("IsEnemy", BindingFlags.Public | BindingFlags.Instance);
 
             _attackField = ecType.GetField("_attack", BindingFlags.NonPublic | BindingFlags.Instance);
             if (_attackField != null)
@@ -275,44 +295,138 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             catch { }
         }
 
+        private MaterialPropertyBlock _propertyBlock;
+
         private void UpdateHealthAndDamageTransitions()
         {
             float ratio = GetHealthRatio();
             bool isDead = IsEntityDead();
 
-            // 1. Moderate Damage (<50% HP): Smoke particle spawner
-            if (ratio <= 0.50f && !_isDamagedStateActive && !isDead)
+            // 1. Reactive Armor (ERA) Detonation on initial heavy impact (<= 75% HP)
+            if (ratio <= 0.75f && !isDead)
             {
-                _isDamagedStateActive = true;
-                Transform smokeMount = _socketDamageSmoke ?? transform;
-                _smokeVfxInstance = RuntimeVisualVfxFallback.SpawnDamageSmoke(smokeMount);
-
-                if (_damagedMeshObject != null)
+                Transform eraSocket;
+                if (_socketHardpoints.TryGetValue("ERA", out eraSocket) && eraSocket != null && eraSocket.gameObject.activeSelf)
                 {
-                    _damagedMeshObject.SetActive(true);
-                    if (_intactMeshObject != null)
+                    eraSocket.gameObject.SetActive(false);
+                    RuntimeVisualVfxFallback.TriggerMuzzleFlash(eraSocket, this);
+                }
+            }
+            else if (ratio > 0.85f && !isDead)
+            {
+                Transform eraSocket;
+                if (_socketHardpoints.TryGetValue("ERA", out eraSocket) && eraSocket != null && !eraSocket.gameObject.activeSelf)
+                {
+                    eraSocket.gameObject.SetActive(true);
+                }
+            }
+
+            // 2. Moderate Damage (<= 50% HP): Smoke particle spawner & Damaged mesh transition
+            if (ratio <= 0.50f && !isDead)
+            {
+                if (!_isDamagedStateActive)
+                {
+                    _isDamagedStateActive = true;
+                    Transform smokeMount = _socketDamageSmoke ?? transform;
+                    _smokeVfxInstance = RuntimeVisualVfxFallback.SpawnDamageSmoke(smokeMount);
+
+                    if (_damagedMeshObject != null)
                     {
-                        _intactMeshObject.SetActive(false);
+                        _damagedMeshObject.SetActive(true);
+                        if (_intactMeshObject != null)
+                        {
+                            _intactMeshObject.SetActive(false);
+                        }
+                    }
+                    else
+                    {
+                        ApplyProceduralScorch(true);
+                    }
+
+                    // Auxiliary Fuel Drums jettison / smoke on heavy damage
+                    Transform fuelSocket;
+                    if (_socketHardpoints.TryGetValue("FuelDrums", out fuelSocket) && fuelSocket != null && fuelSocket.gameObject.activeSelf)
+                    {
+                        fuelSocket.gameObject.SetActive(false);
+                        RuntimeVisualVfxFallback.SpawnDamageSmoke(fuelSocket);
                     }
                 }
             }
-
-            // 2. Critical Damage (<25% HP): Fire particles and jammed turret tilt
-            if (ratio <= 0.25f && !_isCriticalStateActive && !isDead)
+            else if (ratio > 0.50f && !isDead && _isDamagedStateActive)
             {
-                _isCriticalStateActive = true;
-                Transform fireMount = _socketDamageFire ?? transform;
-                _fireVfxInstance = RuntimeVisualVfxFallback.SpawnDamageFire(fireMount, _entity);
-
-                if (_socketTurretPivot != null && !_isTurretJammed)
+                // Health recovered from moderate damage via field repairs
+                _isDamagedStateActive = false;
+                if (_smokeVfxInstance != null)
                 {
-                    _isTurretJammed = true;
-                    // Apply realistic mechanical seizure tilt
-                    _socketTurretPivot.localRotation *= Quaternion.Euler(4.5f, 0f, 3.8f);
+                    UnityEngine.Object.Destroy(_smokeVfxInstance);
+                    _smokeVfxInstance = null;
+                }
+                if (_damagedMeshObject != null)
+                {
+                    _damagedMeshObject.SetActive(false);
+                    if (_intactMeshObject != null)
+                    {
+                        _intactMeshObject.SetActive(true);
+                    }
+                }
+                else
+                {
+                    ApplyProceduralScorch(false);
+                }
+
+                Transform fuelSocket;
+                if (_socketHardpoints.TryGetValue("FuelDrums", out fuelSocket) && fuelSocket != null && !fuelSocket.gameObject.activeSelf)
+                {
+                    fuelSocket.gameObject.SetActive(true);
                 }
             }
 
-            // 3. Destruction cleanup
+            // 3. Critical Damage (<= 25% HP): Fire particles, APS burnout, and jammed turret tilt
+            if (ratio <= 0.25f && !isDead)
+            {
+                if (!_isCriticalStateActive)
+                {
+                    _isCriticalStateActive = true;
+                    Transform fireMount = _socketDamageFire ?? transform;
+                    _fireVfxInstance = RuntimeVisualVfxFallback.SpawnDamageFire(fireMount, _entity);
+
+                    if (_socketTurretPivot != null && !_isTurretJammed)
+                    {
+                        _isTurretJammed = true;
+                        _socketTurretPivot.localRotation *= Quaternion.Euler(4.5f, 0f, 3.8f);
+                    }
+
+                    // APS radar burnout
+                    Transform apsSocket;
+                    if (_socketHardpoints.TryGetValue("APS", out apsSocket) && apsSocket != null)
+                    {
+                        apsSocket.gameObject.SetActive(false);
+                    }
+                }
+            }
+            else if (ratio > 0.25f && !isDead && _isCriticalStateActive)
+            {
+                // Health recovered from critical damage
+                _isCriticalStateActive = false;
+                if (_fireVfxInstance != null)
+                {
+                    UnityEngine.Object.Destroy(_fireVfxInstance);
+                    _fireVfxInstance = null;
+                }
+                if (_socketTurretPivot != null && _isTurretJammed)
+                {
+                    _isTurretJammed = false;
+                    _socketTurretPivot.localRotation = Quaternion.identity;
+                }
+
+                Transform apsSocket;
+                if (_socketHardpoints.TryGetValue("APS", out apsSocket) && apsSocket != null && !apsSocket.gameObject.activeSelf)
+                {
+                    apsSocket.gameObject.SetActive(true);
+                }
+            }
+
+            // 4. Destruction cleanup
             if (isDead)
             {
                 if (_fireVfxInstance != null)
@@ -328,10 +442,34 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             }
         }
 
+        private void ApplyProceduralScorch(bool active)
+        {
+            if (transform == null) return;
+            if (_propertyBlock == null) _propertyBlock = new MaterialPropertyBlock();
+
+            Renderer[] renderers = transform.GetComponentsInChildren<Renderer>(true);
+            foreach (Renderer r in renderers)
+            {
+                if (r.name.StartsWith("Socket_", StringComparison.OrdinalIgnoreCase)) continue;
+                if (active)
+                {
+                    r.GetPropertyBlock(_propertyBlock);
+                    _propertyBlock.SetColor("_Color", new Color(0.38f, 0.35f, 0.33f));
+                    r.SetPropertyBlock(_propertyBlock);
+                }
+                else
+                {
+                    r.SetPropertyBlock(null);
+                }
+            }
+        }
+
         private void UpdateRadarSweep()
         {
             if (_socketRadarMast == null || IsEntityDead()) return;
-            _socketRadarMast.Rotate(Vector3.up, _radarRpm * Time.deltaTime, Space.Self);
+            // Calibrate to true 30 RPM: 30 * 360 deg / 60 sec = 180 deg/sec
+            float degPerSec = _radarRpm * 6.0f;
+            _socketRadarMast.Rotate(Vector3.up, degPerSec * Time.deltaTime, Space.Self);
         }
 
         private void UpdateTurretAiming()
@@ -402,16 +540,33 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             }
         }
 
+        private bool IsHostileTarget(EntityController candidate)
+        {
+            if (candidate == null || candidate.gameObject == null) return false;
+            try
+            {
+                if (_isDestroyedProp != null && (bool)_isDestroyedProp.GetValue(candidate, null)) return false;
+                if (_stillExistsProp != null && !(bool)_stillExistsProp.GetValue(candidate, null)) return false;
+                if (_destroyHasBeenStartedProp != null && (bool)_destroyHasBeenStartedProp.GetValue(candidate, null)) return false;
+                if (_isEnemyMethod != null)
+                {
+                    return (bool)_isEnemyMethod.Invoke(_entity, new object[] { candidate });
+                }
+            }
+            catch { }
+            return true; // Fallback if reflection fails
+        }
+
         private Transform ResolveEntityTarget()
         {
             if (_entity == null) return null;
             try
             {
-                // 1. Direct public CurrentAttackTarget on EntityController
+                // 1. Direct public CurrentAttackTarget on EntityController (authoritative hostile combat target)
                 if (_currentAttackTargetProp != null)
                 {
                     EntityController atkTgt = _currentAttackTargetProp.GetValue(_entity, null) as EntityController;
-                    if (atkTgt != null && atkTgt.gameObject != null) return atkTgt.transform;
+                    if (IsHostileTarget(atkTgt)) return atkTgt.transform;
                 }
 
                 // 2. EntityAttack._attackTarget
@@ -421,7 +576,7 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
                     if (atk != null)
                     {
                         EntityController atkTgt = _attackTargetField.GetValue(atk) as EntityController;
-                        if (atkTgt != null && atkTgt.gameObject != null) return atkTgt.transform;
+                        if (IsHostileTarget(atkTgt)) return atkTgt.transform;
                     }
                 }
 
@@ -435,26 +590,26 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
                         if (aiming != null)
                         {
                             EntityController aimingTgt = _singleTargetActionTargetField.GetValue(aiming) as EntityController;
-                            if (aimingTgt != null && aimingTgt.gameObject != null) return aimingTgt.transform;
+                            if (IsHostileTarget(aimingTgt)) return aimingTgt.transform;
                         }
                     }
                 }
 
-                // 4. Direct public CurrentFollowTarget on EntityController
+                // 4. Direct public CurrentFollowTarget on EntityController (only aim if hostile)
                 if (_currentFollowTargetProp != null)
                 {
                     EntityController flwTgt = _currentFollowTargetProp.GetValue(_entity, null) as EntityController;
-                    if (flwTgt != null && flwTgt.gameObject != null) return flwTgt.transform;
+                    if (IsHostileTarget(flwTgt)) return flwTgt.transform;
                 }
 
-                // 5. Player and AI Command fallbacks
+                // 5. Player and AI Command fallbacks (only aim if hostile)
                 if (_currentPlayerCommandField != null && _cmdTargetField != null)
                 {
                     object cmd = _currentPlayerCommandField.GetValue(_entity);
                     if (cmd != null)
                     {
                         EntityController cmdTgt = _cmdTargetField.GetValue(cmd) as EntityController;
-                        if (cmdTgt != null && cmdTgt.gameObject != null) return cmdTgt.transform;
+                        if (IsHostileTarget(cmdTgt)) return cmdTgt.transform;
                     }
                 }
                 if (_lastAiCommandField != null && _cmdTargetField != null)
@@ -463,7 +618,7 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
                     if (cmd != null)
                     {
                         EntityController cmdTgt = _cmdTargetField.GetValue(cmd) as EntityController;
-                        if (cmdTgt != null && cmdTgt.gameObject != null) return cmdTgt.transform;
+                        if (IsHostileTarget(cmdTgt)) return cmdTgt.transform;
                     }
                 }
             }

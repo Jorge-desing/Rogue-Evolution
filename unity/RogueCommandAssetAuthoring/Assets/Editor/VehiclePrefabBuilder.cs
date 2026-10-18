@@ -5,6 +5,7 @@ using System.IO;
 using System.Text;
 using System.Text.RegularExpressions;
 using UnityEditor;
+using UnityEditor.Animations;
 using UnityEngine;
 
 namespace RogueCommandExpansion.Authoring
@@ -172,16 +173,44 @@ namespace RogueCommandExpansion.Authoring
                 modelInstance.transform.localRotation = Quaternion.identity;
                 modelInstance.transform.localScale = Vector3.one;
 
-                // Assign Atlas material if available, or configure instancing on existing materials
+                // 1. Convert collision hull meshes (_COLLIDER) into real Unity BoxColliders and disable their visible renderers
+                int convertedColliderCount = 0;
+                Renderer[] allModelRenderers = modelInstance.GetComponentsInChildren<Renderer>(true);
+                foreach (Renderer r in allModelRenderers)
+                {
+                    if (r.name.IndexOf("_COLLIDER", StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        r.enabled = false;
+                        MeshFilter mf = r.GetComponent<MeshFilter>();
+                        if (mf != null && mf.sharedMesh != null)
+                        {
+                            BoxCollider bc = r.GetComponent<BoxCollider>();
+                            if (bc == null)
+                            {
+                                bc = r.gameObject.AddComponent<BoxCollider>();
+                            }
+                            Bounds b = mf.sharedMesh.bounds;
+                            bc.center = b.center;
+                            bc.size = b.size;
+                            convertedColliderCount++;
+                            EditorUtility.SetDirty(r.gameObject);
+                        }
+                    }
+                }
+
+                // 2. Assign Atlas material if available, or configure instancing on existing materials
                 if (atlasMaterial != null)
                 {
                     Renderer[] renderers = modelInstance.GetComponentsInChildren<Renderer>(true);
                     foreach (Renderer r in renderers)
                     {
-                        // Check if renderer is a shield bubble or vfx
+                        if (r.name.IndexOf("_COLLIDER", StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            r.enabled = false;
+                            continue;
+                        }
                         if (r.name.EndsWith("_ShieldBubble", StringComparison.OrdinalIgnoreCase))
                         {
-                            // Keep or create translucent shield material
                             continue;
                         }
                         r.sharedMaterial = atlasMaterial;
@@ -193,6 +222,11 @@ namespace RogueCommandExpansion.Authoring
                     Renderer[] renderers = modelInstance.GetComponentsInChildren<Renderer>(true);
                     foreach (Renderer r in renderers)
                     {
+                        if (r.name.IndexOf("_COLLIDER", StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            r.enabled = false;
+                            continue;
+                        }
                         foreach (Material m in r.sharedMaterials)
                         {
                             if (m != null && !m.enableInstancing)
@@ -204,7 +238,7 @@ namespace RogueCommandExpansion.Authoring
                     }
                 }
 
-                // Setup BoxCollider if specified
+                // 3. Setup compound root BoxCollider if specified and no dedicated child colliders were present
                 if (meta.HasCollider)
                 {
                     BoxCollider collider = root.GetComponent<BoxCollider>();
@@ -216,7 +250,7 @@ namespace RogueCommandExpansion.Authoring
                     collider.size = meta.ColliderSize;
                 }
 
-                // Setup Sockets
+                // 4. Setup Sockets
                 if (meta.Sockets != null && meta.Sockets.Count > 0)
                 {
                     foreach (SocketData socket in meta.Sockets)
@@ -232,7 +266,16 @@ namespace RogueCommandExpansion.Authoring
                     }
                 }
 
-                // Setup LODGroup if LOD submeshes are detected
+                // 5. Mount Detached Modular Attachments (ERA, APS, Sponson, FuelDrums) if present
+                MountModularAttachmentsIfAvailable(root, unitName, atlasMaterial);
+
+                // 6. Mount Damaged Variant Model (<Name>_Damaged.fbx) if present
+                MountDamagedVariantIfAvailable(root, unitName, atlasMaterial);
+
+                // 7. Setup Animator & AnimatorController if model has bones or animation clips
+                SetupAnimatorIfAvailable(root, modelInstance, modelAsset, unitName);
+
+                // 8. Setup LODGroup if LOD submeshes are detected
                 SetupLodGroupIfAvailable(root, modelInstance);
 
                 // Save Prefab
@@ -309,12 +352,183 @@ namespace RogueCommandExpansion.Authoring
             }
         }
 
+        private static void MountModularAttachmentsIfAvailable(GameObject root, string unitName, Material atlasMaterial)
+        {
+            string[] guids = AssetDatabase.FindAssets(unitName + "_Attachment_ t:Model", new[] { ModelFolder, AssetRoot });
+            if (guids == null || guids.Length == 0) return;
+
+            foreach (string guid in guids)
+            {
+                string path = AssetDatabase.GUIDToAssetPath(guid);
+                string attFileName = Path.GetFileNameWithoutExtension(path);
+                string prefix = unitName + "_Attachment_";
+                if (!attFileName.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) continue;
+
+                string attType = attFileName.Substring(prefix.Length);
+                GameObject attAsset = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+                if (attAsset != null)
+                {
+                    Transform socket = root.transform.Find("Socket_Hardpoint_" + attType);
+                    Transform parentTransform = socket != null ? socket : root.transform;
+
+                    GameObject attInstance = PrefabUtility.InstantiatePrefab(attAsset) as GameObject;
+                    if (attInstance != null)
+                    {
+                        attInstance.name = attFileName;
+                        attInstance.transform.SetParent(parentTransform, false);
+                        attInstance.transform.localPosition = Vector3.zero;
+                        attInstance.transform.localRotation = Quaternion.identity;
+                        attInstance.transform.localScale = Vector3.one;
+
+                        if (atlasMaterial != null)
+                        {
+                            foreach (Renderer r in attInstance.GetComponentsInChildren<Renderer>(true))
+                            {
+                                if (r.name.IndexOf("_COLLIDER", StringComparison.OrdinalIgnoreCase) >= 0)
+                                {
+                                    r.enabled = false;
+                                    continue;
+                                }
+                                r.sharedMaterial = atlasMaterial;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        private static void MountDamagedVariantIfAvailable(GameObject root, string unitName, Material atlasMaterial)
+        {
+            string damagedModelPath = ModelFolder + "/" + unitName + "_Damaged.fbx";
+            GameObject damagedAsset = AssetDatabase.LoadAssetAtPath<GameObject>(damagedModelPath);
+            if (damagedAsset == null)
+            {
+                string[] guids = AssetDatabase.FindAssets(unitName + "_Damaged t:Model", new[] { ModelFolder, AssetRoot });
+                if (guids != null && guids.Length > 0)
+                {
+                    damagedAsset = AssetDatabase.LoadAssetAtPath<GameObject>(AssetDatabase.GUIDToAssetPath(guids[0]));
+                }
+            }
+
+            if (damagedAsset != null)
+            {
+                GameObject damagedInstance = PrefabUtility.InstantiatePrefab(damagedAsset) as GameObject;
+                if (damagedInstance != null)
+                {
+                    damagedInstance.name = unitName + "_Damaged";
+                    damagedInstance.transform.SetParent(root.transform, false);
+                    damagedInstance.transform.localPosition = Vector3.zero;
+                    damagedInstance.transform.localRotation = Quaternion.identity;
+                    damagedInstance.transform.localScale = Vector3.one;
+
+                    if (atlasMaterial != null)
+                    {
+                        foreach (Renderer r in damagedInstance.GetComponentsInChildren<Renderer>(true))
+                        {
+                            if (r.name.IndexOf("_COLLIDER", StringComparison.OrdinalIgnoreCase) >= 0)
+                            {
+                                r.enabled = false;
+                                continue;
+                            }
+                            r.sharedMaterial = atlasMaterial;
+                        }
+                    }
+
+                    // Initially disabled; activated by RuntimeVisualDirector at <= 50% HP
+                    damagedInstance.SetActive(false);
+                }
+            }
+        }
+
+        private static void SetupAnimatorIfAvailable(GameObject root, GameObject modelInstance, GameObject modelAsset, string unitName)
+        {
+            SkinnedMeshRenderer smr = modelInstance.GetComponentInChildren<SkinnedMeshRenderer>(true);
+            bool hasBones = false;
+            foreach (Transform t in modelInstance.GetComponentsInChildren<Transform>(true))
+            {
+                if (t.name.StartsWith("Bone_", StringComparison.OrdinalIgnoreCase) || t.name.Equals("Armature", StringComparison.OrdinalIgnoreCase))
+                {
+                    hasBones = true;
+                    break;
+                }
+            }
+
+            string modelPath = AssetDatabase.GetAssetPath(modelAsset);
+            UnityEngine.Object[] allAssets = AssetDatabase.LoadAllAssetsAtPath(modelPath);
+            var animationClips = new List<AnimationClip>();
+            if (allAssets != null)
+            {
+                foreach (var asset in allAssets)
+                {
+                    if (asset is AnimationClip clip && !clip.name.StartsWith("__preview__"))
+                    {
+                        animationClips.Add(clip);
+                    }
+                }
+            }
+
+            if (smr != null || hasBones || animationClips.Count > 0)
+            {
+                Animator animator = root.GetComponent<Animator>();
+                if (animator == null)
+                {
+                    animator = root.AddComponent<Animator>();
+                }
+
+                Animator modelAnimator = modelAsset.GetComponent<Animator>();
+                if (modelAnimator != null && modelAnimator.avatar != null)
+                {
+                    animator.avatar = modelAnimator.avatar;
+                }
+
+                if (animationClips.Count > 0)
+                {
+                    string animFolder = AssetRoot + "/Animations";
+                    if (!AssetDatabase.IsValidFolder(animFolder))
+                    {
+                        AssetDatabase.CreateFolder(AssetRoot, "Animations");
+                    }
+
+                    string controllerPath = animFolder + "/" + unitName + "Controller.controller";
+                    AnimatorController controller = AssetDatabase.LoadAssetAtPath<AnimatorController>(controllerPath);
+                    if (controller == null)
+                    {
+                        controller = AnimatorController.CreateAnimatorControllerAtPath(controllerPath);
+                        var rootStateMachine = controller.layers[0].stateMachine;
+
+                        AnimationClip idleClip = animationClips.Find(c => c.name.IndexOf("Idle", StringComparison.OrdinalIgnoreCase) >= 0);
+                        if (idleClip == null && animationClips.Count > 0) idleClip = animationClips[0];
+
+                        if (idleClip != null)
+                        {
+                            var idleState = rootStateMachine.AddState(idleClip.name);
+                            idleState.motion = idleClip;
+                            rootStateMachine.defaultState = idleState;
+                        }
+
+                        foreach (var clip in animationClips)
+                        {
+                            if (clip != idleClip)
+                            {
+                                var state = rootStateMachine.AddState(clip.name);
+                                state.motion = clip;
+                            }
+                        }
+                        AssetDatabase.SaveAssets();
+                    }
+
+                    animator.runtimeAnimatorController = controller;
+                }
+            }
+        }
+
         private static GameObject FindModelAsset(string unitName)
         {
+            // Prioritize LOD chain if available so LODGroup is constructed, then single joined Atlas, then raw FBX
             string[] candidatePaths = new[]
             {
-                ModelFolder + "/" + unitName + "_Atlas.fbx",
                 ModelFolder + "/" + unitName + "_LODs.fbx",
+                ModelFolder + "/" + unitName + "_Atlas.fbx",
                 ModelFolder + "/" + unitName + ".fbx",
                 AssetRoot + "/" + unitName + ".fbx"
             };
@@ -366,7 +580,20 @@ namespace RogueCommandExpansion.Authoring
                 }
             }
 
+            // Configure MetallicGloss Data Map importer (Linear Non-Color, Alpha from Input)
             Texture2D metallicTex = AssetDatabase.LoadAssetAtPath<Texture2D>(metallicPath);
+            if (metallicTex != null)
+            {
+                TextureImporter metalImporter = AssetImporter.GetAtPath(metallicPath) as TextureImporter;
+                if (metalImporter != null && (metalImporter.sRGBTexture || metalImporter.alphaSource != TextureImporterAlphaSource.FromInput))
+                {
+                    metalImporter.sRGBTexture = false;
+                    metalImporter.alphaSource = TextureImporterAlphaSource.FromInput;
+                    metalImporter.SaveAndReimport();
+                    metallicTex = AssetDatabase.LoadAssetAtPath<Texture2D>(metallicPath);
+                }
+            }
+
             Texture2D emissionTex = AssetDatabase.LoadAssetAtPath<Texture2D>(emissionPath);
 
             // Create or load Atlas Material
@@ -390,6 +617,7 @@ namespace RogueCommandExpansion.Authoring
 
             if (metallicTex != null)
             {
+                mat.EnableKeyword("_METALLICGLOSSMAP");
                 mat.SetTexture("_MetallicGlossMap", metallicTex);
                 mat.SetFloat("_Metallic", 1.0f);
                 mat.SetFloat("_Glossiness", 1.0f);
