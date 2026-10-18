@@ -11,10 +11,22 @@ namespace RogueCommandExpansionLoader.Runtime
     /// </summary>
     internal static class RuntimeHooks
     {
+        private sealed class BlueprintRewardScopeFrame
+        {
+            public BlueprintRewardScopeFrame(BlueprintRewardFactoryScope scope)
+            {
+                Scope = scope;
+            }
+
+            public BlueprintRewardFactoryScope Scope { get; private set; }
+        }
+
         private static readonly object Gate = new object();
         private static RuntimeContentMutator _mutator;
         private static IRuntimeContentProvider _provider;
         private static Action<string> _log;
+        [ThreadStatic]
+        private static BlueprintRewardScopeFrame _blueprintRewardScope;
         public static Action<object> OnEntityInstantiated;
 
         public static void Bind(
@@ -43,6 +55,67 @@ namespace RogueCommandExpansionLoader.Runtime
                 _provider = null;
                 _log = null;
                 OnEntityInstantiated = null;
+                _blueprintRewardScope = null;
+            }
+        }
+
+        public static object BeginBlueprintRewardScope()
+        {
+            BlueprintRewardScopeFrame previous = _blueprintRewardScope;
+            IRuntimeContentProvider provider;
+            lock (Gate)
+            {
+                provider = _provider;
+            }
+
+            IBlueprintRewardFactoryScopeProvider scopeProvider =
+                provider as IBlueprintRewardFactoryScopeProvider;
+            if (scopeProvider != null)
+            {
+                try
+                {
+                    BlueprintRewardFactoryScope scope;
+                    if (scopeProvider.TryGetBlueprintRewardFactoryScope(out scope) && scope != null)
+                    {
+                        _blueprintRewardScope = new BlueprintRewardScopeFrame(scope);
+                    }
+                }
+                catch (Exception exception)
+                {
+                    Log("Could not resolve stage-scoped factory rewards: " +
+                        exception.GetBaseException().Message);
+                    try
+                    {
+                        BlueprintRewardFactoryScope failClosedScope =
+                            scopeProvider.CreateFailClosedBlueprintRewardFactoryScope();
+                        if (failClosedScope != null)
+                        {
+                            _blueprintRewardScope = new BlueprintRewardScopeFrame(failClosedScope);
+                        }
+                    }
+                    catch (Exception failClosedException)
+                    {
+                        Log("Could not create a fail-closed factory reward scope: " +
+                            failClosedException.GetBaseException().Message);
+                    }
+                }
+            }
+
+            return previous;
+        }
+
+        public static Exception EndBlueprintRewardScope(Exception exception, object previousScope)
+        {
+            _blueprintRewardScope = previousScope as BlueprintRewardScopeFrame;
+            return exception;
+        }
+
+        public static void FilterGlobalBlueprintRewardCandidates(List<string> candidates)
+        {
+            BlueprintRewardScopeFrame activeScope = _blueprintRewardScope;
+            if (activeScope != null)
+            {
+                activeScope.Scope.RemoveFactoriesOutsideStage(candidates);
             }
         }
 
@@ -82,6 +155,22 @@ namespace RogueCommandExpansionLoader.Runtime
                 {
                     SafeCall(delegate { mutator.ApplyCachedProgression(); });
                 }
+            }
+        }
+
+        public static void AfterStageMapCreated(object stageMap)
+        {
+            IRuntimeContentProvider provider;
+            lock (Gate)
+            {
+                provider = _provider;
+            }
+
+            IBlueprintRewardFactoryScopeProvider scopeProvider =
+                provider as IBlueprintRewardFactoryScopeProvider;
+            if (scopeProvider != null)
+            {
+                SafeCall(delegate { scopeProvider.OnStageMapCreated(stageMap); });
             }
         }
 
@@ -267,6 +356,11 @@ namespace RogueCommandExpansionLoader.Runtime
             try
             {
                 poolProvider.AddExclusiveBlueprints(__0, __result);
+                BlueprintRewardScopeFrame activeScope = _blueprintRewardScope;
+                if (activeScope != null && String.IsNullOrWhiteSpace(__0))
+                {
+                    activeScope.Scope.RemoveFactoriesOutsideStage(__result);
+                }
             }
             catch (Exception exception)
             {
@@ -522,6 +616,21 @@ namespace RogueCommandExpansionLoader.Runtime
 
     internal static class RuntimeHarmonyPatches
     {
+        public static void PresentCardsToChoosePrefix(out object __state)
+        {
+            __state = RuntimeHooks.BeginBlueprintRewardScope();
+        }
+
+        public static Exception PresentCardsToChooseFinalizer(Exception __exception, object __state)
+        {
+            return RuntimeHooks.EndBlueprintRewardScope(__exception, __state);
+        }
+
+        public static void AllEntityIdsAllowedAsBlueprintsPostfix(ref List<string> __result)
+        {
+            RuntimeHooks.FilterGlobalBlueprintRewardCandidates(__result);
+        }
+
         public static void FallbackLandscapeGeneratorsPostfix(ref List<global::LandscapeGenerator> __result)
         {
             __result = (List<global::LandscapeGenerator>)RuntimeHooks.ResolveFallbackLandscapes(__result);
@@ -545,6 +654,11 @@ namespace RogueCommandExpansionLoader.Runtime
         public static void CreateStageMapPrefix()
         {
             RuntimeHooks.BeforeProgressionMap();
+        }
+
+        public static void CreateStageMapPostfix(object __result)
+        {
+            RuntimeHooks.AfterStageMapCreated(__result);
         }
 
         public static void CreateLevelMapPrefix(object __0, out object __state)

@@ -29,6 +29,10 @@
              Link="Runtime/RuntimeContentContracts.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/BlueprintPoolScopeRegistry.cs"
              Link="Runtime/BlueprintPoolScopeRegistry.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/BlueprintRewardFactoryScope.cs"
+             Link="Runtime/BlueprintRewardFactoryScope.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/BlueprintRewardStageResolver.cs"
+             Link="Runtime/BlueprintRewardStageResolver.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/StageFallbackSnapshot.cs"
              Link="Runtime/StageFallbackSnapshot.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeReflection.cs"

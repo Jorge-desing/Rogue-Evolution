@@ -81,9 +81,12 @@ public sealed class DefaultAiBehaviour
 {
 }
 
-internal sealed class RuntimeMutatorTestProvider : IRuntimeContentProvider, IBlueprintPoolRuntimeProvider
+internal sealed class RuntimeMutatorTestProvider : IRuntimeContentProvider, IBlueprintPoolRuntimeProvider,
+    IBlueprintRewardFactoryScopeProvider
 {
     public Dictionary<string, string> PoolLocalizationAliases { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public BlueprintRewardFactoryScope RewardFactoryScope { get; set; }
+    public bool ThrowOnRewardScope { get; set; }
     public bool TryGetBlueprintPoolLocalizationId(string poolId, out string sourcePoolId)
     {
         sourcePoolId = null;
@@ -92,6 +95,17 @@ internal sealed class RuntimeMutatorTestProvider : IRuntimeContentProvider, IBlu
     public bool TryFindBlueprintPool(string poolId, out object pool) { pool = null; return false; }
     public bool TryGetBlueprintPoolDecision(object pool, string unitId, out bool runOriginal) { runOriginal = true; return false; }
     public void AddExclusiveBlueprints(string otherThanPoolId, HashSet<string> result) { }
+    public bool TryGetBlueprintRewardFactoryScope(out BlueprintRewardFactoryScope scope)
+    {
+        if (ThrowOnRewardScope) throw new InvalidOperationException("simulated reward scope resolution failure");
+        scope = RewardFactoryScope;
+        return scope != null;
+    }
+    public BlueprintRewardFactoryScope CreateFailClosedBlueprintRewardFactoryScope()
+    {
+        return RewardFactoryScope == null ? null : RewardFactoryScope.CreateFailClosedScope();
+    }
+    public void OnStageMapCreated(object stageMap) { }
 
     public List<object> EntityRows { get; } = new();
     public List<ProgressionContentContribution> Contributions { get; } = new();

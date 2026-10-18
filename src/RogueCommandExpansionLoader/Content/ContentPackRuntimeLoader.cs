@@ -22,7 +22,7 @@ namespace RogueCommandExpansionLoader.Content
     /// </summary>
     public sealed class ContentPackRuntimeLoader : IRuntimeContentProvider, IStageLandscapeRuntimeProvider,
         IBlueprintPoolRuntimeProvider, IStageFallbackRuntimeProvider,
-        IStageOwnedAiPlacementDistanceRuntimeProvider
+        IStageOwnedAiPlacementDistanceRuntimeProvider, IBlueprintRewardFactoryScopeProvider
     {
         private const int MaxManifestBytes = 1024 * 1024;
         private const uint GenericRead = 0x80000000;
@@ -82,9 +82,14 @@ namespace RogueCommandExpansionLoader.Content
         private readonly FieldInfo _gameBalancingAssetField;
         private readonly FieldInfo _fallbackLandscapeGeneratorsField;
         private readonly FieldInfo _gameStageMapField;
+        private readonly FieldInfo _stageMapLevelMapsField;
         private readonly FieldInfo _lastNativeAiStartBuildingDistanceField;
         private readonly PropertyInfo _stageMapCurrentStageProperty;
         private readonly PropertyInfo _currentProgressionProperty;
+        private readonly FieldInfo _progressionEnableTutorialField;
+        private readonly FieldInfo _progressionTutorialStageField;
+        private readonly PropertyInfo _gameTutorialStateProperty;
+        private readonly FieldInfo _tutorialMainFinishedField;
         private readonly FieldInfo _gameIsDemoField;
         private readonly FieldInfo _gameMaxAscensionLevelField;
         private readonly FieldInfo[] _progressionFields;
@@ -167,6 +172,9 @@ namespace RogueCommandExpansionLoader.Content
         private bool _runtimeContentReady;
         private bool _loaded;
         private bool _aiStartDistanceFailureLogged;
+        private bool _blueprintRewardScopeFailureLogged;
+        private object _stageMapSnapshotOwner;
+        private List<object> _stageMapVisibleStages;
 
         public ContentPackRuntimeLoader(
             string packsRoot,
@@ -273,12 +281,18 @@ namespace RogueCommandExpansionLoader.Content
             // The game also ships Shapes2D.Game; resolve the verified global type exactly.
             Type gameType = _gameAssembly.GetType("Game", true, false);
             Type stageMapType = FindUniqueType("StageMap");
+            Type levelMapType = FindUniqueType("LevelMap");
             _gameBalancingAssetField = FindField(gameBalancingStoreType,
                 "_gameBalancingScriptableObject", StaticFields);
             _gameStageMapField = FindField(gameType, "StageMap", StaticFields);
             if (!_gameStageMapField.IsStatic || _gameStageMapField.FieldType != stageMapType)
             {
                 throw new InvalidOperationException("Game.StageMap has an unexpected field shape.");
+            }
+            _stageMapLevelMapsField = FindField(stageMapType, "_levelMaps", InstanceFields);
+            if (!IsExactList(_stageMapLevelMapsField.FieldType, levelMapType))
+            {
+                throw new InvalidOperationException("StageMap._levelMaps is not List<LevelMap>.");
             }
 
             _stageMapCurrentStageProperty = stageMapType.GetProperty("CurrentStage", InstanceFields);
@@ -304,6 +318,20 @@ namespace RogueCommandExpansionLoader.Content
             {
                 throw new InvalidOperationException("GameBalancingStore.CurrentLevelProgressionParameters has an unexpected shape.");
             }
+            _progressionEnableTutorialField = RequireField(progressionType, "enableTutorial", typeof(bool));
+            _progressionTutorialStageField = RequireField(progressionType, "tutorialStage", _stageType);
+            Type tutorialStateType = FindUniqueType("TutorialState");
+            _gameTutorialStateProperty = gameType.GetProperty("TutorialState", StaticFields);
+            MethodInfo tutorialStateGetter = _gameTutorialStateProperty == null
+                ? null
+                : _gameTutorialStateProperty.GetGetMethod(true);
+            if (_gameTutorialStateProperty == null || _gameTutorialStateProperty.PropertyType != tutorialStateType ||
+                tutorialStateGetter == null || !tutorialStateGetter.IsStatic ||
+                tutorialStateGetter.GetParameters().Length != 0)
+            {
+                throw new InvalidOperationException("Game.TutorialState has an unexpected property shape.");
+            }
+            _tutorialMainFinishedField = RequireField(tutorialStateType, "IsMainTutorialFinished", typeof(bool));
             if (!_gameBalancingAssetField.IsStatic || _gameBalancingAssetField.FieldType != gameBalancingType)
             {
                 throw new InvalidOperationException(
@@ -721,6 +749,125 @@ namespace RogueCommandExpansionLoader.Content
             lock (_gate)
             {
                 _blueprintPoolScopeRegistry.AddExclusiveModUnits(otherThanPoolId, result);
+            }
+        }
+
+        public bool TryGetBlueprintRewardFactoryScope(out BlueprintRewardFactoryScope scope)
+        {
+            lock (_gate)
+            {
+                scope = null;
+                if (_blueprintUnitIds.Count == 0)
+                {
+                    return false;
+                }
+
+                var stageFactoryIds = new HashSet<string>(StringComparer.Ordinal);
+                bool activeStageResolved = false;
+                try
+                {
+                    if (!_runtimeContentReady)
+                    {
+                        scope = new BlueprintRewardFactoryScope(_blueprintUnitIds, null);
+                        return true;
+                    }
+
+                    object stageMap = _gameStageMapField.GetValue(null);
+                    object activeStage = null;
+                    if (stageMap != null && System.Object.ReferenceEquals(stageMap, _stageMapSnapshotOwner) &&
+                        _stageMapVisibleStages != null)
+                    {
+                        int stageMapIndex = (int)_stageMapCurrentStageProperty.GetValue(stageMap, null);
+                        activeStage = BlueprintRewardStageResolver.ResolveVisibleStage(
+                            _stageMapVisibleStages, stageMapIndex);
+                    }
+
+                    if (activeStage != null)
+                    {
+                        activeStageResolved = true;
+                        for (int i = 0; i < _stages.Count; i++)
+                        {
+                            if (System.Object.ReferenceEquals(_stages[i].RuntimeStage, activeStage))
+                            {
+                                stageFactoryIds.UnionWith(_stages[i].BlueprintFactoryIds);
+                                break;
+                            }
+                        }
+                    }
+                }
+                catch (Exception exception)
+                {
+                    Log("Could not resolve the active progression stage for factory rewards: " +
+                        exception.GetBaseException().Message);
+                }
+
+                if (!activeStageResolved && !_blueprintRewardScopeFailureLogged)
+                {
+                    _blueprintRewardScopeFailureLogged = true;
+                    Log("Active progression stage could not be resolved; custom factories are omitted from " +
+                        "the generic reward fallback until a stage is available.");
+                }
+
+                scope = new BlueprintRewardFactoryScope(_blueprintUnitIds, stageFactoryIds);
+                return true;
+            }
+        }
+
+        public void OnStageMapCreated(object stageMap)
+        {
+            lock (_gate)
+            {
+                _stageMapSnapshotOwner = stageMap;
+                _stageMapVisibleStages = null;
+                if (stageMap == null)
+                {
+                    return;
+                }
+
+                object progression = _currentProgressionProperty.GetValue(null, null);
+                IList progressionStages = progression == null
+                    ? null
+                    : _progressionStagesField.GetValue(progression) as IList;
+                if (progression == null || progressionStages == null)
+                {
+                    return;
+                }
+
+                bool enableTutorial = (bool)_progressionEnableTutorialField.GetValue(progression);
+                object tutorialState = _gameTutorialStateProperty.GetValue(null, null);
+                bool tutorialFinished = tutorialState != null &&
+                    (bool)_tutorialMainFinishedField.GetValue(tutorialState);
+                bool useTutorialStage = enableTutorial && !tutorialFinished;
+                object tutorialStage = _progressionTutorialStageField.GetValue(progression);
+                object balancing = _gameBalancingAssetField.GetValue(null);
+                bool isDemo = balancing != null && (bool)_gameIsDemoField.GetValue(balancing);
+
+                List<object> visibleStages = BlueprintRewardStageResolver.BuildVisibleStages(
+                    progressionStages,
+                    tutorialStage,
+                    isDemo,
+                    useTutorialStage,
+                    delegate(object stage)
+                    {
+                        return (bool)_stageDemoField.GetValue(stage);
+                    });
+                IList levelMaps = _stageMapLevelMapsField.GetValue(stageMap) as IList;
+                if (levelMaps == null || levelMaps.Count != visibleStages.Count)
+                {
+                    Log("Stage map snapshot did not match the game's visible LevelMap count; " +
+                        "custom factories will be omitted from generic rewards for this map.");
+                    return;
+                }
+
+                _stageMapVisibleStages = visibleStages;
+            }
+        }
+
+        public BlueprintRewardFactoryScope CreateFailClosedBlueprintRewardFactoryScope()
+        {
+            lock (_gate)
+            {
+                return new BlueprintRewardFactoryScope(_blueprintUnitIds, null);
             }
         }
 
@@ -2287,7 +2434,7 @@ namespace RogueCommandExpansionLoader.Content
                     object runtimeStage = CreateStage(stage, parameters, packageName);
                     UnityEngine.Object fallback = ResolveStageFallback(stage, nativeSourceParameters, stageWorlds, packageName);
                     temporaryStages.Add(new LoadedStage(stage, definition.packId, runtimeStage,
-                        pools, stageWorlds, landscape, stagePoolScopes, fallback));
+                        pools, stageWorlds, landscape, stagePoolScopes, scopedUnitIds, fallback));
                 }
 
                 Dictionary<string, Vector2Int> scopedAiStageRanges = BuildScopedAiStageRanges(
@@ -5495,6 +5642,7 @@ namespace RogueCommandExpansionLoader.Content
                 List<object> worlds,
                 LoadedLandscape landscape,
                 List<BlueprintPoolScopeRegistration> blueprintPoolScopes,
+                HashSet<string> blueprintFactoryIds,
                 UnityEngine.Object fallbackLandscape)
             {
                 Definition = definition;
@@ -5504,6 +5652,7 @@ namespace RogueCommandExpansionLoader.Content
                 Worlds = worlds;
                 Landscape = landscape;
                 BlueprintPoolScopes = blueprintPoolScopes;
+                BlueprintFactoryIds = new HashSet<string>(blueprintFactoryIds, StringComparer.Ordinal);
                 FallbackLandscape = fallbackLandscape;
             }
 
@@ -5514,6 +5663,7 @@ namespace RogueCommandExpansionLoader.Content
             public List<object> Worlds { get; private set; }
             public LoadedLandscape Landscape { get; private set; }
             public List<BlueprintPoolScopeRegistration> BlueprintPoolScopes { get; private set; }
+            public HashSet<string> BlueprintFactoryIds { get; private set; }
             public UnityEngine.Object FallbackLandscape { get; private set; }
         }
 

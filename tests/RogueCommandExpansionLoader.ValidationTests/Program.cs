@@ -1,4 +1,5 @@
 #nullable enable
+using System.Collections;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Text.Json;
@@ -46,6 +47,7 @@ var tests = new (string Name, Action Run)[]
             "EntityBalancingStoreInitPostfix",
             "SetScriptableObjectPostfix",
             "CreateStageMapPrefix",
+            "CreateStageMapPostfix",
             "CreateLevelMapPrefix",
             "CreateLevelMapFinalizer",
             "InstantiateEntityPrefix",
@@ -61,7 +63,10 @@ var tests = new (string Name, Action Run)[]
             "OutlyingStartAiBuildingDistancePrefix",
             "BlueprintPoolIsInPoolPrefix",
             "BlueprintPoolFindPrefix",
-            "BlueprintPoolExclusiveBlueprintsPostfix"
+            "BlueprintPoolExclusiveBlueprintsPostfix",
+            "PresentCardsToChoosePrefix",
+            "PresentCardsToChooseFinalizer",
+            "AllEntityIdsAllowedAsBlueprintsPostfix"
         ];
 
         foreach (string hookName in hookNames)
@@ -210,6 +215,157 @@ var tests = new (string Name, Action Run)[]
         if (!duplicateRejected || registry.ContainsPoolId("RCL_POOL_UNCOMMITTED"))
         {
             throw new InvalidOperationException("A duplicate scoped pool registration was not rejected atomically.");
+        }
+    }),
+    ("random reward fallback only retains loader factories declared by the active stage", () =>
+    {
+        var loaderFactories = new HashSet<string>(new[]
+        {
+            "sample:factory-stage-one",
+            "sample:factory-stage-two"
+        }, StringComparer.Ordinal);
+        var activeStageFactories = new HashSet<string>(new[]
+        {
+            "sample:factory-stage-one"
+        }, StringComparer.Ordinal);
+        var scope = new BlueprintRewardFactoryScope(loaderFactories, activeStageFactories);
+
+        loaderFactories.Add("sample:factory-added-after-snapshot");
+        activeStageFactories.Add("sample:factory-stage-two");
+
+        var candidates = new List<string>
+        {
+            "native:factory",
+            "sample:factory-stage-one",
+            "sample:factory-stage-two",
+            "other-mod:factory"
+        };
+        scope.RemoveFactoriesOutsideStage(candidates);
+        if (!candidates.Contains("native:factory") ||
+            !candidates.Contains("sample:factory-stage-one") ||
+            candidates.Contains("sample:factory-stage-two") ||
+            !candidates.Contains("other-mod:factory") ||
+            candidates.Contains("sample:factory-added-after-snapshot"))
+        {
+            throw new InvalidOperationException(
+                "The random reward scope altered native/other-mod IDs or admitted a factory from another stage.");
+        }
+
+        var exclusives = new HashSet<string>(new[]
+        {
+            "native:exclusive",
+            "sample:factory-stage-one",
+            "sample:factory-stage-two"
+        }, StringComparer.Ordinal);
+        scope.RemoveFactoriesOutsideStage(exclusives);
+        if (!exclusives.SetEquals(new[] { "native:exclusive", "sample:factory-stage-one" }))
+        {
+            throw new InvalidOperationException(
+                "Global no-pool exclusivity retained a loader factory from another stage.");
+        }
+
+        var nativeStageScope = new BlueprintRewardFactoryScope(
+            new[] { "sample:factory-stage-one", "sample:factory-stage-two" }, null);
+        var nativeStageCandidates = new List<string> { "native:factory", "sample:factory-stage-one" };
+        nativeStageScope.RemoveFactoriesOutsideStage(nativeStageCandidates);
+        if (!nativeStageCandidates.SequenceEqual(new[] { "native:factory" }))
+        {
+            throw new InvalidOperationException("A native stage did not exclude all loader-owned factory IDs.");
+        }
+
+        var provider = new RuntimeMutatorTestProvider
+        {
+            RewardFactoryScope = new BlueprintRewardFactoryScope(
+                new[] { "sample:factory-stage-one", "sample:factory-stage-two" },
+                new[] { "sample:factory-stage-one" })
+        };
+        RuntimeHooks.Bind(null!, provider, null!);
+        object previousScope = RuntimeHooks.BeginBlueprintRewardScope();
+        var hookedCandidates = new List<string>
+        {
+            "native:factory",
+            "sample:factory-stage-one",
+            "sample:factory-stage-two"
+        };
+        RuntimeHooks.FilterGlobalBlueprintRewardCandidates(hookedCandidates);
+        RuntimeHooks.EndBlueprintRewardScope(null!, previousScope);
+        var candidatesAfterScope = new List<string> { "sample:factory-stage-two" };
+        RuntimeHooks.FilterGlobalBlueprintRewardCandidates(candidatesAfterScope);
+        RuntimeHooks.Clear(null!);
+        if (!hookedCandidates.SequenceEqual(new[] { "native:factory", "sample:factory-stage-one" }) ||
+            !candidatesAfterScope.SequenceEqual(new[] { "sample:factory-stage-two" }))
+        {
+            throw new InvalidOperationException("The reward scope hook did not filter candidates or leaked past its finalizer.");
+        }
+    }),
+    ("demo reward stage index follows visible stages and tutorial substitution", () =>
+    {
+        var nativeHiddenStage = new object();
+        var modDemoStage = new object();
+        var tutorialStage = new object();
+        var progressionStages = new ArrayList { nativeHiddenStage, modDemoStage };
+        bool IsDemoStage(object stage) => ReferenceEquals(stage, modDemoStage) || ReferenceEquals(stage, tutorialStage);
+
+        IList visibleStages = BlueprintRewardStageResolver.BuildVisibleStages(
+            progressionStages, null, true, false, IsDemoStage);
+        object resolved = BlueprintRewardStageResolver.ResolveVisibleStage(visibleStages, 0);
+        if (!ReferenceEquals(resolved, modDemoStage))
+        {
+            throw new InvalidOperationException("Demo map index zero did not skip the hidden preceding progression stage.");
+        }
+
+        visibleStages = BlueprintRewardStageResolver.BuildVisibleStages(
+            progressionStages, tutorialStage, true, true, IsDemoStage);
+        resolved = BlueprintRewardStageResolver.ResolveVisibleStage(visibleStages, 0);
+        if (!ReferenceEquals(resolved, tutorialStage))
+        {
+            throw new InvalidOperationException("The active tutorial stage was not substituted at the first map index.");
+        }
+
+        resolved = BlueprintRewardStageResolver.ResolveVisibleStage(visibleStages, 1);
+        if (!ReferenceEquals(resolved, modDemoStage))
+        {
+            throw new InvalidOperationException("The progression stage following the visible tutorial stage was not resolved.");
+        }
+
+        // Tutorial state may change after the map has been created. Resolution must use the saved
+        // visible stage list for that map rather than rebuilding it from the changed state.
+        resolved = BlueprintRewardStageResolver.ResolveVisibleStage(visibleStages, 0);
+        if (!ReferenceEquals(resolved, tutorialStage))
+        {
+            throw new InvalidOperationException("The map's tutorial stage snapshot changed after map creation.");
+        }
+
+        resolved = BlueprintRewardStageResolver.ResolveVisibleStage(visibleStages, 2);
+        if (resolved != null)
+        {
+            throw new InvalidOperationException("An out-of-range Demo map index unexpectedly resolved a stage.");
+        }
+    }),
+    ("reward provider exceptions install a fail-closed factory scope", () =>
+    {
+        var provider = new RuntimeMutatorTestProvider
+        {
+            RewardFactoryScope = new BlueprintRewardFactoryScope(
+                new[] { "sample:factory-stage-one", "sample:factory-stage-two" },
+                new[] { "sample:factory-stage-one" }),
+            ThrowOnRewardScope = true
+        };
+        RuntimeHooks.Bind(null!, provider, null!);
+        object previousScope = RuntimeHooks.BeginBlueprintRewardScope();
+        var candidates = new List<string>
+        {
+            "native:factory",
+            "sample:factory-stage-one",
+            "sample:factory-stage-two",
+            "other-mod:factory"
+        };
+        RuntimeHooks.FilterGlobalBlueprintRewardCandidates(candidates);
+        RuntimeHooks.EndBlueprintRewardScope(null!, previousScope);
+        RuntimeHooks.Clear(null!);
+        if (!candidates.SequenceEqual(new[] { "native:factory", "other-mod:factory" }))
+        {
+            throw new InvalidOperationException("A provider exception left loader-owned global factories eligible.");
         }
     }),
     ("scoped blueprint pool tooltips retain their source localization key", () =>

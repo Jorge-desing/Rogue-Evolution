@@ -205,6 +205,7 @@ namespace RogueCommandExpansionLoader.Runtime
             Type defaultAiBehaviour = RuntimeReflection.FindUniqueType(gameAssembly, "DefaultAiBehaviour");
             Type loca = RuntimeReflection.FindUniqueType(gameAssembly, "Loca");
             Type blueprintPool = RuntimeReflection.FindUniqueType(gameAssembly, "BlueprintPool");
+            Type chooseCard = RuntimeReflection.FindUniqueType(gameAssembly, "ChooseCard");
 
             MethodInfo init = RuntimeReflection.FindUniqueMethod(entityStore, "Init",
                 delegate(MethodInfo method) { return method.GetParameters().Length == 0; });
@@ -277,12 +278,17 @@ namespace RogueCommandExpansionLoader.Runtime
                 blueprintPool, "FindBlueprintPool", HasBlueprintPoolFindShape);
             MethodInfo blueprintPoolExclusive = RuntimeReflection.FindUniqueMethod(
                 blueprintPool, "ExclusiveBlueprints", HasBlueprintPoolExclusiveShape);
+            MethodInfo presentCardsToChoose = RuntimeReflection.FindUniqueMethod(
+                chooseCard, "PresentCardsToChoose", HasPresentCardsToChooseShape);
+            MethodInfo allAllowedBlueprints = RuntimeReflection.FindUniqueMethod(
+                entityStore, "AllEntityIdsAllowedAsBlueprints", HasGlobalBlueprintRewardFallbackShape);
             MethodInfo resourcesLoadTyped = FindResourcesLoadTyped();
             MethodInfo resourcesLoadUntyped = FindResourcesLoadUntyped();
 
             MethodInfo entityInitPostfix = Hook("EntityBalancingStoreInitPostfix");
             MethodInfo setScriptableObjectPostfix = Hook("SetScriptableObjectPostfix");
             MethodInfo stageMapPrefix = Hook("CreateStageMapPrefix");
+            MethodInfo stageMapPostfix = Hook("CreateStageMapPostfix");
             MethodInfo levelMapPrefix = Hook("CreateLevelMapPrefix");
             MethodInfo levelMapFinalizer = Hook("CreateLevelMapFinalizer");
             MethodInfo instantiatePrefix = Hook("InstantiateEntityPrefix");
@@ -299,6 +305,9 @@ namespace RogueCommandExpansionLoader.Runtime
             MethodInfo blueprintPoolEligibilityPrefix = Hook("BlueprintPoolIsInPoolPrefix");
             MethodInfo blueprintPoolFindPrefix = Hook("BlueprintPoolFindPrefix");
             MethodInfo blueprintPoolExclusivePostfix = Hook("BlueprintPoolExclusiveBlueprintsPostfix");
+            MethodInfo presentCardsToChoosePrefix = Hook("PresentCardsToChoosePrefix");
+            MethodInfo presentCardsToChooseFinalizer = Hook("PresentCardsToChooseFinalizer");
+            MethodInfo allAllowedBlueprintsPostfix = Hook("AllEntityIdsAllowedAsBlueprintsPostfix");
             MethodInfo loadPrefix = typeof(UnityResourcesLoadTypedPatch).GetMethod("Prefix",
                 BindingFlags.Public | BindingFlags.Static);
             if (loadPrefix == null)
@@ -315,7 +324,7 @@ namespace RogueCommandExpansionLoader.Runtime
             List<PatchPlan> plan = new List<PatchPlan>();
             plan.Add(new PatchPlan(init, null, entityInitPostfix));
             plan.Add(new PatchPlan(setScriptableObject, null, setScriptableObjectPostfix));
-            plan.Add(new PatchPlan(createStageMap, stageMapPrefix, null));
+            plan.Add(new PatchPlan(createStageMap, stageMapPrefix, stageMapPostfix));
             plan.Add(new PatchPlan(createLevelMap, levelMapPrefix, null, levelMapFinalizer));
             plan.Add(new PatchPlan(instantiateEntity, instantiatePrefix, instantiatePostfix));
             plan.Add(new PatchPlan(createEntityMesh, entityMeshPrefix, null));
@@ -331,6 +340,9 @@ namespace RogueCommandExpansionLoader.Runtime
             plan.Add(new PatchPlan(blueprintPoolEligibility, blueprintPoolEligibilityPrefix, null));
             plan.Add(new PatchPlan(blueprintPoolFind, blueprintPoolFindPrefix, null));
             plan.Add(new PatchPlan(blueprintPoolExclusive, null, blueprintPoolExclusivePostfix));
+            plan.Add(new PatchPlan(presentCardsToChoose, presentCardsToChoosePrefix, null,
+                presentCardsToChooseFinalizer));
+            plan.Add(new PatchPlan(allAllowedBlueprints, null, allAllowedBlueprintsPostfix));
             plan.Add(new PatchPlan(resourcesLoadTyped, loadPrefix, null));
             plan.Add(new PatchPlan(resourcesLoadUntyped, untypedLoadPrefix, null));
             return plan;
@@ -364,6 +376,25 @@ namespace RogueCommandExpansionLoader.Runtime
             return method.IsStatic && parameters.Length == 1 &&
                 parameters[0].ParameterType == typeof(string) &&
                 method.ReturnType == typeof(HashSet<string>);
+        }
+
+        private static bool HasPresentCardsToChooseShape(MethodInfo method)
+        {
+            return !method.IsStatic && method.ReturnType == typeof(void) &&
+                method.GetParameters().Length == 0;
+        }
+
+        private static bool HasGlobalBlueprintRewardFallbackShape(MethodInfo method)
+        {
+            ParameterInfo[] parameters = method.GetParameters();
+            return method.IsStatic && method.ReturnType == typeof(List<string>) &&
+                parameters.Length == 6 &&
+                parameters[0].ParameterType.IsEnum &&
+                parameters[1].ParameterType == typeof(bool?) &&
+                parameters[2].ParameterType == typeof(bool) &&
+                parameters[3].ParameterType.IsEnum &&
+                parameters[4].ParameterType == typeof(int?) &&
+                parameters[5].ParameterType == typeof(int?);
         }
 
         private static bool HasInstantiateEntityShape(MethodInfo method)
