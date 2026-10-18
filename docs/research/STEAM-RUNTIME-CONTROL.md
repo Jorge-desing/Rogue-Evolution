@@ -10,9 +10,9 @@ No inicies `RogueCommand.exe` directamente. La partida de aceptación debe venir
 
 ## Pausa segura y control de botones
 
-Cuando el usuario pida detener el avance, abre el menú nativo con Escape o, si el puente es el medio disponible, resuelve en la escena actual `InGameMenuCanvas` y llama una sola vez a `InGameMenu.Show()`. Después verifica por separado el menú y la simulación: `InGameMenu._isShowing=true` solo confirma que el menú está visible. No afirmes que la partida está pausada hasta leer `Time.timeScale == 0` o comprobar que el contador de juego no cambia en dos observaciones separadas por varios segundos. En la sesión del 2026-10-18 el menú siguió visible mientras el HUD avanzó de `00:16` a `01:19`; el puente mostró `Time.timeScale=1` antes de que se congelara manualmente. En esa build, abrir el menú no detuvo la partida.
+Cuando el usuario pida detener el avance, abre el menú nativo con Escape o, si el puente es el medio disponible, resuelve en la escena actual `InGameMenuCanvas` y llama una sola vez a `InGameMenu.Show()`. Después verifica por separado el menú y la simulación: `InGameMenu._isShowing=true` solo confirma que el menú está visible. No afirmes que la partida está pausada hasta leer el `Time.timeScale` actual o comprobar que el reloj de juego no cambia en dos observaciones separadas por varios segundos. En la sesión del 2026-10-18 el menú siguió visible mientras el HUD avanzó de `00:16` a `01:19`; el puente mostró `Time.timeScale=1` antes de que se congelara manualmente. En esa build, abrir el menú no detuvo la partida.
 
-Si Escape/`Show()` deja el menú abierto pero `Time.timeScale` sigue en `1`, congela la simulación con un `MonoBehaviour` temporal compilado mediante `mod_inject_class`, adjúntalo al `InGameMenuCanvas` actual y llama su método `Freeze()` por el puente. Este patrón conserva el valor de escala anterior y permite verificar el resultado desde campos públicos:
+Si Escape/`Show()` deja el menú abierto pero `Time.timeScale` sigue en `1`, congela la simulación con un `MonoBehaviour` temporal compilado mediante `mod_inject_class`, adjúntalo al `InGameMenuCanvas` actual y llama su método `Freeze()` una sola vez por el puente. El campo `scaleAfter` solo registra la lectura tomada dentro de esa llamada: no es una lectura viva. Antes de reassertar la pausa, toma una lectura nueva de `Time.timeScale`. En la sesión actual, la clase dinámica existente no tenía el guard `hasFrozen`; una segunda llamada a `Freeze()` sobrescribió `scaleBefore` de `1` a `0`. Se restauró el campo a `1` sin reanudar el juego, para preservar la reversión correcta. Una implementación nueva debe conservar el valor original solo una vez, como en este patrón:
 
 ```csharp
 using UnityEngine;
@@ -22,6 +22,8 @@ public sealed class RclRuntimeTimeControl : MonoBehaviour
     public float scaleBefore;
     public float scaleAfter;
     private bool hasFrozen;
+    public float currentScale;
+    public float scaledTime;
 
     public void Freeze()
     {
@@ -29,7 +31,15 @@ public sealed class RclRuntimeTimeControl : MonoBehaviour
             scaleBefore = Time.timeScale;
         Time.timeScale = 0f;
         scaleAfter = Time.timeScale;
+        currentScale = Time.timeScale;
+        scaledTime = Time.time;
         hasFrozen = true;
+    }
+
+    public void Sample()
+    {
+        currentScale = Time.timeScale;
+        scaledTime = Time.time;
     }
 
     public void ResumeAndRemove()
@@ -41,7 +51,7 @@ public sealed class RclRuntimeTimeControl : MonoBehaviour
 }
 ```
 
-El helper realmente usado en esta sesión leyó `Time.timeScale=1`, lo cambió a `0` y expuso `scaleBefore=1`, `scaleAfter=0`; su `ResumeAndRemove()` restablece `1`, que era el valor original observado. En otra sesión, compila el patrón anterior para restaurar el valor que haya leído entonces. Vuelve a leer ambos campos antes de seguir y no dejes helpers temporales al terminar la prueba.
+El helper realmente usado inicialmente leyó `Time.timeScale=1`, lo cambió a `0` y expuso `scaleBefore=1`, `scaleAfter=0`; su `ResumeAndRemove()` restablece `scaleBefore`, que debe seguir siendo el valor original. En la verificación posterior, una sonda independiente observó `Time.timeScale=0` y `Time.time=537.5239`; 16,38 segundos después de tiempo no escalado, el reloj escalado seguía exactamente en `537.5239` y el HUD continuaba en `03:51`. `Time.unscaledTime` sí avanzó, lo cual es esperado y por sí solo no significa que siga la simulación. Para separar una lectura actual de una captura anterior, usa `Sample()` y vuelve a leer sus campos. Elimina la sonda de diagnóstico al terminar la comprobación y conserva solo el helper que mantiene la pausa mientras la sesión supervisada está detenida.
 
 La autorización explícita de control permite avanzar durante una interacción supervisada; al terminarla, vuelve a pausar y confirma de nuevo el estado real de la simulación. Si la sesión forma parte de una tarea activa, mantenla abierta y pausada entre interacciones supervisadas. Ciérrala normalmente cuando esa tarea haya terminado; no la cierres solo porque no se esté usando en ese momento.
 
