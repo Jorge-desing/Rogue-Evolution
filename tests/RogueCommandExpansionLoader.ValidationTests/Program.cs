@@ -294,12 +294,21 @@ var tests = new (string Name, Action Run)[]
             !registry.AllowsModUnitInPool(firstPool, "sample:first-unit", isDemo: false, isAllowedForDemo: false) ||
             !registry.AllowsModUnitInPool(firstPool, "sample:first-unit", isDemo: true, isAllowedForDemo: true) ||
             registry.AllowsModUnitInPool(firstPool, "sample:first-unit", isDemo: true, isAllowedForDemo: false) ||
+            !registry.AllowsModUnitInPool(firstPool, "sample:first-unit", isDemo: false,
+                isAllowedForDemo: true, isStartingBlueprintSelection: true,
+                isAllowedAsStartingBlueprint: true) ||
+            registry.AllowsModUnitInPool(firstPool, "sample:first-unit", isDemo: false,
+                isAllowedForDemo: true, isStartingBlueprintSelection: true,
+                isAllowedAsStartingBlueprint: false) ||
+            !registry.AllowsModUnitInPool(firstPool, "sample:first-unit", isDemo: false,
+                isAllowedForDemo: true, isStartingBlueprintSelection: false,
+                isAllowedAsStartingBlueprint: false) ||
             registry.AllowsModUnitInPool(firstPool, "sample:second-unit") ||
             registry.AllowsModUnitInPool(firstPool, "sample:second-unit", isDemo: true, isAllowedForDemo: true) ||
             registry.AllowsModUnitInPool(new object(), "sample:first-unit"))
         {
             throw new InvalidOperationException(
-                "Scoped unit eligibility escaped its exact cloned pool instance or ignored demo eligibility.");
+                "Scoped eligibility escaped its exact cloned pool instance or ignored demo/starting-blueprint flags.");
         }
 
         registry.SetEligibleExclusiveUnitIds(firstPool, new[] { "sample:first-unit" });

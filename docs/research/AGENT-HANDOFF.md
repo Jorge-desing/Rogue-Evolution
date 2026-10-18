@@ -528,4 +528,10 @@ The tool models the exact combat rules discovered via REA in Rogue Command 1.0.9
 
 **Local validation:** `fc.exe /b` verified 100% byte-for-byte twin parity between `tools/simulate_combat_balance.py` and `.agents/skills/rogue-command-balance-simulation/scripts/simulate_combat_balance.py`. Full validation suite passed 131/132 tests (1 skipped).
 
+## Initial blueprint eligibility in stage pools — 2026-10-18
 
+A static review found that `BlueprintPool.IsInPool` applies `inactive`, `isAllowedAsBlueprint`, and the native `blueprintFilter`, while `ChooseCard.PresentCardsToChoose` passes the first-offer flag only to `AllEntityIdsAllowedAsBlueprints` on the no-pool path. The loader's scoped pool hook previously admitted a factory using stage membership and demo eligibility, so a custom factory marked `isAllowedAsStartingBlueprint: false` could pass a stage pool during the player's first blueprint offer.
+
+The loader now reads the pinned build's static `Game.AtLeastOneBlueprintHasBeenAddedByPlayer` flag and applies each mod factory row's mirrored `isAllowedAsStartingBlueprint` value while that flag is false. Once the player has a blueprint, the normal stage-pool eligibility applies. Native rows and pools remain on the game path. A focused registry regression check covers allowed and rejected first-offer cases plus the later-offer case.
+
+**Evidence:** static inspection and local managed metadata for Rogue Command 1.0.9, Unity 2021.3.45f2; `Assembly-CSharp.dll` SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, MVID `db0e9462-128d-4296-9900-de18b4bd0c00`. No Steam runtime run has tested a first offer using a scoped stage pool yet.

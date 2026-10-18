@@ -209,7 +209,7 @@ namespace RogueCommandExpansionLoader.Runtime
 
         public bool AllowsModUnitInPool(object pool, string unitId)
         {
-            return AllowsModUnitInPool(pool, unitId, false, true);
+            return AllowsModUnitInPool(pool, unitId, false, true, false, true);
         }
 
         /// <summary>
@@ -218,11 +218,28 @@ namespace RogueCommandExpansionLoader.Runtime
         /// </summary>
         public bool AllowsModUnitInPool(object pool, string unitId, bool isDemo, bool isAllowedForDemo)
         {
+            return AllowsModUnitInPool(
+                pool, unitId, isDemo, isAllowedForDemo, false, true);
+        }
+
+        /// <summary>
+        /// Applies the game's initial-blueprint restriction to loader-owned rows when querying a
+        /// stage-scoped pool before the player has added a blueprint to the run.
+        /// </summary>
+        public bool AllowsModUnitInPool(
+            object pool,
+            string unitId,
+            bool isDemo,
+            bool isAllowedForDemo,
+            bool isStartingBlueprintSelection,
+            bool isAllowedAsStartingBlueprint)
+        {
             lock (_gate)
             {
                 BlueprintPoolScopeRegistration registration;
                 return pool != null && _byReference.TryGetValue(pool, out registration) &&
-                    registration.ContainsUnit(unitId) && (!isDemo || isAllowedForDemo);
+                    registration.ContainsUnit(unitId) && (!isDemo || isAllowedForDemo) &&
+                    (!isStartingBlueprintSelection || isAllowedAsStartingBlueprint);
             }
         }
 

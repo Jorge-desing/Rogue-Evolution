@@ -93,6 +93,7 @@ namespace RogueCommandExpansionLoader.Content
         private readonly PropertyInfo _gameTutorialStateProperty;
         private readonly FieldInfo _tutorialMainFinishedField;
         private readonly FieldInfo _gameIsDemoField;
+        private readonly FieldInfo _gameAtLeastOneBlueprintAddedByPlayerField;
         private readonly FieldInfo _gameMaxAscensionLevelField;
         private readonly FieldInfo[] _progressionFields;
         private readonly FieldInfo _progressionStagesField;
@@ -296,6 +297,13 @@ namespace RogueCommandExpansionLoader.Content
             Type levelMapType = FindUniqueType("LevelMap");
             _gameBalancingAssetField = FindField(gameBalancingStoreType,
                 "_gameBalancingScriptableObject", StaticFields);
+            _gameAtLeastOneBlueprintAddedByPlayerField = RequireField(
+                gameType, "AtLeastOneBlueprintHasBeenAddedByPlayer", typeof(bool));
+            if (!_gameAtLeastOneBlueprintAddedByPlayerField.IsStatic)
+            {
+                throw new InvalidOperationException(
+                    "Game.AtLeastOneBlueprintHasBeenAddedByPlayer must remain a static bool.");
+            }
             _gameStageMapField = FindField(gameType, "StageMap", StaticFields);
             if (!_gameStageMapField.IsStatic || _gameStageMapField.FieldType != stageMapType)
             {
@@ -799,8 +807,13 @@ namespace RogueCommandExpansionLoader.Content
                 object balancing = _gameBalancingAssetField.GetValue(null);
                 bool isDemo = balancing != null && (bool)_gameIsDemoField.GetValue(balancing);
                 bool isAllowedForDemo = !isDemo || (bool)_allowedForDemoField.GetValue(unit.BalanceRow);
+                bool isStartingBlueprintSelection =
+                    !(bool)_gameAtLeastOneBlueprintAddedByPlayerField.GetValue(null);
+                bool isAllowedAsStartingBlueprint =
+                    (bool)_allowedStartingBlueprintField.GetValue(unit.BalanceRow);
                 runOriginal = _blueprintPoolScopeRegistry.AllowsModUnitInPool(
-                    pool, unitId, isDemo, isAllowedForDemo);
+                    pool, unitId, isDemo, isAllowedForDemo,
+                    isStartingBlueprintSelection, isAllowedAsStartingBlueprint);
                 return true;
             }
         }
