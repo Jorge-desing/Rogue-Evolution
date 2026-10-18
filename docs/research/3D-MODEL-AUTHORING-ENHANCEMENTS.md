@@ -551,6 +551,30 @@ Replaces generic turret detachment with archetype-specific combat destruction ph
 
 ---
 
+## 18. Next-Gen Mechanical & Tactical Detail Suite (v2026.10 Wave 2)
+
+### 1. Telescopic Hydraulic Piston Rams (`make_telescopic_piston_assembly` / `--hydraulic-pistons`)
+Constructs dual-stage telescopic hydraulic actuator struts between arbitrary 3D endpoints using `get_orthonormal_basis`:
+- **Topology**: Start and end clevis eye-mount knuckles with cross pins, outer hydraulic barrel housing (`gunmetal`), wiper seal gland collar (`tread`) with optional pressure ring (`warning`), and inner chrome/steel telescopic ram rod (`wheel_rim`).
+- **Integration**: Automatically spans walker hip-to-knee joints on bipedal/quad walkers (`colossus_titan`, `titan_quad`, `longbow_strider`), gun elevation cradles on artillery/tanks (`sky_sweeper`, `dreadnought_crawler`, `volatile_runner`), and perimeter stabilizing struts on structures (`orbital_defense`, `tesla_obelisk`).
+
+### 2. Articulated Metallic Ammo Belt Chutes (`make_ammo_belt_chute_assembly` / `--ammo-chutes`)
+Generates flexible metallic ammunition feed chutes sweeping from ammo hoppers into rapid-fire weapon receivers:
+- **Topology**: 3D curve with vertical catenary sag and outward lateral bow (`sin(pi * t)`), swept as a continuous rectangular `BMesh` ribbon with stepped expansion ribs, alternate exposed brass cartridge glimpse links (`warning`), source ammo hopper box, and breech feed throat collar.
+- **Integration**: Auto-enabled on rotary gatling and quad flak presets (`recon_interceptor`, `apc_enforcer`, `dune_raider`, `sky_sweeper`, `resource_behemoth`).
+
+### 3. Active Protection System & LWR Suite (`make_aps_hardkill_suite` / `--aps-suite`)
+Equips modern armored turrets and defense bunkers with active countermeasure hardware:
+- **Topology**: Bilateral swiveling hard-kill interceptor launcher pods with dual countermeasure mortar tubes, 4 corner faceted millimeter-wave AESA radar transceiver panels with dielectric faces, and a central roof hemispherical Laser Warning Receiver (LWR) optical prism (`emissive`).
+- **Integration**: Auto-enabled on heavy tanks, cruisers, and airframes (`siege_breaker`, `gunship_alpha`, `dreadnought_crawler`, `hive_carrier`, `titan_quad`, `colossus_titan`, `sea_lance`, `sky_dreadnought`, `beam_destroyer`, `vls_missile_cruiser`, `aegis_bastion`, `spectre_jammer`, `bastion_shield_dome`).
+
+### 4. Tactical Bustle Stowage & Spare Track Kit (`make_tactical_stowage_kit` / `--stowage-kit`)
+Adds lived-in military field gear to vehicle hulls and turrets:
+- **Topology**: Rear turret bustle tubular cargo rack frame, rolled canvas camouflage tarp bundle (`light_armor`) with dual rubber retention straps (`tread`), bilateral auxiliary Jerry fuel cans in side brackets, and forward glacis spare track-link armor blocks with a clamping bar.
+- **Integration**: Auto-enabled on combat and logistics presets (`siege_breaker`, `recon_interceptor`, `apc_enforcer`, `resource_behemoth`, `aegis_bastion`, `inferno_purger`, `spectre_jammer`).
+
+---
+
 ### Authoring Verification Commands
 ```powershell
 # Verify twin script parity (0 byte difference required)
@@ -560,3 +584,4 @@ fc.exe /b tools\generate_unit_model.py .agents\skills\rogue-command-3d-model-aut
 # Run complete loader validation suite (132 tests)
 dotnet run --project tests/RogueCommandExpansionLoader.ValidationTests -- .
 ```
+

@@ -110,6 +110,7 @@ cabin = rmk.make_troop_compartment(
 | `make_quad_crawler_leg` | Quad Spider Crawler ($Z_{\min} = 0.0\text{m}$) | Rotary hip knuckle, upper femur boom, knee knuckle, lower tibia strut, circular rubber foot pad |
 | `make_hover_skimmer_assembly` | Repulsor Hover ($Z_{\min} \approx 0.24–0.52\text{m}$) | Ventral repulsor cushion skirt, 4 plasma thruster bells, lateral stabilizer fins, vectoring ducts |
 | `make_ducted_tiltrotor_assembly` | VTOL Tilt-Rotor (Aerial) | Shroud cowl with beveled lip, spinner hub, angled pitch blades, swivel pylon, plasma exhaust |
+| `make_telescopic_piston_assembly` | Telescopic Hydraulic Actuator | Outer barrel housing, wiper seal collar, inner chrome/steel ram rod, clevis pin eye-mounts |
 
 ```python
 # Bilateral track and walker leg instantiation patterns
@@ -142,6 +143,7 @@ for side in (-1, 1):
 | `make_dual_cannon_assembly` | Twin Cannon (transverse offset $\vec{u}$) | Unified armored mantlet, dual parallel rifled barrels, dual bore evacuators, muzzle brakes |
 | `make_heavy_howitzer_assembly` | Ballistic Howitzer (`elevation_deg \approx 26^\circ`) | Massive breech collar, short large-bore barrel, reinforced blast ring, sector elevation gear |
 | `make_rotary_gatling_cannon` | Gatling Cluster (angle $\theta_i = \frac{2\pi i}{N}$) | Rotor housing, central drive axle, 6 rifled barrels with clamp retaining collars, ammo feed chute |
+| `make_ammo_belt_chute_assembly` | Articulated Ammo Feed Chute | Rectangular BMesh ribbon chute with expansion ribs, ammo hopper box, breech feed throat, brass cartridge links |
 | `make_missile_launcher_pod` | Rocket Pod ($R \times C$ array) | Armored pod shell ($10^\circ–20^\circ$ elevation), recessed launch tube grid, warheads, backblast louvers |
 | `make_arc_energy_emitter` | Arc Plasma Emitter (`forward_dir`) | Generator base pedestal, glowing plasma cathode, dual toroidal induction coils, 3 convergent prongs |
 | `make_collimated_beam_laser_assembly` | Directed Energy Laser (`laser_pivot`, `direction`) | Heavy emitter shroud, radiator cooling fins, focal aperture ring, high-voltage conduit cables |
@@ -183,6 +185,8 @@ gatling = rmk.make_rotary_gatling_cannon(
 | `make_catenary_cable_assembly` | Catenary hydraulic hose / power conduit | Hyperbolic cosine (`cosh`) tube sweep in BMesh with corrugated rib modulation, hex bulkhead couplers, and retaining collar clamps |
 | `make_bmesh_hull_greebles` | Recessed deck hatches, vents & lugs | Selective BMesh face inset (`bmesh.ops.inset_individual`) maintenance hatches with grab handles, micro-louver vents, and 4 forged lifting lugs |
 | `make_tactical_decal_plates` | BVHTree-raycasted floating markings | `mathutils.bvhtree.BVHTree` normal-snapped chevron stripe bars and zenith identification plates (+0.012m normal offset) |
+| `make_aps_hardkill_suite` | Active Protection System & LWR | Bilateral hard-kill interceptor pods, 4 corner millimeter-wave AESA radar panels, roof Laser Warning Receiver (LWR) prism |
+| `make_tactical_stowage_kit` | External bustle stowage & field gear | Rear turret bustle tubular cargo rack, rolled camo tarp with straps, Jerry fuel cans, glacis spare track-link brackets |
 | `create_unity_locator_sockets`| Standardized FBX empties | Emits `Socket_MuzzlePrimary`, `Socket_TurretPivot`, `Socket_Exhaust_L/R`, `Socket_SensorEye` |
 
 ```python

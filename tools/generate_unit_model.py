@@ -37,9 +37,13 @@ Options:
     --mantlet-boot             Attach tiered concentric accordion dust boot on cannon mantlet
     --spaced-skirts            Attach segmented multi-panel spaced armor skirts with standoff brackets
     --hydraulic-hoses          Attach catenary hydraulic hoses and braided power conduits
-    --hull-greebles             Attach maintenance hatches, louver vents, and lifting lugs
-    --tactical-markings         Project tactical chevrons and zenith identification plates
-    --weighted-normals          Apply weighted normals (default); --no-weighted-normals disables them
+    --hull-greebles            Attach maintenance hatches, louver vents, and lifting lugs
+    --tactical-markings        Project tactical chevrons and zenith identification plates
+    --hydraulic-pistons        Attach dual-stage telescopic hydraulic actuator rams and clevis pins
+    --ammo-chutes              Attach articulated metallic ammunition feed chutes and hoppers
+    --aps-suite                Attach Active Protection System (APS) hard-kill pods, AESA radars, and LWR
+    --stowage-kit              Attach external turret bustle rack, camo tarp, Jerry cans, and spare tracks
+    --weighted-normals         Apply weighted normals (default); --no-weighted-normals disables them
     --wreckage-severity <sev>  Damage severity for wreckage: light, medium, catastrophic (default: catastrophic)
     --smoke                    Attach multi-tube smoke discharger banks
     --radar                    Attach command/recon radar dish
@@ -83,6 +87,8 @@ PRESETS = {
         "hydraulic_hoses": True,
         "hull_greebles": True,
         "tactical_markings": True,
+        "aps_suite": True,
+        "stowage_kit": True,
     },
     "recon_interceptor": {
         "archetype": "buggy",
@@ -91,12 +97,15 @@ PRESETS = {
         "rollcage": True,
         "radar": True,
         "tactical_markings": True,
+        "ammo_chutes": True,
+        "stowage_kit": True,
     },
     "gunship_alpha": {
         "archetype": "vtol",
         "weapon": "missile",
         "faction": "syndicate",
         "tactical_markings": True,
+        "aps_suite": True,
     },
     "apc_enforcer": {
         "archetype": "halftrack",
@@ -105,11 +114,14 @@ PRESETS = {
         "smoke": True,
         "hull_greebles": True,
         "tactical_markings": True,
+        "ammo_chutes": True,
+        "stowage_kit": True,
     },
     "dune_raider": {
         "archetype": "bike",
         "weapon": "gatling",
         "faction": "siege",
+        "ammo_chutes": True,
     },
     "sky_sweeper": {
         "archetype": "flak_anti_air",
@@ -120,6 +132,8 @@ PRESETS = {
         "suspension_arms": True,
         "mantlet_boot": True,
         "hull_greebles": True,
+        "ammo_chutes": True,
+        "hydraulic_pistons": True,
     },
     "dreadnought_crawler": {
         "archetype": "siege_crawler",
@@ -131,6 +145,8 @@ PRESETS = {
         "hydraulic_hoses": True,
         "hull_greebles": True,
         "tactical_markings": True,
+        "hydraulic_pistons": True,
+        "aps_suite": True,
     },
     "hive_carrier": {
         "archetype": "drone_carrier",
@@ -140,6 +156,7 @@ PRESETS = {
         "flight_deck": True,
         "hull_greebles": True,
         "tactical_markings": True,
+        "aps_suite": True,
     },
     "titan_quad": {
         "archetype": "quad_mech",
@@ -150,6 +167,8 @@ PRESETS = {
         "hydraulic_hoses": True,
         "hull_greebles": True,
         "tactical_markings": True,
+        "hydraulic_pistons": True,
+        "aps_suite": True,
     },
     "resource_behemoth": {
         "archetype": "combat_harvester",
@@ -160,6 +179,9 @@ PRESETS = {
         "excavator_drum": True,
         "hydraulic_hoses": True,
         "hull_greebles": True,
+        "hydraulic_pistons": True,
+        "ammo_chutes": True,
+        "stowage_kit": True,
     },
     "colossus_titan": {
         "archetype": "colossus_titan",
@@ -172,6 +194,8 @@ PRESETS = {
         "hydraulic_hoses": True,
         "hull_greebles": True,
         "tactical_markings": True,
+        "hydraulic_pistons": True,
+        "aps_suite": True,
     },
     "sea_lance": {
         "archetype": "hover_cruiser",
@@ -182,6 +206,7 @@ PRESETS = {
         "antenna": True,
         "hull_greebles": True,
         "tactical_markings": True,
+        "aps_suite": True,
     },
     "sky_dreadnought": {
         "archetype": "heavy_dropship",
@@ -190,6 +215,7 @@ PRESETS = {
         "smoke": True,
         "antenna": True,
         "tactical_markings": True,
+        "aps_suite": True,
     },
     "orbital_defense": {
         "structure": True,
@@ -198,6 +224,7 @@ PRESETS = {
         "hydraulic_hoses": True,
         "hull_greebles": True,
         "tactical_markings": True,
+        "hydraulic_pistons": True,
     },
     "beam_destroyer": {
         "archetype": "super_heavy",
@@ -213,6 +240,7 @@ PRESETS = {
         "hydraulic_hoses": True,
         "hull_greebles": True,
         "tactical_markings": True,
+        "aps_suite": True,
     },
     "vls_missile_cruiser": {
         "archetype": "hover_cruiser",
@@ -224,6 +252,7 @@ PRESETS = {
         "armor_plating": True,
         "hull_greebles": True,
         "tactical_markings": True,
+        "aps_suite": True,
     },
     "aegis_bastion": {
         "archetype": "shield_truck",
@@ -235,6 +264,8 @@ PRESETS = {
         "hydraulic_hoses": True,
         "hull_greebles": True,
         "tactical_markings": True,
+        "aps_suite": True,
+        "stowage_kit": True,
     },
     "volatile_runner": {
         "archetype": "demolition_breacher",
@@ -244,6 +275,7 @@ PRESETS = {
         "rollcage": True,
         "hydraulic_hoses": True,
         "tactical_markings": True,
+        "hydraulic_pistons": True,
     },
     "longbow_strider": {
         "archetype": "artillery_strider",
@@ -255,6 +287,7 @@ PRESETS = {
         "hydraulic_hoses": True,
         "hull_greebles": True,
         "tactical_markings": True,
+        "hydraulic_pistons": True,
     },
     "inferno_purger": {
         "archetype": "thermobaric_tank",
@@ -266,6 +299,7 @@ PRESETS = {
         "hydraulic_hoses": True,
         "hull_greebles": True,
         "tactical_markings": True,
+        "stowage_kit": True,
     },
     "spectre_jammer": {
         "archetype": "ew_jammer",
@@ -276,6 +310,8 @@ PRESETS = {
         "hydraulic_hoses": True,
         "hull_greebles": True,
         "tactical_markings": True,
+        "aps_suite": True,
+        "stowage_kit": True,
     },
     "bastion_shield_dome": {
         "structure": True,
@@ -284,6 +320,7 @@ PRESETS = {
         "hydraulic_hoses": True,
         "hull_greebles": True,
         "tactical_markings": True,
+        "aps_suite": True,
     },
     "tesla_obelisk": {
         "structure": True,
@@ -292,6 +329,7 @@ PRESETS = {
         "hydraulic_hoses": True,
         "hull_greebles": True,
         "tactical_markings": True,
+        "hydraulic_pistons": True,
     },
 }
 
@@ -367,6 +405,10 @@ def parse_args():
     parser.add_argument("--hydraulic-hoses", action="store_true", help="Attach catenary hydraulic hoses and braided power conduits with bulkhead couplers")
     parser.add_argument("--hull-greebles", action="store_true", help="Attach BMesh-inset maintenance hatches, micro-louver vents, and corner lifting lugs")
     parser.add_argument("--tactical-markings", action="store_true", help="Project BVHTree-raycasted floating tactical chevron decals and zenith ID plates")
+    parser.add_argument("--hydraulic-pistons", action="store_true", help="Attach dual-stage telescopic hydraulic actuator rams and clevis pin eye-mounts")
+    parser.add_argument("--ammo-chutes", action="store_true", help="Attach articulated metallic ammunition feed chutes and ammo hoppers")
+    parser.add_argument("--aps-suite", action="store_true", help="Attach Active Protection System (APS) hard-kill pods, 4-quadrant AESA radars, and LWR mast")
+    parser.add_argument("--stowage-kit", action="store_true", help="Attach external turret bustle cargo rack, rolled camo tarp, Jerry cans, and spare tracks")
     parser.add_argument("--weighted-normals", action=argparse.BooleanOptionalAction, default=True, help="Apply face-area weighted custom split normals to eliminate low-poly chamfer shading pinch (default: enabled)")
     parser.add_argument("--smoke", action="store_true", help="Include multi-tube smoke discharger banks")
     parser.add_argument("--radar", action="store_true", help="Include command/recon radar dish")
@@ -459,6 +501,7 @@ def parse_args():
             "track_shoes", "armor_plating", "ik_rig", "suspension_arms",
             "mantlet_boot", "spaced_skirts", "shield_bubble",
             "hydraulic_hoses", "hull_greebles", "tactical_markings",
+            "hydraulic_pistons", "ammo_chutes", "aps_suite", "stowage_kit",
         ):
             if p.get(flag) and f"--{flag.replace('_', '-')}" not in script_args:
                 setattr(args, flag, True)
@@ -582,6 +625,10 @@ def build_vehicle_model(
     hydraulic_hoses: bool = False,
     hull_greebles: bool = False,
     tactical_markings: bool = False,
+    hydraulic_pistons: bool = False,
+    ammo_chutes: bool = False,
+    aps_suite: bool = False,
+    stowage_kit: bool = False,
     weighted_normals: bool = True,
     wreckage_severity: str = "catastrophic",
 ) -> dict:
@@ -1197,6 +1244,18 @@ def build_vehicle_model(
     if tactical_markings:
         builder.add_tactical_markings()
 
+    if hydraulic_pistons:
+        builder.add_hydraulic_pistons()
+
+    if ammo_chutes:
+        builder.add_ammo_belt_chutes()
+
+    if aps_suite:
+        builder.add_aps_hardkill_suite()
+
+    if stowage_kit:
+        builder.add_tactical_stowage()
+
     # 3. Modular Attachments
     if attachments:
         att_list = [a.strip() for a in attachments.split(",") if a.strip()]
@@ -1296,6 +1355,10 @@ def build_structure_model(
     hydraulic_hoses: bool = False,
     hull_greebles: bool = False,
     tactical_markings: bool = False,
+    hydraulic_pistons: bool = False,
+    ammo_chutes: bool = False,
+    aps_suite: bool = False,
+    stowage_kit: bool = False,
     weighted_normals: bool = True,
 ) -> dict:
     rmk.clear_scene()
@@ -1356,6 +1419,18 @@ def build_structure_model(
 
     if tactical_markings:
         builder.add_tactical_markings()
+
+    if hydraulic_pistons:
+        builder.add_hydraulic_pistons()
+
+    if ammo_chutes:
+        builder.add_ammo_belt_chutes()
+
+    if aps_suite:
+        builder.add_aps_hardkill_suite()
+
+    if stowage_kit:
+        builder.add_tactical_stowage()
 
     gameplay_meta_path = (fbx_file.parent / f"{name}.gameplay.json") if gameplay_json else None
 
@@ -1423,7 +1498,7 @@ def main():
                 print(f"  Colliders: {args.name}_COLLIDER_Base, {args.name}_COLLIDER_Roof")
             if args.render_icons:
                 print(f"  Tactical Icons: {args.icon_size}x{args.icon_size} Top-Down and Isometric")
-            print(f"  Authoring Details: HydraulicHoses={args.hydraulic_hoses}, HullGreebles={args.hull_greebles}, TacticalMarkings={args.tactical_markings}, WeightedNormals={args.weighted_normals}")
+            print(f"  Authoring Details: HydraulicHoses={args.hydraulic_hoses}, HullGreebles={args.hull_greebles}, TacticalMarkings={args.tactical_markings}, HydraulicPistons={args.hydraulic_pistons}, AmmoChutes={args.ammo_chutes}, APSSuite={args.aps_suite}, StowageKit={args.stowage_kit}, WeightedNormals={args.weighted_normals}")
             if args.bake_atlas or args.bake_normals or args.single_material or structure_camo != "none":
                 print(f"  Texture Atlas: {args.atlas_resolution}x{args.atlas_resolution} PBR (Albedo, MetallicGloss, Normal, Emission)")
             if args.single_material:
@@ -1455,7 +1530,7 @@ def main():
         print(f"Primary Weapon: {args.weapon}")
         print(f"Subsystems: Skirts={args.skirts}, Rollcage={args.rollcage}, QuadTracks={args.quad_tracks}, TiltRotors={args.tilt_rotors}, Dozer={args.dozer}, Smoke={args.smoke}, Radar={args.radar}, Sponsons={args.sponsons}, Outriggers={args.outriggers}, FlightDeck={args.flight_deck}, ExcavatorDrum={args.excavator_drum}")
         print(f"Micro-Details: Antenna={args.antenna}, Cupola={args.cupola}, Rivets={args.rivets}, TrackShoes={args.track_shoes}, SuspensionArms={args.suspension_arms}, MantletBoot={args.mantlet_boot}, SpacedSkirts={args.spaced_skirts}")
-        print(f"Authoring Details: HydraulicHoses={args.hydraulic_hoses}, HullGreebles={args.hull_greebles}, TacticalMarkings={args.tactical_markings}, WeightedNormals={args.weighted_normals}")
+        print(f"Authoring Details: HydraulicHoses={args.hydraulic_hoses}, HullGreebles={args.hull_greebles}, TacticalMarkings={args.tactical_markings}, HydraulicPistons={args.hydraulic_pistons}, AmmoChutes={args.ammo_chutes}, APSSuite={args.aps_suite}, StowageKit={args.stowage_kit}, WeightedNormals={args.weighted_normals}")
         if args.attachments:
             print(f"Modular Attachments: {args.attachments} (Detached FBX: {args.export_detached_attachments})")
         if args.primary_color:
@@ -1576,6 +1651,10 @@ def main():
                 hydraulic_hoses=args.hydraulic_hoses,
                 hull_greebles=args.hull_greebles,
                 tactical_markings=args.tactical_markings,
+                hydraulic_pistons=args.hydraulic_pistons,
+                ammo_chutes=args.ammo_chutes,
+                aps_suite=args.aps_suite,
+                stowage_kit=args.stowage_kit,
                 weighted_normals=args.weighted_normals,
                 wreckage_severity=args.wreckage_severity,
             )
@@ -1635,6 +1714,10 @@ def main():
             hydraulic_hoses=args.hydraulic_hoses,
             hull_greebles=args.hull_greebles,
             tactical_markings=args.tactical_markings,
+            hydraulic_pistons=args.hydraulic_pistons,
+            ammo_chutes=args.ammo_chutes,
+            aps_suite=args.aps_suite,
+            stowage_kit=args.stowage_kit,
             weighted_normals=args.weighted_normals,
         )
     else:
@@ -1707,6 +1790,10 @@ def main():
             hydraulic_hoses=args.hydraulic_hoses,
             hull_greebles=args.hull_greebles,
             tactical_markings=args.tactical_markings,
+            hydraulic_pistons=args.hydraulic_pistons,
+            ammo_chutes=args.ammo_chutes,
+            aps_suite=args.aps_suite,
+            stowage_kit=args.stowage_kit,
             weighted_normals=args.weighted_normals,
             wreckage_severity=args.wreckage_severity,
         )

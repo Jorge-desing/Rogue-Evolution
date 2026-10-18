@@ -2470,6 +2470,472 @@ def make_tactical_decal_plates(
     return objects
 
 
+def make_telescopic_piston_assembly(
+    prefix: str,
+    start_point: Tuple[float, float, float] | Vector,
+    end_point: Tuple[float, float, float] | Vector,
+    outer_radius: float = 0.046,
+    inner_radius: float = 0.028,
+    stroke_ratio: float = 0.55,
+    housing_mat: bpy.types.Material | None = None,
+    rod_mat: bpy.types.Material | None = None,
+    seal_mat: bpy.types.Material | None = None,
+    accent_mat: bpy.types.Material | None = None,
+) -> list[bpy.types.Object]:
+    """Generates a dual-stage telescopic hydraulic actuator cylinder with outer housing, wiper seal collar, inner ram rod, and clevis pin eye-mounts."""
+    objects: list[bpy.types.Object] = []
+    p1 = Vector(start_point)
+    p2 = Vector(end_point)
+    vec = p2 - p1
+    total_len = vec.length
+    if total_len < 0.06:
+        return objects
+
+    axis = vec.normalized()
+    u_vec, v_vec, _ = get_orthonormal_basis(axis)
+    rot_euler = axis.to_track_quat("Z", "Y").to_euler()
+    clevis_rot = u_vec.to_track_quat("Z", "Y").to_euler()
+
+    h_mat = housing_mat or rod_mat
+    r_mat = rod_mat or housing_mat
+    s_mat = seal_mat or h_mat
+    a_mat = accent_mat or s_mat
+
+    ratio = max(0.25, min(0.75, float(stroke_ratio)))
+    housing_len = total_len * ratio
+
+    # 1. Start and end clevis eye-mount knuckles + cross pins
+    for tag, pt in (("Base", p1), ("Tip", p2)):
+        objects.append(make_cylinder(
+            f"{prefix}_ClevisEye_{tag}",
+            radius=outer_radius * 1.18,
+            depth=outer_radius * 1.85,
+            location=pt,
+            material=h_mat if tag == "Base" else r_mat,
+            rotation=clevis_rot,
+            vertices=10,
+            bevel=0.005,
+        ))
+        objects.append(make_cylinder(
+            f"{prefix}_ClevisPin_{tag}",
+            radius=outer_radius * 0.52,
+            depth=outer_radius * 2.25,
+            location=pt,
+            material=a_mat if tag == "Base" else s_mat,
+            rotation=clevis_rot,
+            vertices=8,
+            bevel=0.003,
+        ))
+
+    # 2. Outer hydraulic barrel housing
+    housing_start = p1 + axis * (outer_radius * 0.7)
+    housing_end = p1 + axis * housing_len
+    if (housing_end - housing_start).length > 0.02:
+        objects.append(make_rod(
+            f"{prefix}_OuterBarrel",
+            housing_start,
+            housing_end,
+            radius=outer_radius,
+            material=h_mat,
+            vertices=10,
+            bevel=0.006,
+        ))
+
+    # 3. Wiper seal gland collar at barrel mouth
+    objects.append(make_cylinder(
+        f"{prefix}_WiperSealCollar",
+        radius=outer_radius * 1.24,
+        depth=outer_radius * 1.15,
+        location=housing_end,
+        material=s_mat,
+        rotation=rot_euler,
+        vertices=10,
+        bevel=0.004,
+    ))
+    if accent_mat is not None:
+        objects.append(make_cylinder(
+            f"{prefix}_PressureRing",
+            radius=outer_radius * 1.28,
+            depth=outer_radius * 0.35,
+            location=housing_end - axis * (outer_radius * 0.45),
+            material=a_mat,
+            rotation=rot_euler,
+            vertices=10,
+            bevel=0.002,
+        ))
+
+    # 4. Inner telescopic chrome/steel ram rod
+    rod_start = housing_end - axis * (outer_radius * 0.5)
+    rod_end = p2 - axis * (outer_radius * 0.65)
+    if (rod_end - rod_start).length > 0.02:
+        objects.append(make_rod(
+            f"{prefix}_InnerRamRod",
+            rod_start,
+            rod_end,
+            radius=inner_radius,
+            material=r_mat,
+            vertices=10,
+            bevel=0.004,
+        ))
+
+    return objects
+
+
+def make_ammo_belt_chute_assembly(
+    prefix: str,
+    start_point: Tuple[float, float, float] | Vector,
+    end_point: Tuple[float, float, float] | Vector,
+    chute_width: float = 0.14,
+    chute_thickness: float = 0.048,
+    sag: float = 0.12,
+    lateral_bow: float = 0.08,
+    link_count: int = 9,
+    hopper_mat: bpy.types.Material | None = None,
+    chute_mat: bpy.types.Material | None = None,
+    brass_mat: bpy.types.Material | None = None,
+) -> list[bpy.types.Object]:
+    """Generates an articulated metallic ammunition feed chute with feed hopper box, receiver adapter, and linked guide ribs."""
+    objects: list[bpy.types.Object] = []
+    p1 = Vector(start_point)
+    p2 = Vector(end_point)
+    span = (p2 - p1).length
+    if span < 0.08:
+        return objects
+
+    h_mat = hopper_mat or chute_mat
+    c_mat = chute_mat or hopper_mat
+    b_mat = brass_mat or c_mat
+    n_links = max(5, int(link_count))
+
+    # 1. Evaluate 3D curve points with catenary sag and outward lateral bow
+    outward_x = 1.0 if ((p1.x + p2.x) * 0.5 >= 0.0) else -1.0
+    points: list[Vector] = []
+    for i in range(n_links + 1):
+        t = i / float(n_links)
+        pt = p1.lerp(p2, t)
+        arch = math.sin(math.pi * t)
+        pt.z -= sag * arch
+        pt.x += outward_x * lateral_bow * arch
+        points.append(pt)
+
+    # 2. Construct continuous rectangular BMesh ribbon chute with stepped expansion ribs
+    mesh = bpy.data.meshes.new(f"{prefix}_FeedChute_Mesh")
+    chute_obj = bpy.data.objects.new(f"{prefix}_FeedChute", mesh)
+    bpy.context.collection.objects.link(chute_obj)
+    bm = bmesh.new()
+
+    rings: list[list[bmesh.types.BMVert]] = []
+    for i, pt in enumerate(points):
+        if i == 0:
+            tangent = (points[1] - points[0]).normalized()
+        elif i == len(points) - 1:
+            tangent = (points[-1] - points[-2]).normalized()
+        else:
+            tangent = (points[i + 1] - points[i - 1]).normalized()
+
+        u_vec, v_vec, _ = get_orthonormal_basis(tangent)
+        rib_flare = 1.12 if (i % 2 == 1 and 0 < i < n_links) else 1.0
+        hw = chute_width * 0.5 * rib_flare
+        ht = chute_thickness * 0.5 * rib_flare
+        corners = [
+            pt - u_vec * hw - v_vec * ht,
+            pt + u_vec * hw - v_vec * ht,
+            pt + u_vec * hw + v_vec * ht,
+            pt - u_vec * hw + v_vec * ht,
+        ]
+        rings.append([bm.verts.new(c) for c in corners])
+
+    for i in range(len(rings) - 1):
+        r0 = rings[i]
+        r1 = rings[i + 1]
+        for s in range(4):
+            sn = (s + 1) % 4
+            bm.faces.new((r0[s], r0[sn], r1[sn], r1[s]))
+
+    bm.faces.new(reversed(rings[0]))
+    bm.faces.new(rings[-1])
+    bm.normal_update()
+    bm.to_mesh(mesh)
+    bm.free()
+    finish_mesh(chute_obj, c_mat, bevel=0.004, smooth=False)
+    objects.append(chute_obj)
+
+    # 3. Exposed brass cartridge glimpse strips at alternate chute links
+    for i in range(1, n_links, 2):
+        pt = points[i]
+        tan = (points[i + 1] - points[i - 1]).normalized()
+        rot_e = tan.to_track_quat("Z", "Y").to_euler()
+        objects.append(make_box(
+            f"{prefix}_CartridgeLink_{i}",
+            (chute_width * 1.16, chute_thickness * 1.14, 0.022),
+            pt,
+            b_mat,
+            bevel=0.003,
+            rotation=rot_e,
+        ))
+
+    # 4. Source Ammo Hopper Box & Breech Feed Throat Collar
+    objects.append(make_box(
+        f"{prefix}_AmmoHopperBox",
+        (chute_width * 1.55, chute_width * 1.65, chute_width * 1.35),
+        p1,
+        h_mat,
+        bevel=0.012,
+    ))
+    end_tan = (points[-1] - points[-2]).normalized()
+    objects.append(make_box(
+        f"{prefix}_FeedThroatCollar",
+        (chute_width * 1.32, chute_thickness * 1.45, 0.065),
+        p2,
+        b_mat,
+        bevel=0.006,
+        rotation=end_tan.to_track_quat("Z", "Y").to_euler(),
+    ))
+
+    return objects
+
+
+def make_aps_hardkill_suite(
+    prefix: str,
+    turret_center: Tuple[float, float, float] | Vector,
+    turret_width: float = 1.45,
+    turret_length: float = 1.65,
+    turret_height: float = 0.45,
+    armor_mat: bpy.types.Material | None = None,
+    metal_mat: bpy.types.Material | None = None,
+    radar_mat: bpy.types.Material | None = None,
+    emissive_mat: bpy.types.Material | None = None,
+    include_lwr: bool = True,
+) -> list[bpy.types.Object]:
+    """Generates a modern Active Protection System (APS) suite: bilateral hard-kill interceptor launchers, 4 corner millimeter-wave radar panels, and roof Laser Warning Receiver (LWR) prism."""
+    objects: list[bpy.types.Object] = []
+    tc = Vector(turret_center)
+    a_mat = armor_mat or metal_mat
+    m_mat = metal_mat or armor_mat
+    r_mat = radar_mat or a_mat
+    e_mat = emissive_mat or r_mat
+
+    roof_z = tc.z + turret_height * 0.5
+
+    # 1. Bilateral swiveling hard-kill interceptor launcher cassettes on turret roof flanks
+    for side in (-1, 1):
+        stag = "L" if side < 0 else "R"
+        base_loc = Vector((tc.x + side * (turret_width * 0.34), tc.y - turret_length * 0.14, roof_z + 0.04))
+        objects.append(make_cylinder(
+            f"{prefix}_APSTurntable_{stag}",
+            radius=0.11,
+            depth=0.06,
+            location=base_loc,
+            material=m_mat,
+            vertices=10,
+            bevel=0.006,
+        ))
+        pod_loc = base_loc + Vector((0.0, 0.02, 0.09))
+        yaw_rad = math.radians(side * -22.0)
+        pitch_rad = math.radians(-14.0)
+        pod_rot = (pitch_rad, 0.0, yaw_rad)
+        objects.append(make_box(
+            f"{prefix}_APSLauncherPod_{stag}",
+            (0.22, 0.28, 0.13),
+            pod_loc,
+            a_mat,
+            bevel=0.012,
+            rotation=pod_rot,
+        ))
+        # Dual countermeasure mortar tubes inside each APS pod
+        for tube_idx, tx in enumerate((-0.052, 0.052), start=1):
+            tube_pos = pod_loc + Vector((tx * math.cos(yaw_rad), 0.13, 0.015))
+            objects.append(make_cylinder(
+                f"{prefix}_APSTube_{stag}_{tube_idx}",
+                radius=0.036,
+                depth=0.08,
+                location=tube_pos,
+                material=r_mat if tube_idx == 1 else m_mat,
+                rotation=(math.radians(76.0), 0.0, yaw_rad),
+                vertices=8,
+                bevel=0.004,
+            ))
+
+    # 2. Four corner faceted millimeter-wave AESA radar transceiver panels
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            qtag = f"{'F' if sy > 0 else 'R'}{'L' if sx < 0 else 'R'}"
+            rx = tc.x + sx * (turret_width * 0.46)
+            ry = tc.y + sy * (turret_length * 0.38)
+            rz = tc.z + turret_height * 0.08
+            panel_yaw = math.atan2(-sx, sy)
+            objects.append(make_box(
+                f"{prefix}_APSRadarPanel_{qtag}",
+                (0.18, 0.055, 0.14),
+                (rx, ry, rz),
+                r_mat,
+                bevel=0.008,
+                rotation=(math.radians(-10.0), 0.0, panel_yaw),
+            ))
+            objects.append(make_box(
+                f"{prefix}_APSRadarDielectric_{qtag}",
+                (0.13, 0.025, 0.095),
+                (rx + sx * 0.015, ry + sy * 0.015, rz),
+                e_mat if sy > 0 else a_mat,
+                bevel=0.004,
+                rotation=(math.radians(-10.0), 0.0, panel_yaw),
+            ))
+
+    # 3. Hemispherical Laser Warning Receiver (LWR) optical mast on turret roof
+    if include_lwr:
+        lwr_base = Vector((tc.x, tc.y + turret_length * 0.16, roof_z + 0.04))
+        objects.append(make_cylinder(
+            f"{prefix}_LWRPedestal",
+            radius=0.065,
+            depth=0.08,
+            location=lwr_base,
+            material=m_mat,
+            vertices=8,
+            bevel=0.005,
+        ))
+        objects.append(make_cylinder(
+            f"{prefix}_LWRPrismHead",
+            radius=0.078,
+            depth=0.075,
+            location=lwr_base + Vector((0.0, 0.0, 0.075)),
+            material=e_mat,
+            vertices=8,
+            bevel=0.012,
+        ))
+        objects.append(make_cylinder(
+            f"{prefix}_LWRCap",
+            radius=0.082,
+            depth=0.022,
+            location=lwr_base + Vector((0.0, 0.0, 0.12)),
+            material=a_mat,
+            vertices=8,
+            bevel=0.004,
+        ))
+
+    return objects
+
+
+def make_tactical_stowage_kit(
+    prefix: str,
+    hull_length: float = 3.0,
+    hull_width: float = 2.4,
+    deck_z: float = 0.88,
+    turret_center: Tuple[float, float, float] | Vector | None = None,
+    turret_length: float = 1.60,
+    turret_width: float = 1.40,
+    armor_mat: bpy.types.Material | None = None,
+    metal_mat: bpy.types.Material | None = None,
+    tarp_mat: bpy.types.Material | None = None,
+    tread_mat: bpy.types.Material | None = None,
+    accent_mat: bpy.types.Material | None = None,
+) -> list[bpy.types.Object]:
+    """Generates external military stowage: rear turret bustle rack, rolled camo tarp with retention straps, auxiliary Jerry cans, and glacis spare track-link brackets."""
+    objects: list[bpy.types.Object] = []
+    a_mat = armor_mat or metal_mat
+    m_mat = metal_mat or armor_mat
+    tp_mat = tarp_mat or a_mat
+    tr_mat = tread_mat or m_mat
+    ac_mat = accent_mat or a_mat
+
+    anchor = Vector(turret_center) if turret_center is not None else Vector((0.0, -hull_length * 0.15, deck_z + 0.22))
+    rack_y = anchor.y - turret_length * 0.56
+    rack_z = anchor.z + 0.02
+    rack_w = min(1.25, turret_width * 0.78)
+
+    # 1. Rear turret bustle tubular cargo rack frame
+    rail_pts = [
+        Vector((-rack_w * 0.5, rack_y + 0.12, rack_z)),
+        Vector((-rack_w * 0.5, rack_y - 0.22, rack_z)),
+        Vector((rack_w * 0.5, rack_y - 0.22, rack_z)),
+        Vector((rack_w * 0.5, rack_y + 0.12, rack_z)),
+    ]
+    for idx in range(len(rail_pts) - 1):
+        objects.append(make_rod(
+            f"{prefix}_BustleRackBar_{idx+1}",
+            rail_pts[idx],
+            rail_pts[idx + 1],
+            radius=0.018,
+            material=m_mat,
+            vertices=6,
+        ))
+        objects.append(make_rod(
+            f"{prefix}_BustleRackLower_{idx+1}",
+            rail_pts[idx] - Vector((0.0, 0.0, 0.14)),
+            rail_pts[idx + 1] - Vector((0.0, 0.0, 0.14)),
+            radius=0.016,
+            material=m_mat,
+            vertices=6,
+        ))
+
+    # 2. Rolled canvas camouflage tarp bundle with dual retention straps
+    tarp_loc = Vector((0.0, rack_y - 0.10, rack_z + 0.08))
+    objects.append(make_cylinder(
+        f"{prefix}_CamoTarpRoll",
+        radius=0.105,
+        depth=rack_w * 0.76,
+        location=tarp_loc,
+        material=tp_mat,
+        rotation=(0.0, math.radians(90.0), 0.0),
+        vertices=10,
+        bevel=0.025,
+    ))
+    for s_idx, sx in enumerate((-rack_w * 0.22, rack_w * 0.22), start=1):
+        objects.append(make_cylinder(
+            f"{prefix}_TarpStrap_{s_idx}",
+            radius=0.114,
+            depth=0.035,
+            location=(sx, tarp_loc.y, tarp_loc.z),
+            material=tr_mat,
+            rotation=(0.0, math.radians(90.0), 0.0),
+            vertices=10,
+            bevel=0.004,
+        ))
+
+    # 3. Bilateral auxiliary Jerry fuel cans in side racks
+    for side in (-1, 1):
+        stag = "L" if side < 0 else "R"
+        can_loc = Vector((side * (rack_w * 0.56), rack_y - 0.04, rack_z - 0.02))
+        objects.append(make_box(
+            f"{prefix}_JerryCan_{stag}",
+            (0.12, 0.22, 0.28),
+            can_loc,
+            ac_mat if side > 0 else a_mat,
+            bevel=0.012,
+        ))
+        objects.append(make_box(
+            f"{prefix}_JerryCanBracket_{stag}",
+            (0.14, 0.24, 0.04),
+            can_loc - Vector((0.0, 0.0, 0.08)),
+            m_mat,
+            bevel=0.004,
+        ))
+
+    # 4. Forward glacis spare track-link armor blocks & retention bar
+    glacis_y = hull_length * 0.42
+    glacis_z = deck_z * 0.76
+    link_count = 4
+    span_x = min(1.10, hull_width * 0.48)
+    for i in range(link_count):
+        lx = -span_x * 0.5 + i * (span_x / max(1, link_count - 1))
+        objects.append(make_box(
+            f"{prefix}_SpareTrackLink_{i+1}",
+            (0.18, 0.065, 0.22),
+            (lx, glacis_y, glacis_z),
+            tr_mat,
+            bevel=0.008,
+            rotation=(math.radians(-24.0), 0.0, 0.0),
+        ))
+    objects.append(make_box(
+        f"{prefix}_SpareTrackClampBar",
+        (span_x + 0.22, 0.04, 0.035),
+        (0.0, glacis_y + 0.025, glacis_z),
+        m_mat,
+        bevel=0.005,
+    ))
+
+    return objects
+
+
 def create_unity_empty_locator(
     name: str,
     location: Tuple[float, float, float] | Vector,
@@ -9270,6 +9736,146 @@ class RogueVehicleBuilder:
         ))
         return self
 
+    def add_hydraulic_pistons(
+        self,
+        outer_radius: float = 0.044,
+        inner_radius: float = 0.026,
+        stroke_ratio: float = 0.54,
+    ) -> "RogueVehicleBuilder":
+        """Adds dual-stage telescopic hydraulic actuator rams across walker knees/ankles, gun elevation cradles, or outriggers."""
+        hw = (self.hull_width * 0.42) if hasattr(self, "hull_width") else 0.95
+        hz = self.hull_deck_z if hasattr(self, "hull_deck_z") else 0.88
+        tc = self.turret_center if (hasattr(self, "turret_center") and self.turret_center is not None) else Vector((0.0, 0.0, hz + 0.25))
+
+        if self.is_walker and self.leg_type == "quad" and self.quad_hips and self.quad_knees:
+            for tag, hip_v in self.quad_hips.items():
+                knee_v = self.quad_knees.get(tag, hip_v + Vector((0.35, 0.25, -0.25)))
+                p0 = hip_v + Vector((0.0, 0.0, -0.14))
+                p1 = hip_v.lerp(knee_v, 0.72) + Vector((0.0, 0.0, -0.05))
+                self.objects.extend(make_telescopic_piston_assembly(
+                    f"{self.name}Piston_Quad_{tag}",
+                    start_point=p0,
+                    end_point=p1,
+                    outer_radius=outer_radius,
+                    inner_radius=inner_radius,
+                    stroke_ratio=stroke_ratio,
+                    housing_mat=self.palette.gunmetal,
+                    rod_mat=self.palette.wheel_rim,
+                    seal_mat=self.palette.tread,
+                    accent_mat=self.palette.warning,
+                ))
+        elif self.is_walker and self.hip_loc_l is not None and self.knee_loc_l is not None:
+            for stag, hip_v, knee_v in (
+                ("L", self.hip_loc_l, self.knee_loc_l),
+                ("R", self.hip_loc_r or self.hip_loc_l, self.knee_loc_r or self.knee_loc_l),
+            ):
+                p0 = hip_v + Vector((0.0, -0.16, -0.12))
+                p1 = knee_v + Vector((0.0, -0.10, 0.08))
+                self.objects.extend(make_telescopic_piston_assembly(
+                    f"{self.name}Piston_Leg_{stag}",
+                    start_point=p0,
+                    end_point=p1,
+                    outer_radius=outer_radius * 1.1,
+                    inner_radius=inner_radius * 1.1,
+                    stroke_ratio=stroke_ratio,
+                    housing_mat=self.palette.gunmetal,
+                    rod_mat=self.palette.wheel_rim,
+                    seal_mat=self.palette.tread,
+                    accent_mat=self.palette.warning,
+                ))
+        else:
+            # Bilateral gun elevation / recoil actuator rams flanking turret breech / cradle
+            for side, stag in ((-1, "L"), (1, "R")):
+                p0 = tc + Vector((side * min(0.58, hw * 0.56), -0.12, -0.10))
+                p1 = tc + Vector((side * min(0.46, hw * 0.44), 0.52, 0.14))
+                self.objects.extend(make_telescopic_piston_assembly(
+                    f"{self.name}Piston_Cradle_{stag}",
+                    start_point=p0,
+                    end_point=p1,
+                    outer_radius=outer_radius,
+                    inner_radius=inner_radius,
+                    stroke_ratio=stroke_ratio,
+                    housing_mat=self.palette.gunmetal,
+                    rod_mat=self.palette.wheel_rim,
+                    seal_mat=self.palette.tread,
+                    accent_mat=self.palette.warning,
+                ))
+        return self
+
+    def add_ammo_belt_chutes(
+        self,
+        chute_width: float = 0.14,
+        chute_thickness: float = 0.048,
+        sag: float = 0.11,
+    ) -> "RogueVehicleBuilder":
+        """Adds articulated metallic ammunition feed chutes from ammo hoppers into weapon receivers."""
+        hw = (self.hull_width * 0.42) if hasattr(self, "hull_width") else 0.90
+        hz = self.hull_deck_z if hasattr(self, "hull_deck_z") else 0.88
+        tc = self.turret_center if (hasattr(self, "turret_center") and self.turret_center is not None) else Vector((0.0, 0.0, hz + 0.25))
+
+        for side, stag in ((-1, "L"), (1, "R")):
+            p0 = tc + Vector((side * min(0.68, hw * 0.65), -0.36, -0.06))
+            p1 = tc + Vector((side * min(0.42, hw * 0.40), 0.28, 0.08))
+            self.objects.extend(make_ammo_belt_chute_assembly(
+                f"{self.name}AmmoChute_{stag}",
+                start_point=p0,
+                end_point=p1,
+                chute_width=chute_width,
+                chute_thickness=chute_thickness,
+                sag=sag,
+                lateral_bow=0.07,
+                link_count=9,
+                hopper_mat=self.palette.primary_armor,
+                chute_mat=self.palette.gunmetal,
+                brass_mat=self.palette.warning,
+            ))
+        return self
+
+    def add_aps_hardkill_suite(
+        self,
+        include_lwr: bool = True,
+    ) -> "RogueVehicleBuilder":
+        """Adds turret-mounted Active Protection System (APS) hard-kill launchers, 4-quadrant AESA radars, and LWR optical prism."""
+        hz = self.hull_deck_z if hasattr(self, "hull_deck_z") else 0.88
+        tc = self.turret_center if (hasattr(self, "turret_center") and self.turret_center is not None) else Vector((0.0, 0.0, hz + 0.25))
+        tw = min(1.55, (self.hull_width * 0.62) if hasattr(self, "hull_width") else 1.45)
+        tl = min(1.75, (self.hull_length * 0.52) if hasattr(self, "hull_length") else 1.65)
+        self.objects.extend(make_aps_hardkill_suite(
+            f"{self.name}APS",
+            turret_center=tc,
+            turret_width=tw,
+            turret_length=tl,
+            turret_height=0.45,
+            armor_mat=self.palette.light_armor,
+            metal_mat=self.palette.gunmetal,
+            radar_mat=self.palette.warning,
+            emissive_mat=self.palette.emissive,
+            include_lwr=include_lwr,
+        ))
+        return self
+
+    def add_tactical_stowage(self) -> "RogueVehicleBuilder":
+        """Adds external turret bustle cargo rack, rolled camo tarp, Jerry cans, and glacis spare track-link brackets."""
+        hw = self.hull_width if hasattr(self, "hull_width") else 2.4
+        hl = self.hull_length if hasattr(self, "hull_length") else 3.0
+        hz = self.hull_deck_z if hasattr(self, "hull_deck_z") else 0.88
+        tc = self.turret_center if (hasattr(self, "turret_center") and self.turret_center is not None) else Vector((0.0, -0.15, hz + 0.22))
+        self.objects.extend(make_tactical_stowage_kit(
+            f"{self.name}Stowage",
+            hull_length=hl,
+            hull_width=hw,
+            deck_z=hz,
+            turret_center=tc,
+            turret_length=min(1.65, hl * 0.52),
+            turret_width=min(1.45, hw * 0.60),
+            armor_mat=self.palette.primary_armor,
+            metal_mat=self.palette.gunmetal,
+            tarp_mat=self.palette.light_armor,
+            tread_mat=self.palette.tread,
+            accent_mat=self.palette.warning,
+        ))
+        return self
+
     def add_unity_locators(self) -> "RogueVehicleBuilder":
         self.locator_sockets = create_unity_locator_sockets(
             name_prefix=self.name,
@@ -9825,6 +10431,76 @@ class RogueStructureBuilder:
             secondary_mat=self.palette.light_armor,
             stripe_count=2,
             include_zenith_id=True,
+        ))
+        return self
+
+    def add_hydraulic_pistons(self) -> "RogueStructureBuilder":
+        """Adds heavy telescopic hydraulic stabilizing struts to structure perimeter."""
+        for side, stag in ((-1, "L"), (1, "R")):
+            p0 = (side * 2.2, 1.4, 0.28)
+            p1 = (side * 1.45, 0.9, 1.55)
+            self.objects.extend(make_telescopic_piston_assembly(
+                f"{self.name}Struct_{stag}_Piston",
+                start_point=p0,
+                end_point=p1,
+                outer_radius=0.062,
+                inner_radius=0.038,
+                stroke_ratio=0.55,
+                housing_mat=self.palette.gunmetal,
+                rod_mat=self.palette.wheel_rim,
+                seal_mat=self.palette.tread,
+                accent_mat=self.palette.warning,
+            ))
+        return self
+
+    def add_ammo_belt_chutes(self) -> "RogueStructureBuilder":
+        """Adds ammunition feed chutes to defense turret or structure roof mounts."""
+        roof_pos = self.sockets.get("Socket_TurretPivot", self.sockets.get("Socket_RoofMount", Vector((0.0, 0.0, 2.2))))
+        for side, stag in ((-1, "L"), (1, "R")):
+            p0 = roof_pos + Vector((side * 0.95, -0.45, -0.15))
+            p1 = roof_pos + Vector((side * 0.55, 0.25, 0.22))
+            self.objects.extend(make_ammo_belt_chute_assembly(
+                f"{self.name}Struct_{stag}_AmmoChute",
+                start_point=p0,
+                end_point=p1,
+                chute_width=0.16,
+                chute_thickness=0.052,
+                sag=0.12,
+                hopper_mat=self.palette.primary_armor,
+                chute_mat=self.palette.gunmetal,
+                brass_mat=self.palette.warning,
+            ))
+        return self
+
+    def add_aps_hardkill_suite(self) -> "RogueStructureBuilder":
+        """Adds Active Protection System (APS) hard-kill pods and AESA radar panels to structure roof."""
+        roof_pos = self.sockets.get("Socket_TurretPivot", self.sockets.get("Socket_RoofMount", Vector((0.0, 0.0, 2.2))))
+        self.objects.extend(make_aps_hardkill_suite(
+            f"{self.name}Struct_APS",
+            turret_center=roof_pos,
+            turret_width=2.1,
+            turret_length=2.1,
+            turret_height=0.5,
+            armor_mat=self.palette.light_armor,
+            metal_mat=self.palette.gunmetal,
+            radar_mat=self.palette.warning,
+            emissive_mat=self.palette.emissive,
+            include_lwr=True,
+        ))
+        return self
+
+    def add_tactical_stowage(self) -> "RogueStructureBuilder":
+        """Adds external field stowage rack, tarp bundle, and Jerry cans to structure perimeter."""
+        self.objects.extend(make_tactical_stowage_kit(
+            f"{self.name}Struct_Stowage",
+            hull_length=4.2,
+            hull_width=3.6,
+            deck_z=1.1,
+            armor_mat=self.palette.primary_armor,
+            metal_mat=self.palette.gunmetal,
+            tarp_mat=self.palette.light_armor,
+            tread_mat=self.palette.tread,
+            accent_mat=self.palette.warning,
         ))
         return self
 
