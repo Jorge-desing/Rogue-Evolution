@@ -133,6 +133,8 @@ Before finalizing any model, verify dimensions against the template bounds:
 
 Models authored for Rogue Command hook into autonomous gameplay visuals via canonical empty transforms (`Socket_*`) discovered at runtime by `RuntimeVisualDirector`:
 
+The catalog accepts exact canonical names and the exact legacy form `<ModelName>_Socket_<canonical-name>`. Partial names, trailing suffixes, display labels, and substring matches are not socket identifiers. If distinct transforms (including aliases listed together below) map to one behavior role, the runtime disables that role rather than selecting by hierarchy traversal order; other roles remain usable.
+
 ### A. Canonical Socket Catalog
 
 | Canonical Socket Name | Intended Transform Location | Runtime Visual Director Behavior |
@@ -152,5 +154,5 @@ Models authored for Rogue Command hook into autonomous gameplay visuals via cano
 
 ### B. Targeting Hostility Invariant
 
-Turret tracking in `RuntimeVisualDirector` explicitly queries `EntityController.IsEnemy(EntityController)` (token `0x06000844`). Sockets will never orient toward friendly allies, neutral terrain, or friendly waypoints.
+Static inspection verifies that turret tracking resolves `EntityController.IsEnemy(EntityController)` (token `0x06000844`) and rejects inactive or non-hostile targets before changing the turret angle. Runtime targeting still requires verification in a Steam-launched match.
 

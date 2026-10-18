@@ -25,6 +25,8 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
         private Animator _animator;
         private readonly Dictionary<string, Transform> _socketHardpoints = new Dictionary<string, Transform>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, Transform> _attachmentGroups = new Dictionary<string, Transform>(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, UniqueSocketRoleBinding<Transform>> _socketRoleBindings =
+            new Dictionary<string, UniqueSocketRoleBinding<Transform>>(StringComparer.OrdinalIgnoreCase);
 
         private GameObject _damagedMeshObject;
         private GameObject _intactMeshObject;
@@ -122,8 +124,9 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
                 {
                     hasAnimator = true;
                 }
-                if (name.IndexOf("Socket_", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                    name.IndexOf("RCL_Visual_", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                string ignoredSocketName;
+                if (RogueCommandSocketCatalog.TryResolveCanonicalSocketName(name, out ignoredSocketName) ||
+                    name.StartsWith("RCL_Visual_", StringComparison.OrdinalIgnoreCase) ||
                     name.EndsWith("_Damaged", StringComparison.OrdinalIgnoreCase))
                 {
                     return true;
@@ -198,68 +201,69 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
                 Transform current = queue.Dequeue();
                 string name = current.name;
 
-                if (name.IndexOf("TurretPivot", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                    name.IndexOf("TurretYaw", StringComparison.OrdinalIgnoreCase) >= 0)
+                string socketName;
+                bool isKnownSocket = RogueCommandSocketCatalog.TryResolveCanonicalSocketName(name, out socketName);
+                if (isKnownSocket &&
+                    (string.Equals(socketName, "Socket_TurretPivot", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(socketName, "Socket_TurretYaw", StringComparison.OrdinalIgnoreCase)))
                 {
-                    if (_socketTurretPivot == null) _socketTurretPivot = current;
+                    AddSocketRoleCandidate("turret_azimuth", current);
                 }
-                else if (name.IndexOf("TurretPitch", StringComparison.OrdinalIgnoreCase) >= 0)
+                else if (isKnownSocket && string.Equals(socketName, "Socket_TurretPitch", StringComparison.OrdinalIgnoreCase))
                 {
-                    if (_socketTurretPitch == null) _socketTurretPitch = current;
+                    AddSocketRoleCandidate("turret_pitch", current);
                 }
-                else if (name.IndexOf("RadarMast", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                         name.IndexOf("RadarDish", StringComparison.OrdinalIgnoreCase) >= 0)
+                else if (isKnownSocket &&
+                    (string.Equals(socketName, "Socket_RadarMast", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(socketName, "Socket_RadarDish", StringComparison.OrdinalIgnoreCase)))
                 {
-                    if (_socketRadarMast == null) _socketRadarMast = current;
+                    AddSocketRoleCandidate("radar_rotation", current);
                 }
-                else if (name.IndexOf("Deploy_Unit", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                         name.IndexOf("DeployUnit", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                         name.IndexOf("DeployRamp", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                         name.IndexOf("Deploy_Ramp", StringComparison.OrdinalIgnoreCase) >= 0)
+                else if (isKnownSocket &&
+                    (string.Equals(socketName, "Socket_Deploy_Unit", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(socketName, "Socket_DeployUnit", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(socketName, "Socket_DeployRamp", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(socketName, "Socket_Deploy_Ramp", StringComparison.OrdinalIgnoreCase)))
                 {
-                    if (_socketDeployUnit == null) _socketDeployUnit = current;
+                    AddSocketRoleCandidate("deployment", current);
                 }
-                else if (name.IndexOf("DamageSmoke", StringComparison.OrdinalIgnoreCase) >= 0)
+                else if (isKnownSocket && string.Equals(socketName, "Socket_DamageSmoke", StringComparison.OrdinalIgnoreCase))
                 {
-                    if (_socketDamageSmoke == null) _socketDamageSmoke = current;
+                    AddSocketRoleCandidate("damage_smoke", current);
                 }
-                else if (name.IndexOf("DamageFire", StringComparison.OrdinalIgnoreCase) >= 0)
+                else if (isKnownSocket && string.Equals(socketName, "Socket_DamageFire", StringComparison.OrdinalIgnoreCase))
                 {
-                    if (_socketDamageFire == null) _socketDamageFire = current;
+                    AddSocketRoleCandidate("damage_fire", current);
                 }
-                else if (name.IndexOf("RecoilPrimary", StringComparison.OrdinalIgnoreCase) >= 0)
+                else if (isKnownSocket && string.Equals(socketName, "Socket_RecoilPrimary", StringComparison.OrdinalIgnoreCase))
                 {
-                    if (_socketRecoilPrimary == null) _socketRecoilPrimary = current;
+                    AddSocketRoleCandidate("weapon_recoil", current);
                 }
-                else if (name.IndexOf("MuzzlePrimary", StringComparison.OrdinalIgnoreCase) >= 0)
+                else if (isKnownSocket && string.Equals(socketName, "Socket_MuzzlePrimary", StringComparison.OrdinalIgnoreCase))
                 {
-                    if (_socketMuzzlePrimary == null) _socketMuzzlePrimary = current;
+                    AddSocketRoleCandidate("weapon_muzzle", current);
                 }
-                else if (string.Equals(name, "Socket_Antenna", StringComparison.OrdinalIgnoreCase))
+                else if (isKnownSocket && string.Equals(socketName, "Socket_Antenna", StringComparison.OrdinalIgnoreCase))
                 {
-                    _socketAntenna = current;
-                    _antennaBaseLocalRot = current.localRotation;
+                    AddSocketRoleCandidate("antenna", current);
                 }
-                else if (string.Equals(name, "Socket_ThrusterVector_L", StringComparison.OrdinalIgnoreCase))
+                else if (isKnownSocket && string.Equals(socketName, "Socket_ThrusterVector_L", StringComparison.OrdinalIgnoreCase))
                 {
-                    _socketThrusterVectorL = current;
-                    _thrusterVectorBaseLocalRotL = current.localRotation;
+                    AddSocketRoleCandidate("thruster_left", current);
                 }
-                else if (string.Equals(name, "Socket_ThrusterVector_R", StringComparison.OrdinalIgnoreCase))
+                else if (isKnownSocket && string.Equals(socketName, "Socket_ThrusterVector_R", StringComparison.OrdinalIgnoreCase))
                 {
-                    _socketThrusterVectorR = current;
-                    _thrusterVectorBaseLocalRotR = current.localRotation;
+                    AddSocketRoleCandidate("thruster_right", current);
                 }
                 else if (name.StartsWith("RCL_AttachmentGroup_", StringComparison.OrdinalIgnoreCase))
                 {
                     string attachmentType = name.Substring("RCL_AttachmentGroup_".Length);
-                    _attachmentGroups[NormalizeHardpointType(attachmentType)] = current;
+                    AddSocketRoleCandidate("attachment_group:" + NormalizeHardpointType(attachmentType), current);
                 }
-                else if (name.IndexOf("Socket_Hardpoint_", StringComparison.OrdinalIgnoreCase) >= 0)
+                else if (isKnownSocket && socketName.StartsWith("Socket_Hardpoint_", StringComparison.OrdinalIgnoreCase))
                 {
-                    int hpIdx = name.IndexOf("Socket_Hardpoint_", StringComparison.OrdinalIgnoreCase);
-                    string hpType = name.Substring(hpIdx + "Socket_Hardpoint_".Length);
-                    _socketHardpoints[NormalizeHardpointType(hpType)] = current;
+                    string hpType = socketName.Substring("Socket_Hardpoint_".Length);
+                    AddSocketRoleCandidate("hardpoint:" + NormalizeHardpointType(hpType), current);
                 }
                 else if (name.EndsWith("_Damaged", StringComparison.OrdinalIgnoreCase))
                 {
@@ -274,6 +278,52 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
                 for (int i = 0; i < current.childCount; i++)
                 {
                     queue.Enqueue(current.GetChild(i));
+                }
+            }
+
+            _socketTurretPivot = GetSocketRoleValue("turret_azimuth");
+            _socketTurretPitch = GetSocketRoleValue("turret_pitch");
+            _socketRadarMast = GetSocketRoleValue("radar_rotation");
+            _socketDeployUnit = GetSocketRoleValue("deployment");
+            _socketDamageSmoke = GetSocketRoleValue("damage_smoke");
+            _socketDamageFire = GetSocketRoleValue("damage_fire");
+            _socketRecoilPrimary = GetSocketRoleValue("weapon_recoil");
+            _socketMuzzlePrimary = GetSocketRoleValue("weapon_muzzle");
+            _socketAntenna = GetSocketRoleValue("antenna");
+            _socketThrusterVectorL = GetSocketRoleValue("thruster_left");
+            _socketThrusterVectorR = GetSocketRoleValue("thruster_right");
+
+            if (_socketAntenna != null)
+            {
+                _antennaBaseLocalRot = _socketAntenna.localRotation;
+            }
+            if (_socketThrusterVectorL != null)
+            {
+                _thrusterVectorBaseLocalRotL = _socketThrusterVectorL.localRotation;
+            }
+            if (_socketThrusterVectorR != null)
+            {
+                _thrusterVectorBaseLocalRotR = _socketThrusterVectorR.localRotation;
+            }
+
+            foreach (KeyValuePair<string, UniqueSocketRoleBinding<Transform>> role in _socketRoleBindings)
+            {
+                if (role.Value.Value == null)
+                {
+                    continue;
+                }
+
+                const string hardpointPrefix = "hardpoint:";
+                if (role.Key.StartsWith(hardpointPrefix, StringComparison.OrdinalIgnoreCase))
+                {
+                    _socketHardpoints[role.Key.Substring(hardpointPrefix.Length)] = role.Value.Value;
+                    continue;
+                }
+
+                const string attachmentGroupPrefix = "attachment_group:";
+                if (role.Key.StartsWith(attachmentGroupPrefix, StringComparison.OrdinalIgnoreCase))
+                {
+                    _attachmentGroups[role.Key.Substring(attachmentGroupPrefix.Length)] = role.Value.Value;
                 }
             }
 
@@ -293,6 +343,24 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             }
         }
 
+        private void AddSocketRoleCandidate(string role, Transform candidate)
+        {
+            UniqueSocketRoleBinding<Transform> binding;
+            if (!_socketRoleBindings.TryGetValue(role, out binding))
+            {
+                binding = new UniqueSocketRoleBinding<Transform>();
+                _socketRoleBindings.Add(role, binding);
+            }
+
+            binding.Add(candidate);
+        }
+
+        private Transform GetSocketRoleValue(string role)
+        {
+            UniqueSocketRoleBinding<Transform> binding;
+            return _socketRoleBindings.TryGetValue(role, out binding) ? binding.Value : null;
+        }
+
         private static void CacheReflectionAccess()
         {
             if (_healthRatioProp != null) return;
@@ -307,7 +375,8 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             _currentFollowTargetProp = ecType.GetProperty("CurrentFollowTarget", BindingFlags.Public | BindingFlags.Instance);
             _inProductionCountProp = ecType.GetProperty("InProductionCount", BindingFlags.Public | BindingFlags.Instance);
             _productionInfoProp = ecType.GetProperty("ProductionInfo", BindingFlags.Public | BindingFlags.Instance);
-            _isEnemyMethod = ecType.GetMethod("IsEnemy", BindingFlags.Public | BindingFlags.Instance);
+            _isEnemyMethod = ecType.GetMethod("IsEnemy", BindingFlags.Public | BindingFlags.Instance,
+                null, new[] { ecType }, null);
 
             _attackField = ecType.GetField("_attack", BindingFlags.NonPublic | BindingFlags.Instance);
             if (_attackField != null)
@@ -679,12 +748,22 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
         private bool TryGetHardpointVisual(string attachmentType, out Transform visual)
         {
             string normalizedType = NormalizeHardpointType(attachmentType);
-            if (_attachmentGroups.TryGetValue(normalizedType, out visual) && visual != null)
+            Transform groupVisual;
+            if (!_attachmentGroups.TryGetValue(normalizedType, out groupVisual) || groupVisual == null)
             {
-                return true;
+                groupVisual = null;
             }
 
-            return _socketHardpoints.TryGetValue(normalizedType, out visual) && visual != null;
+            Transform hardpointSocket;
+            if (!_socketHardpoints.TryGetValue(normalizedType, out hardpointSocket) || hardpointSocket == null)
+            {
+                hardpointSocket = null;
+            }
+
+            UniqueSocketRoleBinding<Transform> groupRole;
+            _socketRoleBindings.TryGetValue("attachment_group:" + normalizedType, out groupRole);
+            return UniqueSocketRoleBinding<Transform>.TryResolveVisual(
+                groupRole, groupVisual, hardpointSocket, out visual);
         }
 
         private Transform GetHardpointSocket(string attachmentType)
@@ -712,7 +791,7 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
 
         private bool IsHostileTarget(EntityController candidate)
         {
-            if (candidate == null || candidate.gameObject == null) return false;
+            if (candidate == null || candidate.gameObject == null || !candidate.gameObject.activeInHierarchy) return false;
             try
             {
                 if (_isDestroyedProp != null && (bool)_isDestroyedProp.GetValue(candidate, null)) return false;

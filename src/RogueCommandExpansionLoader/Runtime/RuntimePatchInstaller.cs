@@ -200,6 +200,7 @@ namespace RogueCommandExpansionLoader.Runtime
             // CreateLevelMap receives a Stage entry. Its stageParameters field points to the
             // StageParametersScriptableObject loaded from a content bundle.
             Type stage = RuntimeReflection.FindUniqueType(gameAssembly, "Stage");
+            Type stageMap = RuntimeReflection.FindUniqueType(gameAssembly, "StageMap");
             Type entityFactory = RuntimeReflection.FindUniqueType(gameAssembly, "EntityFactory");
             Type aiBehaviour = RuntimeReflection.FindUniqueType(gameAssembly, "AiBehaviour");
             Type defaultAiBehaviour = RuntimeReflection.FindUniqueType(gameAssembly, "DefaultAiBehaviour");
@@ -220,6 +221,9 @@ namespace RogueCommandExpansionLoader.Runtime
                 {
                     return method.GetParameters().Length == 0;
                 });
+            MethodInfo stageMapToJson = RuntimeReflection.FindUniqueMethod(stageMap,
+                "ToJson", HasStageMapToJsonShape);
+            ConstructorInfo stageMapJsonConstructor = FindStageMapJsonConstructor(stageMap);
             MethodInfo createLevelMap = RuntimeReflection.FindUniqueMethod(levelProgression,
                 "CreateLevelMap", delegate(MethodInfo method)
                 {
@@ -289,6 +293,8 @@ namespace RogueCommandExpansionLoader.Runtime
             MethodInfo setScriptableObjectPostfix = Hook("SetScriptableObjectPostfix");
             MethodInfo stageMapPrefix = Hook("CreateStageMapPrefix");
             MethodInfo stageMapPostfix = Hook("CreateStageMapPostfix");
+            MethodInfo stageMapJsonConstructorPostfix = Hook("StageMapJsonConstructorPostfix");
+            MethodInfo stageMapToJsonPostfix = Hook("StageMapToJsonPostfix");
             MethodInfo levelMapPrefix = Hook("CreateLevelMapPrefix");
             MethodInfo levelMapFinalizer = Hook("CreateLevelMapFinalizer");
             MethodInfo instantiatePrefix = Hook("InstantiateEntityPrefix");
@@ -325,6 +331,8 @@ namespace RogueCommandExpansionLoader.Runtime
             plan.Add(new PatchPlan(init, null, entityInitPostfix));
             plan.Add(new PatchPlan(setScriptableObject, null, setScriptableObjectPostfix));
             plan.Add(new PatchPlan(createStageMap, stageMapPrefix, stageMapPostfix));
+            plan.Add(new PatchPlan(stageMapJsonConstructor, null, stageMapJsonConstructorPostfix));
+            plan.Add(new PatchPlan(stageMapToJson, null, stageMapToJsonPostfix));
             plan.Add(new PatchPlan(createLevelMap, levelMapPrefix, null, levelMapFinalizer));
             plan.Add(new PatchPlan(instantiateEntity, instantiatePrefix, instantiatePostfix));
             plan.Add(new PatchPlan(createEntityMesh, entityMeshPrefix, null));
@@ -353,6 +361,35 @@ namespace RogueCommandExpansionLoader.Runtime
             ParameterInfo[] parameters = method.GetParameters();
             return method.IsStatic && method.ReturnType == typeof(string) && parameters.Length == 1 &&
                 parameters[0].ParameterType == typeof(string);
+        }
+
+        private static bool HasStageMapToJsonShape(MethodInfo method)
+        {
+            return !method.IsStatic && method.ReturnType == typeof(string) &&
+                method.GetParameters().Length == 0;
+        }
+
+        private static ConstructorInfo FindStageMapJsonConstructor(Type stageMapType)
+        {
+            ConstructorInfo[] constructors = stageMapType.GetConstructors(
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            List<ConstructorInfo> matches = new List<ConstructorInfo>();
+            for (int i = 0; i < constructors.Length; i++)
+            {
+                ParameterInfo[] parameters = constructors[i].GetParameters();
+                if (parameters.Length == 1 && parameters[0].ParameterType == typeof(string))
+                {
+                    matches.Add(constructors[i]);
+                }
+            }
+
+            if (matches.Count != 1)
+            {
+                throw new InvalidOperationException("Expected one StageMap(string) constructor, found " +
+                    matches.Count + ".");
+            }
+
+            return matches[0];
         }
 
         private static bool HasBlueprintPoolEligibilityShape(MethodInfo method)

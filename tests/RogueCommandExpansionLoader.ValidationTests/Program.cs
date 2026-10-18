@@ -8,6 +8,7 @@ using RogueCommandExpansionLoader.Content;
 using RogueCommandExpansionLoader.Contracts;
 using RogueCommandExpansionLoader.Modules;
 using RogueCommandExpansionLoader.Runtime;
+using RogueCommandExpansionLoader.Runtime.Visual;
 
 if (args.Length != 1)
 {
@@ -40,6 +41,83 @@ ContentPackDefinition reactiveAiSample = JsonSerializer.Deserialize<ContentPackD
 
 var tests = new (string Name, Action Run)[]
 {
+    ("visual socket discovery accepts canonical IDs and exact legacy suffixes only", () =>
+    {
+        if (!RogueCommandSocketCatalog.TryResolveCanonicalSocketName("Socket_TurretPivot", out string canonical) ||
+            canonical != "Socket_TurretPivot" ||
+            !RogueCommandSocketCatalog.TryResolveCanonicalSocketName(
+                "Sandlance_Socket_Hardpoint_ERA", out string legacy) ||
+            legacy != "Socket_Hardpoint_ERA")
+        {
+            throw new InvalidOperationException("A canonical or exact legacy socket name was not resolved.");
+        }
+
+        string[] unsupportedNames =
+        {
+            "Unit_Socket_TurretPivotExtra",
+            "Socket_TurretPivot_Mesh",
+            "Sensor_Eye",
+            "VehicleSocket_RadarMast",
+            "_Socket_TurretPivot"
+        };
+        foreach (string unsupportedName in unsupportedNames)
+        {
+            if (RogueCommandSocketCatalog.TryResolveCanonicalSocketName(unsupportedName, out _))
+            {
+                throw new InvalidOperationException("A noncanonical socket-like name was accepted: " + unsupportedName);
+            }
+        }
+    }),
+    ("visual socket roles disable ambiguous duplicate aliases", () =>
+    {
+        object canonical = new object();
+        var oneRole = new UniqueSocketRoleBinding<object>();
+        oneRole.Add(canonical);
+        oneRole.Add(canonical);
+        if (oneRole.IsAmbiguous || !ReferenceEquals(oneRole.Value, canonical))
+        {
+            throw new InvalidOperationException("Repeated registration of one transform should preserve its unique role.");
+        }
+
+        oneRole.Add(new object());
+        if (!oneRole.IsAmbiguous || oneRole.Value != null)
+        {
+            throw new InvalidOperationException("Distinct aliases for one behavior should disable the ambiguous role.");
+        }
+
+        oneRole.Add(new object());
+        if (!oneRole.IsAmbiguous || oneRole.Value != null)
+        {
+            throw new InvalidOperationException("An ambiguous role should remain disabled after later candidates arrive.");
+        }
+    }),
+    ("ambiguous attachment group does not fall back to its physical socket", () =>
+    {
+        object socket = new object();
+        object groupVisual = new object();
+        var ambiguousGroup = new UniqueSocketRoleBinding<object>();
+        ambiguousGroup.Add(new object());
+        ambiguousGroup.Add(new object());
+
+        if (UniqueSocketRoleBinding<object>.TryResolveVisual(ambiguousGroup, null!, socket, out _))
+        {
+            throw new InvalidOperationException("An ambiguous visual group fell back to its physical socket.");
+        }
+
+        var uniqueGroup = new UniqueSocketRoleBinding<object>();
+        uniqueGroup.Add(groupVisual);
+        if (!UniqueSocketRoleBinding<object>.TryResolveVisual(uniqueGroup, groupVisual, socket, out object? resolved) ||
+            !ReferenceEquals(resolved, groupVisual))
+        {
+            throw new InvalidOperationException("A unique detached group was not preferred over its physical socket.");
+        }
+
+        if (!UniqueSocketRoleBinding<object>.TryResolveVisual(null!, null!, socket, out resolved) ||
+            !ReferenceEquals(resolved, socket))
+        {
+            throw new InvalidOperationException("A missing detached group did not preserve the legacy socket fallback.");
+        }
+    }),
     ("runtime Harmony patch installer hook names resolve to declared methods", () =>
     {
         string[] hookNames =
@@ -48,6 +126,8 @@ var tests = new (string Name, Action Run)[]
             "SetScriptableObjectPostfix",
             "CreateStageMapPrefix",
             "CreateStageMapPostfix",
+            "StageMapJsonConstructorPostfix",
+            "StageMapToJsonPostfix",
             "CreateLevelMapPrefix",
             "CreateLevelMapFinalizer",
             "InstantiateEntityPrefix",
@@ -102,6 +182,26 @@ var tests = new (string Name, Action Run)[]
             eligibilityParameters[2].ParameterType != typeof(bool).MakeByRefType())
         {
             throw new InvalidOperationException("BlueprintPool.IsInPool hook has an invalid Harmony signature.");
+        }
+
+        MethodInfo? savedMapConstructorHook = typeof(RuntimeHarmonyPatches).GetMethod(
+            "StageMapJsonConstructorPostfix", BindingFlags.Public | BindingFlags.Static);
+        ParameterInfo[] savedMapConstructorParameters = savedMapConstructorHook?.GetParameters() ?? Array.Empty<ParameterInfo>();
+        if (savedMapConstructorHook == null || savedMapConstructorHook.ReturnType != typeof(void) ||
+            savedMapConstructorParameters.Length != 2 || savedMapConstructorParameters[0].ParameterType != typeof(object) ||
+            savedMapConstructorParameters[1].ParameterType != typeof(string))
+        {
+            throw new InvalidOperationException("The StageMap JSON constructor hook has an invalid Harmony signature.");
+        }
+
+        MethodInfo? savedMapSerializeHook = typeof(RuntimeHarmonyPatches).GetMethod(
+            "StageMapToJsonPostfix", BindingFlags.Public | BindingFlags.Static);
+        ParameterInfo[] savedMapSerializeParameters = savedMapSerializeHook?.GetParameters() ?? Array.Empty<ParameterInfo>();
+        if (savedMapSerializeHook == null || savedMapSerializeHook.ReturnType != typeof(void) ||
+            savedMapSerializeParameters.Length != 2 || savedMapSerializeParameters[0].ParameterType != typeof(object) ||
+            savedMapSerializeParameters[1].ParameterType != typeof(string).MakeByRefType())
+        {
+            throw new InvalidOperationException("The StageMap JSON serialization hook has an invalid Harmony signature.");
         }
 
         MethodInfo? outlyingStartDistanceHook = typeof(RuntimeHarmonyPatches).GetMethod(
@@ -340,6 +440,105 @@ var tests = new (string Name, Action Run)[]
         if (resolved != null)
         {
             throw new InvalidOperationException("An out-of-range Demo map index unexpectedly resolved a stage.");
+        }
+    }),
+    ("saved stage order roundtrips through StageMap JSON and restores the serialized sequence", () =>
+    {
+        if (!BlueprintRewardStageOrder.TryCreateNativeStageToken("27 Circles", out string nativeA) ||
+            !BlueprintRewardStageOrder.TryCreateNativeStageToken("35 Flat Island", out string nativeB) ||
+            !BlueprintRewardStageOrder.TryCreateCustomStageToken(
+                "sample-native", "sample-native:training-variant", out string customA) ||
+            !BlueprintRewardStageOrder.TryCreateCustomStageToken(
+                "sample-reactive-ai", "sample-reactive-ai:base-defense", out string customB))
+        {
+            throw new InvalidOperationException("A supported native or custom stage identity could not be encoded.");
+        }
+
+        var savedOrder = new List<string> { nativeA, customA, nativeB, customB };
+        string originalJson = "{\"levelMaps\":[{\"note\":\"brace } comma , and \\\"rclStageOrderV1\\\" decoy\"}],\"currentStage\":1}";
+        if (!BlueprintRewardStageOrder.TryAppendSerializedOrder(originalJson, savedOrder, out string serializedJson) ||
+            !BlueprintRewardStageOrder.TryReadSerializedOrder(serializedJson, out List<string>? restoredOrder) ||
+            restoredOrder == null || !restoredOrder.SequenceEqual(savedOrder))
+        {
+            throw new InvalidOperationException("The persisted stage identities did not survive a JSON roundtrip.");
+        }
+
+        if (!BlueprintRewardStageOrder.TryAppendSerializedOrder(serializedJson,
+                new List<string> { customB, nativeB, customA, nativeA }, out string reorderedJson) ||
+            !BlueprintRewardStageOrder.TryReadSerializedOrder(reorderedJson, out restoredOrder) ||
+            restoredOrder == null || !restoredOrder.SequenceEqual(new[] { customB, nativeB, customA, nativeA }) ||
+            reorderedJson.IndexOf("\"rclStageOrderV1\"", StringComparison.Ordinal) !=
+                reorderedJson.LastIndexOf("\"rclStageOrderV1\"", StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("Updating a saved stage order duplicated or failed to replace its marker.");
+        }
+
+        if (!BlueprintRewardStageOrder.TryReadCustomStageToken(customA, out string packId, out string stageId) ||
+            packId != "sample-native" || stageId != "sample-native:training-variant" ||
+            !BlueprintRewardStageOrder.TryReadNativeStageToken(nativeA, out string assetName) || assetName != "27 Circles")
+        {
+            throw new InvalidOperationException("A persisted stage token could not be mapped back to its stable identity.");
+        }
+
+        var nativeStage = new object();
+        var trainingStage = new object();
+        var defenseStage = new object();
+        var candidates = new ArrayList { trainingStage, nativeStage, defenseStage };
+        var tokenByStage = new Dictionary<object, string>
+        {
+            [nativeStage] = nativeA,
+            [trainingStage] = customA,
+            [defenseStage] = customB
+        };
+        var persistedOrder = new List<string> { customB, nativeA, customA };
+        if (!BlueprintRewardStageResolver.TryResolveSavedStageOrder(
+                persistedOrder, candidates, stage => tokenByStage[stage], out List<object>? resolved) ||
+            resolved == null || !resolved.SequenceEqual(new[] { defenseStage, nativeStage, trainingStage }))
+        {
+            throw new InvalidOperationException("A reordered save did not resolve the exact persisted stage sequence.");
+        }
+
+        var missingOrder = new List<string> { customB, customA };
+        var missingCandidates = new ArrayList { defenseStage };
+        if (BlueprintRewardStageResolver.TryResolveSavedStageOrder(
+                missingOrder, missingCandidates, stage => tokenByStage[stage], out _))
+        {
+            throw new InvalidOperationException("A saved custom stage missing from the loaded packs was not rejected.");
+        }
+
+        if (BlueprintRewardStageOrder.TryAppendSerializedOrder(
+                originalJson, new List<string> { customA, customA }, out _) ||
+            BlueprintRewardStageResolver.TryResolveSavedStageOrder(
+                new List<string> { customA, customA }, candidates, stage => tokenByStage[stage], out _))
+        {
+            throw new InvalidOperationException("A repeated custom stage identity was accepted in a saved order.");
+        }
+    }),
+    ("stage-order JSON parser ignores nested marker text and rejects malformed markers", () =>
+    {
+        if (!BlueprintRewardStageOrder.TryCreateNativeStageToken("27 Circles", out string nativeToken))
+        {
+            throw new InvalidOperationException("The native stage token could not be created.");
+        }
+
+        var order = new List<string> { nativeToken };
+        string nestedJson = "{\"levelMaps\":[{\"nested\":{\"rclStageOrderV1\":\"not-the-root\"}}],\"currentStage\":0}";
+        if (!BlueprintRewardStageOrder.TryAppendSerializedOrder(nestedJson, order, out string appended) ||
+            !BlueprintRewardStageOrder.TryReadSerializedOrder(appended, out List<string>? restored) ||
+            restored == null || !restored.SequenceEqual(order))
+        {
+            throw new InvalidOperationException("A nested marker string interfered with the root stage-order property.");
+        }
+
+        string duplicate = appended.Insert(appended.LastIndexOf('}'), ",\"rclStageOrderV1\":\"N_bad\"");
+        if (BlueprintRewardStageOrder.TryReadSerializedOrder(duplicate, out _))
+        {
+            throw new InvalidOperationException("Duplicate root stage-order properties were accepted.");
+        }
+
+        if (BlueprintRewardStageOrder.TryAppendSerializedOrder("not json", order, out _))
+        {
+            throw new InvalidOperationException("Malformed StageMap JSON was rewritten.");
         }
     }),
     ("reward provider exceptions install a fail-closed factory scope", () =>

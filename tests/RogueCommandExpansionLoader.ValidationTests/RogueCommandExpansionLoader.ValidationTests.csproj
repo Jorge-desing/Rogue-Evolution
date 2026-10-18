@@ -33,6 +33,12 @@
              Link="Runtime/BlueprintRewardFactoryScope.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/BlueprintRewardStageResolver.cs"
              Link="Runtime/BlueprintRewardStageResolver.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/BlueprintRewardStageOrder.cs"
+             Link="Runtime/BlueprintRewardStageOrder.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/Visual/RogueCommandSocketCatalog.cs"
+             Link="Runtime/Visual/RogueCommandSocketCatalog.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/Visual/UniqueSocketRoleBinding.cs"
+             Link="Runtime/Visual/UniqueSocketRoleBinding.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/StageFallbackSnapshot.cs"
              Link="Runtime/StageFallbackSnapshot.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeReflection.cs"

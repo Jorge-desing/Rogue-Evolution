@@ -142,6 +142,7 @@ namespace RogueCommandExpansionLoader.Runtime
             }
 
             SafeCall(delegate { mutator.ApplyProgressionFrom(arguments[0]); });
+            NotifyProgressionContentApplied();
         }
 
         public static void BeforeProgressionMap()
@@ -154,6 +155,7 @@ namespace RogueCommandExpansionLoader.Runtime
                 if (rowsRegistered)
                 {
                     SafeCall(delegate { mutator.ApplyCachedProgression(); });
+                    NotifyProgressionContentApplied();
                 }
             }
         }
@@ -171,6 +173,83 @@ namespace RogueCommandExpansionLoader.Runtime
             if (scopeProvider != null)
             {
                 SafeCall(delegate { scopeProvider.OnStageMapCreated(stageMap); });
+            }
+        }
+
+        public static void AfterStageMapDeserialized(object stageMap, string json)
+        {
+            // Save loading can construct StageMap before the normal map-generation hook. Prepare
+            // the same additive content registrations now, then let the provider restore its
+            // serialized stage identity sequence.
+            BeforeProgressionMap();
+
+            IRuntimeContentProvider provider;
+            lock (Gate)
+            {
+                provider = _provider;
+            }
+
+            IBlueprintRewardFactoryScopeProvider scopeProvider =
+                provider as IBlueprintRewardFactoryScopeProvider;
+            if (scopeProvider == null)
+            {
+                return;
+            }
+
+            try
+            {
+                scopeProvider.OnStageMapDeserialized(stageMap, json);
+            }
+            catch (Exception exception)
+            {
+                Log("Could not restore the saved stage identity sequence: " +
+                    exception.GetBaseException().Message);
+            }
+        }
+
+        private static void NotifyProgressionContentApplied()
+        {
+            IRuntimeContentProvider provider;
+            lock (Gate)
+            {
+                provider = _provider;
+            }
+
+            IBlueprintRewardFactoryScopeProvider scopeProvider =
+                provider as IBlueprintRewardFactoryScopeProvider;
+            if (scopeProvider != null)
+            {
+                SafeCall(delegate { scopeProvider.OnProgressionContentApplied(); });
+            }
+        }
+
+        public static void AfterStageMapSerialized(object stageMap, ref string json)
+        {
+            IRuntimeContentProvider provider;
+            lock (Gate)
+            {
+                provider = _provider;
+            }
+
+            IBlueprintRewardFactoryScopeProvider scopeProvider =
+                provider as IBlueprintRewardFactoryScopeProvider;
+            if (scopeProvider == null || json == null)
+            {
+                return;
+            }
+
+            try
+            {
+                string updatedJson = scopeProvider.AppendStageMapOrder(stageMap, json);
+                if (updatedJson != null)
+                {
+                    json = updatedJson;
+                }
+            }
+            catch (Exception exception)
+            {
+                Log("Could not persist the stage identity sequence: " +
+                    exception.GetBaseException().Message);
             }
         }
 
@@ -659,6 +738,16 @@ namespace RogueCommandExpansionLoader.Runtime
         public static void CreateStageMapPostfix(object __result)
         {
             RuntimeHooks.AfterStageMapCreated(__result);
+        }
+
+        public static void StageMapJsonConstructorPostfix(object __instance, string __0)
+        {
+            RuntimeHooks.AfterStageMapDeserialized(__instance, __0);
+        }
+
+        public static void StageMapToJsonPostfix(object __instance, ref string __result)
+        {
+            RuntimeHooks.AfterStageMapSerialized(__instance, ref __result);
         }
 
         public static void CreateLevelMapPrefix(object __0, out object __state)

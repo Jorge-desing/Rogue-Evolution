@@ -442,7 +442,7 @@ Generates `<Name>_Wreckage.fbx` and `<name>-wreckage.blend` for visual combat de
   - Weapons: 462 tris (11.5%)
   - Optics & Greebles: 242 tris (6.0%)
 - **Lifecycle Cleanliness**: Test artifacts were safely verified and removed; zero uncommitted test models exist in `content/` or `unity/`.
-- **Validation Suite**: `dotnet run --project tests/RogueCommandExpansionLoader.ValidationTests -- .` passed 101/102 checks (1 skipped on Windows symlinks).
+- **Validation Suite**: the latest source audit reports 107/108 checks passed (1 Windows symlink check skipped because the environment lacks the required privilege).
 
 ---
 
@@ -750,7 +750,7 @@ Following in-depth static and architectural code review of the 3D authoring pipe
 - **Resolution**:
   1. In `tools/RogueModelKit.py` and its twin in `.agents/skills/rogue-command-3d-model-authoring/scripts/`, `_add_empty` was updated to assign canonical un-prefixed names (`Socket_DamageSmoke`, `Socket_MuzzlePrimary`, etc.).
   2. `create_unity_locator_sockets` was expanded with parameters `radar_loc`, `hardpoints`, and `include_default_hardpoints=True`, automatically emitting `Socket_RadarMast`, `Socket_RadarDish`, `Socket_Hardpoint_ERA`, `Socket_Hardpoint_APS`, `Socket_Hardpoint_Sponsons`, and `Socket_Hardpoint_FuelDrums`.
-  3. `RuntimeVisualDirector.cs` updated `HasCompatibleVisualSockets` from `name.StartsWith("Socket_")` to `name.IndexOf("Socket_") >= 0` and hardpoint discovery to `name.IndexOf("Socket_Hardpoint_") >= 0`, providing robust dual-compatibility for both prefixed and un-prefixed assets.
+  3. Runtime socket discovery is now centralized in `RogueCommandSocketCatalog`: it accepts exact canonical names and legacy `<ModelName>_Socket_<canonical-name>` suffixes only. `RuntimeVisualDirector` no longer chooses turret, radar, deploy, or hardpoint sockets by arbitrary substring matching; explicitly named `RCL_Visual_*` visuals remain a separate attachment signal. If two distinct transforms (including two aliases such as `Socket_TurretPivot` and `Socket_TurretYaw`) map to one behavior role, that role is disabled instead of depending on hierarchy traversal order; other roles on the prefab remain available. An ambiguous detached attachment group does not fall back to the physical hardpoint locator; the locator is used as a legacy visual only if no detached group was authored.
 
 ### B. PBR Metallic-Gloss Packing & Linear Importer Pipeline
 - **Discrepancy**: The baked `_MetallicGloss.png` texture previously contained roughness in place of packed data; Unity's Standard shader treats `_MetallicGlossMap` as linear data ($R = \text{Metallic}, A = \text{Smoothness}$). In Unity, missing `sRGB = false` flags caused gamma distortion, while omitting `_METALLICGLOSSMAP` prevented texture sampling.

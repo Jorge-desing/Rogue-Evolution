@@ -106,6 +106,9 @@ internal sealed class RuntimeMutatorTestProvider : IRuntimeContentProvider, IBlu
         return RewardFactoryScope == null ? null : RewardFactoryScope.CreateFailClosedScope();
     }
     public void OnStageMapCreated(object stageMap) { }
+    public void OnStageMapDeserialized(object stageMap, string json) { }
+    public void OnProgressionContentApplied() { }
+    public string AppendStageMapOrder(object stageMap, string json) { return json; }
 
     public List<object> EntityRows { get; } = new();
     public List<ProgressionContentContribution> Contributions { get; } = new();

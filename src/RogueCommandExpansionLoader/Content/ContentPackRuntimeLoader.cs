@@ -173,8 +173,11 @@ namespace RogueCommandExpansionLoader.Content
         private bool _loaded;
         private bool _aiStartDistanceFailureLogged;
         private bool _blueprintRewardScopeFailureLogged;
+        private bool _stageMapOrderFailureLogged;
         private object _stageMapSnapshotOwner;
         private List<object> _stageMapVisibleStages;
+        private object _pendingStageMapSnapshotOwner;
+        private string _pendingStageMapJson;
 
         public ContentPackRuntimeLoader(
             string packsRoot,
@@ -773,6 +776,11 @@ namespace RogueCommandExpansionLoader.Content
                     }
 
                     object stageMap = _gameStageMapField.GetValue(null);
+                    if (System.Object.ReferenceEquals(stageMap, _pendingStageMapSnapshotOwner))
+                    {
+                        TryRestorePendingStageMapOrder(false);
+                    }
+
                     object activeStage = null;
                     if (stageMap != null && System.Object.ReferenceEquals(stageMap, _stageMapSnapshotOwner) &&
                         _stageMapVisibleStages != null)
@@ -817,50 +825,271 @@ namespace RogueCommandExpansionLoader.Content
         {
             lock (_gate)
             {
+                _pendingStageMapSnapshotOwner = null;
+                _pendingStageMapJson = null;
                 _stageMapSnapshotOwner = stageMap;
                 _stageMapVisibleStages = null;
-                if (stageMap == null)
+                List<object> visibleStages;
+                if (stageMap == null || !TryBuildVisibleStageSequence(out visibleStages))
                 {
                     return;
                 }
 
-                object progression = _currentProgressionProperty.GetValue(null, null);
-                IList progressionStages = progression == null
-                    ? null
-                    : _progressionStagesField.GetValue(progression) as IList;
-                if (progression == null || progressionStages == null)
-                {
-                    return;
-                }
-
-                bool enableTutorial = (bool)_progressionEnableTutorialField.GetValue(progression);
-                object tutorialState = _gameTutorialStateProperty.GetValue(null, null);
-                bool tutorialFinished = tutorialState != null &&
-                    (bool)_tutorialMainFinishedField.GetValue(tutorialState);
-                bool useTutorialStage = enableTutorial && !tutorialFinished;
-                object tutorialStage = _progressionTutorialStageField.GetValue(progression);
-                object balancing = _gameBalancingAssetField.GetValue(null);
-                bool isDemo = balancing != null && (bool)_gameIsDemoField.GetValue(balancing);
-
-                List<object> visibleStages = BlueprintRewardStageResolver.BuildVisibleStages(
-                    progressionStages,
-                    tutorialStage,
-                    isDemo,
-                    useTutorialStage,
-                    delegate(object stage)
-                    {
-                        return (bool)_stageDemoField.GetValue(stage);
-                    });
                 IList levelMaps = _stageMapLevelMapsField.GetValue(stageMap) as IList;
                 if (levelMaps == null || levelMaps.Count != visibleStages.Count)
                 {
-                    Log("Stage map snapshot did not match the game's visible LevelMap count; " +
+                    LogStageMapOrderFailure("Stage map snapshot did not match the game's visible LevelMap count; " +
                         "custom factories will be omitted from generic rewards for this map.");
                     return;
                 }
 
                 _stageMapVisibleStages = visibleStages;
             }
+        }
+
+        public void OnStageMapDeserialized(object stageMap, string json)
+        {
+            lock (_gate)
+            {
+                _stageMapSnapshotOwner = stageMap;
+                _stageMapVisibleStages = null;
+                if (stageMap == null)
+                {
+                    _pendingStageMapSnapshotOwner = null;
+                    _pendingStageMapJson = null;
+                    return;
+                }
+
+                _pendingStageMapSnapshotOwner = stageMap;
+                _pendingStageMapJson = json;
+            }
+
+            // Save loading can run before the first map/entity hook. Prepare content now when the
+            // native registry is available; if it is not, the pending restore is retried after the
+            // progression hooks apply their contributions and before reward eligibility is used.
+            PrepareContentForRuntime();
+            lock (_gate) TryRestorePendingStageMapOrder(false);
+        }
+
+        public void OnProgressionContentApplied()
+        {
+            lock (_gate) TryRestorePendingStageMapOrder(true);
+        }
+
+        public string AppendStageMapOrder(object stageMap, string json)
+        {
+            lock (_gate)
+            {
+                if (json == null || stageMap == null ||
+                    !System.Object.ReferenceEquals(stageMap, _stageMapSnapshotOwner))
+                {
+                    return json;
+                }
+
+                TryRestorePendingStageMapOrder(false);
+
+                List<string> stageTokens;
+                string updatedJson;
+                if (_stageMapVisibleStages != null)
+                {
+                    if (TryCreateStageOrderTokens(_stageMapVisibleStages, out stageTokens) &&
+                        BlueprintRewardStageOrder.TryAppendSerializedOrder(json, stageTokens, out updatedJson))
+                    {
+                        return updatedJson;
+                    }
+
+                    LogStageMapOrderFailure("Could not persist the stage identity sequence; a resumed map will " +
+                        "omit custom factories from generic rewards.");
+                    return json;
+                }
+
+                // Preserve a valid marker while content/progression initialization is deferred.
+                // Otherwise a quick save during load would erase the order needed on the next run.
+                if (_stageMapVisibleStages == null &&
+                    System.Object.ReferenceEquals(stageMap, _pendingStageMapSnapshotOwner) &&
+                    BlueprintRewardStageOrder.TryReadSerializedOrder(_pendingStageMapJson, out stageTokens))
+                {
+                    if (BlueprintRewardStageOrder.TryAppendSerializedOrder(json, stageTokens, out updatedJson))
+                    {
+                        return updatedJson;
+                    }
+
+                    LogStageMapOrderFailure("Could not preserve the pending stage identity sequence; a resumed map will " +
+                        "omit custom factories from generic rewards.");
+                }
+
+                return json;
+            }
+        }
+
+        private bool TryBuildVisibleStageSequence(out List<object> visibleStages)
+        {
+            visibleStages = null;
+            object progression = _currentProgressionProperty.GetValue(null, null);
+            IList progressionStages = progression == null
+                ? null
+                : _progressionStagesField.GetValue(progression) as IList;
+            if (progression == null || progressionStages == null)
+            {
+                return false;
+            }
+
+            bool enableTutorial = (bool)_progressionEnableTutorialField.GetValue(progression);
+            object tutorialState = _gameTutorialStateProperty.GetValue(null, null);
+            bool tutorialFinished = tutorialState != null &&
+                (bool)_tutorialMainFinishedField.GetValue(tutorialState);
+            bool useTutorialStage = enableTutorial && !tutorialFinished;
+            object tutorialStage = _progressionTutorialStageField.GetValue(progression);
+            object balancing = _gameBalancingAssetField.GetValue(null);
+            bool isDemo = balancing != null && (bool)_gameIsDemoField.GetValue(balancing);
+
+            visibleStages = BlueprintRewardStageResolver.BuildVisibleStages(
+                progressionStages,
+                tutorialStage,
+                isDemo,
+                useTutorialStage,
+                delegate(object stage)
+                {
+                    return (bool)_stageDemoField.GetValue(stage);
+                });
+            return visibleStages.Count > 0;
+        }
+
+        private bool TryCreateStageOrderTokens(IList stageSequence, out List<string> stageTokens)
+        {
+            stageTokens = null;
+            if (stageSequence == null || stageSequence.Count == 0)
+            {
+                return false;
+            }
+
+            var tokens = new List<string>(stageSequence.Count);
+            for (int i = 0; i < stageSequence.Count; i++)
+            {
+                string token = GetStageOrderToken(stageSequence[i]);
+                if (String.IsNullOrWhiteSpace(token))
+                {
+                    return false;
+                }
+
+                tokens.Add(token);
+            }
+
+            stageTokens = tokens;
+            return true;
+        }
+
+        private string GetStageOrderToken(object stage)
+        {
+            if (stage == null)
+            {
+                return null;
+            }
+
+            for (int i = 0; i < _stages.Count; i++)
+            {
+                LoadedStage loadedStage = _stages[i];
+                if (System.Object.ReferenceEquals(loadedStage.RuntimeStage, stage))
+                {
+                    string customToken;
+                    return BlueprintRewardStageOrder.TryCreateCustomStageToken(
+                        loadedStage.PackId, loadedStage.Definition.id, out customToken)
+                        ? customToken
+                        : null;
+                }
+            }
+
+            object stageParameters = _stageParametersField.GetValue(stage);
+            UnityEngine.Object stageAsset = stageParameters as UnityEngine.Object;
+            if (stageAsset == null)
+            {
+                return null;
+            }
+
+            string nativeToken;
+            return BlueprintRewardStageOrder.TryCreateNativeStageToken(stageAsset.name, out nativeToken)
+                ? nativeToken
+                : null;
+        }
+
+        private void LogStageMapOrderFailure(string message)
+        {
+            if (_stageMapOrderFailureLogged)
+            {
+                return;
+            }
+
+            _stageMapOrderFailureLogged = true;
+            Log(message);
+        }
+
+        private bool TryRestorePendingStageMapOrder(bool progressionWasApplied)
+        {
+            if (_pendingStageMapSnapshotOwner == null || !_runtimeContentReady)
+            {
+                return false;
+            }
+
+            IList levelMaps = _stageMapLevelMapsField.GetValue(_pendingStageMapSnapshotOwner) as IList;
+            List<string> savedStageTokens;
+            if (levelMaps == null || levelMaps.Count == 0 ||
+                !BlueprintRewardStageOrder.TryReadSerializedOrder(_pendingStageMapJson, out savedStageTokens) ||
+                savedStageTokens.Count != levelMaps.Count)
+            {
+                LogStageMapOrderFailure("A saved stage map has no valid loader stage-order marker; " +
+                    "custom factories will be omitted from generic rewards for this map.");
+                ClearPendingStageMapOrder();
+                return false;
+            }
+
+            object progression = _currentProgressionProperty.GetValue(null, null);
+            IList progressionStages = progression == null
+                ? null
+                : _progressionStagesField.GetValue(progression) as IList;
+            if (progression == null || progressionStages == null)
+            {
+                return false;
+            }
+
+            var candidates = new ArrayList();
+            for (int i = 0; i < progressionStages.Count; i++)
+            {
+                candidates.Add(progressionStages[i]);
+            }
+
+            object tutorialStage = _progressionTutorialStageField.GetValue(progression);
+            if (tutorialStage != null && !ContainsReference(candidates, tutorialStage))
+            {
+                candidates.Add(tutorialStage);
+            }
+
+            List<object> resolvedStages;
+            if (BlueprintRewardStageResolver.TryResolveSavedStageOrder(
+                    savedStageTokens,
+                    candidates,
+                    GetStageOrderToken,
+                    out resolvedStages) && resolvedStages.Count == levelMaps.Count)
+            {
+                _stageMapSnapshotOwner = _pendingStageMapSnapshotOwner;
+                _stageMapVisibleStages = resolvedStages;
+                ClearPendingStageMapOrder();
+                return true;
+            }
+
+            if (progressionWasApplied)
+            {
+                LogStageMapOrderFailure("The saved stage-order marker did not resolve against the loaded content; " +
+                    "custom factories will be omitted from generic rewards for this map.");
+                ClearPendingStageMapOrder();
+            }
+
+            return false;
+        }
+
+        private void ClearPendingStageMapOrder()
+        {
+            _pendingStageMapSnapshotOwner = null;
+            _pendingStageMapJson = null;
         }
 
         public BlueprintRewardFactoryScope CreateFailClosedBlueprintRewardFactoryScope()

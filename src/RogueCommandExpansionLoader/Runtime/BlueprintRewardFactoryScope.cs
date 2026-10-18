@@ -98,5 +98,14 @@ namespace RogueCommandExpansionLoader.Runtime
 
         /// <summary>Captures the effective visible-stage order for a newly created game map.</summary>
         void OnStageMapCreated(object stageMap);
+
+        /// <summary>Restores stage identities from a serialized map when they can be resolved safely.</summary>
+        void OnStageMapDeserialized(object stageMap, string json);
+
+        /// <summary>Retries a pending saved-map restore after progression contributions are applied.</summary>
+        void OnProgressionContentApplied();
+
+        /// <summary>Adds the current map's stage identities to the game's serialized JSON.</summary>
+        string AppendStageMapOrder(object stageMap, string json);
     }
 }
