@@ -11,7 +11,7 @@ Use this skill to design, model, texture, and export original, high-readability 
 
 ## Verified Implementation Boundaries
 
-- **Supported CLI Coverage**: 24 mobile archetypes, 7 strategic structure types, 23 presets, and 13 weapon choices. `--track-sag`, `--armor-plating`, and `--ik-rig` provide parametric droop, BMesh panels, and 2-bone IK solver constraints. `--hydraulic-hoses`, `--hull-greebles`, `--tactical-markings`, `--hydraulic-pistons`, `--ammo-chutes`, `--aps-suite`, and `--stowage-kit` add optional conduits, deck details, raycasted markings, telescopic actuators, ammunition feed chutes, active protection pods, and field stowage to mobile units and structures. Weighted normals are enabled by default and can be disabled with `--no-weighted-normals`. `--lod` reports polygon budgets; `--lods` builds the LOD chain.
+- **Supported CLI Coverage**: 30 mobile archetypes, 7 strategic structure types, 35 presets, and 13 weapon choices. `--track-sag`, `--armor-plating`, and `--ik-rig` provide parametric droop, BMesh panels, and 2-bone IK solver constraints. `--hydraulic-hoses`, `--hull-greebles`, `--tactical-markings`, `--hydraulic-pistons`, `--ammo-chutes`, `--aps-suite`, and `--stowage-kit` add optional conduits, deck details, raycasted markings, telescopic actuators, ammunition feed chutes, active protection pods, and field stowage to mobile units and structures. Weighted normals are enabled by default and can be disabled with `--no-weighted-normals`. `--lod` reports polygon budgets; `--lods` builds the LOD chain.
 - **Node Patterns & Coordinates**: `--camo` uses procedural Object-coordinate nodes (Voronoi for `splinter`/`digital`, wave for `tigerstripe`, noise for `desert`/`urban`/`arctic`/`woodland`).
 - **Biome & Shaders**: `--biome` selects an authoring-time palette alias when `--camo` is `none` (no runtime adaptation). Atlas textures require baking and URP `VehiclePBR_VertexWear` shader.
 - **References**: Follow [Unity Material Pipeline](references/unity-material-pipeline.md), [Native Hierarchy & Pivots](references/native-hierarchy-and-pivots.md), and [3D-MODEL-AUTHORING-ENHANCEMENTS.md](../../../docs/research/3D-MODEL-AUTHORING-ENHANCEMENTS.md).
@@ -142,14 +142,14 @@ Run headless vehicle generation directly from the command line using Blender and
     --wear battle_hardened --sponsons --smoke --radar --dirt --locators --lods --colliders --gameplay-json --wreckage --multiview
 ```
 
-- **Mobile Archetypes (24)**: `tank`, `walker`, `bike`, `artillery`, `arc_tank`, `hover`, `spider`, `vtol`, `halftrack`, `super_heavy`, `buggy`, `flak_anti_air`, `siege_crawler`, `drone_carrier`, `quad_mech`, `combat_harvester`, `colossus_titan`, `hover_cruiser`, `heavy_dropship`, `shield_truck`, `demolition_breacher`, `artillery_strider`, `thermobaric_tank`, and `ew_jammer`.
-- **Strategic Structure Types (7)**: `factory`, `defense_turret`, `radar_station`, `energy_silo`, `orbital_silo`, `shield_dome`, and `emp_obelisk`. These are generated through `RogueStructureBuilder`, separate from the 24 mobile archetypes.
+- **Mobile Archetypes (30)**: `tank`, `walker`, `bike`, `artillery`, `arc_tank`, `hover`, `spider`, `vtol`, `halftrack`, `super_heavy`, `buggy`, `flak_anti_air`, `siege_crawler`, `drone_carrier`, `quad_mech`, `combat_harvester`, `colossus_titan`, `hover_cruiser`, `heavy_dropship`, `shield_truck`, `demolition_breacher`, `artillery_strider`, `thermobaric_tank`, `ew_jammer`, and Wave 3: `mobile_sam_launcher`, `recovery_crawler`, `mine_layer`, `sniper_tankette`, `hexapod_assault`, `assault_hovercraft`.
+- **Strategic Structure Types (7)**: `factory`, `defense_turret`, `radar_station`, `energy_silo`, `orbital_silo`, `shield_dome`, and `emp_obelisk`. These are generated through `RogueStructureBuilder`, separate from the 30 mobile archetypes.
 - **Weapons (13 CLI values)**: `cannon`, `gatling`, `missile`, `arc`, `howitzer`, `dual_cannon`, `railgun`, `quad_flak`, `plasma_mortar`, `laser_beam`, `vls_missiles`, `flamethrower`, and `emp_emitter`.
 - **Factions**: `vanguard` (slate teal), `siege` (rust ochre), `syndicate` (deep cobalt), `arctic` (tundra navy).
 - **Camouflage Variants**: `digital`, `splinter`, and `tigerstripe` build procedural Voronoi/wave color patterns; `desert`, `urban`, `arctic`, and `woodland` use a procedural noise pattern with faction colors. These Blender node graphs can be baked to the atlas. They do not adapt to the map's runtime biome.
 - **Biome Palette Alias**: `--biome desert|arctic|woodland|urban` applies the corresponding authoring-time color palette only when `--camo` remains `none`; it does not adapt to a map's runtime biome.
 - **Surface Wear Levels**: `pristine` (factory clean), `field_tested` (moderate edge scratches and road grime), `battle_hardened` (heavy combat gouges, exhaust soot, and cavity dirt).
-- **Presets (23 Total)**:
+- **Presets (35 Total)**:
 
 | Preset ID | Base Archetype / Building | Weapons & Key Attachments | Tactical Visual Identity |
 |---|---|---|---|
@@ -176,6 +176,21 @@ Run headless vehicle generation directly from the command line using Blender and
 | `spectre_jammer` | `ew_jammer` | EMP emitter, 6x6 chassis, phased-array panels, radar | Electronic warfare & EMP disruptor truck |
 | `bastion_shield_dome`| `shield_dome` | Converging emitter pylons, field coils, dome core | Stationary area shield generator |
 | `tesla_obelisk` | `emp_obelisk` | Segmented conductive spire, discharge rings, emitter crown | Fortified EMP suppression obelisk |
+| `skyguard_sam` | `mobile_sam_launcher` | 6x6 chassis, erector-launcher canisters with rams, radar, APS; digital camo, factory-new | Mobile surface-to-air missile battery |
+| `salvage_hauler` | `recovery_crawler` | Crane boom, winch drum, earth spade, dozer, stowage, fuel drums; battle-hardened | Armored recovery vehicle |
+| `minefield_sower` | `mine_layer` | Mine hopper, dispensing chute, racked AT mines, ammo chutes; desert camo | Tracked area-denial mine layer |
+| `longshot_tankette` | `sniper_tankette` | Long 2.45 m precision gun, dust boot, track shoes; splinter camo | Low-silhouette sniper tankette |
+| `arachnid_hexapod` | `hexapod_assault` | 4 rigged crawler legs + static middle pair, IK rig, missile pod, APS | Six-legged assault crawler |
+| `tidebreaker_hovercraft` | `assault_hovercraft` | Skirt, bow ramp, twin ducted props and rudders, gatling; urban camo | Amphibious assault hovercraft |
+| `urban_brawler` | `tank` | Cannon, spaced skirts, cupola, APS, stowage, ERA attachment; urban, battle-hardened | City-fighting MBT remix |
+| `arctic_sentinel` | `walker` | Twin gatlings, ammo chutes, stowage, antenna; arctic camo | Cold-weather sentinel walker remix |
+| `night_stalker` | `bike` | Gatling, ammo chutes, markings; tigerstripe, factory-new | Night raider bike remix |
+| `armored_hauler` | `halftrack` | Gatling, cupola, smoke, ammo chutes, stowage, fuel drums; woodland camo | Logistics halftrack remix |
+| `early_warning_array` | `radar_station` | Radar station with APS, hoses, greebles | Strategic early-warning radar |
+| `fusion_silo` | `energy_silo` | Energy silo with hydraulic pistons, hoses, greebles | Strategic power silo |
+
+- **Preset defaults for camo, wear and attachments**: A preset may declare `camo`, `wear`, and `attachments` (comma list of `era`, `aps`, `sponson`, `fuel_drums`). These apply only when the matching CLI option was not supplied. `--preset` choices are derived from `PRESETS` keys, so a new preset only needs one dictionary entry.
+- **Hexapod rig boundary**: `hexapod_assault` reuses the quad crawler leg rig; the middle leg pair is static geometry bound to the body bone (no per-leg IK). It does not add foot-contact sockets for the middle pair to avoid socket-role ambiguity.
 
 - **CLI Flag Groups**:
   - *Geometry & Optimization*: `--lods` (LOD0-2 chain), `--colliders` (`_COLLIDER_Hull/Turret`), `--gameplay-json` (kinematic metadata), `--wreckage` (battle-destroyed model), `--wreckage-severity <light|medium|catastrophic>` (destruction severity), `--target-budget <int>` (poly profiling), `--track-sag` (parametric catenary track sag), `--armor-plating` (procedural BMesh faceted panels), `--ik-rig` (automated 2-bone IK solver controls), `--weighted-normals` (default on; `--no-weighted-normals` disables the pass).

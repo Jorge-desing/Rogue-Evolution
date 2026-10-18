@@ -4135,6 +4135,12 @@ def export_gameplay_metadata(
         "colossus_titan": ["GatlingWalker"],
         "hover_cruiser": ["PCXBaseTank"],
         "heavy_dropship": ["PCXBaseTank"],
+        "mobile_sam_launcher": ["PCXBaseTank"],
+        "recovery_crawler": ["PCXBaseTank"],
+        "mine_layer": ["PCXBaseTank"],
+        "sniper_tankette": ["PCXBaseTank"],
+        "hexapod_assault": ["GatlingWalker"],
+        "assault_hovercraft": ["PCXBaseTank"],
     }
 
     if archetype in ("bike", "buggy"):
@@ -4164,7 +4170,7 @@ def export_gameplay_metadata(
             "fireHpFraction": 0.25,
         },
         "rigging": {
-            "rigType": "skeletal_armature" if archetype in ("walker", "colossus_titan", "quad_mech", "spider", "siege_crawler") else "chassis_kinematic",
+            "rigType": "skeletal_armature" if archetype in ("walker", "colossus_titan", "quad_mech", "spider", "siege_crawler", "hexapod_assault") else "chassis_kinematic",
             "hasArmature": True,
             "animatorParameters": ["RCL_IsMoving", "RCL_Fire", "RCL_Death"],
             "actionClips": ["Action_Idle", "Action_Walk", "Action_Drive", "Action_FireRecoil", "Action_Death"],
@@ -4251,7 +4257,7 @@ def make_wreckage_variant(
             wreck_objs.append(h_obj)
 
     else:  # catastrophic
-        if archetype in ("tank", "artillery", "flak_anti_air", "arc_tank", "beam_destroyer", "halftrack", "thermobaric_tank", "demolition_breacher"):
+        if archetype in ("tank", "artillery", "flak_anti_air", "arc_tank", "beam_destroyer", "halftrack", "thermobaric_tank", "demolition_breacher", "recovery_crawler", "mine_layer", "sniper_tankette"):
             roll = math.radians(5.5)
             for h_obj in hull_objs:
                 h_obj.rotation_euler.y += roll
@@ -4277,7 +4283,7 @@ def make_wreckage_variant(
             )
             wreck_objs.extend(debris)
 
-        elif archetype in ("walker", "colossus_titan", "artillery_strider", "spider", "quad_mech", "siege_crawler"):
+        elif archetype in ("walker", "colossus_titan", "artillery_strider", "spider", "quad_mech", "siege_crawler", "hexapod_assault"):
             drop_z = 0.55 if archetype in ("colossus_titan", "quad_mech") else 0.35
             for h_obj in hull_objs:
                 h_obj.location.z = max(0.04, h_obj.location.z - drop_z)
@@ -4288,7 +4294,7 @@ def make_wreckage_variant(
                 t_obj.rotation_euler.x += math.radians(26.0)
                 wreck_objs.append(t_obj)
 
-        elif archetype in ("hover", "hover_cruiser", "vtol", "heavy_dropship"):
+        elif archetype in ("hover", "hover_cruiser", "vtol", "heavy_dropship", "assault_hovercraft"):
             for h_obj in hull_objs:
                 h_obj.location.z = max(0.03, h_obj.location.z - 0.38)
                 h_obj.rotation_euler.x += math.radians(7.5)
