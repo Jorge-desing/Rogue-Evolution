@@ -1432,6 +1432,30 @@ var tests = new (string Name, Action Run)[]
             }
         }
     }),
+    ("reactive base-defense threat radius uses bounded grid distance", () =>
+    {
+        if (!ReactiveBaseDefenseThreatRange.IsWithinRadius(
+                new UnityEngine.Vector2Int(0, 0), new UnityEngine.Vector2Int(12, 0), 12f) ||
+            !ReactiveBaseDefenseThreatRange.IsWithinRadius(
+                new UnityEngine.Vector2Int(0, 0), new UnityEngine.Vector2Int(8, 8), 12f))
+        {
+            throw new InvalidOperationException("A threat on or inside the defense radius was rejected.");
+        }
+
+        if (ReactiveBaseDefenseThreatRange.IsWithinRadius(
+                new UnityEngine.Vector2Int(0, 0), new UnityEngine.Vector2Int(13, 0), 12f) ||
+            ReactiveBaseDefenseThreatRange.IsWithinRadius(
+                new UnityEngine.Vector2Int(0, 0), new UnityEngine.Vector2Int(9, 9), 12f) ||
+            ReactiveBaseDefenseThreatRange.IsWithinRadius(
+                new UnityEngine.Vector2Int(0, 0), new UnityEngine.Vector2Int(0, 0), -1f) ||
+            ReactiveBaseDefenseThreatRange.IsWithinRadius(
+                new UnityEngine.Vector2Int(0, 0), new UnityEngine.Vector2Int(0, 0), Single.NaN) ||
+            ReactiveBaseDefenseThreatRange.IsWithinRadius(
+                new UnityEngine.Vector2Int(0, 0), new UnityEngine.Vector2Int(0, 0), Single.PositiveInfinity))
+        {
+            throw new InvalidOperationException("An out-of-radius or invalid-radius threat was accepted.");
+        }
+    }),
     ("scheduled base-build AI parser rejects unknown duplicate and null parameters", () =>
     {
         ContentModuleParameter[][] invalidInputs =

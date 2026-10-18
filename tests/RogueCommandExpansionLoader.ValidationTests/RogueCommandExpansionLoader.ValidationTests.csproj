@@ -51,6 +51,8 @@
              Link="Modules/ScheduledBaseBuildParameters.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Modules/ReactiveBaseDefenseParameters.cs"
              Link="Modules/ReactiveBaseDefenseParameters.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Modules/ReactiveBaseDefenseThreatRange.cs"
+             Link="Modules/ReactiveBaseDefenseThreatRange.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Modules/HarvesterRaiderParameters.cs"
              Link="Modules/HarvesterRaiderParameters.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Modules/SiegeAssaultParameters.cs"

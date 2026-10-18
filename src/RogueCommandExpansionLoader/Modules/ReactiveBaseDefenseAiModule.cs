@@ -159,7 +159,6 @@ namespace RogueCommandExpansionLoader.Modules
                     return false;
                 }
 
-                float maximumDistanceSquared = _settings.DefenseRadiusCells * _settings.DefenseRadiusCells;
                 foreach (EntityController playerUnit in playerUnits)
                 {
                     if (playerUnit == null || playerUnit.IsDestroyed || playerUnit.DestroyHasBeenStarted ||
@@ -178,8 +177,8 @@ namespace RogueCommandExpansionLoader.Modules
                         continue;
                     }
 
-                    float attackOrderDistance = GridDistanceSquared(playerUnit.CurrentCell, target.CurrentCell);
-                    if (attackOrderDistance > maximumDistanceSquared)
+                    if (!ReactiveBaseDefenseThreatRange.IsWithinRadius(
+                        playerUnit.CurrentCell, target.CurrentCell, _settings.DefenseRadiusCells))
                     {
                         continue;
                     }
@@ -300,9 +299,12 @@ namespace RogueCommandExpansionLoader.Modules
                         continue;
                     }
 
-                    float buildingDistance = GridDistanceSquared(defender.CurrentCell, building.CurrentCell);
-                    float attackerDistance = GridDistanceSquared(defender.CurrentCell, attacker.CurrentCell);
-                    if (buildingDistance > _settings.DefenseRadiusCells * _settings.DefenseRadiusCells)
+                    float buildingDistance = ReactiveBaseDefenseThreatRange.DistanceSquared(
+                        defender.CurrentCell, building.CurrentCell);
+                    float attackerDistance = ReactiveBaseDefenseThreatRange.DistanceSquared(
+                        defender.CurrentCell, attacker.CurrentCell);
+                    if (!ReactiveBaseDefenseThreatRange.IsWithinRadius(
+                        defender.CurrentCell, building.CurrentCell, _settings.DefenseRadiusCells))
                     {
                         continue;
                     }
@@ -318,13 +320,6 @@ namespace RogueCommandExpansionLoader.Modules
                 }
 
                 return nearestAttacker != null;
-            }
-
-            private static float GridDistanceSquared(Vector2Int first, Vector2Int second)
-            {
-                float x = first.x - second.x;
-                float y = first.y - second.y;
-                return x * x + y * y;
             }
 
             private static bool ContainsReference(List<EntityController> entities, EntityController target)
