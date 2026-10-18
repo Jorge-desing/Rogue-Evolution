@@ -1619,7 +1619,8 @@ def create_unity_locator_sockets(
 
     1. Socket_MuzzlePrimary: Main weapon firing point and projectile exit vector.
     2. Socket_MuzzleSecondary: Secondary weapon (coax/pintle/missile) firing point.
-    3. Socket_TurretYaw / Socket_TurretPivot: Horizontal azimuth rotation axis.
+    3. Socket_TurretPivot: Horizontal azimuth rotation axis. Do not emit its legacy
+       Socket_TurretYaw alias in the same hierarchy; both names bind the same runtime role.
     4. Socket_TurretPitch: Vertical elevation pivot axis.
     5. Socket_RecoilPrimary: Linear impulse slide axis for barrel recoil animation.
     6. Socket_SensorOptics / Socket_SensorEye: Targeting visor and sensor beam origin.
@@ -1628,7 +1629,8 @@ def create_unity_locator_sockets(
     9. Socket_DamageFire: Catastrophic damage flame particle spawner (25% HP threshold).
     10. Socket_CenterOfMass: Rigidbody physics center of mass.
     11. Socket_GroundContact / Socket_GroundCenter: Ground contact projection (Z=0) for selection rings.
-    12. Socket_RadarMast / Socket_RadarDish: 360-degree radar mast sweep origin.
+    12. Socket_RadarMast: 360-degree radar mast sweep pivot. Do not also emit the
+        legacy Socket_RadarDish alias in the same hierarchy.
     13. Socket_Hardpoint_<Type>: Modular equipment mounts (ERA, APS, Sponsons, FuelDrums).
     14. Socket_Antenna: Whip antenna mounting root for dynamic inertial wobble simulation.
     15. Socket_ThrusterVector_L / Socket_ThrusterVector_R: Articulated VTOL/dropship vector thrusters.
@@ -1658,7 +1660,6 @@ def create_unity_locator_sockets(
     # 3. Turret Yaw
     if turret_loc is not None:
         t_loc = Vector(turret_loc)
-        _add_empty("Socket_TurretYaw", t_loc)
         _add_empty("Socket_TurretPivot", t_loc)
 
     # 4. Turret Pitch
@@ -1703,11 +1704,9 @@ def create_unity_locator_sockets(
     if radar_loc is not None:
         r_loc = Vector(radar_loc)
         _add_empty("Socket_RadarMast", r_loc)
-        _add_empty("Socket_RadarDish", r_loc + Vector((0.0, 0.0, 0.35)))
     elif turret_loc is not None:
         r_loc = Vector(turret_loc) + Vector((-0.25, -0.30, 0.45))
         _add_empty("Socket_RadarMast", r_loc)
-        _add_empty("Socket_RadarDish", r_loc + Vector((0.0, 0.0, 0.35)))
 
     # 10. Modular Hardpoints
     hp_dict = dict(hardpoints) if hardpoints else {}
@@ -1780,7 +1779,8 @@ def batch_and_join_by_material(
 ) -> list[bpy.types.Object]:
     """Combines modular kitbashed objects by material into unified meshes.
     
-    Dramatically reduces draw calls in Unity (e.g. from 80+ GameObjects to 4-6).
+    Reduces the number of Blender mesh objects/material groups exported. Final
+    Unity draw-call counts depend on the selected prefab source, passes, and settings.
     Objects whose names match or contain strings in `preserve_names` remain separate.
     When `smooth_by_angle` is True, applies Blender 4.5 angle-weighted auto-smoothing,
     giving perfectly rounded cylinders/wheels/barrels while preserving crisp chamfers.
@@ -4960,7 +4960,7 @@ def bake_pbr_texture_atlas(
     resolution: int = 1024,
     palette: FactionPalette | None = None,
 ) -> dict[str, Path]:
-    """Bakes unified PBR texture maps (Albedo, MetallicGloss, Normal, Emission) for 1-draw-call rendering."""
+    """Bakes unified PBR texture maps (Albedo, MetallicGloss, Normal, Emission) for atlas meshes."""
     output_dir.mkdir(parents=True, exist_ok=True)
     maps = {}
 
@@ -5138,7 +5138,7 @@ def create_single_material_atlas_model(
     texture_maps: dict[str, Path],
     output_fbx_path: Path,
 ) -> bpy.types.Object:
-    """Combines all meshes into a single unified object with exactly 1 PBR atlas material (1 draw call in Unity)."""
+    """Combines source meshes into one object with one PBR atlas material slot."""
     valid_mesh_objs = [o for o in source_objects if o.type == "MESH" and not o.name.endswith(("_COLLIDER", "_ShieldBubble"))]
     if not valid_mesh_objs:
         raise ValueError("No mesh objects available for single-material atlas creation")
@@ -5445,6 +5445,141 @@ def hex_to_rgb(hex_code: str) -> Tuple[float, float, float]:
     return (0.5, 0.5, 0.5)
 
 
+def apply_procedural_camouflage(
+    material: bpy.types.Material,
+    base_color: Tuple[float, float, float],
+    secondary_color: Tuple[float, float, float],
+    accent_color: Tuple[float, float, float] | None = None,
+    camo_type: str = "splinter",
+    scale: float = 1.0,
+    contrast: float = 1.0,
+) -> None:
+    """Attaches a procedural mathematical camouflage generator node tree to the material's Base Color."""
+    if not math.isfinite(scale) or scale < 0.1 or scale > 10.0:
+        raise ValueError("Camouflage scale must be finite and between 0.1 and 10.0.")
+    if not math.isfinite(contrast) or contrast < 0.0 or contrast > 4.0:
+        raise ValueError("Camouflage contrast must be finite and between 0.0 and 4.0.")
+
+    if not material or not material.use_nodes:
+        return
+    tree = material.node_tree
+    bsdf = tree.nodes.get("Principled BSDF")
+    if not bsdf or "Base Color" not in bsdf.inputs:
+        return
+
+    # Use Object coordinates for seamless 3D spatial coherence across adjacent parts
+    tex_coord = tree.nodes.new("ShaderNodeTexCoord")
+    c = camo_type.lower()
+    midpoint = tuple((base_color[i] + secondary_color[i]) * 0.5 for i in range(3))
+
+    def contrast_adjusted(color: Tuple[float, float, float]) -> Tuple[float, float, float]:
+        return tuple(
+            max(0.0, min(1.0, midpoint[i] + (color[i] - midpoint[i]) * contrast))
+            for i in range(3)
+        )
+
+    base_color = contrast_adjusted(base_color)
+    secondary_color = contrast_adjusted(secondary_color)
+    if accent_color is not None:
+        accent_color = contrast_adjusted(accent_color)
+
+    if c == "splinter":
+        # Sharp angular Voronoi shards
+        vor = tree.nodes.new("ShaderNodeTexVoronoi")
+        vor.feature = "F1"
+        vor.distance = "MANHATTAN"
+        vor.inputs["Scale"].default_value = 3.6 * max(0.1, scale)
+        ramp = tree.nodes.new("ShaderNodeValToRGB")
+        ramp.color_ramp.interpolation = "CONSTANT"
+        ramp.color_ramp.elements[0].position = 0.0
+        ramp.color_ramp.elements[0].color = (*base_color, 1.0)
+        e1 = ramp.color_ramp.elements.new(0.38)
+        e1.color = (*secondary_color, 1.0)
+        e2 = ramp.color_ramp.elements.new(0.72)
+        tertiary = accent_color or (base_color[0] * 0.45, base_color[1] * 0.45, base_color[2] * 0.45)
+        e2.color = (*tertiary, 1.0)
+        tree.links.new(tex_coord.outputs["Object"], vor.inputs["Vector"])
+        tree.links.new(vor.outputs["Distance"], ramp.inputs["Fac"])
+        tree.links.new(ramp.outputs["Color"], bsdf.inputs["Base Color"])
+
+    elif c == "digital":
+        # Stepped orthogonal cellular grid (pixelated/voxel camo)
+        vor = tree.nodes.new("ShaderNodeTexVoronoi")
+        vor.distance = "CHEBYCHEV"
+        vor.inputs["Scale"].default_value = 5.8 * max(0.1, scale)
+        vor.inputs["Randomness"].default_value = 0.0
+        ramp = tree.nodes.new("ShaderNodeValToRGB")
+        ramp.color_ramp.interpolation = "CONSTANT"
+        ramp.color_ramp.elements[0].position = 0.0
+        ramp.color_ramp.elements[0].color = (*base_color, 1.0)
+        e1 = ramp.color_ramp.elements.new(0.46)
+        e1.color = (*secondary_color, 1.0)
+        tree.links.new(tex_coord.outputs["Object"], vor.inputs["Vector"])
+        tree.links.new(vor.outputs["Distance"], ramp.inputs["Fac"])
+        tree.links.new(ramp.outputs["Color"], bsdf.inputs["Base Color"])
+
+    elif c == "tigerstripe":
+        # Directional wavy brushstroke bands
+        wave = tree.nodes.new("ShaderNodeTexWave")
+        wave.wave_type = "BANDS"
+        wave.bands_direction = "X"
+        wave.inputs["Scale"].default_value = 2.8 * max(0.1, scale)
+        wave.inputs["Distortion"].default_value = 7.5
+        wave.inputs["Detail"].default_value = 2.0
+        ramp = tree.nodes.new("ShaderNodeValToRGB")
+        ramp.color_ramp.interpolation = "LINEAR"
+        ramp.color_ramp.elements[0].position = 0.35
+        ramp.color_ramp.elements[0].color = (*base_color, 1.0)
+        ramp.color_ramp.elements[1].position = 0.65
+        ramp.color_ramp.elements[1].color = (*secondary_color, 1.0)
+        tree.links.new(tex_coord.outputs["Object"], wave.inputs["Vector"])
+        tree.links.new(wave.outputs["Color"], ramp.inputs["Fac"])
+        tree.links.new(ramp.outputs["Color"], bsdf.inputs["Base Color"])
+
+    else:
+        # Desert, urban, arctic, woodland, jungle: multi-frequency fractal noise blotches
+        noise = tree.nodes.new("ShaderNodeTexNoise")
+        noise.inputs["Scale"].default_value = 2.4 * max(0.1, scale)
+        noise.inputs["Detail"].default_value = 3.0
+        noise.inputs["Roughness"].default_value = 0.52
+        ramp = tree.nodes.new("ShaderNodeValToRGB")
+        ramp.color_ramp.interpolation = "LINEAR"
+        ramp.color_ramp.elements[0].position = 0.38
+        ramp.color_ramp.elements[0].color = (*base_color, 1.0)
+        ramp.color_ramp.elements[1].position = 0.62
+        ramp.color_ramp.elements[1].color = (*secondary_color, 1.0)
+        tree.links.new(tex_coord.outputs["Object"], noise.inputs["Vector"])
+        tree.links.new(noise.outputs["Fac"], ramp.inputs["Fac"])
+        tree.links.new(ramp.outputs["Color"], bsdf.inputs["Base Color"])
+
+
+def apply_procedural_normal_relief(
+    material: bpy.types.Material,
+    scale: float = 1.0,
+    strength: float = 0.75,
+) -> None:
+    """Attaches a procedural panel seam groove and relief bump network to the material's Normal socket."""
+    if not material or not material.use_nodes:
+        return
+    tree = material.node_tree
+    bsdf = tree.nodes.get("Principled BSDF")
+    if not bsdf or "Normal" not in bsdf.inputs:
+        return
+
+    tex_coord = tree.nodes.new("ShaderNodeTexCoord")
+    vor = tree.nodes.new("ShaderNodeTexVoronoi")
+    vor.feature = "DISTANCE_TO_EDGE"
+    vor.inputs["Scale"].default_value = 3.8 * max(0.1, scale)
+
+    bump = tree.nodes.new("ShaderNodeBump")
+    bump.inputs["Strength"].default_value = strength
+    bump.inputs["Distance"].default_value = 0.04
+
+    tree.links.new(tex_coord.outputs["Object"], vor.inputs["Vector"])
+    tree.links.new(vor.outputs["Distance"], bump.inputs["Height"])
+    tree.links.new(bump.outputs["Normal"], bsdf.inputs["Normal"])
+
+
 class FactionPalette:
     """Pre-calibrated 5-tone PBR material set for a Rogue Command faction."""
 
@@ -5458,7 +5593,18 @@ class FactionPalette:
         warning_color: Tuple[float, float, float],
         emissive_color: Tuple[float, float, float],
         emissive_strength: float = 2.0,
+        camo: str = "none",
+        camo_scale: float = 1.0,
+        camo_contrast: float = 1.0,
+        enable_normal_relief: bool = True,
+        normal_intensity: float = 1.0,
     ):
+        self.camo = camo
+        self.camo_scale = camo_scale
+        self.camo_contrast = camo_contrast
+        self.enable_normal_relief = enable_normal_relief
+        self.normal_intensity = normal_intensity
+
         self.primary_armor = make_material(f"{name}_PrimaryArmor", primary_color, metallic=0.42, roughness=0.58)
         self.light_armor = make_material(f"{name}_LightArmor", light_color, metallic=0.34, roughness=0.60)
         self.gunmetal = make_material(f"{name}_Gunmetal", gunmetal_color, metallic=0.78, roughness=0.30)
@@ -5471,6 +5617,32 @@ class FactionPalette:
             emission_color=emissive_color, emission_strength=emissive_strength
         )
 
+        c = camo.lower()
+        if c != "none":
+            apply_procedural_camouflage(
+                self.primary_armor,
+                base_color=primary_color,
+                secondary_color=light_color,
+                accent_color=warning_color,
+                camo_type=c,
+                scale=camo_scale,
+                contrast=camo_contrast,
+            )
+            apply_procedural_camouflage(
+                self.light_armor,
+                base_color=light_color,
+                secondary_color=primary_color,
+                accent_color=warning_color,
+                camo_type=c,
+                scale=camo_scale * 1.25,
+                contrast=camo_contrast,
+            )
+
+        if enable_normal_relief and normal_intensity > 0.0:
+            apply_procedural_normal_relief(self.primary_armor, scale=1.0, strength=0.75 * normal_intensity)
+            apply_procedural_normal_relief(self.light_armor, scale=1.2, strength=0.65 * normal_intensity)
+            apply_procedural_normal_relief(self.gunmetal, scale=1.5, strength=0.50 * normal_intensity)
+
 
 def get_faction_palette(
     faction: str = "vanguard",
@@ -5479,6 +5651,10 @@ def get_faction_palette(
     primary_override: Tuple[float, float, float] | None = None,
     light_override: Tuple[float, float, float] | None = None,
     emissive_override: Tuple[float, float, float] | None = None,
+    camo_scale: float = 1.0,
+    camo_contrast: float = 1.0,
+    enable_normal_relief: bool = True,
+    normal_intensity: float = 1.0,
 ) -> FactionPalette:
     """Returns a pre-calibrated 5-tone PBR material set with optional custom color overrides."""
     c = camo.lower()
@@ -5580,7 +5756,11 @@ def get_faction_palette(
     if emissive_override is not None:
         e_col = emissive_override
 
-    return FactionPalette(prefix, p_col, l_col, g_col, t_col, w_col, e_col, e_str)
+    return FactionPalette(
+        prefix, p_col, l_col, g_col, t_col, w_col, e_col, e_str,
+        camo=c, camo_scale=camo_scale, camo_contrast=camo_contrast,
+        enable_normal_relief=enable_normal_relief, normal_intensity=normal_intensity,
+    )
 
 
 class RogueVehicleBuilder:
@@ -5591,7 +5771,7 @@ class RogueVehicleBuilder:
     - 1-segment chamfers on all hard edges for RTS specular highlights
     - Exact ground contact at Z >= 0.0m
     - Strict coaxial weapon alignment
-    - Automated draw-call batching to 4-6 submeshes
+    - Groups exportable meshes by material while preserving requested pivots; output group counts depend on the inputs
     - Automated quality diagnostics and multi-perspective studio previews
     """
 
@@ -5604,8 +5784,18 @@ class RogueVehicleBuilder:
         primary_override: Tuple[float, float, float] | None = None,
         light_override: Tuple[float, float, float] | None = None,
         emissive_override: Tuple[float, float, float] | None = None,
+        camo_scale: float = 1.0,
+        camo_contrast: float = 1.0,
+        enable_normal_relief: bool = True,
+        normal_intensity: float = 1.0,
     ):
         self.name = name
+        self.faction = faction
+        self.camo = camo
+        self.camo_scale = camo_scale
+        self.camo_contrast = camo_contrast
+        self.enable_normal_relief = enable_normal_relief
+        self.normal_intensity = normal_intensity
         self.palette = get_faction_palette(
             faction,
             name,
@@ -5613,6 +5803,10 @@ class RogueVehicleBuilder:
             primary_override=primary_override,
             light_override=light_override,
             emissive_override=emissive_override,
+            camo_scale=camo_scale,
+            camo_contrast=camo_contrast,
+            enable_normal_relief=enable_normal_relief,
+            normal_intensity=normal_intensity,
         )
         self.ground_clearance = ground_clearance
         self.objects: list[bpy.types.Object] = []
@@ -5654,6 +5848,47 @@ class RogueVehicleBuilder:
 
     def set_wear_level(self, wear_level: str) -> "RogueVehicleBuilder":
         self.wear_level = wear_level
+        return self
+
+    def set_camo(
+        self,
+        camo: str,
+        scale: float = 1.0,
+        contrast: float = 1.0,
+    ) -> "RogueVehicleBuilder":
+        self.camo = camo
+        self.camo_scale = scale
+        self.camo_contrast = contrast
+        self.palette = get_faction_palette(
+            self.faction,
+            self.name,
+            camo=camo,
+            camo_scale=scale,
+            camo_contrast=contrast,
+            enable_normal_relief=self.enable_normal_relief,
+            normal_intensity=self.normal_intensity,
+        )
+        return self
+
+    def set_camo_params(self, scale: float = 1.0, contrast: float = 1.0) -> "RogueVehicleBuilder":
+        return self.set_camo(self.camo, scale=scale, contrast=contrast)
+
+    def set_normal_params(
+        self,
+        enabled: bool = True,
+        intensity: float = 1.0,
+    ) -> "RogueVehicleBuilder":
+        self.enable_normal_relief = enabled
+        self.normal_intensity = intensity
+        self.palette = get_faction_palette(
+            self.faction,
+            self.name,
+            camo=self.camo,
+            camo_scale=self.camo_scale,
+            camo_contrast=self.camo_contrast,
+            enable_normal_relief=enabled,
+            normal_intensity=intensity,
+        )
         return self
 
     def add_colliders(
@@ -6876,8 +7111,9 @@ class RogueVehicleBuilder:
             smooth_angle_deg=smooth_angle_deg,
         )
 
-        # 10. Texture Atlas Baking & Single-Material Export (1 Draw Call)
-        if bake_atlas:
+        # 10. Texture Atlas Baking & Single-Material Export
+        effective_bake_atlas = bake_atlas or (self.camo and self.camo != "none")
+        if effective_bake_atlas:
             tex_dir = fbx_path.parent / "Textures"
             tex_maps = bake_pbr_texture_atlas(
                 batched_objects, self.name, tex_dir,
@@ -7012,6 +7248,10 @@ class RogueStructureBuilder:
         primary_override: Tuple[float, float, float] | None = None,
         light_override: Tuple[float, float, float] | None = None,
         emissive_override: Tuple[float, float, float] | None = None,
+        camo_scale: float = 1.0,
+        camo_contrast: float = 1.0,
+        enable_normal_relief: bool = True,
+        normal_intensity: float = 1.0,
     ):
         self.name = name
         self.building_type = building_type.lower()
@@ -7022,6 +7262,10 @@ class RogueStructureBuilder:
             primary_override=primary_override,
             light_override=light_override,
             emissive_override=emissive_override,
+            camo_scale=camo_scale,
+            camo_contrast=camo_contrast,
+            enable_normal_relief=enable_normal_relief,
+            normal_intensity=normal_intensity,
         )
         self.objects: list[bpy.types.Object] = []
         self.sockets: dict[str, Vector] = {}
@@ -7158,6 +7402,9 @@ class RogueStructureBuilder:
         render_icons: bool = False,
         icon_resolutions: Sequence[int] = (64, 128),
         icon_elevation: float = 45.0,
+        bake_atlas: bool = False,
+        atlas_resolution: int = 1024,
+        single_material_atlas: bool = False,
     ) -> dict[str, Any]:
         blend_path.parent.mkdir(parents=True, exist_ok=True)
         fbx_path.parent.mkdir(parents=True, exist_ok=True)
@@ -7192,6 +7439,21 @@ class RogueStructureBuilder:
             smooth_by_angle=smooth_by_angle,
             smooth_angle_deg=smooth_angle_deg,
         )
+
+        if bake_atlas or single_material_atlas or (self.palette.camo and self.palette.camo != "none"):
+            texture_dir = fbx_path.parent / "Textures"
+            texture_maps = bake_pbr_texture_atlas(
+                batched_objects,
+                self.name,
+                texture_dir,
+                resolution=atlas_resolution,
+                palette=self.palette,
+            )
+            diagnostics["texture_maps"] = {key: str(path) for key, path in texture_maps.items()}
+            if single_material_atlas:
+                atlas_fbx_path = fbx_path.parent / f"{fbx_path.stem}_Atlas.fbx"
+                create_single_material_atlas_model(batched_objects, self.name, texture_maps, atlas_fbx_path)
+                diagnostics["atlas_fbx_path"] = str(atlas_fbx_path)
 
         export_objects = list(batched_objects)
         export_objects.extend(self.locator_sockets)

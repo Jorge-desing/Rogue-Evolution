@@ -382,19 +382,8 @@ Encodes four distinct surface and gameplay properties into the single `Color` ve
 - **Channel B (Blue)**: Thermal Soot. Radial gradient darkening ($0.25$–$0.65$) around exhaust pipes and cannon muzzles.
 - **Channel A (Alpha)**: Team Color Mask. $1.0$ for primary and light armor surfaces (allowing dynamic team-color tinting in Unity); $0.0$ for fixed mechanical gunmetal, tread rubber, and hazard stripes.
 
-### B. Standardized 11-Socket Gameplay Hierarchy (`create_unity_locator_sockets`)
-Exports standardized empty transforms into the FBX matching Rogue Command vehicle & weapon mechanics:
-1. `Socket_MuzzlePrimary`: Main weapon firing point and projectile exit vector.
-2. `Socket_MuzzleSecondary`: Secondary coaxial/pintle/missile firing point.
-3. `Socket_TurretYaw` / `Socket_TurretPivot`: Horizontal azimuth rotation axis.
-4. `Socket_TurretPitch`: Vertical elevation pivot axis.
-5. `Socket_RecoilPrimary`: Linear impulse slide axis for barrel recoil animation.
-6. `Socket_SensorOptics` / `Socket_SensorEye`: Targeting visor and sensor beam origin.
-7. `Socket_Exhaust_L` / `Socket_Exhaust_R`: Engine exhaust particle emitters.
-8. `Socket_DamageSmoke`: Engine deck damage particle spawner (50% HP threshold).
-9. `Socket_DamageFire`: Catastrophic damage flame particle spawner (25% HP threshold).
-10. `Socket_CenterOfMass`: Rigidbody physics center of mass.
-11. `Socket_GroundContact` / `Socket_GroundCenter`: Ground projection ($Z=0$) for selection rings.
+### B. Conditional Canonical Gameplay Socket Families (`create_unity_locator_sockets`)
+Exports only the canonical empty transforms for coordinates and features supplied to the authoring call; the count varies by model. Families include primary/secondary muzzles, one turret azimuth pivot, pitch and recoil pivots, sensor optics, exhausts, damage effects, center of mass, ground projection, a radar mast pivot, optional hardpoints, antenna pivot, and left/right thruster vectors. `Socket_TurretPivot` is the emitted azimuth name (`Socket_TurretYaw` is a legacy alias); `Socket_RadarMast` is the emitted sweep name (`Socket_RadarDish` is a legacy alias). Do not emit both aliases for the same behavior role: the runtime deliberately disables ambiguous roles.
 
 ### C. Companion Gameplay Metadata JSON (`export_gameplay_metadata`)
 Generates a sidecar `<Name>.gameplay.json` specifying engine wiring:
@@ -542,7 +531,7 @@ To elevate procedural unit models to commercial RTS asset parity, four new core 
   - `MetallicGloss` (Metallic in RGB, Smoothness in Alpha).
   - `Normal` (Tangent-space normal vector map).
   - `Emission` (Optics, plasma coils, and indicator lights).
-- **Single-Material Mesh Collapse**: `create_single_material_atlas_model(...)` joins all batched parts into a unified mesh `<Name>_Atlas.fbx` with exactly **1 material slot**. In dense combat with 40+ units on screen, this reduces GPU draw call pressure from ~400 draw calls down to ~40 draw calls.
+- **Single-Material Mesh Collapse**: `create_single_material_atlas_model(...)` joins batched parts into a unified mesh `<Name>_Atlas.fbx` with one material slot. This is an authoring result, not a measured Unity draw-call count. The prefab builder can select an animated primary FBX or valid `_LODs.fbx` ahead of the atlas; runtime submissions also depend on Unity passes and rendering settings.
 
 ### B. Skeletal Armature Rigging & Procedural Animation System
 - **Kinematic Armature Creation**: `generate_procedural_armature(model_name, objects)` builds a complete hierarchical bone skeleton:
@@ -880,4 +869,15 @@ To rigorously verify all newly introduced capabilities and functions against com
    - *Correction*: Added explicit mappings: `colossus_titan` $\rightarrow$ `["GatlingWalker"]` (bipedal walker locomotion), `hover_cruiser` $\rightarrow$ `["PCXBaseTank"]`, and `heavy_dropship` $\rightarrow$ `["PCXBaseTank"]`.
 3. **Environmental Biome Pipeline Clarification**:
    - *Audit*: Verified that `--biome` operates strictly as an authoring-time palette and weathering preset baked into textures and vertex colors. No unverified runtime scene heuristic tinting is performed since the native game executes within a unified `Game` scene without distinct per-biome scene names.
+## 21. Review of the Ten Latest Skill Commits (2026-10-18)
 
+The 3D authoring skill was audited against the ten commits that most recently changed it: `018be99`, `09071b8`, `f058f64`, `6acf023`, `1faf694`, `315a5b9`, `8a0e16e`, `c9df159`, `9987f91`, and `3da76ac`. Static source review found and corrected these mismatches:
+
+- CLI lists now match accepted values for archetypes, structures, weapons, and presets. `orbital_silo` is a supported structure type; the socket guidance distinguishes canonical roles from aliases and prohibits emitting both aliases for one role.
+- `RogueModelKit.py` and `generate_unit_model.py` under the skill are synchronized byte-for-byte with their `tools/` sources. The generator emits one turret-pivot role and one radar role rather than separate alias transforms.
+- `--camo-contrast` now adjusts procedural pattern colors around the midpoint of the selected faction colors; accepted scale is `0.1–10.0`, contrast `0.0–4.0`, and normal intensity `0.0–4.0`. `--panel-lines` and `--no-panel-lines` both work, with relief enabled by default. These values are forwarded in single, batch, and structure generation. `--bake-normals` requests the complete atlas bake because the atlas path emits all PBR maps; `--single-material` also enables that bake.
+- Single-material export guarantees one material slot on the authored atlas mesh only. It does not guarantee one draw call. The prefab builder selects an animated primary FBX first, then a valid LOD FBX, then the atlas/base fallback. Instancing merely opts materials into a compatible Unity instancing path.
+- Prefab guidance now matches the builder: it reuses recursively found sockets, creates root fallbacks only for missing sockets, converts named `_COLLIDER` meshes to disabled-renderer box colliders, and uses metadata bounds only when no dedicated collider was converted. It prefers `RogueCommand/VehiclePBR_VertexWear` when available and falls back to Standard.
+- Structure generation now receives the same camo scale/contrast and panel-relief settings and can produce the requested PBR atlas and single-material FBX.
+
+**Evidence status:** static inspection confirmed the implementation paths. Blender 4.5.14 dry-runs parsed vehicle and structure controls without generating meshes; a Blender node check confirmed contrast changes the pattern-ramp colors and panel-relief toggles add/remove bump nodes for both builders. Python syntax checks passed. These checks do not establish atlas baking, Unity import, AssetBundle appearance, draw-call performance, or Steam gameplay.

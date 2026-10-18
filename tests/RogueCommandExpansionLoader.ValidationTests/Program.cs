@@ -680,6 +680,31 @@ var tests = new (string Name, Action Run)[]
             }
         }
     }),
+    ("production-building fallback eligibility follows its produced unit", () =>
+    {
+        var factoryRow = new ProductionBuildingEligibilityTestRow();
+        ProductionBuildingEligibility.ApplyToFactoryRow(
+            new ContentUnitDefinition { isAllowedAsStartingBlueprint = true, isAllowedForDemo = false },
+            factoryRow,
+            typeof(ProductionBuildingEligibilityTestRow).GetField(nameof(factoryRow.isAllowedAsStartingBlueprint))!,
+            typeof(ProductionBuildingEligibilityTestRow).GetField(nameof(factoryRow.isAllowedForDemo))!);
+
+        if (!factoryRow.isAllowedAsStartingBlueprint || factoryRow.isAllowedForDemo ||
+            factoryRow.isAllowedAsBlueprint)
+        {
+            throw new InvalidOperationException(
+                "A production building must inherit the product's start-deck and demo eligibility without becoming a regular blueprint by itself.");
+        }
+
+        factoryRow = new ProductionBuildingEligibilityTestRow();
+        ProductionBuildingEligibility.ApplyToFactoryRow(
+            new ContentUnitDefinition { isAllowedAsStartingBlueprint = false, isAllowedForDemo = true },
+            factoryRow,
+            typeof(ProductionBuildingEligibilityTestRow).GetField(nameof(factoryRow.isAllowedAsStartingBlueprint))!,
+            typeof(ProductionBuildingEligibilityTestRow).GetField(nameof(factoryRow.isAllowedForDemo))!);
+        if (factoryRow.isAllowedAsStartingBlueprint || !factoryRow.isAllowedForDemo)
+            throw new InvalidOperationException("Demo and starting-deck permissions were not copied independently.");
+    }),
     ("unit production buildings are mandatory and cannot share entity IDs", () =>
     {
         WithPackage(sample, (pack, root) =>
@@ -884,6 +909,10 @@ var tests = new (string Name, Action Run)[]
             profile.unitEntries == null || !profile.unitEntries.Any(entry =>
                 entry != null && entry.unitId == "sample-native:skirmish-bike" && entry.baseIndex == 0 &&
                 entry.countAtStart == 1 && entry.maxLiving == 1) ||
+            profile.modules == null || !profile.modules.Any(module =>
+                module != null && module.moduleId == "sample:reactive-base-defense" && module.parameters != null &&
+                module.parameters.Any(parameter => parameter != null && parameter.name == "unitId" &&
+                    parameter.value == "sample-native:skirmish-bike")) ||
             stage.aiProfileIds == null || !stage.aiProfileIds.Contains("sample-reactive-ai:base-defense"))
         {
             throw new InvalidOperationException("The counterstrike stage does not add the bike to its player and AI rosters.");
@@ -1391,20 +1420,23 @@ var tests = new (string Name, Action Run)[]
     {
         if (!ReactiveBaseDefenseParameterParser.TryParse(null, out ReactiveBaseDefenseSettings defaults,
             out string diagnostic) || diagnostic != null || defaults.BaseIndex != 0 ||
-            defaults.CooldownSeconds != 1f || defaults.DefenseRadiusCells != 12f || defaults.MaximumResponders != 2)
+            defaults.UnitId != null || defaults.CooldownSeconds != 1f || defaults.DefenseRadiusCells != 12f ||
+            defaults.MaximumResponders != 2)
         {
             throw new InvalidOperationException("The reactive AI parser did not return its documented defaults.");
         }
 
         ContentModuleParameter[] boundaries =
         [
+            new ContentModuleParameter { name = "unitId", value = "sample-native:skirmish-bike" },
             new ContentModuleParameter { name = "baseIndex", value = "31" },
             new ContentModuleParameter { name = "cooldownSeconds", value = "60" },
             new ContentModuleParameter { name = "defenseRadiusCells", value = "64" },
             new ContentModuleParameter { name = "maxResponders", value = "4" }
         ];
         if (!ReactiveBaseDefenseParameterParser.TryParse(boundaries, out ReactiveBaseDefenseSettings maximums,
-            out diagnostic) || diagnostic != null || maximums.BaseIndex != 31 || maximums.CooldownSeconds != 60f ||
+            out diagnostic) || diagnostic != null || maximums.UnitId != "sample-native:skirmish-bike" ||
+            maximums.BaseIndex != 31 || maximums.CooldownSeconds != 60f ||
             maximums.DefenseRadiusCells != 64f || maximums.MaximumResponders != 4)
         {
             throw new InvalidOperationException("The reactive AI parser rejected valid upper-bound values.");
@@ -1419,6 +1451,13 @@ var tests = new (string Name, Action Run)[]
             [null!],
             [new ContentModuleParameter { name = "baseIndex", value = "32" }],
             [new ContentModuleParameter { name = "maxResponders", value = "5" }],
+            [new ContentModuleParameter { name = "unitId", value = "" }],
+            [new ContentModuleParameter { name = "unitId", value = ":" }],
+            [new ContentModuleParameter { name = "unitId", value = ":bike" }],
+            [new ContentModuleParameter { name = "unitId", value = "sample:" }],
+            [new ContentModuleParameter { name = "unitId", value = "sample::bike" }],
+            [new ContentModuleParameter { name = "unitId", value = "sample:bad/id" }],
+            [new ContentModuleParameter { name = "unitId", value = new string('a', 129) }],
             [new ContentModuleParameter { name = "cooldownSeconds", value = "NaN" }],
             [new ContentModuleParameter { name = "defenseRadiusCells", value = "Infinity" }]
         ];
@@ -1489,19 +1528,36 @@ var tests = new (string Name, Action Run)[]
             CanAttackAndIsAttackEnabled = true,
             CanMoveAndMovementIsEnabled = true,
             IsCombatUnit = true,
+            entityId = "sample-native:skirmish-bike",
             CurrentPlayerCommandName = EntityCommand.Command.DoNothing,
             aiBaseIndex = 0,
             CurrentCell = new UnityEngine.Vector2Int(12, 10),
             UniqueEntityId = 300,
             gameObject = new UnityEngine.GameObject("Idle AI Defender")
         };
+        var closerNativeDefender = new EntityController
+        {
+            IsControlledByAi = true,
+            IsUnit = true,
+            CanAttackAndIsAttackEnabled = true,
+            CanMoveAndMovementIsEnabled = true,
+            IsCombatUnit = true,
+            entityId = "native:combat-unit",
+            CurrentPlayerCommandName = EntityCommand.Command.DoNothing,
+            aiBaseIndex = 0,
+            CurrentCell = new UnityEngine.Vector2Int(10, 10),
+            UniqueEntityId = 301,
+            gameObject = new UnityEngine.GameObject("Closer Native Defender")
+        };
         ExistingControllers.Instance.PlayerUnits().Add(attacker);
         ExistingControllers.Instance.AiUnits().Add(target);
         ExistingControllers.Instance.AiUnits().Add(defender);
+        ExistingControllers.Instance.AiUnits().Add(closerNativeDefender);
 
         var module = new ReactiveBaseDefenseAiModule();
         var parameters = new ContentModuleParameter[]
         {
+            new() { name = "unitId", value = "sample-native:skirmish-bike" },
             new() { name = "baseIndex", value = "0" },
             new() { name = "cooldownSeconds", value = "1" },
             new() { name = "defenseRadiusCells", value = "12" },
@@ -1513,7 +1569,7 @@ var tests = new (string Name, Action Run)[]
         behaviour.OnInitialized();
         behaviour.Tick();
 
-        if (defender.LastExecutedCommand == null ||
+        if (defender.LastExecutedCommand == null || closerNativeDefender.LastExecutedCommand != null ||
             defender.LastExecutedCommand.description != "Reactive base defense" ||
             defender.LastExecutedCommand.position.x != attacker.Position.x ||
             defender.LastExecutedCommand.position.z != attacker.Position.z ||
@@ -3072,4 +3128,11 @@ sealed class SkipTestException : Exception
     public SkipTestException(string message) : base(message)
     {
     }
+}
+
+sealed class ProductionBuildingEligibilityTestRow
+{
+    public bool isAllowedAsBlueprint = false;
+    public bool isAllowedAsStartingBlueprint = false;
+    public bool isAllowedForDemo = false;
 }

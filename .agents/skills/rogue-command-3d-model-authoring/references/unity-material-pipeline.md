@@ -136,7 +136,7 @@ Each playable unit requires a matching card Sprite referenced by `cardImageAsset
 
 ## 6. PBR Texture Atlas Pipeline & Linear Importer Rules
 
-For maximum RTS performance, the pipeline bakes multiple object materials into a single unified PBR texture set, collapsing draw calls to 1 per unit:
+The pipeline can bake multiple object materials into one PBR texture set and assign one material slot to the atlas mesh. This may reduce material and renderer overhead; it does not guarantee one draw call per unit. The prefab builder prefers an animated primary FBX, then a valid `_LODs.fbx`, and only then the atlas, while Unity passes and render settings also affect runtime submissions.
 
 ### A. Texture Maps & Channel Layout
 

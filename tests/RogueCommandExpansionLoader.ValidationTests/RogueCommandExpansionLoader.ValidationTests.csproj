@@ -15,6 +15,8 @@
              Link="Content/UnitLocalizationResolver.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Content/EntityControllerIdentity.cs"
              Link="Content/EntityControllerIdentity.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Content/ProductionBuildingEligibility.cs"
+             Link="Content/ProductionBuildingEligibility.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Content/ContentPackValidation.cs"
              Link="Content/ContentPackValidation.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Content/StageGenerationCompatibility.cs"

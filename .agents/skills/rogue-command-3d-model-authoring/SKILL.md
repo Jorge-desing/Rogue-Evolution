@@ -11,9 +11,9 @@ Use this skill to design, model, texture, and export original, high-readability 
 
 ## Verified implementation boundaries
 
-Treat current source and pinned Unity import evidence as authoritative. The CLI exposes 19 mobile archetypes, five strategic structure types, 14 presets, and nine weapon choices. `--lod` reports polygon-budget diagnostics; `--lods` builds the LOD chain. The editable `.blend` retains canonical locator empties and antenna parenting, and is saved before vertex-wear baking and material batching. `--biome` is an authoring-time palette alias used when `--camo` is `none`; it does not apply dynamic in-game biome adaptation. The `digital`, `splinter`, and `tigerstripe` palette values select solid material colors rather than procedural camouflage masks. Vertex-color channels require a compatible Unity shader to produce their intended appearance. Authored archetypes and visual rigs do not grant flight, weapon logic, or native controller behavior to a cloned gameplay unit.
+Treat current source and pinned Unity import evidence as authoritative. The CLI exposes 19 mobile archetypes, five strategic structure types, 14 presets, and nine weapon choices. `--lod` reports polygon-budget diagnostics; `--lods` builds the LOD chain. The editable `.blend` retains canonical locator empties and antenna parenting, and is saved before vertex-wear baking and material batching. `--camo` builds Blender node-based patterns; the named styles use Voronoi or wave patterns, while desert/urban/arctic/woodland use procedural noise. `--biome` selects an authoring-time palette alias when `--camo` is `none`; it does not apply dynamic in-game biome adaptation. Unity appearance requires the relevant atlas to be baked and imported, and is not runtime biome behavior. Vertex-color channels require a compatible Unity shader to produce their intended appearance. Authored archetypes and visual rigs do not grant flight, weapon logic, or native controller behavior to a cloned gameplay unit.
 
-For material import and prefab construction, follow sections 6–7 of [Unity Material Pipeline](references/unity-material-pipeline.md). For exact unprefixed socket names and runtime visual behavior, follow section 4 of [Native Hierarchy & Pivots](references/native-hierarchy-and-pivots.md). The procedural authoring changes and their runtime limits are recorded in sections 9–18 of `docs/research/3D-MODEL-AUTHORING-ENHANCEMENTS.md`.
+For material import and prefab construction, follow sections 6–7 of [Unity Material Pipeline](references/unity-material-pipeline.md). For exact unprefixed socket names and runtime visual behavior, follow section 4 of [Native Hierarchy & Pivots](references/native-hierarchy-and-pivots.md). The procedural authoring changes and their runtime limits are recorded in sections 9–21 of `docs/research/3D-MODEL-AUTHORING-ENHANCEMENTS.md`.
 
 ## 1. Preserve and Use the Established Authoring Path
 
@@ -28,6 +28,7 @@ Before making any changes, review the project rules and handoffs:
   - Visual prefabs and materials: `unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/`
   - High-resolution render previews and temporary diagnostics: ignored `artifacts/previews/` and `artifacts/`
   - Distributable bundles: `content/packs/<pack-id>/bundles/*.bundle`
+  - The skill copies of `RogueModelKit.py` and `generate_unit_model.py` must remain byte-identical to their `tools/` sources.
 - **Zero Remote Dependencies**: The local Blender executable (`.tools/Blender-4.5.14/.../blender.exe`) and deterministic Python scripts (`bpy`) are the supported authoring tools. Do not require Blender MCP or external 3D subscription services.
 
 ---
@@ -133,15 +134,15 @@ Use the tested, high-readability procedural assemblies rather than ad-hoc mesh p
 | | `make_armor_applique_array` | Array of Explosive Reactive Armor (ERA) tiles with standoff mounting bolts |
 | | `make_hex_bolt_array` | Low-poly 6-sided bolt heads placed along armor seams and flanges |
 | | `make_dozer_blade` | Heavy frontal ram blade with hydraulic push rams |
-| | `create_unity_locator_sockets`| Procedural 11-socket Unity hierarchy (Muzzles, TurretYaw/Pitch, Recoil, Exhausts, Optics, DamageSmoke/Fire, CenterOfMass, Ground) |
+| | `create_unity_locator_sockets`| Conditional canonical socket families for weapons, pivots, sensors, effects, hardpoints, antennae, and thrusters; it does not emit a fixed socket count |
 | | `generate_collision_hulls` | Low-poly physics collision hulls (`<Prefix>_COLLIDER_Hull`, `<Prefix>_COLLIDER_Turret`) |
 | | `generate_lod_chain` | Multi-level LOD mesh hierarchy (LOD0 100%, LOD1 50%, LOD2 22%) for Unity `LODGroup` |
 | | `make_wreckage_variant` | Procedural burned wreckage model with dislodged turret, drooped barrel, and charred armor |
 | | `export_gameplay_metadata` | Companion `.gameplay.json` with `visualRootPath`, collider bounds, turret kinematics, and sockets |
 
 ### Draw-Call Optimization via Material Batching & Smart Smoothing
-Kitbashing produces 50–120 individual objects. In Unity, each object creates a separate GameObject and draw call unless unified. Always pass models through `batch_and_join_by_material(objects, prefix, preserve_names, smooth_by_angle=True, smooth_angle_deg=38.0)` before export:
-- **Draw Call Reduction**: Combines meshes by their PBR material slot into 4–6 unified submeshes while preserving essential animated pivots (`TurretBase`, `MainBarrel`).
+Kitbashing produces 50–120 individual objects. Unbatched exports can create many Unity renderers and render submissions. Pass compatible geometry through `batch_and_join_by_material(objects, prefix, preserve_names, smooth_by_angle=True, smooth_angle_deg=38.0)` before export:
+- **Material Batching**: Combines compatible meshes by PBR material while preserving essential animated pivots (`TurretBase`, `MainBarrel`). Output mesh groups depend on input materials and preserved objects. This Blender-side step does not establish the final Unity draw-call count.
 - **Smart Angle-Weighted Smoothing**: Uses Blender 4.5's `shade_smooth_by_angle` to produce silky smooth round barrels, road wheels, hubs, and exhaust pipes, while preserving razor-sharp 45°/90° chamfers on flat armor plates.
 - **Multi-Channel Procedural Vertex Shading**: Invokes `bake_advanced_vertex_shading(objects, wear_level, exhaust_locs, muzzle_loc)` storing RGBA directly into the `Color` vertex attribute (`Mesh.colors32`):
   - **R (Red)**: Ambient Occlusion / Cavity Dirt (contact shadows in wheel wells, louvers, and undersides).
@@ -222,12 +223,17 @@ Run headless vehicle generation directly from the command line using Blender and
 
 - **Mobile Archetypes (19)**: `tank`, `walker`, `bike`, `artillery`, `arc_tank`, `hover`, `spider`, `vtol`, `halftrack`, `super_heavy`, `buggy`, `flak_anti_air`, `siege_crawler`, `drone_carrier`, `quad_mech`, `combat_harvester`, `colossus_titan`, `hover_cruiser`, and `heavy_dropship`.
 - **Strategic Structure Types (5)**: `factory`, `defense_turret`, `radar_station`, `energy_silo`, and `orbital_silo`. These are generated through the structure builder, separate from the 19 mobile archetypes.
-- **Weapons (9 Total)**: `cannon` (ballistic tank gun), `autocannon` / `gatling` (rotary 6-barrel), `dual_autocannon` / `dual_cannon` (twin synchronized barrels), `missile` / `missile_pod` (honeycomb pod), `howitzer` (siege howitzer), `arc` / `energy_beam` (plasma cathode & prongs), `railgun` (electromagnetic kinetic rails with capacitor energy bank), `quad_flak` (anti-air 2x2 flak autocannon cluster with flash hiders), `plasma_mortar` (heavy siege mortar with 3 magnetic toroidal accelerator rings).
+- **Weapons (9 CLI values)**: `cannon`, `gatling`, `missile`, `arc`, `howitzer`, `dual_cannon`, `railgun`, `quad_flak`, and `plasma_mortar`. These are the exact values accepted by `--weapon`; descriptive names such as autocannon or missile pod are not CLI aliases.
 - **Factions**: `vanguard` (slate teal), `siege` (rust ochre), `syndicate` (deep cobalt), `arctic` (tundra navy).
-- **Palette Variants**: `none`, `desert`, `urban`, `arctic`, `woodland`, `digital`, `splinter`, and `tigerstripe` select solid material color sets. They do not generate camouflage patterns or runtime biome behavior.
+- **Camouflage Variants**: `digital`, `splinter`, and `tigerstripe` build procedural Voronoi/wave color patterns; `desert`, `urban`, `arctic`, and `woodland` use a procedural noise pattern with faction colors. These Blender node graphs can be baked to the atlas. They do not adapt to the map's runtime biome.
 - **Biome Palette Alias**: `--biome desert|arctic|woodland|urban` applies the corresponding authoring-time color palette only when `--camo` remains `none`; it does not adapt to a map's runtime biome.
 - **Surface Wear Levels**: `pristine` (factory clean), `field_tested` (moderate edge scratches and road grime), `battle_hardened` (heavy combat gouges, exhaust soot, and cavity dirt).
 - **Presets (14 Total)**:
+  - `siege_breaker`: Heavy assault vehicle preset for breaking fortified positions.
+  - `recon_interceptor`: Fast recon and interception vehicle preset.
+  - `gunship_alpha`: VTOL gunship preset.
+  - `apc_enforcer`: Armored personnel carrier preset.
+  - `dune_raider`: Fast desert raider preset.
   - `colossus_titan`: Colossal bipedal war walker with dual heavy cannons, pauldrons, radar, and whip antenna.
   - `sea_lance`: Syndicate heavy hover cruiser gunboat with railgun turret, sponsons, and recon radar.
   - `sky_dreadnought`: Heavy VTOL assault dropship with multi-tube missile pods, tilt-rotors, and whip antenna.
@@ -237,18 +243,18 @@ Run headless vehicle generation directly from the command line using Blender and
   - `hive_carrier`: Drone carrier with wide flight deck, bridge tower, rotodome, and missile defense.
   - `titan_quad`: Quad mech with heavy rotary gatling guns and articulated spider legs.
   - `resource_behemoth`: Combat harvester with front rotary excavator drum and ore hoppers.
-  - `scout`: Fast recon buggy with dual rotary gatlings.
-  - `brawler`: Armored medium tank with main cannon and side skirts.
-  - `artillery_battery`: Long-range artillery platform with heavy siege howitzer and stabilizers.
-  - `missile_support`: Mobile missile launcher with elevated missile pod.
-  - `vtol_patrol`: Agile ducted tilt-rotor gunship with chin gatling and missile pods.
 - **Optimization & Engine Flags**:
   - `--lods`: Generates multi-level LOD chain (LOD0 100%, LOD1 50%, LOD2 22%) and exports `_LODs.fbx`.
   - `--colliders`: Generates low-poly physics collision boxes (`_COLLIDER_Hull`, `_COLLIDER_Turret`).
   - `--gameplay-json`: Exports companion `.gameplay.json` with kinematics, collider bounds, sockets, and damage triggers.
   - `--wreckage`: Exports battle-damaged / burned wreckage variant `_Wreckage.fbx` and `-wreckage.blend`.
   - `--target-budget <int>`: Sets target triangle budget for subsystem profiling (default: 4000).
-  - `--report-json <path>`: Exports comprehensive structural report JSON with polygon counts, draw calls, LODs, colliders, and subsystem breakdown.
+  - `--bake-atlas`: Bakes Albedo, MetallicGloss, Normal, and Emission maps. A non-`none` camouflage choice also requests an atlas.
+  - `--bake-normals`: Requests the same full PBR atlas bake; the pipeline always emits the normal map with the atlas.
+  - `--single-material`: Exports `<Name>_Atlas.fbx` with one material slot and enables atlas baking. This does not guarantee one Unity draw call.
+  - `--camo-scale <0.1–10.0>` and `--camo-contrast <0.0–4.0>`: Adjust procedural pattern scale and color separation. Defaults are `1.0`.
+  - `--panel-lines` / `--no-panel-lines`: Enable or disable the procedural Blender bump relief (default enabled); `--normal-intensity <0.0–4.0>` sets its strength. Bake the atlas to carry this surface detail into Unity textures.
+  - `--report-json <path>`: Exports structural diagnostics with polygon counts, estimated batching/draw-call data, LODs, colliders, and subsystem breakdown.
   - `--dry-run`: Validates CLI parameters and prints planned vehicle configuration without running Blender meshing operations.
   - `--batch-all-archetypes`: Builds all 19 archetypes sequentially into the output directory with a tabular console summary.
 - **Micro-Detail & Greeble CLI Flags**:
@@ -327,7 +333,7 @@ When the Unity project scaffolds the prefab and builds the AssetBundle:
 
 1. **Standard Shader Compatibility**: Use `Shader.Find("Standard")` to ensure consistent lighting with game scenes.
 2. **The Emission Invariant**: Setting `_EmissionColor` is not enough; you must explicitly call `material.EnableKeyword("_EMISSION")` and set `globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive`.
-3. **GPU Instancing**: Always enable `material.enableInstancing = true` so dozens of units sharing the 5-tone materials render in batched GPU draw calls.
+3. **GPU Instancing**: The prefab builder sets `material.enableInstancing = true` on materials without an atlas. This opts materials into Unity GPU instancing when the shader, render path, and renderer setup support it; it does not guarantee batching or a lower draw-call count.
 4. **Script-Free Prefabs**: Visual prefabs must contain **no** `MonoBehaviour` components. The loader enforces fail-closed rejection on any missing or custom scripts.
 
 *See C# implementation details in [unity-material-pipeline.md](references/unity-material-pipeline.md).*
@@ -374,14 +380,14 @@ Follow this strict progression when creating or modifying 3D models:
 
 The extended authoring pipeline provides four production-grade optimization and gameplay pillars:
 
-### A. Texture Atlas Baking & 1-Draw-Call Optimization (`--bake-atlas`, `--single-material`)
+### A. Texture Atlas Baking & Single-Material Export (`--bake-atlas`, `--single-material`)
 - **Non-Overlapping Atlas UV Unwrapping**: `unwrap_atlas_uvs(objects, island_margin=0.02)` projects smart UV coordinates with parameterized island padding.
 - **Fast Cycles PBR Baking**: Headless 1-sample Cycles baking generates four synchronized PBR texture maps in `<Project>/Models/Textures/`:
   - `<Name>_Albedo.png`: Diffuse color map with faction palette, camouflage patterns, and wear baked in.
   - `<Name>_MetallicGloss.png`: RGB metallic and smoothness channels matching Unity Standard shader layout.
   - `<Name>_Normal.png`: Tangent-space normal map baking geometric bevels and surface relief.
   - `<Name>_Emission.png`: Isolated emissive mask for glowing sensors, plasma cores, and optics.
-- **1-Draw-Call Mesh Output**: `--single-material` merges all batched objects into `<Name>_Atlas.fbx` with a single unified material slot, collapsing vehicle draw calls from 8–10 down to exactly **1 draw call** per unit on screen.
+- **Single-Material Mesh Output**: `--single-material` joins batched geometry into `<Name>_Atlas.fbx` with one material slot. This does not guarantee one draw call per unit: the prefab builder prefers an animated primary FBX, then a valid `_LODs.fbx`, and only then the atlas; Unity passes and render settings also affect runtime submissions.
 
 ### B. Skeletal Armature Rigging & Procedural Animation Clips (`--rig`, `--animate`)
 - **Kinematic Bone Hierarchy**: `generate_procedural_armature(model_name, objects)` builds a complete mechanical armature:
@@ -401,11 +407,11 @@ The extended authoring pipeline provides four production-grade optimization and 
 ### D. Unity Prefab & AssetBundle Bridge (`VehiclePrefabBuilder.cs`)
 - **Automated C# Editor Scaffolder**: `unity/RogueCommandAssetAuthoring/Assets/Editor/VehiclePrefabBuilder.cs` bridges procedural Blender output and `.gameplay.json` into game-ready Unity prefabs.
 - **Automatic Asset Wiring**:
-  - Automatically locates `<Name>_Atlas.fbx` or `<Name>.fbx`.
+  - Selects the primary FBX when it contains animation clips, otherwise a valid `_LODs.fbx`, then `<Name>_Atlas.fbx`, the primary FBX, or the legacy asset path. A single-material atlas is not always the selected prefab source.
   - Configures TextureImporters (e.g. `TextureImporterType.NormalMap`).
-  - Creates Standard PBR material with `enableInstancing = true` and emission keywords.
-  - Adds `BoxCollider` sized and centered from `.gameplay.json` (translating Blender Z-up to Unity Y-up).
-  - Instantiates child socket transforms for weapon muzzles, pivots, and particle points.
+  - Uses `RogueCommand/VehiclePBR_VertexWear` when available and falls back to Standard; it configures material textures and emission keywords. Instancing is enabled only on the no-atlas material path and is not a batching guarantee.
+  - Converts `_COLLIDER` mesh renderers to box colliders and disables those renderers. If none were converted, it adds the compound `BoxCollider` bounds from `.gameplay.json` (translating Blender Z-up to Unity Y-up).
+  - Reuses matching socket transforms found recursively in the FBX hierarchy; it creates a root-level fallback only when no matching socket exists.
   - Generates `LODGroup` with transition thresholds (0.50, 0.20, 0.05) if multi-level LOD meshes are present.
 - **Headless Batchmode Execution**:
   ```powershell
@@ -426,6 +432,7 @@ Addresses the strict modding rule: *Every added unit must declare its own namesp
   2. `defense_turret`: Static defense installation featuring a stepped octagonal concrete bunker base, armored traverse collar, rotating turret cap with sensor slit, and integrated heavy weapon mount (`cannon`, `quad_flak`, `railgun`).
   3. `radar_station`: Strategic recon and intelligence installation featuring an octagonal command bunker, reinforced roof collar, four-leg structural lattice mast, and motorized parabolic radar dish array with feeder horn.
   4. `energy_silo`: Heavy reactor and resource containment vessel featuring a foundation slab, 4 heavy diagonal buttress support legs, central cylindrical reactor vessel, 3 stepped magnetic containment rings, and quad emissive plasma conduit channels.
+  5. `orbital_silo`: Strategic orbital defense installation with a reinforced launch aperture, blast doors, umbilical gantry, and exhaust trench.
 - **CLI Usage**:
   ```powershell
   python tools/generate_unit_model.py --structure --building-type factory --name VanguardFactory --colliders --gameplay-json
@@ -470,16 +477,16 @@ Automated headless rendering pipeline generating transparent alpha PNG tactical 
 
 ---
 
-## 11. In-Game Runtime Automation (`RuntimeVisualDirector` & Socket Mechanics)
+## 11. RuntimeVisualDirector Integration (Static Implementation; Steam Validation Pending)
 
-All models authored with the procedural toolchain come to life inside the running game through the loader's autonomous `RuntimeVisualDirector` component (`RogueCommandExpansionLoader.Runtime.Visual.RuntimeVisualDirector`). Injected at combat runtime via Harmony postfix on `EntityFactory.InstantiateEntity`, it requires zero MonoBehaviour serialization inside AssetBundles, operates via zero-configuration socket auto-discovery, and binds to native CIL properties verified via Reverse Engineer Anything (REA).
+The loader contains a `RuntimeVisualDirector` component (`RogueCommandExpansionLoader.Runtime.Visual.RuntimeVisualDirector`) that is attached by a Harmony postfix on `EntityFactory.InstantiateEntity` when a spawned object exposes supported sockets or animation state. It requires no serialized custom MonoBehaviour in AssetBundles and resolves pinned game members verified through Reverse Engineer Anything (REA). Static source and binary inspection do not prove Unity prefab import, visual animation, or behavior in a Steam-launched match; treat the table below as implemented code paths that still require runtime validation.
 
 ### A. Socket-to-Gameplay Runtime Binding Map
 
-| Authored Socket | In-Game Runtime Behavior & Logic |
+| Authored Socket | Intended Runtime Behavior in the Current Code |
 | :--- | :--- |
-| `Socket_TurretPivot` / `Socket_TurretYaw` | **Procedural Target Tracking**: Smoothly tracks the entity's hostile target in horizontal azimuth at 120°/s using authoritative native target properties (`CurrentAttackTarget`, `EntityAttack._attackTarget`, and `CurrentFollowTarget`). Jams with $+4.5^\circ$ mechanical seizure tilt at $\le 25\%$ HP. |
-| `Socket_RadarMast` / `Socket_RadarDish` | **Continuous Radar Sweep**: Rotates continuously around its local up axis at 30 RPM during match uptime. |
+| `Socket_TurretPivot` | **Procedural Target Tracking**: Source code tracks the entity's hostile target in horizontal azimuth at 120°/s using native target properties (`CurrentAttackTarget`, `EntityAttack._attackTarget`, and `CurrentFollowTarget`). It applies the configured low-health tilt at $\le 25\%$ HP. `Socket_TurretYaw` remains a legacy alias; do not emit both names for one role. |
+| `Socket_RadarMast` | **Radar Sweep**: Source code rotates this role around its local up axis at 30 RPM. `Socket_RadarDish` remains a legacy alias; do not emit both names for one role. |
 | `Socket_DamageSmoke` | **50% HP Damage Transition**: Spawns volumetric smoke particles when native `HealthRatio <= 0.50f` and switches to `<Name>_Damaged` mesh (or applies procedural soot tint via `MaterialPropertyBlock` if no variant exists). Jettisons auxiliary `FuelDrums`. |
 | `Socket_DamageFire` | **25% HP Critical Seizure**: Spawns flame particles (cloning native `EntityController.onFireParticleSystem`) and dynamic point light, burns out APS, and tilts `Socket_TurretPivot` to simulate traverse ring seizure. |
 | `Socket_Deploy_Unit` | **Factory Rollout Animation**: Detects active unit production via `InProductionCount > 0` and `productionHasStarted` / `queuedCount > 0`, smoothly sliding bay door upward by 1.4 m during production rollout. |

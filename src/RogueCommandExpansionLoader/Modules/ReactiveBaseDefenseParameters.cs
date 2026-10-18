@@ -7,6 +7,7 @@ namespace RogueCommandExpansionLoader.Modules
 {
     internal struct ReactiveBaseDefenseSettings
     {
+        public string UnitId;
         public int BaseIndex;
         public float CooldownSeconds;
         public float DefenseRadiusCells;
@@ -44,7 +45,7 @@ namespace RogueCommandExpansionLoader.Modules
                     return false;
                 }
 
-                if (parameter.name != "baseIndex" && parameter.name != "cooldownSeconds" &&
+                if (parameter.name != "unitId" && parameter.name != "baseIndex" && parameter.name != "cooldownSeconds" &&
                     parameter.name != "defenseRadiusCells" && parameter.name != "maxResponders")
                 {
                     diagnostic = "Unknown parameter '" + parameter.name + "' for module " + ModuleId + ".";
@@ -58,6 +59,13 @@ namespace RogueCommandExpansionLoader.Modules
                 }
 
                 values.Add(parameter.name, parameter.value);
+            }
+
+            string unitId;
+            if (values.TryGetValue("unitId", out unitId) && !IsSafeEntityId(unitId))
+            {
+                diagnostic = "unitId must be a non-empty game entity ID containing only ASCII letters, digits, ':', '.', '_', or '-'.";
+                return false;
             }
 
             int baseIndex;
@@ -93,6 +101,7 @@ namespace RogueCommandExpansionLoader.Modules
 
             settings = new ReactiveBaseDefenseSettings
             {
+                UnitId = unitId,
                 BaseIndex = baseIndex,
                 CooldownSeconds = cooldownSeconds,
                 DefenseRadiusCells = defenseRadiusCells,
@@ -138,6 +147,39 @@ namespace RogueCommandExpansionLoader.Modules
 
             return Single.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out result) &&
                 !Single.IsNaN(result) && !Single.IsInfinity(result) && result >= minimum && result <= maximum;
+        }
+
+        private static bool IsSafeEntityId(string value)
+        {
+            if (String.IsNullOrWhiteSpace(value) || value.Length > 128)
+            {
+                return false;
+            }
+
+            int namespaceSeparator = -1;
+            for (int i = 0; i < value.Length; i++)
+            {
+                char character = value[i];
+                if (character == ':')
+                {
+                    if (i == 0 || i == value.Length - 1 || namespaceSeparator >= 0)
+                    {
+                        return false;
+                    }
+
+                    namespaceSeparator = i;
+                    continue;
+                }
+
+                bool valid = character >= 'a' && character <= 'z' || character >= 'A' && character <= 'Z' ||
+                    character >= '0' && character <= '9' || character == '.' || character == '_' || character == '-';
+                if (!valid)
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
     }
 }

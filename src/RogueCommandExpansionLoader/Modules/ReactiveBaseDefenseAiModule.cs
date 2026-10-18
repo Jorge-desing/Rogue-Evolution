@@ -129,7 +129,7 @@ namespace RogueCommandExpansionLoader.Modules
                         committedResponders.Add(defender);
                         _responsesIssued++;
                         Debug.Log("[RogueCommandExpansionLoader] AI base " + _settings.BaseIndex +
-                            " dispatched '" + defender.gameObject.name + "' to counterattack '" +
+                            " dispatched '" + defender.gameObject.name + "' (" + defender.EntityId + ") to counterattack '" +
                             attacker.gameObject.name + "' (" + _responsesIssued + "/" +
                             _settings.MaximumResponders + ").");
                     }
@@ -242,7 +242,9 @@ namespace RogueCommandExpansionLoader.Modules
                 {
                     if (candidate == null || candidate.IsDestroyed || candidate.DestroyHasBeenStarted ||
                         !candidate.IsControlledByAi || !candidate.IsUnit ||
-                        candidate.aiBaseIndex != _settings.BaseIndex || committedResponders.Contains(candidate))
+                        candidate.aiBaseIndex != _settings.BaseIndex ||
+                        (_settings.UnitId != null && !String.Equals(candidate.EntityId, _settings.UnitId, StringComparison.Ordinal)) ||
+                        committedResponders.Contains(candidate))
                     {
                         continue;
                     }

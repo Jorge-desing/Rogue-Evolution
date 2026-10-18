@@ -3622,7 +3622,8 @@ namespace RogueCommandExpansionLoader.Content
             _imageLocationField.SetValue(row, nativeImagePath);
             _inactiveField.SetValue(row, false);
             _allowedBlueprintField.SetValue(row, false);
-            _allowedStartingBlueprintField.SetValue(row, false);
+            ProductionBuildingEligibility.ApplyToFactoryRow(product, row,
+                _allowedStartingBlueprintField, _allowedForDemoField);
             _factoryForEntityIdField.SetValue(row, CreateNullableString(product.id));
             temporaryResources.Add(prefabKey, nativePrefabClone);
 

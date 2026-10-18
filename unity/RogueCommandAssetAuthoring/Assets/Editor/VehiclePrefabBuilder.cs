@@ -1032,21 +1032,25 @@ namespace RogueCommandExpansion.Authoring
             // Create or load Atlas Material
             string matPath = MaterialFolder + "/" + unitName + "_Atlas.mat";
             Material mat = AssetDatabase.LoadAssetAtPath<Material>(matPath);
-            Shader standardShader = Shader.Find("Standard");
-            if (standardShader == null)
+            Shader targetShader = Shader.Find("RogueCommand/VehiclePBR_VertexWear");
+            if (targetShader == null)
             {
-                throw new InvalidOperationException("Unity's Standard shader is unavailable for " + unitName + ".");
+                targetShader = Shader.Find("Standard");
+            }
+            if (targetShader == null)
+            {
+                throw new InvalidOperationException("Neither RogueCommand/VehiclePBR_VertexWear nor Standard shader is available for " + unitName + ".");
             }
 
             if (mat == null)
             {
-                mat = new Material(standardShader);
+                mat = new Material(targetShader);
                 mat.name = unitName + "_Atlas";
                 AssetDatabase.CreateAsset(mat, matPath);
             }
             else
             {
-                mat.shader = standardShader;
+                mat.shader = targetShader;
             }
 
             mat.mainTexture = albedoTex;

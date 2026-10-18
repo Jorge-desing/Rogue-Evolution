@@ -42,6 +42,7 @@
         {
           "moduleId": "sample:reactive-base-defense",
           "parameters": [
+            { "name": "unitId", "value": "sample-native:skirmish-bike" },
             { "name": "baseIndex", "value": "0" },
             { "name": "cooldownSeconds", "value": "1" },
             { "name": "defenseRadiusCells", "value": "12" },

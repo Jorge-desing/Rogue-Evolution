@@ -481,7 +481,7 @@ dozer = rmk.make_dozer_blade(
 
 ## 7. Draw-Call Batching, Smart Smoothing & Cavity Baking
 
-Procedural kitbashing produces 50–120 individual objects. In Unity, each object becomes an independent GameObject and draw call unless batched.
+Procedural kitbashing produces 50–120 individual objects. If left unbatched, imported geometry can create many Unity objects and renderers. Batching compatible meshes reduces object and material overhead, but does not by itself establish the runtime draw-call count.
 
 ### A. Material Batching with Smart Angle Smoothing
 `batch_and_join_by_material` unifies meshes sharing the same PBR material into 4–6 batched submeshes while preserving designated animated/gameplay pivots:
@@ -497,7 +497,7 @@ optimized_objects = rmk.batch_and_join_by_material(
 ```
 
 - **Smart Angle-Weighted Smoothing**: Uses Blender 4.5's `bpy.ops.object.shade_smooth_by_angle` to produce silky smooth round barrels, road wheels, hubs, and exhaust pipes, while preserving razor-sharp 45°/90° chamfers on flat armor plates.
-- **Draw Call Reduction**: Reduces Unity draw calls from ~100 to ~5.
+- **Batching Estimate**: The authoring report estimates fewer mesh/material groups after batching; confirm actual draw calls in Unity with the selected prefab source and rendering settings.
 - **Clean Normals**: Re-evaluates outward normals consistently and strips non-manifold seams.
 
 ### B. Multi-Channel Procedural Vertex Shading (`bake_advanced_vertex_shading`)

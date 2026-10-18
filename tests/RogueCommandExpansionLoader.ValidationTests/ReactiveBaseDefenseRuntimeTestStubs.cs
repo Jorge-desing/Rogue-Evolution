@@ -22,6 +22,8 @@ public sealed class EntityController
     public bool IsTargetInRange { get; set; }
     public bool IsBuilding { get; set; }
     public int aiBaseIndex { get; set; }
+    public string EntityId { get => entityId; set => entityId = value; }
+    public string entityId { get; set; }
     public int UniqueEntityId { get; set; }
     public Vector2Int CurrentCell { get; set; }
     public Vector3 Position { get; set; }

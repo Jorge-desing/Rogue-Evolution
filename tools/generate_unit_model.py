@@ -4,20 +4,24 @@ Usage with Blender 4.5.14 LTS:
     .\\.tools\\Blender-4.5.14\\...\\blender.exe --background --python tools\\generate_unit_model.py -- [options]
 
 Archetypes:
-    tank, walker, bike, artillery, arc_tank, hover, spider, vtol, halftrack, super_heavy, buggy
+    tank, walker, bike, artillery, arc_tank, hover, spider, vtol, halftrack, super_heavy, buggy,
+    flak_anti_air, siege_crawler, drone_carrier, quad_mech, combat_harvester,
+    colossus_titan, hover_cruiser, heavy_dropship
 
 Weapons:
-    cannon, gatling, missile, arc, howitzer, dual_cannon
+    cannon, gatling, missile, arc, howitzer, dual_cannon, railgun, quad_flak, plasma_mortar
 
 Presets:
-    siege_breaker, recon_interceptor, gunship_alpha, apc_enforcer, dune_raider
+    siege_breaker, recon_interceptor, gunship_alpha, apc_enforcer, dune_raider,
+    sky_sweeper, dreadnought_crawler, hive_carrier, titan_quad, resource_behemoth,
+    colossus_titan, sea_lance, sky_dreadnought, orbital_defense
 
 Options:
     --name <UnitName>          Vehicle class name (e.g., ColossusSuperHeavy)
     --archetype <type>         Vehicle archetype (default: tank)
     --faction <faction>        Color palette: 'vanguard', 'siege', 'syndicate', 'arctic'
-    --camo <pattern>           Camouflage variant: 'none', 'desert', 'urban', 'arctic', 'woodland'
-    --weapon <type>            Primary weapon: 'cannon', 'gatling', 'missile', 'arc', 'howitzer', 'dual_cannon'
+    --camo <pattern>           Camouflage variant: 'none', 'desert', 'urban', 'arctic', 'woodland', 'digital', 'splinter', 'tigerstripe'
+    --weapon <type>            Primary weapon subsystem; see --help for exact accepted values
     --preset <preset>          Quick archetype and weapon preset
     --rollcage                 Attach tubular roll cage structure
     --quad-tracks              Attach 4 independent heavy track pods
@@ -216,8 +220,13 @@ def parse_args():
     parser.add_argument("--track-shoes", action="store_true", help="Attach discrete articulated track shoe links along the ground run")
     parser.add_argument("--biome", default="none", choices=["none", "desert", "arctic", "woodland", "urban"], help="Authoring-time palette alias when --camo is none; does not adapt to runtime map biomes")
     parser.add_argument("--bake-atlas", action="store_true", help="Bake unified PBR texture maps (Albedo, MetallicGloss, Normal, Emission)")
+    parser.add_argument("--bake-normals", action="store_true", help="Enable the full PBR atlas bake, which includes the tangent-space normal map")
+    parser.add_argument("--camo-scale", type=float, default=1.0, help="Procedural camouflage pattern scale (0.1–10.0; default 1.0)")
+    parser.add_argument("--camo-contrast", type=float, default=1.0, help="Procedural camouflage color contrast (0.0–4.0; default 1.0)")
+    parser.add_argument("--normal-intensity", type=float, default=1.0, help="Procedural panel-relief bump strength (0.0–4.0; default 1.0)")
+    parser.add_argument("--panel-lines", action=argparse.BooleanOptionalAction, default=True, help="Enable or disable procedural panel seam relief (default: enabled)")
     parser.add_argument("--atlas-resolution", type=int, default=1024, choices=[512, 1024, 2048], help="Resolution for baked texture atlas")
-    parser.add_argument("--single-material", action="store_true", help="Export unified 1-material mesh (<Name>_Atlas.fbx) for 1 draw call in Unity")
+    parser.add_argument("--single-material", action="store_true", help="Export an atlas FBX with one material slot; this does not guarantee one Unity draw call")
     parser.add_argument("--rig", action="store_true", help="Generate kinematic Armature bones and bind meshes with rigid vertex groups")
     parser.add_argument("--animate", action="store_true", help="Bake procedural action animation clips (Idle, Drive, FireRecoil, Death) into FBX")
     parser.add_argument("--vfx-flash", action="store_true", help="Attach star-spike muzzle flash mesh to weapon")
@@ -380,6 +389,11 @@ def build_vehicle_model(
     render_icons: bool = False,
     icon_size: int = 128,
     icon_elevation: float = 45.0,
+    camo_scale: float = 1.0,
+    camo_contrast: float = 1.0,
+    normal_intensity: float = 1.0,
+    panel_lines: bool = True,
+    bake_normals: bool = False,
 ) -> dict:
     rmk.clear_scene()
 
@@ -410,6 +424,10 @@ def build_vehicle_model(
         primary_override=p_override,
         light_override=l_override,
         emissive_override=e_override,
+        camo_scale=camo_scale,
+        camo_contrast=camo_contrast,
+        enable_normal_relief=panel_lines,
+        normal_intensity=normal_intensity,
     )
     builder.set_archetype(archetype)
     builder.set_wear_level(wear)
@@ -857,7 +875,7 @@ def build_vehicle_model(
         include_shield_bubble=shield_bubble,
         include_rig=rig,
         include_animations=animate,
-        bake_atlas=bake_atlas,
+        bake_atlas=bake_atlas or bake_normals or single_material or (camo and camo != "none"),
         atlas_resolution=atlas_resolution,
         single_material_atlas=single_material,
         export_detached_attachments=export_detached_attachments,
@@ -907,6 +925,13 @@ def build_structure_model(
     render_icons: bool = False,
     icon_size: int = 128,
     icon_elevation: float = 45.0,
+    camo_scale: float = 1.0,
+    camo_contrast: float = 1.0,
+    normal_intensity: float = 1.0,
+    panel_lines: bool = True,
+    bake_atlas: bool = False,
+    atlas_resolution: int = 1024,
+    single_material: bool = False,
 ) -> dict:
     rmk.clear_scene()
 
@@ -934,6 +959,10 @@ def build_structure_model(
         primary_override=p_override,
         light_override=l_override,
         emissive_override=e_override,
+        camo_scale=camo_scale,
+        camo_contrast=camo_contrast,
+        enable_normal_relief=panel_lines,
+        normal_intensity=normal_intensity,
     )
 
     bt = building_type.lower()
@@ -962,6 +991,9 @@ def build_structure_model(
         render_icons=render_icons,
         icon_resolutions=(icon_size,),
         icon_elevation=icon_elevation,
+        bake_atlas=bake_atlas or single_material or (camo and camo != "none"),
+        atlas_resolution=atlas_resolution,
+        single_material_atlas=single_material,
     )
 
     print("\n========================================================")
@@ -980,6 +1012,12 @@ def build_structure_model(
 
 def main():
     args = parse_args()
+    if not math.isfinite(args.camo_scale) or not 0.1 <= args.camo_scale <= 10.0:
+        raise SystemExit("--camo-scale must be finite and between 0.1 and 10.0.")
+    if not math.isfinite(args.camo_contrast) or not 0.0 <= args.camo_contrast <= 4.0:
+        raise SystemExit("--camo-contrast must be finite and between 0.0 and 4.0.")
+    if not math.isfinite(args.normal_intensity) or not 0.0 <= args.normal_intensity <= 4.0:
+        raise SystemExit("--normal-intensity must be finite and between 0.0 and 4.0.")
     out_root = resolve_path(args.out_dir, REPO_ROOT) or REPO_ROOT
 
     if args.dry_run:
@@ -989,6 +1027,7 @@ def main():
             print(f"Building Type: {args.building_type}")
             structure_camo = args.camo if args.camo != "none" else args.biome
             print(f"Faction: {args.faction} | Palette: {structure_camo}")
+            print(f"Surface Detail: camo scale={args.camo_scale}, camo contrast={args.camo_contrast}, panel relief={args.panel_lines}, normal intensity={args.normal_intensity}")
             print("Outputs Planned:")
             print(f"  FBX: {args.fbx_path or (out_root / 'unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/Models' / f'{args.name}.fbx')}")
             print(f"  Blend: {args.blend_path or (out_root / 'content/source-art' / f'{args.name.lower()}.blend')}")
@@ -1001,6 +1040,10 @@ def main():
                 print(f"  Colliders: {args.name}_COLLIDER_Base, {args.name}_COLLIDER_Roof")
             if args.render_icons:
                 print(f"  Tactical Icons: {args.icon_size}x{args.icon_size} Top-Down and Isometric")
+            if args.bake_atlas or args.bake_normals or args.single_material or structure_camo != "none":
+                print(f"  Texture Atlas: {args.atlas_resolution}x{args.atlas_resolution} PBR (Albedo, MetallicGloss, Normal, Emission)")
+            if args.single_material:
+                print(f"  Single-material Atlas FBX: {args.name}_Atlas.fbx (one material slot; Unity draw-call count depends on prefab selection and rendering)")
             print("=== Dry run complete. No meshes created. ===\n")
             return
 
@@ -1009,6 +1052,7 @@ def main():
         print(f"Archetype: {args.archetype}")
         vehicle_camo = args.camo if args.camo != "none" else args.biome
         print(f"Faction: {args.faction} | Palette: {vehicle_camo} | Wear: {args.wear}")
+        print(f"Surface Detail: camo scale={args.camo_scale}, camo contrast={args.camo_contrast}, panel relief={args.panel_lines}, normal intensity={args.normal_intensity}")
         print(f"Primary Weapon: {args.weapon}")
         print(f"Subsystems: Skirts={args.skirts}, Rollcage={args.rollcage}, QuadTracks={args.quad_tracks}, TiltRotors={args.tilt_rotors}, Dozer={args.dozer}, Smoke={args.smoke}, Radar={args.radar}, Sponsons={args.sponsons}, Outriggers={args.outriggers}, FlightDeck={args.flight_deck}, ExcavatorDrum={args.excavator_drum}")
         print(f"Micro-Details: Antenna={args.antenna}, Cupola={args.cupola}, Rivets={args.rivets}, TrackShoes={args.track_shoes}")
@@ -1034,10 +1078,11 @@ def main():
             print(f"  Wreckage FBX: {args.name}_Wreckage.fbx")
         if args.damaged_state:
             print(f"  Damaged State FBX: {args.name}_Damaged.fbx")
-        if args.bake_atlas:
+        atlas_requested = args.bake_atlas or args.bake_normals or args.single_material or vehicle_camo != "none"
+        if atlas_requested:
             print(f"  Texture Atlas: {args.atlas_resolution}x{args.atlas_resolution} PBR (Albedo, MetallicGloss, Normal, Emission)")
         if args.single_material:
-            print(f"  Unified Atlas FBX: {args.name}_Atlas.fbx (1 draw call)")
+            print(f"  Single-material Atlas FBX: {args.name}_Atlas.fbx (one material slot; Unity draw-call count depends on prefab selection and rendering)")
         if args.rig:
             print(f"  Armature Rig: {args.name}_Armature (Bone_Hull, Bone_TurretYaw, Bone_TurretPitch, Bone_BarrelRecoil)")
         if args.animate:
@@ -1100,6 +1145,14 @@ def main():
                 lod_diagnostics=args.lod,
                 smooth_angle=args.smooth_angle,
                 multiview=args.multiview,
+                camo_scale=args.camo_scale,
+                camo_contrast=args.camo_contrast,
+                normal_intensity=args.normal_intensity,
+                panel_lines=args.panel_lines,
+                bake_normals=args.bake_normals,
+                bake_atlas=args.bake_atlas,
+                atlas_resolution=args.atlas_resolution,
+                single_material=args.single_material,
             )
             results.append({
                 "archetype": arch,
@@ -1145,6 +1198,13 @@ def main():
             render_icons=args.render_icons,
             icon_size=args.icon_size,
             icon_elevation=args.icon_elevation,
+            camo_scale=args.camo_scale,
+            camo_contrast=args.camo_contrast,
+            normal_intensity=args.normal_intensity,
+            panel_lines=args.panel_lines,
+            bake_atlas=args.bake_atlas or args.bake_normals,
+            atlas_resolution=args.atlas_resolution,
+            single_material=args.single_material,
         )
     else:
         res = build_vehicle_model(
@@ -1188,6 +1248,11 @@ def main():
             smooth_angle=args.smooth_angle,
             multiview=args.multiview,
             bake_atlas=args.bake_atlas,
+            bake_normals=args.bake_normals,
+            camo_scale=args.camo_scale,
+            camo_contrast=args.camo_contrast,
+            normal_intensity=args.normal_intensity,
+            panel_lines=args.panel_lines,
             atlas_resolution=args.atlas_resolution,
             single_material=args.single_material,
             rig=args.rig,
