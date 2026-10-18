@@ -1,238 +1,73 @@
 # Rogue Command 3D Art Style & Color Palette Guide
 
-This guide establishes the visual rules and aesthetic principles for authoring 3D vehicles and unit models that fit seamlessly into Rogue Command's stylized sci-fi RTS world.
+**Updated:** 2026-10-18  
+**Scope:** Aesthetic rules, 3-tier visual hierarchy, 5-tone PBR palette, and bevel physics for Rogue Command.
 
 ---
 
 ## 1. Aesthetic Lineage & Core Philosophy
 
-Rogue Command (developed by **feneq**) is defined by a clean, chunky, hard-surface low-poly aesthetic. Its visual DNA combines:
-
-1. **Kenney-Inspired Modular Primitives**: Geometric vocabulary rooted in modular vehicle kits (faceted hulls, sloped chamfers, cylindrical exhausts, piston brackets, and segmented track skirts).
-2. **High-Readability RTS Stance**: Bold silhouettes optimized for an elevated, angled camera (~45°–60° isometric/orthographic tilt) where units appear between 30 and 120 pixels tall on screen.
-3. **Tactile Machined Surfaces**: Crisp, single-segment chamfers (bevels) on mechanical edges that catch specular sun glints, eliminating the sterile look of pure CAD sharp edges without requiring heavy textures.
-4. **Functional Color Blocking**: A disciplined 5-to-6-tone palette where colors communicate function, team allegiance, and structural hierarchy.
-
----
-
-## 2. Silhouette Readability & The 3-Tier Hierarchy
-
-Every unit must pass the **Squint Test**: when zoomed out or viewed as a solid black silhouette against a neutral gray background, its gameplay role and forward orientation must be immediately identifiable in less than a quarter-second.
-
-```
-+-------------------------------------------------------------+
-| TIER 1: Macro Silhouette (70% of visual read)              |
-| - Overall volume, footprint, aspect ratio, mass balance    |
-| - Identifies archetype: Scout vs Siege vs Mech vs Bike     |
-+-------------------------------------------------------------+
-                              |
-                              v
-+-------------------------------------------------------------+
-| TIER 2: Meso Mechanical Geometry (20% of visual read)       |
-| - Turret shape, track sponsons, engine deck, intake grilles|
-| - Identifies unit function, weapon class, and propulsion   |
-+-------------------------------------------------------------+
-                              |
-                              v
-+-------------------------------------------------------------+
-| TIER 3: Micro High-Contrast Accents (10% of visual read)    |
-| - Emissive lenses, hazard stripes, muzzle brakes, antenna  |
-| - Directs the eye to focal points (sensors, weapons, core) |
-+-------------------------------------------------------------+
-```
-
-### Archetype Silhouette Guidelines
-
-| Archetype | Native Template | Silhouette Features | Proportions (X × Y × Z) | Visual Mass Center |
-|---|---|---|---|---|
-| **Fast Scout** | `PCXBaseTank` | Low profile, sloped frontal glacis, wide stance, elevated sensor mast | ~2.1m × 2.6m × 1.5m | Low and central |
-| **Strike Bike** | `BombBike` | Ultra-narrow two-wheel footprint, aggressive forward rake, outrigger charges | ~1.1m × 2.0m × 1.3m | Forward-leaning, compact |
-| **Heavy Artillery** | `ArtilleryTank` | Broad tracked chassis, rear recoil spade/outriggers, massive elongated cannon barrel | ~2.8m × 3.6m × 1.9m | Rear-biased, heavy ground contact |
-| **Assault Walker** | `GatlingWalker` | Vertical bipedal stance, inverted knee (digitigrade), twin underslung rotary guns | ~2.2m × 2.0m × 2.7m | Upper torso, dynamic vertical |
-| **Surge / Arc Tank** | `LightningTank` | Segmented tracked hull, central toroidal reactor/induction coil, forward emitter prongs | ~2.3m × 2.8m × 1.6m | Central reactor core |
-| **Hover Skimmer** | `PCXBaseTank` | Anti-grav repulsor cushion, ventral thruster bells, lateral stabilizer fins | ~2.5m × 2.9m × 1.6m | Floating ~0.24m–0.45m above ground |
-| **Siege Spider / Quad** | `GatlingWalker` | 4 wide outrigger crawler legs, central turret, heavy hydraulic knee knuckles | ~4.6m × 4.8m × 1.8m | Low, stable wide 4-point footprint |
-| **VTOL Gunship** | `PCXBaseTank` | Sleek lifting body, swept wing sponsons, dual ducted tilt-rotors, canted V-tail | ~3.8m × 4.7m × 1.5m | Central / wing-biased |
-| **Half-Track APC** | `PCXBaseTank` | Front steerable wheels, rear continuous tracks, armored troop cabin with clamshell doors | ~2.2m × 3.8m × 2.2m | Mid-chassis / troop bay |
-| **Super-Heavy Fortress**| `ArtilleryTank` | 4 independent heavy track pods, massive superstructure, dual heavy cannons or howitzer | ~3.3m × 4.6m × 2.4m | Broad, heavy 4-point ground base |
-| **Recon Strike Buggy**| `BombBike` | Wide stance all-terrain tires, tubular roll cage, exposed rear engine, top pintle gun | ~2.3m × 3.2m × 2.2m | Low, agile off-road stance |
+Rogue Command (developed by **feneq**) features a clean, chunky, hard-surface low-poly aesthetic combining Kenney-inspired modularity with high-clarity RTS gameplay:
+1. **High-Readability RTS Stance**: Bold silhouettes optimized for an elevated camera (~45°–60° tilt) where units appear 30–120 pixels tall.
+2. **Single-Segment Chamfers (The Specular Glint Rule)**: Crisp 1-segment bevels (`segments = 1`, `width = 0.02m–0.06m`) with flat shading (`use_smooth = False`) on mechanical edges that catch bright specular sun glints.
+3. **Disciplined 5-Tone Palette**: Solid-color PBR materials communicating function, faction, and structural hierarchy.
+4. **The Squint Test**: Zooming out the viewport until the model is 50px tall must communicate archetype, role, and heading in < 250ms.
 
 ---
 
-## 3. The 5-Tone Color Palette Rule
+## 2. 3-Tier Visual Read & Archetype Proportions
 
-Do not use random color assortments or muddy textures. Rogue Command units use crisp, solid-color PBR materials structured into functional roles:
+- **Tier 1: Macro Silhouette (70%)**: Overall volume, stance, ground clearance, and mass balance.
+- **Tier 2: Meso Mechanical Geometry (20%)**: Continuous track contours, articulated legs, tilt-rotors, engine louvers.
+- **Tier 3: Micro High-Contrast Accents (10%)**: Recessed emissive optics (HDR ×1.5–2.5), hazard stripes, muzzle collars.
 
-```
-+-------------------------------------------------------------------------+
-| [Primary Armor: 40-45%]        [Secondary Light Armor: 20-25%]          |
-| Base faction chassis           Upper deck, turret cheeks, sponson caps  |
-|                                                                         |
-| [Mechanical Gunmetal: 15-20%]  [Functional Tread/Rubber: 10-15%]        |
-| Barrels, frame, exhausts       Treads, road wheels, dark weather seals  |
-|                                                                         |
-| [High-Contrast Warning: 3-5%]  [Emissive Tech / Optics: 1-3%]           |
-| Hazard stripes, battery rails  Sensors, headlights, arc coils (GLOWING) |
-+-------------------------------------------------------------------------+
-```
-
-### Recommended Faction & Camouflage Sets
-
-#### Palette A: Standard Vanguard (Sample-Native Expansion Default)
-- **Primary Armor**: Slate Teal (`#244552` / `RGB(36, 69, 82)`)
-  - *Metallic*: 0.42 | *Smoothness*: 0.63
-- **Secondary Light Armor**: Seafoam Slate (`#435f62` / `RGB(67, 95, 98)`)
-  - *Metallic*: 0.32 | *Smoothness*: 0.60
-- **Mechanical Gunmetal**: Deep Charcoal Steel (`#1b262b` / `RGB(27, 38, 43)`)
-  - *Metallic*: 0.74 | *Smoothness*: 0.70
-- **Tread / Rubber**: Carbon Black (`#161b1e` / `RGB(22, 27, 30)`)
-  - *Metallic*: 0.18 | *Smoothness*: 0.34
-- **Warning Accent**: Signal Amber (`#e86c20` / `RGB(232, 108, 32)`)
-  - *Metallic*: 0.18 | *Smoothness*: 0.64
-- **Emissive Optics**: Arc Cyan (`#1fcdbf` / `RGB(31, 205, 191)`)
-  - *Metallic*: 0.20 | *Smoothness*: 0.76 | *Emissive*: Enabled (HDR ×1.8)
-
-#### Palette B: Heavy Siege / Industrial Outpost
-- **Primary Armor**: Rust Ochre (`#684126` / `RGB(104, 65, 38)`)
-  - *Metallic*: 0.35 | *Smoothness*: 0.50
-- **Secondary Light Armor**: Desert Sand (`#8c6d48` / `RGB(140, 109, 72)`)
-  - *Metallic*: 0.25 | *Smoothness*: 0.55
-- **Mechanical Gunmetal**: Cast Iron (`#1e1f22` / `RGB(30, 31, 34)`)
-  - *Metallic*: 0.80 | *Smoothness*: 0.65
-- **Warning Accent**: Industrial Hazard Yellow (`#f2a91d` / `RGB(242, 169, 29)`)
-  - *Metallic*: 0.15 | *Smoothness*: 0.60
-- **Emissive Optics**: Molten Orange (`#ff5511` / `RGB(255, 85, 17)`)
-  - *Metallic*: 0.10 | *Smoothness*: 0.80 | *Emissive*: Enabled (HDR ×2.2)
-
-#### Palette C: High-Tech Electrodynamic / Syndicate
-- **Primary Armor**: Deep Cobalt (`#14243b` / `RGB(20, 36, 59)`)
-  - *Metallic*: 0.55 | *Smoothness*: 0.68
-- **Secondary Light Armor**: Titanium Grey (`#526070` / `RGB(82, 96, 112)`)
-  - *Metallic*: 0.60 | *Smoothness*: 0.72
-- **Mechanical Gunmetal**: Anodized Black (`#12161c` / `RGB(18, 22, 28)`)
-  - *Metallic*: 0.78 | *Smoothness*: 0.75
-- **Warning Accent**: Electric Magenta (`#d41876` / `RGB(212, 24, 118)`)
-  - *Metallic*: 0.20 | *Smoothness*: 0.70
-- **Emissive Optics**: Overload Plasma Cyan (`#00f0ff` / `RGB(0, 240, 255)`)
-  - *Metallic*: 0.15 | *Smoothness*: 0.88 | *Emissive*: Enabled (HDR ×2.5)
-
-#### Camouflage Modifier Presets (`--camo`)
-- **`desert`**: Sun-bleached coyote tan primary (`#6b522e`), desert khaki secondary (`#8c7042`), matte finish with high-visibility signal markings.
-- **`urban`**: Concrete slate primary (`#383d42`), asphalt grey secondary (`#5c636b`), dark tungsten mechanics with cool electric cyan optics.
-- **`arctic`**: Glacial tundra white primary (`#c2d1e0`), frost grey secondary (`#8494a8`), dark carbon rubber, and crimson hazard accents.
-- **`woodland`**: Low-reflectance olive drab primary (`#2e4024`), forest green secondary (`#475c38`), dark gunmetal, and high-visibility yellow bands.
-
-## 4. Edge Beveling & The Specular Highlight Rule
-
-In real-time low-poly rendering, flat surfaces with razor-sharp 90° edges suffer from **specular extinction**: the geometric edge has zero surface area, so the directional sun light jumps abruptly from 100% lit face to 0% unlit face without any highlight.
-
-```
-Razor Edge (Flat, Digital, Lifeless):
-    |
-    |  <--- 90° corner has 0 thickness, no highlight
-    +--------
-
-Chamfered Edge (Machined, Tactile, Catches Specular Glints):
-    |
-    \  <--- 45° chamfer reflects sun light directly into RTS camera!
-     +-------
-```
-
-### Rules for Beveling in Rogue Command Models:
-1. **1-Segment Chamfers**: Always use a single segment bevel (`segments = 1`). Never use multi-segment curved bevels on low-poly models—they waste polygon budget without adding readability at RTS distance.
-2. **Width Proportional to Part Scale**:
-   - Main hull / large armor blocks: `width = 0.04m - 0.08m`
-   - Medium parts (turrets, weapon cowlings, sponsons): `width = 0.025m - 0.04m`
-   - Small details (sensor pods, brackets, muzzle rings): `width = 0.010m - 0.018m`
-3. **Flat Shading Preserved**: Keep `polygon.use_smooth = False` on chamfered faces. The crisp transition between the flat hull face and the angled chamfer face is what produces the distinctive stylized low-poly glint.
-
----
-
-## 5. Visual Enhancement Details (Greebles with Purpose)
-
-Do not add random visual noise. Every mechanical detail on a Rogue Command unit should imply a clear functional purpose:
-
-1. **Continuous Track Loops**:
-   - Rather than floating square boxes on a flat hull, shape tracks with sloped front approach angles (~25°–35° climb) and rounded return idlers.
-   - Model individual tread shoes (`0.15m–0.22m` spacing) along the top and bottom runs to create rhythmic surface breakups under dynamic shadows.
-2. **Road Wheel Rims & Hub Caps**:
-   - Stepped cylinders: outer rubber tire (matte), recessed wheel rim (medium tone), and protruding central axle cap with hex bolts (gunmetal).
-3. **Engine Grilles & Louvers**:
-   - Slatted intake vents on the rear engine deck (2–4 angled chamfered slats) to ground the power plant.
-4. **Sensor Masts & Optical Arrays**:
-   - Elevate sensor clusters on braced pylons. Recess the glowing lens within an armored visor or hood so the emissive face contrasts sharply against the dark shadow of the housing.
-5. **Weapon Sleeves & Muzzle Collars**:
-   - Add stepped muzzle brakes or heat-dissipation collars at the barrel tip to give weapons visual punch.
-6. **Battery Rails & Conduit Tubes**:
-   - For energy or explosive units, route visible conduit pipes or insulated charge rails along the flanks to telegraph volatility.
-7. **Explosive Reactive Armor (ERA) & Applique Tiles**:
-   - Spaced armor tiles on frontal glacis or turret cheeks angled at 20°–35° to reflect incoming fire and break up broad, flat expanses.
-8. **Hexagonal Bolt Seams**:
-   - 6-sided bolt heads placed along structural seams or suspension knuckles to convey industrial rigidity without mesh complexity.
-
----
-
-## 6. Weapon Hardpoints & Mobility Kinematics Standards
-
-### A. Weapon Silhouette & Caliber Ratios
-- **Heavy Ballistic Cannons**: Barrel length should be $1.4\times$ to $2.2\times$ the turret length with a prominent breech collar and double-baffle muzzle brake. Recoil dampers should sit parallel to the barrel vector.
-- **Rotary Gatling Clusters**: 6-barrel circular bundles with clamp collars at 45% and 95% of barrel length. Always include a central drive axle and an offset ammo feed chute to sell mechanical operation.
-- **Missile / Rocket Pods**: Multi-cell honeycomb arrays ($2\times 3$, $2\times 2$, or $3\times 3$) recessed inside an armored box tilted upward by $10^\circ–20^\circ$. Bright conical warheads peeking out provide high-contrast focal points.
-- **Electromagnetic Arc Weapons**: Twin or triple toroidal induction coils surrounding a central glowing plasma cathode, ending in convergent prongs angled inward toward a focal arc convergence zone.
-
-### B. Bipedal Walker Kinematics
-- **Digitigrade Stance**: Upper thigh angled backwards ($-15^\circ$ to $-25^\circ$), lower shin angled forwards ($+20^\circ$ to $+35^\circ$), with heavy hydraulic pistons bridging the joints.
-- **Ground Contact Footprint**: Multi-toed stabilizer foot with a wide center toe, an angled lateral outrigger, and a rear heel claw. The lowest vertex must rest precisely on the ground ($Z \ge 0.0\text{m}$) to eliminate floating or clipping into terrain.
-
----
-
-## 7. Draw-Call Batching & Performance Guidelines
-
-To maintain 60+ FPS in dense RTS battles with 50+ units on screen:
-- **Modular Kitbashing during Authoring**: Author with clean geometric primitives, separate objects, and explicit materials.
-- **Material-Based Mesh Unification for Export**: Group and join static submeshes by their PBR material slot (`batch_and_join_by_material`).
-- **Target Submesh Count**: A completed vehicle should contain **4 to 6 unified mesh objects** (one per material, plus any independent animated pivots like `TurretBase` or `MainBarrel`).
-
----
-
-## 8. Multi-Channel Procedural Vertex Shading
-
-Rogue Command models avoid heavy, noisy textures by encoding tactile shading directly into vertex attributes (`Color` / `Mesh.colors32`):
-
-| Channel | Shader Role | Visual Impact | Technical Mapping |
+| Archetype | Native Template | Proportions (X × Y × Z) | Silhouette Signature & Mass Center |
 |---|---|---|---|
-| **R (Red)** | Ambient Occlusion & Cavity Dirt | Deep contact shadows in wheel wells, engine louvers, and undercarriages | Values $0.35$–$0.65$ on undersides and crevices; $0.88$–$1.0$ on upper plates |
-| **G (Green)** | Curvature & Edge Wear | Bright scratch glints on 45°/90° chamfer edges, simulating chipped paint | Values $0.55$–$1.0$ on sharp bevels; $0.0$–$0.15$ on flat armor planes |
-| **B (Blue)** | Thermal Soot & Weathering | Darkening gradient from exhaust manifolds and cannon muzzles | Values $0.25$–$0.65$ near exhaust tips and muzzle brakes; $1.0$ elsewhere |
-| **A (Alpha)** | Optional team-tint mask | Applies the custom shader's `_TeamColor` where the mask is 1 | $1.0$ for primary and light armor plates; $0.0$ for fixed gunmetal and treads. The game does not currently bind faction colors to `_TeamColor`. |
+| **Fast Scout** | `PCXBaseTank` | ~2.1m × 2.6m × 1.5m | Low sloped glacis, wide stance, elevated sensor mast. Low mass center. |
+| **Strike Bike** | `BombBike` | ~1.1m × 2.0m × 1.3m | Narrow two-wheel footprint, aggressive forward rake. Forward-leaning. |
+| **Heavy Artillery** | `ArtilleryTank` | ~2.8m × 3.6m × 1.9m | Broad tracks, rear recoil spade, elongated cannon barrel. Rear-biased. |
+| **Assault Walker** | `GatlingWalker` | ~2.2m × 2.0m × 2.7m | Digitigrade bipedal legs, twin underslung rotary guns. Dynamic vertical. |
+| **Surge Arc Tank** | `LightningTank` | ~2.3m × 2.8m × 1.6m | Segmented hull, central toroidal induction coil, forward discharge prongs. |
+| **Hover Skimmer** | `PCXBaseTank` | ~2.5m × 2.9m × 1.6m | Repulsor skirt, ventral thrusters, lateral strakes. Floating 0.35m–0.55m. |
+| **Siege Spider** | `GatlingWalker` | ~4.6m × 4.8m × 1.8m | 4 outrigger crawler legs, central turret, ground footpads. Stable 4-point stance. |
+| **VTOL Gunship** | `PCXBaseTank` | ~3.8m × 4.7m × 1.5m | Swept wings, dual swiveling ducted tilt-rotors, sensor chin pod. |
+| **Half-Track APC** | `PCXBaseTank` | ~2.2m × 3.8m × 2.2m | Front steerable wheels, rear tracks, armored troop bay with clamshell doors. |
+| **Super-Heavy** | `ArtilleryTank` | ~3.3m × 4.6m × 2.4m | 4 independent track pods, massive superstructure, command radar. |
+| **Colossus Titan** | `GatlingWalker` | ~3.0m × 2.8m × 3.8m | Massive bipedal legs ($2.3\text{m}$ hip height), citadel torso, twin cannons. |
 
 ---
 
-## 9. Multi-Level LOD Hierarchy & Collision Geometry
+## 3. The 5-Tone Color Palette Standard
 
-### A. LOD Triangle Budgets
-- **LOD0 (Combat View, 100%)**: Full fidelity ($1,500$–$5,000$ triangles), complete chamfers, road wheel lugs, and sensor antennas.
-- **LOD1 (Mid-Range View, 50%)**: Preserved planar boundaries, decimated fine bevels ($800$–$2,000$ triangles).
-- **LOD2 (Tactical Far View, 22%)**: Coarse blockout silhouette ($300$–$700$ triangles) for extreme RTS camera zoom.
+| Material Role | Proportion | Function & Description | Metallic | Smoothness | Emission |
+|---|---|---|---|---|---|
+| **Primary Armor** | 40–45% | Main chassis, lower hull, armor sponsons | 0.35–0.45 | 0.60–0.65 | None |
+| **Light Armor** | 20–25% | Turret cheeks, upper deck, hatch covers | 0.30–0.35 | 0.58–0.62 | None |
+| **Mechanical Gunmetal** | 15–20% | Cannon barrels, roll bars, suspension, axles | 0.74–0.80 | 0.68–0.75 | None |
+| **Tread / Rubber** | 10–15% | Track shoes, road wheels, tire rubber | 0.08–0.18 | 0.28–0.34 | None |
+| **Warning Accent** | 3–5% | High-contrast identification hazard stripes | 0.16–0.20 | 0.60–0.65 | None |
+| **Emissive Tech/Optics** | 1–3% | Sensor lenses, headlamps, plasma coils | 0.15–0.25 | 0.75–0.85 | **HDR ×1.5–2.5** |
 
-### B. Physics Collision Hulls
-- Flat-shaded bounding boxes `<Prefix>_COLLIDER_Hull` and `<Prefix>_COLLIDER_Turret` matching vehicle chassis and turret volumes, tagged with `is_collider = True` and unrendered in runtime graphics.
+### Faction Presets
+- **Vanguard (Slate Teal)**: Primary `#244552` (0.12, 0.19, 0.24), Light `#435f62`, Accent Amber `#e86c20`, Emissive Cyan `#1fcdbf`.
+- **Siege (Rust Ochre)**: Primary `#684126` (0.26, 0.14, 0.075), Light `#8c6d48`, Accent Yellow `#f2a91d`, Emissive Orange `#ff5511`.
+- **Syndicate (Deep Cobalt)**: Primary `#14243b` (0.055, 0.11, 0.20), Light `#526070`, Accent Magenta `#d41876`, Emissive Cyan `#00f0ff`.
+- **Arctic (Tundra Navy)**: Primary `#c2d1e0` (0.72, 0.78, 0.85), Light `#8494a8`, Accent Red `#e61e26`, Emissive Glacial Blue `#26d9ff`.
 
 ---
 
-## 10. Standardized Gameplay Sockets & Kinematics
+## 4. Shading & Edge Beveling Guidelines
 
-Every vehicle model includes standardized empty locators in the FBX hierarchy:
-1. `Socket_MuzzlePrimary`: Main weapon muzzle tip & forward projectile vector.
-2. `Socket_MuzzleSecondary`: Secondary coaxial/pintle weapon socket.
-3. `Socket_TurretYaw`: Azimuth rotation axis for turret traversing.
-4. `Socket_TurretPitch`: Elevation pitch axis for weapon elevation.
-5. `Socket_RecoilPrimary`: Linear slide impulse axis for recoil animation.
-6. `Socket_SensorOptics`: Targeting ray / FLIR visor origin.
-7. `Socket_Exhaust_L` / `Socket_Exhaust_R`: Exhaust particle spawners.
-8. `Socket_DamageSmoke`: 50% HP threshold damage smoke emitter.
-9. `Socket_DamageFire`: 25% HP threshold catastrophic fire emitter.
-10. `Socket_CenterOfMass`: Physics center of mass.
-11. `Socket_GroundContact`: Ground projection ($Z=0$) for selection rings.
+### Beveling Physics
+- **1-Segment Chamfers Only**: Always single-segment (`segments = 1`). Never multi-segment rounded bevels.
+- **Scale-Proportional Widths**:
+  - Large hull / armor blocks: `0.04m - 0.08m`
+  - Medium turrets / sponsons: `0.025m - 0.04m`
+  - Small brackets / collars: `0.010m - 0.018m`
+- **Flat Shading**: Keep `use_smooth = False` on chamfers to produce the distinctive RTS specular glint.
 
-
+### Topological BMesh RGBA Vertex Shading
+- **Channel R (Cavity AO)**: $1.0$ on zenith/open faces; $0.25 - 0.40$ on undersides and recesses ($\Delta > 10^{-4}$).
+- **Channel G (Edge Wear)**: $0.7 - 1.0$ on sharp convex edges ($\ge 35^\circ$, $\Delta < -10^{-4}$); strictly $0.0$ on flat/concave seams.
+- **Channel B (Thermal Soot)**: $0.0$ clean metal; scales to $1.0$ at weapon muzzles ($R = 0.60\text{m}$) and exhausts ($R = 0.45\text{m}$) with $(1 - d/R)^2$ dropoff.
+- **Channel A (Team Mask)**: $1.0$ on armor plates for runtime tinting; $0.0$ on mechanical parts.
