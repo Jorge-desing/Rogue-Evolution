@@ -5634,7 +5634,9 @@ class FactionPalette:
                 secondary_color=primary_color,
                 accent_color=warning_color,
                 camo_type=c,
-                scale=camo_scale * 1.25,
+                # Keep the light-armor variation inside the helper's public range
+                # when the caller selects the maximum supported camo scale.
+                scale=min(10.0, camo_scale * 1.25),
                 contrast=camo_contrast,
             )
 

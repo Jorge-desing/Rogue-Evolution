@@ -148,7 +148,7 @@ Kitbashing produces 50–120 individual objects. Unbatched exports can create ma
   - **R (Red)**: Ambient Occlusion / Cavity Dirt (contact shadows in wheel wells, louvers, and undersides).
   - **G (Green)**: Curvature / Edge Wear (bright scratch glints on 45°/90° chamfer edges, simulating chipped paint).
   - **B (Blue)**: Thermal Soot / Weathering (darkening gradient around exhausts and weapon muzzles).
-  - **A (Alpha)**: Team Color Mask (1.0 for dynamic team-tintable primary/light armor, 0.0 for fixed gunmetal/treads).
+  - **A (Alpha)**: Optional team-tint mask (1.0 applies the shader's `_TeamColor`, 0.0 leaves the material color unchanged). The game currently has no faction-color binding for this property; it must be assigned by the author or another integration.
 - **Multi-Level LOD Chains**: Invokes `generate_lod_chain(batched_objects)` with planar boundary preservation (`delimit={"NORMAL", "MATERIAL"}`), exporting a companion `_LODs.fbx` with LOD0 (100%), LOD1 (50%), and LOD2 (22%) meshes.
 - **Physics Collision Hulls**: Invokes `generate_collision_hulls(objects)` to export flat-shaded bounding boxes `<Prefix>_COLLIDER_Hull` and `<Prefix>_COLLIDER_Turret` tagged with `is_collider = True`.
 

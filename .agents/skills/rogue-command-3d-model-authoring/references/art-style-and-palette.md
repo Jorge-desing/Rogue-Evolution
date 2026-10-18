@@ -204,7 +204,7 @@ Rogue Command models avoid heavy, noisy textures by encoding tactile shading dir
 | **R (Red)** | Ambient Occlusion & Cavity Dirt | Deep contact shadows in wheel wells, engine louvers, and undercarriages | Values $0.35$–$0.65$ on undersides and crevices; $0.88$–$1.0$ on upper plates |
 | **G (Green)** | Curvature & Edge Wear | Bright scratch glints on 45°/90° chamfer edges, simulating chipped paint | Values $0.55$–$1.0$ on sharp bevels; $0.0$–$0.15$ on flat armor planes |
 | **B (Blue)** | Thermal Soot & Weathering | Darkening gradient from exhaust manifolds and cannon muzzles | Values $0.25$–$0.65$ near exhaust tips and muzzle brakes; $1.0$ elsewhere |
-| **A (Alpha)** | Team Color Mask | Allows Unity shaders to tint team colors dynamically | $1.0$ for primary and light armor plates; $0.0$ for fixed gunmetal and treads |
+| **A (Alpha)** | Optional team-tint mask | Applies the custom shader's `_TeamColor` where the mask is 1 | $1.0$ for primary and light armor plates; $0.0$ for fixed gunmetal and treads. The game does not currently bind faction colors to `_TeamColor`. |
 
 ---
 
