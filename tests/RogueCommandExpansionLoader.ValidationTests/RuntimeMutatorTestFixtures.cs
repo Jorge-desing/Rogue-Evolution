@@ -119,6 +119,7 @@ internal sealed class RuntimeMutatorTestProvider : IRuntimeContentProvider, IBlu
     IBlueprintRewardFactoryScopeProvider
 {
     public Dictionary<string, string> PoolLocalizationAliases { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<object, string> PoolIds { get; } = new();
     public BlueprintRewardFactoryScope RewardFactoryScope { get; set; }
     public bool ThrowOnRewardScope { get; set; }
     public bool TryGetBlueprintPoolLocalizationId(string poolId, out string sourcePoolId)
@@ -127,6 +128,11 @@ internal sealed class RuntimeMutatorTestProvider : IRuntimeContentProvider, IBlu
         return poolId != null && PoolLocalizationAliases.TryGetValue(poolId, out sourcePoolId);
     }
     public bool TryFindBlueprintPool(string poolId, out object pool) { pool = null; return false; }
+    public bool TryGetBlueprintPoolId(object pool, out string poolId)
+    {
+        poolId = null;
+        return pool != null && PoolIds.TryGetValue(pool, out poolId);
+    }
     public bool TryGetBlueprintPoolDecision(object pool, string unitId, out bool runOriginal) { runOriginal = true; return false; }
     public void AddExclusiveBlueprints(string otherThanPoolId, HashSet<string> result) { }
     public bool TryGetBlueprintRewardFactoryScope(out BlueprintRewardFactoryScope scope)

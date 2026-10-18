@@ -639,6 +639,11 @@ namespace RogueCommandExpansionLoader.Content
             return _blueprintPoolScopeRegistry.TryGetSourcePoolLocalizationId(poolId, out sourcePoolId);
         }
 
+        public bool TryGetBlueprintPoolId(object pool, out string poolId)
+        {
+            return _blueprintPoolScopeRegistry.TryGetPoolId(pool, out poolId);
+        }
+
         public object GetFallbackLandscapeSnapshot(object nativeFallbacks)
         {
             lock (_gate)
@@ -771,12 +776,24 @@ namespace RogueCommandExpansionLoader.Content
                 }
 
                 var stageFactoryIds = new HashSet<string>(StringComparer.Ordinal);
+                var factoryByProductId = new Dictionary<string, string>(StringComparer.Ordinal);
+                foreach (LoadedUnit unit in _units.Values)
+                {
+                    if (!unit.IsProductionBuilding && !String.IsNullOrWhiteSpace(unit.ProductionFactoryId))
+                    {
+                        factoryByProductId[unit.Id] = unit.ProductionFactoryId;
+                    }
+                }
+
                 bool activeStageResolved = false;
+                int activeStageIndex = -1;
+                string activeStageId = null;
                 try
                 {
                     if (!_runtimeContentReady)
                     {
-                        scope = new BlueprintRewardFactoryScope(_blueprintUnitIds, null);
+                        scope = new BlueprintRewardFactoryScope(
+                            _blueprintUnitIds, null, factoryByProductId, activeStageIndex, activeStageId);
                         return true;
                     }
 
@@ -790,19 +807,26 @@ namespace RogueCommandExpansionLoader.Content
                     if (stageMap != null && System.Object.ReferenceEquals(stageMap, _stageMapSnapshotOwner) &&
                         _stageMapVisibleStages != null)
                     {
-                        int stageMapIndex = (int)_stageMapCurrentStageProperty.GetValue(stageMap, null);
+                        activeStageIndex = (int)_stageMapCurrentStageProperty.GetValue(stageMap, null);
                         activeStage = BlueprintRewardStageResolver.ResolveVisibleStage(
-                            _stageMapVisibleStages, stageMapIndex);
+                            _stageMapVisibleStages, activeStageIndex);
                     }
 
                     if (activeStage != null)
                     {
                         activeStageResolved = true;
+                        UnityEngine.Object stageAsset = _stageParametersField.GetValue(activeStage) as UnityEngine.Object;
+                        if (stageAsset != null && !String.IsNullOrWhiteSpace(stageAsset.name))
+                        {
+                            activeStageId = "native:" + stageAsset.name;
+                        }
+
                         for (int i = 0; i < _stages.Count; i++)
                         {
                             if (System.Object.ReferenceEquals(_stages[i].RuntimeStage, activeStage))
                             {
                                 stageFactoryIds.UnionWith(_stages[i].BlueprintFactoryIds);
+                                activeStageId = _stages[i].PackId + ":" + _stages[i].Definition.id;
                                 break;
                             }
                         }
@@ -821,7 +845,8 @@ namespace RogueCommandExpansionLoader.Content
                         "the generic reward fallback until a stage is available.");
                 }
 
-                scope = new BlueprintRewardFactoryScope(_blueprintUnitIds, stageFactoryIds);
+                scope = new BlueprintRewardFactoryScope(
+                    _blueprintUnitIds, stageFactoryIds, factoryByProductId, activeStageIndex, activeStageId);
                 return true;
             }
         }

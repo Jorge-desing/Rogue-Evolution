@@ -207,6 +207,8 @@ namespace RogueCommandExpansionLoader.Runtime
             Type loca = RuntimeReflection.FindUniqueType(gameAssembly, "Loca");
             Type blueprintPool = RuntimeReflection.FindUniqueType(gameAssembly, "BlueprintPool");
             Type chooseCard = RuntimeReflection.FindUniqueType(gameAssembly, "ChooseCard");
+            Type presentCardAsRewardEvent = RuntimeReflection.FindUniqueType(
+                gameAssembly, "PresentCardAsRewardEvent");
 
             MethodInfo init = RuntimeReflection.FindUniqueMethod(entityStore, "Init",
                 delegate(MethodInfo method) { return method.GetParameters().Length == 0; });
@@ -284,6 +286,10 @@ namespace RogueCommandExpansionLoader.Runtime
                 blueprintPool, "ExclusiveBlueprints", HasBlueprintPoolExclusiveShape);
             MethodInfo presentCardsToChoose = RuntimeReflection.FindUniqueMethod(
                 chooseCard, "PresentCardsToChoose", HasPresentCardsToChooseShape);
+            MethodInfo blueprintPoolCandidates = RuntimeReflection.FindUniqueMethod(
+                blueprintPool, "BlueprintsInPool", HasBlueprintPoolCandidatesShape);
+            MethodInfo presentCardAsRewardRecord = RuntimeReflection.FindUniqueMethod(
+                presentCardAsRewardEvent, "Record", HasPresentCardAsRewardRecordShape);
             MethodInfo allAllowedBlueprints = RuntimeReflection.FindUniqueMethod(
                 entityStore, "AllEntityIdsAllowedAsBlueprints", HasGlobalBlueprintRewardFallbackShape);
             MethodInfo resourcesLoadTyped = FindResourcesLoadTyped();
@@ -313,6 +319,8 @@ namespace RogueCommandExpansionLoader.Runtime
             MethodInfo blueprintPoolExclusivePostfix = Hook("BlueprintPoolExclusiveBlueprintsPostfix");
             MethodInfo presentCardsToChoosePrefix = Hook("PresentCardsToChoosePrefix");
             MethodInfo presentCardsToChooseFinalizer = Hook("PresentCardsToChooseFinalizer");
+            MethodInfo blueprintPoolCandidatesPostfix = Hook("BlueprintPoolBlueprintsInPoolPostfix");
+            MethodInfo presentCardAsRewardRecordPostfix = Hook("PresentCardAsRewardRecordPostfix");
             MethodInfo allAllowedBlueprintsPostfix = Hook("AllEntityIdsAllowedAsBlueprintsPostfix");
             MethodInfo loadPrefix = typeof(UnityResourcesLoadTypedPatch).GetMethod("Prefix",
                 BindingFlags.Public | BindingFlags.Static);
@@ -350,6 +358,8 @@ namespace RogueCommandExpansionLoader.Runtime
             plan.Add(new PatchPlan(blueprintPoolExclusive, null, blueprintPoolExclusivePostfix));
             plan.Add(new PatchPlan(presentCardsToChoose, presentCardsToChoosePrefix, null,
                 presentCardsToChooseFinalizer));
+            plan.Add(new PatchPlan(blueprintPoolCandidates, null, blueprintPoolCandidatesPostfix));
+            plan.Add(new PatchPlan(presentCardAsRewardRecord, null, presentCardAsRewardRecordPostfix));
             plan.Add(new PatchPlan(allAllowedBlueprints, null, allAllowedBlueprintsPostfix));
             plan.Add(new PatchPlan(resourcesLoadTyped, loadPrefix, null));
             plan.Add(new PatchPlan(resourcesLoadUntyped, untypedLoadPrefix, null));
@@ -419,6 +429,27 @@ namespace RogueCommandExpansionLoader.Runtime
         {
             return !method.IsStatic && method.ReturnType == typeof(void) &&
                 method.GetParameters().Length == 0;
+        }
+
+        private static bool HasBlueprintPoolCandidatesShape(MethodInfo method)
+        {
+            ParameterInfo[] parameters = method.GetParameters();
+            return !method.IsStatic && method.ReturnType == typeof(List<string>) &&
+                parameters.Length == 2 && parameters[0].ParameterType == typeof(int?) &&
+                parameters[1].ParameterType == typeof(bool);
+        }
+
+        private static bool HasPresentCardAsRewardRecordShape(MethodInfo method)
+        {
+            ParameterInfo[] parameters = method.GetParameters();
+            return method.IsStatic && method.ReturnType == typeof(void) && parameters.Length == 7 &&
+                parameters[0].ParameterType == typeof(int) &&
+                parameters[1].ParameterType == typeof(int) &&
+                parameters[2].ParameterType == typeof(int) &&
+                parameters[3].ParameterType == typeof(string) &&
+                parameters[4].ParameterType == typeof(string) &&
+                parameters[5].ParameterType == typeof(int) &&
+                parameters[6].ParameterType == typeof(int);
         }
 
         private static bool HasGlobalBlueprintRewardFallbackShape(MethodInfo method)

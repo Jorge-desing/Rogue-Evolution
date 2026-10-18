@@ -114,6 +114,8 @@ namespace RogueCommandExpansionLoader.Runtime
 
         bool TryGetBlueprintPoolLocalizationId(string poolId, out string sourcePoolId);
 
+        bool TryGetBlueprintPoolId(object pool, out string poolId);
+
         /// <summary>
         /// Returns true when the unit is loader-owned and sets whether the game's IsInPool method
         /// should run for this exact pool instance.

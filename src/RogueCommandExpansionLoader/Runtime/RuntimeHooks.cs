@@ -16,9 +16,12 @@ namespace RogueCommandExpansionLoader.Runtime
             public BlueprintRewardScopeFrame(BlueprintRewardFactoryScope scope)
             {
                 Scope = scope;
+                Observation = new BlueprintRewardObservation();
             }
 
             public BlueprintRewardFactoryScope Scope { get; private set; }
+
+            public BlueprintRewardObservation Observation { get; private set; }
         }
 
         private static readonly object Gate = new object();
@@ -62,6 +65,7 @@ namespace RogueCommandExpansionLoader.Runtime
         public static object BeginBlueprintRewardScope()
         {
             BlueprintRewardScopeFrame previous = _blueprintRewardScope;
+            _blueprintRewardScope = null;
             IRuntimeContentProvider provider;
             lock (Gate)
             {
@@ -106,16 +110,80 @@ namespace RogueCommandExpansionLoader.Runtime
 
         public static Exception EndBlueprintRewardScope(Exception exception, object previousScope)
         {
-            _blueprintRewardScope = previousScope as BlueprintRewardScopeFrame;
+            BlueprintRewardScopeFrame completedScope = _blueprintRewardScope;
+            try
+            {
+                if (completedScope != null)
+                {
+                    Log("Blueprint reward trace completion=" + (exception == null ? "completed" : "aborted") +
+                        " " + completedScope.Observation.Format(completedScope.Scope));
+                }
+            }
+            catch (Exception loggingException)
+            {
+                Log("Could not format blueprint reward trace: " +
+                    loggingException.GetBaseException().Message);
+            }
+            finally
+            {
+                _blueprintRewardScope = previousScope as BlueprintRewardScopeFrame;
+            }
+
             return exception;
         }
 
         public static void FilterGlobalBlueprintRewardCandidates(List<string> candidates)
         {
             BlueprintRewardScopeFrame activeScope = _blueprintRewardScope;
-            if (activeScope != null)
+            if (activeScope != null && candidates != null)
             {
+                activeScope.Observation.RecordGlobalCandidates(candidates, activeScope.Scope, false);
                 activeScope.Scope.RemoveFactoriesOutsideStage(candidates);
+                activeScope.Observation.RecordGlobalCandidates(candidates, activeScope.Scope, true);
+            }
+        }
+
+        public static void ObserveBlueprintPoolCandidates(
+            object pool,
+            List<string> candidates,
+            int? currentExperienceLevel,
+            bool excludeExclusivesFromOtherPools)
+        {
+            BlueprintRewardScopeFrame activeScope = _blueprintRewardScope;
+            if (activeScope == null || candidates == null)
+            {
+                return;
+            }
+
+            IBlueprintPoolRuntimeProvider poolProvider = GetBlueprintPoolProvider();
+            if (poolProvider == null)
+            {
+                return;
+            }
+
+            try
+            {
+                string poolId;
+                if (poolProvider.TryGetBlueprintPoolId(pool, out poolId))
+                {
+                    activeScope.Observation.RecordPoolCandidates(
+                        poolId, candidates, activeScope.Scope,
+                        currentExperienceLevel, excludeExclusivesFromOtherPools);
+                }
+            }
+            catch (Exception hookException)
+            {
+                Log("Could not observe custom BlueprintPool candidates: " +
+                    hookException.GetBaseException().Message);
+            }
+        }
+
+        public static void ObserveBlueprintRewardRecord(string cardType, string cardName)
+        {
+            BlueprintRewardScopeFrame activeScope = _blueprintRewardScope;
+            if (activeScope != null && String.Equals(cardType, "blueprint", StringComparison.Ordinal))
+            {
+                activeScope.Observation.RecordOfferedProduct(cardName, activeScope.Scope);
             }
         }
 
@@ -703,6 +771,20 @@ namespace RogueCommandExpansionLoader.Runtime
         public static Exception PresentCardsToChooseFinalizer(Exception __exception, object __state)
         {
             return RuntimeHooks.EndBlueprintRewardScope(__exception, __state);
+        }
+
+        public static void BlueprintPoolBlueprintsInPoolPostfix(
+            object __instance,
+            List<string> __result,
+            int? __0,
+            bool __1)
+        {
+            RuntimeHooks.ObserveBlueprintPoolCandidates(__instance, __result, __0, __1);
+        }
+
+        public static void PresentCardAsRewardRecordPostfix(string __3, string __4)
+        {
+            RuntimeHooks.ObserveBlueprintRewardRecord(__3, __4);
         }
 
         public static void AllEntityIdsAllowedAsBlueprintsPostfix(ref List<string> __result)

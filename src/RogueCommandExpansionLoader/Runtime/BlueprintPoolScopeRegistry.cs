@@ -191,6 +191,22 @@ namespace RogueCommandExpansionLoader.Runtime
             return false;
         }
 
+        public bool TryGetPoolId(object pool, out string poolId)
+        {
+            lock (_gate)
+            {
+                BlueprintPoolScopeRegistration registration;
+                if (pool != null && _byReference.TryGetValue(pool, out registration))
+                {
+                    poolId = registration.PoolId;
+                    return true;
+                }
+            }
+
+            poolId = null;
+            return false;
+        }
+
         public bool AllowsModUnitInPool(object pool, string unitId)
         {
             return AllowsModUnitInPool(pool, unitId, false, true);

@@ -146,6 +146,8 @@ var tests = new (string Name, Action Run)[]
             "BlueprintPoolExclusiveBlueprintsPostfix",
             "PresentCardsToChoosePrefix",
             "PresentCardsToChooseFinalizer",
+            "BlueprintPoolBlueprintsInPoolPostfix",
+            "PresentCardAsRewardRecordPostfix",
             "AllEntityIdsAllowedAsBlueprintsPostfix"
         ];
 
@@ -156,6 +158,28 @@ var tests = new (string Name, Action Run)[]
             {
                 throw new InvalidOperationException($"RuntimePatchInstaller expects missing hook '{hookName}'.");
             }
+        }
+
+        MethodInfo? poolCandidatesHook = typeof(RuntimeHarmonyPatches).GetMethod(
+            "BlueprintPoolBlueprintsInPoolPostfix", BindingFlags.Public | BindingFlags.Static);
+        ParameterInfo[] poolCandidateParameters = poolCandidatesHook?.GetParameters() ?? Array.Empty<ParameterInfo>();
+        if (poolCandidatesHook == null || poolCandidatesHook.ReturnType != typeof(void) ||
+            poolCandidateParameters.Length != 4 || poolCandidateParameters[0].ParameterType != typeof(object) ||
+            poolCandidateParameters[1].ParameterType != typeof(List<string>) ||
+            poolCandidateParameters[2].ParameterType != typeof(int?) ||
+            poolCandidateParameters[3].ParameterType != typeof(bool))
+        {
+            throw new InvalidOperationException("Blueprint pool candidate hook has an invalid Harmony signature.");
+        }
+
+        MethodInfo? rewardRecordHook = typeof(RuntimeHarmonyPatches).GetMethod(
+            "PresentCardAsRewardRecordPostfix", BindingFlags.Public | BindingFlags.Static);
+        ParameterInfo[] rewardRecordParameters = rewardRecordHook?.GetParameters() ?? Array.Empty<ParameterInfo>();
+        if (rewardRecordHook == null || rewardRecordHook.ReturnType != typeof(void) ||
+            rewardRecordParameters.Length != 2 || rewardRecordParameters.Any(parameter =>
+                parameter.ParameterType != typeof(string)))
+        {
+            throw new InvalidOperationException("Blueprint reward record hook has an invalid Harmony signature.");
         }
 
         MethodInfo? nameHook = typeof(RuntimeHarmonyPatches).GetMethod("BlueprintNamePrefix",
@@ -401,6 +425,84 @@ var tests = new (string Name, Action Run)[]
             !candidatesAfterScope.SequenceEqual(new[] { "sample:factory-stage-two" }))
         {
             throw new InvalidOperationException("The reward scope hook did not filter candidates or leaked past its finalizer.");
+        }
+    }),
+    ("random reward trace records candidates and actual mod offers", () =>
+    {
+        const string stageFactory = "sample:factory-stage-one";
+        const string otherStageFactory = "sample:factory-stage-two";
+        const string stageUnit = "sample:unit-stage-one";
+        const string otherStageUnit = "sample:unit-stage-two";
+        var scope = new BlueprintRewardFactoryScope(
+            new[] { stageFactory, otherStageFactory },
+            new[] { stageFactory },
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                [stageUnit] = stageFactory,
+                [otherStageUnit] = otherStageFactory
+            },
+            3,
+            "sample-expansion:stage-one");
+        var pool = new object();
+        var provider = new RuntimeMutatorTestProvider { RewardFactoryScope = scope };
+        provider.PoolIds.Add(pool, "RCL_POOL_STAGE_ONE");
+        var logs = new List<string>();
+        RuntimeHooks.Bind(null!, provider, logs.Add);
+        object previousScope = RuntimeHooks.BeginBlueprintRewardScope();
+
+        var globalCandidates = new List<string>
+        {
+            "native:factory",
+            stageFactory,
+            otherStageFactory
+        };
+        RuntimeHooks.FilterGlobalBlueprintRewardCandidates(globalCandidates);
+        var poolCandidates = new List<string> { stageFactory };
+        RuntimeHooks.ObserveBlueprintPoolCandidates(pool, poolCandidates, 2, false);
+        RuntimeHooks.ObserveBlueprintRewardRecord("blueprint", stageUnit);
+        RuntimeHooks.ObserveBlueprintRewardRecord("unit", otherStageUnit);
+        RuntimeHooks.EndBlueprintRewardScope(null!, previousScope);
+        RuntimeHooks.Clear(null!);
+
+        if (!globalCandidates.SequenceEqual(new[] { "native:factory", stageFactory }) ||
+            !poolCandidates.SequenceEqual(new[] { stageFactory }) || logs.Count != 1)
+        {
+            throw new InvalidOperationException("Reward tracing changed candidate lists or did not emit one trace.");
+        }
+
+        string trace = logs[0];
+        if (!trace.Contains("completion=completed", StringComparison.Ordinal) ||
+            !trace.Contains("stageIndex=3", StringComparison.Ordinal) ||
+            !trace.Contains("stageId=sample-expansion:stage-one", StringComparison.Ordinal) ||
+            !trace.Contains("observedSources=global,pool", StringComparison.Ordinal) ||
+            !trace.Contains("stageFactories=[" + stageFactory + "->" + stageUnit + "]", StringComparison.Ordinal) ||
+            !trace.Contains("globalFactories=[" + stageFactory + "->" + stageUnit + "," +
+                otherStageFactory + "->" + otherStageUnit + "]", StringComparison.Ordinal) ||
+            !trace.Contains("RCL_POOL_STAGE_ONE", StringComparison.Ordinal) ||
+            !trace.Contains("xp=2,excludeOther=false", StringComparison.Ordinal) ||
+            !trace.Contains("offeredProducts=[" + stageUnit + "]", StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("The trace did not distinguish stage candidates from actual offers: " + trace);
+        }
+    }),
+    ("random reward trace output is bounded", () =>
+    {
+        var factories = Enumerable.Range(0, 300)
+            .Select(index => "sample:factory-" + index.ToString("D3"))
+            .ToArray();
+        var products = factories.ToDictionary(
+            factory => "sample:unit-" + factory.Substring("sample:factory-".Length),
+            factory => factory,
+            StringComparer.Ordinal);
+        var scope = new BlueprintRewardFactoryScope(
+            factories, factories, products, 0, "sample-expansion:large-stage");
+        var observation = new BlueprintRewardObservation();
+        observation.RecordGlobalCandidates(factories, scope, false);
+        observation.RecordGlobalCandidates(factories, scope, true);
+        string trace = observation.Format(scope);
+        if (trace.Length > 4096 || !trace.Contains("truncatedIds=", StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("A large reward trace exceeded its output bound or hid truncation.");
         }
     }),
     ("demo reward stage index follows visible stages and tutorial substitution", () =>
