@@ -26,6 +26,10 @@ Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'Rogue Command.exe' }
 
 El puente se aloja dentro del proceso del juego. Si `Rogue Command.exe` está cerrado, `ping_unity_bridge` puede responder `Cannot connect to the Unity MCP bridge`; al iniciar la partida desde Steam, vuelve a comprobar ping, capacidades y una lectura Unity real. En la sesión del 18-10-2026, ese error desapareció tras el inicio por Steam (AppID `1461910`), y se confirmó tanto el PID `26220` durante la validación como el PID `36476` en `MainMenu` después de restaurar la instalación. No lo trates como fallo de instalación cuando no haya un proceso Unity activo.
 
+### Captura visual como respaldo de diagnóstico
+
+Si dos intentos independientes de inspección fallan o devuelven estados contradictorios, deja de repetir la misma llamada y usa la skill `screenshot` para inspeccionar la ventana objetivo. Para una captura que solo sirve al análisis, guárdala en temporal (`-Mode temp`); conserva una copia bajo `artifacts/runtime-smoke/` únicamente si aporta evidencia útil a la prueba. Verifica el título y el contenido de la captura antes de interpretarla: en Windows, capturar los límites de una ventana tapada muestra lo que está delante, no el contenido oculto de la aplicación. Si Rogue Command no está visible o la captura apunta a otra ventana, no la cuentes como evidencia; pide al usuario que ponga el juego al frente antes de intentarlo otra vez. Correlaciona la imagen con la escena, el log y las lecturas del puente; una captura no demuestra estado interno que no se vea.
+
 Identidad observada en esta sesión: Rogue Command 1.0.9; Unity 2021.3.45f2; BepInEx 5.4.23.5 Mono x64; `Assembly-CSharp.dll` SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`; MVID `db0e9462-128d-4296-9900-de18b4bd0c00`. Son valores de referencia, no sustituyen la comprobación de cada sesión.
 
 ## Inspección primero

@@ -1,159 +1,325 @@
-# Rogue Command Content Expansion — Agent Handoff
+# Rogue Command Content Expansion — Agent Handoff & Technical Baseline
 
 **Updated:** 2026-10-18  
-**Repository:** Project root (tracks `origin/codex/rogue-unit-balance-20261018`)  
-**Core Goal:** Create a Rogue Command content expansion mod with original playable units, stages, AI profiles, and 3D visual assets. The external BepInEx loader is infrastructure for registering and running content additively. Prioritize playable content and Steam-launched validation over unrequested loader changes.
+**Repository:** Mod Rogue Command (`c:\Users\Alex\Documents\Mod Rogue Command`)  
+**Remote:** `origin` points to `https://github.com/Jorge-desing/Rogue-Evolution.git` (branch `codex/rogue-unit-balance-20261018`)  
+**Mission:** Create a modular, content-first expansion mod for Rogue Command featuring original playable units, base production buildings, stages, tactical AI profiles, and custom 3D visuals. BepInEx and Harmony provide loader infrastructure; playable content and runtime stability are the mod's deliverables.
 
 ---
 
-## 1. Compatibility Identity
+## 1. Authoritative Compatibility Identity
 
-The local development environment and loader target an exact pinned game identity:
-
-| Property | Value |
-|---|---|
-| **Game** | Rogue Command 1.0.9 |
-| **Unity** | 2021.3.45f2 (Mono x64 player) |
-| **Target Framework** | `netstandard2.1` (required by Unity 2021.2+ and native `Assembly-CSharp.dll`) |
-| **`Assembly-CSharp.dll` SHA-256** | `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b` |
-| **`Assembly-CSharp.dll` MVID** | `db0e9462-128d-4296-9900-de18b4bd0c00` |
-| **Game Directory** | `C:\Program Files (x86)\Steam\steamapps\common\Rogue Command` |
-| **Steam AppID** | `1461910` |
-
-> [!IMPORTANT]
-> Treat Game Version, Assembly SHA-256, and MVID as a single identity. Recheck all three before relying on reflected signatures or metadata tokens.
+Always recheck this identity before relying on reflected signatures, CIL metadata tokens, or serialized assets:
+- **Game Version**: Rogue Command `1.0.9` (verified via `version.txt` and `Player.log`)
+- **Engine Version**: Unity `2021.3.45f2` (Mono x64)
+- **Mod Loader Baseline**: BepInEx `5.4.23.5` (Mono Standalone x64, target framework `netstandard2.1`)
+- **Assembly-CSharp.dll SHA-256**: `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`
+- **Assembly-CSharp.dll MVID**: `db0e9462-128d-4296-9900-de18b4bd0c00`
+- **Unity CoreModule SHA-256**: `6305c82c17ffe111a016e8d8ca3e8b2d9203980b4f58cb6e90171e5629994290` (MVID `37d484f4-070f-4518-bfa9-9fa57b7a2871`)
+- **Render Pipeline**: Universal Render Pipeline (URP, `UniversalRenderPipelineAsset`, PathID 2768 in `globalgamemanagers.assets`). Shipped vehicles render via untextured submeshes with `Shader Graphs/EntityColorShader`. Modded AssetBundles must embed self-contained compiled shaders (`RogueCommand/VehiclePBR_VertexWear` or `Standard`).
 
 ---
 
-## 2. Implementation Map
+## 2. Steam Bridge & Runtime Verification State
 
-| Component / Path | Purpose & Responsibilities |
-|---|---|
-| `src/RogueCommandExpansionLoader/RogueCommandExpansionPlugin.cs` | BepInEx entry point, compatibility gate, pack discovery, diagnostic logging. |
-| `src/RogueCommandExpansionLoader/Runtime/RuntimePatchInstaller.cs` | Installs/removes 26 verified owner-scoped Harmony patches. |
-| `src/RogueCommandExpansionLoader/Runtime/RuntimeContentMutator.cs` | Adds unit rows, factory mappings, and changeable-value caches idempotently with rollback. |
-| `src/RogueCommandExpansionLoader/Runtime/Visual/RuntimeVisualDirector.cs` | In-game visual management (damage smoke/fire, turret tracking, 30 RPM radar, antenna wobble). |
-| `src/RogueCommandExpansionLoader/Content/ContentPackRuntimeLoader.cs` | Validates and loads packs, resolves localizations (`Loca`), clones native templates, and builds scoped blueprint pools. |
-| `src/RogueCommandExpansionLoader/Modules/` | Compiled tactical AI modules: `ScheduledBaseBuild`, `ReactiveBaseDefense`, `HarvesterRaider`, `SiegeAssault`. |
-| `content/schema/` | Version-1 JSON Schema for content manifests (`content.json`). |
-| `content/packs/sample-native-expansion/` | 5 units, 5 factories, 3 stages, 3 AI profiles, script-free visual AssetBundle. |
-| `content/packs/sample-reactive-ai/` | Data-only stage and isolated reactive base-defense AI profile. |
-| `tests/RogueCommandExpansionLoader.ValidationTests/` | 133 offline harness tests (mocked game stubs, schema, rollback, mutator, AI parsers). |
-| `tools/RogueModelKit.py` & `tools/generate_unit_model.py` | Procedural 3D modeling toolkit in Blender 4.5.14 LTS (mirrored in `.agents/skills/`). |
-| `unity/RogueCommandAssetAuthoring/` | Unity 2021.3.45f2 project for prefab assembly and AssetBundle compilation. |
+### BepInEx MCP Bridge Protocol 2.0
+- **Process Discovery Pitfall**: The executable is named `Rogue Command.exe` (with a space). Standard `Get-Process -Name RogueCommand` fails. Always query via exact CimInstance:
+  ```powershell
+  Get-CimInstance Win32_Process | Where-Object { $_.Name -like "*Rogue*Command*" }
+  ```
+- **Lifecycle & Health**: The bridge HTTP endpoint (`http://localhost:54321/mcp`) is hosted in-process by BepInEx. A ping failure when no process runs is expected. Follow pings with at least one root GameObject or scene read before asserting connection. Consult [STEAM-RUNTIME-CONTROL.md](STEAM-RUNTIME-CONTROL.md).
+- **Bridge Query Schema**: The bridge accepts JSON-RPC `unity_query` payloads (`{"query": "FindObjectsOfType", "type": "EntityController"}`) returning serialized hierarchy state, component values, and active scene tags without game engine stall.
+- **Verified Startup State**: Steam launch (AppID `1461910`) loads `RogueCommandExpansionLoader.dll` with 26 verified Harmony hooks, registers both sample packs (`sample-native:expansion` and `sample-reactive-ai:expansion`), and transitions cleanly across `MainMenu`, `RunSetup`, `IntermissionScreen`, and `Game`.
 
----
-
-## 3. Content Contracts & System Invariants
-
-### A. Production Building Invariant
-- **Rule**: Every added unit must declare its own namespaced `productionBuilding`.
-- **Registration**: The loader registers a distinct factory row and dormant prefab clone, maps that factory exclusively to its produced unit, and offers the factory blueprint through stage-scoped random reward pools.
-- **Rosters**: Stage `unitIds` and AI `unitEntries` reference the produced unit ID, never the factory.
-- **Sample Units & Factories**: 5 pairs declared in `sample-native-expansion`: Sandlance Scout (`scout-tank`), Skirmish Strike Bike (`skirmish-bike`), Colossus Siege Platform (`heavy-artillery`), Ironclad Gatling Walker (`assault-walker`), Surge Arc Tank (`surge-tank`).
-
-### B. Blueprint Pools, Drafting & Progression
-- **Stage Scoping**: Native `BlueprintPoolList` and `BlueprintPool` objects are cloned deterministically per stage (`RCL_POOL_<sha256>`). Custom units appear only in pools belonging to stages that declare them.
-- **Initial Blueprint Eligibility**: Static `Game.AtLeastOneBlueprintHasBeenAddedByPlayer` governs the first reward draft. Units with `isAllowedAsStartingBlueprint: false` are excluded from stage-0 drafting.
-- **Profile Card Unlock Tiers**: Progression unlocks depend on persistent **profile experience** (levels 0–4), not in-run stage index. Unlocks: Sandlance (L0), Bike (L1), Ironclad (L2), Surge (L3), Colossus (L4).
-- **Generic Reward Fallback**: In `ChooseCard.PresentCardsToChoose`, unmapped reward pools and no-pool reward choices filter out mod factories declared only by other stages.
-
-### C. Procedural 3D Modeling & URP Shaders
-- **Render Pipeline Invariant**: Rogue Command runs strictly on the **Universal Render Pipeline (URP)**. Shipped vehicles use untextured geometry with `Shader Graphs/EntityColorShader`. Mod AssetBundles must embed compiled URP shaders (`RogueCommand/VehiclePBR_VertexWear`).
-- **Topological BMesh RGBA Vertex Color Contract**:
-  - **Channel R (Cavity AO)**: $1.0$ on zenith/open faces; $0.25 - 0.40$ on undersides and wheel recesses.
-  - **Channel G (Edge Wear)**: $0.0$ on flat faces and concave seams; $0.7 - 1.0$ on sharp convex edges (dihedral angle $\ge 35^\circ$).
-  - **Channel B (Thermal Soot)**: $0.0$ default clean base metal; scales to $1.0$ at muzzles ($R = 0.60\text{ m}$) and exhausts ($R = 0.45\text{ m}$) with quadratic dropoff $(1 - d/R)^2$.
-  - **Channel A (Team Tint Mask)**: $1.0$ on primary and light armor plates; $0.0$ on mechanical parts.
-- **Single-Material Export**: Single-material FBX (`_Atlas.fbx`) guarantees one material slot on the exported mesh, not a guaranteed single draw call.
-
-### D. Multi-System Anchors & Locators (`Socket_*`)
-- **Naming**: Always canonical unprefixed names (`Socket_*`). Never prefix with vehicle name.
-- **VFX Hierarchy**: Muzzle locators (`Socket_MuzzlePrimary`) must nest empty `FirePoint_0` (and `FirePoint_1` for secondaries) to satisfy native `ShootProjectile.Init()` discovery (`child.GetChild(0).GetComponent<ParticleSystem>()`).
-- **Spatial 3D Audio**: `Socket_EngineAudio` on engine deck for `EntityFlockingMovement._movementSoundAudioSource`; `Socket_WeaponAudio` at primary muzzle for `ShootProjectile.shotSoundAudioSource`.
-- **Ground Contacts**: Bipeds emit `Socket_FootContact_L/R` at $Z = 0.0$; quadrupeds emit `_FL/FR/RL/RR`.
-- **Tiered Damage**: `Socket_DamageSmoke` ($\le 50\%$ HP, with turret-ring fallback) and `Socket_DamageFire` ($\le 25\%$ HP).
-
-### E. Skeletal Mech Rigging & In-Place Locomotion
-- **Rig Paradigms**: Supports native hierarchical transform rigs (`RotHor/ROTVERT/LEGS`) or skeletal armatures (`Bone_Root`, `Bone_Pelvis`, `Bone_Thigh_*`, `Bone_Shin_*`, `Bone_Foot_*`, `Bone_TurretYaw`, `Bone_TurretPitch`, `Bone_BarrelRecoil`).
-- **In-Place Invariant**: RTS grid physics (`EntityFlockingMovement`) drives position. Walk clips must strictly enforce $\Delta\text{pos} = (0, 0, 0)$ on `Bone_Root` to eliminate double-stepping artifacts.
-- **Rigid Weighting**: Discrete $1.0$ vertex weighting per armor plate assigned on unbatched meshes *before* material batching prevents rubbery joints in Unity.
-- **Mecanim Contract**: Generic Avatars driven by `RCL_IsMoving` (Bool), `RCL_Fire` (Trigger), `RCL_Death` (Trigger) across 5 standard actions (`Action_Idle`, `Action_Walk`, `Action_Drive`, `Action_FireRecoil`, `Action_Death`).
-
-### F. Verified CIL Metadata Tokens (`Assembly-CSharp.dll`)
-Static REA inspection verified the following exact tokens against the pinned game binary:
-- `EntityController.get_HealthRatio`: `0x060007e4` (`Single`)
-- `EntityController.get_DestroyHasBeenStarted`: `0x0600077d` (`Boolean`)
-- `EntityController.get_InProductionCount`: `0x060007df` (`Nullable<Int32>`)
-- `EntityController.get_CurrentAttackTarget`: `0x060007fc` (`EntityController`)
-- `EntityController.IsEnemy`: `0x06000844` (`Boolean(EntityController)`)
-- `EntityAttack._attackTarget`: `0x040004a2`
-- `EntityAttack._timeOfLastShot`: `0x040004ab` (`Single`)
-- `EntityController.onFireParticleSystem`: `0x040004e1` (`ParticleSystem`)
+### Profile Isolation & Cleanup Invariants
+- **Profile Backups**: Testing uses Profile 1 or temporary profiles. Pre-run files under `Profiles/` must be backed up before matches.
+- **Steam Cloud Safeguard**: Steam Cloud synchronization must be temporarily disabled in Steam UI during test matches touching saves, and re-enabled only after restoring baseline hashes.
+- **Package Deployment Integrity**: Distributable ZIPs (`artifacts/packages/RogueCommandExpansionLoader-0.1.0.zip`) contain 9 entries: loader DLL, schemas, and content packs. Never include BepInEx core, Harmony, game assemblies, PDBs, or Unity `Library/` outputs in packages.
 
 ---
 
-## 4. Repository-Local Skills Catalog
+## 3. Core Architectural Invariants
 
-| Skill | Primary Scope & Role |
-|---|---|
-| `rogue-command-unit-authoring` | Unit balancing, native templates, localizations (`en-US`, `es-XL`), and card display stats. |
-| `rogue-command-3d-model-authoring` | Procedural 3D vehicles (19 archetypes, 9 weapons), Blender generation, and URP shaders. |
-| `rogue-command-vfx-authoring` | Particle systems, muzzle flash hierarchy, damage smoke/fire, and URP unlit shaders. |
-| `rogue-command-audio-authoring` | Mono 3D audio spatialization, weapon pitch jitter (+/-5%), and engine looping audio. |
-| `rogue-command-mech-rigging-authoring` | Armatures, rigid vertex weighting, in-place locomotion, and Generic Animators. |
-| `rogue-command-balance-simulation` | Lanchester combat simulation, discrete shields, armor floor (0.1), and CEI calibrations. |
-| `rogue-command-mutator-hazard-authoring` | Native `CardChangeScriptableObject` mutators, relics, and trigger hazards. |
-| `rogue-command-stage-authoring` | Stage progression, world/map selection, and blueprint pool scoping. |
-| `rogue-command-ai-authoring` | Compiled AI modules (`ScheduledBaseBuild`, `ReactiveBaseDefense`, `HarvesterRaider`, `SiegeAssault`). |
-| `rogue-command-assetbundle-authoring` | Unity 2021.3.45f2 AssetBundle compilation, card Sprites, and prefab validation. |
-| `rogue-command-pack-validation` | Schema validation, path safety, and offline test harness audits. |
-| `rogue-command-game-research` | REA reverse-engineering, assembly token verification, and compatibility tracking. |
-| `rogue-command-steam-runtime-validation` | Reversible Steam runtime validation, bridge MCP, and safe profile isolation. |
+### A. Production Building Invariant (1:1 Factory Mapping)
+Every added unit must declare its own namespaced `productionBuilding`.
+- The loader registers an additive factory row and dormant prefab clone, mapping that factory to exactly one produced unit.
+- Native factory mappings are strictly preserved.
+- The stage offers the factory blueprint in randomized reward pools; player purchase and placement produce the unit.
+- Stage `unitIds` and AI `unitEntries` reference the produced unit ID.
+- Five product/building pairs are currently declared in `sample-native-expansion`:
+  - `sample-native:scout-tank` $\leftrightarrow$ `sample-native:scout-tank-factory`
+  - `sample-native:heavy-artillery` $\leftrightarrow$ `sample-native:heavy-artillery-factory`
+  - `sample-native:assault-walker` $\leftrightarrow$ `sample-native:assault-walker-factory`
+  - `sample-native:skirmish-bike` $\leftrightarrow$ `sample-native:skirmish-bike-factory`
+  - `sample-native:surge-tank` $\leftrightarrow$ `sample-native:surge-tank-factory`
+
+### B. Stage-Scoped Blueprint Reward Pools & Roguelike Reward Mechanics
+- **Roguelike Reward Selection**: In `ChooseCard.PresentCardsToChoose`, pool-backed rewards query `BlueprintPool.BlueprintsInPool`. The game removes owned/shown cards, seeds `SeededRandom`, and picks available candidates.
+- **Pool Scoping**: The loader clones `BlueprintPoolList` and referenced `BlueprintPool` objects only when a declared stage lists custom units (`RCL_POOL_<sha256>`). Custom units appear only in pools scoped to the active stage; native and other stage pools reject them.
+- **Filter Preservation**: Native per-pool filters (`blueprintFilter.IsBlueprintValid`) are preserved in cloned pools.
+- **Starting Blueprints vs Regular Blueprints**: `isAllowedAsStartingBlueprint` sets the dedicated starting-deck flag on the unit row via `EntityBalancingStore.IsAllowedAsStartingBlueprint`; regular blueprints require stage pool inclusion.
+- **Generic Fallback Scoping**: The no-pool reward fallback in `ChooseCard.PresentCardsToChoose` is scoped via `Game.StageMap.CurrentStage`. Only loader-owned factories declared by the active stage are eligible; unrelated mod factories are excluded.
+
+### C. Additive AI Unit Rosters & Command Lifecycle
+- **Additive Roster Structure**: `ContentAiProfileDefinition.unitEntries` and `productionBuildingEntries` add namespaced units and factories to `AiBase.entitiesInAiDeck`.
+- **Capacity Enforcement**: `ScheduledBaseBuildAiModule` rereads active deck `MaxLiving` before each attempt, counts distinct living AI buildings via `ExistingControllers.AiBuildings()`, and respects capacity bounds.
+- **Command Lifecycle Tags**: Harvester Raider (`sample:harvester-raider`) and Siege Assault (`sample:siege-assault`) use active command tags as truth: units executing that module's attack-move are skipped, becoming eligible again when their command tag clears.
+- **Harvester Raider Module**: Locates player crystal harvesters (`ExistingControllers.Instance.Harvesters`), selects idle combat units, and dispatches attack-move harassment squads.
+- **Siege Assault Module**: Scans discovered player structures (`PlayerRefineries`, `EngineeringHq`), gathers combat squads, and dispatches coordinated strike waves by priority (`ClosestBuilding`, `Refinery`, `Hq`).
+- **Reactive Base Defense**: Scans attackers targeting AI base buildings within `defenseRadiusCells` (default 12 cells) and dispatches mobile defenders before weapon firing range.
+
+### D. Engine Hooks, Serialization & TextMeshPro Fallback
+- **TextMeshPro In-Memory Fallback**: Rogue Command 1.0.9 does not ship with a serialized `TMP Settings.asset` in `Resources/`. Without a valid instance, TextMeshPro crashes when layout components call `TMP_Settings.defaultStyleSheet`, `linebreakingRules`, and `fallbackFontAssets`. The loader hooks `Resources.Load(string, Type)` for `"TMP Settings"`, creating a dynamic `TMP_Settings` ScriptableObject with initialized `m_defaultStyleSheet` (refreshing `"Normal"` style), `m_linebreakingRules` (dictionaries initialized), empty non-null `fallbackFontAssets`, and assigns static `s_Instance` to eliminate layout crashes.
+- **Shared `Resources.Load` Overload Resolution**: On Unity CoreModule (`6305c82c17ffe111a016e8d8ca3e8b2d9203980b4f58cb6e90171e5629994290` / `37d484f4-070f-4518-bfa9-9fa57b7a2871`), generic `Resources.Load<T>(string)` calls `Resources.Load(string, Type)`. Harmony hooks resolve only that single overload; custom assets return only when matching the requested `Type`, otherwise delegating to Unity's original loader.
+- **Stage Node Distribution Overrides**: `ContentStageParameterOverride` validates and sets boolean fields on `StageParametersScriptableObject`, including `fillFirstLevelWithCardRewards`, `putDefaultCardRewardInCenter`, and `fillLastLevelWithShops`, plus branching and reward weight floats.
+- **Diagnostic Trace Bounds & Loss Counters**: Bounded diagnostic traces (`MaxTraceCharacters = 4096`) place loss/omission counters (`omittedIdObservations`, `omittedPoolQueries`) immediately after `observedSources` before unbounded detail collections (`offeredProducts`, `globalFactories`, `stageFactories`, `pools`), ensuring tail truncation never drops loss diagnostics.
+- **Serialized Scene Bootstrap Flow**: In `level0`, `ImageLOGO` (PathID 3) has `ImageFading` (PathID 66) whose `onFadeInEnd` triggers `LoadScene.LoadMainMenu` on `Loader` (PathID 5), transitioning cleanly from `EmptyBootUpScene` to `MainMenu`.
+
+### E. Persistent Profile Unlock Progression & Savegame Architecture
+- **Savegame Progression Store**: Rogue Command tracks unlocked blueprints, mutators, and cards persistently in `Profiles/Profile<n>/savegame.dat` via `ProfileUnlockedCardStore` (token `0x060004ad`).
+- **Blueprint Unlock Verification**: In `ChooseCard.PresentCardsToChoose`, native cards query `ProfileUnlocks.IsBlueprintUnlocked(string)` before inclusion in regular pools.
+- **Modded Blueprints Invariant**: Expansion units must not corrupt or irreversibly overwrite `savegame.dat`. When `isAllowedAsStartingBlueprint` is true, the factory blueprint is granted to the player's starting selection without mutating persistent profile unlock arrays.
+- **Profile Isolation Protocol**: Automated test sessions must operate against isolated test profiles (`Profile 1` or temporary scratch profiles). Pre-run hashes of `savegame.dat` must be captured and restored following session termination to maintain baseline integrity.
 
 ---
 
-## 5. Build, Validate, and Package Runbook
+## 4. REA Verified Reflection Signatures & CIL Tokens
 
-Execute all commands from the repository root in PowerShell:
+Verified against pinned `Assembly-CSharp.dll` (`d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b` / `db0e9462-128d-4296-9900-de18b4bd0c00`):
+
+| Member Name | Declaring Type | Token | CIL Type / Signature | Verified Runtime Purpose |
+|---|---|---|---|---|
+| `get_HealthRatio` | `EntityController` | `0x060007e4` | `Single get_HealthRatio()` | Damage smoke (50%) and fire (25%) thresholds |
+| `get_DestroyHasBeenStarted`| `EntityController` | `0x0600077d` | `Boolean get_DestroyHasBeenStarted()` | Validates death before destroying emitters |
+| `get_InProductionCount` | `EntityController` | `0x060007df` | `Nullable<Int32> get_InProductionCount()` | Factory bay door opening during rollout |
+| `get_CurrentAttackTarget` | `EntityController` | `0x060007fc` | `EntityController get_CurrentAttackTarget()`| Combat target for turret aiming |
+| `IsEnemy` | `EntityController` | `0x06000844` | `Boolean IsEnemy(EntityController)` | Hostility filter before committing turret traverse |
+| `get_EntityId` | `EntityController` | `0x060007c6` | `String get_EntityId()` (PascalCase) | Root entity identity |
+| `_attackTarget` | `EntityAttack` | `0x040004a2` | `EntityController _attackTarget` | Authoritative attack target field |
+| `_timeOfLastShot` | `EntityAttack` | `0x040004ab` | `Single _timeOfLastShot` | Ballistic clock driving recoil and muzzle flash |
+| `onFireParticleSystem` | `EntityController` | `0x040004e1` | `ParticleSystem onFireParticleSystem` | Native fire particle discovery for fallback |
+| `entityId` | `EntityInAiDeck` | `0x0400005b` | `String entityId` (camelCase) | Serialized AI deck unit references |
+| `entityId` | `ProductionInfo` | `0x04000603` | `String entityId` (camelCase) | Production building product mapping |
+| `IsAllowedAsStartingBlueprint` | `EntityBalancingStore` | `0x060004be` | `Boolean IsAllowedAsStartingBlueprint(String)` | Validates starting deck eligibility |
+| `get_BlueprintsInPool` | `BlueprintPool` | `0x060000a2` | `List<String> get_BlueprintsInPool()` | Returns available pool blueprint IDs |
+| `PresentCardsToChoose` | `ChooseCard` | `0x0600032e` | `Void PresentCardsToChoose(StageParameters)` | Roguelike reward selection entrypoint |
+| `entitiesInAiDeck` | `AiBase` | `0x0400004e` | `List<EntityInAiDeck> entitiesInAiDeck` | Additive AI roster storage |
+| `AiBuildings` | `ExistingControllers` | `0x060008d5` | `List<EntityController> AiBuildings()` | Living AI structure count for deck capacity |
+
+### REA Evidence Ledger
+- Parent Assembly Evidence: `ev_f31810ef788eb949c380fdc4129aebd5483da71763ee7836d3cede7d17a51572`
+- Managed Projection: `ev_2f13567aa172a4942d778f6b6867261f2dddb513f172d95a76d039990f59681d`
+- `EntityFactory` Members: `ev_8a69ec6d37445a4d4e95874af8b5c6047173f4519e4ea0268427f56a147b484b`
+- `EntityBalancingStore` Value Types: `ev_6b1a3269bade89c9ebcdbc1435ad23d190c5f177c8c48771b58c176612f6544b`
+- `EntityController` CIL Metadata: `ev_b8d4657ac454129250b202e6eb31305b15f679364f692c6adb08284ca2d40d64`
+- Expansion Loader Binary: `ev_31e0021f23ea3178482412845099e35d6ac107e99f377ac02d042edf812c19fb`
+
+---
+
+## 5. Content Expansion Roster
+
+### 5 Custom Units (`sample-native-expansion`)
+All units provide English (`en-US`) and Spanish (`es-XL`) localizations, custom models, and card Sprites:
+1. `scout-tank` (Sandlance Scout): Fast recon flanker, cost 70, HP 130, speed 14.5, sight 8. Template: `PCXBaseTank`. Factory: `scout-tank-factory`, Card: `Sprites/ScoutTankCard`.
+2. `heavy-artillery` (Colossus Siege): Long-range siege bombarder, cost 300, HP 160, speed 9.0, range 16, cooldown 4.0, AoE 1.5, armor 2. Template: `ArtilleryTank`. Factory: `heavy-artillery-factory`, Card: `Sprites/HeavyArtilleryCard`.
+3. `assault-walker` (Ironclad Walker): Heavy anti-chaff walker, cost 380, HP 420, speed 12.0, damage 4, cooldown 0.4, range 6, armor 1.0. Template: `GatlingWalker`. Factory: `assault-walker-factory`, Card: `Sprites/AssaultWalkerCard`.
+4. `skirmish-bike` (Skirmish Strike Bike): High-mobility raider, cost 55, HP 75, speed 24.0, damage 32, AoE 1.8. Template: `BombBike`. Factory: `skirmish-bike-factory`, Card: `Sprites/SkirmishBikeCard`.
+5. `surge-tank` (Surge Arc Tank): Electromagnetic disruption tank, cost 210, HP 150, speed 13.0, damage 12, range 4.5, cooldown 1.8, armor 2. Template: `LightningTank`. Factory: `surge-tank-factory`, Card: `Sprites/SurgeTankCard`.
+
+### Factory Blueprint and Visual Scaffolding Rules
+- Factory prefabs must provide standard 1:1 footprint bounds ($3.0\text{m} \times 3.0\text{m}$) with `Socket_Deploy_Unit` transform positioned at the door threshold.
+- Units instantiate dormant at origin until factory build cycle finishes, triggering rollout slide animation.
+
+### 3 Progressive Stages & AI Profiles
+- **Stages**: `training-variant` (8 levels, reward 160), `fortified-frontline` (10 levels, reward 240, starting crystal 80), `core-battleground` (12 levels, reward 350, crystal 150).
+- **AI Profiles**: `quick-hunter-extension` (rapid build interval 8s), `horde-swarm-assault` (swarm interval 12s), `raider-patrol-strike` (patrol strike interval 10s).
+- **Reactive AI Pack (`sample-reactive-ai`)**: `sample:reactive-base-defense` module intercepting attackers on AI bases within `defenseRadiusCells` (default 12 cells).
+
+---
+
+## 6. Specialized Authoring Skills Portfolio
+
+The repository equips 13 local skills under `.agents/skills/`:
+
+| Skill Directory | Domain & Role | Primary Files & Tools | Key Invariants & Contracts |
+|---|---|---|---|
+| `rogue-command-3d-model-authoring` | Procedural 3D vehicles & structures | `RogueModelKit.py`, `generate_unit_model.py` | BMesh topological RGBA wear, soot $B=0.0 \to 1.0$, canonical sockets |
+| `rogue-command-mech-rigging-authoring`| Skeletal rigging & animators | `biped-quadruped-rigging-guide.md`, `gait-cycle.md` | Rigid weighting $1.0$ before join, in-place $\Delta\text{pos} = (0, 0, 0)$ |
+| `rogue-command-balance-simulation` | Combat balance & Lanchester math | `tools/simulate_balance.py`, `balancing.tsv` | CEI bands (Scout 8–15, Tank 12–20, Siege 6–16), no armor lockouts |
+| `rogue-command-mutator-hazard-authoring`| Relics, mutators & hazards | `native-card-change-and-relic-schema.md` | 26 `ChangeableValue` attributes, trigger colliders ($\ge 0.5\text{s}$ tick) |
+| `rogue-command-vfx-authoring` | URP particles & shaders | `vfx-prefab-recipe-book.md`, `urp-shaders.md` | Soft unlit alpha particles, dual-tier fallback in `RuntimeVisualVfxFallback` |
+| `rogue-command-audio-authoring` | Spatial 3D audio & loops | `native-audio-integration-points.md` | `Socket_EngineAudio`, `Socket_WeaponAudio`, logarithmic roll-off (5–45m) |
+| `rogue-command-unit-authoring` | Unit definitions & balance rows | `content/packs/sample-native-expansion/` | Additive rows, 1:1 factory mapping, bilingual localization |
+| `rogue-command-stage-authoring` | Stage progression & reward pools | `StageParameters_*.asset`, `StageMap` | Cloned pool scoping, preserved native filters, Heat progression |
+| `rogue-command-ai-authoring` | Tactical AI profiles & modules | `HarvesterRaiderAiModule`, `SiegeAssaultAiModule`| Deck capacity via `ExistingControllers`, command tags as truth |
+| `rogue-command-assetbundle-authoring` | Unity AssetBundle creation | `Assets/Editor/RogueCommandVisualScaffolder.cs` | Standalone x64 bundles, script-free prefabs, URP shaders |
+| `rogue-command-pack-validation` | Schema & manifest validation | `tests/RogueCommandExpansionLoader.ValidationTests`| JSON Schema Draft 2020-12, path traversal & bundle audits |
+| `rogue-command-game-research` | REA assembly & asset inspection | `tools/asset_inventory.py`, `inspect_unity_objects` | Pinned SHA-256/MVID identity, CIL token verification |
+| `rogue-command-steam-runtime-validation`| Live Steam testing & telemetry | `STEAM-RUNTIME-CONTROL.md`, BepInEx MCP | Reversible deployment, profile isolation, Steam Cloud toggle |
+
+### Domain Technical Details
+
+#### 1. 3D Model Authoring & BMesh Vertex Shading
+- **Topological BMesh Vertex Wear**: Dihedral angle analysis ($\ge 35^\circ$) and normal convexity projection ($\Delta = (v_{other} - v_{edge}) \cdot \vec{n}_{f1}$) maps bright steel wear $G \in [0.7, 1.0]$ to convex edges and cavity AO $R \in [0.25, 0.40]$ to concave seams.
+- **Soot Shading**: Channel B defaulted to $0.0$ (clean metal), scaling to $1.0$ at muzzles ($R = 0.60\text{m}$) and exhausts ($R = 0.45\text{m}$) with quadratic dropoff $(1 - d/R)^2$.
+- **Multi-System Sockets**: Sockets use canonical names with nested `FirePoint_0` under `Socket_MuzzlePrimary`, `Socket_EngineAudio`, `Socket_WeaponAudio`, and `Socket_FootContact_*` at $Z = 0.0$.
+- Detailed architecture: [3D-MODEL-AUTHORING-ENHANCEMENTS.md](3D-MODEL-AUTHORING-ENHANCEMENTS.md).
+
+#### 2. Mech & Walker Rigging
+- Articulated skeletal armatures for bipedal walkers (8 bones) and quadrupeds (10 bones).
+- Rigid vertex weighting ($1.0$ per armor plate) assigned on unbatched source meshes before `batch_and_join_by_material`.
+- **In-Place Invariant**: $\Delta\text{pos} = (0, 0, 0)$ on `Bone_Root` across all frames of `Action_Walk`.
+- Bakes 5 action clips (`Action_Idle`, `Action_Walk`, `Action_Drive`, `Action_FireRecoil`, `Action_Death`) wired to Generic Mecanim Animators.
+
+#### 3. Combat Balance & Lanchester Simulation
+- Standalone simulator `tools/simulate_balance.py` models Lanchester square-law dynamics across 651 native rows and expansion units:
+  $$\text{CEI} = \frac{\text{DPS} \times \text{Effective HP}}{\text{Crystal Cost}}$$
+- Combat Efficiency Index (CEI) calibrated to documented bands: Scout 8–15, Heavy Tank 12–20, Siege 6–16, Mech 10–18.
+- Flags armor lockouts: Ironclad Walker armor calibrated to 1.0 (CEI 14.9); Colossus cost calibrated to 300 (CEI 15.8).
+
+#### 4. Mutators, Relics & Battlefield Hazards
+- Integrates with native `CardChangeScriptableObject` targeting the 26 canonical `ChangeableValue` attributes:
+  `Health`, `Armor`, `Speed`, `Damage`, `AttackRange`, `Cooldown`, `SightRange`, `BuildTime`, `CrystalCost`, `HealPerSecond`, `ShieldCapacity`, `EnergyMax`, `EnergyRecharge`, `CritChance`, `CritMultiplier`, `SplashRadius`, `Knockback`, `Accuracy`, `Evasion`, `LifeSteal`, `SlowResistance`, `StunDuration`, `DotDamage`, `DotDuration`, `ProductionSpeed`, `RadarRange`.
+- Registered into `RelicBalancingStore` or `ManageStartCardChanges`. Environmental hazards use trigger colliders (`isTrigger = true`) with amortized tick rates ($\ge 0.5\text{s}$). Dynamic Heat scaling limited to $\le 3\%$ major combat stat per level, maximum $+15\%$ `AttackRange`.
+
+#### 5. VFX & Audio Authoring
+- URP ParticleSystem prefabs using soft unlit alpha shaders. Dual-tier fallback in `RuntimeVisualVfxFallback`.
+- Spatial 3D audio anchored to `Socket_EngineAudio` and `Socket_WeaponAudio` with logarithmic roll-off (min 5m, max 45m).
+
+---
+
+## 7. Steam Runtime Smoke & Control Procedures
+
+When verifying loader or content behavior in a live Steam session:
+1. **Preflight Health Check**: Verify BepInEx MCP bridge responsive via protocol 2.0; locate `Rogue Command.exe` via `Get-CimInstance Win32_Process`.
+2. **Profile Isolation**: Confirm active profile is backed up under `Profiles/Profile<n>/`; ensure no residual `savegame.dat` exists on test profiles.
+3. **Steam Cloud Safeguard**: Ensure Steam Cloud synchronization is temporarily disabled in Steam game properties before starting a match.
+4. **Reversible Deployment**: Back up all 8 package targets and `LogOutput.log` before deploying new plugin or bundle builds.
+5. **Post-Run Restoration**: Confirm process exit via `LoadScene.QuitGame` (`Application.Quit`); verify and restore all 8 targets to exact original SHA-256 hashes; restore original BepInEx log and profile selector; re-enable Steam Cloud.
+
+### Controlled Steam Runtime Verification Protocol (AI & Card Rewards)
+When validating mod content during live Steam sessions, follow these precise experimental protocols:
+- **Reactive AI Counterattack Dispatch**:
+  1. Confirm simulation time advances (`Time.timeScale == 1.0f`).
+  2. Spawn a live Player combat unit with `canNotBeAttacked = false`, `canNotBeTargetedByAi = false`, and `doNotRegisterGlobally = false`.
+  3. Issue a native Attack order targeting an AI building whose `aiBaseIndex` matches the active profile.
+  4. Ensure `CurrentAttackTarget` references the target building while the attacker is within `defenseRadiusCells` (default 12 cells).
+  5. Ensure AI base 0 has an uncommitted combat unit with attack and movement enabled, no current target, no paused skill activation, and an idle or Move command within `defenseRadiusCells`.
+  6. Confirm the defender transitions to the attacker's position and initiates weapon firing. Do not claim reactive behavior from profile attachment alone.
+- **Stage Blueprint Reward Sampling**:
+  1. Progression route maps sample rewards from active stage pools via `ChooseCard.PresentCardsToChoose`.
+  2. Modded factory blueprints appear only when active stage definitions declare their unit IDs.
+  3. When an offer appears, verify that placing the factory deducts crystals, starts rollout upon completion, opens factory doors via `InProductionCount > 0`, and instantiates the unit with custom 3D visuals.
+
+### Content-First Expansion Philosophy & Boundary Guarantees
+- **Native World Progression Variants**: Modded stages currently operate as progression variants on native world templates (`27 Circles`, `MainSceneDesert`, etc.), injecting custom seeds, parameters, and reward pools additively.
+- **Prefab & Script Containment**: The authoring project at `unity/RogueCommandAssetAuthoring/` cannot attach compiled game scripts from `Assembly-CSharp.dll` inside the Editor. Visual prefabs must remain script-free, relying entirely on `RuntimeVisualDirector` attached dynamically by the loader.
+- **Release Packaging Invariant**: Rebuild the release DLL, validate manifests/schemas, build the 9-entry ZIP via `Package-Loader.ps1`, and verify hashes before distributing.
+
+---
+
+### Authoritative 8-Target Reversible Deployment Table
+
+| Target Index | Deployment Destination in Steam Installation | Source File in Repository / Artifacts | Post-Run Verification |
+|---|---|---|---|
+| 1 | `BepInEx/plugins/RogueCommandExpansionLoader.dll` | `artifacts/bin/.../RogueCommandExpansionLoader.dll` | Match baseline SHA-256 |
+| 2 | `BepInEx/config/local.roguecommand.expansionloader.cfg` | Generated config | Verify no unmapped keys |
+| 3 | `BepInEx/plugins/content/packs/sample-native-expansion/pack.json` | `content/packs/sample-native-expansion/pack.json` | Exact byte match |
+| 4 | `BepInEx/plugins/content/packs/sample-native-expansion/content.json`| `content/packs/sample-native-expansion/content.json`| Exact byte match |
+| 5 | `BepInEx/plugins/content/packs/sample-native-expansion/bundles/sample-native-expansion.bundle` | `content/packs/sample-native-expansion/bundles/...` | Match bundle hash |
+| 6 | `BepInEx/plugins/content/packs/sample-reactive-ai/pack.json` | `content/packs/sample-reactive-ai/pack.json` | Exact byte match |
+| 7 | `BepInEx/plugins/content/packs/sample-reactive-ai/content.json` | `content/packs/sample-reactive-ai/content.json` | Exact byte match |
+| 8 | `BepInEx/plugins/content/packs/sample-reactive-ai/bundles/sample-reactive-ai.bundle` | `content/packs/sample-reactive-ai/bundles/...` | Match bundle hash |
 
 ```powershell
-# 1. Compile Release Loader DLL
-dotnet build src/RogueCommandExpansionLoader/RogueCommandExpansionLoader.csproj --configuration Release --verbosity minimal
-
-# 2. Run Offline Test Suite (132/133 tests passing; 1 skipped for Windows symlink privilege)
-dotnet run --project tests/RogueCommandExpansionLoader.ValidationTests -- .
-
-# 3. Build Staged Distributable ZIP under artifacts/packages/
-.\tools\Package-Loader.ps1
-
-# 4. Verify Twin Script Parity (must return 0 differences)
-fc.exe /b tools\RogueModelKit.py .agents\skills\rogue-command-3d-model-authoring\scripts\RogueModelKit.py
-fc.exe /b tools\generate_unit_model.py .agents\skills\rogue-command-3d-model-authoring\scripts\generate_unit_model.py
+# Restore baseline deployment files and re-verify SHA-256 hashes
+Get-FileHash "C:\Program Files (x86)\Steam\steamapps\common\Rogue Command\BepInEx\plugins\RogueCommandExpansionLoader.dll"
 ```
 
-> [!WARNING]
-> Keep BepInEx, Harmony, and game assemblies out of the distributable ZIP. Only local development builds may reference them.
+---
+
+## 8. Development & Packaging Workflow
+
+### Local Build and Validation Commands
+```powershell
+# 1. Compile C# Loader and run complete validation suite (132 checks)
+dotnet run --project tests/RogueCommandExpansionLoader.ValidationTests -- .
+
+# 2. Rebuild Release Plugin DLL and create distributable 9-entry ZIP
+powershell -ExecutionPolicy Bypass -File tools/Package-Loader.ps1
+
+# 3. Verify twin script binary parity (0 byte difference required)
+fc.exe /b tools\RogueModelKit.py .agents\skills\rogue-command-3d-model-authoring\scripts\RogueModelKit.py
+fc.exe /b tools\generate_unit_model.py .agents\skills\rogue-command-3d-model-authoring\scripts\generate_unit_model.py
+
+# 4. Blender 4.5.14 dry-run archetype preflight
+.tools\Blender-4.5.14\blender-4.5.14-windows-x64\blender.exe --background --python tools/generate_unit_model.py -- --batch-all-archetypes --dry-run
+```
+
+### Unity 2021.3.45f2 Authoring Project Architecture
+- **Location**: `unity/RogueCommandAssetAuthoring/`
+- **Engine Baseline**: Unity `2021.3.45f2` (Mono Standalone x64, URP).
+- **Preserved Metadata**: `ProjectSettings/ProjectSettings.asset`, `ProjectSettings/TagManager.asset`, `Packages/manifest.json`, and Plastic SCM (`.plastic/`, `ProjectSettings/PlasticSCM.asset`). Never delete or overwrite with external project settings.
+- **Headless Prefab Scaffolding Command**:
+  ```powershell
+  & "C:\Program Files\Unity\Hub\Editor\2021.3.45f2\Editor\Unity.exe" `
+    -batchmode -quit `
+    -projectPath "unity\RogueCommandAssetAuthoring" `
+    -executeMethod RogueCommandExpansion.Authoring.VehiclePrefabBuilder.BuildPrefabFromCommandLine `
+    -gameplayJson "artifacts\ColossusFortress.gameplay.json"
+  ```
+- **AssetBundle Build Command**:
+  ```powershell
+  & "C:\Program Files\Unity\Hub\Editor\2021.3.45f2\Editor\Unity.exe" `
+    -batchmode -quit `
+    -projectPath "unity\RogueCommandAssetAuthoring" `
+    -executeMethod RogueCommandExpansion.Authoring.AssetBundleBuilder.BuildAssetBundles
+  ```
+
+### Research Commands for Asset & Runtime Inspection
+```powershell
+# Scan game serialized assets and extract progression objects
+.venv\Scripts\python.exe tools\asset_inventory.py `
+  --asset-root "C:\Program Files (x86)\Steam\steamapps\common\Rogue Command\Rogue Command_Data" `
+  --output-dir docs\research\generated
+
+.venv\Scripts\python.exe tools\inspect_unity_objects.py `
+  --game-root "C:\Program Files (x86)\Steam\steamapps\common\Rogue Command" `
+  --asset-file resources.assets `
+  --path-id 384970 --path-id 384977 --path-id 384981 `
+  --output docs\research\generated\progression-objects.json
+
+# Run balance simulator
+.venv\Scripts\python.exe tools\simulate_balance.py --csv content/data/balancing.tsv
+```
+
+### Evidence Boundaries & Verification Discipline
+- **Static Inspection**: Repository files, Python AST, managed assemblies via REA, Unity serialized asset inspection via UnityPy. Does not establish runtime execution.
+- **Local Validation**: C# build output, validation test suite execution, ZIP archive audits, Blender background dry runs. Proves code correctness and packaging rules.
+- **In-Game Runtime Evidence**: Observations from a live game session launched through Steam (AppID `1461910`). Only live evidence proves match functionality, card offers, factory production, and visual rendering.
+
+### Git & Branch Policy
+- Work committed on `codex/rogue-unit-balance-20261018` tracking `origin/codex/rogue-unit-balance-20261018`.
+- Stage only task-owned paths explicitly (`git add <files>`); never use bulk `git add -A`.
+- Keep BepInEx, Harmony, and game assemblies out of Git and distributable ZIPs.
 
 ---
 
-## 6. Runtime Evidence & Steam Testing Boundaries
+## 9. Next Implementation Milestones & Task Roadmap
 
-- **Evidence Boundaries**:
-  - *Static Inspection*: Assembly metadata, CIL tokens, REA projections, serialized YAML.
-  - *Local Build / Validation*: Compiler success, AssetBundle build, 132 passing harness tests.
-  - *Runtime Evidence*: Live observations inside a Steam-launched match (`Rogue Command.exe` AppID `1461910`).
-- **Verified Runtime Milestones**:
-  - BepInEx MCP bridge connected on loopback (Protocol 2.0).
-  - Loader initialized cleanly with 26 verified Harmony hooks and 0 error lines.
-  - Content packs (`sample-native-expansion` and `sample-reactive-ai`) loaded and registered 10 product/factory prefabs under `DontDestroyOnLoad`.
-  - Profile 1 and Profile 3 isolation verified with zero persistent save pollution; Steam Cloud remained disabled during tests.
-- **Process Discovery Note**: The game executable contains a space: `Rogue Command.exe`. In PowerShell, query via `Get-CimInstance Win32_Process -Filter "Name = 'Rogue Command.exe'"`.
+1. **Procedural 3D Asset Generation for 5 Expansion Units**:
+   - Run `generate_unit_model.py` for each unit archetype (`scout-tank`, `heavy-artillery`, `assault-walker`, `skirmish-bike`, `surge-tank`).
+   - Validate ground contact ($Z_{\min} \ge 0.0\text{m}$), 4-channel vertex shading, and unprefixed sockets.
+2. **Unity Prefab Scaffolding & AssetBundle Export**:
+   - Execute `VehiclePrefabBuilder` and `AssetBundleBuilder` in Unity `2021.3.45f2`.
+   - Embed `RogueCommand/VehiclePBR_VertexWear` shader into `sample-native-expansion.bundle`.
+3. **Stage Reward Distribution & Drafting Verification**:
+   - Verify randomized blueprint offering in stage pools via BepInEx MCP telemetry.
+   - Confirm 1:1 factory placement and unit production rollout.
+4. **Reactive Tactical AI Combat Playtest**:
+   - Validate `HarvesterRaiderAiModule` and `SiegeAssaultAiModule` command lifecycle in live match.
+   - Confirm base defense interceptors engage within `defenseRadiusCells = 12`.
+5. **Release Distribution & Packaging Verification**:
+   - Execute `tools/Package-Loader.ps1` to produce distributable ZIP with exact 9-entry manifest.
+   - Run complete automated test suite to ensure all 132 validation checks pass.
 
----
-
-## 7. Next Implementation Milestones
-
-1. **Live Combat Validation**: Execute a reversible Steam-launched match to verify in-combat unit instantiation, visual overlay alignment, and weapon firing feedback for the 5 sample expansion units.
-2. **AI Combat Decision Verification**: Validate that `sample:reactive-base-defense` and `sample:harvester-raider` trigger autonomous counterattacks during dense combat.
-3. **Stage Map Progression**: Verify natural progression through appended stages (indices 9–12) and confirmation of reward card drafting across profiles.
