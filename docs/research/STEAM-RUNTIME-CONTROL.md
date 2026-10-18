@@ -13,7 +13,7 @@ No inicies `RogueCommand.exe` directamente. La partida de aceptación debe venir
 1. Comprueba el puente con `mcp__bepinex_mcp__ping_unity_bridge` y lee `mcp__bepinex_mcp__get_runtime_capabilities`. Anota runtime, versión de Unity, versión de BepInEx y arquitectura.
 2. Obtén la ruta real del juego con `mcp__bepinex_mcp__get_game_paths`.
 3. Revalida juntos versión del juego, SHA-256 y MVID de `Assembly-CSharp.dll`. Usa `mcp__rea__inspect_managed_artifact` en modo `summary` sobre la ruta devuelta y confirma la versión en el log del juego. No uses firmas reflejadas ni metadata tokens si cualquiera de los tres valores cambió.
-4. Verifica el PID/estado de Steam y del juego, la escena activa, el perfil elegido y la existencia de `savegame.dat` antes de pulsar botones.
+4. Verifica el PID/estado de Steam y del juego, la escena activa, el selector de perfil que realmente usa el juego y la existencia de `savegame.dat` antes de pulsar botones. Resuelve el selector desde `ProfileManager.CurrentProfileTextPath`/`CurrentProfilePath`, no desde un archivo histórico de la carpeta de instalación.
 
 En esta instalación el proceso se llama exactamente `Rogue Command.exe` (con espacio). `Get-Process -Name RogueCommand` no lo encuentra y puede producir un falso diagnóstico de que el juego está cerrado. Comprueba el ejecutable real con:
 
@@ -31,6 +31,12 @@ El puente se aloja dentro del proceso del juego. Si `Rogue Command.exe` está ce
 Si dos intentos independientes de inspección fallan o devuelven estados contradictorios, deja de repetir la misma llamada y usa la skill `screenshot` para inspeccionar la ventana objetivo. Para una captura que solo sirve al análisis, guárdala en temporal (`-Mode temp`); conserva una copia bajo `artifacts/runtime-smoke/` únicamente si aporta evidencia útil a la prueba. Verifica el título y el contenido de la captura antes de interpretarla: en Windows, capturar los límites de una ventana tapada muestra lo que está delante, no el contenido oculto de la aplicación. Si Rogue Command no está visible o la captura apunta a otra ventana, no la cuentes como evidencia; pide al usuario que ponga el juego al frente antes de intentarlo otra vez. Correlaciona la imagen con la escena, el log y las lecturas del puente; una captura no demuestra estado interno que no se vea.
 
 Identidad observada en esta sesión: Rogue Command 1.0.9; Unity 2021.3.45f2; BepInEx 5.4.23.5 Mono x64; `Assembly-CSharp.dll` SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`; MVID `db0e9462-128d-4296-9900-de18b4bd0c00`. Son valores de referencia, no sustituyen la comprobación de cada sesión.
+
+### Resolver el perfil activo
+
+En el `Assembly-CSharp.dll` de esta identidad, el inicializador de `ProfileManager` construye `ProfilesPath` y `CurrentProfileTextPath` desde `Application.persistentDataPath`. En esta instalación, `persistentDataPath` es `C:\Users\Alex\AppData\LocalLow\Feneq\Rogue Command`; el juego lee el selector `Profiles\currentProfile.txt` bajo esa raíz y obtiene `savegame.dat` desde el perfil resultante. No uses `currentProfile.txt` ni `Profiles\currentProfile.txt` dentro de la carpeta de instalación como selector activo: son rutas heredadas y pueden conservar valores antiguos distintos.
+
+En la lectura en vivo del 2026-10-18, el selector de `LocalLow` valía `1`, mientras los dos archivos de la instalación valían `2` y `3`. El perfil activo era `Profile1`; al iniciar no tenía `savegame.dat`. `Profile2` y `Profile3` sí tenían guardados. Esta comprobación estática y de archivos corrige la clasificación de la lectura histórica más abajo: vuelve a consultar la ruta de `ProfileManager` en cada sesión y no cambies ninguno de los selectores heredados para elegir un perfil de prueba.
 
 ## Inspección primero
 
@@ -76,11 +82,11 @@ Para afirmar que una carta apareció, registra la oferta que realmente se render
 
 ## Perfiles, datos y reversión
 
-- Vuelve a comprobar cada perfil en cada intento: la presencia de `savegame.dat` y otros datos cambia y no debe inferirse de una captura histórica. En la lectura del 2026-10-18, Profile 1 y Profile 2 no tenían `savegame.dat`, Profile 2 sí contenía otros datos y Profile 3 estaba vacío.
-- En la prueba del 2026-10-18, `currentProfile.txt` contenía originalmente `3`; se eligió Profile 1 tras comprobar que no tenía `savegame.dat` y respaldar sus archivos en `artifacts/runtime-smoke/loader-stage-ai-20261018-113519/profiles/Profile1-before`. El selector temporal quedó en `1`. Restaura el valor original anotado en el manifiesto de despliegue, después de cerrar el juego.
-- La limpieza de esa prueba terminó: el selector volvió a `3`, los ocho destinos de instalación y `BepInEx/LogOutput.log` coinciden con sus copias originales por SHA-256, Profile 1 conserva solo sus dos archivos previos y Steam Cloud no se modificó.
+- Vuelve a comprobar cada perfil en cada intento: la presencia de `savegame.dat` y otros datos cambia y no debe inferirse de una captura histórica. La lectura histórica de la carpeta de instalación que clasificó Profile 3 como vacío no consultó el selector real de `persistentDataPath`; la lectura actual muestra guardados en Profile 2 y Profile 3.
+- El manifiesto `loader-stage-ai-20261018-113519/deployment-manifest.json` anotó `originalSelector=3` y temporal `1` en la ruta de la instalación. Ese cambio no seleccionó el perfil activo que usa `ProfileManager`: el selector de `LocalLow` ya valía `1`. La limpieza registrada restauró los archivos que había tocado, pero no prueba que Profile 3 fuese el perfil activo.
+- La reversión de archivos del juego y de perfiles debe basarse en las rutas y SHA-256 del intento actual. Nunca restaures el selector real a `2` o `3` basándote solo en el manifiesto histórico citado arriba.
 - Steam Cloud está desactivado por instrucción persistente del usuario. No volver a preguntar ni cambiar esa opción.
-- No borres los archivos que el juego cree durante la prueba. Conserva el nuevo save de prueba y vuelve al perfil anterior al salir limpiamente del juego. Restaura `currentProfile.txt` al valor exacto registrado antes de iniciar; en la prueba del 2026-10-18 el valor original era `3` y el valor temporal fue `1`.
+- No borres los archivos que el juego cree durante la prueba. Respalda todos los datos existentes del perfil activo antes de iniciarla y, al cerrar el juego, restaura desde ese respaldo los archivos previos que la prueba haya modificado. Conserva los archivos nuevos creados durante la prueba y restaura únicamente el selector bajo `persistentDataPath` si el intento lo cambió expresamente.
 - Antes de instalar o cambiar archivos del juego, conserva rutas, copias y SHA-256 de cada destino. No restaure una DLL/contenido mientras el juego siga abierto. Al acabar, restaura los archivos de instalación temporales y verifica sus hashes.
 - Conserva logs, trazas y snapshots bajo `artifacts/runtime-smoke/` (ruta ignorada por Git). No incluyas logs locales, saves, BepInEx, Harmony ni assemblies del juego en el ZIP distribuible.
 - Desactiva y elimina las sondas, watchers o patches creados para la prueba. Usa como máximo un inspector temporal por perfil de prueba; no dejes componentes de diagnóstico en objetos persistentes.
@@ -94,4 +100,4 @@ Para afirmar que una carta apareció, registra la oferta que realmente se render
 - **Validación local:** 132/133 checks del harness pasaron; el único omitido fue la fixture de symlink por falta de privilegio de Windows. El validador resolvió 10/10 referencias de Sprite/prefab y el preflight estático resolvió 5/5 raíces visuales. Son pruebas locales, no de oferta o renderizado en partida.
 - **Sondas:** los componentes temporales `Rcl*Probe` usados en la lectura se destruyeron y se comprobó su ausencia del HUD. No se modificaron archivos versionados ni de instalación; las salidas de validación están bajo `artifacts/`.
 
-Cuando el juego cierre, restaura el selector a Profile 2 y deja intactos los datos recién creados en el perfil de prueba. No sobrescribas ni elimines perfiles para volver a un estado limpio.
+Cuando el juego cierre, conserva la selección del perfil activo que registraste antes de la sesión y deja intactos los datos recién creados en el perfil de prueba. No cambies el selector a Profile 2 ni sobrescribas o elimines perfiles para volver a un estado limpio.

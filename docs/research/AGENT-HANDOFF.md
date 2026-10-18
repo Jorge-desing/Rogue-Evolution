@@ -30,10 +30,11 @@ Always recheck this identity before relying on reflected signatures, CIL metadat
 - **Lifecycle & Health**: The bridge HTTP endpoint (`http://localhost:54321/mcp`) is hosted in-process by BepInEx. A ping failure when no process runs is expected. Follow pings with at least one root GameObject or scene read before asserting connection. Consult [STEAM-RUNTIME-CONTROL.md](STEAM-RUNTIME-CONTROL.md).
 - **Bridge Query Schema**: The bridge accepts JSON-RPC `unity_query` payloads (`{"query": "FindObjectsOfType", "type": "EntityController"}`) returning serialized hierarchy state, component values, and active scene tags without game engine stall.
 - **Verified Startup State**: Steam launch (AppID `1461910`) loads `RogueCommandExpansionLoader.dll` with 26 verified Harmony hooks, registers both sample packs (`sample-native:expansion` and `sample-reactive-ai:expansion`), and transitions cleanly across `MainMenu`, `RunSetup`, `IntermissionScreen`, and `Game`.
+- **Current paused follow-up (2026-10-18)**: The user's screenshot showed the `FirstRun` tutorial's `INICIAR` screen. The in-game button's persistent listener resolved to `PlaceMapObjectsBeforePlayerCanStart.OnPlayerHasPressedStart`; it was invoked once through the native Unity `Button`, and `_playerHasNotPressedStartYet` changed to `false`. The user then paused with Esc. Live bridge inspection confirms `InGameMenu._isShowing = true`; no active `ChooseCard` object or mod AI instance was observed at this point. Continue through the normal run flow before judging random unit offers or reactive AI. The temporary button listener inspector was removed and the bridge has no temporary watchers or patches.
 
 ### Profile Isolation & Cleanup Invariants
 - **Profile Backups**: Testing uses Profile 1 or temporary profiles. Pre-run files under `Profiles/` must be backed up before matches.
-- **Steam Cloud Safeguard**: Steam Cloud synchronization must be temporarily disabled in Steam UI during test matches touching saves, and re-enabled only after restoring baseline hashes.
+- **Steam Cloud Safeguard**: Steam Cloud is disabled by persistent user instruction. Preserve that setting during tests and cleanup; never toggle it.
 - **Package Deployment Integrity**: Distributable ZIPs (`artifacts/packages/RogueCommandExpansionLoader-0.1.0.zip`) contain 9 entries: loader DLL, schemas, and content packs. Never include BepInEx core, Harmony, game assemblies, PDBs, or Unity `Library/` outputs in packages.
 
 ---
@@ -192,16 +193,16 @@ The repository equips 13 local skills under `.agents/skills/`:
 
 When verifying loader or content behavior in a live Steam session:
 1. **Preflight Health Check**: Verify BepInEx MCP bridge responsive via protocol 2.0; locate `Rogue Command.exe` via `Get-CimInstance Win32_Process`.
-2. **Profile Isolation**: Confirm active profile is backed up under `Profiles/Profile<n>/`; ensure no residual `savegame.dat` exists on test profiles.
-3. **Steam Cloud Safeguard**: Ensure Steam Cloud synchronization is temporarily disabled in Steam game properties before starting a match.
+2. **Profile Isolation**: Resolve the active profile through `ProfileManager.CurrentProfileTextPath` under `Application.persistentDataPath`, back up its existing files, and check for `savegame.dat` there. Do not assume a selector under the game installation is authoritative.
+3. **Steam Cloud Safeguard**: Preserve the user's existing Steam Cloud preference. For this project it is disabled by persistent user instruction; do not toggle it during a test.
 4. **Reversible Deployment**: Back up all 8 package targets and `LogOutput.log` before deploying new plugin or bundle builds.
-5. **Post-Run Restoration**: Confirm process exit via `LoadScene.QuitGame` (`Application.Quit`); verify and restore all 8 targets to exact original SHA-256 hashes; restore original BepInEx log and profile selector; re-enable Steam Cloud.
+5. **Post-Run Restoration**: Confirm process exit via `LoadScene.QuitGame` (`Application.Quit`); verify and restore all 8 targets to exact original SHA-256 hashes and restore the original BepInEx log. Restore pre-existing profile files from the session backup if the test changed them, preserve files created during the test, and restore only the selector under `persistentDataPath` if that test explicitly changed it. Never toggle Steam Cloud as cleanup.
 
 ### Controlled Steam Runtime Verification Protocol (AI & Card Rewards)
 When validating mod content during live Steam sessions, follow these precise experimental protocols:
 - **Reactive AI Counterattack Dispatch**:
   1. Confirm simulation time advances (`Time.timeScale == 1.0f`).
-  2. Spawn a live Player combat unit with `canNotBeAttacked = false`, `canNotBeTargetedByAi = false`, and `doNotRegisterGlobally = false`.
+  2. Use a naturally obtained live Player combat unit with `canNotBeAttacked = false`, `canNotBeTargetedByAi = false`, and `doNotRegisterGlobally = false`; do not use the debug/test spawner.
   3. Issue a native Attack order targeting an AI building whose `aiBaseIndex` matches the active profile.
   4. Ensure `CurrentAttackTarget` references the target building while the attacker is within `defenseRadiusCells` (default 12 cells).
   5. Ensure AI base 0 has an uncommitted combat unit with attack and movement enabled, no current target, no paused skill activation, and an idle or Move command within `defenseRadiusCells`.
