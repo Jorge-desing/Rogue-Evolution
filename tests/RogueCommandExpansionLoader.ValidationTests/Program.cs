@@ -1110,10 +1110,16 @@ var tests = new (string Name, Action Run)[]
             "weaponRange", "effectRadius1", "effectRadius2", "skillRange", "healAmount1", "healAmount2",
             "gainCreditsAmount", "skillManaCost", "duration1", "duration2"
         ];
+        var cardImages = new HashSet<string>(StringComparer.Ordinal);
 
         foreach (KeyValuePair<string, string> expected in expectedUnlockLevels)
         {
             ContentUnitDefinition unit = nativeSample.units.Single(candidate => candidate.id == expected.Key);
+            if (string.IsNullOrWhiteSpace(unit.cardImageAssetName) || !cardImages.Add(unit.cardImageAssetName))
+            {
+                throw new InvalidOperationException($"Card {unit.id} is missing a unique custom card image.");
+            }
+
             foreach (string stat in requiredCardStats)
             {
                 if (unit.balanceOverrides == null || !unit.balanceOverrides.Any(entry => entry.name == stat))
