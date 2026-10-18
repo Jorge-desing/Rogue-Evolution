@@ -100,6 +100,7 @@
       "id": "sample-native:assault-walker",
       "nativeTemplateId": "GatlingWalker",
       "assetBundleId": "sample-native:assets",
+      "cardImageAssetName": "assets/roguecommandexpansionsample/ironcladwalkercard.png",
       "visualAssetName": "assets/roguecommandexpansionsample/ironcladwalkervisual.prefab",
       "visualRootPath": "RoboMarine_Mesh",
       "localizations": [
@@ -183,6 +184,7 @@
       "id": "sample-native:surge-tank",
       "nativeTemplateId": "LightningTank",
       "assetBundleId": "sample-native:assets",
+      "cardImageAssetName": "assets/roguecommandexpansionsample/surgearctankcard.png",
       "visualAssetName": "assets/roguecommandexpansionsample/surgearctankvisual.prefab",
       "visualRootPath": "PCX TankHolder",
       "localizations": [

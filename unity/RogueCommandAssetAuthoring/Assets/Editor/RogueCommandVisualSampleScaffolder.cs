@@ -25,8 +25,10 @@ namespace RogueCommandExpansion.Authoring
         private const string ColossusCardSpritePath = AssetRoot + "/ColossusSiegeCard.png";
         private const string ColossusModelPath = AssetRoot + "/Models/ColossusSiegePlatform.fbx";
         private const string IroncladPrefabPath = AssetRoot + "/IroncladWalkerVisual.prefab";
+        private const string IroncladCardSpritePath = AssetRoot + "/IroncladWalkerCard.png";
         private const string IroncladModelPath = AssetRoot + "/Models/IroncladWalker.fbx";
         private const string SurgeArcTankPrefabPath = AssetRoot + "/SurgeArcTankVisual.prefab";
+        private const string SurgeArcTankCardSpritePath = AssetRoot + "/SurgeArcTankCard.png";
         private const string SurgeArcTankModelPath = AssetRoot + "/Models/SurgeArcTank.fbx";
         private const string MaterialRoot = AssetRoot + "/Materials";
         private const string BundleOutputPath = "../../artifacts/asset-bundles";
@@ -57,7 +59,9 @@ namespace RogueCommandExpansion.Authoring
                 string colossusPrefabPath = CreateColossusVisual();
                 ImportCardSprite(ColossusCardSpritePath);
                 string ironcladPrefabPath = CreateIroncladVisual();
+                ImportCardSprite(IroncladCardSpritePath);
                 string surgeArcTankPrefabPath = CreateSurgeArcTankVisual();
+                ImportCardSprite(SurgeArcTankCardSpritePath);
                 string projectRoot = Directory.GetParent(Application.dataPath).FullName;
                 string outputPath = Path.GetFullPath(Path.Combine(projectRoot, BundleOutputPath));
                 Directory.CreateDirectory(outputPath);
@@ -70,7 +74,8 @@ namespace RogueCommandExpansion.Authoring
                         prefabPath, CardSpritePath,
                         bikePrefabPath, BikeCardSpritePath,
                         colossusPrefabPath, ColossusCardSpritePath,
-                        ironcladPrefabPath, surgeArcTankPrefabPath
+                        ironcladPrefabPath, IroncladCardSpritePath,
+                        surgeArcTankPrefabPath, SurgeArcTankCardSpritePath
                     }
                 };
                 AssetBundleManifest manifest = BuildPipeline.BuildAssetBundles(outputPath,
@@ -103,8 +108,8 @@ namespace RogueCommandExpansion.Authoring
 
                 AssetDatabase.Refresh();
                 Debug.Log("Built script-free Sandlance, Skirmish Bike, Colossus, Ironclad, and Surge Arc Tank " +
-                    "visual overlays in " + BundleName + " at " + packBundles + ". Ironclad and Surge Arc Tank " +
-                    "retain their native cards, and all units retain their native gameplay prefabs.");
+                    "visual overlays and card Sprites in " + BundleName + " at " + packBundles + ". All units " +
+                    "retain their native gameplay prefabs.");
             }
             catch (Exception exception)
             {
@@ -451,9 +456,9 @@ namespace RogueCommandExpansion.Authoring
                 ValidateVisualBundleAssets(bundle, assetNames, "colossussiegevisual.prefab", "ColossusSiegeVisual",
                     "colossussiegecard.png", "ColossusSiegeCard", 8, "Colossus Siege Platform");
                 ValidateVisualBundleAssets(bundle, assetNames, "ironcladwalkervisual.prefab", "IroncladWalkerVisual",
-                    null, null, 5, "Ironclad Walker");
+                    "ironcladwalkercard.png", "IroncladWalkerCard", 5, "Ironclad Walker");
                 ValidateVisualBundleAssets(bundle, assetNames, "surgearctankvisual.prefab", "SurgeArcTankVisual",
-                    null, null, 6, "Surge Arc Tank");
+                    "surgearctankcard.png", "SurgeArcTankCard", 6, "Surge Arc Tank");
             }
             finally
             {

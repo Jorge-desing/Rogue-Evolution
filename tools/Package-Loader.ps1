@@ -227,8 +227,7 @@ The native sample adds five localized native-template units with script-free
 visual overlays: Sandlance Scout, Skirmish Strike Bike, Colossus Siege Platform,
 Ironclad Walker, and Surge Arc Tank. Every unit declares its own new production
 building; random blueprint rewards offer that building to produce its unit.
-The first three units have custom card Sprites;
-Ironclad and Surge Arc Tank keep their native cards. All five keep native gameplay
+All five units have unique custom card Sprites and keep native gameplay
 controllers, while the pack adds a stage variant, a seeded native landscape variant,
 and a scheduled-build AI module.
 The reactive AI stage references Sandlance and uses a native AI template with a
@@ -250,8 +249,7 @@ Install:
    Platform, Ironclad Walker, and Surge Arc Tank. Each unit has a separately registered
    production building with its own ID, native factory prefab, and localized name.
    Random rewards offer the new building blueprint; that building produces its unit.
-   The first three units have custom card
-   Sprites; Ironclad and Surge Arc Tank retain their native cards. The pack also adds a
+   All five units have unique custom card Sprites. The pack also adds a
    native stage variant, a fixed-seed landscape variant, and a scheduled-build AI
    module; every unit keeps its native gameplay controller.
    The sample-reactive-ai pack demonstrates a native stage variant that references
