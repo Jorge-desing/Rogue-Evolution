@@ -2051,8 +2051,19 @@ namespace RogueCommandExpansionLoader.Content
 
                 LoadPacksInDependencyOrder(candidates);
 
+                int productionBuildingCount = 0;
+                foreach (LoadedUnit unit in _units.Values)
+                {
+                    if (unit.IsProductionBuilding)
+                    {
+                        productionBuildingCount++;
+                    }
+                }
+
+                int productUnitCount = _units.Count - productionBuildingCount;
                 Log("Carga finalizada: " + _contributions.Count + " paquete(s) de progresión y " +
-                    _entityRows.Count + " unidad(es) nuevas.");
+                    _units.Count + " entidad(es) nuevas (" + productUnitCount + " unidad(es) y " +
+                    productionBuildingCount + " edificio(s) de producción).");
             }
             catch (Exception exception)
             {

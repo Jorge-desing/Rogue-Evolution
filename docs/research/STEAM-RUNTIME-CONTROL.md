@@ -10,7 +10,40 @@ No inicies `RogueCommand.exe` directamente. La partida de aceptación debe venir
 
 ## Pausa segura y control de botones
 
-Cuando el usuario pida detener el avance, abre el menú nativo de pausa con Escape o, si el puente es el medio disponible, resuelve en la escena actual `InGameMenuCanvas` y llama una sola vez a `InGameMenu.Show()`. Lee `InGameMenu._isShowing` después de la acción. Ese campo confirma que el menú está visible; si es importante probar que la simulación se congeló, comprueba además el reloj/contador de juego o `Time.timeScale` disponible en esa build. Mantén la pausa mientras inspeccionas o razonas. La autorización explícita de control permite avanzar durante una interacción supervisada; pausa de nuevo entre acciones. Si la sesión de juego forma parte de una tarea activa, mantenla abierta y pausada entre interacciones supervisadas. Ciérrala normalmente cuando esa tarea haya terminado; no la cierres solo porque no se esté usando en ese momento.
+Cuando el usuario pida detener el avance, abre el menú nativo con Escape o, si el puente es el medio disponible, resuelve en la escena actual `InGameMenuCanvas` y llama una sola vez a `InGameMenu.Show()`. Después verifica por separado el menú y la simulación: `InGameMenu._isShowing=true` solo confirma que el menú está visible. No afirmes que la partida está pausada hasta leer `Time.timeScale == 0` o comprobar que el contador de juego no cambia en dos observaciones separadas por varios segundos. En la sesión del 2026-10-18 el menú siguió visible mientras el HUD avanzó de `00:16` a `01:19`; el puente mostró `Time.timeScale=1` antes de que se congelara manualmente. En esa build, abrir el menú no detuvo la partida.
+
+Si Escape/`Show()` deja el menú abierto pero `Time.timeScale` sigue en `1`, congela la simulación con un `MonoBehaviour` temporal compilado mediante `mod_inject_class`, adjúntalo al `InGameMenuCanvas` actual y llama su método `Freeze()` por el puente. Este patrón conserva el valor de escala anterior y permite verificar el resultado desde campos públicos:
+
+```csharp
+using UnityEngine;
+
+public sealed class RclRuntimeTimeControl : MonoBehaviour
+{
+    public float scaleBefore;
+    public float scaleAfter;
+    private bool hasFrozen;
+
+    public void Freeze()
+    {
+        if (!hasFrozen)
+            scaleBefore = Time.timeScale;
+        Time.timeScale = 0f;
+        scaleAfter = Time.timeScale;
+        hasFrozen = true;
+    }
+
+    public void ResumeAndRemove()
+    {
+        if (hasFrozen)
+            Time.timeScale = scaleBefore;
+        Destroy(this);
+    }
+}
+```
+
+El helper realmente usado en esta sesión leyó `Time.timeScale=1`, lo cambió a `0` y expuso `scaleBefore=1`, `scaleAfter=0`; su `ResumeAndRemove()` restablece `1`, que era el valor original observado. En otra sesión, compila el patrón anterior para restaurar el valor que haya leído entonces. Vuelve a leer ambos campos antes de seguir y no dejes helpers temporales al terminar la prueba.
+
+La autorización explícita de control permite avanzar durante una interacción supervisada; al terminarla, vuelve a pausar y confirma de nuevo el estado real de la simulación. Si la sesión forma parte de una tarea activa, mantenla abierta y pausada entre interacciones supervisadas. Ciérrala normalmente cuando esa tarea haya terminado; no la cierres solo porque no se esté usando en ese momento.
 
 Antes de pulsar un botón del juego, vuelve a resolver su GameObject en la escena actual; los Instance IDs cambian al cargar otra escena o iniciar otra ejecución. Inspecciona componentes, `interactable`, texto visible (`UnityEngine.UI.Text.text` o el componente de texto presente) y listeners de Unity. Para controles nativos, `call_component_method` sobre `UnityEngine.UI.Button.Press()` ejecutó el evento normal del botón en la sesión observada. Pulsa solo una vez y comprueba de nuevo escena, paneles y estado de pausa. No trates una respuesta truncada como fallo de la operación: reduce el árbol o consulta el componente concreto.
 
@@ -48,7 +81,14 @@ Un `ping` correcto solo demuestra que responde el endpoint. Si una lectura grand
 
 ### Captura visual como respaldo de diagnóstico
 
-Si dos intentos independientes de inspección fallan o devuelven estados contradictorios, deja de repetir la misma llamada y usa la skill `screenshot` (`C:\Users\Alex\.codex\skills\screenshot\SKILL.md`) para inspeccionar la ventana objetivo. En Windows, el helper es `scripts/take_screenshot.ps1`; para una captura que solo sirve al análisis, usa `-Mode temp`. Conserva una copia bajo `artifacts/runtime-smoke/` únicamente si aporta evidencia útil a la prueba. Verifica el título y el contenido antes de interpretarla: una captura del escritorio puede mostrar Codex/Antigravity en primer plano con el juego detrás, y capturar los límites de una ventana tapada no revela su contenido. Si la ventana del juego no está visible, la imagen no es evidencia del estado del juego; pide al usuario que lo ponga al frente antes de repetir una captura visual. Correlaciona la imagen con escena, log y lecturas del puente; una captura no demuestra estado interno que no se vea.
+Si dos intentos independientes de inspección fallan o devuelven estados contradictorios, deja de repetir la misma llamada y consulta la skill `screenshot` (`C:\Users\Alex\.codex\skills\screenshot\SKILL.md`). Para una captura de escritorio normal, su helper es `scripts/take_screenshot.ps1`; para análisis temporal usa `-Mode temp`. Si el juego está cubierto por otra ventana y no quieres activarlo, usa `tools/Capture-RogueCommand-Background.ps1`: llama `PrintWindow(hwnd, memoryDC, 2)` directamente, no llama `SetForegroundWindow`, guarda el PNG en `%TEMP%` y registra el handle de primer plano antes y después. Ejemplo:
+
+```powershell
+$shot = Join-Path $env:TEMP ("rogue-command-" + (Get-Date -Format 'yyyyMMdd-HHmmss') + '.png')
+.\tools\Capture-RogueCommand-Background.ps1 -OutputPath $shot
+```
+
+El script busca exactamente un proceso `Rogue Command.exe`; si hay varios, vuelve a resolver el PID con `Get-CimInstance Win32_Process` y pásalo en `-ProcessId`. Inspecciona la imagen resultante: `PrintWindow` puede no producir contenido útil con una ventana minimizada o ciertos renderizadores. Si la captura falla, reporta su resultado y usa la skill para capturar la pantalla visible; no cambies el foco de la ventana sin autorización. Conserva una copia bajo `artifacts/runtime-smoke/` únicamente si aporta evidencia útil. Correlaciona imagen, escena, log y lecturas del puente; la imagen no demuestra estado interno que no se vea.
 
 Identidad observada en esta sesión: Rogue Command 1.0.9; Unity 2021.3.45f2; BepInEx 5.4.23.5 Mono x64; `Assembly-CSharp.dll` SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`; MVID `db0e9462-128d-4296-9900-de18b4bd0c00`. Son valores de referencia, no sustituyen la comprobación de cada sesión.
 
@@ -116,9 +156,10 @@ Para afirmar que una carta apareció, registra la oferta que realmente se render
 
 - **Runtime:** el puente respondió; Mono, Unity 2021.3.45f2 y BepInEx 5.4.23.5 x64. El log del plugin indicó 26 hooks verificados y ambos paquetes de muestra cargados: cinco unidades más cinco fábricas en `sample-native-expansion`; paquete de AI/stage reactivo separado.
 - **Estado del run:** Profile 1, experiencia persistente nivel 0 y 0 XP; escena `Game`, modo `FirstRun`, nivel de run 4, mazo `RoboCrystalMill`, `BountyTankFactory`, `Tier0TankFactory`. Aún no se observó una pantalla `ChooseCard` ni una oferta aleatoria de unidades.
-- **Control en pausa:** en la continuación del tutorial se comprobó `InGameMenu._isShowing=true`. El usuario dejó la pausa activa para evitar una derrota mientras la partida estaba desatendida. La lectura de jerarquía/textos expuso la advertencia de abandono; `UnityEngine.UI.Button.Press()` sobre `KeepPlaying` cerró el diálogo sin abandonar y se verificó `AbandonGoToMenuPanel.active=false`, manteniendo la pausa. Una captura de escritorio mostró Antigravity en primer plano y no se usó como evidencia visual del juego.
+- **Menú frente a pausa real:** en la continuación del tutorial, `KeepPlaying` cerró la confirmación sin abandonar y `InGameMenu._isShowing=true` mantuvo visible el menú. Eso solo confirmó el overlay; no se había probado que la simulación estuviera detenida. La lectura posterior del HUD confirmó que el tiempo siguió avanzando hasta que se ajustó `Time.timeScale` a `0`.
+- **Corrección de pausa real y captura en segundo plano (seguimiento, 2026-10-18):** se inició FirstRun desde el botón nativo `INICIAR`, se llegó al tutorial `7/26` y se descartó el cuadro actual con `Entendido`. La partida continuó aunque `InGameMenu._isShowing=true`: el HUD pasó de `00:16` a `01:19`. El componente temporal `RclRuntimeTimeControl` en `InGameMenuCanvas` leyó `Time.timeScale=1`, aplicó `Freeze()` y confirmó `scaleAfter=0`; el menú permaneció abierto. Dos capturas con `PrintWindow` separadas por siete segundos mostraron el mismo reloj HUD (`03:51`), resolución `1920×1080` y el mismo handle de primer plano antes/después de cada captura. El juego sigue en escena `Game`, el tutorial registra `7/26`, el menú es visible y la simulación está efectivamente congelada. El helper continúa adjunto; en esta sesión `ResumeAndRemove()` devuelve el valor previo observado (`1`) y elimina el componente.
 - **Conclusión:** esto confirma carga del plugin/paquetes y estado de un run de prueba. No confirma que las cartas nuevas aparezcan en ofertas, que una unidad se produzca o renderice, ni que una etapa o AI modded se ejecute.
 - **Validación local:** 132/133 checks del harness pasaron; el único omitido fue la fixture de symlink por falta de privilegio de Windows. El validador resolvió 10/10 referencias de Sprite/prefab y el preflight estático resolvió 5/5 raíces visuales. Son pruebas locales, no de oferta o renderizado en partida.
-- **Sondas:** los componentes temporales `Rcl*Probe` usados en la lectura se destruyeron y se comprobó su ausencia del HUD. No se modificaron archivos versionados ni de instalación; las salidas de validación están bajo `artifacts/`.
+- **Sondas:** los componentes temporales `Rcl*Probe` usados en las lecturas anteriores se destruyeron y se comprobó su ausencia del HUD. En el seguimiento más reciente, el único helper temporal que sigue adjunto es `RclRuntimeTimeControl`, usado para mantener `Time.timeScale=0`; destrúyelo al reanudar o al terminar el proceso controlado. Las salidas de validación están bajo `artifacts/`.
 
 Cuando el juego cierre, conserva la selección del perfil activo que registraste antes de la sesión y deja intactos los datos recién creados en el perfil de prueba. No cambies el selector a Profile 2 ni sobrescribas o elimines perfiles para volver a un estado limpio.
