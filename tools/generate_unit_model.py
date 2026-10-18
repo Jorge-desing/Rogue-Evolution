@@ -237,7 +237,8 @@ def parse_args():
     parser.add_argument("--emissive-color", default=None, help="Custom hex color for emissive glow (e.g. #00ffee)")
     parser.add_argument("--locators", action="store_true", default=True, help="Generate Unity locator sockets")
     parser.add_argument("--dirt", action="store_true", default=True, help="Bake procedural vertex ambient dirt/cavity shading")
-    parser.add_argument("--wear", default="field_tested", choices=["pristine", "field_tested", "battle_hardened"], help="Procedural surface wear level")
+    parser.add_argument("--wear", default="field_tested", choices=["none", "pristine", "factory_new", "field_tested", "battle_hardened"], help="Procedural surface wear level")
+    parser.add_argument("--soot-intensity", type=float, default=1.0, help="Thermal soot intensity around muzzles and exhausts (0.0–2.0; default 1.0)")
     parser.add_argument("--lods", action="store_true", help="Generate multi-level LOD chain (LOD0, LOD1, LOD2) and export _LODs.fbx")
     parser.add_argument("--colliders", action="store_true", help="Generate low-poly physics collision hulls")
     parser.add_argument("--gameplay-json", action="store_true", help="Export companion .gameplay.json specification")
@@ -343,6 +344,7 @@ def build_vehicle_model(
     weapon: str,
     wear: str,
     out_root: Path,
+    soot_intensity: float = 1.0,
     blend_path: Path | None = None,
     fbx_path: Path | None = None,
     preview_path: Path | None = None,
@@ -866,6 +868,7 @@ def build_vehicle_model(
         generate_lods=lods,
         generate_colliders=colliders,
         wear_level=wear,
+        soot_intensity=soot_intensity,
         gameplay_meta_path=gameplay_meta_path,
         wreckage_fbx_path=wreckage_fbx_path,
         damaged_fbx_path=damaged_fbx_path,
@@ -912,6 +915,8 @@ def build_structure_model(
     building_type: str = "factory",
     faction: str = "vanguard",
     camo: str = "none",
+    wear: str = "field_tested",
+    soot_intensity: float = 1.0,
     out_root: Path = REPO_ROOT,
     blend_path: Path | None = None,
     fbx_path: Path | None = None,
@@ -994,6 +999,8 @@ def build_structure_model(
         bake_atlas=bake_atlas or single_material or (camo and camo != "none"),
         atlas_resolution=atlas_resolution,
         single_material_atlas=single_material,
+        wear_level=wear,
+        soot_intensity=soot_intensity,
     )
 
     print("\n========================================================")
@@ -1018,6 +1025,8 @@ def main():
         raise SystemExit("--camo-contrast must be finite and between 0.0 and 4.0.")
     if not math.isfinite(args.normal_intensity) or not 0.0 <= args.normal_intensity <= 4.0:
         raise SystemExit("--normal-intensity must be finite and between 0.0 and 4.0.")
+    if not math.isfinite(args.soot_intensity) or not 0.0 <= args.soot_intensity <= 2.0:
+        raise SystemExit("--soot-intensity must be finite and between 0.0 and 2.0.")
     out_root = resolve_path(args.out_dir, REPO_ROOT) or REPO_ROOT
 
     if args.dry_run:
@@ -1026,7 +1035,7 @@ def main():
             print(f"Structure Name: {args.name}")
             print(f"Building Type: {args.building_type}")
             structure_camo = args.camo if args.camo != "none" else args.biome
-            print(f"Faction: {args.faction} | Palette: {structure_camo}")
+            print(f"Faction: {args.faction} | Palette: {structure_camo} | Wear: {args.wear} | Soot: {args.soot_intensity}")
             print(f"Surface Detail: camo scale={args.camo_scale}, camo contrast={args.camo_contrast}, panel relief={args.panel_lines}, normal intensity={args.normal_intensity}")
             print("Outputs Planned:")
             print(f"  FBX: {args.fbx_path or (out_root / 'unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/Models' / f'{args.name}.fbx')}")
@@ -1051,7 +1060,7 @@ def main():
         print(f"Unit Name: {args.name}")
         print(f"Archetype: {args.archetype}")
         vehicle_camo = args.camo if args.camo != "none" else args.biome
-        print(f"Faction: {args.faction} | Palette: {vehicle_camo} | Wear: {args.wear}")
+        print(f"Faction: {args.faction} | Palette: {vehicle_camo} | Wear: {args.wear} | Soot: {args.soot_intensity}")
         print(f"Surface Detail: camo scale={args.camo_scale}, camo contrast={args.camo_contrast}, panel relief={args.panel_lines}, normal intensity={args.normal_intensity}")
         print(f"Primary Weapon: {args.weapon}")
         print(f"Subsystems: Skirts={args.skirts}, Rollcage={args.rollcage}, QuadTracks={args.quad_tracks}, TiltRotors={args.tilt_rotors}, Dozer={args.dozer}, Smoke={args.smoke}, Radar={args.radar}, Sponsons={args.sponsons}, Outriggers={args.outriggers}, FlightDeck={args.flight_deck}, ExcavatorDrum={args.excavator_drum}")
@@ -1116,6 +1125,7 @@ def main():
                 weapon=def_weapon,
                 wear=args.wear,
                 out_root=out_root,
+                soot_intensity=args.soot_intensity,
                 skirts=args.skirts,
                 rollcage=args.rollcage,
                 quad_tracks=args.quad_tracks,
@@ -1189,6 +1199,8 @@ def main():
             blend_path=blend_path,
             fbx_path=fbx_path,
             preview_path=preview_path,
+            wear=args.wear,
+            soot_intensity=args.soot_intensity,
             primary_color=args.primary_color,
             light_armor_color=args.light_armor_color,
             emissive_color=args.emissive_color,
@@ -1215,6 +1227,7 @@ def main():
             weapon=args.weapon,
             wear=args.wear,
             out_root=out_root,
+            soot_intensity=args.soot_intensity,
             blend_path=blend_path,
             fbx_path=fbx_path,
             preview_path=preview_path,

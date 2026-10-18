@@ -13,7 +13,7 @@ import math
 from pathlib import Path
 from typing import Any, Dict, Sequence, Tuple
 
-import bpy
+import bpy, bmesh
 from mathutils import Vector, Euler, Quaternion
 
 
@@ -1892,18 +1892,29 @@ def bake_advanced_vertex_shading(
     objects: Sequence[bpy.types.Object],
     attribute_name: str = "Color",
     wear_level: str = "field_tested",
+    soot_intensity: float = 1.0,
     team_mask_materials: Sequence[bpy.types.Material] | None = None,
     exhaust_locs: Sequence[Vector | Tuple[float, float, float]] | None = None,
     muzzle_loc: Vector | Tuple[float, float, float] | None = None,
 ) -> None:
-    """Calculates multi-channel procedural vertex shading:
+    """Calculates multi-channel procedural vertex shading targeting URP VehiclePBR_VertexWear:
 
     Channel R: Ambient Occlusion / Cavity Dirt (contact shadows in wheel wells, louvers, undersides).
+               1.0 = zenith exposed; 0.25 - 0.40 = deep crevices and chassis underbelly.
     Channel G: Curvature / Edge Wear (bright glints on sharp chamfers simulating chipped paint).
+               0.0 = flat faces and concave corners; 0.7 - 1.0 = sharp convex edges (>= 35 deg).
     Channel B: Thermal Soot / Weathering (darkening gradient around exhausts and muzzles).
-    Channel A: Team Color Mask (1.0 for tintable primary armor, 0.0 for fixed gunmetal/rubber).
+               0.0 = clean base metal; 1.0 = heavy carbon soot with quadratic dropoff (1 - d/R)^2.
+    Channel A: Team Color Mask (1.0 for tintable primary/light armor, 0.0 for fixed gunmetal/rubber).
     """
-    wear_mult = 1.4 if wear_level == "battle_hardened" else (0.8 if wear_level == "field_tested" else 0.1)
+    if wear_level in ("none", "pristine"):
+        wear_mult = 0.0
+    elif wear_level == "factory_new":
+        wear_mult = 0.25
+    elif wear_level == "battle_hardened":
+        wear_mult = 1.35
+    else:  # field_tested
+        wear_mult = 0.85
 
     team_mat_names = set()
     if team_mask_materials:
@@ -1911,6 +1922,7 @@ def bake_advanced_vertex_shading(
 
     ex_v = [Vector(e) for e in (exhaust_locs or [])]
     muz_v = Vector(muzzle_loc) if muzzle_loc is not None else None
+    min_convex_angle = math.radians(35.0)
 
     for obj in objects:
         if obj.type != "MESH" or not obj.data.polygons:
@@ -1922,39 +1934,89 @@ def bake_advanced_vertex_shading(
             color_attr = mesh.color_attributes.new(name=attribute_name, type="BYTE_COLOR", domain="CORNER")
         mesh.color_attributes.active_color = color_attr
 
-        # Determine team color mask from material
-        mat = obj.data.materials[0] if obj.data.materials else None
-        if team_mat_names and mat:
-            is_team_surface = mat.name in team_mat_names
-        else:
-            is_team_surface = mat and any(a in mat.name for a in ("PrimaryArmor", "LightArmor"))
-        team_alpha = 1.0 if is_team_surface else 0.0
-
         world_mat = obj.matrix_world
-        for poly in mesh.polygons:
-            # R: Cavity / AO
-            norm_w = (world_mat.to_3x3() @ poly.normal).normalized()
-            is_belly = norm_w.z < -0.1
-            cavity_val = 0.35 if is_belly else (0.88 if norm_w.z > 0.4 else 0.65)
+        normal_mat = world_mat.to_3x3()
 
-            # G: Edge Wear (steep angled bevels catch more wear)
-            bevel_factor = 0.55 if (0.15 < abs(norm_w.z) < 0.85) else 0.15
-            edge_val = min(1.0, bevel_factor * wear_mult)
+        # Build BMesh for topological curvature and convexity analysis
+        bm = bmesh.new()
+        bm.from_mesh(mesh)
+        bm.normal_update()
+        bm.verts.ensure_lookup_table()
+        bm.edges.ensure_lookup_table()
+        bm.faces.ensure_lookup_table()
 
-            # B: Thermal Soot
-            soot_val = 1.0
-            if ex_v or muz_v:
-                poly_center = world_mat @ poly.center
-                min_dist = float("inf")
+        vert_wear = [0.0] * len(bm.verts)
+        vert_concavity = [0.0] * len(bm.verts)
+
+        for edge in bm.edges:
+            if len(edge.link_faces) == 2:
+                f1, f2 = edge.link_faces
+                angle = edge.calc_face_angle()
+                v_other = next((v for v in f2.verts if v != edge.verts[0] and v != edge.verts[1]), None)
+                if v_other is not None:
+                    # dot < 0 -> convex (exterior angle > 180), dot > 0 -> concave (interior angle < 180)
+                    dot = (v_other.co - edge.verts[0].co).dot(f1.normal)
+                    if dot < -1e-4 and angle >= min_convex_angle:
+                        sharpness = min(1.0, (angle - min_convex_angle) / (math.pi * 0.5 - min_convex_angle))
+                        edge_w = (0.55 + 0.45 * sharpness) * wear_mult
+                        for v in edge.verts:
+                            vert_wear[v.index] = max(vert_wear[v.index], edge_w)
+                    elif dot > 1e-4 and angle >= math.radians(25.0):
+                        crease = min(1.0, angle / (math.pi * 0.5))
+                        for v in edge.verts:
+                            vert_concavity[v.index] = max(vert_concavity[v.index], crease)
+            elif len(edge.link_faces) == 1:
+                # Open border edge: exposed to scraping
+                edge_w = 0.75 * wear_mult
+                for v in edge.verts:
+                    vert_wear[v.index] = max(vert_wear[v.index], edge_w)
+
+        vert_ao = [1.0] * len(bm.verts)
+        vert_soot = [0.0] * len(bm.verts)
+
+        for v in bm.verts:
+            p_world = world_mat @ v.co
+            n_world = (normal_mat @ v.normal).normalized() if v.normal.length > 1e-4 else Vector((0.0, 0.0, 1.0))
+            up_factor = 0.5 * (n_world.z + 1.0)
+            base_ao = 0.30 + 0.65 * up_factor
+            if p_world.z < 0.35:
+                ground_shadow = max(0.0, p_world.z / 0.35)
+                base_ao = min(base_ao, 0.25 + 0.55 * ground_shadow)
+            if vert_concavity[v.index] > 0.0:
+                base_ao *= (1.0 - 0.35 * vert_concavity[v.index])
+            vert_ao[v.index] = max(0.20, min(1.0, base_ao))
+
+            soot_val = 0.0
+            if soot_intensity > 0.0:
                 for e_pos in ex_v:
-                    min_dist = min(min_dist, (poly_center - e_pos).length)
-                if muz_v:
-                    min_dist = min(min_dist, (poly_center - muz_v).length)
-                if min_dist < 0.65:
-                    soot_val = max(0.25, min_dist / 0.65)
+                    d_ex = (p_world - e_pos).length
+                    if d_ex < 0.45:
+                        soot_val = max(soot_val, (1.0 - (d_ex / 0.45)) ** 2 * 0.95)
+                if muz_v is not None:
+                    d_muz = (p_world - muz_v).length
+                    if d_muz < 0.60:
+                        soot_val = max(soot_val, (1.0 - (d_muz / 0.60)) ** 2 * 1.0)
+            vert_soot[v.index] = max(0.0, min(1.0, soot_val * soot_intensity))
+
+        for poly in mesh.polygons:
+            mat_idx = poly.material_index
+            mat = obj.data.materials[mat_idx] if mat_idx < len(obj.data.materials) else None
+            mat_name = mat.name if mat else ""
+
+            if team_mat_names and mat_name in team_mat_names:
+                team_alpha = 1.0
+            elif any(k in mat_name for k in ("PrimaryArmor", "LightArmor", "TurretArmor", "ChassisTop", "HullTop")):
+                team_alpha = 1.0
+            elif any(k in mat_name for k in ("GunMetal", "Tracks", "Tread", "Wheel", "Exhaust", "Optics", "Grille", "Rubber", "Glass", "Decal")):
+                team_alpha = 0.0
+            else:
+                team_alpha = 1.0 if "Armor" in mat_name else 0.0
 
             for loop_idx in poly.loop_indices:
-                color_attr.data[loop_idx].color = (cavity_val, edge_val, soot_val, team_alpha)
+                v_idx = mesh.loops[loop_idx].vertex_index
+                color_attr.data[loop_idx].color = (vert_ao[v_idx], vert_wear[v_idx], vert_soot[v_idx], team_alpha)
+
+        bm.free()
 
 
 def generate_lod_chain(
@@ -6996,6 +7058,7 @@ class RogueVehicleBuilder:
         lod_ratios: Sequence[Tuple[str, float]] = (("LOD0", 1.0), ("LOD1", 0.50), ("LOD2", 0.22)),
         generate_colliders: bool = False,
         wear_level: str | None = None,
+        soot_intensity: float = 1.0,
         gameplay_meta_path: Path | None = None,
         wreckage_fbx_path: Path | None = None,
         damaged_fbx_path: Path | None = None,
@@ -7061,21 +7124,22 @@ class RogueVehicleBuilder:
         if include_locators and not self.locator_sockets:
             self.add_unity_locators()
 
-        # Save the editable, unbatched source before vertex shading and export transforms.
-        bpy.ops.wm.save_as_mainfile(filepath=str(blend_path))
-
         # 6. Procedural multi-channel vertex shading & cavity AO
         effective_wear = wear_level or self.wear_level
-        if effective_wear:
+        if effective_wear and effective_wear != "none":
             exhausts = [e for e in (self.exhaust_l, self.exhaust_r) if e is not None]
             bake_advanced_vertex_shading(
                 self.objects,
                 wear_level=effective_wear,
+                soot_intensity=soot_intensity,
                 exhaust_locs=exhausts if exhausts else None,
                 muzzle_loc=self.gun_pivot,
             )
         elif bake_vertex_dirt:
             bake_vertex_ambient_dirt(self.objects)
+
+        # Save the editable, unbatched source with baked vertex shading attributes
+        bpy.ops.wm.save_as_mainfile(filepath=str(blend_path))
 
         # Export detached pieces after vertex shading, but before the base-model atlas is baked.
         # Their source materials and UVs are independent of the base atlas.
@@ -7426,6 +7490,9 @@ class RogueStructureBuilder:
         bake_atlas: bool = False,
         atlas_resolution: int = 1024,
         single_material_atlas: bool = False,
+        wear_level: str = "field_tested",
+        soot_intensity: float = 1.0,
+        bake_vertex_shading: bool = True,
     ) -> dict[str, Any]:
         blend_path.parent.mkdir(parents=True, exist_ok=True)
         fbx_path.parent.mkdir(parents=True, exist_ok=True)
@@ -7440,6 +7507,19 @@ class RogueStructureBuilder:
             self.objects,
             allow_hover=False,
         )
+
+        # Procedural multi-channel vertex shading & cavity AO for structures
+        if bake_vertex_shading and wear_level and wear_level != "none":
+            s_muzzles = [pos for name, pos in self.sockets.items() if "Muzzle" in name]
+            s_exhausts = [pos for name, pos in self.sockets.items() if any(k in name for k in ("Exhaust", "Chimney", "Smoke", "Vent"))]
+            muz_pos = s_muzzles[0] if s_muzzles else None
+            bake_advanced_vertex_shading(
+                self.objects,
+                wear_level=wear_level,
+                soot_intensity=soot_intensity,
+                exhaust_locs=s_exhausts if s_exhausts else None,
+                muzzle_loc=muz_pos,
+            )
 
         bpy.ops.wm.save_as_mainfile(filepath=str(blend_path))
 
