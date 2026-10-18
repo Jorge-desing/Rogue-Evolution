@@ -592,3 +592,24 @@ dotnet run --project tests/RogueCommandExpansionLoader.ValidationTests -- .
 - Twelve new presets (6 archetype presets, 4 remixes: `urban_brawler`, `arctic_sentinel`, `night_stalker`, `armored_hauler`; 2 structures: `early_warning_array`, `fusion_silo`). Presets may now declare `camo`, `wear` and `attachments` defaults; explicit CLI options win. `--preset` choices derive from `PRESETS` keys.
 - Blender 4.5.14 headless: all 12 presets built with `Ground OK: True` (4.5k-8.5k tris before LOD); `arachnid_hexapod --rig --animate` built; `--batch-all-archetypes --dry-run` plans 30 archetypes. No in-game runtime evidence yet.
 - Boundary: the hexapod middle legs are static, body-bound geometry; only the four crawler legs are rigged.
+
+---
+
+## 20. Wave 4 Tactical Archetypes, Strategic Structures, and Elite Presets (local build/validation evidence)
+
+- **Six new mobile archetypes** (`tools/generate_unit_model.py` & `tools/RogueModelKit.py`), bringing total mobile archetypes to **36**:
+  1. `bridge_layer`: Armored Vehicle-Launched Bridge (AVLB) on tracked chassis with front hydraulic launch boom (`A-frame` + twin hydraulic rams), elevated scissor hinge pin, and folded dual-lane ribbed treadway bridge spans with approach wedges.
+  2. `command_hq_rig`: 8x8 heavy C4ISR mobile command truck with armored cab, expandable rear tactical operations shelter, roof satcom radome dish, telescopic comms mast with crossbars, and deployed side stabilizer outriggers.
+  3. `flying_wing_bomber`: Low-observable delta flying-wing strike craft with swept stealth chines, serrated dorsal twin air intakes, recessed internal rotary bomb-bay doors, and flush exhaust slots.
+  4. `mortar_carrier`: Tracked heavy siege mortar carrier with open-hatch fighting compartment, split folded roof doors, internal ribbed heavy breach-loaded mortar tube on turntable, and racked spare shells.
+  5. `siege_drill_mole`: Subterranean assault bore vehicle with reinforced heavy crawler tracks, forward push-dozer shield, 4-stage stepped conical front auger drill head with helical tungsten cutter rings, rear rock-crusher exhaust chutes, and roof warning beacon.
+  6. `heavy_crane_mech`: Bipedal industrial/siege walker (`rigType: BipedalWalker`) with wide-stance armored legs, roll-caged cockpit, dorsal fusion reactor core, overhead shoulder gantry crane boom, and dual heavy hydraulic pincer claws.
+- **Three new strategic structure assemblies** (`RogueStructureBuilder`), bringing total structure types to **10**:
+  1. `bunker_pillbox` (`make_bunker_pillbox_assembly`): Reinforced octagonal casemate with sloped armor walls, recessed panoramic firing embrasure, twin heavy automatic cannon barrels, blast-door rear entrance, and roof observation cupola.
+  2. `anti_air_battery` (`make_anti_air_battery_assembly`): Rotatable azimuth turret house on heavy octagonal plinth with twin 4-cell inclined SAM box pods (8 sealed missile tubes) and central planar fire-control radar mast.
+  3. `comms_relay_tower` (`make_comms_relay_tower_assembly`): Armored base transceiver shelter with climate-control vents, 4-chord tapered lattice truss mast, bilateral high-gain microwave drum dishes, and glowing omni-directional apex beacon spire.
+- **Twelve new presets** (total **47 presets**):
+  - 6 archetype presets (`scissor_bridgelayer`, `overlord_command_hq`, `wraith_stealth_wing`, `thunder_mortar_carrier`, `subterranean_mole`, `atlas_crane_mech`).
+  - 3 structure presets (`fortified_pillbox`, `patriot_sam_battery`, `deep_space_relay`).
+  - 3 elite custom-palette remix presets (`crimson_praetorian`, `cobalt_widowmaker`, `golden_aegis_command`) utilizing preset-level overrides for `primary_color`, `light_armor_color`, `emissive_color`, `vfx_flash`, and `vfx_thruster` (honored whenever the corresponding CLI flag is not explicitly passed).
+

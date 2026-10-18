@@ -8,7 +8,8 @@ Archetypes:
     flak_anti_air, siege_crawler, drone_carrier, quad_mech, combat_harvester,
     colossus_titan, hover_cruiser, heavy_dropship,
     shield_truck, demolition_breacher, artillery_strider, thermobaric_tank, ew_jammer,
-    mobile_sam_launcher, recovery_crawler, mine_layer, sniper_tankette, hexapod_assault, assault_hovercraft
+    mobile_sam_launcher, recovery_crawler, mine_layer, sniper_tankette, hexapod_assault, assault_hovercraft,
+    bridge_layer, command_hq_rig, flying_wing_bomber, mortar_carrier, siege_drill_mole, heavy_crane_mech
 
 Weapons:
     cannon, gatling, missile, arc, howitzer, dual_cannon, railgun, quad_flak, plasma_mortar,
@@ -23,8 +24,11 @@ Presets:
     bastion_shield_dome, tesla_obelisk,
     skyguard_sam, salvage_hauler, minefield_sower, longshot_tankette, arachnid_hexapod,
     tidebreaker_hovercraft, urban_brawler, arctic_sentinel, night_stalker, armored_hauler,
-    early_warning_array, fusion_silo
-    (presets may also set default camo, wear and attachments; explicit CLI options win)
+    early_warning_array, fusion_silo,
+    scissor_bridgelayer, overlord_command_hq, wraith_stealth_wing, thunder_mortar_carrier,
+    subterranean_mole, atlas_crane_mech, fortified_pillbox, patriot_sam_battery, deep_space_relay,
+    crimson_praetorian, cobalt_widowmaker, golden_aegis_command
+    (presets may also set default camo, wear, attachments, custom hex colors, and VFX; explicit CLI options win)
 
 Options:
     --name <UnitName>          Vehicle class name (e.g., ColossusSuperHeavy)
@@ -465,6 +469,153 @@ PRESETS = {
         "tactical_markings": True,
         "hydraulic_pistons": True,
     },
+    # --- Wave 4: 6 new mobile archetypes ---
+    "scissor_bridgelayer": {
+        "archetype": "bridge_layer",
+        "weapon": "gatling",
+        "faction": "siege",
+        "camo": "woodland",
+        "hydraulic_hoses": True,
+        "hydraulic_pistons": True,
+        "hull_greebles": True,
+        "tactical_markings": True,
+        "stowage_kit": True,
+    },
+    "overlord_command_hq": {
+        "archetype": "command_hq_rig",
+        "weapon": "gatling",
+        "faction": "vanguard",
+        "camo": "digital",
+        "wear": "factory_new",
+        "smoke": True,
+        "hydraulic_hoses": True,
+        "hull_greebles": True,
+        "tactical_markings": True,
+        "aps_suite": True,
+        "stowage_kit": True,
+    },
+    "wraith_stealth_wing": {
+        "archetype": "flying_wing_bomber",
+        "weapon": "missile",
+        "faction": "syndicate",
+        "camo": "splinter",
+        "wear": "factory_new",
+        "tactical_markings": True,
+        "aps_suite": True,
+        "vfx_thruster": True,
+    },
+    "thunder_mortar_carrier": {
+        "archetype": "mortar_carrier",
+        "weapon": "plasma_mortar",
+        "faction": "siege",
+        "camo": "desert",
+        "smoke": True,
+        "spaced_skirts": True,
+        "hydraulic_hoses": True,
+        "hull_greebles": True,
+        "ammo_chutes": True,
+        "stowage_kit": True,
+    },
+    "subterranean_mole": {
+        "archetype": "siege_drill_mole",
+        "weapon": "flamethrower",
+        "faction": "siege",
+        "wear": "battle_hardened",
+        "hydraulic_hoses": True,
+        "hydraulic_pistons": True,
+        "hull_greebles": True,
+        "tactical_markings": True,
+        "stowage_kit": True,
+    },
+    "atlas_crane_mech": {
+        "archetype": "heavy_crane_mech",
+        "weapon": "dual_cannon",
+        "faction": "arctic",
+        "ik_rig": True,
+        "hydraulic_hoses": True,
+        "hydraulic_pistons": True,
+        "hull_greebles": True,
+        "tactical_markings": True,
+        "stowage_kit": True,
+    },
+    # --- Wave 4: 3 new strategic structures ---
+    "fortified_pillbox": {
+        "structure": True,
+        "building_type": "bunker_pillbox",
+        "faction": "siege",
+        "hull_greebles": True,
+        "tactical_markings": True,
+        "ammo_chutes": True,
+        "stowage_kit": True,
+    },
+    "patriot_sam_battery": {
+        "structure": True,
+        "building_type": "anti_air_battery",
+        "faction": "vanguard",
+        "hydraulic_hoses": True,
+        "hydraulic_pistons": True,
+        "hull_greebles": True,
+        "tactical_markings": True,
+        "aps_suite": True,
+    },
+    "deep_space_relay": {
+        "structure": True,
+        "building_type": "comms_relay_tower",
+        "faction": "syndicate",
+        "hydraulic_hoses": True,
+        "hull_greebles": True,
+        "tactical_markings": True,
+    },
+    # --- Wave 4: 3 elite remixes with custom hex palette & VFX overrides ---
+    "crimson_praetorian": {
+        "archetype": "colossus_titan",
+        "weapon": "railgun",
+        "faction": "siege",
+        "primary_color": "#5a1414",
+        "light_armor_color": "#8f2424",
+        "emissive_color": "#ffaa00",
+        "wear": "battle_hardened",
+        "ik_rig": True,
+        "smoke": True,
+        "radar": True,
+        "hydraulic_hoses": True,
+        "hydraulic_pistons": True,
+        "hull_greebles": True,
+        "tactical_markings": True,
+        "aps_suite": True,
+        "vfx_flash": True,
+    },
+    "cobalt_widowmaker": {
+        "archetype": "hexapod_assault",
+        "weapon": "laser_beam",
+        "faction": "syndicate",
+        "primary_color": "#142238",
+        "light_armor_color": "#29466e",
+        "emissive_color": "#00f0ff",
+        "wear": "factory_new",
+        "ik_rig": True,
+        "hydraulic_hoses": True,
+        "hydraulic_pistons": True,
+        "hull_greebles": True,
+        "aps_suite": True,
+        "vfx_flash": True,
+    },
+    "golden_aegis_command": {
+        "archetype": "hover_cruiser",
+        "weapon": "vls_missiles",
+        "faction": "vanguard",
+        "primary_color": "#2b3642",
+        "light_armor_color": "#c29b38",
+        "emissive_color": "#44ffaa",
+        "wear": "pristine",
+        "radar": True,
+        "sponsons": True,
+        "shield_bubble": True,
+        "hull_greebles": True,
+        "tactical_markings": True,
+        "aps_suite": True,
+        "vfx_thruster": True,
+    },
 }
 
 WAVE3_PRESETS = (
@@ -472,6 +623,13 @@ WAVE3_PRESETS = (
     "arachnid_hexapod", "tidebreaker_hovercraft",
     "urban_brawler", "arctic_sentinel", "night_stalker", "armored_hauler",
     "early_warning_array", "fusion_silo",
+)
+
+WAVE4_PRESETS = (
+    "scissor_bridgelayer", "overlord_command_hq", "wraith_stealth_wing",
+    "thunder_mortar_carrier", "subterranean_mole", "atlas_crane_mech",
+    "fortified_pillbox", "patriot_sam_battery", "deep_space_relay",
+    "crimson_praetorian", "cobalt_widowmaker", "golden_aegis_command",
 )
 
 
@@ -494,7 +652,8 @@ def parse_args():
             "flak_anti_air", "siege_crawler", "drone_carrier", "quad_mech", "combat_harvester",
             "colossus_titan", "hover_cruiser", "heavy_dropship",
             "shield_truck", "demolition_breacher", "artillery_strider", "thermobaric_tank", "ew_jammer",
-            "mobile_sam_launcher", "recovery_crawler", "mine_layer", "sniper_tankette", "hexapod_assault", "assault_hovercraft"
+            "mobile_sam_launcher", "recovery_crawler", "mine_layer", "sniper_tankette", "hexapod_assault", "assault_hovercraft",
+            "bridge_layer", "command_hq_rig", "flying_wing_bomber", "mortar_carrier", "siege_drill_mole", "heavy_crane_mech"
         ],
         help="Vehicle archetype",
     )
@@ -583,7 +742,7 @@ def parse_args():
     parser.add_argument("--wreckage-severity", default="catastrophic", choices=["light", "medium", "catastrophic"], help="Wreckage damage severity level (default: catastrophic)")
     parser.add_argument("--damaged-state", action="store_true", help="Export combat-damaged <Name>_Damaged.fbx variant with distorted plates and scorch marks")
     parser.add_argument("--structure", action="store_true", help="Generate a static building or factory instead of a mobile vehicle")
-    parser.add_argument("--building-type", default="factory", choices=["factory", "defense_turret", "radar_station", "energy_silo", "orbital_silo", "shield_dome", "emp_obelisk"], help="Structure building type")
+    parser.add_argument("--building-type", default="factory", choices=["factory", "defense_turret", "radar_station", "energy_silo", "orbital_silo", "shield_dome", "emp_obelisk", "bunker_pillbox", "anti_air_battery", "comms_relay_tower"], help="Structure building type")
     parser.add_argument("--attachments", default=None, help="Comma-separated list of modular attachments to apply (e.g. 'era,aps,sponson,fuel_drums')")
     parser.add_argument("--export-detached-attachments", action="store_true", help="Export separate <Name>_Attachment_<Type>.fbx meshes for modular attachment in Unity")
     parser.add_argument("--render-icons", action="store_true", help="Render dual orthographic 2D tactical icons (Top-Down and Isometric) with transparent alpha")
@@ -593,7 +752,7 @@ def parse_args():
     parser.add_argument("--lod", action="store_true", help="Calculate polygon budget and recommend LOD reductions")
     parser.add_argument("--smooth-angle", type=float, default=38.0, help="Smart angle-weighted auto-smooth threshold in degrees")
     parser.add_argument("--multiview", action="store_true", help="Render 4 orthographic views")
-    parser.add_argument("--batch-all-archetypes", action="store_true", help="Batch generate all 30 archetypes into the output directory")
+    parser.add_argument("--batch-all-archetypes", action="store_true", help="Batch generate all 36 archetypes into the output directory")
     parser.add_argument("--report-json", default=None, help="Path to write detailed structural and budget JSON report")
     parser.add_argument("--dry-run", action="store_true", help="Validate CLI parameters and print archetype plan without building Blender geometry")
     parser.add_argument("--out-dir", default=None, help="Base root directory for outputs")
@@ -637,10 +796,11 @@ def parse_args():
             "mantlet_boot", "spaced_skirts", "shield_bubble",
             "hydraulic_hoses", "hull_greebles", "tactical_markings",
             "hydraulic_pistons", "ammo_chutes", "aps_suite", "stowage_kit",
+            "vfx_flash", "vfx_thruster",
         ):
             if p.get(flag) and f"--{flag.replace('_', '-')}" not in script_args:
                 setattr(args, flag, True)
-        # Presets may also declare default camo, wear and modular attachments;
+        # Presets may also declare default camo, wear, modular attachments, and custom hex colors;
         # explicit CLI options always win.
         if "camo" in p and not option_was_supplied("--camo"):
             args.camo = p["camo"]
@@ -648,6 +808,12 @@ def parse_args():
             args.wear = p["wear"]
         if "attachments" in p and not option_was_supplied("--attachments"):
             args.attachments = p["attachments"]
+        if "primary_color" in p and not option_was_supplied("--primary-color"):
+            args.primary_color = p["primary_color"]
+        if "light_armor_color" in p and not option_was_supplied("--light-armor-color"):
+            args.light_armor_color = p["light_armor_color"]
+        if "emissive_color" in p and not option_was_supplied("--emissive-color"):
+            args.emissive_color = p["emissive_color"]
         if "track_sag" in p and not option_was_supplied("--track-sag"):
             args.track_sag = p["track_sag"]
         if "wreckage_severity" in p and not option_was_supplied("--wreckage-severity"):
@@ -669,7 +835,8 @@ ALL_ARCHETYPES = [
     "flak_anti_air", "siege_crawler", "drone_carrier", "quad_mech", "combat_harvester",
     "colossus_titan", "hover_cruiser", "heavy_dropship",
     "shield_truck", "demolition_breacher", "artillery_strider", "thermobaric_tank", "ew_jammer",
-            "mobile_sam_launcher", "recovery_crawler", "mine_layer", "sniper_tankette", "hexapod_assault", "assault_hovercraft"
+    "mobile_sam_launcher", "recovery_crawler", "mine_layer", "sniper_tankette", "hexapod_assault", "assault_hovercraft",
+    "bridge_layer", "command_hq_rig", "flying_wing_bomber", "mortar_carrier", "siege_drill_mole", "heavy_crane_mech"
 ]
 
 ARCHETYPE_DEFAULT_WEAPONS = {
@@ -703,6 +870,12 @@ ARCHETYPE_DEFAULT_WEAPONS = {
     "sniper_tankette": "cannon",
     "hexapod_assault": "missile",
     "assault_hovercraft": "gatling",
+    "bridge_layer": "gatling",
+    "command_hq_rig": "gatling",
+    "flying_wing_bomber": "missile",
+    "mortar_carrier": "plasma_mortar",
+    "siege_drill_mole": "flamethrower",
+    "heavy_crane_mech": "dual_cannon",
 }
 
 
@@ -1428,6 +1601,213 @@ def build_vehicle_model(
         builder.add_sensor_visor()
         builder.add_whip_antenna()
 
+    elif archetype == "bridge_layer":
+        # Tracked scissor-bridge layer (AVLB) with hydraulic launch boom and twin folded treadway spans.
+        builder.add_sloped_hull(length=3.6, width=2.65, height=0.92, bevel=0.045)
+        builder.add_continuous_tracks(length=3.4, height=0.66, belt_width=0.38, roadwheels=6, with_skirts=skirts)
+        builder.add_engine_deck(slat_count=4, with_exhausts=True)
+        builder.objects.extend([
+            rmk.make_box(f"{name}Armor_LaunchCradle", (1.85, 0.55, 0.36), (0.0, 1.48, 1.05), builder.palette.gunmetal, 0.025),
+            rmk.make_rod(f"{name}Joint_LaunchBoom_L", (-0.65, 0.85, 1.05), (-0.65, 1.75, 1.68), 0.065, builder.palette.warning, vertices=8),
+            rmk.make_rod(f"{name}Joint_LaunchBoom_R", (0.65, 0.85, 1.05), (0.65, 1.75, 1.68), 0.065, builder.palette.warning, vertices=8),
+            rmk.make_cylinder(f"{name}Joint_ScissorHingePin", 0.14, 2.35, (0.0, 1.78, 1.62), builder.palette.gunmetal,
+                              rotation=(0.0, math.radians(90.0), 0.0), vertices=12, bevel=0.015),
+        ])
+        for side in (-1, 1):
+            stag = "L" if side < 0 else "R"
+            tx = side * 0.72
+            builder.objects.extend([
+                rmk.make_box(f"{name}Armor_BridgeSpanLower_{stag}", (0.78, 3.45, 0.18), (tx, 0.05, 1.38), builder.palette.primary_armor, 0.025),
+                rmk.make_box(f"{name}Armor_BridgeSpanUpper_{stag}", (0.78, 3.45, 0.18), (tx, 0.05, 1.66), builder.palette.light_armor, 0.025),
+                rmk.make_box(f"{name}Armor_ApproachRamp_{stag}", (0.74, 0.65, 0.10), (tx, -1.85, 1.52), builder.palette.warning, 0.015,
+                             rotation=(math.radians(18.0), 0.0, 0.0)),
+            ])
+        builder.add_turret(size=(0.88, 0.96, 0.28), center_y=0.95)
+        builder.turret_center = Vector((0.0, 0.95, 1.92))
+        builder.add_sensor_visor()
+        builder.add_spring_antenna()
+
+    elif archetype == "command_hq_rig":
+        # 8x8 heavy C4ISR mobile command HQ truck with expandable tactical shelter, satcom dome, and mast.
+        builder.hull_length = 4.1
+        builder.hull_width = 2.35
+        builder.hull_deck_z = 0.94
+        builder.add_all_terrain_wheels(wheelbase_y=2.85, track_width_x=2.05, wheel_radius=0.41, wheel_width=0.30, middle_axle=True)
+        for side in (-1, 1):
+            stag = "L" if side < 0 else "R"
+            builder.objects.extend(rmk.make_all_terrain_wheel_assembly(
+                f"{name}Wheel_MidFront_{stag}",
+                location=(side * 1.025, 0.52, builder.ground_clearance + 0.41 + 0.035),
+                radius=0.41, width=0.30,
+                tire_mat=builder.palette.tread, rim_mat=builder.palette.wheel_rim,
+                hub_mat=builder.palette.gunmetal, accent_mat=builder.palette.warning
+            ))
+        builder.objects.extend([
+            rmk.make_box(f"{name}Armor_ChassisSpine", (1.75, 4.05, 0.36), (0.0, 0.0, 0.58), builder.palette.gunmetal, 0.03),
+            rmk.make_box(f"{name}Armor_ArmoredCab", (2.05, 1.22, 0.84), (0.0, 1.38, 1.08), builder.palette.primary_armor, 0.04),
+            rmk.make_box(f"{name}Armor_CommandShelter", (2.18, 2.45, 0.96), (0.0, -0.62, 1.24), builder.palette.primary_armor, 0.045),
+            rmk.make_box(f"{name}Armor_SlideOutBay_L", (0.24, 1.65, 0.68), (-1.18, -0.62, 1.24), builder.palette.light_armor, 0.025),
+            rmk.make_box(f"{name}Armor_SlideOutBay_R", (0.24, 1.65, 0.68), (1.18, -0.62, 1.24), builder.palette.light_armor, 0.025),
+            rmk.make_cylinder(f"{name}Sensor_SatcomRadome", 0.46, 0.34, (0.0, -0.35, 1.88), builder.palette.light_armor, vertices=12, bevel=0.04),
+            rmk.make_cylinder(f"{name}Sensor_TelescopicMast", 0.12, 0.95, (-0.58, -1.45, 2.15), builder.palette.gunmetal, vertices=10, bevel=0.015),
+            rmk.make_box(f"{name}Sensor_UplinkCrossbar", (0.85, 0.10, 0.12), (-0.58, -1.45, 2.62), builder.palette.emissive, 0.015),
+        ])
+        builder.objects.extend(rmk.make_recessed_sensor_visor(
+            f"{name}Sensor_CabVisor", location=(0.0, 2.00, 1.22), size=(1.28, 0.12, 0.18),
+            armor_mat=builder.palette.light_armor, lens_mat=builder.palette.emissive, cavity_mat=builder.palette.gunmetal
+        ))
+        builder.add_turret(size=(1.05, 1.12, 0.32), center_y=1.32)
+        builder.turret_center = Vector((0.0, 1.32, 1.66))
+        builder.add_radar_dish(is_rotodome=True, location=(0.45, -1.25, 2.05))
+        builder.add_whip_antenna()
+
+    elif archetype == "flying_wing_bomber":
+        # Low-observable delta flying-wing strike craft with swept wings, dorsal intakes, and landing skids.
+        builder.is_hover = True
+        builder.hull_length = 3.2
+        builder.hull_width = 4.2
+        builder.hull_deck_z = 1.05
+        builder.objects.extend([
+            rmk.make_sloped_glacis_hull(
+                f"{name}Armor_CentralBlendBody",
+                length_front=1.75, length_rear=1.45,
+                width_front=1.35, width_rear=1.85,
+                height_lower=0.58, height_upper=1.08,
+                material=builder.palette.primary_armor, bevel=0.04
+            ),
+            rmk.make_box(f"{name}Armor_StealthCanopy", (0.92, 1.05, 0.26), (0.0, 0.72, 1.14), builder.palette.emissive, 0.03,
+                         rotation=(math.radians(-12.0), 0.0, 0.0)),
+            rmk.make_box(f"{name}Armor_BombBayDoors", (0.95, 1.45, 0.08), (0.0, -0.05, 0.54), builder.palette.gunmetal, 0.015),
+        ])
+        for side in (-1, 1):
+            stag = "L" if side < 0 else "R"
+            builder.objects.extend([
+                rmk.make_box(
+                    f"{name}Armor_SweptWing_{stag}", (1.65, 1.45, 0.18),
+                    (side * 1.32, -0.22, 0.82), builder.palette.primary_armor, 0.025,
+                    rotation=(0.0, math.radians(side * -4.0), math.radians(side * -28.0))
+                ),
+                rmk.make_box(
+                    f"{name}Armor_WingtipElevon_{stag}", (0.68, 0.52, 0.08),
+                    (side * 2.02, -0.78, 0.78), builder.palette.light_armor, 0.015,
+                    rotation=(0.0, 0.0, math.radians(side * -28.0))
+                ),
+                rmk.make_box(
+                    f"{name}Engine_DorsalIntake_{stag}", (0.38, 0.88, 0.22),
+                    (side * 0.48, -0.35, 1.12), builder.palette.gunmetal, 0.02
+                ),
+                rmk.make_cylinder(
+                    f"{name}Engine_StealthNozzle_{stag}", 0.16, 0.35,
+                    (side * 0.48, -1.42, 0.88), builder.palette.emissive,
+                    rotation=(math.radians(90.0), 0.0, 0.0), vertices=10, bevel=0.015
+                ),
+                rmk.make_box(f"{name}Joint_LandingSkid_{stag}", (0.10, 1.45, 0.05), (side * 0.58, 0.0, 0.04), builder.palette.gunmetal, 0.01),
+                rmk.make_rod(f"{name}Joint_SkidStrutF_{stag}", (side * 0.58, 0.52, 0.06), (side * 0.54, 0.45, 0.58), 0.032, builder.palette.gunmetal),
+                rmk.make_rod(f"{name}Joint_SkidStrutR_{stag}", (side * 0.58, -0.52, 0.06), (side * 0.54, -0.45, 0.58), 0.032, builder.palette.gunmetal),
+            ])
+        builder.turret_center = Vector((0.0, 0.65, 0.52))
+        builder.add_sensor_visor()
+
+    elif archetype == "mortar_carrier":
+        # Open-hatch tracked heavy siege mortar carrier with split roof doors, baseplate, and ammo racks.
+        builder.add_sloped_hull(length=3.15, width=2.48, height=0.96, bevel=0.045)
+        builder.add_continuous_tracks(length=2.98, height=0.64, belt_width=0.35, roadwheels=5, with_skirts=skirts)
+        builder.objects.extend([
+            rmk.make_box(f"{name}Armor_CasemateSuperstructure", (1.92, 2.05, 0.48), (0.0, -0.22, 1.16), builder.palette.primary_armor, 0.035),
+            rmk.make_cylinder(f"{name}Joint_MortarTurntable", 0.68, 0.16, (0.0, -0.25, 1.18), builder.palette.gunmetal, vertices=12, bevel=0.015),
+        ])
+        for side in (-1, 1):
+            stag = "L" if side < 0 else "R"
+            builder.objects.extend([
+                rmk.make_box(
+                    f"{name}Armor_OpenRoofHatch_{stag}", (0.72, 1.48, 0.08),
+                    (side * 0.98, -0.25, 1.56), builder.palette.light_armor, 0.015,
+                    rotation=(0.0, math.radians(side * -62.0), 0.0)
+                ),
+                rmk.make_box(
+                    f"{name}Armor_RearRecoilSpade_{stag}", (0.24, 0.28, 0.34),
+                    (side * 0.65, -1.62, 0.42), builder.palette.gunmetal, 0.02,
+                    rotation=(math.radians(24.0), 0.0, 0.0)
+                ),
+            ])
+            for idx in range(3):
+                builder.objects.append(rmk.make_cylinder(
+                    f"{name}Armor_MortarShell_{stag}{idx}", 0.085, 0.48,
+                    (side * 0.72, -0.68 + idx * 0.32, 1.32), builder.palette.warning,
+                    vertices=10, bevel=0.01
+                ))
+        builder.add_turret(size=(1.12, 1.18, 0.26), center_y=-0.20)
+        builder.turret_center = Vector((0.0, -0.20, 1.38))
+        builder.add_sensor_visor()
+        builder.add_spring_antenna()
+
+    elif archetype == "siege_drill_mole":
+        # Subterranean assault bore vehicle with stepped conical front auger drill, side vents, and heavy tracks.
+        builder.add_sloped_hull(length=3.35, width=2.62, height=0.98, bevel=0.045)
+        builder.add_continuous_tracks(length=3.15, height=0.68, belt_width=0.38, roadwheels=6, with_skirts=skirts)
+        builder.add_engine_deck(slat_count=5, with_exhausts=True)
+        # Multi-stage stepped conical borer head + helical cutter rings along +Y prow
+        builder.objects.append(rmk.make_cylinder(
+            f"{name}Joint_DrillGearboxCollar", 0.72, 0.32,
+            (0.0, 1.72, 0.74), builder.palette.gunmetal,
+            rotation=(math.radians(90.0), 0.0, 0.0), vertices=14, bevel=0.02
+        ))
+        drill_stages = [
+            (0.64, 0.36, 1.98),
+            (0.50, 0.34, 2.28),
+            (0.35, 0.32, 2.55),
+            (0.18, 0.30, 2.80),
+        ]
+        for idx, (r_s, d_s, y_s) in enumerate(drill_stages, start=1):
+            builder.objects.extend([
+                rmk.make_cylinder(
+                    f"{name}Armor_BoreCone_{idx}", r_s, d_s,
+                    (0.0, y_s, 0.74), builder.palette.wheel_rim if idx % 2 == 0 else builder.palette.gunmetal,
+                    rotation=(math.radians(90.0), 0.0, math.radians(idx * 22.5)),
+                    vertices=12, bevel=0.015
+                ),
+                rmk.make_torus(
+                    f"{name}Armor_AugerFlightRing_{idx}", (0.0, y_s + 0.06, 0.74),
+                    major_radius=r_s * 1.04, minor_radius=0.045,
+                    material=builder.palette.warning,
+                    rotation=(math.radians(82.0), math.radians(8.0), 0.0),
+                    major_segments=12, minor_segments=6
+                ),
+            ])
+        builder.add_turret(size=(1.22, 1.32, 0.36), center_y=0.05)
+        builder.add_sensor_visor()
+        builder.add_spring_antenna()
+
+    elif archetype == "heavy_crane_mech":
+        # Industrial & siege bipedal walker with dorsal fusion reactor, shoulder gantry crane, and hydraulic claws.
+        builder.add_bipedal_legs(hip_height=1.95, hip_spacing_x=1.18, total_height=2.00)
+        builder.hull_length = 2.4
+        builder.hull_width = 1.9
+        builder.hull_deck_z = 2.65
+        builder.objects.extend([
+            rmk.make_box(f"{name}Armor_PelvisBlock", (1.28, 0.86, 0.48), (0.0, -0.04, 1.90), builder.palette.gunmetal, 0.07),
+            rmk.make_box(f"{name}Armor_IndustrialTorso", (1.68, 1.22, 0.96), (0.0, 0.04, 2.55), builder.palette.primary_armor, 0.085),
+            rmk.make_box(f"{name}Armor_RollCageCanopy", (1.12, 0.55, 0.58), (0.0, 0.62, 2.58), builder.palette.warning, 0.045),
+            rmk.make_cylinder(f"{name}Armor_DorsalReactorDrum", 0.46, 1.25, (0.0, -0.72, 2.62), builder.palette.gunmetal,
+                              rotation=(0.0, math.radians(90.0), 0.0), vertices=12, bevel=0.03),
+            rmk.make_rod(f"{name}Joint_ShoulderCraneJib", (-0.72, -0.15, 3.05), (-0.72, 1.25, 3.48), 0.085, builder.palette.warning, vertices=8),
+        ])
+        for side in (-1, 1):
+            stag = "L" if side < 0 else "R"
+            sx = side * 1.12
+            builder.objects.extend([
+                rmk.make_box(f"{name}Joint_ShoulderMount_{stag}", (0.44, 0.58, 0.44), (sx, 0.08, 2.75), builder.palette.light_armor, 0.04),
+                rmk.make_rod(f"{name}Armor_ArmBoom_{stag}", (sx, 0.15, 2.68), (sx * 1.05, 0.92, 2.15), 0.11, builder.palette.gunmetal, vertices=8),
+                rmk.make_box(f"{name}Armor_ClawPincerUpper_{stag}", (0.28, 0.48, 0.10), (sx * 1.05, 1.18, 2.22), builder.palette.warning, 0.015,
+                             rotation=(math.radians(-14.0), 0.0, 0.0)),
+                rmk.make_box(f"{name}Armor_ClawPincerLower_{stag}", (0.28, 0.48, 0.10), (sx * 1.05, 1.18, 2.06), builder.palette.warning, 0.015,
+                             rotation=(math.radians(14.0), 0.0, 0.0)),
+            ])
+        builder.add_turret(size=(1.28, 1.42, 0.42), center_y=0.08)
+        builder.turret_center = Vector((0.0, 0.08, 3.18))
+        builder.add_sensor_visor()
+        builder.add_whip_antenna()
+
     else:  # standard tank
         builder.add_sloped_hull(length=3.0, width=2.4, height=0.88)
         builder.add_continuous_tracks(length=2.85, height=0.62, belt_width=0.34, roadwheels=5, with_skirts=skirts)
@@ -1457,31 +1837,31 @@ def build_vehicle_model(
         elif weapon == "dual_cannon":
             builder.add_dual_cannon(caliber=0.082, length=1.65, spacing=0.38, elevation_deg=11.0)
         elif weapon == "gatling":
-            if archetype in ("walker", "bike", "colossus_titan", "artillery_strider"):
-                p_z = 3.25 if archetype == "colossus_titan" else (2.45 if archetype == "artillery_strider" else 1.25)
-                p_x = 1.35 if archetype == "colossus_titan" else (0.95 if archetype == "artillery_strider" else 0.75)
+            if archetype in ("walker", "bike", "colossus_titan", "artillery_strider", "heavy_crane_mech"):
+                p_z = 3.25 if archetype == "colossus_titan" else (2.85 if archetype == "heavy_crane_mech" else (2.45 if archetype == "artillery_strider" else 1.25))
+                p_x = 1.35 if archetype == "colossus_titan" else (1.15 if archetype == "heavy_crane_mech" else (0.95 if archetype == "artillery_strider" else 0.75))
                 builder.add_rotary_gatling(side=-1, pivot_offset=(p_x, 0.35, p_z))
                 builder.add_rotary_gatling(side=1, pivot_offset=(p_x, 0.35, p_z))
-            elif archetype in ("vtol", "heavy_dropship"):
-                builder.add_rotary_gatling(side=0, pivot_offset=(0.0, 1.25 if archetype == "vtol" else 2.15, 0.42 if archetype == "vtol" else 0.65))
-            elif archetype in ("buggy", "halftrack", "shield_truck", "ew_jammer", "assault_hovercraft"):
+            elif archetype in ("vtol", "heavy_dropship", "flying_wing_bomber"):
+                builder.add_rotary_gatling(side=0, pivot_offset=(0.0, 1.25 if archetype != "heavy_dropship" else 2.15, 0.42 if archetype != "heavy_dropship" else 0.65))
+            elif archetype in ("buggy", "halftrack", "shield_truck", "ew_jammer", "assault_hovercraft", "command_hq_rig"):
                 builder.add_rotary_gatling(side=0, pivot_offset=(0.0, 0.25, 1.45))
             else:
                 builder.add_rotary_gatling(side=1)
         elif weapon == "missile":
-            if archetype in ("vtol", "heavy_dropship"):
+            if archetype in ("vtol", "heavy_dropship", "flying_wing_bomber"):
                 for side in (-1, 1):
                     side_tag = "L" if side < 0 else "R"
                     pod = rmk.make_missile_launcher_pod(
                         f"{name}MissilePod_{side_tag}",
-                        location=(side * (0.95 if archetype == "vtol" else 1.35), 0.35, 0.58 if archetype == "vtol" else 1.15),
+                        location=(side * (0.95 if archetype != "heavy_dropship" else 1.35), 0.35, 0.58 if archetype != "heavy_dropship" else 1.15),
                         size=(0.42, 0.75, 0.35),
                         rows=2, cols=2, elevation_deg=8.0,
                         armor_mat=builder.palette.primary_armor, cavity_mat=builder.palette.gunmetal,
                         warhead_mat=builder.palette.warning, accent_mat=builder.palette.warning
                     )
                     builder.objects.extend(pod)
-                builder.gun_pivot = Vector((0.0, 1.10, 0.58 if archetype == "vtol" else 1.15))
+                builder.gun_pivot = Vector((0.0, 1.10, 0.58 if archetype != "heavy_dropship" else 1.15))
                 builder.gun_dir = Vector((0.0, 1.0, 0.0))
             else:
                 builder.add_missile_pod(rows=2, cols=3, elevation_deg=16.0)
@@ -1503,20 +1883,20 @@ def build_vehicle_model(
     if tilt_rotors and archetype not in ("vtol", "heavy_dropship"):
         builder.add_tiltrotors()
 
-    if dozer and archetype in ("tank", "artillery", "halftrack", "super_heavy", "combat_harvester", "demolition_breacher", "thermobaric_tank", "recovery_crawler", "mine_layer"):
+    if dozer and archetype in ("tank", "artillery", "halftrack", "super_heavy", "combat_harvester", "demolition_breacher", "thermobaric_tank", "recovery_crawler", "mine_layer", "bridge_layer", "mortar_carrier"):
         builder.add_dozer_blade(width=builder.hull_width * 1.05, height=0.44)
 
-    if smoke and archetype in ("tank", "artillery", "hover", "spider", "halftrack", "super_heavy", "quad_mech", "flak_anti_air", "colossus_titan", "hover_cruiser", "shield_truck", "thermobaric_tank", "ew_jammer", "mobile_sam_launcher", "recovery_crawler", "mine_layer", "sniper_tankette", "hexapod_assault", "assault_hovercraft"):
+    if smoke and archetype in ("tank", "artillery", "hover", "spider", "halftrack", "super_heavy", "quad_mech", "flak_anti_air", "colossus_titan", "hover_cruiser", "shield_truck", "thermobaric_tank", "ew_jammer", "mobile_sam_launcher", "recovery_crawler", "mine_layer", "sniper_tankette", "hexapod_assault", "assault_hovercraft", "bridge_layer", "command_hq_rig", "mortar_carrier", "siege_drill_mole", "heavy_crane_mech"):
         builder.add_smoke_launchers(tube_count=3)
 
     if radar:
         builder.add_radar_dish()
 
-    if sponsons and archetype in ("tank", "artillery", "super_heavy", "siege_crawler", "combat_harvester", "hover_cruiser", "thermobaric_tank", "shield_truck", "recovery_crawler", "mine_layer", "assault_hovercraft"):
+    if sponsons and archetype in ("tank", "artillery", "super_heavy", "siege_crawler", "combat_harvester", "hover_cruiser", "thermobaric_tank", "shield_truck", "recovery_crawler", "mine_layer", "assault_hovercraft", "bridge_layer", "command_hq_rig", "mortar_carrier", "siege_drill_mole"):
         builder.add_side_sponsons()
 
     if outriggers and archetype not in ("flak_anti_air", "siege_crawler"):
-        builder.add_outriggers(count=4 if archetype in ("super_heavy", "siege_crawler", "colossus_titan") else 2)
+        builder.add_outriggers(count=4 if archetype in ("super_heavy", "siege_crawler", "colossus_titan", "command_hq_rig") else 2)
 
     if flight_deck and archetype not in ("drone_carrier",):
         builder.add_flight_deck()
@@ -1524,7 +1904,7 @@ def build_vehicle_model(
     if excavator_drum and archetype not in ("combat_harvester",):
         builder.add_excavator_drum()
 
-    if antenna and archetype not in ("colossus_titan", "hover_cruiser", "artillery_strider", "ew_jammer", "assault_hovercraft"):
+    if antenna and archetype not in ("colossus_titan", "hover_cruiser", "artillery_strider", "ew_jammer", "assault_hovercraft", "command_hq_rig", "heavy_crane_mech"):
         builder.add_whip_antenna()
 
     if cupola:
@@ -1533,7 +1913,7 @@ def build_vehicle_model(
     if rivets:
         builder.add_rivets_and_welds()
 
-    if track_shoes and archetype in ("tank", "artillery", "arc_tank", "halftrack", "super_heavy", "flak_anti_air", "drone_carrier", "combat_harvester", "demolition_breacher", "thermobaric_tank", "recovery_crawler", "mine_layer", "sniper_tankette"):
+    if track_shoes and archetype in ("tank", "artillery", "arc_tank", "halftrack", "super_heavy", "flak_anti_air", "drone_carrier", "combat_harvester", "demolition_breacher", "thermobaric_tank", "recovery_crawler", "mine_layer", "sniper_tankette", "bridge_layer", "mortar_carrier", "siege_drill_mole"):
         builder.add_track_shoes()
 
     if armor_plating:
@@ -1573,9 +1953,9 @@ def build_vehicle_model(
         card_path=card_path,
         render_multiview=multiview,
         ortho_scale=(
-            8.5 if archetype in ("colossus_titan", "hover_cruiser", "heavy_dropship")
-            else (7.2 if archetype in ("super_heavy", "siege_crawler", "drone_carrier", "artillery_strider", "mobile_sam_launcher", "recovery_crawler", "hexapod_assault", "assault_hovercraft")
-            else (6.2 if archetype in ("artillery", "spider", "vtol", "flak_anti_air", "quad_mech", "combat_harvester", "shield_truck", "thermobaric_tank", "ew_jammer", "mine_layer") else 5.6))
+            8.5 if archetype in ("colossus_titan", "hover_cruiser", "heavy_dropship", "flying_wing_bomber")
+            else (7.2 if archetype in ("super_heavy", "siege_crawler", "drone_carrier", "artillery_strider", "mobile_sam_launcher", "recovery_crawler", "hexapod_assault", "assault_hovercraft", "bridge_layer", "command_hq_rig", "siege_drill_mole", "heavy_crane_mech")
+            else (6.2 if archetype in ("artillery", "spider", "vtol", "flak_anti_air", "quad_mech", "combat_harvester", "shield_truck", "thermobaric_tank", "ew_jammer", "mine_layer", "mortar_carrier") else 5.6))
         ),
         smooth_by_angle=True,
         smooth_angle_deg=smooth_angle,
@@ -1712,6 +2092,12 @@ def build_structure_model(
         builder.build_shield_dome()
     elif bt in ("emp_obelisk", "obelisk"):
         builder.build_emp_obelisk()
+    elif bt in ("bunker_pillbox", "pillbox", "bunker"):
+        builder.build_bunker_pillbox()
+    elif bt in ("anti_air_battery", "sam_battery", "aa_battery"):
+        builder.build_anti_air_battery()
+    elif bt in ("comms_relay_tower", "relay_tower", "comms_tower"):
+        builder.build_comms_relay_tower()
     else:
         builder.build_factory()
 
@@ -1818,8 +2204,8 @@ def main():
                 arch_title = arch.title().replace("_", "")
                 unit_name = f"{args.name}_{arch_title}"
                 def_weapon = ARCHETYPE_DEFAULT_WEAPONS.get(arch, "cannon") if args.weapon == "cannon" else args.weapon
-                is_walker = arch in ("walker", "colossus_titan", "artillery_strider")
-                is_quad = arch in ("spider", "quad_mech", "siege_crawler")
+                is_walker = arch in ("walker", "colossus_titan", "artillery_strider", "heavy_crane_mech")
+                is_quad = arch in ("spider", "quad_mech", "siege_crawler", "hexapod_assault")
                 rig_desc = "Biped Armature (8 bones)" if is_walker else ("Quad Armature (10 bones)" if is_quad else "Standard Rig (6 bones)")
                 print(f"- {arch:<20} -> {unit_name:<30} | Weapon: {def_weapon:<14} | Rig: {rig_desc}")
             print("\n=== Dry run complete. No meshes created. ===\n")
@@ -1863,7 +2249,7 @@ def main():
         if args.single_material:
             print(f"  Single-material Atlas FBX: {args.name}_Atlas.fbx (one material slot; Unity draw-call count depends on prefab selection and rendering)")
         if args.rig:
-            if args.archetype in ("walker", "colossus_titan", "artillery_strider"):
+            if args.archetype in ("walker", "colossus_titan", "artillery_strider", "heavy_crane_mech"):
                 bones_desc = "Bone_Root, Bone_Pelvis, Bone_Thigh_L/R, Bone_Shin_L/R, Bone_Foot_L/R, Bone_TurretYaw, Bone_TurretPitch, Bone_BarrelRecoil"
             elif args.archetype in ("spider", "quad_mech", "siege_crawler", "hexapod_assault"):
                 bones_desc = "Bone_Root, Bone_Hull, Bone_Pelvis, Bone_Thigh_FL/FR/RL/RR, Bone_Shin_*, Bone_Foot_*, Bone_TurretYaw, Bone_TurretPitch, Bone_BarrelRecoil"
@@ -1871,7 +2257,7 @@ def main():
                 bones_desc = "Bone_Root, Bone_Hull, Bone_Pelvis, Bone_TurretYaw, Bone_TurretPitch, Bone_BarrelRecoil"
             print(f"  Armature Rig: {args.name}_Armature ({bones_desc})")
         if args.animate:
-            walk_desc = "Action_Walk (In-Place 40-frame gait), Action_Drive (suspension)" if args.archetype in ("walker", "colossus_titan", "artillery_strider", "spider", "quad_mech", "siege_crawler", "hexapod_assault") else "Action_Drive, Action_Walk"
+            walk_desc = "Action_Walk (In-Place 40-frame gait), Action_Drive (suspension)" if args.archetype in ("walker", "colossus_titan", "artillery_strider", "heavy_crane_mech", "spider", "quad_mech", "siege_crawler", "hexapod_assault") else "Action_Drive, Action_Walk"
             print(f"  Baked Action Clips: Action_Idle, {walk_desc}, Action_FireRecoil, Action_Death")
         if args.vfx_flash:
             print(f"  VFX: Muzzle flash star-spike")

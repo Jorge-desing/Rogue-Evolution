@@ -4141,6 +4141,12 @@ def export_gameplay_metadata(
         "sniper_tankette": ["PCXBaseTank"],
         "hexapod_assault": ["GatlingWalker"],
         "assault_hovercraft": ["PCXBaseTank"],
+        "bridge_layer": ["PCXBaseTank"],
+        "command_hq_rig": ["PCXBaseTank"],
+        "flying_wing_bomber": ["PCXBaseTank"],
+        "mortar_carrier": ["ArtilleryTank"],
+        "siege_drill_mole": ["PCXBaseTank"],
+        "heavy_crane_mech": ["GatlingWalker"],
     }
 
     if archetype in ("bike", "buggy"):
@@ -4170,7 +4176,7 @@ def export_gameplay_metadata(
             "fireHpFraction": 0.25,
         },
         "rigging": {
-            "rigType": "skeletal_armature" if archetype in ("walker", "colossus_titan", "quad_mech", "spider", "siege_crawler", "hexapod_assault") else "chassis_kinematic",
+            "rigType": "skeletal_armature" if archetype in ("walker", "colossus_titan", "quad_mech", "spider", "siege_crawler", "hexapod_assault", "heavy_crane_mech") else "chassis_kinematic",
             "hasArmature": True,
             "animatorParameters": ["RCL_IsMoving", "RCL_Fire", "RCL_Death"],
             "actionClips": ["Action_Idle", "Action_Walk", "Action_Drive", "Action_FireRecoil", "Action_Death"],
@@ -4257,7 +4263,7 @@ def make_wreckage_variant(
             wreck_objs.append(h_obj)
 
     else:  # catastrophic
-        if archetype in ("tank", "artillery", "flak_anti_air", "arc_tank", "beam_destroyer", "halftrack", "thermobaric_tank", "demolition_breacher", "recovery_crawler", "mine_layer", "sniper_tankette"):
+        if archetype in ("tank", "artillery", "flak_anti_air", "arc_tank", "beam_destroyer", "halftrack", "thermobaric_tank", "demolition_breacher", "recovery_crawler", "mine_layer", "sniper_tankette", "bridge_layer", "mortar_carrier", "siege_drill_mole"):
             roll = math.radians(5.5)
             for h_obj in hull_objs:
                 h_obj.rotation_euler.y += roll
@@ -4283,7 +4289,7 @@ def make_wreckage_variant(
             )
             wreck_objs.extend(debris)
 
-        elif archetype in ("walker", "colossus_titan", "artillery_strider", "spider", "quad_mech", "siege_crawler", "hexapod_assault"):
+        elif archetype in ("walker", "colossus_titan", "artillery_strider", "spider", "quad_mech", "siege_crawler", "hexapod_assault", "heavy_crane_mech"):
             drop_z = 0.55 if archetype in ("colossus_titan", "quad_mech") else 0.35
             for h_obj in hull_objs:
                 h_obj.location.z = max(0.04, h_obj.location.z - drop_z)
@@ -4294,7 +4300,7 @@ def make_wreckage_variant(
                 t_obj.rotation_euler.x += math.radians(26.0)
                 wreck_objs.append(t_obj)
 
-        elif archetype in ("hover", "hover_cruiser", "vtol", "heavy_dropship", "assault_hovercraft"):
+        elif archetype in ("hover", "hover_cruiser", "vtol", "heavy_dropship", "assault_hovercraft", "flying_wing_bomber"):
             for h_obj in hull_objs:
                 h_obj.location.z = max(0.03, h_obj.location.z - 0.38)
                 h_obj.rotation_euler.x += math.radians(7.5)
@@ -6757,6 +6763,252 @@ def make_emp_obelisk_assembly(
     sockets["Socket_Antenna"] = Vector((0.0, 0.0, height + 0.22))
     sockets["Socket_DamageSmoke"] = Vector((0.0, -radius * 0.45, spire_base_z + 0.25))
     sockets["Socket_DamageFire"] = Vector((0.30, 0.25, spire_base_z + 0.40))
+
+    return objects, sockets
+
+
+def make_bunker_pillbox_assembly(
+    prefix: str,
+    radius: float = 3.0,
+    height: float = 2.0,
+    foundation_mat: bpy.types.Material | None = None,
+    bunker_mat: bpy.types.Material | None = None,
+    metal_mat: bpy.types.Material | None = None,
+    roof_mat: bpy.types.Material | None = None,
+    accent_mat: bpy.types.Material | None = None,
+    emissive_mat: bpy.types.Material | None = None,
+) -> tuple[list[bpy.types.Object], dict[str, Vector]]:
+    """Generates a fortified octagonal casemate pillbox with recessed firing embrasure slits, blast overhang roof, and twin coax cannons."""
+    objects = []
+    sockets = {}
+
+    slab_h = 0.32
+    objects.append(make_cylinder(
+        f"{prefix}_FoundationSlab", radius * 1.15, slab_h,
+        (0.0, 0.0, slab_h * 0.5), foundation_mat, vertices=8, bevel=0.05
+    ))
+
+    wall_h = height - slab_h - 0.35
+    objects.append(make_cylinder(
+        f"{prefix}_CasemateWall", radius * 0.88, wall_h,
+        (0.0, 0.0, slab_h + wall_h * 0.5), bunker_mat, vertices=8, bevel=0.04
+    ))
+
+    # Overhanging sloped blast roof cap
+    roof_z = slab_h + wall_h + 0.18
+    objects.append(make_cylinder(
+        f"{prefix}_BlastRoofCap", radius * 0.96, 0.36,
+        (0.0, 0.0, roof_z), roof_mat or bunker_mat, vertices=8, bevel=0.045
+    ))
+
+    # 4 corner armor glacis buttresses
+    for i in range(4):
+        ang = math.radians(45.0 + i * 90.0)
+        bx = math.cos(ang) * (radius * 0.86)
+        by = math.sin(ang) * (radius * 0.86)
+        objects.append(make_box(
+            f"{prefix}_CornerButtress_{i+1}", (0.48, 0.65, wall_h * 0.92),
+            (bx, by, slab_h + wall_h * 0.46), roof_mat or bunker_mat,
+            bevel=0.03, rotation=(0.0, 0.0, ang)
+        ))
+
+    # Forward recessed firing embrasure slit + twin heavy machine-gun barrels
+    slit_z = slab_h + wall_h * 0.58
+    objects.append(make_box(
+        f"{prefix}_EmbrasureMantlet", (1.45, 0.36, 0.42),
+        (0.0, radius * 0.82, slit_z), metal_mat, bevel=0.025
+    ))
+    objects.append(make_box(
+        f"{prefix}_OpticRangefinderStrip", (0.95, 0.12, 0.10),
+        (0.0, radius * 0.96, slit_z + 0.14), emissive_mat, bevel=0.01
+    ))
+    for side, stag in ((-1, "L"), (1, "R")):
+        objects.extend([
+            make_cylinder(
+                f"{prefix}_CasemateBarrel_{stag}", 0.065, 1.35,
+                (side * 0.32, radius * 0.88 + 0.60, slit_z - 0.04),
+                metal_mat, rotation=(math.radians(90.0), 0.0, 0.0), vertices=10, bevel=0.01
+            ),
+            make_cylinder(
+                f"{prefix}_MuzzleBrake_{stag}", 0.09, 0.22,
+                (side * 0.32, radius * 0.88 + 1.25, slit_z - 0.04),
+                accent_mat or metal_mat, rotation=(math.radians(90.0), 0.0, 0.0), vertices=10, bevel=0.01
+            ),
+        ])
+
+    # Commander armored observation cupola on roof
+    objects.append(make_cylinder(
+        f"{prefix}_ObservationCupola", 0.55, 0.28,
+        (0.0, -0.25, roof_z + 0.26), metal_mat, vertices=8, bevel=0.025
+    ))
+
+    sockets["Socket_GroundCenter"] = Vector((0.0, 0.0, 0.0))
+    sockets["Socket_MuzzlePrimary"] = Vector((0.0, radius * 0.88 + 1.36, slit_z - 0.04))
+    sockets["Socket_SensorOptics"] = Vector((0.0, radius * 0.96, slit_z + 0.14))
+    sockets["Socket_RoofMount"] = Vector((0.0, -0.25, roof_z + 0.40))
+    sockets["Socket_DamageSmoke"] = Vector((-0.45, -0.55, roof_z + 0.20))
+    sockets["Socket_DamageFire"] = Vector((0.35, -0.35, slit_z + 0.20))
+
+    return objects, sockets
+
+
+def make_anti_air_battery_assembly(
+    prefix: str,
+    radius: float = 3.2,
+    height: float = 3.6,
+    foundation_mat: bpy.types.Material | None = None,
+    bunker_mat: bpy.types.Material | None = None,
+    metal_mat: bpy.types.Material | None = None,
+    turret_mat: bpy.types.Material | None = None,
+    accent_mat: bpy.types.Material | None = None,
+    emissive_mat: bpy.types.Material | None = None,
+) -> tuple[list[bpy.types.Object], dict[str, Vector]]:
+    """Generates a fortified SAM & CIWS air-defense battery with rotatable pedestal, twin quad-SAM pods, and fire-control radar."""
+    objects = []
+    sockets = {}
+
+    slab_h = 0.35
+    objects.append(make_cylinder(
+        f"{prefix}_FoundationSlab", radius * 1.12, slab_h,
+        (0.0, 0.0, slab_h * 0.5), foundation_mat, vertices=8, bevel=0.05
+    ))
+
+    ped_h = 1.25
+    objects.append(make_cylinder(
+        f"{prefix}_PedestalBunker", radius * 0.78, ped_h,
+        (0.0, 0.0, slab_h + ped_h * 0.5), bunker_mat, vertices=8, bevel=0.04
+    ))
+
+    turret_z = slab_h + ped_h + 0.42
+    objects.append(make_box(
+        f"{prefix}_AzimuthTurretHouse", (1.65, 1.85, 0.82),
+        (0.0, 0.0, turret_z), turret_mat or bunker_mat, bevel=0.04
+    ))
+
+    # Twin elevated 4-cell SAM launcher pods on trunnion arms
+    pod_elev = math.radians(-28.0)
+    for side, stag in ((-1, "L"), (1, "R")):
+        px = side * 1.32
+        objects.append(make_box(
+            f"{prefix}_SAMPodHousing_{stag}", (0.72, 1.75, 0.68),
+            (px, 0.15, turret_z + 0.22), bunker_mat, bevel=0.03,
+            rotation=(pod_elev, 0.0, 0.0)
+        ))
+        for r_idx, rz_off in enumerate((-0.16, 0.16)):
+            for c_idx, cx_off in enumerate((-0.18, 0.18)):
+                objects.append(make_cylinder(
+                    f"{prefix}_SAMTube_{stag}_{r_idx}{c_idx}", 0.11, 1.82,
+                    (px + cx_off, 0.20, turret_z + 0.22 + rz_off),
+                    accent_mat or metal_mat, rotation=(math.radians(62.0), 0.0, 0.0),
+                    vertices=10, bevel=0.01
+                ))
+
+    # Central planar fire-control phased-array radar & optical tracker above turret
+    mast_z = turret_z + 0.72
+    objects.extend([
+        make_cylinder(f"{prefix}_RadarMast", 0.22, 0.58, (0.0, -0.25, mast_z), metal_mat, vertices=10, bevel=0.02),
+        make_box(
+            f"{prefix}_FireControlRadarDish", (1.45, 0.18, 0.62),
+            (0.0, -0.25, mast_z + 0.45), emissive_mat, bevel=0.02,
+            rotation=(math.radians(-16.0), 0.0, 0.0)
+        ),
+    ])
+
+    sockets["Socket_GroundCenter"] = Vector((0.0, 0.0, 0.0))
+    sockets["Socket_MuzzlePrimary"] = Vector((0.0, 1.15, turret_z + 0.65))
+    sockets["Socket_RadarMast"] = Vector((0.0, -0.25, mast_z + 0.45))
+    sockets["Socket_SensorOptics"] = Vector((0.0, 0.92, turret_z + 0.25))
+    sockets["Socket_DamageSmoke"] = Vector((-0.55, -0.55, slab_h + ped_h))
+    sockets["Socket_DamageFire"] = Vector((0.45, 0.20, turret_z))
+
+    return objects, sockets
+
+
+def make_comms_relay_tower_assembly(
+    prefix: str,
+    radius: float = 2.8,
+    height: float = 5.6,
+    foundation_mat: bpy.types.Material | None = None,
+    bunker_mat: bpy.types.Material | None = None,
+    metal_mat: bpy.types.Material | None = None,
+    dish_mat: bpy.types.Material | None = None,
+    accent_mat: bpy.types.Material | None = None,
+    emissive_mat: bpy.types.Material | None = None,
+) -> tuple[list[bpy.types.Object], dict[str, Vector]]:
+    """Generates a strategic C4ISR communications relay tower with lattice truss mast, microwave drums, and high-gain uplink array."""
+    objects = []
+    sockets = {}
+
+    slab_h = 0.32
+    objects.append(make_cylinder(
+        f"{prefix}_FoundationSlab", radius * 1.12, slab_h,
+        (0.0, 0.0, slab_h * 0.5), foundation_mat, vertices=8, bevel=0.05
+    ))
+
+    # Armored server & transceiver shelter base
+    shelter_h = 1.15
+    objects.append(make_box(
+        f"{prefix}_TransceiverShelter", (radius * 1.35, radius * 1.35, shelter_h),
+        (0.0, 0.0, slab_h + shelter_h * 0.5), bunker_mat, bevel=0.04
+    ))
+
+    # 4 tapered lattice truss corner legs rising to crown platform
+    base_z = slab_h + shelter_h
+    top_z = height - 0.55
+    r_bot = 0.78
+    r_top = 0.36
+    corners = [(-1, -1), (1, -1), (1, 1), (-1, 1)]
+    for idx, (sx, sy) in enumerate(corners, start=1):
+        p0 = Vector((sx * r_bot, sy * r_bot, base_z))
+        p1 = Vector((sx * r_top, sy * r_top, top_z))
+        objects.append(make_rod(
+            f"{prefix}_LatticeChord_{idx}", p0, p1, 0.065, metal_mat, vertices=8
+        ))
+        # Diagonal cross-bracing struts
+        nx, ny = corners[idx % 4]
+        p_mid = Vector((nx * (r_bot + r_top) * 0.5, ny * (r_bot + r_top) * 0.5, (base_z + top_z) * 0.5))
+        objects.append(make_rod(
+            f"{prefix}_LatticeBraceA_{idx}", p0, p_mid, 0.035, metal_mat, vertices=6
+        ))
+        objects.append(make_rod(
+            f"{prefix}_LatticeBraceB_{idx}", p_mid, p1, 0.035, metal_mat, vertices=6
+        ))
+
+    # Bilateral microwave relay drum dishes mounted mid-mast
+    mid_z = (base_z + top_z) * 0.55
+    for side, stag in ((-1, "L"), (1, "R")):
+        objects.extend([
+            make_cylinder(
+                f"{prefix}_MicrowaveDrum_{stag}", 0.44, 0.28,
+                (side * 0.82, 0.18, mid_z), dish_mat or bunker_mat,
+                rotation=(math.radians(90.0), 0.0, math.radians(side * -18.0)),
+                vertices=12, bevel=0.025
+            ),
+            make_cylinder(
+                f"{prefix}_MicrowaveFeed_{stag}", 0.14, 0.34,
+                (side * 0.82, 0.24, mid_z), emissive_mat,
+                rotation=(math.radians(90.0), 0.0, math.radians(side * -18.0)),
+                vertices=10, bevel=0.01
+            ),
+        ])
+
+    # Crown transceiver ring & vertical omni-directional whip array
+    objects.append(make_torus(
+        f"{prefix}_TelemetryCrownRing", (0.0, 0.0, top_z),
+        major_radius=0.62, minor_radius=0.065, material=accent_mat or metal_mat,
+        major_segments=14, minor_segments=6
+    ))
+    objects.append(make_cylinder(
+        f"{prefix}_OmniBeaconSpire", 0.08, 0.85,
+        (0.0, 0.0, top_z + 0.42), emissive_mat, vertices=8, bevel=0.015
+    ))
+
+    sockets["Socket_GroundCenter"] = Vector((0.0, 0.0, 0.0))
+    sockets["Socket_Antenna"] = Vector((0.0, 0.0, top_z + 0.85))
+    sockets["Socket_RadarMast"] = Vector((0.0, 0.0, mid_z))
+    sockets["Socket_SensorOptics"] = Vector((0.0, 0.85, mid_z))
+    sockets["Socket_DamageSmoke"] = Vector((-0.55, -0.55, base_z))
+    sockets["Socket_DamageFire"] = Vector((0.40, 0.35, base_z * 0.75))
 
     return objects, sockets
 
@@ -10381,6 +10633,66 @@ class RogueStructureBuilder:
             bunker_mat=self.palette.primary_armor,
             metal_mat=self.palette.gunmetal,
             coil_mat=self.palette.light_armor,
+            accent_mat=self.palette.warning,
+            emissive_mat=self.palette.emissive,
+        )
+        self.objects.extend(objs)
+        self.sockets.update(socks)
+        return self
+
+    def build_bunker_pillbox(
+        self,
+        radius: float = 3.0,
+        height: float = 2.0,
+    ) -> "RogueStructureBuilder":
+        objs, socks = make_bunker_pillbox_assembly(
+            self.name,
+            radius=radius,
+            height=height,
+            foundation_mat=self.palette.gunmetal,
+            bunker_mat=self.palette.primary_armor,
+            metal_mat=self.palette.gunmetal,
+            roof_mat=self.palette.light_armor,
+            accent_mat=self.palette.warning,
+            emissive_mat=self.palette.emissive,
+        )
+        self.objects.extend(objs)
+        self.sockets.update(socks)
+        return self
+
+    def build_anti_air_battery(
+        self,
+        radius: float = 3.2,
+        height: float = 3.6,
+    ) -> "RogueStructureBuilder":
+        objs, socks = make_anti_air_battery_assembly(
+            self.name,
+            radius=radius,
+            height=height,
+            foundation_mat=self.palette.gunmetal,
+            bunker_mat=self.palette.primary_armor,
+            metal_mat=self.palette.gunmetal,
+            turret_mat=self.palette.light_armor,
+            accent_mat=self.palette.warning,
+            emissive_mat=self.palette.emissive,
+        )
+        self.objects.extend(objs)
+        self.sockets.update(socks)
+        return self
+
+    def build_comms_relay_tower(
+        self,
+        radius: float = 2.8,
+        height: float = 5.6,
+    ) -> "RogueStructureBuilder":
+        objs, socks = make_comms_relay_tower_assembly(
+            self.name,
+            radius=radius,
+            height=height,
+            foundation_mat=self.palette.gunmetal,
+            bunker_mat=self.palette.primary_armor,
+            metal_mat=self.palette.gunmetal,
+            dish_mat=self.palette.light_armor,
             accent_mat=self.palette.warning,
             emissive_mat=self.palette.emissive,
         )
