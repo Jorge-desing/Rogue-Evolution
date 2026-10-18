@@ -148,7 +148,7 @@ namespace RogueCommandExpansion.Authoring
             // Setup or import Atlas textures if present
             Material atlasMaterial = SetupAtlasTexturesAndMaterial(unitName);
 
-            // Locate 3D Model Asset (Prioritize Atlas FBX, then LODs FBX, then base FBX)
+            // Prefer an animated primary FBX when present; otherwise use the LOD, atlas, or base model.
             GameObject modelAsset = FindModelAsset(unitName);
             if (modelAsset == null)
             {
@@ -239,7 +239,7 @@ namespace RogueCommandExpansion.Authoring
                 }
 
                 // 3. Setup compound root BoxCollider if specified and no dedicated child colliders were present
-                if (meta.HasCollider)
+                if (meta.HasCollider && convertedColliderCount == 0)
                 {
                     BoxCollider collider = root.GetComponent<BoxCollider>();
                     if (collider == null)
@@ -267,7 +267,7 @@ namespace RogueCommandExpansion.Authoring
                 }
 
                 // 5. Mount Detached Modular Attachments (ERA, APS, Sponson, FuelDrums) if present
-                MountModularAttachmentsIfAvailable(root, unitName, atlasMaterial);
+                MountModularAttachmentsIfAvailable(root, unitName);
 
                 // 6. Mount Damaged Variant Model (<Name>_Damaged.fbx) if present
                 MountDamagedVariantIfAvailable(root, unitName, atlasMaterial);
@@ -352,7 +352,7 @@ namespace RogueCommandExpansion.Authoring
             }
         }
 
-        private static void MountModularAttachmentsIfAvailable(GameObject root, string unitName, Material atlasMaterial)
+        private static void MountModularAttachmentsIfAvailable(GameObject root, string unitName)
         {
             string[] guids = AssetDatabase.FindAssets(unitName + "_Attachment_ t:Model", new[] { ModelFolder, AssetRoot });
             if (guids == null || guids.Length == 0) return;
@@ -365,11 +365,19 @@ namespace RogueCommandExpansion.Authoring
                 if (!attFileName.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) continue;
 
                 string attType = attFileName.Substring(prefix.Length);
+                string socketType = NormalizeHardpointSocketType(attType);
                 GameObject attAsset = AssetDatabase.LoadAssetAtPath<GameObject>(path);
                 if (attAsset != null)
                 {
-                    Transform socket = root.transform.Find("Socket_Hardpoint_" + attType);
-                    Transform parentTransform = socket != null ? socket : root.transform;
+                    Transform socket = root.transform.Find("Socket_Hardpoint_" + socketType);
+                    Transform parentTransform = socket != null
+                        ? GetOrCreateAttachmentGroup(root, socketType)
+                        : root.transform;
+                    if (socket == null)
+                    {
+                        Debug.LogWarning("[VehiclePrefabBuilder] No Socket_Hardpoint_" + socketType +
+                            " found for " + attFileName + "; mounting it at the visual root.");
+                    }
 
                     GameObject attInstance = PrefabUtility.InstantiatePrefab(attAsset) as GameObject;
                     if (attInstance != null)
@@ -380,21 +388,38 @@ namespace RogueCommandExpansion.Authoring
                         attInstance.transform.localRotation = Quaternion.identity;
                         attInstance.transform.localScale = Vector3.one;
 
-                        if (atlasMaterial != null)
-                        {
-                            foreach (Renderer r in attInstance.GetComponentsInChildren<Renderer>(true))
-                            {
-                                if (r.name.IndexOf("_COLLIDER", StringComparison.OrdinalIgnoreCase) >= 0)
-                                {
-                                    r.enabled = false;
-                                    continue;
-                                }
-                                r.sharedMaterial = atlasMaterial;
-                            }
-                        }
                     }
                 }
             }
+        }
+
+        private static string NormalizeHardpointSocketType(string attachmentType)
+        {
+            string compact = (attachmentType ?? string.Empty).Replace("_", string.Empty).Replace("-", string.Empty);
+            switch (compact.ToLowerInvariant())
+            {
+                case "era": return "ERA";
+                case "aps": return "APS";
+                case "sponson":
+                case "sponsons": return "Sponsons";
+                case "fueldrum":
+                case "fueldrums": return "FuelDrums";
+                default: return attachmentType ?? string.Empty;
+            }
+        }
+
+        private static Transform GetOrCreateAttachmentGroup(GameObject root, string socketType)
+        {
+            string groupName = "RCL_AttachmentGroup_" + socketType;
+            Transform group = root.transform.Find(groupName);
+            if (group != null) return group;
+
+            GameObject groupObject = new GameObject(groupName);
+            groupObject.transform.SetParent(root.transform, false);
+            groupObject.transform.localPosition = Vector3.zero;
+            groupObject.transform.localRotation = Quaternion.identity;
+            groupObject.transform.localScale = Vector3.one;
+            return groupObject.transform;
         }
 
         private static void MountDamagedVariantIfAvailable(GameObject root, string unitName, Material atlasMaterial)
@@ -456,6 +481,7 @@ namespace RogueCommandExpansion.Authoring
             string modelPath = AssetDatabase.GetAssetPath(modelAsset);
             UnityEngine.Object[] allAssets = AssetDatabase.LoadAllAssetsAtPath(modelPath);
             var animationClips = new List<AnimationClip>();
+            Avatar importedAvatar = null;
             if (allAssets != null)
             {
                 foreach (var asset in allAssets)
@@ -463,6 +489,10 @@ namespace RogueCommandExpansion.Authoring
                     if (asset is AnimationClip clip && !clip.name.StartsWith("__preview__"))
                     {
                         animationClips.Add(clip);
+                    }
+                    else if (asset is Avatar avatar && avatar.isValid && importedAvatar == null)
+                    {
+                        importedAvatar = avatar;
                     }
                 }
             }
@@ -476,9 +506,19 @@ namespace RogueCommandExpansion.Authoring
                 }
 
                 Animator modelAnimator = modelAsset.GetComponent<Animator>();
-                if (modelAnimator != null && modelAnimator.avatar != null)
+                if (importedAvatar != null)
+                {
+                    animator.avatar = importedAvatar;
+                }
+                else if (modelAnimator != null && modelAnimator.avatar != null)
                 {
                     animator.avatar = modelAnimator.avatar;
+                }
+
+                if (animationClips.Count > 0 && animator.avatar == null)
+                {
+                    Debug.LogWarning("[VehiclePrefabBuilder] Imported animation clips for " + unitName +
+                        " have no valid Avatar; verify the FBX rig import settings.");
                 }
 
                 if (animationClips.Count > 0)
@@ -494,37 +534,189 @@ namespace RogueCommandExpansion.Authoring
                     if (controller == null)
                     {
                         controller = AnimatorController.CreateAnimatorControllerAtPath(controllerPath);
-                        var rootStateMachine = controller.layers[0].stateMachine;
-
-                        AnimationClip idleClip = animationClips.Find(c => c.name.IndexOf("Idle", StringComparison.OrdinalIgnoreCase) >= 0);
-                        if (idleClip == null && animationClips.Count > 0) idleClip = animationClips[0];
-
-                        if (idleClip != null)
-                        {
-                            var idleState = rootStateMachine.AddState(idleClip.name);
-                            idleState.motion = idleClip;
-                            rootStateMachine.defaultState = idleState;
-                        }
-
-                        foreach (var clip in animationClips)
-                        {
-                            if (clip != idleClip)
-                            {
-                                var state = rootStateMachine.AddState(clip.name);
-                                state.motion = clip;
-                            }
-                        }
-                        AssetDatabase.SaveAssets();
                     }
+
+                    ConfigureAnimationController(controller, animationClips);
 
                     animator.runtimeAnimatorController = controller;
                 }
             }
         }
 
+        private static void ConfigureAnimationController(AnimatorController controller, List<AnimationClip> clips)
+        {
+            if (controller == null || clips == null || clips.Count == 0 || controller.layers.Length == 0) return;
+
+            AnimatorStateMachine stateMachine = controller.layers[0].stateMachine;
+            AnimationClip idleClip = FindAnimationClip(clips, "Idle") ?? clips[0];
+            AnimationClip driveClip = FindAnimationClip(clips, "Drive");
+            AnimationClip fireClip = FindAnimationClip(clips, "FireRecoil") ?? FindAnimationClip(clips, "Fire");
+            AnimationClip deathClip = FindAnimationClip(clips, "Death");
+
+            AnimatorState idleState = GetOrCreateAnimationState(stateMachine, idleClip);
+            AnimatorState driveState = driveClip != null ? GetOrCreateAnimationState(stateMachine, driveClip) : null;
+            AnimatorState fireState = fireClip != null ? GetOrCreateAnimationState(stateMachine, fireClip) : null;
+            AnimatorState deathState = deathClip != null ? GetOrCreateAnimationState(stateMachine, deathClip) : null;
+
+            foreach (AnimationClip clip in clips)
+            {
+                GetOrCreateAnimationState(stateMachine, clip);
+            }
+
+            stateMachine.defaultState = idleState;
+
+            bool hasMovementParameter = driveState != null && EnsureAnimatorParameter(
+                controller, "RCL_IsMoving", AnimatorControllerParameterType.Bool);
+            bool hasFireParameter = fireState != null && EnsureAnimatorParameter(
+                controller, "RCL_Fire", AnimatorControllerParameterType.Trigger);
+            bool hasDeathParameter = deathState != null && EnsureAnimatorParameter(
+                controller, "RCL_Death", AnimatorControllerParameterType.Trigger);
+
+            if (hasMovementParameter && driveState != idleState)
+            {
+                EnsureStateTransition(idleState, driveState, "RCL_IsMoving", AnimatorConditionMode.If, 0.12f);
+                EnsureStateTransition(driveState, idleState, "RCL_IsMoving", AnimatorConditionMode.IfNot, 0.12f);
+            }
+
+            if (fireState != null && idleState != null && hasFireParameter)
+            {
+                EnsureAnyStateTriggerTransition(stateMachine, fireState, "RCL_Fire");
+                EnsureExitTransition(fireState, idleState);
+            }
+
+            if (deathState != null && hasDeathParameter)
+            {
+                EnsureAnyStateTriggerTransition(stateMachine, deathState, "RCL_Death");
+            }
+
+            EditorUtility.SetDirty(controller);
+            AssetDatabase.SaveAssets();
+        }
+
+        private static AnimationClip FindAnimationClip(List<AnimationClip> clips, string nameFragment)
+        {
+            return clips.Find(clip => clip != null && clip.name.IndexOf(nameFragment, StringComparison.OrdinalIgnoreCase) >= 0);
+        }
+
+        private static AnimatorState GetOrCreateAnimationState(AnimatorStateMachine stateMachine, AnimationClip clip)
+        {
+            if (stateMachine == null || clip == null) return null;
+            ChildAnimatorState[] states = stateMachine.states;
+            foreach (ChildAnimatorState child in states)
+            {
+                if (child.state != null && string.Equals(child.state.name, clip.name, StringComparison.Ordinal))
+                {
+                    child.state.motion = clip;
+                    return child.state;
+                }
+            }
+
+            AnimatorState state = stateMachine.AddState(clip.name);
+            state.motion = clip;
+            return state;
+        }
+
+        private static bool EnsureAnimatorParameter(
+            AnimatorController controller,
+            string parameterName,
+            AnimatorControllerParameterType parameterType)
+        {
+            foreach (AnimatorControllerParameter parameter in controller.parameters)
+            {
+                if (string.Equals(parameter.name, parameterName, StringComparison.Ordinal))
+                {
+                    if (parameter.type == parameterType) return true;
+                    Debug.LogWarning("[VehiclePrefabBuilder] Animator parameter " + parameterName +
+                        " on " + controller.name + " has type " + parameter.type + "; expected " + parameterType + ".");
+                    return false;
+                }
+            }
+
+            controller.AddParameter(parameterName, parameterType);
+            return true;
+        }
+
+        private static void EnsureStateTransition(
+            AnimatorState source,
+            AnimatorState destination,
+            string parameterName,
+            AnimatorConditionMode condition,
+            float duration)
+        {
+            if (source == null || destination == null) return;
+            foreach (AnimatorStateTransition existing in source.transitions)
+            {
+                if (existing.destinationState == destination && HasTransitionCondition(existing, parameterName, condition)) return;
+            }
+
+            AnimatorStateTransition transition = source.AddTransition(destination);
+            transition.hasExitTime = false;
+            transition.duration = duration;
+            transition.AddCondition(condition, 0f, parameterName);
+        }
+
+        private static void EnsureAnyStateTriggerTransition(
+            AnimatorStateMachine stateMachine,
+            AnimatorState destination,
+            string parameterName)
+        {
+            if (stateMachine == null || destination == null) return;
+            foreach (AnimatorStateTransition existing in stateMachine.anyStateTransitions)
+            {
+                if (existing.destinationState == destination && HasTransitionCondition(existing, parameterName, AnimatorConditionMode.If)) return;
+            }
+
+            AnimatorStateTransition transition = stateMachine.AddAnyStateTransition(destination);
+            transition.hasExitTime = false;
+            transition.duration = 0.05f;
+            transition.canTransitionToSelf = false;
+            transition.AddCondition(AnimatorConditionMode.If, 0f, parameterName);
+        }
+
+        private static void EnsureExitTransition(AnimatorState source, AnimatorState destination)
+        {
+            if (source == null || destination == null) return;
+            foreach (AnimatorStateTransition existing in source.transitions)
+            {
+                if (existing.destinationState == destination && existing.hasExitTime) return;
+            }
+
+            AnimatorStateTransition transition = source.AddTransition(destination);
+            transition.hasExitTime = true;
+            transition.exitTime = 1f;
+            transition.duration = 0.05f;
+        }
+
+        private static bool HasTransitionCondition(
+            AnimatorStateTransition transition,
+            string parameterName,
+            AnimatorConditionMode condition)
+        {
+            foreach (AnimatorCondition existing in transition.conditions)
+            {
+                if (string.Equals(existing.parameter, parameterName, StringComparison.Ordinal) && existing.mode == condition)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         private static GameObject FindModelAsset(string unitName)
         {
-            // Prioritize LOD chain if available so LODGroup is constructed, then single joined Atlas, then raw FBX
+            string riggedModelPath = ModelFolder + "/" + unitName + ".fbx";
+            GameObject riggedModel = AssetDatabase.LoadAssetAtPath<GameObject>(riggedModelPath);
+            if (HasEmbeddedAnimationClips(riggedModel))
+            {
+                ConfigureAnimationClipLooping(riggedModelPath);
+                riggedModel = AssetDatabase.LoadAssetAtPath<GameObject>(riggedModelPath);
+                Debug.Log("[VehiclePrefabBuilder] Using animated primary FBX for " + unitName +
+                    " so imported clips remain available to its Animator.");
+                return riggedModel;
+            }
+
+            // Preserve primary-FBX animation clips above; otherwise prioritize LOD chain, atlas mesh, then raw FBX.
             string[] candidatePaths = new[]
             {
                 ModelFolder + "/" + unitName + "_LODs.fbx",
@@ -551,6 +743,53 @@ namespace RogueCommandExpansion.Authoring
             }
 
             return null;
+        }
+
+        private static bool HasEmbeddedAnimationClips(GameObject modelAsset)
+        {
+            if (modelAsset == null) return false;
+            string modelPath = AssetDatabase.GetAssetPath(modelAsset);
+            if (string.IsNullOrEmpty(modelPath)) return false;
+
+            UnityEngine.Object[] assets = AssetDatabase.LoadAllAssetsAtPath(modelPath);
+            if (assets == null) return false;
+            foreach (UnityEngine.Object asset in assets)
+            {
+                AnimationClip clip = asset as AnimationClip;
+                if (clip != null && !clip.name.StartsWith("__preview__", StringComparison.OrdinalIgnoreCase)) return true;
+            }
+
+            return false;
+        }
+
+        private static void ConfigureAnimationClipLooping(string modelPath)
+        {
+            ModelImporter importer = AssetImporter.GetAtPath(modelPath) as ModelImporter;
+            if (importer == null) return;
+
+            ModelImporterClipAnimation[] clips = importer.clipAnimations;
+            if (clips == null || clips.Length == 0)
+            {
+                clips = importer.defaultClipAnimations;
+            }
+            if (clips == null || clips.Length == 0) return;
+
+            bool changed = false;
+            foreach (ModelImporterClipAnimation clip in clips)
+            {
+                if (clip == null) continue;
+                bool shouldLoop = clip.name.IndexOf("Idle", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    clip.name.IndexOf("Drive", StringComparison.OrdinalIgnoreCase) >= 0;
+                if (clip.loopTime != shouldLoop)
+                {
+                    clip.loopTime = shouldLoop;
+                    changed = true;
+                }
+            }
+
+            if (!changed) return;
+            importer.clipAnimations = clips;
+            importer.SaveAndReimport();
         }
 
         private static Material SetupAtlasTexturesAndMaterial(string unitName)

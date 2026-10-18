@@ -536,7 +536,7 @@ The procedural weapon suite includes 9 distinct weapon assemblies:
 To elevate procedural unit models to commercial RTS asset parity, four new core pillars were implemented across `tools/RogueModelKit.py`, `tools/generate_unit_model.py`, and `unity/RogueCommandAssetAuthoring/`:
 
 ### A. Texture Atlas Baking & 1-Draw-Call Mesh Optimization
-- **Unified Atlas UV Unwrapping**: `unwrap_atlas_uvs(objects, margin=0.04)` performs parameterized Smart UV projection across all individual subassemblies, packing non-overlapping UV islands into a single $[0, 1] \times [0, 1]$ coordinate square.
+- **Unified Atlas UV Unwrapping**: `unwrap_atlas_uvs(objects, island_margin=0.02)` performs parameterized Smart UV projection across all individual subassemblies, packing non-overlapping UV islands into a single $[0, 1] \times [0, 1]$ coordinate square.
 - **Ultra-Fast Cycles PBR Texture Baking**: `bake_pbr_texture_atlas(...)` switches Blender's render engine to Cycles (CPU, 1 sample, < 1s) to bake complete PBR texture sets directly into `Assets/RogueCommandExpansionSample/Models/Textures/`:
   - `Albedo` (BaseColor with faction colors and camouflage).
   - `MetallicGloss` (Metallic in RGB, Smoothness in Alpha).
@@ -610,6 +610,8 @@ To satisfy the mod architectural rule that *every added unit requires a dedicate
   - `make_aux_fuel_drums`: Rear-mounted cylindrical fuel drums / power cells with dual retaining bracket straps and feed lines (`--attachments fuel_drums`).
 - **Detached Asset Export (`--export-detached-attachments`)**:
   - Automatically exports individual attachment models to separate FBXs: `<Name>_Attachment_<Type>.fbx`.
+  - Excludes those meshes from the primary model, its baked texture atlas, and generated LOD chain, so disabling the prefab attachment group also removes the visible geometry.
+  - Detached exports keep their source materials and UVs; the base model's atlas material is not assigned to them.
 - **CLI Command**:
   ```powershell
   python tools/generate_unit_model.py --name VanguardTank --attachments era,aps,sponson,fuel_drums --export-detached-attachments
@@ -678,7 +680,7 @@ The runtime visual director was subjected to binary inspection against `Assembly
 
 ## 17. Static Review Resolutions & Asset Pipeline Rigor (2026-10-17)
 
-Following comprehensive static code and architectural review of the 3D model authoring and runtime visual subsystems, four critical points were resolved to ensure seamless compatibility between Blender, Unity, and the in-game runtime:
+Following static code review of the 3D authoring and runtime visual subsystems, the implementation was updated to address integration gaps between Blender, Unity, and the in-game runtime:
 
 ### A. PBR Metallic-Gloss Packing & Viewport Material Flow
 - **Review Finding**: The texture atlas baker did not bake true metallic maps from Principled BSDF inputs, and the roughness channel was improperly mapped as MetallicGloss without the required smoothness inversion.
@@ -700,7 +702,7 @@ Following comprehensive static code and architectural review of the 3D model aut
   1. **Collision Mesh Conversion**:
      - Scans hierarchy for `_COLLIDER` meshes (`_COLLIDER_Hull`, `_COLLIDER_Turret`).
      - Disables visible `Renderer` on collision objects (`r.enabled = false`) and excludes them from atlas material assignment.
-     - Adds native Unity `BoxCollider` sized to `MeshFilter.sharedMesh.bounds` to provide precise physics interaction without visual draw calls.
+     - Adds a native Unity `BoxCollider` sized to `MeshFilter.sharedMesh.bounds` as an approximate collision shape without visual draw calls.
   2. **Automated Animator Setup (`SetupAnimatorIfAvailable`)**:
      - Detects articulated rigs (bones named `Bone_*`, `Armature`), `SkinnedMeshRenderer`, or embedded `AnimationClip`s in the imported FBX.
      - Automatically attaches `Animator` component and binds the FBX avatar.
@@ -710,7 +712,7 @@ Following comprehensive static code and architectural review of the 3D model aut
 - **Review Finding**: Modular hardpoint attachments and damaged mesh variants were static geometry that did not automatically react to unit health or combat damage.
 - **Solution & Implementation (`VehiclePrefabBuilder.cs` & `RuntimeVisualDirector.cs`)**:
   1. **Prefab Hardpoint Auto-Mounting**:
-     - `MountModularAttachmentsIfAvailable`: Detects `<UnitName>_Attachment_<Type>.fbx` in the models directory and automatically mounts it under matching `Socket_Hardpoint_<Type>` with atlas materials.
+     - `MountModularAttachmentsIfAvailable`: Detects `<UnitName>_Attachment_<Type>.fbx`, normalizes its suffix to the matching `Socket_Hardpoint_<Type>`, and mounts the model at vehicle-root coordinates inside an `RCL_AttachmentGroup_<Type>`. The attachment keeps its own material/UVs; the root-level group is the visual activation target while the physical hardpoint remains in place.
      - `MountDamagedVariantIfAvailable`: Detects `<UnitName>_Damaged.fbx` and instantiates it under the prefab root, initially inactive (`SetActive(false)`).
   2. **Authoritative Health-Driven Lifecycle**:
      - $\le 75\%$ HP: Reactive Armor (`ERA`) hardpoint detonate upon heavy impact, triggering explosive muzzle flash VFX and disabling the armor tile.
@@ -730,3 +732,9 @@ Following comprehensive static code and architectural review of the 3D model aut
      - Replaced hardcoded vector offsets with mathematically exact trigonometric positioning:
        $$D_{xy} = M \times 2.2, \quad X = D_{xy} \cos(45^\circ), \quad Y = -D_{xy} \sin(45^\circ), \quad Z = D_{xy} \tan(\theta_{\text{elevation}})$$
      - Parameterized via `elevation_angle_deg` (default $45.0^\circ$ exact) and CLI flag `--icon-elevation <float>`.
+
+### E. Hardpoint, Collider & Animation Integration Corrections
+- Detached attachment suffixes are normalized to the prefab hardpoint names (`era` → `ERA`, `aps` → `APS`, `sponson` → `Sponsons`, `fuel_drums` → `FuelDrums`). The exporter removes detached mesh objects from the primary model before material batching, atlas baking, LOD generation, and base collider generation; any previously tracked generated hulls are replaced from the filtered base geometry. The prefab builder mounts them under identity root-level `RCL_AttachmentGroup_<Type>` transforms so vehicle-space object coordinates remain valid; `RuntimeVisualDirector` toggles that group and falls back to the physical hardpoint for older prefabs. With a separate group, ERA/fuel-drum VFX use the active physical socket as their anchor. If an older prefab uses the socket itself as the visual, the runtime captures the socket's world pose and emits VFX under the active entity root before hiding it. Detached materials remain independent of the base atlas. Unknown attachment types fall back to the visual root with a warning.
+- The metadata-sized root collider is added only when the imported model has no converted `_COLLIDER` child meshes, avoiding duplicate hull coverage. Generated hull bounds exclude meshes exported separately as detached attachments.
+- When the primary FBX contains animation clips, the builder selects it ahead of the static LOD FBX, preserves a valid imported Avatar, configures Idle/Drive clips to loop, and creates locomotion, fire-recoil, and death transitions. `RuntimeVisualDirector` drives those parameters from observed entity movement, the native shot timestamp, and the dead state; fire animation dispatch does not require recoil or muzzle sockets, and loader-prefixed animated units can receive the director without other sockets.
+- **Validation status:** these builder and runtime changes have only received static review. Unity import/prefab creation and animation playback in a Steam-launched match remain unverified. Models without embedded clips continue to use the LOD FBX path.

@@ -5433,9 +5433,15 @@ class RogueVehicleBuilder:
         self.wear_level = wear_level
         return self
 
-    def add_colliders(self, include_turret: bool = True) -> "RogueVehicleBuilder":
+    def add_colliders(
+        self,
+        include_turret: bool = True,
+        model_objects: Sequence[bpy.types.Object] | None = None,
+    ) -> "RogueVehicleBuilder":
         self.collider_objects = generate_collision_hulls(
-            self.objects, prefix=self.name, include_turret_collider=include_turret
+            model_objects if model_objects is not None else self.objects,
+            prefix=self.name,
+            include_turret_collider=include_turret,
         )
         return self
 
@@ -6447,15 +6453,6 @@ class RogueVehicleBuilder:
             icons = render_tactical_icons(self.objects, icon_dir, self.name, resolutions=icon_resolutions, elevation_angle_deg=icon_elevation)
             diagnostics["tactical_icons"] = {k: str(v) for k, v in icons.items()}
 
-        # 4c. Export detached modular attachments if requested
-        if export_detached_attachments and self.attachment_objects:
-            detached_paths = {}
-            for att_type, att_objs in self.attachment_objects.items():
-                att_fbx = fbx_path.parent / f"{self.name}_Attachment_{att_type}.fbx"
-                export_unity_fbx(att_fbx, att_objs, include_empties=False)
-                detached_paths[att_type] = str(att_fbx)
-            diagnostics["detached_attachments"] = detached_paths
-
         # 5. Save editable source .blend
         bpy.ops.wm.save_as_mainfile(filepath=str(blend_path))
 
@@ -6472,6 +6469,21 @@ class RogueVehicleBuilder:
         elif bake_vertex_dirt:
             bake_vertex_ambient_dirt(self.objects)
 
+        # Export detached pieces after vertex shading, but before the base-model atlas is baked.
+        # Their source materials and UVs are independent of the base atlas.
+        detached_attachment_object_ptrs: set[int] = set()
+        if export_detached_attachments and self.attachment_objects:
+            detached_paths = {}
+            for att_type, att_objs in self.attachment_objects.items():
+                exportable_objects = [obj for obj in att_objs if obj is not None and obj.type == "MESH"]
+                if not exportable_objects:
+                    continue
+                att_fbx = fbx_path.parent / f"{self.name}_Attachment_{att_type}.fbx"
+                export_unity_fbx(att_fbx, exportable_objects, include_empties=False)
+                detached_attachment_object_ptrs.update(obj.as_pointer() for obj in exportable_objects)
+                detached_paths[att_type] = str(att_fbx)
+            diagnostics["detached_attachments"] = detached_paths
+
         # 7. Subsystem Budget & Profiling on raw source objects
         if profile_budget:
             profile_report = profile_model_budget_and_drawcalls(
@@ -6481,15 +6493,31 @@ class RogueVehicleBuilder:
             )
             diagnostics["profile_report"] = profile_report
 
-        # 8. Physics Collision Hulls (generated on raw unjoined objects)
+        # Detached attachment meshes must not enlarge the base hull collider.
+        model_export_source_objects = self.objects
+        if detached_attachment_object_ptrs:
+            model_export_source_objects = [
+                obj for obj in self.objects if obj.as_pointer() not in detached_attachment_object_ptrs
+            ]
+            diagnostics["detached_attachment_meshes_excluded_from_base"] = len(detached_attachment_object_ptrs)
+
+        # 8. Physics Collision Hulls (generated on raw unjoined base objects)
         if generate_colliders:
-            if not self.collider_objects:
+            if detached_attachment_object_ptrs:
+                # Colliders may have been requested before export. Replace those tracked hulls
+                # so detached pieces cannot leave stale bounds on the base vehicle.
+                for collider in self.collider_objects:
+                    if collider is not None and collider.name in bpy.data.objects:
+                        bpy.data.objects.remove(collider, do_unlink=True)
+                self.collider_objects = []
+                self.add_colliders(include_turret=True, model_objects=model_export_source_objects)
+            elif not self.collider_objects:
                 self.add_colliders(include_turret=True)
             diagnostics["colliders"] = [c.name for c in self.collider_objects]
 
         # 9. Material batching for FBX with smart angle-weighted smoothing
         batched_objects = batch_and_join_by_material(
-            self.objects,
+            model_export_source_objects,
             prefix=self.name,
             preserve_names=self.preserved_pivots,
             smooth_by_angle=smooth_by_angle,

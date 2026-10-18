@@ -22,7 +22,9 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
         private Transform _socketDamageFire;
         private Transform _socketRecoilPrimary;
         private Transform _socketMuzzlePrimary;
+        private Animator _animator;
         private readonly Dictionary<string, Transform> _socketHardpoints = new Dictionary<string, Transform>(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, Transform> _attachmentGroups = new Dictionary<string, Transform>(StringComparer.OrdinalIgnoreCase);
 
         private GameObject _damagedMeshObject;
         private GameObject _intactMeshObject;
@@ -36,8 +38,18 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
         private bool _isDamagedStateActive;
         private bool _isCriticalStateActive;
         private bool _isTurretJammed;
+        private bool _hasMovementAnimationParameter;
+        private bool _hasFireAnimationParameter;
+        private bool _hasDeathAnimationParameter;
+        private bool _deathAnimationTriggered;
+        private bool _hasLastAnimationPosition;
+        private Vector3 _lastAnimationPosition;
         private float _doorOpenProgress;
         private Vector3 _doorClosedLocalPos;
+
+        private const string MovementAnimationParameter = "RCL_IsMoving";
+        private const string FireAnimationParameter = "RCL_Fire";
+        private const string DeathAnimationParameter = "RCL_Death";
 
         private static PropertyInfo _healthRatioProp;
         private static PropertyInfo _currentHealthProp;
@@ -85,6 +97,7 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
         private static bool HasCompatibleVisualSockets(Transform root)
         {
             if (root == null) return false;
+            bool hasAnimator = false;
             Queue<Transform> queue = new Queue<Transform>();
             queue.Enqueue(root);
 
@@ -92,6 +105,10 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             {
                 Transform current = queue.Dequeue();
                 string name = current.name;
+                if (!hasAnimator && current.GetComponent<Animator>() != null)
+                {
+                    hasAnimator = true;
+                }
                 if (name.IndexOf("Socket_", StringComparison.OrdinalIgnoreCase) >= 0 ||
                     name.IndexOf("RCL_Visual_", StringComparison.OrdinalIgnoreCase) >= 0 ||
                     name.EndsWith("_Damaged", StringComparison.OrdinalIgnoreCase))
@@ -105,13 +122,14 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
                 }
             }
 
-            return false;
+            return hasAnimator && root.name.StartsWith("RCL_", StringComparison.OrdinalIgnoreCase);
         }
 
         public void Initialize(EntityController entity)
         {
             _entity = entity;
             DiscoverSocketsAndMeshes(transform);
+            CacheAnimatorParameters();
 
             if (_socketRecoilPrimary != null)
             {
@@ -124,6 +142,37 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             }
 
             CacheReflectionAccess();
+        }
+
+        private void CacheAnimatorParameters()
+        {
+            _animator = GetComponentInChildren<Animator>(true);
+            if (_animator == null || _animator.runtimeAnimatorController == null) return;
+
+            foreach (AnimatorControllerParameter parameter in _animator.parameters)
+            {
+                if (parameter.type == AnimatorControllerParameterType.Bool &&
+                    string.Equals(parameter.name, MovementAnimationParameter, StringComparison.Ordinal))
+                {
+                    _hasMovementAnimationParameter = true;
+                }
+                else if (parameter.type == AnimatorControllerParameterType.Trigger &&
+                    string.Equals(parameter.name, FireAnimationParameter, StringComparison.Ordinal))
+                {
+                    _hasFireAnimationParameter = true;
+                }
+                else if (parameter.type == AnimatorControllerParameterType.Trigger &&
+                    string.Equals(parameter.name, DeathAnimationParameter, StringComparison.Ordinal))
+                {
+                    _hasDeathAnimationParameter = true;
+                }
+            }
+
+            if (_entity != null)
+            {
+                _lastAnimationPosition = _entity.transform.position;
+                _hasLastAnimationPosition = true;
+            }
         }
 
         private void DiscoverSocketsAndMeshes(Transform root)
@@ -173,11 +222,16 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
                 {
                     if (_socketMuzzlePrimary == null) _socketMuzzlePrimary = current;
                 }
+                else if (name.StartsWith("RCL_AttachmentGroup_", StringComparison.OrdinalIgnoreCase))
+                {
+                    string attachmentType = name.Substring("RCL_AttachmentGroup_".Length);
+                    _attachmentGroups[NormalizeHardpointType(attachmentType)] = current;
+                }
                 else if (name.IndexOf("Socket_Hardpoint_", StringComparison.OrdinalIgnoreCase) >= 0)
                 {
                     int hpIdx = name.IndexOf("Socket_Hardpoint_", StringComparison.OrdinalIgnoreCase);
                     string hpType = name.Substring(hpIdx + "Socket_Hardpoint_".Length);
-                    _socketHardpoints[hpType] = current;
+                    _socketHardpoints[NormalizeHardpointType(hpType)] = current;
                 }
                 else if (name.EndsWith("_Damaged", StringComparison.OrdinalIgnoreCase))
                 {
@@ -262,6 +316,7 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
         {
             if (_entity == null) return;
 
+            UpdateLocomotionAnimation();
             UpdateHealthAndDamageTransitions();
             UpdateRadarSweep();
             UpdateTurretAiming();
@@ -270,9 +325,22 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             UpdateRecoilRecovery();
         }
 
+        private void UpdateLocomotionAnimation()
+        {
+            if (_animator == null || !_hasMovementAnimationParameter || _entity == null) return;
+
+            Vector3 currentPosition = _entity.transform.position;
+            float deltaTime = Time.deltaTime;
+            bool isMoving = _hasLastAnimationPosition && deltaTime > Mathf.Epsilon &&
+                (currentPosition - _lastAnimationPosition).sqrMagnitude > (0.15f * deltaTime) * (0.15f * deltaTime);
+
+            _animator.SetBool(MovementAnimationParameter, isMoving);
+            _lastAnimationPosition = currentPosition;
+            _hasLastAnimationPosition = true;
+        }
+
         private void UpdateAutomaticWeaponFeedback()
         {
-            if (_socketRecoilPrimary == null && _socketMuzzlePrimary == null) return;
             if (_attackField == null || _timeOfLastShotField == null) return;
 
             try
@@ -305,17 +373,28 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             // 1. Reactive Armor (ERA) Detonation on initial heavy impact (<= 75% HP)
             if (ratio <= 0.75f && !isDead)
             {
-                Transform eraSocket;
-                if (_socketHardpoints.TryGetValue("ERA", out eraSocket) && eraSocket != null && eraSocket.gameObject.activeSelf)
+                Transform eraVisual;
+                if (TryGetHardpointVisual("ERA", out eraVisual) && eraVisual.gameObject.activeSelf)
                 {
-                    eraSocket.gameObject.SetActive(false);
-                    RuntimeVisualVfxFallback.TriggerMuzzleFlash(eraSocket, this);
+                    Transform effectAnchor = GetHardpointSocket("ERA") ?? transform;
+                    Vector3 effectPosition = effectAnchor.position;
+                    Quaternion effectRotation = effectAnchor.rotation;
+                    bool hidesEffectAnchor = eraVisual == effectAnchor;
+                    eraVisual.gameObject.SetActive(false);
+                    if (hidesEffectAnchor)
+                    {
+                        RuntimeVisualVfxFallback.TriggerMuzzleFlashAt(transform, effectPosition, effectRotation);
+                    }
+                    else
+                    {
+                        RuntimeVisualVfxFallback.TriggerMuzzleFlash(effectAnchor, this);
+                    }
                 }
             }
             else if (ratio > 0.85f && !isDead)
             {
                 Transform eraSocket;
-                if (_socketHardpoints.TryGetValue("ERA", out eraSocket) && eraSocket != null && !eraSocket.gameObject.activeSelf)
+                if (TryGetHardpointVisual("ERA", out eraSocket) && !eraSocket.gameObject.activeSelf)
                 {
                     eraSocket.gameObject.SetActive(true);
                 }
@@ -344,11 +423,22 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
                     }
 
                     // Auxiliary Fuel Drums jettison / smoke on heavy damage
-                    Transform fuelSocket;
-                    if (_socketHardpoints.TryGetValue("FuelDrums", out fuelSocket) && fuelSocket != null && fuelSocket.gameObject.activeSelf)
+                    Transform fuelVisual;
+                    if (TryGetHardpointVisual("FuelDrums", out fuelVisual) && fuelVisual.gameObject.activeSelf)
                     {
-                        fuelSocket.gameObject.SetActive(false);
-                        RuntimeVisualVfxFallback.SpawnDamageSmoke(fuelSocket);
+                        Transform effectAnchor = GetHardpointSocket("FuelDrums") ?? transform;
+                        Vector3 effectPosition = effectAnchor.position;
+                        Quaternion effectRotation = effectAnchor.rotation;
+                        bool hidesEffectAnchor = fuelVisual == effectAnchor;
+                        fuelVisual.gameObject.SetActive(false);
+                        if (hidesEffectAnchor)
+                        {
+                            RuntimeVisualVfxFallback.SpawnDamageSmokeAt(transform, effectPosition, effectRotation);
+                        }
+                        else
+                        {
+                            RuntimeVisualVfxFallback.SpawnDamageSmoke(effectAnchor);
+                        }
                     }
                 }
             }
@@ -375,7 +465,7 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
                 }
 
                 Transform fuelSocket;
-                if (_socketHardpoints.TryGetValue("FuelDrums", out fuelSocket) && fuelSocket != null && !fuelSocket.gameObject.activeSelf)
+                if (TryGetHardpointVisual("FuelDrums", out fuelSocket) && !fuelSocket.gameObject.activeSelf)
                 {
                     fuelSocket.gameObject.SetActive(true);
                 }
@@ -398,7 +488,7 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
 
                     // APS radar burnout
                     Transform apsSocket;
-                    if (_socketHardpoints.TryGetValue("APS", out apsSocket) && apsSocket != null)
+                    if (TryGetHardpointVisual("APS", out apsSocket))
                     {
                         apsSocket.gameObject.SetActive(false);
                     }
@@ -420,7 +510,7 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
                 }
 
                 Transform apsSocket;
-                if (_socketHardpoints.TryGetValue("APS", out apsSocket) && apsSocket != null && !apsSocket.gameObject.activeSelf)
+                if (TryGetHardpointVisual("APS", out apsSocket) && !apsSocket.gameObject.activeSelf)
                 {
                     apsSocket.gameObject.SetActive(true);
                 }
@@ -429,6 +519,16 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             // 4. Destruction cleanup
             if (isDead)
             {
+                if (!_deathAnimationTriggered && _animator != null && _hasDeathAnimationParameter)
+                {
+                    _deathAnimationTriggered = true;
+                    if (_hasMovementAnimationParameter)
+                    {
+                        _animator.SetBool(MovementAnimationParameter, false);
+                    }
+                    _animator.SetTrigger(DeathAnimationParameter);
+                }
+
                 if (_fireVfxInstance != null)
                 {
                     UnityEngine.Object.Destroy(_fireVfxInstance, 4.0f);
@@ -529,14 +629,53 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             {
                 RuntimeVisualVfxFallback.TriggerMuzzleFlash(_socketMuzzlePrimary, this, 0.07f);
             }
+
+            if (_animator != null && _hasFireAnimationParameter && !_deathAnimationTriggered)
+            {
+                _animator.SetTrigger(FireAnimationParameter);
+            }
         }
 
         public void SetAttachmentActive(string attachmentType, bool active)
         {
-            Transform socket;
-            if (_socketHardpoints.TryGetValue(attachmentType, out socket) && socket != null)
+            Transform visual;
+            if (TryGetHardpointVisual(attachmentType, out visual))
             {
-                socket.gameObject.SetActive(active);
+                visual.gameObject.SetActive(active);
+            }
+        }
+
+        private bool TryGetHardpointVisual(string attachmentType, out Transform visual)
+        {
+            string normalizedType = NormalizeHardpointType(attachmentType);
+            if (_attachmentGroups.TryGetValue(normalizedType, out visual) && visual != null)
+            {
+                return true;
+            }
+
+            return _socketHardpoints.TryGetValue(normalizedType, out visual) && visual != null;
+        }
+
+        private Transform GetHardpointSocket(string attachmentType)
+        {
+            Transform socket;
+            return _socketHardpoints.TryGetValue(NormalizeHardpointType(attachmentType), out socket) ? socket : null;
+        }
+
+        private static string NormalizeHardpointType(string attachmentType)
+        {
+            string compact = (attachmentType ?? string.Empty).Replace("_", string.Empty).Replace("-", string.Empty).Trim();
+            switch (compact.ToLowerInvariant())
+            {
+                case "era": return "ERA";
+                case "aps": return "APS";
+                case "sponson":
+                case "sponsons": return "Sponsons";
+                case "fueldrum":
+                case "fueldrums":
+                case "fuel":
+                case "drums": return "FuelDrums";
+                default: return attachmentType ?? string.Empty;
             }
         }
 

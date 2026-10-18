@@ -32,21 +32,30 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
         public static GameObject SpawnDamageSmoke(Transform parent)
         {
             if (parent == null) return null;
+            return SpawnDamageSmokeAt(parent, parent.position, parent.rotation);
+        }
+
+        public static GameObject SpawnDamageSmokeAt(Transform activeParent, Vector3 worldPosition, Quaternion worldRotation)
+        {
+            if (activeParent == null) return null;
 
             try
             {
                 GameObject nativeSmoke = TryLoadNativePrefab("Smoke");
                 if (nativeSmoke != null)
                 {
-                    GameObject instance = UnityEngine.Object.Instantiate(nativeSmoke, parent);
-                    instance.transform.localPosition = Vector3.zero;
-                    instance.transform.localRotation = Quaternion.identity;
+                    GameObject instance = UnityEngine.Object.Instantiate(nativeSmoke, activeParent);
+                    instance.transform.SetPositionAndRotation(worldPosition, worldRotation);
                     return instance;
                 }
             }
             catch { /* Fallback to procedural */ }
 
-            return CreateProceduralSmoke(parent);
+            GameObject proceduralSmoke = CreateProceduralSmoke(activeParent);
+            proceduralSmoke.transform.SetPositionAndRotation(
+                worldPosition,
+                worldRotation * Quaternion.Euler(-90f, 0f, 0f));
+            return proceduralSmoke;
         }
 
         public static GameObject SpawnDamageFire(Transform parent, EntityController entity = null)
@@ -114,6 +123,16 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
 
             // 2. Otherwise spawn a procedural instantaneous particle burst
             CreateProceduralMuzzleBurst(muzzleSocket, duration);
+        }
+
+        public static void TriggerMuzzleFlashAt(
+            Transform activeParent,
+            Vector3 worldPosition,
+            Quaternion worldRotation,
+            float duration = 0.07f)
+        {
+            if (activeParent == null) return;
+            CreateProceduralMuzzleBurst(activeParent, worldPosition, worldRotation, duration);
         }
 
         private static IEnumerator FlashAuthoredMesh(GameObject flashObj, float duration)
@@ -217,10 +236,19 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
 
         private static void CreateProceduralMuzzleBurst(Transform muzzleSocket, float duration)
         {
+            if (muzzleSocket == null) return;
+            CreateProceduralMuzzleBurst(muzzleSocket, muzzleSocket.position, muzzleSocket.rotation, duration);
+        }
+
+        private static void CreateProceduralMuzzleBurst(
+            Transform activeParent,
+            Vector3 worldPosition,
+            Quaternion worldRotation,
+            float duration)
+        {
             GameObject burstObj = new GameObject("RCL_VFX_MuzzleBurst");
-            burstObj.transform.SetParent(muzzleSocket, false);
-            burstObj.transform.localPosition = Vector3.zero;
-            burstObj.transform.localRotation = Quaternion.identity;
+            burstObj.transform.SetParent(activeParent, false);
+            burstObj.transform.SetPositionAndRotation(worldPosition, worldRotation);
 
             ParticleSystem ps = burstObj.AddComponent<ParticleSystem>();
             ParticleSystemRenderer psr = burstObj.GetComponent<ParticleSystemRenderer>();

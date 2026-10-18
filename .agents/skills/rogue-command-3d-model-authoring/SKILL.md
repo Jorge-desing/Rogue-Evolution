@@ -366,7 +366,7 @@ Follow this strict progression when creating or modifying 3D models:
 The extended authoring pipeline provides four production-grade optimization and gameplay pillars:
 
 ### A. Texture Atlas Baking & 1-Draw-Call Optimization (`--bake-atlas`, `--single-material`)
-- **Non-Overlapping Atlas UV Unwrapping**: `unwrap_atlas_uvs(objects, margin=0.04)` projects smart UV coordinates with parameterized island padding.
+- **Non-Overlapping Atlas UV Unwrapping**: `unwrap_atlas_uvs(objects, island_margin=0.02)` projects smart UV coordinates with parameterized island padding.
 - **Fast Cycles PBR Baking**: Headless 1-sample Cycles baking generates four synchronized PBR texture maps in `<Project>/Models/Textures/`:
   - `<Name>_Albedo.png`: Diffuse color map with faction palette, camouflage patterns, and wear baked in.
   - `<Name>_MetallicGloss.png`: RGB metallic and smoothness channels matching Unity Standard shader layout.
@@ -429,7 +429,7 @@ Parametric armor and tactical upgrade assemblies designed for runtime modularity
   - `aps`: Active Protection System (APS) hardkill suite comprising dual multi-angle millimeter-wave radar detection pods and twin 3-tube rapid countermeasure mortar launchers (`make_aps_hardkill_system`).
   - `sponson`: Flank-mounted armored weapon sponson pod with protective mantlet housing and auxiliary autocannon barrels (`make_sponson_pod`).
   - `fuel_drums`: Rear-mounted twin cylindrical auxiliary fuel drums or high-capacity capacitor cells with armored retaining straps and feeder fuel lines (`make_aux_fuel_drums`).
-- **Detached Asset Export (`--export-detached-attachments`)**: In addition to baking into the base vehicle mesh, exports individual modular FBXs (`<Name>_Attachment_<Type>.fbx`), enabling dynamic runtime equip systems in Unity without reloading base meshes.
+- **Detached Asset Export (`--export-detached-attachments`)**: Exports individual modular FBXs (`<Name>_Attachment_<Type>.fbx`) and excludes those meshes from the base FBX, its atlas, LOD chain, and generated base collision hulls. Existing tracked hulls are regenerated from base geometry when necessary. Detached parts keep their source materials/UVs; Unity mounts them in an identity root-level `RCL_AttachmentGroup_<Type>` using vehicle-space FBX transforms, and the runtime director toggles that group while the physical hardpoint remains in place. For older prefabs where a hardpoint socket itself is the visual, ERA/fuel VFX are emitted from an active entity-root parent at the socket's captured world pose before the socket is hidden.
 - **CLI Usage**:
   ```powershell
   python tools/generate_unit_model.py --name VanguardTank --attachments era,aps,sponson,fuel_drums --export-detached-attachments
