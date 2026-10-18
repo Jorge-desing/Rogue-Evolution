@@ -500,9 +500,22 @@ var tests = new (string Name, Action Run)[]
         observation.RecordGlobalCandidates(factories, scope, false);
         observation.RecordGlobalCandidates(factories, scope, true);
         string trace = observation.Format(scope);
-        if (trace.Length > 4096 || !trace.Contains("truncatedIds=", StringComparison.Ordinal))
+        if (trace.Length > 4096 || !trace.Contains("omittedIdObservations=", StringComparison.Ordinal))
         {
             throw new InvalidOperationException("A large reward trace exceeded its output bound or hid truncation.");
+        }
+
+        var poolObservation = new BlueprintRewardObservation();
+        for (int i = 0; i < 9; i++)
+        {
+            poolObservation.RecordPoolCandidates(
+                "RCL_POOL_" + i.ToString("D2"), Array.Empty<string>(), scope, null, false);
+        }
+
+        string poolTrace = poolObservation.Format(scope);
+        if (!poolTrace.Contains("omittedPoolQueries=1", StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("Pool-query truncation was not reported independently from IDs.");
         }
     }),
     ("demo reward stage index follows visible stages and tutorial substitution", () =>

@@ -167,7 +167,8 @@ namespace RogueCommandExpansionLoader.Runtime
             new SortedDictionary<string, SortedSet<string>>(StringComparer.Ordinal);
         private bool _globalFallbackObserved;
         private bool _poolCandidatesObserved;
-        private int _omittedIds;
+        private int _omittedIdObservations;
+        private int _omittedPoolQueries;
 
         public void RecordGlobalCandidates(
             IList<string> candidates,
@@ -214,7 +215,7 @@ namespace RogueCommandExpansionLoader.Runtime
             {
                 if (_poolCandidates.Count >= MaxRecordedPoolQueries)
                 {
-                    _omittedIds++;
+                    _omittedPoolQueries++;
                     return;
                 }
 
@@ -301,9 +302,14 @@ namespace RogueCommandExpansionLoader.Runtime
                 report.Append('}');
             }
 
-            if (_omittedIds > 0)
+            if (_omittedIdObservations > 0)
             {
-                report.Append(" truncatedIds=").Append(_omittedIds);
+                report.Append(" omittedIdObservations=").Append(_omittedIdObservations);
+            }
+
+            if (_omittedPoolQueries > 0)
+            {
+                report.Append(" omittedPoolQueries=").Append(_omittedPoolQueries);
             }
 
             if (report.Length > MaxTraceCharacters)
@@ -324,7 +330,7 @@ namespace RogueCommandExpansionLoader.Runtime
 
             if (destination.Count >= MaxRecordedIdsPerSet)
             {
-                _omittedIds++;
+                _omittedIdObservations++;
                 return;
             }
 

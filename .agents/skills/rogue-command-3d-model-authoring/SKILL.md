@@ -369,7 +369,7 @@ Follow this strict progression when creating or modifying 3D models:
    - Verify zero missing scripts, valid mesh renderers, and zero null material slots.
 3. **Offline Reference Audit**:
    - Run `tools/validate_content_bundle_references.py content/packs/<pack-id>` to verify all manifest asset names resolve within the built AssetBundle.
-   - Run `dotnet run --project tests/RogueCommandExpansionLoader.ValidationTests -- .` to ensure registry, balance, and localization invariants pass.
+   - Run `dotnet run --artifacts-path artifacts/validation-tests --project tests/RogueCommandExpansionLoader.ValidationTests/RogueCommandExpansionLoader.ValidationTests.csproj -- .` to ensure registry, balance, and localization invariants pass and keep build outputs in ignored `artifacts/`.
 4. **Steam Runtime Validation**:
    - Static inspection, Blender rendering, and Unity reopening provide **local authoring evidence**.
    - Only a Rogue Command session launched through Steam can prove that the model loads, instantiates without clipping, and renders correctly during combat. Record runtime evidence in `docs/research/AGENT-HANDOFF.md` using the categories established there and follow the BepInEx MCP skill when available.

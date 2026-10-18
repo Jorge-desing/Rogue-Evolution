@@ -166,7 +166,7 @@ If `sRGBTexture` is left `true`, Unity applies gamma-to-linear conversion to the
 The C# editor scaffolder automatically constructs game-ready prefabs from Blender exports and `.gameplay.json`:
 
 1. **Model Discovery Precedence**:
-   - Prioritizes `<Name>_LODs.fbx` over `<Name>_Atlas.fbx` and `<Name>.fbx`.
+   - Uses the animated `<Name>.fbx` first when it has animation clips; otherwise it uses a valid `<Name>_LODs.fbx`, then `<Name>_Atlas.fbx`, the primary FBX, or the legacy asset path.
    - When `_LODs.fbx` is loaded, every discovered child renderer (`LOD0`, `LOD1`, `LOD2`) is assigned the shared `atlasMaterial`.
    - `LODGroup` is created with standard RTS thresholds: LOD0 (50%), LOD1 (20%), LOD2 (5% cull).
 2. **Modular Attachments & Damaged Variants**:
