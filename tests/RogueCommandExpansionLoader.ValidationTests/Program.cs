@@ -1441,6 +1441,17 @@ var tests = new (string Name, Action Run)[]
         {
             throw new InvalidOperationException("The reactive AI parser rejected valid upper-bound values.");
         }
+
+        ContentModuleParameter[] nativeUnitId =
+        [
+            new ContentModuleParameter { name = "unitId", value = "BombBike" }
+        ];
+        if (!ReactiveBaseDefenseParameterParser.TryParse(nativeUnitId,
+            out ReactiveBaseDefenseSettings nativeSettings, out diagnostic) ||
+            diagnostic != null || nativeSettings.UnitId != "BombBike")
+        {
+            throw new InvalidOperationException("The reactive AI parser rejected a valid unnamespaced native unit ID.");
+        }
     }),
     ("reactive base-defense AI parser rejects unknown, duplicate, null, and out-of-range values", () =>
     {
@@ -1454,7 +1465,8 @@ var tests = new (string Name, Action Run)[]
             [new ContentModuleParameter { name = "unitId", value = "" }],
             [new ContentModuleParameter { name = "unitId", value = ":" }],
             [new ContentModuleParameter { name = "unitId", value = ":bike" }],
-            [new ContentModuleParameter { name = "unitId", value = "sample:" }],
+            [new ContentModuleParameter { name = "unitId", value = "foo:" }],
+            [new ContentModuleParameter { name = "unitId", value = "a::b" }],
             [new ContentModuleParameter { name = "unitId", value = "sample::bike" }],
             [new ContentModuleParameter { name = "unitId", value = "sample:bad/id" }],
             [new ContentModuleParameter { name = "unitId", value = new string('a', 129) }],
