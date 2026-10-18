@@ -1,0 +1,3 @@
+interface:
+  display_name: "Rogue Command Balance Simulation"
+  short_description: "Simulate and calibrate tactical combat balance, Lanchester dynamics, and unit stats for Rogue Command"
