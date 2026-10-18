@@ -784,3 +784,53 @@ Following in-depth static and architectural code review of the 3D authoring pipe
   - `CurrentAttackTarget`: `0x060007fc` (MethodDef: `EntityController get_CurrentAttackTarget()`)
   - `IsEnemy`: `0x06000844` (MethodDef: `System.Boolean IsEnemy(EntityController)`)
 - While `RuntimeVisualDirector` resolves members dynamically by name, maintaining exact documented tokens ensures future binary patches and compatibility audits can detect layout changes immediately.
+
+
+---
+
+## 19. Next-Gen Tactical Generation Suite: Colossus Titan, Hover Cruiser, Heavy Dropship, Orbital Silo & In-Game Procedural Dynamics (2026-10-18)
+
+To deliver next-generation visual fidelity, RTS tactical depth, and live procedural simulation, the authoring toolkit (`tools/RogueModelKit.py`, `tools/generate_unit_model.py`, and twin skill scripts) and the in-game runtime director (`RuntimeVisualDirector.cs`) were expanded across four major architectural pillars:
+
+### A. Micro-Detail & Visual Fidelity Enhancement Suite
+To eliminate low-poly visual monotony and catch high-contrast specular highlights in RTS isometric cameras, four new procedural micro-assemblies were introduced:
+1. **Flexible Whip Antenna (`make_whip_antenna` / `add_whip_antenna`)**:
+   - Generates an armored mounting bracket, stepped helical spring coils (3 tiers), and an angled carbon-composite mast ($7^\circ - 8^\circ$ backward lean) terminating in a high-visibility hazard tip.
+   - Automatically defines `Socket_Antenna` locator, parenting the antenna geometry so the runtime director can apply inertial sway without mesh deformation.
+2. **Armored Commander Cupola (`make_crew_cupola_hatch` / `add_crew_cupola`)**:
+   - Octagonal beveled vision cupola with 5 armored periscope slits and glowing emissive sensor prisms.
+   - Split circular hatch doors with mechanical pivot hinge blocks.
+3. **Perimeter Rivets & Beveled Weld Seams (`make_rivets_and_weld_seams` / `add_rivets_and_welds`)**:
+   - High-contrast hex bolt heads and low-poly beveled weld seam strips placed along glacis plate edges and hull joints, catching specular highlights under directional sun illumination.
+4. **Articulated Track Shoe Cleats (`make_articulated_track_shoes` / `add_track_shoes`)**:
+   - Discrete, volumetric track shoes with center guide horns and cross-link pins along ground contact runs, transforming continuous tread meshes into mechanical assemblies.
+
+### B. 4 New Tactical Archetypes
+Expanding the vehicle and structure roster to **19 Total Archetypes**:
+1. **Colossus Titan (`colossus_titan`)**:
+   - Heavy bipedal assault war walker. Features massive digitigrade bipedal legs ($2.30\text{ m}$ hip height, $1.35\text{ m}$ spacing), reinforced pelvis core, citadel torso, shoulder pauldrons, dual rear cooling exhaust stacks, and heavy dual cannon or gatling armament.
+2. **Hover Cruiser (`hover_cruiser`)**:
+   - Heavy amphibious assault gunboat and skimmer. Streamlined hydrodynamic sloped bow prow ($4.6\text{ m}$ length), dual flank repulsor cushions, armored conning tower, bridge roof, twin rear jet thruster nacelles, and forward superfiring railgun or cannon turret.
+3. **Heavy Dropship (`heavy_dropship`)**:
+   - Heavy VTOL tactical transport and gunship. Features reinforced cargo fuselage ($3.8\text{ m}$ length), cockpit nose, rear clamshell loading ramp, high wings with ducted vector tilt-rotors, heavy articulated landing gear skids, and multi-tube missile pods.
+4. **Orbital Silo Structure (`orbital_silo` via `make_orbital_silo_assembly` / `build_orbital_silo`)**:
+   - Strategic planetary defense and rocket launch installation. Octagonal foundation pit, blast berm, inner launch aperture, dual book-opening blast doors with hydraulic rams, vertical umbilical gantry tower, warning beacon, and exhaust trench. Emits canonical `Socket_MuzzlePrimary`, `Socket_Deploy_Unit`, and `Socket_RadarMast`.
+
+### C. Procedural Camouflage & Environmental Biome System
+- **Advanced Camouflage Patterns**: Added `digital` (high-contrast pixelated dual-tone), `splinter` (angular geometric fracture camo), and `tigerstripe` (horizontal brushstroke tactical camo) to `get_faction_palette` alongside `desert`, `urban`, `arctic`, and `woodland`.
+- **4 Dedicated Presets**: Added `colossus_titan`, `sea_lance`, `sky_dreadnought`, and `orbital_defense` to `PRESETS`.
+- **Environmental Biomes**: Added CLI flag `--biome <desert|arctic|woodland|urban>` for automated environmental weathering and texturing.
+
+### D. In-Game Runtime Automation & Procedural Dynamics (`RuntimeVisualDirector.cs`)
+The expansion loader was enhanced with dynamic secondary animation and environmental adaptation:
+1. **Inertial Spring-Damper Antenna Wobble (`UpdateAntennaWobble`)**:
+   - Discovers `Socket_Antenna` dynamically on spawned units.
+   - Computes vehicle chassis linear acceleration vector: $\vec{a} = (\vec{v}_t - \vec{v}_{t-1}) / \Delta t$.
+   - Drives a 2D damped harmonic oscillator simulating physical inertia:
+     $$\ddot{\theta} = -\omega^2 \theta - 2\zeta\omega \dot{\theta} - k_{\text{accel}} (\vec{a} \cdot \hat{u})$$
+   - Rotates `Socket_Antenna` local transform in pitch and roll, causing flexible whip antennas to sway convincingly during starting, stopping, and turning.
+2. **VTOL Vector Thruster Pitching (`UpdateVtolThrusterVectoring`)**:
+   - Discovers `Socket_ThrusterVector_L` and `Socket_ThrusterVector_R`.
+   - Reads vehicle local horizontal velocity, pitching thrusters dynamically forward up to $28^\circ$ when cruising and neutral during hover.
+3. **Environmental Biome Pipeline**:
+   - Biome selection (`--biome <desert|arctic|woodland|urban>`) provides deterministic authoring-time palette and weathering baking directly into model textures and vertex colors, avoiding unverified runtime scene heuristic tinting (as native combat takes place inside the unified `Game` scene without distinct per-biome scene names).

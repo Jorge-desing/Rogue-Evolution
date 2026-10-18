@@ -1474,6 +1474,103 @@ def make_side_sponson_assembly(
     return objects
 
 
+def make_whip_antenna(
+    name: str,
+    base_pos: Tuple[float, float, float] | Vector,
+    length: float = 0.85,
+    lean_deg: float = 7.0,
+    base_mat: bpy.types.Material | None = None,
+    mast_mat: bpy.types.Material | None = None,
+    tip_mat: bpy.types.Material | None = None,
+) -> list[bpy.types.Object]:
+    """Generates a tactical whip antenna with stepped helical spring coils and beacon tip."""
+    objects = []
+    base_v = Vector(base_pos)
+    objects.append(make_cylinder(f"{name}_Bracket", 0.045, 0.06, base_v, base_mat, vertices=8, bevel=0.008))
+    for i in range(3):
+        coil_z = base_v.z + 0.03 + i * 0.025
+        objects.append(make_cylinder(f"{name}_SpringCoil_{i}", 0.032 - i * 0.003, 0.02, Vector((base_v.x, base_v.y, coil_z)), base_mat, vertices=8))
+    lean_rad = math.radians(lean_deg)
+    mast_start = base_v + Vector((0.0, 0.0, 0.10))
+    mast_end = mast_start + Vector((0.0, -math.sin(lean_rad) * length, math.cos(lean_rad) * length))
+    objects.append(make_rod(f"{name}_Mast", mast_start, mast_end, 0.010, mast_mat, vertices=6))
+    objects.append(make_cylinder(f"{name}_Tip", 0.018, 0.035, mast_end, tip_mat, vertices=8))
+    return objects
+
+
+def make_crew_cupola_hatch(
+    name: str,
+    location: Tuple[float, float, float] | Vector,
+    radius: float = 0.30,
+    height: float = 0.18,
+    cupola_mat: bpy.types.Material | None = None,
+    lens_mat: bpy.types.Material | None = None,
+    metal_mat: bpy.types.Material | None = None,
+) -> list[bpy.types.Object]:
+    """Generates a commander's periscope cupola and armored split hatch."""
+    objects = []
+    loc_v = Vector(location)
+    objects.append(make_cylinder(f"{name}_Ring", radius, height, loc_v, cupola_mat, vertices=12, bevel=0.015))
+    slit_count = 6
+    for i in range(slit_count):
+        angle = (2.0 * math.pi / slit_count) * i
+        sx = loc_v.x + math.cos(angle) * (radius * 0.90)
+        sy = loc_v.y + math.sin(angle) * (radius * 0.90)
+        sz = loc_v.z + height * 0.15
+        objects.append(make_box(f"{name}_Periscope_{i}", (0.06, 0.08, 0.05), (sx, sy, sz), lens_mat,
+                                rotation=(0.0, 0.0, angle)))
+    hatch_z = loc_v.z + height * 0.52
+    objects.append(make_cylinder(f"{name}_HatchPlate", radius * 0.88, 0.04, Vector((loc_v.x, loc_v.y, hatch_z)), cupola_mat, vertices=12, bevel=0.008))
+    objects.append(make_box(f"{name}_Hinge", (0.08, 0.06, 0.04), (loc_v.x, loc_v.y - radius * 0.75, hatch_z + 0.02), metal_mat, bevel=0.006))
+    return objects
+
+
+def make_rivets_and_weld_seams(
+    name: str,
+    start_point: Tuple[float, float, float] | Vector,
+    end_point: Tuple[float, float, float] | Vector,
+    count: int = 5,
+    rivet_radius: float = 0.016,
+    metal_mat: bpy.types.Material | None = None,
+) -> list[bpy.types.Object]:
+    """Generates a row of hex/dome rivets and continuous beveled weld seam strip."""
+    objects = []
+    p1 = Vector(start_point)
+    p2 = Vector(end_point)
+    diff = p2 - p1
+    length = diff.length
+    if length > 0.05:
+        objects.append(make_rod(f"{name}_WeldSeam", p1, p2, rivet_radius * 0.65, metal_mat, vertices=6))
+        for i in range(count):
+            t = (i + 0.5) / float(count)
+            pos = p1 + diff * t
+            objects.append(make_cylinder(f"{name}_Rivet_{i}", rivet_radius, 0.015, pos, metal_mat, vertices=6, bevel=0.004))
+    return objects
+
+
+def make_articulated_track_shoes(
+    name: str,
+    center: Tuple[float, float, float] | Vector,
+    length: float = 3.0,
+    width: float = 0.36,
+    ground_z: float = 0.08,
+    shoe_count: int = 8,
+    shoe_mat: bpy.types.Material | None = None,
+    pin_mat: bpy.types.Material | None = None,
+) -> list[bpy.types.Object]:
+    """Generates discrete geometric track shoe pads and guide pins along the ground contact run."""
+    objects = []
+    c = Vector(center)
+    span = length * 0.75
+    spacing = span / max(1, shoe_count - 1)
+    start_y = c.y - span * 0.5
+    for i in range(shoe_count):
+        sy = start_y + i * spacing
+        objects.append(make_box(f"{name}_Shoe_{i}", (width * 0.95, spacing * 0.78, 0.035), (c.x, sy, ground_z - 0.015), shoe_mat, bevel=0.006))
+        objects.append(make_cylinder(f"{name}_GuideHorn_{i}", 0.025, 0.05, Vector((c.x, sy, ground_z + 0.03)), pin_mat, vertices=6))
+    return objects
+
+
 def create_unity_empty_locator(
     name: str,
     location: Tuple[float, float, float] | Vector,
@@ -1513,6 +1610,10 @@ def create_unity_locator_sockets(
     radar_loc: Tuple[float, float, float] | Vector | None = None,
     hardpoints: Dict[str, Tuple[float, float, float] | Vector] | None = None,
     include_default_hardpoints: bool = True,
+    antenna_loc: Tuple[float, float, float] | Vector | None = None,
+    thruster_vector_left: Tuple[float, float, float] | Vector | None = None,
+    thruster_vector_right: Tuple[float, float, float] | Vector | None = None,
+    antenna_parts: Sequence[bpy.types.Object] | None = None,
 ) -> list[bpy.types.Object]:
     """Generates standard Unity empty sockets matching Rogue Command vehicle & weapon mechanics:
 
@@ -1529,12 +1630,13 @@ def create_unity_locator_sockets(
     11. Socket_GroundContact / Socket_GroundCenter: Ground contact projection (Z=0) for selection rings.
     12. Socket_RadarMast / Socket_RadarDish: 360-degree radar mast sweep origin.
     13. Socket_Hardpoint_<Type>: Modular equipment mounts (ERA, APS, Sponsons, FuelDrums).
+    14. Socket_Antenna: Whip antenna mounting root for dynamic inertial wobble simulation.
+    15. Socket_ThrusterVector_L / Socket_ThrusterVector_R: Articulated VTOL/dropship vector thrusters.
     """
     empties = []
     def _add_empty(socket_name: str, loc: Vector, rot: Tuple[float, float, float] = (0.0, 0.0, 0.0)):
         bpy.ops.object.empty_add(type="PLAIN_AXES", radius=0.15, location=loc)
         e = bpy.context.object
-        # Use clean canonical socket name (e.g. Socket_DamageSmoke) for zero-config Unity discovery
         e.name = socket_name
         e.rotation_euler = rot
         empties.append(e)
@@ -1635,6 +1737,32 @@ def create_unity_locator_sockets(
     else:
         _add_empty("Socket_GroundContact", Vector((0.0, 0.0, 0.0)))
         _add_empty("Socket_GroundCenter", Vector((0.0, 0.0, 0.0)))
+
+    # 13. Antenna Socket (for dynamic inertial wobble)
+    if antenna_loc is not None:
+        _add_empty("Socket_Antenna", Vector(antenna_loc))
+    elif turret_loc is not None:
+        _add_empty("Socket_Antenna", Vector(turret_loc) + Vector((0.35, -0.40, 0.25)))
+
+    antenna_socket = next((obj for obj in empties if obj.name == "Socket_Antenna"), None)
+    if antenna_socket is not None:
+        for part in antenna_parts or ():
+            try:
+                if part is None or part.type != "MESH":
+                    continue
+                if "Sensor_Antenna" not in part.name and "Sensor_WhipAntenna" not in part.name:
+                    continue
+                world_matrix = part.matrix_world.copy()
+                part.parent = antenna_socket
+                part.matrix_world = world_matrix
+            except ReferenceError:
+                continue
+
+    # 14. Vector Thruster Sockets (VTOL / Dropships)
+    if thruster_vector_left is not None:
+        _add_empty("Socket_ThrusterVector_L", Vector(thruster_vector_left))
+    if thruster_vector_right is not None:
+        _add_empty("Socket_ThrusterVector_R", Vector(thruster_vector_right))
 
     return empties
 
@@ -4553,6 +4681,71 @@ def make_energy_silo_assembly(
     return objects, sockets
 
 
+def make_orbital_silo_assembly(
+    prefix: str,
+    radius: float = 3.6,
+    height: float = 4.5,
+    foundation_mat: bpy.types.Material | None = None,
+    bunker_mat: bpy.types.Material | None = None,
+    metal_mat: bpy.types.Material | None = None,
+    door_mat: bpy.types.Material | None = None,
+    accent_mat: bpy.types.Material | None = None,
+    emissive_mat: bpy.types.Material | None = None,
+) -> tuple[list[bpy.types.Object], dict[str, Vector]]:
+    """Generates a heavy strategic orbital missile silo and tactical launch installation."""
+    objects = []
+    sockets = {}
+
+    # 1. Octagonal foundation pit & perimeter blast berm
+    objects.append(make_cylinder(f"{prefix}_FoundationSlab", radius * 1.15, 0.55, (0.0, 0.0, 0.275), foundation_mat, vertices=8, bevel=0.06))
+    objects.append(make_cylinder(f"{prefix}_LaunchRing", radius * 0.85, 0.35, (0.0, 0.0, 0.65), bunker_mat, vertices=8, bevel=0.04))
+
+    # 2. Silo launch pit aperture (inner well)
+    objects.append(make_cylinder(f"{prefix}_SiloAperture", radius * 0.52, 0.15, (0.0, 0.0, 0.78), metal_mat, vertices=12, bevel=0.02))
+
+    # 3. Dual book-opening heavy armored blast door leaves
+    door_w = radius * 0.56
+    door_l = radius * 0.95
+    door_h = 0.18
+    for side in (-1, 1):
+        stag = "L" if side < 0 else "R"
+        objects.append(make_box(
+            f"{prefix}_BlastDoor_{stag}",
+            (door_w, door_l, door_h),
+            (side * (door_w * 0.48), 0.0, 0.88),
+            door_mat, bevel=0.025
+        ))
+        # Hydraulic actuator cylinders on door flanks
+        objects.append(make_cylinder(
+            f"{prefix}_DoorRam_{stag}", 0.065, 0.45,
+            (side * (radius * 0.62), 0.0, 0.92), metal_mat, vertices=8,
+            rotation=(0.0, math.radians(side * 28), 0.0)
+        ))
+
+    # 4. Vertical gantry crane tower & umbilical service boom
+    tower_x = -radius * 0.78
+    tower_y = radius * 0.45
+    objects.append(make_box(f"{prefix}_GantryColumn", (0.55, 0.55, height), (tower_x, tower_y, height * 0.5), bunker_mat, bevel=0.03))
+    objects.append(make_box(f"{prefix}_UmbilicalBoom", (radius * 0.65, 0.28, 0.25), (tower_x + (radius * 0.32), tower_y, height * 0.85), metal_mat, bevel=0.02))
+    objects.append(make_cylinder(f"{prefix}_WarningBeacon", 0.045, 0.08, (tower_x, tower_y, height + 0.04), emissive_mat, vertices=8))
+
+    # 5. Exhaust deflector trench duct
+    objects.append(make_box(f"{prefix}_ExhaustFlume", (radius * 0.65, radius * 0.82, 0.45), (0.0, -radius * 0.68, 0.32), foundation_mat, bevel=0.035))
+
+    # Sockets
+    sockets["Socket_MuzzlePrimary"] = Vector((0.0, 0.0, 0.90))
+    sockets["Socket_Deploy_Unit"] = Vector((0.0, 0.0, 0.85))
+    sockets["Socket_DeployRamp"] = Vector((0.0, 0.0, 0.85))
+    sockets["Socket_RadarMast"] = Vector((tower_x, tower_y, height + 0.10))
+    sockets["Socket_DamageSmoke"] = Vector((0.0, -radius * 0.68, 0.55))
+    sockets["Socket_DamageFire"] = Vector((0.0, 0.0, 0.92))
+    sockets["Socket_Antenna"] = Vector((tower_x, tower_y, height + 0.15))
+    sockets["Socket_GroundCenter"] = Vector((0.0, 0.0, 0.0))
+
+    return objects, sockets
+
+
+
 # ---------------------------------------------------------------------------
 # Procedural Armature Rigging & Animation Actions
 # ---------------------------------------------------------------------------
@@ -5318,6 +5511,30 @@ def get_faction_palette(
         w_col = (0.90, 0.65, 0.12)
         e_col = (0.20, 0.95, 0.45)
         e_str = 2.0
+    elif c == "digital":
+        p_col = (0.22, 0.26, 0.28)
+        l_col = (0.48, 0.45, 0.38)
+        g_col = (0.07, 0.08, 0.09)
+        t_col = (0.04, 0.045, 0.05)
+        w_col = (0.88, 0.72, 0.15)
+        e_col = (0.12, 0.95, 0.85)
+        e_str = 2.2
+    elif c == "splinter":
+        p_col = (0.14, 0.16, 0.18)
+        l_col = (0.68, 0.72, 0.74)
+        g_col = (0.05, 0.06, 0.07)
+        t_col = (0.03, 0.035, 0.04)
+        w_col = (0.95, 0.22, 0.15)
+        e_col = (0.98, 0.45, 0.10)
+        e_str = 2.3
+    elif c == "tigerstripe":
+        p_col = (0.16, 0.24, 0.14)
+        l_col = (0.34, 0.26, 0.18)
+        g_col = (0.06, 0.07, 0.08)
+        t_col = (0.04, 0.045, 0.05)
+        w_col = (0.85, 0.60, 0.12)
+        e_col = (0.10, 0.88, 0.42)
+        e_str = 2.0
     else:
         f = faction.lower()
         if f == "siege":
@@ -5413,6 +5630,9 @@ class RogueVehicleBuilder:
         self.exhaust_r: Vector | None = None
         self.damage_smoke_loc: Vector | None = None
         self.damage_fire_loc: Vector | None = None
+        self.antenna_loc: Vector | None = None
+        self.thruster_vector_l: Vector | None = None
+        self.thruster_vector_r: Vector | None = None
         self.center_of_mass_loc: Vector | None = None
         self.locator_sockets: list[bpy.types.Object] = []
         self.collider_objects: list[bpy.types.Object] = []
@@ -5671,12 +5891,14 @@ class RogueVehicleBuilder:
         self,
         hip_height: float = 1.45,
         hip_spacing_x: float = 0.84,
+        total_height: float = 1.60,
     ) -> "RogueVehicleBuilder":
         for side in (-1, 1):
             leg = make_bipedal_digitigrade_leg(
                 f"{self.name}Leg",
                 hip_location=(side * (hip_spacing_x * 0.5), -0.05, hip_height),
                 side=side,
+                total_height=total_height,
                 armor_mat=self.palette.primary_armor,
                 joint_mat=self.palette.gunmetal,
                 piston_mat=self.palette.light_armor,
@@ -5864,6 +6086,7 @@ class RogueVehicleBuilder:
         else:
             base_pos = Vector(location)
 
+        self.antenna_loc = base_pos
         self.objects.append(make_cylinder(
             f"{self.name}Sensor_AntennaBase",
             0.038, 0.08, base_pos,
@@ -5881,6 +6104,7 @@ class RogueVehicleBuilder:
             0.018, 0.04, mast_end,
             self.palette.warning, vertices=8
         ))
+        self.preserved_pivots.append("Sensor_Antenna")
         return self
 
     def add_gimbal_sensor(
@@ -6353,6 +6577,122 @@ class RogueVehicleBuilder:
         self.objects.extend(drum)
         return self
 
+    def add_whip_antenna(
+        self,
+        location: Tuple[float, float, float] | None = None,
+        length: float = 0.85,
+        lean_deg: float = 8.0,
+    ) -> "RogueVehicleBuilder":
+        """Adds a flexible whip antenna with spring coils and updates antenna_loc."""
+        if location is None:
+            if hasattr(self, "turret_center") and self.turret_center is not None:
+                base_pos = self.turret_center + Vector((0.36, -0.42, 0.22))
+            else:
+                base_pos = Vector((self.hull_width * 0.28, -self.hull_length * 0.38, self.hull_deck_z + 0.12))
+        else:
+            base_pos = Vector(location)
+
+        self.antenna_loc = base_pos
+        self.objects.extend(make_whip_antenna(
+            f"{self.name}Sensor_WhipAntenna",
+            base_pos,
+            length=length,
+            lean_deg=lean_deg,
+            base_mat=self.palette.gunmetal,
+            mast_mat=self.palette.gunmetal,
+            tip_mat=self.palette.warning,
+        ))
+        self.preserved_pivots.append("Sensor_WhipAntenna")
+        return self
+
+    def add_crew_cupola(
+        self,
+        location: Tuple[float, float, float] | None = None,
+        radius: float = 0.30,
+        height: float = 0.18,
+    ) -> "RogueVehicleBuilder":
+        """Adds an armored commander's vision cupola with periscopes and split hatch."""
+        if location is None:
+            if hasattr(self, "turret_center") and self.turret_center is not None:
+                cupola_pos = self.turret_center + Vector((-0.28, -0.22, 0.24))
+            else:
+                cupola_pos = Vector((0.0, 0.0, self.hull_deck_z + 0.10))
+        else:
+            cupola_pos = Vector(location)
+
+        self.objects.extend(make_crew_cupola_hatch(
+            f"{self.name}Turret_Cupola",
+            cupola_pos,
+            radius=radius,
+            height=height,
+            cupola_mat=self.palette.primary_armor,
+            lens_mat=self.palette.emissive,
+            metal_mat=self.palette.gunmetal,
+        ))
+        return self
+
+    def add_rivets_and_welds(
+        self,
+        start_point: Tuple[float, float, float] | None = None,
+        end_point: Tuple[float, float, float] | None = None,
+        count: int = 6,
+        rivet_radius: float = 0.016,
+    ) -> "RogueVehicleBuilder":
+        """Adds a row of perimeter rivets and beveled weld seams along armor plate edges."""
+        if start_point is None or end_point is None:
+            hy = (self.hull_length * 0.45) if hasattr(self, "hull_length") else 1.2
+            hx = (self.hull_width * 0.42) if hasattr(self, "hull_width") else 0.95
+            hz = (self.hull_deck_z + 0.02) if hasattr(self, "hull_deck_z") else 0.88
+            start_point = (-hx, hy, hz)
+            end_point = (hx, hy, hz)
+        self.objects.extend(make_rivets_and_weld_seams(
+            f"{self.name}Armor_Greeble",
+            start_point,
+            end_point,
+            count=count,
+            rivet_radius=rivet_radius,
+            metal_mat=self.palette.gunmetal,
+        ))
+        return self
+
+    def add_track_shoes(
+        self,
+        center: Tuple[float, float, float] | None = None,
+        length: float | None = None,
+        width: float = 0.36,
+        shoe_count: int = 8,
+    ) -> "RogueVehicleBuilder":
+        """Adds discrete geometric track shoe links along the ground contact run."""
+        t_len = length if length is not None else ((self.hull_length * 0.90) if hasattr(self, "hull_length") else 2.8)
+        if center is None:
+            hw = (self.hull_width * 0.48) if hasattr(self, "hull_width") else 1.15
+            for side in (-1, 1):
+                side_center = (side * hw, 0.0, self.ground_clearance)
+                stag = "L" if side < 0 else "R"
+                self.objects.extend(make_articulated_track_shoes(
+                    f"{self.name}Mobility_TrackShoe_{stag}",
+                    side_center,
+                    length=t_len,
+                    width=width,
+                    ground_z=self.ground_clearance,
+                    shoe_count=shoe_count,
+                    shoe_mat=self.palette.tread,
+                    pin_mat=self.palette.gunmetal,
+                ))
+            return self
+        else:
+            self.objects.extend(make_articulated_track_shoes(
+                f"{self.name}Mobility_TrackShoe",
+                center,
+                length=t_len,
+                width=width,
+                ground_z=self.ground_clearance,
+                shoe_count=shoe_count,
+                shoe_mat=self.palette.tread,
+                pin_mat=self.palette.gunmetal,
+            ))
+            return self
+
     def add_unity_locators(self) -> "RogueVehicleBuilder":
         self.locator_sockets = create_unity_locator_sockets(
             name_prefix=self.name,
@@ -6370,6 +6710,10 @@ class RogueVehicleBuilder:
             damage_smoke_loc=self.damage_smoke_loc,
             damage_fire_loc=self.damage_fire_loc,
             center_of_mass_loc=self.center_of_mass_loc,
+            antenna_loc=self.antenna_loc,
+            thruster_vector_left=self.thruster_vector_l,
+            thruster_vector_right=self.thruster_vector_r,
+            antenna_parts=self.objects,
         )
         return self
 
@@ -6754,6 +7098,26 @@ class RogueStructureBuilder:
             silo_mat=self.palette.primary_armor,
             metal_mat=self.palette.gunmetal,
             containment_mat=self.palette.light_armor,
+            emissive_mat=self.palette.emissive,
+        )
+        self.objects.extend(objs)
+        self.sockets.update(socks)
+        return self
+
+    def build_orbital_silo(
+        self,
+        radius: float = 3.6,
+        height: float = 4.5,
+    ) -> "RogueStructureBuilder":
+        objs, socks = make_orbital_silo_assembly(
+            self.name,
+            radius=radius,
+            height=height,
+            foundation_mat=self.palette.gunmetal,
+            bunker_mat=self.palette.primary_armor,
+            metal_mat=self.palette.gunmetal,
+            door_mat=self.palette.light_armor,
+            accent_mat=self.palette.warning,
             emissive_mat=self.palette.emissive,
         )
         self.objects.extend(objs)

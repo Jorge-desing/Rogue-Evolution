@@ -31,6 +31,19 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
         private GameObject _smokeVfxInstance;
         private GameObject _fireVfxInstance;
 
+        private Transform _socketAntenna;
+        private Transform _socketThrusterVectorL;
+        private Transform _socketThrusterVectorR;
+        private Quaternion _antennaBaseLocalRot = Quaternion.identity;
+        private Quaternion _thrusterVectorBaseLocalRotL = Quaternion.identity;
+        private Quaternion _thrusterVectorBaseLocalRotR = Quaternion.identity;
+        private Vector2 _antennaWobbleAngle = Vector2.zero;
+        private Vector2 _antennaWobbleVelocity = Vector2.zero;
+        private Vector3 _lastVelocity = Vector3.zero;
+        private Vector3 _lastAcceleration = Vector3.zero;
+        private Vector3 _lastPosition = Vector3.zero;
+        private bool _hasLastPosition;
+
         private Vector3 _recoilBaseLocalPos;
         private float _currentRecoilOffset;
         private float _radarRpm = 30f;
@@ -222,6 +235,21 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
                 {
                     if (_socketMuzzlePrimary == null) _socketMuzzlePrimary = current;
                 }
+                else if (string.Equals(name, "Socket_Antenna", StringComparison.OrdinalIgnoreCase))
+                {
+                    _socketAntenna = current;
+                    _antennaBaseLocalRot = current.localRotation;
+                }
+                else if (string.Equals(name, "Socket_ThrusterVector_L", StringComparison.OrdinalIgnoreCase))
+                {
+                    _socketThrusterVectorL = current;
+                    _thrusterVectorBaseLocalRotL = current.localRotation;
+                }
+                else if (string.Equals(name, "Socket_ThrusterVector_R", StringComparison.OrdinalIgnoreCase))
+                {
+                    _socketThrusterVectorR = current;
+                    _thrusterVectorBaseLocalRotR = current.localRotation;
+                }
                 else if (name.StartsWith("RCL_AttachmentGroup_", StringComparison.OrdinalIgnoreCase))
                 {
                     string attachmentType = name.Substring("RCL_AttachmentGroup_".Length);
@@ -323,6 +351,9 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             UpdateFactoryDeployAnimation();
             UpdateAutomaticWeaponFeedback();
             UpdateRecoilRecovery();
+            UpdateMotionSample(Time.deltaTime);
+            UpdateAntennaWobble(Time.deltaTime);
+            UpdateVtolThrusterVectoring(Time.deltaTime);
         }
 
         private void UpdateLocomotionAnimation()
@@ -693,7 +724,7 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
                 }
             }
             catch { }
-            return true; // Fallback if reflection fails
+            return false; // Unknown hostility is not enough to authorize visual targeting.
         }
 
         private Transform ResolveEntityTarget()
@@ -839,6 +870,73 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             }
             catch { }
             return false;
+        }
+
+        private void UpdateMotionSample(float dt)
+        {
+            if (dt <= 0f || _entity == null) return;
+
+            Vector3 currentPos = _entity.transform.position;
+            if (!_hasLastPosition)
+            {
+                _lastPosition = currentPos;
+                _lastVelocity = Vector3.zero;
+                _lastAcceleration = Vector3.zero;
+                _hasLastPosition = true;
+                return;
+            }
+
+            Vector3 velocity = (currentPos - _lastPosition) / dt;
+            _lastAcceleration = (velocity - _lastVelocity) / dt;
+            _lastPosition = currentPos;
+            _lastVelocity = velocity;
+        }
+
+        private void UpdateAntennaWobble(float dt)
+        {
+            if (_socketAntenna == null || dt <= 0f || _entity == null) return;
+
+            // Transform acceleration into vehicle local coordinates
+            Vector3 localAccel = _entity.transform.InverseTransformDirection(_lastAcceleration);
+
+            // 2D spring-damper model on local X (pitch/roll) and Y/Z
+            float springK = 32f;
+            float damping = 4.5f;
+
+            float targetPitch = Mathf.Clamp(-localAccel.z * 1.5f, -25f, 25f);
+            float targetRoll = Mathf.Clamp(localAccel.x * 1.5f, -25f, 25f);
+
+            _antennaWobbleVelocity.x += (targetPitch - _antennaWobbleAngle.x) * springK * dt - _antennaWobbleVelocity.x * damping * dt;
+            _antennaWobbleVelocity.y += (targetRoll - _antennaWobbleAngle.y) * springK * dt - _antennaWobbleVelocity.y * damping * dt;
+
+            _antennaWobbleAngle += _antennaWobbleVelocity * dt;
+
+            _socketAntenna.localRotation = _antennaBaseLocalRot * Quaternion.Euler(_antennaWobbleAngle.x, 0f, _antennaWobbleAngle.y);
+        }
+
+        private void UpdateVtolThrusterVectoring(float dt)
+        {
+            if (_socketThrusterVectorL == null && _socketThrusterVectorR == null) return;
+            if (dt <= 0f || _entity == null) return;
+
+            Vector3 velocity = _lastVelocity;
+            Vector3 localVel = _entity.transform.InverseTransformDirection(velocity);
+            float forwardSpeed = localVel.z;
+
+            // Tilt forward up to 40 degrees when cruising forward, or back when braking
+            float targetTilt = Mathf.Clamp(forwardSpeed * 5.0f, -15f, 40f);
+            Quaternion tiltRot = Quaternion.Euler(targetTilt, 0f, 0f);
+
+            if (_socketThrusterVectorL != null)
+            {
+                Quaternion targetRot = _thrusterVectorBaseLocalRotL * tiltRot;
+                _socketThrusterVectorL.localRotation = Quaternion.Slerp(_socketThrusterVectorL.localRotation, targetRot, dt * 6f);
+            }
+            if (_socketThrusterVectorR != null)
+            {
+                Quaternion targetRot = _thrusterVectorBaseLocalRotR * tiltRot;
+                _socketThrusterVectorR.localRotation = Quaternion.Slerp(_socketThrusterVectorR.localRotation, targetRot, dt * 6f);
+            }
         }
     }
 }

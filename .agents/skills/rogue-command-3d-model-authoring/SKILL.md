@@ -218,17 +218,23 @@ Run headless vehicle generation directly from the command line using Blender and
     --multiview
 ```
 
-- **Archetypes (16 Total)**:
+- **Archetypes (19 Total Mobile + Strategic Structures)**:
   - *Main Battle & Armored*: `tank` (`medium_tank`), `light_tank`, `heavy_tank`, `super_heavy`, `artillery`, `missile_launcher`, `halftrack`, `amphibious_apc`.
-  - *Fast Recon & Skimmers*: `bike`, `scout_buggy` (`buggy`), `hover` (`hover_skiff`), `mobile_radar`.
-  - *Mechs & Walkers*: `walker` (`biped_walker`), `spider`, `quad_mech`.
-  - *Airborne & Drone*: `vtol` (`vtol_gunship`).
+  - *Fast Recon & Skimmers*: `bike`, `scout_buggy` (`buggy`), `hover` (`hover_skiff`), `mobile_radar`, `hover_cruiser` (heavy amphibious assault gunboat with hydro-prow, conning tower, twin jet nacelles, and superfiring turret).
+  - *Mechs & Walkers*: `walker` (`biped_walker`), `spider`, `quad_mech`, `colossus_titan` (colossal bipedal titan walker with heavy pelvis, citadel torso, pauldrons, cooling vents, and dorsal hardpoints).
+  - *Airborne & VTOL*: `vtol` (`vtol_gunship`), `heavy_dropship` (heavy VTOL transport gunship with cargo fuselage, rear loading ramp, high wings, ducted tilt-rotors, and landing skids).
   - *Heavy Tactical Platforms*: `flak_anti_air` (mobile air defense with radar & outriggers), `siege_crawler` (super-heavy siege citadel with 4 track pods & outriggers), `drone_carrier` (wide hull with flight deck, bridge tower & rotodome), `combat_harvester` (industrial combat mining platform with rotary cutter drum & ore hoppers).
+  - *Strategic Structures*: `factory`, `defense_turret`, `radar_station`, `energy_silo`, `orbital_silo` (strategic launch platform with blast doors, umbilical gantry tower, and exhaust trench).
 - **Weapons (9 Total)**: `cannon` (ballistic tank gun), `autocannon` / `gatling` (rotary 6-barrel), `dual_autocannon` / `dual_cannon` (twin synchronized barrels), `missile` / `missile_pod` (honeycomb pod), `howitzer` (siege howitzer), `arc` / `energy_beam` (plasma cathode & prongs), `railgun` (electromagnetic kinetic rails with capacitor energy bank), `quad_flak` (anti-air 2x2 flak autocannon cluster with flash hiders), `plasma_mortar` (heavy siege mortar with 3 magnetic toroidal accelerator rings).
 - **Factions**: `vanguard` (slate teal), `siege` (rust ochre), `syndicate` (deep cobalt), `arctic` (tundra navy).
-- **Camouflage Variants**: `none`, `desert` (khaki sand), `urban` (asphalt grey), `arctic` (tundra white), `woodland` (olive drab).
+- **Camouflage Variants**: `none`, `desert` (khaki sand), `urban` (asphalt grey), `arctic` (tundra white), `woodland` (olive drab), `digital` (high-contrast pixelated dual-tone), `splinter` (angular geometric fracture camo), `tigerstripe` (horizontal brushstroke tactical camo).
+- **Biomes & Adaptive Weathering**: `desert`, `arctic`, `woodland`, `urban` (supports dynamic runtime material adaptation via `RuntimeVisualDirector.cs`).
 - **Surface Wear Levels**: `pristine` (factory clean), `field_tested` (moderate edge scratches and road grime), `battle_hardened` (heavy combat gouges, exhaust soot, and cavity dirt).
-- **Presets (10 Total)**:
+- **Presets (14 Total)**:
+  - `colossus_titan`: Colossal bipedal war walker with dual heavy cannons, pauldrons, radar, and whip antenna.
+  - `sea_lance`: Syndicate heavy hover cruiser gunboat with railgun turret, sponsons, and recon radar.
+  - `sky_dreadnought`: Heavy VTOL assault dropship with multi-tube missile pods, tilt-rotors, and whip antenna.
+  - `orbital_defense`: Strategic planetary defense structure with orbital launch silo and gantry tower.
   - `sky_sweeper`: Flak anti-air with quad flak autocannons, radar dish, and outriggers.
   - `dreadnought_crawler`: Siege crawler with heavy electromagnetic railgun and 4 outriggers.
   - `hive_carrier`: Drone carrier with wide flight deck, bridge tower, rotodome, and missile defense.
@@ -247,7 +253,13 @@ Run headless vehicle generation directly from the command line using Blender and
   - `--target-budget <int>`: Sets target triangle budget for subsystem profiling (default: 4000).
   - `--report-json <path>`: Exports comprehensive structural report JSON with polygon counts, draw calls, LODs, colliders, and subsystem breakdown.
   - `--dry-run`: Validates CLI parameters and prints planned vehicle configuration without running Blender meshing operations.
-  - `--batch-all-archetypes`: Builds all 16 archetypes sequentially into the output directory with a tabular console summary.
+  - `--batch-all-archetypes`: Builds all 19 archetypes sequentially into the output directory with a tabular console summary.
+- **Micro-Detail & Greeble CLI Flags**:
+  - `--antenna`: Adds flexible whip antenna with stepped spring coils and canonical `Socket_Antenna` (with runtime spring-damper wobble dynamics).
+  - `--cupola`: Adds armored commander's vision cupola with periscopes and split hatch.
+  - `--rivets`: Adds perimeter rivet rows and beveled weld seams along armor plate edges.
+  - `--track-shoes`: Adds discrete geometric track shoe links along the ground run.
+  - `--biome <name>`: Sets environmental biome weathering preset (`desert`, `arctic`, `woodland`, `urban`).
 - **Subsystem & Palette CLI Flags**:
   - `--outriggers`: Adds deployable hydraulic stabilizer outriggers.
   - `--flight-deck`: Adds armored flight / drone launch deck with guidance stripes.
@@ -255,7 +267,7 @@ Run headless vehicle generation directly from the command line using Blender and
   - `--primary-color <hex>`: Custom hex override for primary armor (e.g. `#1f3a52`).
   - `--light-armor-color <hex>`: Custom hex override for light armor (e.g. `#3b5f78`).
   - `--emissive-color <hex>`: Custom hex override for emissive glow (e.g. `#00ffee`).
-- **Outputs**: Generates editable `.blend`, Unity-optimized `.fbx` with lightmap UVs, 4-channel vertex color shading, 11-socket empties, batched submeshes, collision hulls, companion `.gameplay.json`, and 4-view orthographic preview sheet.
+- **Outputs**: Generates editable `.blend`, Unity-optimized `.fbx` with lightmap UVs, 4-channel vertex color shading, canonical unprefixed `Socket_*` empties, batched submeshes, collision hulls, companion `.gameplay.json`, and 4-view orthographic preview sheet.
 
 ### Automated Quality & Subsystem Profiling Diagnostics
 Always invoke `validate_model_mesh_quality(model_objects)` and `profile_model_budget_and_drawcalls(model_objects)` prior to export. They verify:
