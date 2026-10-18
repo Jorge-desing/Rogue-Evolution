@@ -1056,6 +1056,21 @@ def main():
             print("=== Dry run complete. No meshes created. ===\n")
             return
 
+        if args.batch_all_archetypes:
+            print("\n========================================================")
+            print(f" DRY RUN: BATCH PLANNING ALL {len(ALL_ARCHETYPES)} ARCHETYPES")
+            print("========================================================\n")
+            for arch in ALL_ARCHETYPES:
+                arch_title = arch.title().replace("_", "")
+                unit_name = f"{args.name}_{arch_title}"
+                def_weapon = ARCHETYPE_DEFAULT_WEAPONS.get(arch, "cannon") if args.weapon == "cannon" else args.weapon
+                is_walker = arch in ("walker", "colossus_titan")
+                is_quad = arch in ("spider", "quad_mech", "siege_crawler")
+                rig_desc = "Biped Armature (8 bones)" if is_walker else ("Quad Armature (10 bones)" if is_quad else "Standard Rig (6 bones)")
+                print(f"- {arch:<18} -> {unit_name:<28} | Weapon: {def_weapon:<12} | Rig: {rig_desc}")
+            print("\n=== Dry run complete. No meshes created. ===\n")
+            return
+
         print("\n=== DRY RUN: Rogue Command Vehicle Planning ===")
         print(f"Unit Name: {args.name}")
         print(f"Archetype: {args.archetype}")
