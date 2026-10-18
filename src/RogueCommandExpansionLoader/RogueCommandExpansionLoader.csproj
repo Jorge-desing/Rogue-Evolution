@@ -38,6 +38,10 @@
       <HintPath>$(GameManagedPath)\UnityEngine.CoreModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
+    <Reference Include="UnityEngine.AnimationModule">
+      <HintPath>$(GameManagedPath)\UnityEngine.AnimationModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
     <Reference Include="UnityEngine.AssetBundleModule">
       <HintPath>$(GameManagedPath)\UnityEngine.AssetBundleModule.dll</HintPath>
       <Private>false</Private>

@@ -2718,7 +2718,8 @@ namespace RogueCommandExpansionLoader.Content
                 if (units[i].Definition.isAllowedAsStartingBlueprint)
                 {
                     startingBlueprintUnitIds.Add(units[i].Id);
-                    blueprintUnitIds.Add(units[i].Id);
+                    // Starting-deck eligibility is separate from normal blueprint eligibility.
+                    // Stage unit IDs add their dedicated production factories below.
                 }
             }
 
