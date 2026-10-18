@@ -49,7 +49,6 @@ namespace RogueCommandExpansionLoader.Modules
 
             private readonly DefaultAiBehaviour _gameBehaviour;
             private readonly HarvesterRaiderSettings _settings;
-            private readonly HashSet<int> _assignedRaiderIds = new HashSet<int>();
             private string _commandTag;
             private float _nextScanAt;
             private bool _stopped;
@@ -112,7 +111,6 @@ namespace RogueCommandExpansionLoader.Modules
                     {
                         raider.ExecuteCommand(raidCommand,
                             EntityController.CommandProcessingType.ExecuteBeforeCurrentCommand);
-                        _assignedRaiderIds.Add(raider.UniqueEntityId);
                         dispatched++;
                     }
                     catch (Exception ex)
@@ -134,7 +132,6 @@ namespace RogueCommandExpansionLoader.Modules
             public void OnDestroyed()
             {
                 _stopped = true;
-                _assignedRaiderIds.Clear();
                 _commandTag = null;
             }
 
@@ -187,10 +184,16 @@ namespace RogueCommandExpansionLoader.Modules
                         !unit.IsControlledByAi || !unit.IsUnit ||
                         unit.aiBaseIndex != _settings.BaseIndex ||
                         !unit.CanAttackAndIsAttackEnabled ||
+                        !unit.CanMoveAndMovementIsEnabled ||
                         unit.HasRole(UnitRole.Harvester) ||
                         unit.HasRole(UnitRole.Refinery) ||
                         unit.HasRole(UnitRole.Engineer) ||
                         unit.HasRole(UnitRole.Builder))
+                    {
+                        continue;
+                    }
+
+                    if (unit.CurrentCommandIsTaggedWith(_commandTag))
                     {
                         continue;
                     }

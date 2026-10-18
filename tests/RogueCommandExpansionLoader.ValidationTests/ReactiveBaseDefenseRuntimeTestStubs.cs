@@ -22,8 +22,10 @@ public sealed class EntityController
     public bool IsTargetInRange { get; set; }
     public bool IsBuilding { get; set; }
     public int aiBaseIndex { get; set; }
+    public float CurrentHealth { get; set; } = 100f;
     public string EntityId { get => entityId; set => entityId = value; }
     public string entityId { get; set; }
+    public string name { get => gameObject?.name ?? string.Empty; set { if (gameObject != null) gameObject.name = value; } }
     public int UniqueEntityId { get; set; }
     public Vector2Int CurrentCell { get; set; }
     public Vector3 Position { get; set; }
@@ -55,7 +57,11 @@ public sealed class EntityController
 public enum UnitRole
 {
     Spawn,
-    Skill
+    Skill,
+    Harvester,
+    Refinery,
+    Engineer,
+    Builder
 }
 
 public sealed class EntityCommand
@@ -90,9 +96,17 @@ public sealed class ExistingControllers
     private readonly HashSet<EntityController> _playerUnits = new();
     private readonly HashSet<EntityController> _aiUnits = new();
     private readonly HashSet<EntityController> _aiBuildings = new();
+    private readonly HashSet<EntityController> _harvesters = new();
+    private readonly HashSet<EntityController> _playerRefineries = new();
+    private readonly HashSet<EntityController> _playerBuildingsKnownToAi = new();
+    public EntityController EngineeringHqEntity { get; set; }
 
     public HashSet<EntityController> PlayerUnits() => _playerUnits;
     public HashSet<EntityController> AiUnits() => _aiUnits;
+    public HashSet<EntityController> Harvesters => _harvesters;
+    public HashSet<EntityController> PlayerRefineries() => _playerRefineries;
+    public HashSet<EntityController> PlayerBuildingsKnownToAi() => _playerBuildingsKnownToAi;
+    public EntityController EngineeringHq() => EngineeringHqEntity;
     public HashSet<EntityController> AiBuildings()
     {
         if (ThrowOnAiBuildings)
@@ -108,6 +122,10 @@ public sealed class ExistingControllers
         _playerUnits.Clear();
         _aiUnits.Clear();
         _aiBuildings.Clear();
+        _harvesters.Clear();
+        _playerRefineries.Clear();
+        _playerBuildingsKnownToAi.Clear();
+        EngineeringHqEntity = null;
         ThrowOnAiBuildings = false;
     }
 }

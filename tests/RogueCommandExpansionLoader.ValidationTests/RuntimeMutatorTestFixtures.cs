@@ -89,6 +89,7 @@ public sealed class DefaultAiBehaviour
     public static int ActualAiStartBaseCount { get; set; } = 1;
 
     public UnityEngine.GameObject gameObject { get; set; } = new("test-ai");
+    public UnityEngine.Transform transform { get; set; } = new();
     public int instanceId { get; set; } = 1;
 
     public int GetInstanceID() => instanceId;

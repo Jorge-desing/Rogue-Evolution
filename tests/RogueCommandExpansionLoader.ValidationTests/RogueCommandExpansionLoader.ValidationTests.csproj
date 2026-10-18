@@ -61,8 +61,12 @@
              Link="Modules/ReactiveBaseDefenseAiModule.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Modules/HarvesterRaiderParameters.cs"
              Link="Modules/HarvesterRaiderParameters.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Modules/HarvesterRaiderAiModule.cs"
+             Link="Modules/HarvesterRaiderAiModule.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Modules/SiegeAssaultParameters.cs"
              Link="Modules/SiegeAssaultParameters.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Modules/SiegeAssaultAiModule.cs"
+             Link="Modules/SiegeAssaultAiModule.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Contracts/IRogueCommandAiModule.cs"
              Link="Contracts/IRogueCommandAiModule.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Modules/AiModuleRegistry.cs"

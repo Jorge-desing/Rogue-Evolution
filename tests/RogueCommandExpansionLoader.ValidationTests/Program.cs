@@ -1836,6 +1836,201 @@ var tests = new (string Name, Action Run)[]
             DefaultAiBehaviour.ResetRuntimeState();
         }
     }),
+    ("harvester-raider AI avoids duplicate orders and reuses raiders after their command ends", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        DefaultAiBehaviour.ResetRuntimeState();
+        UnityEngine.Time.time = 15f;
+
+        var target = new EntityController
+        {
+            IsControlledByPlayer = true,
+            IsUnit = true,
+            Position = new UnityEngine.Vector3(8f, 0f, 0f),
+            gameObject = new UnityEngine.GameObject("Player Harvester")
+        };
+        var raider = new EntityController
+        {
+            IsControlledByAi = true,
+            IsUnit = true,
+            CanAttackAndIsAttackEnabled = true,
+            CanMoveAndMovementIsEnabled = true,
+            aiBaseIndex = 0,
+            UniqueEntityId = 501,
+            Position = new UnityEngine.Vector3(5f, 0f, 0f)
+        };
+        var immobileCombatant = new EntityController
+        {
+            IsControlledByAi = true,
+            IsUnit = true,
+            CanAttackAndIsAttackEnabled = true,
+            CanMoveAndMovementIsEnabled = false,
+            aiBaseIndex = 0,
+            UniqueEntityId = 502,
+            Position = new UnityEngine.Vector3(6f, 0f, 0f)
+        };
+        ExistingControllers.Instance.Harvesters.Add(target);
+        ExistingControllers.Instance.AiUnits().Add(raider);
+        ExistingControllers.Instance.AiUnits().Add(immobileCombatant);
+
+        IRogueCommandAiRuntimeBehaviour behaviour = new HarvesterRaiderAiModule().CreateBehaviour(
+            new DefaultAiBehaviour
+            {
+                gameObject = new UnityEngine.GameObject("Harvester AI"),
+                transform = new UnityEngine.Transform { position = new UnityEngine.Vector3(0f, 0f, 0f) }
+            },
+            [
+                new ContentModuleParameter { name = "baseIndex", value = "0" },
+                new ContentModuleParameter { name = "scanIntervalSeconds", value = "2" },
+                new ContentModuleParameter { name = "cooldownSeconds", value = "5" },
+                new ContentModuleParameter { name = "raidSquadSize", value = "1" },
+                new ContentModuleParameter { name = "minGameTimeSeconds", value = "15" }
+            ]);
+        behaviour.OnInitialized();
+        try
+        {
+            behaviour.Tick();
+            EntityCommand firstRaidOrder = raider.LastExecutedCommand;
+            if (firstRaidOrder == null || firstRaidOrder.description != "Harvester raid strike" ||
+                firstRaidOrder.position.x != target.Position.x ||
+                immobileCombatant.LastExecutedCommand != null)
+            {
+                throw new InvalidOperationException("The harvester raid did not select a mobile raider for the target.");
+            }
+
+            UnityEngine.Time.time = 20f;
+            behaviour.Tick();
+            if (!System.Object.ReferenceEquals(firstRaidOrder, raider.LastExecutedCommand))
+            {
+                throw new InvalidOperationException("The active raid order was duplicated during its cooldown scan.");
+            }
+
+            raider.ExecuteCommand(new EntityCommand { tag = "native:other-order" },
+                EntityController.CommandProcessingType.ExecuteBeforeCurrentCommand);
+            UnityEngine.Time.time = 22f;
+            behaviour.Tick();
+            if (System.Object.ReferenceEquals(firstRaidOrder, raider.LastExecutedCommand) ||
+                raider.LastExecutedCommand?.description != "Harvester raid strike")
+            {
+                throw new InvalidOperationException("The raider did not become eligible after its raid command ended.");
+            }
+        }
+        finally
+        {
+            behaviour.OnDestroyed();
+            ExistingControllers.Instance.Reset();
+            DefaultAiBehaviour.ResetRuntimeState();
+        }
+    }),
+    ("siege-assault AI reuses a completed mobile squad and waits for its minimum size", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        DefaultAiBehaviour.ResetRuntimeState();
+        UnityEngine.Time.time = 30f;
+
+        var target = new EntityController
+        {
+            IsControlledByPlayer = true,
+            IsBuilding = true,
+            CurrentHealth = 250f,
+            Position = new UnityEngine.Vector3(25f, 0f, 0f),
+            gameObject = new UnityEngine.GameObject("Known Player Building")
+        };
+        var first = new EntityController
+        {
+            IsControlledByAi = true,
+            IsUnit = true,
+            CanAttackAndIsAttackEnabled = true,
+            CanMoveAndMovementIsEnabled = true,
+            aiBaseIndex = 0,
+            UniqueEntityId = 601
+        };
+        var second = new EntityController
+        {
+            IsControlledByAi = true,
+            IsUnit = true,
+            CanAttackAndIsAttackEnabled = true,
+            CanMoveAndMovementIsEnabled = true,
+            aiBaseIndex = 0,
+            UniqueEntityId = 602
+        };
+        var immobileCombatant = new EntityController
+        {
+            IsControlledByAi = true,
+            IsUnit = true,
+            CanAttackAndIsAttackEnabled = true,
+            CanMoveAndMovementIsEnabled = false,
+            aiBaseIndex = 0,
+            UniqueEntityId = 603
+        };
+        ExistingControllers.Instance.PlayerBuildingsKnownToAi().Add(target);
+        ExistingControllers.Instance.AiUnits().Add(first);
+        ExistingControllers.Instance.AiUnits().Add(second);
+        ExistingControllers.Instance.AiUnits().Add(immobileCombatant);
+
+        IRogueCommandAiRuntimeBehaviour behaviour = new SiegeAssaultAiModule().CreateBehaviour(
+            new DefaultAiBehaviour
+            {
+                gameObject = new UnityEngine.GameObject("Siege AI"),
+                transform = new UnityEngine.Transform { position = new UnityEngine.Vector3(0f, 0f, 0f) }
+            },
+            [
+                new ContentModuleParameter { name = "baseIndex", value = "0" },
+                new ContentModuleParameter { name = "cooldownSeconds", value = "10" },
+                new ContentModuleParameter { name = "minSquadSize", value = "2" },
+                new ContentModuleParameter { name = "targetPriority", value = "ClosestBuilding" },
+                new ContentModuleParameter { name = "minGameTimeSeconds", value = "30" }
+            ]);
+        behaviour.OnInitialized();
+        try
+        {
+            behaviour.Tick();
+            EntityCommand firstOrder = first.LastExecutedCommand;
+            EntityCommand secondOrder = second.LastExecutedCommand;
+            if (firstOrder?.description != "Siege assault operation" ||
+                secondOrder?.description != "Siege assault operation" ||
+                firstOrder.position.x != target.Position.x ||
+                secondOrder.position.x != target.Position.x ||
+                immobileCombatant.LastExecutedCommand != null)
+            {
+                throw new InvalidOperationException("The siege assault did not dispatch the required mobile squad to its known target.");
+            }
+
+            UnityEngine.Time.time = 40f;
+            behaviour.Tick();
+            if (!System.Object.ReferenceEquals(firstOrder, first.LastExecutedCommand) ||
+                !System.Object.ReferenceEquals(secondOrder, second.LastExecutedCommand))
+            {
+                throw new InvalidOperationException("The siege module duplicated orders while its squad was still assigned.");
+            }
+
+            first.ExecuteCommand(new EntityCommand { tag = "native:other-order" },
+                EntityController.CommandProcessingType.ExecuteBeforeCurrentCommand);
+            UnityEngine.Time.time = 45f;
+            behaviour.Tick();
+            if (first.LastExecutedCommand?.tag != "native:other-order" ||
+                !System.Object.ReferenceEquals(secondOrder, second.LastExecutedCommand))
+            {
+                throw new InvalidOperationException("The siege module dispatched before the minimum squad had reassembled.");
+            }
+
+            second.ExecuteCommand(new EntityCommand { tag = "native:other-order" },
+                EntityController.CommandProcessingType.ExecuteBeforeCurrentCommand);
+            UnityEngine.Time.time = 50f;
+            behaviour.Tick();
+            if (System.Object.ReferenceEquals(firstOrder, first.LastExecutedCommand) ||
+                System.Object.ReferenceEquals(secondOrder, second.LastExecutedCommand))
+            {
+                throw new InvalidOperationException("The completed siege squad could not be reused in a later assault.");
+            }
+        }
+        finally
+        {
+            behaviour.OnDestroyed();
+            ExistingControllers.Instance.Reset();
+            DefaultAiBehaviour.ResetRuntimeState();
+        }
+    }),
     ("reactive base-defense AI parser supplies bounded defaults", () =>
     {
         if (!ReactiveBaseDefenseParameterParser.TryParse(null, out ReactiveBaseDefenseSettings defaults,

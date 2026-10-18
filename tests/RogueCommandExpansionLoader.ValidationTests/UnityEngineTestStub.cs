@@ -18,12 +18,20 @@ namespace UnityEngine
         public float y;
         public float z;
 
+        public float sqrMagnitude => x * x + y * y + z * z;
+
         public Vector3(float x, float y, float z)
         {
             this.x = x;
             this.y = y;
             this.z = z;
         }
+
+        public static Vector3 operator -(Vector3 left, Vector3 right) =>
+            new(left.x - right.x, left.y - right.y, left.z - right.z);
+
+        public static float Distance(Vector3 left, Vector3 right) =>
+            (float)System.Math.Sqrt((left - right).sqrMagnitude);
     }
 
     public class Object
@@ -54,6 +62,11 @@ namespace UnityEngine
         {
             this.name = name;
         }
+    }
+
+    public sealed class Transform : Object
+    {
+        public Vector3 position { get; set; }
     }
 
     public static class Time

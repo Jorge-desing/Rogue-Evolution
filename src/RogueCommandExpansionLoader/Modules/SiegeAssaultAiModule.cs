@@ -49,7 +49,6 @@ namespace RogueCommandExpansionLoader.Modules
 
             private readonly DefaultAiBehaviour _gameBehaviour;
             private readonly SiegeAssaultSettings _settings;
-            private readonly HashSet<int> _assignedSquadIds = new HashSet<int>();
             private string _commandTag;
             private float _nextAssaultAt;
             private bool _stopped;
@@ -113,7 +112,6 @@ namespace RogueCommandExpansionLoader.Modules
                     {
                         unit.ExecuteCommand(assaultCommand,
                             EntityController.CommandProcessingType.ExecuteBeforeCurrentCommand);
-                        _assignedSquadIds.Add(unit.UniqueEntityId);
                         dispatched++;
                     }
                     catch (Exception ex)
@@ -135,7 +133,6 @@ namespace RogueCommandExpansionLoader.Modules
             public void OnDestroyed()
             {
                 _stopped = true;
-                _assignedSquadIds.Clear();
                 _commandTag = null;
             }
 
@@ -254,6 +251,7 @@ namespace RogueCommandExpansionLoader.Modules
                         !unit.IsControlledByAi || !unit.IsUnit ||
                         unit.aiBaseIndex != _settings.BaseIndex ||
                         !unit.CanAttackAndIsAttackEnabled ||
+                        !unit.CanMoveAndMovementIsEnabled ||
                         unit.HasRole(UnitRole.Harvester) ||
                         unit.HasRole(UnitRole.Refinery) ||
                         unit.HasRole(UnitRole.Engineer) ||
@@ -262,8 +260,8 @@ namespace RogueCommandExpansionLoader.Modules
                         continue;
                     }
 
-                    // Avoid pulling already dispatched raiders or workers
-                    if (_assignedSquadIds.Contains(unit.UniqueEntityId))
+                    // Avoid issuing duplicate orders while this module's attack-move is active.
+                    if (unit.CurrentCommandIsTaggedWith(_commandTag))
                     {
                         continue;
                     }
