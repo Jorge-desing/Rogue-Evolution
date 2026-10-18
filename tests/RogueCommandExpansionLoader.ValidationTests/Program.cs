@@ -542,6 +542,30 @@ var tests = new (string Name, Action Run)[]
             throw new InvalidOperationException(
                 "A truncated candidate report hid its independent ID or pool-query omission counters.");
         }
+
+        var longProducts = Enumerable.Range(0, 300)
+            .Select(index => "sample:unit-" + index.ToString("D3") + new string('y', 180))
+            .ToArray();
+        var longProductScope = new BlueprintRewardFactoryScope(
+            longFactories, longFactories, longProducts.ToDictionary(p => p, p => longFactories[0]), 0, "sample-expansion:large-stage");
+        var offeredObservation = new BlueprintRewardObservation();
+        for (int i = 0; i < longProducts.Length; i++)
+        {
+            offeredObservation.RecordOfferedProduct(longProducts[i], longProductScope);
+        }
+        for (int i = 0; i < 9; i++)
+        {
+            offeredObservation.RecordPoolCandidates(
+                "RCL_POOL_" + i.ToString("D2"), Array.Empty<string>(), longProductScope, null, false);
+        }
+        string offeredTrace = offeredObservation.Format(longProductScope);
+        if (offeredTrace.Length > 4096 || !offeredTrace.EndsWith("...", StringComparison.Ordinal) ||
+            !offeredTrace.Contains("omittedIdObservations=", StringComparison.Ordinal) ||
+            !offeredTrace.Contains("omittedPoolQueries=1", StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                "An offered-product truncated report hid its independent ID or pool-query omission counters.");
+        }
     }),
     ("demo reward stage index follows visible stages and tutorial substitution", () =>
     {

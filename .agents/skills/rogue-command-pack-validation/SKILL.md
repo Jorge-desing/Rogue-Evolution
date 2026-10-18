@@ -10,7 +10,8 @@ Use this skill when validating or packaging a Rogue Command loader/content chang
 ## Validate the source and content
 
 - Parse `content/schema/content.schema.json` and validate each changed `content.json` against it. Run `dotnet run --project tests/RogueCommandExpansionLoader.ValidationTests -- .` for the package-local contract and registry safeguards when tests are part of the accepted task. Report a skipped symlink check as skipped, not passed.
-- Build the loader in Release. For Unity assets, use the repository's Unity 2021.3.45f2 authoring project and builder, then reopen the generated AssetBundle in Unity. UnityPy can independently list serialized objects offline, but cannot establish runtime compatibility.
+- Build the loader in Release. For Unity assets, use the repository's Unity 2021.3.45f2 authoring project and builder, then reopen the generated AssetBundle in Unity. Verify that bundles embed their own compiled shaders (`VehiclePBR_VertexWear` or `Standard`) for URP execution, since native game assets do not provide built-in shaders. UnityPy can independently list serialized objects offline, but cannot establish runtime compatibility.
+- In diagnostic trace and telemetry formatting, ensure bounded outputs (e.g. `MaxTraceCharacters = 4096`) place omission/loss counters before unbounded-detail collections (`offeredProducts`, candidates, pools) so tail truncation never hides lost observations.
 - Rebuild the install archive with `tools/Package-Loader.ps1`. Inspect its actual entries: confirm the intended plugin, manifests, bundles, and readmes are present, and that game assemblies, BepInEx, Harmony, PDBs, and Unity editor output are absent.
 
 ## Protect the repository and runtime

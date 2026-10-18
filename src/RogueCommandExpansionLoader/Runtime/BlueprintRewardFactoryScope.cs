@@ -253,8 +253,6 @@ namespace RogueCommandExpansionLoader.Runtime
             report.Append(" stageId=").Append(String.IsNullOrWhiteSpace(scope.ActiveStageId)
                 ? "<native-or-unresolved>"
                 : scope.ActiveStageId);
-            report.Append(" offeredProducts=").Append(FormatSet(_offeredProducts, null));
-
             report.Append(" observedSources=");
             if (!_globalFallbackObserved && !_poolCandidatesObserved)
             {
@@ -278,8 +276,8 @@ namespace RogueCommandExpansionLoader.Runtime
                 }
             }
 
-            // Keep loss counters near the start of the trace. Detailed candidate lists can
-            // consume the character cap, so appending these after the lists could hide them.
+            // Keep loss counters near the start of the trace. Detailed candidate and product lists can
+            // consume the character cap, so appending these after any lists could hide them.
             if (_omittedIdObservations > 0)
             {
                 report.Append(" omittedIdObservations=").Append(_omittedIdObservations);
@@ -289,6 +287,8 @@ namespace RogueCommandExpansionLoader.Runtime
             {
                 report.Append(" omittedPoolQueries=").Append(_omittedPoolQueries);
             }
+
+            report.Append(" offeredProducts=").Append(FormatSet(_offeredProducts, null));
 
             if (_globalFallbackObserved)
             {
