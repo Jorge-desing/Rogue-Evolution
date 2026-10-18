@@ -32,8 +32,8 @@ Always recheck this identity before relying on reflected signatures, CIL metadat
 - **Verified Startup State**: Steam launch (AppID `1461910`) loads `RogueCommandExpansionLoader.dll` with 26 verified Harmony hooks, registers both sample packs (`sample-native:expansion` and `sample-reactive-ai:expansion`), and transitions cleanly across `MainMenu`, `RunSetup`, `IntermissionScreen`, and `Game`.
 - **First-run tutorial start (2026-10-18)**: The user's screenshot showed the `FirstRun` tutorial's `INICIAR` screen. The in-game button's persistent listener resolved to `PlaceMapObjectsBeforePlayerCanStart.OnPlayerHasPressedStart`; it was invoked once through the native Unity `Button`, and `_playerHasNotPressedStartYet` changed to `false`. The temporary button listener inspector was removed and the bridge had no temporary watchers or patches afterward.
 - **BepInEx MCP repair and live health (2026-10-18)**: `tools/Repair-BepInExMCP.ps1` completed successfully. `pip check` found no broken requirements (Pydantic 2.13.5; MCP 1.20.0), the server entrypoint and FastMCP settings verification passed, and the existing `FastMCPSettings.model_rebuild()` startup fix was present. Protocol 2.0 ping/capabilities and live Unity scene, component, and native UI calls all succeeded, including a fresh `Button.Press()` with a follow-up scene/pause-state read. The repair verified the local MCP environment; it did not modify the game's BepInEx installation. See [STEAM-RUNTIME-CONTROL.md](STEAM-RUNTIME-CONTROL.md) for the recovery and controlled-input procedure.
-- **Latest paused tutorial smoke (2026-10-18)**: The game is in scene `Game`, paused with `InGameMenu._isShowing = true`, at tutorial step 7/26 (six tutorial prompts finished). The user intentionally left it paused to prevent a defeat while the game was unattended. The existing authorization permits supervised control; keep it paused between interactions and when unattended. A native `RoboCrystalMill` was placed at `(-145, 10, 65)`; live component reads reported `EntityId=RoboCrystalMill`, `IsBuilding=true`, `IsFactory=true`, `Cost=1000`, and `CurrentHealth=1000`. Seven active native `RoboCrystalHarvester` entities appeared after the four-second building drop. The abandon-run confirmation was inspected and dismissed with `KeepPlaying`; the panel is inactive and the pause menu remains shown. This validates native tutorial production behavior only. The step-by-step bridge, pause, button, and screenshot recovery notes are in [STEAM-RUNTIME-CONTROL.md](STEAM-RUNTIME-CONTROL.md).
-- **Mod-content runtime boundary**: The current BepInEx log reports `sample-native:expansion` with 5 units, 5 production buildings, 3 stages, and 3 AI profiles; `sample-reactive-ai:expansion` has 1 stage and 1 AI profile. The five `RCL_Native_sample-native_*` unit templates and four `RCL_sample_*` AI templates are present but inactive under `DontDestroyOnLoad`/`RCL_ResourceTemplateHolder`. The current tutorial has no `ChooseCard` reward screen, and its active `DefaultAiBehaviour` is native PCX AI. Modded reward offers, factory production, model rendering, a custom stage map, and a reactive AI decision remain unverified. Keep this game paused; continue with a reversible run that reaches a randomized reward, and restore the temporary deployment from its manifest after the game process exits.
+- **Latest paused tutorial smoke (2026-10-18)**: The game is open in scene `Game`, paused with `InGameMenu._isShowing = true`, at tutorial step 7/26 (six tutorial prompts finished). The user left the pause active so the run would not end by defeat while unattended. Keep the game open and paused between supervised interactions and when unattended. A native `RoboCrystalMill` was placed at `(-145, 10, 65)`; live component reads reported `EntityId=RoboCrystalMill`, `IsBuilding=true`, `IsFactory=true`, `Cost=1000`, and `CurrentHealth=1000`. Seven active native `RoboCrystalHarvester` entities appeared after the four-second building drop. The abandon-run confirmation was inspected and dismissed with `KeepPlaying`; the panel is inactive and the pause menu remains shown. This validates native tutorial production behavior only. The step-by-step bridge, pause, button, and screenshot recovery notes are in [STEAM-RUNTIME-CONTROL.md](STEAM-RUNTIME-CONTROL.md).
+- **Mod-content runtime boundary (fresh bridge reads, 2026-10-18)**: The current BepInEx log reports `sample-native:expansion` with 5 units, 5 production buildings, 3 stages, and 3 AI profiles; `sample-reactive-ai:expansion` has 1 stage and 1 AI profile. Among `FindObjectsWithComponent(EntityController)` results are exactly five `RCL_Native_sample-native_*` unit templates and five matching factory templates; a live read of the surge-tank resource reported `entityId=sample-native:surge-tank`, while its factory reported `entityId=sample-native:surge-tank-factory`. These are registered resource templates, not proof of a placed factory or produced unit. `FindObjectsWithComponent(DefaultAiBehaviour)` returns the active native PCX tutorial AI plus four `RCL_sample_*` AI templates, all four reporting `isActiveAndEnabled=false`. `FindObjectsWithComponent(ChooseCard)` returns no object in this tutorial state. Therefore modded reward offers, factory production, model rendering, custom stage-map selection, and reactive AI decisions remain unverified. A `ProgressionMap` type lookup failed because that type name is absent from loaded assemblies; the bridge itself passed ping, capabilities, path lookup, and live component reads. Keep the current run open and paused. The temporary deployment manifest to restore after the game process exits is `artifacts/runtime-smoke/loader-natural-offer-followup-20261018T125126/deployment-manifest.json`.
 
 ### Profile Isolation & Cleanup Invariants
 - **Profile Backups**: Testing uses Profile 1 or temporary profiles. Pre-run files under `Profiles/` must be backed up before matches.
@@ -149,7 +149,7 @@ The repository equips 13 local skills under `.agents/skills/`:
 |---|---|---|---|
 | `rogue-command-3d-model-authoring` | Procedural 3D vehicles & structures | `RogueModelKit.py`, `generate_unit_model.py` | BMesh topological RGBA wear, soot $B=0.0 \to 1.0$, canonical sockets |
 | `rogue-command-mech-rigging-authoring`| Skeletal rigging & animators | `biped-quadruped-rigging-guide.md`, `gait-cycle.md` | Rigid weighting $1.0$ before join, in-place $\Delta\text{pos} = (0, 0, 0)$ |
-| `rogue-command-balance-simulation` | Combat balance & Lanchester math | `tools/simulate_balance.py`, `balancing.tsv` | CEI bands (Scout 8–15, Tank 12–20, Siege 6–16), no armor lockouts |
+| `rogue-command-balance-simulation` | Combat balance & Lanchester math | `tools/simulate_combat_balance.py`, `content/packs/sample-native-expansion/content.json`, skill reference matrix | CEI bands (Scout 30–45, MBT 12–20, Siege 6–16, Mech 10–18), no armor lockouts or unreviewed kiting envelopes |
 | `rogue-command-mutator-hazard-authoring`| Relics, mutators & hazards | `native-card-change-and-relic-schema.md` | 26 `ChangeableValue` attributes, trigger colliders ($\ge 0.5\text{s}$ tick) |
 | `rogue-command-vfx-authoring` | URP particles & shaders | `vfx-prefab-recipe-book.md`, `urp-shaders.md` | Soft unlit alpha particles, dual-tier fallback in `RuntimeVisualVfxFallback` |
 | `rogue-command-audio-authoring` | Spatial 3D audio & loops | `native-audio-integration-points.md` | `Socket_EngineAudio`, `Socket_WeaponAudio`, logarithmic roll-off (5–45m) |
@@ -177,11 +177,11 @@ The repository equips 13 local skills under `.agents/skills/`:
 - **In-Place Invariant**: $\Delta\text{pos} = (0, 0, 0)$ on `Bone_Root` across all frames of `Action_Walk`.
 - Bakes 5 action clips (`Action_Idle`, `Action_Walk`, `Action_Drive`, `Action_FireRecoil`, `Action_Death`) wired to Generic Mecanim Animators.
 
-#### 3. Combat Balance & Lanchester Simulation
-- Standalone simulator `tools/simulate_balance.py` models Lanchester square-law dynamics across 651 native rows and expansion units:
-  $$\text{CEI} = \frac{\text{DPS} \times \text{Effective HP}}{\text{Crystal Cost}}$$
-- Combat Efficiency Index (CEI) calibrated to documented bands: Scout 8–15, Heavy Tank 12–20, Siege 6–16, Mech 10–18.
+#### 3. Combat Balance & Tactical Simulation
+- `tools/simulate_combat_balance.py` provides discrete 1v1 and squad matchups across 651 native rows and expansion units. The CEI is `sqrt(DPS * BaselineEHP) / (CrystalCost + 0.3 * ProductionDuration) * 100`.
+- The skill calibration matrix targets CEI bands: Scout 30–45, Main Battle Tank 12–20, Siege 6–16, and Mech 10–18.
 - Flags armor lockouts: Ironclad Walker armor calibrated to 1.0 (CEI 14.9); Colossus cost calibrated to 300 (CEI 15.8).
+- Discrete duels emit `INFINITE_KITING_ENVELOPE` when a damaging non-suicide unit both outranges and outspeeds its opponent, matching the movement rule used by that simulator. The 2026-10-18 run flags Sandlance Scout vs `PCXBaseTank` and native `ArtilleryTank` vs Colossus; these are model risks, not proof of live combat behavior. No stats were changed from this observation.
 
 #### 4. Mutators, Relics & Battlefield Hazards
 - Integrates with native `CardChangeScriptableObject` targeting the 26 canonical `ChangeableValue` attributes:
@@ -296,7 +296,7 @@ fc.exe /b tools\generate_unit_model.py .agents\skills\rogue-command-3d-model-aut
   --output docs\research\generated\progression-objects.json
 
 # Run balance simulator
-.venv\Scripts\python.exe tools\simulate_balance.py --csv content/data/balancing.tsv
+.venv\Scripts\python.exe tools\simulate_combat_balance.py --all-mod-units
 ```
 
 ### Evidence Boundaries & Verification Discipline
@@ -313,19 +313,11 @@ fc.exe /b tools\generate_unit_model.py .agents\skills\rogue-command-3d-model-aut
 
 ## 9. Next Implementation Milestones & Task Roadmap
 
-1. **Procedural 3D Asset Generation for 5 Expansion Units**:
-   - Run `generate_unit_model.py` for each unit archetype (`scout-tank`, `heavy-artillery`, `assault-walker`, `skirmish-bike`, `surge-tank`).
-   - Validate ground contact ($Z_{\min} \ge 0.0\text{m}$), 4-channel vertex shading, and unprefixed sockets.
-2. **Unity Prefab Scaffolding & AssetBundle Export**:
-   - Execute `VehiclePrefabBuilder` and `AssetBundleBuilder` in Unity `2021.3.45f2`.
-   - Embed `RogueCommand/VehiclePBR_VertexWear` shader into `sample-native-expansion.bundle`.
-3. **Stage Reward Distribution & Drafting Verification**:
-   - Verify randomized blueprint offering in stage pools via BepInEx MCP telemetry.
-   - Confirm 1:1 factory placement and unit production rollout.
-4. **Reactive Tactical AI Combat Playtest**:
-   - Validate `HarvesterRaiderAiModule` and `SiegeAssaultAiModule` command lifecycle in live match.
-   - Confirm base defense interceptors engage within `defenseRadiusCells = 12`.
-5. **Release Distribution & Packaging Verification**:
-   - Execute `tools/Package-Loader.ps1` to produce distributable ZIP with exact 9-entry manifest.
-   - Run complete automated test suite to ensure all 132 validation checks pass.
+The generated unit models, prefab authoring outputs, compiled visual bundle, and distributable package already exist in the workspace under `unity/RogueCommandAssetAuthoring/` and ignored `artifacts/`. Do not repeat generation/export/package steps unless their source assets change. These files and prior local validation do not establish that they render or play correctly in a Steam run.
+
+1. **Preserve the current tutorial run**: Keep the current game process open with the native pause menu shown. Do not abandon or let the match run unattended. Any runtime acceptance that needs a fresh progression should use a separately isolated, reversible run and preserve profile/save state.
+2. **Stage rewards and production acceptance**: Reach an eligible stage reward in a controlled Steam run; observe one of the stage-owned factory blueprints in a randomized offer, purchase/place it, and verify the matching namespaced produced unit and its visual. Confirm unrelated native factory mappings and native per-pool filters remain intact.
+3. **Custom stage map acceptance**: Verify a declared mod stage appears in the progression/map flow with its configured world, map-size range, reward distribution, and stage-scoped AI roster. A loaded stage resource or log line alone is not sufficient.
+4. **AI behavior acceptance**: Start a stage using a mod profile and observe initialization/tick of its compiled module, additive `unitEntries`/`productionBuildingEntries`, capacity-aware production, and its expected command dispatch. For reactive defense, capture an actual interceptor response to an attacker within the configured radius.
+5. **Final review and delivery**: After runtime evidence is collected, restore the temporary deployment from its manifest by hash, inspect the package manifest, run the requested validation/build workflow, review only task-owned changes, then commit and push after verifying the tracked remote branch. Keep static inspection, local validation, and live Steam evidence labeled separately.
 

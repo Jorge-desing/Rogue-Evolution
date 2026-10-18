@@ -336,6 +336,29 @@ class CombatSimulator:
         elapsed_time = 0.0
         flags = []
 
+        if (
+            not unit_a.is_suicide_unit
+            and unit_a.damage1 > 0.0
+            and unit_a.effective_range > unit_b.effective_range
+            and unit_a.move_speed > unit_b.move_speed
+            and current_distance > unit_b.effective_range
+        ):
+            flags.append(
+                f"INFINITE_KITING_ENVELOPE: {unit_a.unit_id} outranges and outspeeds "
+                f"{unit_b.unit_id}; this duel model lets it hold distance outside the defender's range."
+            )
+        elif (
+            not unit_b.is_suicide_unit
+            and unit_b.damage1 > 0.0
+            and unit_b.effective_range > unit_a.effective_range
+            and unit_b.move_speed > unit_a.move_speed
+            and current_distance > unit_a.effective_range
+        ):
+            flags.append(
+                f"INFINITE_KITING_ENVELOPE: {unit_b.unit_id} outranges and outspeeds "
+                f"{unit_a.unit_id}; this duel model lets it hold distance outside the defender's range."
+            )
+
         if unit_a.damage1 <= unit_b.armor_protection and unit_a.damage1 > 0:
             flags.append(f"ARMOR_LOCKOUT: {unit_a.unit_id} ({unit_a.damage1} dmg) <= {unit_b.unit_id} ({unit_b.armor_protection} armor). Dealing 0.1 floor.")
         if unit_b.damage1 <= unit_a.armor_protection and unit_b.damage1 > 0:
