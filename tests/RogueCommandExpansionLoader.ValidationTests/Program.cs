@@ -427,6 +427,44 @@ var tests = new (string Name, Action Run)[]
             throw new InvalidOperationException("The reward scope hook did not filter candidates or leaked past its finalizer.");
         }
     }),
+    ("random reward trace distinguishes unmapped native pool queries", () =>
+    {
+        const string factoryId = "sample:factory-stage-one";
+        const string productId = "sample:unit-stage-one";
+        var scope = new BlueprintRewardFactoryScope(
+            new[] { factoryId },
+            new[] { factoryId },
+            new Dictionary<string, string>(StringComparer.Ordinal) { [productId] = factoryId },
+            0,
+            "native:stage-zero");
+        var provider = new RuntimeMutatorTestProvider { RewardFactoryScope = scope };
+        var logs = new List<string>();
+        RuntimeHooks.Bind(null!, provider, logs.Add);
+        object previousScope = RuntimeHooks.BeginBlueprintRewardScope();
+        var candidates = new List<string> { "native:factory", factoryId };
+        try
+        {
+            RuntimeHooks.ObserveBlueprintPoolCandidates(new object(), candidates, 0, false);
+        }
+        finally
+        {
+            RuntimeHooks.EndBlueprintRewardScope(null!, previousScope);
+            RuntimeHooks.Clear(null!);
+        }
+
+        if (!candidates.SequenceEqual(new[] { "native:factory", factoryId }) || logs.Count != 1)
+        {
+            throw new InvalidOperationException("Unmapped-pool observation changed candidates or failed to emit one trace.");
+        }
+
+        string trace = logs[0];
+        if (!trace.Contains("observedSources=unmapped-pool", StringComparison.Ordinal) ||
+            !trace.Contains("unmappedPoolQueries=1", StringComparison.Ordinal) ||
+            !trace.Contains("unmappedPoolFactories=[" + factoryId + "->" + productId + "]", StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("The trace did not identify an unregistered pool query: " + trace);
+        }
+    }),
     ("random reward trace records candidates and actual mod offers", () =>
     {
         const string stageFactory = "sample:factory-stage-one";

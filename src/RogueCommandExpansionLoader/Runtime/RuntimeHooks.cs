@@ -158,6 +158,7 @@ namespace RogueCommandExpansionLoader.Runtime
             IBlueprintPoolRuntimeProvider poolProvider = GetBlueprintPoolProvider();
             if (poolProvider == null)
             {
+                activeScope.Observation.RecordUnmappedPoolCandidates(candidates, activeScope.Scope);
                 return;
             }
 
@@ -170,9 +171,14 @@ namespace RogueCommandExpansionLoader.Runtime
                         poolId, candidates, activeScope.Scope,
                         currentExperienceLevel, excludeExclusivesFromOtherPools);
                 }
+                else
+                {
+                    activeScope.Observation.RecordUnmappedPoolCandidates(candidates, activeScope.Scope);
+                }
             }
             catch (Exception hookException)
             {
+                activeScope.Observation.RecordUnmappedPoolCandidates(candidates, activeScope.Scope);
                 Log("Could not observe custom BlueprintPool candidates: " +
                     hookException.GetBaseException().Message);
             }

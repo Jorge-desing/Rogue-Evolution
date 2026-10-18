@@ -163,12 +163,14 @@ namespace RogueCommandExpansionLoader.Runtime
         private readonly SortedSet<string> _globalCandidates = new SortedSet<string>(StringComparer.Ordinal);
         private readonly SortedSet<string> _stageCandidates = new SortedSet<string>(StringComparer.Ordinal);
         private readonly SortedSet<string> _offeredProducts = new SortedSet<string>(StringComparer.Ordinal);
+        private readonly SortedSet<string> _unmappedPoolFactories = new SortedSet<string>(StringComparer.Ordinal);
         private readonly SortedDictionary<string, SortedSet<string>> _poolCandidates =
             new SortedDictionary<string, SortedSet<string>>(StringComparer.Ordinal);
         private bool _globalFallbackObserved;
         private bool _poolCandidatesObserved;
         private int _omittedIdObservations;
         private int _omittedPoolQueries;
+        private int _unmappedPoolQueries;
 
         public void RecordGlobalCandidates(
             IList<string> candidates,
@@ -233,6 +235,35 @@ namespace RogueCommandExpansionLoader.Runtime
             }
         }
 
+        /// <summary>
+        /// Records a pool query whose object is not owned by the loader's stage-pool registry.
+        /// Native pools are intentionally left unchanged, but marking the query prevents an
+        /// observed native offer from being reported as if no candidate source had run.
+        /// </summary>
+        public void RecordUnmappedPoolCandidates(
+            IList<string> candidates,
+            BlueprintRewardFactoryScope scope)
+        {
+            if (candidates == null || scope == null)
+            {
+                return;
+            }
+
+            if (_unmappedPoolQueries < Int32.MaxValue)
+            {
+                _unmappedPoolQueries++;
+            }
+
+            for (int i = 0; i < candidates.Count; i++)
+            {
+                string candidate = candidates[i];
+                if (scope.IsLoaderFactory(candidate))
+                {
+                    AddBounded(_unmappedPoolFactories, candidate);
+                }
+            }
+        }
+
         public void RecordOfferedProduct(string productId, BlueprintRewardFactoryScope scope)
         {
             if (scope != null && scope.IsLoaderProduct(productId))
@@ -254,7 +285,7 @@ namespace RogueCommandExpansionLoader.Runtime
                 ? "<native-or-unresolved>"
                 : scope.ActiveStageId);
             report.Append(" observedSources=");
-            if (!_globalFallbackObserved && !_poolCandidatesObserved)
+            if (!_globalFallbackObserved && !_poolCandidatesObserved && _unmappedPoolQueries == 0)
             {
                 report.Append("unobserved");
             }
@@ -274,6 +305,16 @@ namespace RogueCommandExpansionLoader.Runtime
                 {
                     report.Append("pool");
                 }
+
+                if (_unmappedPoolQueries > 0)
+                {
+                    if (_globalFallbackObserved || _poolCandidatesObserved)
+                    {
+                        report.Append(',');
+                    }
+
+                    report.Append("unmapped-pool");
+                }
             }
 
             // Keep loss counters near the start of the trace. Detailed candidate and product lists can
@@ -288,7 +329,18 @@ namespace RogueCommandExpansionLoader.Runtime
                 report.Append(" omittedPoolQueries=").Append(_omittedPoolQueries);
             }
 
+            if (_unmappedPoolQueries > 0)
+            {
+                report.Append(" unmappedPoolQueries=").Append(_unmappedPoolQueries);
+            }
+
             report.Append(" offeredProducts=").Append(FormatSet(_offeredProducts, null));
+
+            if (_unmappedPoolQueries > 0)
+            {
+                report.Append(" unmappedPoolFactories=")
+                    .Append(FormatSet(_unmappedPoolFactories, scope));
+            }
 
             if (_globalFallbackObserved)
             {
