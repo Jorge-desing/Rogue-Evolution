@@ -645,28 +645,35 @@ To satisfy the mod architectural rule that *every added unit requires a dedicate
 
 ## 16. In-Game Runtime Automation & Reactive Visual Director (2026-10-17)
 
-To bridge the offline 3D authoring pipeline with live gameplay simulation, the expansion loader now injects an autonomous visual management subsystem during match execution:
+To bridge the offline 3D authoring pipeline with live gameplay simulation, the expansion loader injects an autonomous visual management subsystem during match execution:
 
 ### A. Autonomous Socket Discovery & In-Game Director (`RuntimeVisualDirector`)
 - **Injection Hook**: Intercepts `EntityFactory.InstantiateEntity` via Harmony postfix, dynamically attaching `RuntimeVisualDirector` to any spawned unit or structure possessing authoring sockets (`Socket_*`).
 - **Zero-Configuration Operation**:
   1. **Progressive Combat Damage States**:
-     - At $\le 50\%$ HP: Automatically mounts smoke particle emitters onto `Socket_DamageSmoke` and activates `<Name>_Damaged` mesh variants.
+     - At $\le 50\%$ HP: Automatically mounts smoke particle emitters onto `Socket_DamageSmoke` and activates `<Name>_Damaged` mesh variants. Driven by native `HealthRatio` property (`get_HealthRatio` token `0x06000778`).
      - At $\le 25\%$ HP: Activates dynamic fire particles and point lighting on `Socket_DamageFire`, and introduces a mechanical tilt on `Socket_TurretPivot` to simulate traverse jamming.
-     - At $0\%$ HP: Cleans up transient particle emitters cleanly before garbage collection.
+     - At $0\%$ HP: Cleans up transient particle emitters cleanly before garbage collection, confirmed via `StillExists == false`, `IsDestroyed == true`, and native property `DestroyHasBeenStarted == true` (token `0x06000780`).
   2. **Structure Dynamics**:
      - `radar_station`: Spins `Socket_RadarMast` at 30 RPM continuously.
-     - `factory`: Detects active unit production and smoothly slides `Socket_Deploy_Unit` bay door upward by 1.4 m during rollout.
-     - `defense_turret`: Dynamically tracks hostile combat targets in horizontal azimuth at 120°/s.
-  3. **Weapon Combat Feedback**:
-     - `Socket_RecoilPrimary`: Simulates explosive barrel recoil slide with spring-damper recovery.
-     - `Socket_MuzzlePrimary`: Triggers high-luminance star-spike muzzle flash bursts.
+     - `factory`: Detects active unit production via `EntityController.InProductionCount > 0` (token `0x060007b8`) and `ProductionInfo.productionHasStarted` / `queuedCount > 0`, smoothly sliding `Socket_Deploy_Unit` bay door upward by 1.4 m during rollout.
+     - `defense_turret`: Dynamically tracks hostile combat targets in horizontal azimuth at 120°/s using authoritative targets `CurrentAttackTarget` (token `0x060007ec`), `EntityAttack._attackTarget`, and `CurrentFollowTarget`.
+  3. **Autonomous Weapon Combat Feedback**:
+     - Tracks `EntityAttack._timeOfLastShot` (`Single`) in real time. Whenever a unit fires:
+       - `Socket_RecoilPrimary`: Simulates explosive barrel recoil slide with spring-damper recovery.
+       - `Socket_MuzzlePrimary`: Triggers high-luminance star-spike muzzle flash bursts.
   4. **Modular Hardpoint Hot-Swapping**:
      - Scans `Socket_Hardpoint_*` and provides programmatic API to toggle attached modular armor (`ERA`, `APS`, `Sponsons`, `FuelDrums`).
 
 ### B. Dual-Tier Resilient Particle Fallback (`RuntimeVisualVfxFallback`)
-- **Tier 1**: Attempts discovery of native game particle prefabs (`Smoke`, `Fire`) from loaded asset bundles and active memory.
-- **Tier 2**: Procedurally generates dedicated Unity `ParticleSystem` components with configured emission rates, cone dispersion angles, and color ramps, guaranteeing zero runtime dependency on external asset bundles or proprietary assets.
+- **Tier 1 (Native Engine Discovery & Cloning)**: Directly checks `EntityController.onFireParticleSystem` for unit fire effects and searches memory for loaded Rogue Command particle prefabs (`Smoke`, `Fire`) to guarantee authentic visual harmony with native game art.
+- **Tier 2 (Self-Contained Procedural Fallback)**: If native prefabs are uninstantiated, dynamically generates standalone Unity `ParticleSystem` components with soft unlit alpha blending, upwards cone expansion, and color ramps, guaranteeing zero runtime dependency on external asset bundles or proprietary assets.
+
+### C. Low-Level Binary Verification via Reverse Engineer Anything (REA)
+The runtime visual director was subjected to binary inspection against `Assembly-CSharp.dll` (SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, MVID `db0e9462-128d-4296-9900-de18b4bd0c00`) and the compiled loader `RogueCommandExpansionLoader.dll` (SHA-256 `93d62cba0b1ac49db90736d303f6cd0a9b0b98f0d41237daf1265922af222f16`, MVID `a172fe22-39f6-446e-818e-36c240944af9`).
+- **Evidence IDs**: `ev_c38acc530bb49ca3bf82a91df86a9c74c5d3ed78ffe88ea57c0aadb74226c975` (loader assembly artifact), `ev_f6327eae071cf0725cfa35ac28bde2d57dff8528bdfd41a668fc7256edafdcf8` (RuntimeVisualDirector members).
+- **Corrected Assumptions**: Eliminated fictitious reflection fields (`isProducing`, `DestroyHasBeenStarted` as field) and replaced them with exact CIL properties and authoritative combat clocks (`_timeOfLastShot`).
+
 
 
 

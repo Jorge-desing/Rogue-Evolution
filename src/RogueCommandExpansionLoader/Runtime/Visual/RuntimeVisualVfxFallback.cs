@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Reflection;
 using UnityEngine;
 
 namespace RogueCommandExpansionLoader.Runtime.Visual
@@ -48,9 +49,31 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             return CreateProceduralSmoke(parent);
         }
 
-        public static GameObject SpawnDamageFire(Transform parent)
+        public static GameObject SpawnDamageFire(Transform parent, EntityController entity = null)
         {
             if (parent == null) return null;
+
+            // 1. Try native onFireParticleSystem from the EntityController itself
+            if (entity != null)
+            {
+                try
+                {
+                    FieldInfo fireField = typeof(EntityController).GetField("onFireParticleSystem", BindingFlags.Public | BindingFlags.Instance);
+                    if (fireField != null)
+                    {
+                        ParticleSystem ps = fireField.GetValue(entity) as ParticleSystem;
+                        if (ps != null && ps.gameObject != null)
+                        {
+                            GameObject instance = UnityEngine.Object.Instantiate(ps.gameObject, parent);
+                            instance.transform.localPosition = Vector3.zero;
+                            instance.transform.localRotation = Quaternion.identity;
+                            instance.SetActive(true);
+                            return instance;
+                        }
+                    }
+                }
+                catch { }
+            }
 
             try
             {

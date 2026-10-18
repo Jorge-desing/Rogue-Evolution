@@ -39,10 +39,29 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
         private float _doorOpenProgress;
         private Vector3 _doorClosedLocalPos;
 
+        private static PropertyInfo _healthRatioProp;
         private static PropertyInfo _currentHealthProp;
         private static PropertyInfo _maxHealthProp;
         private static PropertyInfo _isDestroyedProp;
-        private static FieldInfo _destroyHasBeenStartedField;
+        private static PropertyInfo _destroyHasBeenStartedProp;
+        private static PropertyInfo _stillExistsProp;
+        private static PropertyInfo _currentAttackTargetProp;
+        private static PropertyInfo _currentFollowTargetProp;
+        private static PropertyInfo _inProductionCountProp;
+        private static PropertyInfo _productionInfoProp;
+
+        private static FieldInfo _attackField;
+        private static FieldInfo _timeOfLastShotField;
+        private static FieldInfo _attackTargetField;
+        private static FieldInfo _aimingField;
+        private static FieldInfo _singleTargetActionTargetField;
+        private static FieldInfo _currentPlayerCommandField;
+        private static FieldInfo _lastAiCommandField;
+        private static FieldInfo _cmdTargetField;
+        private static FieldInfo _prodHasStartedField;
+        private static FieldInfo _prodQueuedCountField;
+
+        private float _lastShotTimestamp = -1f;
 
         public static void AttachIfApplicable(object entityObj)
         {
@@ -175,12 +194,48 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
 
         private static void CacheReflectionAccess()
         {
-            if (_currentHealthProp != null) return;
+            if (_healthRatioProp != null) return;
             Type ecType = typeof(EntityController);
+            _healthRatioProp = ecType.GetProperty("HealthRatio", BindingFlags.Public | BindingFlags.Instance);
             _currentHealthProp = ecType.GetProperty("CurrentHealth", BindingFlags.Public | BindingFlags.Instance);
             _maxHealthProp = ecType.GetProperty("MaxHealth", BindingFlags.Public | BindingFlags.Instance);
             _isDestroyedProp = ecType.GetProperty("IsDestroyed", BindingFlags.Public | BindingFlags.Instance);
-            _destroyHasBeenStartedField = ecType.GetField("DestroyHasBeenStarted", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+            _destroyHasBeenStartedProp = ecType.GetProperty("DestroyHasBeenStarted", BindingFlags.Public | BindingFlags.Instance);
+            _stillExistsProp = ecType.GetProperty("StillExists", BindingFlags.Public | BindingFlags.Instance);
+            _currentAttackTargetProp = ecType.GetProperty("CurrentAttackTarget", BindingFlags.Public | BindingFlags.Instance);
+            _currentFollowTargetProp = ecType.GetProperty("CurrentFollowTarget", BindingFlags.Public | BindingFlags.Instance);
+            _inProductionCountProp = ecType.GetProperty("InProductionCount", BindingFlags.Public | BindingFlags.Instance);
+            _productionInfoProp = ecType.GetProperty("ProductionInfo", BindingFlags.Public | BindingFlags.Instance);
+
+            _attackField = ecType.GetField("_attack", BindingFlags.NonPublic | BindingFlags.Instance);
+            if (_attackField != null)
+            {
+                Type attackType = _attackField.FieldType;
+                _timeOfLastShotField = attackType.GetField("_timeOfLastShot", BindingFlags.NonPublic | BindingFlags.Instance);
+                _attackTargetField = attackType.GetField("_attackTarget", BindingFlags.NonPublic | BindingFlags.Instance);
+                _aimingField = attackType.GetField("_aiming", BindingFlags.NonPublic | BindingFlags.Instance);
+            }
+
+            Type staType = ecType.Assembly.GetType("SingleTargetAction");
+            if (staType != null)
+            {
+                _singleTargetActionTargetField = staType.GetField("target", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+            }
+
+            _currentPlayerCommandField = ecType.GetField("_currentPlayerCommand", BindingFlags.NonPublic | BindingFlags.Instance);
+            _lastAiCommandField = ecType.GetField("_lastAiCommand", BindingFlags.NonPublic | BindingFlags.Instance);
+            Type cmdType = ecType.Assembly.GetType("EntityCommand");
+            if (cmdType != null)
+            {
+                _cmdTargetField = cmdType.GetField("target", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+            }
+
+            Type prodType = ecType.Assembly.GetType("ProductionInfo");
+            if (prodType != null)
+            {
+                _prodHasStartedField = prodType.GetField("productionHasStarted", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                _prodQueuedCountField = prodType.GetField("queuedCount", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+            }
         }
 
         private void Update()
@@ -191,15 +246,38 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             UpdateRadarSweep();
             UpdateTurretAiming();
             UpdateFactoryDeployAnimation();
+            UpdateAutomaticWeaponFeedback();
             UpdateRecoilRecovery();
+        }
+
+        private void UpdateAutomaticWeaponFeedback()
+        {
+            if (_socketRecoilPrimary == null && _socketMuzzlePrimary == null) return;
+            if (_attackField == null || _timeOfLastShotField == null) return;
+
+            try
+            {
+                object attackObj = _attackField.GetValue(_entity);
+                if (attackObj != null)
+                {
+                    float shotTime = (float)_timeOfLastShotField.GetValue(attackObj);
+                    if (_lastShotTimestamp < 0f)
+                    {
+                        _lastShotTimestamp = shotTime;
+                    }
+                    else if (shotTime > _lastShotTimestamp)
+                    {
+                        _lastShotTimestamp = shotTime;
+                        TriggerWeaponFeedback();
+                    }
+                }
+            }
+            catch { }
         }
 
         private void UpdateHealthAndDamageTransitions()
         {
-            float currentHp = GetCurrentHealth();
-            float maxHp = Mathf.Max(1f, GetMaxHealth());
-            float ratio = currentHp / maxHp;
-
+            float ratio = GetHealthRatio();
             bool isDead = IsEntityDead();
 
             // 1. Moderate Damage (<50% HP): Smoke particle spawner
@@ -224,7 +302,7 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             {
                 _isCriticalStateActive = true;
                 Transform fireMount = _socketDamageFire ?? transform;
-                _fireVfxInstance = RuntimeVisualVfxFallback.SpawnDamageFire(fireMount);
+                _fireVfxInstance = RuntimeVisualVfxFallback.SpawnDamageFire(fireMount, _entity);
 
                 if (_socketTurretPivot != null && !_isTurretJammed)
                 {
@@ -326,24 +404,66 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
 
         private Transform ResolveEntityTarget()
         {
+            if (_entity == null) return null;
             try
             {
-                // Inspect EntityController fields for target
-                FieldInfo aiCmdField = typeof(EntityController).GetField("_lastAiCommand", BindingFlags.NonPublic | BindingFlags.Instance);
-                if (aiCmdField != null)
+                // 1. Direct public CurrentAttackTarget on EntityController
+                if (_currentAttackTargetProp != null)
                 {
-                    object cmd = aiCmdField.GetValue(_entity);
+                    EntityController atkTgt = _currentAttackTargetProp.GetValue(_entity, null) as EntityController;
+                    if (atkTgt != null && atkTgt.gameObject != null) return atkTgt.transform;
+                }
+
+                // 2. EntityAttack._attackTarget
+                if (_attackField != null && _attackTargetField != null)
+                {
+                    object atk = _attackField.GetValue(_entity);
+                    if (atk != null)
+                    {
+                        EntityController atkTgt = _attackTargetField.GetValue(atk) as EntityController;
+                        if (atkTgt != null && atkTgt.gameObject != null) return atkTgt.transform;
+                    }
+                }
+
+                // 3. SingleTargetAction._aiming target
+                if (_attackField != null && _aimingField != null && _singleTargetActionTargetField != null)
+                {
+                    object atk = _attackField.GetValue(_entity);
+                    if (atk != null)
+                    {
+                        object aiming = _aimingField.GetValue(atk);
+                        if (aiming != null)
+                        {
+                            EntityController aimingTgt = _singleTargetActionTargetField.GetValue(aiming) as EntityController;
+                            if (aimingTgt != null && aimingTgt.gameObject != null) return aimingTgt.transform;
+                        }
+                    }
+                }
+
+                // 4. Direct public CurrentFollowTarget on EntityController
+                if (_currentFollowTargetProp != null)
+                {
+                    EntityController flwTgt = _currentFollowTargetProp.GetValue(_entity, null) as EntityController;
+                    if (flwTgt != null && flwTgt.gameObject != null) return flwTgt.transform;
+                }
+
+                // 5. Player and AI Command fallbacks
+                if (_currentPlayerCommandField != null && _cmdTargetField != null)
+                {
+                    object cmd = _currentPlayerCommandField.GetValue(_entity);
                     if (cmd != null)
                     {
-                        FieldInfo tField = cmd.GetType().GetField("target");
-                        if (tField != null)
-                        {
-                            EntityController targetEc = tField.GetValue(cmd) as EntityController;
-                            if (targetEc != null && targetEc.gameObject != null)
-                            {
-                                return targetEc.transform;
-                            }
-                        }
+                        EntityController cmdTgt = _cmdTargetField.GetValue(cmd) as EntityController;
+                        if (cmdTgt != null && cmdTgt.gameObject != null) return cmdTgt.transform;
+                    }
+                }
+                if (_lastAiCommandField != null && _cmdTargetField != null)
+                {
+                    object cmd = _lastAiCommandField.GetValue(_entity);
+                    if (cmd != null)
+                    {
+                        EntityController cmdTgt = _cmdTargetField.GetValue(cmd) as EntityController;
+                        if (cmdTgt != null && cmdTgt.gameObject != null) return cmdTgt.transform;
                     }
                 }
             }
@@ -354,24 +474,46 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
 
         private bool CheckIfProducing()
         {
+            if (_entity == null) return false;
             try
             {
-                FieldInfo prodField = typeof(EntityController).GetField("_productionInfo", BindingFlags.NonPublic | BindingFlags.Instance);
-                if (prodField != null)
+                // 1. InProductionCount on EntityController (Nullable<int>)
+                if (_inProductionCountProp != null)
                 {
-                    object info = prodField.GetValue(_entity);
+                    object val = _inProductionCountProp.GetValue(_entity, null);
+                    if (val is int count && count > 0) return true;
+                }
+
+                // 2. ProductionInfo on EntityController
+                if (_productionInfoProp != null)
+                {
+                    object info = _productionInfoProp.GetValue(_entity, null);
                     if (info != null)
                     {
-                        FieldInfo isProdField = info.GetType().GetField("isProducing");
-                        if (isProdField != null)
-                        {
-                            return (bool)isProdField.GetValue(info);
-                        }
+                        if (_prodHasStartedField != null && (bool)_prodHasStartedField.GetValue(info)) return true;
+                        if (_prodQueuedCountField != null && (int)_prodQueuedCountField.GetValue(info) > 0) return true;
                     }
                 }
             }
             catch { }
             return false;
+        }
+
+        private float GetHealthRatio()
+        {
+            if (_entity == null) return 1f;
+            try
+            {
+                if (_healthRatioProp != null)
+                {
+                    return (float)_healthRatioProp.GetValue(_entity, null);
+                }
+            }
+            catch { }
+
+            float current = GetCurrentHealth();
+            float max = Mathf.Max(1f, GetMaxHealth());
+            return Mathf.Clamp01(current / max);
         }
 
         private float GetCurrentHealth()
@@ -397,8 +539,9 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             if (_entity == null) return true;
             try
             {
+                if (_stillExistsProp != null && !(bool)_stillExistsProp.GetValue(_entity, null)) return true;
                 if (_isDestroyedProp != null && (bool)_isDestroyedProp.GetValue(_entity, null)) return true;
-                if (_destroyHasBeenStartedField != null && (bool)_destroyHasBeenStartedField.GetValue(_entity)) return true;
+                if (_destroyHasBeenStartedProp != null && (bool)_destroyHasBeenStartedProp.GetValue(_entity, null)) return true;
             }
             catch { }
             return false;

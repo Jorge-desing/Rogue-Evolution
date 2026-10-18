@@ -463,25 +463,28 @@ Automated headless rendering pipeline generating transparent alpha PNG tactical 
 
 ## 11. In-Game Runtime Automation (`RuntimeVisualDirector` & Socket Mechanics)
 
-All models authored with the procedural toolchain come to life inside the running game through the loader's autonomous `RuntimeVisualDirector` component (`RogueCommandExpansionLoader.Runtime.Visual.RuntimeVisualDirector`). Injected at combat runtime via Harmony postfix on `EntityFactory.InstantiateEntity`, it requires zero MonoBehaviour serialization inside AssetBundles and operates via zero-configuration socket auto-discovery.
+All models authored with the procedural toolchain come to life inside the running game through the loader's autonomous `RuntimeVisualDirector` component (`RogueCommandExpansionLoader.Runtime.Visual.RuntimeVisualDirector`). Injected at combat runtime via Harmony postfix on `EntityFactory.InstantiateEntity`, it requires zero MonoBehaviour serialization inside AssetBundles, operates via zero-configuration socket auto-discovery, and binds to native CIL properties verified via Reverse Engineer Anything (REA).
 
 ### A. Socket-to-Gameplay Runtime Binding Map
 
 | Authored Socket | In-Game Runtime Behavior & Logic |
 | :--- | :--- |
-| `Socket_TurretPivot` / `Socket_TurretYaw` | **Procedural Target Tracking**: Smoothly tracks the entity's hostile target (`_lastAiCommand.target` / `_currentPlayerCommand.target`) in horizontal azimuth at 120°/s. |
+| `Socket_TurretPivot` / `Socket_TurretYaw` | **Procedural Target Tracking**: Smoothly tracks the entity's hostile target in horizontal azimuth at 120°/s using authoritative native target properties (`CurrentAttackTarget`, `EntityAttack._attackTarget`, and `CurrentFollowTarget`). |
 | `Socket_RadarMast` / `Socket_RadarDish` | **Continuous Radar Sweep**: Rotates continuously around its local up axis at 30 RPM during match uptime. |
-| `Socket_DamageSmoke` | **50% HP Damage Transition**: Spawns volumetric smoke particles when `CurrentHealth / MaxHealth <= 0.50f` and enables `<Name>_Damaged` mesh. |
-| `Socket_DamageFire` | **25% HP Critical Seizure**: Spawns flame particles and dynamic point light, tilting `Socket_TurretPivot` ($+4.5^\circ$) to simulate mechanical turret ring jam. |
-| `Socket_Deploy_Unit` | **Factory Rollout Animation**: Detects unit production and smoothly slides bay door upward by 1.4 m during production rollout. |
-| `Socket_RecoilPrimary` | **Physical Barrel Recoil**: Instantaneous linear slide backward (0.22 m) upon weapon firing, recovering smoothly via spring-damper lerp. |
-| `Socket_MuzzlePrimary` | **Combat Flash Feedback**: Pulses the authored star-spike mesh (or procedural flash burst) for 0.07 s. |
+| `Socket_DamageSmoke` | **50% HP Damage Transition**: Spawns volumetric smoke particles when native `HealthRatio <= 0.50f` and enables `<Name>_Damaged` mesh. |
+| `Socket_DamageFire` | **25% HP Critical Seizure**: Spawns flame particles (cloning native `EntityController.onFireParticleSystem`) and dynamic point light, tilting `Socket_TurretPivot` ($+4.5^\circ$) to simulate mechanical turret ring jam. |
+| `Socket_Deploy_Unit` | **Factory Rollout Animation**: Detects active unit production via `InProductionCount > 0` and `productionHasStarted` / `queuedCount > 0`, smoothly sliding bay door upward by 1.4 m during production rollout. |
+| `Socket_RecoilPrimary` | **Physical Barrel Recoil**: Autonomous explosive linear slide backward (0.22 m) upon weapon firing triggered by tracking `EntityAttack._timeOfLastShot`, recovering smoothly via spring-damper lerp. |
+| `Socket_MuzzlePrimary` | **Combat Flash Feedback**: Pulses the authored star-spike mesh (or procedural flash burst) for 0.07 s synchronously with `_timeOfLastShot`. |
 | `Socket_Hardpoint_<Type>` | **Modular Attachment Toggling**: Enables/disables or hot-swaps detached attachment sub-meshes (`ERA`, `APS`, `Sponson`, `FuelDrums`) at runtime. |
 
 ### B. Resilient Visual Particle Fallback (`RuntimeVisualVfxFallback`)
 Combat particle systems (smoke, fire, muzzle flash) utilize a resilient dual-tier engine:
-1. **Tier 1 (Native Engine Discovery)**: Searches memory for loaded Rogue Command particle prefabs (`Smoke`, `Fire`) to guarantee authentic visual harmony with native game art.
+1. **Tier 1 (Native Engine Discovery & Cloning)**: Directly clones `EntityController.onFireParticleSystem` for entity fires and searches memory for loaded Rogue Command particle prefabs (`Smoke`, `Fire`) to guarantee authentic visual harmony with native game art.
 2. **Tier 2 (Self-Contained Procedural Fallback)**: If native prefabs are uninstantiated, dynamically generates standalone Unity `ParticleSystem` components with soft unlit alpha blending, upwards cone expansion, and color ramps.
+
+### C. Binary Verification via REA
+Verified against `Assembly-CSharp.dll` (SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, MVID `db0e9462-128d-4296-9900-de18b4bd0c00`) and loader `RogueCommandExpansionLoader.dll` (SHA-256 `93d62cba0b1ac49db90736d303f6cd0a9b0b98f0d41237daf1265922af222f16`, MVID `a172fe22-39f6-446e-818e-36c240944af9`). Evidence IDs: `ev_c38acc530bb49ca3bf82a91df86a9c74c5d3ed78ffe88ea57c0aadb74226c975`, `ev_f6327eae071cf0725cfa35ac28bde2d57dff8528bdfd41a668fc7256edafdcf8`.
 
 ---
 
