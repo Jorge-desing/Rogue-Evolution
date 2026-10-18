@@ -264,10 +264,15 @@ var tests = new (string Name, Action Run)[]
         if (!registry.TryFind("RCL_POOL_FIRST", out object? resolved) ||
             !ReferenceEquals(resolved, firstPool) ||
             !registry.AllowsModUnitInPool(firstPool, "sample:first-unit") ||
+            !registry.AllowsModUnitInPool(firstPool, "sample:first-unit", isDemo: false, isAllowedForDemo: false) ||
+            !registry.AllowsModUnitInPool(firstPool, "sample:first-unit", isDemo: true, isAllowedForDemo: true) ||
+            registry.AllowsModUnitInPool(firstPool, "sample:first-unit", isDemo: true, isAllowedForDemo: false) ||
             registry.AllowsModUnitInPool(firstPool, "sample:second-unit") ||
+            registry.AllowsModUnitInPool(firstPool, "sample:second-unit", isDemo: true, isAllowedForDemo: true) ||
             registry.AllowsModUnitInPool(new object(), "sample:first-unit"))
         {
-            throw new InvalidOperationException("Scoped unit eligibility escaped its exact cloned pool instance.");
+            throw new InvalidOperationException(
+                "Scoped unit eligibility escaped its exact cloned pool instance or ignored demo eligibility.");
         }
 
         registry.SetEligibleExclusiveUnitIds(firstPool, new[] { "sample:first-unit" });

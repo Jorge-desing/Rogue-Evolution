@@ -731,13 +731,18 @@ namespace RogueCommandExpansionLoader.Content
         {
             lock (_gate)
             {
-                if (String.IsNullOrEmpty(unitId) || !_units.ContainsKey(unitId))
+                LoadedUnit unit;
+                if (String.IsNullOrEmpty(unitId) || !_units.TryGetValue(unitId, out unit))
                 {
                     runOriginal = true;
                     return false;
                 }
 
-                runOriginal = _blueprintPoolScopeRegistry.AllowsModUnitInPool(pool, unitId);
+                object balancing = _gameBalancingAssetField.GetValue(null);
+                bool isDemo = balancing != null && (bool)_gameIsDemoField.GetValue(balancing);
+                bool isAllowedForDemo = !isDemo || (bool)_allowedForDemoField.GetValue(unit.BalanceRow);
+                runOriginal = _blueprintPoolScopeRegistry.AllowsModUnitInPool(
+                    pool, unitId, isDemo, isAllowedForDemo);
                 return true;
             }
         }
