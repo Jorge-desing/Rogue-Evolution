@@ -15,6 +15,15 @@ No inicies `RogueCommand.exe` directamente. La partida de aceptación debe venir
 3. Revalida juntos versión del juego, SHA-256 y MVID de `Assembly-CSharp.dll`. Usa `mcp__rea__inspect_managed_artifact` en modo `summary` sobre la ruta devuelta y confirma la versión en el log del juego. No uses firmas reflejadas ni metadata tokens si cualquiera de los tres valores cambió.
 4. Verifica el PID/estado de Steam y del juego, la escena activa, el perfil elegido y la existencia de `savegame.dat` antes de pulsar botones.
 
+En esta instalación el proceso se llama exactamente `Rogue Command.exe` (con espacio). `Get-Process -Name RogueCommand` no lo encuentra y puede producir un falso diagnóstico de que el juego está cerrado. Comprueba el ejecutable real con:
+
+```powershell
+Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'Rogue Command.exe' } |
+  Select-Object ProcessId, Name, ExecutablePath
+```
+
+`ping_unity_bridge` comprueba que responde el endpoint HTTP del puente; por sí solo no confirma que haya una sesión Unity conectada. Después del ping, confirma capacidades/rutas y una consulta de escena o componente. En esta sesión, `get_game_paths`, búsqueda de componentes y lecturas de `DefaultAiBehaviour` respondieron correctamente.
+
 Identidad observada en esta sesión: Rogue Command 1.0.9; Unity 2021.3.45f2; BepInEx 5.4.23.5 Mono x64; `Assembly-CSharp.dll` SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`; MVID `db0e9462-128d-4296-9900-de18b4bd0c00`. Son valores de referencia, no sustituyen la comprobación de cada sesión.
 
 ## Inspección primero
@@ -61,10 +70,11 @@ Para afirmar que una carta apareció, registra la oferta que realmente se render
 
 ## Perfiles, datos y reversión
 
-- No uses Profile 2: tiene una partida guardada. Profile 3 también tiene `savegame.dat`.
-- El perfil 1 se eligió para esta prueba y se respaldó antes de iniciar. Su copia previa está en `artifacts/runtime-smoke/profile1-safe-test-2026-10-18/`; antes de la prueba no tenía `savegame.dat`.
+- Vuelve a comprobar cada perfil en cada intento: la presencia de `savegame.dat` y otros datos cambia y no debe inferirse de una captura histórica. En la lectura del 2026-10-18, Profile 1 y Profile 2 no tenían `savegame.dat`, Profile 2 sí contenía otros datos y Profile 3 estaba vacío.
+- En la prueba del 2026-10-18, `currentProfile.txt` contenía originalmente `3`; se eligió Profile 1 tras comprobar que no tenía `savegame.dat` y respaldar sus archivos en `artifacts/runtime-smoke/loader-stage-ai-20261018-113519/profiles/Profile1-before`. El selector temporal quedó en `1`. Restaura el valor original anotado en el manifiesto de despliegue, después de cerrar el juego.
+- La limpieza de esa prueba terminó: el selector volvió a `3`, los ocho destinos de instalación y `BepInEx/LogOutput.log` coinciden con sus copias originales por SHA-256, Profile 1 conserva solo sus dos archivos previos y Steam Cloud no se modificó.
 - Steam Cloud está desactivado por instrucción persistente del usuario. No volver a preguntar ni cambiar esa opción.
-- No borres los archivos que el juego cree durante la prueba. Conserva el nuevo save de prueba y vuelve al perfil anterior al salir limpiamente del juego. El selector previo era Profile 2 (`currentProfile.txt` contenía `2`); actualmente el intento de prueba usa Profile 1 (`1`).
+- No borres los archivos que el juego cree durante la prueba. Conserva el nuevo save de prueba y vuelve al perfil anterior al salir limpiamente del juego. Restaura `currentProfile.txt` al valor exacto registrado antes de iniciar; en la prueba del 2026-10-18 el valor original era `3` y el valor temporal fue `1`.
 - Antes de instalar o cambiar archivos del juego, conserva rutas, copias y SHA-256 de cada destino. No restaure una DLL/contenido mientras el juego siga abierto. Al acabar, restaura los archivos de instalación temporales y verifica sus hashes.
 - Conserva logs, trazas y snapshots bajo `artifacts/runtime-smoke/` (ruta ignorada por Git). No incluyas logs locales, saves, BepInEx, Harmony ni assemblies del juego en el ZIP distribuible.
 - Desactiva y elimina las sondas, watchers o patches creados para la prueba. Usa como máximo un inspector temporal por perfil de prueba; no dejes componentes de diagnóstico en objetos persistentes.
