@@ -101,6 +101,7 @@ Task-specific Codex skills live under `.agents/skills/` and are versioned with t
 | `rogue-command-vfx-authoring` | URP particle systems, muzzle flashes, tiered damage smoke/fire, and visual VFX sockets. |
 | `rogue-command-audio-authoring` | Mono 3D audio spatialization, weapon SFX, flocking engine audio, and audio asset validation. |
 | `rogue-command-mech-rigging-authoring` | Bipedal and quadrupedal mech armatures, in-place locomotion, and Generic Animators. |
+| `rogue-command-mutator-hazard-authoring` | Roguelike mutators, relics, battlefield hazards, and Heat/Ascension difficulty scaling curves. |
 | `rogue-command-steam-runtime-validation` | Reversible Steam-launched runtime checks and evidence boundaries. |
 
 The skills summarize this repository's verified workflows and limitations. They do not establish that any unit, stage, or AI works in-game.
@@ -578,3 +579,16 @@ The skill integrates with native Rogue Command 1.0.9 walker structures and visua
 - **Generic Mecanim & Animator Contract**: Unity Model Importer must use Generic (not Humanoid) rigs with `Create From This Model`. `RuntimeVisualDirector` autonomously discovers and drives states via parameters `RCL_IsMoving` (Bool), `RCL_Fire` (Trigger), and `RCL_Death` (Trigger).
 
 **Local validation:** `fc.exe /b` verified 100% byte-for-byte twin parity between `tools/validate_mech_rigging.py` and `.agents/skills/rogue-command-mech-rigging-authoring/scripts/validate_mech_rigging.py`. All 132/133 loader validation tests pass.
+
+## Mutator, relic, and battlefield hazard authoring skill — 2026-10-18
+
+Created `.agents/skills/rogue-command-mutator-hazard-authoring/` and validator CLI `tools/validate_mutators_and_hazards.py` (mirrored byte-identically in `scripts/validate_mutators_and_hazards.py`).
+
+The skill integrates with native Rogue Command 1.0.9 mutator, relic, and status architectures discovered via REA (`Assembly-CSharp.dll` SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, MVID `db0e9462-128d-4296-9900-de18b4bd0c00`):
+- **Native ScriptableObject Pipeline vs Custom Harmony Hooks**: Rogue Command natively supports data-driven mutators through `CardChangeScriptableObject` (token `0x020000bd`). Mod mutators can modify the 26 canonical attributes in `EntityBalancingStore.ChangeableValue` without custom C# Harmony hooks or bytecode manipulation.
+- **Faction and Role Filtering**: Target side is governed by the `Side` enum (`False` = Player, `True` = Enemy/AI, `Irrelevant` = Global). Fine-grained targeting uses conjunction (`cardMustHaveAllOfTheseRoles`), disjunction (`cardMustHaveOneOfTheseRoles`), and exclusion lists over the 34 native `UnitRole` identifiers.
+- **Canonical 30 Status Effects Engine**: All 30 status effects (`Turbo`, `Stun`, `OnFire`, `Vampirism`, `Stealth`, `Armored`, `Overclocked`, etc.) are natively supported and visually handled by `StatusEffectsAndParticles` on unit prefabs.
+- **Environmental Hazard Architecture**: Map hazards (acid pools, EMP storms, lava vents) must use trigger colliders (`isTrigger = true`) with amortized tick rates ($\ge 0.5\text{s}$) to preserve flocking pathfinding (`EntityFlockingMovement`) and frame pacing, paired with looping 3D audio (`spatialBlend = 1.0`) and URP particle emitters.
+- **Heat & Ascension Progression Scaling**: Mutators scale natively with pre-run Heat levels via `multiplyValueWithCurrentHeatLevel = true` and activate at specific thresholds (`startingOnHeat`, `startingOnAscensionLevel`). Authors must follow Lanchester combat scaling constraints ($\le 3\%$ major combat stat per level, maximum $+15\%$ `AttackRange`) to prevent exponential difficulty runaway.
+
+**Local validation:** `fc.exe /b` verified 100% byte-for-byte twin parity between `tools/validate_mutators_and_hazards.py` and `.agents/skills/rogue-command-mutator-hazard-authoring/scripts/validate_mutators_and_hazards.py`. Full validation suite passed 132/133 tests (1 skipped for Windows symlink privilege).

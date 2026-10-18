@@ -1,0 +1,4 @@
+interface:
+  display_name: "Rogue Command Mutator & Hazard Authoring"
+  short_description: "Author roguelike mutators, relics, battlefield hazards, and Heat/Ascension scaling curves for Rogue Command."
+  default_model: "inherit"
