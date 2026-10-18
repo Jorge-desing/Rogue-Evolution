@@ -85,16 +85,29 @@ public sealed class EntityCommand
 public sealed class ExistingControllers
 {
     public static ExistingControllers Instance { get; } = new();
+    public bool ThrowOnAiBuildings { get; set; }
 
     private readonly HashSet<EntityController> _playerUnits = new();
     private readonly HashSet<EntityController> _aiUnits = new();
+    private readonly HashSet<EntityController> _aiBuildings = new();
 
     public HashSet<EntityController> PlayerUnits() => _playerUnits;
     public HashSet<EntityController> AiUnits() => _aiUnits;
+    public HashSet<EntityController> AiBuildings()
+    {
+        if (ThrowOnAiBuildings)
+        {
+            throw new System.InvalidOperationException("simulated AI building registry failure");
+        }
+
+        return _aiBuildings;
+    }
 
     public void Reset()
     {
         _playerUnits.Clear();
         _aiUnits.Clear();
+        _aiBuildings.Clear();
+        ThrowOnAiBuildings = false;
     }
 }

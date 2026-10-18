@@ -1575,6 +1575,267 @@ var tests = new (string Name, Action Run)[]
             throw new InvalidOperationException("The scheduled AI build limit did not enforce the active deck capacity.");
         }
     }),
+    ("scheduled base-build AI counts only living factories for its AI base", () =>
+    {
+        const string factoryId = "sample-native:skirmish-bike-factory";
+        EntityBalancingStore.Reset();
+        EntityBalancingStore.BuildingEntityIds.Add(factoryId);
+        ExistingControllers.Instance.Reset();
+        DefaultAiBehaviour.ResetRuntimeState();
+        UnityEngine.Time.time = 0f;
+
+        IRogueCommandAiRuntimeBehaviour? behaviour = null;
+        int createCalls = 0;
+        try
+        {
+            DefaultAiBehaviour.TickHasStarted = true;
+            DefaultAiBehaviour.ActiveConstructableEntities.Add(new EntityInAiDeck
+            {
+                entityId = factoryId,
+                MaxLiving = 2
+            });
+            ExistingControllers.Instance.AiBuildings().Add(new EntityController
+            {
+                EntityId = factoryId,
+                IsControlledByAi = true,
+                aiBaseIndex = 0
+            });
+            ExistingControllers.Instance.AiBuildings().Add(new EntityController
+            {
+                EntityId = factoryId,
+                IsControlledByAi = true,
+                aiBaseIndex = 1
+            });
+            ExistingControllers.Instance.AiBuildings().Add(new EntityController
+            {
+                EntityId = factoryId,
+                IsControlledByAi = true,
+                aiBaseIndex = 0,
+                IsDestroyed = true
+            });
+            ExistingControllers.Instance.AiBuildings().Add(new EntityController
+            {
+                EntityId = factoryId,
+                IsControlledByAi = true,
+                aiBaseIndex = 0,
+                DestroyHasBeenStarted = true
+            });
+            ExistingControllers.Instance.AiBuildings().Add(new EntityController
+            {
+                EntityId = factoryId,
+                IsControlledByAi = false,
+                aiBaseIndex = 0
+            });
+            ExistingControllers.Instance.AiBuildings().Add(new EntityController
+            {
+                EntityId = "native:other-factory",
+                IsControlledByAi = true,
+                aiBaseIndex = 0
+            });
+            DefaultAiBehaviour.CreateBuildingHandler = (_, _) =>
+            {
+                createCalls++;
+                return new EntityController();
+            };
+
+            behaviour = new ScheduledBaseBuildAiModule().CreateBehaviour(new DefaultAiBehaviour(),
+                [
+                    new ContentModuleParameter { name = "entityId", value = factoryId },
+                    new ContentModuleParameter { name = "intervalSeconds", value = "1" },
+                    new ContentModuleParameter { name = "maxSuccessfulBuilds", value = "1" },
+                    new ContentModuleParameter { name = "maxAttempts", value = "2" }
+                ]);
+            behaviour.OnInitialized();
+            behaviour.Tick();
+            UnityEngine.Time.time = 1f;
+            behaviour.Tick();
+
+            if (createCalls != 1)
+            {
+                throw new InvalidOperationException(
+                    "The AI factory capacity count included another base, a destroyed factory, a non-AI factory, or a different entity ID.");
+            }
+        }
+        finally
+        {
+            behaviour?.OnDestroyed();
+            ExistingControllers.Instance.Reset();
+            DefaultAiBehaviour.ResetRuntimeState();
+        }
+    }),
+    ("scheduled base-build AI deduplicates returned registered factories at the live cap", () =>
+    {
+        const string factoryId = "sample-native:skirmish-bike-factory";
+        EntityBalancingStore.Reset();
+        EntityBalancingStore.BuildingEntityIds.Add(factoryId);
+        ExistingControllers.Instance.Reset();
+        DefaultAiBehaviour.ResetRuntimeState();
+        UnityEngine.Time.time = 0f;
+
+        IRogueCommandAiRuntimeBehaviour? behaviour = null;
+        int createCalls = 0;
+        try
+        {
+            DefaultAiBehaviour.TickHasStarted = true;
+            DefaultAiBehaviour.ActiveConstructableEntities.Add(new EntityInAiDeck
+            {
+                entityId = factoryId,
+                MaxLiving = 2
+            });
+            DefaultAiBehaviour.CreateBuildingHandler = (entityId, baseIndex) =>
+            {
+                createCalls++;
+                var created = new EntityController
+                {
+                    EntityId = entityId,
+                    IsControlledByAi = true,
+                    aiBaseIndex = baseIndex
+                };
+                ExistingControllers.Instance.AiBuildings().Add(created);
+                return created;
+            };
+
+            behaviour = new ScheduledBaseBuildAiModule().CreateBehaviour(new DefaultAiBehaviour(),
+                [
+                    new ContentModuleParameter { name = "entityId", value = factoryId },
+                    new ContentModuleParameter { name = "intervalSeconds", value = "1" },
+                    new ContentModuleParameter { name = "maxSuccessfulBuilds", value = "3" },
+                    new ContentModuleParameter { name = "maxAttempts", value = "4" }
+                ]);
+            behaviour.OnInitialized();
+            behaviour.Tick();
+            for (int second = 1; second <= 3; second++)
+            {
+                UnityEngine.Time.time = second;
+                behaviour.Tick();
+            }
+
+            if (createCalls != 2)
+            {
+                throw new InvalidOperationException(
+                    "The AI module either counted a returned factory twice or built beyond the active deck maxLiving.");
+            }
+        }
+        finally
+        {
+            behaviour?.OnDestroyed();
+            ExistingControllers.Instance.Reset();
+            DefaultAiBehaviour.ResetRuntimeState();
+        }
+    }),
+    ("scheduled base-build AI refreshes maxLiving before each attempt", () =>
+    {
+        const string factoryId = "sample-native:skirmish-bike-factory";
+        EntityBalancingStore.Reset();
+        EntityBalancingStore.BuildingEntityIds.Add(factoryId);
+        ExistingControllers.Instance.Reset();
+        DefaultAiBehaviour.ResetRuntimeState();
+        UnityEngine.Time.time = 0f;
+
+        IRogueCommandAiRuntimeBehaviour? behaviour = null;
+        int createCalls = 0;
+        try
+        {
+            DefaultAiBehaviour.TickHasStarted = true;
+            DefaultAiBehaviour.ActiveConstructableEntities.Add(new EntityInAiDeck
+            {
+                entityId = factoryId,
+                MaxLiving = 3
+            });
+            DefaultAiBehaviour.CreateBuildingHandler = (entityId, baseIndex) =>
+            {
+                createCalls++;
+                var created = new EntityController
+                {
+                    EntityId = entityId,
+                    IsControlledByAi = true,
+                    aiBaseIndex = baseIndex
+                };
+                ExistingControllers.Instance.AiBuildings().Add(created);
+                return created;
+            };
+
+            behaviour = new ScheduledBaseBuildAiModule().CreateBehaviour(new DefaultAiBehaviour(),
+                [
+                    new ContentModuleParameter { name = "entityId", value = factoryId },
+                    new ContentModuleParameter { name = "intervalSeconds", value = "1" },
+                    new ContentModuleParameter { name = "maxSuccessfulBuilds", value = "3" },
+                    new ContentModuleParameter { name = "maxAttempts", value = "4" }
+                ]);
+            behaviour.OnInitialized();
+            behaviour.Tick();
+            UnityEngine.Time.time = 1f;
+            behaviour.Tick();
+            DefaultAiBehaviour.ActiveConstructableEntities[0] = new EntityInAiDeck
+            {
+                entityId = factoryId,
+                MaxLiving = 1
+            };
+            UnityEngine.Time.time = 2f;
+            behaviour.Tick();
+
+            if (createCalls != 1)
+            {
+                throw new InvalidOperationException("The AI module used a stale maxLiving value after the active deck changed.");
+            }
+        }
+        finally
+        {
+            behaviour?.OnDestroyed();
+            ExistingControllers.Instance.Reset();
+            DefaultAiBehaviour.ResetRuntimeState();
+        }
+    }),
+    ("scheduled base-build AI fails closed when the building registry is unavailable", () =>
+    {
+        const string factoryId = "sample-native:skirmish-bike-factory";
+        EntityBalancingStore.Reset();
+        EntityBalancingStore.BuildingEntityIds.Add(factoryId);
+        ExistingControllers.Instance.Reset();
+        DefaultAiBehaviour.ResetRuntimeState();
+        UnityEngine.Time.time = 0f;
+
+        IRogueCommandAiRuntimeBehaviour? behaviour = null;
+        int createCalls = 0;
+        try
+        {
+            DefaultAiBehaviour.TickHasStarted = true;
+            DefaultAiBehaviour.ActiveConstructableEntities.Add(new EntityInAiDeck
+            {
+                entityId = factoryId,
+                MaxLiving = 1
+            });
+            ExistingControllers.Instance.ThrowOnAiBuildings = true;
+            DefaultAiBehaviour.CreateBuildingHandler = (_, _) =>
+            {
+                createCalls++;
+                return new EntityController();
+            };
+
+            behaviour = new ScheduledBaseBuildAiModule().CreateBehaviour(new DefaultAiBehaviour(),
+                [
+                    new ContentModuleParameter { name = "entityId", value = factoryId },
+                    new ContentModuleParameter { name = "intervalSeconds", value = "1" },
+                    new ContentModuleParameter { name = "maxSuccessfulBuilds", value = "1" },
+                    new ContentModuleParameter { name = "maxAttempts", value = "2" }
+                ]);
+            behaviour.OnInitialized();
+            behaviour.Tick();
+            UnityEngine.Time.time = 1f;
+            behaviour.Tick();
+
+            if (createCalls != 0)
+            {
+                throw new InvalidOperationException("The scheduled AI placed a factory without verifying live capacity.");
+            }
+        }
+        finally
+        {
+            behaviour?.OnDestroyed();
+            ExistingControllers.Instance.Reset();
+            DefaultAiBehaviour.ResetRuntimeState();
+        }
+    }),
     ("reactive base-defense AI parser supplies bounded defaults", () =>
     {
         if (!ReactiveBaseDefenseParameterParser.TryParse(null, out ReactiveBaseDefenseSettings defaults,

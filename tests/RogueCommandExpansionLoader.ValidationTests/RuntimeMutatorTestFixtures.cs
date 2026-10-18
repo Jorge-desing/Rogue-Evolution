@@ -35,6 +35,9 @@ public static class EntityBalancingStore
     public static Dictionary<string, string> FactoryEntityIdOf = new(StringComparer.Ordinal);
     public static Dictionary<string, Dictionary<ChangeableValue, int>> ChangeableIntValueCache = new(StringComparer.Ordinal);
     public static Dictionary<string, Dictionary<ChangeableValue, float>> ChangeableFloatValueCache = new(StringComparer.Ordinal);
+    public static HashSet<string> BuildingEntityIds = new(StringComparer.Ordinal);
+
+    public static bool IsBuilding(string entityId) => BuildingEntityIds.Contains(entityId);
 
     public static void Reset(IEqualityComparer<string> indexComparer = null)
     {
@@ -43,6 +46,7 @@ public static class EntityBalancingStore
         FactoryEntityIdOf.Clear();
         ChangeableIntValueCache = new Dictionary<string, Dictionary<ChangeableValue, int>>(StringComparer.Ordinal);
         ChangeableFloatValueCache = new Dictionary<string, Dictionary<ChangeableValue, float>>(StringComparer.Ordinal);
+        BuildingEntityIds.Clear();
     }
 }
 
@@ -79,10 +83,35 @@ public sealed class LandscapeGenerator
 
 public sealed class DefaultAiBehaviour
 {
+    public static List<EntityInAiDeck> ActiveConstructableEntities { get; set; } = new();
+    public static Func<string, int, EntityController> CreateBuildingHandler { get; set; }
+    public static bool TickHasStarted { get; set; }
+    public static int ActualAiStartBaseCount { get; set; } = 1;
+
     public UnityEngine.GameObject gameObject { get; set; } = new("test-ai");
     public int instanceId { get; set; } = 1;
 
     public int GetInstanceID() => instanceId;
+
+    public static List<EntityInAiDeck> ConstructableEntities_Static() => ActiveConstructableEntities;
+    public static bool HasTickStarted_Static() => TickHasStarted;
+    public static int ActualAiStartBaseCount_Static() => ActualAiStartBaseCount;
+    public static EntityController CreateBuilding_Static(string entityId, int baseIndex) =>
+        CreateBuildingHandler?.Invoke(entityId, baseIndex);
+
+    public static void ResetRuntimeState()
+    {
+        ActiveConstructableEntities = new List<EntityInAiDeck>();
+        CreateBuildingHandler = null;
+        TickHasStarted = false;
+        ActualAiStartBaseCount = 1;
+    }
+}
+
+public struct EntityInAiDeck
+{
+    public string entityId;
+    public int MaxLiving { get; set; }
 }
 
 internal sealed class RuntimeMutatorTestProvider : IRuntimeContentProvider, IBlueprintPoolRuntimeProvider,
