@@ -4,6 +4,8 @@
 **Repository:** project root (path varies by checkout)
 **Goal:** create a Rogue Command expansion mod with original playable units, stages, and AI. The external BepInEx loader is necessary infrastructure for registering and running that content, not the mod's end product. Prioritize playable content and Steam-launched validation over expanding loader diagnostics or infrastructure without a content need.
 
+> **Before any live-game inspection or control:** read the [Steam runtime control runbook](STEAM-RUNTIME-CONTROL.md) and follow `.agents/skills/rogue-command-steam-runtime-validation/SKILL.md`. BepInEx MCP is the preferred control path; do not assume the game needs focus or use Computer Use just to click controls when the bridge is connected.
+
 ## Procedural 3D authoring verification & static review resolutions — 2026-10-17
 
 Read sections 9–18 of [3D model authoring enhancements](3D-MODEL-AUTHORING-ENHANCEMENTS.md) for the verified capabilities and procedural architecture of the kit. The authoring pipeline in `tools/RogueModelKit.py` and `tools/generate_unit_model.py` (mirrored in `.agents/skills/rogue-command-3d-model-authoring/`) provides:

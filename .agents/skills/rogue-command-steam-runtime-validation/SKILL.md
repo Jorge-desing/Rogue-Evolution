@@ -10,9 +10,11 @@ Use this skill when an acceptance claim requires observing a loader, unit, stage
 ## Protect the Steam installation and profile
 
 - Read `AGENTS.md`, `docs/research/AGENT-HANDOFF.md`, and the current runtime notes in `README.md`. Before using reflected signatures, verify the complete identity tuple: game version, `Assembly-CSharp.dll` SHA-256, and MVID.
+- Before every live-game task, also read `docs/research/STEAM-RUNTIME-CONTROL.md`; it is the persistent runbook for the BepInEx MCP control path, profile handling, and cleanup.
 - Inspect the Steam/game process and deployment state first. Do not interfere with an already running game. Launch the game through Steam; do not start `RogueCommand.exe` directly.
 - Before changing the game folder, record the exact files and configuration that will be touched and their original hashes. Use a reversible test setup, keep the user's saves and Steam Cloud data intact, and restore temporary deployment changes after the run. Never use an unverified clone or copied profile as proof of a Steam-launched run.
 - If a BepInEx MCP bridge or runtime inspector is available, verify its connected target and use read-only observations first. Use at most one runtime inspector in a test profile and remove it during cleanup. Do not assume a tool is connected because its files are installed locally.
+- Prefer BepInEx MCP over Computer Use for controls exposed by the bridge. The bridge has operated in this project without the game window focused; do not request focus or invoke Computer Use solely to click a control when a bridge call can do it.
 
 ## Verify the behavior that the claim names
 
