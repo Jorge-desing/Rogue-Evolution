@@ -409,7 +409,7 @@ The extended authoring pipeline provides four production-grade optimization and 
 - **Automatic Asset Wiring**:
   - Selects the primary FBX when it contains animation clips, otherwise a valid `_LODs.fbx`, then `<Name>_Atlas.fbx`, the primary FBX, or the legacy asset path. A single-material atlas is not always the selected prefab source.
   - Configures TextureImporters (e.g. `TextureImporterType.NormalMap`).
-  - Uses `RogueCommand/VehiclePBR_VertexWear` when available and falls back to Standard; it configures material textures and emission keywords. Instancing is enabled only on the no-atlas material path and is not a batching guarantee.
+  - Requires `RogueCommand/VehiclePBR_VertexWear` for atlas materials and fails with an actionable error if that URP shader is unavailable; it does not fall back to Built-in Standard. It configures material textures and emission keywords. Instancing is enabled only on the no-atlas material path and is not a batching guarantee.
   - Converts `_COLLIDER` mesh renderers to box colliders and disables those renderers. If none were converted, it adds the compound `BoxCollider` bounds from `.gameplay.json` (translating Blender Z-up to Unity Y-up).
   - Reuses matching socket transforms found recursively in the FBX hierarchy; it creates a root-level fallback only when no matching socket exists.
   - Generates `LODGroup` with transition thresholds (0.50, 0.20, 0.05) if multi-level LOD meshes are present.

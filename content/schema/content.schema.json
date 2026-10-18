@@ -374,6 +374,11 @@
           "maxItems": 32,
           "items": { "$ref": "#/$defs/aiUnitEntry" }
         },
+        "productionBuildingEntries": {
+          "type": "array",
+          "maxItems": 32,
+          "items": { "$ref": "#/$defs/aiProductionBuildingEntry" }
+        },
         "modules": {
           "type": "array",
           "minItems": 1,
@@ -417,6 +422,17 @@
         "baseIndex": { "type": "integer", "minimum": 0, "maximum": 31 },
         "startingInAscensionLevel": { "type": "integer", "minimum": 0, "maximum": 19 },
         "countAtStart": { "type": "integer", "minimum": 1, "maximum": 8 },
+        "maxLiving": { "type": "integer", "minimum": 1, "maximum": 32 }
+      }
+    },
+    "aiProductionBuildingEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["unitId", "baseIndex", "startingInAscensionLevel", "maxLiving"],
+      "properties": {
+        "unitId": { "$ref": "#/$defs/namespacedId" },
+        "baseIndex": { "type": "integer", "minimum": 0, "maximum": 31 },
+        "startingInAscensionLevel": { "type": "integer", "minimum": 0, "maximum": 19 },
         "maxLiving": { "type": "integer", "minimum": 1, "maximum": 32 }
       }
     },

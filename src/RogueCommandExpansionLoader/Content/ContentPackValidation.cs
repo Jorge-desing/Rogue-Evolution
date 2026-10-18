@@ -94,6 +94,17 @@ namespace RogueCommandExpansionLoader.Content
                 }
             }
 
+            // Production-building deck entries name the produced unit so the dependency
+            // loads both its balance row and the factory row that the profile will add.
+            foreach (ContentAiProductionBuildingEntryDefinition entry in
+                profile.productionBuildingEntries ?? new ContentAiProductionBuildingEntryDefinition[0])
+            {
+                if (entry != null && String.Equals(entry.unitId, unitId, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
             return false;
         }
 
@@ -120,6 +131,7 @@ namespace RogueCommandExpansionLoader.Content
         public const int MaxNeededExperienceLevel = 10000;
         public const int MaxAiModulesPerProfile = 8;
         public const int MaxAiUnitEntriesPerProfile = 32;
+        public const int MaxAiProductionBuildingEntriesPerProfile = 32;
         public const int MaxAiUnitDependenciesPerProfile = 64;
         public const int MaxAiUnitCountAtStart = 8;
         public const int MaxAiUnitMaxLiving = 32;
@@ -443,17 +455,31 @@ namespace RogueCommandExpansionLoader.Content
 
                 ContentAiUnitEntryDefinition[] unitEntries = profile.unitEntries ??
                     new ContentAiUnitEntryDefinition[0];
+                ContentAiProductionBuildingEntryDefinition[] productionBuildingEntries =
+                    profile.productionBuildingEntries ?? new ContentAiProductionBuildingEntryDefinition[0];
                 if (unitEntries.Length > MaxAiUnitEntriesPerProfile)
                 {
                     Add(diagnostics, "ai-profile.unit-entries-limit", itemPath + ".unitEntries",
                         "An AI profile can add at most " + MaxAiUnitEntriesPerProfile + " unit entries.");
                 }
 
-                if (unitEntries.Length > 0 && (!hasNativeTemplate || !profile.scopeToReferencedStages))
+                if (productionBuildingEntries.Length > MaxAiProductionBuildingEntriesPerProfile)
                 {
+                    Add(diagnostics, "ai-profile.production-building-entries-limit",
+                        itemPath + ".productionBuildingEntries",
+                        "An AI profile can add at most " + MaxAiProductionBuildingEntriesPerProfile +
+                        " production-building entries.");
+                }
+
+                if ((unitEntries.Length > 0 || productionBuildingEntries.Length > 0) &&
+                    (!hasNativeTemplate || !profile.scopeToReferencedStages))
+                {
+                    string extensionPath = unitEntries.Length > 0
+                        ? itemPath + ".unitEntries"
+                        : itemPath + ".productionBuildingEntries";
                     Add(diagnostics, "ai-profile.unit-entries-require-scoped-native",
-                        itemPath + ".unitEntries",
-                        "AI unit entries can only extend an isolated, stage-scoped native-template profile.");
+                        extensionPath,
+                        "AI unit and production-building entries can only extend an isolated, stage-scoped native-template profile.");
                 }
 
                 var referencedAiUnits = new List<string>(unitEntries.Length);
@@ -498,6 +524,56 @@ namespace RogueCommandExpansionLoader.Content
 
                 ValidateReferences(referencedAiUnits.ToArray(), itemPath + ".unitEntries",
                     unitIds, registrySnapshot, true, diagnostics);
+
+                var referencedProductionProducts = new List<string>(productionBuildingEntries.Length);
+                var productionBuildingEntryKeys = new HashSet<string>(StringComparer.Ordinal);
+                for (int buildingIndex = 0; buildingIndex < productionBuildingEntries.Length; buildingIndex++)
+                {
+                    ContentAiProductionBuildingEntryDefinition entry = productionBuildingEntries[buildingIndex];
+                    string entryPath = itemPath + ".productionBuildingEntries[" + buildingIndex + "]";
+                    if (entry == null)
+                    {
+                        Add(diagnostics, "entry.null", entryPath,
+                            "AI production-building entries cannot be null.");
+                        continue;
+                    }
+
+                    referencedProductionProducts.Add(entry.unitId);
+                    if (entry.baseIndex < 0 || entry.baseIndex > MaxAiBaseIndex)
+                    {
+                        Add(diagnostics, "ai-production-building-entry.base-index-invalid",
+                            entryPath + ".baseIndex",
+                            "AI base indices must be between 0 and " + MaxAiBaseIndex + ".");
+                    }
+
+                    if (entry.startingInAscensionLevel < 0 ||
+                        entry.startingInAscensionLevel > MaxAiUnitStartingAscensionLevel)
+                    {
+                        Add(diagnostics, "ai-production-building-entry.ascension-invalid",
+                            entryPath + ".startingInAscensionLevel",
+                            "Starting ascension must be between 0 and " + MaxAiUnitStartingAscensionLevel + ".");
+                    }
+
+                    if (entry.maxLiving < 1 || entry.maxLiving > MaxAiUnitMaxLiving)
+                    {
+                        Add(diagnostics, "ai-production-building-entry.max-living-invalid",
+                            entryPath + ".maxLiving",
+                            "maxLiving must be between 1 and " + MaxAiUnitMaxLiving + ".");
+                    }
+
+                    if (!String.IsNullOrWhiteSpace(entry.unitId))
+                    {
+                        string key = entry.baseIndex.ToString(CultureInfo.InvariantCulture) + "\0" + entry.unitId;
+                        if (!productionBuildingEntryKeys.Add(key))
+                        {
+                            Add(diagnostics, "reference.duplicate", entryPath + ".unitId",
+                                "A production building can only be added once per AI base.");
+                        }
+                    }
+                }
+
+                ValidateReferences(referencedProductionProducts.ToArray(),
+                    itemPath + ".productionBuildingEntries", unitIds, registrySnapshot, true, diagnostics);
 
                 var modules = RequireArray(profile.modules, itemPath + ".modules", diagnostics);
                 if (modules.Length == 0)

@@ -6,6 +6,7 @@ namespace RogueCommandExpansionLoader.Content
     internal struct ProductionBuildingEligibility
     {
         public bool IsAllowedAsStartingBlueprint { get; private set; }
+        public bool IsAllowedForAi { get; private set; }
         public bool IsAllowedForDemo { get; private set; }
 
         public static ProductionBuildingEligibility FromProduct(ContentUnitDefinition product)
@@ -18,6 +19,7 @@ namespace RogueCommandExpansionLoader.Content
             return new ProductionBuildingEligibility
             {
                 IsAllowedAsStartingBlueprint = product.isAllowedAsStartingBlueprint,
+                IsAllowedForAi = product.isAllowedForAi,
                 IsAllowedForDemo = product.isAllowedForDemo
             };
         }
@@ -26,6 +28,7 @@ namespace RogueCommandExpansionLoader.Content
             ContentUnitDefinition product,
             object factoryRow,
             FieldInfo allowedAsStartingBlueprintField,
+            FieldInfo allowedForAiField,
             FieldInfo allowedForDemoField)
         {
             if (factoryRow == null)
@@ -38,6 +41,11 @@ namespace RogueCommandExpansionLoader.Content
                 throw new ArgumentNullException("allowedAsStartingBlueprintField");
             }
 
+            if (allowedForAiField == null)
+            {
+                throw new ArgumentNullException("allowedForAiField");
+            }
+
             if (allowedForDemoField == null)
             {
                 throw new ArgumentNullException("allowedForDemoField");
@@ -45,6 +53,7 @@ namespace RogueCommandExpansionLoader.Content
 
             ProductionBuildingEligibility eligibility = FromProduct(product);
             allowedAsStartingBlueprintField.SetValue(factoryRow, eligibility.IsAllowedAsStartingBlueprint);
+            allowedForAiField.SetValue(factoryRow, eligibility.IsAllowedForAi);
             allowedForDemoField.SetValue(factoryRow, eligibility.IsAllowedForDemo);
         }
     }

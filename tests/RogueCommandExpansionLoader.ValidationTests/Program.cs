@@ -684,26 +684,38 @@ var tests = new (string Name, Action Run)[]
     {
         var factoryRow = new ProductionBuildingEligibilityTestRow();
         ProductionBuildingEligibility.ApplyToFactoryRow(
-            new ContentUnitDefinition { isAllowedAsStartingBlueprint = true, isAllowedForDemo = false },
+            new ContentUnitDefinition
+            {
+                isAllowedAsStartingBlueprint = true,
+                isAllowedForAi = true,
+                isAllowedForDemo = false
+            },
             factoryRow,
             typeof(ProductionBuildingEligibilityTestRow).GetField(nameof(factoryRow.isAllowedAsStartingBlueprint))!,
+            typeof(ProductionBuildingEligibilityTestRow).GetField(nameof(factoryRow.isAllowedForAi))!,
             typeof(ProductionBuildingEligibilityTestRow).GetField(nameof(factoryRow.isAllowedForDemo))!);
 
         if (!factoryRow.isAllowedAsStartingBlueprint || factoryRow.isAllowedForDemo ||
-            factoryRow.isAllowedAsBlueprint)
+            factoryRow.isAllowedAsBlueprint || !factoryRow.isAllowedForAi)
         {
             throw new InvalidOperationException(
-                "A production building must inherit the product's start-deck and demo eligibility without becoming a regular blueprint by itself.");
+                "A production building must inherit the product's AI, start-deck, and demo eligibility without becoming a regular blueprint by itself.");
         }
 
         factoryRow = new ProductionBuildingEligibilityTestRow();
         ProductionBuildingEligibility.ApplyToFactoryRow(
-            new ContentUnitDefinition { isAllowedAsStartingBlueprint = false, isAllowedForDemo = true },
+            new ContentUnitDefinition
+            {
+                isAllowedAsStartingBlueprint = false,
+                isAllowedForAi = false,
+                isAllowedForDemo = true
+            },
             factoryRow,
             typeof(ProductionBuildingEligibilityTestRow).GetField(nameof(factoryRow.isAllowedAsStartingBlueprint))!,
+            typeof(ProductionBuildingEligibilityTestRow).GetField(nameof(factoryRow.isAllowedForAi))!,
             typeof(ProductionBuildingEligibilityTestRow).GetField(nameof(factoryRow.isAllowedForDemo))!);
-        if (factoryRow.isAllowedAsStartingBlueprint || !factoryRow.isAllowedForDemo)
-            throw new InvalidOperationException("Demo and starting-deck permissions were not copied independently.");
+        if (factoryRow.isAllowedAsStartingBlueprint || factoryRow.isAllowedForAi || !factoryRow.isAllowedForDemo)
+            throw new InvalidOperationException("Factory AI, demo, and starting-deck permissions were not copied independently.");
     }),
     ("unit production buildings are mandatory and cannot share entity IDs", () =>
     {
@@ -909,13 +921,19 @@ var tests = new (string Name, Action Run)[]
             profile.unitEntries == null || !profile.unitEntries.Any(entry =>
                 entry != null && entry.unitId == "sample-native:skirmish-bike" && entry.baseIndex == 0 &&
                 entry.countAtStart == 1 && entry.maxLiving == 1) ||
+            profile.productionBuildingEntries == null || !profile.productionBuildingEntries.Any(entry =>
+                entry != null && entry.unitId == "sample-native:skirmish-bike" && entry.baseIndex == 0 &&
+                entry.startingInAscensionLevel == 0 && entry.maxLiving == 1) ||
             profile.modules == null || !profile.modules.Any(module =>
                 module != null && module.moduleId == "sample:reactive-base-defense" && module.parameters != null &&
                 module.parameters.Any(parameter => parameter != null && parameter.name == "unitId" &&
                     parameter.value == "sample-native:skirmish-bike")) ||
+            !profile.modules.Any(module => module != null && module.moduleId == "sample:scheduled-base-build" &&
+                module.parameters != null && module.parameters.Any(parameter => parameter != null &&
+                    parameter.name == "entityId" && parameter.value == "sample-native:skirmish-bike-factory")) ||
             stage.aiProfileIds == null || !stage.aiProfileIds.Contains("sample-reactive-ai:base-defense"))
         {
-            throw new InvalidOperationException("The counterstrike stage does not add the bike to its player and AI rosters.");
+            throw new InvalidOperationException("The counterstrike profile does not add the bike and its buildable factory to the AI deck.");
         }
 
         WithPackage(reactiveAiSample, (pack, root) =>
@@ -942,6 +960,12 @@ var tests = new (string Name, Action Run)[]
             ContentPackValidator.DeclaresAiUnitDependency(null!, "sample-native:skirmish-bike"))
         {
             throw new InvalidOperationException("AI deck validation lost the explicit unitEntries dependency or admitted an undeclared ID.");
+        }
+
+        if (!ContentPackValidator.DeclaresAiUnitDependency(profile, "sample-native:skirmish-bike") ||
+            ContentPackValidator.DeclaresAiUnitDependency(profile, "sample-native:skirmish-bike-factory"))
+        {
+            throw new InvalidOperationException("Production-building deck entries must declare their product unit dependency, not a raw factory ID.");
         }
 
         var customProfile = new ContentAiProfileDefinition { unitDependencies = ["foreign:unit"] };
@@ -979,6 +1003,19 @@ var tests = new (string Name, Action Run)[]
             clone.aiProfiles[0].unitDependencies[0] != "foreign:unit")
         {
             throw new InvalidOperationException("Deep cloning an AI profile did not preserve an independent dependency array.");
+        }
+    }),
+    ("content pack deep clone preserves independent AI production-building entries", () =>
+    {
+        ContentPackDefinition source = Clone(reactiveAiSample);
+        ContentPackDefinition clone = ContentPackCopy.DeepClone(source);
+        source.aiProfiles[0].productionBuildingEntries[0].maxLiving = 7;
+        if (clone.aiProfiles[0].productionBuildingEntries == null ||
+            clone.aiProfiles[0].productionBuildingEntries.Length != 1 ||
+            clone.aiProfiles[0].productionBuildingEntries[0].unitId != "sample-native:skirmish-bike" ||
+            clone.aiProfiles[0].productionBuildingEntries[0].maxLiving != 1)
+        {
+            throw new InvalidOperationException("AI production-building configuration was not cloned independently.");
         }
     }),
     ("stage-scoped native AI samples use unique reserved resource aliases", () =>
@@ -1311,6 +1348,116 @@ var tests = new (string Name, Action Run)[]
 
             ExpectValid(pack, root, new EmptySnapshot(), new KnownModuleValidator());
         });
+    }),
+    ("scoped native AI can add a product factory to a base in the same pack", () =>
+    {
+        WithPackage(sample, (pack, root) =>
+        {
+            ContentAiProfileDefinition profile = pack.aiProfiles[0];
+            profile.assetBundleId = null;
+            profile.prefabAssetName = null;
+            profile.nativeTemplateId = "_01_ Quick Hunter Enemy Var";
+            profile.scopeToReferencedStages = true;
+            profile.productionBuildingEntries =
+            [
+                new ContentAiProductionBuildingEntryDefinition
+                {
+                    unitId = pack.units[0].id,
+                    baseIndex = 0,
+                    startingInAscensionLevel = 0,
+                    maxLiving = 1
+                }
+            ];
+
+            ExpectValid(pack, root, new EmptySnapshot(), new KnownModuleValidator());
+        });
+    }),
+    ("AI production-building entries require a scoped native clone and report their path", () =>
+    {
+        WithPackage(sample, (pack, root) =>
+        {
+            ContentAiProfileDefinition profile = pack.aiProfiles[0];
+            profile.productionBuildingEntries =
+            [
+                new ContentAiProductionBuildingEntryDefinition
+                {
+                    unitId = pack.units[0].id,
+                    baseIndex = 0,
+                    startingInAscensionLevel = 0,
+                    maxLiving = 1
+                }
+            ];
+
+            ContentPackValidationResult result = ContentPackValidator.Validate(
+                pack, root, new EmptySnapshot(), new KnownModuleValidator());
+            ContentDiagnostic diagnostic = result.Diagnostics.Single(item =>
+                item.Code == "ai-profile.unit-entries-require-scoped-native");
+            if (!diagnostic.Path.EndsWith(".productionBuildingEntries", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    "A factory-only scope error did not point to productionBuildingEntries.");
+            }
+        });
+    }),
+    ("AI production-building entries validate max living and reject duplicates per base", () =>
+    {
+        WithPackage(sample, (pack, root) =>
+        {
+            ContentAiProfileDefinition profile = pack.aiProfiles[0];
+            profile.assetBundleId = null;
+            profile.prefabAssetName = null;
+            profile.nativeTemplateId = "_01_ Quick Hunter Enemy Var";
+            profile.scopeToReferencedStages = true;
+            profile.productionBuildingEntries =
+            [
+                new ContentAiProductionBuildingEntryDefinition
+                {
+                    unitId = pack.units[0].id,
+                    baseIndex = 0,
+                    startingInAscensionLevel = 0,
+                    maxLiving = 0
+                },
+                new ContentAiProductionBuildingEntryDefinition
+                {
+                    unitId = pack.units[0].id,
+                    baseIndex = 0,
+                    startingInAscensionLevel = 0,
+                    maxLiving = 1
+                }
+            ];
+
+            ContentPackValidationResult result = ContentPackValidator.Validate(
+                pack, root, new EmptySnapshot(), new KnownModuleValidator());
+            if (!result.Diagnostics.Any(item => item.Code == "ai-production-building-entry.max-living-invalid") ||
+                !result.Diagnostics.Any(item => item.Code == "reference.duplicate"))
+            {
+                throw new InvalidOperationException(
+                    "Invalid production-building maxLiving or a duplicate base entry was not rejected.");
+            }
+        });
+    }),
+    ("AI production-building product IDs establish declared unit dependencies", () =>
+    {
+        ContentAiProfileDefinition profile = new ContentAiProfileDefinition
+        {
+            productionBuildingEntries =
+            [
+                new ContentAiProductionBuildingEntryDefinition
+                {
+                    unitId = "foreign:bike",
+                    baseIndex = 0,
+                    startingInAscensionLevel = 0,
+                    maxLiving = 1
+                }
+            ]
+        };
+
+        if (!ContentPackValidator.DeclaresAiUnitDependency(profile, "foreign:bike") ||
+            ContentPackValidator.DeclaresAiUnitDependency(profile, "foreign:bike-factory"))
+        {
+            throw new InvalidOperationException(
+                "The product unit ID must establish the dependency; its derived factory ID must not.");
+        }
     }),
     ("AI unit entries reject custom prefabs that are not isolated clones", () =>
     {
@@ -3146,5 +3293,6 @@ sealed class ProductionBuildingEligibilityTestRow
 {
     public bool isAllowedAsBlueprint = false;
     public bool isAllowedAsStartingBlueprint = false;
+    public bool isAllowedForAi = false;
     public bool isAllowedForDemo = false;
 }

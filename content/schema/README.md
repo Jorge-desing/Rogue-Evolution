@@ -28,6 +28,8 @@ Run `.venv\Scripts\python.exe tools/validate_native_visual_roots.py content/pack
 
 An AI profile may optionally declare `unitEntries` to append namespaced units to one `AiBase` in an isolated, stage-scoped native profile. Each entry selects the `aiBases` index, the starting ascension level, the number of units spawned at base setup, and the native `maxLiving` value. The referenced unit must be declared by this pack or another loaded/declared pack; the loader resolves that dependency before loading the profile. Custom AI prefabs and unscoped templates cannot use `unitEntries`, so the native AI template remains unchanged. `unitEntries` may be omitted when unused; sample manifests include an empty array for clarity.
 
+An AI profile may also declare `productionBuildingEntries` to add each referenced product unit's factory to one base in the same isolated, stage-scoped native profile. Each entry names the product in `unitId` and sets `baseIndex`, `startingInAscensionLevel`, and `maxLiving`; the loader resolves the product's registered `productionBuilding.id` and adds that factory to the AI deck with a starting count of zero. The product must set `isAllowedForAi: true`. A compiled module such as `sample:scheduled-base-build` can then target the factory ID in its `entityId` parameter. Cross-pack product references establish load order automatically. Custom AI prefabs and unscoped templates cannot use this field. Static inspection confirms the native deck uses `countPerStage` and exposes starting and maximum counts; construction of a mod factory in a Steam-launched match still requires runtime confirmation.
+
 Custom AI prefabs may optionally declare `unitDependencies` for namespaced units referenced by serialized `AiBase.entitiesInAiDeck` entries. Cross-pack IDs must be declared here so the loader loads the owning unit pack first, independent of pack-directory order. Native game IDs and units declared in the same pack need no dependency entry. The loader rejects a custom prefab whose external deck IDs omit this declaration, even if another pack happened to load first. Dependencies are references only; they do not replace or edit native AI templates.
 
 Static REA inspection of the pinned 1.0.9 assembly found that `AiBehaviour.BuildBaseStartSetup` creates each eligible `EntityInAiDeck` entry at its AI base. Non-building entries flow through `EntityFactory.InstantiateEntity` with the AI tag and receive the base index, so a mod unit added to the isolated profile can join that AI's starting roster. A Steam-launched diagnostic run on 2026-10-17 confirmed stage-map generation, attachment of the scoped sample profile, and a Skirmish Bike in AI base 0's roster. That run used a forced stage setup; it did not verify ordinary roguelike progression, the exact creation path for the observed unit, or a reactive counterattack. Treat the rest as unverified runtime behavior and see `docs/research/AGENT-HANDOFF.md` for the test boundary and next procedure.
@@ -57,6 +59,7 @@ Landscape `localizations` use the same supported language IDs and require an `en
       "nativeTemplateId": "PCXBaseTank",
       "assetBundleId": "example:assets",
       "cardImageAssetName": "assets/example/scouttankcard.png",
+      "isAllowedForAi": true,
       "localizations": [
         { "language": "en-US", "name": "Sandlance Scout", "description": "A fast reconnaissance tank." },
         { "language": "es-XL", "name": "Explorador Sandlance", "description": "Un tanque rápido de reconocimiento." }
@@ -65,7 +68,17 @@ Landscape `localizations` use the same supported language IDs and require an `en
         { "name": "cost", "value": "70" },
         { "name": "maxHealth", "value": "130" },
         { "name": "moveSpeed", "value": "1.1" }
-      ]
+      ],
+      "productionBuilding": {
+        "id": "example:scout-tank-factory",
+        "nativeTemplateId": "PCXBaseTankFactory",
+        "balanceOverrides": [
+          { "name": "cost", "value": "500" }
+        ],
+        "localizations": [
+          { "language": "en-US", "name": "Scout Assembly Plant" }
+        ]
+      }
     }
   ],
   "stages": [
@@ -87,10 +100,29 @@ Landscape `localizations` use the same supported language IDs and require an `en
       "id": "example:guard-ai",
       "nativeTemplateId": "_01_ Quick Hunter Enemy Var",
       "scopeToReferencedStages": true,
+      "unitEntries": [
+        {
+          "unitId": "example:scout-tank",
+          "baseIndex": 0,
+          "startingInAscensionLevel": 0,
+          "countAtStart": 1,
+          "maxLiving": 2
+        }
+      ],
+      "productionBuildingEntries": [
+        {
+          "unitId": "example:scout-tank",
+          "baseIndex": 0,
+          "startingInAscensionLevel": 0,
+          "maxLiving": 1
+        }
+      ],
       "modules": [
         {
           "moduleId": "sample:scheduled-base-build",
           "parameters": [
+            { "name": "entityId", "value": "example:scout-tank-factory" },
+            { "name": "baseIndex", "value": "0" },
             { "name": "intervalSeconds", "value": "8" },
             { "name": "maxSuccessfulBuilds", "value": "1" },
             { "name": "maxAttempts", "value": "3" }

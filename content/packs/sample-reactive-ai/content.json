@@ -38,7 +38,25 @@
           "maxLiving": 1
         }
       ],
+      "productionBuildingEntries": [
+        {
+          "unitId": "sample-native:skirmish-bike",
+          "baseIndex": 0,
+          "startingInAscensionLevel": 0,
+          "maxLiving": 1
+        }
+      ],
       "modules": [
+        {
+          "moduleId": "sample:scheduled-base-build",
+          "parameters": [
+            { "name": "entityId", "value": "sample-native:skirmish-bike-factory" },
+            { "name": "baseIndex", "value": "0" },
+            { "name": "intervalSeconds", "value": "8" },
+            { "name": "maxSuccessfulBuilds", "value": "1" },
+            { "name": "maxAttempts", "value": "3" }
+          ]
+        },
         {
           "moduleId": "sample:reactive-base-defense",
           "parameters": [

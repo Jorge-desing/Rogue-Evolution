@@ -119,6 +119,7 @@ namespace RogueCommandExpansionLoader.Content
         public bool scopeToReferencedStages;
         public string[] unitDependencies;
         public ContentAiUnitEntryDefinition[] unitEntries;
+        public ContentAiProductionBuildingEntryDefinition[] productionBuildingEntries;
         public ContentAiModuleDefinition[] modules;
     }
 
@@ -129,6 +130,15 @@ namespace RogueCommandExpansionLoader.Content
         public int baseIndex;
         public int startingInAscensionLevel;
         public int countAtStart;
+        public int maxLiving;
+    }
+
+    [Serializable]
+    public sealed class ContentAiProductionBuildingEntryDefinition
+    {
+        public string unitId;
+        public int baseIndex;
+        public int startingInAscensionLevel;
         public int maxLiving;
     }
 
@@ -301,6 +311,8 @@ namespace RogueCommandExpansionLoader.Content
                     ? null
                     : (string[])source.unitDependencies.Clone(),
                 unitEntries = CloneArray(source.unitEntries, CloneAiUnitEntry),
+                productionBuildingEntries = CloneArray(source.productionBuildingEntries,
+                    CloneAiProductionBuildingEntry),
                 modules = CloneArray(source.modules, CloneAiModule)
             };
         }
@@ -313,6 +325,18 @@ namespace RogueCommandExpansionLoader.Content
                 baseIndex = source.baseIndex,
                 startingInAscensionLevel = source.startingInAscensionLevel,
                 countAtStart = source.countAtStart,
+                maxLiving = source.maxLiving
+            };
+        }
+
+        private static ContentAiProductionBuildingEntryDefinition CloneAiProductionBuildingEntry(
+            ContentAiProductionBuildingEntryDefinition source)
+        {
+            return source == null ? null : new ContentAiProductionBuildingEntryDefinition
+            {
+                unitId = source.unitId,
+                baseIndex = source.baseIndex,
+                startingInAscensionLevel = source.startingInAscensionLevel,
                 maxLiving = source.maxLiving
             };
         }

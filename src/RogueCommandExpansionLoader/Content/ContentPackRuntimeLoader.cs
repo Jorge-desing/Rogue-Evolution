@@ -2269,6 +2269,24 @@ namespace RogueCommandExpansionLoader.Content
                         candidate.Dependencies.Add(owner);
                     }
                 }
+
+                ContentAiProductionBuildingEntryDefinition[] buildingEntries =
+                    profile.productionBuildingEntries ?? new ContentAiProductionBuildingEntryDefinition[0];
+                for (int j = 0; j < buildingEntries.Length; j++)
+                {
+                    ContentAiProductionBuildingEntryDefinition buildingEntry = buildingEntries[j];
+                    if (buildingEntry == null || String.IsNullOrWhiteSpace(buildingEntry.unitId))
+                    {
+                        continue;
+                    }
+
+                    PackCandidate owner;
+                    if (unitOwners.TryGetValue(buildingEntry.unitId, out owner) &&
+                        !System.Object.ReferenceEquals(owner, candidate))
+                    {
+                        candidate.Dependencies.Add(owner);
+                    }
+                }
             }
         }
 
@@ -2777,6 +2795,7 @@ namespace RogueCommandExpansionLoader.Content
                     }
 
                     AppendAiUnitEntries(profile, aiBases, temporaryUnits, packageName);
+                    AppendAiProductionBuildingEntries(profile, aiBases, temporaryUnits, packageName);
 
                     int totalDeckEntries = 0;
                     for (int baseIndex = 0; baseIndex < aiBases.Count; baseIndex++)
@@ -2813,11 +2832,12 @@ namespace RogueCommandExpansionLoader.Content
                             }
 
                             if (!IsDeckEntityNativeOrPackLocal(deckEntityId, temporaryUnits) &&
-                                !ContentPackValidator.DeclaresAiUnitDependency(profile, deckEntityId))
+                                !DeclaresAiDeckEntityDependency(profile, deckEntityId, temporaryUnits))
                             {
                                 throw new InvalidDataException("Perfil AI " + profile.id +
                                     ": la unidad de deck externa '" + deckEntityId +
-                                    "' debe declararse en unitDependencies o unitEntries para fijar su orden de carga.");
+                                    "' debe declararse en unitDependencies, unitEntries o " +
+                                    "productionBuildingEntries para fijar su orden de carga.");
                             }
 
                             if (!IsDeckEntityAvailable(deckEntityId, temporaryUnits))
@@ -3623,7 +3643,7 @@ namespace RogueCommandExpansionLoader.Content
             _inactiveField.SetValue(row, false);
             _allowedBlueprintField.SetValue(row, false);
             ProductionBuildingEligibility.ApplyToFactoryRow(product, row,
-                _allowedStartingBlueprintField, _allowedForDemoField);
+                _allowedStartingBlueprintField, _allowedForAiField, _allowedForDemoField);
             _factoryForEntityIdField.SetValue(row, CreateNullableString(product.id));
             temporaryResources.Add(prefabKey, nativePrefabClone);
 
@@ -4342,6 +4362,156 @@ namespace RogueCommandExpansionLoader.Content
                 _aiDeckEntryCountPerStageField.SetValue(newEntry, countPerStage);
                 deckEntries.Add(newEntry);
             }
+        }
+
+        private void AppendAiProductionBuildingEntries(
+            ContentAiProfileDefinition profile,
+            IList aiBases,
+            List<LoadedUnit> temporaryUnits,
+            string packageName)
+        {
+            ContentAiProductionBuildingEntryDefinition[] entries = profile.productionBuildingEntries ??
+                new ContentAiProductionBuildingEntryDefinition[0];
+            if (entries.Length == 0)
+            {
+                return;
+            }
+
+            if (String.IsNullOrWhiteSpace(profile.nativeTemplateId) || !profile.scopeToReferencedStages)
+            {
+                throw new InvalidDataException("Perfil AI " + profile.id + " en '" + packageName +
+                    "': las fábricas requieren un clon nativo aislado y limitado a sus etapas.");
+            }
+
+            for (int i = 0; i < entries.Length; i++)
+            {
+                ContentAiProductionBuildingEntryDefinition definition = entries[i];
+                if (definition == null || String.IsNullOrWhiteSpace(definition.unitId))
+                {
+                    throw new InvalidDataException("Perfil AI " + profile.id + " en '" + packageName +
+                        "': la entrada de fábrica " + i + " está vacía.");
+                }
+
+                LoadedUnit product;
+                if (!TryGetLoadedUnit(definition.unitId, temporaryUnits, out product) ||
+                    product.IsProductionBuilding || String.IsNullOrWhiteSpace(product.ProductionFactoryId))
+                {
+                    throw new InvalidDataException("Perfil AI " + profile.id + " en '" + packageName +
+                        "': la unidad " + definition.unitId + " no tiene una fábrica de producción cargada.");
+                }
+
+                if (!product.Definition.isAllowedForAi)
+                {
+                    throw new InvalidDataException("Perfil AI " + profile.id + " en '" + packageName +
+                        "': la unidad " + definition.unitId + " no tiene isAllowedForAi habilitado.");
+                }
+
+                LoadedUnit factory;
+                if (!TryGetLoadedUnit(product.ProductionFactoryId, temporaryUnits, out factory) ||
+                    !factory.IsProductionBuilding || !(bool)_allowedForAiField.GetValue(factory.BalanceRow))
+                {
+                    throw new InvalidDataException("Perfil AI " + profile.id + " en '" + packageName +
+                        "': la fábrica " + product.ProductionFactoryId + " no está habilitada para AI.");
+                }
+
+                if (definition.baseIndex < 0 || definition.baseIndex >= aiBases.Count)
+                {
+                    throw new InvalidDataException("Perfil AI " + profile.id + " en '" + packageName +
+                        "': baseIndex " + definition.baseIndex + " no existe en la plantilla nativa.");
+                }
+
+                if (definition.startingInAscensionLevel < 0 ||
+                    definition.startingInAscensionLevel > ContentPackValidator.MaxAiUnitStartingAscensionLevel ||
+                    definition.maxLiving < 1 ||
+                    definition.maxLiving > ContentPackValidator.MaxAiUnitMaxLiving)
+                {
+                    throw new InvalidDataException("Perfil AI " + profile.id + " en '" + packageName +
+                        "': la configuración de cantidad o ascensión de la fábrica " +
+                        product.ProductionFactoryId + " no es válida.");
+                }
+
+                object aiBase = aiBases[definition.baseIndex];
+                if (aiBase == null || aiBase.GetType() != _aiBaseType)
+                {
+                    throw new InvalidDataException("Perfil AI " + profile.id + " en '" + packageName +
+                        "': la base " + definition.baseIndex + " tiene un tipo inesperado.");
+                }
+
+                IList deckEntries = _aiBaseEntitiesInDeckField.GetValue(aiBase) as IList;
+                if (deckEntries == null)
+                {
+                    throw new InvalidDataException("Perfil AI " + profile.id + " en '" + packageName +
+                        "': entitiesInAiDeck es nulo en la base " + definition.baseIndex + ".");
+                }
+
+                for (int deckIndex = 0; deckIndex < deckEntries.Count; deckIndex++)
+                {
+                    object current = deckEntries[deckIndex];
+                    if (current == null || current.GetType() != _aiDeckEntryType)
+                    {
+                        throw new InvalidDataException("Perfil AI " + profile.id + " en '" + packageName +
+                            "': una entrada nativa de entitiesInAiDeck tiene un tipo inesperado.");
+                    }
+
+                    string existingId = _aiDeckEntryEntityIdField.GetValue(current) as string;
+                    if (String.Equals(existingId, product.ProductionFactoryId, StringComparison.Ordinal))
+                    {
+                        throw new InvalidDataException("Perfil AI " + profile.id + " en '" + packageName +
+                            "': la fábrica " + product.ProductionFactoryId + " ya aparece en el deck de la base " +
+                            definition.baseIndex + ".");
+                    }
+                }
+
+                object newEntry = Activator.CreateInstance(_aiDeckEntryType);
+                _aiDeckEntryEntityIdField.SetValue(newEntry, product.ProductionFactoryId);
+                _aiDeckEntryStartingInAscensionLevelField.SetValue(
+                    newEntry, definition.startingInAscensionLevel);
+
+                object countPerStage = Activator.CreateInstance(_aiDeckEntryCountPerStageField.FieldType);
+                IList counts = countPerStage as IList;
+                if (counts == null)
+                {
+                    throw new InvalidDataException("Perfil AI " + profile.id + " en '" + packageName +
+                        "': no se pudo crear la lista countPerStage de EntityInAiDeck.");
+                }
+
+                // The native build helper sees the factory as constructable, but base setup does not
+                // start one for free. The scheduled module can build it when the profile requests it.
+                counts.Add(new Vector2Int(0, definition.maxLiving));
+                _aiDeckEntryCountPerStageField.SetValue(newEntry, countPerStage);
+                deckEntries.Add(newEntry);
+            }
+        }
+
+        private bool DeclaresAiDeckEntityDependency(
+            ContentAiProfileDefinition profile,
+            string deckEntityId,
+            List<LoadedUnit> temporaryUnits)
+        {
+            if (ContentPackValidator.DeclaresAiUnitDependency(profile, deckEntityId))
+            {
+                return true;
+            }
+
+            foreach (ContentAiProductionBuildingEntryDefinition entry in
+                profile.productionBuildingEntries ?? new ContentAiProductionBuildingEntryDefinition[0])
+            {
+                if (entry == null || String.IsNullOrWhiteSpace(entry.unitId))
+                {
+                    continue;
+                }
+
+                LoadedUnit product;
+                if (TryGetLoadedUnit(entry.unitId, temporaryUnits, out product) &&
+                    !product.IsProductionBuilding &&
+                    String.Equals(product.ProductionFactoryId, deckEntityId, StringComparison.Ordinal) &&
+                    ContentPackValidator.DeclaresAiUnitDependency(profile, entry.unitId))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private bool IsProductUnitAvailable(string entityId, List<LoadedUnit> temporaryUnits)
