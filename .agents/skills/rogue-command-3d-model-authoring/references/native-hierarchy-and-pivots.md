@@ -126,3 +126,31 @@ Before finalizing any model, verify dimensions against the template bounds:
 2. **Width Bounds**: Does the vehicle width fit within the template's `BoxCollider` width?
 3. **Length Bounds**: Does the vehicle front/rear stay within the template's collision extents?
 4. **Camera Scale Test**: Zoom the Blender viewport to orthographic view (`Numpad 5` + `Numpad 7`). Does the model look proportional alongside neighboring units?
+
+---
+
+## 4. Canonical Sockets & Runtime Visual Director Integration
+
+Models authored for Rogue Command hook into autonomous gameplay visuals via canonical empty transforms (`Socket_*`) discovered at runtime by `RuntimeVisualDirector`:
+
+### A. Canonical Socket Catalog
+
+| Canonical Socket Name | Intended Transform Location | Runtime Visual Director Behavior |
+| :--- | :--- | :--- |
+| `Socket_TurretPivot` / `Socket_TurretYaw` | Turret ring rotation center | Procedural azimuth tracking toward hostile target (`IsEnemy == true`) at 120°/s; jams with $+4.5^\circ$ tilt at $\le 25\%$ HP |
+| `Socket_TurretPitch` | Weapon trunnion elevation pivot | Pitch elevation toward target elevation |
+| `Socket_RecoilPrimary` | Base of main gun barrel | Rapid 0.22m backward recoil kick on shot, smoothed with spring-damper recovery |
+| `Socket_MuzzlePrimary` | Tip of main gun barrel | 0.07s emissive muzzle star-spike flash on shot |
+| `Socket_DamageSmoke` | Engine deck / exhaust grilles | Volumetric smoke particle emission at $\le 50\%$ HP |
+| `Socket_DamageFire` | Engine deck / damaged hull | Flame particle emission + dynamic point light at $\le 25\%$ HP |
+| `Socket_RadarMast` / `Socket_RadarDish` | Command mast / radar collar | Continuous rotation at true **30 RPM** ($180^\circ/\text{s}$) during match uptime |
+| `Socket_Deploy_Unit` / `Socket_DeployRamp` | Factory rollout portal / bay door | Vertical sliding door opening during active unit production (`InProductionCount > 0`) |
+| `Socket_Hardpoint_ERA` | Glacis / turret cheek mounts | Mounts modular ERA armor tiles; detonates on heavy impact ($\le 75\%$ HP) |
+| `Socket_Hardpoint_APS` | Turret roof countermeasure pods | Mounts active protection mortars; burns out at $\le 25\%$ HP |
+| `Socket_Hardpoint_Sponsons` | Flank sponson weapon mounts | Mounts auxiliary weapon sponsons |
+| `Socket_Hardpoint_FuelDrums` | Rear chassis hull brackets | Mounts auxiliary fuel drums; jettisons at $\le 50\%$ HP |
+
+### B. Targeting Hostility Invariant
+
+Turret tracking in `RuntimeVisualDirector` explicitly queries `EntityController.IsEnemy(EntityController)` (token `0x06000844`). Sockets will never orient toward friendly allies, neutral terrain, or friendly waypoints.
+

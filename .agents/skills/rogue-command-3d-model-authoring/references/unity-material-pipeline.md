@@ -131,3 +131,48 @@ Each playable unit requires a matching card Sprite referenced by `cardImageAsset
    - **Border Frame**: 1-pixel inner border with team accent corner cuts.
    - **Vehicle Silhouette**: Angled profile of the unit matching the exact colors of the 3D model.
    - **High-Contrast Focal Highlight**: Bright emissive optic dot or weapon muzzle glint to draw the player's eye in the card draft interface.
+
+---
+
+## 6. PBR Texture Atlas Pipeline & Linear Importer Rules
+
+For maximum RTS performance, the pipeline bakes multiple object materials into a single unified PBR texture set, collapsing draw calls to 1 per unit:
+
+### A. Texture Maps & Channel Layout
+
+| Texture File | Channels / Layout | Import Setting (`TextureImporter`) | Standard Shader Destination |
+| :--- | :--- | :--- | :--- |
+| `<Name>_Albedo.png` | sRGB Color (Diffuse, Camo, Wear) | `sRGBTexture = true` | `_MainTex` |
+| `<Name>_MetallicGloss.png` | **Linear Non-Color**: Red/Green/Blue = Metallic, **Alpha = Smoothness** ($1.0 - \text{Roughness}$) | `sRGBTexture = false`, `alphaSource = TextureImporterAlphaSource.FromInput` | `_MetallicGlossMap` (Keyword: `_METALLICGLOSSMAP`) |
+| `<Name>_Normal.png` | Tangent-space Normal Vector | `textureType = TextureImporterType.NormalMap` | `_BumpMap` (Keyword: `_NORMALMAP`) |
+| `<Name>_Emission.png` | sRGB Color (Sensors, Coils, Beacons) | `sRGBTexture = true` | `_EmissionMap` (Keyword: `_EMISSION`) |
+
+### B. Standard Shader Keyword & Multiplier Invariants
+
+When assigning `_MetallicGlossMap` in C# (`VehiclePrefabBuilder.cs`):
+```csharp
+mat.SetTexture("_MetallicGlossMap", metallicGlossTex);
+mat.EnableKeyword("_METALLICGLOSSMAP");
+mat.SetFloat("_Metallic", 1.0f);     // MUST be 1.0f so texture Red is not attenuated
+mat.SetFloat("_Glossiness", 1.0f);   // MUST be 1.0f so texture Alpha is not attenuated
+```
+If `sRGBTexture` is left `true`, Unity applies gamma-to-linear conversion, destroying metallic reflectance and darkening midtone smoothness. If `_Metallic` or `_Glossiness` is set to `< 1.0`, it acts as an arithmetic multiplier on the sampled texture data.
+
+---
+
+## 7. Automated Prefab Construction (`VehiclePrefabBuilder.cs`)
+
+The C# editor scaffolder automatically constructs game-ready prefabs from Blender exports and `.gameplay.json`:
+
+1. **Model Discovery Precedence**:
+   - Prioritizes `<Name>_LODs.fbx` over `<Name>_Atlas.fbx` and `<Name>.fbx`.
+   - When `_LODs.fbx` is loaded, every discovered child renderer (`LOD0`, `LOD1`, `LOD2`) is assigned the shared `atlasMaterial`.
+   - `LODGroup` is created with standard RTS thresholds: LOD0 (50%), LOD1 (20%), LOD2 (5% cull).
+2. **Modular Attachments & Damaged Variants**:
+   - Scans using `AssetDatabase.FindAssets` across model folders for `<Name>_Attachment_<Type>.fbx` and `<Name>_Damaged.fbx`.
+   - Mounts attachments under `RCL_AttachmentGroup_<Type>` at the vehicle root.
+   - Mounts damaged variant under prefab root as an inactive object (`SetActive(false)`), activated at runtime by `RuntimeVisualDirector` when `HealthRatio <= 0.50f`.
+3. **Collision Box Scaffolding**:
+   - Converts `_COLLIDER_Hull` and `_COLLIDER_Turret` meshes to invisible `BoxCollider` components (`renderer.enabled = false`).
+   - If no child collider meshes exist, generates an approximate `BoxCollider` from `.gameplay.json` bounds.
+

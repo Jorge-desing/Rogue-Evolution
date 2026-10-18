@@ -738,3 +738,49 @@ Following static code review of the 3D authoring and runtime visual subsystems, 
 - The metadata-sized root collider is added only when the imported model has no converted `_COLLIDER` child meshes, avoiding duplicate hull coverage. Generated hull bounds exclude meshes exported separately as detached attachments.
 - When the primary FBX contains animation clips, the builder selects it ahead of the static LOD FBX, preserves a valid imported Avatar, configures Idle/Drive clips to loop, and creates locomotion, fire-recoil, and death transitions. `RuntimeVisualDirector` drives those parameters from observed entity movement, the native shot timestamp, and the dead state; fire animation dispatch does not require recoil or muzzle sockets, and loader-prefixed animated units can receive the director without other sockets.
 - **Validation status:** these builder and runtime changes have only received static review. Unity import/prefab creation and animation playback in a Steam-launched match remain unverified. Models without embedded clips continue to use the LOD FBX path.
+
+---
+
+## 18. Comprehensive Review Rectifications & Runtime Rigor (2026-10-17)
+
+Following in-depth static and architectural code review of the 3D authoring pipeline, five critical integration discrepancies between Blender output, Unity prefab construction, and the live BepInEx loader runtime director were identified and resolved:
+
+### A. Canonical Socket Naming & Resilient Discovery
+- **Discrepancy**: `RogueModelKit.py` previously generated prefixed socket names (`<ModelName>_Socket_DamageSmoke`), while `RuntimeVisualDirector.cs` searched strictly for names beginning with `Socket_` or `RCL_Visual_`. In addition, default vehicle socket generation omitted radar mast/dish mounts and modular armor hardpoints.
+- **Resolution**:
+  1. In `tools/RogueModelKit.py` and its twin in `.agents/skills/rogue-command-3d-model-authoring/scripts/`, `_add_empty` was updated to assign canonical un-prefixed names (`Socket_DamageSmoke`, `Socket_MuzzlePrimary`, etc.).
+  2. `create_unity_locator_sockets` was expanded with parameters `radar_loc`, `hardpoints`, and `include_default_hardpoints=True`, automatically emitting `Socket_RadarMast`, `Socket_RadarDish`, `Socket_Hardpoint_ERA`, `Socket_Hardpoint_APS`, `Socket_Hardpoint_Sponsons`, and `Socket_Hardpoint_FuelDrums`.
+  3. `RuntimeVisualDirector.cs` updated `HasCompatibleVisualSockets` from `name.StartsWith("Socket_")` to `name.IndexOf("Socket_") >= 0` and hardpoint discovery to `name.IndexOf("Socket_Hardpoint_") >= 0`, providing robust dual-compatibility for both prefixed and un-prefixed assets.
+
+### B. PBR Metallic-Gloss Packing & Linear Importer Pipeline
+- **Discrepancy**: The baked `_MetallicGloss.png` texture previously contained roughness in place of packed data; Unity's Standard shader treats `_MetallicGlossMap` as linear data ($R = \text{Metallic}, A = \text{Smoothness}$). In Unity, missing `sRGB = false` flags caused gamma distortion, while omitting `_METALLICGLOSSMAP` prevented texture sampling.
+- **Resolution**:
+  1. In `RogueModelKit.py`, `bake_pbr_texture_atlas` isolates metallic via emission shader rerouting and inverts roughness ($S = 1.0 - \text{roughness}$), packing $R=M, G=M, B=M, A=S$ into `_MetallicGloss.png`.
+  2. In `VehiclePrefabBuilder.cs`, `SetupAtlasTexturesAndMaterial` explicitly configures `TextureImporter` for `_MetallicGloss.png` with:
+     - `sRGBTexture = false` (linear non-color data)
+     - `alphaSource = TextureImporterAlphaSource.FromInput`
+  3. The Standard shader material enables the `_METALLICGLOSSMAP` keyword and sets scalar multipliers `_Metallic = 1.0f` and `_Glossiness = 1.0f`, allowing the material to sample the texture's full dynamic range without unwanted attenuation.
+
+### C. LOD Hierarchy Precedence, Atlas Material Binding & Multi-Asset DB Search
+- **Discrepancy**: When both an atlas FBX (`_Atlas.fbx`) and an LOD chain (`_LODs.fbx`) were exported, `VehiclePrefabBuilder.cs` prioritized `_Atlas.fbx`, preventing the creation of Unity's `LODGroup` component. Furthermore, detached attachments and damaged variants were not reliably located across varied folder structures.
+- **Resolution**:
+  1. `FindModelAsset` now prioritizes `_LODs.fbx` over `_Atlas.fbx`, falling back to standard `.fbx`.
+  2. When `_LODs.fbx` is loaded, every discovered LOD renderer (`LOD0`, `LOD1`, `LOD2`) is systematically assigned the shared `atlasMaterial`, and `SetupLodGroupIfAvailable` constructs a functional `LODGroup` with calibrated cull thresholds (50%, 20%, 5%).
+  3. `MountModularAttachmentsIfAvailable` and `MountDamagedVariantIfAvailable` refactored to employ `AssetDatabase.FindAssets` scoped across `ModelFolder` and `AssetRoot`, ensuring reliable discovery and automatic parenting of `<Name>_Attachment_<Type>.fbx` and `<Name>_Damaged.fbx` into the prefab.
+
+### D. Runtime Mechanics: Deploy Ramps, True 30 RPM, & Hostility Filtering
+- **Discrepancy**: Factory rollout searched for `Deploy_Unit` or `DeployUnit`, while the structure exporter generated `Socket_DeployRamp`. Radar sweep rotated at $30^\circ/\text{s}$ (5 RPM) instead of the documented 30 RPM ($180^\circ/\text{s}$). Turret target tracking lacked explicit hostility verification, risking targeting friendly units.
+- **Resolution**:
+  1. `make_factory_assembly` in `RogueModelKit.py` now exports both `Socket_Deploy_Unit` and `Socket_DeployRamp`. `RuntimeVisualDirector.cs` accepts `Deploy_Unit`, `DeployUnit`, `DeployRamp`, and `Deploy_Ramp`.
+  2. `UpdateRadarSweep()` calibrated from $30^\circ/\text{s}$ to `_radarRpm * 6.0f` ($30 \times 6 = 180^\circ/\text{s}$, achieving exact 30 RPM).
+  3. `RuntimeVisualDirector.cs` binds to `EntityController.IsEnemy(EntityController)` (token `0x06000844`) via reflection, implementing `IsHostileTarget(candidate)` to verify that candidates are active, non-destroyed, and hostile before committing turret traverse angles.
+
+### E. Verified CIL Metadata Tokens Against Pinned Assembly
+- **Discrepancy**: Earlier documentation cited preliminary tokens for four properties on `EntityController`.
+- **Resolution**: Verified through Reflection and REA static inspection against the pinned game binary (`Assembly-CSharp.dll`, SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, MVID `db0e9462-128d-4296-9900-de18b4bd0c00`):
+  - `HealthRatio`: `0x060007e4` (MethodDef: `System.Single get_HealthRatio()`)
+  - `DestroyHasBeenStarted`: `0x0600077d` (MethodDef: `System.Boolean get_DestroyHasBeenStarted()`)
+  - `InProductionCount`: `0x060007df` (MethodDef: `System.Int32 get_InProductionCount()`)
+  - `CurrentAttackTarget`: `0x060007fc` (MethodDef: `EntityController get_CurrentAttackTarget()`)
+  - `IsEnemy`: `0x06000844` (MethodDef: `System.Boolean IsEnemy(EntityController)`)
+- While `RuntimeVisualDirector` resolves members dynamically by name, maintaining exact documented tokens ensures future binary patches and compatibility audits can detect layout changes immediately.
