@@ -837,3 +837,47 @@ The expansion loader was enhanced with dynamic secondary animation and environme
    - Reads vehicle local horizontal velocity, pitching thrusters dynamically forward up to $28^\circ$ when cruising and neutral during hover.
 3. **Environmental Biome Pipeline**:
    - Biome selection (`--biome <desert|arctic|woodland|urban>`) provides deterministic authoring-time palette and weathering baking directly into model textures and vertex colors, avoiding unverified runtime scene heuristic tinting (as native combat takes place inside the unified `Game` scene without distinct per-biome scene names).
+
+
+---
+
+## 20. REA Reverse-Engineering Verification & Pipeline Corrections (2026-10-18)
+
+To rigorously verify all newly introduced capabilities and functions against compiled binaries and runtime constraints, REA (`inspect_managed_artifact`, `inspect_managed_members`) was executed across the target game assembly (`Assembly-CSharp.dll`) and the expansion loader artifact (`RogueCommandExpansionLoader.dll`).
+
+### A. Managed Binary Verification Evidence
+
+1. **Target Game Assembly (`Assembly-CSharp.dll`)**:
+   - **Identity**: SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, MVID `db0e9462-128d-4296-9900-de18b4bd0c00`.
+   - **REA Evidence ID**: `ev_b8d4657ac454129250b202e6eb31305b15f679364f692c6adb08284ca2d40d64`.
+   - **Verified Property/Method Tokens on `EntityController`**:
+     - `get_IsDestroyed`: Token `0x0600077b`, returns `System.Boolean`.
+     - `get_DestroyHasBeenStarted`: Token `0x0600077d`, returns `System.Boolean`.
+     - `get_InProductionCount`: Token `0x060007df`, returns `System.Nullable`1<System.Int32>`.
+     - `get_HealthRatio`: Token `0x060007e4`, returns `System.Single` (`r4`).
+     - `get_StillExists`: Token `0x060007e9`, returns `System.Boolean`.
+     - `get_CurrentAttackTarget`: Token `0x060007fc`, returns `EntityController` (`class:1020`).
+     - `IsEnemy(EntityController)`: Token `0x06000844`, returns `System.Boolean`.
+   - **Verified Field Tokens**:
+     - `EntityAttack._attackTarget`: Field token `0x040004a2`.
+     - `EntityAttack._timeOfLastShot`: Field token `0x040004ab`.
+     - `EntityController.onFireParticleSystem`: Field token `0x040004e1`.
+     - `EntityController._currentAttackTarget`: Field token `0x04000565`.
+
+2. **Expansion Loader Assembly (`RogueCommandExpansionLoader.dll`)**:
+   - **Artifact Evidence ID**: `ev_31e0021f23ea3178482412845099e35d6ac107e99f377ac02d042edf812c19fb` (SHA-256 `bb091077285927d472449494b69565723b2ac55bd132dbca01727de2b3753a9d`, MVID `5b5bb4a4-01a1-466a-b33b-8161f2f90cc6`).
+   - **`RuntimeVisualDirector` Members Evidence ID**: `ev_0f7f1a151af8f9b397e68c938214b2a259652ae556ae4c9c0209b94f7995277d`.
+   - **Verified Compiled Member Presence**:
+     - Confirmed all 33 methods compiled, including `UpdateAntennaWobble` (`0x06000169`), `UpdateVtolThrusterVectoring` (`0x0600016a`), `UpdateMotionSample` (`0x06000168`), and `IsHostileTarget` (`0x06000161`).
+
+### B. Static Audit & Corrections Applied
+
+1. **Resolution of Socket Ambiguity Trap in `VehiclePrefabBuilder.cs`**:
+   - *Defect*: `root.transform.Find(socket.Name)` only checked immediate children of `root`. When an imported FBX already authored sockets (nested under `modelInstance` or bones), `Find` returned `null` and spawned a duplicate `GameObject(socket.Name)` directly under `root`. At runtime, `UniqueSocketRoleBinding<Transform>` detected the duplicate transforms and flagged the role as ambiguous (`Value = null`), disabling antenna wobble, radar sweep, and turret aiming.
+   - *Correction*: Replaced shallow lookup with `FindTransformRecursive`. When a socket exists anywhere in the hierarchy, duplicate creation is skipped and the authored bone/turret parentage is preserved. Fallback GameObjects are created only when no matching socket exists in the entire hierarchy.
+2. **Missing Archetype Native Templates in `export_gameplay_metadata`**:
+   - *Defect*: `template_map` in `tools/RogueModelKit.py` and its twin omitted mappings for the three newly added archetypes (`colossus_titan`, `hover_cruiser`, `heavy_dropship`), causing them to fall back to generic tank controllers.
+   - *Correction*: Added explicit mappings: `colossus_titan` $\rightarrow$ `["GatlingWalker"]` (bipedal walker locomotion), `hover_cruiser` $\rightarrow$ `["PCXBaseTank"]`, and `heavy_dropship` $\rightarrow$ `["PCXBaseTank"]`.
+3. **Environmental Biome Pipeline Clarification**:
+   - *Audit*: Verified that `--biome` operates strictly as an authoring-time palette and weathering preset baked into textures and vertex colors. No unverified runtime scene heuristic tinting is performed since the native game executes within a unified `Game` scene without distinct per-biome scene names.
+

@@ -2604,6 +2604,9 @@ def export_gameplay_metadata(
         "drone_carrier": ["PCXBaseTank"],
         "quad_mech": ["GatlingWalker"],
         "combat_harvester": ["PCXBaseTank"],
+        "colossus_titan": ["GatlingWalker"],
+        "hover_cruiser": ["PCXBaseTank"],
+        "heavy_dropship": ["PCXBaseTank"],
     }
 
     if archetype in ("bike", "buggy"):

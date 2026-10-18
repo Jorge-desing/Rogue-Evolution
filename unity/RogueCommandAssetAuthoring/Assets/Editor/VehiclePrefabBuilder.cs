@@ -256,13 +256,30 @@ namespace RogueCommandExpansion.Authoring
                 {
                     foreach (SocketData socket in meta.Sockets)
                     {
-                        Transform existing = root.transform.Find(socket.Name);
-                        GameObject socketGo = existing != null ? existing.gameObject : new GameObject(socket.Name);
-                        socketGo.transform.SetParent(root.transform, false);
-                        socketGo.transform.localPosition = socket.Position;
-                        if (socket.Forward.sqrMagnitude > 0.001f)
+                        Transform existing = FindTransformRecursive(root.transform, socket.Name);
+                        if (existing != null)
                         {
-                            socketGo.transform.localRotation = Quaternion.LookRotation(socket.Forward);
+                            // Socket already exists in model hierarchy (e.g. from FBX or turret/armature).
+                            // Only update transform if it is an immediate child of root to avoid breaking nested pivots.
+                            if (existing.parent == root.transform)
+                            {
+                                existing.localPosition = socket.Position;
+                                if (socket.Forward.sqrMagnitude > 0.001f)
+                                {
+                                    existing.localRotation = Quaternion.LookRotation(socket.Forward);
+                                }
+                            }
+                        }
+                        else
+                        {
+                            // Socket not present in model hierarchy; create fallback under root
+                            GameObject socketGo = new GameObject(socket.Name);
+                            socketGo.transform.SetParent(root.transform, false);
+                            socketGo.transform.localPosition = socket.Position;
+                            if (socket.Forward.sqrMagnitude > 0.001f)
+                            {
+                                socketGo.transform.localRotation = Quaternion.LookRotation(socket.Forward);
+                            }
                         }
                     }
                 }
@@ -459,7 +476,7 @@ namespace RogueCommandExpansion.Authoring
                 GameObject attAsset = AssetDatabase.LoadAssetAtPath<GameObject>(path);
                 if (attAsset != null)
                 {
-                    Transform socket = root.transform.Find("Socket_Hardpoint_" + socketType);
+                    Transform socket = FindTransformRecursive(root.transform, "Socket_Hardpoint_" + socketType);
                     Transform parentTransform = socket != null
                         ? GetOrCreateAttachmentGroup(root, socketType)
                         : root.transform;
@@ -479,6 +496,20 @@ namespace RogueCommandExpansion.Authoring
                     }
                 }
             }
+        }
+
+        private static Transform FindTransformRecursive(Transform parent, string name)
+        {
+            if (parent == null) return null;
+            if (string.Equals(parent.name, name, StringComparison.OrdinalIgnoreCase)) return parent;
+            foreach (Transform child in parent.GetComponentsInChildren<Transform>(true))
+            {
+                if (string.Equals(child.name, name, StringComparison.OrdinalIgnoreCase))
+                {
+                    return child;
+                }
+            }
+            return null;
         }
 
         private static string NormalizeHardpointSocketType(string attachmentType)
