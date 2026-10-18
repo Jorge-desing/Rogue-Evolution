@@ -517,6 +517,31 @@ var tests = new (string Name, Action Run)[]
         {
             throw new InvalidOperationException("Pool-query truncation was not reported independently from IDs.");
         }
+
+        var longFactories = Enumerable.Range(0, 300)
+            .Select(index => "sample:factory-" + index.ToString("D3") + new string('x', 96))
+            .ToArray();
+        var longScope = new BlueprintRewardFactoryScope(
+            longFactories, longFactories, null, 0, "sample-expansion:large-stage");
+        var detailedPoolObservation = new BlueprintRewardObservation();
+        for (int i = 0; i < 9; i++)
+        {
+            detailedPoolObservation.RecordPoolCandidates(
+                "RCL_POOL_" + i.ToString("D2"),
+                i < 8 ? longFactories : Array.Empty<string>(),
+                longScope,
+                null,
+                false);
+        }
+
+        string detailedPoolTrace = detailedPoolObservation.Format(longScope);
+        if (detailedPoolTrace.Length > 4096 || !detailedPoolTrace.EndsWith("...", StringComparison.Ordinal) ||
+            !detailedPoolTrace.Contains("omittedIdObservations=", StringComparison.Ordinal) ||
+            !detailedPoolTrace.Contains("omittedPoolQueries=1", StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                "A truncated candidate report hid its independent ID or pool-query omission counters.");
+        }
     }),
     ("demo reward stage index follows visible stages and tutorial substitution", () =>
     {

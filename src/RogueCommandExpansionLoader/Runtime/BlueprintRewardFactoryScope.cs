@@ -278,6 +278,18 @@ namespace RogueCommandExpansionLoader.Runtime
                 }
             }
 
+            // Keep loss counters near the start of the trace. Detailed candidate lists can
+            // consume the character cap, so appending these after the lists could hide them.
+            if (_omittedIdObservations > 0)
+            {
+                report.Append(" omittedIdObservations=").Append(_omittedIdObservations);
+            }
+
+            if (_omittedPoolQueries > 0)
+            {
+                report.Append(" omittedPoolQueries=").Append(_omittedPoolQueries);
+            }
+
             if (_globalFallbackObserved)
             {
                 report.Append(" globalFactories=").Append(FormatSet(_globalCandidates, scope));
@@ -300,16 +312,6 @@ namespace RogueCommandExpansionLoader.Runtime
                 }
 
                 report.Append('}');
-            }
-
-            if (_omittedIdObservations > 0)
-            {
-                report.Append(" omittedIdObservations=").Append(_omittedIdObservations);
-            }
-
-            if (_omittedPoolQueries > 0)
-            {
-                report.Append(" omittedPoolQueries=").Append(_omittedPoolQueries);
             }
 
             if (report.Length > MaxTraceCharacters)
