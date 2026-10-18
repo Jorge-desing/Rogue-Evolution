@@ -36,6 +36,10 @@ Options:
     --suspension-arms          Attach trailing swing-arm suspension linkage with torsion bosses
     --mantlet-boot             Attach tiered concentric accordion dust boot on cannon mantlet
     --spaced-skirts            Attach segmented multi-panel spaced armor skirts with standoff brackets
+    --hydraulic-hoses          Attach catenary hydraulic hoses and braided power conduits
+    --hull-greebles             Attach maintenance hatches, louver vents, and lifting lugs
+    --tactical-markings         Project tactical chevrons and zenith identification plates
+    --weighted-normals          Apply weighted normals (default); --no-weighted-normals disables them
     --wreckage-severity <sev>  Damage severity for wreckage: light, medium, catastrophic (default: catastrophic)
     --smoke                    Attach multi-tube smoke discharger banks
     --radar                    Attach command/recon radar dish
@@ -76,6 +80,9 @@ PRESETS = {
         "suspension_arms": True,
         "spaced_skirts": True,
         "mantlet_boot": True,
+        "hydraulic_hoses": True,
+        "hull_greebles": True,
+        "tactical_markings": True,
     },
     "recon_interceptor": {
         "archetype": "buggy",
@@ -83,17 +90,21 @@ PRESETS = {
         "faction": "vanguard",
         "rollcage": True,
         "radar": True,
+        "tactical_markings": True,
     },
     "gunship_alpha": {
         "archetype": "vtol",
         "weapon": "missile",
         "faction": "syndicate",
+        "tactical_markings": True,
     },
     "apc_enforcer": {
         "archetype": "halftrack",
         "weapon": "gatling",
         "faction": "vanguard",
         "smoke": True,
+        "hull_greebles": True,
+        "tactical_markings": True,
     },
     "dune_raider": {
         "archetype": "bike",
@@ -108,6 +119,7 @@ PRESETS = {
         "outriggers": True,
         "suspension_arms": True,
         "mantlet_boot": True,
+        "hull_greebles": True,
     },
     "dreadnought_crawler": {
         "archetype": "siege_crawler",
@@ -116,6 +128,9 @@ PRESETS = {
         "outriggers": True,
         "sponsons": True,
         "suspension_arms": True,
+        "hydraulic_hoses": True,
+        "hull_greebles": True,
+        "tactical_markings": True,
     },
     "hive_carrier": {
         "archetype": "drone_carrier",
@@ -123,6 +138,8 @@ PRESETS = {
         "faction": "syndicate",
         "radar": True,
         "flight_deck": True,
+        "hull_greebles": True,
+        "tactical_markings": True,
     },
     "titan_quad": {
         "archetype": "quad_mech",
@@ -130,6 +147,9 @@ PRESETS = {
         "faction": "arctic",
         "smoke": True,
         "ik_rig": True,
+        "hydraulic_hoses": True,
+        "hull_greebles": True,
+        "tactical_markings": True,
     },
     "resource_behemoth": {
         "archetype": "combat_harvester",
@@ -138,6 +158,8 @@ PRESETS = {
         "dozer": True,
         "sponsons": True,
         "excavator_drum": True,
+        "hydraulic_hoses": True,
+        "hull_greebles": True,
     },
     "colossus_titan": {
         "archetype": "colossus_titan",
@@ -147,6 +169,9 @@ PRESETS = {
         "radar": True,
         "antenna": True,
         "ik_rig": True,
+        "hydraulic_hoses": True,
+        "hull_greebles": True,
+        "tactical_markings": True,
     },
     "sea_lance": {
         "archetype": "hover_cruiser",
@@ -155,6 +180,8 @@ PRESETS = {
         "sponsons": True,
         "radar": True,
         "antenna": True,
+        "hull_greebles": True,
+        "tactical_markings": True,
     },
     "sky_dreadnought": {
         "archetype": "heavy_dropship",
@@ -162,11 +189,15 @@ PRESETS = {
         "faction": "siege",
         "smoke": True,
         "antenna": True,
+        "tactical_markings": True,
     },
     "orbital_defense": {
         "structure": True,
         "building_type": "orbital_silo",
         "faction": "siege",
+        "hydraulic_hoses": True,
+        "hull_greebles": True,
+        "tactical_markings": True,
     },
     "beam_destroyer": {
         "archetype": "super_heavy",
@@ -179,6 +210,9 @@ PRESETS = {
         "track_sag": 0.05,
         "suspension_arms": True,
         "spaced_skirts": True,
+        "hydraulic_hoses": True,
+        "hull_greebles": True,
+        "tactical_markings": True,
     },
     "vls_missile_cruiser": {
         "archetype": "hover_cruiser",
@@ -188,6 +222,8 @@ PRESETS = {
         "antenna": True,
         "sponsons": True,
         "armor_plating": True,
+        "hull_greebles": True,
+        "tactical_markings": True,
     },
     "aegis_bastion": {
         "archetype": "shield_truck",
@@ -196,6 +232,9 @@ PRESETS = {
         "radar": True,
         "smoke": True,
         "shield_bubble": True,
+        "hydraulic_hoses": True,
+        "hull_greebles": True,
+        "tactical_markings": True,
     },
     "volatile_runner": {
         "archetype": "demolition_breacher",
@@ -203,6 +242,8 @@ PRESETS = {
         "faction": "siege",
         "dozer": True,
         "rollcage": True,
+        "hydraulic_hoses": True,
+        "tactical_markings": True,
     },
     "longbow_strider": {
         "archetype": "artillery_strider",
@@ -211,6 +252,9 @@ PRESETS = {
         "outriggers": True,
         "antenna": True,
         "ik_rig": True,
+        "hydraulic_hoses": True,
+        "hull_greebles": True,
+        "tactical_markings": True,
     },
     "inferno_purger": {
         "archetype": "thermobaric_tank",
@@ -219,6 +263,9 @@ PRESETS = {
         "spaced_skirts": True,
         "smoke": True,
         "sponsons": True,
+        "hydraulic_hoses": True,
+        "hull_greebles": True,
+        "tactical_markings": True,
     },
     "spectre_jammer": {
         "archetype": "ew_jammer",
@@ -226,16 +273,25 @@ PRESETS = {
         "faction": "arctic",
         "radar": True,
         "antenna": True,
+        "hydraulic_hoses": True,
+        "hull_greebles": True,
+        "tactical_markings": True,
     },
     "bastion_shield_dome": {
         "structure": True,
         "building_type": "shield_dome",
         "faction": "vanguard",
+        "hydraulic_hoses": True,
+        "hull_greebles": True,
+        "tactical_markings": True,
     },
     "tesla_obelisk": {
         "structure": True,
         "building_type": "emp_obelisk",
         "faction": "syndicate",
+        "hydraulic_hoses": True,
+        "hull_greebles": True,
+        "tactical_markings": True,
     },
 }
 
@@ -308,6 +364,10 @@ def parse_args():
     parser.add_argument("--suspension-arms", action="store_true", help="Attach trailing swing-arm suspension linkage with torsion bosses and coilover dampers")
     parser.add_argument("--mantlet-boot", action="store_true", help="Attach tiered concentric accordion dust boot between gun mantlet and barrel")
     parser.add_argument("--spaced-skirts", action="store_true", help="Attach segmented multi-panel spaced armor skirts with standoff brackets and mudflaps")
+    parser.add_argument("--hydraulic-hoses", action="store_true", help="Attach catenary hydraulic hoses and braided power conduits with bulkhead couplers")
+    parser.add_argument("--hull-greebles", action="store_true", help="Attach BMesh-inset maintenance hatches, micro-louver vents, and corner lifting lugs")
+    parser.add_argument("--tactical-markings", action="store_true", help="Project BVHTree-raycasted floating tactical chevron decals and zenith ID plates")
+    parser.add_argument("--weighted-normals", action=argparse.BooleanOptionalAction, default=True, help="Apply face-area weighted custom split normals to eliminate low-poly chamfer shading pinch (default: enabled)")
     parser.add_argument("--smoke", action="store_true", help="Include multi-tube smoke discharger banks")
     parser.add_argument("--radar", action="store_true", help="Include command/recon radar dish")
     parser.add_argument("--sponsons", action="store_true", help="Include armored external side sponsons")
@@ -398,6 +458,7 @@ def parse_args():
             "flight_deck", "excavator_drum", "antenna", "cupola", "rivets",
             "track_shoes", "armor_plating", "ik_rig", "suspension_arms",
             "mantlet_boot", "spaced_skirts", "shield_bubble",
+            "hydraulic_hoses", "hull_greebles", "tactical_markings",
         ):
             if p.get(flag) and f"--{flag.replace('_', '-')}" not in script_args:
                 setattr(args, flag, True)
@@ -518,6 +579,10 @@ def build_vehicle_model(
     suspension_arms: bool = False,
     mantlet_boot: bool = False,
     spaced_skirts: bool = False,
+    hydraulic_hoses: bool = False,
+    hull_greebles: bool = False,
+    tactical_markings: bool = False,
+    weighted_normals: bool = True,
     wreckage_severity: str = "catastrophic",
 ) -> dict:
     rmk.clear_scene()
@@ -1123,6 +1188,15 @@ def build_vehicle_model(
     if armor_plating:
         builder.add_armor_plating()
 
+    if hydraulic_hoses:
+        builder.add_hydraulic_hoses()
+
+    if hull_greebles:
+        builder.add_hull_greebles()
+
+    if tactical_markings:
+        builder.add_tactical_markings()
+
     # 3. Modular Attachments
     if attachments:
         att_list = [a.strip() for a in attachments.split(",") if a.strip()]
@@ -1142,6 +1216,7 @@ def build_vehicle_model(
         ),
         smooth_by_angle=True,
         smooth_angle_deg=smooth_angle,
+        weighted_normals=weighted_normals,
         bake_vertex_dirt=dirt,
         include_locators=locators,
         generate_lods=lods,
@@ -1218,6 +1293,10 @@ def build_structure_model(
     bake_atlas: bool = False,
     atlas_resolution: int = 1024,
     single_material: bool = False,
+    hydraulic_hoses: bool = False,
+    hull_greebles: bool = False,
+    tactical_markings: bool = False,
+    weighted_normals: bool = True,
 ) -> dict:
     rmk.clear_scene()
 
@@ -1269,6 +1348,15 @@ def build_structure_model(
     else:
         builder.build_factory()
 
+    if hydraulic_hoses:
+        builder.add_hydraulic_hoses()
+
+    if hull_greebles:
+        builder.add_hull_greebles()
+
+    if tactical_markings:
+        builder.add_tactical_markings()
+
     gameplay_meta_path = (fbx_file.parent / f"{name}.gameplay.json") if gameplay_json else None
 
     res = builder.build_and_export(
@@ -1284,6 +1372,7 @@ def build_structure_model(
         bake_atlas=bake_atlas or single_material or (camo and camo != "none"),
         atlas_resolution=atlas_resolution,
         single_material_atlas=single_material,
+        weighted_normals=weighted_normals,
         wear_level=wear,
         soot_intensity=soot_intensity,
     )
@@ -1334,6 +1423,7 @@ def main():
                 print(f"  Colliders: {args.name}_COLLIDER_Base, {args.name}_COLLIDER_Roof")
             if args.render_icons:
                 print(f"  Tactical Icons: {args.icon_size}x{args.icon_size} Top-Down and Isometric")
+            print(f"  Authoring Details: HydraulicHoses={args.hydraulic_hoses}, HullGreebles={args.hull_greebles}, TacticalMarkings={args.tactical_markings}, WeightedNormals={args.weighted_normals}")
             if args.bake_atlas or args.bake_normals or args.single_material or structure_camo != "none":
                 print(f"  Texture Atlas: {args.atlas_resolution}x{args.atlas_resolution} PBR (Albedo, MetallicGloss, Normal, Emission)")
             if args.single_material:
@@ -1365,6 +1455,7 @@ def main():
         print(f"Primary Weapon: {args.weapon}")
         print(f"Subsystems: Skirts={args.skirts}, Rollcage={args.rollcage}, QuadTracks={args.quad_tracks}, TiltRotors={args.tilt_rotors}, Dozer={args.dozer}, Smoke={args.smoke}, Radar={args.radar}, Sponsons={args.sponsons}, Outriggers={args.outriggers}, FlightDeck={args.flight_deck}, ExcavatorDrum={args.excavator_drum}")
         print(f"Micro-Details: Antenna={args.antenna}, Cupola={args.cupola}, Rivets={args.rivets}, TrackShoes={args.track_shoes}, SuspensionArms={args.suspension_arms}, MantletBoot={args.mantlet_boot}, SpacedSkirts={args.spaced_skirts}")
+        print(f"Authoring Details: HydraulicHoses={args.hydraulic_hoses}, HullGreebles={args.hull_greebles}, TacticalMarkings={args.tactical_markings}, WeightedNormals={args.weighted_normals}")
         if args.attachments:
             print(f"Modular Attachments: {args.attachments} (Detached FBX: {args.export_detached_attachments})")
         if args.primary_color:
@@ -1482,6 +1573,10 @@ def main():
                 suspension_arms=args.suspension_arms,
                 mantlet_boot=args.mantlet_boot,
                 spaced_skirts=args.spaced_skirts,
+                hydraulic_hoses=args.hydraulic_hoses,
+                hull_greebles=args.hull_greebles,
+                tactical_markings=args.tactical_markings,
+                weighted_normals=args.weighted_normals,
                 wreckage_severity=args.wreckage_severity,
             )
             results.append({
@@ -1537,6 +1632,10 @@ def main():
             bake_atlas=args.bake_atlas or args.bake_normals,
             atlas_resolution=args.atlas_resolution,
             single_material=args.single_material,
+            hydraulic_hoses=args.hydraulic_hoses,
+            hull_greebles=args.hull_greebles,
+            tactical_markings=args.tactical_markings,
+            weighted_normals=args.weighted_normals,
         )
     else:
         res = build_vehicle_model(
@@ -1605,6 +1704,10 @@ def main():
             suspension_arms=args.suspension_arms,
             mantlet_boot=args.mantlet_boot,
             spaced_skirts=args.spaced_skirts,
+            hydraulic_hoses=args.hydraulic_hoses,
+            hull_greebles=args.hull_greebles,
+            tactical_markings=args.tactical_markings,
+            weighted_normals=args.weighted_normals,
             wreckage_severity=args.wreckage_severity,
         )
 

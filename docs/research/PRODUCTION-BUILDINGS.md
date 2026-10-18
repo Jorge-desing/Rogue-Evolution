@@ -53,7 +53,7 @@ The verified starter field is `EntityBalancingParameters.isAllowedAsStartingBlue
 - Release build: zero errors and warnings.
 - Contract/registry harness before the later placement-distance patch: 89/90 passed, one Windows symlink privilege skip.
 - All three source manifests pass the JSON Schema.
-- Read-only native visual preflight passes all five overlay paths after checking the compatibility tuple and `resources.assets` hash.
+- Historical read-only native visual preflight resolved all five candidate native visual roots after checking the compatibility tuple and `resources.assets` hash. The current pack preflight resolves its four active overlay roots; Ironclad Walker keeps the native articulated model while its custom static prototype remains unrigged.
 - ZIP inspected: plugin, two installable packs, bundles, contract/readmes; no game assemblies, BepInEx/Harmony runtime dependencies, or PDBs.
 - Static code review covered IDs, factory roles/product relation, clone cleanup, registration, blueprint translation and AI dependencies. Review found a native AI deck regression while separating products/factories; it was corrected before the successful runtime attempt.
 

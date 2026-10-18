@@ -18,12 +18,24 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
         {
             if (_particleDefaultMaterial == null)
             {
-                Shader shader = Shader.Find("Particles/Standard Unlit") ??
+                // Rogue Command runs URP. Prefer a pipeline-native particle shader so the
+                // procedural fallback does not resolve to a Built-in Render Pipeline shader.
+                Shader shader = Shader.Find("Universal Render Pipeline/Particles/Unlit") ??
+                               Shader.Find("Universal Render Pipeline/Particles/Simple Lit") ??
                                Shader.Find("Mobile/Particles/Alpha Blended") ??
                                Shader.Find("Sprites/Default");
                 if (shader != null)
                 {
                     _particleDefaultMaterial = new Material(shader);
+                    _particleDefaultMaterial.enableInstancing = true;
+                    if (_particleDefaultMaterial.HasProperty("_SoftParticlesEnabled"))
+                    {
+                        _particleDefaultMaterial.SetFloat("_SoftParticlesEnabled", 1f);
+                    }
+                    if (_particleDefaultMaterial.HasProperty("_CameraFadingEnabled"))
+                    {
+                        _particleDefaultMaterial.SetFloat("_CameraFadingEnabled", 1f);
+                    }
                 }
             }
             return _particleDefaultMaterial;
@@ -157,7 +169,8 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             ParticleSystemRenderer psr = smokeObj.GetComponent<ParticleSystemRenderer>();
             if (psr != null && GetParticleMaterial() != null)
             {
-                psr.material = GetParticleMaterial();
+                psr.sharedMaterial = GetParticleMaterial();
+                psr.enableGPUInstancing = true;
             }
 
             var main = ps.main;
@@ -197,7 +210,8 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             ParticleSystemRenderer psr = fireObj.GetComponent<ParticleSystemRenderer>();
             if (psr != null && GetParticleMaterial() != null)
             {
-                psr.material = GetParticleMaterial();
+                psr.sharedMaterial = GetParticleMaterial();
+                psr.enableGPUInstancing = true;
             }
 
             var main = ps.main;
@@ -254,7 +268,8 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             ParticleSystemRenderer psr = burstObj.GetComponent<ParticleSystemRenderer>();
             if (psr != null && GetParticleMaterial() != null)
             {
-                psr.material = GetParticleMaterial();
+                psr.sharedMaterial = GetParticleMaterial();
+                psr.enableGPUInstancing = true;
             }
 
             var main = ps.main;

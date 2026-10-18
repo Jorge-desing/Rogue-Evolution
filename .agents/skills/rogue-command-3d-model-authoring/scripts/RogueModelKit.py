@@ -2133,6 +2133,343 @@ def make_articulated_track_shoes(
     return objects
 
 
+def make_catenary_cable_assembly(
+    prefix: str,
+    start_point: Tuple[float, float, float] | Vector,
+    end_point: Tuple[float, float, float] | Vector,
+    sag: float = 0.14,
+    radius: float = 0.024,
+    segments: int = 10,
+    sides: int = 8,
+    clamp_count: int = 2,
+    hose_mat: bpy.types.Material | None = None,
+    coupler_mat: bpy.types.Material | None = None,
+    accent_mat: bpy.types.Material | None = None,
+    corrugated: bool = True,
+) -> list[bpy.types.Object]:
+    """Generates a catenary-sagging hydraulic hose / power conduit with BMesh sweep, end couplers, and retaining collars."""
+    objects: list[bpy.types.Object] = []
+    p1 = Vector(start_point)
+    p2 = Vector(end_point)
+    span = (p2 - p1).length
+    if span < 0.05:
+        return objects
+
+    num_segs = max(4, int(segments))
+    n_sides = max(6, int(sides))
+
+    # Evaluate catenary points along curve with hyperbolic cosine / parabolic sag profile
+    points: list[Vector] = []
+    for i in range(num_segs + 1):
+        t = i / float(num_segs)
+        pt = p1.lerp(p2, t)
+        # Hyperbolic cosine catenary approximation normalized to [0, 1]
+        u = 2.0 * t - 1.0
+        cosh_drop = (math.cosh(1.5) - math.cosh(1.5 * u)) / (math.cosh(1.5) - 1.0)
+        pt.z -= sag * cosh_drop
+        points.append(pt)
+
+    # Construct continuous BMesh tube along the catenary curve
+    mesh = bpy.data.meshes.new(f"{prefix}_Hose_Mesh")
+    hose_obj = bpy.data.objects.new(f"{prefix}_Hose", mesh)
+    bpy.context.collection.objects.link(hose_obj)
+    bm = bmesh.new()
+
+    rings: list[list[bmesh.types.BMVert]] = []
+    for i, pt in enumerate(points):
+        if i == 0:
+            tangent = (points[1] - points[0]).normalized()
+        elif i == len(points) - 1:
+            tangent = (points[-1] - points[-2]).normalized()
+        else:
+            tangent = (points[i + 1] - points[i - 1]).normalized()
+
+        u_vec, v_vec, _ = get_orthonormal_basis(tangent)
+        ring_verts = []
+        # Subtle corrugated rib radius modulation along hose length
+        rib_scale = 1.0 + (0.08 if (corrugated and i % 2 == 1 and 0 < i < num_segs) else 0.0)
+        r_eff = radius * rib_scale
+        for s in range(n_sides):
+            theta = (2.0 * math.pi * s) / n_sides
+            offset = (u_vec * math.cos(theta) + v_vec * math.sin(theta)) * r_eff
+            ring_verts.append(bm.verts.new(pt + offset))
+        rings.append(ring_verts)
+
+    for i in range(len(rings) - 1):
+        r_curr = rings[i]
+        r_next = rings[i + 1]
+        for s in range(n_sides):
+            s_next = (s + 1) % n_sides
+            bm.faces.new((r_curr[s], r_curr[s_next], r_next[s_next], r_next[s]))
+
+    # Cap ends
+    bm.faces.new(reversed(rings[0]))
+    bm.faces.new(rings[-1])
+    bm.normal_update()
+    bm.to_mesh(mesh)
+    bm.free()
+
+    finish_mesh(hose_obj, hose_mat, bevel=0.0, smooth=True)
+    objects.append(hose_obj)
+
+    # Hexagonal end bulkhead couplers
+    c_mat = coupler_mat or hose_mat
+    for idx, (end_pt, adj_pt) in enumerate(((points[0], points[1]), (points[-1], points[-2])), start=1):
+        t_dir = (adj_pt - end_pt).normalized()
+        rot_euler = t_dir.to_track_quat("Z", "Y").to_euler()
+        objects.append(make_cylinder(
+            f"{prefix}_HoseCoupler_{idx}",
+            radius=radius * 1.55,
+            depth=radius * 2.2,
+            location=end_pt + t_dir * (radius * 0.8),
+            material=c_mat,
+            rotation=rot_euler,
+            vertices=6,
+            bevel=0.004,
+        ))
+
+    # Intermediate retaining collar clamps
+    if clamp_count > 0:
+        for c_idx in range(1, clamp_count + 1):
+            t_c = c_idx / float(clamp_count + 1)
+            f_idx = min(num_segs - 1, max(1, int(round(t_c * num_segs))))
+            c_pt = points[f_idx]
+            c_tan = (points[f_idx + 1] - points[f_idx - 1]).normalized()
+            rot_c = c_tan.to_track_quat("Z", "Y").to_euler()
+            col_mat = accent_mat if (accent_mat and c_idx == 1) else c_mat
+            objects.append(make_cylinder(
+                f"{prefix}_HoseClamp_{c_idx}",
+                radius=radius * 1.42,
+                depth=radius * 1.4,
+                location=c_pt,
+                material=col_mat,
+                rotation=rot_c,
+                vertices=8,
+                bevel=0.003,
+            ))
+
+    return objects
+
+
+def make_bmesh_hull_greebles(
+    prefix: str,
+    hull_length: float = 3.0,
+    hull_width: float = 2.4,
+    deck_z: float = 0.90,
+    deck_center: Tuple[float, float, float] | Vector = (0.0, 0.0, 0.0),
+    armor_mat: bpy.types.Material | None = None,
+    metal_mat: bpy.types.Material | None = None,
+    accent_mat: bpy.types.Material | None = None,
+    include_lugs: bool = True,
+    include_vents: bool = True,
+) -> list[bpy.types.Object]:
+    """Generates low-poly BMesh surface greebles: recessed maintenance hatches, louver vents, and forged lifting lugs."""
+    objects: list[bpy.types.Object] = []
+    a_mat = armor_mat or metal_mat
+    m_mat = metal_mat or armor_mat
+    center = Vector(deck_center)
+
+    # 1. Bilateral BMesh-inset maintenance access panels with raised handle bars
+    panel_w = min(0.36, hull_width * 0.16)
+    panel_l = min(0.46, hull_length * 0.16)
+    for side in (-1, 1):
+        stag = "L" if side < 0 else "R"
+        px = center.x + side * (hull_width * 0.26)
+        py = center.y + hull_length * 0.22
+        pz = center.z + deck_z + 0.015
+
+        mesh = bpy.data.meshes.new(f"{prefix}_GreebleHatch_{stag}_Mesh")
+        hatch_obj = bpy.data.objects.new(f"{prefix}_GreebleHatch_{stag}", mesh)
+        hatch_obj.location = (px, py, pz)
+        bpy.context.collection.objects.link(hatch_obj)
+
+        bm = bmesh.new()
+        bmesh.ops.create_cube(bm, size=1.0)
+        for v in bm.verts:
+            v.co.x *= panel_w
+            v.co.y *= panel_l
+            v.co.z *= 0.032
+        bm.faces.ensure_lookup_table()
+        top_faces = [f for f in bm.faces if f.normal.z > 0.8]
+        if top_faces:
+            res = bmesh.ops.inset_individual(bm, faces=top_faces, thickness=0.035, depth=-0.010)
+            inner_faces = [f for f in bm.faces if f.normal.z > 0.8 and f not in res.get("faces", [])]
+            if inner_faces:
+                bmesh.ops.inset_individual(bm, faces=inner_faces, thickness=0.018, depth=0.014)
+        bm.normal_update()
+        bm.to_mesh(mesh)
+        bm.free()
+        finish_mesh(hatch_obj, a_mat, bevel=0.006, smooth=False)
+        objects.append(hatch_obj)
+
+        # Recessed grab handle bar on hatch
+        objects.append(make_box(
+            f"{prefix}_GreebleHandle_{stag}",
+            (0.025, panel_l * 0.38, 0.022),
+            (px, py, pz + 0.024),
+            m_mat, bevel=0.004
+        ))
+
+    # 2. Slotted micro-louver heat dissipation cassette on rear/mid deck
+    if include_vents:
+        louver_loc = Vector((center.x, center.y - hull_length * 0.14, center.z + deck_z + 0.02))
+        louver_w = min(0.58, hull_width * 0.26)
+        louver_l = min(0.42, hull_length * 0.14)
+        objects.append(make_box(
+            f"{prefix}_GreebleLouverFrame",
+            (louver_w, louver_l, 0.028),
+            louver_loc, m_mat, bevel=0.006
+        ))
+        slat_count = 4
+        for idx in range(slat_count):
+            sy = louver_loc.y - louver_l * 0.34 + idx * (louver_l * 0.68 / max(1, slat_count - 1))
+            objects.append(make_box(
+                f"{prefix}_GreebleLouverSlat_{idx+1}",
+                (louver_w * 0.86, 0.032, 0.024),
+                (louver_loc.x, sy, louver_loc.z + 0.015),
+                a_mat, bevel=0.004, rotation=(math.radians(22.0), 0.0, 0.0)
+            ))
+
+    # 3. Four corner forged crane lifting lugs / tow shackles
+    if include_lugs:
+        for sx in (-1, 1):
+            for sy in (-1, 1):
+                tag = f"{'L' if sx < 0 else 'R'}{'F' if sy > 0 else 'R'}"
+                lx = center.x + sx * (hull_width * 0.34)
+                ly = center.y + sy * (hull_length * 0.38)
+                lz = center.z + deck_z + 0.025
+                objects.append(make_box(
+                    f"{prefix}_GreebleLiftLug_{tag}",
+                    (0.036, 0.095, 0.055),
+                    (lx, ly, lz),
+                    accent_mat if (accent_mat and sy > 0) else m_mat,
+                    bevel=0.008,
+                ))
+
+    return objects
+
+
+def make_tactical_decal_plates(
+    prefix: str,
+    target_objects: Sequence[bpy.types.Object],
+    hull_length: float = 3.0,
+    hull_width: float = 2.4,
+    deck_z: float = 0.90,
+    decal_mat: bpy.types.Material | None = None,
+    secondary_mat: bpy.types.Material | None = None,
+    emissive_mat: bpy.types.Material | None = None,
+    stripe_count: int = 2,
+    include_zenith_id: bool = True,
+) -> list[bpy.types.Object]:
+    """Projects low-poly tactical chevron stripes and faction ID stencil plates onto armor surfaces via BVHTree raycasting."""
+    from mathutils.bvhtree import BVHTree
+
+    objects: list[bpy.types.Object] = []
+    w_mat = decal_mat or secondary_mat
+    l_mat = secondary_mat or decal_mat
+    stripe_count = max(0, min(8, int(stripe_count)))
+
+    # Filter candidate armor meshes for BVHTree surface snapping
+    armor_meshes = [
+        o for o in target_objects
+        if o.type == "MESH"
+        and any(k in o.name for k in ("Hull", "Torso", "Citadel", "Cab", "Shelter", "Hall", "Bunker", "Foundation"))
+        and not o.name.endswith(("_COLLIDER", "_ShieldBubble"))
+    ]
+
+    bpy.context.view_layer.update()
+    bvh_trees: list[BVHTree] = []
+    for o in armor_meshes:
+        try:
+            bm = bmesh.new()
+            bm.from_mesh(o.data)
+            bm.transform(o.matrix_world)
+            bvh_trees.append(BVHTree.FromBMesh(bm))
+            bm.free()
+        except Exception:
+            pass
+
+    def _raycast_armor(origin: Vector, direction: Vector, max_dist: float = 3.5) -> Tuple[Vector, Vector] | None:
+        best_loc = None
+        best_norm = None
+        best_dist = max_dist
+        dir_n = direction.normalized()
+        for tree in bvh_trees:
+            loc, norm, _, dist = tree.ray_cast(origin, dir_n, best_dist)
+            if loc is not None and norm is not None and dist < best_dist:
+                best_dist = dist
+                best_loc = loc
+                best_norm = norm.normalized()
+        if best_loc is not None and best_norm is not None:
+            return best_loc, best_norm
+        return None
+
+    # 1. Bilateral flank tactical chevron stripes (snapped to side hull/torso armor)
+    for side in (-1, 1):
+        stag = "L" if side < 0 else "R"
+        stripe_y = hull_length * 0.08
+        ray_origin = Vector((side * (hull_width * 1.35), stripe_y, deck_z * 0.78))
+        ray_dir = Vector((-side, 0.0, 0.0))
+        hit = _raycast_armor(ray_origin, ray_dir)
+        if hit is not None:
+            hit_loc, hit_norm = hit
+            # Ensure outward normal points toward the side
+            if hit_norm.dot(Vector((side, 0.0, 0.0))) < 0.0:
+                hit_norm = -hit_norm
+            plate_center = hit_loc + hit_norm * 0.012
+            rot_euler = hit_norm.to_track_quat("Z", "Y").to_euler()
+        else:
+            plate_center = Vector((side * (hull_width * 0.48 + 0.012), stripe_y, deck_z * 0.75))
+            rot_euler = Vector((side, 0.0, 0.0)).to_track_quat("Z", "Y").to_euler()
+
+        # Primary warning stripes and a secondary ID badge on each flank.
+        for stripe_index in range(stripe_count):
+            stripe_offset = (stripe_index - (stripe_count - 1) * 0.5) * 0.18
+            stripe_pos = plate_center + Vector((0.0, stripe_offset, 0.0))
+            objects.append(make_box(
+                f"{prefix}_DecalStripe_{stag}_{stripe_index + 1}",
+                (0.42, 0.11, 0.012),
+                stripe_pos,
+                w_mat, bevel=0.003, rotation=rot_euler
+            ))
+        objects.append(make_box(
+            f"{prefix}_DecalBadge_{stag}",
+            (0.16, 0.16, 0.014),
+            plate_center + Vector((0.0, -0.32, 0.0)),
+            l_mat, bevel=0.003, rotation=rot_euler
+        ))
+
+    # 2. Forward glacis / upper deck zenith identification chevron plate (visible from 45° RTS camera)
+    if include_zenith_id:
+        top_origin = Vector((0.0, hull_length * 0.28, deck_z + 2.2))
+        top_hit = _raycast_armor(top_origin, Vector((0.0, 0.0, -1.0)))
+        if top_hit is not None:
+            t_loc, t_norm = top_hit
+            if t_norm.z < 0.0:
+                t_norm = -t_norm
+            front_plate_pos = t_loc + t_norm * 0.012
+            front_rot = t_norm.to_track_quat("Z", "Y").to_euler()
+        else:
+            front_plate_pos = Vector((0.0, hull_length * 0.26, deck_z + 0.015))
+            front_rot = (0.0, 0.0, 0.0)
+
+        objects.append(make_box(
+            f"{prefix}_DecalChevron_Front",
+            (min(0.52, hull_width * 0.28), 0.14, 0.014),
+            front_plate_pos,
+            w_mat, bevel=0.003, rotation=front_rot
+        ))
+        if emissive_mat is not None:
+            objects.append(make_box(
+                f"{prefix}_DecalBeacon_Front",
+                (min(0.22, hull_width * 0.12), 0.05, 0.016),
+                front_plate_pos + Vector((0.0, -0.11, 0.002)),
+                emissive_mat, bevel=0.002, rotation=front_rot
+            ))
+
+    return objects
+
+
 def create_unity_empty_locator(
     name: str,
     location: Tuple[float, float, float] | Vector,
@@ -2391,12 +2728,44 @@ def create_unity_locator_sockets(
 # 7. Optimization, Batching & Mesh Quality
 # ---------------------------------------------------------------------------
 
+def apply_weighted_normals(
+    obj: bpy.types.Object,
+    weight: int = 50,
+    mode: str = "FACE_AREA",
+    keep_sharp: bool = True,
+    apply_modifier: bool = True,
+) -> bpy.types.Object:
+    """Applies a Face-Area Weighted Normal modifier to eliminate low-poly shading pinch on chamfered hard-surface plates."""
+    if obj is None or obj.type != "MESH" or not obj.data.polygons:
+        return obj
+
+    try:
+        bpy.ops.object.select_all(action="DESELECT")
+        obj.select_set(True)
+        bpy.context.view_layer.objects.active = obj
+
+        mod = obj.modifiers.new(name="RCL_WeightedNormal", type="WEIGHTED_NORMAL")
+        mod.mode = mode
+        mod.weight = max(1, min(100, int(weight)))
+        mod.keep_sharp = keep_sharp
+
+        has_armature = any(m.type == "ARMATURE" for m in obj.modifiers)
+        if apply_modifier and not has_armature:
+            bpy.ops.object.modifier_apply(modifier=mod.name)
+    except Exception as ex:
+        print(f"Warning: Weighted normal pass skipped for {obj.name}: {ex}")
+
+    return obj
+
+
 def batch_and_join_by_material(
     objects: Sequence[bpy.types.Object],
     prefix: str = "Unit",
     preserve_names: Sequence[str] | None = None,
     smooth_by_angle: bool = True,
     smooth_angle_deg: float = 38.0,
+    weighted_normals: bool = True,
+    normal_weight: int = 50,
 ) -> list[bpy.types.Object]:
     """Combines modular kitbashed objects by material into unified meshes.
     
@@ -2405,6 +2774,8 @@ def batch_and_join_by_material(
     Objects whose names match or contain strings in `preserve_names` remain separate.
     When `smooth_by_angle` is True, applies Blender 4.5 angle-weighted auto-smoothing,
     giving perfectly rounded cylinders/wheels/barrels while preserving crisp chamfers.
+    When `weighted_normals` is True, applies face-area weighted normals (`WEIGHTED_NORMAL`)
+    so broad armor plates remain flat without shading pinch across 1-segment bevels.
     """
     material_groups: Dict[bpy.types.Material | None, list[bpy.types.Object]] = {}
     preserved_objects: list[bpy.types.Object] = []
@@ -2456,6 +2827,9 @@ def batch_and_join_by_material(
             for poly in joined_obj.data.polygons:
                 poly.use_smooth = False
 
+        if weighted_normals and smooth_by_angle:
+            apply_weighted_normals(joined_obj, weight=normal_weight, keep_sharp=True, apply_modifier=True)
+
     # Also smooth preserved objects if requested
     if smooth_by_angle and hasattr(bpy.ops.object, "shade_smooth_by_angle"):
         for p_obj in preserved_objects:
@@ -2464,6 +2838,8 @@ def batch_and_join_by_material(
                 p_obj.select_set(True)
                 bpy.context.view_layer.objects.active = p_obj
                 bpy.ops.object.shade_smooth_by_angle(angle=math.radians(smooth_angle_deg))
+                if weighted_normals:
+                    apply_weighted_normals(p_obj, weight=normal_weight, keep_sharp=True, apply_modifier=True)
 
     return joined_objects
 
@@ -2646,6 +3022,7 @@ def generate_lod_chain(
     lod_levels: Sequence[Tuple[str, float]] = (("LOD0", 1.0), ("LOD1", 0.50), ("LOD2", 0.22)),
     smooth_by_angle: bool = True,
     smooth_angle_deg: float = 38.0,
+    weighted_normals: bool = True,
 ) -> Dict[str, list[bpy.types.Object]]:
     """Generates an automated multi-level LOD hierarchy (LOD0, LOD1, LOD2) for Unity LODGroup.
 
@@ -2683,6 +3060,8 @@ def generate_lod_chain(
                 bpy.ops.object.select_all(action="DESELECT")
                 dup.select_set(True)
                 bpy.ops.object.shade_smooth_by_angle(angle=math.radians(smooth_angle_deg))
+                if weighted_normals:
+                    apply_weighted_normals(dup, weight=50, keep_sharp=True, apply_modifier=True)
 
             lod_objects.append(dup)
         lod_dict[lod_name] = lod_objects
@@ -2800,11 +3179,11 @@ def profile_model_budget_and_drawcalls(
 
         if any(k in name for k in ("Track", "Wheel", "Tire", "Leg", "Skimmer", "Thruster", "TiltRotor", "Outrigger")):
             subsystems["Mobility & Wheels"] += tris
-        elif any(k in name for k in ("Cannon", "Barrel", "Howitzer", "Gatling", "Missile", "Gun", "Emitter", "Muzzle", "Railgun", "Flak", "Plasma", "Mortar")):
+        elif any(k in name for k in ("Cannon", "Barrel", "Howitzer", "Gatling", "Missile", "Gun", "Emitter", "Muzzle", "Railgun", "Flak", "Plasma", "Mortar", "Flamer", "EMP", "Laser", "VLS")):
             subsystems["Weapons"] += tris
         elif any(k in name for k in ("Turret", "Troop", "RollCage", "Cab", "FlightDeck", "Bridge")):
             subsystems["Turret & Cabin"] += tris
-        elif any(k in name for k in ("Sensor", "Visor", "Antenna", "Radar", "Smoke", "Sponson", "Applique", "Grille", "Bolt", "Excavator", "Drum")):
+        elif any(k in name for k in ("Sensor", "Visor", "Antenna", "Radar", "Smoke", "Sponson", "Applique", "Grille", "Bolt", "Excavator", "Drum", "Hose", "Greeble", "Decal", "Marking")):
             subsystems["Optics & Greebles"] += tris
         else:
             subsystems["Chassis & Hull"] += tris
@@ -3223,7 +3602,7 @@ def export_unity_fbx(
         apply_unit_scale=True,
         apply_scale_options="FBX_SCALE_NONE",
         use_mesh_modifiers=True,
-        mesh_smooth_type="OFF",
+        mesh_smooth_type="FACE",
         path_mode="AUTO",
         axis_forward="-Z",
         axis_up="Y",
@@ -8800,6 +9179,97 @@ class RogueVehicleBuilder:
             ))
             return self
 
+    def add_hydraulic_hoses(
+        self,
+        radius: float = 0.024,
+        sag: float = 0.14,
+        corrugated: bool = True,
+    ) -> "RogueVehicleBuilder":
+        """Adds bilateral catenary hydraulic hoses and braided power conduits between chassis/pelvis and turret/limbs."""
+        hw = (self.hull_width * 0.42) if hasattr(self, "hull_width") else 0.90
+        hl = (self.hull_length * 0.34) if hasattr(self, "hull_length") else 1.15
+        hz = self.hull_deck_z if hasattr(self, "hull_deck_z") else 0.85
+
+        if self.archetype in ("walker", "quad_walker", "reverse_walker"):
+            # Connect pelvis underside to upper thigh hydraulic manifolds on left & right
+            pelvis_z = hz - 0.10
+            thigh_z = max(0.45, pelvis_z - 0.38)
+            for side, stag in ((-1, "L"), (1, "R")):
+                p0 = (side * (hw * 0.55), -0.12, pelvis_z)
+                p1 = (side * (hw * 0.92), 0.10, thigh_z)
+                self.objects.extend(make_catenary_cable_assembly(
+                    f"{self.name}Leg_{stag}_HydraulicHose",
+                    start_point=p0,
+                    end_point=p1,
+                    radius=radius,
+                    sag=sag,
+                    segments=10,
+                    corrugated=corrugated,
+                    hose_mat=self.palette.tread,
+                    coupler_mat=self.palette.gunmetal,
+                    accent_mat=self.palette.warning,
+                ))
+        else:
+            # Connect rear engine power pack to mid-hull/turret ring manifold
+            tc_z = self.turret_center.z if (hasattr(self, "turret_center") and self.turret_center is not None) else (hz + 0.16)
+            tc_y = self.turret_center.y if (hasattr(self, "turret_center") and self.turret_center is not None) else 0.0
+            for side, stag in ((-1, "L"), (1, "R")):
+                p0 = (side * (hw * 0.72), -hl * 0.85, hz + 0.06)
+                p1 = (side * (hw * 0.56), tc_y - 0.18, tc_z - 0.04)
+                self.objects.extend(make_catenary_cable_assembly(
+                    f"{self.name}Hull_{stag}_PowerHose",
+                    start_point=p0,
+                    end_point=p1,
+                    radius=radius,
+                    sag=sag * 0.85,
+                    segments=10,
+                    corrugated=corrugated,
+                    hose_mat=self.palette.tread,
+                    coupler_mat=self.palette.gunmetal,
+                    accent_mat=self.palette.warning,
+                ))
+        return self
+
+    def add_hull_greebles(
+        self,
+        include_lugs: bool = True,
+        include_vents: bool = True,
+    ) -> "RogueVehicleBuilder":
+        """Adds BMesh-inset maintenance hatches, slotted micro-louver vents, and corner forged lifting lugs."""
+        hw = self.hull_width if hasattr(self, "hull_width") else 2.2
+        hl = self.hull_length if hasattr(self, "hull_length") else 3.4
+        hz = self.hull_deck_z if hasattr(self, "hull_deck_z") else 0.88
+        center_y = -hl * 0.12 if (hasattr(self, "turret_center") and self.turret_center is not None) else 0.0
+        self.objects.extend(make_bmesh_hull_greebles(
+            f"{self.name}Hull_Greeble",
+            deck_center=(0.0, center_y, 0.0),
+            hull_width=hw,
+            hull_length=hl,
+            deck_z=hz,
+            armor_mat=self.palette.light_armor,
+            metal_mat=self.palette.gunmetal,
+            accent_mat=self.palette.warning,
+            include_lugs=include_lugs,
+            include_vents=include_vents,
+        ))
+        return self
+
+    def add_tactical_markings(
+        self,
+        stripe_count: int = 2,
+        include_zenith_id: bool = True,
+    ) -> "RogueVehicleBuilder":
+        """Projects floating tactical chevron decals and zenith identification plates onto armor via BVHTree."""
+        self.objects.extend(make_tactical_decal_plates(
+            f"{self.name}Decal",
+            target_objects=list(self.objects),
+            decal_mat=self.palette.warning,
+            secondary_mat=self.palette.light_armor,
+            stripe_count=stripe_count,
+            include_zenith_id=include_zenith_id,
+        ))
+        return self
+
     def add_unity_locators(self) -> "RogueVehicleBuilder":
         self.locator_sockets = create_unity_locator_sockets(
             name_prefix=self.name,
@@ -8844,6 +9314,7 @@ class RogueVehicleBuilder:
         ortho_scale: float = 5.8,
         smooth_by_angle: bool = True,
         smooth_angle_deg: float = 38.0,
+        weighted_normals: bool = True,
         bake_vertex_dirt: bool = True,
         include_locators: bool = True,
         generate_lods: bool = False,
@@ -8985,14 +9456,16 @@ class RogueVehicleBuilder:
         if include_rig:
             self.add_armature_rig(with_animations=include_animations, with_ik=include_ik, target_objects=model_export_source_objects)
 
-        # 9. Material batching for FBX with smart angle-weighted smoothing
+        # 9. Material batching for FBX with smart angle-weighted smoothing & face-area weighted normals
         batched_objects = batch_and_join_by_material(
             model_export_source_objects,
             prefix=self.name,
             preserve_names=self.preserved_pivots,
             smooth_by_angle=smooth_by_angle,
             smooth_angle_deg=smooth_angle_deg,
+            weighted_normals=weighted_normals,
         )
+        diagnostics["weighted_normals"] = weighted_normals
 
         # 10. Texture Atlas Baking & Single-Material Export
         effective_bake_atlas = bake_atlas or (self.camo and self.camo != "none")
@@ -9017,6 +9490,7 @@ class RogueVehicleBuilder:
                 lod_levels=lod_ratios,
                 smooth_by_angle=smooth_by_angle,
                 smooth_angle_deg=smooth_angle_deg,
+                weighted_normals=weighted_normals,
             )
             diagnostics["lod_levels"] = {k: len(v) for k, v in lod_dict.items()}
 
@@ -9302,6 +9776,58 @@ class RogueStructureBuilder:
         self.sockets.update(socks)
         return self
 
+    def add_hydraulic_hoses(
+        self,
+        radius: float = 0.032,
+        sag: float = 0.22,
+    ) -> "RogueStructureBuilder":
+        """Adds bilateral external high-voltage power conduits to the structure base."""
+        for side, stag in ((-1, "L"), (1, "R")):
+            p0 = (side * 2.1, -1.6, 0.35)
+            p1 = (side * 1.35, -0.5, 1.65)
+            self.objects.extend(make_catenary_cable_assembly(
+                f"{self.name}Struct_{stag}_PowerConduit",
+                start_point=p0,
+                end_point=p1,
+                radius=radius,
+                sag=sag,
+                segments=10,
+                corrugated=True,
+                hose_mat=self.palette.tread,
+                coupler_mat=self.palette.gunmetal,
+                accent_mat=self.palette.warning,
+            ))
+        return self
+
+    def add_hull_greebles(self) -> "RogueStructureBuilder":
+        """Adds BMesh-inset maintenance hatches and louver vents to structure roof/deck."""
+        roof_pos = self.sockets.get("Socket_RoofMount", Vector((0.0, 0.0, 2.2)))
+        self.objects.extend(make_bmesh_hull_greebles(
+            f"{self.name}Struct_Greeble",
+            deck_center=(0.0, 0.0, 0.0),
+            hull_width=3.6,
+            hull_length=4.0,
+            deck_z=max(0.45, roof_pos.z * 0.45),
+            armor_mat=self.palette.light_armor,
+            metal_mat=self.palette.gunmetal,
+            accent_mat=self.palette.warning,
+            include_lugs=True,
+            include_vents=True,
+        ))
+        return self
+
+    def add_tactical_markings(self) -> "RogueStructureBuilder":
+        """Projects BVHTree tactical chevron decals onto structure walls."""
+        self.objects.extend(make_tactical_decal_plates(
+            f"{self.name}Struct_Decal",
+            target_objects=list(self.objects),
+            decal_mat=self.palette.warning,
+            secondary_mat=self.palette.light_armor,
+            stripe_count=2,
+            include_zenith_id=True,
+        ))
+        return self
+
     def add_colliders(self) -> "RogueStructureBuilder":
         self.collider_objects = generate_collision_hulls(
             self.objects, prefix=self.name, include_turret_collider=True
@@ -9341,6 +9867,7 @@ class RogueStructureBuilder:
         gameplay_meta_path: Path | None = None,
         smooth_by_angle: bool = True,
         smooth_angle_deg: float = 38.0,
+        weighted_normals: bool = True,
         render_icons: bool = False,
         icon_resolutions: Sequence[int] = (64, 128),
         icon_elevation: float = 45.0,
@@ -9396,7 +9923,9 @@ class RogueStructureBuilder:
             preserve_names=[],
             smooth_by_angle=smooth_by_angle,
             smooth_angle_deg=smooth_angle_deg,
+            weighted_normals=weighted_normals,
         )
+        diagnostics["weighted_normals"] = weighted_normals
 
         if bake_atlas or single_material_atlas or (self.palette.camo and self.palette.camo != "none"):
             texture_dir = fbx_path.parent / "Textures"
@@ -9428,6 +9957,7 @@ class RogueStructureBuilder:
                 lod_levels=lod_ratios,
                 smooth_by_angle=smooth_by_angle,
                 smooth_angle_deg=smooth_angle_deg,
+                weighted_normals=weighted_normals,
             )
             diagnostics["lod_levels"] = {k: len(v) for k, v in lod_dict.items()}
             lod_fbx_path = fbx_path.parent / f"{fbx_path.stem}_LODs.fbx"
@@ -9457,5 +9987,3 @@ class RogueStructureBuilder:
         print(f"  Type: {self.building_type}, Batched parts: {len(batched_objects)}")
         print(f"  Polygons: {diagnostics['total_polygons']}, Ground valid: {diagnostics['ground_contact_valid']}")
         return diagnostics
-
-

@@ -27,6 +27,7 @@ Read `AGENTS.md`, `references/changeable-values-spec.md`, `references/lanchester
 - **Flat Armor Subtraction with Floor**: Damage after armor is calculated as $\max(0.1\text{f}, \text{RawDamage} - \text{ArmorProtection})$. Armor directly subtracts from damage; it does not reduce by a percentage.
 - **Weapon Ranges & Speeds**: Units close distance until within `weaponRange` before opening fire. If a unit is outranged and slower, it will take damage without dealing any back.
 - **Suicide Detonators**: Units with the `Bomb` tag or `is_suicide` close to contact ($\le 1.0\text{m}$), detonate their payload across `effectRadius1`, and immediately self-destruct.
+- **Attack delivery model limit**: In this simulator, `UnitProfile.attack_type` is descriptive metadata only; the game uses `AttackType` to select delivery and targeting behavior. The simulator applies `damage1` as discrete cooldown events and does not independently model multi-projectile volleys, beam ticks, or AoE victim counts. It reports `Unknown` when the input has no verified `AttackType`; do not treat `Continuous` as a game enum or as proof that damage is continuous.
 
 ---
 

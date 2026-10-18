@@ -73,7 +73,7 @@ BUILTIN_NATIVE_ARCHETYPES: Dict[str, Dict[str, Any]] = {
         "weaponRange": 3.8,
         "effectRadius1": 0.2,
         "systemTags": "None",
-        "attackType": "Continuous",
+        "attackType": "Unknown",
     },
     "ArtilleryTank": {
         "cost": 320.0,
@@ -89,7 +89,7 @@ BUILTIN_NATIVE_ARCHETYPES: Dict[str, Dict[str, Any]] = {
         "weaponRange": 18.0,
         "effectRadius1": 1.2,
         "systemTags": "AoE, Vehicle, Sniper",
-        "attackType": "Continuous",
+        "attackType": "Unknown",
     },
     "GatlingWalker": {
         "cost": 500.0,
@@ -105,7 +105,7 @@ BUILTIN_NATIVE_ARCHETYPES: Dict[str, Dict[str, Any]] = {
         "weaponRange": 5.0,
         "effectRadius1": 0.0,
         "systemTags": "Mech",
-        "attackType": "Continuous",
+        "attackType": "Unknown",
     },
     "BombBike": {
         "cost": 45.0,
@@ -137,7 +137,7 @@ BUILTIN_NATIVE_ARCHETYPES: Dict[str, Dict[str, Any]] = {
         "weaponRange": 3.0,
         "effectRadius1": 0.0,
         "systemTags": "Shield, Armor, SkillRangeUse, Tank",
-        "attackType": "Continuous",
+        "attackType": "Unknown",
     },
     "PCXShieldingTruck": {
         "cost": 260.0,
@@ -153,7 +153,7 @@ BUILTIN_NATIVE_ARCHETYPES: Dict[str, Dict[str, Any]] = {
         "weaponRange": 4.5,
         "effectRadius1": 0.0,
         "systemTags": "None",
-        "attackType": "Continuous",
+        "attackType": "Unknown",
     },
 }
 
@@ -179,7 +179,7 @@ class UnitProfile:
     attack2_cooldown: float = 0.0
     weapon_range: float = 5.0
     effect_radius1: float = 0.0
-    attack_type: str = "Single"  # "Single", "AoE", "Multi", "Beam", "Artillery"
+    attack_type: str = "Unknown"  # AttackType metadata; not currently used by the damage model.
     is_suicide: bool = False
     tags: List[str] = field(default_factory=list)
 
@@ -335,6 +335,29 @@ class CombatSimulator:
 
         elapsed_time = 0.0
         flags = []
+
+        if (
+            not unit_a.is_suicide_unit
+            and unit_a.damage1 > 0.0
+            and unit_a.effective_range > unit_b.effective_range
+            and unit_a.move_speed > unit_b.move_speed
+            and current_distance > unit_b.effective_range
+        ):
+            flags.append(
+                f"INFINITE_KITING_ENVELOPE: {unit_a.unit_id} outranges and outspeeds "
+                f"{unit_b.unit_id}; this duel model lets it hold distance outside the defender's range."
+            )
+        elif (
+            not unit_b.is_suicide_unit
+            and unit_b.damage1 > 0.0
+            and unit_b.effective_range > unit_a.effective_range
+            and unit_b.move_speed > unit_a.move_speed
+            and current_distance > unit_a.effective_range
+        ):
+            flags.append(
+                f"INFINITE_KITING_ENVELOPE: {unit_b.unit_id} outranges and outspeeds "
+                f"{unit_a.unit_id}; this duel model lets it hold distance outside the defender's range."
+            )
 
         if unit_a.damage1 <= unit_b.armor_protection and unit_a.damage1 > 0:
             flags.append(f"ARMOR_LOCKOUT: {unit_a.unit_id} ({unit_a.damage1} dmg) <= {unit_b.unit_id} ({unit_b.armor_protection} armor). Dealing 0.1 floor.")
@@ -638,7 +661,7 @@ class BalanceRepository:
                 attack2_cooldown=float(data.get("attack2Cooldown", 0.0)),
                 weapon_range=float(data.get("weaponRange", 5.0)),
                 effect_radius1=float(data.get("effectRadius1", 0.0)),
-                attack_type=str(data.get("attackType", "Continuous")),
+                attack_type=str(data.get("attackType", "Unknown")),
                 tags=str(data.get("systemTags", "")).split(", "),
             )
 
@@ -667,7 +690,7 @@ class BalanceRepository:
                             attack2_cooldown=float(row.get("attack2Cooldown", 0.0) or 0.0),
                             weapon_range=float(row.get("weaponRange", 5.0) or 5.0),
                             effect_radius1=float(row.get("effectRadius1", 0.0) or 0.0),
-                            attack_type="Single" if "Bomb" in str(row.get("offeredSystemTags", "")) else "Continuous",
+                            attack_type="Single" if "Bomb" in str(row.get("offeredSystemTags", "")) else "Unknown",
                             tags=[t.strip() for t in str(row.get("offeredSystemTags", "")).split(",") if t.strip()],
                         )
             except Exception as e:

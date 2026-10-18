@@ -37,7 +37,7 @@
         { "name": "maxHealth", "value": "130" },
         { "name": "moveSpeed", "value": "14.5" },
         { "name": "sightRadius", "value": "8" },
-        { "name": "weaponRange", "value": "6" },
+        { "name": "weaponRange", "value": "3.5" },
         { "name": "attackCooldown", "value": "0.9" },
         { "name": "rarity", "value": "Common" },
         { "name": "neededExperienceLevel", "value": "0" },
@@ -104,7 +104,7 @@
         { "name": "maxHealth", "value": "160" },
         { "name": "moveSpeed", "value": "9.0" },
         { "name": "damage1", "value": "55" },
-        { "name": "weaponRange", "value": "16" },
+        { "name": "weaponRange", "value": "18.5" },
         { "name": "attackCooldown", "value": "4.0" },
         { "name": "effectRadius1", "value": "1.5" },
         { "name": "armorProtection", "value": "2" },
@@ -149,8 +149,6 @@
       "nativeTemplateId": "GatlingWalker",
       "assetBundleId": "sample-native:assets",
       "cardImageAssetName": "assets/roguecommandexpansionsample/ironcladwalkercard.png",
-      "visualAssetName": "assets/roguecommandexpansionsample/ironcladwalkervisual.prefab",
-      "visualRootPath": "RoboMarine_Mesh",
       "localizations": [
         {
           "language": "en-US",

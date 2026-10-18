@@ -272,7 +272,7 @@ namespace RogueCommandExpansion.Authoring
                         prefabPath, CardSpritePath,
                         bikePrefabPath, BikeCardSpritePath,
                         colossusPrefabPath, ColossusCardSpritePath,
-                        ironcladPrefabPath, IroncladCardSpritePath,
+                        IroncladCardSpritePath,
                         surgeArcTankPrefabPath, SurgeArcTankCardSpritePath
                     }
                 };
@@ -305,9 +305,9 @@ namespace RogueCommandExpansion.Authoring
                     Path.Combine(packBundles, "assetbundle-manifest.bundle"));
 
                 AssetDatabase.Refresh();
-                Debug.Log("Built script-free Sandlance, Skirmish Bike, Colossus, Ironclad, and Surge Arc Tank " +
-                    "visual overlays and card Sprites in " + BundleName + " at " + packBundles + ". All units " +
-                    "retain their native gameplay prefabs.");
+                Debug.Log("Built four script-free Sandlance, Skirmish Bike, Colossus, and Surge Arc Tank " +
+                    "visual overlays plus five card Sprites in " + BundleName + " at " + packBundles + ". " +
+                    "Ironclad Walker keeps its native articulated GatlingWalker visual until its custom model is rigged.");
             }
             catch (Exception exception)
             {
@@ -353,6 +353,7 @@ namespace RogueCommandExpansion.Authoring
                 modelInstance.transform.localRotation = Quaternion.identity;
                 modelInstance.transform.localScale = Vector3.one;
                 AssignScoutMaterials(modelInstance, materials);
+                VehiclePrefabBuilder.EnsureCanonicalVfxSockets(root, modelInstance);
 
                 bool success;
                 PrefabUtility.SaveAsPrefabAsset(root, PrefabPath, out success);
@@ -412,6 +413,7 @@ namespace RogueCommandExpansion.Authoring
                 modelInstance.transform.localRotation = Quaternion.identity;
                 modelInstance.transform.localScale = Vector3.one;
                 AssignSkirmishBikeMaterials(modelInstance, materials);
+                VehiclePrefabBuilder.EnsureCanonicalVfxSockets(root, modelInstance);
 
                 bool success;
                 PrefabUtility.SaveAsPrefabAsset(root, BikePrefabPath, out success);
@@ -471,6 +473,7 @@ namespace RogueCommandExpansion.Authoring
                 modelInstance.transform.localRotation = Quaternion.identity;
                 modelInstance.transform.localScale = Vector3.one;
                 AssignColossusMaterials(modelInstance, materials);
+                VehiclePrefabBuilder.EnsureCanonicalVfxSockets(root, modelInstance);
 
                 bool success;
                 PrefabUtility.SaveAsPrefabAsset(root, ColossusPrefabPath, out success);
@@ -535,6 +538,7 @@ namespace RogueCommandExpansion.Authoring
                 modelInstance.transform.localRotation = Quaternion.identity;
                 modelInstance.transform.localScale = Vector3.one;
                 AssignIroncladMaterials(modelInstance, materials);
+                VehiclePrefabBuilder.EnsureCanonicalVfxSockets(root, modelInstance);
 
                 bool success;
                 PrefabUtility.SaveAsPrefabAsset(root, IroncladPrefabPath, out success);
@@ -562,8 +566,13 @@ namespace RogueCommandExpansion.Authoring
                 throw new FileNotFoundException("Unity did not import " + IroncladPrefabPath + ".");
             }
 
-            importer.assetBundleName = BundleName;
-            importer.assetBundleVariant = String.Empty;
+            // This static model is retained as an authoring prototype, but the pack uses the
+            // native GatlingWalker renderer and articulation until this model has a walker rig.
+            if (!String.IsNullOrEmpty(importer.assetBundleName))
+            {
+                importer.assetBundleVariant = String.Empty;
+                importer.assetBundleName = String.Empty;
+            }
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
             NormalizeGeneratedUnityMetaFiles(projectRoot);
@@ -600,6 +609,7 @@ namespace RogueCommandExpansion.Authoring
                 modelInstance.transform.localRotation = Quaternion.identity;
                 modelInstance.transform.localScale = Vector3.one;
                 AssignSurgeArcTankMaterials(modelInstance, materials);
+                VehiclePrefabBuilder.EnsureCanonicalVfxSockets(root, modelInstance);
 
                 bool success;
                 PrefabUtility.SaveAsPrefabAsset(root, SurgeArcTankPrefabPath, out success);
@@ -653,10 +663,14 @@ namespace RogueCommandExpansion.Authoring
                     "skirmishbikecard.png", "SkirmishBikeCard", 7, "Skirmish Strike Bike");
                 ValidateVisualBundleAssets(bundle, assetNames, "colossussiegevisual.prefab", "ColossusSiegeVisual",
                     "colossussiegecard.png", "ColossusSiegeCard", 8, "Colossus Siege Platform");
-                ValidateVisualBundleAssets(bundle, assetNames, "ironcladwalkervisual.prefab", "IroncladWalkerVisual",
-                    "ironcladwalkercard.png", "IroncladWalkerCard", 5, "Ironclad Walker");
+                ValidateCardSpriteAsset(bundle, assetNames, "ironcladwalkercard.png", "IroncladWalkerCard",
+                    "Ironclad Walker");
                 ValidateVisualBundleAssets(bundle, assetNames, "surgearctankvisual.prefab", "SurgeArcTankVisual",
                     "surgearctankcard.png", "SurgeArcTankCard", 6, "Surge Arc Tank");
+                if (FindAssetPathOrNull(assetNames, "ironcladwalkervisual.prefab") != null)
+                {
+                    throw new InvalidDataException("The unrigged Ironclad walker prototype must not ship in the visual bundle.");
+                }
             }
             finally
             {
@@ -689,13 +703,7 @@ namespace RogueCommandExpansion.Authoring
 
             if (requiresCard)
             {
-                string cardSpriteAssetPath = FindUniqueAssetPath(
-                    assetNames, cardSuffix, visualLabel + " card Sprite");
-                Sprite cardSprite = bundle.LoadAsset<Sprite>(cardSpriteAssetPath);
-                if (cardSprite == null || !String.Equals(cardSprite.name, cardName, StringComparison.Ordinal))
-                {
-                    throw new InvalidDataException(visualLabel + " card Sprite is missing or has the wrong asset name.");
-                }
+                ValidateCardSpriteAsset(bundle, assetNames, cardSuffix, cardName, visualLabel);
             }
 
             Renderer[] renderers = prefab.GetComponentsInChildren<Renderer>(true);
@@ -774,6 +782,35 @@ namespace RogueCommandExpansion.Authoring
             }
 
             return result;
+        }
+
+        private static void ValidateCardSpriteAsset(
+            AssetBundle bundle,
+            string[] assetNames,
+            string cardSuffix,
+            string cardName,
+            string visualLabel)
+        {
+            string cardSpriteAssetPath = FindUniqueAssetPath(
+                assetNames, cardSuffix, visualLabel + " card Sprite");
+            Sprite cardSprite = bundle.LoadAsset<Sprite>(cardSpriteAssetPath);
+            if (cardSprite == null || !String.Equals(cardSprite.name, cardName, StringComparison.Ordinal))
+            {
+                throw new InvalidDataException(visualLabel + " card Sprite is missing or has the wrong asset name.");
+            }
+        }
+
+        private static string FindAssetPathOrNull(string[] assetNames, string suffix)
+        {
+            for (int i = 0; i < assetNames.Length; i++)
+            {
+                if (assetNames[i].EndsWith("/" + suffix, StringComparison.OrdinalIgnoreCase))
+                {
+                    return assetNames[i];
+                }
+            }
+
+            return null;
         }
 
         private static Dictionary<string, Material> CreateScoutMaterials()

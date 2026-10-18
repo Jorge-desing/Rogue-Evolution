@@ -285,6 +285,11 @@ namespace RogueCommandExpansion.Authoring
                     }
                 }
 
+                // Add correctly placed fallback anchors for the loader's procedural VFX.
+                // Existing FBX sockets always win; this search must remain recursive to avoid
+                // duplicate transforms and ambiguous runtime role bindings.
+                EnsureCanonicalVfxSockets(root, modelInstance);
+
                 // 5. Mount Detached Modular Attachments (ERA, APS, Sponson, FuelDrums) if present
                 MountModularAttachmentsIfAvailable(root, unitName);
 
@@ -511,6 +516,88 @@ namespace RogueCommandExpansion.Authoring
                 }
             }
             return null;
+        }
+
+        internal static void EnsureCanonicalVfxSockets(GameObject root, GameObject model)
+        {
+            if (root == null || model == null)
+            {
+                throw new ArgumentNullException(root == null ? "root" : "model");
+            }
+
+            Renderer[] renderers = model.GetComponentsInChildren<Renderer>(true);
+            if (renderers == null || renderers.Length == 0)
+            {
+                Debug.LogWarning("[VehiclePrefabBuilder] Cannot place fallback VFX sockets without model renderers.");
+                return;
+            }
+
+            Renderer firstRenderer = null;
+            for (int i = 0; i < renderers.Length; i++)
+            {
+                if (renderers[i] != null)
+                {
+                    firstRenderer = renderers[i];
+                    break;
+                }
+            }
+            if (firstRenderer == null)
+            {
+                Debug.LogWarning("[VehiclePrefabBuilder] Cannot place fallback VFX sockets because all model renderers are null.");
+                return;
+            }
+
+            Bounds worldBounds = firstRenderer.bounds;
+            for (int i = 0; i < renderers.Length; i++)
+            {
+                if (renderers[i] != null && renderers[i] != firstRenderer)
+                {
+                    worldBounds.Encapsulate(renderers[i].bounds);
+                }
+            }
+
+            Vector3 min = new Vector3(float.PositiveInfinity, float.PositiveInfinity, float.PositiveInfinity);
+            Vector3 max = new Vector3(float.NegativeInfinity, float.NegativeInfinity, float.NegativeInfinity);
+            for (int corner = 0; corner < 8; corner++)
+            {
+                Vector3 worldCorner = new Vector3(
+                    (corner & 1) == 0 ? worldBounds.min.x : worldBounds.max.x,
+                    (corner & 2) == 0 ? worldBounds.min.y : worldBounds.max.y,
+                    (corner & 4) == 0 ? worldBounds.min.z : worldBounds.max.z);
+                Vector3 localCorner = root.transform.InverseTransformPoint(worldCorner);
+                min = Vector3.Min(min, localCorner);
+                max = Vector3.Max(max, localCorner);
+            }
+            Vector3 size = max - min;
+            Vector3 center = (min + max) * 0.5f;
+            float depthOffset = Mathf.Max(0.05f, size.z * 0.04f);
+
+            Vector3 muzzle = new Vector3(center.x, Mathf.Lerp(min.y, max.y, 0.72f), max.z + depthOffset);
+            Vector3 smoke = new Vector3(center.x, Mathf.Lerp(min.y, max.y, 0.82f), min.z + size.z * 0.20f);
+            Vector3 fire = new Vector3(center.x + size.x * 0.12f, Mathf.Lerp(min.y, max.y, 0.55f), center.z);
+            Vector3 engine = new Vector3(center.x, Mathf.Lerp(min.y, max.y, 0.30f), min.z + size.z * 0.18f);
+            Vector3 ground = new Vector3(center.x, min.y, center.z);
+
+            EnsureSocketIfMissing(root.transform, "Socket_MuzzlePrimary", muzzle);
+            EnsureSocketIfMissing(root.transform, "Socket_DamageSmoke", smoke);
+            EnsureSocketIfMissing(root.transform, "Socket_DamageFire", fire);
+            EnsureSocketIfMissing(root.transform, "Socket_EngineAudio", engine);
+            EnsureSocketIfMissing(root.transform, "Socket_WeaponAudio", muzzle);
+            EnsureSocketIfMissing(root.transform, "Socket_GroundCenter", ground);
+        }
+
+        private static void EnsureSocketIfMissing(Transform root, string socketName, Vector3 localPosition)
+        {
+            if (FindTransformRecursive(root, socketName) != null)
+            {
+                return;
+            }
+
+            var socket = new GameObject(socketName);
+            socket.transform.SetParent(root, false);
+            socket.transform.localPosition = localPosition;
+            socket.transform.localRotation = Quaternion.identity;
+            socket.transform.localScale = Vector3.one;
         }
 
         private static string NormalizeHardpointSocketType(string attachmentType)
