@@ -1720,6 +1720,7 @@ def main():
             "camo": args.camo,
             "weapon": args.weapon,
             "wear_level": args.wear,
+            "weighted_normals": res.get("weighted_normals", True),
             "total_triangles": res["total_polygons"],
             "total_vertices": res["total_vertices"],
             "predicted_draw_calls": res["exported_batched_objects"],

@@ -90,8 +90,8 @@ Use the tested, high-readability procedural assemblies rather than ad-hoc mesh p
 | **Chassis & Cabins** | `make_sloped_glacis_hull`, `make_faceted_turret_housing`, `make_troop_compartment`, `make_tubular_rollcage_assembly` | Sloped wedge glacis, faceted turret bustles, armored troop bays, welded tubular roll cages |
 | **Mobility & Legs** | `make_continuous_track_assembly`, `make_quad_track_pod_assembly`, `make_all_terrain_wheel_assembly`, `make_bipedal_digitigrade_leg`, `make_quad_crawler_leg`, `make_hover_skimmer_assembly`, `make_ducted_tiltrotor_assembly`, `make_outrigger_stabilizer_legs`, `make_swing_arm_suspension_linkage`, `make_spaced_armor_side_skirts` | Continuous tracks, 4-track pods, 4x4/6x6 off-road chevron tires, biped/spider legs, hover skirts, tilt-rotors, outriggers, trailing suspension arms, spaced armor skirts |
 | **Weapons (13)** | `make_coaxial_cannon_assembly`, `make_dual_cannon_assembly`, `make_heavy_howitzer_assembly`, `make_rotary_gatling_cannon`, `make_missile_launcher_pod`, `make_arc_energy_emitter`, `make_railgun_assembly`, `make_quad_flak_autocannon_assembly`, `make_plasma_mortar_assembly`, `make_collimated_beam_laser_assembly`, `make_vls_vertical_missile_array`, `make_flamethrower_assembly`, `make_emp_emitter_assembly`, `make_mantlet_dust_boot` | Cannons, dual guns, siege mortars, 6-barrel gatlings, rocket arrays, arc prongs, railguns, flak clusters, plasma mortars, beam lasers, VLS missile arrays, thermobaric flamethrowers, directional EMP emitters, accordion mantlet boots |
-| **Greebles & Structures** | `make_recessed_sensor_visor`, `make_gimbal_sensor_turret`, `make_radar_dish_or_rotodome`, `make_smoke_launcher_rack`, `make_side_sponson_assembly`, `make_dozer_blade`, `make_flight_deck_assembly`, `make_heavy_excavator_drum`, `make_shield_dome_assembly`, `make_emp_obelisk_assembly` | Recessed visor hoods, FLIR gimbals, radar rotodomes, smoke racks, sponsons, ERA bricks, dozer blades, flight decks, tactical shield domes, EMP suppression obelisks |
-| **Pipeline & Rigging** | `batch_and_join_by_material`, `bake_advanced_vertex_shading`, `generate_lod_chain`, `generate_collision_hulls`, `export_gameplay_metadata`, `make_wreckage_variant`, `make_thrown_track_debris`, `create_unity_locator_sockets` | Batched submeshes, RGBA wear baking, LOD0–2 chains, box colliders, `.gameplay.json`, thrown track debris, archetype-aware wreckage models, sockets |
+| **Greebles & Structures** | `make_recessed_sensor_visor`, `make_gimbal_sensor_turret`, `make_radar_dish_or_rotodome`, `make_smoke_launcher_rack`, `make_side_sponson_assembly`, `make_dozer_blade`, `make_flight_deck_assembly`, `make_heavy_excavator_drum`, `make_shield_dome_assembly`, `make_emp_obelisk_assembly`, `make_catenary_cable_assembly`, `make_bmesh_hull_greebles`, `make_tactical_decal_plates` | Recessed visor hoods, FLIR gimbals, radar rotodomes, smoke racks, sponsons, ERA bricks, dozer blades, flight decks, tactical shield domes, EMP suppression obelisks, catenary hydraulic hoses, BMesh-inset hatches/vents/lugs, BVHTree-raycasted tactical decal plates |
+| **Pipeline & Rigging** | `batch_and_join_by_material`, `apply_weighted_normals`, `bake_advanced_vertex_shading`, `generate_lod_chain`, `generate_collision_hulls`, `export_gameplay_metadata`, `make_wreckage_variant`, `make_thrown_track_debris`, `create_unity_locator_sockets` | Batched submeshes, face-area weighted split normals, RGBA wear baking, LOD0–2 chains, box colliders, `.gameplay.json`, thrown track debris, archetype-aware wreckage models, sockets |
 
 *See exact arguments and recipes in [blender-procedural-techniques.md](references/blender-procedural-techniques.md).*
 
@@ -99,7 +99,7 @@ Use the tested, high-readability procedural assemblies rather than ad-hoc mesh p
 Kitbashing produces 50–120 individual objects. Unbatched exports can create many Unity renderers and render submissions. Pass compatible geometry through `batch_and_join_by_material(objects, prefix, preserve_names, smooth_by_angle=True, smooth_angle_deg=38.0)` before export:
 - **Material Batching**: Combines compatible meshes by PBR material while preserving essential animated pivots (`TurretBase`, `MainBarrel`). Output mesh groups depend on input materials and preserved objects. This Blender-side step does not establish the final Unity draw-call count.
 - **Smart Angle-Weighted Smoothing**: Uses Blender 4.5's `shade_smooth_by_angle` to produce silky smooth round barrels, road wheels, hubs, and exhaust pipes, while preserving razor-sharp 45°/90° chamfers on flat armor plates.
-- **Weighted Normals**: `batch_and_join_by_material(..., weighted_normals=True, normal_weight=50)` follows angle smoothing with Blender's Weighted Normal modifier to reduce shading pinch across broad beveled plates while keeping sharp edges. The weight is clamped to 1–100; mesh-only objects apply the modifier, while armature meshes keep it in the modifier stack. A dry-run validates batch planning only and does not verify rendered shading.
+- **Weighted Normals**: `batch_and_join_by_material(..., weighted_normals=True, normal_weight=50)` follows angle smoothing with Blender's Weighted Normal modifier (`mode="FACE_AREA"`, `keep_sharp=True`) to reduce shading pinch across broad beveled plates while keeping sharp edges. The weight is clamped to 1–100; mesh-only objects apply the modifier, while armature meshes keep it in the modifier stack. A dry-run validates batch planning only and does not verify rendered shading.
 - **Multi-Channel Procedural Vertex Shading**: Invokes `bake_advanced_vertex_shading(objects, wear_level, exhaust_locs, muzzle_loc)` storing RGBA directly into the `Color` vertex attribute (`Mesh.colors32`):
   - **R (Red)**: Ambient Occlusion / Cavity Dirt (contact shadows in wheel wells, louvers, and undersides).
   - **G (Green)**: Curvature / Edge Wear (bright scratch glints on 45°/90° chamfer edges, simulating chipped paint).
@@ -122,13 +122,14 @@ builder = (
     .add_turret((1.85, 2.1, 0.58), center_y=0.15)
     .add_dual_cannon(caliber=0.082, length=1.65, spacing=0.38)
     .add_sensor_visor().add_radar_dish().add_side_sponsons()
+    .add_hydraulic_hoses().add_hull_greebles().add_tactical_markings()
     .add_colliders(include_turret=True).add_unity_locators()
 )
 diagnostics = builder.build_and_export(
     fbx_path=FBX_PATH, blend_path=BLEND_PATH, preview_path=PREVIEW_PATH,
-    render_multiview=True, smooth_by_angle=True, bake_vertex_dirt=True,
-    include_locators=True, generate_lods=True, generate_colliders=True,
-    gameplay_meta_path=GAMEPLAY_JSON_PATH, target_budget=4500
+    render_multiview=True, smooth_by_angle=True, weighted_normals=True,
+    bake_vertex_dirt=True, include_locators=True, generate_lods=True,
+    generate_colliders=True, gameplay_meta_path=GAMEPLAY_JSON_PATH, target_budget=4500
 )
 ```
 
@@ -207,7 +208,7 @@ bpy.ops.export_scene.fbx(
     apply_unit_scale=True,
     apply_scale_options="FBX_SCALE_NONE",
     use_mesh_modifiers=True,
-    mesh_smooth_type="OFF",
+    mesh_smooth_type="FACE",
     path_mode="AUTO",
     axis_forward="-Z",
     axis_up="Y",

@@ -28,7 +28,7 @@ bpy.ops.export_scene.fbx(
     apply_unit_scale=True,
     apply_scale_options="FBX_SCALE_NONE",
     use_mesh_modifiers=True,
-    mesh_smooth_type="OFF",
+    mesh_smooth_type="FACE",
     path_mode="AUTO",
     axis_forward="-Z",
     axis_up="Y",
@@ -186,6 +186,10 @@ rmk.apply_procedural_armor_plating(hull, thickness=0.035, inset_depth=0.04, beve
 - `make_articulated_track_shoes`: Volumetric track shoe plates with center guide horns along ground contact runs.
 - `make_engine_deck_grille`: Cooling intake frame with angled louvers and exhaust pipe manifolds.
 - `make_recessed_sensor_visor`: Armored visor brow hood with deep cavity and glowing HDR sensor prisms.
+- `make_catenary_cable_assembly` (`--hydraulic-hoses`): Hyperbolic cosine (`cosh`) catenary tube sweep in BMesh with corrugated rib modulation, hex bulkhead couplers, and retaining collar clamps.
+- `make_bmesh_hull_greebles` (`--hull-greebles`): Selective BMesh face inset (`bmesh.ops.inset_individual`) maintenance hatches with grab handles, slotted micro-louver vents, and 4 forged corner lifting lugs.
+- `make_tactical_decal_plates` (`--tactical-markings`): `mathutils.bvhtree.BVHTree` normal-snapped floating chevron stripe bars and zenith identification plates (+0.012m normal offset).
+- `apply_weighted_normals` (`--weighted-normals` / `--no-weighted-normals`): Face-area weighted custom split normals (`mode="FACE_AREA"`, `weight=50`, `keep_sharp=True`) eliminating shading pinch across 1-segment chamfered armor plates.
 
 ### Fluent Vehicle Construction with `RogueVehicleBuilder`
 ```python
@@ -205,6 +209,9 @@ builder = (
     .add_side_sponsons()
     .add_smoke_launchers(tube_count=3)
     .add_spring_antenna()
+    .add_hydraulic_hoses()
+    .add_hull_greebles()
+    .add_tactical_markings()
     .add_colliders(include_turret=True)
     .add_unity_locators()
 )
@@ -212,8 +219,8 @@ builder = (
 diagnostics = builder.build_and_export(
     fbx_path=FBX_PATH, blend_path=BLEND_PATH, preview_path=PREVIEW_PATH,
     render_multiview=True, smooth_by_angle=True, smooth_angle_deg=38.0,
-    bake_vertex_dirt=True, include_locators=True, generate_lods=True,
-    generate_colliders=True, wear_level="battle_hardened",
+    weighted_normals=True, bake_vertex_dirt=True, include_locators=True,
+    generate_lods=True, generate_colliders=True, wear_level="battle_hardened",
     gameplay_meta_path=GAMEPLAY_JSON_PATH, wreckage_fbx_path=WRECKAGE_FBX_PATH,
     visual_root_path="Vehicle", profile_budget=True, target_budget=4500,
 )

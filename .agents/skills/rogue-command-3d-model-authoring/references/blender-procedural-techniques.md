@@ -30,7 +30,7 @@ bpy.ops.export_scene.fbx(
     apply_unit_scale=True,
     apply_scale_options="FBX_SCALE_NONE",
     use_mesh_modifiers=True,
-    mesh_smooth_type="OFF",          # Preserves hard-surface flat shading
+    mesh_smooth_type="FACE",         # Preserves custom weighted split normals & flat chamfers
     path_mode="AUTO",
     axis_forward="-Z",               # Maps Blender +Y to Unity +Z
     axis_up="Y",                     # Maps Blender +Z to Unity +Y
@@ -180,6 +180,9 @@ gatling = rmk.make_rotary_gatling_cannon(
 | `make_smoke_launcher_rack` | Defensive smoke discharger | Multi-tube angled grenade rack with recessed launch bores on mounting bracket |
 | `make_side_sponson_assembly` | External ammo / fuel drum | Armored flank panniers or cylindrical drums with retention straps |
 | `make_dozer_blade` | Obstacle clearing ram | Heavy angled shield plate, bottom cutting edge, twin hydraulic push rams |
+| `make_catenary_cable_assembly` | Catenary hydraulic hose / power conduit | Hyperbolic cosine (`cosh`) tube sweep in BMesh with corrugated rib modulation, hex bulkhead couplers, and retaining collar clamps |
+| `make_bmesh_hull_greebles` | Recessed deck hatches, vents & lugs | Selective BMesh face inset (`bmesh.ops.inset_individual`) maintenance hatches with grab handles, micro-louver vents, and 4 forged lifting lugs |
+| `make_tactical_decal_plates` | BVHTree-raycasted floating markings | `mathutils.bvhtree.BVHTree` normal-snapped chevron stripe bars and zenith identification plates (+0.012m normal offset) |
 | `create_unity_locator_sockets`| Standardized FBX empties | Emits `Socket_MuzzlePrimary`, `Socket_TurretPivot`, `Socket_Exhaust_L/R`, `Socket_SensorEye` |
 
 ```python
@@ -204,11 +207,11 @@ locators = rmk.create_unity_locator_sockets(
 
 ---
 
-## 7. Draw-Call Batching, Smart Smoothing & Cavity Baking
+## 7. Draw-Call Batching, Smart Smoothing, Weighted Normals & Cavity Baking
 
 Procedural kitbashing produces 50–120 individual objects. If left unbatched, imported geometry creates redundant draw calls and material switches.
 
-### A. Material Batching with Smart Angle Smoothing
+### A. Material Batching with Smart Angle Smoothing & Weighted Normals
 `batch_and_join_by_material` unifies meshes sharing the same PBR material into 4–6 batched submeshes while preserving designated animated/gameplay pivots:
 
 ```python
@@ -217,11 +220,14 @@ optimized_objects = rmk.batch_and_join_by_material(
     prefix="Colossus",
     preserve_names=["TurretBase", "MainBarrel"],
     smooth_by_angle=True,
-    smooth_angle_deg=38.0
+    smooth_angle_deg=38.0,
+    weighted_normals=True,
+    normal_weight=50,
 )
 ```
 
 - **Smart Angle-Weighted Smoothing**: Uses Blender 4.5's `bpy.ops.object.shade_smooth_by_angle` to produce silky smooth round barrels, road wheels, hubs, and exhaust pipes, while preserving razor-sharp 45°/90° chamfers on flat armor plates.
+- **Face-Area Weighted Normals (`apply_weighted_normals`)**: Applies Blender's `WEIGHTED_NORMAL` modifier (`mode="FACE_AREA"`, `weight=50`, `keep_sharp=True`) so large armor plates dominate vertex normals and 1-segment chamfers absorb the transition without shading pinch. Exported via `mesh_smooth_type="FACE"`.
 - **Batching Estimate**: The authoring report estimates fewer mesh/material groups after batching; confirm actual draw calls in Unity with the selected prefab source and rendering settings.
 - **Clean Normals**: Re-evaluates outward normals consistently and strips non-manifold seams.
 
