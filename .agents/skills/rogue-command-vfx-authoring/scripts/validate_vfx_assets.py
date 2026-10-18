@@ -38,6 +38,17 @@ CANONICAL_VFX_SOCKETS = {
     "Socket_Hardpoint_ERA",
     "Socket_Hardpoint_APS",
     "Socket_Hardpoint_FuelDrums",
+    "Socket_FootContact_L",
+    "Socket_FootContact_R",
+    "Socket_FootContact_FL",
+    "Socket_FootContact_FR",
+    "Socket_FootContact_RL",
+    "Socket_FootContact_RR",
+    "Socket_EngineAudio",
+    "Socket_WeaponAudio",
+    "Socket_BuildingAudio",
+    "FirePoint_0",
+    "FirePoint_1",
 }
 
 # Verified URP particle shaders in Rogue Command 1.0.9

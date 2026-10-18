@@ -75,6 +75,10 @@ CANONICAL_WALKER_SOCKETS = [
 OPTIONAL_WALKER_SOCKETS = [
     "socket_footcontact_l",
     "socket_footcontact_r",
+    "socket_footcontact_fl",
+    "socket_footcontact_fr",
+    "socket_footcontact_rl",
+    "socket_footcontact_rr",
     "socket_recoilprimary",
 ]
 

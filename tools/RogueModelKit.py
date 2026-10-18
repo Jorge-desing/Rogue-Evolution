@@ -1613,12 +1613,20 @@ def create_unity_locator_sockets(
     antenna_loc: Tuple[float, float, float] | Vector | None = None,
     thruster_vector_left: Tuple[float, float, float] | Vector | None = None,
     thruster_vector_right: Tuple[float, float, float] | Vector | None = None,
+    foot_contact_left: Tuple[float, float, float] | Vector | None = None,
+    foot_contact_right: Tuple[float, float, float] | Vector | None = None,
+    quad_foot_contacts: Dict[str, Tuple[float, float, float] | Vector] | None = None,
+    engine_audio_loc: Tuple[float, float, float] | Vector | None = None,
+    weapon_audio_loc: Tuple[float, float, float] | Vector | None = None,
+    nested_firepoints: bool = True,
     antenna_parts: Sequence[bpy.types.Object] | None = None,
 ) -> list[bpy.types.Object]:
     """Generates standard Unity empty sockets matching Rogue Command vehicle & weapon mechanics:
 
     1. Socket_MuzzlePrimary: Main weapon firing point and projectile exit vector.
+       If nested_firepoints is True, creates child empty FirePoint_0 for ShootProjectile.Init().
     2. Socket_MuzzleSecondary: Secondary weapon (coax/pintle/missile) firing point.
+       If nested_firepoints is True, creates child empty FirePoint_1.
     3. Socket_TurretPivot: Horizontal azimuth rotation axis. Do not emit its legacy
        Socket_TurretYaw alias in the same hierarchy; both names bind the same runtime role.
     4. Socket_TurretPitch: Vertical elevation pivot axis.
@@ -1634,28 +1642,46 @@ def create_unity_locator_sockets(
     13. Socket_Hardpoint_<Type>: Modular equipment mounts (ERA, APS, Sponsons, FuelDrums).
     14. Socket_Antenna: Whip antenna mounting root for dynamic inertial wobble simulation.
     15. Socket_ThrusterVector_L / Socket_ThrusterVector_R: Articulated VTOL/dropship vector thrusters.
+    16. Socket_FootContact_L / Socket_FootContact_R / Socket_FootContact_<Tag>: Foot ground contact anchors.
+    17. Socket_EngineAudio: Looping engine/movement SFX anchor for EntityFlockingMovement.
+    18. Socket_WeaponAudio: Weapon firing 3D SFX anchor for ShootProjectile.
     """
     empties = []
-    def _add_empty(socket_name: str, loc: Vector, rot: Tuple[float, float, float] = (0.0, 0.0, 0.0)):
+    def _add_empty(socket_name: str, loc: Vector, rot: Tuple[float, float, float] = (0.0, 0.0, 0.0)) -> bpy.types.Object:
         bpy.ops.object.empty_add(type="PLAIN_AXES", radius=0.15, location=loc)
         e = bpy.context.object
         e.name = socket_name
         e.rotation_euler = rot
         empties.append(e)
+        return e
 
     # 1. Primary Muzzle
     if muzzle_loc is not None:
         m_loc = Vector(muzzle_loc)
         m_dir = Vector(muzzle_dir if muzzle_dir is not None else (0.0, 1.0, 0.0)).normalized()
         rot = m_dir.to_track_quat("Z", "Y").to_euler()
-        _add_empty("Socket_MuzzlePrimary", m_loc, rot)
+        muz_obj = _add_empty("Socket_MuzzlePrimary", m_loc, rot)
+        if nested_firepoints:
+            bpy.ops.object.empty_add(type="PLAIN_AXES", radius=0.08, location=m_loc)
+            fp0 = bpy.context.object
+            fp0.name = "FirePoint_0"
+            fp0.rotation_euler = rot
+            fp0.parent = muz_obj
+            empties.append(fp0)
 
     # 2. Secondary Muzzle
     if muzzle_secondary_loc is not None:
         m2_loc = Vector(muzzle_secondary_loc)
         m2_dir = Vector(muzzle_secondary_dir if muzzle_secondary_dir is not None else (0.0, 1.0, 0.0)).normalized()
         rot2 = m2_dir.to_track_quat("Z", "Y").to_euler()
-        _add_empty("Socket_MuzzleSecondary", m2_loc, rot2)
+        muz2_obj = _add_empty("Socket_MuzzleSecondary", m2_loc, rot2)
+        if nested_firepoints:
+            bpy.ops.object.empty_add(type="PLAIN_AXES", radius=0.08, location=m2_loc)
+            fp1 = bpy.context.object
+            fp1.name = "FirePoint_1"
+            fp1.rotation_euler = rot2
+            fp1.parent = muz2_obj
+            empties.append(fp1)
 
     # 3. Turret Yaw
     if turret_loc is not None:
@@ -1694,6 +1720,10 @@ def create_unity_locator_sockets(
         _add_empty("Socket_DamageSmoke", Vector(damage_smoke_loc))
     elif exhaust_left is not None:
         _add_empty("Socket_DamageSmoke", Vector(exhaust_left) + Vector((0.0, 0.15, 0.25)))
+    elif turret_loc is not None:
+        _add_empty("Socket_DamageSmoke", Vector(turret_loc) + Vector((-0.20, -0.20, 0.30)))
+    else:
+        _add_empty("Socket_DamageSmoke", Vector((0.0, -0.45, 0.65)))
 
     if damage_fire_loc is not None:
         _add_empty("Socket_DamageFire", Vector(damage_fire_loc))
@@ -1762,6 +1792,35 @@ def create_unity_locator_sockets(
         _add_empty("Socket_ThrusterVector_L", Vector(thruster_vector_left))
     if thruster_vector_right is not None:
         _add_empty("Socket_ThrusterVector_R", Vector(thruster_vector_right))
+
+    # 15. Foot Contact Sockets (for Walkers, Mechs, and Step SFX / Dust)
+    if foot_contact_left is not None:
+        _add_empty("Socket_FootContact_L", Vector(foot_contact_left))
+    if foot_contact_right is not None:
+        _add_empty("Socket_FootContact_R", Vector(foot_contact_right))
+    if quad_foot_contacts:
+        for q_name, q_loc in quad_foot_contacts.items():
+            _add_empty(f"Socket_FootContact_{q_name}", Vector(q_loc))
+
+    # 16. Positional 3D Audio Anchors
+    # Socket_EngineAudio: Looping engine/movement SFX anchor (EntityFlockingMovement._movementSoundAudioSource)
+    if engine_audio_loc is not None:
+        _add_empty("Socket_EngineAudio", Vector(engine_audio_loc))
+    elif exhaust_left is not None and exhaust_right is not None:
+        mid_ex = (Vector(exhaust_left) + Vector(exhaust_right)) * 0.5
+        _add_empty("Socket_EngineAudio", mid_ex)
+    elif exhaust_left is not None:
+        _add_empty("Socket_EngineAudio", Vector(exhaust_left))
+    else:
+        _add_empty("Socket_EngineAudio", Vector((0.0, -0.65, 0.40)))
+
+    # Socket_WeaponAudio: Weapon firing SFX anchor (ShootProjectile.shotSoundAudioSource)
+    if weapon_audio_loc is not None:
+        _add_empty("Socket_WeaponAudio", Vector(weapon_audio_loc))
+    elif muzzle_loc is not None:
+        _add_empty("Socket_WeaponAudio", Vector(muzzle_loc))
+    elif turret_pitch_loc is not None:
+        _add_empty("Socket_WeaponAudio", Vector(turret_pitch_loc))
 
     return empties
 
@@ -2696,6 +2755,12 @@ def export_gameplay_metadata(
         "damageThresholds": {
             "smokeHpFraction": 0.50,
             "fireHpFraction": 0.25,
+        },
+        "rigging": {
+            "rigType": "skeletal_armature" if archetype in ("walker", "colossus_titan", "quad_mech", "spider", "siege_crawler") else "chassis_kinematic",
+            "hasArmature": True,
+            "animatorParameters": ["RCL_IsMoving", "RCL_Fire", "RCL_Death"],
+            "actionClips": ["Action_Idle", "Action_Walk", "Action_Drive", "Action_FireRecoil", "Action_Death"],
         },
         "sockets": socket_dict,
     }
@@ -4815,14 +4880,97 @@ def make_orbital_silo_assembly(
 # Procedural Armature Rigging & Animation Actions
 # ---------------------------------------------------------------------------
 
+def assign_rigid_mesh_weights(
+    objects: Sequence[bpy.types.Object],
+    prefix: str,
+    armature_obj: bpy.types.Object,
+    leg_type: str | None = None,
+) -> None:
+    """Assigns rigid vertex groups (weight 1.0) and Armature modifiers to hard-surface model components."""
+    for obj in objects:
+        if obj.type != "MESH" or obj.name.endswith(("_COLLIDER", "_ShieldBubble")):
+            continue
+
+        clean_name = obj.name
+        if clean_name.startswith(prefix):
+            clean_name = clean_name[len(prefix):]
+
+        target_bone = None
+        if leg_type == "biped":
+            side_str = "L" if ("_L" in clean_name or "Left" in clean_name) else ("R" if ("_R" in clean_name or "Right" in clean_name) else None)
+            if side_str:
+                if any(k in clean_name for k in ("Foot", "Toe", "Ankle")):
+                    target_bone = f"Bone_Foot_{side_str}"
+                elif any(k in clean_name for k in ("Shin", "Knee", "Hydraulic", "Piston")):
+                    target_bone = f"Bone_Shin_{side_str}"
+                elif any(k in clean_name for k in ("Thigh", "HipJoint", "Femur")):
+                    target_bone = f"Bone_Thigh_{side_str}"
+
+            if target_bone is None and any(k in clean_name for k in ("Pelvis", "HipHub")):
+                target_bone = "Bone_Pelvis"
+
+        elif leg_type == "quad":
+            tag_found = None
+            for cand, norm in [
+                ("FL", "FL"), ("FR", "FR"), ("RL", "RL"), ("RR", "RR"),
+                ("L_F", "FL"), ("R_F", "FR"), ("L_R", "RL"), ("R_R", "RR"),
+            ]:
+                if cand in clean_name:
+                    tag_found = norm
+                    break
+            if tag_found:
+                if any(k in clean_name for k in ("Foot", "Talon")):
+                    target_bone = f"Bone_Foot_{tag_found}"
+                elif any(k in clean_name for k in ("Tibia", "Knee")):
+                    target_bone = f"Bone_Shin_{tag_found}"
+                elif any(k in clean_name for k in ("Femur", "Hip")):
+                    target_bone = f"Bone_Thigh_{tag_found}"
+
+            if target_bone is None and any(k in clean_name for k in ("Pelvis", "MechPelvis")):
+                target_bone = "Bone_Pelvis"
+
+        if target_bone is None:
+            if any(k in clean_name for k in ("Barrel", "Muzzle", "Bore", "Recoil")):
+                target_bone = "Bone_BarrelRecoil"
+            elif any(k in clean_name for k in ("Mantlet", "Cradle", "Howitzer", "Rail", "Flak", "Mortar", "Gatling", "Pod", "Emitter", "TurretPitch")):
+                target_bone = "Bone_TurretPitch"
+            elif any(k in clean_name for k in ("Turret", "Bustle", "Visor", "Radar", "Rotodome", "TurretPivot")):
+                target_bone = "Bone_TurretYaw"
+            elif leg_type == "biped":
+                target_bone = "Bone_Pelvis"
+            else:
+                target_bone = "Bone_Hull"
+
+        vg = obj.vertex_groups.get(target_bone) or obj.vertex_groups.new(name=target_bone)
+        all_v_indices = list(range(len(obj.data.vertices)))
+        if all_v_indices:
+            vg.add(all_v_indices, 1.0, "REPLACE")
+
+        arm_mod = next((m for m in obj.modifiers if m.type == "ARMATURE"), None)
+        if not arm_mod:
+            arm_mod = obj.modifiers.new(name="Armature", type="ARMATURE")
+        arm_mod.object = armature_obj
+
+
 def generate_procedural_armature(
     objects: Sequence[bpy.types.Object],
     prefix: str,
     turret_center: Vector | Tuple[float, float, float] | None = None,
     gun_pivot: Vector | Tuple[float, float, float] | None = None,
     hull_deck_z: float = 0.88,
+    leg_type: str | None = None,
+    hip_height: float = 1.45,
+    hip_loc_l: Vector | Tuple[float, float, float] | None = None,
+    hip_loc_r: Vector | Tuple[float, float, float] | None = None,
+    knee_loc_l: Vector | Tuple[float, float, float] | None = None,
+    knee_loc_r: Vector | Tuple[float, float, float] | None = None,
+    foot_loc_l: Vector | Tuple[float, float, float] | None = None,
+    foot_loc_r: Vector | Tuple[float, float, float] | None = None,
+    quad_hips: Dict[str, Vector | Tuple[float, float, float]] | None = None,
+    quad_knees: Dict[str, Vector | Tuple[float, float, float]] | None = None,
+    quad_feet: Dict[str, Vector | Tuple[float, float, float]] | None = None,
 ) -> bpy.types.Object:
-    """Creates a kinematic vehicle armature and binds mesh components to rigid bones."""
+    """Creates a kinematic vehicle or articulated mech armature and binds mesh components to rigid bones."""
     tc = Vector(turret_center) if turret_center is not None else Vector((0.0, 0.05, 1.15))
     gp = Vector(gun_pivot) if gun_pivot is not None else Vector((0.0, 1.45, 1.25))
 
@@ -4840,17 +4988,98 @@ def generate_procedural_armature(
     b_root.head = (0.0, 0.0, 0.0)
     b_root.tail = (0.0, 0.0, 0.22)
 
-    # 2. Hull bone (main vehicle body & suspension)
-    b_hull = eb.new("Bone_Hull")
-    b_hull.head = (0.0, 0.0, 0.22)
-    b_hull.tail = (0.0, 0.0, max(0.5, hull_deck_z * 0.85))
-    b_hull.parent = b_root
+    # 2. Pelvis / Hull bones & leg chains
+    if leg_type == "biped":
+        b_pelvis = eb.new("Bone_Pelvis")
+        b_pelvis.head = (0.0, 0.0, 0.22)
+        b_pelvis.tail = (0.0, 0.0, max(0.65, hip_height))
+        b_pelvis.parent = b_root
+
+        b_hull = eb.new("Bone_Hull")
+        b_hull.head = (0.0, 0.0, max(0.65, hip_height))
+        b_hull.tail = (0.0, 0.0, max(0.65, hip_height) + 0.55)
+        b_hull.parent = b_pelvis
+
+        for side, hip_p, knee_p, foot_p in [
+            ("L", hip_loc_l, knee_loc_l, foot_loc_l),
+            ("R", hip_loc_r, knee_loc_r, foot_loc_r),
+        ]:
+            hip_v = Vector(hip_p) if hip_p is not None else Vector((-0.42 if side == "L" else 0.42, -0.05, hip_height))
+            knee_v = Vector(knee_p) if knee_p is not None else Vector((hip_v.x + (-0.12 if side == "L" else 0.12), hip_v.y - hip_height * 0.14, hip_height * 0.58))
+            foot_v = Vector(foot_p) if foot_p is not None else Vector((hip_v.x + (-0.08 if side == "L" else 0.08), hip_v.y + hip_height * 0.10 + 0.12, 0.0))
+
+            b_thigh = eb.new(f"Bone_Thigh_{side}")
+            b_thigh.head = hip_v
+            b_thigh.tail = knee_v
+            b_thigh.parent = b_pelvis
+
+            b_shin = eb.new(f"Bone_Shin_{side}")
+            b_shin.head = knee_v
+            b_shin.tail = Vector((foot_v.x, foot_v.y, max(0.12, foot_v.z + 0.15)))
+            b_shin.parent = b_thigh
+
+            b_foot = eb.new(f"Bone_Foot_{side}")
+            b_foot.head = Vector((foot_v.x, foot_v.y, max(0.12, foot_v.z + 0.15)))
+            b_foot.tail = Vector((foot_v.x, foot_v.y + 0.22, 0.0))
+            b_foot.parent = b_shin
+
+        turret_parent = b_pelvis
+
+    elif leg_type == "quad":
+        b_hull = eb.new("Bone_Hull")
+        b_hull.head = (0.0, 0.0, 0.22)
+        b_hull.tail = (0.0, 0.0, max(0.5, hull_deck_z * 0.85))
+        b_hull.parent = b_root
+
+        b_pelvis = eb.new("Bone_Pelvis")
+        b_pelvis.head = (0.0, 0.0, 0.35)
+        b_pelvis.tail = (0.0, 0.0, 0.75)
+        b_pelvis.parent = b_hull
+
+        q_hips = quad_hips or {}
+        q_knees = quad_knees or {}
+        q_feet = quad_feet or {}
+        for tag in ("FL", "FR", "RL", "RR"):
+            h_v = Vector(q_hips[tag]) if tag in q_hips else Vector((-0.8 if "L" in tag else 0.8, 0.8 if "F" in tag else -0.8, 0.85))
+            k_v = Vector(q_knees[tag]) if tag in q_knees else Vector((h_v.x * 1.3, h_v.y * 1.2, 0.95))
+            f_v = Vector(q_feet[tag]) if tag in q_feet else Vector((h_v.x * 1.6, h_v.y * 1.4, 0.0))
+
+            b_thigh = eb.new(f"Bone_Thigh_{tag}")
+            b_thigh.head = h_v
+            b_thigh.tail = k_v
+            b_thigh.parent = b_hull
+
+            b_shin = eb.new(f"Bone_Shin_{tag}")
+            b_shin.head = k_v
+            b_shin.tail = Vector((f_v.x, f_v.y, f_v.z + 0.12))
+            b_shin.parent = b_thigh
+
+            b_foot = eb.new(f"Bone_Foot_{tag}")
+            b_foot.head = Vector((f_v.x, f_v.y, f_v.z + 0.12))
+            b_foot.tail = f_v
+            b_foot.parent = b_shin
+
+        turret_parent = b_hull
+
+    else:
+        # Standard vehicle chassis
+        b_hull = eb.new("Bone_Hull")
+        b_hull.head = (0.0, 0.0, 0.22)
+        b_hull.tail = (0.0, 0.0, max(0.5, hull_deck_z * 0.85))
+        b_hull.parent = b_root
+
+        b_pelvis = eb.new("Bone_Pelvis")
+        b_pelvis.head = (0.0, 0.0, 0.22)
+        b_pelvis.tail = (0.0, 0.0, max(0.4, hull_deck_z * 0.65))
+        b_pelvis.parent = b_hull
+
+        turret_parent = b_hull
 
     # 3. Turret Yaw bone (horizontal azimuth traverse)
     b_turret = eb.new("Bone_TurretYaw")
     b_turret.head = (tc.x, tc.y, tc.z)
     b_turret.tail = (tc.x, tc.y, tc.z + 0.32)
-    b_turret.parent = b_hull
+    b_turret.parent = turret_parent
 
     # 4. Turret Pitch bone (vertical gun elevation)
     b_pitch = eb.new("Bone_TurretPitch")
@@ -4867,36 +5096,7 @@ def generate_procedural_armature(
     bpy.ops.object.mode_set(mode="OBJECT")
 
     # Bind meshes to armature with rigid vertex groups
-    for obj in objects:
-        if obj.type != "MESH" or obj.name.endswith(("_COLLIDER", "_ShieldBubble")):
-            continue
-
-        clean_name = obj.name
-        if clean_name.startswith(prefix):
-            clean_name = clean_name[len(prefix):]
-
-        if any(k in clean_name for k in ("Barrel", "Muzzle", "Bore", "Recoil")):
-            target_bone = "Bone_BarrelRecoil"
-        elif any(k in clean_name for k in ("Mantlet", "Cradle", "Howitzer", "Rail", "Flak", "Mortar", "Gatling", "Pod", "Emitter")):
-            target_bone = "Bone_TurretPitch"
-        elif any(k in clean_name for k in ("Turret", "Bustle", "Visor", "Radar", "Rotodome")):
-            target_bone = "Bone_TurretYaw"
-        else:
-            target_bone = "Bone_Hull"
-
-        vg = obj.vertex_groups.get(target_bone) or obj.vertex_groups.new(name=target_bone)
-        all_v_indices = list(range(len(obj.data.vertices)))
-        if all_v_indices:
-            vg.add(all_v_indices, 1.0, "REPLACE")
-
-        arm_mod = None
-        for m in obj.modifiers:
-            if m.type == "ARMATURE":
-                arm_mod = m
-                break
-        if not arm_mod:
-            arm_mod = obj.modifiers.new(name="Armature", type="ARMATURE")
-            arm_mod.object = armature_obj
+    assign_rigid_mesh_weights(objects, prefix, armature_obj, leg_type=leg_type)
 
     return armature_obj
 
@@ -4904,14 +5104,19 @@ def generate_procedural_armature(
 def generate_procedural_action_clips(
     armature_obj: bpy.types.Object,
     prefix: str,
+    leg_type: str | None = None,
 ) -> dict[str, bpy.types.Action]:
-    """Generates baked NLA animation clips (Idle, Drive, FireRecoil, Death) on the vehicle armature."""
+    """Generates baked NLA animation clips (Idle, Walk/Drive, FireRecoil, Death) on the armature.
+
+    Enforces the In-Place Locomotion Invariant: Bone_Root position delta is strictly ZERO
+    across all animation frames, ensuring tactical flocking translations work without double-stepping.
+    """
     if not armature_obj.animation_data:
         armature_obj.animation_data_create()
 
     actions = {}
 
-    def set_bone_key(bone_name, data_path, frame, value):
+    def set_bone_key(bone_name: str, data_path: str, frame: int, value: Sequence[float]) -> None:
         pbone = armature_obj.pose.bones.get(bone_name)
         if not pbone:
             return
@@ -4923,57 +5128,165 @@ def generate_procedural_action_clips(
             pbone.rotation_euler = Euler(value, "XYZ")
             pbone.keyframe_insert(data_path="rotation_euler", frame=frame)
 
-    # 1. Action_Idle (Engine vibration: 30 frames)
+    # 1. Action_Idle (Engine vibration & stance breathing: 30 frames)
     act_idle = bpy.data.actions.new(name=f"{prefix}_Action_Idle")
     armature_obj.animation_data.action = act_idle
+    base_body = "Bone_Pelvis" if leg_type == "biped" else "Bone_Hull"
     for f in (1, 30):
-        set_bone_key("Bone_Hull", "location", f, (0.0, 0.0, 0.0))
-        set_bone_key("Bone_Hull", "rotation_euler", f, (0.0, 0.0, 0.0))
-    set_bone_key("Bone_Hull", "location", 15, (0.0, 0.0, -0.006))
-    set_bone_key("Bone_Hull", "rotation_euler", 15, (math.radians(0.35), 0.0, 0.0))
+        set_bone_key(base_body, "location", f, (0.0, 0.0, 0.0))
+        set_bone_key(base_body, "rotation_euler", f, (0.0, 0.0, 0.0))
+    set_bone_key(base_body, "location", 15, (0.0, 0.0, -0.008 if leg_type else -0.006))
+    set_bone_key(base_body, "rotation_euler", 15, (math.radians(0.35), 0.0, 0.0))
     act_idle.use_fake_user = True
     actions["Idle"] = act_idle
 
-    # 2. Action_Drive (Terrain traversal / chassis suspension rocking: 40 frames)
-    act_drive = bpy.data.actions.new(name=f"{prefix}_Action_Drive")
-    armature_obj.animation_data.action = act_drive
-    for f in (1, 40):
-        set_bone_key("Bone_Hull", "location", f, (0.0, 0.0, 0.0))
-        set_bone_key("Bone_Hull", "rotation_euler", f, (0.0, 0.0, 0.0))
-    set_bone_key("Bone_Hull", "location", 10, (0.0, 0.0, 0.012))
-    set_bone_key("Bone_Hull", "rotation_euler", 10, (math.radians(-0.8), math.radians(0.6), 0.0))
-    set_bone_key("Bone_Hull", "location", 20, (0.0, 0.0, -0.010))
-    set_bone_key("Bone_Hull", "rotation_euler", 20, (math.radians(0.6), math.radians(-0.5), 0.0))
-    set_bone_key("Bone_Hull", "location", 30, (0.0, 0.0, 0.008))
-    set_bone_key("Bone_Hull", "rotation_euler", 30, (math.radians(-0.5), math.radians(0.4), 0.0))
-    act_drive.use_fake_user = True
-    actions["Drive"] = act_drive
+    # 2. Locomotion: Action_Walk and Action_Drive (In-Place Invariant!)
+    if leg_type == "biped":
+        act_walk = bpy.data.actions.new(name=f"{prefix}_Action_Walk")
+        armature_obj.animation_data.action = act_walk
+        for f in (1, 10, 20, 30, 40):
+            set_bone_key("Bone_Root", "location", f, (0.0, 0.0, 0.0))
+            set_bone_key("Bone_Root", "rotation_euler", f, (0.0, 0.0, 0.0))
+
+        # Pelvis bob and weight-absorption dip
+        set_bone_key("Bone_Pelvis", "location", 1, (0.0, 0.0, 0.0))
+        set_bone_key("Bone_Pelvis", "rotation_euler", 1, (0.0, 0.0, 0.0))
+        set_bone_key("Bone_Pelvis", "location", 10, (0.015, 0.0, -0.04))
+        set_bone_key("Bone_Pelvis", "rotation_euler", 10, (0.0, math.radians(0.6), math.radians(-0.8)))
+        set_bone_key("Bone_Pelvis", "location", 20, (0.0, 0.0, 0.015))
+        set_bone_key("Bone_Pelvis", "rotation_euler", 20, (0.0, 0.0, 0.0))
+        set_bone_key("Bone_Pelvis", "location", 30, (-0.015, 0.0, -0.04))
+        set_bone_key("Bone_Pelvis", "rotation_euler", 30, (0.0, math.radians(-0.6), math.radians(0.8)))
+        set_bone_key("Bone_Pelvis", "location", 40, (0.0, 0.0, 0.0))
+        set_bone_key("Bone_Pelvis", "rotation_euler", 40, (0.0, 0.0, 0.0))
+
+        # Left Leg Schedule: Contact -> Down -> Passing -> Push-Off -> Contact
+        biped_gait_left = {
+            1: (18.0, -10.0, -8.0),
+            10: (8.0, -22.0, 0.0),
+            20: (-10.0, -5.0, 12.0),
+            30: (-20.0, 15.0, 20.0),
+            40: (18.0, -10.0, -8.0),
+        }
+        for f, (thigh_rot, shin_rot, foot_rot) in biped_gait_left.items():
+            set_bone_key("Bone_Thigh_L", "rotation_euler", f, (math.radians(thigh_rot), 0.0, 0.0))
+            set_bone_key("Bone_Shin_L", "rotation_euler", f, (math.radians(shin_rot), 0.0, 0.0))
+            set_bone_key("Bone_Foot_L", "rotation_euler", f, (math.radians(foot_rot), 0.0, 0.0))
+
+        # Right Leg Schedule: 180 degrees out of phase (shifted 20 frames)
+        biped_gait_right = {
+            1: (-10.0, -5.0, 12.0),
+            10: (-20.0, 15.0, 20.0),
+            20: (18.0, -10.0, -8.0),
+            30: (8.0, -22.0, 0.0),
+            40: (-10.0, -5.0, 12.0),
+        }
+        for f, (thigh_rot, shin_rot, foot_rot) in biped_gait_right.items():
+            set_bone_key("Bone_Thigh_R", "rotation_euler", f, (math.radians(thigh_rot), 0.0, 0.0))
+            set_bone_key("Bone_Shin_R", "rotation_euler", f, (math.radians(shin_rot), 0.0, 0.0))
+            set_bone_key("Bone_Foot_R", "rotation_euler", f, (math.radians(foot_rot), 0.0, 0.0))
+
+        act_walk.use_fake_user = True
+        actions["Walk"] = act_walk
+        actions["Drive"] = act_walk
+
+    elif leg_type == "quad":
+        act_walk = bpy.data.actions.new(name=f"{prefix}_Action_Walk")
+        armature_obj.animation_data.action = act_walk
+        for f in (1, 10, 20, 30, 40):
+            set_bone_key("Bone_Root", "location", f, (0.0, 0.0, 0.0))
+            set_bone_key("Bone_Root", "rotation_euler", f, (0.0, 0.0, 0.0))
+
+        # Hull diagonal pitch/roll oscillation
+        for f, (pz, rx, ry) in [
+            (1, (0.0, 0.0, 0.0)),
+            (10, (-0.025, -0.5, 0.4)),
+            (20, (0.012, 0.0, 0.0)),
+            (30, (-0.025, 0.5, -0.4)),
+            (40, (0.0, 0.0, 0.0)),
+        ]:
+            set_bone_key("Bone_Hull", "location", f, (0.0, 0.0, pz))
+            set_bone_key("Bone_Hull", "rotation_euler", f, (math.radians(rx), math.radians(ry), 0.0))
+
+        quad_gait_diag1 = {
+            1: (15.0, -12.0, -6.0),
+            10: (5.0, -18.0, 0.0),
+            20: (-8.0, -4.0, 8.0),
+            30: (-16.0, 12.0, 14.0),
+            40: (15.0, -12.0, -6.0),
+        }
+        quad_gait_diag2 = {
+            1: (-8.0, -4.0, 8.0),
+            10: (-16.0, 12.0, 14.0),
+            20: (15.0, -12.0, -6.0),
+            30: (5.0, -18.0, 0.0),
+            40: (-8.0, -4.0, 8.0),
+        }
+        for tag in ("FL", "RR"):
+            for f, (thigh_rot, shin_rot, foot_rot) in quad_gait_diag1.items():
+                set_bone_key(f"Bone_Thigh_{tag}", "rotation_euler", f, (math.radians(thigh_rot), 0.0, 0.0))
+                set_bone_key(f"Bone_Shin_{tag}", "rotation_euler", f, (math.radians(shin_rot), 0.0, 0.0))
+                set_bone_key(f"Bone_Foot_{tag}", "rotation_euler", f, (math.radians(foot_rot), 0.0, 0.0))
+        for tag in ("FR", "RL"):
+            for f, (thigh_rot, shin_rot, foot_rot) in quad_gait_diag2.items():
+                set_bone_key(f"Bone_Thigh_{tag}", "rotation_euler", f, (math.radians(thigh_rot), 0.0, 0.0))
+                set_bone_key(f"Bone_Shin_{tag}", "rotation_euler", f, (math.radians(shin_rot), 0.0, 0.0))
+                set_bone_key(f"Bone_Foot_{tag}", "rotation_euler", f, (math.radians(foot_rot), 0.0, 0.0))
+
+        act_walk.use_fake_user = True
+        actions["Walk"] = act_walk
+        actions["Drive"] = act_walk
+
+    else:
+        # Wheeled or Tracked vehicle: Action_Drive and alias Action_Walk
+        act_drive = bpy.data.actions.new(name=f"{prefix}_Action_Drive")
+        armature_obj.animation_data.action = act_drive
+        for f in (1, 40):
+            set_bone_key("Bone_Hull", "location", f, (0.0, 0.0, 0.0))
+            set_bone_key("Bone_Hull", "rotation_euler", f, (0.0, 0.0, 0.0))
+        set_bone_key("Bone_Hull", "location", 10, (0.0, 0.0, 0.012))
+        set_bone_key("Bone_Hull", "rotation_euler", 10, (math.radians(-0.8), math.radians(0.6), 0.0))
+        set_bone_key("Bone_Hull", "location", 20, (0.0, 0.0, -0.010))
+        set_bone_key("Bone_Hull", "rotation_euler", 20, (math.radians(0.6), math.radians(-0.5), 0.0))
+        set_bone_key("Bone_Hull", "location", 30, (0.0, 0.0, 0.008))
+        set_bone_key("Bone_Hull", "rotation_euler", 30, (math.radians(-0.5), math.radians(0.4), 0.0))
+        act_drive.use_fake_user = True
+        actions["Drive"] = act_drive
+        actions["Walk"] = act_drive
 
     # 3. Action_FireRecoil (Sharp ballistic backward impulse & recovery: 20 frames)
     act_fire = bpy.data.actions.new(name=f"{prefix}_Action_FireRecoil")
     armature_obj.animation_data.action = act_fire
+    body_bone = "Bone_Pelvis" if leg_type == "biped" else "Bone_Hull"
     for f in (1, 20):
         set_bone_key("Bone_BarrelRecoil", "location", f, (0.0, 0.0, 0.0))
-        set_bone_key("Bone_Hull", "rotation_euler", f, (0.0, 0.0, 0.0))
+        set_bone_key(body_bone, "rotation_euler", f, (0.0, 0.0, 0.0))
     set_bone_key("Bone_BarrelRecoil", "location", 2, (0.0, -0.22, 0.0))
-    set_bone_key("Bone_Hull", "rotation_euler", 2, (math.radians(-1.2), 0.0, 0.0))
+    set_bone_key(body_bone, "rotation_euler", 2, (math.radians(-1.2), 0.0, 0.0))
     set_bone_key("Bone_BarrelRecoil", "location", 6, (0.0, -0.06, 0.0))
-    set_bone_key("Bone_Hull", "rotation_euler", 6, (math.radians(0.4), 0.0, 0.0))
+    set_bone_key(body_bone, "rotation_euler", 6, (math.radians(0.4), 0.0, 0.0))
     set_bone_key("Bone_BarrelRecoil", "location", 14, (0.0, 0.0, 0.0))
-    set_bone_key("Bone_Hull", "rotation_euler", 14, (0.0, 0.0, 0.0))
+    set_bone_key(body_bone, "rotation_euler", 14, (0.0, 0.0, 0.0))
     act_fire.use_fake_user = True
     actions["FireRecoil"] = act_fire
 
-    # 4. Action_Death (Chassis collapse & barrel droop: 30 frames)
+    # 4. Action_Death (Chassis collapse & barrel droop: 35 frames)
     act_death = bpy.data.actions.new(name=f"{prefix}_Action_Death")
     armature_obj.animation_data.action = act_death
-    set_bone_key("Bone_Hull", "location", 1, (0.0, 0.0, 0.0))
-    set_bone_key("Bone_Hull", "rotation_euler", 1, (0.0, 0.0, 0.0))
+    set_bone_key(body_bone, "location", 1, (0.0, 0.0, 0.0))
+    set_bone_key(body_bone, "rotation_euler", 1, (0.0, 0.0, 0.0))
     set_bone_key("Bone_TurretPitch", "rotation_euler", 1, (0.0, 0.0, 0.0))
-    for f in (25, 30):
-        set_bone_key("Bone_Hull", "location", f, (0.0, 0.0, -0.12))
-        set_bone_key("Bone_Hull", "rotation_euler", f, (math.radians(4.5), math.radians(-6.5), math.radians(2.0)))
+    collapse_z = -0.55 if leg_type == "biped" else (-0.28 if leg_type == "quad" else -0.12)
+    for f in (28, 35):
+        set_bone_key(body_bone, "location", f, (0.0, 0.0, collapse_z))
+        set_bone_key(body_bone, "rotation_euler", f, (math.radians(4.5), math.radians(-6.5), math.radians(2.0)))
         set_bone_key("Bone_TurretPitch", "rotation_euler", f, (math.radians(-22.0), 0.0, 0.0))
+        if leg_type == "biped":
+            set_bone_key("Bone_Thigh_L", "rotation_euler", f, (math.radians(12.0), 0.0, math.radians(-18.0)))
+            set_bone_key("Bone_Thigh_R", "rotation_euler", f, (math.radians(12.0), 0.0, math.radians(18.0)))
+            set_bone_key("Bone_Shin_L", "rotation_euler", f, (math.radians(-35.0), 0.0, 0.0))
+            set_bone_key("Bone_Shin_R", "rotation_euler", f, (math.radians(-35.0), 0.0, 0.0))
+
     act_death.use_fake_user = True
     actions["Death"] = act_death
 
@@ -5918,6 +6231,20 @@ class RogueVehicleBuilder:
         self.archetype: str = "tank"
         self.wear_level: str = "field_tested"
         self.attachment_objects: dict[str, list[bpy.types.Object]] = {}
+        self.is_walker: bool = False
+        self.leg_type: str | None = None
+        self.hip_height: float = 1.45
+        self.foot_loc_l: Vector | None = None
+        self.foot_loc_r: Vector | None = None
+        self.hip_loc_l: Vector | None = None
+        self.hip_loc_r: Vector | None = None
+        self.knee_loc_l: Vector | None = None
+        self.knee_loc_r: Vector | None = None
+        self.quad_feet: dict[str, Vector] = {}
+        self.quad_hips: dict[str, Vector] = {}
+        self.quad_knees: dict[str, Vector] = {}
+        self.engine_audio_loc: Vector | None = None
+        self.weapon_audio_loc: Vector | None = None
 
     def set_archetype(self, archetype: str) -> "RogueVehicleBuilder":
         self.archetype = archetype
@@ -6044,9 +6371,24 @@ class RogueVehicleBuilder:
             turret_center=self.turret_center,
             gun_pivot=self.gun_pivot,
             hull_deck_z=self.hull_deck_z,
+            leg_type=self.leg_type,
+            hip_height=getattr(self, "hip_height", 1.45),
+            hip_loc_l=getattr(self, "hip_loc_l", None),
+            hip_loc_r=getattr(self, "hip_loc_r", None),
+            knee_loc_l=getattr(self, "knee_loc_l", None),
+            knee_loc_r=getattr(self, "knee_loc_r", None),
+            foot_loc_l=getattr(self, "foot_loc_l", None),
+            foot_loc_r=getattr(self, "foot_loc_r", None),
+            quad_hips=getattr(self, "quad_hips", None),
+            quad_knees=getattr(self, "quad_knees", None),
+            quad_feet=getattr(self, "quad_feet", None),
         )
         if with_animations:
-            self.action_clips = generate_procedural_action_clips(self.armature_object, prefix=self.name)
+            self.action_clips = generate_procedural_action_clips(
+                self.armature_object,
+                prefix=self.name,
+                leg_type=self.leg_type,
+            )
         return self
 
     def add_era_armor(
@@ -6214,6 +6556,15 @@ class RogueVehicleBuilder:
         hip_spacing_x: float = 0.84,
         total_height: float = 1.60,
     ) -> "RogueVehicleBuilder":
+        self.is_walker = True
+        self.leg_type = "biped"
+        self.hip_height = hip_height
+        self.hip_loc_l = Vector((-hip_spacing_x * 0.5, -0.05, hip_height))
+        self.hip_loc_r = Vector((hip_spacing_x * 0.5, -0.05, hip_height))
+        self.knee_loc_l = Vector((-hip_spacing_x * 0.5 - 0.12, -0.05 - hip_height * 0.14, hip_height * 0.58))
+        self.knee_loc_r = Vector((hip_spacing_x * 0.5 + 0.12, -0.05 - hip_height * 0.14, hip_height * 0.58))
+        self.foot_loc_l = Vector((-hip_spacing_x * 0.5 - 0.08, -0.05 + hip_height * 0.10 + 0.12, 0.0))
+        self.foot_loc_r = Vector((hip_spacing_x * 0.5 + 0.08, -0.05 + hip_height * 0.10 + 0.12, 0.0))
         for side in (-1, 1):
             leg = make_bipedal_digitigrade_leg(
                 f"{self.name}Leg",
@@ -6510,14 +6861,25 @@ class RogueVehicleBuilder:
         reach_x: float = 1.05,
         reach_y: float = 0.85,
     ) -> "RogueVehicleBuilder":
+        self.is_walker = True
+        self.leg_type = "quad"
+        self.quad_feet = {}
+        self.quad_hips = {}
+        self.quad_knees = {}
         half_w = self.hull_width * 0.46
         half_l = self.hull_length * 0.40
         for sx in (-1, 1):
             for sy in (-1, 1):
-                tag = f"{'L' if sx < 0 else 'R'}_{'F' if sy > 0 else 'R'}"
+                tag_mesh = f"{'L' if sx < 0 else 'R'}_{'F' if sy > 0 else 'R'}"
+                tag_canonical = f"{'F' if sy > 0 else 'R'}{'L' if sx < 0 else 'R'}"
                 hip = Vector((sx * half_w, sy * half_l, self.ground_clearance + 0.65))
+                foot_target = Vector((hip.x + sx * reach_x, hip.y + sy * reach_y, 0.0))
+                knee_pos = Vector((hip.x + sx * (reach_x * 0.65), hip.y + sy * (reach_y * 0.60), knee_height))
+                self.quad_hips[tag_canonical] = hip
+                self.quad_knees[tag_canonical] = knee_pos
+                self.quad_feet[tag_canonical] = foot_target
                 leg = make_quad_crawler_leg(
-                    f"{self.name}CrawlerLeg_{tag}",
+                    f"{self.name}CrawlerLeg_{tag_mesh}",
                     hip_location=hip,
                     side_x=sx, side_y=sy,
                     reach_x=reach_x, reach_y=reach_y,
@@ -7034,6 +7396,12 @@ class RogueVehicleBuilder:
             antenna_loc=self.antenna_loc,
             thruster_vector_left=self.thruster_vector_l,
             thruster_vector_right=self.thruster_vector_r,
+            foot_contact_left=self.foot_loc_l,
+            foot_contact_right=self.foot_loc_r,
+            quad_foot_contacts=self.quad_feet if self.quad_feet else None,
+            engine_audio_loc=self.engine_audio_loc,
+            weapon_audio_loc=self.weapon_audio_loc,
+            nested_firepoints=True,
             antenna_parts=self.objects,
         )
         return self
@@ -7187,6 +7555,10 @@ class RogueVehicleBuilder:
                 self.add_colliders(include_turret=True)
             diagnostics["colliders"] = [c.name for c in self.collider_objects]
 
+        # 8b. Kinematic Armature Rigging & Rigid Vertex Weights (assigned before material batching)
+        if include_rig:
+            self.add_armature_rig(with_animations=include_animations, target_objects=model_export_source_objects)
+
         # 9. Material batching for FBX with smart angle-weighted smoothing
         batched_objects = batch_and_join_by_material(
             model_export_source_objects,
@@ -7230,13 +7602,15 @@ class RogueVehicleBuilder:
         if generate_colliders and self.collider_objects:
             export_objects.extend(self.collider_objects)
 
-        # 13. Kinematic Armature Rigging & Action Clips
-        if include_rig:
-            self.add_armature_rig(with_animations=include_animations, target_objects=batched_objects)
-            if self.armature_object:
-                export_objects.append(self.armature_object)
-                diagnostics["has_armature"] = True
-                diagnostics["action_clips"] = list(self.action_clips.keys())
+        # 13. Finalize Armature Attachment on Batched Meshes
+        if include_rig and self.armature_object:
+            for b_obj in batched_objects:
+                if b_obj.type == "MESH" and not any(m.type == "ARMATURE" for m in b_obj.modifiers):
+                    arm_mod = b_obj.modifiers.new(name="Armature", type="ARMATURE")
+                    arm_mod.object = self.armature_object
+            export_objects.append(self.armature_object)
+            diagnostics["has_armature"] = True
+            diagnostics["action_clips"] = list(self.action_clips.keys())
 
         # 14. Export Primary FBX for Unity
         export_unity_fbx(
@@ -7467,10 +7841,24 @@ class RogueStructureBuilder:
 
     def add_unity_locators(self) -> "RogueStructureBuilder":
         self.locator_sockets = []
+        if "Socket_DamageSmoke" not in self.sockets:
+            self.sockets["Socket_DamageSmoke"] = Vector((0.0, 0.0, 2.2))
+        if "Socket_DamageFire" not in self.sockets:
+            self.sockets["Socket_DamageFire"] = Vector((0.3, -0.3, 2.5))
+        s_muzzles = [pos for name, pos in self.sockets.items() if "Muzzle" in name]
+        if s_muzzles and "Socket_WeaponAudio" not in self.sockets:
+            self.sockets["Socket_WeaponAudio"] = s_muzzles[0]
+        if "Socket_BuildingAudio" not in self.sockets:
+            self.sockets["Socket_BuildingAudio"] = Vector((0.0, 0.0, 1.0))
+
         for s_name, s_pos in self.sockets.items():
             fwd = (0.0, 1.0, 0.0) if ("Deploy" in s_name or "Muzzle" in s_name) else (0.0, 0.0, 1.0)
             emp = create_unity_empty_locator(s_name, s_pos, forward=fwd)
             self.locator_sockets.append(emp)
+            if "Muzzle" in s_name:
+                fp = create_unity_empty_locator("FirePoint_0", s_pos, forward=fwd, radius=0.08)
+                fp.parent = emp
+                self.locator_sockets.append(fp)
         return self
 
     def build_and_export(

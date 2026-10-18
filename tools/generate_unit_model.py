@@ -1093,9 +1093,16 @@ def main():
         if args.single_material:
             print(f"  Single-material Atlas FBX: {args.name}_Atlas.fbx (one material slot; Unity draw-call count depends on prefab selection and rendering)")
         if args.rig:
-            print(f"  Armature Rig: {args.name}_Armature (Bone_Hull, Bone_TurretYaw, Bone_TurretPitch, Bone_BarrelRecoil)")
+            if args.archetype in ("walker", "colossus_titan"):
+                bones_desc = "Bone_Root, Bone_Pelvis, Bone_Thigh_L/R, Bone_Shin_L/R, Bone_Foot_L/R, Bone_TurretYaw, Bone_TurretPitch, Bone_BarrelRecoil"
+            elif args.archetype in ("spider", "quad_mech", "siege_crawler"):
+                bones_desc = "Bone_Root, Bone_Hull, Bone_Pelvis, Bone_Thigh_FL/FR/RL/RR, Bone_Shin_*, Bone_Foot_*, Bone_TurretYaw, Bone_TurretPitch, Bone_BarrelRecoil"
+            else:
+                bones_desc = "Bone_Root, Bone_Hull, Bone_Pelvis, Bone_TurretYaw, Bone_TurretPitch, Bone_BarrelRecoil"
+            print(f"  Armature Rig: {args.name}_Armature ({bones_desc})")
         if args.animate:
-            print(f"  Baked Action Clips: Action_Idle, Action_Drive, Action_FireRecoil, Action_Death")
+            walk_desc = "Action_Walk (In-Place 40-frame gait), Action_Drive (suspension)" if args.archetype in ("walker", "colossus_titan", "spider", "quad_mech", "siege_crawler") else "Action_Drive, Action_Walk"
+            print(f"  Baked Action Clips: Action_Idle, {walk_desc}, Action_FireRecoil, Action_Death")
         if args.vfx_flash:
             print(f"  VFX: Muzzle flash star-spike")
         if args.vfx_thruster:
