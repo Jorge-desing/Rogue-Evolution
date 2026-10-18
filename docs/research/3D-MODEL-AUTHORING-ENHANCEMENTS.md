@@ -641,5 +641,33 @@ To satisfy the mod architectural rule that *every added unit requires a dedicate
   python tools/generate_unit_model.py --name VanguardTank --render-icons --icon-size 64
   ```
 
+---
+
+## 16. In-Game Runtime Automation & Reactive Visual Director (2026-10-17)
+
+To bridge the offline 3D authoring pipeline with live gameplay simulation, the expansion loader now injects an autonomous visual management subsystem during match execution:
+
+### A. Autonomous Socket Discovery & In-Game Director (`RuntimeVisualDirector`)
+- **Injection Hook**: Intercepts `EntityFactory.InstantiateEntity` via Harmony postfix, dynamically attaching `RuntimeVisualDirector` to any spawned unit or structure possessing authoring sockets (`Socket_*`).
+- **Zero-Configuration Operation**:
+  1. **Progressive Combat Damage States**:
+     - At $\le 50\%$ HP: Automatically mounts smoke particle emitters onto `Socket_DamageSmoke` and activates `<Name>_Damaged` mesh variants.
+     - At $\le 25\%$ HP: Activates dynamic fire particles and point lighting on `Socket_DamageFire`, and introduces a mechanical tilt on `Socket_TurretPivot` to simulate traverse jamming.
+     - At $0\%$ HP: Cleans up transient particle emitters cleanly before garbage collection.
+  2. **Structure Dynamics**:
+     - `radar_station`: Spins `Socket_RadarMast` at 30 RPM continuously.
+     - `factory`: Detects active unit production and smoothly slides `Socket_Deploy_Unit` bay door upward by 1.4 m during rollout.
+     - `defense_turret`: Dynamically tracks hostile combat targets in horizontal azimuth at 120°/s.
+  3. **Weapon Combat Feedback**:
+     - `Socket_RecoilPrimary`: Simulates explosive barrel recoil slide with spring-damper recovery.
+     - `Socket_MuzzlePrimary`: Triggers high-luminance star-spike muzzle flash bursts.
+  4. **Modular Hardpoint Hot-Swapping**:
+     - Scans `Socket_Hardpoint_*` and provides programmatic API to toggle attached modular armor (`ERA`, `APS`, `Sponsons`, `FuelDrums`).
+
+### B. Dual-Tier Resilient Particle Fallback (`RuntimeVisualVfxFallback`)
+- **Tier 1**: Attempts discovery of native game particle prefabs (`Smoke`, `Fire`) from loaded asset bundles and active memory.
+- **Tier 2**: Procedurally generates dedicated Unity `ParticleSystem` components with configured emission rates, cone dispersion angles, and color ramps, guaranteeing zero runtime dependency on external asset bundles or proprietary assets.
+
+
 
 

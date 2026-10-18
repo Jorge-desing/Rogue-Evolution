@@ -461,11 +461,36 @@ Automated headless rendering pipeline generating transparent alpha PNG tactical 
 
 ---
 
+## 11. In-Game Runtime Automation (`RuntimeVisualDirector` & Socket Mechanics)
+
+All models authored with the procedural toolchain come to life inside the running game through the loader's autonomous `RuntimeVisualDirector` component (`RogueCommandExpansionLoader.Runtime.Visual.RuntimeVisualDirector`). Injected at combat runtime via Harmony postfix on `EntityFactory.InstantiateEntity`, it requires zero MonoBehaviour serialization inside AssetBundles and operates via zero-configuration socket auto-discovery.
+
+### A. Socket-to-Gameplay Runtime Binding Map
+
+| Authored Socket | In-Game Runtime Behavior & Logic |
+| :--- | :--- |
+| `Socket_TurretPivot` / `Socket_TurretYaw` | **Procedural Target Tracking**: Smoothly tracks the entity's hostile target (`_lastAiCommand.target` / `_currentPlayerCommand.target`) in horizontal azimuth at 120°/s. |
+| `Socket_RadarMast` / `Socket_RadarDish` | **Continuous Radar Sweep**: Rotates continuously around its local up axis at 30 RPM during match uptime. |
+| `Socket_DamageSmoke` | **50% HP Damage Transition**: Spawns volumetric smoke particles when `CurrentHealth / MaxHealth <= 0.50f` and enables `<Name>_Damaged` mesh. |
+| `Socket_DamageFire` | **25% HP Critical Seizure**: Spawns flame particles and dynamic point light, tilting `Socket_TurretPivot` ($+4.5^\circ$) to simulate mechanical turret ring jam. |
+| `Socket_Deploy_Unit` | **Factory Rollout Animation**: Detects unit production and smoothly slides bay door upward by 1.4 m during production rollout. |
+| `Socket_RecoilPrimary` | **Physical Barrel Recoil**: Instantaneous linear slide backward (0.22 m) upon weapon firing, recovering smoothly via spring-damper lerp. |
+| `Socket_MuzzlePrimary` | **Combat Flash Feedback**: Pulses the authored star-spike mesh (or procedural flash burst) for 0.07 s. |
+| `Socket_Hardpoint_<Type>` | **Modular Attachment Toggling**: Enables/disables or hot-swaps detached attachment sub-meshes (`ERA`, `APS`, `Sponson`, `FuelDrums`) at runtime. |
+
+### B. Resilient Visual Particle Fallback (`RuntimeVisualVfxFallback`)
+Combat particle systems (smoke, fire, muzzle flash) utilize a resilient dual-tier engine:
+1. **Tier 1 (Native Engine Discovery)**: Searches memory for loaded Rogue Command particle prefabs (`Smoke`, `Fire`) to guarantee authentic visual harmony with native game art.
+2. **Tier 2 (Self-Contained Procedural Fallback)**: If native prefabs are uninstantiated, dynamically generates standalone Unity `ParticleSystem` components with soft unlit alpha blending, upwards cone expansion, and color ramps.
+
+---
+
 ## References & Specialized Guides
 
 - [Art Style & Palette Guide](references/art-style-and-palette.md) — 3-tier silhouette hierarchy, 5-tone palette sets, bevel physics, and greeble standards.
 - [Blender Procedural Techniques](references/blender-procedural-techniques.md) — Parametric `bpy` recipes for chamfered hulls, continuous tracks, stepped road wheels, and engine grilles.
 - [Unity Material Pipeline](references/unity-material-pipeline.md) — Standard shader configuration, emission keywords, GPU instancing, and card sprite rules.
 - [Native Hierarchy & Pivots](references/native-hierarchy-and-pivots.md) — Transform hierarchy maps for `PCXBaseTank`, `BombBike`, `ArtilleryTank`, `GatlingWalker`, and `LightningTank`.
+
 
 

@@ -46,6 +46,10 @@
       <HintPath>$(GameManagedPath)\UnityEngine.JSONSerializeModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
+    <Reference Include="UnityEngine.ParticleSystemModule">
+      <HintPath>$(GameManagedPath)\UnityEngine.ParticleSystemModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
     <Reference Include="UnityEngine.IMGUIModule">
       <HintPath>$(GameManagedPath)\UnityEngine.IMGUIModule.dll</HintPath>
       <Private>false</Private>

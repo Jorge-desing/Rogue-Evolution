@@ -15,6 +15,7 @@ namespace RogueCommandExpansionLoader.Runtime
         private static RuntimeContentMutator _mutator;
         private static IRuntimeContentProvider _provider;
         private static Action<string> _log;
+        public static Action<object> OnEntityInstantiated;
 
         public static void Bind(
             RuntimeContentMutator mutator,
@@ -41,6 +42,7 @@ namespace RogueCommandExpansionLoader.Runtime
                 _mutator = null;
                 _provider = null;
                 _log = null;
+                OnEntityInstantiated = null;
             }
         }
 
@@ -498,6 +500,24 @@ namespace RogueCommandExpansionLoader.Runtime
                 // Logging failures are isolated from the game thread.
             }
         }
+        public static void AfterInstantiateEntity(object result)
+        {
+            if (result == null)
+            {
+                return;
+            }
+
+            Action<object> callback;
+            lock (Gate)
+            {
+                callback = OnEntityInstantiated;
+            }
+
+            if (callback != null)
+            {
+                SafeCall(delegate { callback(result); });
+            }
+        }
     }
 
     internal static class RuntimeHarmonyPatches
@@ -540,6 +560,11 @@ namespace RogueCommandExpansionLoader.Runtime
         public static void InstantiateEntityPrefix()
         {
             RuntimeHooks.BeforeEntityFactory();
+        }
+
+        public static void InstantiateEntityPostfix(object __result)
+        {
+            RuntimeHooks.AfterInstantiateEntity(__result);
         }
 
         public static void CreateEntityMeshPrefix()

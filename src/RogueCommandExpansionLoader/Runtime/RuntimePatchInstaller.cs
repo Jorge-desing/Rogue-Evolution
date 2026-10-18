@@ -94,6 +94,7 @@ namespace RogueCommandExpansionLoader.Runtime
                 try
                 {
                     RuntimeHooks.Bind(mutator, provider, logger);
+                    RuntimeHooks.OnEntityInstantiated = Visual.RuntimeVisualDirector.AttachIfApplicable;
                     harmony = new Harmony(HarmonyOwnerId);
                     for (int i = 0; i < patches.Count; i++)
                     {
@@ -285,6 +286,7 @@ namespace RogueCommandExpansionLoader.Runtime
             MethodInfo levelMapPrefix = Hook("CreateLevelMapPrefix");
             MethodInfo levelMapFinalizer = Hook("CreateLevelMapFinalizer");
             MethodInfo instantiatePrefix = Hook("InstantiateEntityPrefix");
+            MethodInfo instantiatePostfix = Hook("InstantiateEntityPostfix");
             MethodInfo entityMeshPrefix = Hook("CreateEntityMeshPrefix");
             MethodInfo aiUpdatePostfix = Hook("AiBehaviourUpdatePostfix");
             MethodInfo aiInitPostfix = Hook("DefaultAiBehaviourInitPostfix");
@@ -315,7 +317,7 @@ namespace RogueCommandExpansionLoader.Runtime
             plan.Add(new PatchPlan(setScriptableObject, null, setScriptableObjectPostfix));
             plan.Add(new PatchPlan(createStageMap, stageMapPrefix, null));
             plan.Add(new PatchPlan(createLevelMap, levelMapPrefix, null, levelMapFinalizer));
-            plan.Add(new PatchPlan(instantiateEntity, instantiatePrefix, null));
+            plan.Add(new PatchPlan(instantiateEntity, instantiatePrefix, instantiatePostfix));
             plan.Add(new PatchPlan(createEntityMesh, entityMeshPrefix, null));
             plan.Add(new PatchPlan(aiUpdate, null, aiUpdatePostfix));
             plan.Add(new PatchPlan(aiInit, null, aiInitPostfix));

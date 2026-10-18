@@ -49,6 +49,7 @@ var tests = new (string Name, Action Run)[]
             "CreateLevelMapPrefix",
             "CreateLevelMapFinalizer",
             "InstantiateEntityPrefix",
+            "InstantiateEntityPostfix",
             "CreateEntityMeshPrefix",
             "AiBehaviourUpdatePostfix",
             "DefaultAiBehaviourInitPostfix",
