@@ -44,7 +44,7 @@ Always recheck this identity before relying on reflected signatures, CIL metadat
 - **Walker visual correction (local AssetBundle build, 2026-10-18)**: The authored Ironclad FBX/prefab has a static hierarchy and no walker rig. Because `visualRootPath` disables native renderers under that subtree, keeping it in the pack would suppress the articulated native GatlingWalker legs. The active sample pack now omits `visualAssetName`/`visualRootPath` for `sample-native:assault-walker`, retains its custom card Sprite, and uses the native articulated unit visual. Unity rebuilt the bundle with four vehicle overlays plus five cards; UnityPy and the offline reference validator confirmed four visuals and nine references. This is local build/serialized-bundle evidence only; the in-game presentation still needs a live match.
 
 ### Profile Isolation & Cleanup Invariants
-- **Profile Backups**: Testing uses Profile 1 or temporary profiles. Pre-run files under `Profiles/` must be backed up before matches.
+- **Profile Backups**: Before a live run, resolve the active profile and hash its existing files. For acceptance that skips `FirstRun`, use the active user profile and preserve its selector and save data; the native tutorial-state completion, including custom tutorials auto-finished by the game, is intentional and remains completed after the run.
 - **Steam Cloud Safeguard**: Steam Cloud is disabled by persistent user instruction. Preserve that setting during tests and cleanup; never toggle it.
 - **Package Deployment Integrity**: Distributable ZIPs (`artifacts/packages/RogueCommandExpansionLoader-0.1.0.zip`) contain 9 entries: loader DLL, schemas, and content packs. Never include BepInEx core, Harmony, game assemblies, PDBs, or Unity `Library/` outputs in packages.
 
@@ -91,7 +91,7 @@ Every added unit must declare its own namespaced `productionBuilding`.
 - **Savegame Progression Store**: Rogue Command tracks unlocked blueprints, mutators, and cards persistently in `Profiles/Profile<n>/savegame.dat` via `ProfileUnlockedCardStore` (token `0x060004ad`).
 - **Blueprint Unlock Verification**: In `ChooseCard.PresentCardsToChoose`, native cards query `ProfileUnlocks.IsBlueprintUnlocked(string)` before inclusion in regular pools.
 - **Modded Blueprints Invariant**: Expansion units must not corrupt or irreversibly overwrite `savegame.dat`. When `isAllowedAsStartingBlueprint` is true, the factory blueprint is granted to the player's starting selection without mutating persistent profile unlock arrays.
-- **Profile Isolation Protocol**: Automated test sessions must operate against isolated test profiles (`Profile 1` or temporary scratch profiles). Pre-run hashes of `savegame.dat` must be captured and restored following session termination to maintain baseline integrity.
+- **Profile Isolation Protocol**: Do not reset or switch profiles to bypass `FirstRun`. Use the active profile's native `Game.TutorialState` completion flow documented in [STEAM-RUNTIME-CONTROL.md](STEAM-RUNTIME-CONTROL.md), after verifying the current selector and hashing the profile. Preserve all existing profile data except tutorial-state changes caused by that native flow, including custom tutorials auto-finished by the game; retain a pre-change copy for user-requested recovery but do not restore it during ordinary cleanup.
 
 ---
 

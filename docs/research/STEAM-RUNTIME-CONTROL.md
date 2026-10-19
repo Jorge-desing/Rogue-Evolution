@@ -126,6 +126,45 @@ En el `Assembly-CSharp.dll` de esta identidad, el inicializador de `ProfileManag
 
 En la lectura en vivo del 2026-10-18, el selector de `LocalLow` valía `1`, mientras los dos archivos de la instalación valían `2` y `3`. El perfil activo era `Profile1`; al iniciar no tenía `savegame.dat`. `Profile2` y `Profile3` sí tenían guardados. Esta comprobación estática y de archivos corrige la clasificación de la lectura histórica más abajo: vuelve a consultar la ruta de `ProfileManager` en cada sesión y no cambies ninguno de los selectores heredados para elegir un perfil de prueba.
 
+### Completar FirstRun en el perfil activo del usuario
+
+Para las pruebas de aceptación que no tengan por objetivo probar el tutorial, el agente omite `FirstRun` completando el estado del tutorial en el perfil activo del usuario. Este cambio es persistente y se conserva después de la prueba. No cambies de perfil ni uses las opciones nativas de reset: pueden afectar datos ajenos al tutorial.
+
+1. Hazlo desde `MainMenu` o `RunSetup`, antes de que empiece una corrida. Si ya hay una partida activa, no la abandones ni la sobrescribas solo para llegar al menú; pausa y deja este cambio para cuando vuelva a un estado seguro.
+2. Resuelve el selector activo por `ProfileManager.CurrentProfileTextPath` bajo `Application.persistentDataPath`. Registra el número de perfil, ruta, hashes de todos los archivos existentes y una copia de `tutorialState.txt` si existe. No cambies el selector y no escribas directamente ningún archivo del perfil.
+3. Antes de usar las firmas, vuelve a comprobar en conjunto la versión de Rogue Command, el SHA-256 y el MVID de `Assembly-CSharp.dll`. Para Rogue Command `1.0.9`, SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, MVID `db0e9462-128d-4296-9900-de18b4bd0c00`, la inspección estática encontró estas llamadas nativas en `TutorialState`: `FinishMainTutorial()` y `OnPlayerHasFinishedLevel1()`. La primera persiste el fin del tutorial principal y llama a `AutoFinishCustomTutorialsWithMainTutorial()`; la segunda persiste el indicador usado por `GameBalancingStore.DetermineLevelProgressionModeForNewRun()` para dejar de escoger `FirstRun`. Este camino no usa Harmony ni escribe XP.
+4. Invoca cada método una vez si su flag correspondiente sigue falso, directamente por el puente si este ofrece esa llamada. Si hace falta un helper temporal, compílalo con `mod_inject_class`, adjunta uno solo a un GameObject activo, llama una vez a `Apply()`, lee los dos flags y el modo de próxima corrida, llama `Remove()` y confirma con `inspect_components` que ya no queda ningún `RclTutorialCompletion`. No lo dejes adjunto al pasar de escena. El helper de referencia es:
+
+   ```csharp
+   using UnityEngine;
+
+   public sealed class RclTutorialCompletion : MonoBehaviour
+   {
+       public bool mainTutorialFinished;
+       public bool playerHasFinishedLevel1;
+       public string nextRunMode;
+
+       public void Apply()
+       {
+           var tutorial = Game.TutorialState;
+           if (!tutorial.IsMainTutorialFinished)
+               tutorial.FinishMainTutorial();
+           if (!tutorial.PlayerHasFinishedLevel1)
+               tutorial.OnPlayerHasFinishedLevel1();
+
+           mainTutorialFinished = tutorial.IsMainTutorialFinished;
+           playerHasFinishedLevel1 = tutorial.PlayerHasFinishedLevel1;
+           nextRunMode = GameBalancingStore.DetermineLevelProgressionModeForNewRun().ToString();
+       }
+
+       public void Remove() => Destroy(this);
+   }
+   ```
+5. Confirma `IsMainTutorialFinished=true`, `PlayerHasFinishedLevel1=true` y modo de próxima corrida `Default` o `Heat` antes de empezar. Tras la transición, comprueba `Game.CurrentLevelProgressionMode`; debe ser distinto de `FirstRun`. Si no lo es, detente y diagnostica la identidad, el selector y la carga de `TutorialState`; no avances el tutorial manualmente.
+6. Después de la aceptación, confirma que el selector sigue apuntando al perfil registrado y compara sus hashes. Se espera que cambie `tutorialState.txt`; si varía cualquier otro archivo, detente y determina la causa antes de continuar o restaurarlo. Conserva los demás datos y deja los flags completados. Restaura los archivos temporales de instalación por hash y retira helpers/sondas. No restaures automáticamente la copia previa de `tutorialState.txt`, porque eso reactivaría el tutorial que el usuario pidió quitar.
+
+La ruta de las firmas y los efectos anteriores tiene **inspección estática** en la identidad indicada; no se afirma una nueva ejecución en vivo del bypass en esta documentación. Si cambia cualquier elemento de la identidad, no reutilices esas firmas sin volver a inspeccionarlas.
+
 ## Inspección primero
 
 Empieza con operaciones de lectura acotadas:
