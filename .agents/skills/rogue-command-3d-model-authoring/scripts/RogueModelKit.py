@@ -1,6 +1,6 @@
 """RogueModelKit: Reusable procedural 3D modeling toolkit for Rogue Command vehicles.
 
-Provides parametric geometric primitives, chamfered hard-surface builders,
+Provides parametric geometric primitives, scale-aware hard-surface builders,
 continuous track loops, stepped wheels, recessed optics, advanced rotary weapons,
 missile pods, energy emitters, bipedal legs, draw-call batching, multi-perspective
 studio rendering, and automated quality diagnostics designed for Blender 4.5.14 LTS
@@ -66,8 +66,9 @@ def finish_mesh(
     material: bpy.types.Material | None,
     bevel: float = 0.0,
     smooth: bool = False,
+    bevel_segments: int = 1,
 ) -> bpy.types.Object:
-    """Assigns material, enforces flat or smooth shading, and applies 1-segment bevel."""
+    """Assigns material and applies an optional scale-appropriate edge bevel."""
     if material is not None:
         obj.data.materials.append(material)
 
@@ -77,7 +78,7 @@ def finish_mesh(
     if bevel > 0.0:
         modifier = obj.modifiers.new("machined chamfers", "BEVEL")
         modifier.width = bevel
-        modifier.segments = 1
+        modifier.segments = max(1, int(bevel_segments))
         modifier.limit_method = "ANGLE"
         modifier.angle_limit = math.radians(35)
         bpy.context.view_layer.objects.active = obj
@@ -111,8 +112,9 @@ def make_box(
     material: bpy.types.Material | None,
     bevel: float = 0.025,
     rotation: Tuple[float, float, float] = (0.0, 0.0, 0.0),
+    bevel_segments: int = 1,
 ) -> bpy.types.Object:
-    """Creates a box with baked transforms and 1-segment chamfer."""
+    """Creates a box with baked transforms and configurable edge rounding."""
     if rotation is None:
         rotation = (0.0, 0.0, 0.0)
     bpy.ops.mesh.primitive_cube_add(size=1.0, location=location)
@@ -121,7 +123,54 @@ def make_box(
     obj.dimensions = size
     obj.rotation_euler = rotation
     bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
-    return finish_mesh(obj, material, bevel)
+    return finish_mesh(obj, material, bevel, bevel_segments=bevel_segments)
+
+
+def _make_tapered_shell(
+    name: str,
+    size: Tuple[float, float, float],
+    location: Tuple[float, float, float] | Vector,
+    material: bpy.types.Material | None,
+    top_scale: Tuple[float, float] = (0.92, 0.92),
+    bevel: float = 0.025,
+    bevel_segments: int = 2,
+) -> bpy.types.Object:
+    """Creates a tapered armor shell with a narrower roof and softened edge transitions."""
+    sx, sy, sz = size
+    scale_x, scale_y = top_scale
+    if min(sx, sy, sz) <= 0.0:
+        raise ValueError("shell dimensions must be positive")
+    if not (0.0 < scale_x <= 1.0 and 0.0 < scale_y <= 1.0):
+        raise ValueError("top_scale values must be in the range (0, 1]")
+
+    loc = Vector(location)
+    hx, hy = sx * 0.5, sy * 0.5
+    z_bottom, z_top = loc.z - sz * 0.5, loc.z + sz * 0.5
+    vertices = [
+        (loc.x - hx, loc.y - hy, z_bottom), (loc.x + hx, loc.y - hy, z_bottom),
+        (loc.x + hx, loc.y + hy, z_bottom), (loc.x - hx, loc.y + hy, z_bottom),
+        (loc.x - hx * scale_x, loc.y - hy * scale_y, z_top),
+        (loc.x + hx * scale_x, loc.y - hy * scale_y, z_top),
+        (loc.x + hx * scale_x, loc.y + hy * scale_y, z_top),
+        (loc.x - hx * scale_x, loc.y + hy * scale_y, z_top),
+    ]
+    faces = [
+        (3, 2, 1, 0), (4, 5, 6, 7),
+        (0, 1, 5, 4), (1, 2, 6, 5),
+        (2, 3, 7, 6), (3, 0, 4, 7),
+    ]
+    mesh = bpy.data.meshes.new(f"{name}_Mesh")
+    mesh.from_pydata(vertices, [], faces)
+    mesh.update()
+    obj = bpy.data.objects.new(name, mesh)
+    bpy.context.collection.objects.link(obj)
+    bpy.context.view_layer.objects.active = obj
+    obj.select_set(True)
+    bpy.ops.object.mode_set(mode="EDIT")
+    bpy.ops.mesh.select_all(action="SELECT")
+    bpy.ops.mesh.normals_make_consistent(inside=False)
+    bpy.ops.object.mode_set(mode="OBJECT")
+    return finish_mesh(obj, material, bevel, bevel_segments=bevel_segments)
 
 
 def make_cylinder(
@@ -133,6 +182,7 @@ def make_cylinder(
     rotation: Tuple[float, float, float] = (0.0, 0.0, 0.0),
     vertices: int = 12,
     bevel: float | None = None,
+    bevel_segments: int = 1,
 ) -> bpy.types.Object:
     """Creates a cylinder with baked scale and proportional chamfers."""
     if rotation is None:
@@ -145,7 +195,7 @@ def make_cylinder(
     bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
     if bevel is None:
         bevel = min(radius * 0.16, depth * 0.14)
-    return finish_mesh(obj, material, bevel)
+    return finish_mesh(obj, material, bevel, bevel_segments=bevel_segments)
 
 
 def make_rod(
@@ -156,6 +206,7 @@ def make_rod(
     material: bpy.types.Material | None,
     vertices: int = 8,
     bevel: float | None = None,
+    bevel_segments: int = 1,
 ) -> bpy.types.Object:
     """Creates a rod/pipe between two arbitrary 3D endpoints."""
     start_v = Vector(start)
@@ -177,7 +228,7 @@ def make_rod(
     bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
     if bevel is None:
         bevel = min(radius * 0.18, length * 0.03)
-    return finish_mesh(obj, material, bevel)
+    return finish_mesh(obj, material, bevel, bevel_segments=bevel_segments)
 
 
 def make_torus(
@@ -219,8 +270,9 @@ def make_sloped_glacis_hull(
     height_upper: float,
     material: bpy.types.Material | None,
     bevel: float = 0.045,
+    bevel_segments: int = 2,
 ) -> bpy.types.Object:
-    """Creates an armored tank chassis with sloped frontal glacis and tapered sides."""
+    """Creates a tapered armored chassis with sloped glacis and softened edge transitions."""
     hw_f = width_front * 0.5
     hw_r = width_rear * 0.5
     vertices = [
@@ -254,7 +306,7 @@ def make_sloped_glacis_hull(
     bpy.ops.mesh.select_all(action="SELECT")
     bpy.ops.mesh.normals_make_consistent(inside=False)
     bpy.ops.object.mode_set(mode="OBJECT")
-    return finish_mesh(obj, material, bevel)
+    return finish_mesh(obj, material, bevel, bevel_segments=bevel_segments)
 
 
 def make_faceted_turret_housing(
@@ -265,32 +317,40 @@ def make_faceted_turret_housing(
     roof_mat: bpy.types.Material | None = None,
     bevel: float = 0.035,
 ) -> list[bpy.types.Object]:
-    """Generates an angular, multi-faceted armored turret shell with sloped cheeks and rear bustle."""
+    """Generates a tapered turret shell with rounded transitions, mantlet, and rear bustle."""
     objects = []
     loc_v = Vector(location)
-    hw = size[0] * 0.5
     hl = size[1] * 0.5
-    hh = size[2] * 0.5
+    shell_bevel = min(bevel, size[2] * 0.18, size[0] * 0.08) if bevel > 0.0 else 0.0
 
-    # Octagonal/faceted main turret body
-    objects.append(make_cylinder(
-        f"{prefix}_BaseShell", hw * 0.92, size[2],
-        loc_v, armor_mat, vertices=8, bevel=bevel
+    # Taper the roof inward so the primary body reads as formed armor, not a cylinder.
+    objects.append(_make_tapered_shell(
+        f"{prefix}_BaseShell",
+        size=(size[0] * 0.96, size[1] * 0.90, size[2]),
+        location=loc_v,
+        material=armor_mat,
+        top_scale=(0.90, 0.88),
+        bevel=shell_bevel,
+        bevel_segments=2,
     ))
-    # Forward sloped gun mantlet cradle
+    # Forward sloped gun mantlet cradle, rounded only at exposed hard edges.
     objects.append(make_box(
         f"{prefix}_MantletHousing",
         (size[0] * 0.65, size[1] * 0.35, size[2] * 0.88),
         loc_v + Vector((0.0, hl * 0.65, 0.0)),
-        roof_mat if roof_mat else armor_mat, bevel=bevel * 0.8,
-        rotation=(math.radians(-8), 0.0, 0.0)
+        roof_mat if roof_mat else armor_mat,
+        bevel=min(bevel * 0.72, size[2] * 0.14),
+        rotation=(math.radians(-8), 0.0, 0.0),
+        bevel_segments=2,
     ))
     # Rear bustle counterweight / ammo compartment
     objects.append(make_box(
         f"{prefix}_RearBustle",
         (size[0] * 0.78, size[1] * 0.42, size[2] * 0.76),
         loc_v + Vector((0.0, -hl * 0.72, 0.0)),
-        armor_mat, bevel=bevel
+        armor_mat,
+        bevel=min(bevel, size[2] * 0.16),
+        bevel_segments=2,
     ))
     return objects
 
@@ -5949,10 +6009,13 @@ def make_troop_compartment(
     loc_v = Vector(location)
     sx, sy, sz = size
 
-    # 1. Main cabin box with sloped chamfers
-    objects.append(make_box(
+    # 1. Main cabin shell with a slight roof taper and rolled edge transitions.
+    objects.append(_make_tapered_shell(
         f"{prefix}_CabinShell",
-        size, loc_v, armor_mat, bevel=0.04
+        size, loc_v, armor_mat,
+        top_scale=(0.94, 0.96),
+        bevel=min(0.025, sz * 0.06),
+        bevel_segments=2,
     ))
 
     # 2. Roof observation cupola / hatch
@@ -5961,13 +6024,13 @@ def make_troop_compartment(
         f"{prefix}_RoofCupola",
         radius=sx * 0.22, depth=0.10,
         location=(loc_v.x, loc_v.y + sy * 0.15, cupola_z),
-        material=detail_mat, vertices=12, bevel=0.015
+        material=detail_mat, vertices=16, bevel=0.012, bevel_segments=2
     ))
     objects.append(make_cylinder(
         f"{prefix}_HatchCover",
         radius=sx * 0.18, depth=0.035,
         location=(loc_v.x, loc_v.y + sy * 0.15, cupola_z + 0.06),
-        material=door_mat, vertices=10, bevel=0.008
+        material=door_mat, vertices=16, bevel=0.006, bevel_segments=2
     ))
 
     # 3. Rear clamshell access doors
@@ -5981,7 +6044,7 @@ def make_troop_compartment(
             f"{prefix}_RearDoor_{'L' if side < 0 else 'R'}",
             (door_w, 0.04, door_h),
             (door_x, rear_y, door_z),
-            door_mat, bevel=0.012
+            door_mat, bevel=0.010, bevel_segments=2
         ))
         # Grab handles
         handle_x = loc_v.x + side * 0.08
@@ -9181,7 +9244,7 @@ def apply_procedural_normal_relief(
     scale: float = 1.0,
     strength: float = 0.75,
 ) -> None:
-    """Attaches a procedural panel seam groove and relief bump network to the material's Normal socket."""
+    """Adds restrained, fine-grained surface relief to the material's Normal socket."""
     if not material or not material.use_nodes:
         return
     tree = material.node_tree
@@ -9190,16 +9253,17 @@ def apply_procedural_normal_relief(
         return
 
     tex_coord = tree.nodes.new("ShaderNodeTexCoord")
-    vor = tree.nodes.new("ShaderNodeTexVoronoi")
-    vor.feature = "DISTANCE_TO_EDGE"
-    vor.inputs["Scale"].default_value = 3.8 * max(0.1, scale)
+    noise = tree.nodes.new("ShaderNodeTexNoise")
+    noise.inputs["Scale"].default_value = 28.0 * max(0.1, scale)
+    noise.inputs["Detail"].default_value = 2.0
+    noise.inputs["Roughness"].default_value = 0.62
 
     bump = tree.nodes.new("ShaderNodeBump")
     bump.inputs["Strength"].default_value = strength
-    bump.inputs["Distance"].default_value = 0.04
+    bump.inputs["Distance"].default_value = 0.006
 
-    tree.links.new(tex_coord.outputs["Object"], vor.inputs["Vector"])
-    tree.links.new(vor.outputs["Distance"], bump.inputs["Height"])
+    tree.links.new(tex_coord.outputs["Object"], noise.inputs["Vector"])
+    tree.links.new(noise.outputs["Fac"], bump.inputs["Height"])
     tree.links.new(bump.outputs["Normal"], bsdf.inputs["Normal"])
 
 
@@ -9264,9 +9328,9 @@ class FactionPalette:
             )
 
         if enable_normal_relief and normal_intensity > 0.0:
-            apply_procedural_normal_relief(self.primary_armor, scale=1.0, strength=0.75 * normal_intensity)
-            apply_procedural_normal_relief(self.light_armor, scale=1.2, strength=0.65 * normal_intensity)
-            apply_procedural_normal_relief(self.gunmetal, scale=1.5, strength=0.50 * normal_intensity)
+            apply_procedural_normal_relief(self.primary_armor, scale=1.0, strength=0.20 * normal_intensity)
+            apply_procedural_normal_relief(self.light_armor, scale=1.2, strength=0.16 * normal_intensity)
+            apply_procedural_normal_relief(self.gunmetal, scale=1.5, strength=0.12 * normal_intensity)
 
 
 def get_faction_palette(
@@ -9393,7 +9457,7 @@ class RogueVehicleBuilder:
 
     Guarantees:
     - 5-tone faction PBR material standard
-    - 1-segment chamfers on all hard edges for RTS specular highlights
+    - Scale-aware edge treatment on primary hull, turret, and cabin forms
     - Exact ground contact at Z >= 0.0m
     - Strict coaxial weapon alignment
     - Groups exportable meshes by material while preserving requested pivots; output group counts depend on the inputs
@@ -9831,7 +9895,7 @@ class RogueVehicleBuilder:
             f"{self.name}Armor_UpperDeck",
             (width * 0.65, length * 0.72, 0.24),
             (0.0, -0.05, height + 0.10),
-            self.palette.light_armor, bevel=0.035
+            self.palette.light_armor, bevel=0.022, bevel_segments=2
         ))
         return self
 
