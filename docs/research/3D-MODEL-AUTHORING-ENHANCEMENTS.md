@@ -613,3 +613,20 @@ dotnet run --project tests/RogueCommandExpansionLoader.ValidationTests -- .
   - 3 structure presets (`fortified_pillbox`, `patriot_sam_battery`, `deep_space_relay`).
   - 3 elite custom-palette remix presets (`crimson_praetorian`, `cobalt_widowmaker`, `golden_aegis_command`) utilizing preset-level overrides for `primary_color`, `light_armor_color`, `emissive_color`, `vfx_flash`, and `vfx_thruster` (honored whenever the corresponding CLI flag is not explicitly passed).
 
+---
+
+## 21. Wave 5 Procedural BMesh Survivability, Camo Netting & Thermal Radiator Suite (local build/validation evidence)
+
+- **Four new consolidated BMesh subsystem generators** (`tools/RogueModelKit.py` & `tools/generate_unit_model.py`), all reusing the existing `FactionPalette` materials (`primary_armor`, `light_armor`, `gunmetal`, `tread`, `emissive`) for **0 additional draw calls** after `batch_meshes_by_material()`:
+  1. **Anti-HEAT Slat / Cage Armor (`make_slat_cage_armor_assembly` / `--slat-armor`)**:
+     - Consolidates bilateral side-hull horizontal slat bars, vertical support ribs, angled hull standoff mounting brackets, and an optional turret bustle wrap-around cage screen into two single `BMesh` objects (`SlatCage_Grid`, `SlatCage_Struts`).
+  2. **Explosive Reactive Armor Wedge Bricks (`make_era_reactive_bricks_assembly` / `--era-bricks`)**:
+     - Generates staggered rows of Kontakt-5 / Relikt sloped ERA tiles across the forward glacis (with full `cos_p` / `sin_p` pitch alignment), bilateral angled turret cheek ERA wedge blocks, and recessed mounting bolts (`ERABricks_Tiles`, `ERABricks_Bolts`).
+  3. **3D Noise-Displaced Camouflage Netting & Barrel Wrap (`make_camo_netting_assembly` / `--camo-netting`)**:
+     - Subdivides a dorsal `bmesh.ops.create_grid` canopy displaced via `mathutils.noise.noise` with quadratic edge gravity droop ($d^2$) and solidifies it via `bmesh.ops.extrude_face_region` (`+0.028m` Z thickness) to prevent single-sided backface culling in Unity URP, accompanied by 4 corner telescopic support poles and 3 main-gun barrel ghillie wrap rings along `gun_pivot` / `gun_dir`.
+  4. **Glowing Thermal Exchanger Radiator Banks (`make_thermal_radiator_assembly` / `--thermal-radiators`)**:
+     - Builds bilateral recessed radiator shroud housings (`primary_armor`), glowing internal plasma/fusion heat-core beds (`emissive`), consolidated multi-slat `BMesh` cooling fin arrays (`gunmetal`), and longitudinal coolant manifold pipes (`tread`).
+- **Builder & CLI Integration**:
+  - Added `.add_slat_armor()`, `.add_era_bricks()`, `.add_camo_netting()`, and `.add_thermal_radiators()` to both `RogueVehicleBuilder` and `RogueStructureBuilder`.
+  - Exposed `--slat-armor`, `--era-bricks`, `--camo-netting`, and `--thermal-radiators` CLI flags and auto-enabled them across matching tactical presets (`siege_breaker`, `urban_brawler`, `dreadnought_crawler`, `beam_destroyer`, `longbow_strider`, `inferno_purger`, `longshot_tankette`, `arctic_sentinel`, `thunder_mortar_carrier`, `subterranean_mole`, `atlas_crane_mech`, `fortified_pillbox`, `deep_space_relay`, `crimson_praetorian`, `cobalt_widowmaker`, `golden_aegis_command`, etc.).
+

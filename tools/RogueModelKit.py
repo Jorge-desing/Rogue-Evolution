@@ -2936,6 +2936,387 @@ def make_tactical_stowage_kit(
     return objects
 
 
+def make_slat_cage_armor_assembly(
+    prefix: str,
+    hull_length: float = 3.0,
+    hull_width: float = 2.4,
+    deck_z: float = 0.88,
+    turret_center: Tuple[float, float, float] | Vector | None = None,
+    turret_length: float = 1.60,
+    turret_width: float = 1.40,
+    slat_count: int = 5,
+    standoff_dist: float = 0.14,
+    metal_mat: bpy.types.Material | None = None,
+    armor_mat: bpy.types.Material | None = None,
+    accent_mat: bpy.types.Material | None = None,
+) -> list[bpy.types.Object]:
+    """Generates anti-HEAT standoff slat/cage bar armor grids around rear hull flanks and turret bustle cheeks."""
+    objects: list[bpy.types.Object] = []
+    m_mat = metal_mat or armor_mat
+    a_mat = armor_mat or metal_mat
+    ac_mat = accent_mat or m_mat
+    n_slats = max(3, min(8, int(slat_count)))
+
+    # 1. Bilateral rear hull flank anti-HEAT slat cage grids (consolidated into single BMesh per side)
+    cage_len = max(0.85, hull_length * 0.42)
+    cage_h = max(0.32, min(0.56, deck_z * 0.48))
+    cage_y = -hull_length * 0.20
+    cage_z = max(0.32, deck_z - cage_h * 0.55)
+
+    for side in (-1, 1):
+        stag = "L" if side < 0 else "R"
+        base_x = side * (hull_width * 0.50)
+        outer_x = base_x + side * standoff_dist
+
+        mesh = bpy.data.meshes.new(f"{prefix}_HullSlatCage_{stag}_Mesh")
+        cage_obj = bpy.data.objects.new(f"{prefix}_HullSlatCage_{stag}", mesh)
+        bpy.context.collection.objects.link(cage_obj)
+        bm = bmesh.new()
+
+        def _append_box_to_bmesh(center_v: Vector, dims: Tuple[float, float, float]) -> None:
+            res = bmesh.ops.create_cube(bm, size=1.0)
+            verts = res["verts"]
+            for v in verts:
+                v.co.x = v.co.x * dims[0] + center_v.x
+                v.co.y = v.co.y * dims[1] + center_v.y
+                v.co.z = v.co.z * dims[2] + center_v.z
+
+        # Horizontal slat blades
+        for i in range(n_slats):
+            t = i / float(max(1, n_slats - 1))
+            sz = cage_z - cage_h * 0.45 + t * (cage_h * 0.90)
+            _append_box_to_bmesh(Vector((outer_x, cage_y, sz)), (0.032, cage_len, 0.022))
+
+        # Vertical framing ribs + standoff struts
+        for idx, fy in enumerate((cage_y - cage_len * 0.44, cage_y, cage_y + cage_len * 0.44)):
+            _append_box_to_bmesh(Vector((outer_x, fy, cage_z)), (0.038, 0.036, cage_h))
+            if idx != 1:
+                mid_x = (base_x + outer_x) * 0.5
+                _append_box_to_bmesh(Vector((mid_x, fy, cage_z + cage_h * 0.30)), (standoff_dist, 0.042, 0.042))
+                _append_box_to_bmesh(Vector((mid_x, fy, cage_z - cage_h * 0.30)), (standoff_dist, 0.042, 0.042))
+
+        bm.normal_update()
+        bm.to_mesh(mesh)
+        bm.free()
+        finish_mesh(cage_obj, m_mat, bevel=0.004, smooth=False)
+        objects.append(cage_obj)
+
+        # Corner hazard tie plates
+        objects.append(make_box(
+            f"{prefix}_SlatTiePlate_{stag}",
+            (0.045, 0.14, cage_h * 0.82),
+            (outer_x + side * 0.006, cage_y - cage_len * 0.38, cage_z),
+            ac_mat if side > 0 else a_mat,
+            bevel=0.005,
+        ))
+
+    # 2. Turret bustle rear wrap-around slat screen
+    if turret_center is not None:
+        tc = Vector(turret_center)
+        rear_y = tc.y - turret_length * 0.56 - standoff_dist * 0.65
+        rear_w = max(0.75, turret_width * 0.84)
+        rear_h = 0.28
+        mesh_t = bpy.data.meshes.new(f"{prefix}_TurretSlatScreen_Mesh")
+        t_obj = bpy.data.objects.new(f"{prefix}_TurretSlatScreen", mesh_t)
+        bpy.context.collection.objects.link(t_obj)
+        bm_t = bmesh.new()
+        for i in range(4):
+            tz = tc.z - 0.10 + i * (rear_h / 3.0)
+            res = bmesh.ops.create_cube(bm_t, size=1.0)
+            for v in res["verts"]:
+                v.co.x = v.co.x * rear_w + tc.x
+                v.co.y = v.co.y * 0.032 + rear_y
+                v.co.z = v.co.z * 0.020 + tz
+        for sx in (-1, 1):
+            res = bmesh.ops.create_cube(bm_t, size=1.0)
+            for v in res["verts"]:
+                v.co.x = v.co.x * 0.038 + (tc.x + sx * rear_w * 0.46)
+                v.co.y = v.co.y * 0.14 + (rear_y + 0.06)
+                v.co.z = v.co.z * (rear_h + 0.04) + (tc.z + 0.04)
+        bm_t.normal_update()
+        bm_t.to_mesh(mesh_t)
+        bm_t.free()
+        finish_mesh(t_obj, m_mat, bevel=0.004, smooth=False)
+        objects.append(t_obj)
+
+    return objects
+
+
+def make_era_reactive_bricks_assembly(
+    prefix: str,
+    hull_length: float = 3.0,
+    hull_width: float = 2.4,
+    deck_z: float = 0.88,
+    turret_center: Tuple[float, float, float] | Vector | None = None,
+    turret_length: float = 1.60,
+    turret_width: float = 1.40,
+    cols: int = 5,
+    rows: int = 2,
+    brick_mat: bpy.types.Material | None = None,
+    bolt_mat: bpy.types.Material | None = None,
+    accent_mat: bpy.types.Material | None = None,
+) -> list[bpy.types.Object]:
+    """Generates staggered Explosive Reactive Armor (ERA) Kontakt/Relikt wedge bricks across the front glacis and turret cheeks."""
+    objects: list[bpy.types.Object] = []
+    b_mat = brick_mat or bolt_mat
+    m_mat = bolt_mat or brick_mat
+    ac_mat = accent_mat or b_mat
+
+    n_cols = max(3, min(8, int(cols)))
+    n_rows = max(1, min(3, int(rows)))
+    brick_w = min(0.28, (hull_width * 0.68) / n_cols)
+    brick_l = 0.18
+    brick_h = 0.075
+
+    # 1. Forward sloped glacis staggered ERA brick array (single BMesh)
+    mesh = bpy.data.meshes.new(f"{prefix}_GlacisERABricks_Mesh")
+    era_obj = bpy.data.objects.new(f"{prefix}_GlacisERABricks", mesh)
+    bpy.context.collection.objects.link(era_obj)
+    bm = bmesh.new()
+
+    span_x = n_cols * (brick_w + 0.025)
+    base_y = hull_length * 0.36
+    base_z = deck_z * 0.84
+    pitch_rad = math.radians(-22.0)
+    cos_p, sin_p = math.cos(pitch_rad), math.sin(pitch_rad)
+
+    for r in range(n_rows):
+        stagger_x = (0.04 if (r % 2 == 1) else -0.04) if n_rows > 1 else 0.0
+        ry = base_y + r * (brick_l + 0.025) * cos_p
+        rz = base_z - r * (brick_l + 0.025) * abs(sin_p)
+        for c in range(n_cols):
+            cx = -span_x * 0.5 + (c + 0.5) * (span_x / n_cols) + stagger_x
+            res = bmesh.ops.create_cube(bm, size=1.0)
+            for v in res["verts"]:
+                lx = v.co.x * brick_w
+                ly = v.co.y * brick_l
+                lz = v.co.z * brick_h
+                # Wedge profile: taper top front edge slightly
+                if v.co.z > 0 and v.co.y > 0:
+                    lz *= 0.68
+                rot_y = ly * cos_p - lz * sin_p
+                rot_z = ly * sin_p + lz * cos_p
+                v.co = Vector((cx + lx, ry + rot_y, rz + rot_z))
+
+    bm.normal_update()
+    bm.to_mesh(mesh)
+    bm.free()
+    finish_mesh(era_obj, b_mat, bevel=0.008, smooth=False)
+    objects.append(era_obj)
+
+    # Retaining rails and corner warning tiles
+    objects.append(make_box(
+        f"{prefix}_GlacisERARail",
+        (span_x * 0.96, 0.042, 0.036),
+        (0.0, base_y - 0.06, base_z + 0.04),
+        m_mat,
+        bevel=0.005,
+    ))
+
+    # 2. Bilateral angled turret cheek ERA wedge blocks
+    if turret_center is not None:
+        tc = Vector(turret_center)
+        for side in (-1, 1):
+            stag = "L" if side < 0 else "R"
+            for idx in range(3):
+                by = tc.y + turret_length * 0.24 - idx * 0.21
+                bx = tc.x + side * (turret_width * 0.48 + 0.04)
+                bz = tc.z + 0.02
+                objects.append(make_box(
+                    f"{prefix}_TurretERABrick_{stag}_{idx+1}",
+                    (0.085, 0.19, 0.16),
+                    (bx, by, bz),
+                    ac_mat if idx == 0 else b_mat,
+                    bevel=0.010,
+                    rotation=(0.0, math.radians(side * 16.0), math.radians(side * -14.0)),
+                ))
+
+    return objects
+
+
+def make_camo_netting_assembly(
+    prefix: str,
+    hull_length: float = 3.0,
+    hull_width: float = 2.4,
+    deck_z: float = 0.88,
+    turret_center: Tuple[float, float, float] | Vector | None = None,
+    turret_length: float = 1.60,
+    turret_width: float = 1.40,
+    gun_pivot: Tuple[float, float, float] | Vector | None = None,
+    gun_dir: Tuple[float, float, float] | Vector | None = None,
+    net_mat: bpy.types.Material | None = None,
+    strap_mat: bpy.types.Material | None = None,
+    pole_mat: bpy.types.Material | None = None,
+) -> list[bpy.types.Object]:
+    """Generates procedural 3D noise-displaced draped camouflage netting canopy, support poles, and barrel ghillie wrap."""
+    from mathutils import noise
+
+    objects: list[bpy.types.Object] = []
+    n_mat = net_mat or strap_mat
+    s_mat = strap_mat or net_mat
+    p_mat = pole_mat or s_mat
+
+    anchor = Vector(turret_center) if turret_center is not None else Vector((0.0, 0.0, deck_z + 0.22))
+    canopy_w = max(1.10, min(hull_width * 0.78, turret_width * 1.18))
+    canopy_l = max(1.20, min(hull_length * 0.65, turret_length * 1.15))
+    canopy_z = anchor.z + 0.28
+
+    # 1. Noise-displaced BMesh camouflage netting canopy with perimeter droop
+    mesh = bpy.data.meshes.new(f"{prefix}_CamoNetCanopy_Mesh")
+    net_obj = bpy.data.objects.new(f"{prefix}_CamoNetCanopy", mesh)
+    bpy.context.collection.objects.link(net_obj)
+    bm = bmesh.new()
+
+    seg_x, seg_y = 8, 8
+    bmesh.ops.create_grid(bm, x_segments=seg_x, y_segments=seg_y, size=0.5)
+    for v in bm.verts:
+        nx = v.co.x * 2.0  # [-1, 1]
+        ny = v.co.y * 2.0  # [-1, 1]
+        wx = anchor.x + nx * (canopy_w * 0.5)
+        wy = anchor.y + ny * (canopy_l * 0.5)
+        edge_dist = max(abs(nx), abs(ny))
+        # Natural perimeter drape + 3D Perlin noise folds
+        n_val = noise.noise(Vector((wx * 1.85 + 1.3, wy * 1.85 + 2.7, canopy_z)))
+        droop = (edge_dist ** 2) * 0.20 + abs(n_val) * 0.075
+        wz = max(0.18, canopy_z - droop)
+        v.co = Vector((wx, wy, wz))
+
+    # Solidify canopy slightly so both top & underside render cleanly in URP without backface culling gaps
+    ext = bmesh.ops.extrude_face_region(bm, geom=bm.faces[:])
+    extruded_verts = [ele for ele in ext["geom"] if isinstance(ele, bmesh.types.BMVert)]
+    for v in extruded_verts:
+        v.co.z += 0.028
+
+    bm.normal_update()
+    bm.to_mesh(mesh)
+    bm.free()
+    finish_mesh(net_obj, n_mat, bevel=0.004, smooth=False)
+    objects.append(net_obj)
+
+    # 2. Corner telescopic support spreader poles
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            qtag = f"{'F' if sy > 0 else 'R'}{'L' if sx < 0 else 'R'}"
+            px = anchor.x + sx * (canopy_w * 0.44)
+            py = anchor.y + sy * (canopy_l * 0.42)
+            p_base = Vector((px * 0.88, py * 0.88, max(0.25, anchor.z - 0.04)))
+            p_tip = Vector((px, py, canopy_z - 0.12))
+            objects.append(make_rod(
+                f"{prefix}_NetSupportPole_{qtag}",
+                p_base,
+                p_tip,
+                radius=0.016,
+                material=p_mat,
+                vertices=6,
+            ))
+
+    # 3. Barrel ghillie wrap rings & retention straps along primary weapon tube
+    if gun_pivot is not None and gun_dir is not None:
+        gp = Vector(gun_pivot)
+        gd = Vector(gun_dir).normalized()
+        rot_e = gd.to_track_quat("Z", "Y").to_euler()
+        for idx, dist_f in enumerate((0.28, 0.55, 0.82), start=1):
+            ring_pos = gp - gd * dist_f
+            objects.append(make_cylinder(
+                f"{prefix}_BarrelGhillieWrap_{idx}",
+                radius=0.115 - idx * 0.008,
+                depth=0.16,
+                location=ring_pos,
+                material=n_mat if idx % 2 == 1 else s_mat,
+                rotation=rot_e,
+                vertices=8,
+                bevel=0.012,
+            ))
+
+    return objects
+
+
+def make_thermal_radiator_assembly(
+    prefix: str,
+    hull_length: float = 3.0,
+    hull_width: float = 2.4,
+    deck_z: float = 0.88,
+    fin_count: int = 6,
+    housing_mat: bpy.types.Material | None = None,
+    fin_mat: bpy.types.Material | None = None,
+    glow_mat: bpy.types.Material | None = None,
+    pipe_mat: bpy.types.Material | None = None,
+) -> list[bpy.types.Object]:
+    """Generates armored heat-exchanger radiator banks with glowing emissive plasma/coolant fins and manifolds."""
+    objects: list[bpy.types.Object] = []
+    h_mat = housing_mat or pipe_mat
+    f_mat = fin_mat or housing_mat
+    g_mat = glow_mat or f_mat
+    p_mat = pipe_mat or h_mat
+    n_fins = max(4, min(9, int(fin_count)))
+
+    bank_y = -hull_length * 0.26
+    bank_z = deck_z + 0.08
+    bank_l = max(0.56, min(1.05, hull_length * 0.28))
+    bank_w = max(0.24, min(0.42, hull_width * 0.16))
+    bank_h = 0.22
+
+    for side in (-1, 1):
+        stag = "L" if side < 0 else "R"
+        bx = side * (hull_width * 0.30)
+        tilt_rad = math.radians(side * -18.0)
+
+        # 1. Armored radiator shroud frame
+        objects.append(make_box(
+            f"{prefix}_RadiatorShroud_{stag}",
+            (bank_w, bank_l, 0.065),
+            (bx, bank_y, bank_z - 0.04),
+            h_mat,
+            bevel=0.010,
+            rotation=(0.0, tilt_rad, 0.0),
+        ))
+
+        # 2. Glowing emissive core bed inside shroud
+        objects.append(make_box(
+            f"{prefix}_RadiatorGlowCore_{stag}",
+            (bank_w * 0.82, bank_l * 0.88, 0.045),
+            (bx, bank_y, bank_z + 0.01),
+            g_mat,
+            bevel=0.006,
+            rotation=(0.0, tilt_rad, 0.0),
+        ))
+
+        # 3. Array of heat-sink cooling fins (single BMesh per bank)
+        mesh = bpy.data.meshes.new(f"{prefix}_RadiatorFins_{stag}_Mesh")
+        fin_obj = bpy.data.objects.new(f"{prefix}_RadiatorFins_{stag}", mesh)
+        bpy.context.collection.objects.link(fin_obj)
+        bm = bmesh.new()
+
+        for i in range(n_fins):
+            fy = bank_y - bank_l * 0.40 + i * (bank_l * 0.80 / max(1, n_fins - 1))
+            res = bmesh.ops.create_cube(bm, size=1.0)
+            for v in res["verts"]:
+                v.co.x = v.co.x * (bank_w * 0.88) + bx
+                v.co.y = v.co.y * 0.024 + fy
+                v.co.z = v.co.z * bank_h + (bank_z + bank_h * 0.35)
+
+        bm.normal_update()
+        bm.to_mesh(mesh)
+        bm.free()
+        finish_mesh(fin_obj, f_mat, bevel=0.003, smooth=False)
+        objects.append(fin_obj)
+
+        # 4. Longitudinal coolant manifold pipe along inboard edge
+        inboard_x = bx - side * (bank_w * 0.48)
+        objects.append(make_rod(
+            f"{prefix}_CoolantManifold_{stag}",
+            (inboard_x, bank_y - bank_l * 0.46, bank_z + 0.02),
+            (inboard_x, bank_y + bank_l * 0.46, bank_z + 0.02),
+            radius=0.028,
+            material=p_mat,
+            vertices=8,
+            bevel=0.004,
+        ))
+
+    return objects
+
+
+
 def create_unity_empty_locator(
     name: str,
     location: Tuple[float, float, float] | Vector,
@@ -10134,6 +10515,91 @@ class RogueVehicleBuilder:
         ))
         return self
 
+    def add_slat_armor(self, slat_count: int = 5) -> "RogueVehicleBuilder":
+        """Adds anti-HEAT standoff slat/cage bar armor grids around rear hull flanks and turret bustle."""
+        hw = self.hull_width if hasattr(self, "hull_width") else 2.4
+        hl = self.hull_length if hasattr(self, "hull_length") else 3.0
+        hz = self.hull_deck_z if hasattr(self, "hull_deck_z") else 0.88
+        tc = self.turret_center if (hasattr(self, "turret_center") and self.turret_center is not None) else None
+        self.objects.extend(make_slat_cage_armor_assembly(
+            f"{self.name}SlatArmor",
+            hull_length=hl,
+            hull_width=hw,
+            deck_z=hz,
+            turret_center=tc,
+            turret_length=min(1.65, hl * 0.52),
+            turret_width=min(1.45, hw * 0.60),
+            slat_count=slat_count,
+            metal_mat=self.palette.gunmetal,
+            armor_mat=self.palette.primary_armor,
+            accent_mat=self.palette.warning,
+        ))
+        return self
+
+    def add_era_bricks(self, cols: int = 5, rows: int = 2) -> "RogueVehicleBuilder":
+        """Adds staggered Explosive Reactive Armor (ERA) wedge bricks across glacis and turret cheeks."""
+        hw = self.hull_width if hasattr(self, "hull_width") else 2.4
+        hl = self.hull_length if hasattr(self, "hull_length") else 3.0
+        hz = self.hull_deck_z if hasattr(self, "hull_deck_z") else 0.88
+        tc = self.turret_center if (hasattr(self, "turret_center") and self.turret_center is not None) else None
+        self.objects.extend(make_era_reactive_bricks_assembly(
+            f"{self.name}ERABricks",
+            hull_length=hl,
+            hull_width=hw,
+            deck_z=hz,
+            turret_center=tc,
+            turret_length=min(1.65, hl * 0.52),
+            turret_width=min(1.45, hw * 0.60),
+            cols=cols,
+            rows=rows,
+            brick_mat=self.palette.light_armor,
+            bolt_mat=self.palette.gunmetal,
+            accent_mat=self.palette.warning,
+        ))
+        return self
+
+    def add_camo_netting(self) -> "RogueVehicleBuilder":
+        """Adds procedural 3D noise-displaced draped camouflage netting canopy and barrel ghillie wrap."""
+        hw = self.hull_width if hasattr(self, "hull_width") else 2.4
+        hl = self.hull_length if hasattr(self, "hull_length") else 3.0
+        hz = self.hull_deck_z if hasattr(self, "hull_deck_z") else 0.88
+        tc = self.turret_center if (hasattr(self, "turret_center") and self.turret_center is not None) else None
+        gp = self.gun_pivot if hasattr(self, "gun_pivot") else None
+        gd = self.gun_dir if hasattr(self, "gun_dir") else None
+        self.objects.extend(make_camo_netting_assembly(
+            f"{self.name}CamoNet",
+            hull_length=hl,
+            hull_width=hw,
+            deck_z=hz,
+            turret_center=tc,
+            turret_length=min(1.65, hl * 0.52),
+            turret_width=min(1.45, hw * 0.60),
+            gun_pivot=gp,
+            gun_dir=gd,
+            net_mat=self.palette.light_armor,
+            strap_mat=self.palette.tread,
+            pole_mat=self.palette.gunmetal,
+        ))
+        return self
+
+    def add_thermal_radiators(self, fin_count: int = 6) -> "RogueVehicleBuilder":
+        """Adds armored heat-exchanger radiator banks with glowing emissive plasma/coolant fins."""
+        hw = self.hull_width if hasattr(self, "hull_width") else 2.4
+        hl = self.hull_length if hasattr(self, "hull_length") else 3.0
+        hz = self.hull_deck_z if hasattr(self, "hull_deck_z") else 0.88
+        self.objects.extend(make_thermal_radiator_assembly(
+            f"{self.name}Radiator",
+            hull_length=hl,
+            hull_width=hw,
+            deck_z=hz,
+            fin_count=fin_count,
+            housing_mat=self.palette.primary_armor,
+            fin_mat=self.palette.gunmetal,
+            glow_mat=self.palette.emissive,
+            pipe_mat=self.palette.wheel_rim,
+        ))
+        return self
+
     def add_unity_locators(self) -> "RogueVehicleBuilder":
         self.locator_sockets = create_unity_locator_sockets(
             name_prefix=self.name,
@@ -10819,6 +11285,71 @@ class RogueStructureBuilder:
             tarp_mat=self.palette.light_armor,
             tread_mat=self.palette.tread,
             accent_mat=self.palette.warning,
+        ))
+        return self
+
+    def add_slat_armor(self, slat_count: int = 5) -> "RogueStructureBuilder":
+        """Adds perimeter anti-HEAT standoff slat/cage bar armor grids to the structure base."""
+        self.objects.extend(make_slat_cage_armor_assembly(
+            f"{self.name}Struct_SlatArmor",
+            hull_length=4.2,
+            hull_width=3.8,
+            deck_z=1.15,
+            slat_count=slat_count,
+            metal_mat=self.palette.gunmetal,
+            armor_mat=self.palette.primary_armor,
+            accent_mat=self.palette.warning,
+        ))
+        return self
+
+    def add_era_bricks(self, cols: int = 5, rows: int = 2) -> "RogueStructureBuilder":
+        """Adds staggered Explosive Reactive Armor (ERA) wedge bricks to the structure casemate walls."""
+        roof_pos = self.sockets.get("Socket_TurretPivot", self.sockets.get("Socket_RoofMount", Vector((0.0, 0.0, 2.0))))
+        self.objects.extend(make_era_reactive_bricks_assembly(
+            f"{self.name}Struct_ERABricks",
+            hull_length=4.2,
+            hull_width=3.8,
+            deck_z=1.25,
+            turret_center=roof_pos,
+            turret_length=2.2,
+            turret_width=2.2,
+            cols=cols,
+            rows=rows,
+            brick_mat=self.palette.light_armor,
+            bolt_mat=self.palette.gunmetal,
+            accent_mat=self.palette.warning,
+        ))
+        return self
+
+    def add_camo_netting(self) -> "RogueStructureBuilder":
+        """Adds procedural 3D noise-displaced draped camouflage netting canopy over the structure roof."""
+        roof_pos = self.sockets.get("Socket_TurretPivot", self.sockets.get("Socket_RoofMount", Vector((0.0, 0.0, 2.1))))
+        self.objects.extend(make_camo_netting_assembly(
+            f"{self.name}Struct_CamoNet",
+            hull_length=4.4,
+            hull_width=4.0,
+            deck_z=1.5,
+            turret_center=roof_pos,
+            turret_length=2.4,
+            turret_width=2.4,
+            net_mat=self.palette.light_armor,
+            strap_mat=self.palette.tread,
+            pole_mat=self.palette.gunmetal,
+        ))
+        return self
+
+    def add_thermal_radiators(self, fin_count: int = 6) -> "RogueStructureBuilder":
+        """Adds armored heat-exchanger radiator banks with glowing emissive plasma/coolant fins to the structure."""
+        self.objects.extend(make_thermal_radiator_assembly(
+            f"{self.name}Struct_Radiator",
+            hull_length=4.2,
+            hull_width=3.8,
+            deck_z=1.05,
+            fin_count=fin_count,
+            housing_mat=self.palette.primary_armor,
+            fin_mat=self.palette.gunmetal,
+            glow_mat=self.palette.emissive,
+            pipe_mat=self.palette.wheel_rim,
         ))
         return self
 

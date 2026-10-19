@@ -52,6 +52,10 @@ Options:
     --ammo-chutes              Attach articulated metallic ammunition feed chutes and hoppers
     --aps-suite                Attach Active Protection System (APS) hard-kill pods, AESA radars, and LWR
     --stowage-kit              Attach external turret bustle rack, camo tarp, Jerry cans, and spare tracks
+    --slat-armor               Attach anti-HEAT standoff slat/cage bar armor grids
+    --era-bricks               Attach staggered Explosive Reactive Armor (ERA) wedge bricks
+    --camo-netting             Attach 3D noise-displaced draped camouflage netting and barrel wrap
+    --thermal-radiators        Attach armored heat-exchanger radiator banks with glowing emissive fins
     --weighted-normals         Apply weighted normals (default); --no-weighted-normals disables them
     --wreckage-severity <sev>  Damage severity for wreckage: light, medium, catastrophic (default: catastrophic)
     --smoke                    Attach multi-tube smoke discharger banks
@@ -98,6 +102,8 @@ PRESETS = {
         "tactical_markings": True,
         "aps_suite": True,
         "stowage_kit": True,
+        "slat_armor": True,
+        "era_bricks": True,
     },
     "recon_interceptor": {
         "archetype": "buggy",
@@ -125,6 +131,7 @@ PRESETS = {
         "tactical_markings": True,
         "ammo_chutes": True,
         "stowage_kit": True,
+        "slat_armor": True,
     },
     "dune_raider": {
         "archetype": "bike",
@@ -156,6 +163,8 @@ PRESETS = {
         "tactical_markings": True,
         "hydraulic_pistons": True,
         "aps_suite": True,
+        "era_bricks": True,
+        "thermal_radiators": True,
     },
     "hive_carrier": {
         "archetype": "drone_carrier",
@@ -191,6 +200,7 @@ PRESETS = {
         "hydraulic_pistons": True,
         "ammo_chutes": True,
         "stowage_kit": True,
+        "slat_armor": True,
     },
     "colossus_titan": {
         "archetype": "colossus_titan",
@@ -216,6 +226,7 @@ PRESETS = {
         "hull_greebles": True,
         "tactical_markings": True,
         "aps_suite": True,
+        "thermal_radiators": True,
     },
     "sky_dreadnought": {
         "archetype": "heavy_dropship",
@@ -250,6 +261,7 @@ PRESETS = {
         "hull_greebles": True,
         "tactical_markings": True,
         "aps_suite": True,
+        "thermal_radiators": True,
     },
     "vls_missile_cruiser": {
         "archetype": "hover_cruiser",
@@ -275,6 +287,7 @@ PRESETS = {
         "tactical_markings": True,
         "aps_suite": True,
         "stowage_kit": True,
+        "thermal_radiators": True,
     },
     "volatile_runner": {
         "archetype": "demolition_breacher",
@@ -285,6 +298,7 @@ PRESETS = {
         "hydraulic_hoses": True,
         "tactical_markings": True,
         "hydraulic_pistons": True,
+        "slat_armor": True,
     },
     "longbow_strider": {
         "archetype": "artillery_strider",
@@ -297,6 +311,8 @@ PRESETS = {
         "hull_greebles": True,
         "tactical_markings": True,
         "hydraulic_pistons": True,
+        "camo_netting": True,
+        "thermal_radiators": True,
     },
     "inferno_purger": {
         "archetype": "thermobaric_tank",
@@ -309,6 +325,8 @@ PRESETS = {
         "hull_greebles": True,
         "tactical_markings": True,
         "stowage_kit": True,
+        "era_bricks": True,
+        "thermal_radiators": True,
     },
     "spectre_jammer": {
         "archetype": "ew_jammer",
@@ -321,6 +339,7 @@ PRESETS = {
         "tactical_markings": True,
         "aps_suite": True,
         "stowage_kit": True,
+        "camo_netting": True,
     },
     "bastion_shield_dome": {
         "structure": True,
@@ -330,6 +349,7 @@ PRESETS = {
         "hull_greebles": True,
         "tactical_markings": True,
         "aps_suite": True,
+        "thermal_radiators": True,
     },
     "tesla_obelisk": {
         "structure": True,
@@ -339,6 +359,7 @@ PRESETS = {
         "hull_greebles": True,
         "tactical_markings": True,
         "hydraulic_pistons": True,
+        "thermal_radiators": True,
     },
     # --- Wave 3: one preset per new archetype ---
     "skyguard_sam": {
@@ -362,6 +383,7 @@ PRESETS = {
         "hydraulic_pistons": True,
         "hull_greebles": True,
         "stowage_kit": True,
+        "slat_armor": True,
         "attachments": "fuel_drums",
     },
     "minefield_sower": {
@@ -383,6 +405,7 @@ PRESETS = {
         "track_shoes": True,
         "hull_greebles": True,
         "stowage_kit": True,
+        "camo_netting": True,
     },
     "arachnid_hexapod": {
         "archetype": "hexapod_assault",
@@ -417,6 +440,8 @@ PRESETS = {
         "hull_greebles": True,
         "aps_suite": True,
         "stowage_kit": True,
+        "slat_armor": True,
+        "era_bricks": True,
         "attachments": "era",
     },
     "arctic_sentinel": {
@@ -428,6 +453,7 @@ PRESETS = {
         "hydraulic_hoses": True,
         "ammo_chutes": True,
         "stowage_kit": True,
+        "camo_netting": True,
     },
     "night_stalker": {
         "archetype": "bike",
@@ -448,6 +474,7 @@ PRESETS = {
         "hull_greebles": True,
         "ammo_chutes": True,
         "stowage_kit": True,
+        "slat_armor": True,
         "attachments": "fuel_drums",
     },
     # --- Wave 3: strategic structures ---
@@ -459,6 +486,7 @@ PRESETS = {
         "hull_greebles": True,
         "tactical_markings": True,
         "aps_suite": True,
+        "camo_netting": True,
     },
     "fusion_silo": {
         "structure": True,
@@ -468,6 +496,7 @@ PRESETS = {
         "hull_greebles": True,
         "tactical_markings": True,
         "hydraulic_pistons": True,
+        "thermal_radiators": True,
     },
     # --- Wave 4: 6 new mobile archetypes ---
     "scissor_bridgelayer": {
@@ -493,6 +522,7 @@ PRESETS = {
         "tactical_markings": True,
         "aps_suite": True,
         "stowage_kit": True,
+        "camo_netting": True,
     },
     "wraith_stealth_wing": {
         "archetype": "flying_wing_bomber",
@@ -515,6 +545,8 @@ PRESETS = {
         "hull_greebles": True,
         "ammo_chutes": True,
         "stowage_kit": True,
+        "slat_armor": True,
+        "camo_netting": True,
     },
     "subterranean_mole": {
         "archetype": "siege_drill_mole",
@@ -526,6 +558,8 @@ PRESETS = {
         "hull_greebles": True,
         "tactical_markings": True,
         "stowage_kit": True,
+        "era_bricks": True,
+        "thermal_radiators": True,
     },
     "atlas_crane_mech": {
         "archetype": "heavy_crane_mech",
@@ -537,6 +571,7 @@ PRESETS = {
         "hull_greebles": True,
         "tactical_markings": True,
         "stowage_kit": True,
+        "thermal_radiators": True,
     },
     # --- Wave 4: 3 new strategic structures ---
     "fortified_pillbox": {
@@ -547,6 +582,9 @@ PRESETS = {
         "tactical_markings": True,
         "ammo_chutes": True,
         "stowage_kit": True,
+        "slat_armor": True,
+        "era_bricks": True,
+        "camo_netting": True,
     },
     "patriot_sam_battery": {
         "structure": True,
@@ -565,6 +603,7 @@ PRESETS = {
         "hydraulic_hoses": True,
         "hull_greebles": True,
         "tactical_markings": True,
+        "thermal_radiators": True,
     },
     # --- Wave 4: 3 elite remixes with custom hex palette & VFX overrides ---
     "crimson_praetorian": {
@@ -583,6 +622,8 @@ PRESETS = {
         "hull_greebles": True,
         "tactical_markings": True,
         "aps_suite": True,
+        "era_bricks": True,
+        "thermal_radiators": True,
         "vfx_flash": True,
     },
     "cobalt_widowmaker": {
@@ -598,6 +639,7 @@ PRESETS = {
         "hydraulic_pistons": True,
         "hull_greebles": True,
         "aps_suite": True,
+        "thermal_radiators": True,
         "vfx_flash": True,
     },
     "golden_aegis_command": {
@@ -614,6 +656,7 @@ PRESETS = {
         "hull_greebles": True,
         "tactical_markings": True,
         "aps_suite": True,
+        "era_bricks": True,
         "vfx_thruster": True,
     },
 }
@@ -703,6 +746,10 @@ def parse_args():
     parser.add_argument("--ammo-chutes", action="store_true", help="Attach articulated metallic ammunition feed chutes and ammo hoppers")
     parser.add_argument("--aps-suite", action="store_true", help="Attach Active Protection System (APS) hard-kill pods, 4-quadrant AESA radars, and LWR mast")
     parser.add_argument("--stowage-kit", action="store_true", help="Attach external turret bustle cargo rack, rolled camo tarp, Jerry cans, and spare tracks")
+    parser.add_argument("--slat-armor", action="store_true", help="Attach anti-HEAT standoff slat/cage bar armor grids")
+    parser.add_argument("--era-bricks", action="store_true", help="Attach staggered Explosive Reactive Armor (ERA) wedge bricks")
+    parser.add_argument("--camo-netting", action="store_true", help="Attach 3D noise-displaced draped camouflage netting and barrel wrap")
+    parser.add_argument("--thermal-radiators", action="store_true", help="Attach armored heat-exchanger radiator banks with glowing emissive fins")
     parser.add_argument("--weighted-normals", action=argparse.BooleanOptionalAction, default=True, help="Apply face-area weighted custom split normals to eliminate low-poly chamfer shading pinch (default: enabled)")
     parser.add_argument("--smoke", action="store_true", help="Include multi-tube smoke discharger banks")
     parser.add_argument("--radar", action="store_true", help="Include command/recon radar dish")
@@ -796,6 +843,7 @@ def parse_args():
             "mantlet_boot", "spaced_skirts", "shield_bubble",
             "hydraulic_hoses", "hull_greebles", "tactical_markings",
             "hydraulic_pistons", "ammo_chutes", "aps_suite", "stowage_kit",
+            "slat_armor", "era_bricks", "camo_netting", "thermal_radiators",
             "vfx_flash", "vfx_thruster",
         ):
             if p.get(flag) and f"--{flag.replace('_', '-')}" not in script_args:
@@ -952,6 +1000,10 @@ def build_vehicle_model(
     ammo_chutes: bool = False,
     aps_suite: bool = False,
     stowage_kit: bool = False,
+    slat_armor: bool = False,
+    era_bricks: bool = False,
+    camo_netting: bool = False,
+    thermal_radiators: bool = False,
     weighted_normals: bool = True,
     wreckage_severity: str = "catastrophic",
 ) -> dict:
@@ -1940,6 +1992,18 @@ def build_vehicle_model(
     if stowage_kit:
         builder.add_tactical_stowage()
 
+    if slat_armor:
+        builder.add_slat_armor()
+
+    if era_bricks:
+        builder.add_era_bricks()
+
+    if camo_netting:
+        builder.add_camo_netting()
+
+    if thermal_radiators:
+        builder.add_thermal_radiators()
+
     # 3. Modular Attachments
     if attachments:
         att_list = [a.strip() for a in attachments.split(",") if a.strip()]
@@ -2043,6 +2107,10 @@ def build_structure_model(
     ammo_chutes: bool = False,
     aps_suite: bool = False,
     stowage_kit: bool = False,
+    slat_armor: bool = False,
+    era_bricks: bool = False,
+    camo_netting: bool = False,
+    thermal_radiators: bool = False,
     weighted_normals: bool = True,
 ) -> dict:
     rmk.clear_scene()
@@ -2122,6 +2190,18 @@ def build_structure_model(
     if stowage_kit:
         builder.add_tactical_stowage()
 
+    if slat_armor:
+        builder.add_slat_armor()
+
+    if era_bricks:
+        builder.add_era_bricks()
+
+    if camo_netting:
+        builder.add_camo_netting()
+
+    if thermal_radiators:
+        builder.add_thermal_radiators()
+
     gameplay_meta_path = (fbx_file.parent / f"{name}.gameplay.json") if gameplay_json else None
 
     res = builder.build_and_export(
@@ -2188,7 +2268,7 @@ def main():
                 print(f"  Colliders: {args.name}_COLLIDER_Base, {args.name}_COLLIDER_Roof")
             if args.render_icons:
                 print(f"  Tactical Icons: {args.icon_size}x{args.icon_size} Top-Down and Isometric")
-            print(f"  Authoring Details: HydraulicHoses={args.hydraulic_hoses}, HullGreebles={args.hull_greebles}, TacticalMarkings={args.tactical_markings}, HydraulicPistons={args.hydraulic_pistons}, AmmoChutes={args.ammo_chutes}, APSSuite={args.aps_suite}, StowageKit={args.stowage_kit}, WeightedNormals={args.weighted_normals}")
+            print(f"  Authoring Details: HydraulicHoses={args.hydraulic_hoses}, HullGreebles={args.hull_greebles}, TacticalMarkings={args.tactical_markings}, HydraulicPistons={args.hydraulic_pistons}, AmmoChutes={args.ammo_chutes}, APSSuite={args.aps_suite}, StowageKit={args.stowage_kit}, SlatArmor={args.slat_armor}, ERABricks={args.era_bricks}, CamoNetting={args.camo_netting}, ThermalRadiators={args.thermal_radiators}, WeightedNormals={args.weighted_normals}")
             if args.bake_atlas or args.bake_normals or args.single_material or structure_camo != "none":
                 print(f"  Texture Atlas: {args.atlas_resolution}x{args.atlas_resolution} PBR (Albedo, MetallicGloss, Normal, Emission)")
             if args.single_material:
@@ -2220,7 +2300,7 @@ def main():
         print(f"Primary Weapon: {args.weapon}")
         print(f"Subsystems: Skirts={args.skirts}, Rollcage={args.rollcage}, QuadTracks={args.quad_tracks}, TiltRotors={args.tilt_rotors}, Dozer={args.dozer}, Smoke={args.smoke}, Radar={args.radar}, Sponsons={args.sponsons}, Outriggers={args.outriggers}, FlightDeck={args.flight_deck}, ExcavatorDrum={args.excavator_drum}")
         print(f"Micro-Details: Antenna={args.antenna}, Cupola={args.cupola}, Rivets={args.rivets}, TrackShoes={args.track_shoes}, SuspensionArms={args.suspension_arms}, MantletBoot={args.mantlet_boot}, SpacedSkirts={args.spaced_skirts}")
-        print(f"Authoring Details: HydraulicHoses={args.hydraulic_hoses}, HullGreebles={args.hull_greebles}, TacticalMarkings={args.tactical_markings}, HydraulicPistons={args.hydraulic_pistons}, AmmoChutes={args.ammo_chutes}, APSSuite={args.aps_suite}, StowageKit={args.stowage_kit}, WeightedNormals={args.weighted_normals}")
+        print(f"Authoring Details: HydraulicHoses={args.hydraulic_hoses}, HullGreebles={args.hull_greebles}, TacticalMarkings={args.tactical_markings}, HydraulicPistons={args.hydraulic_pistons}, AmmoChutes={args.ammo_chutes}, APSSuite={args.aps_suite}, StowageKit={args.stowage_kit}, SlatArmor={args.slat_armor}, ERABricks={args.era_bricks}, CamoNetting={args.camo_netting}, ThermalRadiators={args.thermal_radiators}, WeightedNormals={args.weighted_normals}")
         if args.attachments:
             print(f"Modular Attachments: {args.attachments} (Detached FBX: {args.export_detached_attachments})")
         if args.primary_color:
@@ -2345,6 +2425,10 @@ def main():
                 ammo_chutes=args.ammo_chutes,
                 aps_suite=args.aps_suite,
                 stowage_kit=args.stowage_kit,
+                slat_armor=args.slat_armor,
+                era_bricks=args.era_bricks,
+                camo_netting=args.camo_netting,
+                thermal_radiators=args.thermal_radiators,
                 weighted_normals=args.weighted_normals,
                 wreckage_severity=args.wreckage_severity,
             )
@@ -2408,6 +2492,10 @@ def main():
             ammo_chutes=args.ammo_chutes,
             aps_suite=args.aps_suite,
             stowage_kit=args.stowage_kit,
+            slat_armor=args.slat_armor,
+            era_bricks=args.era_bricks,
+            camo_netting=args.camo_netting,
+            thermal_radiators=args.thermal_radiators,
             weighted_normals=args.weighted_normals,
         )
     else:
@@ -2484,6 +2572,10 @@ def main():
             ammo_chutes=args.ammo_chutes,
             aps_suite=args.aps_suite,
             stowage_kit=args.stowage_kit,
+            slat_armor=args.slat_armor,
+            era_bricks=args.era_bricks,
+            camo_netting=args.camo_netting,
+            thermal_radiators=args.thermal_radiators,
             weighted_normals=args.weighted_normals,
             wreckage_severity=args.wreckage_severity,
         )
