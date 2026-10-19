@@ -587,13 +587,10 @@ PRESETS = {
         "archetype": "heavy_crane_mech",
         "weapon": "dual_cannon",
         "faction": "arctic",
+        "model_scale": 0.75,
         "ik_rig": True,
         "hydraulic_hoses": True,
         "hydraulic_pistons": True,
-        "hull_greebles": True,
-        "tactical_markings": True,
-        "stowage_kit": True,
-        "thermal_radiators": True,
     },
     # --- Wave 4: 3 new strategic structures ---
     "fortified_pillbox": {
@@ -826,6 +823,7 @@ def parse_args():
     parser.add_argument("--icon-size", type=int, default=128, choices=[64, 128], help="Resolution for rendered tactical icons")
     parser.add_argument("--icon-elevation", type=float, default=45.0, help="Elevation angle for tactical isometric icon in degrees (default 45.0 for RTS 45-degree angle, or 35.26 for true isometric)")
     parser.add_argument("--target-budget", type=int, default=4000, help="Target polygon budget for profiling")
+    parser.add_argument("--model-scale", type=float, default=1.0, help="Uniformly scale authored vehicle geometry and sockets around the ground origin")
     parser.add_argument("--lod", action="store_true", help="Calculate polygon budget and recommend LOD reductions")
     parser.add_argument("--smooth-angle", type=float, default=38.0, help="Smart angle-weighted auto-smooth threshold in degrees")
     parser.add_argument("--multiview", action="store_true", help="Render 4 orthographic views")
@@ -836,6 +834,7 @@ def parse_args():
     parser.add_argument("--blend-path", default=None, help="Explicit .blend output file path")
     parser.add_argument("--fbx-path", default=None, help="Explicit .fbx output file path")
     parser.add_argument("--preview-path", default=None, help="Explicit preview render output file path")
+    parser.add_argument("--card-path", default=None, help="Explicit 128x128 tactical card Sprite output file path")
 
     args = parser.parse_args(script_args)
 
@@ -866,6 +865,8 @@ def parse_args():
             args.structure = True
         if "building_type" in p and not option_was_supplied("--building-type"):
             args.building_type = p["building_type"]
+        if "model_scale" in p and not option_was_supplied("--model-scale"):
+            args.model_scale = p["model_scale"]
         for flag in (
             "sponsons", "smoke", "radar", "rollcage", "dozer", "outriggers",
             "flight_deck", "excavator_drum", "antenna", "cupola", "rivets",
@@ -1041,6 +1042,9 @@ def build_vehicle_model(
     barrel_shroud: bool = False,
     weighted_normals: bool = True,
     wreckage_severity: str = "catastrophic",
+    model_scale: float = 1.0,
+    card_path: Path | None = None,
+    structural_wear_mask: bool = False,
 ) -> dict:
     rmk.clear_scene()
 
@@ -1055,8 +1059,6 @@ def build_vehicle_model(
         / f"{name}.fbx"
     )
     preview_file = preview_path or (out_root / "artifacts" / "previews" / f"{name.lower()}.png")
-    card_path = None
-
     p_override = rmk.hex_to_rgb(primary_color) if primary_color else None
     l_override = rmk.hex_to_rgb(light_armor_color) if light_armor_color else None
     e_override = rmk.hex_to_rgb(emissive_color) if emissive_color else None
@@ -1890,8 +1892,10 @@ def build_vehicle_model(
                 rmk.make_box(f"{name}Armor_ClawPincerLower_{stag}", (0.28, 0.48, 0.10), (sx * 1.05, 1.18, 2.06), builder.palette.warning, 0.015,
                              rotation=(math.radians(14.0), 0.0, 0.0)),
             ])
-        builder.add_turret(size=(1.28, 1.42, 0.42), center_y=0.08)
-        builder.turret_center = Vector((0.0, 0.08, 3.18))
+        # The compact rear-set turret places both cannon firepoints at the native
+        # GatlingWalker muzzle envelope after the preset's 0.75 model scale.
+        builder.add_turret(size=(1.28, 1.42, 0.42), center_y=-0.40)
+        builder.turret_center = Vector((0.0, -0.40, 2.145))
         builder.add_sensor_visor()
         builder.add_whip_antenna()
 
@@ -1922,7 +1926,10 @@ def build_vehicle_model(
         elif weapon == "howitzer":
             builder.add_howitzer(caliber=0.135, length=1.15, elevation_deg=26.0)
         elif weapon == "dual_cannon":
-            builder.add_dual_cannon(caliber=0.082, length=1.65, spacing=0.38, elevation_deg=11.0)
+            if archetype == "heavy_crane_mech":
+                builder.add_dual_cannon(caliber=0.082, length=0.60, spacing=0.38, elevation_deg=11.0)
+            else:
+                builder.add_dual_cannon(caliber=0.082, length=1.65, spacing=0.38, elevation_deg=11.0)
         elif weapon == "gatling":
             if archetype in ("walker", "bike", "colossus_titan", "artillery_strider", "heavy_crane_mech"):
                 p_z = 3.25 if archetype == "colossus_titan" else (2.85 if archetype == "heavy_crane_mech" else (2.45 if archetype == "artillery_strider" else 1.25))
@@ -2056,6 +2063,16 @@ def build_vehicle_model(
         att_list = [a.strip() for a in attachments.split(",") if a.strip()]
         builder.add_attachments(att_list)
 
+    if archetype == "heavy_crane_mech":
+        # Position failure effects and movement audio on the dorsal reactor; the
+        # muzzle audio follows the paired cannon center and foot contacts stay at Z=0.
+        builder.damage_smoke_loc = Vector((0.0, -0.72, 2.68))
+        builder.damage_fire_loc = Vector((0.0, -0.72, 2.50))
+        builder.engine_audio_loc = Vector((0.0, -0.72, 2.68))
+        builder.weapon_audio_loc = Vector(builder.gun_pivot)
+
+    builder.apply_uniform_scale(model_scale)
+
     # 4. Build, Validate, and Export
     res = builder.build_and_export(
         fbx_path=fbx_file,
@@ -2095,12 +2112,15 @@ def build_vehicle_model(
         icon_resolutions=(icon_size,),
         icon_elevation=icon_elevation,
         wreckage_severity=wreckage_severity,
+        structural_wear_mask=structural_wear_mask,
+        unity_batch_names=(archetype == "heavy_crane_mech"),
     )
 
     if lod_diagnostics:
         print("\n--- Low-Poly Geometry Budget & LOD Diagnostics ---")
-        print(f"LOD0 (Current): {res['total_polygons']} tris | {res['total_vertices']} verts (RTS Combat Camera)")
-        print(f"  Target Budget: 1,500 - 5,000 tris (Current: {round(res['total_polygons'] / max(1, target_budget) * 100, 1)}% of budget)")
+        true_triangles = res.get("profile_report", {}).get("total_triangles", res["total_polygons"])
+        print(f"LOD0 (Current): {res['total_polygons']} faces / {true_triangles} triangles | {res['total_vertices']} verts (RTS Combat Camera)")
+        print(f"  Target Face Budget: 1,500 - 5,000 faces (Current: {round(res['total_polygons'] / max(1, target_budget) * 100, 1)}% of budget)")
         print("LOD Recommendations:")
         print(f"  LOD1 (~1,200 tris): Merge track cleats & road wheel rims into single cylinder silhouettes.")
         print(f"  LOD2 (~500 tris): Collapse greebles, antennas, and multi-barrel clusters into convex hulls.")
@@ -2115,6 +2135,8 @@ def build_vehicle_model(
     print(f"  Source Blend: {blend_file}")
     print(f"  Unity FBX: {fbx_file}")
     print(f"  Preview Image: {preview_file}")
+    if card_path is not None:
+        print(f"  Tactical Card Sprite: {card_path}")
     print("========================================================\n")
 
     return res
@@ -2309,6 +2331,8 @@ def main():
         raise SystemExit("--normal-intensity must be finite and between 0.0 and 4.0.")
     if not math.isfinite(args.soot_intensity) or not 0.0 <= args.soot_intensity <= 2.0:
         raise SystemExit("--soot-intensity must be finite and between 0.0 and 2.0.")
+    if not math.isfinite(args.model_scale) or not 0.1 <= args.model_scale <= 10.0:
+        raise SystemExit("--model-scale must be finite and between 0.1 and 10.0.")
     out_root = resolve_path(args.out_dir, REPO_ROOT) or REPO_ROOT
 
     if args.dry_run:
@@ -2360,6 +2384,7 @@ def main():
         vehicle_camo = args.camo if args.camo != "none" else args.biome
         print(f"Faction: {args.faction} | Palette: {vehicle_camo} | Wear: {args.wear} | Soot: {args.soot_intensity}")
         print(f"Surface Detail: camo scale={args.camo_scale}, camo contrast={args.camo_contrast}, panel relief={args.panel_lines}, normal intensity={args.normal_intensity}")
+        print(f"Model Scale: {args.model_scale}")
         print(f"Primary Weapon: {args.weapon}")
         print(f"Subsystems: Skirts={args.skirts}, Rollcage={args.rollcage}, QuadTracks={args.quad_tracks}, TiltRotors={args.tilt_rotors}, Dozer={args.dozer}, Smoke={args.smoke}, Radar={args.radar}, Sponsons={args.sponsons}, Outriggers={args.outriggers}, FlightDeck={args.flight_deck}, ExcavatorDrum={args.excavator_drum}")
         print(f"Micro-Details: Antenna={args.antenna}, Cupola={args.cupola}, Rivets={args.rivets}, TrackShoes={args.track_shoes}, SuspensionArms={args.suspension_arms}, MantletBoot={args.mantlet_boot}, SpacedSkirts={args.spaced_skirts}")
@@ -2502,7 +2527,8 @@ def main():
             results.append({
                 "archetype": arch,
                 "name": unit_name,
-                "triangles": res["total_polygons"],
+                "faces": res["total_polygons"],
+                "triangles": res.get("profile_report", {}).get("total_triangles", res["total_polygons"]),
                 "draw_calls": res["exported_batched_objects"],
                 "valid": res["ground_contact_valid"],
             })
@@ -2510,10 +2536,10 @@ def main():
         print("\n========================================================")
         print(f" BATCH GENERATION COMPLETE - {len(ALL_ARCHETYPES)} ARCHETYPES REPORT")
         print("========================================================")
-        print(f"{'Archetype':<18} | {'Unit Name':<28} | {'Tris':<7} | {'DrawCalls':<9} | {'GroundValid'}")
-        print("-" * 75)
+        print(f"{'Archetype':<18} | {'Unit Name':<28} | {'Faces':<7} | {'Triangles':<10} | {'DrawCalls':<9} | {'GroundValid'}")
+        print("-" * 92)
         for r in results:
-            print(f"{r['archetype']:<18} | {r['name']:<28} | {r['triangles']:<7} | {r['draw_calls']:<9} | {r['valid']}")
+            print(f"{r['archetype']:<18} | {r['name']:<28} | {r['faces']:<7} | {r['triangles']:<10} | {r['draw_calls']:<9} | {r['valid']}")
         print("========================================================\n")
         return
 
@@ -2521,6 +2547,7 @@ def main():
     blend_path = resolve_path(args.blend_path, REPO_ROOT)
     fbx_path = resolve_path(args.fbx_path, REPO_ROOT)
     preview_path = resolve_path(args.preview_path, REPO_ROOT)
+    card_path = resolve_path(args.card_path, REPO_ROOT)
 
     # Execution: Structure or Vehicle
     if args.structure:
@@ -2653,6 +2680,9 @@ def main():
             barrel_shroud=args.barrel_shroud,
             weighted_normals=args.weighted_normals,
             wreckage_severity=args.wreckage_severity,
+            model_scale=args.model_scale,
+            card_path=card_path,
+            structural_wear_mask=args.archetype == "heavy_crane_mech",
         )
 
     if args.report_json:
@@ -2664,8 +2694,10 @@ def main():
             "camo": args.camo,
             "weapon": args.weapon,
             "wear_level": args.wear,
+            "model_scale": args.model_scale,
             "weighted_normals": res.get("weighted_normals", True),
-            "total_triangles": res["total_polygons"],
+            "total_faces": res["total_polygons"],
+            "total_triangles": res.get("profile_report", {}).get("total_triangles", res["total_polygons"]),
             "total_vertices": res["total_vertices"],
             "predicted_draw_calls": res["exported_batched_objects"],
             "ground_contact_valid": res["ground_contact_valid"],

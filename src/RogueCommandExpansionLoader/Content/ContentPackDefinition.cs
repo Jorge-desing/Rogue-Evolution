@@ -16,6 +16,7 @@ namespace RogueCommandExpansionLoader.Content
         public ContentUnitDefinition[] units;
         public ContentStageDefinition[] stages;
         public ContentAiProfileDefinition[] aiProfiles;
+        public ContentRelicDefinition[] relics;
     }
 
     [Serializable]
@@ -61,6 +62,43 @@ namespace RogueCommandExpansionLoader.Content
         public string name;
         public string description;
         public string skillDescription;
+    }
+
+    [Serializable]
+    public sealed class ContentRelicDefinition
+    {
+        public string id;
+        public string assetBundleId;
+        public string imageAssetName;
+        public string rarity;
+        public string tech;
+        public string offeredSystemTags;
+        public string neededSystemTags;
+        public int neededExperienceLevel;
+        public bool isAllowedForDemo;
+        public bool isForSpecialists;
+        public ContentRelicLocalizationDefinition[] localizations;
+        public ContentCardChangeDefinition[] cardChanges;
+    }
+
+    [Serializable]
+    public sealed class ContentRelicLocalizationDefinition
+    {
+        public string language;
+        public string name;
+        public string description;
+    }
+
+    [Serializable]
+    public sealed class ContentCardChangeDefinition
+    {
+        public string valueToChange;
+        public string operation;
+        public float value;
+        public string side;
+        public bool multiplyValueWithCurrentHeatLevel;
+        public string multiplyValueWithMetaProgressionMultiplier;
+        public string[] onlyForTheseEntityIds;
     }
 
     [Serializable]
@@ -179,7 +217,8 @@ namespace RogueCommandExpansionLoader.Content
                 assetBundles = CloneArray(source.assetBundles, CloneBundle),
                 units = CloneArray(source.units, CloneUnit),
                 stages = CloneArray(source.stages, CloneStage),
-                aiProfiles = CloneArray(source.aiProfiles, CloneAiProfile)
+                aiProfiles = CloneArray(source.aiProfiles, CloneAiProfile),
+                relics = CloneArray(source.relics, CloneRelic)
             };
         }
 
@@ -316,6 +355,52 @@ namespace RogueCommandExpansionLoader.Content
                 productionBuildingEntries = CloneArray(source.productionBuildingEntries,
                     CloneAiProductionBuildingEntry),
                 modules = CloneArray(source.modules, CloneAiModule)
+            };
+        }
+
+        private static ContentRelicDefinition CloneRelic(ContentRelicDefinition source)
+        {
+            return source == null ? null : new ContentRelicDefinition
+            {
+                id = source.id,
+                assetBundleId = source.assetBundleId,
+                imageAssetName = source.imageAssetName,
+                rarity = source.rarity,
+                tech = source.tech,
+                offeredSystemTags = source.offeredSystemTags,
+                neededSystemTags = source.neededSystemTags,
+                neededExperienceLevel = source.neededExperienceLevel,
+                isAllowedForDemo = source.isAllowedForDemo,
+                isForSpecialists = source.isForSpecialists,
+                localizations = CloneArray(source.localizations, CloneRelicLocalization),
+                cardChanges = CloneArray(source.cardChanges, CloneCardChange)
+            };
+        }
+
+        private static ContentRelicLocalizationDefinition CloneRelicLocalization(
+            ContentRelicLocalizationDefinition source)
+        {
+            return source == null ? null : new ContentRelicLocalizationDefinition
+            {
+                language = source.language,
+                name = source.name,
+                description = source.description
+            };
+        }
+
+        private static ContentCardChangeDefinition CloneCardChange(ContentCardChangeDefinition source)
+        {
+            return source == null ? null : new ContentCardChangeDefinition
+            {
+                valueToChange = source.valueToChange,
+                operation = source.operation,
+                value = source.value,
+                side = source.side,
+                multiplyValueWithCurrentHeatLevel = source.multiplyValueWithCurrentHeatLevel,
+                multiplyValueWithMetaProgressionMultiplier = source.multiplyValueWithMetaProgressionMultiplier,
+                onlyForTheseEntityIds = source.onlyForTheseEntityIds == null
+                    ? null
+                    : (string[])source.onlyForTheseEntityIds.Clone()
             };
         }
 

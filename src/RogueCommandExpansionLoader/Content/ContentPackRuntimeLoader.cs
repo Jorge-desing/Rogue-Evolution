@@ -21,7 +21,7 @@ namespace RogueCommandExpansionLoader.Content
     /// keeps their AssetBundles and Unity objects alive for the whole game session.
     /// </summary>
     public sealed class ContentPackRuntimeLoader : IRuntimeContentProvider, IUnitSkillLocalizationRuntimeProvider,
-        IStageLandscapeRuntimeProvider,
+        IRelicLocalizationRuntimeProvider, IStageLandscapeRuntimeProvider,
         IBlueprintPoolRuntimeProvider, IStageFallbackRuntimeProvider,
         IStageOwnedAiPlacementDistanceRuntimeProvider, IBlueprintRewardFactoryScopeProvider
     {
@@ -43,6 +43,7 @@ namespace RogueCommandExpansionLoader.Content
         private readonly object _gate = new object();
         private readonly string _packsRoot;
         private readonly Assembly _gameAssembly;
+        private readonly RelicContentRuntimeRegistrar _relicRegistrar;
         private readonly AiModuleRegistry _moduleRegistry;
         private readonly Action<string> _log;
         private readonly Type _entityRowType;
@@ -142,6 +143,7 @@ namespace RogueCommandExpansionLoader.Content
         private readonly List<ScriptableObject> _stageParameterClones = new List<ScriptableObject>();
         private readonly List<ScriptableObject> _landscapeClones = new List<ScriptableObject>();
         private readonly List<ScriptableObject> _blueprintPoolClones = new List<ScriptableObject>();
+        private readonly List<ScriptableObject> _retainedRelicObjects = new List<ScriptableObject>();
         private readonly List<object> _blueprintPools = new List<object>();
         private readonly BlueprintPoolScopeRegistry _blueprintPoolScopeRegistry =
             new BlueprintPoolScopeRegistry();
@@ -157,6 +159,8 @@ namespace RogueCommandExpansionLoader.Content
             new Dictionary<object, BoundAiRuntimeBehaviour>(ReferenceComparer.Instance);
         private readonly Dictionary<string, LoadedUnit> _units =
             new Dictionary<string, LoadedUnit>(StringComparer.Ordinal);
+        private readonly Dictionary<string, ContentRelicDefinition> _relicDefinitions =
+            new Dictionary<string, ContentRelicDefinition>(StringComparer.Ordinal);
         private readonly HashSet<string> _knownIds = new HashSet<string>(StringComparer.Ordinal);
         private readonly HashSet<string> _nativeUnitIds = new HashSet<string>(StringComparer.Ordinal);
         private readonly HashSet<string> _nativeFactoryIds = new HashSet<string>(StringComparer.Ordinal);
@@ -195,6 +199,7 @@ namespace RogueCommandExpansionLoader.Content
 
             _packsRoot = Path.GetFullPath(packsRoot);
             _gameAssembly = gameAssembly ?? throw new ArgumentNullException("gameAssembly");
+            _relicRegistrar = new RelicContentRuntimeRegistrar(_gameAssembly);
             _moduleRegistry = moduleRegistry ?? throw new ArgumentNullException("moduleRegistry");
             _log = logger;
 
@@ -632,6 +637,27 @@ namespace RogueCommandExpansionLoader.Content
                             return null;
                         }
                     }, out value);
+            }
+        }
+
+        public bool TryGetRelicLocalization(string relicId, bool description, out string value)
+        {
+            value = null;
+            lock (_gate)
+            {
+                ContentRelicDefinition relic;
+                if (String.IsNullOrWhiteSpace(relicId) || !_relicDefinitions.TryGetValue(relicId, out relic))
+                {
+                    return false;
+                }
+
+                string language = _localizationLanguageProperty.GetValue(null, null) as string;
+                if (String.IsNullOrWhiteSpace(language))
+                {
+                    language = "en-US";
+                }
+
+                return RelicLocalizationResolver.TryResolve(relic, language, description, out value);
             }
         }
 
@@ -3214,6 +3240,10 @@ namespace RogueCommandExpansionLoader.Content
             for (int i = 0; i < units.Count; i++) localKnownIds.Add(units[i].Id);
             for (int i = 0; i < stages.Count; i++) localKnownIds.Add(stages[i].Definition.id);
             for (int i = 0; i < profiles.Count; i++) localKnownIds.Add(profiles[i].Id);
+            for (int i = 0; i < (definition.relics ?? new ContentRelicDefinition[0]).Length; i++)
+            {
+                localKnownIds.Add(definition.relics[i].id);
+            }
 
             var contributionStages = new List<object>();
             var contributionAi = new List<object>();
@@ -3330,10 +3360,21 @@ namespace RogueCommandExpansionLoader.Content
             _blueprintPoolScopeRegistry.ValidateCanRegister(poolScopeRegistrations);
 
             // All checks above complete before any pack-owned runtime registry is updated.
+            _relicRegistrar.Register(definition.relics, delegate(ContentRelicDefinition relic)
+            {
+                AssetBundle bundle = GetBundle(bundles, relic.assetBundleId, definition.packId);
+                return bundle.LoadAsset<Sprite>(relic.imageAssetName);
+            }, _retainedRelicObjects);
+
             for (int i = 0; i < units.Count; i++)
             {
                 _units.Add(units[i].Id, units[i]);
                 _entityRows.Add(units[i].BalanceRow);
+            }
+
+            for (int i = 0; i < (definition.relics ?? new ContentRelicDefinition[0]).Length; i++)
+            {
+                _relicDefinitions.Add(definition.relics[i].id, definition.relics[i]);
             }
 
             _blueprintPoolScopeRegistry.Register(poolScopeRegistrations);

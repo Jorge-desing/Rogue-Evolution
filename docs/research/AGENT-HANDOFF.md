@@ -1,8 +1,8 @@
 # Rogue Command Content Expansion — Agent Handoff & Technical Baseline
 
-**Updated:** 2026-10-18  
-**Repository:** Mod Rogue Command (`c:\Users\Alex\Documents\Mod Rogue Command`)  
-**Remote:** `origin` points to `https://github.com/Jorge-desing/Rogue-Evolution.git` (branch `codex/rogue-unit-balance-20261018`)  
+**Updated:** 2026-10-18
+**Repository:** Mod Rogue Command (`c:\Users\Alex\Documents\Mod Rogue Command`)
+**Remote:** `origin` points to `https://github.com/Jorge-desing/Rogue-Evolution.git` (branch `codex/rogue-unit-balance-20261018`)
 **Mission:** Create a modular, content-first expansion mod for Rogue Command featuring original playable units, base production buildings, stages, tactical AI profiles, and custom 3D visuals. BepInEx and Harmony provide loader infrastructure; playable content and runtime stability are the mod's deliverables.
 
 ---
@@ -193,8 +193,8 @@ The repository equips 13 local skills under `.agents/skills/`:
 
 #### 4. Mutators, Relics & Battlefield Hazards
 - Integrates with native `CardChangeScriptableObject` targeting the 26 canonical `ChangeableValue` attributes:
-  `Health`, `Armor`, `Speed`, `Damage`, `AttackRange`, `Cooldown`, `SightRange`, `BuildTime`, `CrystalCost`, `HealPerSecond`, `ShieldCapacity`, `EnergyMax`, `EnergyRecharge`, `CritChance`, `CritMultiplier`, `SplashRadius`, `Knockback`, `Accuracy`, `Evasion`, `LifeSteal`, `SlowResistance`, `StunDuration`, `DotDamage`, `DotDuration`, `ProductionSpeed`, `RadarRange`.
-- Registered into `RelicBalancingStore` or `ManageStartCardChanges`. Environmental hazards use trigger colliders (`isTrigger = true`) with amortized tick rates ($\ge 0.5\text{s}$). Dynamic Heat scaling limited to $\le 3\%$ major combat stat per level, maximum $+15\%$ `AttackRange`.
+  `Cost`, `ProductionDuration`, `MaxCapacity`, `MaxHealth`, `MaxShield`, `MaxMana`, `MaxRank`, `MoveSpeed`, `SightRadius`, `Damage1`, `Damage2`, `WeaponRange`, `Attack1Cooldown`, `Attack2Cooldown`, `EffectRadius1`, `EffectRadius2`, `SkillRange`, `HealAmount1`, `HealAmount2`, `GainCreditsAmount`, `SkillManaCost`, `Duration1`, `SpawnTtl`, `ManaRechargePerSecond`, `MaxArmor`, `ArmorProtection`. The content-pack relic schema currently accepts `Health` as an alias for `MaxHealth` only.
+- Relics use `RelicBalancingStore`; stage-start card changes use `ManageStartCardChanges`. `multiplyValueWithMetaProgressionMultiplier` is a string key. The content-pack relic contract rejects Heat scaling until its per-level balance limit is validated. Environmental hazards use trigger colliders (`isTrigger = true`) with amortized tick rates ($\ge 0.5\text{s}$). When authoring supported dynamic Heat changes, keep major combat stats at $\le 3\%$ per level and `AttackRange` at $+15\%$ maximum.
 
 #### 5. VFX & Audio Authoring
 - URP ParticleSystem prefabs use authored alpha materials where present. `RuntimeVisualVfxFallback` searches URP particle shaders first, then older/mobile and sprite fallbacks, and shares the fallback material across low-count emitters.

@@ -51,7 +51,7 @@
         { "name": "skillType", "value": "None" },
         { "name": "damage1", "value": "8" },
         { "name": "damage2", "value": "0" },
-        { "name": "firePointCount", "value": "2" },
+        { "name": "firePointCount", "value": "6" },
         { "name": "attack2Cooldown", "value": "0" },
         { "name": "effectRadius1", "value": "0.2" },
         { "name": "effectRadius2", "value": "0" },
@@ -180,7 +180,7 @@
         { "name": "attackType", "value": "Single" },
         { "name": "skillType", "value": "None" },
         { "name": "damage2", "value": "0" },
-        { "name": "firePointCount", "value": "6" },
+        { "name": "firePointCount", "value": "2" },
         { "name": "attack2Cooldown", "value": "0" },
         { "name": "effectRadius1", "value": "0" },
         { "name": "effectRadius2", "value": "0" },
@@ -203,6 +203,72 @@
         "localizations": [
           { "language": "en-US", "name": "Ironclad Walker Foundry", "description": "Produces Ironclad Gatling Walkers." },
           { "language": "es-XL", "name": "Fundición de caminantes Ironclad", "description": "Produce caminantes Gatling acorazados." }
+        ]
+      }
+    },
+    {
+      "id": "sample-native:atlas-crane-mech",
+      "nativeTemplateId": "GatlingWalker",
+      "assetBundleId": "sample-native:assets",
+      "cardImageAssetName": "assets/roguecommandexpansionsample/atlascranemechcard.png",
+      "visualAssetName": "assets/roguecommandexpansionsample/atlascranemechvisual.prefab",
+      "visualRootPath": "RoboMarine_Mesh",
+      "isAllowedForDemo": false,
+      "isForSpecialists": false,
+      "localizations": [
+        {
+          "language": "en-US",
+          "name": "Atlas Crane Mech",
+          "description": "A heavy bipedal combat mech fitted with an industrial crane and twin cannons."
+        },
+        {
+          "language": "es-XL",
+          "name": "Mecha Grúa Atlas",
+          "description": "Un mecha bípedo de combate pesado equipado con una grúa industrial y cañones dobles."
+        }
+      ],
+      "balanceOverrides": [
+        { "name": "cost", "value": "380" },
+        { "name": "maxHealth", "value": "420" },
+        { "name": "moveSpeed", "value": "12.0" },
+        { "name": "damage1", "value": "4" },
+        { "name": "attackCooldown", "value": "0.4" },
+        { "name": "weaponRange", "value": "6" },
+        { "name": "armorProtection", "value": "1" },
+        { "name": "rarity", "value": "Common" },
+        { "name": "neededExperienceLevel", "value": "2" },
+        { "name": "productionDuration", "value": "36" },
+        { "name": "maxCapacity", "value": "4" },
+        { "name": "maxShield", "value": "0" },
+        { "name": "maxMana", "value": "0" },
+        { "name": "maxArmor", "value": "1" },
+        { "name": "sightRadius", "value": "7" },
+        { "name": "attackType", "value": "Single" },
+        { "name": "skillType", "value": "None" },
+        { "name": "damage2", "value": "0" },
+        { "name": "firePointCount", "value": "2" },
+        { "name": "attack2Cooldown", "value": "0" },
+        { "name": "effectRadius1", "value": "0" },
+        { "name": "effectRadius2", "value": "0" },
+        { "name": "skillRange", "value": "0" },
+        { "name": "healAmount1", "value": "0" },
+        { "name": "healAmount2", "value": "0" },
+        { "name": "gainCreditsAmount", "value": "0" },
+        { "name": "skillManaCost", "value": "0" },
+        { "name": "duration1", "value": "0" },
+        { "name": "duration2", "value": "0" }
+      ],
+      "productionBuilding": {
+        "id": "sample-native:atlas-crane-mech-factory",
+        "nativeTemplateId": "GatlingWalkerFactory",
+        "balanceOverrides": [
+          { "name": "cost", "value": "1100" },
+          { "name": "neededExperienceLevel", "value": "2" },
+          { "name": "rarity", "value": "Common" }
+        ],
+        "localizations": [
+          { "language": "en-US", "name": "Atlas Crane Foundry", "description": "Produces Atlas Crane Mechs." },
+          { "language": "es-XL", "name": "Fábrica de Mechas Grúa Atlas", "description": "Produce mechas grúa Atlas." }
         ]
       }
     },
@@ -395,6 +461,7 @@
         "sample-native:scout-tank",
         "sample-native:heavy-artillery",
         "sample-native:assault-walker",
+        "sample-native:atlas-crane-mech",
         "sample-native:surge-tank"
       ],
       "aiProfileIds": [
@@ -421,6 +488,7 @@
         "sample-native:scout-tank",
         "sample-native:heavy-artillery",
         "sample-native:assault-walker",
+        "sample-native:atlas-crane-mech",
         "sample-native:skirmish-bike",
         "sample-native:surge-tank"
       ],
@@ -496,6 +564,44 @@
             { "name": "minSquadSize", "value": "3" },
             { "name": "targetPriority", "value": "Refinery" },
             { "name": "minGameTimeSeconds", "value": "25" }
+          ]
+        }
+      ]
+    }
+  ],
+  "relics": [
+    {
+      "id": "sample-native:foundry-counterweight",
+      "assetBundleId": "sample-native:assets",
+      "imageAssetName": "assets/roguecommandexpansionsample/atlascranemechcard.png",
+      "rarity": "Rare",
+      "tech": "Mech",
+      "offeredSystemTags": "Mech",
+      "neededSystemTags": "Mech",
+      "neededExperienceLevel": 0,
+      "isAllowedForDemo": false,
+      "isForSpecialists": false,
+      "localizations": [
+        {
+          "language": "en-US",
+          "name": "Foundry Counterweight",
+          "description": "Atlas Crane Mechs gain 10% Health for the rest of the run."
+        },
+        {
+          "language": "es-XL",
+          "name": "Contrapeso de fundición",
+          "description": "Los mechas grúa Atlas obtienen un 10 % más de salud durante el resto de la partida."
+        }
+      ],
+      "cardChanges": [
+        {
+          "valueToChange": "Health",
+          "operation": "Multiply",
+          "value": 1.1,
+          "side": "False",
+          "multiplyValueWithCurrentHeatLevel": false,
+          "onlyForTheseEntityIds": [
+            "sample-native:atlas-crane-mech"
           ]
         }
       ]

@@ -30,10 +30,15 @@ namespace RogueCommandExpansion.Authoring
         private const string IroncladPrefabPath = AssetRoot + "/IroncladWalkerVisual.prefab";
         private const string IroncladCardSpritePath = AssetRoot + "/IroncladWalkerCard.png";
         private const string IroncladModelPath = AssetRoot + "/Models/IroncladWalker.fbx";
+        private const string AtlasCraneMechPrefabPath = AssetRoot + "/AtlasCraneMechVisual.prefab";
+        private const string AtlasCraneMechCardSpritePath = AssetRoot + "/AtlasCraneMechCard.png";
+        private const string AtlasCraneMechModelPath = AssetRoot + "/Models/AtlasCraneMech.fbx";
         private const string SurgeArcTankPrefabPath = AssetRoot + "/SurgeArcTankVisual.prefab";
         private const string SurgeArcTankCardSpritePath = AssetRoot + "/SurgeArcTankCard.png";
         private const string SurgeArcTankModelPath = AssetRoot + "/Models/SurgeArcTank.fbx";
         private const string MaterialRoot = AssetRoot + "/Materials";
+        private const string VertexWearShaderName = "RogueCommand/VehiclePBR_VertexWear";
+        private const float FactoryNewWearStrength = 0.25f;
         private const string RenderingRoot = AssetRoot + "/Rendering";
         private const string AuthoringPipelineAssetPath = RenderingRoot + "/RogueCommandURP.asset";
         private const string DefaultRendererDataAssetPath =
@@ -248,6 +253,8 @@ namespace RogueCommandExpansion.Authoring
                         "Install the Unity Windows Build Support module before building this sample.");
                 }
 
+                string projectRoot = Directory.GetParent(Application.dataPath).FullName;
+                ValidateRiggedWalkerSources(projectRoot);
                 EnsureUrpAuthoringPipeline();
 
                 string prefabPath = CreateSampleVisual();
@@ -258,9 +265,10 @@ namespace RogueCommandExpansion.Authoring
                 ImportCardSprite(ColossusCardSpritePath);
                 string ironcladPrefabPath = CreateIroncladVisual();
                 ImportCardSprite(IroncladCardSpritePath);
+                string atlasCraneMechPrefabPath = CreateAtlasCraneMechVisual();
+                ImportCardSprite(AtlasCraneMechCardSpritePath);
                 string surgeArcTankPrefabPath = CreateSurgeArcTankVisual();
                 ImportCardSprite(SurgeArcTankCardSpritePath);
-                string projectRoot = Directory.GetParent(Application.dataPath).FullName;
                 string outputPath = Path.GetFullPath(Path.Combine(projectRoot, BundleOutputPath));
                 Directory.CreateDirectory(outputPath);
 
@@ -272,7 +280,8 @@ namespace RogueCommandExpansion.Authoring
                         prefabPath, CardSpritePath,
                         bikePrefabPath, BikeCardSpritePath,
                         colossusPrefabPath, ColossusCardSpritePath,
-                        IroncladCardSpritePath,
+                        ironcladPrefabPath, IroncladCardSpritePath,
+                        atlasCraneMechPrefabPath, AtlasCraneMechCardSpritePath,
                         surgeArcTankPrefabPath, SurgeArcTankCardSpritePath
                     }
                 };
@@ -305,9 +314,13 @@ namespace RogueCommandExpansion.Authoring
                     Path.Combine(packBundles, "assetbundle-manifest.bundle"));
 
                 AssetDatabase.Refresh();
-                Debug.Log("Built four script-free Sandlance, Skirmish Bike, Colossus, and Surge Arc Tank " +
-                    "visual overlays plus five card Sprites in " + BundleName + " at " + packBundles + ". " +
-                    "Ironclad Walker keeps its native articulated GatlingWalker visual until its custom model is rigged.");
+                Debug.Log("Built six script-free Sandlance, Skirmish Bike, Colossus, Ironclad Walker, " +
+                    "Atlas Crane Mech, and Surge Arc Tank visual overlays plus six card Sprites in " +
+                    BundleName + " at " + packBundles + ".");
+                if (Application.isBatchMode)
+                {
+                    EditorApplication.Exit(0);
+                }
             }
             catch (Exception exception)
             {
@@ -321,6 +334,523 @@ namespace RogueCommandExpansion.Authoring
                     EditorUtility.DisplayDialog("Sample visual bundle build failed", exception.Message, "OK");
                 }
             }
+        }
+
+        private static void ValidateRiggedWalkerSources(string projectRoot)
+        {
+            var issues = new List<string>();
+            ValidateSourceFile(projectRoot, IroncladCardSpritePath, "Ironclad Walker card", issues);
+            ValidateSourceFile(projectRoot, AtlasCraneMechCardSpritePath, "Atlas Crane Mech card", issues);
+
+            ValidateWalkerModelSource(projectRoot, IroncladModelPath, "Ironclad Walker", issues);
+            ValidateWalkerModelSource(projectRoot, AtlasCraneMechModelPath, "Atlas Crane Mech", issues);
+
+            if (issues.Count > 0)
+            {
+                throw new InvalidOperationException(
+                    "The sample-native-expansion bundle needs these rigged walker source assets and settings:" +
+                    Environment.NewLine + " - " + String.Join(Environment.NewLine + " - ", issues));
+            }
+        }
+
+        private static void ValidateSourceFile(
+            string projectRoot,
+            string assetPath,
+            string description,
+            ICollection<string> issues)
+        {
+            string absolutePath = Path.GetFullPath(Path.Combine(projectRoot,
+                assetPath.Replace('/', Path.DirectorySeparatorChar)));
+            if (!File.Exists(absolutePath))
+            {
+                issues.Add(description + " source is missing: " + assetPath);
+            }
+        }
+
+        private static void ValidateWalkerModelSource(
+            string projectRoot,
+            string modelPath,
+            string unitName,
+            ICollection<string> issues)
+        {
+            string absolutePath = Path.GetFullPath(Path.Combine(projectRoot,
+                modelPath.Replace('/', Path.DirectorySeparatorChar)));
+            if (!File.Exists(absolutePath))
+            {
+                issues.Add(unitName + " source FBX is missing: " + modelPath);
+                return;
+            }
+
+            try
+            {
+                if (AssetDatabase.LoadAssetAtPath<GameObject>(modelPath) == null)
+                {
+                    AssetDatabase.ImportAsset(modelPath, ImportAssetOptions.ForceUpdate);
+                }
+
+                ModelImporter importer = AssetImporter.GetAtPath(modelPath) as ModelImporter;
+                if (importer == null)
+                {
+                    issues.Add(unitName + " must be imported by Unity as a ModelImporter: " + modelPath);
+                    return;
+                }
+
+                bool settingsChanged = false;
+                if (importer.animationType != ModelImporterAnimationType.Generic)
+                {
+                    importer.animationType = ModelImporterAnimationType.Generic;
+                    settingsChanged = true;
+                }
+                if (importer.avatarSetup != ModelImporterAvatarSetup.CreateFromThisModel)
+                {
+                    importer.avatarSetup = ModelImporterAvatarSetup.CreateFromThisModel;
+                    settingsChanged = true;
+                }
+                if (!importer.importAnimation)
+                {
+                    importer.importAnimation = true;
+                    settingsChanged = true;
+                }
+                if (importer.optimizeGameObjects)
+                {
+                    importer.optimizeGameObjects = false;
+                    settingsChanged = true;
+                }
+                if (settingsChanged)
+                {
+                    importer.SaveAndReimport();
+                }
+
+                GameObject model = AssetDatabase.LoadAssetAtPath<GameObject>(modelPath);
+                if (model == null)
+                {
+                    issues.Add(unitName + " FBX could not be imported: " + modelPath);
+                    return;
+                }
+
+                SkinnedMeshRenderer[] skinnedRenderers = model.GetComponentsInChildren<SkinnedMeshRenderer>(true);
+                bool hasSkinnedMeshWithBones = false;
+                for (int i = 0; i < skinnedRenderers.Length; i++)
+                {
+                    if (skinnedRenderers[i] != null && skinnedRenderers[i].sharedMesh != null &&
+                        skinnedRenderers[i].bones != null && skinnedRenderers[i].bones.Length > 0)
+                    {
+                        hasSkinnedMeshWithBones = true;
+                        break;
+                    }
+                }
+
+                bool hasRootBone = FindNamedTransforms(model, "Bone_Root").Count == 1;
+                Avatar validAvatar = null;
+                AnimationClip[] clips = new AnimationClip[0];
+                UnityEngine.Object[] importedAssets = AssetDatabase.LoadAllAssetsAtPath(modelPath);
+                if (importedAssets != null)
+                {
+                    var foundClips = new List<AnimationClip>();
+                    for (int i = 0; i < importedAssets.Length; i++)
+                    {
+                        AnimationClip clip = importedAssets[i] as AnimationClip;
+                        if (clip != null && !clip.name.StartsWith("__preview__", StringComparison.OrdinalIgnoreCase))
+                        {
+                            foundClips.Add(clip);
+                        }
+
+                        Avatar avatar = importedAssets[i] as Avatar;
+                        if (avatar != null && avatar.isValid && validAvatar == null)
+                        {
+                            validAvatar = avatar;
+                        }
+                    }
+                    clips = foundClips.ToArray();
+                }
+
+                var missingActions = new List<string>();
+                if (!HasAnimationClip(clips, "Idle")) missingActions.Add("Action_Idle");
+                if (!HasAnimationClip(clips, "Walk") && !HasAnimationClip(clips, "Drive"))
+                {
+                    missingActions.Add("Action_Walk or Action_Drive");
+                }
+                if (!HasAnimationClip(clips, "FireRecoil") && !HasAnimationClip(clips, "Fire"))
+                {
+                    missingActions.Add("Action_FireRecoil");
+                }
+                if (!HasAnimationClip(clips, "Death")) missingActions.Add("Action_Death");
+
+                var modelIssues = new List<string>();
+                if (!hasSkinnedMeshWithBones) modelIssues.Add("a SkinnedMeshRenderer with bound bones");
+                if (!hasRootBone) modelIssues.Add("the Bone_Root transform");
+                if (validAvatar == null) modelIssues.Add("a valid Generic Avatar");
+                if (missingActions.Count > 0)
+                {
+                    modelIssues.Add("animation clips " + String.Join(", ", missingActions));
+                }
+
+                if (modelIssues.Count > 0)
+                {
+                    issues.Add(unitName + " is not ready at " + modelPath + "; add " +
+                        String.Join(", ", modelIssues) +
+                        ". The current static Ironclad Walker prototype does not satisfy the rigged overlay contract.");
+                }
+            }
+            catch (Exception exception)
+            {
+                issues.Add(unitName + " FBX at " + modelPath + " could not be validated: " + exception.Message);
+            }
+        }
+
+        private static bool HasAnimationClip(AnimationClip[] clips, string nameFragment)
+        {
+            if (clips == null)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < clips.Length; i++)
+            {
+                if (clips[i] != null &&
+                    clips[i].name.IndexOf(nameFragment, StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static void EnsureCanonicalWalkerSockets(GameObject root, GameObject model, bool rapidFireMuzzle)
+        {
+            string[] uniqueSocketNames =
+            {
+                "Socket_MuzzlePrimary",
+                "Socket_EngineAudio",
+                "Socket_WeaponAudio",
+                "Socket_DamageSmoke",
+                "Socket_DamageFire",
+                "Socket_GroundCenter",
+                "Socket_FootContact_L",
+                "Socket_FootContact_R"
+            };
+            for (int i = 0; i < uniqueSocketNames.Length; i++)
+            {
+                GetUniqueNamedTransform(root, uniqueSocketNames[i], false);
+            }
+
+            Bounds modelBounds = GetModelBoundsInRootSpace(root, model);
+            float footHalfWidth = Mathf.Max(modelBounds.size.x * 0.22f, 0.12f);
+            Vector3 leftFootFallback = new Vector3(modelBounds.center.x - footHalfWidth, 0.0f, modelBounds.center.z);
+            Vector3 rightFootFallback = new Vector3(modelBounds.center.x + footHalfWidth, 0.0f, modelBounds.center.z);
+            Transform leftFoot = EnsureUniqueSocket(root, "Socket_FootContact_L", leftFootFallback);
+            Transform rightFoot = EnsureUniqueSocket(root, "Socket_FootContact_R", rightFootFallback);
+
+            Transform muzzle = GetUniqueNamedTransform(root, "Socket_MuzzlePrimary", true);
+            Transform weaponAudio = GetUniqueNamedTransform(root, "Socket_WeaponAudio", true);
+            Transform engineAudio = GetUniqueNamedTransform(root, "Socket_EngineAudio", true);
+            EnsureRootLocalFootContact(root, leftFoot, "Socket_FootContact_L");
+            EnsureRootLocalFootContact(root, rightFoot, "Socket_FootContact_R");
+            weaponAudio.SetPositionAndRotation(muzzle.position, muzzle.rotation);
+            if (Vector3.Distance(engineAudio.position, root.transform.position) < 0.05f)
+            {
+                Vector3 fallbackEnginePosition = new Vector3(
+                    modelBounds.center.x,
+                    Mathf.Lerp(modelBounds.min.y, modelBounds.max.y, 0.30f),
+                    modelBounds.min.z + modelBounds.size.z * 0.18f);
+                engineAudio.position = root.transform.TransformPoint(fallbackEnginePosition);
+            }
+
+            float barrelSpacing = Mathf.Max(modelBounds.size.x * 0.10f, 0.06f);
+            Transform firePoint0 = EnsureFirePoint(
+                root, muzzle, "FirePoint_0", new Vector3(-barrelSpacing, 0.0f, 0.0f), rapidFireMuzzle);
+            Transform firePoint1 = EnsureFirePoint(
+                root, muzzle, "FirePoint_1", new Vector3(barrelSpacing, 0.0f, 0.0f), rapidFireMuzzle);
+            if (firePoint0 == firePoint1)
+            {
+                throw new InvalidDataException("FirePoint_0 and FirePoint_1 must be distinct on " + root.name + ".");
+            }
+
+            ValidateCanonicalWalkerSockets(root, root.name);
+        }
+
+        private static void ValidateCanonicalWalkerSockets(GameObject root, string unitName)
+        {
+            string[] requiredSocketNames =
+            {
+                "Socket_MuzzlePrimary",
+                "Socket_EngineAudio",
+                "Socket_WeaponAudio",
+                "Socket_DamageSmoke",
+                "Socket_DamageFire",
+                "Socket_FootContact_L",
+                "Socket_FootContact_R"
+            };
+            for (int i = 0; i < requiredSocketNames.Length; i++)
+            {
+                GetUniqueNamedTransform(root, requiredSocketNames[i], true);
+            }
+
+            Transform muzzle = GetUniqueNamedTransform(root, "Socket_MuzzlePrimary", true);
+            Transform weaponAudio = GetUniqueNamedTransform(root, "Socket_WeaponAudio", true);
+            if (Vector3.Distance(muzzle.position, weaponAudio.position) > 0.75f)
+            {
+                throw new InvalidDataException(unitName + " has Socket_WeaponAudio too far from Socket_MuzzlePrimary.");
+            }
+
+            EnsureRootLocalFootContact(root, GetUniqueNamedTransform(root, "Socket_FootContact_L", true),
+                "Socket_FootContact_L");
+            EnsureRootLocalFootContact(root, GetUniqueNamedTransform(root, "Socket_FootContact_R", true),
+                "Socket_FootContact_R");
+
+            ValidateFirePoint(root, muzzle, "FirePoint_0");
+            ValidateFirePoint(root, muzzle, "FirePoint_1");
+        }
+
+        private static Transform EnsureUniqueSocket(GameObject root, string name, Vector3 fallbackPosition)
+        {
+            Transform existing = GetUniqueNamedTransform(root, name, false);
+            if (existing != null)
+            {
+                return existing;
+            }
+
+            var socketObject = new GameObject(name);
+            socketObject.transform.SetParent(root.transform, false);
+            socketObject.transform.localPosition = fallbackPosition;
+            socketObject.transform.localRotation = Quaternion.identity;
+            socketObject.transform.localScale = Vector3.one;
+            return socketObject.transform;
+        }
+
+        private static Transform EnsureFirePoint(
+            GameObject root,
+            Transform muzzle,
+            string name,
+            Vector3 fallbackPosition,
+            bool rapidFireMuzzle)
+        {
+            Transform firePoint = GetUniqueNamedTransform(root, name, false);
+            if (firePoint == null)
+            {
+                var firePointObject = new GameObject(name);
+                firePointObject.transform.SetParent(muzzle, false);
+                firePointObject.transform.localPosition = fallbackPosition;
+                firePointObject.transform.localRotation = Quaternion.identity;
+                firePointObject.transform.localScale = Vector3.one;
+                firePoint = firePointObject.transform;
+            }
+            else if (firePoint.parent != muzzle)
+            {
+                firePoint.SetParent(muzzle, true);
+            }
+
+            EnsureMuzzleFlashParticleSystem(firePoint, rapidFireMuzzle);
+            return firePoint;
+        }
+
+        private static void EnsureMuzzleFlashParticleSystem(Transform firePoint, bool rapidFireMuzzle)
+        {
+            ParticleSystem particleSystem = null;
+            Transform particleObject = null;
+            for (int i = 0; i < firePoint.childCount; i++)
+            {
+                Transform child = firePoint.GetChild(i);
+                ParticleSystem candidate = child.GetComponent<ParticleSystem>();
+                if (candidate != null)
+                {
+                    particleSystem = candidate;
+                    particleObject = child;
+                    break;
+                }
+            }
+
+            if (particleSystem == null)
+            {
+                var particleGameObject = new GameObject("MuzzleFlash");
+                particleGameObject.transform.SetParent(firePoint, false);
+                particleGameObject.transform.localPosition = Vector3.zero;
+                particleGameObject.transform.localRotation = Quaternion.identity;
+                particleGameObject.transform.localScale = Vector3.one;
+                particleSystem = particleGameObject.AddComponent<ParticleSystem>();
+                particleObject = particleGameObject.transform;
+            }
+
+            particleObject.SetSiblingIndex(0);
+            ParticleSystem.MainModule main = particleSystem.main;
+            main.duration = rapidFireMuzzle ? 0.05f : 0.10f;
+            main.loop = false;
+            main.prewarm = false;
+            main.playOnAwake = false;
+            main.startLifetime = rapidFireMuzzle ? 0.04f : 0.06f;
+            main.startSpeed = rapidFireMuzzle ? 3.0f : 0.0f;
+            main.startSize = rapidFireMuzzle ? 0.9f : 1.8f;
+            main.startColor = rapidFireMuzzle
+                ? new Color(1.0f, 0.70f, 0.31f, 1.0f)
+                : new Color(1.0f, 0.86f, 0.55f, 1.0f);
+            main.maxParticles = rapidFireMuzzle ? 6 : 2;
+            main.simulationSpace = ParticleSystemSimulationSpace.World;
+
+            ParticleSystem.EmissionModule emission = particleSystem.emission;
+            emission.enabled = true;
+            emission.rateOverTime = 0.0f;
+            short burstCount = (short)(rapidFireMuzzle ? 2 : 1);
+            emission.SetBursts(new[] { new ParticleSystem.Burst(0.0f, burstCount) });
+
+            ParticleSystem.ShapeModule shape = particleSystem.shape;
+            shape.enabled = true;
+            shape.shapeType = ParticleSystemShapeType.Cone;
+            shape.angle = rapidFireMuzzle ? 8.0f : 12.0f;
+            shape.radius = 0.05f;
+
+            ParticleSystemRenderer particleRenderer = particleSystem.GetComponent<ParticleSystemRenderer>();
+            if (particleRenderer == null)
+            {
+                throw new InvalidDataException("Unity did not create a ParticleSystemRenderer for " + firePoint.name + ".");
+            }
+            particleRenderer.renderMode = ParticleSystemRenderMode.Billboard;
+            particleRenderer.enableGPUInstancing = true;
+            particleRenderer.sharedMaterial = GetOrCreateMuzzleFlashMaterial();
+        }
+
+        private static Material GetOrCreateMuzzleFlashMaterial()
+        {
+            const string materialPath = MaterialRoot + "/RogueCommandMuzzleFlash.mat";
+            Material material = AssetDatabase.LoadAssetAtPath<Material>(materialPath);
+            Shader shader = Shader.Find("Universal Render Pipeline/Particles/Unlit");
+            if (shader == null)
+            {
+                throw new InvalidOperationException(
+                    "The URP Particles/Unlit shader is required for walker muzzle flashes.");
+            }
+
+            if (material == null)
+            {
+                material = new Material(shader);
+                material.name = "RogueCommandMuzzleFlash";
+                AssetDatabase.CreateAsset(material, materialPath);
+            }
+            else
+            {
+                material.shader = shader;
+            }
+
+            material.color = new Color(1.0f, 0.62f, 0.20f, 0.92f);
+            material.enableInstancing = true;
+            EditorUtility.SetDirty(material);
+            return material;
+        }
+
+        private static void ValidateFirePoint(GameObject root, Transform muzzle, string name)
+        {
+            Transform firePoint = GetUniqueNamedTransform(root, name, true);
+            if (firePoint.parent != muzzle)
+            {
+                throw new InvalidDataException(name + " must be nested directly under Socket_MuzzlePrimary.");
+            }
+            if (firePoint.childCount == 0 || firePoint.GetChild(0).GetComponent<ParticleSystem>() == null)
+            {
+                throw new InvalidDataException(
+                    name + " must have its ParticleSystem on child index 0 for native muzzle flash discovery.");
+            }
+
+            ParticleSystem.MainModule main = firePoint.GetChild(0).GetComponent<ParticleSystem>().main;
+            if (main.playOnAwake || main.loop)
+            {
+                throw new InvalidDataException(name + " muzzle flash ParticleSystem must be non-looping and not play on awake.");
+            }
+        }
+
+        private static void EnsureRootLocalFootContact(GameObject root, Transform footContact, string socketName)
+        {
+            float localHeight = root.transform.InverseTransformPoint(footContact.position).y;
+            if (Mathf.Abs(localHeight) > 0.03f)
+            {
+                throw new InvalidDataException(socketName + " must rest on the Unity ground plane Y = 0.0.");
+            }
+        }
+
+        private static Transform GetUniqueNamedTransform(GameObject root, string name, bool required)
+        {
+            List<Transform> matches = FindNamedTransforms(root, name);
+            if (matches.Count > 1)
+            {
+                throw new InvalidDataException("The visual contains duplicate " + name + " transforms.");
+            }
+            if (matches.Count == 0)
+            {
+                if (required)
+                {
+                    throw new InvalidDataException("The visual is missing required transform " + name + ".");
+                }
+                return null;
+            }
+            if (!String.Equals(matches[0].name, name, StringComparison.Ordinal))
+            {
+                throw new InvalidDataException("The visual transform must use the canonical name " + name + ".");
+            }
+
+            return matches[0];
+        }
+
+        private static List<Transform> FindNamedTransforms(GameObject root, string name)
+        {
+            var matches = new List<Transform>();
+            if (root == null)
+            {
+                return matches;
+            }
+
+            Transform[] transforms = root.GetComponentsInChildren<Transform>(true);
+            for (int i = 0; i < transforms.Length; i++)
+            {
+                if (transforms[i] != null &&
+                    String.Equals(transforms[i].name, name, StringComparison.OrdinalIgnoreCase))
+                {
+                    matches.Add(transforms[i]);
+                }
+            }
+
+            return matches;
+        }
+
+        private static Bounds GetModelBoundsInRootSpace(GameObject root, GameObject model)
+        {
+            Renderer[] renderers = model.GetComponentsInChildren<Renderer>(true);
+            bool hasPoint = false;
+            Vector3 min = Vector3.zero;
+            Vector3 max = Vector3.zero;
+            for (int i = 0; i < renderers.Length; i++)
+            {
+                if (renderers[i] == null)
+                {
+                    continue;
+                }
+
+                Bounds bounds = renderers[i].bounds;
+                for (int corner = 0; corner < 8; corner++)
+                {
+                    Vector3 worldCorner = new Vector3(
+                        (corner & 1) == 0 ? bounds.min.x : bounds.max.x,
+                        (corner & 2) == 0 ? bounds.min.y : bounds.max.y,
+                        (corner & 4) == 0 ? bounds.min.z : bounds.max.z);
+                    Vector3 localCorner = root.transform.InverseTransformPoint(worldCorner);
+                    if (!hasPoint)
+                    {
+                        min = localCorner;
+                        max = localCorner;
+                        hasPoint = true;
+                    }
+                    else
+                    {
+                        min = Vector3.Min(min, localCorner);
+                        max = Vector3.Max(max, localCorner);
+                    }
+                }
+            }
+
+            if (!hasPoint)
+            {
+                throw new InvalidDataException("The walker model has no renderer bounds for socket fallback placement.");
+            }
+
+            return new Bounds((min + max) * 0.5f, max - min);
         }
 
         private static string CreateSampleVisual()
@@ -511,45 +1041,86 @@ namespace RogueCommandExpansion.Authoring
 
         private static string CreateIroncladVisual()
         {
+            return CreateRiggedWalkerVisual(
+                "IroncladWalker",
+                IroncladModelPath,
+                IroncladPrefabPath,
+                CreateIroncladMaterials,
+                AssignIroncladMaterials,
+                true);
+        }
+
+        private static string CreateAtlasCraneMechVisual()
+        {
+            return CreateRiggedWalkerVisual(
+                "AtlasCraneMech",
+                AtlasCraneMechModelPath,
+                AtlasCraneMechPrefabPath,
+                CreateAtlasCraneMechMaterials,
+                AssignAtlasCraneMechMaterials,
+                false);
+        }
+
+        private static string CreateRiggedWalkerVisual(
+            string unitName,
+            string modelPath,
+            string prefabPath,
+            Func<Dictionary<string, Material>> createMaterials,
+            Action<GameObject, IDictionary<string, Material>> assignMaterials,
+            bool rapidFireMuzzle)
+        {
             string projectRoot = Directory.GetParent(Application.dataPath).FullName;
             Directory.CreateDirectory(Path.GetFullPath(Path.Combine(projectRoot, AssetRoot)));
             AssetDatabase.Refresh();
 
-            GameObject modelAsset = AssetDatabase.LoadAssetAtPath<GameObject>(IroncladModelPath);
+            GameObject modelAsset = AssetDatabase.LoadAssetAtPath<GameObject>(modelPath);
             if (modelAsset == null)
             {
-                throw new FileNotFoundException("Import the authored Ironclad Walker FBX before building the " +
-                    "sample bundle.", IroncladModelPath);
+                throw new FileNotFoundException(
+                    "Import the rigged " + unitName + " FBX before building the sample bundle.", modelPath);
             }
 
-            Dictionary<string, Material> materials = CreateIroncladMaterials();
-            var root = new GameObject("IroncladWalkerVisual");
+            Dictionary<string, Material> materials = createMaterials();
+            var root = new GameObject(unitName + "Visual");
             try
             {
                 GameObject modelInstance = PrefabUtility.InstantiatePrefab(modelAsset) as GameObject;
                 if (modelInstance == null)
                 {
-                    throw new InvalidOperationException("Unity could not instantiate the authored Ironclad Walker.");
+                    throw new InvalidOperationException("Unity could not instantiate the authored " + unitName + ".");
                 }
 
-                modelInstance.name = "IroncladWalkerModel";
+                modelInstance.name = unitName + "Model";
                 modelInstance.transform.SetParent(root.transform, false);
                 modelInstance.transform.localPosition = Vector3.zero;
                 modelInstance.transform.localRotation = Quaternion.identity;
                 modelInstance.transform.localScale = Vector3.one;
-                AssignIroncladMaterials(modelInstance, materials);
-                VehiclePrefabBuilder.EnsureCanonicalVfxSockets(root, modelInstance);
+                assignMaterials(modelInstance, materials);
 
-                bool success;
-                PrefabUtility.SaveAsPrefabAsset(root, IroncladPrefabPath, out success);
-                if (!success)
+                VehiclePrefabBuilder.EnsureCanonicalVfxSockets(root, modelInstance);
+                EnsureCanonicalWalkerSockets(root, modelInstance, rapidFireMuzzle);
+                VehiclePrefabBuilder.SetupAnimatorIfAvailable(root, modelInstance, modelAsset, unitName, true);
+
+                Animator animator = root.GetComponent<Animator>();
+                if (animator == null || animator.avatar == null || !animator.avatar.isValid ||
+                    animator.runtimeAnimatorController == null)
                 {
-                    throw new InvalidOperationException("Unity could not save " + IroncladPrefabPath + ".");
+                    throw new InvalidDataException(
+                        unitName + " must import a valid Generic Avatar and the RCL animation controller.");
                 }
 
-                string prefabPath = Path.GetFullPath(Path.Combine(projectRoot, IroncladPrefabPath));
-                NormalizeEmptyUnityYamlStrings(prefabPath);
-                string prefabMetadataPath = prefabPath + ".meta";
+                animator.applyRootMotion = false;
+
+                bool success;
+                PrefabUtility.SaveAsPrefabAsset(root, prefabPath, out success);
+                if (!success)
+                {
+                    throw new InvalidOperationException("Unity could not save " + prefabPath + ".");
+                }
+
+                string absolutePrefabPath = Path.GetFullPath(Path.Combine(projectRoot, prefabPath));
+                NormalizeEmptyUnityYamlStrings(absolutePrefabPath);
+                string prefabMetadataPath = absolutePrefabPath + ".meta";
                 if (File.Exists(prefabMetadataPath))
                 {
                     NormalizeEmptyUnityYamlStrings(prefabMetadataPath);
@@ -560,24 +1131,19 @@ namespace RogueCommandExpansion.Authoring
                 UnityEngine.Object.DestroyImmediate(root);
             }
 
-            AssetImporter importer = AssetImporter.GetAtPath(IroncladPrefabPath);
+            AssetImporter importer = AssetImporter.GetAtPath(prefabPath);
             if (importer == null)
             {
-                throw new FileNotFoundException("Unity did not import " + IroncladPrefabPath + ".");
+                throw new FileNotFoundException("Unity did not import " + prefabPath + ".");
             }
 
-            // This static model is retained as an authoring prototype, but the pack uses the
-            // native GatlingWalker renderer and articulation until this model has a walker rig.
-            if (!String.IsNullOrEmpty(importer.assetBundleName))
-            {
-                importer.assetBundleVariant = String.Empty;
-                importer.assetBundleName = String.Empty;
-            }
+            importer.assetBundleName = BundleName;
+            importer.assetBundleVariant = String.Empty;
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
             NormalizeGeneratedUnityMetaFiles(projectRoot);
-            NormalizeEmptyUnityYamlStrings(Path.GetFullPath(Path.Combine(projectRoot, IroncladPrefabPath)) + ".meta");
-            return IroncladPrefabPath;
+            NormalizeEmptyUnityYamlStrings(Path.GetFullPath(Path.Combine(projectRoot, prefabPath)) + ".meta");
+            return prefabPath;
         }
 
         private static string CreateSurgeArcTankVisual()
@@ -663,19 +1229,146 @@ namespace RogueCommandExpansion.Authoring
                     "skirmishbikecard.png", "SkirmishBikeCard", 7, "Skirmish Strike Bike");
                 ValidateVisualBundleAssets(bundle, assetNames, "colossussiegevisual.prefab", "ColossusSiegeVisual",
                     "colossussiegecard.png", "ColossusSiegeCard", 8, "Colossus Siege Platform");
-                ValidateCardSpriteAsset(bundle, assetNames, "ironcladwalkercard.png", "IroncladWalkerCard",
-                    "Ironclad Walker");
+                ValidateRiggedWalkerBundleAssets(bundle, assetNames,
+                    "ironcladwalkervisual.prefab", "IroncladWalkerVisual",
+                    "ironcladwalkercard.png", "IroncladWalkerCard", "Ironclad Walker");
+                ValidateRiggedWalkerBundleAssets(bundle, assetNames,
+                    "atlascranemechvisual.prefab", "AtlasCraneMechVisual",
+                    "atlascranemechcard.png", "AtlasCraneMechCard", "Atlas Crane Mech");
                 ValidateVisualBundleAssets(bundle, assetNames, "surgearctankvisual.prefab", "SurgeArcTankVisual",
                     "surgearctankcard.png", "SurgeArcTankCard", 6, "Surge Arc Tank");
-                if (FindAssetPathOrNull(assetNames, "ironcladwalkervisual.prefab") != null)
-                {
-                    throw new InvalidDataException("The unrigged Ironclad walker prototype must not ship in the visual bundle.");
-                }
             }
             finally
             {
                 bundle.Unload(true);
             }
+        }
+
+        private static void ValidateRiggedWalkerBundleAssets(
+            AssetBundle bundle,
+            string[] assetNames,
+            string prefabSuffix,
+            string prefabName,
+            string cardSuffix,
+            string cardName,
+            string visualLabel)
+        {
+            string prefabAssetPath = FindUniqueAssetPath(assetNames, prefabSuffix, visualLabel + " prefab");
+            GameObject prefab = bundle.LoadAsset<GameObject>(prefabAssetPath);
+            if (prefab == null || !String.Equals(prefab.name, prefabName, StringComparison.Ordinal))
+            {
+                throw new InvalidDataException(visualLabel + " prefab could not be loaded by its AssetBundle path.");
+            }
+
+            ValidateCardSpriteAsset(bundle, assetNames, cardSuffix, cardName, visualLabel);
+
+            SkinnedMeshRenderer[] skinnedRenderers = prefab.GetComponentsInChildren<SkinnedMeshRenderer>(true);
+            bool hasBoundSkinnedMesh = false;
+            for (int i = 0; i < skinnedRenderers.Length; i++)
+            {
+                if (skinnedRenderers[i] != null && skinnedRenderers[i].sharedMesh != null &&
+                    skinnedRenderers[i].bones != null && skinnedRenderers[i].bones.Length > 0)
+                {
+                    hasBoundSkinnedMesh = true;
+                    break;
+                }
+            }
+            if (!hasBoundSkinnedMesh)
+            {
+                throw new InvalidDataException(visualLabel + " prefab has no skinned mesh with bound bones.");
+            }
+
+            Animator animator = prefab.GetComponent<Animator>();
+            if (animator == null || animator.applyRootMotion || animator.avatar == null || !animator.avatar.isValid ||
+                animator.runtimeAnimatorController == null)
+            {
+                throw new InvalidDataException(visualLabel +
+                    " prefab must keep root motion disabled and include its valid Generic Avatar and controller.");
+            }
+            GameObject animatorProbe = null;
+            try
+            {
+                animatorProbe = UnityEngine.Object.Instantiate(prefab);
+                Animator probeAnimator = animatorProbe.GetComponent<Animator>();
+                probeAnimator.Rebind();
+                probeAnimator.Update(0f);
+
+                if (!HasAnimatorParameter(probeAnimator, "RCL_IsMoving", AnimatorControllerParameterType.Bool) ||
+                    !HasAnimatorParameter(probeAnimator, "RCL_Fire", AnimatorControllerParameterType.Trigger) ||
+                    !HasAnimatorParameter(probeAnimator, "RCL_Death", AnimatorControllerParameterType.Trigger))
+                {
+                    AnimatorControllerParameter[] parameters = probeAnimator.parameters;
+                    var parameterSummary = new StringBuilder();
+                    for (int i = 0; i < parameters.Length; i++)
+                    {
+                        if (i > 0) parameterSummary.Append(", ");
+                        parameterSummary.Append(parameters[i].name).Append(":").Append(parameters[i].type);
+                    }
+
+                    throw new InvalidDataException(visualLabel +
+                        " AnimatorController is missing the native RCL parameter contract after bundle instantiation " +
+                        "(controller=" + probeAnimator.runtimeAnimatorController.name +
+                        "; initialized=" + probeAnimator.isInitialized + "; parameters=" + parameterSummary + ").");
+                }
+            }
+            finally
+            {
+                if (animatorProbe != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(animatorProbe);
+                }
+            }
+
+            ValidateCanonicalWalkerSockets(prefab, visualLabel);
+
+            Renderer[] renderers = prefab.GetComponentsInChildren<Renderer>(true);
+            for (int i = 0; i < renderers.Length; i++)
+            {
+                Material[] assignedMaterials = renderers[i].sharedMaterials;
+                if (assignedMaterials == null || assignedMaterials.Length == 0)
+                {
+                    throw new InvalidDataException(visualLabel + " renderer '" + renderers[i].name +
+                        "' has no material.");
+                }
+                for (int materialIndex = 0; materialIndex < assignedMaterials.Length; materialIndex++)
+                {
+                    if (assignedMaterials[materialIndex] == null)
+                    {
+                        throw new InvalidDataException(visualLabel + " renderer '" + renderers[i].name +
+                            "' has a missing material.");
+                    }
+                }
+            }
+
+            Component[] components = prefab.GetComponentsInChildren<Component>(true);
+            for (int i = 0; i < components.Length; i++)
+            {
+                if (components[i] == null || components[i] is MonoBehaviour)
+                {
+                    throw new InvalidDataException(visualLabel +
+                        " visual bundle contains a missing or scripted component.");
+                }
+            }
+        }
+
+        private static bool HasAnimatorParameter(
+            Animator animator,
+            string parameterName,
+            AnimatorControllerParameterType expectedType)
+        {
+            AnimatorControllerParameter[] parameters = animator != null
+                ? animator.parameters
+                : new AnimatorControllerParameter[0];
+            for (int i = 0; i < parameters.Length; i++)
+            {
+                if (String.Equals(parameters[i].name, parameterName, StringComparison.Ordinal) &&
+                    parameters[i].type == expectedType)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static void ValidateVisualBundleAssets(
@@ -800,19 +1493,6 @@ namespace RogueCommandExpansion.Authoring
             }
         }
 
-        private static string FindAssetPathOrNull(string[] assetNames, string suffix)
-        {
-            for (int i = 0; i < assetNames.Length; i++)
-            {
-                if (assetNames[i].EndsWith("/" + suffix, StringComparison.OrdinalIgnoreCase))
-                {
-                    return assetNames[i];
-                }
-            }
-
-            return null;
-        }
-
         private static Dictionary<string, Material> CreateScoutMaterials()
         {
             string projectRoot = Directory.GetParent(Application.dataPath).FullName;
@@ -877,11 +1557,31 @@ namespace RogueCommandExpansion.Authoring
             Directory.CreateDirectory(Path.GetFullPath(Path.Combine(projectRoot, MaterialRoot)));
             var materials = new Dictionary<string, Material>(StringComparer.Ordinal)
             {
-                { "armor", CreateOrUpdateMaterial("IroncladArmor", new Color32(34, 58, 72, 255), 0.44f, 0.62f) },
-                { "lightArmor", CreateOrUpdateMaterial("IroncladLightArmor", new Color32(71, 102, 113, 255), 0.34f, 0.60f) },
-                { "gunmetal", CreateOrUpdateMaterial("IroncladGunmetal", new Color32(18, 27, 34, 255), 0.78f, 0.70f) },
-                { "warning", CreateOrUpdateMaterial("IroncladWarningAmber", new Color32(239, 104, 24, 255), 0.18f, 0.64f, new Color(0.94f, 0.30f, 0.06f) * 1.5f) },
-                { "sensor", CreateOrUpdateMaterial("IroncladSensorCyan", new Color32(10, 184, 224, 255), 0.20f, 0.78f, new Color(0.04f, 0.72f, 0.88f) * 1.8f) }
+                { "armor", CreateOrUpdateMaterial("IroncladArmor", new Color32(34, 58, 72, 255), 0.44f, 0.62f, useVertexWearShader: true) },
+                { "lightArmor", CreateOrUpdateMaterial("IroncladLightArmor", new Color32(71, 102, 113, 255), 0.34f, 0.60f, useVertexWearShader: true) },
+                { "gunmetal", CreateOrUpdateMaterial("IroncladGunmetal", new Color32(18, 27, 34, 255), 0.78f, 0.70f, useVertexWearShader: true) },
+                { "warning", CreateOrUpdateMaterial("IroncladWarningAmber", new Color32(239, 104, 24, 255), 0.18f, 0.64f, new Color(0.94f, 0.30f, 0.06f) * 1.5f, true) },
+                { "sensor", CreateOrUpdateMaterial("IroncladSensorCyan", new Color32(10, 184, 224, 255), 0.20f, 0.78f, new Color(0.04f, 0.72f, 0.88f) * 1.8f, true) }
+            };
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+            return materials;
+        }
+
+        private static Dictionary<string, Material> CreateAtlasCraneMechMaterials()
+        {
+            string projectRoot = Directory.GetParent(Application.dataPath).FullName;
+            Directory.CreateDirectory(Path.GetFullPath(Path.Combine(projectRoot, MaterialRoot)));
+            var materials = new Dictionary<string, Material>(StringComparer.Ordinal)
+            {
+                { "armor", CreateOrUpdateMaterial("AtlasCranePrimaryArmor", new Color32(184, 198, 212, 255), 0.42f, 0.60f, useVertexWearShader: true) },
+                { "lightArmor", CreateOrUpdateMaterial("AtlasCraneLightArmor", new Color32(128, 145, 164, 255), 0.34f, 0.60f, useVertexWearShader: true) },
+                { "gunmetal", CreateOrUpdateMaterial("AtlasCraneGunmetal", new Color32(20, 26, 36, 255), 0.78f, 0.70f, useVertexWearShader: true) },
+                { "tread", CreateOrUpdateMaterial("AtlasCraneTread", new Color32(13, 15, 20, 255), 0.18f, 0.32f, useVertexWearShader: true) },
+                { "wheelRim", CreateOrUpdateMaterial("AtlasCraneWheelRim", new Color32(128, 145, 164, 255), 0.62f, 0.60f, useVertexWearShader: true) },
+                { "wheelHub", CreateOrUpdateMaterial("AtlasCraneWheelHub", new Color32(20, 26, 36, 255), 0.55f, 0.50f, useVertexWearShader: true) },
+                { "warning", CreateOrUpdateMaterial("AtlasCraneWarningRed", new Color32(230, 31, 38, 255), 0.18f, 0.64f, useVertexWearShader: true) },
+                { "emissive", CreateOrUpdateMaterial("AtlasCraneSensorCyan", new Color32(38, 217, 255, 255), 0.20f, 0.80f, new Color(0.15f, 0.85f, 1.0f) * 2.0f, true) }
             };
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
@@ -927,6 +1627,13 @@ namespace RogueCommandExpansion.Authoring
             AssignBatchedMaterials(model, "IroncladWalker", materials);
         }
 
+        private static void AssignAtlasCraneMechMaterials(
+            GameObject model,
+            IDictionary<string, Material> materials)
+        {
+            AssignBatchedMaterials(model, "AtlasCraneMech", materials);
+        }
+
         private static void AssignSurgeArcTankMaterials(
             GameObject model,
             IDictionary<string, Material> materials)
@@ -956,7 +1663,7 @@ namespace RogueCommandExpansion.Authoring
 
                 string materialKey = rendererName.Substring(batchPrefix.Length);
                 Material material;
-                if (!materials.TryGetValue(materialKey, out material) || material == null)
+                if (!TryResolveBatchMaterial(materialKey, modelPrefix, materials, out material) || material == null)
                 {
                     throw new InvalidDataException("No authored material mapping exists for model batch '" +
                         rendererName + "'.");
@@ -964,6 +1671,51 @@ namespace RogueCommandExpansion.Authoring
 
                 renderers[i].sharedMaterials = new[] { material };
             }
+        }
+
+        private static bool TryResolveBatchMaterial(
+            string materialKey,
+            string modelPrefix,
+            IDictionary<string, Material> materials,
+            out Material material)
+        {
+            if (materials.TryGetValue(materialKey, out material) && material != null)
+            {
+                return true;
+            }
+
+            string normalizedKey = materialKey ?? String.Empty;
+            string modelMaterialPrefix = modelPrefix + "_";
+            if (normalizedKey.StartsWith(modelMaterialPrefix, StringComparison.OrdinalIgnoreCase))
+            {
+                normalizedKey = normalizedKey.Substring(modelMaterialPrefix.Length);
+            }
+
+            string alias = null;
+            switch (normalizedKey.Replace("_", String.Empty).ToLowerInvariant())
+            {
+                case "primaryarmor": alias = "armor"; break;
+                case "lightarmor": alias = "lightArmor"; break;
+                case "gunmetal": alias = "gunmetal"; break;
+                case "tread": alias = "tread"; break;
+                case "wheelrim": alias = "wheelRim"; break;
+                case "wheelhub": alias = "wheelHub"; break;
+                case "warning": alias = "warning"; break;
+                case "emissive": alias = "emissive"; break;
+            }
+
+            if (alias != null && materials.TryGetValue(alias, out material) && material != null)
+            {
+                return true;
+            }
+            if (String.Equals(alias, "emissive", StringComparison.Ordinal) &&
+                materials.TryGetValue("sensor", out material) && material != null)
+            {
+                return true;
+            }
+
+            material = null;
+            return false;
         }
 
         private static void NormalizeGeneratedUnityMetaFiles(string projectRoot)
@@ -1054,7 +1806,23 @@ namespace RogueCommandExpansion.Authoring
                 "$1 \"\"$2");
             if (!String.Equals(contents, normalized, StringComparison.Ordinal))
             {
-                File.WriteAllText(filePath, normalized, new UTF8Encoding(false));
+                try
+                {
+                    File.WriteAllText(filePath, normalized, new UTF8Encoding(false));
+                }
+                catch (IOException exception)
+                {
+                    // Unity can keep a freshly saved prefab memory-mapped while its
+                    // AssetDatabase imports it. Windows then reports ERROR_USER_MAPPED_FILE
+                    // (1224) for this cosmetic YAML normalization write.
+                    if ((exception.HResult & 0xffff) != 1224)
+                    {
+                        throw;
+                    }
+
+                    Debug.LogWarning("Skipped empty-string YAML normalization for a mapped " +
+                        "Unity asset: " + filePath);
+                }
             }
         }
 
@@ -1063,16 +1831,31 @@ namespace RogueCommandExpansion.Authoring
             Color color,
             float metallic,
             float smoothness,
-            Color? emissionColor = null)
+            Color? emissionColor = null,
+            bool useVertexWearShader = false)
         {
             string path = MaterialRoot + "/" + name + ".mat";
             Material material = AssetDatabase.LoadAssetAtPath<Material>(path);
-            Shader shader = Shader.Find("Universal Render Pipeline/Lit");
+            Shader shader = useVertexWearShader ? Shader.Find(VertexWearShaderName) : null;
+            bool vertexWearEnabled = shader != null;
+            if (shader == null)
+            {
+                shader = Shader.Find(useVertexWearShader
+                    ? "Standard"
+                    : "Universal Render Pipeline/Lit");
+                if (useVertexWearShader)
+                {
+                    Debug.LogWarning("Shader " + VertexWearShaderName + " is unavailable for " + name +
+                        "; falling back to Standard, which does not read vertex wear channels.");
+                }
+            }
             if (shader == null)
             {
                 throw new InvalidOperationException(
-                    "The Universal Render Pipeline/Lit shader is unavailable for " + name + ". " +
-                    "Resolve the Unity URP package dependency before building sample visuals.");
+                    "The required Unity shader is unavailable for " + name + ". " +
+                    (useVertexWearShader
+                        ? "Resolve the bundled VertexWear or Standard shader before building sample visuals."
+                        : "Resolve the Unity URP package dependency before building sample visuals."));
             }
 
             if (material == null)
@@ -1088,8 +1871,23 @@ namespace RogueCommandExpansion.Authoring
 
             material.color = color;
             material.SetFloat("_Metallic", metallic);
-            material.SetFloat("_Smoothness", smoothness);
+            if (material.HasProperty("_Smoothness"))
+            {
+                material.SetFloat("_Smoothness", smoothness);
+            }
+            if (material.HasProperty("_Glossiness"))
+            {
+                material.SetFloat("_Glossiness", smoothness);
+            }
             material.enableInstancing = true;
+            if (vertexWearEnabled)
+            {
+                material.SetFloat("_GlossMapScale", 1.0f);
+                material.SetFloat("_AoStrength", 1.0f);
+                material.SetFloat("_WearStrength", FactoryNewWearStrength);
+                material.SetFloat("_SootStrength", 1.0f);
+                material.SetColor("_TeamColor", Color.white);
+            }
 
             if (emissionColor.HasValue && emissionColor.Value != Color.black)
             {

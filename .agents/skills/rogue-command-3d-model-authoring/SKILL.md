@@ -309,6 +309,15 @@ Each playable unit requires a matching `128 × 128` pixel card Sprite referenced
 - **Texture Atlas Baking & Single-Material Export (`--bake-atlas`, `--single-material`)**:
   - Non-overlapping UV unwrapping (`unwrap_atlas_uvs`, island margin 0.02). Headless Cycles 1-sample baking generates `<Name>_Albedo.png`, `<Name>_MetallicGloss.png` (linear RGB metallic + alpha smoothness), `<Name>_Normal.png`, and `<Name>_Emission.png`.
   - Joins batched geometry into `<Name>_Atlas.fbx` with single material slot.
+
+### Optional ArmorPaint Texture Pass
+
+- Blender 4.5.14 and the deterministic `--bake-atlas` workflow remain the production baseline. ArmorPaint is an optional local painting and material-editing step; it is not a required build dependency and does not replace the generator.
+- After the UV layout is final, import the FBX or Blender mesh into ArmorPaint and use it only to author texture images. Build the Unity prefab and AssetBundle from the original Blender export to preserve canonical sockets and mesh hierarchy; after Unity import, verify that the mesh still exposes its RGBA vertex-color attribute. Do not accept an ArmorPaint mesh export without separately checking those contracts.
+- ArmorPaint's neural nodes run locally after their model files have been downloaded; its manual recommends at least 6 GB of VRAM. `Image to PBR` derives base color, occlusion, roughness, normal, and height from a color image. This does not provide the project's complete texture set by itself: set Metallic and Emission deliberately and preserve all four expected maps. See the [ArmorPaint manual](https://armorpaint.org/manual).
+- Export the maps with a custom preset and preserve the existing names: `<Name>_Albedo.png`, `<Name>_MetallicGloss.png`, `<Name>_Normal.png`, and `<Name>_Emission.png`. ArmorPaint's Unity preset packs Metallic, Occlusion, and Smoothness; confirm its swizzle or use a custom preset so the project shader receives Metallic in R and Smoothness (`1 - roughness`) in A. The shader does not consume AO from this map. The Unity importer must keep MetallicGloss linear (`sRGBTexture = false`, alpha from input); Albedo and Emission remain sRGB and Normal uses `TextureImporterType.NormalMap`. `VehiclePrefabBuilder` applies these import settings during rebuild, so verify the effective importer settings and texture after Unity reimports it. See [Unity Material Pipeline](references/unity-material-pipeline.md).
+- Do not bake ArmorPaint's occlusion into the project's vertex-wear R channel or overwrite any RGBA vertex colors. Keep the existing cavity AO, edge wear, thermal soot, and team-mask authoring contracts on the source mesh.
+
 - **Skeletal Armature Rigging & Procedural Animations (`--rig`, `--animate`)**:
   - Armature hierarchy: `Bone_Root` $\rightarrow$ `Bone_Hull` $\rightarrow$ `Bone_TurretYaw` $\rightarrow$ `Bone_TurretPitch` $\rightarrow$ `Bone_BarrelRecoil`. Rigid weights ($1.0$) per plate.
   - Bakes 4 RTS action clips: `Action_Idle`, `Action_Drive`, `Action_FireRecoil`, and `Action_Death`.

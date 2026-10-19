@@ -672,7 +672,12 @@ namespace RogueCommandExpansion.Authoring
             }
         }
 
-        private static void SetupAnimatorIfAvailable(GameObject root, GameObject modelInstance, GameObject modelAsset, string unitName)
+        internal static void SetupAnimatorIfAvailable(
+            GameObject root,
+            GameObject modelInstance,
+            GameObject modelAsset,
+            string unitName,
+            bool preferWalkForMovement = false)
         {
             SkinnedMeshRenderer smr = modelInstance.GetComponentInChildren<SkinnedMeshRenderer>(true);
             bool hasBones = false;
@@ -743,20 +748,25 @@ namespace RogueCommandExpansion.Authoring
                         controller = AnimatorController.CreateAnimatorControllerAtPath(controllerPath);
                     }
 
-                    ConfigureAnimationController(controller, animationClips);
+                    ConfigureAnimationController(controller, animationClips, preferWalkForMovement);
 
                     animator.runtimeAnimatorController = controller;
                 }
             }
         }
 
-        private static void ConfigureAnimationController(AnimatorController controller, List<AnimationClip> clips)
+        private static void ConfigureAnimationController(
+            AnimatorController controller,
+            List<AnimationClip> clips,
+            bool preferWalkForMovement)
         {
             if (controller == null || clips == null || clips.Count == 0 || controller.layers.Length == 0) return;
 
             AnimatorStateMachine stateMachine = controller.layers[0].stateMachine;
             AnimationClip idleClip = FindAnimationClip(clips, "Idle") ?? clips[0];
-            AnimationClip driveClip = FindAnimationClip(clips, "Drive");
+            AnimationClip driveClip = preferWalkForMovement
+                ? FindAnimationClip(clips, "Walk") ?? FindAnimationClip(clips, "Drive")
+                : FindAnimationClip(clips, "Drive") ?? FindAnimationClip(clips, "Walk");
             AnimationClip fireClip = FindAnimationClip(clips, "FireRecoil") ?? FindAnimationClip(clips, "Fire");
             AnimationClip deathClip = FindAnimationClip(clips, "Death");
 

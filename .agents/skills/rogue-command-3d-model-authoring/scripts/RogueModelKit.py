@@ -3380,6 +3380,16 @@ def make_remote_weapon_station_assembly(
             rotation=yoke_rot,
         ))
 
+    # Upper bridge closes the yoke over the elevating weapon receiver.
+    objects.append(make_box(
+        f"{prefix}_RWS_YokeTop",
+        (0.34 * s, 0.06 * s, 0.06 * s),
+        cradle_center + up * (0.25 * s),
+        h_mat,
+        bevel=0.010 * s,
+        rotation=yoke_rot,
+    ))
+
     # 3. Armored ammunition magazine box on left flank
     ammo_pos = cradle_center - right * (0.24 * s) + up * (0.10 * s) - fwd * (0.02 * s)
     objects.append(make_box(
@@ -3443,6 +3453,7 @@ def make_remote_weapon_station_assembly(
     b_len = 0.72 * s
     b_rad = 0.028 * s
     b_center = elev_pivot + gun_dir * (0.16 * s + b_len * 0.5)
+    barrel_rotation = (pitch_rad - math.radians(90.0), 0.0, yaw_rad)
     objects.append(make_cylinder(
         f"{prefix}_RWS_Barrel",
         radius=b_rad,
@@ -3451,7 +3462,7 @@ def make_remote_weapon_station_assembly(
         material=g_mat,
         vertices=8,
         bevel=0.004 * s,
-        rotation=(math.radians(90.0) - pitch_rad, 0.0, yaw_rad),
+        rotation=barrel_rotation,
     ))
     # Slotted flash hider / muzzle brake
     muzzle_pos = elev_pivot + gun_dir * (0.16 * s + b_len + 0.04 * s)
@@ -3463,7 +3474,7 @@ def make_remote_weapon_station_assembly(
         material=g_mat,
         vertices=8,
         bevel=0.006 * s,
-        rotation=(math.radians(90.0) - pitch_rad, 0.0, yaw_rad),
+        rotation=barrel_rotation,
     ))
 
     return objects
@@ -3655,7 +3666,7 @@ def make_recoil_earth_spade_assembly(
     # 2. Deployed vs Folded swing arms and spade blade coordinates
     if deployed:
         arm_end_y = hinge_y - d
-        blade_z = 0.080  # Grounded firmly on terrain without penetrating Z < 0.0
+        blade_z = 0.010  # Teeth end at Z=0.02, just above the terrain plane.
     else:
         arm_end_y = hinge_y - d * 0.25
         blade_z = hinge_z + 0.55  # Folded up against rear hull
@@ -3751,7 +3762,10 @@ def make_perforated_barrel_shroud_assembly(
     """Generates a ventilated thermal barrel jacket with consolidated BMesh cooling perforation slats, reinforced clamping collars, and an aggressive multi-baffle muzzle brake."""
     objects: list[bpy.types.Object] = []
     gp = Vector(gun_pivot)
-    gd = Vector(gun_dir).normalized()
+    gd = Vector(gun_dir)
+    if gd.length_squared <= 1e-8:
+        raise ValueError("gun_dir must be a non-zero direction vector.")
+    gd.normalize()
     s_mat = shroud_mat or collar_mat
     c_mat = collar_mat or shroud_mat
     b_mat = brake_mat or s_mat
@@ -3921,6 +3935,7 @@ def create_unity_locator_sockets(
     weapon_audio_loc: Tuple[float, float, float] | Vector | None = None,
     nested_firepoints: bool = True,
     antenna_parts: Sequence[bpy.types.Object] | None = None,
+    primary_firepoint_locs: Sequence[Tuple[float, float, float] | Vector] | None = None,
 ) -> list[bpy.types.Object]:
     """Generates standard Unity empty sockets matching Rogue Command vehicle & weapon mechanics:
 
@@ -3956,6 +3971,22 @@ def create_unity_locator_sockets(
         empties.append(e)
         return e
 
+    def _add_child_empty(
+        child_name: str,
+        parent: bpy.types.Object,
+        world_loc: Vector,
+        rot: Tuple[float, float, float],
+    ) -> bpy.types.Object:
+        bpy.ops.object.empty_add(type="PLAIN_AXES", radius=0.08, location=world_loc)
+        child = bpy.context.object
+        child.name = child_name
+        child.rotation_euler = rot
+        world_matrix = child.matrix_world.copy()
+        child.parent = parent
+        child.matrix_world = world_matrix
+        empties.append(child)
+        return child
+
     # 1. Primary Muzzle
     if muzzle_loc is not None:
         m_loc = Vector(muzzle_loc)
@@ -3963,12 +3994,13 @@ def create_unity_locator_sockets(
         rot = m_dir.to_track_quat("Z", "Y").to_euler()
         muz_obj = _add_empty("Socket_MuzzlePrimary", m_loc, rot)
         if nested_firepoints:
-            bpy.ops.object.empty_add(type="PLAIN_AXES", radius=0.08, location=m_loc)
-            fp0 = bpy.context.object
-            fp0.name = "FirePoint_0"
-            fp0.rotation_euler = rot
-            fp0.parent = muz_obj
-            empties.append(fp0)
+            if primary_firepoint_locs:
+                if len(primary_firepoint_locs) > 2:
+                    raise ValueError("Socket_MuzzlePrimary supports at most FirePoint_0 and FirePoint_1.")
+                for index, firepoint_loc in enumerate(primary_firepoint_locs):
+                    _add_child_empty("FirePoint_" + str(index), muz_obj, Vector(firepoint_loc), rot)
+            else:
+                _add_child_empty("FirePoint_0", muz_obj, m_loc, rot)
 
     # 2. Secondary Muzzle
     if muzzle_secondary_loc is not None:
@@ -3977,12 +4009,7 @@ def create_unity_locator_sockets(
         rot2 = m2_dir.to_track_quat("Z", "Y").to_euler()
         muz2_obj = _add_empty("Socket_MuzzleSecondary", m2_loc, rot2)
         if nested_firepoints:
-            bpy.ops.object.empty_add(type="PLAIN_AXES", radius=0.08, location=m2_loc)
-            fp1 = bpy.context.object
-            fp1.name = "FirePoint_1"
-            fp1.rotation_euler = rot2
-            fp1.parent = muz2_obj
-            empties.append(fp1)
+            _add_child_empty("FirePoint_1", muz2_obj, m2_loc, rot2)
 
     # 3. Turret Yaw
     if turret_loc is not None:
@@ -4168,9 +4195,10 @@ def batch_and_join_by_material(
     smooth_angle_deg: float = 38.0,
     weighted_normals: bool = True,
     normal_weight: int = 50,
+    unity_batch_names: bool = False,
 ) -> list[bpy.types.Object]:
     """Combines modular kitbashed objects by material into unified meshes.
-    
+
     Reduces the number of Blender mesh objects/material groups exported. Final
     Unity draw-call counts depend on the selected prefab source, passes, and settings.
     Objects whose names match or contain strings in `preserve_names` remain separate.
@@ -4181,7 +4209,11 @@ def batch_and_join_by_material(
     """
     material_groups: Dict[bpy.types.Material | None, list[bpy.types.Object]] = {}
     preserved_objects: list[bpy.types.Object] = []
-    preserve_patterns = list(preserve_names) if preserve_names else []
+    # Rigged sample overlays are consumed as material batches under the
+    # Generic armature; every rendered object must use the canonical batch
+    # naming contract even when a source mech part was ordinarily preserved
+    # for a runtime transform pivot.
+    preserve_patterns = [] if unity_batch_names else (list(preserve_names) if preserve_names else [])
 
     for obj in objects:
         if obj.type != "MESH":
@@ -4211,7 +4243,13 @@ def batch_and_join_by_material(
             bpy.ops.object.join()
             joined_obj = bpy.context.view_layer.objects.active
             mat_name = mat.name.replace(" ", "_") if mat else "Unassigned"
-            joined_obj.name = f"{prefix}_{mat_name}"
+            if unity_batch_names:
+                prefix_marker = f"{prefix}_"
+                if mat_name.lower().startswith(prefix_marker.lower()):
+                    mat_name = mat_name[len(prefix_marker):]
+                joined_obj.name = f"{prefix}_Batch_{mat_name}"
+            else:
+                joined_obj.name = f"{prefix}_{mat_name}"
 
             # Clean up mesh normals
             bpy.ops.object.mode_set(mode="EDIT")
@@ -4219,6 +4257,13 @@ def batch_and_join_by_material(
             bpy.ops.mesh.normals_make_consistent(inside=False)
             bpy.ops.object.mode_set(mode="OBJECT")
             joined_objects.append(joined_obj)
+
+        if unity_batch_names and len(group) == 1:
+            mat_name = mat.name.replace(" ", "_") if mat else "Unassigned"
+            prefix_marker = f"{prefix}_"
+            if mat_name.lower().startswith(prefix_marker.lower()):
+                mat_name = mat_name[len(prefix_marker):]
+            joined_obj.name = f"{prefix}_Batch_{mat_name}"
 
         if smooth_by_angle and hasattr(bpy.ops.object, "shade_smooth_by_angle"):
             bpy.ops.object.select_all(action="DESELECT")
@@ -4255,7 +4300,7 @@ def bake_vertex_ambient_dirt(
     attribute_name: str = "Color",
 ) -> None:
     """Calculates procedural vertex ambient occlusion and crevice darkening (cavity shading).
-    
+
     Generates subtle contact shadows in wheel wells, armor recesses, and undersides.
     Stores the result in a standard vertex color attribute named `attribute_name` (default 'Color')
     for direct ingestion into Unity Mesh.colors32.
@@ -4295,6 +4340,7 @@ def bake_advanced_vertex_shading(
     team_mask_materials: Sequence[bpy.types.Material] | None = None,
     exhaust_locs: Sequence[Vector | Tuple[float, float, float]] | None = None,
     muzzle_loc: Vector | Tuple[float, float, float] | None = None,
+    structural_wear_mask: bool = False,
 ) -> None:
     """Calculates multi-channel procedural vertex shading targeting URP VehiclePBR_VertexWear:
 
@@ -4343,9 +4389,12 @@ def bake_advanced_vertex_shading(
         bm.verts.ensure_lookup_table()
         bm.edges.ensure_lookup_table()
         bm.faces.ensure_lookup_table()
+        bm.verts.index_update()
+        bm.faces.index_update()
 
         vert_wear = [0.0] * len(bm.verts)
         vert_concavity = [0.0] * len(bm.verts)
+        corner_wear: dict[tuple[int, int], float] = {}
 
         for edge in bm.edges:
             if len(edge.link_faces) == 2:
@@ -4358,8 +4407,16 @@ def bake_advanced_vertex_shading(
                     if dot < -1e-4 and angle >= min_convex_angle:
                         sharpness = min(1.0, (angle - min_convex_angle) / (math.pi * 0.5 - min_convex_angle))
                         edge_w = (0.55 + 0.45 * sharpness) * wear_mult
-                        for v in edge.verts:
-                            vert_wear[v.index] = max(vert_wear[v.index], edge_w)
+                        if structural_wear_mask and wear_level not in ("none", "pristine"):
+                            edge_w = 0.70 + 0.30 * sharpness
+                        if structural_wear_mask:
+                            for face in edge.link_faces:
+                                for v in edge.verts:
+                                    key = (face.index, v.index)
+                                    corner_wear[key] = max(corner_wear.get(key, 0.0), edge_w)
+                        else:
+                            for v in edge.verts:
+                                vert_wear[v.index] = max(vert_wear[v.index], edge_w)
                     elif dot > 1e-4 and angle >= math.radians(25.0):
                         crease = min(1.0, angle / (math.pi * 0.5))
                         for v in edge.verts:
@@ -4367,8 +4424,16 @@ def bake_advanced_vertex_shading(
             elif len(edge.link_faces) == 1:
                 # Open border edge: exposed to scraping
                 edge_w = 0.75 * wear_mult
-                for v in edge.verts:
-                    vert_wear[v.index] = max(vert_wear[v.index], edge_w)
+                if structural_wear_mask and wear_level not in ("none", "pristine"):
+                    edge_w = 0.70
+                if structural_wear_mask:
+                    for face in edge.link_faces:
+                        for v in edge.verts:
+                            key = (face.index, v.index)
+                            corner_wear[key] = max(corner_wear.get(key, 0.0), edge_w)
+                else:
+                    for v in edge.verts:
+                        vert_wear[v.index] = max(vert_wear[v.index], edge_w)
 
         vert_ao = [1.0] * len(bm.verts)
         vert_soot = [0.0] * len(bm.verts)
@@ -4377,7 +4442,7 @@ def bake_advanced_vertex_shading(
             p_world = world_mat @ v.co
             n_world = (normal_mat @ v.normal).normalized() if v.normal.length > 1e-4 else Vector((0.0, 0.0, 1.0))
             up_factor = 0.5 * (n_world.z + 1.0)
-            base_ao = 0.30 + 0.65 * up_factor
+            base_ao = 0.35 + 0.65 * up_factor
             if p_world.z < 0.35:
                 ground_shadow = max(0.0, p_world.z / 0.35)
                 base_ao = min(base_ao, 0.25 + 0.55 * ground_shadow)
@@ -4413,7 +4478,8 @@ def bake_advanced_vertex_shading(
 
             for loop_idx in poly.loop_indices:
                 v_idx = mesh.loops[loop_idx].vertex_index
-                color_attr.data[loop_idx].color = (vert_ao[v_idx], vert_wear[v_idx], vert_soot[v_idx], team_alpha)
+                edge_wear = corner_wear.get((poly.index, v_idx), 0.0) if structural_wear_mask else vert_wear[v_idx]
+                color_attr.data[loop_idx].color = (vert_ao[v_idx], edge_wear, vert_soot[v_idx], team_alpha)
 
         bm.free()
 
@@ -4552,7 +4618,7 @@ def profile_model_budget_and_drawcalls(
     target_budget: int = 4000,
     lod_dict: Dict[str, list[bpy.types.Object]] | None = None,
 ) -> Dict[str, Any]:
-    """Provides granular polygon and draw-call diagnostics categorized by mechanical subsystem."""
+    """Provides face-budget, true triangulation, and draw-call diagnostics by subsystem."""
     subsystems = {
         "Chassis & Hull": 0,
         "Turret & Cabin": 0,
@@ -4561,15 +4627,20 @@ def profile_model_budget_and_drawcalls(
         "Optics & Greebles": 0,
     }
     total_verts = 0
-    total_tris = 0
+    total_faces = 0
+    total_triangles = 0
     materials_used = set()
 
     for obj in objects:
         if obj.type != "MESH":
             continue
-        tris = len(obj.data.polygons)
+        mesh = obj.data
+        faces = len(mesh.polygons)
+        mesh.calc_loop_triangles()
+        triangles = len(mesh.loop_triangles)
         verts = len(obj.data.vertices)
-        total_tris += tris
+        total_faces += faces
+        total_triangles += triangles
         total_verts += verts
         for m in obj.data.materials:
             if m:
@@ -4580,47 +4651,55 @@ def profile_model_budget_and_drawcalls(
             name = name[len(prefix):]
 
         if any(k in name for k in ("Track", "Wheel", "Tire", "Leg", "Skimmer", "Thruster", "TiltRotor", "Outrigger")):
-            subsystems["Mobility & Wheels"] += tris
+            subsystems["Mobility & Wheels"] += faces
         elif any(k in name for k in ("Cannon", "Barrel", "Howitzer", "Gatling", "Missile", "Gun", "Emitter", "Muzzle", "Railgun", "Flak", "Plasma", "Mortar", "Flamer", "EMP", "Laser", "VLS")):
-            subsystems["Weapons"] += tris
+            subsystems["Weapons"] += faces
         elif any(k in name for k in ("Turret", "Troop", "RollCage", "Cab", "FlightDeck", "Bridge")):
-            subsystems["Turret & Cabin"] += tris
+            subsystems["Turret & Cabin"] += faces
         elif any(k in name for k in ("Sensor", "Visor", "Antenna", "Radar", "Smoke", "Sponson", "Applique", "Grille", "Bolt", "Excavator", "Drum", "Hose", "Greeble", "Decal", "Marking")):
-            subsystems["Optics & Greebles"] += tris
+            subsystems["Optics & Greebles"] += faces
         else:
-            subsystems["Chassis & Hull"] += tris
+            subsystems["Chassis & Hull"] += faces
 
-    pct_of_budget = round((total_tris / max(1, target_budget)) * 100, 1)
+    pct_of_budget = round((total_faces / max(1, target_budget)) * 100, 1)
 
     lod_summary = {}
+    lod_triangle_summary = {}
     if lod_dict:
         for lod_name, lod_objs in lod_dict.items():
-            l_tris = sum(len(o.data.polygons) for o in lod_objs if o.type == "MESH")
-            lod_summary[lod_name] = l_tris
+            lod_meshes = [o.data for o in lod_objs if o.type == "MESH"]
+            lod_summary[lod_name] = sum(len(mesh.polygons) for mesh in lod_meshes)
+            lod_triangle_summary[lod_name] = 0
+            for mesh in lod_meshes:
+                mesh.calc_loop_triangles()
+                lod_triangle_summary[lod_name] += len(mesh.loop_triangles)
 
     report = {
         "prefix": prefix,
-        "total_triangles": total_tris,
+        "total_faces": total_faces,
+        "total_triangles": total_triangles,
         "total_vertices": total_verts,
         "materials_count": len(materials_used),
         "predicted_draw_calls": len(materials_used),
         "target_budget": target_budget,
         "budget_percentage": pct_of_budget,
         "subsystems": subsystems,
+        "subsystem_faces": subsystems.copy(),
         "lod_levels": lod_summary,
+        "lod_triangle_levels": lod_triangle_summary,
     }
 
     print(f"\n================ [ {prefix} Subsystem Budget & Profiling ] ================")
-    print(f"Total Triangles: {total_tris} | Vertices: {total_verts} | Materials: {len(materials_used)}")
-    print(f"Budget Health: {total_tris}/{target_budget} tris ({pct_of_budget}%)")
+    print(f"Total Faces: {total_faces} | True Triangles: {total_triangles} | Vertices: {total_verts} | Materials: {len(materials_used)}")
+    print(f"Face Budget Health: {total_faces}/{target_budget} faces ({pct_of_budget}%)")
     print("Subsystem Breakdown:")
     for sub, count in subsystems.items():
-        sub_pct = round((count / max(1, total_tris)) * 100, 1)
-        print(f"  - {sub:20s}: {count:5d} tris ({sub_pct:4.1f}%)")
+        sub_pct = round((count / max(1, total_faces)) * 100, 1)
+        print(f"  - {sub:20s}: {count:5d} faces ({sub_pct:4.1f}%)")
     if lod_summary:
         print("LOD Chain Hierarchy:")
-        for lod_name, l_tris in lod_summary.items():
-            print(f"  - {lod_name}: {l_tris} tris")
+        for lod_name, lod_faces in lod_summary.items():
+            print(f"  - {lod_name}: {lod_faces} faces / {lod_triangle_summary[lod_name]} triangles")
     print("========================================================================\n")
     return report
 
@@ -9309,7 +9388,7 @@ def get_faction_palette(
 
 class RogueVehicleBuilder:
     """Fluent procedural builder for Rogue Command vehicles and units.
-    
+
     Guarantees:
     - 5-tone faction PBR material standard
     - 1-segment chamfers on all hard edges for RTS specular highlights
@@ -9366,6 +9445,7 @@ class RogueVehicleBuilder:
         self.gun_dir: Vector | None = None
         self.secondary_gun_pivot: Vector | None = None
         self.secondary_gun_dir: Vector | None = None
+        self.primary_firepoint_locs: list[Vector] = []
         self.turret_pitch_loc: Vector | None = None
         self.recoil_loc: Vector | None = None
         self.recoil_dir: Vector | None = None
@@ -9415,6 +9495,46 @@ class RogueVehicleBuilder:
 
     def set_archetype(self, archetype: str) -> "RogueVehicleBuilder":
         self.archetype = archetype
+        return self
+
+    def apply_uniform_scale(self, scale: float) -> "RogueVehicleBuilder":
+        """Uniformly scale authored geometry and positional metadata around the ground origin."""
+        if not math.isfinite(scale) or scale <= 0.0:
+            raise ValueError("scale must be finite and greater than zero")
+        if abs(scale - 1.0) <= 1e-8:
+            return self
+
+        for obj in self.objects:
+            if obj.type == "MESH":
+                for vertex in obj.data.vertices:
+                    vertex.co *= scale
+                obj.data.update()
+            else:
+                obj.scale *= scale
+            obj.location *= scale
+
+        for field_name in (
+            "turret_center", "gun_pivot", "secondary_gun_pivot", "turret_pitch_loc",
+            "recoil_loc", "sensor_loc", "exhaust_l", "exhaust_r", "damage_smoke_loc",
+            "damage_fire_loc", "antenna_loc", "thruster_vector_l", "thruster_vector_r",
+            "center_of_mass_loc", "foot_loc_l", "foot_loc_r", "hip_loc_l", "hip_loc_r",
+            "knee_loc_l", "knee_loc_r", "engine_audio_loc", "weapon_audio_loc",
+        ):
+            value = getattr(self, field_name, None)
+            if value is not None:
+                setattr(self, field_name, Vector(value) * scale)
+
+        self.primary_firepoint_locs = [Vector(value) * scale for value in self.primary_firepoint_locs]
+        for field_name in ("quad_feet", "quad_hips", "quad_knees"):
+            value_map = getattr(self, field_name, None)
+            if value_map:
+                setattr(self, field_name, {key: Vector(value) * scale for key, value in value_map.items()})
+
+        for field_name in ("hull_deck_z", "hull_length", "hull_width", "hip_height", "ground_clearance"):
+            setattr(self, field_name, getattr(self, field_name) * scale)
+
+        if self._last_mantlet_boot_pivots:
+            self._last_mantlet_boot_pivots = [point * scale for point in self._last_mantlet_boot_pivots]
         return self
 
     def set_wear_level(self, wear_level: str) -> "RogueVehicleBuilder":
@@ -10318,6 +10438,10 @@ class RogueVehicleBuilder:
         self.gun_pivot = gun_pivot + gun_dir * (length + 0.38)
         self.gun_dir = gun_dir
         u_vec, _, _ = get_orthonormal_basis(gun_dir)
+        self.primary_firepoint_locs = [
+            gun_pivot + u_vec * (side * spacing * 0.5) + gun_dir * (length + 0.38 + caliber * 1.2)
+            for side in (-1, 1)
+        ]
         self._last_mantlet_boot_pivots = [
             gun_pivot + u_vec * (side * spacing * 0.5)
             for side in (-1, 1)
@@ -10850,7 +10974,7 @@ class RogueVehicleBuilder:
         hl = (self.hull_length * 0.34) if hasattr(self, "hull_length") else 1.15
         hz = self.hull_deck_z if hasattr(self, "hull_deck_z") else 0.85
 
-        if self.archetype in ("walker", "quad_walker", "reverse_walker"):
+        if self.archetype in ("walker", "quad_walker", "reverse_walker", "heavy_crane_mech"):
             # Connect pelvis underside to upper thigh hydraulic manifolds on left & right
             pelvis_z = hz - 0.10
             thigh_z = max(0.45, pelvis_z - 0.38)
@@ -11293,6 +11417,7 @@ class RogueVehicleBuilder:
             weapon_audio_loc=self.weapon_audio_loc,
             nested_firepoints=True,
             antenna_parts=self.objects,
+            primary_firepoint_locs=self.primary_firepoint_locs,
         )
         return self
 
@@ -11338,6 +11463,8 @@ class RogueVehicleBuilder:
         icon_resolutions: Sequence[int] = (64, 128),
         icon_elevation: float = 45.0,
         wreckage_severity: str | None = None,
+        structural_wear_mask: bool = False,
+        unity_batch_names: bool = False,
     ) -> Dict[str, Any]:
         """Runs diagnostics, smart UV unwrapping, preview rendering, batching, and FBX export."""
         blend_path.parent.mkdir(parents=True, exist_ok=True)
@@ -11352,6 +11479,9 @@ class RogueVehicleBuilder:
             self.add_shield_bubble()
 
         # 1. Quality diagnostics on raw source objects
+        # Mesh vertex edits performed by model presets can leave Blender's cached
+        # object bounds stale until the dependency graph evaluates.
+        bpy.context.view_layer.update()
         diagnostics = validate_model_mesh_quality(self.objects, allow_hover=self.is_hover)
 
         # 2. Smart UV Projection for lightmapping
@@ -11395,6 +11525,7 @@ class RogueVehicleBuilder:
                 soot_intensity=soot_intensity,
                 exhaust_locs=exhausts if exhausts else None,
                 muzzle_loc=self.gun_pivot,
+                structural_wear_mask=structural_wear_mask,
             )
         elif bake_vertex_dirt:
             bake_vertex_ambient_dirt(self.objects)
@@ -11451,6 +11582,11 @@ class RogueVehicleBuilder:
         # 8b. Kinematic Armature Rigging & Rigid Vertex Weights (assigned before material batching)
         if include_rig:
             self.add_armature_rig(with_animations=include_animations, with_ik=include_ik, target_objects=model_export_source_objects)
+            # Keep the editable authoring source in the same rigged state as the FBX.
+            # This save happens before material batching, so each mechanical plate
+            # remains a separate rigidly weighted source mesh.
+            bpy.context.view_layer.update()
+            bpy.ops.wm.save_as_mainfile(filepath=str(blend_path))
 
         # 9. Material batching for FBX with smart angle-weighted smoothing & face-area weighted normals
         batched_objects = batch_and_join_by_material(
@@ -11460,6 +11596,7 @@ class RogueVehicleBuilder:
             smooth_by_angle=smooth_by_angle,
             smooth_angle_deg=smooth_angle_deg,
             weighted_normals=weighted_normals,
+            unity_batch_names=unity_batch_names,
         )
         diagnostics["weighted_normals"] = weighted_normals
 

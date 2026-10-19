@@ -49,6 +49,13 @@
       "items": {
         "$ref": "#/$defs/aiProfile"
       }
+    },
+    "relics": {
+      "type": "array",
+      "maxItems": 128,
+      "items": {
+        "$ref": "#/$defs/relic"
+      }
     }
   },
   "allOf": [
@@ -59,9 +66,10 @@
     },
     {
       "anyOf": [
-        { "properties": { "units": { "minItems": 1 } } },
-        { "properties": { "stages": { "minItems": 1 } } },
-        { "properties": { "aiProfiles": { "minItems": 1 } } }
+        { "required": ["units"], "properties": { "units": { "minItems": 1 } } },
+        { "required": ["stages"], "properties": { "stages": { "minItems": 1 } } },
+        { "required": ["aiProfiles"], "properties": { "aiProfiles": { "minItems": 1 } } },
+        { "required": ["relics"], "properties": { "relics": { "minItems": 1 } } }
       ]
     }
   ],
@@ -162,6 +170,69 @@
         "name": { "type": "string", "minLength": 1, "pattern": "\\S" },
         "description": { "type": "string", "pattern": "\\S" },
         "skillDescription": { "type": "string", "minLength": 1, "pattern": "\\S" }
+      }
+    },
+    "relic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "assetBundleId", "imageAssetName", "rarity", "tech", "offeredSystemTags", "neededSystemTags", "neededExperienceLevel", "isAllowedForDemo", "isForSpecialists", "localizations", "cardChanges"],
+      "properties": {
+        "id": { "$ref": "#/$defs/namespacedId" },
+        "assetBundleId": { "$ref": "#/$defs/namespacedId" },
+        "imageAssetName": { "type": "string", "minLength": 1, "pattern": "\\S" },
+        "rarity": { "enum": ["Common", "Rare", "UltraRare"] },
+        "tech": { "enum": ["None", "Colorless", "Mech", "Tank", "Ancient", "Specialist", "All"] },
+        "offeredSystemTags": { "enum": ["None", "Melee", "Shield", "Spawn", "Armor", "Mech", "Robo", "Heal", "Turret", "Fire", "Bounty", "Panic", "Slow", "Stun", "Teleport", "AoE", "ManaUse", "Rush", "Turbo", "Strength", "Robust", "SkillRangeUse", "Bomb", "Tank", "Vehicle", "EffectDuration", "SpawnDuration", "CriticalHits", "Stealth", "Zombo", "Sniper", "Regen", "EconomySupport", "All"] },
+        "neededSystemTags": { "enum": ["None", "Melee", "Shield", "Spawn", "Armor", "Mech", "Robo", "Heal", "Turret", "Fire", "Bounty", "Panic", "Slow", "Stun", "Teleport", "AoE", "ManaUse", "Rush", "Turbo", "Strength", "Robust", "SkillRangeUse", "Bomb", "Tank", "Vehicle", "EffectDuration", "SpawnDuration", "CriticalHits", "Stealth", "Zombo", "Sniper", "Regen", "EconomySupport", "All"] },
+        "neededExperienceLevel": { "type": "integer", "minimum": 0, "maximum": 10000 },
+        "isAllowedForDemo": { "type": "boolean" },
+        "isForSpecialists": { "type": "boolean" },
+        "localizations": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 10,
+          "items": { "$ref": "#/$defs/relicLocalization" },
+          "contains": {
+            "properties": { "language": { "const": "en-US" }, "name": { "type": "string", "minLength": 1, "pattern": "\\S" } },
+            "required": ["language", "name"]
+          }
+        },
+        "cardChanges": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 16,
+          "items": { "$ref": "#/$defs/cardChange" }
+        }
+      }
+    },
+    "relicLocalization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["language", "name", "description"],
+      "properties": {
+        "language": { "enum": ["en-US", "de-DE", "ja-JP", "ko-KR", "zh-CN", "zh-TW", "fr-FR", "es-XL", "pt-BR", "ru-RU"] },
+        "name": { "type": "string", "minLength": 1, "pattern": "\\S" },
+        "description": { "type": "string", "minLength": 1, "pattern": "\\S" }
+      }
+    },
+    "cardChange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["valueToChange", "operation", "value", "side", "multiplyValueWithCurrentHeatLevel", "onlyForTheseEntityIds"],
+      "properties": {
+        "valueToChange": { "const": "Health" },
+        "operation": { "enum": ["Add", "Multiply"] },
+        "value": { "type": "number", "exclusiveMinimum": 0, "maximum": 10000 },
+        "side": { "enum": ["False", "True", "Irrelevant"] },
+        "multiplyValueWithCurrentHeatLevel": { "const": false },
+        "multiplyValueWithMetaProgressionMultiplier": { "type": "string", "minLength": 1, "pattern": "\\S" },
+        "onlyForTheseEntityIds": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 128,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/namespacedId" }
+        }
       }
     },
     "productionBuilding": {

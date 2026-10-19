@@ -396,6 +396,16 @@ namespace RogueCommandExpansionLoader.Runtime
             return TryResolveUnitLocalization(__0, true, ref __result);
         }
 
+        public static bool RelicNamePrefix(string __0, ref string __result)
+        {
+            return TryResolveRelicLocalization(__0, false, ref __result);
+        }
+
+        public static bool RelicDescriptionPrefix(string __0, ref string __result)
+        {
+            return TryResolveRelicLocalization(__0, true, ref __result);
+        }
+
         public static bool SkillDescriptionPrefix(string __0, ref string __result)
         {
             IUnitSkillLocalizationRuntimeProvider provider;
@@ -637,6 +647,44 @@ namespace RogueCommandExpansionLoader.Runtime
                 if (logger != null)
                 {
                     logger("Could not resolve localized text for unit '" + unitId + "': " +
+                        exception.GetType().Name + ": " + exception.Message);
+                }
+
+                return true;
+            }
+        }
+
+        private static bool TryResolveRelicLocalization(string relicId, bool description, ref string result)
+        {
+            IRelicLocalizationRuntimeProvider provider;
+            Action<string> logger;
+            lock (Gate)
+            {
+                provider = _provider as IRelicLocalizationRuntimeProvider;
+                logger = _log;
+            }
+
+            if (provider == null)
+            {
+                return true;
+            }
+
+            try
+            {
+                string value;
+                if (!provider.TryGetRelicLocalization(relicId, description, out value))
+                {
+                    return true;
+                }
+
+                result = value ?? String.Empty;
+                return false;
+            }
+            catch (Exception exception)
+            {
+                if (logger != null)
+                {
+                    logger("Could not resolve localized text for relic '" + relicId + "': " +
                         exception.GetType().Name + ": " + exception.Message);
                 }
 
@@ -929,6 +977,16 @@ namespace RogueCommandExpansionLoader.Runtime
         public static bool SkillDescriptionPrefix(string __0, ref string __result)
         {
             return RuntimeHooks.SkillDescriptionPrefix(__0, ref __result);
+        }
+
+        public static bool RelicNamePrefix(string __0, ref string __result)
+        {
+            return RuntimeHooks.RelicNamePrefix(__0, ref __result);
+        }
+
+        public static bool RelicDescriptionPrefix(string __0, ref string __result)
+        {
+            return RuntimeHooks.RelicDescriptionPrefix(__0, ref __result);
         }
 
         public static bool LandscapeLocalizationPrefix(ref string __0, ref string __result)

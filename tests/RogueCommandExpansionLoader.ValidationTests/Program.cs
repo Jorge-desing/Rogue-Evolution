@@ -1012,6 +1012,31 @@ var tests = new (string Name, Action Run)[]
                 .localizations[0].skillDescription == "Changed skill text")
             throw new InvalidOperationException("Production building data shared mutable arrays with the source pack.");
     }),
+    ("relic clone and localization preserve independent player card data", () =>
+    {
+        ContentRelicDefinition sourceRelic = nativeSample.relics.Single(
+            relic => relic.id == "sample-native:foundry-counterweight");
+        if (!RelicLocalizationResolver.TryResolve(sourceRelic, "es-XL", false, out string spanishName) ||
+            spanishName != "Contrapeso de fundición" ||
+            !RelicLocalizationResolver.TryResolve(sourceRelic, "fr-FR", true, out string fallbackDescription) ||
+            fallbackDescription != "Atlas Crane Mechs gain 10% Health for the rest of the run.")
+        {
+            throw new InvalidOperationException("The relic localization or en-US fallback did not resolve.");
+        }
+
+        ContentPackDefinition copy = ContentPackCopy.DeepClone(nativeSample);
+        ContentRelicDefinition clonedRelic = copy.relics.Single(
+            relic => relic.id == "sample-native:foundry-counterweight");
+        clonedRelic.localizations[0].name = "Changed";
+        clonedRelic.cardChanges[0].onlyForTheseEntityIds[0] = "test:other-unit";
+        clonedRelic.cardChanges[0].value = 9.0f;
+        if (sourceRelic.localizations[0].name == "Changed" ||
+            sourceRelic.cardChanges[0].onlyForTheseEntityIds[0] != "sample-native:atlas-crane-mech" ||
+            Math.Abs(sourceRelic.cardChanges[0].value - 1.1f) > 0.0001f)
+        {
+            throw new InvalidOperationException("Relic localization, targets, or card changes shared mutable data.");
+        }
+    }),
     ("sample manifest passes package-local validation", () =>
     {
         WithPackage(sample, (pack, root) =>
@@ -1021,6 +1046,49 @@ var tests = new (string Name, Action Run)[]
     {
         WithPackage(nativeSample, (pack, root) =>
             ExpectValid(pack, root, new EmptySnapshot(), new KnownModuleValidator()));
+    }),
+    ("Atlas Crane declares its own factory, two firepoints, and random-pool offers", () =>
+    {
+        ContentUnitDefinition atlas = nativeSample.units.Single(
+            unit => unit.id == "sample-native:atlas-crane-mech");
+        if (atlas.productionBuilding == null || atlas.productionBuilding.id != "sample-native:atlas-crane-mech-factory" ||
+            atlas.balanceOverrides.Single(item => item.name == "firePointCount").value != "2" ||
+            nativeSample.units.Any(unit => unit.id != atlas.id &&
+                unit.productionBuilding.id == atlas.productionBuilding.id) ||
+            !nativeSample.stages.Any(stage => stage.unitIds.Contains(atlas.id)))
+        {
+            throw new InvalidOperationException(
+                "Atlas does not have an exclusive factory, two firepoints, or a stage reward-pool offer.");
+        }
+    }),
+    ("Foundry Counterweight targets player Atlas Health without Heat or meta scaling", () =>
+    {
+        ContentRelicDefinition relic = nativeSample.relics.Single(
+            candidate => candidate.id == "sample-native:foundry-counterweight");
+        ContentCardChangeDefinition change = relic.cardChanges.Single();
+        if (relic.rarity != "Rare" || change.valueToChange != "Health" || change.operation != "Multiply" ||
+            Math.Abs(change.value - 1.10f) > 0.0001f || change.side != "False" ||
+            change.multiplyValueWithCurrentHeatLevel ||
+            !String.IsNullOrEmpty(change.multiplyValueWithMetaProgressionMultiplier) ||
+            change.onlyForTheseEntityIds == null || change.onlyForTheseEntityIds.Length != 1 ||
+            change.onlyForTheseEntityIds[0] != "sample-native:atlas-crane-mech")
+        {
+            throw new InvalidOperationException("The foundry relic no longer matches its player-only Atlas Health contract.");
+        }
+    }),
+    ("relic validation rejects unsupported stat attributes", () =>
+    {
+        ContentPackDefinition invalid = Clone(nativeSample);
+        invalid.relics[0].cardChanges[0].valueToChange = "Damage";
+        WithPackage(invalid, (pack, root) => ExpectDiagnostic(pack, root, new EmptySnapshot(),
+            new KnownModuleValidator(), "relic.change-value-unsupported"));
+    }),
+    ("relic validation rejects unbudgeted Heat scaling", () =>
+    {
+        ContentPackDefinition invalid = Clone(nativeSample);
+        invalid.relics[0].cardChanges[0].multiplyValueWithCurrentHeatLevel = true;
+        WithPackage(invalid, (pack, root) => ExpectDiagnostic(pack, root, new EmptySnapshot(),
+            new KnownModuleValidator(), "relic.heat-scaling-unsupported"));
     }),
     ("training stage declares a deterministic, localized native landscape variant", () =>
     {
@@ -3291,7 +3359,7 @@ var tests = new (string Name, Action Run)[]
             EntityBalancingStore.Reset();
         }
     }),
-    ("five new production pairs append without replacing the native factory mapping", () =>
+    ("all native sample production pairs append without replacing the native factory mapping", () =>
     {
         EntityBalancingStore.Reset();
         try
@@ -3316,11 +3384,22 @@ var tests = new (string Name, Action Run)[]
                 provider.EntityRows.Add(RuntimeMutatorTestData.Row(unit.productionBuilding.id, unit.id));
             }
             var mutator = new RuntimeContentMutator(typeof(EntityBalancingStore).Assembly, provider, null);
-            if (!mutator.RegisterEntityRows() || !mutator.RegisterEntityRows() ||
-                EntityBalancingStore.EntityBalancingParametersList.Count != 12 ||
-                EntityBalancingStore.FactoryEntityIdOf.Count != 6 ||
+            bool firstRegistration = mutator.RegisterEntityRows();
+            bool secondRegistration = mutator.RegisterEntityRows();
+            int expectedRowCount = originals.Length + 2 * nativeSample.units.Length;
+            int expectedFactoryCount = 1 + nativeSample.units.Length;
+            if (!firstRegistration || !secondRegistration ||
+                EntityBalancingStore.EntityBalancingParametersList.Count != expectedRowCount ||
+                EntityBalancingStore.FactoryEntityIdOf.Count != expectedFactoryCount ||
                 EntityBalancingStore.FactoryEntityIdOf["NativeUnit"] != "NativeFactory")
-                throw new InvalidOperationException("New production pairs replaced native state or registered twice.");
+            {
+                throw new InvalidOperationException(
+                    "Production registration state was inconsistent. first=" + firstRegistration +
+                    ", second=" + secondRegistration +
+                    ", rows=" + EntityBalancingStore.EntityBalancingParametersList.Count + "/" + expectedRowCount +
+                    ", factories=" + EntityBalancingStore.FactoryEntityIdOf.Count + "/" + expectedFactoryCount +
+                    ", nativeFactory=" + EntityBalancingStore.FactoryEntityIdOf["NativeUnit"] + ".");
+            }
             foreach (ContentUnitDefinition unit in nativeSample.units)
                 if (EntityBalancingStore.FactoryEntityIdOf[unit.id] != unit.productionBuilding.id)
                     throw new InvalidOperationException("A new production building points at the wrong product.");

@@ -19,6 +19,8 @@
              Link="Content/ProductionBuildingEligibility.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Content/ContentPackValidation.cs"
              Link="Content/ContentPackValidation.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Content/RelicLocalizationResolver.cs"
+             Link="Content/RelicLocalizationResolver.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Content/StageGenerationCompatibility.cs"
              Link="Content/StageGenerationCompatibility.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Compatibility/GameCompatibility.cs"

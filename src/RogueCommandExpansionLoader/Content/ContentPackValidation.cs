@@ -133,6 +133,7 @@ namespace RogueCommandExpansionLoader.Content
         public const int MaxAiUnitEntriesPerProfile = 32;
         public const int MaxAiProductionBuildingEntriesPerProfile = 32;
         public const int MaxAiUnitDependenciesPerProfile = 64;
+        public const int MaxRelicsPerPack = 128;
         public const int MaxAiUnitCountAtStart = 8;
         public const int MaxAiUnitMaxLiving = 32;
         public const int MaxAiBaseIndex = 31;
@@ -145,6 +146,17 @@ namespace RogueCommandExpansionLoader.Content
         private static readonly StringComparer PathComparer = StringComparer.OrdinalIgnoreCase;
         private static readonly HashSet<string> SupportedUnitLocalizationLanguages = new HashSet<string>(
             new[] { "en-US", "de-DE", "ja-JP", "ko-KR", "zh-CN", "zh-TW", "fr-FR", "es-XL", "pt-BR", "ru-RU" },
+            StringComparer.Ordinal);
+        private static readonly HashSet<string> SupportedRelicRarities = new HashSet<string>(
+            new[] { "Common", "Rare", "UltraRare" }, StringComparer.Ordinal);
+        private static readonly HashSet<string> SupportedRelicTechs = new HashSet<string>(
+            new[] { "None", "Colorless", "Mech", "Tank", "Ancient", "Specialist", "All" },
+            StringComparer.Ordinal);
+        private static readonly HashSet<string> SupportedRelicSystemTags = new HashSet<string>(
+            new[] { "None", "Melee", "Shield", "Spawn", "Armor", "Mech", "Robo", "Heal", "Turret", "Fire",
+                "Bounty", "Panic", "Slow", "Stun", "Teleport", "AoE", "ManaUse", "Rush", "Turbo", "Strength",
+                "Robust", "SkillRangeUse", "Bomb", "Tank", "Vehicle", "EffectDuration", "SpawnDuration",
+                "CriticalHits", "Stealth", "Zombo", "Sniper", "Regen", "EconomySupport", "All" },
             StringComparer.Ordinal);
 
         public static ContentPackValidationResult Validate(
@@ -174,8 +186,9 @@ namespace RogueCommandExpansionLoader.Content
             var units = RequireArray(pack.units, "units", diagnostics);
             var stages = RequireArray(pack.stages, "stages", diagnostics);
             var aiProfiles = RequireArray(pack.aiProfiles, "aiProfiles", diagnostics);
+            ContentRelicDefinition[] relics = pack.relics ?? new ContentRelicDefinition[0];
 
-            if (units.Length == 0 && stages.Length == 0 && aiProfiles.Length == 0)
+            if (units.Length == 0 && stages.Length == 0 && aiProfiles.Length == 0 && relics.Length == 0)
             {
                 Add(diagnostics, "content.empty", "content.json",
                     "A content pack must declare at least one unit, stage, or AI profile.");
@@ -592,6 +605,18 @@ namespace RogueCommandExpansionLoader.Content
                 {
                     ValidateAiModule(modules[moduleIndex], itemPath + ".modules[" + moduleIndex + "]", aiModuleValidator, diagnostics);
                 }
+            }
+
+            if (relics.Length > MaxRelicsPerPack)
+            {
+                Add(diagnostics, "relic.count-exceeds-limit", "relics",
+                    "A content pack can declare at most " + MaxRelicsPerPack + " relics.");
+            }
+
+            for (int i = 0; i < relics.Length; i++)
+            {
+                ValidateRelic(relics[i], "relics[" + i + "]", allIds, bundleIds, unitIds,
+                    registrySnapshot, diagnostics);
             }
 
             for (int i = 0; i < stages.Length; i++)
@@ -1162,6 +1187,211 @@ namespace RogueCommandExpansionLoader.Content
         {
             ValidateLocalizations(unit.localizations, path, hasNativeTemplate,
                 "unit", "Unit", diagnostics);
+        }
+
+        private static void ValidateRelic(
+            ContentRelicDefinition relic,
+            string path,
+            HashSet<string> allIds,
+            HashSet<string> bundleIds,
+            HashSet<string> unitIds,
+            IContentRegistrySnapshot registrySnapshot,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (relic == null)
+            {
+                Add(diagnostics, "entry.null", path, "Relic entries cannot be null.");
+                return;
+            }
+
+            RegisterId(relic.id, path + ".id", "relic", allIds, registrySnapshot, diagnostics);
+            ValidateBundleReference(relic.assetBundleId, path + ".assetBundleId", bundleIds, diagnostics);
+            ValidateAssetName(relic.imageAssetName, path + ".imageAssetName", diagnostics);
+
+            if (String.IsNullOrWhiteSpace(relic.rarity) || !SupportedRelicRarities.Contains(relic.rarity))
+            {
+                Add(diagnostics, "relic.rarity-invalid", path + ".rarity",
+                    "Relic rarity must be one of the game's supported rarity IDs.");
+            }
+
+            if (String.IsNullOrWhiteSpace(relic.tech) || !SupportedRelicTechs.Contains(relic.tech))
+            {
+                Add(diagnostics, "relic.tech-invalid", path + ".tech",
+                    "Relic tech must be one of the game's supported tech IDs.");
+            }
+
+            if (String.IsNullOrWhiteSpace(relic.offeredSystemTags) ||
+                !SupportedRelicSystemTags.Contains(relic.offeredSystemTags))
+            {
+                Add(diagnostics, "relic.offered-system-tags-invalid", path + ".offeredSystemTags",
+                    "Relic offeredSystemTags must be one supported system tag.");
+            }
+
+            if (String.IsNullOrWhiteSpace(relic.neededSystemTags) ||
+                !SupportedRelicSystemTags.Contains(relic.neededSystemTags))
+            {
+                Add(diagnostics, "relic.needed-system-tags-invalid", path + ".neededSystemTags",
+                    "Relic neededSystemTags must be one supported system tag.");
+            }
+
+            if (relic.neededExperienceLevel < 0 || relic.neededExperienceLevel > MaxNeededExperienceLevel)
+            {
+                Add(diagnostics, "relic.experience-level-invalid", path + ".neededExperienceLevel",
+                    "Relic experience level must be between 0 and " + MaxNeededExperienceLevel + ".");
+            }
+
+            ValidateRelicLocalizations(relic.localizations, path + ".localizations", diagnostics);
+
+            ContentCardChangeDefinition[] changes = RequireArray(relic.cardChanges,
+                path + ".cardChanges", diagnostics);
+            if (changes.Length == 0)
+            {
+                Add(diagnostics, "relic.card-change-required", path + ".cardChanges",
+                    "A relic must declare at least one native card change.");
+            }
+
+            if (changes.Length > 16)
+            {
+                Add(diagnostics, "relic.card-change-limit", path + ".cardChanges",
+                    "A relic can declare at most 16 card changes.");
+            }
+
+            for (int i = 0; i < changes.Length; i++)
+            {
+                ContentCardChangeDefinition change = changes[i];
+                string changePath = path + ".cardChanges[" + i + "]";
+                if (change == null)
+                {
+                    Add(diagnostics, "entry.null", changePath, "Card change entries cannot be null.");
+                    continue;
+                }
+
+                if (!String.Equals(change.valueToChange, "Health", StringComparison.Ordinal))
+                {
+                    Add(diagnostics, "relic.change-value-unsupported", changePath + ".valueToChange",
+                        "Data-only relics currently support the Health changeable value (mapped to native MaxHealth).");
+                }
+
+                if (!String.Equals(change.operation, "Add", StringComparison.Ordinal) &&
+                    !String.Equals(change.operation, "Multiply", StringComparison.Ordinal))
+                {
+                    Add(diagnostics, "relic.change-operation-invalid", changePath + ".operation",
+                        "Card change operation must be Add or Multiply.");
+                }
+
+                if (Single.IsNaN(change.value) || Single.IsInfinity(change.value) ||
+                    change.value <= 0f || change.value > 10000f)
+                {
+                    Add(diagnostics, "relic.change-value-invalid", changePath + ".value",
+                        "Card change value must be greater than 0 and at most 10000.");
+                }
+
+                if (change.multiplyValueWithCurrentHeatLevel)
+                {
+                    Add(diagnostics, "relic.heat-scaling-unsupported",
+                        changePath + ".multiplyValueWithCurrentHeatLevel",
+                        "Pack-authored relic changes must keep Heat scaling disabled until the per-level balance budget is validated.");
+                }
+
+                if (!String.Equals(change.side, "False", StringComparison.Ordinal) &&
+                    !String.Equals(change.side, "True", StringComparison.Ordinal) &&
+                    !String.Equals(change.side, "Irrelevant", StringComparison.Ordinal))
+                {
+                    Add(diagnostics, "relic.change-side-invalid", changePath + ".side",
+                        "Card change side must match the game's False, True, or Irrelevant value.");
+                }
+
+                if (change.multiplyValueWithMetaProgressionMultiplier != null &&
+                    String.IsNullOrWhiteSpace(change.multiplyValueWithMetaProgressionMultiplier))
+                {
+                    Add(diagnostics, "relic.meta-progression-invalid",
+                        changePath + ".multiplyValueWithMetaProgressionMultiplier",
+                        "A meta progression multiplier key must be non-empty when provided.");
+                }
+
+                string[] targetIds = RequireArray(change.onlyForTheseEntityIds,
+                    changePath + ".onlyForTheseEntityIds", diagnostics);
+                if (targetIds.Length == 0)
+                {
+                    Add(diagnostics, "relic.change-target-required", changePath + ".onlyForTheseEntityIds",
+                        "Every card change must target at least one namespaced unit ID.");
+                }
+
+                if (targetIds.Length > 128)
+                {
+                    Add(diagnostics, "relic.change-target-limit", changePath + ".onlyForTheseEntityIds",
+                        "A card change can target at most 128 unit IDs.");
+                }
+
+                ValidateReferences(targetIds, changePath + ".onlyForTheseEntityIds",
+                    unitIds, registrySnapshot, true, diagnostics);
+            }
+        }
+
+        private static void ValidateRelicLocalizations(
+            ContentRelicLocalizationDefinition[] localizations,
+            string path,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (localizations == null || localizations.Length == 0)
+            {
+                Add(diagnostics, "relic.localization-required", path,
+                    "A relic must provide at least its en-US name and description.");
+                return;
+            }
+
+            if (localizations.Length > MaxLocalizationsPerDefinition)
+            {
+                Add(diagnostics, "relic.localization-limit", path,
+                    "A relic can declare at most " + MaxLocalizationsPerDefinition + " localizations.");
+            }
+
+            var languages = new HashSet<string>(StringComparer.Ordinal);
+            bool hasEnglish = false;
+            for (int i = 0; i < localizations.Length; i++)
+            {
+                ContentRelicLocalizationDefinition localization = localizations[i];
+                string itemPath = path + "[" + i + "]";
+                if (localization == null)
+                {
+                    Add(diagnostics, "entry.null", itemPath, "Relic localization entries cannot be null.");
+                    continue;
+                }
+
+                if (String.IsNullOrWhiteSpace(localization.language) ||
+                    !SupportedUnitLocalizationLanguages.Contains(localization.language))
+                {
+                    Add(diagnostics, "relic.localization-language-unsupported", itemPath + ".language",
+                        "Relic localization language must match one of the game's supported language IDs exactly.");
+                }
+                else if (!languages.Add(localization.language))
+                {
+                    Add(diagnostics, "relic.localization-language-duplicate", itemPath + ".language",
+                        "A relic can declare at most one localization for each language.");
+                }
+
+                if (String.IsNullOrWhiteSpace(localization.name))
+                {
+                    Add(diagnostics, "relic.localization-name-required", itemPath + ".name",
+                        "Every relic localization must include a non-empty display name.");
+                }
+                else if (String.Equals(localization.language, "en-US", StringComparison.Ordinal))
+                {
+                    hasEnglish = true;
+                }
+
+                if (String.IsNullOrWhiteSpace(localization.description))
+                {
+                    Add(diagnostics, "relic.localization-description-required", itemPath + ".description",
+                        "Every relic localization must include a non-empty description.");
+                }
+            }
+
+            if (!hasEnglish)
+            {
+                Add(diagnostics, "relic.localization-english-required", path,
+                    "Relic localizations must include an en-US name and description for fallback.");
+            }
         }
 
         private static void ValidateLocalizations(

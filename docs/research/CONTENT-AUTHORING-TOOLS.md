@@ -1,6 +1,6 @@
 # Herramientas para crear contenido de Rogue Command
 
-**Revisado:** 2026-10-17
+**Revisado:** 2026-10-18
 
 **Objetivo:** producir unidades, etapas/mapas y AI originales para el mod Rogue Evolution. El loader se mantiene como infraestructura necesaria.
 
@@ -97,6 +97,26 @@ Para producir una unidad: diseñar y conservar el `.blend`, exportar FBX al proy
 
 Para una referencia gráfica se puede usar `imagegen` durante la conversación o `anthropic-skills:algorithmic-art` para arte procedural 2D. Esos recursos generan imágenes o gráficos; no producen un FBX listo para cargar, no sustituyen la autoría en Blender y sus imágenes no deben copiarse a un pack como si ya fueran un modelo integrado.
 
+## Generación de texturas PBR (2026-10-18)
+
+El flujo local ya genera atlas PBR con Blender 4.5.14: Albedo, MetallicGloss, Normal y Emission. La integración recomendada conserva ese flujo como fuente reproducible y permite usar ArmorPaint como una etapa artística opcional sobre las UV ya cerradas. No se instaló ninguna herramienta nueva ni se modificó el generador en esta revisión.
+
+| Opción | Capacidad y compatibilidad revisadas | Decisión para Rogue Evolution |
+|---|---|---|
+| [ArmorPaint](https://armorpaint.org/manual) | Importa `.fbx` y `.blend`, permite pintar materiales PBR y exporta presets genéricos o personalizados, incluso por CLI. Sus nodos neuronales procesan localmente después de descargar los modelos; el manual recomienda 6 GB de VRAM. `Image to PBR` genera base color, occlusion, roughness, normal y height desde una imagen. El preset Unity empaqueta Metallic/Occlusion/Smoothness. | Mejor candidato para un piloto opcional de pintura local. Usar las UV existentes, conservar la malla Blender original y configurar un preset personalizado que entregue Metallic en R y Smoothness (`1 - roughness`) en A para `<Name>_MetallicGloss.png`. El shader no consume AO desde ese mapa. Metallic y Emission deben definirse explícitamente; los mapas generados no sustituyen por sí solos el conjunto requerido por el shader. |
+| [Material Maker](https://materialmaker.org/) | Herramienta open-source de grafos para crear y exportar materiales PBR compatibles con Unity. Tiene más de 200 nodos; la pintura de modelos 3D está descrita como experimental. | Alternativa para materiales procedurales reproducibles. Mantenerla como programa externo opcional, no como dependencia del build. |
+| [blendsmith](https://github.com/brianchenanimator/blendsmith) | Skill para agentes que cubre referencias, UV, PBR y horneado; su README declara Blender 4.4 y licencia GPL-3.0-only. | Referencia de proceso solamente. La skill local sigue siendo autoridad para formatos, shaders, sockets y vertex wear de Rogue Command; no copiar ni instalar la skill externa como sustituto. |
+| [EL4CTEO/blender-skills](https://github.com/EL4CTEO/blender-skills) | Incluye skills específicas de materiales PBR y baking, pero requiere Blender 5.2 o posterior. | No instalar con el Blender fijado 4.5.14. Sus guías pueden revisarse de nuevo cuando la versión local cambie. |
+| [Adobe Substance 3D Sampler](https://experienceleague.adobe.com/en/docs/substance-3d-sampler/using/features-and-workflows/generative-workflows) | Text-to-Texture e Image-to-Texture están descritos como flujos generativos en beta, con Text-to-Texture impulsado por Firefly. La página oficial de beta advierte que las betas no siempre están disponibles y documenta el procesamiento vía servicio. | Referencia opcional para ideación. No convertirlo en un requisito del flujo local reproducible. |
+
+### Contrato para una etapa opcional de pintura
+
+- Importar a ArmorPaint solo después de cerrar las UV. Usar la aplicación para crear o editar mapas; volver a generar el FBX de Unity desde el `.blend` original para preservar sockets y jerarquía. Después de importar en Unity, verificar que el mesh conserve el atributo de vertex colors; ArmorPaint solo debe exportar texturas.
+- Conservar `<Name>_Albedo.png`, `<Name>_MetallicGloss.png`, `<Name>_Normal.png` y `<Name>_Emission.png`. En MetallicGloss, Metallic va en R y Smoothness en A; configurar Unity con `sRGBTexture = false` y `TextureImporterAlphaSource.FromInput`. Albedo y Emission son sRGB; Normal debe importarse como `TextureImporterType.NormalMap`.
+- Mantener sin cambios los cuatro canales de vertex wear: R cavity AO, G edge wear, B thermal soot y A team mask. No sustituir esos datos por mapas AO/roughness de una herramienta externa.
+- El `VehiclePrefabBuilder` aplica los ajustes de importación al reconstruir. Verificar la configuración efectiva y la textura después de la reimportación de Unity; el archivo `.meta` por sí solo no acredita el estado final ni la calidad del mapa comprimido.
+- Revisar padding, costuras y color en una copia de prueba. Reconstruir el prefab con el shader `RogueCommand/VehiclePBR_VertexWear` dentro de Unity 2021.3.45f2. Esto valida el pipeline local; solo una partida iniciada por Steam permite afirmar que el aspecto quedó validado en el juego.
+
 ## Fuentes
 
 - [BepInEx: documentación oficial y soporte Unity Mono/Harmony](https://docs.bepinex.dev/)
@@ -130,6 +150,13 @@ Para una referencia gráfica se puede usar `imagegen` durante la conversación o
 - [Unity Technologies: skills para workflows Unity](https://github.com/Unity-Technologies/skills)
 - [Skill oficial `unity-cli`](https://github.com/Unity-Technologies/skills/blob/main/skills/unity-cli/SKILL.md)
 - [Create 3D Model for Codex: skill de Blender evaluada](https://github.com/CheshireJCat/create-3d-model-skill)
+- [ArmorPaint: manual de importación, nodos neuronales, presets Unity y exportación](https://armorpaint.org/manual)
+- [Material Maker: herramienta procedural PBR y documentación](https://materialmaker.org/)
+- [Material Maker: exportación de texturas y materiales Unity](https://rodzill4.github.io/material-maker/doc/export.html)
+- [blendsmith: skill de Blender para UV, PBR y baking](https://github.com/brianchenanimator/blendsmith)
+- [EL4CTEO/blender-skills: skills de Blender 5.2+ para agentes](https://github.com/EL4CTEO/blender-skills)
+- [Adobe Substance 3D Sampler: documentación de flujos generativos](https://experienceleague.adobe.com/en/docs/substance-3d-sampler/using/features-and-workflows/generative-workflows)
+- [Adobe Substance 3D Sampler: notas oficiales de beta](https://experienceleague.adobe.com/en/docs/substance-3d-sampler/using/release-notes/beta-version)
 - [Unity Technologies: Asset Bundle Browser](https://github.com/Unity-Technologies/AssetBundles-Browser)
 - [UABEA: lector/editor de AssetBundles y archivos serializados](https://github.com/nesrak1/UABEA)
 - [Unity 2021.3: API `AssetBundle.LoadAsset`](https://docs.unity3d.com/2021.3/Documentation/ScriptReference/AssetBundle.LoadAsset.html)

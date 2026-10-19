@@ -16,14 +16,14 @@ Reverse engineering of Rogue Command 1.0.9 (`Assembly-CSharp.dll` SHA-256 `d2da3
 1. **Native ScriptableObject Mutator Pipeline:**
    - Modded mutators and stat changes do not require runtime Harmony hooks or bytecode patching.
    - The engine provides [`CardChangeScriptableObject`](references/native-card-change-and-relic-schema.md), applying direct modifications across the 26 canonical attributes in `EntityBalancingStore.ChangeableValue`.
-   - Mutators are loaded additively into `RelicBalancingStore` or evaluated at stage start via `ManageStartCardChanges`.
+   - Relics are registered through `RelicBalancingStore`; difficulty card changes are evaluated at stage start through `ManageStartCardChanges`.
 2. **Faction & Role Target Filtering:**
    - Target side is governed by the `Side` enum: `False` (Player), `True` (Enemy/AI), and `Irrelevant` (Global/Symmetric).
    - Precision targeting uses conjunction (`cardMustHaveAllOfTheseRoles`), disjunction (`cardMustHaveOneOfTheseRoles`), and exclusion lists over the 34 native `UnitRole` identifiers.
 3. **Canonical 30-Status-Effect Engine:**
    - Built-in status effects (`Turbo`, `Stun`, `OnFire`, `Vampirism`, `Stealth`, `Armored`, `Overclocked`, etc.) are natively supported and visually handled by `StatusEffectsAndParticles`.
 4. **Dynamic Heat & Ascension Progression:**
-   - Modifiers natively scale with pre-run Heat level via `multiplyValueWithCurrentHeatLevel = true` and activate at specific thresholds (`startingOnHeat`, `startingOnAscensionLevel`).
+   - Native card changes expose Heat and progression fields, but a mod must verify the exact game formula and per-level balance budget before enabling them. The current content-pack relic contract requires Heat scaling to be disabled.
 
 ---
 
@@ -38,10 +38,10 @@ Reverse engineering of Rogue Command 1.0.9 (`Assembly-CSharp.dll` SHA-256 `d2da3
 - Restrict applicability using `UnitRole` filters to protect strategic asymmetry (e.g. apply siege buffs only to `Building` or `Turret`, avoid giving infinite range to `Rock` swarmers).
 
 ### Step 2: Configure Stat Modifiers & Operations
-- Choose target attributes from the 26 canonical `ChangeableValue` entries (e.g. `Health`, `AttackDamage`, `MovementSpeed`, `ProductionTime`, `Armor`).
+- Choose target attributes from the 26 native `ChangeableValue` entries (e.g. `MaxHealth`, `Damage1`, `MoveSpeed`, `ProductionDuration`, `MaxArmor`). The pack relic contract currently accepts `Health` as an alias for native `MaxHealth` only.
 - Select mathematical operation:
-  - `Operation.Add` for flat adjustments ($+2$ Armor, $+1$ UnitCount).
-  - `Operation.Multiply` for fractional scaling ($1.20\times$ Damage, $0.85\times$ ProductionTime).
+  - `Operation.Add` for flat adjustments such as a fixed `MaxArmor` increase.
+  - `Operation.Multiply` for fractional scaling such as `$1.20\times$ MaxHealth` or `$0.85\times$ ProductionDuration`.
 - Refer to [native-card-change-and-relic-schema.md](references/native-card-change-and-relic-schema.md) for field definitions.
 
 ### Step 3: Implement Environmental Battlefield Hazards
@@ -57,11 +57,11 @@ Reverse engineering of Rogue Command 1.0.9 (`Assembly-CSharp.dll` SHA-256 `d2da3
 - Refer to [heat-ascension-scaling-guide.md](references/heat-ascension-scaling-guide.md) for scaling formulas and progression blueprints.
 
 ### Step 5: Declare Pack Manifest & Export Assets
-- Register mutators in `mutators.json` within your expansion pack directory (or compile serialized ScriptableObjects into the pack AssetBundle).
+- Declare pack relics in `content.json` under `relics`, with localized text and bundle-backed images. This loader has no separate `mutators.json` contract; author stage-start changes only through an explicitly supported native path.
 - Ensure localization tokens exist for pre-run card descriptions.
 
 ### Step 6: Validate with the Dedicated Audit Tool
-- Run `tools/validate_mutators_and_hazards.py` to audit schema compliance, enum validity, value bounds, and scaling curves.
+- Run `tools/validate_mutators_and_hazards.py` for enum, value, hazard, and unverified Heat-scaling diagnostics. Also run the content-pack validator against `content/schema/content.schema.json`; the skill audit is not a replacement for strict pack validation.
 
 ---
 
@@ -73,14 +73,11 @@ Audit custom mutators, relics, hazard prefabs, and Heat scaling curves:
 # Audit an entire content pack
 python tools/validate_mutators_and_hazards.py --pack content/packs/sample-native-expansion
 
-# Audit a standalone mutators.json manifest
-python tools/validate_mutators_and_hazards.py --manifest content/packs/sample-native-expansion/mutators.json
-
-# Simulate Lanchester scaling at Heat Level 10
-python tools/validate_mutators_and_hazards.py --pack content/packs/sample-native-expansion --heat 10
+# Audit a specific pack-shaped JSON file
+python tools/validate_mutators_and_hazards.py --file path/to/content.json
 
 # Scan workspace packs and authoring prefabs with default settings
 python tools/validate_mutators_and_hazards.py
 ```
 
-The tool validates enum identities, detects invalid string values, checks for dangerous out-of-bounds scaling, verifies trigger collider invariants, and outputs a formatted diagnostic summary table.
+The tool audits enum identities, modifier values, and unverified Heat scaling, then outputs a formatted diagnostic table. It does not validate hazard prefabs or simulate Heat levels; inspect hazard trigger/tick behavior in Unity and run the strict content-pack validator separately.

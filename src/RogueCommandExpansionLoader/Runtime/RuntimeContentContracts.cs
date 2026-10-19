@@ -53,6 +53,12 @@ namespace RogueCommandExpansionLoader.Runtime
         bool TryGetUnitSkillDescription(string unitId, out string value);
     }
 
+    /// <summary>Optional bridge for native player relic names and descriptions.</summary>
+    public interface IRelicLocalizationRuntimeProvider
+    {
+        bool TryGetRelicLocalization(string relicId, bool description, out string value);
+    }
+
     /// <summary>
     /// Optional bridge for a stage-owned procedural landscape. The returned scope is temporary
     /// and must be ended from a Harmony finalizer so game collections are restored after failures.

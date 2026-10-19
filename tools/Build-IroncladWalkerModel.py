@@ -11,6 +11,7 @@ sys.path.insert(0, str(REPO_ROOT / "tools"))
 
 import bpy
 import RogueModelKit as rmk
+from mathutils import Vector
 
 
 UNIT_NAME = "IroncladWalker"
@@ -118,6 +119,19 @@ def build_ironclad_walker_model() -> None:
             ]
         )
 
+    # Keep the two rotary gun mouths and all status/audio anchors in the model's
+    # local envelope. Both firepoints sit under one canonical primary muzzle.
+    builder.turret_center = Vector((0.0, 0.02, 1.98))
+    builder.gun_pivot = Vector((0.0, 1.18, 1.58))
+    builder.gun_dir = Vector((0.0, 1.0, 0.0))
+    builder.primary_firepoint_locs = [
+        Vector((side * 0.72, 1.18, 1.58)) for side in (-1, 1)
+    ]
+    builder.weapon_audio_loc = Vector((0.0, 1.18, 1.58))
+    builder.engine_audio_loc = Vector((0.0, -0.51, 2.01))
+    builder.damage_smoke_loc = Vector((0.0, -0.51, 2.10))
+    builder.damage_fire_loc = Vector((0.0, -0.45, 1.86))
+
     # Recessed targeting optics sit above the chest and point in the unit's forward direction (+Y).
     builder.objects.extend(
         rmk.make_recessed_sensor_visor(
@@ -162,22 +176,28 @@ def build_ironclad_walker_model() -> None:
     if diagnostics["total_polygons"] > 5000:
         raise ValueError("Ironclad Walker exceeds the 5,000-face low-poly authoring budget")
 
-    rmk.generate_lightmap_uvs(builder.objects)
-    bpy.ops.wm.save_as_mainfile(filepath=str(BLEND_PATH))
-
-    export_batches = rmk.merge_meshes_by_material(builder.objects, UNIT_NAME, {
-        builder.palette.primary_armor: "armor",
-        builder.palette.light_armor: "lightArmor",
-        builder.palette.gunmetal: "gunmetal",
-        builder.palette.warning: "warning",
-        builder.palette.emissive: "sensor",
-    })
-    rmk.export_unity_fbx(FBX_PATH, export_batches)
+    result = builder.build_and_export(
+        fbx_path=FBX_PATH,
+        blend_path=BLEND_PATH,
+        include_locators=True,
+        generate_lods=False,
+        include_rig=True,
+        include_ik=True,
+        include_animations=True,
+        wear_level="factory_new",
+        target_budget=4000,
+        profile_budget=True,
+        structural_wear_mask=True,
+        unity_batch_names=True,
+    )
+    if not result.get("ground_contact_valid"):
+        raise ValueError("Rigged Ironclad Walker failed the export ground-contact check")
 
     print(f"Editable source: {BLEND_PATH}")
     print(f"Unity FBX: {FBX_PATH}")
     print(f"Source mesh parts: {diagnostics['object_count']}")
-    print(f"Exported material batches: {len(export_batches)}")
+    print(f"Exported material batches: {result['exported_batched_objects']}")
+    print(f"Rigged: {result.get('has_armature', False)} | Clips: {', '.join(result.get('action_clips', []))}")
     print(f"Bounds (W x L x H): {bounds['width_x']} x {bounds['length_y']} x {bounds['height_z']} m")
     print("Preview rendering was skipped; existing previews and framing were left untouched.")
 
