@@ -129,6 +129,11 @@ namespace RogueCommandExpansion.Authoring
             BuildSampleVisualPreview("SalvageHauler", "SkyguardSAM");
         }
 
+        [MenuItem("Rogue Command/Visual Preview/Build Tidebreaker Hovercraft + Deep Space Relay")]
+        public static void BuildTidebreakerAndDeepSpaceRelayPreview()
+        {
+            BuildSampleVisualPreview("TidebreakerHovercraft", "DeepSpaceRelay");
+        }
 
         [MenuItem("Rogue Command/Visual Preview/Build Wraith Stealth Wing + Subterranean Mole")]
         public static void BuildWraithStealthWingAndSubterraneanMolePreview()
