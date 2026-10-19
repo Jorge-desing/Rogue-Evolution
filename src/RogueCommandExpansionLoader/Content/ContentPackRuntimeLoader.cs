@@ -4405,6 +4405,13 @@ namespace RogueCommandExpansionLoader.Content
                         "': la unidad " + definition.unitId + " no está registrada ni disponible.");
                 }
 
+                if (!IsProductUnitAllowedForAi(definition.unitId, temporaryUnits))
+                {
+                    throw new InvalidDataException("Perfil AI " + profile.id + " en '" + packageName +
+                        "': la unidad " + definition.unitId +
+                        " no tiene isAllowedForAi habilitado.");
+                }
+
                 if (definition.baseIndex < 0 || definition.baseIndex >= aiBases.Count)
                 {
                     throw new InvalidDataException("Perfil AI " + profile.id + " en '" + packageName +
@@ -4634,6 +4641,46 @@ namespace RogueCommandExpansionLoader.Content
 
             LoadedUnit unit;
             return TryGetLoadedUnit(entityId, temporaryUnits, out unit) && !unit.IsProductionBuilding;
+        }
+
+        private bool IsProductUnitAllowedForAi(string entityId, List<LoadedUnit> temporaryUnits)
+        {
+            LoadedUnit loadedUnit;
+            if (TryGetLoadedUnit(entityId, temporaryUnits, out loadedUnit))
+            {
+                return loadedUnit != null && !loadedUnit.IsProductionBuilding &&
+                    loadedUnit.Definition != null && loadedUnit.Definition.isAllowedForAi;
+            }
+
+            if (!_nativeUnitIds.Contains(entityId) || _nativeFactoryIds.Contains(entityId))
+            {
+                return false;
+            }
+
+            IList rows = _nativeEntityRowsField.GetValue(null) as IList;
+            IDictionary index = _entityIndexField.GetValue(null) as IDictionary;
+            if (rows == null || index == null || !index.Contains(entityId))
+            {
+                return false;
+            }
+
+            object rowIndexValue = index[entityId];
+            if (!(rowIndexValue is int))
+            {
+                return false;
+            }
+
+            int rowIndex = (int)rowIndexValue;
+
+            if (rowIndex < 0 || rowIndex >= rows.Count)
+            {
+                return false;
+            }
+
+            object row = rows[rowIndex];
+            return row != null && row.GetType() == _entityRowType &&
+                String.Equals(_entityIdField.GetValue(row) as string, entityId, StringComparison.Ordinal) &&
+                (bool)_allowedForAiField.GetValue(row);
         }
 
         private bool IsDeckEntityAvailable(string entityId, List<LoadedUnit> temporaryUnits)
