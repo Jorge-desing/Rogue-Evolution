@@ -5,7 +5,7 @@ description: "Design, create, or refine original 3D vehicle and unit visuals for
 
 # Rogue Command 3D Model Authoring
 
-Use this skill to design, model, texture, and export original, high-readability 3D vehicle models and visual overlays for Rogue Command. It guides the visual pipeline—from procedural low-poly blockout in Blender 4.5.14 LTS to Unity 2021.3.45f2 AssetBundle authoring, material assignment, ImageGen card handoff, and multi-tier verification.
+Use this skill to design, model, texture, and export original, high-readability 3D vehicle models and visual overlays for Rogue Command. It guides the visual pipeline—from a deterministic Blender 4.5.14 LTS blockout through mechanically plausible hard-surface refinement, texture authoring, Unity 2021.3.45f2 AssetBundle authoring, material assignment, ImageGen card handoff, and multi-tier verification.
 
 ---
 
@@ -38,18 +38,26 @@ Before making any changes, review the project rules and handoffs:
 
 ## 2. Rogue Command Art Direction & Silhouette Design
 
-Rogue Command (by **feneq**) features a distinctive chunky, hard-surface low-poly aesthetic combining Kenney-inspired modularity with high-clarity RTS gameplay.
+Aim for **grounded, stylized military sci-fi realism**: each vehicle should read clearly at RTS distance while its visible forms suggest plausible armor, fabrication, propulsion, and maintenance. Keep the project's faction palette and gameplay readability, but do not treat a final model as a pile of beveled cubes or a collection of disconnected primitives. Procedural assemblies are a starting block; refine the visible shell and transitions before export.
+
+### Form-Realism Rules
+- **Build a coherent primary shell.** Establish the hull, cabin, turret, or chassis from tapered profiles, compound slopes, rounded shoulders, and recessed wells where the silhouette benefits. Use boxes and cylinders for hidden structure or genuinely box-shaped components, not as the default visible shape for every subsystem.
+- **Make parts look assembled.** Give armor plates believable thickness, overlap, attachment lips, and narrow shadow gaps. Seat turrets on rings, wheels in fenders, optics behind protective brows, and guns in mantlets with room for recoil. Avoid coplanar layers, floating panels, and intersections that make the construction look toy-like.
+- **Use curvature selectively.** Round or smoothly transition large cast housings, turret cheeks, wheel shoulders, mantlets, engine covers, and sensor shells. Keep planar armor planar when it serves the design. Vary cross-sections and taper long parts; do not make every panel a rectangular slab or every barrel a plain cylinder.
+- **Keep detail functional and restrained.** Add seams, fasteners, handles, vents, hoses, and stowage only where a crew, service task, heat path, or mechanical connection explains them. Prefer a few readable details over repeated greeble patterns. Introduce asymmetry only when a system explains it (for example, an offset exhaust, access side, or ammo feed).
+- **Judge shape before surface noise.** Review a neutral clay render with grazing light, then a flat black silhouette and the faction materials. Fix faceting, pinching, uniform edge treatment, and primitive-looking joins in the geometry; do not hide them with camouflage, vertex dirt, or extra decals.
 
 ### The 3-Tier Readability Pyramid
-- **Tier 1 (Macro Silhouette, 70%)**: Bold volume, stance, ground clearance. Must pass the 250ms Squint Test at 45° RTS elevation.
-- **Tier 2 (Meso Mechanical Geometry, 20%)**: Track loops, turret cheeks, engine louvers, exhaust ports telegraphing propulsion and armor grade.
-- **Tier 3 (Micro High-Contrast Accents, 10%)**: Emissive sensor lenses, hazard stripes, muzzle collars focusing player attention on weapons and optics.
+- **Tier 1 (Macro Silhouette, about 65%)**: Proportion, stance, ground clearance, and the largest hull/turret masses. Must pass the 250ms Squint Test at RTS elevation.
+- **Tier 2 (Meso Mechanical Construction, about 25%)**: Coherent track or suspension assemblies, hull transitions, armor overlaps, weapon mounts, cooling, and access systems.
+- **Tier 3 (Micro Accents, about 10%)**: Optics, fasteners, seams, markings, and localized wear. These must not substitute for a well-resolved primary form.
 
-### The 4 Core Visual Rules:
-1. **The Squint Test**: Zoom out the Blender orthographic viewport until the unit is roughly 50 pixels tall. If its archetype (Scout, Strike Bike, Siege Tank, Mech) and forward direction are not instantly recognizable, simplify the internal geometry and exaggerate the primary silhouette masses.
-2. **Single-Segment Chamfers (The Specular Glint Rule)**: Razor-sharp 90° edges have zero surface area facing the sun and look digital and dead. Always apply a 1-segment bevel (`segments = 1`, `width = 0.02m–0.06m`) with flat shading (`polygon.use_smooth = False`). These angled chamfers catch bright specular glints under directional lights at RTS distance.
-3. **Continuous Track Contour**: Avoid flat box treads with floating blocks. Model tracks with sloped front approach angles (~25°–35° climb), round return idlers, and individual tread shoes (`0.15m–0.22m` spacing) along the ground and return runs.
-4. **Recessed Glowing Optics**: Never leave sensor glass or headlights as flat paint. Recess lenses inside an armored visor hood and activate Unity's `_EMISSION` keyword with HDR multipliers (`1.5×–2.2×`) so they glow through the game's bloom filter.
+### Core Visual Checks
+1. **The Squint Test**: Zoom out the Blender orthographic viewport until the unit is roughly 50 pixels tall. Its archetype (Scout, Strike Bike, Siege Tank, Mech) and forward direction must remain recognizable. Refine proportions and the outer contour before adding details.
+2. **Scale-Aware Edge Treatment**: Do not bevel every edge uniformly. Use a narrow chamfer on a deliberately crisp armor edge and a multi-segment radius on a rounded or rolled form when it affects the silhouette or highlight. Choose widths in proportion to the part; preserve broad, clean planes and avoid oversized toy-like bevels.
+3. **Continuous Track Contour**: Avoid flat box treads with floating blocks. Model tracks with sloped front approach angles (~25°–35° climb), round return idlers, and individual tread shoes (`0.15m–0.22m` spacing) along the ground and return runs. Show enough wheel, suspension, and fender depth to explain how the track is carried.
+4. **Integrated Functional Details**: Recess lenses inside protective hoods, connect visible hoses to endpoints, and show plausible supports for antennas, weapon mounts, exhausts, and external stores. Activate Unity's `_EMISSION` keyword only for actual light sources or energized elements.
+5. **Two-Scale Review**: Inspect a clay turntable from front, side, top, and the elevated gameplay view, then inspect the unit around 50 pixels tall. Correct silhouette tangencies and shading pinches at close range without adding details that disappear or alias at gameplay scale.
 
 *See detailed breakdown in [art-style-and-palette.md](references/art-style-and-palette.md).*
 
@@ -399,7 +407,7 @@ Verified against pinned `Assembly-CSharp.dll` (`d2da384df3318e7ac52db58eb13699ec
 
 ## References & Specialized Guides
 
-- [Art Style & Palette Guide](references/art-style-and-palette.md) — 3-tier silhouette hierarchy, 5-tone palette sets, bevel physics, and greeble standards.
+- [Art Style & Palette Guide](references/art-style-and-palette.md) — grounded form language, mechanical construction checks, faction palettes, scale-aware edge treatment, and LOD/readability rules.
 - [Blender Procedural Techniques](references/blender-procedural-techniques.md) — Parametric `bpy` recipes for chamfered hulls, continuous tracks, stepped road wheels, and engine grilles.
 - [Unity Material Pipeline](references/unity-material-pipeline.md) — URP material configuration, emission keywords, GPU instancing limits, and card sprite rules.
 - [Native Hierarchy & Pivots](references/native-hierarchy-and-pivots.md) — Transform hierarchy maps for `PCXBaseTank`, `BombBike`, `ArtilleryTank`, `GatlingWalker`, and `LightningTank`.

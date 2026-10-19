@@ -1,16 +1,16 @@
 # Rogue Command 3D Art Style & Color Palette Guide
 
-This guide establishes the visual rules and aesthetic principles for authoring 3D vehicles and unit models that fit seamlessly into Rogue Command's stylized sci-fi RTS world.
+This guide establishes the visual rules and aesthetic principles for authoring grounded, mechanically plausible 3D vehicles and unit models that remain legible in Rogue Command's stylized sci-fi RTS world.
 
 ---
 
 ## 1. Aesthetic Lineage & Core Philosophy
 
-Rogue Command (developed by **feneq**) is defined by a clean, chunky, hard-surface low-poly aesthetic. Its visual DNA combines:
-1. **Kenney-Inspired Modular Primitives**: Geometric vocabulary rooted in modular vehicle kits (faceted hulls, sloped chamfers, cylindrical exhausts, piston brackets, and segmented track skirts).
-2. **High-Readability RTS Stance**: Bold silhouettes optimized for an elevated, angled camera (~45°–60° isometric/orthographic tilt) where units appear between 30 and 120 pixels tall on screen.
-3. **Tactile Machined Surfaces**: Crisp, single-segment chamfers (bevels) on mechanical edges that catch specular sun glints, eliminating the sterile look of pure CAD sharp edges without requiring heavy textures.
-4. **Functional Color Blocking**: A disciplined 5-to-6-tone palette where colors communicate function, team allegiance, and structural hierarchy.
+Use a grounded, stylized military sci-fi language: readable from the elevated RTS camera, with believable mass, connected machinery, and surfaces that respond like armor, cast housings, rubber, and machined metal. The desired finish is not photorealism; it is a more convincing, less primitive-looking version of the project's clear faction and gameplay language.
+1. **Designed Silhouettes**: Distinct proportions and a coherent outer shell replace a stack of uniform boxes. Use faceted planes where they describe armor and controlled curvature where it describes cast or formed parts.
+2. **High-Readability RTS Stance**: Keep the archetype and facing legible from the elevated, angled camera (~45°–60° isometric/orthographic tilt), including when the unit is roughly 30–120 pixels tall.
+3. **Believable Fabrication**: Distinguish welded plates, cast armor, access panels, suspension, and attached equipment through thickness, overlap, recesses, joints, and scale-aware edge radii.
+4. **Functional Color and Material Blocking**: Keep a disciplined 5-to-6-tone faction palette, then use restrained value and roughness variation to distinguish structural roles without adding visual noise.
 
 ---
 
@@ -18,9 +18,16 @@ Rogue Command (developed by **feneq**) is defined by a clean, chunky, hard-surfa
 
 Every unit must pass the **Squint Test**: when zoomed out or viewed as a solid black silhouette, its gameplay role and forward orientation must be immediately identifiable in < 250ms.
 
-- **Tier 1 (Macro Silhouette, 70%)**: Bold volume, stance, ground clearance. Identifies archetype (Scout vs Siege vs Mech vs Bike).
-- **Tier 2 (Meso Mechanical Geometry, 20%)**: Turret shape, track sponsons, engine deck, intake louvers. Identifies weapon class and propulsion.
-- **Tier 3 (Micro High-Contrast Accents, 10%)**: Emissive sensor lenses, hazard stripes, muzzle collars. Directs the eye to active hardpoints.
+- **Tier 1 (Macro Silhouette, 65%)**: Proportion, stance, ground clearance, and largest hull/turret masses. Identifies archetype (Scout vs Siege vs Mech vs Bike).
+- **Tier 2 (Meso Mechanical Construction, 25%)**: Hull transitions, turret seating, track or suspension depth, weapon mounts, engine deck, and access systems. Explains how the unit is built and operated.
+- **Tier 3 (Micro Accents, 10%)**: Optics, fasteners, seams, markings, and localized wear. Directs attention but never carries the silhouette on its own.
+
+### Form Construction Checklist
+- Establish the primary hull/cabin/turret as a coherent shell from tapered profiles and intersecting volumes with intentional transitions; do not leave obvious box-to-box joins on the visible silhouette.
+- Vary dimensions and cross-sections according to each component's job. Taper barrels and booms, soften cast shoulders, recess wheel wells and optics, and give panels enough thickness to read at gameplay scale.
+- Make mechanical connections visible where they matter: turret ring under turret, suspension arms into wheel hubs, gun breech into mantlet, hose ends on fittings, and exhausts rooted in the engine deck.
+- Keep intentional asymmetry purposeful. Repeated details should follow a real layout (bolt rows, cooling banks, track shoes) and should not become all-over surface decoration.
+- Compare a neutral clay render under grazing light against the textured model. Geometry must carry the form without relying on camouflage, AO, vertex wear, or emissive accents.
 
 ### Archetype Silhouette Matrix
 
@@ -61,16 +68,20 @@ Every vehicle follows the disciplined 5-to-6-tone structural PBR material standa
 
 ---
 
-## 4. Edge Beveling & The Specular Glint Rule
+## 4. Scale-Aware Edge Radii & Surface Shading
 
-In real-time low-poly rendering, 90° razor edges have zero surface area, causing specular extinction under directional sunlight.
-- **1-Segment Chamfers**: Always use a single segment bevel (`segments = 1`). Never use multi-segment curved bevels on low-poly RTS assets.
-- **Width by Scale**: Main hull blocks `0.04m–0.08m`; turrets/cowlings `0.025m–0.04m`; small brackets/sensors `0.010m–0.018m`.
-- **Flat Shading Preserved**: Keep `polygon.use_smooth = False` on chamfers so angled faces catch bright specular highlights under RTS lighting.
+Use edge treatment to describe fabrication and catch light, not to make every object look like the same beveled primitive.
+- **Treat edges selectively**: Keep broad armor planes clean. Chamfer an edge when it is a cut plate edge, protective corner, or deliberate facet; use a rounded transition for cast housings, formed covers, wheel shoulders, and other surfaces that should not read as a sharp folded plate.
+- **Scale the treatment to the part**: As a starting guide, use about `0.003m–0.010m` on small machined details, `0.006m–0.025m` on exposed armor plate edges, and `0.02m–0.06m` on large cast or molded housings. Prefer a fraction of local part thickness over a universal bevel width. Reduce these values when they make a panel look inflated.
+- **Choose segments by shape**: A 1-segment bevel is appropriate for a crisp chamfer. Use 2–4 segments for visible rolled edges and rounded transitions; use enough radial sides on wheels, pipes, and barrels that their gameplay-scale silhouette does not look square. Keep hidden geometry economical.
+- **Preserve intentional planes**: Keep true armor facets flat-shaded, but shade curved surfaces smoothly by angle. Inspect normal transitions and highlights in a neutral clay render; do not use weighted normals to disguise a bad cross-section or intersecting shells.
+- **Avoid uniform beveling**: Never apply the same wide bevel to every edge. Large, soft corners on all panels create a toy-like look and erase structural differences.
 
 ---
 
-## 5. Functional Visual Details (Greebles with Purpose)
+## 5. Functional Construction Details
+
+Every added detail should explain protection, access, cooling, sensing, propulsion, ammunition, or field repair. Avoid decorative repetition and scattered “greebles” without a visible attachment point.
 
 1. **Continuous Track Loops**: Sloped front approach angles (~25°–35° climb), rounded return idlers, and individual tread shoes (`0.15m–0.22m` spacing).
 2. **Road Wheel Rims & Hubs**: Stepped cylinders: outer rubber tire (matte), recessed rim, and central 6-bolt planetary axle cap (gunmetal).
@@ -79,7 +90,7 @@ In real-time low-poly rendering, 90° razor edges have zero surface area, causin
 5. **Weapon Sleeves**: Stepped muzzle brakes or heat-dissipation collars at the barrel tip.
 6. **Conduit Rails**: Insulated charge rails along flanks for energy weapons.
 7. **Applique Armor (ERA)**: Spaced armor tiles on frontal glacis angled at 20°–35°.
-8. **Hex Bolt Seams**: Low-poly 6-sided bolt heads along structural flanges.
+8. **Fasteners & Seams**: Place small fasteners along real plate flanges, access covers, and mounting rails; keep scale and spacing consistent with the panel they secure.
 
 ---
 
@@ -95,7 +106,7 @@ In real-time low-poly rendering, 90° razor edges have zero surface area, causin
 
 ## 7. Draw-Call Optimization via Material Batching
 
-- **Kitbashing during Authoring**: Author with clean primitives and explicit materials.
+- **Blockout and Refinement**: Start with clean primitives and explicit materials, then replace visible silhouette masses with refined shells, transitions, or shaped components before the production export.
 - **Material-Based Unification for Export**: Group and join static submeshes by PBR material via `batch_and_join_by_material`.
 - **Target Output**: 4 to 6 unified mesh objects per vehicle (one per material, plus independent animated pivots like `TurretBase` or `MainBarrel`).
 
