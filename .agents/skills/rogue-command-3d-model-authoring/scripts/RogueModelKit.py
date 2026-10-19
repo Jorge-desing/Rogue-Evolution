@@ -3316,6 +3316,561 @@ def make_thermal_radiator_assembly(
     return objects
 
 
+def make_remote_weapon_station_assembly(
+    prefix: str,
+    location: Tuple[float, float, float] | Vector = (0.0, 0.0, 1.2),
+    scale: float = 1.0,
+    yaw_deg: float = 0.0,
+    pitch_deg: float = 0.0,
+    weapon_type: str = "autocannon",
+    housing_mat: bpy.types.Material | None = None,
+    gun_mat: bpy.types.Material | None = None,
+    optic_mat: bpy.types.Material | None = None,
+    ammo_mat: bpy.types.Material | None = None,
+) -> list[bpy.types.Object]:
+    """Generates a roof-mounted independent Remote Weapon Station (RWS/CROWS) with stabilized EO/IR optical sensor ball, traversing weapon yoke, armored ammo box, and rapid-fire autocannon/HMG."""
+    objects: list[bpy.types.Object] = []
+    loc = Vector(location)
+    h_mat = housing_mat or gun_mat
+    g_mat = gun_mat or housing_mat
+    o_mat = optic_mat or h_mat
+    a_mat = ammo_mat or h_mat
+
+    s = max(0.4, scale)
+    yaw_rad = math.radians(yaw_deg)
+    pitch_rad = math.radians(pitch_deg)
+
+    # 1. Base rotatable pintle / azimuth plinth
+    objects.append(make_cylinder(
+        f"{prefix}_RWS_Plinth",
+        radius=0.18 * s,
+        depth=0.10 * s,
+        location=loc + Vector((0.0, 0.0, 0.05 * s)),
+        material=g_mat,
+        vertices=10,
+        bevel=0.012 * s,
+    ))
+
+    # Azimuth coordinate frame
+    fwd = Vector((-math.sin(yaw_rad), math.cos(yaw_rad), 0.0)).normalized()
+    right = Vector((math.cos(yaw_rad), math.sin(yaw_rad), 0.0)).normalized()
+    up = Vector((0.0, 0.0, 1.0))
+    cradle_center = loc + up * (0.16 * s)
+
+    # 2. U-shaped traversing weapon yoke / trunnion housing
+    yoke_rot = (0.0, 0.0, yaw_rad)
+    objects.append(make_box(
+        f"{prefix}_RWS_YokeBase",
+        (0.32 * s, 0.28 * s, 0.08 * s),
+        cradle_center,
+        h_mat,
+        bevel=0.012 * s,
+        rotation=yoke_rot,
+    ))
+    # Bilateral vertical trunnion uprights
+    for side in (-1, 1):
+        stag = "L" if side < 0 else "R"
+        arm_pos = cradle_center + right * (side * 0.14 * s) + up * (0.12 * s)
+        objects.append(make_box(
+            f"{prefix}_RWS_Trunnion_{stag}",
+            (0.06 * s, 0.20 * s, 0.18 * s),
+            arm_pos,
+            h_mat,
+            bevel=0.010 * s,
+            rotation=yoke_rot,
+        ))
+
+    # 3. Armored ammunition magazine box on left flank
+    ammo_pos = cradle_center - right * (0.24 * s) + up * (0.10 * s) - fwd * (0.02 * s)
+    objects.append(make_box(
+        f"{prefix}_RWS_AmmoBox",
+        (0.14 * s, 0.26 * s, 0.20 * s),
+        ammo_pos,
+        a_mat,
+        bevel=0.012 * s,
+        rotation=yoke_rot,
+    ))
+
+    # 4. Stabilized Electro-Optical / Infrared (EO/IR) sensor ball on right flank
+    optic_pos = cradle_center + right * (0.23 * s) + up * (0.14 * s) + fwd * (0.04 * s)
+    objects.append(make_box(
+        f"{prefix}_RWS_OpticHousing",
+        (0.13 * s, 0.16 * s, 0.16 * s),
+        optic_pos,
+        h_mat,
+        bevel=0.014 * s,
+        rotation=yoke_rot,
+    ))
+    # Dual aperture sensor lenses: large FLIR thermal lens & small laser rangefinder
+    flir_pos = optic_pos + fwd * (0.085 * s) + up * (0.02 * s)
+    objects.append(make_cylinder(
+        f"{prefix}_RWS_FLIR_Lens",
+        radius=0.045 * s,
+        depth=0.03 * s,
+        location=flir_pos,
+        material=o_mat,
+        vertices=10,
+        bevel=0.005 * s,
+        rotation=(math.radians(90.0), 0.0, yaw_rad),
+    ))
+    lrf_pos = optic_pos + fwd * (0.085 * s) - up * (0.038 * s) + right * (0.025 * s)
+    objects.append(make_cylinder(
+        f"{prefix}_RWS_LRF_Aperture",
+        radius=0.022 * s,
+        depth=0.025 * s,
+        location=lrf_pos,
+        material=o_mat,
+        vertices=8,
+        bevel=0.003 * s,
+        rotation=(math.radians(90.0), 0.0, yaw_rad),
+    ))
+
+    # 5. Elevated weapon receiver & barrel assembly
+    elev_pivot = cradle_center + up * (0.14 * s)
+    gun_dir = (fwd * math.cos(pitch_rad) + up * math.sin(pitch_rad)).normalized()
+    gun_rot = (pitch_rad, 0.0, yaw_rad)
+
+    # Receiver body
+    objects.append(make_box(
+        f"{prefix}_RWS_Receiver",
+        (0.12 * s, 0.30 * s, 0.14 * s),
+        elev_pivot,
+        g_mat,
+        bevel=0.010 * s,
+        rotation=gun_rot,
+    ))
+    # Main autocannon / machine gun barrel
+    b_len = 0.72 * s
+    b_rad = 0.028 * s
+    b_center = elev_pivot + gun_dir * (0.16 * s + b_len * 0.5)
+    objects.append(make_cylinder(
+        f"{prefix}_RWS_Barrel",
+        radius=b_rad,
+        depth=b_len,
+        location=b_center,
+        material=g_mat,
+        vertices=8,
+        bevel=0.004 * s,
+        rotation=(math.radians(90.0) - pitch_rad, 0.0, yaw_rad),
+    ))
+    # Slotted flash hider / muzzle brake
+    muzzle_pos = elev_pivot + gun_dir * (0.16 * s + b_len + 0.04 * s)
+    objects.append(make_cylinder(
+        f"{prefix}_RWS_FlashHider",
+        radius=b_rad * 1.45,
+        depth=0.10 * s,
+        location=muzzle_pos,
+        material=g_mat,
+        vertices=8,
+        bevel=0.006 * s,
+        rotation=(math.radians(90.0) - pitch_rad, 0.0, yaw_rad),
+    ))
+
+    return objects
+
+
+def make_drone_docking_bay_assembly(
+    prefix: str,
+    location: Tuple[float, float, float] | Vector = (0.0, 0.0, 1.0),
+    scale: float = 1.0,
+    dock_type: str = "quadcopter",
+    bay_mat: bpy.types.Material | None = None,
+    frame_mat: bpy.types.Material | None = None,
+    drone_mat: bpy.types.Material | None = None,
+    glow_mat: bpy.types.Material | None = None,
+) -> list[bpy.types.Object]:
+    """Generates a recessed roof/deck landing cradle with magnetic charging guide rails, alignment runway glow LEDs, and a docked parasitic reconnaissance/escort drone."""
+    objects: list[bpy.types.Object] = []
+    loc = Vector(location)
+    b_mat = bay_mat or frame_mat
+    f_mat = frame_mat or bay_mat
+    d_mat = drone_mat or b_mat
+    g_mat = glow_mat or f_mat
+
+    s = max(0.4, scale)
+
+    # 1. Recessed docking tray cradle base
+    tray_w = 0.95 * s
+    tray_l = 0.95 * s
+    tray_h = 0.08 * s
+    objects.append(make_box(
+        f"{prefix}_DroneDock_Tray",
+        (tray_w, tray_l, tray_h),
+        loc + Vector((0.0, 0.0, tray_h * 0.5)),
+        b_mat,
+        bevel=0.014 * s,
+    ))
+
+    # 2. Perimeter guide bevel lip / chamfered bumper curbs
+    for sx in (-1, 1):
+        objects.append(make_box(
+            f"{prefix}_DroneDock_Curb_X_{'L' if sx < 0 else 'R'}",
+            (0.06 * s, tray_l * 0.92, 0.06 * s),
+            loc + Vector((sx * (tray_w * 0.46), 0.0, tray_h + 0.02 * s)),
+            f_mat,
+            bevel=0.008 * s,
+        ))
+    for sy in (-1, 1):
+        objects.append(make_box(
+            f"{prefix}_DroneDock_Curb_Y_{'F' if sy > 0 else 'R'}",
+            (tray_w * 0.82, 0.06 * s, 0.06 * s),
+            loc + Vector((0.0, sy * (tray_l * 0.46), tray_h + 0.02 * s)),
+            f_mat,
+            bevel=0.008 * s,
+        ))
+
+    # 3. Glowing LED alignment landing markers
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            qtag = f"{'F' if sy > 0 else 'R'}{'L' if sx < 0 else 'R'}"
+            objects.append(make_box(
+                f"{prefix}_DroneDock_LED_{qtag}",
+                (0.08 * s, 0.08 * s, 0.015 * s),
+                loc + Vector((sx * (tray_w * 0.32), sy * (tray_l * 0.32), tray_h + 0.008 * s)),
+                g_mat,
+                bevel=0.003 * s,
+            ))
+
+    # Center magnetic charging contact puck
+    objects.append(make_cylinder(
+        f"{prefix}_DroneDock_ChargePuck",
+        radius=0.10 * s,
+        depth=0.025 * s,
+        location=loc + Vector((0.0, 0.0, tray_h + 0.012 * s)),
+        material=f_mat,
+        vertices=10,
+        bevel=0.004 * s,
+    ))
+
+    # 4. Docked Parasitic Recon Drone
+    drone_z = loc.z + tray_h + 0.06 * s
+    # Fuselage pod
+    objects.append(make_box(
+        f"{prefix}_ParasiteDrone_Fuselage",
+        (0.24 * s, 0.36 * s, 0.09 * s),
+        Vector((loc.x, loc.y, drone_z)),
+        d_mat,
+        bevel=0.016 * s,
+    ))
+    # Forward sensor optic dome
+    objects.append(make_cylinder(
+        f"{prefix}_ParasiteDrone_SensorEye",
+        radius=0.045 * s,
+        depth=0.03 * s,
+        location=Vector((loc.x, loc.y + 0.18 * s, drone_z - 0.01 * s)),
+        material=g_mat,
+        vertices=8,
+        bevel=0.004 * s,
+        rotation=(math.radians(90.0), 0.0, 0.0),
+    ))
+
+    # 4 Diagonal motor outrigger booms & rotor cowlings
+    boom_reach_x = 0.28 * s
+    boom_reach_y = 0.28 * s
+    for bx in (-1, 1):
+        for by in (-1, 1):
+            rtag = f"{'F' if by > 0 else 'R'}{'L' if bx < 0 else 'R'}"
+            boom_start = Vector((loc.x + bx * 0.08 * s, loc.y + by * 0.10 * s, drone_z))
+            boom_end = Vector((loc.x + bx * boom_reach_x, loc.y + by * boom_reach_y, drone_z + 0.02 * s))
+            objects.append(make_rod(
+                f"{prefix}_ParasiteDrone_Boom_{rtag}",
+                boom_start,
+                boom_end,
+                radius=0.016 * s,
+                material=f_mat,
+                vertices=6,
+            ))
+            # Rotor duct cowling
+            objects.append(make_cylinder(
+                f"{prefix}_ParasiteDrone_Cowl_{rtag}",
+                radius=0.085 * s,
+                depth=0.045 * s,
+                location=boom_end,
+                material=f_mat,
+                vertices=10,
+                bevel=0.006 * s,
+            ))
+            # Rotor hub spinner
+            objects.append(make_cylinder(
+                f"{prefix}_ParasiteDrone_Hub_{rtag}",
+                radius=0.025 * s,
+                depth=0.035 * s,
+                location=boom_end + Vector((0.0, 0.0, 0.015 * s)),
+                material=d_mat,
+                vertices=6,
+                bevel=0.003 * s,
+            ))
+
+    return objects
+
+
+def make_recoil_earth_spade_assembly(
+    prefix: str,
+    location: Tuple[float, float, float] | Vector = (0.0, -1.8, 0.45),
+    width: float = 1.8,
+    depth: float = 0.85,
+    deployed: bool = True,
+    blade_mat: bpy.types.Material | None = None,
+    strut_mat: bpy.types.Material | None = None,
+    ram_mat: bpy.types.Material | None = None,
+    rod_mat: bpy.types.Material | None = None,
+) -> list[bpy.types.Object]:
+    """Generates rear-mounted heavy hydraulic recoil spades / earth anchors that bite into the terrain plane (Z ≈ 0.02) to absorb massive kinetic artillery recoil."""
+    objects: list[bpy.types.Object] = []
+    loc = Vector(location)
+    b_mat = blade_mat or strut_mat
+    s_mat = strut_mat or blade_mat
+    rm_mat = ram_mat or b_mat
+    rd_mat = rod_mat or s_mat
+
+    w = max(0.8, width)
+    d = max(0.4, depth)
+
+    # 1. Transverse pivot hinge trunnion crossbar
+    hinge_y = loc.y
+    hinge_z = loc.z
+    objects.append(make_cylinder(
+        f"{prefix}_RecoilSpade_HingeBar",
+        radius=0.055,
+        depth=w * 0.90,
+        location=Vector((loc.x, hinge_y, hinge_z)),
+        material=s_mat,
+        vertices=10,
+        bevel=0.008,
+        rotation=(0.0, math.radians(90.0), 0.0),
+    ))
+
+    # Chassis anchor mounting knuckles
+    for side in (-1, 1):
+        stag = "L" if side < 0 else "R"
+        kx = loc.x + side * (w * 0.42)
+        objects.append(make_box(
+            f"{prefix}_RecoilSpade_MountBracket_{stag}",
+            (0.08, 0.16, 0.18),
+            Vector((kx, hinge_y + 0.06, hinge_z)),
+            b_mat,
+            bevel=0.012,
+        ))
+
+    # 2. Deployed vs Folded swing arms and spade blade coordinates
+    if deployed:
+        arm_end_y = hinge_y - d
+        blade_z = 0.080  # Grounded firmly on terrain without penetrating Z < 0.0
+    else:
+        arm_end_y = hinge_y - d * 0.25
+        blade_z = hinge_z + 0.55  # Folded up against rear hull
+
+    # Bilateral heavy swing arms
+    for side in (-1, 1):
+        stag = "L" if side < 0 else "R"
+        ax = loc.x + side * (w * 0.36)
+        arm_start = Vector((ax, hinge_y, hinge_z))
+        arm_end = Vector((ax, arm_end_y, blade_z + 0.12))
+        objects.append(make_rod(
+            f"{prefix}_RecoilSpade_SwingArm_{stag}",
+            arm_start,
+            arm_end,
+            radius=0.055,
+            material=b_mat,
+            vertices=8,
+            bevel=0.008,
+        ))
+
+    # 3. Main wedge spade anchor blade across the rear
+    blade_w = w * 0.92
+    blade_pos = Vector((loc.x, arm_end_y - 0.06, blade_z + 0.12))
+    blade_rot = (math.radians(-24.0 if deployed else 75.0), 0.0, 0.0)
+    objects.append(make_box(
+        f"{prefix}_RecoilSpade_BladePlate",
+        (blade_w, 0.08, 0.20),
+        blade_pos,
+        b_mat,
+        bevel=0.012,
+        rotation=blade_rot,
+    ))
+
+    # 4. Triangular ground-penetrating teeth along the bottom lip
+    n_teeth = 5
+    for i in range(n_teeth):
+        tx = loc.x - blade_w * 0.40 + i * (blade_w * 0.80 / max(1, n_teeth - 1))
+        tooth_pos = Vector((tx, arm_end_y - 0.08, blade_z + 0.04))
+        objects.append(make_box(
+            f"{prefix}_RecoilSpade_Tooth_{i+1}",
+            (0.08, 0.08, 0.06),
+            tooth_pos,
+            s_mat,
+            bevel=0.006,
+            rotation=blade_rot,
+        ))
+
+    # 5. Dual angled hydraulic actuator rams spanning chassis to spade blade
+    ram_mount_y = hinge_y + 0.30
+    ram_mount_z = hinge_z + 0.36
+    for side in (-1, 1):
+        stag = "L" if side < 0 else "R"
+        rx = loc.x + side * (w * 0.28)
+        upper_point = Vector((rx, ram_mount_y, ram_mount_z))
+        lower_point = Vector((rx, arm_end_y + 0.04, blade_z + 0.18))
+        mid_point = upper_point.lerp(lower_point, 0.55)
+
+        # Upper cylinder barrel
+        objects.append(make_rod(
+            f"{prefix}_RecoilSpade_Cylinder_{stag}",
+            upper_point,
+            mid_point,
+            radius=0.042,
+            material=rm_mat,
+            vertices=8,
+            bevel=0.006,
+        ))
+        # Telescopic chrome piston rod
+        objects.append(make_rod(
+            f"{prefix}_RecoilSpade_PistonRod_{stag}",
+            mid_point,
+            lower_point,
+            radius=0.026,
+            material=rd_mat,
+            vertices=8,
+        ))
+
+    return objects
+
+
+def make_perforated_barrel_shroud_assembly(
+    prefix: str,
+    gun_pivot: Tuple[float, float, float] | Vector = (0.0, 1.2, 0.9),
+    gun_dir: Tuple[float, float, float] | Vector = (0.0, 1.0, 0.0),
+    barrel_length: float = 2.4,
+    barrel_radius: float = 0.10,
+    shroud_length: float = 1.4,
+    shroud_radius: float = 0.16,
+    shroud_mat: bpy.types.Material | None = None,
+    collar_mat: bpy.types.Material | None = None,
+    brake_mat: bpy.types.Material | None = None,
+) -> list[bpy.types.Object]:
+    """Generates a ventilated thermal barrel jacket with consolidated BMesh cooling perforation slats, reinforced clamping collars, and an aggressive multi-baffle muzzle brake."""
+    objects: list[bpy.types.Object] = []
+    gp = Vector(gun_pivot)
+    gd = Vector(gun_dir).normalized()
+    s_mat = shroud_mat or collar_mat
+    c_mat = collar_mat or shroud_mat
+    b_mat = brake_mat or s_mat
+
+    # Compute orthonormal basis (gd, right_vec, up_vec)
+    world_up = Vector((0.0, 0.0, 1.0))
+    if abs(gd.dot(world_up)) > 0.95:
+        world_up = Vector((1.0, 0.0, 0.0))
+    right_vec = gd.cross(world_up).normalized()
+    up_vec = right_vec.cross(gd).normalized()
+
+    b_len = max(0.8, barrel_length)
+    s_len = min(b_len * 0.75, max(0.5, shroud_length))
+    s_rad = max(barrel_radius * 1.25, shroud_radius)
+    offset_dist = b_len * 0.14
+
+    shroud_start = gp + gd * offset_dist
+    shroud_end = shroud_start + gd * s_len
+
+    # 1. Consolidated BMesh ventilated thermal shroud jacket with radial perforation slots
+    mesh = bpy.data.meshes.new(f"{prefix}_BarrelShroud_Mesh")
+    shroud_obj = bpy.data.objects.new(f"{prefix}_BarrelShroud", mesh)
+    bpy.context.collection.objects.link(shroud_obj)
+    bm = bmesh.new()
+
+    # 8-sided polygonal jacket with alternating vented slats
+    n_facets = 8
+    n_slots = 5
+    slot_span = s_len / max(1, n_slots)
+    bar_thick = 0.022
+
+    for f_idx in range(n_facets):
+        theta = f_idx * (2.0 * math.pi / n_facets)
+        rad_dir = (right_vec * math.cos(theta) + up_vec * math.sin(theta)).normalized()
+        tan_dir = (-right_vec * math.sin(theta) + up_vec * math.cos(theta)).normalized()
+
+        for s_idx in range(n_slots):
+            # Perforated window: leave alternate gaps open along barrel length
+            slot_mid_d = offset_dist + (s_idx + 0.5) * slot_span
+            slot_center = gp + gd * slot_mid_d + rad_dir * s_rad
+
+            # Create ventilated slat bar segment
+            res = bmesh.ops.create_cube(bm, size=1.0)
+            slat_w = (2.0 * math.pi * s_rad / n_facets) * 0.72
+            slat_l = slot_span * 0.65  # Leaves 35% open venting slot
+            for v in res["verts"]:
+                p = (
+                    slot_center
+                    + tan_dir * (v.co.x * slat_w)
+                    + gd * (v.co.y * slat_l)
+                    + rad_dir * (v.co.z * bar_thick)
+                )
+                v.co = p
+
+    bm.normal_update()
+    bm.to_mesh(mesh)
+    bm.free()
+    finish_mesh(shroud_obj, s_mat, bevel=0.003, smooth=False)
+    objects.append(shroud_obj)
+
+    # 2. Clamping collar rings at jacket base and tip
+    for c_pos in (shroud_start, shroud_end):
+        rot_e = gd.to_track_quat("Z", "Y").to_euler()
+        objects.append(make_cylinder(
+            f"{prefix}_ShroudCollar",
+            radius=s_rad * 1.08,
+            depth=0.065,
+            location=c_pos,
+            material=c_mat,
+            vertices=10,
+            bevel=0.006,
+            rotation=rot_e,
+        ))
+
+    # 3. High-efficiency multi-baffle aggressive muzzle brake at the barrel tip
+    muzzle_tip = gp + gd * b_len
+    mb_len = max(0.24, barrel_radius * 2.8)
+    mb_rad = max(0.14, barrel_radius * 1.65)
+    mb_pos = muzzle_tip + gd * (mb_len * 0.5)
+    rot_mb = gd.to_track_quat("Z", "Y").to_euler()
+
+    objects.append(make_cylinder(
+        f"{prefix}_MuzzleBrake_Housing",
+        radius=mb_rad,
+        depth=mb_len,
+        location=mb_pos,
+        material=b_mat,
+        vertices=10,
+        bevel=0.008,
+        rotation=rot_mb,
+    ))
+
+    # Bilateral horizontal gas-deflector baffles
+    for side in (-1, 1):
+        stag = "L" if side < 0 else "R"
+        baffle_pos = mb_pos + right_vec * (side * mb_rad * 0.55)
+        objects.append(make_box(
+            f"{prefix}_MuzzleBrake_Baffle_{stag}",
+            (mb_rad * 0.45, mb_len * 0.60, mb_rad * 0.55),
+            baffle_pos,
+            c_mat,
+            bevel=0.005,
+        ))
+
+    # Stepped crown ring at the muzzle exit
+    objects.append(make_cylinder(
+        f"{prefix}_MuzzleBrake_Crown",
+        radius=mb_rad * 0.88,
+        depth=0.04,
+        location=muzzle_tip + gd * (mb_len + 0.02),
+        material=c_mat,
+        vertices=10,
+        bevel=0.004,
+        rotation=rot_mb,
+    ))
+
+    return objects
+
+
 
 def create_unity_empty_locator(
     name: str,
@@ -10600,6 +11155,117 @@ class RogueVehicleBuilder:
         ))
         return self
 
+    def add_rws_mount(
+        self,
+        scale: float = 1.0,
+        yaw_deg: float = 0.0,
+        pitch_deg: float = 0.0,
+        location: Tuple[float, float, float] | Vector | None = None,
+    ) -> "RogueVehicleBuilder":
+        """Adds a roof-mounted independent Remote Weapon Station (RWS/CROWS) with stabilized EO/IR optical sensor ball, traversing weapon yoke, armored ammo box, and rapid-fire autocannon/HMG."""
+        if location is not None:
+            rws_loc = Vector(location)
+        elif hasattr(self, "turret_center") and self.turret_center:
+            tc = Vector(self.turret_center)
+            th = self.turret_height if hasattr(self, "turret_height") else 0.45
+            tw = self.turret_width if hasattr(self, "turret_width") else 1.40
+            tl = self.turret_length if hasattr(self, "turret_length") else 1.60
+            rws_loc = tc + Vector((tw * 0.28, -tl * 0.18, th * 0.52))
+        else:
+            hl = self.hull_length if hasattr(self, "hull_length") else 3.0
+            hw = self.hull_width if hasattr(self, "hull_width") else 2.4
+            hz = self.hull_deck_z if hasattr(self, "hull_deck_z") else 0.88
+            rws_loc = Vector((hw * 0.25, hl * 0.12, hz))
+
+        self.objects.extend(make_remote_weapon_station_assembly(
+            f"{self.name}RWS",
+            location=rws_loc,
+            scale=scale,
+            yaw_deg=yaw_deg,
+            pitch_deg=pitch_deg,
+            housing_mat=self.palette.light_armor,
+            gun_mat=self.palette.gunmetal,
+            optic_mat=self.palette.emissive,
+            ammo_mat=self.palette.primary_armor,
+        ))
+        return self
+
+    def add_drone_dock(
+        self,
+        scale: float = 1.0,
+        location: Tuple[float, float, float] | Vector | None = None,
+    ) -> "RogueVehicleBuilder":
+        """Adds a recessed roof/deck landing cradle with magnetic charging guide rails, alignment runway glow LEDs, and a docked parasitic reconnaissance/escort drone."""
+        if location is not None:
+            dock_loc = Vector(location)
+        else:
+            hl = self.hull_length if hasattr(self, "hull_length") else 3.0
+            hz = self.hull_deck_z if hasattr(self, "hull_deck_z") else 0.88
+            dock_loc = Vector((0.0, -hl * 0.24, hz))
+
+        self.objects.extend(make_drone_docking_bay_assembly(
+            f"{self.name}DroneBay",
+            location=dock_loc,
+            scale=scale,
+            bay_mat=self.palette.primary_armor,
+            frame_mat=self.palette.gunmetal,
+            drone_mat=self.palette.light_armor,
+            glow_mat=self.palette.emissive,
+        ))
+        return self
+
+    def add_recoil_spade(
+        self,
+        width: float | None = None,
+        depth: float = 0.85,
+        deployed: bool = True,
+        location: Tuple[float, float, float] | Vector | None = None,
+    ) -> "RogueVehicleBuilder":
+        """Adds rear-mounted heavy hydraulic recoil spades / earth anchors that bite into the terrain plane (Z ≈ 0.02) to absorb massive kinetic artillery recoil."""
+        hl = self.hull_length if hasattr(self, "hull_length") else 3.0
+        hw = self.hull_width if hasattr(self, "hull_width") else 2.4
+        hz = self.hull_deck_z if hasattr(self, "hull_deck_z") else 0.88
+        spade_w = width if width is not None else hw * 0.82
+        spade_loc = Vector(location) if location is not None else Vector((0.0, -hl * 0.52, hz * 0.45))
+
+        self.objects.extend(make_recoil_earth_spade_assembly(
+            f"{self.name}Spade",
+            location=spade_loc,
+            width=spade_w,
+            depth=depth,
+            deployed=deployed,
+            blade_mat=self.palette.primary_armor,
+            strut_mat=self.palette.gunmetal,
+            ram_mat=self.palette.primary_armor,
+            rod_mat=self.palette.wheel_rim,
+        ))
+        return self
+
+    def add_barrel_shroud(
+        self,
+        shroud_length: float = 1.4,
+        shroud_radius: float = 0.16,
+    ) -> "RogueVehicleBuilder":
+        """Adds a ventilated thermal barrel jacket with consolidated BMesh cooling perforation slats, reinforced clamping collars, and an aggressive multi-baffle muzzle brake."""
+        gp = self.gun_pivot if hasattr(self, "gun_pivot") and self.gun_pivot else Vector((0.0, 1.2, 0.9))
+        gd = self.gun_dir if hasattr(self, "gun_dir") and self.gun_dir else Vector((0.0, 1.0, 0.0))
+        b_len = self.barrel_length if hasattr(self, "barrel_length") else 2.4
+        b_rad = self.barrel_radius if hasattr(self, "barrel_radius") else 0.10
+
+        self.objects.extend(make_perforated_barrel_shroud_assembly(
+            f"{self.name}BarrelShroud",
+            gun_pivot=gp,
+            gun_dir=gd,
+            barrel_length=b_len,
+            barrel_radius=b_rad,
+            shroud_length=shroud_length,
+            shroud_radius=shroud_radius,
+            shroud_mat=self.palette.gunmetal,
+            collar_mat=self.palette.light_armor,
+            brake_mat=self.palette.gunmetal,
+        ))
+        return self
+
     def add_unity_locators(self) -> "RogueVehicleBuilder":
         self.locator_sockets = create_unity_locator_sockets(
             name_prefix=self.name,
@@ -11350,6 +12016,90 @@ class RogueStructureBuilder:
             fin_mat=self.palette.gunmetal,
             glow_mat=self.palette.emissive,
             pipe_mat=self.palette.wheel_rim,
+        ))
+        return self
+
+    def add_rws_mount(
+        self,
+        scale: float = 1.0,
+        yaw_deg: float = 0.0,
+        pitch_deg: float = 0.0,
+        location: Tuple[float, float, float] | Vector | None = None,
+    ) -> "RogueStructureBuilder":
+        """Adds a roof/perimeter mounted independent Remote Weapon Station (RWS/CROWS) with stabilized EO/IR optical sensor ball and rapid-fire autocannon."""
+        rws_loc = Vector(location) if location is not None else Vector((1.2, 0.8, 2.1))
+        self.objects.extend(make_remote_weapon_station_assembly(
+            f"{self.name}Struct_RWS",
+            location=rws_loc,
+            scale=scale,
+            yaw_deg=yaw_deg,
+            pitch_deg=pitch_deg,
+            housing_mat=self.palette.light_armor,
+            gun_mat=self.palette.gunmetal,
+            optic_mat=self.palette.emissive,
+            ammo_mat=self.palette.primary_armor,
+        ))
+        return self
+
+    def add_drone_dock(
+        self,
+        scale: float = 1.0,
+        location: Tuple[float, float, float] | Vector | None = None,
+    ) -> "RogueStructureBuilder":
+        """Adds a roof landing cradle with magnetic charging guide rails, alignment runway glow LEDs, and a docked parasitic reconnaissance drone."""
+        dock_loc = Vector(location) if location is not None else Vector((0.0, -1.1, 2.1))
+        self.objects.extend(make_drone_docking_bay_assembly(
+            f"{self.name}Struct_DroneBay",
+            location=dock_loc,
+            scale=scale,
+            bay_mat=self.palette.primary_armor,
+            frame_mat=self.palette.gunmetal,
+            drone_mat=self.palette.light_armor,
+            glow_mat=self.palette.emissive,
+        ))
+        return self
+
+    def add_recoil_spade(
+        self,
+        width: float = 2.4,
+        depth: float = 0.95,
+        deployed: bool = True,
+        location: Tuple[float, float, float] | Vector | None = None,
+    ) -> "RogueStructureBuilder":
+        """Adds perimeter heavy hydraulic recoil earth spades that bite into the terrain plane (Z ≈ 0.02) to absorb firing recoil."""
+        spade_loc = Vector(location) if location is not None else Vector((0.0, -2.1, 0.45))
+        self.objects.extend(make_recoil_earth_spade_assembly(
+            f"{self.name}Struct_Spade",
+            location=spade_loc,
+            width=width,
+            depth=depth,
+            deployed=deployed,
+            blade_mat=self.palette.primary_armor,
+            strut_mat=self.palette.gunmetal,
+            ram_mat=self.palette.primary_armor,
+            rod_mat=self.palette.wheel_rim,
+        ))
+        return self
+
+    def add_barrel_shroud(
+        self,
+        shroud_length: float = 1.6,
+        shroud_radius: float = 0.18,
+    ) -> "RogueStructureBuilder":
+        """Adds a ventilated thermal barrel jacket with consolidated BMesh cooling perforation slats, reinforced clamping collars, and multi-baffle muzzle brake."""
+        gp = self.sockets.get("Socket_MuzzlePrimary", Vector((0.0, 1.8, 1.8)))
+        gd = Vector((0.0, 1.0, 0.0))
+        self.objects.extend(make_perforated_barrel_shroud_assembly(
+            f"{self.name}Struct_BarrelShroud",
+            gun_pivot=gp,
+            gun_dir=gd,
+            barrel_length=2.8,
+            barrel_radius=0.12,
+            shroud_length=shroud_length,
+            shroud_radius=shroud_radius,
+            shroud_mat=self.palette.gunmetal,
+            collar_mat=self.palette.light_armor,
+            brake_mat=self.palette.gunmetal,
         ))
         return self
 

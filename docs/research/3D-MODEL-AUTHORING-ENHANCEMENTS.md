@@ -630,3 +630,20 @@ dotnet run --project tests/RogueCommandExpansionLoader.ValidationTests -- .
   - Added `.add_slat_armor()`, `.add_era_bricks()`, `.add_camo_netting()`, and `.add_thermal_radiators()` to both `RogueVehicleBuilder` and `RogueStructureBuilder`.
   - Exposed `--slat-armor`, `--era-bricks`, `--camo-netting`, and `--thermal-radiators` CLI flags and auto-enabled them across matching tactical presets (`siege_breaker`, `urban_brawler`, `dreadnought_crawler`, `beam_destroyer`, `longbow_strider`, `inferno_purger`, `longshot_tankette`, `arctic_sentinel`, `thunder_mortar_carrier`, `subterranean_mole`, `atlas_crane_mech`, `fortified_pillbox`, `deep_space_relay`, `crimson_praetorian`, `cobalt_widowmaker`, `golden_aegis_command`, etc.).
 
+---
+
+## 22. Wave 6 Tactical Hardware & Heavy Support Suite (local build/validation evidence)
+
+- **Four new consolidated tactical hardware generators** (`tools/RogueModelKit.py` & `tools/generate_unit_model.py`), reusing exclusively the canonical `FactionPalette` materials (`primary_armor`, `light_armor`, `gunmetal`, `tread`, `wheel_rim`, `emissive`) for **0 additional draw calls** after `batch_meshes_by_material()`:
+  1. **Remote Weapon Station (`make_remote_weapon_station_assembly` / `--rws-mount`)**:
+     - Independent roof-mounted traversable weapon station comprising an azimuth plinth, U-shaped traversing yoke with vertical trunnions, an armored ammunition feed box, a stabilized Electro-Optical / Infrared (EO/IR) sensor ball (dual FLIR thermal lens and laser rangefinder aperture in `emissive`), and an elevated rapid-fire autocannon barrel with a slotted flash suppressor.
+  2. **Parasitic Recon / Escort Drone Docking Bay (`make_drone_docking_bay_assembly` / `--drone-dock`)**:
+     - Recessed landing tray cradle base with perimeter chamfered guide curbs, magnetic charging puck, glowing runway alignment LED corner markers (`emissive`), and a docked parasitic reconnaissance quadcopter drone with central fuselage pod, ventral glowing sensor eye, and 4 outrigger ducted fan rotor cowlings.
+  3. **Heavy Hydraulic Recoil Spades / Earth Anchors (`make_recoil_earth_spade_assembly` / `--recoil-spade`)**:
+     - Heavy rear chassis transverse pivot hinge trunnion crossbar, mounting brackets, bilateral welded swing arms, a wedge spade anchor plate with 5 triangular ground-penetrating teeth biting firmly into the terrain plane ($Z \approx 0.02\text{m}$), and dual angled hydraulic actuator rams with chrome telescopic rods.
+  4. **Perforated Thermal Barrel Shroud & Multi-Baffle Muzzle Brake (`make_perforated_barrel_shroud_assembly` / `--barrel-shroud`)**:
+     - Ventilated cylindrical/octagonal thermal jacket constructed in consolidated `BMesh` with alternating radial cooling perforation slots, base and tip clamping collars, and an expanding multi-baffle muzzle brake at the barrel tip with bilateral horizontal gas-deflector baffles and stepped crown ring.
+- **Builder & CLI Integration**:
+  - Added `.add_rws_mount()`, `.add_drone_dock()`, `.add_recoil_spade()`, and `.add_barrel_shroud()` to both `RogueVehicleBuilder` and `RogueStructureBuilder`.
+  - Exposed `--rws-mount`, `--drone-dock`, `--recoil-spade`, and `--barrel-shroud` CLI flags and auto-enabled them across matching tactical presets (`siege_breaker`, `apc_enforcer`, `sky_sweeper`, `dreadnought_crawler`, `hive_carrier`, `beam_destroyer`, `volatile_runner`, `longbow_strider`, `spectre_jammer`, `salvage_hauler`, `longshot_tankette`, `urban_brawler`, `night_stalker`, `early_warning_array`, `overlord_command_hq`, `thunder_mortar_carrier`, `fortified_pillbox`, `patriot_sam_battery`, `deep_space_relay`).
+
