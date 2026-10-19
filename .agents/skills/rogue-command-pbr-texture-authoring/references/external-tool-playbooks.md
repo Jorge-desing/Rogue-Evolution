@@ -1,6 +1,6 @@
 # External PBR Texture Tool Playbooks
 
-Use this reference only when an atlas uses ArmorPaint or Material Maker. The production FBX still comes from the Blender source, and the project-specific contract in the parent skill remains authoritative.
+Use this reference when an atlas uses ArmorPaint, Material Maker, or an adapted external Blender workflow. The production FBX still comes from the Blender source, and the project-specific contract in the parent skill remains authoritative.
 
 ## Shared setup and handoff
 
@@ -24,6 +24,12 @@ Use this reference only when an atlas uses ArmorPaint or Material Maker. The pro
 - Export PNG images only. Ignore engine `.mat` output and any mesh export. Retain the graph/project file as source art only when it is needed to reproduce the texture.
 - Material Maker represents Metallic and Roughness separately. For the project map, pack metallic into R/G/B and invert roughness into A for smoothness. If channel packing is uncertain, return to Blender's deterministic bake rather than importing a generic Unity material.
 
+## Adapted Blender agent workflows
+
+- `blendsmith` is available as a local Rogue Command adaptation at [`.agents/skills/blendsmith/SKILL.md`](../../blendsmith/SKILL.md). Its GPL-3.0-only upstream snapshot and license are retained in that skill. The active adapter replaces Blender 4.4 and generic separate Metallic/Roughness map assumptions with Blender 4.5.14, the local four-map set, MetallicGloss R/A packing, and Rogue Command mesh/socket/vertex-color rules.
+- The PBR material and baking ideas from [EL4CTEO/blender-skills](https://github.com/EL4CTEO/blender-skills) are adapted in [Rogue Command Blender PBR 4.5](../../rogue-command-blender-pbr-45/SKILL.md). The upstream repository targets Blender 5.2+; its scripts and ORM output are not installed. This project adaptation keeps the existing `--bake-atlas` generator as the production route and uses only version-checked concepts such as color-space separation, projection checks, padding, and tangent-basis consistency.
+- Use [Rogue Command ArmorPaint Texture Authoring](../../rogue-command-armorpaint-texture-authoring/SKILL.md) or [Rogue Command Material Maker Texture Authoring](../../rogue-command-material-maker-texture-authoring/SKILL.md) for operational tool steps. The shared checks below summarize their common handoff; the main PBR skill remains the contract authority.
+
 ## Final validation
 
 Run the parent PBR validation skill after the tool pass. In Unity, rebuild through `VehiclePrefabBuilder` and verify effective importer settings, alpha retention, texture bindings, shader keyword/properties, and the original mesh's vertex-color attribute. Tool viewport appearance alone is not Unity or in-game evidence.
@@ -35,3 +41,5 @@ Run the parent PBR validation skill after the tool pass. In Unity, rebuild throu
 - [Material Maker 1.7 release](https://github.com/RodZill4/material-maker/releases/tag/1.7)
 - [Material Maker paint-project mesh requirements](https://rodzill4.github.io/material-maker/doc/user_interface_paint_panel.html)
 - [Material Maker image and Unity export behavior](https://rodzill4.github.io/material-maker/doc/export.html)
+- [blendsmith upstream skill snapshot](../../blendsmith/references/upstream/SKILL.md) (GPL-3.0-only; adapted locally)
+- [EL4CTEO Blender skills](https://github.com/EL4CTEO/blender-skills) (Blender 5.2+ upstream; selected PBR/bake guidance adapted locally)

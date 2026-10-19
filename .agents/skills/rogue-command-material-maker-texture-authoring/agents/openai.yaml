@@ -1,0 +1,4 @@
+interface:
+  display_name: "Rogue Command Material Maker Textures"
+  short_description: "Create procedural PBR maps for Rogue Command units"
+  default_prompt: "Use $rogue-command-material-maker-texture-authoring to prepare a Material Maker texture pass for a Rogue Command model."

@@ -9,6 +9,8 @@ Use this skill to review texture atlases before or after importing them into the
 
 When maps came from ArmorPaint or Material Maker, also read the [external-tool playbooks](../rogue-command-pbr-texture-authoring/references/external-tool-playbooks.md) for the applicable export limits. Treat tool previews and generated Unity `.mat` files as source-art evidence only; validate the PNG channels and the project's actual shader/importer after rebuild.
 
+For tool-specific source review, also read [ArmorPaint Texture Authoring](../rogue-command-armorpaint-texture-authoring/SKILL.md) or [Material Maker Texture Authoring](../rogue-command-material-maker-texture-authoring/SKILL.md). For maps produced with Blender, use the [Blender 4.5 PBR adaptation](../rogue-command-blender-pbr-45/SKILL.md) alongside the required project bake workflow.
+
 Before reviewing, read `AGENTS.md`, `docs/research/AGENT-HANDOFF.md`, `unity/RogueCommandAssetAuthoring/README.md`, [the PBR workflow](../../../docs/research/PBR-TEXTURE-WORKFLOW.md), [3D Model Authoring](../rogue-command-3d-model-authoring/SKILL.md), [Unity Material Pipeline](../rogue-command-3d-model-authoring/references/unity-material-pipeline.md), and [AssetBundle Authoring](../rogue-command-assetbundle-authoring/SKILL.md) if bundle changes are part of the request. Keep unrelated working-tree changes intact.
 
 ## Validation Checklist
