@@ -8,12 +8,12 @@ This document defines the project-specific handoff from vehicle texturing to Uni
 |---|---|---|
 | Blender 4.5.14 LTS with `tools/generate_unit_model.py` / `tools/RogueModelKit.py` | Deterministic model and PBR atlas generation | Production baseline; retain the editable `.blend` and use the existing bake flags. |
 | ArmorPaint | Optional local painting and image-to-PBR assistance | Optional texture-only pass after UVs are final. Verify custom channel packing. Its neural nodes require separately downloaded model files; the manual recommends at least 6 GB VRAM. |
-| Material Maker | Procedural material graph authoring | Optional source of texture images. Direct model painting is experimental; do not depend on its Unity material export for this project's custom shader. |
+| Material Maker 1.7 | Procedural material graphs and 3D texture painting | Optional local source of texture images. Its paint project requires UVs and a single-submesh model; for other source meshes, use procedural maps or a disposable texture-only copy. Export PNGs only and ignore generated Unity `.mat` files. |
 | `blendsmith` | Public agent skill reference | Do not copy or install as-is. It is GPL-3.0-only and targets Blender 4.4; preserve license boundaries and Rogue Command contracts. |
 | `EL4CTEO/blender-skills` | Public agent skill reference | Do not install directly into this workflow because it targets Blender 5.2+, while the project pins Blender 4.5.14. |
 | Adobe Substance 3D Sampler generative workflows | Optional ideation reference | Do not make beta/service-dependent generation a reproducible build requirement. |
 
-These adaptations are project-local skills, not a vendored copy of external skill text. No third-party texturing application is installed or required by this workflow.
+These adaptations are project-local skills, not a vendored copy of external skill text. Material Maker 1.7 is staged locally under the ignored `.tools/` directory as an optional tool; it is not required by the baseline bake. ArmorPaint's portable desktop binary is distributed through purchase access, so stage it only from a user's official archive when available.
 
 ## Texture contract
 
@@ -34,7 +34,7 @@ The current shader keyword is `_METALLICSPECGLOSSMAP`; its source and `VehiclePr
 
 1. **Freeze the model inputs.** Confirm the source `.blend`, finalized UVs, atlas resolution, texture names, and whether the Unity output needs `_Atlas.fbx`. Preserve sockets, hierarchy, vertex colors, and source files.
 2. **Create the baseline maps in Blender.** Use the current deterministic `--bake-atlas` workflow. Keep generated intermediates in `artifacts/` until a specific texture asset is ready for integration. Do not change the generator CLI or AssetBundle manifest contract for a texture pass.
-3. **Optional art pass.** If a painted or generated texture improves readability, send the finalized UV mesh to ArmorPaint or create procedural images in Material Maker. Export only texture images. Explicitly pack metallic to RGB and smoothness to A; do not trust a generic Unity preset to match the shader. Keep AO, height, and auxiliary maps separate unless an in-project shader is verified to consume them.
+3. **Optional art pass.** If a painted texture improves readability, use ArmorPaint or Material Maker with the finalized UVs. Material Maker's 3D paint project currently requires UVs and a single-submesh model; when that does not match the source FBX, use its procedural graph path or a disposable texture-only copy. Export images only, never replace the authoritative Blender mesh. Explicitly pack metallic to RGB and smoothness to A; do not trust a generic Unity preset or exported `.mat` to match this shader. Keep AO, height, and auxiliary maps separate unless an in-project shader is verified to consume them.
 4. **Integrate the four named maps.** Copy only task-owned texture outputs into the Unity authoring project's model texture folder. Keep Blender's source FBX as the authoritative mesh. Never replace mesh vertex wear with texture AO or an external tool's vertex colors.
 5. **Rebuild and inspect in Unity 2021.3.45f2.** Run the existing `VehiclePrefabBuilder`, then inspect the effective import settings, material texture references, shader keyword, packed MetallicGloss channels, normal response, emission, UV padding, and mesh vertex colors. The builder may repair import settings during its run.
 6. **Check scale and evidence.** Review the unit at RTS camera scale and check atlas seams at close range. Record the result as static inspection or local Unity validation. A live-game appearance claim requires a separate Steam-launched runtime review.
@@ -52,7 +52,9 @@ The current shader keyword is `_METALLICSPECGLOSSMAP`; its source and `VehiclePr
 ## References
 
 - [ArmorPaint manual](https://armorpaint.org/manual)
+- [ArmorPaint official download page](https://armorpaint.org/download)
 - [Material Maker](https://materialmaker.org/) and [Unity export documentation](https://rodzill4.github.io/material-maker/doc/export.html)
+- [Material Maker 1.7 release](https://github.com/RodZill4/material-maker/releases/tag/1.7) and [3D paint project requirements](https://rodzill4.github.io/material-maker/doc/user_interface_paint_panel.html)
 - [blendsmith](https://github.com/brianchenanimator/blendsmith)
 - [EL4CTEO/blender-skills](https://github.com/EL4CTEO/blender-skills)
 - [Adobe Substance 3D Sampler generative workflows](https://experienceleague.adobe.com/en/docs/substance-3d-sampler/using/features-and-workflows/generative-workflows)

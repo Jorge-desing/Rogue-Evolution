@@ -12,9 +12,10 @@ Before authoring, read `AGENTS.md`, `docs/research/AGENT-HANDOFF.md`, `README.md
 ## Supported Workflow
 
 - Blender **4.5.14 LTS** and the repository's deterministic `bpy` pipeline are the reproducible production baseline. Start from the existing `.blend` and the generator's `--bake-atlas` path; use `--single-material` only when the intended export requires `<Name>_Atlas.fbx`. Read the current CLI help before selecting additional switches.
-- Keep ArmorPaint as an optional local art pass after UVs are final. It may paint or generate texture images, but it is not a build dependency. Its neural nodes run locally only after their model data has been downloaded; the manual recommends 6 GB VRAM. Material Maker is an optional procedural alternative; its direct model painting is experimental, and its Unity material export is not a substitute for checking this project's shader.
+- ArmorPaint and Material Maker are optional local art passes after UVs are final. ArmorPaint's distributed Windows binary requires purchase access; stage an already accessible official archive with `tools/Setup-TextureAuthoringTools.ps1 -ArmorPaintArchivePath <zip>`. Material Maker 1.7 is staged with `tools/Setup-TextureAuthoringTools.ps1 -MaterialMaker`. Neither application is a build dependency.
 - Do not install or copy external skills as-is. In particular, do not make a Blender 5.2+ workflow a dependency of the pinned Blender 4.5.14 project. Use third-party skills as references only and preserve their licenses; write project-specific adaptations here.
 - Do not make remote generative services necessary for texture creation or acceptance. Generated images may be used as references, but production outputs must be reviewable and stored as project assets.
+- For tool-specific import, painting, and export constraints, read [the external-tool playbooks](references/external-tool-playbooks.md). These tools supply texture images; Blender remains the source of the production mesh and Unity builder remains responsible for importer settings and material wiring.
 
 ## Required Texture Set
 
@@ -33,7 +34,7 @@ The current `RogueCommand/VehiclePBR_VertexWear` shader samples metallic from `M
 
 1. Confirm the source model, final UV layout, atlas resolution, target texture folder, and current texture set. Preserve a recoverable `.blend` source and work on a copy when changing an existing model.
 2. Produce the deterministic Blender atlas first. Confirm the output files, dimensions, naming, and that the bake completed without warnings that invalidate a map.
-3. If an art pass is useful, import the finalized UV mesh into ArmorPaint or use Material Maker for procedural maps. Export **textures only**. Preserve the Blender-produced FBX as the authoritative Unity mesh; re-exporting a mesh from an external painter requires a separate check of hierarchy, sockets, UVs, LODs, and vertex colors.
+3. If an art pass is useful, use ArmorPaint for brush-based edits or Material Maker for procedural maps and supported single-submesh paint projects. Read the tool playbook first. Export **textures only**. Preserve the Blender-produced FBX as the authoritative Unity mesh; re-exporting a mesh from an external painter requires a separate check of hierarchy, sockets, UVs, LODs, and vertex colors.
 4. Pack the custom metallic/smoothness output as RGB metallic and A smoothness. Set or verify metallic in R and alpha as `1 - roughness`; do not assume an application's default Unity preset uses this project's channel layout. Author emission deliberately. The tool's AO, height, or auxiliary maps can remain separate unless a verified project shader consumes them.
 5. Put the four named PNGs in the existing Unity authoring texture folder. Keep generated intermediates under `artifacts/` until they are ready to replace a specific task-owned asset.
 6. Rebuild the relevant visual prefab with the existing Unity builder and continue with the AssetBundle authoring skill when a bundle is in scope. Verify effective importer settings after the builder/reimport; do not rely only on `.meta` text.

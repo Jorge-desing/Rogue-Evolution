@@ -39,6 +39,8 @@ Unity 2021.3.45f2 ya está instalado para compilar AssetBundles. Blender 4.5.14 
 
 El script verifica SHA-256 y solo prepara Blender y UnityExplorer bajo `.tools/`. Runtime Unity Editor se prepara por separado con `./tools/Setup-BackendTools.ps1 -RuntimeUnityEditor`; también verifica SHA-256. Ninguno de estos scripts copia archivos al juego ni lo inicia. Los inspectores requieren BepInEx 5 Mono y se añaden a la instalación de Steam solo durante una prueba reversible, usando uno por perfil de prueba.
 
+Para preparar Material Maker 1.7 como herramienta PBR opcional, ejecuta desde la raíz del repositorio `powershell -File tools/Setup-TextureAuthoringTools.ps1 -MaterialMaker`. El script verifica el SHA-256 publicado para la release y deja la aplicación en `.tools/MaterialMaker-1.7/`. ArmorPaint se distribuye como binario portable con acceso de compra; si ya tienes acceso, usa `-ArmorPaintArchivePath <ZIP-oficial>`. Ambos flujos se mantienen fuera del proyecto Unity y de la instalación del juego. Sigue [PBR-TEXTURE-WORKFLOW.md](docs/research/PBR-TEXTURE-WORKFLOW.md) y las dos skills PBR antes de integrar mapas.
+
 Para revisar por CLI el contenido serializado de los bundles ya creados, prepara UnityDataTool 2.4.0 con su instalador fijado a una release y hash:
 
 ```powershell

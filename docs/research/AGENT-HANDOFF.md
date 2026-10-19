@@ -171,7 +171,7 @@ The repository equips 15 local skills under `.agents/skills/`:
 | `rogue-command-game-research` | REA assembly & asset inspection | `tools/asset_inventory.py`, `inspect_unity_objects` | Pinned SHA-256/MVID identity, CIL token verification |
 | `rogue-command-steam-runtime-validation`| Live Steam testing & telemetry | `STEAM-RUNTIME-CONTROL.md`, BepInEx MCP | Reversible deployment, profile isolation, Steam Cloud toggle |
 
-For texture work, use [PBR-TEXTURE-WORKFLOW.md](PBR-TEXTURE-WORKFLOW.md) as the shared handoff. Blender 4.5.14 remains the reproducible atlas path; ArmorPaint and Material Maker are optional image authoring steps. External texture tools export images only, while Unity's existing builder remains responsible for importer settings and prefab material wiring.
+For texture work, use [PBR-TEXTURE-WORKFLOW.md](PBR-TEXTURE-WORKFLOW.md) as the shared handoff. Blender 4.5.14 remains the reproducible atlas path; Material Maker 1.7 is staged as an optional local painter/procedural tool, and ArmorPaint is optional when its official binary is available to the user. External texture tools export images only, while Unity's existing builder remains responsible for importer settings and prefab material wiring. Prepare local copies with `tools/Setup-TextureAuthoringTools.ps1`; both app paths stay under ignored `.tools/`.
 
 ### Domain Technical Details
 
