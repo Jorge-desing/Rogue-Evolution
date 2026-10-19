@@ -273,6 +273,70 @@
       }
     },
     {
+      "id": "sample-native:bastion-siege-mech",
+      "nativeTemplateId": "GatlingWalker",
+      "assetBundleId": "sample-native:assets",
+      "cardImageAssetName": "assets/roguecommandexpansionsample/bastionsiegemechcard.png",
+      "visualAssetName": "assets/roguecommandexpansionsample/bastionsiegemechvisual.prefab",
+      "visualRootPath": "RoboMarine_Mesh",
+      "localizations": [
+        {
+          "language": "en-US",
+          "name": "Bastion Siege Mech",
+          "description": "A fortified heavy walker that trades speed for deliberate cannon fire and staying power."
+        },
+        {
+          "language": "es-XL",
+          "name": "Mecha de Asedio Bastión",
+          "description": "Un caminante pesado fortificado que cambia velocidad por fuego de cañón y resistencia."
+        }
+      ],
+      "balanceOverrides": [
+        { "name": "cost", "value": "410" },
+        { "name": "maxHealth", "value": "420" },
+        { "name": "moveSpeed", "value": "11.0" },
+        { "name": "damage1", "value": "4" },
+        { "name": "attackCooldown", "value": "1.0" },
+        { "name": "weaponRange", "value": "5.0" },
+        { "name": "armorProtection", "value": "1" },
+        { "name": "rarity", "value": "Common" },
+        { "name": "neededExperienceLevel", "value": "2" },
+        { "name": "productionDuration", "value": "42" },
+        { "name": "maxCapacity", "value": "4" },
+        { "name": "maxShield", "value": "0" },
+        { "name": "maxMana", "value": "0" },
+        { "name": "maxArmor", "value": "1" },
+        { "name": "sightRadius", "value": "7" },
+        { "name": "attackType", "value": "Single" },
+        { "name": "skillType", "value": "None" },
+        { "name": "damage2", "value": "0" },
+        { "name": "firePointCount", "value": "2" },
+        { "name": "attack2Cooldown", "value": "0" },
+        { "name": "effectRadius1", "value": "0" },
+        { "name": "effectRadius2", "value": "0" },
+        { "name": "skillRange", "value": "0" },
+        { "name": "healAmount1", "value": "0" },
+        { "name": "healAmount2", "value": "0" },
+        { "name": "gainCreditsAmount", "value": "0" },
+        { "name": "skillManaCost", "value": "0" },
+        { "name": "duration1", "value": "0" },
+        { "name": "duration2", "value": "0" }
+      ],
+      "productionBuilding": {
+        "id": "sample-native:bastion-siege-mech-factory",
+        "nativeTemplateId": "GatlingWalkerFactory",
+        "balanceOverrides": [
+          { "name": "cost", "value": "1100" },
+          { "name": "neededExperienceLevel", "value": "2" },
+          { "name": "rarity", "value": "Common" }
+        ],
+        "localizations": [
+          { "language": "en-US", "name": "Bastion Siege Foundry", "description": "Produces Bastion Siege Mechs." },
+          { "language": "es-XL", "name": "Fundición del Bastión", "description": "Produce mechas de asedio Bastión." }
+        ]
+      }
+    },
+    {
       "id": "sample-native:skirmish-bike",
       "nativeTemplateId": "BombBike",
       "assetBundleId": "sample-native:assets",
@@ -462,6 +526,7 @@
         "sample-native:heavy-artillery",
         "sample-native:assault-walker",
         "sample-native:atlas-crane-mech",
+        "sample-native:bastion-siege-mech",
         "sample-native:surge-tank"
       ],
       "aiProfileIds": [
@@ -489,6 +554,7 @@
         "sample-native:heavy-artillery",
         "sample-native:assault-walker",
         "sample-native:atlas-crane-mech",
+        "sample-native:bastion-siege-mech",
         "sample-native:skirmish-bike",
         "sample-native:surge-tank"
       ],

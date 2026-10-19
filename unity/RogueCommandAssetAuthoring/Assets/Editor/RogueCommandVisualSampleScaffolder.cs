@@ -33,6 +33,11 @@ namespace RogueCommandExpansion.Authoring
         private const string AtlasCraneMechPrefabPath = AssetRoot + "/AtlasCraneMechVisual.prefab";
         private const string AtlasCraneMechCardSpritePath = AssetRoot + "/AtlasCraneMechCard.png";
         private const string AtlasCraneMechModelPath = AssetRoot + "/Models/AtlasCraneMech.fbx";
+        private const string BastionSiegeMechPrefabPath = AssetRoot + "/BastionSiegeMechVisual.prefab";
+        private const string BastionSiegeMechCardSpritePath = AssetRoot + "/BastionSiegeMechCard.png";
+        private const string BastionSiegeMechModelPath = AssetRoot + "/Models/BastionSiegeMech.fbx";
+        private const string BastionEngineLoopAudioPath = AssetRoot + "/Audio/BastionSiegeMech_EngineLoop.wav";
+        private const string BastionWeaponShotAudioPath = AssetRoot + "/Audio/BastionSiegeMech_WeaponShot.wav";
         private const string SurgeArcTankPrefabPath = AssetRoot + "/SurgeArcTankVisual.prefab";
         private const string SurgeArcTankCardSpritePath = AssetRoot + "/SurgeArcTankCard.png";
         private const string SurgeArcTankModelPath = AssetRoot + "/Models/SurgeArcTank.fbx";
@@ -267,6 +272,8 @@ namespace RogueCommandExpansion.Authoring
                 ImportCardSprite(IroncladCardSpritePath);
                 string atlasCraneMechPrefabPath = CreateAtlasCraneMechVisual();
                 ImportCardSprite(AtlasCraneMechCardSpritePath);
+                string bastionSiegeMechPrefabPath = CreateBastionSiegeMechVisual();
+                ImportCardSprite(BastionSiegeMechCardSpritePath, true);
                 string surgeArcTankPrefabPath = CreateSurgeArcTankVisual();
                 ImportCardSprite(SurgeArcTankCardSpritePath);
                 string outputPath = Path.GetFullPath(Path.Combine(projectRoot, BundleOutputPath));
@@ -282,6 +289,7 @@ namespace RogueCommandExpansion.Authoring
                         colossusPrefabPath, ColossusCardSpritePath,
                         ironcladPrefabPath, IroncladCardSpritePath,
                         atlasCraneMechPrefabPath, AtlasCraneMechCardSpritePath,
+                        bastionSiegeMechPrefabPath, BastionSiegeMechCardSpritePath,
                         surgeArcTankPrefabPath, SurgeArcTankCardSpritePath
                     }
                 };
@@ -314,8 +322,8 @@ namespace RogueCommandExpansion.Authoring
                     Path.Combine(packBundles, "assetbundle-manifest.bundle"));
 
                 AssetDatabase.Refresh();
-                Debug.Log("Built six script-free Sandlance, Skirmish Bike, Colossus, Ironclad Walker, " +
-                    "Atlas Crane Mech, and Surge Arc Tank visual overlays plus six card Sprites in " +
+                Debug.Log("Built seven script-free Sandlance, Skirmish Bike, Colossus, Ironclad Walker, " +
+                    "Atlas Crane Mech, Bastion Siege Mech, and Surge Arc Tank visual overlays plus seven card Sprites in " +
                     BundleName + " at " + packBundles + ".");
                 if (Application.isBatchMode)
                 {
@@ -336,14 +344,146 @@ namespace RogueCommandExpansion.Authoring
             }
         }
 
+        // Targeted recovery/build entry point. This consumes already-authored prefabs and
+        // cards without invoking any model, material, animation, or prefab scaffolding.
+        public static void BuildBastionBundleFromExistingAssets()
+        {
+            try
+            {
+                if (!String.Equals(Application.unityVersion, RequiredUnityVersion, StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("This sample must be built with Unity " +
+                        RequiredUnityVersion + "; current Editor is " + Application.unityVersion + ".");
+                }
+
+                if (!BuildPipeline.IsBuildTargetSupported(BuildTargetGroup.Standalone,
+                    BuildTarget.StandaloneWindows64))
+                {
+                    throw new InvalidOperationException(
+                        "Install the Unity Windows Build Support module before building this sample.");
+                }
+
+                string projectRoot = Directory.GetParent(Application.dataPath).FullName;
+                EnsureExistingBundleAsset(PrefabPath, typeof(GameObject));
+                EnsureExistingBundleAsset(CardSpritePath, typeof(Sprite));
+                EnsureExistingBundleAsset(BikePrefabPath, typeof(GameObject));
+                EnsureExistingBundleAsset(BikeCardSpritePath, typeof(Sprite));
+                EnsureExistingBundleAsset(ColossusPrefabPath, typeof(GameObject));
+                EnsureExistingBundleAsset(ColossusCardSpritePath, typeof(Sprite));
+                EnsureExistingBundleAsset(IroncladPrefabPath, typeof(GameObject));
+                EnsureExistingBundleAsset(IroncladCardSpritePath, typeof(Sprite));
+                EnsureExistingBundleAsset(AtlasCraneMechPrefabPath, typeof(GameObject));
+                EnsureExistingBundleAsset(AtlasCraneMechCardSpritePath, typeof(Sprite));
+                EnsureExistingBundleAsset(BastionSiegeMechPrefabPath, typeof(GameObject));
+                EnsureExistingBundleAsset(BastionSiegeMechCardSpritePath, typeof(Sprite));
+                EnsureExistingBundleAsset(SurgeArcTankPrefabPath, typeof(GameObject));
+                EnsureExistingBundleAsset(SurgeArcTankCardSpritePath, typeof(Sprite));
+                EnsureExistingBundleAsset(BastionEngineLoopAudioPath, typeof(AudioClip));
+                EnsureExistingBundleAsset(BastionWeaponShotAudioPath, typeof(AudioClip));
+
+                GameObject bastionPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(BastionSiegeMechPrefabPath);
+                AudioSource[] bastionAudioSources = bastionPrefab.GetComponentsInChildren<AudioSource>(true);
+                if (bastionAudioSources.Length != 2)
+                {
+                    throw new InvalidDataException("Bastion prefab must already contain its two authored 3D AudioSources; " +
+                        "found " + bastionAudioSources.Length + ". Refusing to regenerate the prefab in this targeted build.");
+                }
+
+                string packageManifestPath = Path.Combine(projectRoot, "Packages", "manifest.json");
+                string packageManifest = File.ReadAllText(packageManifestPath);
+                if (packageManifest.IndexOf("\"com.unity.modules.audio\": \"1.0.0\"", StringComparison.Ordinal) < 0)
+                {
+                    throw new InvalidDataException("Packages/manifest.json must enable built-in com.unity.modules.audio 1.0.0.");
+                }
+
+                EnsureUrpAuthoringPipeline();
+                string outputPath = Path.GetFullPath(Path.Combine(projectRoot, BundleOutputPath));
+                Directory.CreateDirectory(outputPath);
+                var build = new AssetBundleBuild
+                {
+                    assetBundleName = BundleName,
+                    assetNames = new[]
+                    {
+                        PrefabPath, CardSpritePath,
+                        BikePrefabPath, BikeCardSpritePath,
+                        ColossusPrefabPath, ColossusCardSpritePath,
+                        IroncladPrefabPath, IroncladCardSpritePath,
+                        AtlasCraneMechPrefabPath, AtlasCraneMechCardSpritePath,
+                        BastionSiegeMechPrefabPath, BastionSiegeMechCardSpritePath,
+                        SurgeArcTankPrefabPath, SurgeArcTankCardSpritePath
+                    }
+                };
+                AssetBundleManifest manifest = BuildPipeline.BuildAssetBundles(outputPath,
+                    new[] { build }, BuildAssetBundleOptions.ChunkBasedCompression |
+                    BuildAssetBundleOptions.ForceRebuildAssetBundle,
+                    BuildTarget.StandaloneWindows64);
+                if (manifest == null)
+                {
+                    throw new InvalidOperationException("Unity did not produce an AssetBundle manifest.");
+                }
+
+                string[] bundleNames = manifest.GetAllAssetBundles();
+                if (bundleNames == null || bundleNames.Length != 1 ||
+                    !String.Equals(bundleNames[0], BundleName, StringComparison.Ordinal))
+                {
+                    throw new InvalidDataException("Unity's AssetBundle manifest does not contain exactly " +
+                        BundleName + ".");
+                }
+
+                ValidateBuiltVisualBundle(Path.Combine(outputPath, BundleName));
+
+                string packRoot = ResolvePackRoot(projectRoot);
+                string packBundles = Path.Combine(packRoot, "bundles");
+                Directory.CreateDirectory(packBundles);
+                CopyRequiredFile(Path.Combine(outputPath, BundleName),
+                    Path.Combine(packBundles, BundleName));
+                string generatedManifest = Path.Combine(outputPath, new DirectoryInfo(outputPath).Name);
+                CopyRequiredFile(generatedManifest,
+                    Path.Combine(packBundles, "assetbundle-manifest.bundle"));
+
+                Debug.Log("Rebuilt and reopened " + BundleName + " from existing sample assets; no prefabs or " +
+                    "model/material scaffolding was run. Bastion includes its two authored AudioSources.");
+                if (Application.isBatchMode)
+                {
+                    EditorApplication.Exit(0);
+                }
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception);
+                if (Application.isBatchMode)
+                {
+                    EditorApplication.Exit(1);
+                }
+                else
+                {
+                    EditorUtility.DisplayDialog("Bastion bundle build failed", exception.Message, "OK");
+                }
+            }
+        }
+
+        private static void EnsureExistingBundleAsset(string assetPath, Type requiredType)
+        {
+            UnityEngine.Object asset = AssetDatabase.LoadAssetAtPath(assetPath, requiredType);
+            if (asset == null)
+            {
+                throw new FileNotFoundException("Targeted bundle build requires an existing " +
+                    requiredType.Name + " at " + assetPath + ". It will not create or repair it.");
+            }
+        }
+
         private static void ValidateRiggedWalkerSources(string projectRoot)
         {
             var issues = new List<string>();
             ValidateSourceFile(projectRoot, IroncladCardSpritePath, "Ironclad Walker card", issues);
             ValidateSourceFile(projectRoot, AtlasCraneMechCardSpritePath, "Atlas Crane Mech card", issues);
+            ValidateSourceFile(projectRoot, BastionSiegeMechCardSpritePath, "Bastion Siege Mech card", issues);
+            ValidateSourceFile(projectRoot, BastionEngineLoopAudioPath, "Bastion Siege Mech engine loop", issues);
+            ValidateSourceFile(projectRoot, BastionWeaponShotAudioPath, "Bastion Siege Mech weapon shot", issues);
 
             ValidateWalkerModelSource(projectRoot, IroncladModelPath, "Ironclad Walker", issues);
             ValidateWalkerModelSource(projectRoot, AtlasCraneMechModelPath, "Atlas Crane Mech", issues);
+            ValidateWalkerModelSource(projectRoot, BastionSiegeMechModelPath, "Bastion Siege Mech", issues, true);
 
             if (issues.Count > 0)
             {
@@ -371,7 +511,8 @@ namespace RogueCommandExpansion.Authoring
             string projectRoot,
             string modelPath,
             string unitName,
-            ICollection<string> issues)
+            ICollection<string> issues,
+            bool validateBastionRigContract = false)
         {
             string absolutePath = Path.GetFullPath(Path.Combine(projectRoot,
                 modelPath.Replace('/', Path.DirectorySeparatorChar)));
@@ -484,6 +625,25 @@ namespace RogueCommandExpansion.Authoring
                 {
                     modelIssues.Add("animation clips " + String.Join(", ", missingActions));
                 }
+                if (validateBastionRigContract)
+                {
+                    if (!HasClipFrameCount(clips, "FireRecoil", 15))
+                    {
+                        modelIssues.Add("Action_FireRecoil at 15 frames");
+                    }
+                    if (!HasClipFrameCount(clips, "Death", 45))
+                    {
+                        modelIssues.Add("Action_Death at 45 frames");
+                    }
+                    if (!HasInPlaceRootBoneAnimation(model, clips))
+                    {
+                        modelIssues.Add("Action_Walk with Bone_Root position invariant");
+                    }
+                    if (!HasRigidMechanicalBoneWeights(skinnedRenderers))
+                    {
+                        modelIssues.Add("single-bone 1.0 weights on all mechanical mesh vertices");
+                    }
+                }
 
                 if (modelIssues.Count > 0)
                 {
@@ -517,8 +677,125 @@ namespace RogueCommandExpansion.Authoring
             return false;
         }
 
-        private static void EnsureCanonicalWalkerSockets(GameObject root, GameObject model, bool rapidFireMuzzle)
+        private static bool HasClipFrameCount(AnimationClip[] clips, string nameFragment, int expectedFrames)
         {
+            if (clips == null) return false;
+            for (int i = 0; i < clips.Length; i++)
+            {
+                AnimationClip clip = clips[i];
+                if (clip == null || clip.name.IndexOf(nameFragment, StringComparison.OrdinalIgnoreCase) < 0)
+                {
+                    continue;
+                }
+
+                float frameCount = clip.length * Mathf.Max(1.0f, clip.frameRate);
+                return Mathf.Abs(frameCount - expectedFrames) <= 1.01f;
+            }
+
+            return false;
+        }
+
+        private static bool HasInPlaceRootBoneAnimation(GameObject model, AnimationClip[] clips)
+        {
+            AnimationClip walkClip = null;
+            if (clips != null)
+            {
+                for (int i = 0; i < clips.Length; i++)
+                {
+                    if (clips[i] != null &&
+                        (clips[i].name.IndexOf("Walk", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                         clips[i].name.IndexOf("Drive", StringComparison.OrdinalIgnoreCase) >= 0))
+                    {
+                        walkClip = clips[i];
+                        break;
+                    }
+                }
+            }
+            if (model == null || walkClip == null) return false;
+
+            GameObject sample = UnityEngine.Object.Instantiate(model);
+            try
+            {
+                List<Transform> rootBones = FindNamedTransforms(sample, "Bone_Root");
+                if (rootBones.Count != 1) return false;
+
+                Transform rootBone = rootBones[0];
+                float frameRate = Mathf.Max(1.0f, walkClip.frameRate);
+                int frameCount = Mathf.Max(1, Mathf.CeilToInt(walkClip.length * frameRate));
+                walkClip.SampleAnimation(sample, 0.0f);
+                Vector3 inPlacePosition = rootBone.localPosition;
+                for (int frame = 1; frame <= frameCount; frame++)
+                {
+                    float sampleTime = Mathf.Min(frame / frameRate, walkClip.length);
+                    walkClip.SampleAnimation(sample, sampleTime);
+                    if ((rootBone.localPosition - inPlacePosition).sqrMagnitude > 0.000001f)
+                    {
+                        return false;
+                    }
+                }
+
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(sample);
+            }
+        }
+
+        private static bool HasRigidMechanicalBoneWeights(SkinnedMeshRenderer[] renderers)
+        {
+            if (renderers == null || renderers.Length == 0) return false;
+            bool foundMesh = false;
+            for (int rendererIndex = 0; rendererIndex < renderers.Length; rendererIndex++)
+            {
+                SkinnedMeshRenderer renderer = renderers[rendererIndex];
+                Mesh mesh = renderer != null ? renderer.sharedMesh : null;
+                if (mesh == null) continue;
+                foundMesh = true;
+                BoneWeight[] weights = mesh.boneWeights;
+                if (weights == null || weights.Length != mesh.vertexCount) return false;
+                for (int vertex = 0; vertex < weights.Length; vertex++)
+                {
+                    BoneWeight weight = weights[vertex];
+                    int activeWeights = 0;
+                    float strongestWeight = 0.0f;
+                    if (weight.weight0 > 0.001f) { activeWeights++; strongestWeight = Mathf.Max(strongestWeight, weight.weight0); }
+                    if (weight.weight1 > 0.001f) { activeWeights++; strongestWeight = Mathf.Max(strongestWeight, weight.weight1); }
+                    if (weight.weight2 > 0.001f) { activeWeights++; strongestWeight = Mathf.Max(strongestWeight, weight.weight2); }
+                    if (weight.weight3 > 0.001f) { activeWeights++; strongestWeight = Mathf.Max(strongestWeight, weight.weight3); }
+                    if (activeWeights != 1 || strongestWeight < 0.999f)
+                    {
+                        return false;
+                    }
+                }
+            }
+
+            return foundMesh;
+        }
+
+        private static void EnsureCanonicalWalkerSockets(
+            GameObject root,
+            GameObject model,
+            bool rapidFireMuzzle,
+            bool quadrupedCrawler = false)
+        {
+            string[] footContactNames = quadrupedCrawler
+                ? new[]
+                {
+                    "Socket_FootContact_FL",
+                    "Socket_FootContact_FR",
+                    "Socket_FootContact_RL",
+                    "Socket_FootContact_RR"
+                }
+                : new[]
+                {
+                    "Socket_FootContact_L",
+                    "Socket_FootContact_R"
+                };
             string[] uniqueSocketNames =
             {
                 "Socket_MuzzlePrimary",
@@ -526,27 +803,47 @@ namespace RogueCommandExpansion.Authoring
                 "Socket_WeaponAudio",
                 "Socket_DamageSmoke",
                 "Socket_DamageFire",
-                "Socket_GroundCenter",
-                "Socket_FootContact_L",
-                "Socket_FootContact_R"
+                "Socket_GroundCenter"
             };
             for (int i = 0; i < uniqueSocketNames.Length; i++)
             {
                 GetUniqueNamedTransform(root, uniqueSocketNames[i], false);
             }
 
+            for (int i = 0; i < footContactNames.Length; i++)
+            {
+                GetUniqueNamedTransform(root, footContactNames[i], false);
+            }
+
             Bounds modelBounds = GetModelBoundsInRootSpace(root, model);
             float footHalfWidth = Mathf.Max(modelBounds.size.x * 0.22f, 0.12f);
-            Vector3 leftFootFallback = new Vector3(modelBounds.center.x - footHalfWidth, 0.0f, modelBounds.center.z);
-            Vector3 rightFootFallback = new Vector3(modelBounds.center.x + footHalfWidth, 0.0f, modelBounds.center.z);
-            Transform leftFoot = EnsureUniqueSocket(root, "Socket_FootContact_L", leftFootFallback);
-            Transform rightFoot = EnsureUniqueSocket(root, "Socket_FootContact_R", rightFootFallback);
+            Transform[] footContacts = new Transform[footContactNames.Length];
+            if (quadrupedCrawler)
+            {
+                // Crawler contact points are part of the authored model contract. Do not synthesize
+                // generic L/R contacts, which lose the independent front/rear track anchors.
+                for (int i = 0; i < footContactNames.Length; i++)
+                {
+                    footContacts[i] = GetUniqueNamedTransform(root, footContactNames[i], true);
+                }
+            }
+            else
+            {
+                Vector3 leftFootFallback = new Vector3(
+                    modelBounds.center.x - footHalfWidth, 0.0f, modelBounds.center.z);
+                Vector3 rightFootFallback = new Vector3(
+                    modelBounds.center.x + footHalfWidth, 0.0f, modelBounds.center.z);
+                footContacts[0] = EnsureUniqueSocket(root, footContactNames[0], leftFootFallback);
+                footContacts[1] = EnsureUniqueSocket(root, footContactNames[1], rightFootFallback);
+            }
 
             Transform muzzle = GetUniqueNamedTransform(root, "Socket_MuzzlePrimary", true);
             Transform weaponAudio = GetUniqueNamedTransform(root, "Socket_WeaponAudio", true);
             Transform engineAudio = GetUniqueNamedTransform(root, "Socket_EngineAudio", true);
-            EnsureRootLocalFootContact(root, leftFoot, "Socket_FootContact_L");
-            EnsureRootLocalFootContact(root, rightFoot, "Socket_FootContact_R");
+            for (int i = 0; i < footContacts.Length; i++)
+            {
+                EnsureRootLocalFootContact(root, footContacts[i], footContactNames[i]);
+            }
             weaponAudio.SetPositionAndRotation(muzzle.position, muzzle.rotation);
             if (Vector3.Distance(engineAudio.position, root.transform.position) < 0.05f)
             {
@@ -567,24 +864,43 @@ namespace RogueCommandExpansion.Authoring
                 throw new InvalidDataException("FirePoint_0 and FirePoint_1 must be distinct on " + root.name + ".");
             }
 
-            ValidateCanonicalWalkerSockets(root, root.name);
+            ValidateCanonicalWalkerSockets(root, root.name, quadrupedCrawler);
         }
 
-        private static void ValidateCanonicalWalkerSockets(GameObject root, string unitName)
+        private static void ValidateCanonicalWalkerSockets(
+            GameObject root,
+            string unitName,
+            bool quadrupedCrawler = false)
         {
+            string[] footContactNames = quadrupedCrawler
+                ? new[]
+                {
+                    "Socket_FootContact_FL",
+                    "Socket_FootContact_FR",
+                    "Socket_FootContact_RL",
+                    "Socket_FootContact_RR"
+                }
+                : new[]
+                {
+                    "Socket_FootContact_L",
+                    "Socket_FootContact_R"
+                };
             string[] requiredSocketNames =
             {
                 "Socket_MuzzlePrimary",
                 "Socket_EngineAudio",
                 "Socket_WeaponAudio",
                 "Socket_DamageSmoke",
-                "Socket_DamageFire",
-                "Socket_FootContact_L",
-                "Socket_FootContact_R"
+                "Socket_DamageFire"
             };
             for (int i = 0; i < requiredSocketNames.Length; i++)
             {
                 GetUniqueNamedTransform(root, requiredSocketNames[i], true);
+            }
+
+            for (int i = 0; i < footContactNames.Length; i++)
+            {
+                GetUniqueNamedTransform(root, footContactNames[i], true);
             }
 
             Transform muzzle = GetUniqueNamedTransform(root, "Socket_MuzzlePrimary", true);
@@ -594,10 +910,11 @@ namespace RogueCommandExpansion.Authoring
                 throw new InvalidDataException(unitName + " has Socket_WeaponAudio too far from Socket_MuzzlePrimary.");
             }
 
-            EnsureRootLocalFootContact(root, GetUniqueNamedTransform(root, "Socket_FootContact_L", true),
-                "Socket_FootContact_L");
-            EnsureRootLocalFootContact(root, GetUniqueNamedTransform(root, "Socket_FootContact_R", true),
-                "Socket_FootContact_R");
+            for (int i = 0; i < footContactNames.Length; i++)
+            {
+                EnsureRootLocalFootContact(root,
+                    GetUniqueNamedTransform(root, footContactNames[i], true), footContactNames[i]);
+            }
 
             ValidateFirePoint(root, muzzle, "FirePoint_0");
             ValidateFirePoint(root, muzzle, "FirePoint_1");
@@ -755,6 +1072,414 @@ namespace RogueCommandExpansion.Authoring
             {
                 throw new InvalidDataException(name + " muzzle flash ParticleSystem must be non-looping and not play on awake.");
             }
+        }
+
+        private static void EnsureBastionAudioSources(GameObject root, AudioClip engineLoop, AudioClip weaponShot)
+        {
+            Transform engineSocket = GetUniqueNamedTransform(root, "Socket_EngineAudio", true);
+            Transform weaponSocket = GetUniqueNamedTransform(root, "Socket_WeaponAudio", true);
+            Transform muzzle = GetUniqueNamedTransform(root, "Socket_MuzzlePrimary", true);
+            if (Vector3.Distance(weaponSocket.position, muzzle.position) > 0.03f)
+            {
+                throw new InvalidDataException(
+                    "Bastion Siege Mech Socket_WeaponAudio must be colocated with Socket_MuzzlePrimary.");
+            }
+            if (Vector3.Distance(engineSocket.position, root.transform.position) < 0.10f)
+            {
+                throw new InvalidDataException(
+                    "Bastion Siege Mech Socket_EngineAudio must be authored at its engine deck or exhaust midpoint.");
+            }
+
+            ConfigureBastionAudioSource(engineSocket, "EngineLoopAudioSource", engineLoop, true, 0.55f);
+            ConfigureBastionAudioSource(weaponSocket, "WeaponShotAudioSource", weaponShot, false, 0.85f);
+        }
+
+        private static void ConfigureBastionAudioSource(
+            Transform socket,
+            string sourceName,
+            AudioClip clip,
+            bool loop,
+            float volume)
+        {
+            if (socket == null || clip == null || clip.channels != 1)
+            {
+                throw new InvalidDataException(sourceName + " requires a non-null mono AudioClip and canonical socket.");
+            }
+
+            Transform sourceTransform = GetUniqueNamedTransform(socket.root.gameObject, sourceName, false);
+            if (sourceTransform == null)
+            {
+                var sourceObject = new GameObject(sourceName);
+                sourceTransform = sourceObject.transform;
+                sourceTransform.SetParent(socket, false);
+            }
+            else if (sourceTransform.parent != socket)
+            {
+                sourceTransform.SetParent(socket, false);
+            }
+
+            AudioSource[] existingSources = socket.GetComponentsInChildren<AudioSource>(true);
+            if (existingSources.Length > 1)
+            {
+                throw new InvalidDataException(socket.name + " must contain exactly one authored AudioSource.");
+            }
+
+            AudioSource source = sourceTransform.GetComponent<AudioSource>();
+            if (source == null)
+            {
+                source = sourceTransform.gameObject.AddComponent<AudioSource>();
+            }
+
+            source.clip = clip;
+            source.enabled = true;
+            source.loop = loop;
+            source.playOnAwake = false;
+            source.spatialBlend = 1.0f;
+            source.rolloffMode = AudioRolloffMode.Logarithmic;
+            source.minDistance = 3.0f;
+            source.maxDistance = 60.0f;
+            source.dopplerLevel = 0.0f;
+            source.volume = volume;
+            source.priority = loop ? 192 : 128;
+            EditorUtility.SetDirty(source);
+        }
+
+        private static void ImportBastionAudioClip(string assetPath, bool engineLoop)
+        {
+            string projectRoot = Directory.GetParent(Application.dataPath).FullName;
+            string absolutePath = Path.GetFullPath(Path.Combine(projectRoot,
+                assetPath.Replace('/', Path.DirectorySeparatorChar)));
+            if (!File.Exists(absolutePath))
+            {
+                throw new FileNotFoundException("Add the authored mono Bastion audio asset before building.", absolutePath);
+            }
+
+            AssetDatabase.ImportAsset(assetPath, ImportAssetOptions.ForceUpdate);
+            AudioImporter importer = AssetImporter.GetAtPath(assetPath) as AudioImporter;
+            if (importer == null)
+            {
+                throw new InvalidDataException("Unity did not create an AudioImporter for " + assetPath + ".");
+            }
+
+            importer.forceToMono = true;
+            importer.ambisonic = false;
+            importer.loadInBackground = false;
+            importer.preloadAudioData = true;
+            importer.defaultSampleSettings = new AudioImporterSampleSettings
+            {
+                loadType = engineLoop ? AudioClipLoadType.CompressedInMemory : AudioClipLoadType.DecompressOnLoad,
+                compressionFormat = engineLoop ? AudioCompressionFormat.Vorbis : AudioCompressionFormat.ADPCM,
+                quality = engineLoop ? 0.45f : 1.0f,
+                sampleRateSetting = AudioSampleRateSetting.PreserveSampleRate
+            };
+            importer.assetBundleName = BundleName;
+            importer.assetBundleVariant = String.Empty;
+            importer.SaveAndReimport();
+
+            AudioClip clip = AssetDatabase.LoadAssetAtPath<AudioClip>(assetPath);
+            if (clip == null || clip.channels != 1)
+            {
+                throw new InvalidDataException(assetPath + " must import as a mono AudioClip.");
+            }
+        }
+
+        private static void EnsureBastionDamageVfx(GameObject root)
+        {
+            Transform smokeSocket = GetUniqueNamedTransform(root, "Socket_DamageSmoke", true);
+            Transform fireSocket = GetUniqueNamedTransform(root, "Socket_DamageFire", true);
+            ValidateBastionDamageAnchors(root);
+            ConfigureDamageSmokeParticleSystem(root, smokeSocket);
+            ConfigureDamageFireParticleSystem(root, fireSocket);
+        }
+
+        private static void ValidateBastionDamageAnchors(GameObject root)
+        {
+            Transform engineSocket = GetUniqueNamedTransform(root, "Socket_EngineAudio", true);
+            Transform damageSmokeSocket = GetUniqueNamedTransform(root, "Socket_DamageSmoke", true);
+            Transform reactorCore = GetUniqueNamedTransform(root, "Socket_ReactorCore", true);
+            Transform damageFireSocket = GetUniqueNamedTransform(root, "Socket_DamageFire", true);
+            GameObject model = GetUniqueNamedTransform(root, "BastionSiegeMechModel", true).gameObject;
+            Bounds modelBounds = GetModelBoundsInRootSpace(root, model);
+            float largestDimension = Mathf.Max(modelBounds.size.x, modelBounds.size.y, modelBounds.size.z);
+            float smokeTolerance = largestDimension * 0.30f;
+            float fireTolerance = largestDimension * 0.10f;
+            if (largestDimension <= 0.0f ||
+                Vector3.Distance(engineSocket.position, damageSmokeSocket.position) > smokeTolerance)
+            {
+                throw new InvalidDataException(
+                    "Bastion Siege Mech damage smoke must be anchored within 30% of its engine/exhaust midpoint.");
+            }
+            if (Vector3.Distance(reactorCore.position, damageFireSocket.position) > fireTolerance)
+            {
+                throw new InvalidDataException(
+                    "Bastion Siege Mech damage fire must be anchored within 10% of its reactor core.");
+            }
+        }
+
+        private static void EnsureBastionFootContactVfx(GameObject root)
+        {
+            string[] footSuffixes = { "FL", "FR", "RL", "RR" };
+            for (int i = 0; i < footSuffixes.Length; i++)
+            {
+                string suffix = footSuffixes[i];
+                ConfigureFootContactParticleSystem(root,
+                    GetUniqueNamedTransform(root, "Socket_FootContact_" + suffix, true),
+                    "FootstepDustVFX_" + suffix);
+            }
+        }
+
+        private static ParticleSystem EnsureParticleSystemChild(GameObject root, Transform socket, string name)
+        {
+            Transform particleTransform = GetUniqueNamedTransform(root, name, false);
+            if (particleTransform == null)
+            {
+                var particleObject = new GameObject(name);
+                particleTransform = particleObject.transform;
+                particleTransform.SetParent(socket, false);
+            }
+            else if (particleTransform.parent != socket)
+            {
+                particleTransform.SetParent(socket, false);
+            }
+
+            ParticleSystem[] systems = particleTransform.GetComponents<ParticleSystem>();
+            if (systems.Length > 1)
+            {
+                throw new InvalidDataException(name + " must not contain duplicate ParticleSystem components.");
+            }
+
+            ParticleSystem particleSystem = systems.Length == 1
+                ? systems[0]
+                : particleTransform.gameObject.AddComponent<ParticleSystem>();
+            ParticleSystemRenderer particleRenderer = particleSystem.GetComponent<ParticleSystemRenderer>();
+            if (particleRenderer == null)
+            {
+                throw new InvalidDataException("Unity did not create a ParticleSystemRenderer for " + name + ".");
+            }
+            particleRenderer.renderMode = ParticleSystemRenderMode.Billboard;
+            particleRenderer.enableGPUInstancing = true;
+            return particleSystem;
+        }
+
+        private static void ConfigureDamageSmokeParticleSystem(GameObject root, Transform socket)
+        {
+            ParticleSystem particleSystem = EnsureParticleSystemChild(root, socket, "DamageSmokeVFX");
+            particleSystem.transform.localPosition = Vector3.zero;
+            particleSystem.transform.localRotation = Quaternion.identity;
+            particleSystem.transform.localScale = Vector3.one;
+
+            ParticleSystem.MainModule main = particleSystem.main;
+            main.duration = 1.0f;
+            main.loop = true;
+            main.prewarm = false;
+            main.playOnAwake = false;
+            main.startLifetime = new ParticleSystem.MinMaxCurve(1.2f, 1.8f);
+            main.startSpeed = new ParticleSystem.MinMaxCurve(1.5f, 2.5f);
+            main.startSize = new ParticleSystem.MinMaxCurve(0.6f, 0.9f);
+            main.startColor = new Color(0.18f, 0.18f, 0.20f, 0.84f);
+            main.gravityModifier = -0.15f;
+            main.simulationSpace = ParticleSystemSimulationSpace.World;
+            main.maxParticles = 35;
+
+            ParticleSystem.EmissionModule emission = particleSystem.emission;
+            emission.enabled = true;
+            emission.rateOverTime = 12.0f;
+            emission.rateOverDistance = 0.0f;
+
+            ParticleSystem.ShapeModule shape = particleSystem.shape;
+            shape.enabled = true;
+            shape.shapeType = ParticleSystemShapeType.Hemisphere;
+            shape.radius = 0.15f;
+
+            ParticleSystem.SizeOverLifetimeModule size = particleSystem.sizeOverLifetime;
+            size.enabled = true;
+            var sizeCurve = new AnimationCurve();
+            sizeCurve.AddKey(0.0f, 0.45f);
+            sizeCurve.AddKey(0.5f, 1.0f);
+            sizeCurve.AddKey(1.0f, 2.8f);
+            size.size = new ParticleSystem.MinMaxCurve(1.0f, sizeCurve);
+
+            ParticleSystem.ColorOverLifetimeModule color = particleSystem.colorOverLifetime;
+            color.enabled = true;
+            color.color = CreateDamageSmokeGradient();
+
+            ParticleSystemRenderer renderer = particleSystem.GetComponent<ParticleSystemRenderer>();
+            renderer.sharedMaterial = GetOrCreateParticleMaterial("BastionDamageSmoke", false);
+            particleSystem.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+        }
+
+        private static void ConfigureDamageFireParticleSystem(GameObject root, Transform socket)
+        {
+            ParticleSystem particleSystem = EnsureParticleSystemChild(root, socket, "DamageFireVFX");
+            particleSystem.transform.localPosition = Vector3.zero;
+            particleSystem.transform.localRotation = Quaternion.identity;
+            particleSystem.transform.localScale = Vector3.one;
+
+            ParticleSystem.MainModule main = particleSystem.main;
+            main.duration = 0.8f;
+            main.loop = true;
+            main.prewarm = false;
+            main.playOnAwake = false;
+            main.startLifetime = new ParticleSystem.MinMaxCurve(0.3f, 0.5f);
+            main.startSpeed = new ParticleSystem.MinMaxCurve(2.5f, 4.0f);
+            main.startSize = new ParticleSystem.MinMaxCurve(0.5f, 0.8f);
+            main.startColor = new Color(1.0f, 0.55f, 0.12f, 0.96f);
+            main.gravityModifier = -0.3f;
+            main.simulationSpace = ParticleSystemSimulationSpace.World;
+            main.maxParticles = 25;
+
+            ParticleSystem.EmissionModule emission = particleSystem.emission;
+            emission.enabled = true;
+            emission.rateOverTime = 18.0f;
+            emission.rateOverDistance = 0.0f;
+
+            ParticleSystem.ShapeModule shape = particleSystem.shape;
+            shape.enabled = true;
+            shape.shapeType = ParticleSystemShapeType.Cone;
+            shape.angle = 10.0f;
+            shape.radius = 0.05f;
+
+            ParticleSystem.ColorOverLifetimeModule color = particleSystem.colorOverLifetime;
+            color.enabled = true;
+            color.color = CreateFireGradient();
+
+            ParticleSystem.SizeOverLifetimeModule size = particleSystem.sizeOverLifetime;
+            size.enabled = true;
+            var sizeCurve = new AnimationCurve();
+            sizeCurve.AddKey(0.0f, 0.35f);
+            sizeCurve.AddKey(0.5f, 1.0f);
+            sizeCurve.AddKey(1.0f, 0.1f);
+            size.size = new ParticleSystem.MinMaxCurve(1.0f, sizeCurve);
+
+            ParticleSystemRenderer renderer = particleSystem.GetComponent<ParticleSystemRenderer>();
+            renderer.sharedMaterial = GetOrCreateParticleMaterial("BastionDamageFire", true);
+            particleSystem.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+        }
+
+        private static void ConfigureFootContactParticleSystem(GameObject root, Transform socket, string name)
+        {
+            ParticleSystem particleSystem = EnsureParticleSystemChild(root, socket, name);
+            particleSystem.transform.localPosition = Vector3.zero;
+            particleSystem.transform.localRotation = Quaternion.Euler(0.0f, 180.0f, 0.0f);
+            particleSystem.transform.localScale = Vector3.one;
+
+            ParticleSystem.MainModule main = particleSystem.main;
+            main.duration = 1.0f;
+            main.loop = true;
+            main.prewarm = false;
+            main.playOnAwake = true;
+            main.startLifetime = new ParticleSystem.MinMaxCurve(0.6f, 1.0f);
+            main.startSpeed = new ParticleSystem.MinMaxCurve(0.8f, 1.4f);
+            main.startSize = new ParticleSystem.MinMaxCurve(0.25f, 0.45f);
+            main.startColor = new Color(0.60f, 0.52f, 0.40f, 0.42f);
+            main.gravityModifier = 0.1f;
+            main.simulationSpace = ParticleSystemSimulationSpace.World;
+            main.maxParticles = 20;
+
+            ParticleSystem.EmissionModule emission = particleSystem.emission;
+            emission.enabled = true;
+            emission.rateOverTime = 0.0f;
+            emission.rateOverDistance = 2.5f;
+
+            ParticleSystem.ShapeModule shape = particleSystem.shape;
+            shape.enabled = true;
+            shape.shapeType = ParticleSystemShapeType.Hemisphere;
+            shape.radius = 0.08f;
+
+            ParticleSystem.ColorOverLifetimeModule color = particleSystem.colorOverLifetime;
+            color.enabled = true;
+            color.color = CreateFadeGradient(new Color(0.70f, 0.62f, 0.49f, 0.52f));
+
+            ParticleSystemRenderer renderer = particleSystem.GetComponent<ParticleSystemRenderer>();
+            renderer.sharedMaterial = GetOrCreateParticleMaterial("BastionFootDust", false);
+        }
+
+        private static Gradient CreateFireGradient()
+        {
+            var gradient = new Gradient();
+            gradient.SetKeys(
+                new[]
+                {
+                    new GradientColorKey(new Color(1.0f, 0.91f, 0.40f), 0.0f),
+                    new GradientColorKey(new Color(1.0f, 0.38f, 0.05f), 0.48f),
+                    new GradientColorKey(new Color(0.22f, 0.045f, 0.012f), 1.0f)
+                },
+                new[]
+                {
+                    new GradientAlphaKey(1.0f, 0.0f),
+                    new GradientAlphaKey(0.92f, 0.55f),
+                    new GradientAlphaKey(0.0f, 1.0f)
+                });
+            return gradient;
+        }
+
+        private static Gradient CreateDamageSmokeGradient()
+        {
+            var gradient = new Gradient();
+            gradient.SetKeys(
+                new[]
+                {
+                    new GradientColorKey(new Color(0.18f, 0.18f, 0.20f), 0.0f),
+                    new GradientColorKey(new Color(0.18f, 0.18f, 0.20f), 1.0f)
+                },
+                new[]
+                {
+                    new GradientAlphaKey(0.0f, 0.0f),
+                    new GradientAlphaKey(0.86f, 0.10f),
+                    new GradientAlphaKey(0.86f, 0.60f),
+                    new GradientAlphaKey(0.0f, 1.0f)
+                });
+            return gradient;
+        }
+
+        private static Gradient CreateFadeGradient(Color color)
+        {
+            var gradient = new Gradient();
+            gradient.SetKeys(
+                new[] { new GradientColorKey(color, 0.0f), new GradientColorKey(color, 1.0f) },
+                new[] { new GradientAlphaKey(color.a * 0.65f, 0.0f), new GradientAlphaKey(0.0f, 1.0f) });
+            return gradient;
+        }
+
+        private static Material GetOrCreateParticleMaterial(string materialName, bool additive)
+        {
+            string materialPath = MaterialRoot + "/" + materialName + ".mat";
+            Material material = AssetDatabase.LoadAssetAtPath<Material>(materialPath);
+            Shader shader = Shader.Find("Universal Render Pipeline/Particles/Unlit");
+            if (shader == null)
+            {
+                throw new InvalidOperationException("The URP Particles/Unlit shader is required for Bastion VFX.");
+            }
+
+            if (material == null)
+            {
+                material = new Material(shader) { name = materialName };
+                AssetDatabase.CreateAsset(material, materialPath);
+            }
+            else
+            {
+                material.shader = shader;
+            }
+
+            material.color = Color.white;
+            if (material.HasProperty("_Surface")) material.SetFloat("_Surface", 1.0f);
+            if (material.HasProperty("_Blend")) material.SetFloat("_Blend", additive ? 2.0f : 0.0f);
+            if (material.HasProperty("_SrcBlend")) material.SetFloat("_SrcBlend", (float)BlendMode.SrcAlpha);
+            if (material.HasProperty("_DstBlend"))
+            {
+                material.SetFloat("_DstBlend", (float)(additive ? BlendMode.One : BlendMode.OneMinusSrcAlpha));
+            }
+            if (material.HasProperty("_ZWrite")) material.SetFloat("_ZWrite", 0.0f);
+            material.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+            if (material.HasProperty("_SoftParticlesEnabled"))
+            {
+                material.SetFloat("_SoftParticlesEnabled", 1.0f);
+                material.EnableKeyword("_SOFTPARTICLES_ON");
+            }
+            material.renderQueue = (int)RenderQueue.Transparent;
+            material.enableInstancing = true;
+            EditorUtility.SetDirty(material);
+            return material;
         }
 
         private static void EnsureRootLocalFootContact(GameObject root, Transform footContact, string socketName)
@@ -1061,13 +1786,43 @@ namespace RogueCommandExpansion.Authoring
                 false);
         }
 
+        private static string CreateBastionSiegeMechVisual()
+        {
+            ImportBastionAudioClip(BastionEngineLoopAudioPath, true);
+            ImportBastionAudioClip(BastionWeaponShotAudioPath, false);
+
+            AudioClip engineLoop = AssetDatabase.LoadAssetAtPath<AudioClip>(BastionEngineLoopAudioPath);
+            AudioClip weaponShot = AssetDatabase.LoadAssetAtPath<AudioClip>(BastionWeaponShotAudioPath);
+            if (engineLoop == null || weaponShot == null)
+            {
+                throw new InvalidDataException("Bastion Siege Mech audio clips could not be imported.");
+            }
+
+            return CreateRiggedWalkerVisual(
+                "BastionSiegeMech",
+                BastionSiegeMechModelPath,
+                BastionSiegeMechPrefabPath,
+                CreateBastionSiegeMechMaterials,
+                AssignBastionSiegeMechMaterials,
+                false,
+                root =>
+                {
+                    EnsureBastionDamageVfx(root);
+                    EnsureBastionFootContactVfx(root);
+                    EnsureBastionAudioSources(root, engineLoop, weaponShot);
+                },
+                quadrupedCrawler: true);
+        }
+
         private static string CreateRiggedWalkerVisual(
             string unitName,
             string modelPath,
             string prefabPath,
             Func<Dictionary<string, Material>> createMaterials,
             Action<GameObject, IDictionary<string, Material>> assignMaterials,
-            bool rapidFireMuzzle)
+            bool rapidFireMuzzle,
+            Action<GameObject> configureAdditionalComponents = null,
+            bool quadrupedCrawler = false)
         {
             string projectRoot = Directory.GetParent(Application.dataPath).FullName;
             Directory.CreateDirectory(Path.GetFullPath(Path.Combine(projectRoot, AssetRoot)));
@@ -1098,7 +1853,11 @@ namespace RogueCommandExpansion.Authoring
                 assignMaterials(modelInstance, materials);
 
                 VehiclePrefabBuilder.EnsureCanonicalVfxSockets(root, modelInstance);
-                EnsureCanonicalWalkerSockets(root, modelInstance, rapidFireMuzzle);
+                EnsureCanonicalWalkerSockets(root, modelInstance, rapidFireMuzzle, quadrupedCrawler);
+                if (configureAdditionalComponents != null)
+                {
+                    configureAdditionalComponents(root);
+                }
                 VehiclePrefabBuilder.SetupAnimatorIfAvailable(root, modelInstance, modelAsset, unitName, true);
 
                 Animator animator = root.GetComponent<Animator>();
@@ -1235,6 +1994,9 @@ namespace RogueCommandExpansion.Authoring
                 ValidateRiggedWalkerBundleAssets(bundle, assetNames,
                     "atlascranemechvisual.prefab", "AtlasCraneMechVisual",
                     "atlascranemechcard.png", "AtlasCraneMechCard", "Atlas Crane Mech");
+                ValidateRiggedWalkerBundleAssets(bundle, assetNames,
+                    "bastionsiegemechvisual.prefab", "BastionSiegeMechVisual",
+                    "bastionsiegemechcard.png", "BastionSiegeMechCard", "Bastion Siege Mech", true);
                 ValidateVisualBundleAssets(bundle, assetNames, "surgearctankvisual.prefab", "SurgeArcTankVisual",
                     "surgearctankcard.png", "SurgeArcTankCard", 6, "Surge Arc Tank");
             }
@@ -1251,7 +2013,8 @@ namespace RogueCommandExpansion.Authoring
             string prefabName,
             string cardSuffix,
             string cardName,
-            string visualLabel)
+            string visualLabel,
+            bool validateBastionIntegration = false)
         {
             string prefabAssetPath = FindUniqueAssetPath(assetNames, prefabSuffix, visualLabel + " prefab");
             GameObject prefab = bundle.LoadAsset<GameObject>(prefabAssetPath);
@@ -1319,7 +2082,11 @@ namespace RogueCommandExpansion.Authoring
                 }
             }
 
-            ValidateCanonicalWalkerSockets(prefab, visualLabel);
+            ValidateCanonicalWalkerSockets(prefab, visualLabel, validateBastionIntegration);
+            if (validateBastionIntegration)
+            {
+                ValidateBastionBundleIntegration(prefab);
+            }
 
             Renderer[] renderers = prefab.GetComponentsInChildren<Renderer>(true);
             for (int i = 0; i < renderers.Length; i++)
@@ -1348,6 +2115,136 @@ namespace RogueCommandExpansion.Authoring
                     throw new InvalidDataException(visualLabel +
                         " visual bundle contains a missing or scripted component.");
                 }
+            }
+        }
+
+        private static void ValidateBastionBundleIntegration(GameObject prefab)
+        {
+            ValidateBastionAudioSource(prefab, "Socket_EngineAudio", "EngineLoopAudioSource", true);
+            ValidateBastionAudioSource(prefab, "Socket_WeaponAudio", "WeaponShotAudioSource", false);
+            ValidateBastionParticleSystem(prefab, "Socket_DamageSmoke", "DamageSmokeVFX", true, false);
+            ValidateBastionParticleSystem(prefab, "Socket_DamageFire", "DamageFireVFX", true, false);
+            string[] footSuffixes = { "FL", "FR", "RL", "RR" };
+            for (int i = 0; i < footSuffixes.Length; i++)
+            {
+                string suffix = footSuffixes[i];
+                ValidateBastionParticleSystem(
+                    prefab,
+                    "Socket_FootContact_" + suffix,
+                    "FootstepDustVFX_" + suffix,
+                    true,
+                    true);
+            }
+
+            Transform muzzle = GetUniqueNamedTransform(prefab, "Socket_MuzzlePrimary", true);
+            ValidateFirePoint(prefab, muzzle, "FirePoint_0");
+            ValidateFirePoint(prefab, muzzle, "FirePoint_1");
+
+            ValidateBastionDamageAnchors(prefab);
+
+            Renderer[] renderers = prefab.GetComponentsInChildren<Renderer>(true);
+            for (int i = 0; i < renderers.Length; i++)
+            {
+                if (renderers[i] is ParticleSystemRenderer)
+                {
+                    continue;
+                }
+
+                Material[] materials = renderers[i].sharedMaterials;
+                for (int materialIndex = 0; materialIndex < materials.Length; materialIndex++)
+                {
+                    Material material = materials[materialIndex];
+                    if (material == null || material.shader == null ||
+                        !String.Equals(material.shader.name, VertexWearShaderName, StringComparison.Ordinal) ||
+                        !material.HasProperty("_WearStrength") ||
+                        Mathf.Abs(material.GetFloat("_WearStrength") - FactoryNewWearStrength) > 0.001f)
+                    {
+                        throw new InvalidDataException(
+                            "Bastion Siege Mech mesh materials must use the bundled VertexWear shader at factory-new wear strength.");
+                    }
+                }
+            }
+        }
+
+        private static void ValidateBastionAudioSource(
+            GameObject root,
+            string socketName,
+            string sourceName,
+            bool loop)
+        {
+            Transform socket = GetUniqueNamedTransform(root, socketName, true);
+            Transform sourceTransform = GetUniqueNamedTransform(root, sourceName, true);
+            if (sourceTransform.parent != socket)
+            {
+                throw new InvalidDataException(sourceName + " must be parented directly under " + socketName + ".");
+            }
+
+            AudioSource[] socketSources = socket.GetComponentsInChildren<AudioSource>(true);
+            AudioSource source = sourceTransform.GetComponent<AudioSource>();
+            if (socketSources.Length != 1 || source == null || source.clip == null || source.clip.channels != 1 ||
+                source.loop != loop || source.playOnAwake || !source.enabled ||
+                Mathf.Abs(source.spatialBlend - 1.0f) > 0.001f ||
+                source.rolloffMode != AudioRolloffMode.Logarithmic ||
+                Mathf.Abs(source.minDistance - 3.0f) > 0.001f ||
+                Mathf.Abs(source.maxDistance - 60.0f) > 0.001f ||
+                Mathf.Abs(source.dopplerLevel) > 0.001f)
+            {
+                throw new InvalidDataException(sourceName + " has a missing mono clip or invalid 3D source settings " +
+                    "(count=" + socketSources.Length +
+                    ", clip=" + (source != null && source.clip != null ? source.clip.name : "<null>") +
+                    ", channels=" + (source != null && source.clip != null ? source.clip.channels.ToString() : "n/a") +
+                    ", loop=" + (source != null && source.loop).ToString() +
+                    ", playOnAwake=" + (source != null && source.playOnAwake).ToString() +
+                    ", enabled=" + (source != null && source.enabled).ToString() +
+                    ", spatialBlend=" + (source != null ? source.spatialBlend.ToString("F3") : "n/a") +
+                    ", rolloff=" + (source != null ? source.rolloffMode.ToString() : "n/a") +
+                    ", min=" + (source != null ? source.minDistance.ToString("F2") : "n/a") +
+                    ", max=" + (source != null ? source.maxDistance.ToString("F2") : "n/a") +
+                    ", doppler=" + (source != null ? source.dopplerLevel.ToString("F2") : "n/a") + ").");
+            }
+        }
+
+        private static void ValidateBastionParticleSystem(
+            GameObject root,
+            string socketName,
+            string particleName,
+            bool expectLooping,
+            bool expectDistanceEmission)
+        {
+            Transform socket = GetUniqueNamedTransform(root, socketName, true);
+            Transform particleTransform = GetUniqueNamedTransform(root, particleName, true);
+            if (particleTransform.parent != socket)
+            {
+                throw new InvalidDataException(particleName + " must be parented directly under " + socketName + ".");
+            }
+
+            ParticleSystem particleSystem = particleTransform.GetComponent<ParticleSystem>();
+            ParticleSystemRenderer renderer = particleTransform.GetComponent<ParticleSystemRenderer>();
+            if (particleSystem == null || renderer == null || renderer.sharedMaterial == null ||
+                renderer.sharedMaterial.shader == null ||
+                !renderer.sharedMaterial.shader.name.StartsWith("Universal Render Pipeline/Particles/", StringComparison.Ordinal) ||
+                !renderer.enableGPUInstancing)
+            {
+                throw new InvalidDataException(particleName + " must use an instanced URP particle material.");
+            }
+
+            ParticleSystem.MainModule main = particleSystem.main;
+            if (main.loop != expectLooping || main.playOnAwake != expectDistanceEmission)
+            {
+                throw new InvalidDataException(particleName + " has an invalid play/loop configuration.");
+            }
+
+            ParticleSystem.EmissionModule emission = particleSystem.emission;
+            if (expectDistanceEmission)
+            {
+                if (emission.rateOverDistance.constant < 2.4f || emission.rateOverTime.constant > 0.01f)
+                {
+                    throw new InvalidDataException(particleName + " must emit dust by distance traveled only.");
+                }
+            }
+            else if (emission.rateOverTime.constant <= 0.0f || main.maxParticles > 40)
+            {
+                throw new InvalidDataException(particleName + " must use a bounded damage emission rate.");
             }
         }
 
@@ -1588,6 +2485,35 @@ namespace RogueCommandExpansion.Authoring
             return materials;
         }
 
+        private static Dictionary<string, Material> CreateBastionSiegeMechMaterials()
+        {
+            string projectRoot = Directory.GetParent(Application.dataPath).FullName;
+            Directory.CreateDirectory(Path.GetFullPath(Path.Combine(projectRoot, MaterialRoot)));
+            var materials = new Dictionary<string, Material>(StringComparer.Ordinal)
+            {
+                { "armor", CreateOrUpdateMaterial("BastionPrimaryArmor", new Color32(104, 65, 38, 255), 0.44f, 0.62f, useVertexWearShader: true) },
+                { "lightArmor", CreateOrUpdateMaterial("BastionLightArmor", new Color32(140, 109, 72, 255), 0.38f, 0.60f, useVertexWearShader: true) },
+                { "gunmetal", CreateOrUpdateMaterial("BastionGunmetal", new Color32(30, 31, 34, 255), 0.78f, 0.70f, useVertexWearShader: true) },
+                { "tread", CreateOrUpdateMaterial("BastionTread", new Color32(22, 27, 30, 255), 0.18f, 0.32f, useVertexWearShader: true) },
+                { "warning", CreateOrUpdateMaterial("BastionWarningYellow", new Color32(242, 169, 29, 255), 0.22f, 0.65f, useVertexWearShader: true) },
+                { "emissive", CreateOrUpdateMaterial("BastionReactorAmber", new Color32(242, 169, 29, 255), 0.16f, 0.82f, new Color(1.0f, 0.48f, 0.05f) * 1.8f, true) },
+                { "wheelRim", CreateOrUpdateMaterial("BastionWheelRim", new Color32(105, 107, 103, 255), 0.64f, 0.62f, useVertexWearShader: true) }
+            };
+            foreach (KeyValuePair<string, Material> material in materials)
+            {
+                if (material.Value == null || material.Value.shader == null ||
+                    !String.Equals(material.Value.shader.name, VertexWearShaderName, StringComparison.Ordinal) ||
+                    Mathf.Abs(material.Value.GetFloat("_WearStrength") - FactoryNewWearStrength) > 0.001f)
+                {
+                    throw new InvalidDataException("Bastion material '" + material.Key +
+                        "' must use VehiclePBR_VertexWear with _WearStrength = " + FactoryNewWearStrength + ".");
+                }
+            }
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+            return materials;
+        }
+
         private static Dictionary<string, Material> CreateSurgeArcTankMaterials()
         {
             string projectRoot = Directory.GetParent(Application.dataPath).FullName;
@@ -1632,6 +2558,54 @@ namespace RogueCommandExpansion.Authoring
             IDictionary<string, Material> materials)
         {
             AssignBatchedMaterials(model, "AtlasCraneMech", materials);
+        }
+
+        private static void AssignBastionSiegeMechMaterials(
+            GameObject model,
+            IDictionary<string, Material> materials)
+        {
+            Renderer[] renderers = model.GetComponentsInChildren<Renderer>(true);
+            if (renderers.Length == 0)
+            {
+                throw new InvalidDataException("The authored BastionSiegeMech FBX contains no renderers.");
+            }
+
+            var usedMaterials = new HashSet<Material>();
+            for (int rendererIndex = 0; rendererIndex < renderers.Length; rendererIndex++)
+            {
+                Material[] sourceMaterials = renderers[rendererIndex].sharedMaterials;
+                if (sourceMaterials == null || sourceMaterials.Length == 0)
+                {
+                    throw new InvalidDataException(renderers[rendererIndex].name +
+                        " has no imported material slot for the Bastion material map.");
+                }
+
+                Material[] assignedMaterials = new Material[sourceMaterials.Length];
+                for (int materialIndex = 0; materialIndex < sourceMaterials.Length; materialIndex++)
+                {
+                    Material sourceMaterial = sourceMaterials[materialIndex];
+                    Material assignedMaterial;
+                    if (sourceMaterial == null || !TryResolveBatchMaterial(
+                        sourceMaterial.name, "BastionSiegeMech", materials, out assignedMaterial) ||
+                        assignedMaterial == null)
+                    {
+                        throw new InvalidDataException("No authored material mapping exists for Bastion renderer '" +
+                            renderers[rendererIndex].name + "' source material '" +
+                            (sourceMaterial != null ? sourceMaterial.name : "<null>") + "'.");
+                    }
+
+                    assignedMaterials[materialIndex] = assignedMaterial;
+                    usedMaterials.Add(assignedMaterial);
+                }
+
+                renderers[rendererIndex].sharedMaterials = assignedMaterials;
+            }
+
+            if (usedMaterials.Count != materials.Count)
+            {
+                throw new InvalidDataException("BastionSiegeMech must use every authored base material batch; used " +
+                    usedMaterials.Count + " of " + materials.Count + ".");
+            }
         }
 
         private static void AssignSurgeArcTankMaterials(
@@ -1686,7 +2660,7 @@ namespace RogueCommandExpansion.Authoring
 
             string normalizedKey = materialKey ?? String.Empty;
             string modelMaterialPrefix = modelPrefix + "_";
-            if (normalizedKey.StartsWith(modelMaterialPrefix, StringComparison.OrdinalIgnoreCase))
+            while (normalizedKey.StartsWith(modelMaterialPrefix, StringComparison.OrdinalIgnoreCase))
             {
                 normalizedKey = normalizedKey.Substring(modelMaterialPrefix.Length);
             }
@@ -1748,7 +2722,7 @@ namespace RogueCommandExpansion.Authoring
             }
         }
 
-        private static void ImportCardSprite(string assetPath)
+        private static void ImportCardSprite(string assetPath, bool alphaIsTransparency = false)
         {
             string projectRoot = Directory.GetParent(Application.dataPath).FullName;
             string absolutePath = Path.GetFullPath(Path.Combine(projectRoot,
@@ -1771,6 +2745,10 @@ namespace RogueCommandExpansion.Authoring
             importer.filterMode = FilterMode.Point;
             importer.mipmapEnabled = false;
             importer.wrapMode = TextureWrapMode.Clamp;
+            if (alphaIsTransparency)
+            {
+                importer.alphaIsTransparency = true;
+            }
             importer.maxTextureSize = 128;
             importer.textureCompression = TextureImporterCompression.Uncompressed;
             importer.assetBundleName = BundleName;

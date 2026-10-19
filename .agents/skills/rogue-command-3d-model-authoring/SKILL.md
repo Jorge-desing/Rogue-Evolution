@@ -82,6 +82,7 @@ All production models must be script-reproducible using Blender's Python API (`b
 - **Right / Starboard**: Blender `+X` $\rightarrow$ Unity `+X`
 - **Ground Contact**: Lowest vertex of treads/tires/feet must rest exactly on $Z \ge 0.0$ ($0.0\text{m} \le Z_{\min} \le 0.08\text{m}$).
 - **Local Origin**: `(0.0, 0.0, 0.0)` at ground center.
+- Use `--structural-wear-mask` on articulated industrial models to keep channel G edge wear localized to convex corners while leaving flat and concave corners unmarked; this optional argument preserves the generator's existing CLI defaults.
 
 ### Core Procedural Generator Suite (`RogueModelKit`)
 Use the tested, high-readability procedural assemblies rather than ad-hoc mesh primitives:

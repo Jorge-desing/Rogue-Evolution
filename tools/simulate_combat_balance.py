@@ -69,6 +69,7 @@ BUILTIN_NATIVE_ARCHETYPES: Dict[str, Dict[str, Any]] = {
         "moveSpeed": 11.0,
         "sightRadius": 5.0,
         "damage1": 8.0,
+        "firePointCount": 2,
         "attackCooldown": 3.0,
         "weaponRange": 3.8,
         "effectRadius1": 0.2,
@@ -85,6 +86,7 @@ BUILTIN_NATIVE_ARCHETYPES: Dict[str, Dict[str, Any]] = {
         "moveSpeed": 13.0,
         "sightRadius": 6.0,
         "damage1": 45.0,
+        "firePointCount": 1,
         "attackCooldown": 7.0,
         "weaponRange": 18.0,
         "effectRadius1": 1.2,
@@ -101,6 +103,7 @@ BUILTIN_NATIVE_ARCHETYPES: Dict[str, Dict[str, Any]] = {
         "moveSpeed": 14.0,
         "sightRadius": 7.0,
         "damage1": 2.0,
+        "firePointCount": 6,
         "attackCooldown": 0.6,
         "weaponRange": 5.0,
         "effectRadius1": 0.0,
@@ -117,6 +120,7 @@ BUILTIN_NATIVE_ARCHETYPES: Dict[str, Dict[str, Any]] = {
         "moveSpeed": 22.0,
         "sightRadius": 5.0,
         "damage1": 36.0,
+        "firePointCount": 1,
         "attackCooldown": 0.0,
         "weaponRange": 0.8,
         "effectRadius1": 1.75,
@@ -133,6 +137,7 @@ BUILTIN_NATIVE_ARCHETYPES: Dict[str, Dict[str, Any]] = {
         "moveSpeed": 14.0,
         "sightRadius": 6.0,
         "damage1": 7.0,
+        "firePointCount": 1,
         "attackCooldown": 1.5,
         "weaponRange": 3.0,
         "effectRadius1": 0.0,
@@ -149,6 +154,7 @@ BUILTIN_NATIVE_ARCHETYPES: Dict[str, Dict[str, Any]] = {
         "moveSpeed": 13.0,
         "sightRadius": 6.0,
         "damage1": 8.0,
+        "firePointCount": 1,
         "attackCooldown": 0.35,
         "weaponRange": 4.5,
         "effectRadius1": 0.0,
@@ -175,6 +181,7 @@ class UnitProfile:
     sight_radius: float = 6.0
     damage1: float = 10.0
     attack_cooldown: float = 1.0
+    fire_point_count: int = 1
     damage2: float = 0.0
     attack2_cooldown: float = 0.0
     weapon_range: float = 5.0
@@ -208,7 +215,7 @@ class UnitProfile:
         if self.is_suicide_unit:
             return self.damage1
         if self.attack_cooldown > 0.0:
-            val += self.damage1 / self.attack_cooldown
+            val += (self.damage1 * self.fire_point_count) / self.attack_cooldown
         if self.damage2 > 0.0 and self.attack2_cooldown > 0.0:
             val += self.damage2 / self.attack2_cooldown
         return val
@@ -220,7 +227,7 @@ class UnitProfile:
         val = 0.0
         if self.attack_cooldown > 0.0:
             dmg1 = max(0.1, self.damage1 - defender_armor)
-            val += dmg1 / self.attack_cooldown
+            val += (dmg1 * self.fire_point_count) / self.attack_cooldown
         if self.damage2 > 0.0 and self.attack2_cooldown > 0.0:
             dmg2 = max(0.1, self.damage2 - defender_armor)
             val += dmg2 / self.attack2_cooldown
@@ -304,6 +311,41 @@ class CombatSimulator:
         effective_damage = max(0.1, raw_damage - defender_armor)
         absorbed_armor = max(0.0, raw_damage - effective_damage)
         return effective_damage, absorbed_armor, 0.0
+
+    def calculate_volley_damage(
+        self,
+        raw_damage: float,
+        fire_point_count: int,
+        defender_armor: float,
+        defender_shields: float,
+        defender_hp: Optional[float] = None,
+    ) -> Tuple[float, float, float, float, int]:
+        """Applies one discrete projectile hit per firepoint in a primary attack volley.
+
+        Each projectile independently consumes one shield charge before later projectiles
+        in the same volley can damage HP. If a target HP total is supplied, stop when it
+        would be destroyed rather than counting unused projectiles as shots fired.
+        """
+        hp_damage = 0.0
+        armor_absorbed = 0.0
+        shield_absorbed = 0.0
+        remaining_shields = defender_shields
+        shots_fired = 0
+
+        for _ in range(max(0, fire_point_count)):
+            if defender_hp is not None and hp_damage >= defender_hp:
+                break
+            hit_damage, armor_hit, shield_hit = self.calculate_hit_damage(
+                raw_damage, defender_armor, remaining_shields
+            )
+            shots_fired += 1
+            hp_damage += hit_damage
+            armor_absorbed += armor_hit
+            shield_absorbed += shield_hit
+            if remaining_shields > 0:
+                remaining_shields = max(0.0, remaining_shields - 1.0)
+
+        return hp_damage, armor_absorbed, shield_absorbed, remaining_shields, shots_fired
 
     def simulate_1v1_duel(
         self,
@@ -394,10 +436,14 @@ class CombatSimulator:
             fired_a = False
             if a_in_range and cd_a <= 0.0 and hp_a > 0:
                 fired_a = True
-                shots_a += 1
-                hp_loss, arm_abs, sh_abs = self.calculate_hit_damage(unit_a.damage1, unit_b.armor_protection, shields_b)
-                if shields_b > 0:
-                    shields_b = max(0.0, shields_b - 1.0)
+                hp_loss, arm_abs, sh_abs, shields_b, fired_projectiles = self.calculate_volley_damage(
+                    unit_a.damage1,
+                    unit_a.fire_point_count,
+                    unit_b.armor_protection,
+                    shields_b,
+                    hp_b,
+                )
+                shots_a += fired_projectiles
                 hp_b -= hp_loss
                 dmg_dealt_a += hp_loss
                 armor_absorbed_b += arm_abs
@@ -410,10 +456,14 @@ class CombatSimulator:
 
             # Action phase: Unit B fires
             if b_in_range and cd_b <= 0.0 and hp_b > 0:
-                shots_b += 1
-                hp_loss, arm_abs, sh_abs = self.calculate_hit_damage(unit_b.damage1, unit_a.armor_protection, shields_a)
-                if shields_a > 0:
-                    shields_a = max(0.0, shields_a - 1.0)
+                hp_loss, arm_abs, sh_abs, shields_a, fired_projectiles = self.calculate_volley_damage(
+                    unit_b.damage1,
+                    unit_b.fire_point_count,
+                    unit_a.armor_protection,
+                    shields_a,
+                    hp_a,
+                )
+                shots_b += fired_projectiles
                 hp_a -= hp_loss
                 dmg_dealt_b += hp_loss
                 armor_absorbed_a += arm_abs
@@ -539,20 +589,25 @@ class CombatSimulator:
                         in_range_b = [ub for ub in living_b if ub["hp"] > 0]
                         if in_range_b:
                             target = min(in_range_b, key=lambda x: x["hp"])
-                            hp_loss, _, _ = self.calculate_hit_damage(unit_a.damage1, unit_b.armor_protection, target["shields"])
-                            if target["shields"] > 0:
-                                target["shields"] = max(0.0, target["shields"] - 1.0)
-                            target["hp"] -= hp_loss
+                            for _ in range(max(0, unit_a.fire_point_count)):
+                                if target["hp"] <= 0.0:
+                                    break
+                                hp_loss, _, _ = self.calculate_hit_damage(
+                                    unit_a.damage1, unit_b.armor_protection, target["shields"]
+                                )
+                                if target["shields"] > 0:
+                                    target["shields"] = max(0.0, target["shields"] - 1.0)
+                                target["hp"] -= hp_loss
 
-                            if unit_a.effect_radius1 > 0.0 and len(in_range_b) > 1:
-                                extra_targets = [ub for ub in in_range_b if ub is not target][:2]
-                                for extra in extra_targets:
-                                    extra_hp_loss, _, _ = self.calculate_hit_damage(
-                                        unit_a.damage1 * 0.6, unit_b.armor_protection, extra["shields"]
-                                    )
-                                    if extra["shields"] > 0:
-                                        extra["shields"] = max(0.0, extra["shields"] - 1.0)
-                                    extra["hp"] -= extra_hp_loss
+                                if unit_a.effect_radius1 > 0.0 and len(in_range_b) > 1:
+                                    extra_targets = [ub for ub in in_range_b if ub is not target and ub["hp"] > 0][:2]
+                                    for extra in extra_targets:
+                                        extra_hp_loss, _, _ = self.calculate_hit_damage(
+                                            unit_a.damage1 * 0.6, unit_b.armor_protection, extra["shields"]
+                                        )
+                                        if extra["shields"] > 0:
+                                            extra["shields"] = max(0.0, extra["shields"] - 1.0)
+                                        extra["hp"] -= extra_hp_loss
 
                             if unit_a.is_suicide_unit:
                                 ua["hp"] = 0.0
@@ -565,20 +620,25 @@ class CombatSimulator:
                         in_range_a = [ua for ua in living_a if ua["hp"] > 0]
                         if in_range_a:
                             target = min(in_range_a, key=lambda x: x["hp"])
-                            hp_loss, _, _ = self.calculate_hit_damage(unit_b.damage1, unit_a.armor_protection, target["shields"])
-                            if target["shields"] > 0:
-                                target["shields"] = max(0.0, target["shields"] - 1.0)
-                            target["hp"] -= hp_loss
+                            for _ in range(max(0, unit_b.fire_point_count)):
+                                if target["hp"] <= 0.0:
+                                    break
+                                hp_loss, _, _ = self.calculate_hit_damage(
+                                    unit_b.damage1, unit_a.armor_protection, target["shields"]
+                                )
+                                if target["shields"] > 0:
+                                    target["shields"] = max(0.0, target["shields"] - 1.0)
+                                target["hp"] -= hp_loss
 
-                            if unit_b.effect_radius1 > 0.0 and len(in_range_a) > 1:
-                                extra_targets = [ua for ua in in_range_a if ua is not target][:2]
-                                for extra in extra_targets:
-                                    extra_hp_loss, _, _ = self.calculate_hit_damage(
-                                        unit_b.damage1 * 0.6, unit_a.armor_protection, extra["shields"]
-                                    )
-                                    if extra["shields"] > 0:
-                                        extra["shields"] = max(0.0, extra["shields"] - 1.0)
-                                    extra["hp"] -= extra_hp_loss
+                                if unit_b.effect_radius1 > 0.0 and len(in_range_a) > 1:
+                                    extra_targets = [ua for ua in in_range_a if ua is not target and ua["hp"] > 0][:2]
+                                    for extra in extra_targets:
+                                        extra_hp_loss, _, _ = self.calculate_hit_damage(
+                                            unit_b.damage1 * 0.6, unit_a.armor_protection, extra["shields"]
+                                        )
+                                        if extra["shields"] > 0:
+                                            extra["shields"] = max(0.0, extra["shields"] - 1.0)
+                                        extra["hp"] -= extra_hp_loss
 
                             if unit_b.is_suicide_unit:
                                 ub["hp"] = 0.0
@@ -657,6 +717,7 @@ class BalanceRepository:
                 sight_radius=float(data.get("sightRadius", 6.0)),
                 damage1=float(data.get("damage1", 10.0)),
                 attack_cooldown=float(data.get("attackCooldown", 1.0)),
+                fire_point_count=int(float(data.get("firePointCount", 1))),
                 damage2=float(data.get("damage2", 0.0)),
                 attack2_cooldown=float(data.get("attack2Cooldown", 0.0)),
                 weapon_range=float(data.get("weaponRange", 5.0)),
@@ -673,6 +734,8 @@ class BalanceRepository:
                         eid = row.get("entityId")
                         if not eid:
                             continue
+                        fallback_fire_points = self.profiles[eid].fire_point_count if eid in self.profiles else 1
+                        raw_fire_points = row.get("firePointCount") or fallback_fire_points
                         self.profiles[eid] = UnitProfile(
                             unit_id=eid,
                             display_name=eid,
@@ -686,6 +749,7 @@ class BalanceRepository:
                             sight_radius=float(row.get("sightRadius", 6.0) or 6.0),
                             damage1=float(row.get("damage1", 10.0) or 10.0),
                             attack_cooldown=float(row.get("attackCooldown", 1.0) or 1.0),
+                            fire_point_count=max(0, int(float(raw_fire_points))),
                             damage2=float(row.get("damage2", 0.0) or 0.0),
                             attack2_cooldown=float(row.get("attack2Cooldown", 0.0) or 0.0),
                             weapon_range=float(row.get("weaponRange", 5.0) or 5.0),
@@ -761,6 +825,8 @@ class BalanceRepository:
                     profile.damage1 = val
                 elif key in ("attackcooldown", "cooldown"):
                     profile.attack_cooldown = val
+                elif key == "firepointcount":
+                    profile.fire_point_count = max(0, int(val))
                 elif key in ("weaponrange", "range"):
                     profile.weapon_range = val
                 elif key in ("effectradius1", "effectradius", "aoe"):
@@ -778,7 +844,7 @@ def print_unit_profile_table(profiles: List[UnitProfile]) -> None:
     """Prints a formatted ASCII comparison table of unit stats."""
     header = (
         f"{'Unit ID':<28} | {'Cost':<5} | {'HP':<5} | {'Sh':<3} | {'Arm':<3} | "
-        f"{'Spd':<4} | {'Dmg':<5} | {'CD':<4} | {'Rng':<4} | {'DPS':<6} | {'CEI':<6}"
+        f"{'Spd':<4} | {'Dmg':<5} | {'FP':<3} | {'CD':<4} | {'Rng':<4} | {'DPS':<6} | {'CEI':<6}"
     )
     print("-" * len(header))
     print(header)
@@ -786,7 +852,7 @@ def print_unit_profile_table(profiles: List[UnitProfile]) -> None:
     for p in profiles:
         print(
             f"{p.unit_id:<28} | {p.cost:<5.0f} | {p.max_health:<5.0f} | {p.max_shield:<3.0f} | "
-            f"{p.armor_protection:<3.0f} | {p.move_speed:<4.1f} | {p.damage1:<5.1f} | "
+            f"{p.armor_protection:<3.0f} | {p.move_speed:<4.1f} | {p.damage1:<5.1f} | {p.fire_point_count:<3d} | "
             f"{p.attack_cooldown:<4.1f} | {p.weapon_range:<4.1f} | {p.dps:<6.1f} | {p.cost_efficiency_index:<6.1f}"
         )
     print("-" * len(header))
@@ -872,7 +938,7 @@ def main() -> int:
             print(f"Cost: {p.cost:.0f} | Production Duration: {p.production_duration:.1f}s")
             print(f"Health: {p.max_health:.0f} | Shields: {p.max_shield:.0f} | Armor: {p.armor_protection:.0f}")
             print(f"Move Speed: {p.move_speed:.1f} m/s | Sight Radius: {p.sight_radius:.1f} m")
-            print(f"Weapon: Damage={p.damage1:.1f}, Cooldown={p.attack_cooldown:.2f}s, Range={p.weapon_range:.1f}m (Effective={p.effective_range:.1f}m)")
+            print(f"Weapon: Damage={p.damage1:.1f} per projectile, Firepoints={p.fire_point_count}, Cooldown={p.attack_cooldown:.2f}s, Range={p.weapon_range:.1f}m (Effective={p.effective_range:.1f}m)")
             print(f"Nominal DPS: {p.dps:.2f} | Cost-Efficiency Index (CEI): {p.cost_efficiency_index:.2f}")
             print(f"EHP vs Light Attack (10 dmg): {p.effective_health_against(10.0):.1f}")
             print(f"EHP vs Heavy Shell (50 dmg): {p.effective_health_against(50.0):.1f}")

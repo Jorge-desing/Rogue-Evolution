@@ -20,6 +20,8 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
         private Transform _socketDeployUnit;
         private Transform _socketDamageSmoke;
         private Transform _socketDamageFire;
+        private Transform _socketEngineAudio;
+        private Transform _socketWeaponAudio;
         private Transform _socketRecoilPrimary;
         private Transform _socketMuzzlePrimary;
         private Animator _animator;
@@ -32,6 +34,12 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
         private GameObject _intactMeshObject;
         private GameObject _smokeVfxInstance;
         private GameObject _fireVfxInstance;
+        private ParticleSystem _authoredDamageSmoke;
+        private ParticleSystem _authoredDamageFire;
+        private bool _movementAudioBound;
+        private bool _weaponAudioBound;
+        private float _audioBindingStartedAt;
+        private float _nextAudioBindingAttemptAt;
 
         private Transform _socketAntenna;
         private Transform _socketThrusterVectorL;
@@ -88,6 +96,8 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
         private static FieldInfo _cmdTargetField;
         private static FieldInfo _prodHasStartedField;
         private static FieldInfo _prodQueuedCountField;
+        private static FieldInfo _movementSoundAudioSourceField;
+        private static FieldInfo _shotSoundAudioSourceField;
 
         private float _lastShotTimestamp = -1f;
 
@@ -158,6 +168,7 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             }
 
             CacheReflectionAccess();
+            _audioBindingStartedAt = Time.unscaledTime;
         }
 
         private void CacheAnimatorParameters()
@@ -235,6 +246,14 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
                 {
                     AddSocketRoleCandidate("damage_fire", current);
                 }
+                else if (isKnownSocket && string.Equals(socketName, "Socket_EngineAudio", StringComparison.OrdinalIgnoreCase))
+                {
+                    AddSocketRoleCandidate("engine_audio", current);
+                }
+                else if (isKnownSocket && string.Equals(socketName, "Socket_WeaponAudio", StringComparison.OrdinalIgnoreCase))
+                {
+                    AddSocketRoleCandidate("weapon_audio", current);
+                }
                 else if (isKnownSocket && string.Equals(socketName, "Socket_RecoilPrimary", StringComparison.OrdinalIgnoreCase))
                 {
                     AddSocketRoleCandidate("weapon_recoil", current);
@@ -287,11 +306,15 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             _socketDeployUnit = GetSocketRoleValue("deployment");
             _socketDamageSmoke = GetSocketRoleValue("damage_smoke");
             _socketDamageFire = GetSocketRoleValue("damage_fire");
+            _socketEngineAudio = GetSocketRoleValue("engine_audio");
+            _socketWeaponAudio = GetSocketRoleValue("weapon_audio");
             _socketRecoilPrimary = GetSocketRoleValue("weapon_recoil");
             _socketMuzzlePrimary = GetSocketRoleValue("weapon_muzzle");
             _socketAntenna = GetSocketRoleValue("antenna");
             _socketThrusterVectorL = GetSocketRoleValue("thruster_left");
             _socketThrusterVectorR = GetSocketRoleValue("thruster_right");
+            _authoredDamageSmoke = GetUniqueParticleSystemUnder(_socketDamageSmoke);
+            _authoredDamageFire = GetUniqueParticleSystemUnder(_socketDamageFire);
 
             if (_socketAntenna != null)
             {
@@ -361,6 +384,103 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             return _socketRoleBindings.TryGetValue(role, out binding) ? binding.Value : null;
         }
 
+        private static ParticleSystem GetUniqueParticleSystemUnder(Transform socket)
+        {
+            if (socket == null) return null;
+            ParticleSystem[] systems = socket.GetComponentsInChildren<ParticleSystem>(true);
+            return systems != null && systems.Length == 1 ? systems[0] : null;
+        }
+
+        private void UpdateNativeAudioBindings()
+        {
+            if (_movementAudioBound && _weaponAudioBound) return;
+            if (Time.unscaledTime - _audioBindingStartedAt > 10.0f ||
+                Time.unscaledTime < _nextAudioBindingAttemptAt)
+            {
+                return;
+            }
+
+            _nextAudioBindingAttemptAt = Time.unscaledTime + 0.5f;
+            TryBindNativeAudioSources();
+        }
+
+        private void TryBindNativeAudioSources()
+        {
+            if (_entity == null) return;
+
+            if (!_movementAudioBound && _movementSoundAudioSourceField != null && _socketEngineAudio != null)
+            {
+                AudioSource source = GetUniqueAudioSourceUnder(_socketEngineAudio);
+                if (source != null)
+                {
+                    Component target = FindNearestComponent(
+                        transform.GetComponentsInChildren(_movementSoundAudioSourceField.DeclaringType, true),
+                        _socketEngineAudio.position);
+                    _movementAudioBound = TryAssignAudioSource(
+                        target, _movementSoundAudioSourceField, source);
+                }
+            }
+
+            if (!_weaponAudioBound && _shotSoundAudioSourceField != null && _socketWeaponAudio != null)
+            {
+                AudioSource source = GetUniqueAudioSourceUnder(_socketWeaponAudio);
+                if (source != null)
+                {
+                    Component target = FindNearestComponent(
+                        transform.GetComponentsInChildren(_shotSoundAudioSourceField.DeclaringType, true),
+                        _socketWeaponAudio.position);
+                    _weaponAudioBound = TryAssignAudioSource(
+                        target, _shotSoundAudioSourceField, source);
+                }
+            }
+        }
+
+        private static AudioSource GetUniqueAudioSourceUnder(Transform socket)
+        {
+            if (socket == null) return null;
+            AudioSource[] sources = socket.GetComponentsInChildren<AudioSource>(true);
+            return sources != null && sources.Length == 1 ? sources[0] : null;
+        }
+
+        private static Component FindNearestComponent(Component[] candidates, Vector3 point)
+        {
+            if (candidates == null || candidates.Length == 0) return null;
+
+            Component nearest = null;
+            float nearestDistance = float.PositiveInfinity;
+            for (int i = 0; i < candidates.Length; i++)
+            {
+                Component candidate = candidates[i];
+                if (candidate == null || candidate.transform == null) continue;
+                float distance = (candidate.transform.position - point).sqrMagnitude;
+                if (distance < nearestDistance)
+                {
+                    nearest = candidate;
+                    nearestDistance = distance;
+                }
+            }
+
+            return nearest;
+        }
+
+        private static bool TryAssignAudioSource(Component target, FieldInfo field, AudioSource source)
+        {
+            if (target == null || field == null || source == null || field.FieldType != typeof(AudioSource))
+            {
+                return false;
+            }
+
+            try
+            {
+                field.SetValue(target, source);
+                return ReferenceEquals(field.GetValue(target), source);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         private static void CacheReflectionAccess()
         {
             if (_healthRatioProp != null) return;
@@ -377,6 +497,28 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             _productionInfoProp = ecType.GetProperty("ProductionInfo", BindingFlags.Public | BindingFlags.Instance);
             _isEnemyMethod = ecType.GetMethod("IsEnemy", BindingFlags.Public | BindingFlags.Instance,
                 null, new[] { ecType }, null);
+
+            Type movementType = ecType.Assembly.GetType("EntityFlockingMovement", false);
+            if (movementType != null)
+            {
+                FieldInfo movementAudioField = movementType.GetField(
+                    "_movementSoundAudioSource", BindingFlags.NonPublic | BindingFlags.Instance);
+                if (movementAudioField != null && movementAudioField.FieldType == typeof(AudioSource))
+                {
+                    _movementSoundAudioSourceField = movementAudioField;
+                }
+            }
+
+            Type projectileType = ecType.Assembly.GetType("ShootProjectile", false);
+            if (projectileType != null)
+            {
+                FieldInfo shotAudioField = projectileType.GetField(
+                    "shotSoundAudioSource", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                if (shotAudioField != null && shotAudioField.FieldType == typeof(AudioSource))
+                {
+                    _shotSoundAudioSourceField = shotAudioField;
+                }
+            }
 
             _attackField = ecType.GetField("_attack", BindingFlags.NonPublic | BindingFlags.Instance);
             if (_attackField != null)
@@ -413,6 +555,7 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
         {
             if (_entity == null) return;
 
+            UpdateNativeAudioBindings();
             UpdateLocomotionAnimation();
             UpdateHealthAndDamageTransitions();
             UpdateRadarSweep();
@@ -506,8 +649,15 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
                 if (!_isDamagedStateActive)
                 {
                     _isDamagedStateActive = true;
-                    Transform smokeMount = _socketDamageSmoke ?? transform;
-                    _smokeVfxInstance = RuntimeVisualVfxFallback.SpawnDamageSmoke(smokeMount);
+                    if (_authoredDamageSmoke != null)
+                    {
+                        _authoredDamageSmoke.Play(true);
+                    }
+                    else
+                    {
+                        Transform smokeMount = _socketDamageSmoke ?? transform;
+                        _smokeVfxInstance = RuntimeVisualVfxFallback.SpawnDamageSmoke(smokeMount);
+                    }
 
                     if (_damagedMeshObject != null)
                     {
@@ -546,6 +696,10 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             {
                 // Health recovered from moderate damage via field repairs
                 _isDamagedStateActive = false;
+                if (_authoredDamageSmoke != null)
+                {
+                    _authoredDamageSmoke.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+                }
                 if (_smokeVfxInstance != null)
                 {
                     UnityEngine.Object.Destroy(_smokeVfxInstance);
@@ -577,8 +731,15 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
                 if (!_isCriticalStateActive)
                 {
                     _isCriticalStateActive = true;
-                    Transform fireMount = _socketDamageFire ?? transform;
-                    _fireVfxInstance = RuntimeVisualVfxFallback.SpawnDamageFire(fireMount, _entity);
+                    if (_authoredDamageFire != null)
+                    {
+                        _authoredDamageFire.Play(true);
+                    }
+                    else
+                    {
+                        Transform fireMount = _socketDamageFire ?? transform;
+                        _fireVfxInstance = RuntimeVisualVfxFallback.SpawnDamageFire(fireMount, _entity);
+                    }
 
                     if (_socketTurretPivot != null && !_isTurretJammed)
                     {
@@ -598,6 +759,10 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             {
                 // Health recovered from critical damage
                 _isCriticalStateActive = false;
+                if (_authoredDamageFire != null)
+                {
+                    _authoredDamageFire.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+                }
                 if (_fireVfxInstance != null)
                 {
                     UnityEngine.Object.Destroy(_fireVfxInstance);
@@ -619,6 +784,15 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             // 4. Destruction cleanup
             if (isDead)
             {
+                if (_authoredDamageFire != null)
+                {
+                    _authoredDamageFire.Stop(true, ParticleSystemStopBehavior.StopEmitting);
+                }
+                if (_authoredDamageSmoke != null)
+                {
+                    _authoredDamageSmoke.Stop(true, ParticleSystemStopBehavior.StopEmitting);
+                }
+
                 if (!_deathAnimationTriggered && _animator != null && _hasDeathAnimationParameter)
                 {
                     _deathAnimationTriggered = true;

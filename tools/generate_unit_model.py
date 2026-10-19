@@ -808,6 +808,7 @@ def parse_args():
     parser.add_argument("--locators", action="store_true", default=True, help="Generate Unity locator sockets")
     parser.add_argument("--dirt", action="store_true", default=True, help="Bake procedural vertex ambient dirt/cavity shading")
     parser.add_argument("--wear", default="field_tested", choices=["none", "pristine", "factory_new", "field_tested", "battle_hardened"], help="Procedural surface wear level")
+    parser.add_argument("--structural-wear-mask", action="store_true", help="Keep convex-edge wear localized in vertex-color channel G, with flat and concave corners unmarked")
     parser.add_argument("--soot-intensity", type=float, default=1.0, help="Thermal soot intensity around muzzles and exhausts (0.0–2.0; default 1.0)")
     parser.add_argument("--lods", action="store_true", help="Generate multi-level LOD chain (LOD0, LOD1, LOD2) and export _LODs.fbx")
     parser.add_argument("--colliders", action="store_true", help="Generate low-poly physics collision hulls")
@@ -2682,7 +2683,7 @@ def main():
             wreckage_severity=args.wreckage_severity,
             model_scale=args.model_scale,
             card_path=card_path,
-            structural_wear_mask=args.archetype == "heavy_crane_mech",
+            structural_wear_mask=args.structural_wear_mask or args.archetype == "heavy_crane_mech",
         )
 
     if args.report_json:

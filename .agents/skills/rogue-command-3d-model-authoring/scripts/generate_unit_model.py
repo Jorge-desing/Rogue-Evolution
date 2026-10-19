@@ -811,6 +811,7 @@ def parse_args():
     parser.add_argument("--locators", action="store_true", default=True, help="Generate Unity locator sockets")
     parser.add_argument("--dirt", action="store_true", default=True, help="Bake procedural vertex ambient dirt/cavity shading")
     parser.add_argument("--wear", default="field_tested", choices=["none", "pristine", "factory_new", "field_tested", "battle_hardened"], help="Procedural surface wear level")
+    parser.add_argument("--structural-wear-mask", action="store_true", help="Keep convex-edge wear localized in vertex-color channel G, with flat and concave corners unmarked")
     parser.add_argument("--soot-intensity", type=float, default=1.0, help="Thermal soot intensity around muzzles and exhausts (0.0–2.0; default 1.0)")
     parser.add_argument("--lods", action="store_true", help="Generate multi-level LOD chain (LOD0, LOD1, LOD2) and export _LODs.fbx")
     parser.add_argument("--colliders", action="store_true", help="Generate low-poly physics collision hulls")
@@ -1041,6 +1042,7 @@ def build_vehicle_model(
     barrel_shroud: bool = False,
     weighted_normals: bool = True,
     wreckage_severity: str = "catastrophic",
+    structural_wear_mask: bool = False,
 ) -> dict:
     rmk.clear_scene()
 
@@ -2095,6 +2097,7 @@ def build_vehicle_model(
         icon_resolutions=(icon_size,),
         icon_elevation=icon_elevation,
         wreckage_severity=wreckage_severity,
+        structural_wear_mask=structural_wear_mask,
     )
 
     if lod_diagnostics:
@@ -2653,6 +2656,7 @@ def main():
             barrel_shroud=args.barrel_shroud,
             weighted_normals=args.weighted_normals,
             wreckage_severity=args.wreckage_severity,
+            structural_wear_mask=args.structural_wear_mask or args.archetype == "heavy_crane_mech",
         )
 
     if args.report_json:
