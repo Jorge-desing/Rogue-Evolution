@@ -7,6 +7,7 @@ This guide establishes the visual rules and aesthetic principles for authoring g
 ## 1. Aesthetic Lineage & Core Philosophy
 
 Use a grounded, stylized military sci-fi language: readable from the elevated RTS camera, with believable mass, connected machinery, and surfaces that respond like armor, cast housings, rubber, and machined metal. The desired finish is not photorealism; it is a more convincing, less primitive-looking version of the project's clear faction and gameplay language.
+The checks below adapt public RTS art-direction and Blender/Unity modeling guidance to this project; see [Design Guides Adapted](design-guides-adapted.md) for sources and the full workflow.
 1. **Designed Silhouettes**: Distinct proportions and a coherent outer shell replace a stack of uniform boxes. Use faceted planes where they describe armor and controlled curvature where it describes cast or formed parts.
 2. **High-Readability RTS Stance**: Keep the archetype and facing legible from the elevated, angled camera (~45°–60° isometric/orthographic tilt), including when the unit is roughly 30–120 pixels tall.
 3. **Believable Fabrication**: Distinguish welded plates, cast armor, access panels, suspension, and attached equipment through thickness, overlap, recesses, joints, and scale-aware edge radii.
@@ -16,11 +17,13 @@ Use a grounded, stylized military sci-fi language: readable from the elevated RT
 
 ## 2. Silhouette Readability & The 3-Tier Hierarchy
 
-Every unit must pass the **Squint Test**: when zoomed out or viewed as a solid black silhouette, its gameplay role and forward orientation must be immediately identifiable in < 250ms.
+Every unit must pass the **Silhouette Test**: from the elevated gameplay camera and the main orthographic views, the black silhouette should identify its role and forward orientation before color or material is considered. The project's roughly 50-pixel review size and 250ms glance target are internal heuristics, not external standards. The camera-first review is adapted from RTS art direction that prioritizes form and removes noisy micro-detail.
 
 - **Tier 1 (Macro Silhouette, 65%)**: Proportion, stance, ground clearance, and largest hull/turret masses. Identifies archetype (Scout vs Siege vs Mech vs Bike).
 - **Tier 2 (Meso Mechanical Construction, 25%)**: Hull transitions, turret seating, track or suspension depth, weapon mounts, engine deck, and access systems. Explains how the unit is built and operated.
 - **Tier 3 (Micro Accents, 10%)**: Optics, fasteners, seams, markings, and localized wear. Directs attention but never carries the silhouette on its own.
+
+Treat 65/25/10 as relative visual priorities for this project, not measured percentages or an external standard.
 
 ### Form Construction Checklist
 - Establish the primary hull/cabin/turret as a coherent shell from tapered profiles and intersecting volumes with intentional transitions; do not leave obvious box-to-box joins on the visible silhouette.
@@ -76,6 +79,8 @@ Use edge treatment to describe fabrication and catch light, not to make every ob
 - **Choose segments by shape**: A 1-segment bevel is appropriate for a crisp chamfer. Use 2–4 segments for visible rolled edges and rounded transitions; use enough radial sides on wheels, pipes, and barrels that their gameplay-scale silhouette does not look square. Keep hidden geometry economical.
 - **Preserve intentional planes**: Keep true armor facets flat-shaded, but shade curved surfaces smoothly by angle. Inspect normal transitions and highlights in a neutral clay render; do not use weighted normals to disguise a bad cross-section or intersecting shells.
 - **Avoid uniform beveling**: Never apply the same wide bevel to every edge. Large, soft corners on all panels create a toy-like look and erase structural differences.
+
+Keep shape and shading checks separate: bevels change mesh geometry and highlights; smooth shading and weighted normals change how existing faces shade. If a black silhouette still looks boxy, revise the mesh cross-section instead of increasing normal weights.
 
 ---
 

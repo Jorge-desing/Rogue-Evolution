@@ -6,6 +6,20 @@ All recipes are implemented in `tools/RogueModelKit.py` and `.agents/skills/rogu
 
 Use the form-realism rules in the parent skill as the art-direction authority. Keep faceted armor where it communicates plate construction, and add controlled curvature to cast or formed parts where it improves the silhouette. The bevel values shown below are usable recipe parameters, not a requirement to bevel every edge; scale or adjust them for the part and preserve the established triangle and LOD budgets.
 
+## Visual Refinement Workflow
+
+Run this sequence before treating a generated vehicle as final:
+
+1. **Define role and proportions**: specify tactical role, mobility, primary system, and distinct silhouette cues; use front/side/top references to set scale and component placement.
+2. **Build the functional blockout**: use the kit for a reproducible starting point, with ground contact, pivots, sockets, and subsystem clearances in place.
+3. **Review the silhouette**: inspect a black, unlit render from the elevated RTS camera and major orthographic views. At the local 30–120 px review range, correct indistinct role cues and overly thin features before material work. These sizes and the 250 ms glance target are local heuristics.
+4. **Refine visible shells**: reshape long profiles and cross-sections, form compound transitions, and create believable overlaps, shadow gaps, and joints. Preserve flat armor facets where they describe plates. Do not add surface detail to hide unresolved blockout shapes.
+5. **Review geometry and shading independently**: use selective bevels for physical edge radii/chamfers; use angle smoothing and weighted normals for the appearance of curved or broad faces. Weighted normals cannot round the silhouette. Keep normals/tangents authored for the Unity FBX import and inspect the imported result.
+6. **Add baked detail and inspect budgets**: after geometry and UVs stabilize, bake useful fine relief into the existing Normal atlas with padding. Treat the current 7,500-face value as a Rogue Command profiling ceiling for LOD0, not a universal Unity budget or an instruction to use every face. Compare Blender face counts with exported Unity triangle counts and review the LODs.
+7. **Preserve integration contracts**: before export, verify canonical sockets, hierarchy, pivots, ground contact, UVs, texture channels/import settings, and the mesh `Color` RGBA vertex-wear attribute. See [PBR Texture Authoring](../../rogue-command-pbr-texture-authoring/SKILL.md) and [PBR Texture Validation](../../rogue-command-pbr-texture-validation/SKILL.md).
+
+This project workflow adapts RTS silhouette guidance, Blender's separation of mesh geometry and shading, and Unity's FBX/LOD behavior. The cited sources do not mandate one universal style or polygon count; see [Design Guides Adapted](design-guides-adapted.md).
+
 ---
 
 ## 1. Coordinate Systems & Export Invariants
