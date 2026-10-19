@@ -824,6 +824,7 @@ def parse_args():
     parser.add_argument("--icon-size", type=int, default=128, choices=[64, 128], help="Resolution for rendered tactical icons")
     parser.add_argument("--icon-elevation", type=float, default=45.0, help="Elevation angle for tactical isometric icon in degrees (default 45.0 for RTS 45-degree angle, or 35.26 for true isometric)")
     parser.add_argument("--target-budget", type=int, default=4000, help="Target polygon budget for profiling")
+    parser.add_argument("--rts-budget", action="store_true", help="Use lower-detail preset variants for RTS camera polygon budgets")
     parser.add_argument("--model-scale", type=float, default=1.0, help="Uniformly scale authored vehicle geometry and sockets around the ground origin")
     parser.add_argument("--lod", action="store_true", help="Calculate polygon budget and recommend LOD reductions")
     parser.add_argument("--smooth-angle", type=float, default=38.0, help="Smart angle-weighted auto-smooth threshold in degrees")
@@ -1046,8 +1047,22 @@ def build_vehicle_model(
     model_scale: float = 1.0,
     card_path: Path | None = None,
     structural_wear_mask: bool = False,
+    rts_budget: bool = False,
 ) -> dict:
     rmk.clear_scene()
+
+    if rts_budget and archetype == "mobile_sam_launcher":
+        hydraulic_pistons = False
+        hull_greebles = False
+        tactical_markings = False
+    elif rts_budget and archetype == "recovery_crawler":
+        hydraulic_hoses = False
+        hydraulic_pistons = False
+        hull_greebles = False
+        stowage_kit = False
+        slat_armor = False
+        rws_mount = False
+        attachments = None
 
     blend_file = blend_path or (out_root / "content" / "source-art" / f"{name.lower()}.blend")
     fbx_file = fbx_path or (
@@ -1545,7 +1560,10 @@ def build_vehicle_model(
         builder.hull_length = 3.6
         builder.hull_width = 2.2
         builder.hull_deck_z = 0.90
-        builder.add_all_terrain_wheels(wheelbase_y=2.55, track_width_x=1.95, wheel_radius=0.40, wheel_width=0.28, middle_axle=True)
+        builder.add_all_terrain_wheels(
+            wheelbase_y=2.55, track_width_x=1.95, wheel_radius=0.40, wheel_width=0.28,
+            middle_axle=True, lug_count=6 if rts_budget else 10, bolt_count=0 if rts_budget else 6
+        )
         builder.objects.extend([
             rmk.make_box(f"{name}Armor_ChassisFrame", (1.62, 3.55, 0.34), (0.0, 0.0, 0.56), builder.palette.gunmetal, 0.03),
             rmk.make_box(f"{name}Armor_ForwardCab", (1.80, 1.05, 0.74), (0.0, 1.28, 1.02), builder.palette.primary_armor, 0.04),
@@ -2386,6 +2404,7 @@ def main():
         print(f"Faction: {args.faction} | Palette: {vehicle_camo} | Wear: {args.wear} | Soot: {args.soot_intensity}")
         print(f"Surface Detail: camo scale={args.camo_scale}, camo contrast={args.camo_contrast}, panel relief={args.panel_lines}, normal intensity={args.normal_intensity}")
         print(f"Model Scale: {args.model_scale}")
+        print(f"RTS Polygon Budget Variant: {args.rts_budget}")
         print(f"Primary Weapon: {args.weapon}")
         print(f"Subsystems: Skirts={args.skirts}, Rollcage={args.rollcage}, QuadTracks={args.quad_tracks}, TiltRotors={args.tilt_rotors}, Dozer={args.dozer}, Smoke={args.smoke}, Radar={args.radar}, Sponsons={args.sponsons}, Outriggers={args.outriggers}, FlightDeck={args.flight_deck}, ExcavatorDrum={args.excavator_drum}")
         print(f"Micro-Details: Antenna={args.antenna}, Cupola={args.cupola}, Rivets={args.rivets}, TrackShoes={args.track_shoes}, SuspensionArms={args.suspension_arms}, MantletBoot={args.mantlet_boot}, SpacedSkirts={args.spaced_skirts}")
@@ -2684,6 +2703,7 @@ def main():
             model_scale=args.model_scale,
             card_path=card_path,
             structural_wear_mask=args.structural_wear_mask or args.archetype == "heavy_crane_mech",
+            rts_budget=args.rts_budget,
         )
 
     if args.report_json:

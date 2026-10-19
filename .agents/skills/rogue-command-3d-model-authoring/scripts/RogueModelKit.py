@@ -849,6 +849,7 @@ def make_all_terrain_wheel_assembly(
     accent_mat: bpy.types.Material | None = None,
     lug_count: int = 10,
     lug_depth: float = 0.035,
+    bolt_count: int = 6,
 ) -> list[bpy.types.Object]:
     """Generates a heavy tactical off-road wheel with chevron tread lugs and planetary gear hub."""
     objects = []
@@ -898,10 +899,11 @@ def make_all_terrain_wheel_assembly(
         rim_mat, rotation=wheel_rot, vertices=6, bevel=0.005
     ))
 
-    # 5. Hexagonal lug bolts circle (6 bolts on hub face)
+    # 5. Hexagonal lug bolts circle
     bolt_radius = radius * 0.22
-    for b in range(6):
-        b_angle = b * (math.pi / 3.0)
+    bolt_angle_step = (2.0 * math.pi) / max(1, bolt_count)
+    for b in range(bolt_count):
+        b_angle = b * bolt_angle_step
         b_y = loc_v.y + math.cos(b_angle) * bolt_radius
         b_z = loc_v.z + math.sin(b_angle) * bolt_radius
         b_loc = (loc_v.x + hub_offset + sign * 0.015, b_y, b_z)
@@ -9877,6 +9879,8 @@ class RogueVehicleBuilder:
         wheel_radius: float = 0.38,
         wheel_width: float = 0.28,
         middle_axle: bool = False,
+        lug_count: int = 10,
+        bolt_count: int = 6,
     ) -> "RogueVehicleBuilder":
         effective_z = self.ground_clearance + wheel_radius + 0.035
         axles = [(-wheelbase_y * 0.5, "Rear"), (wheelbase_y * 0.5, "Front")]
@@ -9890,7 +9894,8 @@ class RogueVehicleBuilder:
                     location=(x, y_pos, effective_z),
                     radius=wheel_radius, width=wheel_width,
                     tire_mat=self.palette.tread, rim_mat=self.palette.wheel_rim,
-                    hub_mat=self.palette.gunmetal, accent_mat=self.palette.warning
+                    hub_mat=self.palette.gunmetal, accent_mat=self.palette.warning,
+                    lug_count=lug_count, bolt_count=bolt_count,
                 )
                 self.objects.extend(w)
         return self
