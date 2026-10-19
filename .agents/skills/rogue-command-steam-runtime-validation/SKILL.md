@@ -16,13 +16,6 @@ Use this skill when an acceptance claim requires observing a loader, unit, stage
 - If a BepInEx MCP bridge or runtime inspector is available, verify its connected target and use read-only observations first. Use at most one runtime inspector in a test profile and remove it during cleanup. Do not assume a tool is connected because its files are installed locally.
 - Prefer BepInEx MCP over Computer Use for controls exposed by the bridge. The bridge has operated in this project without the game window focused; do not request focus or invoke Computer Use solely to click a control when a bridge call can do it.
 
-## Bypass FirstRun for mod acceptance
-
-- Unless the acceptance target is the tutorial, run the test on a dedicated QA profile and bypass `FirstRun` before pressing Start Run. Reuse a previously designated QA slot only when it has no `savegame.dat`; otherwise create a fresh higher-numbered slot using the native profile API described in the runbook. Never reset an occupied slot. Resolve the actual selector through `ProfileManager.CurrentProfileTextPath` under `Application.persistentDataPath` and preserve QA files. Do not change tutorial progress on Profile 1 or another user profile.
-- If the current build exposes a native tutorial-skip control, use it and verify both profile flags and the next-run mode. If no control exists, or it leaves either flag unset, recheck the complete game-version/SHA-256/MVID identity and use the native `Game.TutorialState.FinishMainTutorial()` and `Game.TutorialState.OnPlayerHasFinishedLevel1()` methods through the BepInEx bridge. These persist the tutorial flags; the second flag is what makes `GameBalancingStore.DetermineLevelProgressionModeForNewRun()` choose `Default` or `Heat` instead of `FirstRun`.
-- If direct bridge invocation is unavailable, use one temporary bridge-compiled helper, invoke its apply method once, read back both flags and the selected progression mode, then remove the helper and confirm no temporary component remains before a scene transition. Follow the exact recipe in `docs/research/STEAM-RUNTIME-CONTROL.md`.
-- Never edit `tutorialState.txt` directly, grant experience, call `MetaGame.AddExperiencePoints`, disable tutorial code with Harmony, or treat the bypass as proof that a tutorial was played or a reward earned. If the QA run still selects `FirstRun`, stop and diagnose the state instead of advancing the tutorial.
-
 ## Verify the behavior that the claim names
 
 - Define one observable success condition before launching: for example, the pack is accepted, the unit appears in a blueprint pool, `EntityFactory` instantiates it, the card/name/model render, a stage creates a map, or an AI module makes its intended bounded decision.

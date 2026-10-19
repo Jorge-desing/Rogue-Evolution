@@ -63,7 +63,7 @@ En la sesión supervisada del 2026-10-18, se llamó `Navigator.Pause()` por refl
 
 **Comprobación de reanudación supervisada (2026-10-18):** se resolvió de nuevo `GameButton`, se verificó el texto `Reanudar el juego` y `UnityEngine.UI.Button.interactable=true`, y se pulsó una vez con `Button.Press()`. La lectura en vivo inmediatamente posterior indicó `_isPaused=false`, `Time.timeScale=1` y `Time.time=549.9843`; el HUD avanzó de `03:51` a `04:03`. Esto confirma que reanudar vuelve a ejecutar la simulación. Para dejar la sesión segura, se llamó `Navigator.Pause()`; la lectura posterior confirmó `_isPaused=true`, escala `0` y el mismo `Time.time=549.9843`. `InGameMenu.Show()` restauró el overlay sin reanudar: `_isShowing=true` y la pausa nativa siguió activa. Se retiraron las sondas temporales y el Canvas quedó solo con componentes del juego. La captura `PrintWindow` [rogue-command-resumed-then-paused-20261018.png](%TEMP%/rogue-command-resumed-then-paused-20261018.png) fue 1920×1080; el handle en primer plano permaneció `0x190054E` antes y después. La primera congelación de esta sesión había sido una asignación directa de `Time.timeScale=0` desde Unity; al reportar una pausa, distingue siempre esa intervención, la pausa nativa y el reloj que corre normalmente al reanudar.
 
-**Continuación de aceptación y pausa nativa verificada (2026-10-18):** se inició un nuevo `FirstRun` en dificultad Meditativo. La escena `Game` quedó con 3 vidas, tutorial `7/26` y sin `ChooseCard`. Antes de pasar a trabajo de código se llamó `Navigator.Pause()` desde la instancia Steam activa (PID `41992`), con `Time.timeScale` de `1` a `0`. Una sonda temporal de solo lectura confirmó `Navigator._isPaused=true`, `_isDebugPaused=false`, `Time.timeScale=0` y `Time.time=1180.464` sin cambio entre muestras separadas por 8 segundos; `Time.unscaledTime` avanzó. El HUD permaneció en `09:04` en ambas capturas `PrintWindow` de 1920×1080. `InGameMenu._isShowing=false`: el overlay puede estar oculto mientras la pausa nativa está activa; verifica el flag y el tiempo escalado, no solo la visibilidad del menú. Las capturas y los valores están guardados en `artifacts/runtime-smoke/loader-continuation-20261018/`. La sonda se retiró y se comprobó que no queda ningún componente `Rcl*` en `Game Menu UI HUD`. En esa sesión se usó Profile 1 y su respaldo está en `artifacts/runtime-smoke/baseline-20261018-160435`; revisa el estado actual desde cero antes de otra prueba. La oferta moddeada, producción, mapa moddeado y AI moddeada siguen pendientes.
+**Continuación de aceptación y pausa nativa verificada (2026-10-18):** se inició un nuevo `FirstRun` en dificultad Meditativo. La escena `Game` quedó con 3 vidas, tutorial `7/26` y sin `ChooseCard`. Antes de pasar a trabajo de código se llamó `Navigator.Pause()` desde la instancia Steam activa (PID `41992`), con `Time.timeScale` de `1` a `0`. Una sonda temporal de solo lectura confirmó `Navigator._isPaused=true`, `_isDebugPaused=false`, `Time.timeScale=0` y `Time.time=1180.464` sin cambio entre muestras separadas por 8 segundos; `Time.unscaledTime` avanzó. El HUD permaneció en `09:04` en ambas capturas `PrintWindow` de 1920×1080. `InGameMenu._isShowing=false`: el overlay puede estar oculto mientras la pausa nativa está activa; verifica el flag y el tiempo escalado, no solo la visibilidad del menú. Las capturas y los valores están guardados en `artifacts/runtime-smoke/loader-continuation-20261018/`. La sonda se retiró y se comprobó que no queda ningún componente `Rcl*` en `Game Menu UI HUD`. El perfil activo sigue siendo Profile 1; conserva su respaldo existente en `artifacts/runtime-smoke/baseline-20261018-160435`. La oferta moddeada, producción, mapa moddeado y AI moddeada siguen pendientes.
 
 **Avance desde el opener y corrección del estado de pausa (2026-10-18):** al volver a iniciar el run, la captura sin foco mostraba una pantalla de inicio porque `LoadingHider` estaba activo en la propia escena `Game`; una lectura del puente encontró los textos vivos `IntroRunText="An Engineer Awakes"` y `ObjectiveText="Destruye el control de la base PCX"`, además del botón nativo `UnityEngine.UI.Button` `Button` con texto `"Iniciar"` e `interactable=true`. No la clasifiques como una captura anterior sin revisar el objeto y sus textos. Tras pulsar una vez `Button.Press()`, `LoadingHider` se desactivó y una nueva captura `PrintWindow` mostró el mapa, tres vidas y reloj HUD `00:10`.
 
@@ -126,86 +126,6 @@ En el `Assembly-CSharp.dll` de esta identidad, el inicializador de `ProfileManag
 
 En la lectura en vivo del 2026-10-18, el selector de `LocalLow` valía `1`, mientras los dos archivos de la instalación valían `2` y `3`. El perfil activo era `Profile1`; al iniciar no tenía `savegame.dat`. `Profile2` y `Profile3` sí tenían guardados. Esta comprobación estática y de archivos corrige la clasificación de la lectura histórica más abajo: vuelve a consultar la ruta de `ProfileManager` en cada sesión y no cambies ninguno de los selectores heredados para elegir un perfil de prueba.
 
-### Saltar FirstRun en el perfil QA
-
-Para aceptar unidades, fábricas, escenarios o efectos del mod no consumas la corrida en el tutorial `FirstRun`. La ruta siguiente modifica únicamente el estado de tutorial de un perfil QA dedicado; no elimina el tutorial del juego ni termina la partida del usuario.
-
-1. Comprueba que el juego no está ejecutando una partida del usuario. Revalida versión, SHA-256 y MVID antes de usar métodos reflejados, y confirma con `ProfileManager.CurrentProfileTextPath` cuál es el selector real bajo `Application.persistentDataPath`.
-2. Guarda los bytes y el hash del selector actual, y toma hashes de los archivos de los perfiles existentes. En la build identificada abajo, `ProfilePanel` solo muestra Profile 1/2/3 y su acción de reset borra los archivos del perfil: no la uses para fabricar un perfil QA. Reutiliza un perfil superior que ya esté registrado como QA solo si no tiene `savegame.dat`; selecciónalo con `ProfilePanel.SetCurrentProfile(n)`. Si no hay perfil QA disponible, elige un número `n >= 4` cuyo directorio `Profiles\Profile<n>` no exista; usa `SelectFreshQaProfile(n)` del helper para crear solo ese directorio vacío y llamar al método nativo `ProfilePanel.SetCurrentProfile(n)`. Ese método actualiza el selector, carga MetaGame y recarga el estado tutorial en ese orden. Verifica que el número y las rutas actuales apuntan al perfil QA y que no existe `savegame.dat`. Nunca sobrescribas un directorio existente ni alteres Profile 1/2/3.
-3. En Main Menu o RunSetup, usa un control nativo de saltar tutorial si la build ofrece uno. Verifica ambos flags y el modo de la próxima corrida; si no existe el control o deja algún flag sin marcar, la build `1.0.9` identificada abajo permite completarlos mediante las APIs nativas de `Game.TutorialState`. Hazlo antes de pulsar `Start Run`, que calcula el modo de progresión.
-4. Para crear o seleccionar un perfil superior, o si el puente no puede invocar directamente los métodos nativos, inyecta temporalmente este helper en un GameObject activo que permanezca activo al cerrarse el panel de perfiles, por ejemplo el canvas principal del menú. Llama una sola vez a `SelectFreshQaProfile(n)` para crear un perfil nuevo o a `SelectExistingQaProfile(n)` solo para el perfil que ya está registrado como QA; después llama `Apply()` una vez. Lee los campos de retorno, llama `Remove()` y confirma por inspección que no queda ningún componente `RclTutorialBypass`. Resuelve de nuevo los GameObjects si cambia la escena.
-
-```csharp
-using System;
-using System.IO;
-using UnityEngine;
-
-public sealed class RclTutorialBypass : MonoBehaviour
-{
-    public string selectedProfileNumber;
-    public bool qaProfileSelected;
-    public bool mainTutorialFinished;
-    public bool playerHasFinishedLevel1;
-    public string nextRunMode;
-
-    public void SelectFreshQaProfile(int profileNumber)
-    {
-        if (profileNumber < 4)
-            throw new ArgumentOutOfRangeException(nameof(profileNumber));
-
-        var path = Path.Combine(Application.persistentDataPath, "Profiles", "Profile" + profileNumber);
-        if (Directory.Exists(path))
-            throw new IOException("Refusing to reuse an existing profile directory.");
-
-        var profilePanel = FindObjectOfType<ProfilePanel>();
-        if (profilePanel == null)
-            throw new InvalidOperationException("ProfilePanel is not active.");
-
-        Directory.CreateDirectory(path);
-        profilePanel.SetCurrentProfile(profileNumber);
-        selectedProfileNumber = ProfileManager.CurrentProfileNumber;
-        qaProfileSelected = selectedProfileNumber == profileNumber.ToString();
-    }
-
-    public void SelectExistingQaProfile(int profileNumber)
-    {
-        if (profileNumber < 4)
-            throw new ArgumentOutOfRangeException(nameof(profileNumber));
-
-        var path = Path.Combine(Application.persistentDataPath, "Profiles", "Profile" + profileNumber);
-        if (!Directory.Exists(path))
-            throw new DirectoryNotFoundException("The recorded QA profile does not exist.");
-
-        var profilePanel = FindObjectOfType<ProfilePanel>();
-        if (profilePanel == null)
-            throw new InvalidOperationException("ProfilePanel is not active.");
-
-        profilePanel.SetCurrentProfile(profileNumber);
-        selectedProfileNumber = ProfileManager.CurrentProfileNumber;
-        qaProfileSelected = selectedProfileNumber == profileNumber.ToString();
-    }
-
-    public void Apply()
-    {
-        if (!Game.TutorialState.IsMainTutorialFinished)
-            Game.TutorialState.FinishMainTutorial();
-        if (!Game.TutorialState.PlayerHasFinishedLevel1)
-            Game.TutorialState.OnPlayerHasFinishedLevel1();
-
-        mainTutorialFinished = Game.TutorialState.IsMainTutorialFinished;
-        playerHasFinishedLevel1 = Game.TutorialState.PlayerHasFinishedLevel1;
-        nextRunMode = GameBalancingStore.DetermineLevelProgressionModeForNewRun().ToString();
-    }
-
-    public void Remove() => Destroy(this);
-}
-```
-
-La inspección estática de Rogue Command `1.0.9`, Unity `2021.3.45f2`, `Assembly-CSharp.dll` SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, MVID `db0e9462-128d-4296-9900-de18b4bd0c00`, encontró que `ProfilePanel` limita sus botones y el reset de perfil a los números 1–3, mientras su método `SetCurrentProfile(int)` no aplica ese límite y actualiza el perfil llamando a `ProfileManager.SetCurrentProfile(int)`, cargando MetaGame y recargando `Game.TutorialState`. `ProfileManager` construye la ruta activa concatenando el número seleccionado. `FinishMainTutorial()` marca y persiste `IsMainTutorialFinished`, y `OnPlayerHasFinishedLevel1()` marca y persiste `PlayerHasFinishedLevel1`. `GameBalancingStore.DetermineLevelProgressionModeForNewRun()` devuelve `FirstRun` si falta el segundo flag; después devuelve `Heat` cuando Heat es mayor que cero, o `Default` en caso contrario. Es una ruta de bypass para QA y no otorga XP ni demuestra que el jugador haya completado el tutorial.
-
-5. Confirma en vivo ambos flags, que `tutorialState.txt` del perfil QA se actualizó por la API nativa, y que `nextRunMode` es `Default` o `Heat`. Solo entonces inicia la corrida. Tras la transición, verifica `Game.CurrentLevelProgressionMode`; si aún es `FirstRun`, no avances el tutorial y diagnostica el perfil o la build.
-6. Conserva el perfil QA y la evidencia. Tras cerrar el juego, restaura por los bytes/hash guardados el selector real si se cambió, además de cualquier archivo temporal de instalación registrado. No reviertas los flags del perfil QA ni borres sus archivos.
-
 ## Inspección primero
 
 Empieza con operaciones de lectura acotadas:
@@ -226,7 +146,7 @@ Un `ButtonManager` puede tener listeners que abren diálogos o avanzan una secue
 3. Invoca una sola vez mediante el componente temporal o el método específico expuesto por el puente. Comprueba escena y jerarquía después.
 4. Destruye el componente temporal y confirma que ya no aparece en `inspect_components`.
 
-No confirmes el diálogo de sobrescritura de una partida guardada. `StartNewRun.OnClick()` comprueba si existe el archivo del perfil; si existe, ofrece sobrescribirlo. Usa el perfil QA sin `savegame.dat` preparado en la sección anterior y conserva una copia previa de sus archivos. Nunca llames a `Game.Init`, `MetaGame.AddExperiencePoints` ni escribas campos de progresión como atajo para demostrar una recompensa real.
+No confirmes el diálogo de sobrescritura de una partida guardada. `StartNewRun.OnClick()` comprueba si existe el archivo del perfil; si existe, ofrece sobrescribirlo. Usa un perfil de prueba sin `savegame.dat` y conserva una copia previa de sus archivos. Nunca llames a `Game.Init`, `MetaGame.AddExperiencePoints` ni escribas campos de progresión como atajo para demostrar una recompensa real.
 
 En una ejecución observada, el botón `Start Run Button` de `RunSetup` abrió `RunOpenerStoryCanvas`; su botón `ConfirmButton` avanzó la secuencia y llevó a `Game`. Ese recorrido terminó en `FirstRun`, nivel de run 4. No asumir que este flujo equivale a una partida normal ni que la pantalla de inicio es una oferta de recompensa.
 
