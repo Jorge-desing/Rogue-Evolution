@@ -823,7 +823,7 @@ def parse_args():
     parser.add_argument("--render-icons", action="store_true", help="Render dual orthographic 2D tactical icons (Top-Down and Isometric) with transparent alpha")
     parser.add_argument("--icon-size", type=int, default=128, choices=[64, 128], help="Resolution for rendered tactical icons")
     parser.add_argument("--icon-elevation", type=float, default=45.0, help="Elevation angle for tactical isometric icon in degrees (default 45.0 for RTS 45-degree angle, or 35.26 for true isometric)")
-    parser.add_argument("--target-budget", type=int, default=4000, help="Target polygon budget for profiling")
+    parser.add_argument("--target-budget", type=int, default=rmk.DEFAULT_FACE_BUDGET, help="Target face budget for profiling (default: 7500)")
     parser.add_argument("--rts-budget", action="store_true", help="Use lower-detail preset variants for RTS camera polygon budgets")
     parser.add_argument("--model-scale", type=float, default=1.0, help="Uniformly scale authored vehicle geometry and sockets around the ground origin")
     parser.add_argument("--lod", action="store_true", help="Calculate polygon budget and recommend LOD reductions")
@@ -998,7 +998,7 @@ def build_vehicle_model(
     colliders: bool = False,
     gameplay_json: bool = False,
     wreckage: bool = False,
-    target_budget: int = 4000,
+    target_budget: int = rmk.DEFAULT_FACE_BUDGET,
     lod_diagnostics: bool = False,
     smooth_angle: float = 38.0,
     multiview: bool = False,
@@ -2139,7 +2139,7 @@ def build_vehicle_model(
         print("\n--- Low-Poly Geometry Budget & LOD Diagnostics ---")
         true_triangles = res.get("profile_report", {}).get("total_triangles", res["total_polygons"])
         print(f"LOD0 (Current): {res['total_polygons']} faces / {true_triangles} triangles | {res['total_vertices']} verts (RTS Combat Camera)")
-        print(f"  Target Face Budget: 1,500 - 5,000 faces (Current: {round(res['total_polygons'] / max(1, target_budget) * 100, 1)}% of budget)")
+        print(f"  Target Face Budget: 1,500 - 7,500 faces (Current: {round(res['total_polygons'] / max(1, target_budget) * 100, 1)}% of budget)")
         print("LOD Recommendations:")
         print(f"  LOD1 (~1,200 tris): Merge track cleats & road wheel rims into single cylinder silhouettes.")
         print(f"  LOD2 (~500 tris): Collapse greebles, antennas, and multi-barrel clusters into convex hulls.")

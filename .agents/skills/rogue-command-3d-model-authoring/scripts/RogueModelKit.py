@@ -16,6 +16,8 @@ from typing import Any, Dict, Sequence, Tuple
 import bpy, bmesh
 from mathutils import Vector, Euler, Quaternion
 
+DEFAULT_FACE_BUDGET = 7500
+
 
 # ---------------------------------------------------------------------------
 # 1. Scene Management & Materials
@@ -90,6 +92,55 @@ def finish_mesh(
     return obj
 
 
+def _auto_box_bevel(size: Sequence[float], bevel: float) -> float:
+    """Widens bevels on major armor volumes while leaving small hardware crisp."""
+    dimensions = [abs(float(component)) for component in size]
+    if not dimensions or bevel <= 0.0:
+        return bevel
+    largest = max(dimensions)
+    smallest = max(min(dimensions), 1e-5)
+    if largest >= 1.10 and smallest >= 0.30 and bevel >= 0.018:
+        return max(bevel, min(smallest * 0.16, 0.12))
+    if largest >= 0.68 and smallest >= 0.16 and bevel >= 0.012:
+        return max(bevel, min(smallest * 0.12, 0.075))
+    return bevel
+
+
+def _auto_bevel_segments(size: Sequence[float], bevel: float) -> int:
+    """Adds rounded transitions to major forms without densifying small details."""
+    dimensions = [abs(float(component)) for component in size]
+    if not dimensions or bevel <= 0.0:
+        return 1
+    largest = max(dimensions)
+    smallest = max(min(dimensions), 1e-5)
+    bevel_ratio = bevel / smallest
+    if largest >= 1.00 and smallest >= 0.30 and bevel_ratio <= 0.20:
+        return 4
+    if largest >= 0.62 and smallest >= 0.14 and bevel_ratio <= 0.22:
+        return 3
+    return 1
+
+
+def _auto_armor_taper(name: str, size: Sequence[float], bevel: float) -> Tuple[float, float] | None:
+    """Returns a restrained formed-plate taper for large named vehicle body masses."""
+    dimensions = [abs(float(component)) for component in size]
+    if not dimensions or bevel <= 0.0:
+        return None
+    lower_name = name.casefold()
+    body_terms = ("armor_", "hull", "cab", "cabin", "fuselage", "torso", "cockpit", "cowl", "superstructure")
+    if not any(term in lower_name for term in body_terms):
+        return None
+
+    largest = max(dimensions)
+    smallest = max(min(dimensions), 1e-5)
+    aspect_ratio = largest / smallest
+    if largest >= 1.20 and smallest >= 0.28 and aspect_ratio <= 4.5:
+        return (0.90, 0.94)
+    if largest >= 0.78 and smallest >= 0.22 and aspect_ratio <= 3.5:
+        return (0.95, 0.97)
+    return None
+
+
 def get_orthonormal_basis(direction: Vector) -> Tuple[Vector, Vector, Vector]:
     """Constructs a right-handed orthonormal basis (u_vec, v_vec, dir_vec) around direction."""
     dir_vec = direction.normalized()
@@ -112,18 +163,43 @@ def make_box(
     material: bpy.types.Material | None,
     bevel: float = 0.025,
     rotation: Tuple[float, float, float] = (0.0, 0.0, 0.0),
-    bevel_segments: int = 1,
+    bevel_segments: int | None = None,
+    smooth: bool | None = None,
 ) -> bpy.types.Object:
-    """Creates a box with baked transforms and configurable edge rounding."""
+    """Creates a box with wider rounded transitions on major armor volumes."""
     if rotation is None:
         rotation = (0.0, 0.0, 0.0)
+    resolved_bevel = _auto_box_bevel(size, bevel)
+    resolved_segments = bevel_segments if bevel_segments is not None else _auto_bevel_segments(size, resolved_bevel)
+    smooth_faces = resolved_segments > 1 if smooth is None else smooth
+    top_scale = _auto_armor_taper(name, size, resolved_bevel)
+    if top_scale is not None:
+        obj = _make_tapered_shell(
+            name,
+            size,
+            location,
+            material,
+            top_scale=top_scale,
+            bevel=resolved_bevel,
+            bevel_segments=resolved_segments,
+            smooth=smooth_faces,
+        )
+        loc_v = Vector(location)
+        for vertex in obj.data.vertices:
+            vertex.co -= loc_v
+        obj.location = loc_v
+        obj.rotation_euler = rotation
+        bpy.context.view_layer.objects.active = obj
+        bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
+        return obj
+
     bpy.ops.mesh.primitive_cube_add(size=1.0, location=location)
     obj = bpy.context.object
     obj.name = name
     obj.dimensions = size
     obj.rotation_euler = rotation
     bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
-    return finish_mesh(obj, material, bevel, bevel_segments=bevel_segments)
+    return finish_mesh(obj, material, resolved_bevel, smooth=smooth_faces, bevel_segments=resolved_segments)
 
 
 def _make_tapered_shell(
@@ -134,6 +210,7 @@ def _make_tapered_shell(
     top_scale: Tuple[float, float] = (0.92, 0.92),
     bevel: float = 0.025,
     bevel_segments: int = 2,
+    smooth: bool = True,
 ) -> bpy.types.Object:
     """Creates a tapered armor shell with a narrower roof and softened edge transitions."""
     sx, sy, sz = size
@@ -170,7 +247,7 @@ def _make_tapered_shell(
     bpy.ops.mesh.select_all(action="SELECT")
     bpy.ops.mesh.normals_make_consistent(inside=False)
     bpy.ops.object.mode_set(mode="OBJECT")
-    return finish_mesh(obj, material, bevel, bevel_segments=bevel_segments)
+    return finish_mesh(obj, material, bevel, smooth=smooth, bevel_segments=bevel_segments)
 
 
 def make_cylinder(
@@ -195,7 +272,11 @@ def make_cylinder(
     bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
     if bevel is None:
         bevel = min(radius * 0.16, depth * 0.14)
-    return finish_mesh(obj, material, bevel, bevel_segments=bevel_segments)
+    obj = finish_mesh(obj, material, bevel, bevel_segments=bevel_segments)
+    axis = Euler(rotation).to_matrix() @ Vector((0.0, 0.0, 1.0))
+    for polygon in obj.data.polygons:
+        polygon.use_smooth = abs(polygon.normal.dot(axis)) < 0.999
+    return obj
 
 
 def make_rod(
@@ -228,7 +309,11 @@ def make_rod(
     bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
     if bevel is None:
         bevel = min(radius * 0.18, length * 0.03)
-    return finish_mesh(obj, material, bevel, bevel_segments=bevel_segments)
+    obj = finish_mesh(obj, material, bevel, bevel_segments=bevel_segments)
+    axis = direction.normalized() if direction.length > 1e-6 else Vector((0.0, 0.0, 1.0))
+    for polygon in obj.data.polygons:
+        polygon.use_smooth = abs(polygon.normal.dot(axis)) < 0.999
+    return obj
 
 
 def make_torus(
@@ -253,7 +338,8 @@ def make_torus(
     obj = bpy.context.object
     obj.name = name
     bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
-    return finish_mesh(obj, material, 0.0)
+    obj = finish_mesh(obj, material, 0.0, smooth=True)
+    return obj
 
 
 # ---------------------------------------------------------------------------
@@ -272,29 +358,58 @@ def make_sloped_glacis_hull(
     bevel: float = 0.045,
     bevel_segments: int = 2,
 ) -> bpy.types.Object:
-    """Creates a tapered armored chassis with sloped glacis and softened edge transitions."""
-    hw_f = width_front * 0.5
-    hw_r = width_rear * 0.5
-    vertices = [
-        # Lower chassis (ground clearance)
-        (-hw_r * 0.88, -length_rear, height_lower),
-        ( hw_r * 0.88, -length_rear, height_lower),
-        ( hw_f * 0.85,  length_front * 0.65, height_lower),
-        (-hw_f * 0.85,  length_front * 0.65, height_lower),
-        # Upper deck
-        (-hw_r, -length_rear * 0.95, height_upper),
-        ( hw_r, -length_rear * 0.95, height_upper),
-        ( hw_f,  length_front, height_upper),
-        (-hw_f,  length_front, height_upper),
-    ]
-    faces = [
-        (3, 2, 1, 0),  # Bottom
-        (4, 5, 6, 7),  # Upper Deck
-        (0, 4, 7, 3),  # Port / Left side
-        (1, 2, 6, 5),  # Starboard / Right side
-        (0, 1, 5, 4),  # Rear plate
-        (3, 7, 6, 2),  # Sloped frontal glacis plate
-    ]
+    """Creates a swept hull with rounded shoulders, shaped lower sides, and a sloped glacis."""
+    if min(length_front, length_rear, width_front, width_rear) <= 0.0:
+        raise ValueError("hull lengths and widths must be positive")
+    if height_upper <= height_lower:
+        raise ValueError("height_upper must be greater than height_lower")
+
+    # A rounded-rectangle cross-section keeps the deck broad while rolling the
+    # shoulders and narrowing the lower hull above the track line.
+    cross_section = (
+        (-0.84, 1.00), (-0.48, 1.00), (0.00, 1.00), (0.48, 1.00), (0.84, 1.00),
+        (0.92, 0.985), (0.97, 0.95), (0.995, 0.90), (1.00, 0.84),
+        (1.00, 0.70), (0.995, 0.57), (0.985, 0.44), (0.965, 0.32),
+        (0.94, 0.22), (0.91, 0.13), (0.88, 0.06), (0.84, 0.00),
+        (-0.84, 0.00), (-0.88, 0.06), (-0.91, 0.13), (-0.94, 0.22),
+        (-0.965, 0.32), (-0.985, 0.44), (-0.995, 0.57), (-1.00, 0.70),
+        (-1.00, 0.84), (-0.995, 0.90), (-0.97, 0.95), (-0.92, 0.985),
+    )
+    height_span = height_upper - height_lower
+    middle_width = (width_front + width_rear) * 0.5
+    stations = (
+        (-length_rear, -length_rear * 0.95, width_rear * 0.90, height_lower, height_upper - height_span * 0.02),
+        (-length_rear * 0.72, -length_rear * 0.68, width_rear, height_lower, height_upper),
+        (-length_rear * 0.24, -length_rear * 0.16, middle_width, height_lower, height_upper),
+        (length_front * 0.36, length_front * 0.48, width_front, height_lower, height_upper),
+        (length_front * 0.58, length_front * 0.76, width_front * 0.98, height_lower, height_upper - height_span * 0.06),
+        (length_front * 0.65, length_front, width_front * 0.72, height_lower, height_lower + height_span * 0.56),
+    )
+    ring_size = len(cross_section)
+    vertices = []
+    for bottom_y, top_y, width, bottom_z, top_z in stations:
+        for x_ratio, height_ratio in cross_section:
+            vertices.append((
+                x_ratio * width * 0.5,
+                bottom_y + (top_y - bottom_y) * height_ratio,
+                bottom_z + (top_z - bottom_z) * height_ratio,
+            ))
+
+    faces = [tuple(reversed(range(ring_size)))]
+    last_ring_start = (len(stations) - 1) * ring_size
+    faces.append(tuple(last_ring_start + i for i in range(ring_size)))
+    for station_index in range(len(stations) - 1):
+        lower_start = station_index * ring_size
+        upper_start = (station_index + 1) * ring_size
+        for profile_index in range(ring_size):
+            next_index = (profile_index + 1) % ring_size
+            faces.append((
+                lower_start + profile_index,
+                lower_start + next_index,
+                upper_start + next_index,
+                upper_start + profile_index,
+            ))
+
     mesh = bpy.data.meshes.new(f"{name}_Mesh")
     mesh.from_pydata(vertices, [], faces)
     mesh.update()
@@ -306,7 +421,7 @@ def make_sloped_glacis_hull(
     bpy.ops.mesh.select_all(action="SELECT")
     bpy.ops.mesh.normals_make_consistent(inside=False)
     bpy.ops.object.mode_set(mode="OBJECT")
-    return finish_mesh(obj, material, bevel, bevel_segments=bevel_segments)
+    return finish_mesh(obj, material, bevel, smooth=True, bevel_segments=bevel_segments)
 
 
 def make_faceted_turret_housing(
@@ -315,13 +430,13 @@ def make_faceted_turret_housing(
     size: Tuple[float, float, float] = (1.4, 1.6, 0.45),
     armor_mat: bpy.types.Material | None = None,
     roof_mat: bpy.types.Material | None = None,
-    bevel: float = 0.035,
+    bevel: float = 0.075,
 ) -> list[bpy.types.Object]:
     """Generates a tapered turret shell with rounded transitions, mantlet, and rear bustle."""
     objects = []
     loc_v = Vector(location)
     hl = size[1] * 0.5
-    shell_bevel = min(bevel, size[2] * 0.18, size[0] * 0.08) if bevel > 0.0 else 0.0
+    shell_bevel = min(bevel, size[2] * 0.30, size[0] * 0.12) if bevel > 0.0 else 0.0
 
     # Taper the roof inward so the primary body reads as formed armor, not a cylinder.
     objects.append(_make_tapered_shell(
@@ -331,7 +446,8 @@ def make_faceted_turret_housing(
         material=armor_mat,
         top_scale=(0.90, 0.88),
         bevel=shell_bevel,
-        bevel_segments=2,
+        bevel_segments=4,
+        smooth=True,
     ))
     # Forward sloped gun mantlet cradle, rounded only at exposed hard edges.
     objects.append(make_box(
@@ -339,9 +455,10 @@ def make_faceted_turret_housing(
         (size[0] * 0.65, size[1] * 0.35, size[2] * 0.88),
         loc_v + Vector((0.0, hl * 0.65, 0.0)),
         roof_mat if roof_mat else armor_mat,
-        bevel=min(bevel * 0.72, size[2] * 0.14),
+        bevel=min(bevel * 0.82, size[2] * 0.24),
         rotation=(math.radians(-8), 0.0, 0.0),
-        bevel_segments=2,
+        bevel_segments=4,
+        smooth=True,
     ))
     # Rear bustle counterweight / ammo compartment
     objects.append(make_box(
@@ -349,8 +466,9 @@ def make_faceted_turret_housing(
         (size[0] * 0.78, size[1] * 0.42, size[2] * 0.76),
         loc_v + Vector((0.0, -hl * 0.72, 0.0)),
         armor_mat,
-        bevel=min(bevel, size[2] * 0.16),
-        bevel_segments=2,
+        bevel=min(bevel * 0.78, size[2] * 0.24),
+        bevel_segments=4,
+        smooth=True,
     ))
     return objects
 
@@ -4677,7 +4795,7 @@ def generate_collision_hulls(
 def profile_model_budget_and_drawcalls(
     objects: Sequence[bpy.types.Object],
     prefix: str = "Unit",
-    target_budget: int = 4000,
+    target_budget: int = DEFAULT_FACE_BUDGET,
     lod_dict: Dict[str, list[bpy.types.Object]] | None = None,
 ) -> Dict[str, Any]:
     """Provides face-budget, true triangulation, and draw-call diagnostics by subsystem."""
@@ -6013,9 +6131,10 @@ def make_troop_compartment(
     objects.append(_make_tapered_shell(
         f"{prefix}_CabinShell",
         size, loc_v, armor_mat,
-        top_scale=(0.94, 0.96),
-        bevel=min(0.025, sz * 0.06),
-        bevel_segments=2,
+        top_scale=(0.92, 0.94),
+        bevel=min(0.045, sz * 0.16),
+        bevel_segments=3,
+        smooth=True,
     ))
 
     # 2. Roof observation cupola / hatch
@@ -9253,18 +9372,66 @@ def apply_procedural_normal_relief(
         return
 
     tex_coord = tree.nodes.new("ShaderNodeTexCoord")
+    tex_coord.location = (-700, -420)
     noise = tree.nodes.new("ShaderNodeTexNoise")
-    noise.inputs["Scale"].default_value = 28.0 * max(0.1, scale)
+    noise.location = (-480, -420)
+    noise.inputs["Scale"].default_value = 20.0 * max(0.1, scale)
     noise.inputs["Detail"].default_value = 2.0
     noise.inputs["Roughness"].default_value = 0.62
 
     bump = tree.nodes.new("ShaderNodeBump")
+    bump.location = (-220, -360)
     bump.inputs["Strength"].default_value = strength
-    bump.inputs["Distance"].default_value = 0.006
+    bump.inputs["Distance"].default_value = 0.010
 
     tree.links.new(tex_coord.outputs["Object"], noise.inputs["Vector"])
     tree.links.new(noise.outputs["Fac"], bump.inputs["Height"])
     tree.links.new(bump.outputs["Normal"], bsdf.inputs["Normal"])
+
+    # Add low-contrast paint and roughness variation so large armor plates do
+    # not read as uniformly flat color in previews or baked PBR atlases.
+    finish_noise = tree.nodes.new("ShaderNodeTexNoise")
+    finish_noise.location = (-480, -80)
+    finish_noise.inputs["Scale"].default_value = 4.2 * max(0.1, scale)
+    finish_noise.inputs["Detail"].default_value = 2.0
+    finish_noise.inputs["Roughness"].default_value = 0.58
+    tree.links.new(tex_coord.outputs["Object"], finish_noise.inputs["Vector"])
+
+    color_scale = tree.nodes.new("ShaderNodeMapRange")
+    color_scale.location = (-220, -80)
+    color_scale.clamp = True
+    color_scale.inputs["From Min"].default_value = 0.0
+    color_scale.inputs["From Max"].default_value = 1.0
+    color_scale.inputs["To Min"].default_value = 0.94
+    color_scale.inputs["To Max"].default_value = 1.06
+    tree.links.new(finish_noise.outputs["Fac"], color_scale.inputs["Value"])
+
+    base_color_input = bsdf.inputs["Base Color"]
+    base_color_link = next((link for link in tree.links if link.to_socket == base_color_input), None)
+    color_mix = tree.nodes.new("ShaderNodeMixRGB")
+    color_mix.blend_type = "MULTIPLY"
+    color_mix.location = (20, -120)
+    color_mix.inputs["Fac"].default_value = 1.0
+    if base_color_link:
+        tree.links.new(base_color_link.from_socket, color_mix.inputs["Color1"])
+        tree.links.remove(base_color_link)
+    else:
+        color_mix.inputs["Color1"].default_value = base_color_input.default_value
+    tree.links.new(color_scale.outputs["Result"], color_mix.inputs["Color2"])
+    tree.links.new(color_mix.outputs["Color"], base_color_input)
+
+    roughness_input = bsdf.inputs["Roughness"]
+    if not roughness_input.is_linked:
+        base_roughness = float(roughness_input.default_value)
+        roughness_scale = tree.nodes.new("ShaderNodeMapRange")
+        roughness_scale.location = (-220, 180)
+        roughness_scale.clamp = True
+        roughness_scale.inputs["From Min"].default_value = 0.0
+        roughness_scale.inputs["From Max"].default_value = 1.0
+        roughness_scale.inputs["To Min"].default_value = max(0.04, base_roughness - 0.08)
+        roughness_scale.inputs["To Max"].default_value = min(0.98, base_roughness + 0.08)
+        tree.links.new(finish_noise.outputs["Fac"], roughness_scale.inputs["Value"])
+        tree.links.new(roughness_scale.outputs["Result"], roughness_input)
 
 
 class FactionPalette:
@@ -9891,11 +10058,15 @@ class RogueVehicleBuilder:
             height_lower=self.ground_clearance + 0.18, height_upper=height,
             material=self.palette.primary_armor, bevel=bevel
         ))
-        self.objects.append(make_box(
+        self.objects.append(_make_tapered_shell(
             f"{self.name}Armor_UpperDeck",
-            (width * 0.65, length * 0.72, 0.24),
+            (width * 0.72, length * 0.78, 0.20),
             (0.0, -0.05, height + 0.10),
-            self.palette.light_armor, bevel=0.022, bevel_segments=2
+            self.palette.light_armor,
+            top_scale=(0.96, 0.97),
+            bevel=0.045,
+            bevel_segments=4,
+            smooth=True,
         ))
         return self
 
@@ -11517,7 +11688,7 @@ class RogueVehicleBuilder:
         damaged_fbx_path: Path | None = None,
         visual_root_path: str = "Vehicle",
         profile_budget: bool = True,
-        target_budget: int = 4000,
+        target_budget: int = DEFAULT_FACE_BUDGET,
         include_vfx_flash: bool = False,
         include_vfx_thruster: bool = False,
         include_shield_bubble: bool = False,
