@@ -1,8 +1,10 @@
 # Blender Procedural Modeling Techniques for Rogue Command
 
-This reference provides tested Python (`bpy`) recipes, mathematical foundations, and geometric algorithms to generate production-ready low-poly vehicle models deterministically in Blender 4.5.14 LTS.
+This reference provides tested Python (`bpy`) recipes, mathematical foundations, and geometric algorithms for deterministic, grounded stylized vehicle models in Blender 4.5.14 LTS. The generators establish repeatable proportions and mechanical systems; refine visible primary shells when their output looks like a stack of primitives.
 
 All recipes are implemented in `tools/RogueModelKit.py` and `.agents/skills/rogue-command-3d-model-authoring/scripts/RogueModelKit.py`.
+
+Use the form-realism rules in the parent skill as the art-direction authority. Keep faceted armor where it communicates plate construction, and add controlled curvature to cast or formed parts where it improves the silhouette. The bevel values shown below are usable recipe parameters, not a requirement to bevel every edge; scale or adjust them for the part and preserve the established triangle and LOD budgets.
 
 ---
 
@@ -70,6 +72,8 @@ rot_euler = dir_vec.to_track_quat("Z", "Y").to_euler()
 ---
 
 ## 3. Macro Hull & Chassis Generators
+
+These assemblies are repeatable starting forms. A faceted housing or wedge hull can remain faceted when that is intentional; otherwise refine the visible profile with shaped transitions or replacement geometry before export. Do not alter required pivots, socket paths, mesh `Color` RGBA vertex wear, or export transforms while refining.
 
 | Generator Function | Primary Parameters | Geometric Features & Chamfers |
 |---|---|---|
@@ -178,7 +182,7 @@ gatling = rmk.make_rotary_gatling_cannon(
 | `make_gimbal_sensor_turret` | 2-axis targeting pod | Azimuth pedestal, U-shaped elevation yoke, spherical sensor ball, thermal lens |
 | `make_radar_dish_or_rotodome`| Recon radar antenna | Parabolic dish with feed horn or elliptical rotodome mounted on turntable mast |
 | `make_armor_applique_array` | Explosive Reactive Armor (ERA) | Array of beveled armor tiles with corner standoff bolts along glacis seams |
-| `make_hex_bolt_array` | Industrial structural rivets | Low-poly 6-sided bolt heads placed along armor seams and joint flanges |
+| `make_hex_bolt_array` | Industrial structural fasteners | Six-sided bolt heads placed along armor seams and joint flanges |
 | `make_smoke_launcher_rack` | Defensive smoke discharger | Multi-tube angled grenade rack with recessed launch bores on mounting bracket |
 | `make_side_sponson_assembly` | External ammo / fuel drum | Armored flank panniers or cylindrical drums with retention straps |
 | `make_dozer_blade` | Obstacle clearing ram | Heavy angled shield plate, bottom cutting edge, twin hydraulic push rams |
@@ -230,8 +234,8 @@ optimized_objects = rmk.batch_and_join_by_material(
 )
 ```
 
-- **Smart Angle-Weighted Smoothing**: Uses Blender 4.5's `bpy.ops.object.shade_smooth_by_angle` to produce silky smooth round barrels, road wheels, hubs, and exhaust pipes, while preserving razor-sharp 45°/90° chamfers on flat armor plates.
-- **Face-Area Weighted Normals (`apply_weighted_normals`)**: Applies Blender's `WEIGHTED_NORMAL` modifier (`mode="FACE_AREA"`, `weight=50`, `keep_sharp=True`) so large armor plates dominate vertex normals and 1-segment chamfers absorb the transition without shading pinch. Exported via `mesh_smooth_type="FACE"`.
+- **Smart Angle-Weighted Smoothing**: Uses Blender 4.5's `bpy.ops.object.shade_smooth_by_angle` to smooth round barrels, road wheels, hubs, and exhaust pipes while preserving deliberate hard edges between planar armor faces.
+- **Face-Area Weighted Normals (`apply_weighted_normals`)**: Applies Blender's `WEIGHTED_NORMAL` modifier (`mode="FACE_AREA"`, `weight=50`, `keep_sharp=True`) to reduce shading pinch across broad armor faces and their intentional edge treatments. Use it to improve shading, not to conceal poor topology or an unsuitable cross-section. Exported via `mesh_smooth_type="FACE"`.
 - **Batching Estimate**: The authoring report estimates fewer mesh/material groups after batching; confirm actual draw calls in Unity with the selected prefab source and rendering settings.
 - **Clean Normals**: Re-evaluates outward normals consistently and strips non-manifold seams.
 

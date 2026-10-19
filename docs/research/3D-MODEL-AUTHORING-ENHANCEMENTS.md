@@ -9,7 +9,7 @@
 
 ## 1. Executive Summary & Core Invariants
 
-The Rogue Command 3D model authoring pipeline provides a complete, deterministic procedural geometry generator designed to author vehicles, base structures, modular attachments, and destruction states matching the chunky low-poly RTS aesthetic of the base game. It operates locally via Python (`bpy`) under Blender 4.5.14 LTS and bridges into Unity 2021.3.45f2 through automated prefab builders and runtime directors.
+The Rogue Command 3D model authoring pipeline provides a deterministic procedural geometry generator for vehicles, base structures, modular attachments, and destruction states. Its art direction is grounded, stylized military sci-fi: preserve the game's RTS readability while giving visible forms plausible mass, construction, and controlled curvature. The tools operate locally via Python (`bpy`) under Blender 4.5.14 LTS and bridge into Unity 2021.3.45f2 through automated prefab builders and runtime directors.
 
 ### Architectural Invariants
 - **Zero Content Pollution**: Authoring geometry and CLI generators never add unrequested balance rows, prefab registrations, or modifications to `content.json`. All gameplay registrations require explicit authoring tasks.
@@ -44,20 +44,20 @@ bpy.ops.export_scene.fbx(
 
 ## 2. Art Direction & The 3-Tier RTS Visual Hierarchy
 
-Assets are viewed from an elevated orthographic/isometric camera ($45^\circ - 60^\circ$ pitch) at 30–120 pixel heights:
+Assets are viewed from an elevated orthographic/isometric camera ($45^\circ - 60^\circ$ pitch) at 30–120 pixel heights. Keep the macro silhouette easy to parse, but refine generated blockouts so visible hulls and housings do not read as unmodified boxes or disconnected primitives. Use tapered profiles, compound transitions, plausible panel thickness, and restrained curvature on cast or formed components. Keep planar facets when they describe armor construction.
 
 ```
 +-------------------------------------------------------------------------+
-| TIER 1: Macro Silhouette (70% of visual read)                           |
+| TIER 1: Macro Silhouette (65% of visual read)                           |
 | - Bold volume, aspect ratio, stance, ground clearance                   |
 | - Must pass the "Squint Test" in < 250ms at 50px rendering              |
 +-------------------------------------------------------------------------+
                                     |
                                     v
 +-------------------------------------------------------------------------+
-| TIER 2: Meso Mechanical Geometry (20% of visual read)                   |
-| - Continuous tracks, articulated legs, tilt-rotors, engine louvers      |
-| - Conveys propulsion physics, armor grade, and weapon function          |
+| TIER 2: Meso Mechanical Construction (25% of visual read)               |
+| - Hull transitions, suspension, weapon mounts, cooling, and access      |
+| - Explains how the vehicle is built and operated                        |
 +-------------------------------------------------------------------------+
                                     |
                                     v
@@ -70,7 +70,7 @@ Assets are viewed from an elevated orthographic/isometric camera ($45^\circ - 60
 
 ### The 4 Core Visual Rules
 1. **The Squint Test**: Zooming out the Blender viewport until the model is 50 pixels tall must clearly communicate archetype, role, and heading within 250 ms.
-2. **Single-Segment Chamfers (The Specular Glint Rule)**: Razor-sharp 90° CAD edges have zero surface area facing the directional sun, looking flat and dead. Hull plates receive a 1-segment bevel (`segments = 1`, `width = 0.02m–0.06m`) with flat shading (`polygon.use_smooth = False`). These angled chamfers catch bright specular glints at RTS distance.
+2. **Scale-Aware Edge Treatment**: Do not apply a universal bevel to every edge. Use a crisp 1-segment chamfer for a deliberately cut or protected plate edge; use 2–4 segments for a visible rolled radius on cast or formed parts. Scale the width to the part, keep broad armor planes clean, and review the shading in neutral grazing light. A bevel must describe construction and catch light without making the panels look inflated.
 3. **Smart Angle Smoothing**: Cylindrical parts (barrels, wheels, exhausts) use `bpy.ops.object.shade_smooth_by_angle(angle=math.radians(38.0))`, keeping chamfers sharp while smoothing round surfaces without edge-split modifiers.
 4. **Recessed Emissive Optics**: Sensor glass and headlamps are recessed inside armored brow hoods and assigned real-time emissive materials (`_EMISSION` keyword with HDR multipliers 1.5×–2.5×) that pierce the post-processing bloom filter.
 
@@ -182,14 +182,14 @@ rmk.apply_procedural_armor_plating(hull, thickness=0.035, inset_depth=0.04, beve
 ### Micro-Detail & Accent Assemblies
 - `make_whip_antenna`: Armored mounting bracket, 3-tier helical spring coils, and angled mast with high-visibility tip.
 - `make_crew_cupola_hatch`: Octagonal vision cupola with 5 armored periscope slits and split circular hatch doors.
-- `make_rivets_and_weld_seams`: Low-poly hex bolt heads and beveled weld seams along plate boundaries for specular glints.
+- `make_rivets_and_weld_seams`: Six-sided bolt heads and weld seams along plate boundaries for scale-appropriate specular highlights.
 - `make_articulated_track_shoes`: Volumetric track shoe plates with center guide horns along ground contact runs.
 - `make_engine_deck_grille`: Cooling intake frame with angled louvers and exhaust pipe manifolds.
 - `make_recessed_sensor_visor`: Armored visor brow hood with deep cavity and glowing HDR sensor prisms.
 - `make_catenary_cable_assembly` (`--hydraulic-hoses`): Hyperbolic cosine (`cosh`) catenary tube sweep in BMesh with corrugated rib modulation, hex bulkhead couplers, and retaining collar clamps.
 - `make_bmesh_hull_greebles` (`--hull-greebles`): Selective BMesh face inset (`bmesh.ops.inset_individual`) maintenance hatches with grab handles, slotted micro-louver vents, and 4 forged corner lifting lugs.
 - `make_tactical_decal_plates` (`--tactical-markings`): `mathutils.bvhtree.BVHTree` normal-snapped floating chevron stripe bars and zenith identification plates (+0.012m normal offset).
-- `apply_weighted_normals` (`--weighted-normals` / `--no-weighted-normals`): Face-area weighted custom split normals (`mode="FACE_AREA"`, `weight=50`, `keep_sharp=True`) eliminating shading pinch across 1-segment chamfered armor plates.
+- `apply_weighted_normals` (`--weighted-normals` / `--no-weighted-normals`): Face-area weighted custom split normals (`mode="FACE_AREA"`, `weight=50`, `keep_sharp=True`) reducing shading pinch across broad armor faces and intentional edge treatments.
 
 ### Fluent Vehicle Construction with `RogueVehicleBuilder`
 ```python
@@ -528,7 +528,7 @@ Links each roadwheel axle to hull sponsons via diagonal swing arms, torsion bar 
 - **CLI Flag**: `--suspension-arms` (auto-enabled in presets `siege_breaker`, `sky_sweeper`, `dreadnought_crawler`, `beam_destroyer`).
 
 ### 2. Tiered Concentric Mantlet Dust Boot (`make_mantlet_dust_boot`)
-Adds low-poly rubber/canvas accordion rings between the mantlet faceplate and each supported weapon barrel while keeping the bore open.
+Adds segmented rubber/canvas accordion rings between the mantlet faceplate and each supported weapon barrel while keeping the bore open.
 - **Topology**: Hollow torus pleat rings with alternating major radii ($1.14\times$ outer, $0.90\times$ inner) and an open torus clamp. Dual cannons and quad flak emit one fitted boot per barrel.
 - **CLI Flag**: `--mantlet-boot` (auto-enabled in presets `siege_breaker`, `sky_sweeper`; supports cannon, dual cannon, howitzer, railgun, quad flak, and plasma mortar).
 
