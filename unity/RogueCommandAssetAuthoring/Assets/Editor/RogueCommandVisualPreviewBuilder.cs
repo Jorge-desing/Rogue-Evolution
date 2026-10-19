@@ -126,17 +126,30 @@ namespace RogueCommandExpansion.Authoring
         [MenuItem("Rogue Command/Visual Preview/Build Salvage Hauler + Skyguard SAM")]
         public static void BuildSalvageHaulerAndSkyguardPreview()
         {
+            BuildSampleVisualPreview("SalvageHauler", "SkyguardSAM");
+        }
+
+
+        [MenuItem("Rogue Command/Visual Preview/Build Wraith Stealth Wing + Subterranean Mole")]
+        public static void BuildWraithStealthWingAndSubterraneanMolePreview()
+        {
+            BuildSampleVisualPreview("WraithStealthWing", "SubterraneanMole");
+        }
+
+        private static void BuildSampleVisualPreview(string modelAName, string modelBName)
+        {
             try
             {
                 string projectRoot = Directory.GetParent(Application.dataPath).FullName;
                 var builder = CreateInstance<RogueCommandVisualPreviewBuilder>();
-                builder._displayNameA = "SalvageHauler";
-                builder._displayNameB = "SkyguardSAM";
-                builder._modelA = CreateSampleInput(projectRoot, "SalvageHauler");
-                builder._modelB = CreateSampleInput(projectRoot, "SkyguardSAM");
+                builder._displayNameA = modelAName;
+                builder._displayNameB = modelBName;
+                builder._modelA = CreateSampleInput(projectRoot, modelAName);
+                builder._modelB = CreateSampleInput(projectRoot, modelBName);
                 try
                 {
-                    builder.BuildPreviewPair(!Application.isBatchMode, true);
+                    builder.BuildPreviewPair(!Application.isBatchMode,
+                        new[] { modelAName, modelBName });
                 }
                 finally
                 {
@@ -155,7 +168,7 @@ namespace RogueCommandExpansion.Authoring
         {
             try
             {
-                ConfigureSampleSourceTextureImports();
+                ConfigureSampleSourceTextureImports("SalvageHauler", "SkyguardSAM");
                 Debug.Log("Configured and verified source PBR texture import settings for Salvage Hauler and Skyguard SAM.");
                 if (Application.isBatchMode) EditorApplication.Exit(0);
             }
@@ -166,10 +179,10 @@ namespace RogueCommandExpansion.Authoring
             }
         }
 
-        private static void ConfigureSampleSourceTextureImports()
+        private static void ConfigureSampleSourceTextureImports(string modelAName, string modelBName)
         {
             AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
-            string[] modelNames = { "SalvageHauler", "SkyguardSAM" };
+            string[] modelNames = { modelAName, modelBName };
             string[] mapSuffixes = { "_Albedo.png", "_MetallicGloss.png", "_Normal.png", "_Emission.png" };
             string projectRoot = Directory.GetParent(Application.dataPath).FullName;
             for (int modelIndex = 0; modelIndex < modelNames.Length; modelIndex++)
@@ -234,7 +247,7 @@ namespace RogueCommandExpansion.Authoring
                 assetPath.Replace('/', Path.DirectorySeparatorChar)));
         }
 
-        private void BuildPreviewPair(bool showDialog, bool configureSampleSourceTextureImports = false)
+        private void BuildPreviewPair(bool showDialog, string[] sourceTextureModelNames = null)
         {
             try
             {
@@ -253,9 +266,16 @@ namespace RogueCommandExpansion.Authoring
                         "The authoring project is missing its RogueCommand/VehiclePBR_VertexWear shader asset.");
                 }
 
-                if (configureSampleSourceTextureImports)
+                if (sourceTextureModelNames != null)
                 {
-                    ConfigureSampleSourceTextureImports();
+                    if (sourceTextureModelNames.Length != 2 ||
+                        String.IsNullOrWhiteSpace(sourceTextureModelNames[0]) ||
+                        String.IsNullOrWhiteSpace(sourceTextureModelNames[1]))
+                    {
+                        throw new InvalidDataException(
+                            "Source texture configuration requires exactly two model names.");
+                    }
+                    ConfigureSampleSourceTextureImports(sourceTextureModelNames[0], sourceTextureModelNames[1]);
                 }
 
                 string runId = DateTime.UtcNow.ToString("yyyyMMdd_HHmmss") + "_" +
