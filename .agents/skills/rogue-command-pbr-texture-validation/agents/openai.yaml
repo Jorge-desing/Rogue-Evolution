@@ -1,0 +1,3 @@
+interface:
+  display_name: "Rogue Command PBR Texture Validation"
+  short_description: "Check texture channels and Unity imports for Rogue Command"

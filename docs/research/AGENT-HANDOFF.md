@@ -151,11 +151,13 @@ All units provide English (`en-US`) and Spanish (`es-XL`) localizations, custom 
 
 ## 6. Specialized Authoring Skills Portfolio
 
-The repository equips 13 local skills under `.agents/skills/`:
+The repository equips 15 local skills under `.agents/skills/`:
 
 | Skill Directory | Domain & Role | Primary Files & Tools | Key Invariants & Contracts |
 |---|---|---|---|
 | `rogue-command-3d-model-authoring` | Procedural 3D vehicles & structures | `RogueModelKit.py`, `generate_unit_model.py` | BMesh topological RGBA wear, soot $B=0.0 \to 1.0$, canonical sockets |
+| `rogue-command-pbr-texture-authoring` | PBR texture creation and art-tool handoff | Blender 4.5.14 bake, optional ArmorPaint / Material Maker | Exact map names, Metallic RGB, smoothness A, preserve source mesh |
+| `rogue-command-pbr-texture-validation` | Texture channels and Unity import audit | PBR texture workflow, `VehiclePrefabBuilder.cs`, `VehiclePBR_VertexWear.shader` | Linear MetallicGloss, alpha from input, RGBA vertex colors, evidence tiers |
 | `rogue-command-mech-rigging-authoring`| Skeletal rigging & animators | `biped-quadruped-rigging-guide.md`, `gait-cycle.md` | Rigid weighting $1.0$ before join, in-place $\Delta\text{pos} = (0, 0, 0)$ |
 | `rogue-command-balance-simulation` | Combat balance & Lanchester math | `tools/simulate_combat_balance.py`, `content/packs/sample-native-expansion/content.json`, skill reference matrix | CEI bands (Scout 30–45, MBT 12–20, Siege 6–16, Mech 10–18), no armor lockouts or unreviewed kiting envelopes |
 | `rogue-command-mutator-hazard-authoring`| Relics, mutators & hazards | `native-card-change-and-relic-schema.md` | 26 `ChangeableValue` attributes, trigger colliders ($\ge 0.5\text{s}$ tick) |
@@ -168,6 +170,8 @@ The repository equips 13 local skills under `.agents/skills/`:
 | `rogue-command-pack-validation` | Schema & manifest validation | `tests/RogueCommandExpansionLoader.ValidationTests`| JSON Schema Draft 2020-12, path traversal & bundle audits |
 | `rogue-command-game-research` | REA assembly & asset inspection | `tools/asset_inventory.py`, `inspect_unity_objects` | Pinned SHA-256/MVID identity, CIL token verification |
 | `rogue-command-steam-runtime-validation`| Live Steam testing & telemetry | `STEAM-RUNTIME-CONTROL.md`, BepInEx MCP | Reversible deployment, profile isolation, Steam Cloud toggle |
+
+For texture work, use [PBR-TEXTURE-WORKFLOW.md](PBR-TEXTURE-WORKFLOW.md) as the shared handoff. Blender 4.5.14 remains the reproducible atlas path; ArmorPaint and Material Maker are optional image authoring steps. External texture tools export images only, while Unity's existing builder remains responsible for importer settings and prefab material wiring.
 
 ### Domain Technical Details
 

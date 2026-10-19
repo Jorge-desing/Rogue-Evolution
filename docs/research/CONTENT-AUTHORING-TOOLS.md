@@ -99,7 +99,7 @@ Para una referencia gráfica se puede usar `imagegen` durante la conversación o
 
 ## Generación de texturas PBR (2026-10-18)
 
-El flujo local ya genera atlas PBR con Blender 4.5.14: Albedo, MetallicGloss, Normal y Emission. La integración recomendada conserva ese flujo como fuente reproducible y permite usar ArmorPaint como una etapa artística opcional sobre las UV ya cerradas. No se instaló ninguna herramienta nueva ni se modificó el generador en esta revisión.
+El flujo local genera atlas PBR con Blender 4.5.14: Albedo, MetallicGloss, Normal y Emission. La integración conserva ese flujo reproducible y permite usar ArmorPaint como etapa artística opcional sobre UV ya cerradas. Se añadieron las skills locales `rogue-command-pbr-texture-authoring` y `rogue-command-pbr-texture-validation` y la guía [PBR-TEXTURE-WORKFLOW.md](PBR-TEXTURE-WORKFLOW.md); no se instaló ninguna aplicación externa ni se modificó el generador.
 
 | Opción | Capacidad y compatibilidad revisadas | Decisión para Rogue Evolution |
 |---|---|---|
@@ -110,6 +110,8 @@ El flujo local ya genera atlas PBR con Blender 4.5.14: Albedo, MetallicGloss, No
 | [Adobe Substance 3D Sampler](https://experienceleague.adobe.com/en/docs/substance-3d-sampler/using/features-and-workflows/generative-workflows) | Text-to-Texture e Image-to-Texture están descritos como flujos generativos en beta, con Text-to-Texture impulsado por Firefly. La página oficial de beta advierte que las betas no siempre están disponibles y documenta el procesamiento vía servicio. | Referencia opcional para ideación. No convertirlo en un requisito del flujo local reproducible. |
 
 ### Contrato para una etapa opcional de pintura
+
+El procedimiento completo y los criterios de aceptación están en [PBR-TEXTURE-WORKFLOW.md](PBR-TEXTURE-WORKFLOW.md); las skills locales separan autoría de mapas y validación de Unity.
 
 - Importar a ArmorPaint solo después de cerrar las UV. Usar la aplicación para crear o editar mapas; volver a generar el FBX de Unity desde el `.blend` original para preservar sockets y jerarquía. Después de importar en Unity, verificar que el mesh conserve el atributo de vertex colors; ArmorPaint solo debe exportar texturas.
 - Conservar `<Name>_Albedo.png`, `<Name>_MetallicGloss.png`, `<Name>_Normal.png` y `<Name>_Emission.png`. En MetallicGloss, Metallic va en R y Smoothness en A; configurar Unity con `sRGBTexture = false` y `TextureImporterAlphaSource.FromInput`. Albedo y Emission son sRGB; Normal debe importarse como `TextureImporterType.NormalMap`.

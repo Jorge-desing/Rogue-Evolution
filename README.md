@@ -29,7 +29,7 @@ El ensamblado se genera en `artifacts/plugin/RogueCommandExpansionLoader.dll`. E
 
 ## Herramientas de contenido
 
-Las skills del repositorio en `.agents/skills/` orientan a agentes por área: `rogue-command-unit-authoring`, `rogue-command-3d-model-authoring`, `rogue-command-assetbundle-authoring`, `rogue-command-stage-authoring`, `rogue-command-ai-authoring`, `rogue-command-game-research`, `rogue-command-pack-validation` y `rogue-command-steam-runtime-validation`. Se basan en el contrato y la evidencia del handoff; no elevan una validación local a prueba de juego.
+Las skills del repositorio en `.agents/skills/` orientan a agentes por área: `rogue-command-unit-authoring`, `rogue-command-3d-model-authoring`, `rogue-command-pbr-texture-authoring`, `rogue-command-pbr-texture-validation`, `rogue-command-mech-rigging-authoring`, `rogue-command-assetbundle-authoring`, `rogue-command-stage-authoring`, `rogue-command-ai-authoring`, `rogue-command-game-research`, `rogue-command-pack-validation`, `rogue-command-steam-runtime-validation`, `rogue-command-audio-authoring`, `rogue-command-balance-simulation`, `rogue-command-mutator-hazard-authoring` y `rogue-command-vfx-authoring`. La guía de [flujo PBR](docs/research/PBR-TEXTURE-WORKFLOW.md) conecta Blender, las herramientas opcionales y el importador de Unity. Las skills se basan en el contrato y la evidencia del handoff; no elevan una validación local a prueba de juego.
 
 Unity 2021.3.45f2 ya está instalado para compilar AssetBundles. Blender 4.5.14 LTS y los inspectores de runtime UnityExplorer 4.8.2 y Runtime Unity Editor 6.3.2.1 se guardan bajo `.tools/`; esta carpeta está ignorada por Git. Para volver a preparar las copias locales en otro checkout:
 
