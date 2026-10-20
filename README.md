@@ -119,7 +119,7 @@ El paquete final también adapta la distancia de edificios AI para etapas propia
 
 El loader incluye un inspector visual integrado accesible mediante **F8** o **F10** (o haciendo clic en la marca de agua superior derecha):
 
-- **Marca de agua:** Muestra el estado del loader y versión (`RCL v1.1.0 [OK]`).
+- **Marca de agua:** Muestra el estado del loader y versión (`RCL v1.19.0 [OK]`).
 - **6 pestañas interactivas:**
   1. **Resumen:** Estado del registro nativo, compatibilidad, recuento de paquetes y memoria en AssetBundles.
   2. **Paquetes:** Lista de paquetes descubiertos, estado (Activo/Error), tamaño y desglose de contenido.

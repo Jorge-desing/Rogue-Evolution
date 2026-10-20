@@ -386,6 +386,9 @@ namespace RogueCommandExpansionLoader.Content
                 ValidateUnitStealth(unit.stealth, itemPath + ".stealth", diagnostics);
                 ValidateUnitCommand(unit.command, itemPath + ".command", diagnostics);
                 ValidateUnitExperienceReward(unit.experienceReward, itemPath + ".experienceReward", diagnostics);
+                ValidateUnitAura(unit.aura, itemPath + ".aura", diagnostics);
+                ValidateUnitResourceGathering(unit.resourceGathering, itemPath + ".resourceGathering", diagnostics);
+                ValidateUnitAiBehavior(unit.aiBehavior, itemPath + ".aiBehavior", diagnostics);
                 ValidateProductionBuilding(unit.productionBuilding, itemPath + ".productionBuilding",
                                     allIds, productionBuildingIds, bundleIds, registrySnapshot, diagnostics);
                 ValidateProfileCardEligibility(unit, itemPath, diagnostics);
@@ -1853,6 +1856,82 @@ namespace RogueCommandExpansionLoader.Content
             {
                 Add(diagnostics, "unit-experience-reward.bonus-multiplier-invalid", path + ".bonusMultiplier",
                     "Bonus multiplier must be non-negative.");
+            }
+        }
+
+        private static void ValidateUnitAura(
+            ContentUnitAuraDefinition aura,
+            string path,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (aura == null) return;
+            if (aura.auraRadius < 0)
+            {
+                Add(diagnostics, "unit-aura.radius-invalid", path + ".auraRadius",
+                    "Aura radius must be non-negative.");
+            }
+            if (!String.IsNullOrWhiteSpace(aura.auraType) &&
+                aura.auraType != "Buff" && aura.auraType != "Debuff" &&
+                aura.auraType != "Heal" && aura.auraType != "Shield")
+            {
+                Add(diagnostics, "unit-aura.type-invalid", path + ".auraType",
+                    "Aura type must be Buff, Debuff, Heal, or Shield.");
+            }
+            if (aura.buffAmount < 0)
+            {
+                Add(diagnostics, "unit-aura.buff-invalid", path + ".buffAmount",
+                    "Buff amount must be non-negative.");
+            }
+        }
+
+        private static void ValidateUnitResourceGathering(
+            ContentUnitResourceGatheringDefinition gathering,
+            string path,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (gathering == null) return;
+            if (String.IsNullOrWhiteSpace(gathering.resourceType))
+            {
+                Add(diagnostics, "unit-gathering.type-required", path + ".resourceType",
+                    "Resource type is required.");
+            }
+            if (gathering.gatherRate < 0)
+            {
+                Add(diagnostics, "unit-gathering.rate-invalid", path + ".gatherRate",
+                    "Gather rate must be non-negative.");
+            }
+            if (gathering.carryCapacity < 0)
+            {
+                Add(diagnostics, "unit-gathering.capacity-invalid", path + ".carryCapacity",
+                    "Carry capacity must be non-negative.");
+            }
+            if (gathering.gatherRange < 0)
+            {
+                Add(diagnostics, "unit-gathering.range-invalid", path + ".gatherRange",
+                    "Gather range must be non-negative.");
+            }
+        }
+
+        private static void ValidateUnitAiBehavior(
+            ContentUnitAiBehaviorDefinition aiBehavior,
+            string path,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (aiBehavior == null) return;
+            if (aiBehavior.unitCap < 0)
+            {
+                Add(diagnostics, "unit-ai.cap-invalid", path + ".unitCap",
+                    "Unit cap must be non-negative.");
+            }
+            if (aiBehavior.combatUnitCap < 0)
+            {
+                Add(diagnostics, "unit-ai.combat-cap-invalid", path + ".combatUnitCap",
+                    "Combat unit cap must be non-negative.");
+            }
+            if (aiBehavior.skillActivationCheckInterval < 0)
+            {
+                Add(diagnostics, "unit-ai.interval-invalid", path + ".skillActivationCheckInterval",
+                    "Skill activation check interval must be non-negative.");
             }
         }
 

@@ -200,6 +200,34 @@ namespace RogueCommandExpansionLoader.Content
     }
 
     [Serializable]
+    public sealed class ContentUnitAuraDefinition
+    {
+        public float auraRadius;
+        public string auraType;
+        public float buffAmount;
+        public bool affectsAllies;
+        public bool affectsEnemies;
+    }
+
+    [Serializable]
+    public sealed class ContentUnitResourceGatheringDefinition
+    {
+        public string resourceType;
+        public float gatherRate;
+        public int carryCapacity;
+        public float gatherRange;
+    }
+
+    [Serializable]
+    public sealed class ContentUnitAiBehaviorDefinition
+    {
+        public int unitCap;
+        public int combatUnitCap;
+        public float skillActivationCheckInterval;
+        public string aiTag;
+    }
+
+    [Serializable]
     public sealed class ContentUnitDefinition
     {
         public string id;
@@ -236,6 +264,9 @@ namespace RogueCommandExpansionLoader.Content
         public ContentUnitStealthDefinition stealth;
         public ContentUnitCommandDefinition command;
         public ContentUnitExperienceRewardDefinition experienceReward;
+        public ContentUnitAuraDefinition aura;
+        public ContentUnitResourceGatheringDefinition resourceGathering;
+        public ContentUnitAiBehaviorDefinition aiBehavior;
         public ContentBalanceOverride[] balanceOverrides;
         public ContentUnitLocalizationDefinition[] localizations;
         public ContentProductionBuildingDefinition productionBuilding;
@@ -483,6 +514,9 @@ namespace RogueCommandExpansionLoader.Content
                 stealth = CloneUnitStealth(source.stealth),
                 command = CloneUnitCommand(source.command),
                 experienceReward = CloneUnitExperienceReward(source.experienceReward),
+                aura = CloneUnitAura(source.aura),
+                resourceGathering = CloneUnitResourceGathering(source.resourceGathering),
+                aiBehavior = CloneUnitAiBehavior(source.aiBehavior),
                 productionBuilding = CloneProductionBuilding(source.productionBuilding)
             };
         }
@@ -675,6 +709,40 @@ namespace RogueCommandExpansionLoader.Content
                 experienceAmount = source.experienceAmount,
                 experienceType = source.experienceType,
                 bonusMultiplier = source.bonusMultiplier
+            };
+        }
+
+        private static ContentUnitAuraDefinition CloneUnitAura(ContentUnitAuraDefinition source)
+        {
+            return source == null ? null : new ContentUnitAuraDefinition
+            {
+                auraRadius = source.auraRadius,
+                auraType = source.auraType,
+                buffAmount = source.buffAmount,
+                affectsAllies = source.affectsAllies,
+                affectsEnemies = source.affectsEnemies
+            };
+        }
+
+        private static ContentUnitResourceGatheringDefinition CloneUnitResourceGathering(ContentUnitResourceGatheringDefinition source)
+        {
+            return source == null ? null : new ContentUnitResourceGatheringDefinition
+            {
+                resourceType = source.resourceType,
+                gatherRate = source.gatherRate,
+                carryCapacity = source.carryCapacity,
+                gatherRange = source.gatherRange
+            };
+        }
+
+        private static ContentUnitAiBehaviorDefinition CloneUnitAiBehavior(ContentUnitAiBehaviorDefinition source)
+        {
+            return source == null ? null : new ContentUnitAiBehaviorDefinition
+            {
+                unitCap = source.unitCap,
+                combatUnitCap = source.combatUnitCap,
+                skillActivationCheckInterval = source.skillActivationCheckInterval,
+                aiTag = source.aiTag
             };
         }
 

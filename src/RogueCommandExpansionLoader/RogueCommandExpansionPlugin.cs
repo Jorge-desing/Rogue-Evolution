@@ -13,7 +13,7 @@ namespace RogueCommandExpansionLoader
     {
         public const string PluginGuid = "roguecommand.expansionloader";
         public const string PluginName = "Rogue Command Expansion Loader";
-        public const string PluginVersion = "1.1.0";
+        public const string PluginVersion = "1.19.0";
 
         private ContentPackRuntimeLoader _contentLoader;
         private RuntimeOverlayUi _overlay;
