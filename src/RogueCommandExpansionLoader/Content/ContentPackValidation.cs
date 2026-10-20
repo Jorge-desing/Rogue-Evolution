@@ -379,6 +379,7 @@ namespace RogueCommandExpansionLoader.Content
                 ValidateUnitProductionQueue(unit.productionQueue, itemPath + ".productionQueue", diagnostics);
                 ValidateUnitResourceCosts(unit.resourceCosts, itemPath + ".resourceCosts", diagnostics);
                 ValidateUnitMovement(unit.movement, itemPath + ".movement", diagnostics);
+                ValidateUnitDetection(unit.detection, itemPath + ".detection", diagnostics);
                 ValidateProductionBuilding(unit.productionBuilding, itemPath + ".productionBuilding",
                     allIds, productionBuildingIds, bundleIds, registrySnapshot, diagnostics);
                 ValidateProfileCardEligibility(unit, itemPath, diagnostics);
@@ -1659,6 +1660,26 @@ namespace RogueCommandExpansionLoader.Content
             {
                 Add(diagnostics, "unit-movement.acceleration-invalid", path + ".acceleration",
                     "Acceleration must be non-negative.");
+            }
+        }
+
+        private static void ValidateUnitDetection(
+            ContentUnitDetectionDefinition detection,
+            string path,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (detection == null) return;
+            if (detection.detectionRange < 0)
+            {
+                Add(diagnostics, "unit-detection.range-invalid", path + ".detectionRange",
+                    "Detection range must be non-negative.");
+            }
+            if (!String.IsNullOrWhiteSpace(detection.sensorType) &&
+                detection.sensorType != "Visual" && detection.sensorType != "Radar" &&
+                detection.sensorType != "Sonar" && detection.sensorType != "Thermal")
+            {
+                Add(diagnostics, "unit-detection.sensor-type-invalid", path + ".sensorType",
+                    "Sensor type must be Visual, Radar, Sonar, or Thermal.");
             }
         }
 

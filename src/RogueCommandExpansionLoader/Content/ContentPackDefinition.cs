@@ -141,6 +141,14 @@ namespace RogueCommandExpansionLoader.Content
     }
 
     [Serializable]
+    public sealed class ContentUnitDetectionDefinition
+    {
+        public float detectionRange;
+        public string sensorType;
+        public bool stealthDetection;
+    }
+
+    [Serializable]
     public sealed class ContentUnitDefinition
     {
         public string id;
@@ -170,6 +178,7 @@ namespace RogueCommandExpansionLoader.Content
         public ContentUnitProductionQueueDefinition productionQueue;
         public ContentUnitResourceCostDefinition[] resourceCosts;
         public ContentUnitMovementDefinition movement;
+        public ContentUnitDetectionDefinition detection;
         public ContentBalanceOverride[] balanceOverrides;
         public ContentUnitLocalizationDefinition[] localizations;
         public ContentProductionBuildingDefinition productionBuilding;
@@ -410,6 +419,7 @@ namespace RogueCommandExpansionLoader.Content
                 productionQueue = CloneUnitProductionQueue(source.productionQueue),
                 resourceCosts = CloneArray(source.resourceCosts, CloneUnitResourceCost),
                 movement = CloneUnitMovement(source.movement),
+                detection = CloneUnitDetection(source.detection),
                 productionBuilding = CloneProductionBuilding(source.productionBuilding)
             };
         }
@@ -529,6 +539,16 @@ namespace RogueCommandExpansionLoader.Content
                 moveSpeed = source.moveSpeed,
                 turnRate = source.turnRate,
                 acceleration = source.acceleration
+            };
+        }
+
+        private static ContentUnitDetectionDefinition CloneUnitDetection(ContentUnitDetectionDefinition source)
+        {
+            return source == null ? null : new ContentUnitDetectionDefinition
+            {
+                detectionRange = source.detectionRange,
+                sensorType = source.sensorType,
+                stealthDetection = source.stealthDetection
             };
         }
 
