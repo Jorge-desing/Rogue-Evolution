@@ -280,6 +280,23 @@ var tests = new (string Name, Action Run)[]
             throw new InvalidOperationException("The untyped Resources.Load patch prefix is missing.");
         }
     }),
+    ("pool-specific entries do not authorize sibling pools in the same stage", () =>
+    {
+        var registry = new BlueprintPoolScopeRegistry();
+        var firstPool = new object();
+        var siblingPool = new object();
+        registry.Register(new[]
+        {
+            new BlueprintPoolScopeRegistration("RCL_POOL_SCOPED_A", "sample:stage", firstPool,
+                new[] { "sample:alpha" }, false, "native:a"),
+            new BlueprintPoolScopeRegistration("RCL_POOL_SCOPED_B", "sample:stage", siblingPool,
+                new[] { "sample:beta" }, false, "native:b")
+        });
+        if (!registry.AllowsModUnitInPool(firstPool, "sample:alpha") ||
+            registry.AllowsModUnitInPool(firstPool, "sample:beta") ||
+            !registry.AllowsModUnitInPool(siblingPool, "sample:beta"))
+            throw new InvalidOperationException("A stage's pool-specific unit allowlist leaked to a sibling pool.");
+    }),
     ("stage-scoped blueprint pools use object identity and isolate mod eligibility", () =>
     {
         var registry = new BlueprintPoolScopeRegistry();
@@ -688,7 +705,7 @@ var tests = new (string Name, Action Run)[]
             ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(), "ability.value-invalid");
         });
     }),
-    ("AI override validation rejects null entries and empty parameters", () =>
+    ("AI override validation rejects null entries empty parameters and non-finite values", () =>
     {
         WithPackage(sample, (pack, root) =>
         {
@@ -699,6 +716,16 @@ var tests = new (string Name, Action Run)[]
         {
             pack.units[0].aiOverrides = [new ContentAiOverrideDefinition { parameter = "", value = 1.0f }];
             ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(), "ai-override.parameter-required");
+        });
+        WithPackage(sample, (pack, root) =>
+        {
+            pack.units[0].aiOverrides = [new ContentAiOverrideDefinition { parameter = "tickRate", value = Single.NaN }];
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(), "ai-override.value-invalid");
+        });
+        WithPackage(sample, (pack, root) =>
+        {
+            pack.units[0].aiOverrides = [new ContentAiOverrideDefinition { parameter = "tickRate", value = Single.PositiveInfinity }];
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(), "ai-override.value-invalid");
         });
     }),
 
@@ -1336,6 +1363,39 @@ var tests = new (string Name, Action Run)[]
 
         WithPackage(nativeSample, (pack, root) =>
             ExpectValid(pack, root, new EmptySnapshot(), new KnownModuleValidator()));
+    }),
+    ("stage pool entries validate native IDs and reject unknown IDs", () =>
+    {
+        ContentPackDefinition invalid = Clone(nativeSample);
+        invalid.stages[0].blueprintPoolEntries = [new ContentStagePoolEntryDefinition
+        {
+            poolId = "NativePool",
+            unitIds = ["native:NativeUnit"]
+        }];
+        WithPackage(invalid, (pack, root) => ExpectValid(pack, root,
+            new SnapshotWithUnits(new[] { "native:NativeUnit" }), new KnownModuleValidator()));
+
+        invalid = Clone(nativeSample);
+        invalid.stages[0].blueprintPoolEntries = [new ContentStagePoolEntryDefinition
+        {
+            poolId = "NativePool",
+            unitIds = ["missing:NativeUnit"]
+        }];
+        WithPackage(invalid, (pack, root) => ExpectDiagnostic(pack, root,
+            new SnapshotWithUnits(Array.Empty<string>()), new KnownModuleValidator(), "reference.unit-unresolved"));
+    }),
+    ("stage pool entries deep clone their unit ID arrays", () =>
+    {
+        ContentPackDefinition source = Clone(nativeSample);
+        source.stages[0].blueprintPoolEntries = [new ContentStagePoolEntryDefinition
+        {
+            poolId = "native-test-pool",
+            unitIds = ["sample-native:atlas-crane-mech", "NativeTank"]
+        }];
+        ContentPackDefinition clone = Clone(source);
+        clone.stages[0].blueprintPoolEntries[0].unitIds[0] = "changed:unit";
+        if (source.stages[0].blueprintPoolEntries[0].unitIds[0] != "sample-native:atlas-crane-mech")
+            throw new InvalidOperationException("Stage pool override unit IDs shared mutable state.");
     }),
     ("stage landscape rejects unsafe size, seed, and localization values", () =>
     {
@@ -4627,6 +4687,15 @@ static void ExpectDiagnostic(
         throw new InvalidOperationException(
             $"Expected diagnostic '{expectedCode}', got: {string.Join(", ", result.Diagnostics.Select(x => x.Code))}");
     }
+}
+
+sealed class SnapshotWithUnits : IContentRegistrySnapshot
+{
+    private readonly HashSet<string> ids;
+    public SnapshotWithUnits(IEnumerable<string> ids) => this.ids = new HashSet<string>(ids, StringComparer.Ordinal);
+    public bool ContainsId(string id) => ids.Contains(id);
+    public bool ContainsUnit(string id) => ids.Contains(id);
+    public bool ContainsAiProfile(string id) => false;
 }
 
 sealed class EmptySnapshot : IContentRegistrySnapshot

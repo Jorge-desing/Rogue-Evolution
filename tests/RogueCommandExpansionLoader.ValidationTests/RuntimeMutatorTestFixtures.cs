@@ -118,13 +118,30 @@ public sealed class Stage
     public StageParametersScriptableObject stageParameters = new();
 }
 
+public sealed class OpenReward
+{
+    public string poolId;
+    public int count;
+    public float weight;
+}
+
 public sealed class StageParametersScriptableObject
 {
+    public bool fillFirstLevelWithCardRewards;
+    public bool putDefaultCardRewardInCenter;
+    public OpenReward cardReward = new();
+    public BlueprintPoolList blueprintPoolList = new();
+}
+
+public sealed class BlueprintPoolList : UnityEngine.ScriptableObject
+{
+    public List<BlueprintPool> blueprintPools = new();
 }
 
 // RuntimeHarmonyPatches binds this typed return to Rogue Command's global BlueprintPool type.
-public sealed class BlueprintPool
+public sealed class BlueprintPool : UnityEngine.ScriptableObject
 {
+    public string poolId;
 }
 
 public sealed class LandscapeGenerator

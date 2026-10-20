@@ -351,6 +351,7 @@ namespace RogueCommandExpansionLoader.Content
         public int mapSizeMax;
         public bool isPartOfDemo;
         public string[] unitIds;
+        public ContentStagePoolEntryDefinition[] blueprintPoolEntries;
         public string[] aiProfileIds;
         public ContentStageLandscapeDefinition landscape;
     }
@@ -377,6 +378,13 @@ namespace RogueCommandExpansionLoader.Content
     {
         public string name;
         public string value;
+    }
+
+    [Serializable]
+    public sealed class ContentStagePoolEntryDefinition
+    {
+        public string poolId;
+        public string[] unitIds;
     }
 
     [Serializable]
@@ -792,6 +800,7 @@ namespace RogueCommandExpansionLoader.Content
                 mapSizeMax = source.mapSizeMax,
                 isPartOfDemo = source.isPartOfDemo,
                 unitIds = source.unitIds == null ? null : (string[])source.unitIds.Clone(),
+                blueprintPoolEntries = CloneArray(source.blueprintPoolEntries, CloneStagePoolEntry),
                 aiProfileIds = source.aiProfileIds == null ? null : (string[])source.aiProfileIds.Clone(),
                 landscape = CloneLandscape(source.landscape)
             };
@@ -822,6 +831,15 @@ namespace RogueCommandExpansionLoader.Content
         private static ContentStageParameterOverride CloneStageParameterOverride(ContentStageParameterOverride source)
         {
             return source == null ? null : new ContentStageParameterOverride { name = source.name, value = source.value };
+        }
+
+        private static ContentStagePoolEntryDefinition CloneStagePoolEntry(ContentStagePoolEntryDefinition source)
+        {
+            return source == null ? null : new ContentStagePoolEntryDefinition
+            {
+                poolId = source.poolId,
+                unitIds = source.unitIds == null ? null : (string[])source.unitIds.Clone()
+            };
         }
 
         private static ContentAiProfileDefinition CloneAiProfile(ContentAiProfileDefinition source)

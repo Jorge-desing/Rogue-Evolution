@@ -702,11 +702,103 @@ namespace RogueCommandExpansionLoader.Content
                 var stageUnits = RequireArray(stage.unitIds, itemPath + ".unitIds", diagnostics);
                 ValidateReferences(stageUnits, itemPath + ".unitIds", unitIds, registrySnapshot, true, diagnostics);
 
+                ValidateStagePoolEntries(stage.blueprintPoolEntries,
+                    itemPath + ".blueprintPoolEntries", unitIds, registrySnapshot, diagnostics);
+
                 var stageAiProfiles = RequireArray(stage.aiProfileIds, itemPath + ".aiProfileIds", diagnostics);
                 ValidateReferences(stageAiProfiles, itemPath + ".aiProfileIds", aiProfileIds, registrySnapshot, false, diagnostics);
             }
 
             return new ContentPackValidationResult(pack, diagnostics);
+        }
+
+        private static void ValidateStagePoolEntries(
+            ContentStagePoolEntryDefinition[] entries,
+            string path,
+            HashSet<string> localUnitIds,
+            IContentRegistrySnapshot registrySnapshot,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (entries == null)
+            {
+                return;
+            }
+
+            if (entries.Length > 64)
+            {
+                Add(diagnostics, "stage.blueprint-pool-entries-limit", path,
+                    "A stage can override at most 64 native blueprint pools.");
+            }
+
+            var seenPools = new HashSet<string>(StringComparer.Ordinal);
+            for (int i = 0; i < entries.Length; i++)
+            {
+                ContentStagePoolEntryDefinition entry = entries[i];
+                string entryPath = path + "[" + i + "]";
+                if (entry == null)
+                {
+                    Add(diagnostics, "entry.null", entryPath, "Blueprint pool entries cannot be null.");
+                    continue;
+                }
+
+                if (String.IsNullOrWhiteSpace(entry.poolId) ||
+                    !String.Equals(entry.poolId, entry.poolId.Trim(), StringComparison.Ordinal) ||
+                    entry.poolId.Length > 128 || !seenPools.Add(entry.poolId))
+                {
+                    Add(diagnostics, "stage.blueprint-pool-id-invalid", entryPath + ".poolId",
+                        "Pool IDs must be non-empty, trimmed, at most 128 characters, and unique per stage.");
+                }
+
+                string[] unitIds = RequireArray(entry.unitIds, entryPath + ".unitIds", diagnostics);
+                if (unitIds.Length == 0 || unitIds.Length > 64)
+                {
+                    Add(diagnostics, "stage.blueprint-pool-units-limit", entryPath + ".unitIds",
+                        "A blueprint pool override must reference between 1 and 64 product units.");
+                }
+
+                ValidateStagePoolUnitReferences(unitIds, entryPath + ".unitIds", localUnitIds,
+                    registrySnapshot, diagnostics);
+            }
+        }
+
+        private static void ValidateStagePoolUnitReferences(
+            string[] ids,
+            string path,
+            HashSet<string> localUnitIds,
+            IContentRegistrySnapshot registrySnapshot,
+            List<ContentDiagnostic> diagnostics)
+        {
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            for (int i = 0; ids != null && i < ids.Length; i++)
+            {
+                string id = ids[i];
+                if (String.IsNullOrWhiteSpace(id) || !String.Equals(id, id.Trim(), StringComparison.Ordinal) ||
+                    id.Length > 128 || !seen.Add(id))
+                {
+                    Add(diagnostics, "stage.blueprint-pool-unit-id-invalid", path + "[" + i + "]",
+                        "Pool unit IDs must be non-empty, trimmed, at most 128 characters, and unique.");
+                    continue;
+                }
+
+                if (localUnitIds.Contains(id))
+                {
+                    continue;
+                }
+
+                if (IsNamespacedId(id))
+                {
+                    Add(diagnostics, "reference.unit-unresolved", path + "[" + i + "]",
+                        "Mod unit ID '" + id + "' must be declared by this pack.");
+                    continue;
+                }
+                if (registrySnapshot != null && registrySnapshot.ContainsUnit(id))
+                {
+                    continue;
+                }
+
+                Add(diagnostics, "reference.unit-unresolved", path + "[" + i + "]",
+                    "Unit ID '" + id + "' is neither declared by this pack nor registered by the game.");
+            }
         }
 
         internal static bool TryBuildScopedAiResourceName(string profileId, out string resourceName)
@@ -1321,9 +1413,10 @@ namespace RogueCommandExpansionLoader.Content
                 {
                     Add(diagnostics, "ai-override.parameter-required", itemPath + ".parameter", "AI override parameter must be non-empty.");
                 }
-                if (ovr.value == null)
+                if (float.IsNaN(ovr.value) || float.IsInfinity(ovr.value))
                 {
-                    Add(diagnostics, "ai-override.value-required", itemPath + ".value", "AI override value must be provided.");
+                    Add(diagnostics, "ai-override.value-invalid", itemPath + ".value",
+                        "AI override value must be a finite number.");
                 }
             }
         }
