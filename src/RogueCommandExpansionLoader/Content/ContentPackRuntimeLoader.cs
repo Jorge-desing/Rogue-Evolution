@@ -3773,26 +3773,28 @@ namespace RogueCommandExpansionLoader.Content
 
             GameObject visualTemplate = null;
             AssetBundle buildingAssetBundle = null;
+            string imagePath = nativeImagePath;
             if (!String.IsNullOrWhiteSpace(building.cardImageAssetName) ||
                 !String.IsNullOrWhiteSpace(building.visualAssetName))
             {
                 buildingAssetBundle = GetBundle(temporaryBundles, building.assetBundleId, packageName);
-                if (!String.IsNullOrWhiteSpace(building.cardImageAssetName))
-                {
-                    Sprite cardImage = LoadRequiredAsset(buildingAssetBundle, building.cardImageAssetName,
-                        typeof(Sprite), "production-building Sprite card image", packageName) as Sprite;
-                    string imageKey = ResourceKey(building.id, "image");
-                    temporaryResources.Add(imageKey, cardImage);
-                    _imageLocationField.SetValue(row, imageKey);
-                }
+            }
+            if (!String.IsNullOrWhiteSpace(building.cardImageAssetName))
+            {
+                AssetBundle cardBundle = buildingAssetBundle ??
+                    GetBundle(temporaryBundles, building.assetBundleId, packageName);
+                Sprite cardImage = LoadRequiredAsset(cardBundle, building.cardImageAssetName,
+                    typeof(Sprite), "production-building Sprite card image", packageName) as Sprite;
+                imagePath = ResourceKey(building.id, "image");
+                temporaryResources.Add(imagePath, cardImage);
+            }
 
-                if (!String.IsNullOrWhiteSpace(building.visualAssetName))
-                {
-                    visualTemplate = LoadRequiredAsset(buildingAssetBundle, building.visualAssetName,
-                        typeof(GameObject), "visual-only production-building GameObject prefab", packageName) as GameObject;
-                    ValidateVisualPrefab(visualTemplate, localizationDefinition, packageName,
-                        "Edificio de producción");
-                }
+            if (!String.IsNullOrWhiteSpace(building.visualAssetName))
+            {
+                visualTemplate = LoadRequiredAsset(buildingAssetBundle, building.visualAssetName,
+                    typeof(GameObject), "visual-only production-building GameObject prefab", packageName) as GameObject;
+                ValidateVisualPrefab(visualTemplate, localizationDefinition, packageName,
+                    "Edificio de producción");
             }
 
             GameObject nativePrefabClone = InstantiateDormantPrefab(nativeTemplate);
@@ -3826,7 +3828,7 @@ namespace RogueCommandExpansionLoader.Content
             ApplyBalanceOverrides(row, building.balanceOverrides, packageName, building.id);
             _entityIdField.SetValue(row, building.id);
             _prefabLocationField.SetValue(row, prefabKey);
-            _imageLocationField.SetValue(row, nativeImagePath);
+            _imageLocationField.SetValue(row, imagePath);
             _inactiveField.SetValue(row, false);
             _allowedBlueprintField.SetValue(row, false);
             ProductionBuildingEligibility.ApplyToFactoryRow(product, row,
@@ -3834,7 +3836,7 @@ namespace RogueCommandExpansionLoader.Content
             _factoryForEntityIdField.SetValue(row, CreateNullableString(product.id));
             temporaryResources.Add(prefabKey, nativePrefabClone);
 
-            return new LoadedUnit(building.id, packId, prefabKey, nativeImagePath,
+            return new LoadedUnit(building.id, packId, prefabKey, imagePath,
                 row, localizationDefinition, true, null);
         }
 
