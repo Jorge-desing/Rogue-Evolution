@@ -370,6 +370,8 @@ namespace RogueCommandExpansionLoader.Content
                 ValidateAiOverrides(unit.aiOverrides, itemPath + ".aiOverrides", diagnostics);
                 ValidateActiveSkills(unit.activeSkills, itemPath + ".activeSkills", diagnostics);
                 ValidateCombatBoosts(unit.combatBoosts, itemPath + ".combatBoosts", diagnostics);
+                ValidateUnitUpgrades(unit.upgrades, itemPath + ".upgrades", allIds, diagnostics);
+                ValidateUnitExperience(unit.experience, itemPath + ".experience", diagnostics);
                 ValidateProductionBuilding(unit.productionBuilding, itemPath + ".productionBuilding",
                     allIds, productionBuildingIds, bundleIds, registrySnapshot, diagnostics);
                 ValidateProfileCardEligibility(unit, itemPath, diagnostics);
@@ -1375,6 +1377,73 @@ namespace RogueCommandExpansionLoader.Content
                 }
             }
         }
+        private static void ValidateUnitUpgrades(
+            ContentUnitUpgradeDefinition[] upgrades,
+            string path,
+            HashSet<string> allIds,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (upgrades == null) return;
+            for (int i = 0; i < upgrades.Length; i++)
+            {
+                var upgrade = upgrades[i];
+                string itemPath = path + "[" + i + "]";
+                if (upgrade == null)
+                {
+                    Add(diagnostics, "entry.null", itemPath, "Upgrade entries cannot be null.");
+                    continue;
+                }
+                if (String.IsNullOrWhiteSpace(upgrade.targetUnitId))
+                {
+                    Add(diagnostics, "unit-upgrade.target-required", itemPath + ".targetUnitId",
+                        "Upgrade target unit ID must be non-empty.");
+                }
+                else if (!allIds.Contains(upgrade.targetUnitId))
+                {
+                    Add(diagnostics, "unit-upgrade.target-unknown", itemPath + ".targetUnitId",
+                        "Upgrade target unit must be a declared or native unit ID.");
+                }
+                if (upgrade.requiredExperienceLevel < 0)
+                {
+                    Add(diagnostics, "unit-upgrade.level-invalid", itemPath + ".requiredExperienceLevel",
+                        "Required experience level must be non-negative.");
+                }
+                if (upgrade.cost < 0)
+                {
+                    Add(diagnostics, "unit-upgrade.cost-invalid", itemPath + ".cost",
+                        "Upgrade cost must be non-negative.");
+                }
+            }
+        }
+
+        private static void ValidateUnitExperience(
+            ContentUnitExperienceDefinition experience,
+            string path,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (experience == null) return;
+            if (experience.experiencePerLevel < 0)
+            {
+                Add(diagnostics, "unit-experience.per-level-invalid", path + ".experiencePerLevel",
+                    "Experience per level must be non-negative.");
+            }
+            if (experience.maxLevel < 0 || experience.maxLevel > 100)
+            {
+                Add(diagnostics, "unit-experience.max-level-invalid", path + ".maxLevel",
+                    "Max level must be between 0 and 100.");
+            }
+            if (experience.experienceGainMultiplier < 0 || experience.experienceGainMultiplier > 10)
+            {
+                Add(diagnostics, "unit-experience.gain-multiplier-invalid", path + ".experienceGainMultiplier",
+                    "Experience gain multiplier must be between 0 and 10.");
+            }
+            if (experience.levelUpBonus < 0)
+            {
+                Add(diagnostics, "unit-experience.level-up-bonus-invalid", path + ".levelUpBonus",
+                    "Level up bonus must be non-negative.");
+            }
+        }
+
         private static void ValidateUnitLocalizations(
             ContentUnitDefinition unit,
             string path,

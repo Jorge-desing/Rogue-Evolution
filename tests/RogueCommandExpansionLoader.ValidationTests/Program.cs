@@ -1935,6 +1935,39 @@ var tests = new (string Name, Action Run)[]
                 "unit.source-conflict");
         });
     }),
+    ("unit upgrade requires a known target unit", () =>
+    {
+        WithPackage(sample, (pack, root) =>
+        {
+            pack.units[0].upgrades =
+            [
+                new ContentUnitUpgradeDefinition { targetUnitId = "sample:unknown-unit", requiredExperienceLevel = 1, cost = 10 }
+            ];
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "unit-upgrade.target-unknown");
+        });
+    }),
+    ("unit upgrade rejects negative cost", () =>
+    {
+        WithPackage(sample, (pack, root) =>
+        {
+            pack.units[0].upgrades =
+            [
+                new ContentUnitUpgradeDefinition { targetUnitId = pack.units[0].id, requiredExperienceLevel = 1, cost = -5 }
+            ];
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "unit-upgrade.cost-invalid");
+        });
+    }),
+    ("unit experience rejects invalid max level", () =>
+    {
+        WithPackage(sample, (pack, root) =>
+        {
+            pack.units[0].experience = new ContentUnitExperienceDefinition { experiencePerLevel = 100, maxLevel = 200, experienceGainMultiplier = 1, levelUpBonus = 5 };
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "unit-experience.max-level-invalid");
+        });
+    }),
     ("native-template unit rejects non-allowlisted or negative stat overrides", () =>
     {
         WithPackage(sample, (pack, root) =>

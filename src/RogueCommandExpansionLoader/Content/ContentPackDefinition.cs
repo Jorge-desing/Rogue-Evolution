@@ -61,6 +61,24 @@ namespace RogueCommandExpansionLoader.Content
     }
 
     [Serializable]
+    public sealed class ContentUnitUpgradeDefinition
+    {
+        public string targetUnitId;
+        public int requiredExperienceLevel;
+        public float cost;
+        public string description;
+    }
+
+    [Serializable]
+    public sealed class ContentUnitExperienceDefinition
+    {
+        public int experiencePerLevel;
+        public int maxLevel;
+        public float experienceGainMultiplier;
+        public float levelUpBonus;
+    }
+
+    [Serializable]
     public sealed class ContentUnitDefinition
     {
         public string id;
@@ -81,6 +99,8 @@ namespace RogueCommandExpansionLoader.Content
         public ContentAiOverrideDefinition[] aiOverrides;
         public ContentActiveSkillDefinition[] activeSkills;
         public ContentCombatBoostDefinition[] combatBoosts;
+        public ContentUnitUpgradeDefinition[] upgrades;
+        public ContentUnitExperienceDefinition experience;
         public ContentBalanceOverride[] balanceOverrides;
         public ContentUnitLocalizationDefinition[] localizations;
         public ContentProductionBuildingDefinition productionBuilding;
@@ -312,6 +332,8 @@ namespace RogueCommandExpansionLoader.Content
                 aiOverrides = CloneArray(source.aiOverrides, CloneAiOverride),
                 activeSkills = CloneArray(source.activeSkills, CloneActiveSkill),
                 combatBoosts = CloneArray(source.combatBoosts, CloneCombatBoost),
+                upgrades = CloneArray(source.upgrades, CloneUnitUpgrade),
+                experience = CloneUnitExperience(source.experience),
                 productionBuilding = CloneProductionBuilding(source.productionBuilding)
             };
         }
@@ -334,6 +356,28 @@ namespace RogueCommandExpansionLoader.Content
         private static ContentCombatBoostDefinition CloneCombatBoost(ContentCombatBoostDefinition source)
         {
             return source == null ? null : new ContentCombatBoostDefinition { id = source.id, statName = source.statName, multiplier = source.multiplier, duration = source.duration };
+        }
+
+        private static ContentUnitUpgradeDefinition CloneUnitUpgrade(ContentUnitUpgradeDefinition source)
+        {
+            return source == null ? null : new ContentUnitUpgradeDefinition
+            {
+                targetUnitId = source.targetUnitId,
+                requiredExperienceLevel = source.requiredExperienceLevel,
+                cost = source.cost,
+                description = source.description
+            };
+        }
+
+        private static ContentUnitExperienceDefinition CloneUnitExperience(ContentUnitExperienceDefinition source)
+        {
+            return source == null ? null : new ContentUnitExperienceDefinition
+            {
+                experiencePerLevel = source.experiencePerLevel,
+                maxLevel = source.maxLevel,
+                experienceGainMultiplier = source.experienceGainMultiplier,
+                levelUpBonus = source.levelUpBonus
+            };
         }
 
         private static ContentProductionBuildingDefinition CloneProductionBuilding(
