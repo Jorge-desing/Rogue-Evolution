@@ -24,7 +24,7 @@ Run `.venv\Scripts\python.exe tools/validate_native_visual_roots.py content/pack
 `sample:siege-assault` accepts `baseIndex` (integer 0–31), `cooldownSeconds` (finite 10–300 seconds; default 30), `minSquadSize` (integer 1–12; default 4), `targetPriority` (`ClosestBuilding`, `Refinery`, `Hq`; default `ClosestBuilding`), and `minGameTimeSeconds` (finite 0–600 seconds; default 30). It scans known player buildings (`PlayerBuildingsKnownToAi`, `PlayerRefineries`, or `EngineeringHq`), gathers combat units from the specified AI base, and dispatches coordinated assault strike waves to dismantle player fortifications.
 - Include empty arrays when a section has no entries. The validator reports package-local diagnostics and does not mutate the registry.
 
-Production-building visuals may also specify `assetBundleId` and `cardImageAssetName`. The latter is a typed Sprite address for that factory's reward card; leave it absent to retain the native factory icon. `visualAssetName` plus `visualRootPath` remain optional, paired overlay fields. A shared building bundle can provide both.
+Production-building visuals may also specify `assetBundleId` and `cardImageAssetName`. `assetBundleId` is required when either visual field or `cardImageAssetName` is set; that Sprite address supplies the factory's reward-card image. `visualAssetName` plus `visualRootPath` remain optional, paired overlay fields. A shared building bundle can provide both.
 
 ## AI unit entries
 

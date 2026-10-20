@@ -976,7 +976,7 @@ namespace RogueCommandExpansionLoader.Content
             else if (!String.IsNullOrWhiteSpace(productionBuilding.assetBundleId))
             {
                 Add(diagnostics, "production-building.bundle-unused", path + ".assetBundleId",
-                    "A production building only declares a bundle when it supplies a visual overlay.");
+                    "A production building only declares a bundle when it supplies a card image or visual overlay.");
             }
 
             ValidateBalanceOverrides(productionBuilding.balanceOverrides,

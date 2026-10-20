@@ -906,7 +906,26 @@ var tests = new (string Name, Action Run)[]
             ContentProductionBuildingDefinition building = pack.units[0].productionBuilding;
             building.assetBundleId = pack.assetBundles[0].id;
             building.cardImageAssetName = "assets/factory-card.png";
+            building.visualAssetName = null;
+            building.visualRootPath = null;
             ExpectValid(pack, root, new EmptySnapshot(), new KnownModuleValidator());
+        });
+    }),
+    ("production building card-only bundle is not reported unused", () =>
+    {
+        WithPackage(nativeSample, (pack, root) =>
+        {
+            ContentProductionBuildingDefinition building = pack.units[0].productionBuilding;
+            building.assetBundleId = pack.assetBundles[0].id;
+            building.cardImageAssetName = "assets/factory-card.png";
+            building.visualAssetName = null;
+            building.visualRootPath = null;
+            ContentPackValidationResult result = ContentPackValidator.Validate(
+                pack, root, new EmptySnapshot(), new KnownModuleValidator());
+            if (result.Diagnostics.Any(diagnostic => diagnostic.Code == "production-building.bundle-unused"))
+            {
+                throw new InvalidOperationException("A bundle referenced only by the factory reward-card Sprite was incorrectly marked unused.");
+            }
         });
     }),
     ("production building reward card asset path is validated", () =>
