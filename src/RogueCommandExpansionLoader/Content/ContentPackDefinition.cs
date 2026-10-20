@@ -192,6 +192,14 @@ namespace RogueCommandExpansionLoader.Content
     }
 
     [Serializable]
+    public sealed class ContentUnitExperienceRewardDefinition
+    {
+        public int experienceAmount;
+        public string experienceType;
+        public float bonusMultiplier;
+    }
+
+    [Serializable]
     public sealed class ContentUnitDefinition
     {
         public string id;
@@ -227,6 +235,7 @@ namespace RogueCommandExpansionLoader.Content
         public ContentUnitHealingDefinition healing;
         public ContentUnitStealthDefinition stealth;
         public ContentUnitCommandDefinition command;
+        public ContentUnitExperienceRewardDefinition experienceReward;
         public ContentBalanceOverride[] balanceOverrides;
         public ContentUnitLocalizationDefinition[] localizations;
         public ContentProductionBuildingDefinition productionBuilding;
@@ -473,6 +482,7 @@ namespace RogueCommandExpansionLoader.Content
                 healing = CloneUnitHealing(source.healing),
                 stealth = CloneUnitStealth(source.stealth),
                 command = CloneUnitCommand(source.command),
+                experienceReward = CloneUnitExperienceReward(source.experienceReward),
                 productionBuilding = CloneProductionBuilding(source.productionBuilding)
             };
         }
@@ -655,6 +665,16 @@ namespace RogueCommandExpansionLoader.Content
                 commandRange = source.commandRange,
                 commandType = source.commandType,
                 maxCommandChain = source.maxCommandChain
+            };
+        }
+
+        private static ContentUnitExperienceRewardDefinition CloneUnitExperienceReward(ContentUnitExperienceRewardDefinition source)
+        {
+            return source == null ? null : new ContentUnitExperienceRewardDefinition
+            {
+                experienceAmount = source.experienceAmount,
+                experienceType = source.experienceType,
+                bonusMultiplier = source.bonusMultiplier
             };
         }
 
