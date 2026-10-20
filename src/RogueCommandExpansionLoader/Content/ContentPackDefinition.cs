@@ -99,6 +99,15 @@ namespace RogueCommandExpansionLoader.Content
     }
 
     [Serializable]
+    public sealed class ContentUnitSpawnDefinition
+    {
+        public float spawnRate;
+        public int maxSpawnCount;
+        public float spawnCooldown;
+        public string spawnLocation;
+    }
+
+    [Serializable]
     public sealed class ContentUnitDefinition
     {
         public string id;
@@ -123,6 +132,7 @@ namespace RogueCommandExpansionLoader.Content
         public ContentUnitExperienceDefinition experience;
         public ContentUnitSynergyDefinition[] synergies;
         public ContentUnitVisualVariantDefinition[] visualVariants;
+        public ContentUnitSpawnDefinition spawn;
         public ContentBalanceOverride[] balanceOverrides;
         public ContentUnitLocalizationDefinition[] localizations;
         public ContentProductionBuildingDefinition productionBuilding;
@@ -358,6 +368,7 @@ namespace RogueCommandExpansionLoader.Content
                 experience = CloneUnitExperience(source.experience),
                 synergies = CloneArray(source.synergies, CloneUnitSynergy),
                 visualVariants = CloneArray(source.visualVariants, CloneUnitVisualVariant),
+                spawn = CloneUnitSpawn(source.spawn),
                 productionBuilding = CloneProductionBuilding(source.productionBuilding)
             };
         }
@@ -425,6 +436,17 @@ namespace RogueCommandExpansionLoader.Content
                 visualRootPath = source.visualRootPath,
                 colorTint = source.colorTint,
                 scale = source.scale
+            };
+        }
+
+        private static ContentUnitSpawnDefinition CloneUnitSpawn(ContentUnitSpawnDefinition source)
+        {
+            return source == null ? null : new ContentUnitSpawnDefinition
+            {
+                spawnRate = source.spawnRate,
+                maxSpawnCount = source.maxSpawnCount,
+                spawnCooldown = source.spawnCooldown,
+                spawnLocation = source.spawnLocation
             };
         }
 

@@ -374,6 +374,7 @@ namespace RogueCommandExpansionLoader.Content
                 ValidateUnitExperience(unit.experience, itemPath + ".experience", diagnostics);
                 ValidateUnitSynergies(unit.synergies, itemPath + ".synergies", allIds, diagnostics);
                 ValidateUnitVisualVariants(unit.visualVariants, itemPath + ".visualVariants", bundleIds, diagnostics);
+                ValidateUnitSpawn(unit.spawn, itemPath + ".spawn", diagnostics);
                 ValidateProductionBuilding(unit.productionBuilding, itemPath + ".productionBuilding",
                     allIds, productionBuildingIds, bundleIds, registrySnapshot, diagnostics);
                 ValidateProfileCardEligibility(unit, itemPath, diagnostics);
@@ -1523,6 +1524,29 @@ namespace RogueCommandExpansionLoader.Content
                     Add(diagnostics, "unit-visual-variant.scale-invalid", itemPath + ".scale",
                         "Visual variant scale must be between 0 and 10.");
                 }
+            }
+        }
+
+        private static void ValidateUnitSpawn(
+            ContentUnitSpawnDefinition spawn,
+            string path,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (spawn == null) return;
+            if (spawn.spawnRate < 0)
+            {
+                Add(diagnostics, "unit-spawn.rate-invalid", path + ".spawnRate",
+                    "Spawn rate must be non-negative.");
+            }
+            if (spawn.maxSpawnCount < 0)
+            {
+                Add(diagnostics, "unit-spawn.max-count-invalid", path + ".maxSpawnCount",
+                    "Max spawn count must be non-negative.");
+            }
+            if (spawn.spawnCooldown < 0)
+            {
+                Add(diagnostics, "unit-spawn.cooldown-invalid", path + ".spawnCooldown",
+                    "Spawn cooldown must be non-negative.");
             }
         }
 
