@@ -167,6 +167,15 @@ namespace RogueCommandExpansionLoader.Content
     }
 
     [Serializable]
+    public sealed class ContentUnitHealingDefinition
+    {
+        public float healAmount;
+        public float healRange;
+        public float healRate;
+        public float repairAmount;
+    }
+
+    [Serializable]
     public sealed class ContentUnitDefinition
     {
         public string id;
@@ -199,6 +208,7 @@ namespace RogueCommandExpansionLoader.Content
         public ContentUnitDetectionDefinition detection;
         public ContentUnitWeaponDefinition[] weapons;
         public ContentUnitArmorDefinition armor;
+        public ContentUnitHealingDefinition healing;
         public ContentBalanceOverride[] balanceOverrides;
         public ContentUnitLocalizationDefinition[] localizations;
         public ContentProductionBuildingDefinition productionBuilding;
@@ -442,6 +452,7 @@ namespace RogueCommandExpansionLoader.Content
                 detection = CloneUnitDetection(source.detection),
                 weapons = CloneArray(source.weapons, CloneUnitWeapon),
                 armor = CloneUnitArmor(source.armor),
+                healing = CloneUnitHealing(source.healing),
                 productionBuilding = CloneProductionBuilding(source.productionBuilding)
             };
         }
@@ -593,6 +604,17 @@ namespace RogueCommandExpansionLoader.Content
                 armorValue = source.armorValue,
                 shieldValue = source.shieldValue,
                 damageReduction = source.damageReduction
+            };
+        }
+
+        private static ContentUnitHealingDefinition CloneUnitHealing(ContentUnitHealingDefinition source)
+        {
+            return source == null ? null : new ContentUnitHealingDefinition
+            {
+                healAmount = source.healAmount,
+                healRange = source.healRange,
+                healRate = source.healRate,
+                repairAmount = source.repairAmount
             };
         }
 

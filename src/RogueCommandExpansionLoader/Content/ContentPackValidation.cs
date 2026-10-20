@@ -382,6 +382,7 @@ namespace RogueCommandExpansionLoader.Content
                 ValidateUnitDetection(unit.detection, itemPath + ".detection", diagnostics);
                 ValidateUnitWeapons(unit.weapons, itemPath + ".weapons", diagnostics);
                 ValidateUnitArmor(unit.armor, itemPath + ".armor", diagnostics);
+                ValidateUnitHealing(unit.healing, itemPath + ".healing", diagnostics);
                 ValidateProductionBuilding(unit.productionBuilding, itemPath + ".productionBuilding",
                     allIds, productionBuildingIds, bundleIds, registrySnapshot, diagnostics);
                 ValidateProfileCardEligibility(unit, itemPath, diagnostics);
@@ -1750,6 +1751,34 @@ namespace RogueCommandExpansionLoader.Content
             {
                 Add(diagnostics, "unit-armor.reduction-invalid", path + ".damageReduction",
                     "Damage reduction must be between 0 and 1.");
+            }
+        }
+
+        private static void ValidateUnitHealing(
+            ContentUnitHealingDefinition healing,
+            string path,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (healing == null) return;
+            if (healing.healAmount < 0)
+            {
+                Add(diagnostics, "unit-healing.amount-invalid", path + ".healAmount",
+                    "Heal amount must be non-negative.");
+            }
+            if (healing.healRange < 0)
+            {
+                Add(diagnostics, "unit-healing.range-invalid", path + ".healRange",
+                    "Heal range must be non-negative.");
+            }
+            if (healing.healRate < 0)
+            {
+                Add(diagnostics, "unit-healing.rate-invalid", path + ".healRate",
+                    "Heal rate must be non-negative.");
+            }
+            if (healing.repairAmount < 0)
+            {
+                Add(diagnostics, "unit-healing.repair-invalid", path + ".repairAmount",
+                    "Repair amount must be non-negative.");
             }
         }
 
