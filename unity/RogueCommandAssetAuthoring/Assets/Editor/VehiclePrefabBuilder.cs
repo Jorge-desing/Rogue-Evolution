@@ -290,6 +290,10 @@ namespace RogueCommandExpansion.Authoring
                 // duplicate transforms and ambiguous runtime role bindings.
                 EnsureCanonicalVfxSockets(root, modelInstance);
 
+                // Scaffold muzzle-flash particles (FirePoint_0 child 0) and calibrated 3D mono AudioSources.
+                // Damage sockets stay clean: RuntimeVisualDirector spawns smoke/fire dynamically.
+                EnsureCanonicalVfxAndAudioComponents(root);
+
                 // 5. Mount Detached Modular Attachments (ERA, APS, Sponson, FuelDrums) if present
                 MountModularAttachmentsIfAvailable(root, unitName);
 
@@ -584,6 +588,121 @@ namespace RogueCommandExpansion.Authoring
             EnsureSocketIfMissing(root.transform, "Socket_EngineAudio", engine);
             EnsureSocketIfMissing(root.transform, "Socket_WeaponAudio", muzzle);
             EnsureSocketIfMissing(root.transform, "Socket_GroundCenter", ground);
+        }
+
+        private const string VfxMaterialFolder = MaterialFolder + "/VFX";
+        private const string MuzzleFlashMaterialPath = VfxMaterialFolder + "/VFX_MuzzleFlash_Additive.mat";
+
+        /// <summary>
+        /// Ensures FirePoint_0 (with a ParticleSystem as child index 0, as ShootProjectile.Init expects)
+        /// under each muzzle socket, and calibrated 3D AudioSources on the weapon/engine audio sockets.
+        /// Idempotent: existing FirePoint_0 children, particle systems and AudioSources are preserved.
+        /// </summary>
+        internal static void EnsureCanonicalVfxAndAudioComponents(GameObject root)
+        {
+            if (root == null) throw new ArgumentNullException("root");
+
+            string[] muzzleSockets = { "Socket_MuzzlePrimary", "Socket_MuzzleSecondary" };
+            string[] firePointNames = { "FirePoint_0", "FirePoint_1" };
+            Material flashMaterial = null;
+            for (int i = 0; i < muzzleSockets.Length; i++)
+            {
+                Transform muzzle = FindTransformRecursive(root.transform, muzzleSockets[i]);
+                if (muzzle == null) continue;
+
+                Transform firePoint = muzzle.Find(firePointNames[i]);
+                if (firePoint == null)
+                {
+                    var fp = new GameObject(firePointNames[i]);
+                    fp.transform.SetParent(muzzle, false);
+                    fp.transform.localPosition = Vector3.zero;
+                    fp.transform.localRotation = Quaternion.identity;
+                    firePoint = fp.transform;
+                }
+
+                // ShootProjectile reads child.GetChild(0).GetComponent<ParticleSystem>().
+                if (firePoint.childCount > 0 && firePoint.GetChild(0).GetComponent<ParticleSystem>() != null) continue;
+
+                if (flashMaterial == null) flashMaterial = GetOrCreateMuzzleFlashMaterial();
+                var flash = new GameObject("MuzzleFlash");
+                flash.transform.SetParent(firePoint, false);
+                flash.transform.SetSiblingIndex(0);
+                ConfigureMuzzleFlash(flash.AddComponent<ParticleSystem>(), flashMaterial);
+            }
+
+            EnsureAudioSource(root.transform, "Socket_WeaponAudio", false);
+            EnsureAudioSource(root.transform, "Socket_EngineAudio", true);
+        }
+
+        private static void ConfigureMuzzleFlash(ParticleSystem ps, Material material)
+        {
+            var main = ps.main;
+            main.duration = 0.08f;
+            main.loop = false;
+            main.playOnAwake = false;
+            main.startLifetime = 0.08f;
+            main.startSpeed = 2.5f;
+            main.startSize = 0.35f;
+            main.maxParticles = 25;
+            main.simulationSpace = ParticleSystemSimulationSpace.Local;
+
+            var emission = ps.emission;
+            emission.rateOverTime = 0f;
+            emission.SetBursts(new[] { new ParticleSystem.Burst(0f, 12, 15) });
+
+            var shape = ps.shape;
+            shape.shapeType = ParticleSystemShapeType.Cone;
+            shape.angle = 12f;
+            shape.radius = 0.04f;
+
+            var renderer = ps.GetComponent<ParticleSystemRenderer>();
+            renderer.sharedMaterial = material;
+            renderer.enableGPUInstancing = true;
+        }
+
+        private static Material GetOrCreateMuzzleFlashMaterial()
+        {
+            string projectRoot = Directory.GetParent(Application.dataPath).FullName;
+            Directory.CreateDirectory(Path.GetFullPath(Path.Combine(projectRoot, VfxMaterialFolder)));
+
+            Material mat = AssetDatabase.LoadAssetAtPath<Material>(MuzzleFlashMaterialPath);
+            if (mat != null) return mat;
+
+            Shader shader = Shader.Find("Universal Render Pipeline/Particles/Unlit");
+            if (shader == null)
+            {
+                throw new InvalidOperationException(
+                    "URP shader 'Universal Render Pipeline/Particles/Unlit' is unavailable for muzzle flash material.");
+            }
+
+            mat = new Material(shader) { name = "VFX_MuzzleFlash_Additive", enableInstancing = true };
+            if (mat.HasProperty("_Surface")) mat.SetFloat("_Surface", 1f);
+            if (mat.HasProperty("_Blend")) mat.SetFloat("_Blend", 2f); // Additive
+            if (mat.HasProperty("_SrcBlend")) mat.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.One);
+            if (mat.HasProperty("_DstBlend")) mat.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.One);
+            if (mat.HasProperty("_ZWrite")) mat.SetFloat("_ZWrite", 0f);
+            if (mat.HasProperty("_SoftParticlesEnabled")) mat.SetFloat("_SoftParticlesEnabled", 1f);
+            if (mat.HasProperty("_BaseColor")) mat.SetColor("_BaseColor", new Color(1f, 0.72f, 0.25f, 1f));
+            mat.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
+            mat.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+            AssetDatabase.CreateAsset(mat, MuzzleFlashMaterialPath);
+            return mat;
+        }
+
+        private static void EnsureAudioSource(Transform root, string socketName, bool loop)
+        {
+            Transform socket = FindTransformRecursive(root, socketName);
+            if (socket == null) return;
+
+            AudioSource source = socket.GetComponent<AudioSource>();
+            if (source == null) source = socket.gameObject.AddComponent<AudioSource>();
+            source.playOnAwake = false;
+            source.loop = loop;
+            source.spatialBlend = 1f;
+            source.rolloffMode = AudioRolloffMode.Logarithmic;
+            source.minDistance = 3f;
+            source.maxDistance = 60f;
+            source.dopplerLevel = 0f;
         }
 
         private static void EnsureSocketIfMissing(Transform root, string socketName, Vector3 localPosition)

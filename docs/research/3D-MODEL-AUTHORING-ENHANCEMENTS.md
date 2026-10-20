@@ -660,3 +660,8 @@ The local art direction now uses a source-backed, camera-first review sequence. 
 
 The local 50 px silhouette glance test, 30–120 px review range, and 65/25/10 visual hierarchy are authoring heuristics for this project. The cited sources support camera-first readability and staged refinement, but do not prescribe these numeric thresholds.
 
+
+## 23. Unity prefab scaffolding of muzzle VFX and 3D audio
+
+VehiclePrefabBuilder.EnsureCanonicalVfxAndAudioComponents adds (idempotently) FirePoint_0/FirePoint_1 under Socket_MuzzlePrimary/Socket_MuzzleSecondary with a ParticleSystem as child 0 (shared URP material Materials/VFX/VFX_MuzzleFlash_Additive.mat, max 25 particles), and 3D AudioSources (spatialBlend 1, logarithmic, 3-60 m, doppler 0) on Socket_WeaponAudio and Socket_EngineAudio (looping). Damage sockets stay clean for RuntimeVisualDirector. Evidence: static edit only; Unity compile and prefab build not yet run.
+
