@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace RogueCommandExpansionLoader.Content
 {
@@ -16,6 +17,7 @@ namespace RogueCommandExpansionLoader.Content
         public ContentUnitDefinition[] units;
         public ContentStageDefinition[] stages;
         public ContentAiProfileDefinition[] aiProfiles;
+        public ContentRelicDefinition[] relics;
     }
 
     [Serializable]
@@ -26,9 +28,211 @@ namespace RogueCommandExpansionLoader.Content
     }
 
     [Serializable]
+    public sealed class ContentAbilityDefinition
+    {
+        public string id;
+        public float value;
+    }
+
+    [Serializable]
+    public sealed class ContentAiOverrideDefinition
+    {
+        public string parameter;
+        public float value;
+    }
+
+    [Serializable]
+    public sealed class ContentActiveSkillDefinition
+    {
+        public string id;
+        public string skillType;
+        public float cooldown;
+        public float manaCost;
+        public float effectValue;
+    }
+
+    [Serializable]
+    public sealed class ContentCombatBoostDefinition
+    {
+        public string id;
+        public string statName;
+        public float multiplier;
+        public float duration;
+    }
+
+    [Serializable]
+    public sealed class ContentUnitUpgradeDefinition
+    {
+        public string targetUnitId;
+        public int requiredExperienceLevel;
+        public float cost;
+        public string description;
+    }
+
+    [Serializable]
+    public sealed class ContentUnitExperienceDefinition
+    {
+        public int experiencePerLevel;
+        public int maxLevel;
+        public float experienceGainMultiplier;
+        public float levelUpBonus;
+    }
+
+    [Serializable]
+    public sealed class ContentUnitSynergyDefinition
+    {
+        public string id;
+        public string statName;
+        public float multiplier;
+        public float radius;
+        public string[] targetUnitIds;
+    }
+
+    [Serializable]
+    public sealed class ContentUnitVisualVariantDefinition
+    {
+        public string id;
+        public string visualAssetName;
+        public string visualRootPath;
+        public string colorTint;
+        public float scale;
+    }
+
+    [Serializable]
+    public sealed class ContentUnitSpawnDefinition
+    {
+        public float spawnRate;
+        public int maxSpawnCount;
+        public float spawnCooldown;
+        public string spawnLocation;
+    }
+
+    [Serializable]
+    public sealed class ContentUnitStatusEffectDefinition
+    {
+        public string id;
+        public string effectType;
+        public float duration;
+        public float magnitude;
+    }
+
+    [Serializable]
+    public sealed class ContentUnitProductionQueueDefinition
+    {
+        public float buildTime;
+        public float resourceCost;
+        public int queueSize;
+        public int productionPriority;
+    }
+
+    [Serializable]
+    public sealed class ContentUnitResourceCostDefinition
+    {
+        public string resourceType;
+        public float amount;
+    }
+
+    [Serializable]
+    public sealed class ContentUnitMovementDefinition
+    {
+        public float moveSpeed;
+        public float turnRate;
+        public float acceleration;
+    }
+
+    [Serializable]
+    public sealed class ContentUnitDetectionDefinition
+    {
+        public float detectionRange;
+        public string sensorType;
+        public bool stealthDetection;
+    }
+
+    [Serializable]
+    public sealed class ContentUnitWeaponDefinition
+    {
+        public string weaponType;
+        public float damage;
+        public float range;
+        public float fireRate;
+    }
+
+    [Serializable]
+    public sealed class ContentUnitArmorDefinition
+    {
+        public string armorType;
+        public float armorValue;
+        public float shieldValue;
+        public float damageReduction;
+    }
+
+    [Serializable]
+    public sealed class ContentUnitHealingDefinition
+    {
+        public float healAmount;
+        public float healRange;
+        public float healRate;
+        public float repairAmount;
+    }
+
+    [Serializable]
+    public sealed class ContentUnitStealthDefinition
+    {
+        public float stealthLevel;
+        public float cloakDuration;
+        public float detectionReduction;
+    }
+
+    [Serializable]
+    public sealed class ContentUnitCommandDefinition
+    {
+        public float commandRange;
+        public string commandType;
+        public int maxCommandChain;
+    }
+
+    [Serializable]
+    public sealed class ContentUnitExperienceRewardDefinition
+    {
+        public int experienceAmount;
+        public string experienceType;
+        public float bonusMultiplier;
+    }
+
+    [Serializable]
+    public sealed class ContentUnitAuraDefinition
+    {
+        public float auraRadius;
+        public string auraType;
+        public float buffAmount;
+        public bool affectsAllies;
+        public bool affectsEnemies;
+    }
+
+    [Serializable]
+    public sealed class ContentUnitResourceGatheringDefinition
+    {
+        public string resourceType;
+        public float gatherRate;
+        public int carryCapacity;
+        public float gatherRange;
+    }
+
+    [Serializable]
+    public sealed class ContentUnitAiBehaviorDefinition
+    {
+        public int unitCap;
+        public int combatUnitCap;
+        public float skillActivationCheckInterval;
+        public string aiTag;
+    }
+
+    [Serializable]
     public sealed class ContentUnitDefinition
     {
         public string id;
+        public string unitType;
+        public Dictionary<string, float> customBalance;
         public string assetBundleId;
         public string balanceAssetName;
         public string prefabAssetName;
@@ -40,6 +244,29 @@ namespace RogueCommandExpansionLoader.Content
         public bool isAllowedForAi;
         public bool isAllowedForDemo;
         public bool isForSpecialists;
+        public ContentAbilityDefinition[] abilities;
+        public ContentAiOverrideDefinition[] aiOverrides;
+        public ContentActiveSkillDefinition[] activeSkills;
+        public ContentCombatBoostDefinition[] combatBoosts;
+        public ContentUnitUpgradeDefinition[] upgrades;
+        public ContentUnitExperienceDefinition experience;
+        public ContentUnitSynergyDefinition[] synergies;
+        public ContentUnitVisualVariantDefinition[] visualVariants;
+        public ContentUnitSpawnDefinition spawn;
+        public ContentUnitStatusEffectDefinition[] statusEffects;
+        public ContentUnitProductionQueueDefinition productionQueue;
+        public ContentUnitResourceCostDefinition[] resourceCosts;
+        public ContentUnitMovementDefinition movement;
+        public ContentUnitDetectionDefinition detection;
+        public ContentUnitWeaponDefinition[] weapons;
+        public ContentUnitArmorDefinition armor;
+        public ContentUnitHealingDefinition healing;
+        public ContentUnitStealthDefinition stealth;
+        public ContentUnitCommandDefinition command;
+        public ContentUnitExperienceRewardDefinition experienceReward;
+        public ContentUnitAuraDefinition aura;
+        public ContentUnitResourceGatheringDefinition resourceGathering;
+        public ContentUnitAiBehaviorDefinition aiBehavior;
         public ContentBalanceOverride[] balanceOverrides;
         public ContentUnitLocalizationDefinition[] localizations;
         public ContentProductionBuildingDefinition productionBuilding;
@@ -47,9 +274,14 @@ namespace RogueCommandExpansionLoader.Content
 
     [Serializable]
     public sealed class ContentProductionBuildingDefinition
+
     {
         public string id;
         public string nativeTemplateId;
+        public string assetBundleId;
+        public string cardImageAssetName;
+        public string visualAssetName;
+        public string visualRootPath;
         public ContentBalanceOverride[] balanceOverrides;
         public ContentUnitLocalizationDefinition[] localizations;
     }
@@ -61,6 +293,43 @@ namespace RogueCommandExpansionLoader.Content
         public string name;
         public string description;
         public string skillDescription;
+    }
+
+    [Serializable]
+    public sealed class ContentRelicDefinition
+    {
+        public string id;
+        public string assetBundleId;
+        public string imageAssetName;
+        public string rarity;
+        public string tech;
+        public string offeredSystemTags;
+        public string neededSystemTags;
+        public int neededExperienceLevel;
+        public bool isAllowedForDemo;
+        public bool isForSpecialists;
+        public ContentRelicLocalizationDefinition[] localizations;
+        public ContentCardChangeDefinition[] cardChanges;
+    }
+
+    [Serializable]
+    public sealed class ContentRelicLocalizationDefinition
+    {
+        public string language;
+        public string name;
+        public string description;
+    }
+
+    [Serializable]
+    public sealed class ContentCardChangeDefinition
+    {
+        public string valueToChange;
+        public string operation;
+        public float value;
+        public string side;
+        public bool multiplyValueWithCurrentHeatLevel;
+        public string multiplyValueWithMetaProgressionMultiplier;
+        public string[] onlyForTheseEntityIds;
     }
 
     [Serializable]
@@ -179,7 +448,8 @@ namespace RogueCommandExpansionLoader.Content
                 assetBundles = CloneArray(source.assetBundles, CloneBundle),
                 units = CloneArray(source.units, CloneUnit),
                 stages = CloneArray(source.stages, CloneStage),
-                aiProfiles = CloneArray(source.aiProfiles, CloneAiProfile)
+                aiProfiles = CloneArray(source.aiProfiles, CloneAiProfile),
+                relics = CloneArray(source.relics, CloneRelic)
             };
         }
 
@@ -209,6 +479,8 @@ namespace RogueCommandExpansionLoader.Content
             return source == null ? null : new ContentUnitDefinition
             {
                 id = source.id,
+                unitType = source.unitType,
+                customBalance = source.customBalance == null ? null : new Dictionary<string, float>(source.customBalance),
                 assetBundleId = source.assetBundleId,
                 balanceAssetName = source.balanceAssetName,
                 prefabAssetName = source.prefabAssetName,
@@ -222,7 +494,255 @@ namespace RogueCommandExpansionLoader.Content
                 isForSpecialists = source.isForSpecialists,
                 balanceOverrides = CloneArray(source.balanceOverrides, CloneBalanceOverride),
                 localizations = CloneArray(source.localizations, CloneUnitLocalization),
+                abilities = CloneArray(source.abilities, CloneAbility),
+                aiOverrides = CloneArray(source.aiOverrides, CloneAiOverride),
+                activeSkills = CloneArray(source.activeSkills, CloneActiveSkill),
+                combatBoosts = CloneArray(source.combatBoosts, CloneCombatBoost),
+                upgrades = CloneArray(source.upgrades, CloneUnitUpgrade),
+                experience = CloneUnitExperience(source.experience),
+                synergies = CloneArray(source.synergies, CloneUnitSynergy),
+                visualVariants = CloneArray(source.visualVariants, CloneUnitVisualVariant),
+                spawn = CloneUnitSpawn(source.spawn),
+                statusEffects = CloneArray(source.statusEffects, CloneUnitStatusEffect),
+                productionQueue = CloneUnitProductionQueue(source.productionQueue),
+                resourceCosts = CloneArray(source.resourceCosts, CloneUnitResourceCost),
+                movement = CloneUnitMovement(source.movement),
+                detection = CloneUnitDetection(source.detection),
+                weapons = CloneArray(source.weapons, CloneUnitWeapon),
+                armor = CloneUnitArmor(source.armor),
+                healing = CloneUnitHealing(source.healing),
+                stealth = CloneUnitStealth(source.stealth),
+                command = CloneUnitCommand(source.command),
+                experienceReward = CloneUnitExperienceReward(source.experienceReward),
+                aura = CloneUnitAura(source.aura),
+                resourceGathering = CloneUnitResourceGathering(source.resourceGathering),
+                aiBehavior = CloneUnitAiBehavior(source.aiBehavior),
                 productionBuilding = CloneProductionBuilding(source.productionBuilding)
+            };
+        }
+
+        private static ContentAbilityDefinition CloneAbility(ContentAbilityDefinition source)
+        {
+            return source == null ? null : new ContentAbilityDefinition { id = source.id, value = source.value };
+        }
+
+        private static ContentAiOverrideDefinition CloneAiOverride(ContentAiOverrideDefinition source)
+        {
+            return source == null ? null : new ContentAiOverrideDefinition { parameter = source.parameter, value = source.value };
+        }
+
+        private static ContentActiveSkillDefinition CloneActiveSkill(ContentActiveSkillDefinition source)
+        {
+            return source == null ? null : new ContentActiveSkillDefinition { id = source.id, skillType = source.skillType, cooldown = source.cooldown, manaCost = source.manaCost, effectValue = source.effectValue };
+        }
+
+        private static ContentCombatBoostDefinition CloneCombatBoost(ContentCombatBoostDefinition source)
+        {
+            return source == null ? null : new ContentCombatBoostDefinition { id = source.id, statName = source.statName, multiplier = source.multiplier, duration = source.duration };
+        }
+
+        private static ContentUnitUpgradeDefinition CloneUnitUpgrade(ContentUnitUpgradeDefinition source)
+        {
+            return source == null ? null : new ContentUnitUpgradeDefinition
+            {
+                targetUnitId = source.targetUnitId,
+                requiredExperienceLevel = source.requiredExperienceLevel,
+                cost = source.cost,
+                description = source.description
+            };
+        }
+
+        private static ContentUnitExperienceDefinition CloneUnitExperience(ContentUnitExperienceDefinition source)
+        {
+            return source == null ? null : new ContentUnitExperienceDefinition
+            {
+                experiencePerLevel = source.experiencePerLevel,
+                maxLevel = source.maxLevel,
+                experienceGainMultiplier = source.experienceGainMultiplier,
+                levelUpBonus = source.levelUpBonus
+            };
+        }
+
+        private static ContentUnitSynergyDefinition CloneUnitSynergy(ContentUnitSynergyDefinition source)
+        {
+            return source == null ? null : new ContentUnitSynergyDefinition
+            {
+                id = source.id,
+                statName = source.statName,
+                multiplier = source.multiplier,
+                radius = source.radius,
+                targetUnitIds = source.targetUnitIds == null ? null : (string[])source.targetUnitIds.Clone()
+            };
+        }
+
+        private static ContentUnitVisualVariantDefinition CloneUnitVisualVariant(ContentUnitVisualVariantDefinition source)
+        {
+            return source == null ? null : new ContentUnitVisualVariantDefinition
+            {
+                id = source.id,
+                visualAssetName = source.visualAssetName,
+                visualRootPath = source.visualRootPath,
+                colorTint = source.colorTint,
+                scale = source.scale
+            };
+        }
+
+        private static ContentUnitSpawnDefinition CloneUnitSpawn(ContentUnitSpawnDefinition source)
+        {
+            return source == null ? null : new ContentUnitSpawnDefinition
+            {
+                spawnRate = source.spawnRate,
+                maxSpawnCount = source.maxSpawnCount,
+                spawnCooldown = source.spawnCooldown,
+                spawnLocation = source.spawnLocation
+            };
+        }
+
+        private static ContentUnitStatusEffectDefinition CloneUnitStatusEffect(ContentUnitStatusEffectDefinition source)
+        {
+            return source == null ? null : new ContentUnitStatusEffectDefinition
+            {
+                id = source.id,
+                effectType = source.effectType,
+                duration = source.duration,
+                magnitude = source.magnitude
+            };
+        }
+
+        private static ContentUnitProductionQueueDefinition CloneUnitProductionQueue(ContentUnitProductionQueueDefinition source)
+        {
+            return source == null ? null : new ContentUnitProductionQueueDefinition
+            {
+                buildTime = source.buildTime,
+                resourceCost = source.resourceCost,
+                queueSize = source.queueSize,
+                productionPriority = source.productionPriority
+            };
+        }
+
+        private static ContentUnitResourceCostDefinition CloneUnitResourceCost(ContentUnitResourceCostDefinition source)
+        {
+            return source == null ? null : new ContentUnitResourceCostDefinition
+            {
+                resourceType = source.resourceType,
+                amount = source.amount
+            };
+        }
+
+        private static ContentUnitMovementDefinition CloneUnitMovement(ContentUnitMovementDefinition source)
+        {
+            return source == null ? null : new ContentUnitMovementDefinition
+            {
+                moveSpeed = source.moveSpeed,
+                turnRate = source.turnRate,
+                acceleration = source.acceleration
+            };
+        }
+
+        private static ContentUnitDetectionDefinition CloneUnitDetection(ContentUnitDetectionDefinition source)
+        {
+            return source == null ? null : new ContentUnitDetectionDefinition
+            {
+                detectionRange = source.detectionRange,
+                sensorType = source.sensorType,
+                stealthDetection = source.stealthDetection
+            };
+        }
+
+        private static ContentUnitWeaponDefinition CloneUnitWeapon(ContentUnitWeaponDefinition source)
+        {
+            return source == null ? null : new ContentUnitWeaponDefinition
+            {
+                weaponType = source.weaponType,
+                damage = source.damage,
+                range = source.range,
+                fireRate = source.fireRate
+            };
+        }
+
+        private static ContentUnitArmorDefinition CloneUnitArmor(ContentUnitArmorDefinition source)
+        {
+            return source == null ? null : new ContentUnitArmorDefinition
+            {
+                armorType = source.armorType,
+                armorValue = source.armorValue,
+                shieldValue = source.shieldValue,
+                damageReduction = source.damageReduction
+            };
+        }
+
+        private static ContentUnitHealingDefinition CloneUnitHealing(ContentUnitHealingDefinition source)
+        {
+            return source == null ? null : new ContentUnitHealingDefinition
+            {
+                healAmount = source.healAmount,
+                healRange = source.healRange,
+                healRate = source.healRate,
+                repairAmount = source.repairAmount
+            };
+        }
+
+        private static ContentUnitStealthDefinition CloneUnitStealth(ContentUnitStealthDefinition source)
+        {
+            return source == null ? null : new ContentUnitStealthDefinition
+            {
+                stealthLevel = source.stealthLevel,
+                cloakDuration = source.cloakDuration,
+                detectionReduction = source.detectionReduction
+            };
+        }
+
+        private static ContentUnitCommandDefinition CloneUnitCommand(ContentUnitCommandDefinition source)
+        {
+            return source == null ? null : new ContentUnitCommandDefinition
+            {
+                commandRange = source.commandRange,
+                commandType = source.commandType,
+                maxCommandChain = source.maxCommandChain
+            };
+        }
+
+        private static ContentUnitExperienceRewardDefinition CloneUnitExperienceReward(ContentUnitExperienceRewardDefinition source)
+        {
+            return source == null ? null : new ContentUnitExperienceRewardDefinition
+            {
+                experienceAmount = source.experienceAmount,
+                experienceType = source.experienceType,
+                bonusMultiplier = source.bonusMultiplier
+            };
+        }
+
+        private static ContentUnitAuraDefinition CloneUnitAura(ContentUnitAuraDefinition source)
+        {
+            return source == null ? null : new ContentUnitAuraDefinition
+            {
+                auraRadius = source.auraRadius,
+                auraType = source.auraType,
+                buffAmount = source.buffAmount,
+                affectsAllies = source.affectsAllies,
+                affectsEnemies = source.affectsEnemies
+            };
+        }
+
+        private static ContentUnitResourceGatheringDefinition CloneUnitResourceGathering(ContentUnitResourceGatheringDefinition source)
+        {
+            return source == null ? null : new ContentUnitResourceGatheringDefinition
+            {
+                resourceType = source.resourceType,
+                gatherRate = source.gatherRate,
+                carryCapacity = source.carryCapacity,
+                gatherRange = source.gatherRange
+            };
+        }
+
+        private static ContentUnitAiBehaviorDefinition CloneUnitAiBehavior(ContentUnitAiBehaviorDefinition source)
+        {
+            return source == null ? null : new ContentUnitAiBehaviorDefinition
+            {
+                unitCap = source.unitCap,
+                combatUnitCap = source.combatUnitCap,
+                skillActivationCheckInterval = source.skillActivationCheckInterval,
+                aiTag = source.aiTag
             };
         }
 
@@ -233,6 +753,10 @@ namespace RogueCommandExpansionLoader.Content
             {
                 id = source.id,
                 nativeTemplateId = source.nativeTemplateId,
+                assetBundleId = source.assetBundleId,
+                cardImageAssetName = source.cardImageAssetName,
+                visualAssetName = source.visualAssetName,
+                visualRootPath = source.visualRootPath,
                 balanceOverrides = CloneArray(source.balanceOverrides, CloneBalanceOverride),
                 localizations = CloneArray(source.localizations, CloneUnitLocalization)
             };
@@ -316,6 +840,52 @@ namespace RogueCommandExpansionLoader.Content
                 productionBuildingEntries = CloneArray(source.productionBuildingEntries,
                     CloneAiProductionBuildingEntry),
                 modules = CloneArray(source.modules, CloneAiModule)
+            };
+        }
+
+        private static ContentRelicDefinition CloneRelic(ContentRelicDefinition source)
+        {
+            return source == null ? null : new ContentRelicDefinition
+            {
+                id = source.id,
+                assetBundleId = source.assetBundleId,
+                imageAssetName = source.imageAssetName,
+                rarity = source.rarity,
+                tech = source.tech,
+                offeredSystemTags = source.offeredSystemTags,
+                neededSystemTags = source.neededSystemTags,
+                neededExperienceLevel = source.neededExperienceLevel,
+                isAllowedForDemo = source.isAllowedForDemo,
+                isForSpecialists = source.isForSpecialists,
+                localizations = CloneArray(source.localizations, CloneRelicLocalization),
+                cardChanges = CloneArray(source.cardChanges, CloneCardChange)
+            };
+        }
+
+        private static ContentRelicLocalizationDefinition CloneRelicLocalization(
+            ContentRelicLocalizationDefinition source)
+        {
+            return source == null ? null : new ContentRelicLocalizationDefinition
+            {
+                language = source.language,
+                name = source.name,
+                description = source.description
+            };
+        }
+
+        private static ContentCardChangeDefinition CloneCardChange(ContentCardChangeDefinition source)
+        {
+            return source == null ? null : new ContentCardChangeDefinition
+            {
+                valueToChange = source.valueToChange,
+                operation = source.operation,
+                value = source.value,
+                side = source.side,
+                multiplyValueWithCurrentHeatLevel = source.multiplyValueWithCurrentHeatLevel,
+                multiplyValueWithMetaProgressionMultiplier = source.multiplyValueWithMetaProgressionMultiplier,
+                onlyForTheseEntityIds = source.onlyForTheseEntityIds == null
+                    ? null
+                    : (string[])source.onlyForTheseEntityIds.Clone()
             };
         }
 

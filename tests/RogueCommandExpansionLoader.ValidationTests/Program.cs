@@ -41,6 +41,14 @@ ContentPackDefinition reactiveAiSample = JsonSerializer.Deserialize<ContentPackD
 
 var tests = new (string Name, Action Run)[]
 {
+    ("unit type validation rejects unsupported types", () =>
+    {
+        WithPackage(sample, (pack, root) =>
+        {
+            pack.units[0].unitType = "InvalidType";
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(), "unit.type-invalid");
+        });
+    }),
     ("visual socket discovery accepts canonical IDs and exact legacy suffixes only", () =>
     {
         if (!RogueCommandSocketCatalog.TryResolveCanonicalSocketName("Socket_TurretPivot", out string canonical) ||
@@ -617,6 +625,84 @@ var tests = new (string Name, Action Run)[]
                 "An offered-product truncated report hid its independent ID or pool-query omission counters.");
         }
     }),
+    ("runtime mutation modifies buff and ai behaviour", () =>
+    {
+        var mutationManager = new RuntimeMutationManager(msg => Console.WriteLine(msg));
+        
+        // Test Buff Mutation
+        var buff = new EntityValueModifier { value = 1.0f };
+        mutationManager.MutateFloat(buff, "value", 2.5f);
+        if (buff.value != 2.5f) throw new InvalidOperationException("Buff value mutation failed.");
+
+        // Test AI Behaviour Mutation
+        var behaviour = new AiBehaviour { tickRate = 1.0f, detectionRange = 10.0f };
+        var manager = new AiBehaviourManager { activeBehaviour = behaviour };
+        mutationManager.MutateActiveAiBehaviour(manager, "tickRate", 0.5f);
+        if (behaviour.tickRate != 0.5f) throw new InvalidOperationException("AI tickRate mutation failed.");
+        
+        mutationManager.MutateActiveAiBehaviour(manager, "detectionRange", 20.0f);
+        if (behaviour.detectionRange != 20.0f) throw new InvalidOperationException("AI detectionRange mutation failed.");
+    }),
+    ("runtime mutation handles invalid targets and fields", () =>
+    {
+        var mutationManager = new RuntimeMutationManager(msg => { });
+        
+        // Null target
+        if (mutationManager.MutateField(null!, "someField", 1.0f)) 
+            throw new InvalidOperationException("Mutation should fail for null target.");
+
+        // Non-existent field
+        var target = new object();
+        if (mutationManager.MutateField(target, "NonExistentField", 1.0f)) 
+            throw new InvalidOperationException("Mutation should fail for non-existent field.");
+
+        // Wrong type
+        var buff = new EntityValueModifier { value = 1.0f };
+        if (mutationManager.MutateField(buff, "value", "not a float")) 
+            throw new InvalidOperationException("Mutation should fail for type mismatch.");
+
+        // AI Behaviour: null manager
+        if (mutationManager.MutateActiveAiBehaviour(null!, "tickRate", 0.5f)) 
+            throw new InvalidOperationException("AI mutation should fail for null manager.");
+
+        // AI Behaviour: null activeBehaviour
+        var manager = new AiBehaviourManager { activeBehaviour = null! };
+        if (mutationManager.MutateActiveAiBehaviour(manager, "tickRate", 0.5f)) 
+            throw new InvalidOperationException("AI mutation should fail for null activeBehaviour.");
+    }),
+    ("ability validation rejects null entries and non-finite values", () =>
+    {
+        WithPackage(sample, (pack, root) =>
+        {
+            pack.units[0].abilities = [null!];
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(), "entry.null");
+        });
+        WithPackage(sample, (pack, root) =>
+        {
+            pack.units[0].abilities = [new ContentAbilityDefinition { id = "test", value = Single.NaN }];
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(), "ability.value-invalid");
+        });
+        WithPackage(sample, (pack, root) =>
+        {
+            pack.units[0].abilities = [new ContentAbilityDefinition { id = "test", value = Single.PositiveInfinity }];
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(), "ability.value-invalid");
+        });
+    }),
+    ("AI override validation rejects null entries and empty parameters", () =>
+    {
+        WithPackage(sample, (pack, root) =>
+        {
+            pack.units[0].aiOverrides = [null!];
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(), "entry.null");
+        });
+        WithPackage(sample, (pack, root) =>
+        {
+            pack.units[0].aiOverrides = [new ContentAiOverrideDefinition { parameter = "", value = 1.0f }];
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(), "ai-override.parameter-required");
+        });
+    }),
+
+
     ("demo reward stage index follows visible stages and tutorial substitution", () =>
     {
         var nativeHiddenStage = new object();
@@ -899,6 +985,74 @@ var tests = new (string Name, Action Run)[]
             }
         }
     }),
+    ("production building reward card accepts a Sprite from its declared bundle", () =>
+    {
+        WithPackage(nativeSample, (pack, root) =>
+        {
+            ContentProductionBuildingDefinition building = pack.units[0].productionBuilding;
+            building.assetBundleId = pack.assetBundles[0].id;
+            building.cardImageAssetName = "assets/factory-card.png";
+            building.visualAssetName = null;
+            building.visualRootPath = null;
+            ExpectValid(pack, root, new EmptySnapshot(), new KnownModuleValidator());
+        });
+    }),
+    ("production building card-only bundle is not reported unused", () =>
+    {
+        WithPackage(nativeSample, (pack, root) =>
+        {
+            ContentProductionBuildingDefinition building = pack.units[0].productionBuilding;
+            building.assetBundleId = pack.assetBundles[0].id;
+            building.cardImageAssetName = "assets/factory-card.png";
+            building.visualAssetName = null;
+            building.visualRootPath = null;
+            ContentPackValidationResult result = ContentPackValidator.Validate(
+                pack, root, new EmptySnapshot(), new KnownModuleValidator());
+            if (result.Diagnostics.Any(diagnostic => diagnostic.Code == "production-building.bundle-unused"))
+            {
+                throw new InvalidOperationException("A bundle referenced only by the factory reward-card Sprite was incorrectly marked unused.");
+            }
+        });
+    }),
+    ("production building reward card asset path is validated", () =>
+    {
+        WithPackage(nativeSample, (pack, root) =>
+        {
+            ContentProductionBuildingDefinition building = pack.units[0].productionBuilding;
+            building.assetBundleId = pack.assetBundles[0].id;
+            building.cardImageAssetName = "../outside.png";
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "asset.name-invalid");
+        });
+        WithPackage(nativeSample, (pack, root) =>
+        {
+            ContentProductionBuildingDefinition building = pack.units[0].productionBuilding;
+            building.assetBundleId = "sample-native:missing-assets";
+            building.cardImageAssetName = "assets/factory-card.png";
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "reference.bundle-unresolved");
+        });
+    }),
+    ("production building visual-source compatibility is explicit and independent", () =>
+    {
+        WithPackage(nativeSample, (pack, root) =>
+        {
+            ContentUnitDefinition unit = pack.units[0];
+            ContentProductionBuildingDefinition building = unit.productionBuilding;
+            string originalUnitBundleId = unit.assetBundleId;
+            string originalUnitCardImageAssetName = unit.cardImageAssetName;
+            building.assetBundleId = pack.assetBundles[0].id;
+            building.visualAssetName = "FactoryVisual";
+            building.visualRootPath = "FactoryModel";
+            ExpectValid(pack, root, new EmptySnapshot(), new KnownModuleValidator());
+            if (unit.assetBundleId != originalUnitBundleId ||
+                unit.cardImageAssetName != originalUnitCardImageAssetName ||
+                building.assetBundleId != pack.assetBundles[0].id ||
+                building.visualAssetName != "FactoryVisual" ||
+                building.visualRootPath != "FactoryModel")
+                throw new InvalidOperationException("Factory visual content should not mutate product unit asset fields.");
+        });
+    }),
     ("production-building fallback eligibility follows its produced unit", () =>
     {
         var factoryRow = new ProductionBuildingEligibilityTestRow();
@@ -999,18 +1153,119 @@ var tests = new (string Name, Action Run)[]
     }),
     ("production building deep clones preserve independent balance and localization", () =>
     {
-        ContentPackDefinition copy = ContentPackCopy.DeepClone(nativeSample);
+        ContentPackDefinition source = ContentPackCopy.DeepClone(nativeSample);
+        ContentProductionBuildingDefinition sourceBuilding = source.units[0].productionBuilding;
+        sourceBuilding.cardImageAssetName = "FactoryCard";
+        sourceBuilding.assetBundleId = "sample-native:assets";
+        sourceBuilding.visualAssetName = "FactoryVisual";
+        sourceBuilding.visualRootPath = "FactoryModel";
+        ContentPackDefinition copy = ContentPackCopy.DeepClone(source);
+        if (copy.units[0].productionBuilding.assetBundleId != "sample-native:assets" ||
+            copy.units[0].productionBuilding.visualAssetName != "FactoryVisual" ||
+            copy.units[0].productionBuilding.visualRootPath != "FactoryModel" ||
+            copy.units[0].productionBuilding.cardImageAssetName != "FactoryCard")
+        {
+            throw new InvalidOperationException("Deep cloning dropped production-building visual overlay fields.");
+        }
+
         copy.units[0].productionBuilding.id = "test:changed-factory";
+        copy.units[0].productionBuilding.assetBundleId = "test:changed-assets";
+        copy.units[0].productionBuilding.visualAssetName = "ChangedVisual";
+        copy.units[0].productionBuilding.visualRootPath = "ChangedRoot";
+        copy.units[0].productionBuilding.cardImageAssetName = "ChangedCard";
         copy.units[0].productionBuilding.balanceOverrides[0].value = "9999";
         copy.units[0].productionBuilding.localizations[0].name = "Changed";
         copy.units.Single(unit => unit.id == "sample-native:skirmish-bike")
             .localizations[0].skillDescription = "Changed skill text";
-        if (nativeSample.units[0].productionBuilding.id == "test:changed-factory" ||
-            nativeSample.units[0].productionBuilding.balanceOverrides[0].value == "9999" ||
-            nativeSample.units[0].productionBuilding.localizations[0].name == "Changed" ||
-            nativeSample.units.Single(unit => unit.id == "sample-native:skirmish-bike")
+        if (sourceBuilding.id == "test:changed-factory" ||
+            sourceBuilding.assetBundleId != "sample-native:assets" ||
+            sourceBuilding.visualAssetName != "FactoryVisual" ||
+            sourceBuilding.visualRootPath != "FactoryModel" ||
+            sourceBuilding.cardImageAssetName != "FactoryCard" ||
+            sourceBuilding.balanceOverrides[0].value == "9999" ||
+            sourceBuilding.localizations[0].name == "Changed" ||
+            source.units.Single(unit => unit.id == "sample-native:skirmish-bike")
                 .localizations[0].skillDescription == "Changed skill text")
-            throw new InvalidOperationException("Production building data shared mutable arrays with the source pack.");
+            throw new InvalidOperationException("Production-building overlay data or nested arrays shared mutable state with the source pack.");
+    }),
+
+    ("production building visual overlay accepts an explicit package bundle", () =>
+    {
+        WithPackage(nativeSample, (pack, root) =>
+        {
+            ContentProductionBuildingDefinition building = pack.units[0].productionBuilding;
+            building.assetBundleId = pack.assetBundles[0].id;
+            building.visualAssetName = "FactoryVisual";
+            building.visualRootPath = "FactoryModel";
+            ExpectValid(pack, root, new EmptySnapshot(), new KnownModuleValidator());
+        });
+    }),
+    ("production building visual overlay requires paired asset and root fields", () =>
+    {
+        WithPackage(nativeSample, (pack, root) =>
+        {
+            ContentProductionBuildingDefinition building = pack.units[0].productionBuilding;
+            building.assetBundleId = pack.assetBundles[0].id;
+            building.visualAssetName = "FactoryVisual";
+            building.visualRootPath = null;
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "production-building.visual-source-invalid");
+        });
+        WithPackage(nativeSample, (pack, root) =>
+        {
+            ContentProductionBuildingDefinition building = pack.units[0].productionBuilding;
+            building.assetBundleId = pack.assetBundles[0].id;
+            building.visualAssetName = null;
+            building.visualRootPath = "FactoryModel";
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "production-building.visual-source-invalid");
+        });
+    }),
+    ("production building visual bundle and root path are validated", () =>
+    {
+        WithPackage(nativeSample, (pack, root) =>
+        {
+            ContentProductionBuildingDefinition building = pack.units[0].productionBuilding;
+            building.assetBundleId = "sample-native:missing-assets";
+            building.visualAssetName = "FactoryVisual";
+            building.visualRootPath = "FactoryModel";
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "reference.bundle-unresolved");
+        });
+        WithPackage(nativeSample, (pack, root) =>
+        {
+            ContentProductionBuildingDefinition building = pack.units[0].productionBuilding;
+            building.assetBundleId = pack.assetBundles[0].id;
+            building.visualAssetName = "FactoryVisual";
+            building.visualRootPath = "FactoryModel/../FactoryRoot";
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "production-building.visual-root-path-invalid");
+        });
+    }),
+    ("relic clone and localization preserve independent player card data", () =>
+    {
+        ContentRelicDefinition sourceRelic = nativeSample.relics.Single(
+            relic => relic.id == "sample-native:foundry-counterweight");
+        if (!RelicLocalizationResolver.TryResolve(sourceRelic, "es-XL", false, out string spanishName) ||
+            spanishName != "Contrapeso de fundición" ||
+            !RelicLocalizationResolver.TryResolve(sourceRelic, "fr-FR", true, out string fallbackDescription) ||
+            fallbackDescription != "Atlas Crane Mechs gain 10% Health for the rest of the run.")
+        {
+            throw new InvalidOperationException("The relic localization or en-US fallback did not resolve.");
+        }
+
+        ContentPackDefinition copy = ContentPackCopy.DeepClone(nativeSample);
+        ContentRelicDefinition clonedRelic = copy.relics.Single(
+            relic => relic.id == "sample-native:foundry-counterweight");
+        clonedRelic.localizations[0].name = "Changed";
+        clonedRelic.cardChanges[0].onlyForTheseEntityIds[0] = "test:other-unit";
+        clonedRelic.cardChanges[0].value = 9.0f;
+        if (sourceRelic.localizations[0].name == "Changed" ||
+            sourceRelic.cardChanges[0].onlyForTheseEntityIds[0] != "sample-native:atlas-crane-mech" ||
+            Math.Abs(sourceRelic.cardChanges[0].value - 1.1f) > 0.0001f)
+        {
+            throw new InvalidOperationException("Relic localization, targets, or card changes shared mutable data.");
+        }
     }),
     ("sample manifest passes package-local validation", () =>
     {
@@ -1021,6 +1276,49 @@ var tests = new (string Name, Action Run)[]
     {
         WithPackage(nativeSample, (pack, root) =>
             ExpectValid(pack, root, new EmptySnapshot(), new KnownModuleValidator()));
+    }),
+    ("Atlas Crane declares its own factory, two firepoints, and random-pool offers", () =>
+    {
+        ContentUnitDefinition atlas = nativeSample.units.Single(
+            unit => unit.id == "sample-native:atlas-crane-mech");
+        if (atlas.productionBuilding == null || atlas.productionBuilding.id != "sample-native:atlas-crane-mech-factory" ||
+            atlas.balanceOverrides.Single(item => item.name == "firePointCount").value != "2" ||
+            nativeSample.units.Any(unit => unit.id != atlas.id &&
+                unit.productionBuilding.id == atlas.productionBuilding.id) ||
+            !nativeSample.stages.Any(stage => stage.unitIds.Contains(atlas.id)))
+        {
+            throw new InvalidOperationException(
+                "Atlas does not have an exclusive factory, two firepoints, or a stage reward-pool offer.");
+        }
+    }),
+    ("Foundry Counterweight targets player Atlas Health without Heat or meta scaling", () =>
+    {
+        ContentRelicDefinition relic = nativeSample.relics.Single(
+            candidate => candidate.id == "sample-native:foundry-counterweight");
+        ContentCardChangeDefinition change = relic.cardChanges.Single();
+        if (relic.rarity != "Rare" || change.valueToChange != "Health" || change.operation != "Multiply" ||
+            Math.Abs(change.value - 1.10f) > 0.0001f || change.side != "False" ||
+            change.multiplyValueWithCurrentHeatLevel ||
+            !String.IsNullOrEmpty(change.multiplyValueWithMetaProgressionMultiplier) ||
+            change.onlyForTheseEntityIds == null || change.onlyForTheseEntityIds.Length != 1 ||
+            change.onlyForTheseEntityIds[0] != "sample-native:atlas-crane-mech")
+        {
+            throw new InvalidOperationException("The foundry relic no longer matches its player-only Atlas Health contract.");
+        }
+    }),
+    ("relic validation rejects unsupported stat attributes", () =>
+    {
+        ContentPackDefinition invalid = Clone(nativeSample);
+        invalid.relics[0].cardChanges[0].valueToChange = "Damage";
+        WithPackage(invalid, (pack, root) => ExpectDiagnostic(pack, root, new EmptySnapshot(),
+            new KnownModuleValidator(), "relic.change-value-unsupported"));
+    }),
+    ("relic validation rejects unbudgeted Heat scaling", () =>
+    {
+        ContentPackDefinition invalid = Clone(nativeSample);
+        invalid.relics[0].cardChanges[0].multiplyValueWithCurrentHeatLevel = true;
+        WithPackage(invalid, (pack, root) => ExpectDiagnostic(pack, root, new EmptySnapshot(),
+            new KnownModuleValidator(), "relic.heat-scaling-unsupported"));
     }),
     ("training stage declares a deterministic, localized native landscape variant", () =>
     {
@@ -1130,10 +1428,15 @@ var tests = new (string Name, Action Run)[]
         var expectedUnlockLevels = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["sample-native:scout-tank"] = "0",
-            ["sample-native:skirmish-bike"] = "1",
-            ["sample-native:assault-walker"] = "2",
-            ["sample-native:surge-tank"] = "3",
-            ["sample-native:heavy-artillery"] = "4"
+            ["sample-native:skirmish-bike"] = "0",
+            ["sample-native:assault-walker"] = "0",
+            ["sample-native:surge-tank"] = "0",
+            ["sample-native:heavy-artillery"] = "0"
+        };
+        var expectedFactoryCardImages = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["sample-native:heavy-artillery"] = "assets/roguecommandexpansionsample/colossussiegecard.png",
+            ["sample-native:assault-walker"] = "assets/roguecommandexpansionsample/ironcladwalkercard.png"
         };
         string[] requiredCardStats =
         [
@@ -1172,6 +1475,38 @@ var tests = new (string Name, Action Run)[]
             {
                 throw new InvalidOperationException(
                     $"Card {unit.id} does not mirror its level {expected.Value} unlock and rarity on its factory.");
+            }
+
+            if (expectedFactoryCardImages.TryGetValue(unit.id, out string? expectedFactoryCard) &&
+                (unit.productionBuilding.assetBundleId != nativeSample.assetBundles[0].id ||
+                 unit.productionBuilding.cardImageAssetName != expectedFactoryCard))
+            {
+                throw new InvalidOperationException($"Factory {unit.productionBuilding.id} is missing its independent reward-card Sprite mapping.");
+            }
+        }
+
+        var expectedRosterUnlockLevels = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["sample-native:scout-tank"] = "0",
+            ["sample-native:heavy-artillery"] = "0",
+            ["sample-native:assault-walker"] = "0",
+            ["sample-native:atlas-crane-mech"] = "0",
+            ["sample-native:bastion-siege-mech"] = "0",
+            ["sample-native:arachnid-hexapod"] = "0",
+            ["sample-native:overlord-command-hq"] = "0",
+            ["sample-native:skirmish-bike"] = "0",
+            ["sample-native:surge-tank"] = "0"
+        };
+        foreach (ContentUnitDefinition unit in nativeSample.units)
+        {
+            string productLevel = unit.balanceOverrides.Single(entry => entry.name == "neededExperienceLevel").value;
+            string buildingLevel = unit.productionBuilding.balanceOverrides
+                .Single(entry => entry.name == "neededExperienceLevel").value;
+            if (!expectedRosterUnlockLevels.TryGetValue(unit.id, out string? expectedLevel) ||
+                productLevel != expectedLevel || buildingLevel != expectedLevel)
+            {
+                throw new InvalidOperationException(
+                    $"Card {unit.id} and its factory must retain their expected matching profile unlock level.");
             }
         }
 
@@ -1598,6 +1933,39 @@ var tests = new (string Name, Action Run)[]
             pack.units[0].nativeTemplateId = "PCXBaseTank";
             ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
                 "unit.source-conflict");
+        });
+    }),
+    ("unit upgrade requires a known target unit", () =>
+    {
+        WithPackage(sample, (pack, root) =>
+        {
+            pack.units[0].upgrades =
+            [
+                new ContentUnitUpgradeDefinition { targetUnitId = "sample:unknown-unit", requiredExperienceLevel = 1, cost = 10 }
+            ];
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "unit-upgrade.target-unknown");
+        });
+    }),
+    ("unit upgrade rejects negative cost", () =>
+    {
+        WithPackage(sample, (pack, root) =>
+        {
+            pack.units[0].upgrades =
+            [
+                new ContentUnitUpgradeDefinition { targetUnitId = pack.units[0].id, requiredExperienceLevel = 1, cost = -5 }
+            ];
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "unit-upgrade.cost-invalid");
+        });
+    }),
+    ("unit experience rejects invalid max level", () =>
+    {
+        WithPackage(sample, (pack, root) =>
+        {
+            pack.units[0].experience = new ContentUnitExperienceDefinition { experiencePerLevel = 100, maxLevel = 200, experienceGainMultiplier = 1, levelUpBonus = 5 };
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "unit-experience.max-level-invalid");
         });
     }),
     ("native-template unit rejects non-allowlisted or negative stat overrides", () =>
@@ -3291,7 +3659,38 @@ var tests = new (string Name, Action Run)[]
             EntityBalancingStore.Reset();
         }
     }),
-    ("five new production pairs append without replacing the native factory mapping", () =>
+    ("runtime entity registration invalidates cached image misses for new unit and factory IDs", () =>
+    {
+        EntityBalancingStore.Reset();
+        try
+        {
+            EntityBalancingStore.ImageOf.Add("sample:product", null!);
+            var cachedFactorySprite = new UnityEngine.Sprite();
+            EntityBalancingStore.ImageOf.Add("sample:factory", cachedFactorySprite);
+            var provider = new RuntimeMutatorTestProvider();
+            provider.EntityRows.Add(RuntimeMutatorTestData.Row("sample:product"));
+            provider.EntityRows.Add(RuntimeMutatorTestData.Row("sample:factory", "sample:product"));
+            var mutator = new RuntimeContentMutator(typeof(EntityBalancingStore).Assembly, provider, null);
+
+            bool registered = mutator.RegisterEntityRows();
+            if (!registered || EntityBalancingStore.ImageOf.ContainsKey("sample:product") ||
+                !EntityBalancingStore.ImageOf.ContainsKey("sample:factory") ||
+                !ReferenceEquals(EntityBalancingStore.ImageOf["sample:factory"], cachedFactorySprite))
+            {
+                throw new InvalidOperationException("Entity registration cache state mismatch. registered=" + registered +
+                    ", imageCount=" + EntityBalancingStore.ImageOf.Count +
+                    ", product=" + EntityBalancingStore.ImageOf.ContainsKey("sample:product") +
+                    ", factory=" + EntityBalancingStore.ImageOf.ContainsKey("sample:factory") +
+                    ", sameSprite=" + (EntityBalancingStore.ImageOf.ContainsKey("sample:factory") &&
+                        ReferenceEquals(EntityBalancingStore.ImageOf["sample:factory"], cachedFactorySprite)));
+            }
+        }
+        finally
+        {
+            EntityBalancingStore.Reset();
+        }
+    }),
+    ("all native sample production pairs append without replacing the native factory mapping", () =>
     {
         EntityBalancingStore.Reset();
         try
@@ -3316,11 +3715,22 @@ var tests = new (string Name, Action Run)[]
                 provider.EntityRows.Add(RuntimeMutatorTestData.Row(unit.productionBuilding.id, unit.id));
             }
             var mutator = new RuntimeContentMutator(typeof(EntityBalancingStore).Assembly, provider, null);
-            if (!mutator.RegisterEntityRows() || !mutator.RegisterEntityRows() ||
-                EntityBalancingStore.EntityBalancingParametersList.Count != 12 ||
-                EntityBalancingStore.FactoryEntityIdOf.Count != 6 ||
+            bool firstRegistration = mutator.RegisterEntityRows();
+            bool secondRegistration = mutator.RegisterEntityRows();
+            int expectedRowCount = originals.Length + 2 * nativeSample.units.Length;
+            int expectedFactoryCount = 1 + nativeSample.units.Length;
+            if (!firstRegistration || !secondRegistration ||
+                EntityBalancingStore.EntityBalancingParametersList.Count != expectedRowCount ||
+                EntityBalancingStore.FactoryEntityIdOf.Count != expectedFactoryCount ||
                 EntityBalancingStore.FactoryEntityIdOf["NativeUnit"] != "NativeFactory")
-                throw new InvalidOperationException("New production pairs replaced native state or registered twice.");
+            {
+                throw new InvalidOperationException(
+                    "Production registration state was inconsistent. first=" + firstRegistration +
+                    ", second=" + secondRegistration +
+                    ", rows=" + EntityBalancingStore.EntityBalancingParametersList.Count + "/" + expectedRowCount +
+                    ", factories=" + EntityBalancingStore.FactoryEntityIdOf.Count + "/" + expectedFactoryCount +
+                    ", nativeFactory=" + EntityBalancingStore.FactoryEntityIdOf["NativeUnit"] + ".");
+            }
             foreach (ContentUnitDefinition unit in nativeSample.units)
                 if (EntityBalancingStore.FactoryEntityIdOf[unit.id] != unit.productionBuilding.id)
                     throw new InvalidOperationException("A new production building points at the wrong product.");
@@ -3626,12 +4036,16 @@ var tests = new (string Name, Action Run)[]
             pack.units[0].balanceOverrides =
             [
                 new ContentBalanceOverride { name = "rarity", value = "Rare" },
-                new ContentBalanceOverride { name = "neededExperienceLevel", value = "0" }
+                new ContentBalanceOverride { name = "neededExperienceLevel", value = "0" },
+                new ContentBalanceOverride { name = "roles", value = "Unit, Vehicle, Scout" },
+                new ContentBalanceOverride { name = "offeredSystemTags", value = "Vehicle, Turbo" }
             ];
             pack.units[0].productionBuilding.balanceOverrides =
             [
                 new ContentBalanceOverride { name = "rarity", value = "Rare" },
-                new ContentBalanceOverride { name = "neededExperienceLevel", value = "0" }
+                new ContentBalanceOverride { name = "neededExperienceLevel", value = "0" },
+                new ContentBalanceOverride { name = "roles", value = "Building, Factory" },
+                new ContentBalanceOverride { name = "offeredSystemTags", value = "None" }
             ];
             ExpectValid(pack, root, new EmptySnapshot(), new KnownModuleValidator());
 
@@ -3640,6 +4054,130 @@ var tests = new (string Name, Action Run)[]
                 new ContentBalanceOverride { name = "rarity", value = "Mythic" },
                 new ContentBalanceOverride { name = "neededExperienceLevel", value = "0" }
             ];
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "unit.balance-override-invalid");
+        });
+    }),
+    ("balance overrides accept themed blueprint role and system-tag combinations", () =>
+    {
+        WithPackage(nativeSample, (pack, root) =>
+        {
+            pack.units[0].balanceOverrides = pack.units[0].balanceOverrides
+                .Where(entry => entry.name != "roles" && entry.name != "offeredSystemTags")
+                .Concat(new[]
+                {
+                    new ContentBalanceOverride { name = "roles", value = "Unit, Mech, Melee" },
+                    new ContentBalanceOverride { name = "offeredSystemTags", value = "Armor, Mech" }
+                })
+                .ToArray();
+            ExpectValid(pack, root, new EmptySnapshot(), new KnownModuleValidator());
+        });
+    }),
+    ("native blueprint role and tag flags combine and reject special duplicates", () =>
+    {
+        if (!BalanceOverrideFlags.TryParse("roles", "Unit, Mech, Melee", true, false,
+                out HashSet<string> roles, out string diagnostic) || diagnostic != null ||
+            !roles.SetEquals(new[] { "Unit", "Mech", "Melee" }) ||
+            !BalanceOverrideFlags.TryParse("offeredSystemTags", "Armor, Mech", true, false,
+                out HashSet<string> tags, out diagnostic) || diagnostic != null ||
+            !tags.SetEquals(new[] { "Armor", "Mech" }))
+        {
+            throw new InvalidOperationException("Valid native role/tag combinations did not parse as independent flags.");
+        }
+
+        string[] invalidValues = { "Unit,,Mech", "Unit, Unit", "UnknownRole", "Unit, All", "None, Armor" };
+        foreach (string invalid in invalidValues)
+        {
+            if (BalanceOverrideFlags.TryParse("roles", invalid, true, false, out _, out diagnostic) || diagnostic == null)
+            {
+                throw new InvalidOperationException("Invalid product roles were accepted: " + invalid);
+            }
+        }
+
+        if (!BalanceOverrideFlags.TryParse("roles", "Building, Factory", false, true, out _, out diagnostic) ||
+            diagnostic != null ||
+            BalanceOverrideFlags.TryParse("roles", "Building", false, true, out _, out diagnostic) ||
+            diagnostic == null)
+        {
+            throw new InvalidOperationException("Factory role constraints were not distinguished between products and buildings.");
+        }
+    }),
+    ("native blueprint flags map to the pinned game enum values", () =>
+    {
+        if (!BalanceOverrideFlags.TryCreateEnumValue(typeof(UnitRole), "roles", "Unit, Mech, Melee",
+                true, false, out object roleValue, out string diagnostic) || diagnostic != null ||
+            (UnitRole)roleValue != (UnitRole.Unit | UnitRole.Mech | UnitRole.Melee) ||
+            !BalanceOverrideFlags.TryCreateEnumValue(typeof(SystemTags), "offeredSystemTags", "Armor, Mech",
+                true, false, out object tagValue, out diagnostic) || diagnostic != null ||
+            (SystemTags)tagValue != (SystemTags.Armor | SystemTags.Mech) ||
+            BalanceOverrideFlags.TryCreateEnumValue(typeof(UnitRole), "roles", "Unit, NotAFlag",
+                true, false, out _, out diagnostic) || diagnostic == null)
+        {
+            throw new InvalidOperationException("Native role/tag values were not converted or invalid flags did not fail closed.");
+        }
+    }),
+    ("native blueprint flags apply to detached balance row instances", () =>
+    {
+        FieldInfo rolesField = typeof(EntityBalancingParameters).GetField("roles")!;
+        FieldInfo tagsField = typeof(EntityBalancingParameters).GetField("offeredSystemTags")!;
+        EntityBalancingParameters product = RuntimeMutatorTestData.Row("sample:product");
+        EntityBalancingParameters factory = RuntimeMutatorTestData.Row("sample:factory", "sample:product");
+        if (!BalanceOverrideFlags.TryApply(product, rolesField, "roles", "Unit, Mech, Melee",
+                true, false, out object updatedProduct, out string diagnostic) || diagnostic != null ||
+            !(updatedProduct is EntityBalancingParameters) ||
+            ((EntityBalancingParameters)updatedProduct).roles != (UnitRole.Unit | UnitRole.Mech | UnitRole.Melee) ||
+            !BalanceOverrideFlags.TryApply(product, tagsField, "offeredSystemTags", "Armor, Mech",
+                true, false, out updatedProduct, out diagnostic) || diagnostic != null ||
+            !(updatedProduct is EntityBalancingParameters) ||
+            !BalanceOverrideFlags.TryApply(factory, rolesField, "roles", "Building, Factory",
+                false, true, out object updatedFactory, out diagnostic) || diagnostic != null ||
+            !(updatedFactory is EntityBalancingParameters) ||
+            ((EntityBalancingParameters)updatedFactory).roles != (UnitRole.Building | UnitRole.Factory) ||
+            BalanceOverrideFlags.TryApply(product, rolesField, "roles", "Unit, Factory",
+                true, false, out _, out diagnostic) || diagnostic == null)
+        {
+            throw new InvalidOperationException("Native balance row flags were not applied or invalid product roles were admitted.");
+        }
+    }),
+    ("production building role overrides preserve native factory classification", () =>
+    {
+        if (!BalanceOverrideFlags.TryParse("roles", "Building, Factory", false, true,
+                out HashSet<string> roles, out string diagnostic) || diagnostic != null ||
+            !roles.SetEquals(new[] { "Building", "Factory" }) ||
+            BalanceOverrideFlags.TryParse("roles", "Building", false, true, out _, out diagnostic) ||
+            diagnostic == null ||
+            BalanceOverrideFlags.TryParse("roles", "Unit, Mech", false, false, out _, out diagnostic) ||
+            diagnostic == null)
+        {
+            throw new InvalidOperationException("Factory role overrides must retain both native factory flags and use the factory-row context.");
+        }
+    }),
+    ("balance overrides reject unknown and factory role flags on a unit product", () =>
+    {
+        WithPackage(nativeSample, (pack, root) =>
+        {
+            pack.units[0].balanceOverrides = pack.units[0].balanceOverrides
+                .Where(entry => entry.name != "roles")
+                .Append(new ContentBalanceOverride { name = "roles", value = "Unit, Factory" })
+                .ToArray();
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "unit.balance-override-invalid");
+        });
+        WithPackage(nativeSample, (pack, root) =>
+        {
+            pack.units[0].balanceOverrides = pack.units[0].balanceOverrides
+                .Where(entry => entry.name != "roles")
+                .Append(new ContentBalanceOverride { name = "roles", value = "Unit, All" })
+                .ToArray();
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "unit.balance-override-invalid");
+        });
+        WithPackage(nativeSample, (pack, root) =>
+        {
+            pack.units[0].balanceOverrides = pack.units[0].balanceOverrides
+                .Where(entry => entry.name != "offeredSystemTags")
+                .Append(new ContentBalanceOverride { name = "offeredSystemTags", value = "Armor, NotAGameTag" })
+                .ToArray();
             ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
                 "unit.balance-override-invalid");
         });

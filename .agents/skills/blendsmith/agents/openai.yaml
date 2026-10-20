@@ -1,0 +1,4 @@
+interface:
+  display_name: "Blendsmith for Rogue Command"
+  short_description: "Reference-led Blender assets with Rogue Command contracts"
+  default_prompt: "Use $blendsmith to review a Rogue Command model's references, UVs, PBR maps, and editable handoff."

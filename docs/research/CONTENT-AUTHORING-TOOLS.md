@@ -1,6 +1,6 @@
 # Herramientas para crear contenido de Rogue Command
 
-**Revisado:** 2026-10-17
+**Revisado:** 2026-10-18
 
 **Objetivo:** producir unidades, etapas/mapas y AI originales para el mod Rogue Evolution. El loader se mantiene como infraestructura necesaria.
 
@@ -97,6 +97,30 @@ Para producir una unidad: diseñar y conservar el `.blend`, exportar FBX al proy
 
 Para una referencia gráfica se puede usar `imagegen` durante la conversación o `anthropic-skills:algorithmic-art` para arte procedural 2D. Esos recursos generan imágenes o gráficos; no producen un FBX listo para cargar, no sustituyen la autoría en Blender y sus imágenes no deben copiarse a un pack como si ya fueran un modelo integrado.
 
+## Generación de texturas PBR (2026-10-19)
+
+El flujo de producción continúa con el horneado determinista de Blender 4.5.14: Albedo, MetallicGloss, Normal y Emission. Se implementaron skills locales para ArmorPaint y Material Maker, una adaptación licenciada de `blendsmith` y una adaptación selectiva de las guías PBR/baking de EL4CTEO para Blender 4.5.14. Las skills centrales `rogue-command-pbr-texture-authoring` y `rogue-command-pbr-texture-validation`, más [PBR-TEXTURE-WORKFLOW.md](PBR-TEXTURE-WORKFLOW.md), siguen definiendo el traspaso a Unity.
+
+| Opción | Capacidad y compatibilidad revisadas | Decisión para Rogue Evolution |
+|---|---|---|
+| [ArmorPaint](https://armorpaint.org/manual) | Importa `.fbx` y `.blend`, permite pintar materiales PBR y exportar presets genéricos o personalizados con swizzle. El preset Unity empaqueta Metallic/Occlusion/Smoothness, por lo que no equivale al layout del shader local. Sus nodos neuronales son opcionales y procesan localmente cuando sus modelos están disponibles. | Skill local [rogue-command-armorpaint-texture-authoring](../../.agents/skills/rogue-command-armorpaint-texture-authoring/SKILL.md). La aplicación no está staged: requiere un ZIP oficial al que el usuario tenga acceso y no se recibió uno en esta tarea. La skill prescribe mapas de imagen solamente, con Metallic en R/G/B y Smoothness (`1 - roughness`) en A. |
+| [Material Maker 1.7](https://github.com/RodZill4/material-maker/releases/tag/1.7) | Editor open-source de grafos PBR y pintura 3D. Los proyectos de pintura admiten OBJ/GLB/GLTF/FBX con UV y una sola submalla. La release de Windows pesa 109,821,136 bytes y su SHA-256 es `DEB4416BC939861D48097A866A8B2BF0363C29FF64874F2E04478658FF900808`; el ZIP local presenta el mismo hash. | Skill local [rogue-command-material-maker-texture-authoring](../../.agents/skills/rogue-command-material-maker-texture-authoring/SKILL.md). La app ya está preparada en `.tools/MaterialMaker-1.7/`. Usarla para grafos procedurales o copias compatibles, exportando PNGs únicamente; no usar el `.mat` exportado para el shader del proyecto. |
+| [blendsmith](https://github.com/brianchenanimator/blendsmith) | Skill para agentes con UV, PBR, baking y entrega editable; la versión revisada es `2026.09.011`, baseline Blender 4.4 y licencia GPL-3.0-only. | Adaptación local activa en `.agents/skills/blendsmith/`. Se conserva el snapshot upstream, referencias, plantillas, licencia y notice bajo GPL. La entrada activa fija Blender 4.5.14, mapas de Rogue Command, vertex wear RGBA, sockets, contratos de Unity y el flujo de usuario del repositorio. |
+| [EL4CTEO/blender-skills](https://github.com/EL4CTEO/blender-skills) | Incluye `blender-pbr-materials` y `blender-texture-baking`; el repositorio y sus scripts están dirigidos a Blender 5.2+. Los ejemplos usan ORM y separan roughness/metallic. | Adaptación selectiva en `.agents/skills/rogue-command-blender-pbr-45/`. El sondeo local de Blender 4.5.14 confirmó `Emission Color`, `Emission Strength` y `Specular IOR Level`, pero no `Thin Wall`. No se copian ni ejecutan los scripts 5.2; se conservan prácticas compatibles y el generador determinista `--bake-atlas` como ruta de producción. |
+| [Adobe Substance 3D Sampler](https://experienceleague.adobe.com/en/docs/substance-3d-sampler/using/features-and-workflows/generative-workflows) | Text-to-Texture e Image-to-Texture están descritos como flujos generativos en beta, con Text-to-Texture impulsado por Firefly. La página oficial de beta advierte que las betas no siempre están disponibles y documenta el procesamiento vía servicio. | Referencia opcional para ideación. No convertirlo en un requisito del flujo local reproducible. |
+
+### Contrato para una etapa opcional de pintura
+
+El procedimiento completo y los criterios de aceptación están en [PBR-TEXTURE-WORKFLOW.md](PBR-TEXTURE-WORKFLOW.md). Las skills específicas encaminan cada herramienta a la autoría de mapas; la skill central de validación inspecciona los PNG, importadores de Unity, shader y vertex colors.
+
+- Importar a ArmorPaint o Material Maker solo después de cerrar las UV. Material Maker requiere una sola submalla para el proyecto de pintura; si el FBX de producción no cumple esa forma, usar grafos procedurales o una copia temporal para textura y no exportar esa malla a Unity. Volver a generar el FBX de producción desde el `.blend` original para preservar sockets y jerarquía. Después de importar en Unity, verificar que el mesh conserve el atributo de vertex colors; las herramientas externas solo deben aportar imágenes.
+- Conservar `<Name>_Albedo.png`, `<Name>_MetallicGloss.png`, `<Name>_Normal.png` y `<Name>_Emission.png`. En MetallicGloss, Metallic va en R y Smoothness en A; configurar Unity con `sRGBTexture = false` y `TextureImporterAlphaSource.FromInput`. Albedo y Emission son sRGB; Normal debe importarse como `TextureImporterType.NormalMap`.
+- Mantener sin cambios los cuatro canales de vertex wear: R cavity AO, G edge wear, B thermal soot y A team mask. No sustituir esos datos por mapas AO/roughness de una herramienta externa.
+- El `VehiclePrefabBuilder` aplica los ajustes de importación al reconstruir. Verificar la configuración efectiva y la textura después de la reimportación de Unity; el archivo `.meta` por sí solo no acredita el estado final ni la calidad del mapa comprimido.
+- Revisar padding, costuras y color en una copia de prueba. Reconstruir el prefab con el shader `RogueCommand/VehiclePBR_VertexWear` dentro de Unity 2021.3.45f2. Esto valida el pipeline local; solo una partida iniciada por Steam permite afirmar que el aspecto quedó validado en el juego.
+
+Para preparar Material Maker 1.7 con comprobación de hash y extracción segura, ejecutar `tools/Setup-TextureAuthoringTools.ps1 -MaterialMaker`. Para ArmorPaint, pasar al mismo script un ZIP oficial al que el usuario tenga acceso: `-ArmorPaintArchivePath "<ruta-al-zip>"`. El script solo guarda las aplicaciones bajo `.tools/` y no las inicia.
+
 ## Fuentes
 
 - [BepInEx: documentación oficial y soporte Unity Mono/Harmony](https://docs.bepinex.dev/)
@@ -130,6 +154,18 @@ Para una referencia gráfica se puede usar `imagegen` durante la conversación o
 - [Unity Technologies: skills para workflows Unity](https://github.com/Unity-Technologies/skills)
 - [Skill oficial `unity-cli`](https://github.com/Unity-Technologies/skills/blob/main/skills/unity-cli/SKILL.md)
 - [Create 3D Model for Codex: skill de Blender evaluada](https://github.com/CheshireJCat/create-3d-model-skill)
+- [ArmorPaint: manual de importación, nodos neuronales, presets Unity y exportación](https://armorpaint.org/manual)
+- [ArmorPaint: descargas oficiales y acceso al binario portable](https://armorpaint.org/download)
+- [Material Maker: herramienta procedural PBR y documentación](https://materialmaker.org/)
+- [Material Maker 1.7: release de Windows y hashes publicados](https://github.com/RodZill4/material-maker/releases/tag/1.7)
+- [Material Maker: requisitos para pintar modelos 3D](https://rodzill4.github.io/material-maker/doc/user_interface_paint_panel.html)
+- [Material Maker: exportación de texturas y materiales Unity](https://rodzill4.github.io/material-maker/doc/export.html)
+- [blendsmith: skill de Blender para UV, PBR y baking](https://github.com/brianchenanimator/blendsmith)
+- [EL4CTEO/blender-skills: skills de Blender 5.2+ para agentes](https://github.com/EL4CTEO/blender-skills)
+- [blendsmith snapshot revisado](https://github.com/brianchenanimator/blendsmith/tree/b46f037aa8c9596fc40c2eafb2c782ed9c0d63ac)
+- [EL4CTEO snapshot revisado](https://github.com/EL4CTEO/blender-skills/tree/71d031dab8bc6729504d11a78cbe91945401045f)
+- [Adobe Substance 3D Sampler: documentación de flujos generativos](https://experienceleague.adobe.com/en/docs/substance-3d-sampler/using/features-and-workflows/generative-workflows)
+- [Adobe Substance 3D Sampler: notas oficiales de beta](https://experienceleague.adobe.com/en/docs/substance-3d-sampler/using/release-notes/beta-version)
 - [Unity Technologies: Asset Bundle Browser](https://github.com/Unity-Technologies/AssetBundles-Browser)
 - [UABEA: lector/editor de AssetBundles y archivos serializados](https://github.com/nesrak1/UABEA)
 - [Unity 2021.3: API `AssetBundle.LoadAsset`](https://docs.unity3d.com/2021.3/Documentation/ScriptReference/AssetBundle.LoadAsset.html)

@@ -4,7 +4,9 @@
 
 ## Shape
 
-- The native-unit sample overlays five models on cloned native units: Sandlance on `PCXBaseTank/Vehicle`, Skirmish Strike Bike on `BombBike/GameObject/BombBike`, Colossus on `ArtilleryTank/Tank`, Ironclad on `GatlingWalker/RoboMarine_Mesh`, and Surge on `LightningTank/PCX TankHolder`. These paths were inspected in the pinned game's serialized assets. Each path is relative to the native prefab root; the template name shown here is not part of `visualRootPath`. All five retain native controllers and combat behavior. Verify model spacing, animation compatibility, and rendering in a live match.
+- `roles` balance overrides set comma-separated native `UnitRole` flags; `offeredSystemTags` set comma-separated native `SystemTags` flags. They enable native themed reward filters and role/tag-driven hacks or upgrades, while excluding product `Factory`/`All` and preserving both factory roles on production buildings.
+
+- The native-unit sample overlays four models on cloned native units: Sandlance on `PCXBaseTank/Vehicle`, Skirmish Strike Bike on `BombBike/GameObject/BombBike`, Colossus on `ArtilleryTank/Tank`, and Surge on `LightningTank/PCX TankHolder`. Ironclad Walker currently keeps its native `GatlingWalker` visual because its custom static prototype has no walker rig. Overlay paths were inspected in the pinned game's serialized assets and are relative to the native prefab root. All five retain native controllers and combat behavior. Verify model spacing, animation compatibility, and rendering in a live match.
 
 Run `.venv\Scripts\python.exe tools/validate_native_visual_roots.py content/packs/sample-native-expansion` before installing a native overlay pack. The tool checks the game's version, assembly SHA-256, MVID, and `resources.assets` SHA-256, then resolves every path through unique direct children and requires a Renderer below the target. It selects a uniquely named scripted GameObject in that serialized file and rejects ambiguous candidates; runtime resource selection still requires a Steam test. Install its pinned Python dependencies from `requirements.txt`.
 
@@ -24,6 +26,8 @@ Run `.venv\Scripts\python.exe tools/validate_native_visual_roots.py content/pack
 `sample:siege-assault` accepts `baseIndex` (integer 0–31), `cooldownSeconds` (finite 10–300 seconds; default 30), `minSquadSize` (integer 1–12; default 4), `targetPriority` (`ClosestBuilding`, `Refinery`, `Hq`; default `ClosestBuilding`), and `minGameTimeSeconds` (finite 0–600 seconds; default 30). It scans known player buildings (`PlayerBuildingsKnownToAi`, `PlayerRefineries`, or `EngineeringHq`), gathers combat units from the specified AI base, and dispatches coordinated assault strike waves to dismantle player fortifications.
 - Include empty arrays when a section has no entries. The validator reports package-local diagnostics and does not mutate the registry.
 
+Production-building visuals may also specify `assetBundleId` and `cardImageAssetName`. `assetBundleId` is required when either visual field or `cardImageAssetName` is set; that Sprite address supplies the factory's reward-card image. `visualAssetName` plus `visualRootPath` remain optional, paired overlay fields. A shared building bundle can provide both.
+
 ## AI unit entries
 
 An AI profile may optionally declare `unitEntries` to append namespaced units to one `AiBase` in an isolated, stage-scoped native profile. Each entry selects the `aiBases` index, the starting ascension level, the number of units spawned at base setup, and the native `maxLiving` value. The referenced unit must be declared by this pack or another loaded/declared pack; the loader resolves that dependency before loading the profile. Custom AI prefabs and unscoped templates cannot use `unitEntries`, so the native AI template remains unchanged. `unitEntries` may be omitted when unused; sample manifests include an empty array for clarity.
@@ -39,6 +43,12 @@ Static REA inspection of the pinned 1.0.9 assembly found that `AiBehaviour.Build
 Units may declare `localizations` entries with a game's language ID, a visible `name`, and optional `description` and `skillDescription`. Custom-prefab units must provide an `en-US` name; native-template units may omit localizations and inherit the native template's name and description. If the active language has no pack translation, the loader falls back to `en-US`; additional supported game languages are `de-DE`, `ja-JP`, `ko-KR`, `zh-CN`, `zh-TW`, `fr-FR`, `es-XL`, `pt-BR`, and `ru-RU`. Duplicate or unsupported language IDs disable the package. The loader intercepts `Loca.BlueprintName`, `Loca.BlueprintDescription`, and `Loca.SkillDescription` for registered mod-unit IDs, so namespaced IDs resolve without editing the game's localization resources.
 
 Landscape `localizations` use the same supported language IDs and require an `en-US` name. The loader intercepts `Loca.Global` only for generated landscape localization keys; all other game localization calls continue through the original method.
+
+## Pack-authored relics
+
+A pack may declare `relics` to add passive relic entries to the native relic balance store. Each relic uses a namespaced `id`, an `assetBundleId`, an `imageAssetName` that resolves to a Sprite in that bundle, native rarity/tech/system-tag enum values, an experience-level threshold, demo/specialist eligibility flags, and localized names and descriptions. Provide an `en-US` localization; other supported languages such as `es-XL` are optional.
+
+Each `cardChanges` entry uses the pack's `valueToChange`, `operation`, `value`, and `side` fields and must whitelist one or more namespaced unit IDs in `onlyForTheseEntityIds`. The current pack contract supports `Health` changes; the loader maps `Health` to Rogue Command's native `ChangeableValue.MaxHealth` enum member when it constructs a `CardChangeScriptableObject`. `side: "False"` targets player units, `"True"` targets enemy/AI units, and `"Irrelevant"` applies globally. Pack-authored relic changes must set `multiplyValueWithCurrentHeatLevel` to `false`; Heat scaling is rejected until the per-level balance budget is validated. Leave `multiplyValueWithMetaProgressionMultiplier` absent when the change should not scale with meta progression. Relic images are loaded as typed Sprites from the declared bundle, and localized names/descriptions use the active language with an `en-US` fallback.
 
 ## Example
 
@@ -134,6 +144,8 @@ Landscape `localizations` use the same supported language IDs and require an `en
 }
 ```
 
+`productionBuilding` can optionally replace the native factory's mesh with a visual-only prefab by declaring `assetBundleId`, `visualAssetName`, and `visualRootPath` together. The bundle ID must name an `assetBundles` entry; the asset reference must resolve to a script-free GameObject prefab with an enabled Renderer; and the path must identify exactly one subtree in the cloned native factory. The loader hides only `MeshRenderer` and `SkinnedMeshRenderer` components in that subtree, then attaches the authored visual at its origin, so native factory roles, particles, lights, and other components remain. Choose a subtree that contains only the intended factory geometry: mesh renderers such as native build indicators inside the selected subtree are hidden too.
+
 ## Profile-level card unlocks
 
 `neededExperienceLevel` on a unit is the minimum persistent profile experience level required before its card can enter reward candidates. The game adds persistent profile experience when the run ends: losing a run awards experience from previously won encounters and minibosses, while a full victory also adds the run-win bonus. Clearing an intermediate stage advances the run but does not immediately change persistent profile experience. The profile level is not the current stage index, map node, or run progression counter. The package validator requires the unit and its `productionBuilding` to each declare the same `neededExperienceLevel` and `rarity`; some reward paths inspect the factory row, while stage pools validate the associated product row.
@@ -144,4 +156,4 @@ Every added product should explicitly set its card-facing balance values instead
 
 ## Initial blueprint eligibility in stage pools
 
-The game marks the first card offer while `Game.AtLeastOneBlueprintHasBeenAddedByPlayer` is false. The no-pool candidate path already applies the start-only filter. The loader also applies `isAllowedAsStartingBlueprint` to its custom production-building candidates when the first offer comes from a cloned stage pool. Later offers retain the normal stage-pool rules. Native pool candidates continue through the game's filter.
+The game marks the first card offer while `Game.AtLeastOneBlueprintHasBeenAddedByPlayer` is false. The no-pool candidate path already applies the start-only filter. A product with `isAllowedAsStartingBlueprint: true` may enter the first offer at native stage index 0, even though pack stages are appended later; the loader allows its factory through the current native pool's original filter without changing or replacing the native stage or pool. The loader also applies this flag to custom production-building candidates when the first offer comes from a cloned stage pool. The field is independent of `neededExperienceLevel`, which controls persistent profile XP. Later offers retain the normal stage-pool rules. Native pool candidates continue through the game's filter.

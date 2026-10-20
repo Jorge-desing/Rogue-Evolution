@@ -1,0 +1,38 @@
+---
+name: rogue-command-blender-pbr-45
+description: "Use Blender 4.5.14 for Rogue Command PBR material and bake work adapted from selected EL4CTEO Blender skill workflows without their Blender 5.2 scripts or incompatible ORM output."
+metadata:
+  upstream: "EL4CTEO/blender-skills"
+  upstream_commit: "71d031dab8bc6729504d11a78cbe91945401045f"
+---
+
+# Rogue Command Blender PBR Authoring — 4.5.14
+
+This is a selective, project-local adaptation of the PBR material and texture-baking workflows in [EL4CTEO/blender-skills](https://github.com/EL4CTEO/blender-skills/tree/71d031dab8bc6729504d11a78cbe91945401045f). The upstream repository targets Blender 5.2+. Its scripts are not installed or used here. The local adaptation retains useful checks for color spaces, bake projection, margins, and tangent basis while using the pinned Blender 4.5.14 generator and Rogue Command map contract.
+
+Read [Rogue Command PBR Texture Authoring](../rogue-command-pbr-texture-authoring/SKILL.md) before producing maps and [Rogue Command PBR Texture Validation](../rogue-command-pbr-texture-validation/SKILL.md) before Unity import acceptance. This skill does not change the generator CLI or shader.
+
+## Blender 4.5.14 compatibility
+
+- Check the actual Blender binary/version before writing `bpy` code. Inspect node sockets and operator enums by their current RNA API; do not assume the upstream 5.2 socket list or property names.
+- A read-only probe of this repository's Blender 4.5.14 build found `Emission Color`, `Emission Strength`, and `Specular IOR Level` on Principled BSDF, but no `Thin Wall` input. Do not read or set the 5.2 `Thin Wall` socket in 4.5.14. For any other version-sensitive socket, query the current node input collection before use.
+- The upstream Principled-material script and baking script were not ported. Their generic filenames, optional API behavior, image routing, and ORM packing do not constitute a verified replacement for the local generator.
+- The existing deterministic `--bake-atlas` route remains the production path. Read the generator's current `--help` output before using switches; keep intermediates in `artifacts/` and do not add CLI behavior unless separately requested.
+
+## Adapted material and bake checks
+
+1. Finalize the target UVs, scale, smoothing, custom normals, evaluated modifiers, and triangulation before a tangent-space bake. Use the same shading basis on the exported mesh and bake target.
+2. Check cage/extrusion and projection distances on a copy when there are thin plates, concave corners, or nearby parts. Isolate high/low pairs or bake them separately when a nearby piece can contaminate the projection.
+3. Check island padding at the output resolution and inspect seams after the bake. Do not assume a generic margin value is sufficient for the target mip chain, compression, or this model's atlas density.
+4. Keep color data and numeric data separate: Albedo and Emission are sRGB; MetallicGloss and Normal are imported as linear data/normal-map type through the existing builder. Do not set Unity importer values from a generic Blender export preset.
+5. Output exactly `<Name>_Albedo.png`, `<Name>_MetallicGloss.png`, `<Name>_Normal.png`, and `<Name>_Emission.png`. MetallicGloss is RGB = metallic and A = smoothness (`1 - roughness`). The shader reads R and A; it does not consume AO from this map. Do not emit an ORM-packed substitute.
+6. Preserve vertex wear on the mesh `Color` attribute: R cavity AO, G edge wear, B thermal soot, A team mask. Do not bake texture AO over it or replace it with a generic `Vertex Color` bake.
+7. Keep high-to-low projection separate from same-geometry procedural material baking. Record which was used and which outputs were actually created; a viewport preview or completed bake does not establish Unity import or in-game appearance.
+
+## Version-checked local probe
+
+The compatibility facts above were checked against `.tools/Blender-4.5.14/blender-4.5.14-windows-x64/blender.exe` on 2026-10-19 by inspecting the version string and Principled BSDF input names in a temporary background session. The upstream scripts remain unverified on Blender 4.5.14 and must not be described as tested or adapted code.
+
+## Attribution and license
+
+The upstream repository is licensed MIT. Its license text is kept at [references/EL4CTEO-LICENSE.txt](references/EL4CTEO-LICENSE.txt). No upstream script or source text has been copied into this skill; the local workflow is written for Rogue Command's pinned version and asset contract.

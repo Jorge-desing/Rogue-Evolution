@@ -14,6 +14,16 @@ namespace RogueCommandExpansionLoader.Runtime
     /// </summary>
     internal sealed class RuntimeContentMutator
     {
+        private enum ParameterType { Int, Float }
+        private static readonly Dictionary<string, ParameterType> ParamMap = new Dictionary<string, ParameterType> {
+            { "AttackSpeed", ParameterType.Float },
+            { "ArmorValue", ParameterType.Int },
+            { "MaxHealth", ParameterType.Int },
+            { "MaxShield", ParameterType.Int },
+            { "MoveSpeed", ParameterType.Float },
+            { "Damage", ParameterType.Float },
+        };
+
         private const BindingFlags StaticFields = BindingFlags.Public | BindingFlags.NonPublic |
             BindingFlags.Static | BindingFlags.FlattenHierarchy;
         private const BindingFlags InstanceFields = BindingFlags.Public | BindingFlags.NonPublic |
@@ -39,6 +49,7 @@ namespace RogueCommandExpansionLoader.Runtime
         private readonly FieldInfo _entityRowsField;
         private readonly FieldInfo _entityIndexField;
         private readonly FieldInfo _factoryEntityIdOfField;
+        private readonly FieldInfo _imageOfField;
         private readonly FieldInfo _changeableIntValueCacheField;
         private readonly FieldInfo _changeableFloatValueCacheField;
         private readonly FieldInfo[] _progressionFields;
@@ -146,6 +157,14 @@ namespace RogueCommandExpansionLoader.Runtime
                     "FactoryEntityIdOf is not Dictionary<string, string>.");
             }
 
+            _imageOfField = RuntimeReflection.FindField(entityStoreType, "ImageOf", StaticFields);
+            if (!_imageOfField.IsStatic ||
+                _imageOfField.FieldType != typeof(Dictionary<string, UnityEngine.Sprite>))
+            {
+                throw new InvalidOperationException(
+                    "ImageOf is not Dictionary<string, Sprite>.");
+            }
+
             Type changeableValueType = entityStoreType.GetNestedType("ChangeableValue",
                 BindingFlags.Public | BindingFlags.NonPublic);
             if (changeableValueType == null || !changeableValueType.IsEnum)
@@ -243,12 +262,13 @@ namespace RogueCommandExpansionLoader.Runtime
                 IList rowsList = _entityRowsField.GetValue(null) as IList;
                 IDictionary index = _entityIndexField.GetValue(null) as IDictionary;
                 IDictionary factoryMap = _factoryEntityIdOfField.GetValue(null) as IDictionary;
+                IDictionary imageCache = _imageOfField.GetValue(null) as IDictionary;
                 IDictionary intValueCache = _changeableIntValueCacheField.GetValue(null) as IDictionary;
                 IDictionary floatValueCache = _changeableFloatValueCacheField.GetValue(null) as IDictionary;
-                if (rowsList == null || index == null || factoryMap == null ||
+                if (rowsList == null || index == null || factoryMap == null || imageCache == null ||
                     intValueCache == null || floatValueCache == null)
                 {
-                    Log("Entity balancing rows, index, factory map, or value caches are not initialized; " +
+                    Log("Entity balancing rows, index, factory map, image cache, or value caches are not initialized; " +
                         "content rows were not added.");
                     return false;
                 }
@@ -265,7 +285,7 @@ namespace RogueCommandExpansionLoader.Runtime
                         }
                     }
 
-                    if (!TryRegisterEntityRows(materializedRows, rowsList, index, factoryMap,
+                    if (!TryRegisterEntityRows(materializedRows, rowsList, index, factoryMap, imageCache,
                             intValueCache, floatValueCache))
                     {
                         return false;
@@ -294,7 +314,98 @@ namespace RogueCommandExpansionLoader.Runtime
                 }
             }
 
+            if (registrationSucceeded)
+            {
+                ApplyBalanceOverrides();
+            }
+
             return registrationSucceeded;
+        }
+
+        public void ApplyBalanceOverrides()
+        {
+            if (!EnsureUnityMainThread("balance overrides"))
+            {
+                return;
+            }
+
+            lock (_gate)
+            {
+                var overrides = _provider.GetBalanceOverrides();
+                if (overrides == null)
+                {
+                    return;
+                }
+
+                IDictionary intValueCache = _changeableIntValueCacheField.GetValue(null) as IDictionary;
+                IDictionary floatValueCache = _changeableFloatValueCacheField.GetValue(null) as IDictionary;
+
+                if (intValueCache == null || floatValueCache == null)
+                {
+                    Log("Balance caches not initialized; could not apply overrides.");
+                    return;
+                }
+
+                IDictionary index = _entityIndexField.GetValue(null) as IDictionary;
+
+                foreach (var ovr in overrides)
+                {
+                    if (ovr == null || string.IsNullOrWhiteSpace(ovr.EntityId))
+                    {
+                        continue;
+                    }
+
+                    if (!index.Contains(ovr.EntityId))
+                    {
+                        continue;
+                    }
+
+                    if (ovr.Parameters == null)
+                    {
+                        continue;
+                    }
+
+                    foreach (var param in ovr.Parameters)
+                    {
+                        string name = param.Key;
+                        float value = param.Value;
+
+                        if (!ParamMap.TryGetValue(name, out ParameterType type))
+                        {
+                            continue;
+                        }
+
+                        try
+                        {
+                            Type enumType = _balancingType.GetNestedType("ChangeableValue");
+                            object enumValue = Enum.Parse(enumType, name, true);
+
+                            if (type == ParameterType.Int)
+                            {
+                                if (!intValueCache.Contains(ovr.EntityId))
+                                {
+                                    intValueCache[ovr.EntityId] = Activator.CreateInstance(typeof(Dictionary<,>).MakeGenericType(enumType, typeof(int)));
+                                }
+                                var inner = intValueCache[ovr.EntityId] as IDictionary;
+                                inner[enumValue] = (int)value;
+                            }
+                            else
+                            {
+                                if (!floatValueCache.Contains(ovr.EntityId))
+                                {
+                                    floatValueCache[ovr.EntityId] = Activator.CreateInstance(typeof(Dictionary<,>).MakeGenericType(enumType, typeof(float)));
+                                }
+                                var inner = floatValueCache[ovr.EntityId] as IDictionary;
+                                inner[enumValue] = value;
+                            }
+                        }
+                        catch (Exception exception)
+                        {
+                            Log("Could not apply balance parameter '" + name + "' to '" + ovr.EntityId + "': " + exception.Message);
+                        }
+                    }
+                }
+            }
         }
 
         public void ApplyProgressionFrom(object gameBalancingScriptableObject)
@@ -343,6 +454,7 @@ namespace RogueCommandExpansionLoader.Runtime
             IList rows,
             IDictionary index,
             IDictionary factoryMap,
+            IDictionary imageCache,
             IDictionary intValueCache,
             IDictionary floatValueCache)
         {
@@ -491,6 +603,7 @@ namespace RogueCommandExpansionLoader.Runtime
                 new List<KeyValuePair<string, string>>(factoryByProduct.Count);
             List<KeyValuePair<string, string>> attemptedFactoryMappings =
                 new List<KeyValuePair<string, string>>(factoryByProduct.Count);
+            var attemptedImageIds = new List<string>(entityIdsToAppend.Count);
             List<KeyValuePair<string, object>> attemptedIntValueCacheEntries =
                 new List<KeyValuePair<string, object>>(rowsToAppend.Count);
             List<KeyValuePair<string, object>> addedIntValueCacheEntries =
@@ -506,6 +619,50 @@ namespace RogueCommandExpansionLoader.Runtime
                     rows.Add(rowsToAppend[i]);
                     appendedRows.Add(rowsToAppend[i]);
                     appendedRowIds.Add(entityIdsToAppend[i]);
+                }
+
+                for (int i = 0; i < entityIdsToAppend.Count; i++)
+                {
+                    string entityId = entityIdsToAppend[i];
+                    if (!imageCache.Contains(entityId))
+                    {
+                        continue;
+                    }
+
+                    object previousImage = imageCache[entityId];
+                    if (previousImage == null)
+                    {
+                        attemptedImageIds.Add(entityId);
+                        imageCache.Remove(entityId);
+                        if (imageCache.Contains(entityId))
+                        {
+                            throw new InvalidOperationException("Cached image for '" + entityId + "' could not be invalidated.");
+                        }
+                    }
+
+                    // Invalidate value caches for the registered entity to ensure fresh parameters are used.
+                    if (index.Contains(entityId))
+                    {
+                        int entityToken = Convert.ToInt32(index[entityId]);
+                        
+                        foreach (string fieldName in intValueCache.Keys)
+                        {
+                            IDictionary innerCache = intValueCache[fieldName] as IDictionary;
+                            if (innerCache != null && innerCache.Contains(entityToken))
+                            {
+                                innerCache.Remove(entityToken);
+                            }
+                        }
+
+                        foreach (string fieldName in floatValueCache.Keys)
+                        {
+                            IDictionary innerCache = floatValueCache[fieldName] as IDictionary;
+                            if (innerCache != null && innerCache.Contains(entityToken))
+                            {
+                                innerCache.Remove(entityToken);
+                            }
+                        }
+                    }
                 }
 
                 for (int i = 0; i < entityIdsToAppend.Count; i++)
@@ -551,6 +708,7 @@ namespace RogueCommandExpansionLoader.Runtime
             catch (Exception exception)
             {
                 bool rollbackComplete = RollbackEntityRegistration(rows, index, factoryMap,
+                    imageCache, attemptedImageIds,
                     intValueCache, floatValueCache,
                     appendedRows, appendedRowIds, attemptedIndexMappings,
                     addedIndexMappings, attemptedFactoryMappings, addedFactoryMappings,
@@ -849,6 +1007,8 @@ namespace RogueCommandExpansionLoader.Runtime
             IList rows,
             IDictionary index,
             IDictionary factoryMap,
+            IDictionary imageCache,
+            IList<string> attemptedImageIds,
             IDictionary intValueCache,
             IDictionary floatValueCache,
             IList<object> appendedRows,
@@ -1053,6 +1213,40 @@ namespace RogueCommandExpansionLoader.Runtime
                 }
             }
 
+            for (int i = attemptedImageIds.Count - 1; i >= 0; i--)
+            {
+                string entityId = attemptedImageIds[i];
+
+                if (preserveRegistrationIds.Contains(entityId))
+                {
+                    rollbackComplete = false;
+                    continue;
+                }
+
+                try
+                {
+                    if (imageCache.Contains(entityId))
+                    {
+                        if (imageCache[entityId] != null)
+                        {
+                            preserveRegistrationIds.Add(entityId);
+                            rollbackComplete = false;
+                            Log("Preserved a newly populated image cache entry for '" + entityId + "' during rollback.");
+                        }
+                        else
+                        {
+                            imageCache.Remove(entityId);
+                        }
+                    }
+                }
+                catch (Exception exception)
+                {
+                    preserveRegistrationIds.Add(entityId);
+                    rollbackComplete = false;
+                    Log("Could not safely remove the image cache entry for '" + entityId +
+                        "' during rollback: " + exception.Message);
+                }
+            }
             bool[] removedRows = new bool[appendedRows.Count];
             for (int i = appendedRows.Count - 1; i >= 0; i--)
             {
@@ -1348,13 +1542,14 @@ namespace RogueCommandExpansionLoader.Runtime
                     continue;
                 }
 
-                ApplyToProgression(progression, contributions);
+                ApplyToProgression(progression, contributions, _progressionFields[i].Name);
             }
         }
 
         private void ApplyToProgression(
             object progression,
-            IList<ProgressionContentContribution> contributions)
+            IList<ProgressionContentContribution> contributions,
+            string progressionFieldName)
         {
             if (!_progressionType.IsInstanceOfType(progression))
             {
@@ -1400,9 +1595,17 @@ namespace RogueCommandExpansionLoader.Runtime
 
                     try
                     {
-                        AppendByReference(stages, contributionStages);
-                        AppendByReference(defaultAis, contributionAi);
+                        int firstStageSlot = stages.Count;
+                        int firstAiSlot = defaultAis.Count;
+                        int appendedStages = AppendByReference(stages, contributionStages);
+                        int appendedAiProfiles = AppendByReference(defaultAis, contributionAi);
                         appliedKeys.Add(contribution.Key);
+
+                        Log("Processed progression contribution '" + contribution.Key +
+                            "' to '" + progressionFieldName + "': progression list slots stages [" +
+                            firstStageSlot + ", " + stages.Count + "), DefaultAiBehaviour [" +
+                            firstAiSlot + ", " + defaultAis.Count + "); appendedStages=" +
+                            appendedStages + ", appendedAiProfiles=" + appendedAiProfiles + ".");
                     }
                     catch (Exception exception)
                     {
@@ -1450,8 +1653,9 @@ namespace RogueCommandExpansionLoader.Runtime
             return true;
         }
 
-        private static void AppendByReference(IList target, IList<object> source)
+        private static int AppendByReference(IList target, IList<object> source)
         {
+            int appendedCount = 0;
             for (int i = 0; i < source.Count; i++)
             {
                 bool alreadyPresent = false;
@@ -1467,8 +1671,11 @@ namespace RogueCommandExpansionLoader.Runtime
                 if (!alreadyPresent)
                 {
                     target.Add(source[i]);
+                    appendedCount++;
                 }
             }
+
+            return appendedCount;
         }
 
         private void Log(string message)

@@ -75,6 +75,10 @@ CANONICAL_WALKER_SOCKETS = [
 OPTIONAL_WALKER_SOCKETS = [
     "socket_footcontact_l",
     "socket_footcontact_r",
+    "socket_footcontact_fl",
+    "socket_footcontact_fr",
+    "socket_footcontact_rl",
+    "socket_footcontact_rr",
     "socket_recoilprimary",
 ]
 
@@ -241,6 +245,8 @@ class MechRigValidator:
                     name = getattr(data, "m_Name", "")
                     if not any(k in name.lower() for k in ("visual", "model", "walker", "mech")):
                         continue
+                    if not self._is_root_game_object(data):
+                        continue
 
                     audit = MechRigAudit(
                         model_name=name,
@@ -262,6 +268,12 @@ class MechRigValidator:
                         audit.rig_type = "hierarchical_transform"
                     else:
                         audit.rig_type = "static_unrigged"
+
+                    if audit.rig_type == "static_unrigged" and "walker" in name.lower():
+                        audit.score -= 40
+                        audit.flags.append(
+                            "UNRIGGED_WALKER: Walker visual lacks skeletal bones and hierarchical leg pivots."
+                        )
 
                     for b in SKELETAL_WALKER_BONES:
                         if any(b in n for n in lower_names):
@@ -286,19 +298,35 @@ class MechRigValidator:
 
         return audits
 
+    @staticmethod
+    def _is_root_game_object(go_data: Any) -> bool:
+        """Audits visual roots so child FBX model objects do not get false missing-socket flags."""
+        for component_pair in getattr(go_data, "m_Component", []):
+            try:
+                component_ptr = getattr(component_pair, "component", component_pair)
+                component = component_ptr.read() if hasattr(component_ptr, "read") else component_ptr
+                if type(component).__name__ == "Transform":
+                    parent = getattr(component, "m_Father", None)
+                    return parent is None or int(getattr(parent, "path_id", 0)) == 0
+            except Exception:
+                continue
+        return True
+
     def _collect_child_names(self, go_data: Any, names_set: Set[str]) -> None:
         """Recursively collects GameObject child names."""
         try:
             names_set.add(getattr(go_data, "m_Name", ""))
-            for comp_ptr in getattr(go_data, "m_Component", []):
+            for component_pair in getattr(go_data, "m_Component", []):
                 try:
-                    c = comp_ptr.read() if hasattr(comp_ptr, "read") else comp_ptr.component.read()
-                    if c.type.name == "Transform":
+                    component_ptr = getattr(component_pair, "component", component_pair)
+                    c = component_ptr.read() if hasattr(component_ptr, "read") else component_ptr
+                    if type(c).__name__ == "Transform":
                         for ch_ptr in getattr(c, "m_Children", []):
-                            ch = ch_ptr.read()
+                            ch = ch_ptr.read() if hasattr(ch_ptr, "read") else ch_ptr
                             go_ptr = getattr(ch, "m_GameObject", None)
                             if go_ptr:
-                                self._collect_child_names(go_ptr.read(), names_set)
+                                go_data = go_ptr.read() if hasattr(go_ptr, "read") else go_ptr
+                                self._collect_child_names(go_data, names_set)
                 except Exception:
                     pass
         except Exception:
@@ -398,7 +426,10 @@ def main() -> int:
         print(f"\nAudited {len(all_audits)} visual model asset(s).")
         print_audit_table(all_audits)
 
-    has_critical_failure = any(a.score < 40 for a in all_audits)
+    has_critical_failure = any(
+        a.score < 40 or any(flag.startswith("UNRIGGED_WALKER:") for flag in a.flags)
+        for a in all_audits
+    )
     return 2 if has_critical_failure else 0
 
 

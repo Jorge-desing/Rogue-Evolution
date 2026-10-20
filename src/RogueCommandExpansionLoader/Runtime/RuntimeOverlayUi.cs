@@ -69,7 +69,7 @@ namespace RogueCommandExpansionLoader.Runtime
             Action<string> logWarning = null)
         {
             _provider = provider;
-            _pluginVersion = pluginVersion ?? "0.1.0";
+            _pluginVersion = pluginVersion ?? "1.19.0";
             _patchResult = patchResult;
             _compatibilityError = compatibilityError;
             _logWarning = logWarning;

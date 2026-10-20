@@ -1,0 +1,4 @@
+interface:
+  display_name: "Rogue Command ArmorPaint Textures"
+  short_description: "Paint PBR maps while preserving the Rogue Command contract"
+  default_prompt: "Use $rogue-command-armorpaint-texture-authoring to prepare an ArmorPaint texture pass for a Rogue Command model."

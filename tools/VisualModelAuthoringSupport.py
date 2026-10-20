@@ -1,0 +1,324 @@
+"""Small deterministic Blender helpers for task-specific visual refinements.
+
+The repository generator remains the source of each preset blockout and export
+pipeline.  Build scripts patch the vehicle builder immediately before its normal
+validation, UV, vertex-wear, atlas, and FBX stages.
+"""
+
+from __future__ import annotations
+
+import math
+import sys
+from pathlib import Path
+from typing import Callable, Iterable, Sequence
+
+import bpy
+import bmesh
+from mathutils import Vector
+
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+GENERATOR_PATH = REPO_ROOT / "tools" / "generate_unit_model.py"
+
+
+def run_preset_build(generator_args: Sequence[str], refine: Callable) -> None:
+    """Run the canonical generator while refining the preset before export."""
+    sys.path.insert(0, str(REPO_ROOT / "tools"))
+    import generate_unit_model as generator
+
+    builder_type = generator.rmk.RogueVehicleBuilder
+    original = builder_type.build_and_export
+
+    def build_and_export_with_refinement(builder, *args, **kwargs):
+        refine(builder)
+        return original(builder, *args, **kwargs)
+
+    builder_type.build_and_export = build_and_export_with_refinement
+    sys.argv = [str(GENERATOR_PATH), "--", *generator_args]
+    try:
+        generator.main()
+    finally:
+        builder_type.build_and_export = original
+
+
+def remove_objects(builder, predicate: Callable[[str], bool]) -> list[str]:
+    removed = []
+    for obj in list(builder.objects):
+        if obj is None or obj.name not in bpy.data.objects or not predicate(obj.name):
+            continue
+        removed.append(obj.name)
+        builder.objects.remove(obj)
+        bpy.data.objects.remove(obj, do_unlink=True)
+    return removed
+
+
+def set_material_color(material, color: Sequence[float], metallic=None, roughness=None) -> None:
+    if material is None:
+        return
+    rgba = (float(color[0]), float(color[1]), float(color[2]), 1.0)
+    material.diffuse_color = rgba
+    if not material.use_nodes:
+        material.use_nodes = True
+    shader = next((n for n in material.node_tree.nodes if n.type == "BSDF_PRINCIPLED"), None)
+    if shader is None:
+        return
+    base = shader.inputs.get("Base Color")
+    if base is not None:
+        base.default_value = rgba
+    if metallic is not None and shader.inputs.get("Metallic") is not None:
+        shader.inputs["Metallic"].default_value = float(metallic)
+    if roughness is not None and shader.inputs.get("Roughness") is not None:
+        shader.inputs["Roughness"].default_value = float(roughness)
+
+
+def hex_color(value: str) -> tuple[float, float, float]:
+    value = value.strip().lstrip("#")
+    if len(value) != 6:
+        raise ValueError(f"Expected an RGB hex color, got {value!r}")
+    return tuple(int(value[i:i + 2], 16) / 255.0 for i in (0, 2, 4))
+
+
+def _make_mesh_object(name: str, vertices: Sequence[Sequence[float]],
+                      faces: Sequence[Sequence[int]], material,
+                      collection=None, smooth=False):
+    mesh = bpy.data.meshes.new(name + "_Mesh")
+    mesh.from_pydata(vertices, [], faces)
+    mesh.update()
+    bm = bmesh.new()
+    bm.from_mesh(mesh)
+    bmesh.ops.recalc_face_normals(bm, faces=list(bm.faces))
+    bm.to_mesh(mesh)
+    bm.free()
+    mesh.update()
+    if material is not None:
+        mesh.materials.append(material)
+    for poly in mesh.polygons:
+        poly.use_smooth = smooth
+    obj = bpy.data.objects.new(name, mesh)
+    (collection or bpy.context.collection).objects.link(obj)
+    return obj
+
+
+def add_loft_shell(builder, name: str, stations: Sequence[tuple[float, float, float, float]],
+                    material, center_x: float = 0.0, exponent: float = 0.66,
+                    smooth: bool = True):
+    """Build a continuous rounded, tapered armor shell from horizontal sections.
+
+    Stations are (z, half-width, front-y, rear-y), with the vehicle nose at +Y.
+    The superellipse footprint gives broad armor faces with softened corners.
+    """
+    if len(stations) < 2:
+        raise ValueError(f"{name} needs at least two shell stations")
+    segments = 16
+    vertices = []
+    for z, half_width, front_y, rear_y in stations:
+        if half_width <= 0 or front_y <= rear_y:
+            raise ValueError(f"Invalid shell station for {name}: {(z, half_width, front_y, rear_y)}")
+        center_y = (front_y + rear_y) * 0.5
+        half_length = (front_y - rear_y) * 0.5
+        for i in range(segments):
+            angle = 2.0 * math.pi * i / segments
+            c, s = math.cos(angle), math.sin(angle)
+            x = math.copysign(abs(c) ** exponent, c) * half_width
+            y = math.copysign(abs(s) ** exponent, s) * half_length
+            vertices.append((center_x + x, center_y + y, z))
+    faces = [tuple(reversed(range(segments))), tuple((len(stations) - 1) * segments + i
+                                                     for i in range(segments))]
+    for ring in range(len(stations) - 1):
+        a = ring * segments
+        b = (ring + 1) * segments
+        for i in range(segments):
+            n = (i + 1) % segments
+            faces.append((a + i, a + n, b + n, b + i))
+    obj = _make_mesh_object(name, vertices, faces, material, smooth=smooth)
+    builder.objects.append(obj)
+    return obj
+
+
+def add_box(builder, name: str, center: Sequence[float], size: Sequence[float], material,
+            rotation_z: float = 0.0):
+    cx, cy, cz = map(float, center)
+    sx, sy, sz = (float(v) * 0.5 for v in size)
+    ca, sa = math.cos(rotation_z), math.sin(rotation_z)
+    vertices = []
+    for x, y, z in ((-sx, -sy, -sz), (sx, -sy, -sz), (sx, sy, -sz), (-sx, sy, -sz),
+                    (-sx, -sy, sz), (sx, -sy, sz), (sx, sy, sz), (-sx, sy, sz)):
+        vertices.append((cx + x * ca - y * sa, cy + x * sa + y * ca, cz + z))
+    faces = [(3, 2, 1, 0), (4, 5, 6, 7), (0, 1, 5, 4),
+             (1, 2, 6, 5), (2, 3, 7, 6), (3, 0, 4, 7)]
+    obj = _make_mesh_object(name, vertices, faces, material)
+    builder.objects.append(obj)
+    return obj
+
+
+def add_uv_ellipsoid(builder, name: str, center: Sequence[float], radii: Sequence[float], material,
+                     segments: int = 16, rings: int = 8):
+    cx, cy, cz = map(float, center)
+    rx, ry, rz = map(float, radii)
+    vertices = []
+    for ring in range(rings + 1):
+        theta = math.pi * ring / rings
+        z = math.cos(theta) * rz
+        radial = math.sin(theta)
+        for seg in range(segments):
+            phi = 2.0 * math.pi * seg / segments
+            vertices.append((cx + math.cos(phi) * radial * rx,
+                             cy + math.sin(phi) * radial * ry,
+                             cz + z))
+    faces = []
+    for ring in range(rings):
+        for seg in range(segments):
+            a = ring * segments + seg
+            b = ring * segments + (seg + 1) % segments
+            c = (ring + 1) * segments + (seg + 1) % segments
+            d = (ring + 1) * segments + seg
+            faces.append((a, b, c, d))
+    obj = _make_mesh_object(name, vertices, faces, material, smooth=True)
+    builder.objects.append(obj)
+    return obj
+
+
+def add_y_axis_tube(builder, name: str, center: Sequence[float], radius: float, length: float,
+                    material, segments: int = 12):
+    cx, cy, cz = map(float, center)
+    vertices = []
+    for y in (cy - length * 0.5, cy + length * 0.5):
+        for i in range(segments):
+            angle = 2.0 * math.pi * i / segments
+            vertices.append((cx + math.cos(angle) * radius, y, cz + math.sin(angle) * radius))
+    faces = [tuple(reversed(range(segments))), tuple(segments + i for i in range(segments))]
+    for i in range(segments):
+        n = (i + 1) % segments
+        faces.append((i, n, segments + n, segments + i))
+    obj = _make_mesh_object(name, vertices, faces, material, smooth=True)
+    builder.objects.append(obj)
+    return obj
+
+
+def add_z_axis_post(builder, name: str, center: Sequence[float], radius: float,
+                    height: float, material, sides: int = 10):
+    cx, cy, cz = map(float, center)
+    vertices = []
+    for z in (cz - height * 0.5, cz + height * 0.5):
+        for i in range(sides):
+            angle = 2.0 * math.pi * i / sides
+            vertices.append((cx + math.cos(angle) * radius,
+                             cy + math.sin(angle) * radius, z))
+    faces = [tuple(reversed(range(sides))), tuple(sides + i for i in range(sides))]
+    for i in range(sides):
+        n = (i + 1) % sides
+        faces.append((i, n, sides + n, sides + i))
+    obj = _make_mesh_object(name, vertices, faces, material, smooth=True)
+    builder.objects.append(obj)
+    return obj
+
+
+def add_link(builder, name: str, start: Sequence[float], end: Sequence[float],
+             width: float, thickness: float, material):
+    a, b = Vector(start), Vector(end)
+    axis = (b - a).normalized()
+    side = Vector((0.0, 0.0, 1.0)).cross(axis)
+    if side.length < 1e-5:
+        side = Vector((1.0, 0.0, 0.0)).cross(axis)
+    side.normalize()
+    normal = axis.cross(side).normalized()
+    profile = ((0.0, 0.72), (0.12, 1.0), (0.88, 1.0), (1.0, 0.72))
+    segments = 8
+    vertices = []
+    for t, scale in profile:
+        center = a.lerp(b, t)
+        for i in range(segments):
+            ang = 2.0 * math.pi * i / segments
+            x = math.copysign(abs(math.cos(ang)) ** 0.72, math.cos(ang)) * width * scale
+            y = math.copysign(abs(math.sin(ang)) ** 0.72, math.sin(ang)) * thickness * scale
+            vertices.append(tuple(center + side * x + normal * y))
+    faces = [tuple(reversed(range(segments))),
+             tuple((len(profile) - 1) * segments + i for i in range(segments))]
+    for ring in range(len(profile) - 1):
+        a0, b0 = ring * segments, (ring + 1) * segments
+        for i in range(segments):
+            n = (i + 1) % segments
+            faces.append((a0 + i, a0 + n, b0 + n, b0 + i))
+    obj = _make_mesh_object(name, vertices, faces, material, smooth=True)
+    builder.objects.append(obj)
+    return obj
+
+
+def replace_link_mesh(obj, start: Sequence[float], end: Sequence[float], width: float,
+                      thickness: float, material):
+    a, b = Vector(start), Vector(end)
+    axis = (b - a).normalized()
+    side = Vector((0.0, 0.0, 1.0)).cross(axis)
+    if side.length < 1e-5:
+        side = Vector((1.0, 0.0, 0.0)).cross(axis)
+    side.normalize()
+    normal = axis.cross(side).normalized()
+    profile = ((0.0, 0.66), (0.12, 1.0), (0.78, 0.90), (1.0, 0.62))
+    ring_segments = 8
+    vertices = []
+    for t, scale in profile:
+        center = a.lerp(b, t)
+        for i in range(ring_segments):
+            ang = 2.0 * math.pi * i / ring_segments
+            x = math.copysign(abs(math.cos(ang)) ** 0.72, math.cos(ang)) * width * scale
+            y = math.copysign(abs(math.sin(ang)) ** 0.72, math.sin(ang)) * thickness * scale
+            p = center + side * x + normal * y
+            vertices.append(tuple(p))
+    faces = [tuple(reversed(range(ring_segments))),
+             tuple((len(profile) - 1) * ring_segments + i for i in range(ring_segments))]
+    for ring in range(len(profile) - 1):
+        a0, b0 = ring * ring_segments, (ring + 1) * ring_segments
+        for i in range(ring_segments):
+            n = (i + 1) % ring_segments
+            faces.append((a0 + i, a0 + n, b0 + n, b0 + i))
+    mesh = bpy.data.meshes.new(obj.name + "_RefinedMesh")
+    mesh.from_pydata(vertices, [], faces)
+    bm = bmesh.new()
+    bm.from_mesh(mesh)
+    bmesh.ops.recalc_face_normals(bm, faces=list(bm.faces))
+    bm.to_mesh(mesh)
+    bm.free()
+    mesh.update()
+    mesh.materials.append(material)
+    old = obj.data
+    obj.data = mesh
+    obj.location = (0.0, 0.0, 0.0)
+    obj.rotation_euler = (0.0, 0.0, 0.0)
+    obj.scale = (1.0, 1.0, 1.0)
+    if old.users == 0:
+        bpy.data.meshes.remove(old)
+    for poly in mesh.polygons:
+        poly.use_smooth = True
+
+
+def simplify_command_wheels(builder) -> int:
+    """Keep eight rugged wheel silhouettes while removing tiny repeated lug detail."""
+    tires = [o for o in builder.objects if o.type == "MESH" and o.name.endswith("_TireCarcass")]
+    removed = remove_objects(builder, lambda n: "_TreadLug_" in n or "_LugBolt_" in n)
+    for tire in tires:
+        c = tire.matrix_world.translation.copy()
+        vertices = []
+        faces = []
+        radius = min(tire.dimensions.y, tire.dimensions.z) * 0.5 - 0.025
+        half_x = tire.dimensions.x * 0.48
+        phase = 0.11 if "MidFront" in tire.name else 0.0
+        for k in range(8):
+            ang = 2.0 * math.pi * k / 8.0 + phase
+            radial = Vector((0.0, math.sin(ang), math.cos(ang)))
+            tangent = Vector((0.0, math.cos(ang), -math.sin(ang)))
+            center = c + radial * (radius + 0.012)
+            start = len(vertices)
+            for xsign, tsign, rsign in ((-1, -1, -1), (1, -1, -1), (1, 1, -1), (-1, 1, -1),
+                                        (-1, -1, 1), (1, -1, 1), (1, 1, 1), (-1, 1, 1)):
+                p = center + Vector((xsign * half_x, 0.0, 0.0)) + tangent * (tsign * 0.068) + radial * (rsign * 0.04)
+                vertices.append(tuple(p))
+            faces.extend([(start + 3, start + 2, start + 1, start),
+                          (start + 4, start + 5, start + 6, start + 7),
+                          (start, start + 1, start + 5, start + 4),
+                          (start + 1, start + 2, start + 6, start + 5),
+                          (start + 2, start + 3, start + 7, start + 6),
+                          (start + 3, start, start + 4, start + 7)])
+        tread = _make_mesh_object(tire.name.replace("_TireCarcass", "_TreadBlocks"),
+                                  vertices, faces, builder.palette.tread)
+        builder.objects.append(tread)
+    return len(removed)

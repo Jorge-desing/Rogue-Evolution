@@ -1,0 +1,4 @@
+interface:
+  display_name: "blendsmith"
+  short_description: "Reference-led Blender assets with editable handoffs"
+  default_prompt: "Use $blendsmith to confirm references and production requirements, then create and verify the agreed editable Blender asset and write an English worklog."

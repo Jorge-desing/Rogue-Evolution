@@ -37,9 +37,11 @@ This fundamental law explains why:
 Because Rogue Command implements **flat armor subtraction** and **discrete shield charges** rather than percentage mitigations, standard RTS formulas must be adjusted.
 
 ### Effective DPS Against Target Armor
-Given primary weapon damage $D_1$, attack cooldown $T_1$, secondary damage $D_2$, secondary cooldown $T_2$, and defender armor $A$:
+Given primary weapon damage per projectile $D_1$, primary firepoint count $F_1$, attack cooldown per volley $T_1$, secondary damage $D_2$, secondary cooldown $T_2$, and defender armor $A$:
 
-$$\text{DPS}_{\text{eff}}(A) = \frac{\max(0.1, D_1 - A)}{\max(0.05, T_1)} + \frac{\max(0.1, D_2 - A)}{\max(0.05, T_2)}$$
+$$\text{DPS}_{\text{eff}}(A) = \frac{F_1 \times \max(0.1, D_1 - A)}{\max(0.05, T_1)} + \frac{\max(0.1, D_2 - A)}{\max(0.05, T_2)}$$
+
+The simulator treats each primary firepoint as one projectile in the same-tick volley. Each projectile applies armor separately, and each can consume one shield charge before later projectiles in the volley reach HP. This is an approximation of volley delivery; it does not model firepoint stagger or native target ordering.
 
 ### Effective Health Pool (EHP)
 For a defender with base health $H$, discrete shield charges $S$, and armor $A$, defending against an attacker with incoming raw damage per hit $D_{\text{in}}$:
@@ -74,7 +76,4 @@ $$\text{WeaponRange}_A > \text{WeaponRange}_B \quad \text{AND} \quad \text{MoveS
 
 In 1v1 duels, this condition results in Unit $A$ dealing damage while Unit $B$ can never close distance, producing a 100% win rate for Unit $A$ with zero damage taken.
 
-In swarm engagements, however, spatial crowding and surrounding dynamics restrict kiting space:
-- Turn rates and obstacle navigation slow retreat vectors.
-- Swarm units can pinch and enclose kiting units from flanks.
-- The simulator models this in `--squad` mode by applying initial approach scatter and collision boundaries.
+The simulator's `--squad` mode does not resolve physical crowding or pursuit. Each unit gets an independent scalar distance with initial approach scatter and moves toward its own effective range; firing units choose the lowest-HP surviving target without pairwise distance or line-of-sight checks. It does not model collision, formation, obstacles, flanking, or retreat behavior. Treat squad outcomes as comparative estimates, especially when the duel model reports an infinite-kiting envelope.

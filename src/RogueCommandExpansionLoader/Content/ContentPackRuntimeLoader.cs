@@ -7,6 +7,7 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading.Tasks;
 using Microsoft.Win32.SafeHandles;
 using Newtonsoft.Json;
 using RogueCommandExpansionLoader.Contracts;
@@ -21,7 +22,7 @@ namespace RogueCommandExpansionLoader.Content
     /// keeps their AssetBundles and Unity objects alive for the whole game session.
     /// </summary>
     public sealed class ContentPackRuntimeLoader : IRuntimeContentProvider, IUnitSkillLocalizationRuntimeProvider,
-        IStageLandscapeRuntimeProvider,
+        IRelicLocalizationRuntimeProvider, IStageLandscapeRuntimeProvider,
         IBlueprintPoolRuntimeProvider, IStageFallbackRuntimeProvider,
         IStageOwnedAiPlacementDistanceRuntimeProvider, IBlueprintRewardFactoryScopeProvider
     {
@@ -43,8 +44,10 @@ namespace RogueCommandExpansionLoader.Content
         private readonly object _gate = new object();
         private readonly string _packsRoot;
         private readonly Assembly _gameAssembly;
+        private readonly RelicContentRuntimeRegistrar _relicRegistrar;
         private readonly AiModuleRegistry _moduleRegistry;
         private readonly Action<string> _log;
+        private readonly RuntimeMutationManager _mutationManager;
         private readonly Type _entityRowType;
         private readonly Type _entityBalanceAssetType;
         private readonly Type _entityControllerType;
@@ -142,9 +145,11 @@ namespace RogueCommandExpansionLoader.Content
         private readonly List<ScriptableObject> _stageParameterClones = new List<ScriptableObject>();
         private readonly List<ScriptableObject> _landscapeClones = new List<ScriptableObject>();
         private readonly List<ScriptableObject> _blueprintPoolClones = new List<ScriptableObject>();
+        private readonly List<ScriptableObject> _retainedRelicObjects = new List<ScriptableObject>();
         private readonly List<object> _blueprintPools = new List<object>();
         private readonly BlueprintPoolScopeRegistry _blueprintPoolScopeRegistry =
             new BlueprintPoolScopeRegistry();
+        private readonly GlobalBundleRegistry _bundleRegistry = new GlobalBundleRegistry();
         private readonly Dictionary<string, UnityEngine.Object> _resourceAssets =
             new Dictionary<string, UnityEngine.Object>(StringComparer.Ordinal);
         private readonly Dictionary<string, LoadedAiProfile> _aiProfiles =
@@ -157,6 +162,8 @@ namespace RogueCommandExpansionLoader.Content
             new Dictionary<object, BoundAiRuntimeBehaviour>(ReferenceComparer.Instance);
         private readonly Dictionary<string, LoadedUnit> _units =
             new Dictionary<string, LoadedUnit>(StringComparer.Ordinal);
+        private readonly Dictionary<string, ContentRelicDefinition> _relicDefinitions =
+            new Dictionary<string, ContentRelicDefinition>(StringComparer.Ordinal);
         private readonly HashSet<string> _knownIds = new HashSet<string>(StringComparer.Ordinal);
         private readonly HashSet<string> _nativeUnitIds = new HashSet<string>(StringComparer.Ordinal);
         private readonly HashSet<string> _nativeFactoryIds = new HashSet<string>(StringComparer.Ordinal);
@@ -168,12 +175,15 @@ namespace RogueCommandExpansionLoader.Content
         private readonly object _logGate = new object();
 
         private long _loadedAssetBundleBytes;
+        private int _mutationSuccessCount;
+        private int _mutationFailureCount;
         private string _resolvedPacksRoot;
         private string _packRootError;
         private bool _nativeRegistryReady;
         private bool _registryUnavailableLogged;
         private bool _runtimeContentReady;
         private bool _loaded;
+        private Task _loadingTask;
         private bool _aiStartDistanceFailureLogged;
         private bool _blueprintRewardScopeFailureLogged;
         private bool _stageMapOrderFailureLogged;
@@ -195,8 +205,10 @@ namespace RogueCommandExpansionLoader.Content
 
             _packsRoot = Path.GetFullPath(packsRoot);
             _gameAssembly = gameAssembly ?? throw new ArgumentNullException("gameAssembly");
+            _relicRegistrar = new RelicContentRuntimeRegistrar(_gameAssembly);
             _moduleRegistry = moduleRegistry ?? throw new ArgumentNullException("moduleRegistry");
             _log = logger;
+            _mutationManager = new RuntimeMutationManager(_log ?? (msg => { }));
 
             _entityRowType = FindUniqueType("EntityBalancingParameters");
             if (!_entityRowType.IsValueType)
@@ -529,9 +541,26 @@ namespace RogueCommandExpansionLoader.Content
                     return false;
                 }
 
-                LoadAllPacks();
-                ApplyBlueprintEligibility();
-                _runtimeContentReady = _loaded;
+                if (_loadingTask == null)
+                {
+                    _loadingTask = LoadAllPacksAsync();
+                }
+
+                if (_loadingTask.IsCompleted)
+                {
+                    try
+                    {
+                        _loadingTask.GetAwaiter().GetResult();
+                        ApplyBlueprintEligibility();
+                        _runtimeContentReady = _loaded;
+                    }
+                    catch (Exception exception)
+                    {
+                        Log("Critical error during async content loading: " + exception.Message);
+                        _runtimeContentReady = false;
+                    }
+                }
+
                 return _runtimeContentReady;
             }
         }
@@ -635,6 +664,27 @@ namespace RogueCommandExpansionLoader.Content
             }
         }
 
+        public bool TryGetRelicLocalization(string relicId, bool description, out string value)
+        {
+            value = null;
+            lock (_gate)
+            {
+                ContentRelicDefinition relic;
+                if (String.IsNullOrWhiteSpace(relicId) || !_relicDefinitions.TryGetValue(relicId, out relic))
+                {
+                    return false;
+                }
+
+                string language = _localizationLanguageProperty.GetValue(null, null) as string;
+                if (String.IsNullOrWhiteSpace(language))
+                {
+                    language = "en-US";
+                }
+
+                return RelicLocalizationResolver.TryResolve(relic, language, description, out value);
+            }
+        }
+
         public void OnEntityRowsRegistered()
         {
             lock (_gate)
@@ -689,6 +739,65 @@ namespace RogueCommandExpansionLoader.Content
                     }
                 }
             }
+            ApplyUnitMutations();
+        }
+
+            private void ApplyUnitMutations()
+            {
+            lock (_gate)
+            {
+            if (!_runtimeContentReady)
+            {
+                return;
+            }
+
+            foreach (var pair in _units)
+            {
+                LoadedUnit unit = pair.Value;
+                if (unit == null || unit.Definition == null)
+                {
+                    continue;
+                }
+
+                if (unit.Definition.abilities != null)
+                {
+                    foreach (var ability in unit.Definition.abilities)
+                    {
+                        if (ability == null || String.IsNullOrWhiteSpace(ability.id))
+                        {
+                            continue;
+                        }
+                        if (_mutationManager.MutateFloat(unit.BalanceRow, ability.id, ability.value))
+                        {
+                            _mutationSuccessCount++;
+                        }
+                        else
+                        {
+                            _mutationFailureCount++;
+                        }
+                    }
+                }
+                // Apply combat boosts
+                if (unit.Definition.combatBoosts != null)
+                {
+                    foreach (var boost in unit.Definition.combatBoosts)
+                    {
+                        if (boost == null || String.IsNullOrWhiteSpace(boost.statName))
+                        {
+                            continue;
+                        }
+                        if (_mutationManager.MutateFloat(unit.BalanceRow, boost.statName, boost.multiplier))
+                        {
+                            _mutationSuccessCount++;
+                        }
+                        else
+                        {
+                            _mutationFailureCount++;
+                        }
+                    }
+                }
+            }
+        }
         }
 
         public bool TryFindBlueprintPool(string poolId, out object pool)
@@ -815,11 +924,106 @@ namespace RogueCommandExpansionLoader.Content
                     !(bool)_gameAtLeastOneBlueprintAddedByPlayerField.GetValue(null);
                 bool isAllowedAsStartingBlueprint =
                     (bool)_allowedStartingBlueprintField.GetValue(unit.BalanceRow);
+                if (unit.IsProductionBuilding && _blueprintUnitIds.Contains(unitId) &&
+                    isStartingBlueprintSelection &&
+                    isAllowedAsStartingBlueprint && isAllowedForDemo &&
+                    IsNativeInitialStagePool(pool))
+                {
+                    // Keep the native pool's own BlueprintFilter.IsBlueprintValid check. This
+                    // only lets an explicitly starting-eligible factory reach that filter for
+                    // the first offer in the first native stage.
+                    runOriginal = true;
+                    return true;
+                }
+
                 runOriginal = _blueprintPoolScopeRegistry.AllowsModUnitInPool(
                     pool, unitId, isDemo, isAllowedForDemo,
                     isStartingBlueprintSelection, isAllowedAsStartingBlueprint);
                 return true;
             }
+        }
+
+        private void AddInitialStageStartingFactories(HashSet<string> destination)
+        {
+            if (destination == null)
+            {
+                return;
+            }
+
+            object balancing = _gameBalancingAssetField.GetValue(null);
+            bool isDemo = balancing != null && (bool)_gameIsDemoField.GetValue(balancing);
+            foreach (LoadedUnit product in _units.Values)
+            {
+                if (product.IsProductionBuilding || product.Definition == null ||
+                    !product.Definition.isAllowedAsStartingBlueprint ||
+                    String.IsNullOrWhiteSpace(product.ProductionFactoryId) ||
+                    !_blueprintUnitIds.Contains(product.ProductionFactoryId))
+                {
+                    continue;
+                }
+
+                LoadedUnit factory;
+                if (!_units.TryGetValue(product.ProductionFactoryId, out factory) ||
+                    !factory.IsProductionBuilding ||
+                    (isDemo && !(bool)_allowedForDemoField.GetValue(factory.BalanceRow)))
+                {
+                    continue;
+                }
+
+                destination.Add(factory.Id);
+            }
+        }
+
+        private bool IsNativeInitialStagePool(object pool)
+        {
+            object stageMap = _gameStageMapField.GetValue(null);
+            if (pool == null || stageMap == null ||
+                !System.Object.ReferenceEquals(stageMap, _stageMapSnapshotOwner) ||
+                _stageMapVisibleStages == null ||
+                (int)_stageMapCurrentStageProperty.GetValue(stageMap, null) != 0)
+            {
+                return false;
+            }
+
+            object activeStage = BlueprintRewardStageResolver.ResolveVisibleStage(
+                _stageMapVisibleStages, 0);
+            if (activeStage == null)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < _stages.Count; i++)
+            {
+                if (System.Object.ReferenceEquals(_stages[i].RuntimeStage, activeStage))
+                {
+                    return false;
+                }
+            }
+
+            UnityEngine.Object stageParameters =
+                _stageParametersField.GetValue(activeStage) as UnityEngine.Object;
+            if (stageParameters == null)
+            {
+                return false;
+            }
+
+            UnityEngine.Object poolList =
+                _stageParametersBlueprintPoolListField.GetValue(stageParameters) as UnityEngine.Object;
+            IList pools = poolList == null ? null : _blueprintPoolsField.GetValue(poolList) as IList;
+            if (pools == null)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < pools.Count; i++)
+            {
+                if (System.Object.ReferenceEquals(pools[i], pool))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         public void AddExclusiveBlueprints(string otherThanPoolId, HashSet<string> result)
@@ -856,6 +1060,7 @@ namespace RogueCommandExpansionLoader.Content
                 }
 
                 bool activeStageResolved = false;
+                bool activeStageIsPackOwned = false;
                 int activeStageIndex = -1;
                 string activeStageId = null;
                 try
@@ -897,8 +1102,17 @@ namespace RogueCommandExpansionLoader.Content
                             {
                                 stageFactoryIds.UnionWith(_stages[i].BlueprintFactoryIds);
                                 activeStageId = _stages[i].PackId + ":" + _stages[i].Definition.id;
+                                activeStageIsPackOwned = true;
                                 break;
                             }
+                        }
+
+                        bool isStartingBlueprintSelection =
+                            !(bool)_gameAtLeastOneBlueprintAddedByPlayerField.GetValue(null);
+                        if (activeStageIndex == 0 && !activeStageIsPackOwned &&
+                            isStartingBlueprintSelection)
+                        {
+                            AddInitialStageStartingFactories(stageFactoryIds);
                         }
                     }
                 }
@@ -1121,6 +1335,12 @@ namespace RogueCommandExpansionLoader.Content
 
             _stageMapOrderFailureLogged = true;
             Log(message);
+        }
+
+        private string GetGlobalFallbackBundlePath()
+        {
+            // In a real scenario, this would read from a mod configuration file.
+            return null;
         }
 
         private bool TryRestorePendingStageMapOrder(bool progressionWasApplied)
@@ -1544,6 +1764,46 @@ namespace RogueCommandExpansionLoader.Content
             }
         }
 
+        public IEnumerable<BalanceOverride> GetBalanceOverrides()
+        {
+            lock (_gate)
+            {
+                if (!_runtimeContentReady)
+                {
+                    return new List<BalanceOverride>();
+                }
+
+                var overrides = new List<BalanceOverride>();
+                foreach (var candidate in _packCandidates)
+                {
+                    if (candidate == null || candidate.Definition == null)
+                    {
+                        continue;
+                    }
+
+                    if (candidate.Definition.units == null)
+                    {
+                        continue;
+                    }
+
+                    foreach (var unit in candidate.Definition.units)
+                    {
+                        if (unit == null || unit.customBalance == null)
+                        {
+                            continue;
+                        }
+
+                        overrides.Add(new BalanceOverride
+                        {
+                            EntityId = unit.id,
+                            Parameters = unit.customBalance
+                        });
+                    }
+                }
+                return overrides;
+            }
+        }
+
         public void OnAiBehaviourInitialized(object gameBehaviour)
         {
             DefaultAiBehaviour behaviour = gameBehaviour as DefaultAiBehaviour;
@@ -1628,6 +1888,37 @@ namespace RogueCommandExpansionLoader.Content
             try
             {
                 bound.RuntimeBehaviour.OnInitialized();
+                // Apply AI overrides from units referenced in this profile
+                if (profile.Definition.unitEntries != null)
+                {
+                    foreach (var entry in profile.Definition.unitEntries)
+                    {
+                        if (entry == null || String.IsNullOrWhiteSpace(entry.unitId))
+                        {
+                            continue;
+                        }
+                        LoadedUnit unit;
+                        if (_units.TryGetValue(entry.unitId, out unit) && unit != null &&
+                            unit.Definition != null && unit.Definition.aiOverrides != null)
+                        {
+                            foreach (var ovr in unit.Definition.aiOverrides)
+                            {
+                                if (ovr == null || String.IsNullOrWhiteSpace(ovr.parameter))
+                                {
+                                    continue;
+                                }
+                                if (_mutationManager.MutateActiveAiBehaviour(behaviour, ovr.parameter, ovr.value))
+                                {
+                                    _mutationSuccessCount++;
+                                }
+                                else
+                                {
+                                    _mutationFailureCount++;
+                                }
+                            }
+                        }
+                    }
+                }
                 bool stillRegistered = false;
                 lock (_gate)
                 {
@@ -1956,7 +2247,7 @@ namespace RogueCommandExpansionLoader.Content
             }
         }
 
-        private void LoadAllPacks()
+        private async Task LoadAllPacksAsync()
         {
             if (_loaded || !_nativeRegistryReady)
             {
@@ -2049,15 +2340,36 @@ namespace RogueCommandExpansionLoader.Content
                     ResolvePackDependencies(candidate, unitOwners, profileOwners);
                 }
 
-                LoadPacksInDependencyOrder(candidates);
+                await LoadPacksInDependencyOrderAsync(candidates);
 
-                Log("Carga finalizada: " + _contributions.Count + " paquete(s) de progresión y " +
-                    _entityRows.Count + " unidad(es) nuevas.");
+                int productionBuildingCount = 0;
+                int productUnitCount;
+                int contributionCount;
+                lock (_gate)
+                {
+                    foreach (LoadedUnit unit in _units.Values)
+                    {
+                        if (unit.IsProductionBuilding)
+                        {
+                            productionBuildingCount++;
+                        }
+                    }
+
+                    productUnitCount = _units.Count - productionBuildingCount;
+                    contributionCount = _contributions.Count;
+                }
+
+                Log("Carga finalizada: " + contributionCount + " paquete(s) de progresión y " +
+                    (productUnitCount + productionBuildingCount) + " entidad(es) nuevas (" + productUnitCount + " unidad(es) y " +
+                    productionBuildingCount + " edificio(s) de producción).");
             }
             catch (Exception exception)
             {
-                _loaded = false;
-                _packRootError = exception.GetType().Name + ": " + exception.Message;
+                lock (_gate)
+                {
+                    _loaded = false;
+                    _packRootError = exception.GetType().Name + ": " + exception.Message;
+                }
                 Log("No se pudo recorrer la carpeta de paquetes: " + _packRootError);
             }
         }
@@ -2390,7 +2702,7 @@ namespace RogueCommandExpansionLoader.Content
             }
         }
 
-        private void LoadPacksInDependencyOrder(List<PackCandidate> candidates)
+        private async Task LoadPacksInDependencyOrderAsync(List<PackCandidate> candidates)
         {
             var pending = new List<PackCandidate>();
             for (int i = 0; i < candidates.Count; i++)
@@ -2426,8 +2738,11 @@ namespace RogueCommandExpansionLoader.Content
 
                     if (failedDependency != null)
                     {
-                        candidate.Disabled = true;
-                        candidate.StatusReason = "depende del paquete '" + failedDependency.Name + "', que no pudo cargarse.";
+                        lock (_gate)
+                        {
+                            candidate.Disabled = true;
+                            candidate.StatusReason = "depende del paquete '" + failedDependency.Name + "', que no pudo cargarse.";
+                        }
                         Log("Paquete '" + candidate.Name + "' desactivado: " + candidate.StatusReason);
                         pending.RemoveAt(i);
                         advanced = true;
@@ -2439,15 +2754,23 @@ namespace RogueCommandExpansionLoader.Content
                         continue;
                     }
 
-                    candidate.LoadAttempted = true;
-                    candidate.LoadSucceeded = LoadOnePack(candidate);
-                    if (!candidate.LoadSucceeded)
+                    lock (_gate)
                     {
-                        candidate.Disabled = true;
+                        candidate.LoadAttempted = true;
                     }
-                    else
+
+                    bool loadSucceeded = await LoadOnePackAsync(candidate);
+                    lock (_gate)
                     {
-                        candidate.StatusReason = null;
+                        candidate.LoadSucceeded = loadSucceeded;
+                        if (!loadSucceeded)
+                        {
+                            candidate.Disabled = true;
+                        }
+                        else
+                        {
+                            candidate.StatusReason = null;
+                        }
                     }
 
                     pending.RemoveAt(i);
@@ -2456,10 +2779,17 @@ namespace RogueCommandExpansionLoader.Content
 
                 if (!advanced)
                 {
+                    lock (_gate)
+                    {
+                        for (int i = 0; i < pending.Count; i++)
+                        {
+                            pending[i].Disabled = true;
+                            pending[i].StatusReason = "se detectó una dependencia circular entre paquetes.";
+                        }
+                    }
+
                     for (int i = 0; i < pending.Count; i++)
                     {
-                        pending[i].Disabled = true;
-                        pending[i].StatusReason = "se detectó una dependencia circular entre paquetes.";
                         Log("Paquete '" + pending[i].Name + "' desactivado: " + pending[i].StatusReason);
                     }
 
@@ -2468,7 +2798,7 @@ namespace RogueCommandExpansionLoader.Content
             }
         }
 
-        private bool LoadOnePack(PackCandidate candidate)
+        private async Task<bool> LoadOnePackAsync(PackCandidate candidate)
         {
             string packageRoot = candidate.Root;
             string packageName = candidate.Name;
@@ -2491,6 +2821,7 @@ namespace RogueCommandExpansionLoader.Content
             HashSet<string> reservedBlueprintPoolIds = null;
             AssetBundle manifestBundle = null;
             FileStream manifestStream = null;
+            string manifestBundleRegistryKey = null;
             long packBundleBytes = 0;
             string pathFailure;
 
@@ -2513,7 +2844,10 @@ namespace RogueCommandExpansionLoader.Content
 
                     ValidateBundleStreamSize(manifestStream, definition.assetBundleManifestPath,
                         ContentPackValidator.MaxManifestBundleBytes, "manifiesto");
-                    manifestBundle = AssetBundle.LoadFromStream(manifestStream, 0, 0);
+                    manifestBundleRegistryKey = BundleRegistryKey(
+                        definition.packId, "manifest:" + definition.assetBundleManifestPath);
+                    manifestBundle = await _bundleRegistry.LoadBundleAsync(
+                        manifestBundleRegistryKey, manifestStream);
 
                     if (manifestBundle == null)
                     {
@@ -2530,6 +2864,7 @@ namespace RogueCommandExpansionLoader.Content
                     }
 
                     loadOrder = GetBundleLoadOrder(unityManifest, definition.assetBundles, packageName);
+                    _bundleRegistry.RemoveBundle(manifestBundleRegistryKey, manifestBundle);
                     manifestBundle.Unload(true);
                     manifestBundle = null;
                     manifestStream.Dispose();
@@ -2548,7 +2883,18 @@ namespace RogueCommandExpansionLoader.Content
                     FileStream stream;
                     if (!TryOpenContainedFile(packageRoot, fullPath, out stream, out pathFailure))
                     {
-                        throw new InvalidDataException(pathFailure);
+                        _log?.Invoke("Warning: Bundle file missing at '" + fullPath + "'; attempting global fallback if configured.");
+
+                        // Implement global-fallback mechanism
+                        string fallbackPath = GetGlobalFallbackBundlePath();
+                        if (!String.IsNullOrWhiteSpace(fallbackPath) && TryOpenContainedFile(packageRoot, fallbackPath, out stream, out pathFailure))
+                        {
+                            _log?.Invoke("Successfully loaded fallback bundle: " + fallbackPath);
+                        }
+                        else
+                        {
+                            throw new InvalidDataException(pathFailure);
+                        }
                     }
 
                     temporaryBundleStreams.Add(stream);
@@ -2564,7 +2910,8 @@ namespace RogueCommandExpansionLoader.Content
                     }
 
                     packBundleBytes += bundleBytes;
-                    AssetBundle bundle = AssetBundle.LoadFromStream(stream, 0, 0);
+                    AssetBundle bundle = await _bundleRegistry.LoadBundleAsync(
+                        BundleRegistryKey(definition.packId, bundleDefinition.id), stream);
                     if (bundle == null)
                     {
                         throw new InvalidDataException("AssetBundle no válido: " + bundleDefinition.path);
@@ -2655,7 +3002,7 @@ namespace RogueCommandExpansionLoader.Content
                             temporaryResources.Add(imageKey, cardImage);
                         }
 
-                        ApplyBalanceOverrides(row, unit.balanceOverrides, packageName, unit.id);
+                        ApplyBalanceOverrides(row, unit.balanceOverrides, packageName, unit.id, true, false);
                         _entityIdField.SetValue(row, unit.id);
                         _prefabLocationField.SetValue(row, prefabKey);
                         _imageLocationField.SetValue(row, imageKey);
@@ -2692,7 +3039,7 @@ namespace RogueCommandExpansionLoader.Content
 
                         prefabKey = ResourceKey(unit.id, "prefab");
                         imageKey = ResourceKey(unit.id, "image");
-                        ApplyBalanceOverrides(row, unit.balanceOverrides, packageName, unit.id);
+                        ApplyBalanceOverrides(row, unit.balanceOverrides, packageName, unit.id, true, false);
                         _entityIdField.SetValue(row, unit.id);
                         _prefabLocationField.SetValue(row, prefabKey);
                         _imageLocationField.SetValue(row, imageKey);
@@ -2705,10 +3052,10 @@ namespace RogueCommandExpansionLoader.Content
                         temporaryResources.Add(imageKey, cardImage);
                     }
 
-                    if (HasRoleFlag(row, "Factory"))
+                    if (HasRoleFlag(row, "Factory") || HasRoleFlag(row, "Building"))
                     {
                         throw new InvalidDataException("La fila de unidad " + unit.id + " en '" + packageName +
-                            "' tiene el rol Factory; debe ser un producto. Declara la fábrica en productionBuilding.");
+                            "' tiene un rol de edificio; debe ser un producto. Declara la fábrica en productionBuilding.");
                     }
 
                     _factoryForEntityIdField.SetValue(row, CreateEmptyNullableString());
@@ -2717,7 +3064,7 @@ namespace RogueCommandExpansionLoader.Content
                     temporaryUnits.Add(new LoadedUnit(unit.id, definition.packId, prefabKey, imageKey,
                         row, unit, false, unit.productionBuilding.id));
                     temporaryUnits.Add(CreateProductionBuilding(unit, unit.productionBuilding, definition.packId,
-                        packageName, temporaryNativePrefabs, temporaryResources));
+                        packageName, temporaryBundles, temporaryNativePrefabs, temporaryResources));
                 }
 
                 for (int i = 0; i < definition.stages.Length; i++)
@@ -2980,18 +3327,24 @@ namespace RogueCommandExpansionLoader.Content
 
                 ValidateStageGenerationCompatibility(temporaryStages, temporaryProfiles, packageName);
 
-                CommitPack(definition, temporaryBundles, temporaryBundleStreams, packBundleBytes, temporaryResources,
-                    temporaryUnits, temporaryStages, temporaryProfiles);
-                _nativePrefabClones.AddRange(temporaryNativePrefabs);
-                _stageParameterClones.AddRange(temporaryStageParameterClones);
-                _blueprintPoolClones.AddRange(temporaryBlueprintPoolClones);
-                _landscapeClones.AddRange(temporaryLandscapeClones);
-                candidate.LoadedBytes = packBundleBytes;
+                lock (_gate)
+                {
+                    CommitPack(definition, temporaryBundles, temporaryBundleStreams, packBundleBytes,
+                        temporaryResources, temporaryUnits, temporaryStages, temporaryProfiles);
+                    _nativePrefabClones.AddRange(temporaryNativePrefabs);
+                    _stageParameterClones.AddRange(temporaryStageParameterClones);
+                    _blueprintPoolClones.AddRange(temporaryBlueprintPoolClones);
+                    _landscapeClones.AddRange(temporaryLandscapeClones);
+                    candidate.LoadedBytes = packBundleBytes;
+                }
                 return true;
             }
             catch (Exception exception)
             {
-                candidate.StatusReason = exception.GetType().Name + ": " + exception.Message;
+                lock (_gate)
+                {
+                    candidate.StatusReason = exception.GetType().Name + ": " + exception.Message;
+                }
                 for (int prefabIndex = 0; prefabIndex < temporaryNativePrefabs.Count; prefabIndex++)
                 {
                     GameObject prefab = temporaryNativePrefabs[prefabIndex];
@@ -3028,11 +3381,27 @@ namespace RogueCommandExpansionLoader.Content
                     }
                 }
 
-                try { if (manifestBundle != null) manifestBundle.Unload(true); } catch { }
-                try { if (manifestStream != null) manifestStream.Dispose(); } catch { }
-                foreach (AssetBundle bundle in temporaryBundles.Values)
+                try
                 {
-                    try { if (bundle != null) bundle.Unload(true); } catch { }
+                    if (manifestBundle != null)
+                    {
+                        if (!String.IsNullOrEmpty(manifestBundleRegistryKey))
+                        {
+                            _bundleRegistry.RemoveBundle(manifestBundleRegistryKey, manifestBundle);
+                        }
+                        manifestBundle.Unload(true);
+                    }
+                }
+                catch { }
+                try { if (manifestStream != null) manifestStream.Dispose(); } catch { }
+                foreach (KeyValuePair<string, AssetBundle> entry in temporaryBundles)
+                {
+                    try
+                    {
+                        _bundleRegistry.RemoveBundle(BundleRegistryKey(definition.packId, entry.Key), entry.Value);
+                        if (entry.Value != null) entry.Value.Unload(true);
+                    }
+                    catch { }
                 }
 
                 for (int i = 0; i < temporaryBundleStreams.Count; i++)
@@ -3203,6 +3572,10 @@ namespace RogueCommandExpansionLoader.Content
             for (int i = 0; i < units.Count; i++) localKnownIds.Add(units[i].Id);
             for (int i = 0; i < stages.Count; i++) localKnownIds.Add(stages[i].Definition.id);
             for (int i = 0; i < profiles.Count; i++) localKnownIds.Add(profiles[i].Id);
+            for (int i = 0; i < (definition.relics ?? new ContentRelicDefinition[0]).Length; i++)
+            {
+                localKnownIds.Add(definition.relics[i].id);
+            }
 
             var contributionStages = new List<object>();
             var contributionAi = new List<object>();
@@ -3319,10 +3692,21 @@ namespace RogueCommandExpansionLoader.Content
             _blueprintPoolScopeRegistry.ValidateCanRegister(poolScopeRegistrations);
 
             // All checks above complete before any pack-owned runtime registry is updated.
+            _relicRegistrar.Register(definition.relics, delegate(ContentRelicDefinition relic)
+            {
+                AssetBundle bundle = GetBundle(bundles, relic.assetBundleId, definition.packId);
+                return bundle.LoadAsset<Sprite>(relic.imageAssetName);
+            }, _retainedRelicObjects);
+
             for (int i = 0; i < units.Count; i++)
             {
                 _units.Add(units[i].Id, units[i]);
                 _entityRows.Add(units[i].BalanceRow);
+            }
+
+            for (int i = 0; i < (definition.relics ?? new ContentRelicDefinition[0]).Length; i++)
+            {
+                _relicDefinitions.Add(definition.relics[i].id, definition.relics[i]);
             }
 
             _blueprintPoolScopeRegistry.Register(poolScopeRegistrations);
@@ -3661,6 +4045,7 @@ namespace RogueCommandExpansionLoader.Content
             ContentProductionBuildingDefinition building,
             string packId,
             string packageName,
+            Dictionary<string, AssetBundle> temporaryBundles,
             List<GameObject> temporaryNativePrefabs,
             Dictionary<string, UnityEngine.Object> temporaryResources)
         {
@@ -3710,9 +4095,39 @@ namespace RogueCommandExpansionLoader.Content
             {
                 id = building.id,
                 nativeTemplateId = building.nativeTemplateId,
+                assetBundleId = building.assetBundleId,
+                cardImageAssetName = building.cardImageAssetName,
+                visualAssetName = building.visualAssetName,
+                visualRootPath = building.visualRootPath,
                 localizations = building.localizations
             };
             ValidateUnitPrefab(nativeTemplate, localizationDefinition, packageName, false);
+
+            GameObject visualTemplate = null;
+            AssetBundle buildingAssetBundle = null;
+            string imagePath = nativeImagePath;
+            if (!String.IsNullOrWhiteSpace(building.cardImageAssetName) ||
+                !String.IsNullOrWhiteSpace(building.visualAssetName))
+            {
+                buildingAssetBundle = GetBundle(temporaryBundles, building.assetBundleId, packageName);
+            }
+            if (!String.IsNullOrWhiteSpace(building.cardImageAssetName))
+            {
+                AssetBundle cardBundle = buildingAssetBundle ??
+                    GetBundle(temporaryBundles, building.assetBundleId, packageName);
+                Sprite cardImage = LoadRequiredAsset(cardBundle, building.cardImageAssetName,
+                    typeof(Sprite), "production-building Sprite card image", packageName) as Sprite;
+                imagePath = ResourceKey(building.id, "image");
+                temporaryResources.Add(imagePath, cardImage);
+            }
+
+            if (!String.IsNullOrWhiteSpace(building.visualAssetName))
+            {
+                visualTemplate = LoadRequiredAsset(buildingAssetBundle, building.visualAssetName,
+                    typeof(GameObject), "visual-only production-building GameObject prefab", packageName) as GameObject;
+                ValidateVisualPrefab(visualTemplate, localizationDefinition, packageName,
+                    "Edificio de producción");
+            }
 
             GameObject nativePrefabClone = InstantiateDormantPrefab(nativeTemplate);
             if (nativePrefabClone == null)
@@ -3721,6 +4136,12 @@ namespace RogueCommandExpansionLoader.Content
             }
 
             temporaryNativePrefabs.Add(nativePrefabClone);
+            if (visualTemplate != null)
+            {
+                ApplyVisualOverlay(nativePrefabClone, visualTemplate, localizationDefinition, packageName,
+                    "Edificio de producción", true);
+            }
+
             EntityController clonedController = nativePrefabClone.GetComponent<EntityController>();
             if (clonedController == null)
             {
@@ -3736,10 +4157,10 @@ namespace RogueCommandExpansionLoader.Content
             UnityEngine.Object.DontDestroyOnLoad(nativePrefabClone);
 
             string prefabKey = ResourceKey(building.id, "prefab");
-            ApplyBalanceOverrides(row, building.balanceOverrides, packageName, building.id);
+            ApplyBalanceOverrides(row, building.balanceOverrides, packageName, building.id, false, true);
             _entityIdField.SetValue(row, building.id);
             _prefabLocationField.SetValue(row, prefabKey);
-            _imageLocationField.SetValue(row, nativeImagePath);
+            _imageLocationField.SetValue(row, imagePath);
             _inactiveField.SetValue(row, false);
             _allowedBlueprintField.SetValue(row, false);
             ProductionBuildingEligibility.ApplyToFactoryRow(product, row,
@@ -3747,7 +4168,7 @@ namespace RogueCommandExpansionLoader.Content
             _factoryForEntityIdField.SetValue(row, CreateNullableString(product.id));
             temporaryResources.Add(prefabKey, nativePrefabClone);
 
-            return new LoadedUnit(building.id, packId, prefabKey, nativeImagePath,
+            return new LoadedUnit(building.id, packId, prefabKey, imagePath,
                 row, localizationDefinition, true, null);
         }
 
@@ -3822,7 +4243,9 @@ namespace RogueCommandExpansionLoader.Content
             object row,
             ContentBalanceOverride[] overrides,
             string packageName,
-            string unitId)
+            string unitId,
+            bool isProduct,
+            bool isFactoryRow)
         {
             if (overrides == null)
             {
@@ -3869,7 +4292,21 @@ namespace RogueCommandExpansionLoader.Content
                 {
                     try
                     {
-                        value = Enum.Parse(field.FieldType, balanceOverride.value, true);
+                        if (balanceOverride.name == "roles" || balanceOverride.name == "offeredSystemTags")
+                        {
+                            if (!BalanceOverrideFlags.TryApply(row, field, balanceOverride.name,
+                                balanceOverride.value, isProduct, isFactoryRow,
+                                out object updatedRow, out string flagDiagnostic))
+                            {
+                                throw new InvalidDataException(flagDiagnostic);
+                            }
+                            row = updatedRow;
+                            continue;
+                        }
+                        else
+                        {
+                            value = Enum.Parse(field.FieldType, balanceOverride.value, true);
+                        }
                     }
                     catch
                     {
@@ -3924,28 +4361,32 @@ namespace RogueCommandExpansionLoader.Content
             }
         }
 
-        private static void ValidateVisualPrefab(GameObject prefab, ContentUnitDefinition unit, string packageName)
+        private static void ValidateVisualPrefab(
+            GameObject prefab,
+            ContentUnitDefinition unit,
+            string packageName,
+            string ownerLabel = "Unidad")
         {
             if (prefab == null)
             {
-                throw new InvalidDataException("Unidad " + unit.id + " en '" + packageName +
+                throw new InvalidDataException(ownerLabel + " " + unit.id + " en '" + packageName +
                     "': el prefab visual está vacío.");
             }
 
             if (!ContentPackValidator.PrefabReferenceMatchesObjectName(unit.visualAssetName, prefab.name))
             {
-                throw new InvalidDataException("Unidad " + unit.id + " en '" + packageName +
+                throw new InvalidDataException(ownerLabel + " " + unit.id + " en '" + packageName +
                     "': el nombre interno del prefab visual '" + prefab.name +
                     "' no coincide con el alias visualAssetName '" + unit.visualAssetName + "'.");
             }
 
-            ValidateNoMissingPrefabComponents(prefab, packageName, "Visual de unidad " + unit.id);
+            ValidateNoMissingPrefabComponents(prefab, packageName, "Visual de " + ownerLabel + " " + unit.id);
             Component[] components = prefab.GetComponentsInChildren<Component>(true);
             for (int i = 0; i < components.Length; i++)
             {
                 if (components[i] is MonoBehaviour)
                 {
-                    throw new InvalidDataException("Visual de unidad " + unit.id + " en '" + packageName +
+                    throw new InvalidDataException("Visual de " + ownerLabel + " " + unit.id + " en '" + packageName +
                         "': los modelos de bundle no pueden incluir componentes MonoBehaviour.");
                 }
             }
@@ -3964,7 +4405,7 @@ namespace RogueCommandExpansionLoader.Content
 
             if (!hasEnabledRenderer)
             {
-                throw new InvalidDataException("Visual de unidad " + unit.id + " en '" + packageName +
+                throw new InvalidDataException("Visual de " + ownerLabel + " " + unit.id + " en '" + packageName +
                     "': el prefab debe contener al menos un Renderer habilitado.");
             }
         }
@@ -3989,26 +4430,39 @@ namespace RogueCommandExpansionLoader.Content
             GameObject nativePrefab,
             GameObject visualTemplate,
             ContentUnitDefinition unit,
-            string packageName)
+            string packageName,
+            string ownerLabel = "Unidad",
+            bool meshRenderersOnly = false)
         {
             Transform target = FindUniqueTransformPath(nativePrefab.transform, unit.visualRootPath);
             if (target == null)
             {
-                throw new InvalidDataException("Unidad " + unit.id + " en '" + packageName +
+                throw new InvalidDataException(ownerLabel + " " + unit.id + " en '" + packageName +
                     "': visualRootPath '" + unit.visualRootPath +
                     "' no identifica una única ruta dentro de la jerarquía del prefab nativo.");
             }
 
-            Renderer[] originalRenderers = target.GetComponentsInChildren<Renderer>(true);
-            if (originalRenderers.Length == 0)
+            Renderer[] renderersUnderTarget = target.GetComponentsInChildren<Renderer>(true);
+            var originalRenderers = new List<Renderer>();
+            for (int i = 0; i < renderersUnderTarget.Length; i++)
             {
-                throw new InvalidDataException("Unidad " + unit.id + " en '" + packageName +
+                Renderer renderer = renderersUnderTarget[i];
+                if (renderer != null && (!meshRenderersOnly ||
+                    renderer is MeshRenderer || renderer is SkinnedMeshRenderer))
+                {
+                    originalRenderers.Add(renderer);
+                }
+            }
+
+            if (originalRenderers.Count == 0)
+            {
+                throw new InvalidDataException(ownerLabel + " " + unit.id + " en '" + packageName +
                     "': visualRootPath '" + unit.visualRootPath + "' no contiene Renderer nativos que reemplazar.");
             }
 
-            Material fallbackMaterial = FindNativeVisualMaterial(originalRenderers);
+            Material fallbackMaterial = FindNativeVisualMaterial(originalRenderers.ToArray());
 
-            for (int i = 0; i < originalRenderers.Length; i++)
+            for (int i = 0; i < originalRenderers.Count; i++)
             {
                 originalRenderers[i].enabled = false;
             }
@@ -4016,7 +4470,7 @@ namespace RogueCommandExpansionLoader.Content
             GameObject visualClone = UnityEngine.Object.Instantiate(visualTemplate, target, false);
             if (visualClone == null)
             {
-                throw new InvalidDataException("Unidad " + unit.id + " en '" + packageName +
+                throw new InvalidDataException(ownerLabel + " " + unit.id + " en '" + packageName +
                     "': Unity no pudo instanciar el prefab visual.");
             }
 
@@ -4024,7 +4478,7 @@ namespace RogueCommandExpansionLoader.Content
             visualClone.transform.localPosition = Vector3.zero;
             visualClone.transform.localRotation = Quaternion.identity;
             visualClone.transform.localScale = Vector3.one;
-            ApplyFallbackVisualMaterial(visualClone, fallbackMaterial, unit, packageName);
+            ApplyFallbackVisualMaterial(visualClone, fallbackMaterial, unit, packageName, ownerLabel);
             visualClone.SetActive(true);
         }
 
@@ -4093,7 +4547,8 @@ namespace RogueCommandExpansionLoader.Content
             GameObject visualClone,
             Material fallbackMaterial,
             ContentUnitDefinition unit,
-            string packageName)
+            string packageName,
+            string ownerLabel = "Unidad")
         {
             Renderer[] renderers = visualClone.GetComponentsInChildren<Renderer>(true);
             for (int i = 0; i < renderers.Length; i++)
@@ -4116,7 +4571,7 @@ namespace RogueCommandExpansionLoader.Content
 
                 if (fallbackMaterial == null)
                 {
-                    throw new InvalidDataException("Unidad " + unit.id + " en '" + packageName +
+                    throw new InvalidDataException(ownerLabel + " " + unit.id + " en '" + packageName +
                         "': el modelo visual no tiene materiales y la plantilla nativa no ofrece un material MeshRenderer.");
                 }
 
@@ -4394,6 +4849,13 @@ namespace RogueCommandExpansionLoader.Content
                         "': la unidad " + definition.unitId + " no está registrada ni disponible.");
                 }
 
+                if (!IsProductUnitAllowedForAi(definition.unitId, temporaryUnits))
+                {
+                    throw new InvalidDataException("Perfil AI " + profile.id + " en '" + packageName +
+                        "': la unidad " + definition.unitId +
+                        " no tiene isAllowedForAi habilitado.");
+                }
+
                 if (definition.baseIndex < 0 || definition.baseIndex >= aiBases.Count)
                 {
                     throw new InvalidDataException("Perfil AI " + profile.id + " en '" + packageName +
@@ -4623,6 +5085,46 @@ namespace RogueCommandExpansionLoader.Content
 
             LoadedUnit unit;
             return TryGetLoadedUnit(entityId, temporaryUnits, out unit) && !unit.IsProductionBuilding;
+        }
+
+        private bool IsProductUnitAllowedForAi(string entityId, List<LoadedUnit> temporaryUnits)
+        {
+            LoadedUnit loadedUnit;
+            if (TryGetLoadedUnit(entityId, temporaryUnits, out loadedUnit))
+            {
+                return loadedUnit != null && !loadedUnit.IsProductionBuilding &&
+                    loadedUnit.Definition != null && loadedUnit.Definition.isAllowedForAi;
+            }
+
+            if (!_nativeUnitIds.Contains(entityId) || _nativeFactoryIds.Contains(entityId))
+            {
+                return false;
+            }
+
+            IList rows = _nativeEntityRowsField.GetValue(null) as IList;
+            IDictionary index = _entityIndexField.GetValue(null) as IDictionary;
+            if (rows == null || index == null || !index.Contains(entityId))
+            {
+                return false;
+            }
+
+            object rowIndexValue = index[entityId];
+            if (!(rowIndexValue is int))
+            {
+                return false;
+            }
+
+            int rowIndex = (int)rowIndexValue;
+
+            if (rowIndex < 0 || rowIndex >= rows.Count)
+            {
+                return false;
+            }
+
+            object row = rows[rowIndex];
+            return row != null && row.GetType() == _entityRowType &&
+                String.Equals(_entityIdField.GetValue(row) as string, entityId, StringComparison.Ordinal) &&
+                (bool)_allowedForAiField.GetValue(row);
         }
 
         private bool IsDeckEntityAvailable(string entityId, List<LoadedUnit> temporaryUnits)
@@ -5918,6 +6420,11 @@ namespace RogueCommandExpansionLoader.Content
             StringBuilder path,
             uint pathLength,
             uint flags);
+
+        private static string BundleRegistryKey(string packId, string bundleId)
+        {
+            return (packId ?? String.Empty) + "\u001f" + (bundleId ?? String.Empty);
+        }
 
         private static string ResourceKey(string entityId, string kind)
         {

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Rogue Command Blender PBR 4.5"
+  short_description: "Adapt PBR baking guidance to Blender 4.5.14"
+  default_prompt: "Use $rogue-command-blender-pbr-45 to author or review Rogue Command PBR maps in Blender 4.5.14."

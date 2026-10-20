@@ -223,16 +223,18 @@ sample-reactive-ai pack is data-only. Other packs must include every AssetBundle
 declared by content.json and its manifest.
 Use the adjacent schema directory when authoring content.json.
 
-The native sample adds five localized native-template units with script-free
-visual overlays: Sandlance Scout, Skirmish Strike Bike, Colossus Siege Platform,
-Ironclad Walker, and Surge Arc Tank. Every unit declares its own new production
-building; random blueprint rewards offer that building to produce its unit.
-All five units have unique custom card Sprites and keep native gameplay
-controllers, while the pack adds a stage variant, a seeded native landscape variant,
-and a scheduled-build AI module.
-The cards unlock at persistent profile levels 0 through 4 in order. Reaching a
-level makes that card eligible for randomized reward offers; it does not force
-the card into a particular offer.
+The native sample adds nine localized native-template units with script-free
+visual overlays: Sandlance Scout, Colossus Siege Platform, Ironclad Walker,
+Atlas Crane Mech, Bastion Siege Mech, Arachnid Hexapod, Overlord Command HQ,
+Skirmish Strike Bike, and Surge Arc Tank. Every unit declares its own new
+production building; random blueprint rewards offer that building to produce
+its unit. Seven units have custom card Sprites; the remaining unit cards keep
+their native artwork. All nine units keep native gameplay controllers, while
+the pack adds a stage variant, a seeded native landscape variant, and a
+scheduled-build AI module.
+Each card's persistent profile-level requirement is configured on its unit and
+factory rows. Reaching that level makes the card eligible for randomized reward
+offers; it does not force the card into a particular offer.
 The reactive AI stage references Sandlance and uses a native AI template with a
 bounded compiled counterattack module. The landscape reuses native 27 Circles rules
 with a fixed seed and is scoped to its stage; it does not add new terrain logic.
@@ -247,16 +249,18 @@ Rogue Command Expansion Loader $pluginVersion
 Install:
 1. Install BepInEx 5.4.23.5 win-x64 Mono into the Rogue Command game folder.
 2. Extract this archive into the Rogue Command game folder, preserving its BepInEx directory.
-3. The included sample-native-expansion pack adds five localized native-template units
-   with bundled model overlays: Sandlance Scout, Skirmish Strike Bike, Colossus Siege
-   Platform, Ironclad Walker, and Surge Arc Tank. Each unit has a separately registered
+3. The included sample-native-expansion pack adds nine localized native-template units
+   with bundled model overlays: Sandlance Scout, Colossus Siege Platform, Ironclad
+   Walker, Atlas Crane Mech, Bastion Siege Mech, Arachnid Hexapod, Overlord Command
+   HQ, Skirmish Strike Bike, and Surge Arc Tank. Each unit has a separately registered
    production building with its own ID, native factory prefab, and localized name.
-   The cards unlock at persistent profile levels 0 through 4; reaching a threshold
-   makes that card eligible for randomized offers but does not guarantee a draw.
+   Persistent profile-level requirements are configured on each unit and factory
+   row; reaching a threshold makes a card eligible for randomized offers but does
+   not guarantee a draw.
    Random rewards offer the new building blueprint; that building produces its unit.
-   All five units have unique custom card Sprites. The pack also adds a
-   native stage variant, a fixed-seed landscape variant, and a scheduled-build AI
-   module; every unit keeps its native gameplay controller.
+   Seven units have custom card Sprites, while the two newest units use native card
+   artwork. The pack also adds a native stage variant, a fixed-seed landscape variant,
+   and a scheduled-build AI module; every unit keeps its native gameplay controller.
    The sample-reactive-ai pack demonstrates a native stage variant that references
    the Sandlance Scout from sample-native-expansion and an AI module that sends up
    to two nearby units to counterattack an active attacker. Stage reward pools are

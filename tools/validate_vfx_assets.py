@@ -38,6 +38,17 @@ CANONICAL_VFX_SOCKETS = {
     "Socket_Hardpoint_ERA",
     "Socket_Hardpoint_APS",
     "Socket_Hardpoint_FuelDrums",
+    "Socket_FootContact_L",
+    "Socket_FootContact_R",
+    "Socket_FootContact_FL",
+    "Socket_FootContact_FR",
+    "Socket_FootContact_RL",
+    "Socket_FootContact_RR",
+    "Socket_EngineAudio",
+    "Socket_WeaponAudio",
+    "Socket_BuildingAudio",
+    "FirePoint_0",
+    "FirePoint_1",
 }
 
 # Verified URP particle shaders in Rogue Command 1.0.9
@@ -246,15 +257,18 @@ class VfxAssetValidator:
                 # Only analyze visual prefabs or root visual models
                 if not name.endswith("Visual") and not name.endswith("Model"):
                     continue
+                if not self._is_root_game_object(data):
+                    continue
 
                 audit = VisualPrefabAudit(asset_name=name, source_type="bundle")
                 found_names: Set[str] = set()
 
                 # Walk hierarchy through Transform
-                for comp_ptr in getattr(data, "m_Component", []):
+                for component_pair in getattr(data, "m_Component", []):
                     try:
-                        comp = comp_ptr.read()
-                        if comp.type.name == "Transform":
+                        component_ptr = getattr(component_pair, "component", component_pair)
+                        comp = component_ptr.read() if hasattr(component_ptr, "read") else component_ptr
+                        if type(comp).__name__ == "Transform":
                             self._collect_child_names(comp, found_names)
                     except Exception:
                         pass
@@ -290,6 +304,20 @@ class VfxAssetValidator:
 
         return bundle_audits
 
+    @staticmethod
+    def _is_root_game_object(go_data: Any) -> bool:
+        """Exclude nested model GameObjects; sockets belong to their visual prefab root."""
+        for component_pair in getattr(go_data, "m_Component", []):
+            try:
+                component_ptr = getattr(component_pair, "component", component_pair)
+                component = component_ptr.read() if hasattr(component_ptr, "read") else component_ptr
+                if type(component).__name__ == "Transform":
+                    parent = getattr(component, "m_Father", None)
+                    return parent is None or int(getattr(parent, "path_id", 0)) == 0
+            except Exception:
+                continue
+        return True
+
     def _collect_child_names(self, transform_obj: Any, names_set: Set[str]) -> None:
         """Recursively gathers all child GameObject names."""
         try:
@@ -300,7 +328,7 @@ class VfxAssetValidator:
 
             children = getattr(transform_obj, "m_Children", [])
             for c_ptr in children:
-                c_tf = c_ptr.read()
+                c_tf = c_ptr.read() if hasattr(c_ptr, "read") else c_ptr
                 self._collect_child_names(c_tf, names_set)
         except Exception:
             pass

@@ -19,10 +19,14 @@ AI `unitEntries` names produced units. A native AI's existing serialized deck ca
 | `scout-tank` | `scout-tank-factory` | `PCXBaseTankFactory` | 500 | 42 s |
 | `heavy-artillery` | `heavy-artillery-factory` | `ArtilleryTankFactory` | 800 | 50 s |
 | `assault-walker` | `assault-walker-factory` | `GatlingWalkerFactory` | 1100 | 36 s |
+| `atlas-crane-mech` | `atlas-crane-mech-factory` | `GatlingWalkerFactory` | 1100 | 36 s |
+| `bastion-siege-mech` | `bastion-siege-mech-factory` | `GatlingWalkerFactory` | 1100 | 42 s |
+| `arachnid-hexapod` | `arachnid-hexapod-factory` | `GatlingWalkerFactory` | 1100 | 45 s |
+| `overlord-command-hq` | `overlord-command-hq-factory` | `PCXBaseTankFactory` | 700 | 48 s |
 | `skirmish-bike` | `skirmish-bike-factory` | `BombBikeFactory` | 280 | 10 s |
 | `surge-tank` | `surge-tank-factory` | `LightningTankFactory` | 650 | 30 s |
 
-All sample IDs above use `sample-native:`. The Sandlance factory explicitly permits three buildings; other factory counts inherit their native templates. The product and factory unlock levels now match each other; see the profile-level progression below. Costs, timings, and capacities are explicit in the sample manifest but have not been tuned through a controlled gameplay balance pass.
+All nine sample IDs above use `sample-native:`. The Sandlance factory explicitly permits three buildings; other factory counts inherit their native templates. All nine products and their factories use the minimum persistent profile unlock level, `0`, for QA. Costs, timings, and capacities are explicit in the sample manifest but have not been tuned through a controlled gameplay balance pass.
 
 ## Profile-level card unlocks
 
@@ -30,15 +34,11 @@ All sample IDs above use `sample-native:`. The Sandlance factory explicitly perm
 
 The product and its factory must both explicitly declare the same `neededExperienceLevel` and `rarity`. The package validator rejects missing or mismatched values before registration. The static game path queries the product's level when building a pool, while some reward candidate paths inspect the factory row; keeping both values aligned avoids mismatched unlock behavior.
 
-| Profile level | Card | Rarity | Card cost | Durability | Attack and card ability |
-|---:|---|---|---:|---|---|
-| 0 | Sandlance Scout | Common | 70 | 130 health | AoE, 8 damage at range 6; fast scout |
-| 1 | Skirmish Strike Bike | Common | 55 | 75 health | AoE, 32 damage, radius 1.8; dies and summons a Large Mine |
-| 2 | Ironclad Gatling Walker | Common | 380 | 420 health, 1 max armor | Single attack, 4 damage, 6 firepoints at range 6 |
-| 3 | Surge Arc Tank | Common | 210 | 150 health, 5 shield | Beam, 12 damage at range 4.5 |
-| 4 | Colossus Siege Platform | Common | 280 | 160 health, armor protection 2 | Artillery, 55 damage at range 16; toggle movement/attack mode |
+| Profile level | Cards | Rarity |
+|---:|---|---|
+| 0 | Sandlance Scout; Skirmish Strike Bike; Ironclad Gatling Walker; Colossus Siege Platform; Surge Arc Tank; Atlas Crane Mech; Bastion Siege Mech; Arachnid Hexapod; Overlord Command HQ | Common |
 
-The active sample manifest explicitly records 29 balance fields for each product, including zero values for unused shields, secondary weapons, and skill parameters. All five cards have English and Spanish names and descriptions; the Bike and Colossus also have English and Spanish skill text. This makes their card data deliberate rather than inherited from the native templates.
+The active sample manifest explicitly records 29 balance fields for each product, including zero values for unused shields, secondary weapons, and skill parameters. All nine cards have English and Spanish names and descriptions; the Bike and Colossus also have English and Spanish skill text. This makes their card data deliberate rather than inherited from the native templates.
 
 ## Static evidence
 
@@ -53,7 +53,7 @@ The verified starter field is `EntityBalancingParameters.isAllowedAsStartingBlue
 - Release build: zero errors and warnings.
 - Contract/registry harness before the later placement-distance patch: 89/90 passed, one Windows symlink privilege skip.
 - All three source manifests pass the JSON Schema.
-- Read-only native visual preflight passes all five overlay paths after checking the compatibility tuple and `resources.assets` hash.
+- Historical read-only native visual preflight resolved all five candidate native visual roots after checking the compatibility tuple and `resources.assets` hash. The current pack preflight resolves its four active overlay roots; Ironclad Walker keeps the native articulated model while its custom static prototype remains unrigged.
 - ZIP inspected: plugin, two installable packs, bundles, contract/readmes; no game assemblies, BepInEx/Harmony runtime dependencies, or PDBs.
 - Static code review covered IDs, factory roles/product relation, clone cleanup, registration, blueprint translation and AI dependencies. Review found a native AI deck regression while separating products/factories; it was corrected before the successful runtime attempt.
 

@@ -1,8 +1,24 @@
 # Blender Procedural Modeling Techniques for Rogue Command
 
-This reference provides tested Python (`bpy`) recipes, mathematical foundations, and geometric algorithms to generate production-ready low-poly vehicle models deterministically in Blender 4.5.14 LTS.
+This reference provides tested Python (`bpy`) recipes, mathematical foundations, and geometric algorithms for deterministic, grounded stylized vehicle models in Blender 4.5.14 LTS. The generators establish repeatable proportions and mechanical systems; refine visible primary shells when their output looks like a stack of primitives.
 
 All recipes are implemented in `tools/RogueModelKit.py` and `.agents/skills/rogue-command-3d-model-authoring/scripts/RogueModelKit.py`.
+
+Use the form-realism rules in the parent skill as the art-direction authority. Keep faceted armor where it communicates plate construction, and add controlled curvature to cast or formed parts where it improves the silhouette. The bevel values shown below are usable recipe parameters, not a requirement to bevel every edge; scale or adjust them for the part and preserve the established triangle and LOD budgets.
+
+## Visual Refinement Workflow
+
+Run this sequence before treating a generated vehicle as final:
+
+1. **Define role and proportions**: specify tactical role, mobility, primary system, and distinct silhouette cues; use front/side/top references to set scale and component placement.
+2. **Build the functional blockout**: use the kit for a reproducible starting point, with ground contact, pivots, sockets, and subsystem clearances in place.
+3. **Review the silhouette**: inspect a black, unlit render from the elevated RTS camera and major orthographic views. At the local 30–120 px review range, correct indistinct role cues and overly thin features before material work. These sizes and the 250 ms glance target are local heuristics.
+4. **Refine visible shells**: reshape long profiles and cross-sections, form compound transitions, and create believable overlaps, shadow gaps, and joints. Preserve flat armor facets where they describe plates. Do not add surface detail to hide unresolved blockout shapes.
+5. **Review geometry and shading independently**: use selective bevels for physical edge radii/chamfers; use angle smoothing and weighted normals for the appearance of curved or broad faces. Weighted normals cannot round the silhouette. Keep normals/tangents authored for the Unity FBX import and inspect the imported result.
+6. **Add baked detail and inspect budgets**: after geometry and UVs stabilize, bake useful fine relief into the existing Normal atlas with padding. Treat the current 7,500-face value as a Rogue Command profiling ceiling for LOD0, not a universal Unity budget or an instruction to use every face. Compare Blender face counts with exported Unity triangle counts and review the LODs.
+7. **Preserve integration contracts**: before export, verify canonical sockets, hierarchy, pivots, ground contact, UVs, texture channels/import settings, and the mesh `Color` RGBA vertex-wear attribute. See [PBR Texture Authoring](../../rogue-command-pbr-texture-authoring/SKILL.md) and [PBR Texture Validation](../../rogue-command-pbr-texture-validation/SKILL.md).
+
+This project workflow adapts RTS silhouette guidance, Blender's separation of mesh geometry and shading, and Unity's FBX/LOD behavior. The cited sources do not mandate one universal style or polygon count; see [Design Guides Adapted](design-guides-adapted.md).
 
 ---
 
@@ -30,7 +46,7 @@ bpy.ops.export_scene.fbx(
     apply_unit_scale=True,
     apply_scale_options="FBX_SCALE_NONE",
     use_mesh_modifiers=True,
-    mesh_smooth_type="OFF",          # Preserves hard-surface flat shading
+    mesh_smooth_type="FACE",         # Preserves custom weighted split normals & flat chamfers
     path_mode="AUTO",
     axis_forward="-Z",               # Maps Blender +Y to Unity +Z
     axis_up="Y",                     # Maps Blender +Z to Unity +Y
@@ -71,60 +87,29 @@ rot_euler = dir_vec.to_track_quat("Z", "Y").to_euler()
 
 ## 3. Macro Hull & Chassis Generators
 
-### A. Sloped Armored Glacis Hull (`make_sloped_glacis_hull`)
-Generates an armored tank chassis with sloped frontal glacis, undercut belly clearance, and tapered sides.
+These assemblies are repeatable starting forms. A faceted housing or wedge hull can remain faceted when that is intentional; otherwise refine the visible profile with shaped transitions or replacement geometry before export. Do not alter required pivots, socket paths, mesh `Color` RGBA vertex wear, or export transforms while refining.
+
+| Generator Function | Primary Parameters | Geometric Features & Chamfers |
+|---|---|---|
+| `make_sloped_glacis_hull` | `length_front`, `length_rear`, `width_front`, `width_rear`, `height_lower`, `height_upper`, `bevel=0.045` | Armored wedge chassis, sloped frontal glacis, undercut belly clearance, tapered sponson flanks |
+| `make_faceted_turret_housing` | `location`, `size=(x,y,z)`, `armor_mat`, `roof_mat`, `bevel=0.035` | Octagonal faceted turret shell, sloped gun mantlet cradle, rear bustle counterweight |
+| `make_troop_compartment` | `location`, `size`, `armor_mat`, `door_mat`, `detail_mat` | Armored personnel cabin, rear clamshell access doors with grab handles, roof commander cupola |
+| `make_tubular_rollcage_assembly` | `size`, `location`, `bar_radius=0.034`, `tube_mat`, `roof_mat`, `visor_mat` | Welded tubular roll cage, A/B pillars, cross-header bar, diagonal C-stays, armored sun visor plate |
 
 ```python
+# Chassis and superstructure construction pattern
 hull = rmk.make_sloped_glacis_hull(
-    name="Vehicle_Hull",
-    length_front=1.45, length_rear=1.40,
-    width_front=1.35, width_rear=1.42,
-    height_lower=0.24, height_upper=0.82,
+    name="Vehicle_Hull", length_front=1.45, length_rear=1.40,
+    width_front=1.35, width_rear=1.42, height_lower=0.24, height_upper=0.82,
     material=armor_primary, bevel=0.045
 )
-```
-
-### B. Faceted Turret Shell with Bustle (`make_faceted_turret_housing`)
-Creates an octagonal/faceted armored turret shell with sloped gun mantlet cradle and rear counterweight bustle.
-
-```python
-turret_parts = rmk.make_faceted_turret_housing(
-    prefix="Vehicle_Turret",
-    location=(0.0, 0.10, 1.15),
-    size=(1.45, 1.65, 0.42),
+turret = rmk.make_faceted_turret_housing(
+    prefix="Vehicle_Turret", location=(0.0, 0.10, 1.15), size=(1.45, 1.65, 0.42),
     armor_mat=armor_primary, roof_mat=armor_light, bevel=0.035
 )
-```
-
-### C. Armored Troop Cabin (`make_troop_compartment`)
-Generates an enclosed rear personnel compartment for APCs and halftracks:
-- Sloped armored crew shell with single-segment chamfers.
-- Twin rear clamshell access doors with grab handles and recessed seams.
-- Roof observation hatch / commander cupola.
-- Flank armored vision slits and firing ports.
-
-```python
 cabin = rmk.make_troop_compartment(
-    prefix="APC_TroopBay",
-    location=(0.0, -0.95, 0.88),
-    size=(1.42, 1.65, 0.74),
+    prefix="APC_TroopBay", location=(0.0, -0.95, 0.88), size=(1.42, 1.65, 0.74),
     armor_mat=armor_primary, door_mat=armor_light, detail_mat=gunmetal
-)
-```
-
-### D. Off-Road Tubular Roll Cage (`make_tubular_rollcage_assembly`)
-Generates an exo-skeleton welded tubular frame for strike buggies and scout vehicles:
-- A-pillars (windshield posts) with cross-header bar.
-- B-pillar main roll hoop and diagonal rear C-stays.
-- Armored roof sun-visor plate and brow shield.
-
-```python
-rollcage = rmk.make_tubular_rollcage_assembly(
-    prefix="Buggy_RollCage",
-    size=(1.15, 1.45, 0.78),
-    location=(0.0, 0.02, 1.02),
-    bar_radius=0.034,
-    tube_mat=gunmetal, roof_mat=armor_primary, visor_mat=armor_light
 )
 ```
 
@@ -132,250 +117,72 @@ rollcage = rmk.make_tubular_rollcage_assembly(
 
 ## 4. High-Fidelity Mobility & Suspension Systems
 
-### A. Parametric Continuous Track Assembly (`make_continuous_track_assembly`)
-Creates a complete track subsystem including:
-1. Articulated continuous track belt with sloped front approach angle (~25°–35° climb).
-2. Stepped road wheels array (outer tread rim, recessed hub dish, center axle cap).
-3. Rear drive sprocket and front idler wheel.
-4. Top-run cleats for mechanical surface rhythm.
-5. Optional armored upper mudguard/fender and chamfered side skirts with hazard stripes.
+| System Generator | Mobility Type & Ground Invariant | Key Subsystem Primitives |
+|---|---|---|
+| `make_continuous_track_assembly` | Continuous Track ($Z_{\min} = 0.0\text{m}$) | Articulated belt (~30° climb), 5–6 stepped road wheels, drive sprocket, return idler, cleats, skirts, catenary sag (`track_sag`), suspension arms (`with_suspension_arms`), spaced skirts (`with_spaced_skirts`) |
+| `make_quad_track_pod_assembly` | Independent 4-Track Pod ($Z_{\min} = 0.0\text{m}$) | Independent continuous track pod, catenary sag (`track_sag`), swivel mounting sponson arm, top mudguard fender |
+| `make_swing_arm_suspension_linkage` | Trailing Swing-Arm Linkage | Trailing swing arms, inboard torsion bar bosses on hull, upper coilover/hydraulic dampers |
+| `make_spaced_armor_side_skirts` | Standoff Composite Skirts | Multi-panel armor tiles, top mounting rail, standoff bracket struts, rear rubber mudflaps |
+| `make_all_terrain_wheel_assembly` | Tactical Wheeled ($Z_{\min} = 0.0\text{m}$) | Directional chevron tire lugs, deep-dish rim, planetary hub with 6 bolts, coilover shock (`add_all_terrain_wheels(..., middle_axle=True)` for 6x6 chassis) |
+| `make_bipedal_digitigrade_leg` | Digitigrade Walker ($Z_{\min} = 0.0\text{m}$) | Rotary hip actuator, hydraulic thigh ram, knee armor cap, shin strut, 3-toed stabilizer foot |
+| `make_quad_crawler_leg` | Quad Spider Crawler ($Z_{\min} = 0.0\text{m}$) | Rotary hip knuckle, upper femur boom, knee knuckle, lower tibia strut, circular rubber foot pad |
+| `make_hover_skimmer_assembly` | Repulsor Hover ($Z_{\min} \approx 0.24–0.52\text{m}$) | Ventral repulsor cushion skirt, 4 plasma thruster bells, lateral stabilizer fins, vectoring ducts |
+| `make_ducted_tiltrotor_assembly` | VTOL Tilt-Rotor (Aerial) | Shroud cowl with beveled lip, spinner hub, angled pitch blades, swivel pylon, plasma exhaust |
+| `make_telescopic_piston_assembly` | Telescopic Hydraulic Actuator | Outer barrel housing, wiper seal collar, inner chrome/steel ram rod, clevis pin eye-mounts |
 
 ```python
+# Bilateral track and walker leg instantiation patterns
 for side in (-1, 1):
-    x_pos = side * 1.10
+    # Continuous tracks: side * 1.10 spacing with suspension linkage & spaced skirts
     tracks = rmk.make_continuous_track_assembly(
-        prefix="Vehicle_Treads",
-        x_pos=x_pos, length=2.85, height=0.62, belt_width=0.34,
-        roadwheel_count=5, tread_mat=tread_mat, rim_mat=wheel_rim,
-        hub_mat=wheel_hub, axle_mat=gunmetal,
-        fender_mat=armor_light, skirt_mat=armor_primary, accent_mat=warning_amber
+        prefix="Vehicle_Treads", x_pos=side * 1.10, length=2.85, height=0.62, belt_width=0.34,
+        roadwheel_count=5, tread_mat=tread_mat, rim_mat=wheel_rim, hub_mat=wheel_hub,
+        axle_mat=gunmetal, fender_mat=armor_light, skirt_mat=armor_primary, accent_mat=warning_amber,
+        with_suspension_arms=True, with_spaced_skirts=True
     )
     model_objects.extend(tracks)
-```
 
-### B. Heavy Tactical All-Terrain Wheel (`make_all_terrain_wheel_assembly`)
-Generates a rugged off-road tire for recon buggies, missile trucks, and strike bikes:
-- Directional chevron tread lugs around tire circumference.
-- Deep-dish steel rim recessed inside the rubber carcass.
-- Planetary gear reduction hub with 6-bolt hexagonal pattern.
-- Suspension wishbone and coilover shock strut.
-
-```python
-wheel = rmk.make_all_terrain_wheel_assembly(
-    prefix="Buggy_Wheel_FL",
-    location=(0.85, 0.95, 0.38),
-    radius=0.38, width=0.28,
-    tire_mat=tire_rubber, rim_mat=wheel_rim, hub_mat=gunmetal,
-    accent_mat=warning_amber, lug_count=10
-)
-```
-
-### C. Articulated Digitigrade Bipedal Leg (`make_bipedal_digitigrade_leg`)
-Generates a combat walker leg with mechanical joint kinematics:
-- Rotary hip actuator cylinder.
-- Armored thigh plate with hydraulic compression cylinder and chrome piston rod.
-- Knee hinge joint with protective armor cap.
-- Sloped shin armor plate with dual ankle damper struts.
-- 3-toed stabilizer foot (center toe, lateral outrigger, heel claw) resting flat on $Z \ge 0.0$.
-
-```python
-for side in (-1, 1):
+    # Bipedal walker legs: hip at (side * 0.42, -0.05, 1.45)
     leg = rmk.make_bipedal_digitigrade_leg(
-        prefix="Walker_Leg",
-        hip_location=(side * 0.42, -0.05, 1.45),
-        side=side,
-        armor_mat=armor_primary, joint_mat=gunmetal,
-        piston_mat=piston_chrome, accent_mat=warning_amber
+        prefix="Walker_Leg", hip_location=(side * 0.42, -0.05, 1.45), side=side,
+        armor_mat=armor_primary, joint_mat=gunmetal, piston_mat=piston_chrome, accent_mat=warning_amber
     )
     model_objects.extend(leg)
-```
-
-### D. Articulated Quad-Crawler Spider Leg (`make_quad_crawler_leg`)
-Generates heavy 4-legged walking artillery and siege spider platforms:
-- Heavy rotary hip knuckle actuator.
-- Reinforced upper femur boom with hydraulic support ram.
-- Knee hinge joint with protective knuckle armor.
-- Lower tibia strut angled towards ground contact.
-- Broad circular foot pad with rubber tread base and ankle shock sleeve resting exactly at $Z \ge 0.0\text{m}$.
-
-```python
-for sx in (-1, 1):
-    for sy in (-1, 1):
-        tag = f"{'L' if sx < 0 else 'R'}_{'F' if sy > 0 else 'R'}"
-        leg = rmk.make_quad_crawler_leg(
-            prefix=f"Spider_Leg_{tag}",
-            hip_location=(sx * 1.10, sy * 0.95, 0.72),
-            side_x=sx, side_y=sy,
-            reach_x=1.15, reach_y=0.90, knee_height=1.02,
-            armor_mat=armor_primary, joint_mat=gunmetal, damper_mat=armor_light
-        )
-        model_objects.extend(leg)
-```
-
-### E. Anti-Grav Repulsor Skimmer Assembly (`make_hover_skimmer_assembly`)
-Creates a futuristic hovering propulsion unit for skimmers and assault hovercraft:
-- Ventral repulsor cushion skirt with chamfered cowlings.
-- 4 downward-firing thruster bells with glowing plasma field emitter cores.
-- Lateral aerodynamic stabilizer strakes/fins angled for ground-effect lift.
-- Twin rear vectoring thrust ducts with glowing internal nozzles.
-
-```python
-skimmer = rmk.make_hover_skimmer_assembly(
-    prefix="Skimmer_Propulsion",
-    hull_length=2.9, hull_width=2.5, float_height=0.52,
-    skirt_mat=armor_primary, thruster_mat=gunmetal,
-    core_mat=armor_light, glow_mat=emissive_cyan
-)
-model_objects.extend(skimmer)
-```
-
-### F. Ducted Tilt-Rotor Pod (`make_ducted_tiltrotor_assembly`)
-Creates an aerodynamic ducted propulsion fan for VTOL gunships and aerial assault drones:
-- Cylindrical outer shroud cowl with beveled intake lip.
-- Inner recessed duct wall with aerodynamic bullet spinner hub.
-- Angled pitch rotor blades radiating from hub.
-- Transverse mounting pylon with swivel pivot bearing.
-- Ventral glowing plasma core exhaust.
-
-```python
-tilt_rotor = rmk.make_ducted_tiltrotor_assembly(
-    prefix="Gunship_TiltRotor_L",
-    location=(-1.45, 0.15, 0.75),
-    radius=0.44, depth=0.26, tilt_deg=14.0,
-    duct_mat=armor_primary, rotor_mat=gunmetal,
-    hub_mat=armor_light, pylon_mat=gunmetal, glow_mat=emissive_cyan
-)
-model_objects.extend(tilt_rotor)
-```
-
-### G. Independent Quad-Track Pod (`make_quad_track_pod_assembly`)
-Generates 4-corner independent continuous track assemblies for mobile fortresses and super-heavy siege platforms:
-- Self-contained continuous track belt with front and rear climb approach slopes.
-- Stepped road wheels array and idler/sprocket units.
-- Armored top mudguard fender.
-- Inboard swivel mounting sponson arm connecting directly to the vehicle superstructure.
-
-```python
-track_pod = rmk.make_quad_track_pod_assembly(
-    prefix="Fortress_TrackPod_FL",
-    location=(-1.25, 1.0, 0.0),
-    length=1.65, height=0.62, belt_width=0.34,
-    tread_mat=tread_mat, rim_mat=wheel_rim, hub_mat=wheel_hub,
-    axle_mat=gunmetal, fender_mat=armor_primary, accent_mat=warning_amber,
-    ground_z=0.06, inboard_side=1
-)
-model_objects.extend(track_pod)
 ```
 
 ---
 
 ## 5. Heavy Weapon System Generators
 
-### A. Coaxial Parametric Cannon (`make_coaxial_cannon_assembly`)
-Guarantees coaxial alignment along gun elevation and azimuth vectors without drift:
-- Heavy breech collar.
-- Thermal shroud / sleeve with chamfered profile.
-- Mid-barrel bore evacuator (fume extractor) with warning stripe.
-- Rifled main barrel rod.
-- Double-baffle muzzle brake with bore opening.
-- Twin hydraulic recoil recuperator cylinders flanking the mantlet.
+| Weapon Generator | Weapon Class & Pivot Semantics | Key Mechanical Primitives |
+|---|---|---|
+| `make_coaxial_cannon_assembly` | Coaxial Cannon (`gun_pivot`, `direction`) | Breech collar, thermal sleeve, bore evacuator, rifled barrel, double-baffle muzzle brake, recoil rams, accordion dust boot (`has_dust_boot`) |
+| `make_mantlet_dust_boot` | Open Accordion Bellows | Hollow torus pleat rings with alternating radii ($1.14\times$ / $0.90\times$) and an open retention clamp, preserving the weapon bore |
+| `make_dual_cannon_assembly` | Twin Cannon (transverse offset $\vec{u}$) | Unified armored mantlet, dual parallel rifled barrels, dual bore evacuators, muzzle brakes |
+| `make_heavy_howitzer_assembly` | Ballistic Howitzer (`elevation_deg \approx 26^\circ`) | Massive breech collar, short large-bore barrel, reinforced blast ring, sector elevation gear |
+| `make_rotary_gatling_cannon` | Gatling Cluster (angle $\theta_i = \frac{2\pi i}{N}$) | Rotor housing, central drive axle, 6 rifled barrels with clamp retaining collars, ammo feed chute |
+| `make_ammo_belt_chute_assembly` | Articulated Ammo Feed Chute | Rectangular BMesh ribbon chute with expansion ribs, ammo hopper box, breech feed throat, brass cartridge links |
+| `make_missile_launcher_pod` | Rocket Pod ($R \times C$ array) | Armored pod shell ($10^\circ–20^\circ$ elevation), recessed launch tube grid, warheads, backblast louvers |
+| `make_arc_energy_emitter` | Arc Plasma Emitter (`forward_dir`) | Generator base pedestal, glowing plasma cathode, dual toroidal induction coils, 3 convergent prongs |
+| `make_collimated_beam_laser_assembly` | Directed Energy Laser (`laser_pivot`, `direction`) | Heavy emitter shroud, radiator cooling fins, focal aperture ring, high-voltage conduit cables |
+| `make_vls_vertical_missile_array` | Vertical Launch Silo ($R \times C$ array) | Armored rectangular silo coaming, recessed missile cells with chamfered lips, exhaust duct trench |
+| `make_flamethrower_assembly` | Heavy Flame Projector (`pivot`, `direction`) | Pressurized fuel manifold block, dual side feed tanks, perforated heat shroud, ventral igniter pilot assembly (`has_dust_boot`) |
+| `make_emp_emitter_assembly` | Electromagnetic Pulse Array (`pivot`, `direction`) | Octagonal dielectric pedestal, 3 stepped concentric pulse rings, central waveguide mast, 4 dipole fins, glowing HDR pulse globe |
 
 ```python
+# Coaxial cannon and rotary gatling alignment patterns
 cannon = rmk.make_coaxial_cannon_assembly(
-    prefix="Colossus_Gun",
-    gun_pivot=(0.0, 0.52, 1.20),
+    prefix="Colossus_Gun", gun_pivot=(0.0, 0.52, 1.20),
     direction=(0.0, math.cos(math.radians(12)), math.sin(math.radians(12))),
     caliber_radius=0.095, barrel_length=1.65,
     armor_mat=armor_light, barrel_mat=gunmetal, accent_mat=warning_amber,
     has_thermal_sleeve=True, has_bore_evacuator=True, has_muzzle_brake=True
 )
-```
 
-### B. Rotary Gatling Cannon (`make_rotary_gatling_cannon`)
-Generates an articulated 6-barrel (or N-barrel) Gatling autocannon:
-- Cylindrical rotor housing / motor breech with ammo feed chute.
-- Central drive axle shaft.
-- Ring of N rifled barrels mathematically spaced at $\theta_i = \frac{2\pi i}{N}$.
-- Mid-barrel and muzzle clamp retaining collars with optional warning accent.
-
-```python
 gatling = rmk.make_rotary_gatling_cannon(
-    prefix="Ironclad_Gatling_R",
-    pivot=(0.80, 0.45, 1.45),
-    direction=(0.0, 1.0, 0.0),
-    barrel_count=6, barrel_length=1.15,
-    barrel_radius=0.032, cluster_radius=0.10,
+    prefix="Ironclad_Gatling_R", pivot=(0.80, 0.45, 1.45), direction=(0.0, 1.0, 0.0),
+    barrel_count=6, barrel_length=1.15, barrel_radius=0.032, cluster_radius=0.10,
     gunmetal_mat=gunmetal, housing_mat=armor_light, accent_mat=warning_amber
-)
-```
-
-### C. Armored Missile Launcher Pod (`make_missile_launcher_pod`)
-Generates a multi-cell rocket / missile pod:
-- Armored pod chassis with upward elevation angle ($10^\circ–20^\circ$).
-- Recessed dark launch cell well.
-- Grid array of $R \times C$ cylindrical launch tubes with conical warheads peeking out.
-- Rear backblast exhaust louvers / blast vents.
-- Flank identification stripes.
-
-```python
-pod = rmk.make_missile_launcher_pod(
-    prefix="Strike_RocketPod",
-    location=(0.0, 0.15, 1.40),
-    size=(0.72, 0.95, 0.48),
-    rows=2, cols=3, elevation_deg=14.0,
-    armor_mat=armor_primary, cavity_mat=gunmetal,
-    warhead_mat=warning_amber, accent_mat=warning_amber
-)
-```
-
-### D. Electromagnetic Arc Energy Emitter (`make_arc_energy_emitter`)
-Generates a futuristic high-voltage arc weapon:
-- Heavy generator base pedestal with heat sink housing.
-- Central glowing plasma cathode core.
-- Dual toroidal induction accelerator coils with dielectric insulator rings.
-- Forward convergent discharge prongs angled toward a focal arc point ahead.
-
-```python
-arc_weapon = rmk.make_arc_energy_emitter(
-    prefix="Surge_ArcEmitter",
-    base_location=(0.0, 0.20, 1.25),
-    forward_dir=(0.0, 1.0, 0.10),
-    core_radius=0.22, core_length=0.48, prong_count=3, prong_length=0.55,
-    housing_mat=armor_primary, gunmetal_mat=gunmetal, arc_mat=emissive_cyan
-)
-```
-
-### E. Heavy Siege Howitzer / Mortar (`make_heavy_howitzer_assembly`)
-Generates a massive large-bore ballistic artillery weapon:
-- Heavy cylindrical breech collar with armored reinforcements.
-- Large-caliber short barrel with rifled profile.
-- Massive reinforced muzzle blast ring with high-visibility warning stripe.
-- Dual hydraulic recoil recuperator cylinders flanking the breech.
-- Sector elevation quadrant gear plates.
-
-```python
-howitzer = rmk.make_heavy_howitzer_assembly(
-    prefix="Siege_Howitzer",
-    gun_pivot=(0.0, 0.40, 1.20),
-    direction=(0.0, math.cos(math.radians(26)), math.sin(math.radians(26))),
-    caliber_radius=0.135, barrel_length=1.15,
-    armor_mat=armor_light, barrel_mat=gunmetal, accent_mat=warning_amber
-)
-```
-
-### F. Synchronized Dual Coaxial Cannon (`make_dual_cannon_assembly`)
-Generates twin heavy autocannons on a unified mantlet:
-- Armored mantlet block spanning both barrels.
-- Dual parallel rifled barrels mathematically spaced along local transverse axis $\vec{u}$.
-- Individual thermal shroud sleeves, mid-barrel bore evacuators, and double-baffle muzzle brakes.
-
-```python
-dual_cannons = rmk.make_dual_cannon_assembly(
-    prefix="Fortress_DualGun",
-    gun_pivot=(0.0, 0.42, 1.22),
-    direction=(0.0, math.cos(math.radians(11)), math.sin(math.radians(11))),
-    caliber_radius=0.082, barrel_length=1.65, barrel_spacing=0.38,
-    armor_mat=armor_light, barrel_mat=gunmetal, accent_mat=warning_amber
 )
 ```
 
@@ -383,78 +190,35 @@ dual_cannons = rmk.make_dual_cannon_assembly(
 
 ## 6. Micro-Greebles & Optical Sensors
 
-### A. Recessed Sensor Visor (`make_recessed_sensor_visor`)
-Protective armored visor housing with recessed cavity and glowing HDR optical slits.
-
-### B. Gimballed FLIR Sensor Turret (`make_gimbal_sensor_turret`)
-2-axis gimballed spherical targeting pod with:
-- Azimuth mounting pedestal and U-shaped elevation yoke.
-- Spherical sensor ball.
-- Primary circular thermal lens (with bezel ring).
-- Secondary optical slit / laser designator aperture.
+| Greeble Generator | Functional Role | Mounting & Transform Invariant |
+|---|---|---|
+| `make_recessed_sensor_visor` | Primary FLIR / targeting visor | Armored brow hood with deep shadow cavity and glowing HDR slit lenses |
+| `make_gimbal_sensor_turret` | 2-axis targeting pod | Azimuth pedestal, U-shaped elevation yoke, spherical sensor ball, thermal lens |
+| `make_radar_dish_or_rotodome`| Recon radar antenna | Parabolic dish with feed horn or elliptical rotodome mounted on turntable mast |
+| `make_armor_applique_array` | Explosive Reactive Armor (ERA) | Array of beveled armor tiles with corner standoff bolts along glacis seams |
+| `make_hex_bolt_array` | Industrial structural fasteners | Six-sided bolt heads placed along armor seams and joint flanges |
+| `make_smoke_launcher_rack` | Defensive smoke discharger | Multi-tube angled grenade rack with recessed launch bores on mounting bracket |
+| `make_side_sponson_assembly` | External ammo / fuel drum | Armored flank panniers or cylindrical drums with retention straps |
+| `make_dozer_blade` | Obstacle clearing ram | Heavy angled shield plate, bottom cutting edge, twin hydraulic push rams |
+| `make_catenary_cable_assembly` | Catenary hydraulic hose / power conduit | Hyperbolic cosine (`cosh`) tube sweep in BMesh with corrugated rib modulation, hex bulkhead couplers, and retaining collar clamps |
+| `make_bmesh_hull_greebles` | Recessed deck hatches, vents & lugs | Selective BMesh face inset (`bmesh.ops.inset_individual`) maintenance hatches with grab handles, micro-louver vents, and 4 forged lifting lugs |
+| `make_tactical_decal_plates` | BVHTree-raycasted floating markings | `mathutils.bvhtree.BVHTree` normal-snapped chevron stripe bars and zenith identification plates (+0.012m normal offset) |
+| `make_aps_hardkill_suite` | Active Protection System & LWR | Bilateral hard-kill interceptor pods, 4 corner millimeter-wave AESA radar panels, roof Laser Warning Receiver (LWR) prism |
+| `make_tactical_stowage_kit` | External bustle stowage & field gear | Rear turret bustle tubular cargo rack, rolled camo tarp with straps, Jerry fuel cans, glacis spare track-link brackets |
+| `create_unity_locator_sockets`| Standardized FBX empties | Emits `Socket_MuzzlePrimary`, `Socket_TurretPivot`, `Socket_Exhaust_L/R`, `Socket_SensorEye` |
 
 ```python
-sensor_pod = rmk.make_gimbal_sensor_turret(
-    prefix="Scout_FLIR",
-    location=(0.42, 0.35, 1.35),
+# Sensor, defensive smoke, and socket locator patterns
+sensor = rmk.make_gimbal_sensor_turret(
+    prefix="Scout_FLIR", location=(0.42, 0.35, 1.35),
     radius=0.18, look_dir=(0.0, 1.0, 0.15),
     armor_mat=armor_light, lens_mat=emissive_cyan, gunmetal_mat=gunmetal
 )
-```
-
-### C. Explosive Reactive Armor (ERA) Bricks (`make_armor_applique_array`)
-Array of modular armored tiles with corner standoff mounting bolts.
-
-```python
-era_tiles = rmk.make_armor_applique_array(
-    prefix="Glacis_ERA",
-    start=(-0.65, 0.75, 0.85), end=(0.65, 0.75, 0.85),
-    count=5, size=(0.20, 0.24, 0.05),
-    armor_mat=armor_light, standoff_mat=gunmetal,
-    rotation=(math.radians(-25), 0.0, 0.0)
-)
-```
-
-### D. Hexagonal Bolt Seams (`make_hex_bolt_array`)
-Places low-poly 6-sided bolt heads along armor seams or joint flanges without excess geometry.
-
-### E. Smoke Discharger Racks (`make_smoke_launcher_rack`)
-Multi-tube defensive grenade banks with angled bracket and recessed launch bores:
-```python
-smoke_rack = rmk.make_smoke_launcher_rack(
-    prefix="Turret_Smoke",
-    location=(0.65, 0.25, 1.25),
-    tube_count=3,
-    direction=(0.7, 0.7, 0.4),
+smoke = rmk.make_smoke_launcher_rack(
+    prefix="Turret_Smoke", location=(0.65, 0.25, 1.25),
+    tube_count=3, direction=(0.7, 0.7, 0.4),
     armor_mat=armor_primary, tube_mat=gunmetal, cap_mat=warning_amber
 )
-```
-
-### F. Tactical Radar Dish & Rotodome (`make_radar_dish_or_rotodome`)
-Turntable-mounted parabolic dish or elliptical rotodome with feed horn and transceiver:
-```python
-radar = rmk.make_radar_dish_or_rotodome(
-    prefix="Command_Radar",
-    location=(0.0, -0.45, 1.35),
-    dish_radius=0.42, is_rotodome=False,
-    armor_mat=armor_primary, antenna_mat=gunmetal, accent_mat=warning_amber
-)
-```
-
-### G. Armored Side Sponsons (`make_side_sponson_assembly`)
-External armored ammo panniers or auxiliary fuel cells with retention straps:
-```python
-sponson = rmk.make_side_sponson_assembly(
-    prefix="Tank_FuelDrum",
-    location=(1.35, -0.20, 0.65),
-    side=1, size=(0.26, 0.82, 0.38),
-    armor_mat=armor_primary, strap_mat=gunmetal, accent_mat=warning_amber
-)
-```
-
-### H. Procedural Unity Socket Locators (`create_unity_locator_sockets`)
-Generates standardized empty transforms (`Socket_MuzzlePrimary`, `Socket_TurretPivot`, `Socket_Exhaust_L`, `Socket_Exhaust_R`, `Socket_SensorEye`) exported directly into the FBX hierarchy:
-```python
 locators = rmk.create_unity_locator_sockets(
     name_prefix="SiegeTank",
     muzzle_loc=(0.0, 2.45, 1.25), muzzle_dir=(0.0, 1.0, 0.1),
@@ -463,27 +227,13 @@ locators = rmk.create_unity_locator_sockets(
 )
 ```
 
-### I. Heavy Frontal Dozer Ram Blade (`make_dozer_blade`)
-Generates an armored obstacle-clearing ram blade:
-- Angled primary shield plate with heavy bottom cutting edge.
-- Twin hydraulic push rams with spherical anchor brackets.
-
-```python
-dozer = rmk.make_dozer_blade(
-    prefix="Breaker_Dozer",
-    location=(0.0, 1.85, 0.42),
-    width=2.6, height=0.45,
-    armor_mat=armor_primary, ram_mat=gunmetal
-)
-```
-
 ---
 
-## 7. Draw-Call Batching, Smart Smoothing & Cavity Baking
+## 7. Draw-Call Batching, Smart Smoothing, Weighted Normals & Cavity Baking
 
-Procedural kitbashing produces 50–120 individual objects. If left unbatched, imported geometry can create many Unity objects and renderers. Batching compatible meshes reduces object and material overhead, but does not by itself establish the runtime draw-call count.
+Procedural kitbashing produces 50–120 individual objects. If left unbatched, imported geometry creates redundant draw calls and material switches.
 
-### A. Material Batching with Smart Angle Smoothing
+### A. Material Batching with Smart Angle Smoothing & Weighted Normals
 `batch_and_join_by_material` unifies meshes sharing the same PBR material into 4–6 batched submeshes while preserving designated animated/gameplay pivots:
 
 ```python
@@ -492,11 +242,14 @@ optimized_objects = rmk.batch_and_join_by_material(
     prefix="Colossus",
     preserve_names=["TurretBase", "MainBarrel"],
     smooth_by_angle=True,
-    smooth_angle_deg=38.0
+    smooth_angle_deg=38.0,
+    weighted_normals=True,
+    normal_weight=50,
 )
 ```
 
-- **Smart Angle-Weighted Smoothing**: Uses Blender 4.5's `bpy.ops.object.shade_smooth_by_angle` to produce silky smooth round barrels, road wheels, hubs, and exhaust pipes, while preserving razor-sharp 45°/90° chamfers on flat armor plates.
+- **Smart Angle-Weighted Smoothing**: Uses Blender 4.5's `bpy.ops.object.shade_smooth_by_angle` to smooth round barrels, road wheels, hubs, and exhaust pipes while preserving deliberate hard edges between planar armor faces.
+- **Face-Area Weighted Normals (`apply_weighted_normals`)**: Applies Blender's `WEIGHTED_NORMAL` modifier (`mode="FACE_AREA"`, `weight=50`, `keep_sharp=True`) to reduce shading pinch across broad armor faces and their intentional edge treatments. Use it to improve shading, not to conceal poor topology or an unsuitable cross-section. Exported via `mesh_smooth_type="FACE"`.
 - **Batching Estimate**: The authoring report estimates fewer mesh/material groups after batching; confirm actual draw calls in Unity with the selected prefab source and rendering settings.
 - **Clean Normals**: Re-evaluates outward normals consistently and strips non-manifold seams.
 
@@ -513,6 +266,11 @@ rmk.bake_advanced_vertex_shading(
 )
 ```
 
+- **R (Red)**: Ambient occlusion cavity dirt ($0.25–0.40$ on undersides and crevices; $1.0$ on zenith faces).
+- **G (Green)**: Edge wear glints ($0.7–1.0$ on sharp convex edges with dihedral angle $\ge 35^\circ$; $0.0$ on flat planes).
+- **B (Blue)**: Thermal soot ($0.0$ base metal; scales to $1.0$ at muzzles and exhaust tips with quadratic dropoff $(1 - d/R)^2$).
+- **A (Alpha)**: Team color tint mask ($1.0$ on primary/light armor; $0.0$ on mechanical gunmetal and rubber treads).
+
 ### C. Multi-Level LOD Chain Generation (`generate_lod_chain`)
 Creates decimated LOD mesh hierarchies with planar normal boundary preservation:
 
@@ -527,47 +285,27 @@ lod_dict = rmk.generate_lod_chain(
 # Returns {"LOD0": [...], "LOD1": [...], "LOD2": [...]}
 ```
 
-### D. Physics Collision Hulls (`generate_collision_hulls`)
-Generates flat-shaded bounding boxes tagged for Unity physics:
-
+### D. Physics Collision Hulls & Companion Metadata
 ```python
 colliders = rmk.generate_collision_hulls(
-    model_objects,
-    prefix="Colossus",
-    include_turret_collider=True,
-    ground_offset_z=0.04
+    model_objects, prefix="Colossus",
+    include_turret_collider=True, ground_offset_z=0.04
 )
-# Returns [Colossus_COLLIDER_Hull, Colossus_COLLIDER_Turret]
-```
 
-### E. Companion Gameplay Metadata JSON (`export_gameplay_metadata`)
-Generates companion specification for Unity prefab wiring:
-
-```python
 meta = rmk.export_gameplay_metadata(
-    output_path=Path("Colossus.gameplay.json"),
-    unit_name="Colossus",
-    archetype="super_heavy",
-    bounds=diagnostics["bounds"],
-    sockets=locators,
-    turret_center=Vector((0.0, 0.15, 1.25)),
-    gun_pivot=Vector((0.0, 2.45, 1.45)),
-    recoil_distance=0.25,
-    elevation_range=(-8.0, 32.0),
-    yaw_speed=35.0,
+    output_path=Path("Colossus.gameplay.json"), unit_name="Colossus",
+    archetype="super_heavy", bounds=diagnostics["bounds"], sockets=locators,
+    turret_center=Vector((0.0, 0.15, 1.25)), gun_pivot=Vector((0.0, 2.45, 1.45)),
+    recoil_distance=0.25, elevation_range=(-8.0, 32.0), yaw_speed=35.0,
     visual_root_path="Vehicle"
 )
-```
 
-### F. Procedural Damaged & Burned Wreckage (`make_wreckage_variant`)
-Generates battle-destroyed model with dislodged turret and charred materials:
-
-```python
 wreckage_objects = rmk.make_wreckage_variant(
-    source_objects=model_objects,
-    prefix="Colossus",
+    source_objects=model_objects, prefix="Colossus",
     output_fbx_path=Path("Colossus_Wreckage.fbx"),
-    output_blend_path=Path("colossus-wreckage.blend")
+    output_blend_path=Path("colossus-wreckage.blend"),
+    archetype="super_heavy",
+    severity="catastrophic"  # light, medium, catastrophic
 )
 ```
 
@@ -588,7 +326,7 @@ cams = rmk.setup_multi_view_studio(
     preview_dir=REPO_ROOT / "artifacts" / "previews",
     base_name="colossus-siege",
     ortho_scale=6.0,
-    render_all=True  # Renders all 4 views automatically!
+    render_all=True  # Renders all 4 views automatically
 )
 ```
 

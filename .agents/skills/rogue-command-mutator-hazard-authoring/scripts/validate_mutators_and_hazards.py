@@ -132,6 +132,12 @@ class MutatorValidator:
                 f"UNKNOWN_TARGET_STAT: '{stat_raw}' is not one of the 26 canonical ChangeableValue stats."
             )
 
+        if scales_heat:
+            audit.score -= 20
+            audit.flags.append(
+                "UNVERIFIED_HEAT_SCALING: Confirm the native scaling formula and per-level budget before enabling this modifier."
+            )
+
         # 2. Validate Operation
         if op_raw not in CANONICAL_OPERATIONS:
             audit.score -= 20
@@ -197,13 +203,25 @@ class MutatorValidator:
             mid = m.get("id", f"mutator_{i}")
             audits.append(self.validate_mutator_entry(m, mid))
 
-        # 2. Inspect stage mutator overrides if present
+        # 2. Inspect native card changes declared by content-pack relics.
+        for i, relic in enumerate(data.get("relics", [])):
+            relic_id = relic.get("id", f"relic_{i}")
+            for j, change in enumerate(relic.get("cardChanges", [])):
+                entry = dict(change)
+                # The pack's player-facing Health alias maps to native MaxHealth.
+                if str(entry.get("valueToChange", "")).strip().lower() == "health":
+                    entry["valueToChange"] = "MaxHealth"
+                audits.append(self.validate_mutator_entry(
+                    entry, f"{relic_id}_card_change_{j}"
+                ))
+
+        # 3. Inspect stage mutator overrides if present
         for stage in data.get("stages", []):
             s_id = stage.get("id", "stage")
             for j, mo in enumerate(stage.get("mutators", [])):
                 audits.append(self.validate_mutator_entry(mo, f"{s_id}_mutator_{j}"))
 
-        # 3. Inspect unit balance overrides as baseline modifiers
+        # 4. Inspect unit balance overrides as baseline modifiers
         for unit in data.get("units", []):
             u_id = unit.get("id", "unit")
             for bo in unit.get("balanceOverrides", []):
@@ -249,7 +267,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--file",
         type=Path,
-        help="Path to a specific mutator / relic JSON specification file.",
+        help="Path to a pack-shaped JSON file containing mutators, relics, or units.",
     )
     parser.add_argument(
         "--json",
