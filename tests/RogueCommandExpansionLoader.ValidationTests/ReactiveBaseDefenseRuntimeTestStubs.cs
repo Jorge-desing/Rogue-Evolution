@@ -54,14 +54,43 @@ public sealed class EntityController
     }
 }
 
-public enum UnitRole
+[System.Flags]
+public enum UnitRole : int
 {
-    Spawn,
-    Skill,
-    Harvester,
-    Refinery,
-    Engineer,
-    Builder
+    None = 0,
+    Spawn = 1,
+    Harvester = 2,
+    FrontalAttacker = 4,
+    MassDestruction = 8,
+    Fire = 16,
+    Sniper = 32,
+    Supporter = 64,
+    Rock = 128,
+    Robo = 256,
+    Spawner = 512,
+    PCXCard = 1024,
+    Building = 2048,
+    Factory = 4096,
+    Turret = 8192,
+    Refinery = 16384,
+    Unit = 32768,
+    Heal = 65536,
+    Specialist = 131072,
+    Skill = 262144,
+    Engineer = 524288,
+    Bomb = 1048576,
+    Scout = 2097152,
+    Chest = 4194304,
+    Tank = 8388608,
+    Vehicle = 16777216,
+    Mech = 33554432,
+    Tree = 67108864,
+    Melee = 134217728,
+    Research = 268435456,
+    Crystal = 536870912,
+    Builder = 1073741824,
+    Drop = int.MinValue,
+    All = -1
 }
 
 public sealed class EntityCommand

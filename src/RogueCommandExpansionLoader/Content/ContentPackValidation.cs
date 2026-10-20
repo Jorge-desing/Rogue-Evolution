@@ -365,7 +365,7 @@ namespace RogueCommandExpansionLoader.Content
                 }
 
                 ValidateUnitLocalizations(unit, itemPath + ".localizations", hasNativeTemplate, diagnostics);
-                ValidateBalanceOverrides(unit.balanceOverrides, itemPath + ".balanceOverrides", "unit", "unit", diagnostics);
+                ValidateBalanceOverrides(unit.balanceOverrides, itemPath + ".balanceOverrides", "unit", "unit", diagnostics, false);
                 ValidateAbilities(unit.abilities, itemPath + ".abilities", diagnostics);
                 ValidateAiOverrides(unit.aiOverrides, itemPath + ".aiOverrides", diagnostics);
                 ValidateActiveSkills(unit.activeSkills, itemPath + ".activeSkills", diagnostics);
@@ -1009,7 +1009,7 @@ namespace RogueCommandExpansionLoader.Content
             }
 
             ValidateBalanceOverrides(productionBuilding.balanceOverrides,
-                path + ".balanceOverrides", "production-building", "production building", diagnostics);
+                path + ".balanceOverrides", "production-building", "production building", diagnostics, true);
             ValidateLocalizations(productionBuilding.localizations, path + ".localizations",
                 false, "production-building", "Production building", diagnostics);
         }
@@ -1232,7 +1232,8 @@ namespace RogueCommandExpansionLoader.Content
             string path,
             string codePrefix,
             string ownerLabel,
-            List<ContentDiagnostic> diagnostics)
+            List<ContentDiagnostic> diagnostics,
+            bool isFactoryRow)
         {
             if (overrides == null)
             {
@@ -1264,10 +1265,10 @@ namespace RogueCommandExpansionLoader.Content
                         "Balance override names must be non-empty and unique within the " + ownerLabel + ".");
                 }
 
-                if (!TryValidateBalanceOverrideValue(balanceOverride.name, balanceOverride.value))
+                if (!TryValidateBalanceOverrideValue(balanceOverride.name, balanceOverride.value, ownerLabel, isFactoryRow))
                 {
                     Add(diagnostics, codePrefix + ".balance-override-invalid", itemPath,
-                        "The override must target an allowlisted numeric balance field and contain a finite, non-negative invariant-culture value.");
+                        "The override must target an allowlisted balance field and contain a valid invariant-culture value.");
                 }
             }
         }
@@ -2231,7 +2232,7 @@ namespace RogueCommandExpansionLoader.Content
             }
         }
 
-        private static bool TryValidateBalanceOverrideValue(string name, string value)
+        private static bool TryValidateBalanceOverrideValue(string name, string value, string ownerLabel, bool isFactoryRow)
         {
             if (String.IsNullOrWhiteSpace(name) || String.IsNullOrEmpty(value) ||
                 !String.Equals(value, value.Trim(), StringComparison.Ordinal) ||
@@ -2242,6 +2243,11 @@ namespace RogueCommandExpansionLoader.Content
 
             switch (name)
             {
+                case "roles":
+                case "offeredSystemTags":
+                    return BalanceOverrideFlags.TryParse(name, value,
+                        String.Equals(ownerLabel, "unit", StringComparison.Ordinal),
+                        isFactoryRow, out _, out _);
                 case "coinsAmount":
                 case "cost":
                 case "maxCapacity":

@@ -4,6 +4,8 @@
 
 ## Shape
 
+- `roles` balance overrides set comma-separated native `UnitRole` flags; `offeredSystemTags` set comma-separated native `SystemTags` flags. They enable native themed reward filters and role/tag-driven hacks or upgrades, while excluding product `Factory`/`All` and preserving both factory roles on production buildings.
+
 - The native-unit sample overlays four models on cloned native units: Sandlance on `PCXBaseTank/Vehicle`, Skirmish Strike Bike on `BombBike/GameObject/BombBike`, Colossus on `ArtilleryTank/Tank`, and Surge on `LightningTank/PCX TankHolder`. Ironclad Walker currently keeps its native `GatlingWalker` visual because its custom static prototype has no walker rig. Overlay paths were inspected in the pinned game's serialized assets and are relative to the native prefab root. All five retain native controllers and combat behavior. Verify model spacing, animation compatibility, and rendering in a live match.
 
 Run `.venv\Scripts\python.exe tools/validate_native_visual_roots.py content/packs/sample-native-expansion` before installing a native overlay pack. The tool checks the game's version, assembly SHA-256, MVID, and `resources.assets` SHA-256, then resolves every path through unique direct children and requires a Renderer below the target. It selects a uniquely named scripted GameObject in that serialized file and rejects ambiguous candidates; runtime resource selection still requires a Steam test. Install its pinned Python dependencies from `requirements.txt`.

@@ -3002,7 +3002,7 @@ namespace RogueCommandExpansionLoader.Content
                             temporaryResources.Add(imageKey, cardImage);
                         }
 
-                        ApplyBalanceOverrides(row, unit.balanceOverrides, packageName, unit.id);
+                        ApplyBalanceOverrides(row, unit.balanceOverrides, packageName, unit.id, true, false);
                         _entityIdField.SetValue(row, unit.id);
                         _prefabLocationField.SetValue(row, prefabKey);
                         _imageLocationField.SetValue(row, imageKey);
@@ -3039,7 +3039,7 @@ namespace RogueCommandExpansionLoader.Content
 
                         prefabKey = ResourceKey(unit.id, "prefab");
                         imageKey = ResourceKey(unit.id, "image");
-                        ApplyBalanceOverrides(row, unit.balanceOverrides, packageName, unit.id);
+                        ApplyBalanceOverrides(row, unit.balanceOverrides, packageName, unit.id, true, false);
                         _entityIdField.SetValue(row, unit.id);
                         _prefabLocationField.SetValue(row, prefabKey);
                         _imageLocationField.SetValue(row, imageKey);
@@ -3052,10 +3052,10 @@ namespace RogueCommandExpansionLoader.Content
                         temporaryResources.Add(imageKey, cardImage);
                     }
 
-                    if (HasRoleFlag(row, "Factory"))
+                    if (HasRoleFlag(row, "Factory") || HasRoleFlag(row, "Building"))
                     {
                         throw new InvalidDataException("La fila de unidad " + unit.id + " en '" + packageName +
-                            "' tiene el rol Factory; debe ser un producto. Declara la fábrica en productionBuilding.");
+                            "' tiene un rol de edificio; debe ser un producto. Declara la fábrica en productionBuilding.");
                     }
 
                     _factoryForEntityIdField.SetValue(row, CreateEmptyNullableString());
@@ -4157,7 +4157,7 @@ namespace RogueCommandExpansionLoader.Content
             UnityEngine.Object.DontDestroyOnLoad(nativePrefabClone);
 
             string prefabKey = ResourceKey(building.id, "prefab");
-            ApplyBalanceOverrides(row, building.balanceOverrides, packageName, building.id);
+            ApplyBalanceOverrides(row, building.balanceOverrides, packageName, building.id, false, true);
             _entityIdField.SetValue(row, building.id);
             _prefabLocationField.SetValue(row, prefabKey);
             _imageLocationField.SetValue(row, imagePath);
@@ -4243,7 +4243,9 @@ namespace RogueCommandExpansionLoader.Content
             object row,
             ContentBalanceOverride[] overrides,
             string packageName,
-            string unitId)
+            string unitId,
+            bool isProduct,
+            bool isFactoryRow)
         {
             if (overrides == null)
             {
@@ -4290,7 +4292,21 @@ namespace RogueCommandExpansionLoader.Content
                 {
                     try
                     {
-                        value = Enum.Parse(field.FieldType, balanceOverride.value, true);
+                        if (balanceOverride.name == "roles" || balanceOverride.name == "offeredSystemTags")
+                        {
+                            if (!BalanceOverrideFlags.TryApply(row, field, balanceOverride.name,
+                                balanceOverride.value, isProduct, isFactoryRow,
+                                out object updatedRow, out string flagDiagnostic))
+                            {
+                                throw new InvalidDataException(flagDiagnostic);
+                            }
+                            row = updatedRow;
+                            continue;
+                        }
+                        else
+                        {
+                            value = Enum.Parse(field.FieldType, balanceOverride.value, true);
+                        }
                     }
                     catch
                     {

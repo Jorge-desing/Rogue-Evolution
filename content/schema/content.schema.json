@@ -897,6 +897,8 @@
             "cardModelScalingFactor",
             "maxArmor",
             "armorProtection",
+            "roles",
+            "offeredSystemTags",
             "moveSpeed",
             "damage1",
             "damage2",
@@ -988,11 +990,35 @@
           "if": {
             "properties": {
               "name": {
+                "enum": [
+                  "roles",
+                  "offeredSystemTags"
+                ]
+              }
+            },
+            "required": [
+              "name"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "pattern": "^[A-Za-z][A-Za-z0-9]*(?:,\\s*[A-Za-z][A-Za-z0-9]*)*$"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "name": {
                 "not": {
                   "enum": [
                     "rarity",
                     "attackType",
-                    "skillType"
+                    "skillType",
+                    "roles",
+                    "offeredSystemTags"
                   ]
                 }
               }

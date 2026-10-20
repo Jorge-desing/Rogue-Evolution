@@ -15,6 +15,54 @@ public struct EntityBalancingParameters
 {
     public string entityId;
     public NullableString factoryForEntityId;
+    public UnitRole roles;
+    public SystemTags offeredSystemTags;
+}
+
+[Flags]
+public enum SystemTags
+{
+    None = 0,
+    Melee = 1,
+    Shield = 2,
+    Spawn = 4,
+    Armor = 8,
+    Mech = 16,
+    Robo = 32,
+    Heal = 64,
+    Turret = 128,
+    Fire = 256,
+    Bounty = 512,
+    Panic = 1024,
+    Slow = 2048,
+    Stun = 4096,
+    Teleport = 8192,
+    AoE = 16384,
+    ManaUse = 32768,
+    Rush = 65536,
+    Turbo = 131072,
+    Strength = 262144,
+    Robust = 524288,
+    SkillRangeUse = 1048576,
+    Bomb = 2097152,
+    Tank = 4194304,
+    Vehicle = 8388608,
+    EffectDuration = 16777216,
+    SpawnDuration = 33554432,
+    CriticalHits = 67108864,
+    Stealth = 134217728,
+    Zombo = 268435456,
+    Sniper = 536870912,
+    Regen = 1073741824,
+    EconomySupport = int.MinValue,
+    All = -1
+}
+
+public enum Rarity
+{
+    Common,
+    Rare,
+    UltraRare
 }
 
 public sealed class EntityControllerIdentityTestController
@@ -171,6 +219,7 @@ internal sealed class RuntimeMutatorTestProvider : IRuntimeContentProvider, IBlu
 
     public List<object> EntityRows { get; } = new();
     public List<ProgressionContentContribution> Contributions { get; } = new();
+    public List<BalanceOverride> BalanceOverrides { get; } = new();
     public int EntityRowsRegisteredCount { get; private set; }
 
     public string TargetGameVersion => "1.0.9";
@@ -183,7 +232,7 @@ internal sealed class RuntimeMutatorTestProvider : IRuntimeContentProvider, IBlu
 
     public void OnEntityRowsRegistered() => EntityRowsRegisteredCount++;
 
-    public IEnumerable<BalanceOverride> GetBalanceOverrides() => new List<BalanceOverride>();
+    public IEnumerable<BalanceOverride> GetBalanceOverrides() => BalanceOverrides;
 
     public IEnumerable<object> GetEntityParameterRows() => EntityRows;
 

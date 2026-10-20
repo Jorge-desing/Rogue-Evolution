@@ -4036,12 +4036,16 @@ var tests = new (string Name, Action Run)[]
             pack.units[0].balanceOverrides =
             [
                 new ContentBalanceOverride { name = "rarity", value = "Rare" },
-                new ContentBalanceOverride { name = "neededExperienceLevel", value = "0" }
+                new ContentBalanceOverride { name = "neededExperienceLevel", value = "0" },
+                new ContentBalanceOverride { name = "roles", value = "Unit, Vehicle, Scout" },
+                new ContentBalanceOverride { name = "offeredSystemTags", value = "Vehicle, Turbo" }
             ];
             pack.units[0].productionBuilding.balanceOverrides =
             [
                 new ContentBalanceOverride { name = "rarity", value = "Rare" },
-                new ContentBalanceOverride { name = "neededExperienceLevel", value = "0" }
+                new ContentBalanceOverride { name = "neededExperienceLevel", value = "0" },
+                new ContentBalanceOverride { name = "roles", value = "Building, Factory" },
+                new ContentBalanceOverride { name = "offeredSystemTags", value = "None" }
             ];
             ExpectValid(pack, root, new EmptySnapshot(), new KnownModuleValidator());
 
@@ -4050,6 +4054,130 @@ var tests = new (string Name, Action Run)[]
                 new ContentBalanceOverride { name = "rarity", value = "Mythic" },
                 new ContentBalanceOverride { name = "neededExperienceLevel", value = "0" }
             ];
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "unit.balance-override-invalid");
+        });
+    }),
+    ("balance overrides accept themed blueprint role and system-tag combinations", () =>
+    {
+        WithPackage(nativeSample, (pack, root) =>
+        {
+            pack.units[0].balanceOverrides = pack.units[0].balanceOverrides
+                .Where(entry => entry.name != "roles" && entry.name != "offeredSystemTags")
+                .Concat(new[]
+                {
+                    new ContentBalanceOverride { name = "roles", value = "Unit, Mech, Melee" },
+                    new ContentBalanceOverride { name = "offeredSystemTags", value = "Armor, Mech" }
+                })
+                .ToArray();
+            ExpectValid(pack, root, new EmptySnapshot(), new KnownModuleValidator());
+        });
+    }),
+    ("native blueprint role and tag flags combine and reject special duplicates", () =>
+    {
+        if (!BalanceOverrideFlags.TryParse("roles", "Unit, Mech, Melee", true, false,
+                out HashSet<string> roles, out string diagnostic) || diagnostic != null ||
+            !roles.SetEquals(new[] { "Unit", "Mech", "Melee" }) ||
+            !BalanceOverrideFlags.TryParse("offeredSystemTags", "Armor, Mech", true, false,
+                out HashSet<string> tags, out diagnostic) || diagnostic != null ||
+            !tags.SetEquals(new[] { "Armor", "Mech" }))
+        {
+            throw new InvalidOperationException("Valid native role/tag combinations did not parse as independent flags.");
+        }
+
+        string[] invalidValues = { "Unit,,Mech", "Unit, Unit", "UnknownRole", "Unit, All", "None, Armor" };
+        foreach (string invalid in invalidValues)
+        {
+            if (BalanceOverrideFlags.TryParse("roles", invalid, true, false, out _, out diagnostic) || diagnostic == null)
+            {
+                throw new InvalidOperationException("Invalid product roles were accepted: " + invalid);
+            }
+        }
+
+        if (!BalanceOverrideFlags.TryParse("roles", "Building, Factory", false, true, out _, out diagnostic) ||
+            diagnostic != null ||
+            BalanceOverrideFlags.TryParse("roles", "Building", false, true, out _, out diagnostic) ||
+            diagnostic == null)
+        {
+            throw new InvalidOperationException("Factory role constraints were not distinguished between products and buildings.");
+        }
+    }),
+    ("native blueprint flags map to the pinned game enum values", () =>
+    {
+        if (!BalanceOverrideFlags.TryCreateEnumValue(typeof(UnitRole), "roles", "Unit, Mech, Melee",
+                true, false, out object roleValue, out string diagnostic) || diagnostic != null ||
+            (UnitRole)roleValue != (UnitRole.Unit | UnitRole.Mech | UnitRole.Melee) ||
+            !BalanceOverrideFlags.TryCreateEnumValue(typeof(SystemTags), "offeredSystemTags", "Armor, Mech",
+                true, false, out object tagValue, out diagnostic) || diagnostic != null ||
+            (SystemTags)tagValue != (SystemTags.Armor | SystemTags.Mech) ||
+            BalanceOverrideFlags.TryCreateEnumValue(typeof(UnitRole), "roles", "Unit, NotAFlag",
+                true, false, out _, out diagnostic) || diagnostic == null)
+        {
+            throw new InvalidOperationException("Native role/tag values were not converted or invalid flags did not fail closed.");
+        }
+    }),
+    ("native blueprint flags apply to detached balance row instances", () =>
+    {
+        FieldInfo rolesField = typeof(EntityBalancingParameters).GetField("roles")!;
+        FieldInfo tagsField = typeof(EntityBalancingParameters).GetField("offeredSystemTags")!;
+        EntityBalancingParameters product = RuntimeMutatorTestData.Row("sample:product");
+        EntityBalancingParameters factory = RuntimeMutatorTestData.Row("sample:factory", "sample:product");
+        if (!BalanceOverrideFlags.TryApply(product, rolesField, "roles", "Unit, Mech, Melee",
+                true, false, out object updatedProduct, out string diagnostic) || diagnostic != null ||
+            !(updatedProduct is EntityBalancingParameters) ||
+            ((EntityBalancingParameters)updatedProduct).roles != (UnitRole.Unit | UnitRole.Mech | UnitRole.Melee) ||
+            !BalanceOverrideFlags.TryApply(product, tagsField, "offeredSystemTags", "Armor, Mech",
+                true, false, out updatedProduct, out diagnostic) || diagnostic != null ||
+            !(updatedProduct is EntityBalancingParameters) ||
+            !BalanceOverrideFlags.TryApply(factory, rolesField, "roles", "Building, Factory",
+                false, true, out object updatedFactory, out diagnostic) || diagnostic != null ||
+            !(updatedFactory is EntityBalancingParameters) ||
+            ((EntityBalancingParameters)updatedFactory).roles != (UnitRole.Building | UnitRole.Factory) ||
+            BalanceOverrideFlags.TryApply(product, rolesField, "roles", "Unit, Factory",
+                true, false, out _, out diagnostic) || diagnostic == null)
+        {
+            throw new InvalidOperationException("Native balance row flags were not applied or invalid product roles were admitted.");
+        }
+    }),
+    ("production building role overrides preserve native factory classification", () =>
+    {
+        if (!BalanceOverrideFlags.TryParse("roles", "Building, Factory", false, true,
+                out HashSet<string> roles, out string diagnostic) || diagnostic != null ||
+            !roles.SetEquals(new[] { "Building", "Factory" }) ||
+            BalanceOverrideFlags.TryParse("roles", "Building", false, true, out _, out diagnostic) ||
+            diagnostic == null ||
+            BalanceOverrideFlags.TryParse("roles", "Unit, Mech", false, false, out _, out diagnostic) ||
+            diagnostic == null)
+        {
+            throw new InvalidOperationException("Factory role overrides must retain both native factory flags and use the factory-row context.");
+        }
+    }),
+    ("balance overrides reject unknown and factory role flags on a unit product", () =>
+    {
+        WithPackage(nativeSample, (pack, root) =>
+        {
+            pack.units[0].balanceOverrides = pack.units[0].balanceOverrides
+                .Where(entry => entry.name != "roles")
+                .Append(new ContentBalanceOverride { name = "roles", value = "Unit, Factory" })
+                .ToArray();
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "unit.balance-override-invalid");
+        });
+        WithPackage(nativeSample, (pack, root) =>
+        {
+            pack.units[0].balanceOverrides = pack.units[0].balanceOverrides
+                .Where(entry => entry.name != "roles")
+                .Append(new ContentBalanceOverride { name = "roles", value = "Unit, All" })
+                .ToArray();
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "unit.balance-override-invalid");
+        });
+        WithPackage(nativeSample, (pack, root) =>
+        {
+            pack.units[0].balanceOverrides = pack.units[0].balanceOverrides
+                .Where(entry => entry.name != "offeredSystemTags")
+                .Append(new ContentBalanceOverride { name = "offeredSystemTags", value = "Armor, NotAGameTag" })
+                .ToArray();
             ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
                 "unit.balance-override-invalid");
         });
