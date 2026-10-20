@@ -1992,9 +1992,306 @@ namespace RogueCommandExpansionLoader.Content
                 {
                     bound.Failed = true;
                     RemoveAiBehaviourBindingIfCurrentLocked(behaviour, bound);
+                
+        private async Task LoadAllPacksAsync()
+        {
+            try
+            {
+                if (_loaded || !_nativeRegistryReady) return;
+                _loaded = true;
+                _packRootError = null;
+                _packCandidates.Clear();
+
+                if (!HasNoReparsePointsInPath(_packsRoot, out string rootFailure))
+                {
+                    throw new InvalidDataException("La raíz de paquetes no es segura: " + rootFailure);
                 }
 
-                SafeDestroyAiRuntimeBehaviour(bound, profile.Definition.id);
-                Log("El módulo AI de " + profile.Definition.id + " falló durante Tick para la instancia " +
-                    behaviour.gameObject.name + "; se desactiva su despacho: " +
-                    exception.GetType().Name + ": " + exception.Message);
+                Directory.CreateDirectory(_packsRoot);
+                if (!HasNoReparsePointsHInPath(_packsRoot, out rootFailure))
+                {
+                    throw new InvalidDataException("La raíz de paquetes dejó de ser segura: " + rootFailure);
+                }
+
+                using (SafeFileHandle rootHandle = OpenDirectoryHandle(_packsRoot, out rootFailure))
+                {
+                    if (rootHandle == null)
+                    {
+                        throw new InvalidDataException("No se pudo fijar la raíz de paquetes: " + rootFailure);
+                    }
+                    _resolvedPacksRoot = GetFinalPath(rootHandle);
+                }
+
+                string[] packageDirectories = Directory.GetDirectories(_packsRoot);
+                Array.Sort(packageDirectories, StringComparer.OrdinalIgnoreCase);
+                var candidates = new List<PackCandidate>();
+                for (int i = 0; i < packageDirectories.Length; i++)
+                {
+                    ContentPackDefinition definition;
+                    string packageName = Path.GetFileName(packageDirectories[i]);
+                    string readFailure;
+                    if (TryReadPackDefinition(packageDirectories[i], packageName, out definition, out readFailure))
+                    {
+                        var candidate = new PackCandidate(packageDirectories[i], packageName, definition);
+                        _packCandidates.Add(candidate);
+                        candidates.Add(candidate);
+                    }
+                    else
+                    {
+                        _packCandidates.Add(new PackCandidate(packageDirectories[i], packageName, null)
+                        {
+                            Disabled = true,
+                            StatusReason = readFailure
+                        });
+                    }
+                }
+
+                DisableCrossPackIdCollisions(candidates);
+                Dictionary<string, PackCandidate> unitOwners;
+                Dictionary<string, PackCandidate> profileOwners;
+                HashSet<string> declaredUnitIds;
+                HashSet<string> declaredProfileIds;
+                BuildDeclaredContentIndex(candidates, out unitOwners, out profileOwners,
+                    out declaredUnitIds, out declaredProfileIds);
+
+                for (int i = 0; i < candidates.Count; i++)
+                {
+                    PackCandidate candidate = candidates[i];
+                    if (candidate.Disabled) continue;
+
+                    ContentPackValidationResult validation = ContentPackValidator.Validate(
+                        candidate.Definition, candidate.Root,
+                        new RegistrySnapshot(this, declaredUnitIds, declaredProfileIds), _moduleRegistry);
+                    if (!validation.IsValid)
+                    {
+                        candidate.Disabled = true;
+                        var messages = new string[validation.Diagnostics.Count];
+                        for (int diagnosticIndex = 0; diagnosticIndex < validation.Diagnostics.Count; diagnosticIndex++)
+                        {
+                            messages[diagnosticIndex] = validation.Diagnostics[diagnosticIndex].ToString();
+                        }
+                        candidate.StatusReason = String.Join(" | ", messages);
+                        LogDiagnostics(candidate.Name, validation.Diagnostics);
+                        continue;
+                    }
+
+                    candidate.ValidatedDefinition = validation.Pack;
+                    ResolvePackDependencies(candidate, unitOwners, profileOwners);
+                }
+
+                await LoadPacksInDependencyOrderAsync(candidates);
+
+                int productionBuildingCount = 0;
+                foreach (LoadedUnit unit in _units.Values)
+                {
+                    if (unit.IsProductionBuilding) productionBuildingCount++;
+                }
+
+                int productUnitCount = _units.Count - productionBuildingCount;
+                Log("Carga asíncrona finalizada: " + _contributions.Count + " paquete(s) de progresión y " +
+                    _units.Count + " entidad(es) nuevas (" + productUnitCount + " unidad(es) y " +
+                    productionBuildingCount + " edificio(s) de producción).");
+            }
+            catch (Exception exception)
+            {
+                _loaded = false;
+                _packRootError = exception.GetType().Name + ": " + exception.Message;
+                Log("No se pudo recorrer la carpeta de paquetes (async): " + _packRootError);
+            }
+        }
+
+        private async Task LoadPacksInDependencyOrderAsync(List<PackCandidate> candidates)
+        {
+            var pending = new List<PackCandidate>();
+            for (int i = 0; i < candidates.Count; i++)
+            {
+                if (!candidates[i].Disabled && candidates[i].ValidatedDefinition != null)
+                {
+                    pending.Add(candidates[i]);
+                }
+            }
+
+            HashSet<PackCandidate> loaded = new HashSet<PackCandidate>();
+
+            while (pending.Count > 0)
+            {
+                var wave = new List<PackCandidate>();
+                for (int i = pending.Count - 1; i >= 0; i--)
+                {
+                    PackCandidate candidate = pending[i];
+                    bool ready = true;
+                    foreach (PackCandidate dependency in candidate.Dependencies)
+                    {
+                        if (!loaded.Contains(dependency))
+                        {
+                            ready = false;
+                            break;
+                        }
+                    }
+                    if (ready)
+                    {
+                        wave.Add(candidate);
+                        pending.RemoveAt(i);
+                    }
+                }
+
+                if (wave.Count == 0)
+                {
+                    foreach (var p in pending)
+                    {
+                        p.Disabled = true;
+                        p.StatusReason = "se detectó una dependencia circular entre paquetes.";
+                        Log("Paquete '" + p.Name + "' desactivado: " + p.StatusReason);
+                    }
+                    break;
+                }
+
+                var tasks = wave.Select(c => LoadOnePackAsync(c)).ToList();
+                bool[] results = await Task.WhenAll(tasks);
+
+                for (int i = 0; i < wave.Count; i++)
+                {
+                    if (results[i])
+                    {
+                        loaded.Add(wave[i]);
+                    }
+                    else
+                    {
+                        wave[i].Disabled = true;
+                    }
+                }
+            }
+        }
+
+        private async Task<bool> LoadOnePackAsync(PackCandidate candidate)
+        {
+            string packageRoot = candidate.Root;
+            string packageName = candidate.Name;
+            ContentPackDefinition definition = candidate.ValidatedDefinition;
+            if (definition == null) return false;
+
+            var temporaryBundles = new Dictionary<string, AssetBundle>(StringComparer.Ordinal);
+            var temporaryResources = new Dictionary<string, UnityEngine.Object>(StringComparer.Ordinal);
+            var temporaryUnits = new List<LoadedUnit>();
+            var temporaryStages = new List<LoadedStage>();
+            var temporaryProfiles = new List<LoadedAiProfile>();
+            HashSet<string> reservedBlueprintPoolIds = null;
+            long packBundleBytes = 0;
+            string pathFailure;
+
+            try
+            {
+                var loadOrder = new List<ContentAssetBundleDefinition>();
+                if (definition.assetBundles.Length > 0)
+                {
+                    string manifestFullPath;
+                    if (!TryResolveBundleFile(packageRoot, definition.assetBundleManifestPath, out manifestFullPath, out pathFailure))
+                    {
+                        throw new InvalidDataException("Manifiesto de AssetBundles: " + pathFailure);
+                    }
+
+                    string manifestPath = manifestFullPath;
+                    AssetBundle manifestBundle = await _bundleRegistry.LoadBundleAsync(definition.assetBundleManifestPath, manifestPath);
+                    AssetBundleManifest unityManifest = manifestBundle.LoadAsset<AssetBundleManifest>("AssetBundleManifest");
+                    if (unityManifest == null)
+                    {
+                        throw new InvalidDataException("El bundle '" + definition.assetBundleManifestPath + "' no contiene AssetBundleManifest.");
+                    }
+                    loadOrder = GetBundleLoadOrder(unityManifest, definition.assetBundles, packageName);
+                }
+
+                for (int i = 0; i < loadOrder.Count; i++)
+                {
+                    ContentAssetBundleDefinition bundleDefinition = loadOrder[i];
+                    string fullPath;
+                    if (!TryResolveBundleFile(packageRoot, bundleDefinition.path, out fullPath, out pathFailure))
+                    {
+                        throw new InvalidDataException(pathFailure);
+                    }
+
+                    AssetBundle bundle = await _bundleRegistry.LoadBundleAsync(bundleDefinition.id, fullPath);
+                    packBundleBytes += 0; 
+                    temporaryBundles.Add(bundleDefinition.id, bundle);
+                }
+
+                for (int i = 0; i < definition.units.Length; i++)
+                {
+                    ContentUnitDefinition unit = definition.units[i];
+                    if (unit.productionBuilding == null) throw new InvalidDataException("Unidad " + unit.id + " debe declarar productionBuilding.");
+
+                    bool usesNativeTemplate = !String.IsNullOrWhiteSpace(unit.nativeTemplateId);
+                    object row;
+                    string prefabKey;
+                    string imageKey;
+                    if (usesNativeTemplate)
+                    {
+                        row = CopyNativeBalanceRow(unit.nativeTemplateId, packageName, unit.id);
+                        string nativePrefabPath = _prefabLocationField.GetValue(row) as string;
+                        string nativeImagePath = _imageLocationField.GetValue(row) as string;
+                        
+                        GameObject nativeTemplate = Resources.Load<GameObject>(nativePrefabPath) ?? Resources.Load<GameObject>(nativePrefabPath.ToLowerInvariant());
+                        if (nativeTemplate == null) throw new InvalidDataException("No se pudo cargar el prefab nativo de " + unit.id);
+                        
+                        prefabKey = ResourceKey(unit.id, "prefab");
+                        temporaryResources.Add(prefabKey, nativeTemplate);
+                        
+                        imageKey = nativeImagePath;
+                        if (!String.IsNullOrWhiteSpace(unit.cardImageAssetName))
+                        {
+                            AssetBundle cardBundle = GetBundle(temporaryBundles, unit.assetBundleId, packageName);
+                            Sprite cardImage = LoadRequiredAsset(cardBundle, unit.cardImageAssetName, typeof(Sprite), "Sprite card image", packageName) as Sprite;
+                            imageKey = ResourceKey(unit.id, "image");
+                            temporaryResources.Add(imageKey, cardImage);
+                        }
+
+                        ApplyBalanceOverrides(row, unit.balanceOverrides, packageName, unit.id);
+                        _entityIdField.SetValue(row, unit.id);
+                        _prefabLocationField.SetValue(row, prefabKey);
+                        _imageLocationField.SetValue(row, imageKey);
+                        _inactiveField.SetValue(row, false);
+                        _allowedForAiField.SetValue(row, unit.isAllowedForAi);
+                        _allowedForDemoField.SetValue(row, unit.isAllowedForDemo);
+                        _isForSpecialistsField.SetValue(row, unit.isForSpecialists);
+                    }
+                    else
+                    {
+                        AssetBundle bundle = GetBundle(temporaryBundles, unit.assetBundleId, packageName);
+                        UnityEngine.Object balanceAsset = LoadRequiredAsset(bundle, unit.balanceAssetName, _entityBalanceAssetType, "EntityBalancingScriptableObject", packageName);
+                        var prefab = LoadRequiredAsset(bundle, unit.prefabAssetName, typeof(GameObject), "GameObject prefab", packageName) as GameObject;
+                        Sprite cardImage = LoadRequiredAsset(bundle, unit.cardImageAssetName, typeof(Sprite), "Sprite card image", packageName) as Sprite;
+                        
+                        prefabKey = ResourceKey(unit.id, "prefab");
+                        imageKey = ResourceKey(unit.id, "image");
+                        temporaryResources.Add(prefabKey, prefab);
+                        temporaryResources.Add(imageKey, cardImage);
+                        
+                        row = ReadSingleBalanceRow(balanceAsset, packageName, unit.id);
+                        ApplyBalanceOverrides(row, unit.balanceOverrides, packageName, unit.id);
+                        _entityIdField.SetValue(row, unit.id);
+                        _prefabLocationField.SetValue(row, prefabKey);
+                        _imageLocationField.SetValue(row, imageKey);
+                        _inactiveField.SetValue(row, false);
+                        _allowedForAiField.SetValue(row, unit.isAllowedForAi);
+                        _allowedForDemoField.SetValue(row, unit.isAllowedForDemo);
+                        _isForSpecialistsField.SetValue(row, unit.isForSpecialists);
+                    }
+
+                    if (HasRoleFlag(row, "Factory")) throw new InvalidDataException("Unidad " + unit.id + " no puede ser Factory.");
+                    _factoryForEntityIdField.SetValue(row, CreateEmptyNullableString());
+                    _allowedBlueprintField.SetValue(row, false);
+                    _allowedStartingBlueprintField.SetValue(row, false);
+                    temporaryUnits.Add(new LoadedUnit(unit.id, definition.packId, prefabKey, imageKey, row, unit, false, unit.productionBuilding.id));
+                    temporaryUnits.Add(CreateProductionBuilding(unit, unit.productionBuilding, definition.packId, packageName, temporaryBundles, new List<GameObject>(), temporaryResources));
+                }
+
+                CommitPack(definition, temporaryBundles, new List<FileStream>(), packBundleBytes, temporaryResources, temporaryUnits, temporaryStages, temporaryProfiles);
+                return true;
+            }
+            catch (Exception exception)
+            {
+                candidate.StatusReason = exception.GetType().Name + ": " + exception.Message;
+                return false;
+            }
+        }
+
+}
