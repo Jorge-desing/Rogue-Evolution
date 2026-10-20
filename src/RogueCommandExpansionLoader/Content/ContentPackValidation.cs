@@ -385,8 +385,9 @@ namespace RogueCommandExpansionLoader.Content
                 ValidateUnitHealing(unit.healing, itemPath + ".healing", diagnostics);
                 ValidateUnitStealth(unit.stealth, itemPath + ".stealth", diagnostics);
                 ValidateUnitCommand(unit.command, itemPath + ".command", diagnostics);
+                ValidateUnitExperienceReward(unit.experienceReward, itemPath + ".experienceReward", diagnostics);
                 ValidateProductionBuilding(unit.productionBuilding, itemPath + ".productionBuilding",
-                    allIds, productionBuildingIds, bundleIds, registrySnapshot, diagnostics);
+                                    allIds, productionBuildingIds, bundleIds, registrySnapshot, diagnostics);
                 ValidateProfileCardEligibility(unit, itemPath, diagnostics);
             }
 
@@ -1829,6 +1830,29 @@ namespace RogueCommandExpansionLoader.Content
             {
                 Add(diagnostics, "unit-command.chain-invalid", path + ".maxCommandChain",
                     "Max command chain must be non-negative.");
+            }
+        }
+
+        private static void ValidateUnitExperienceReward(
+            ContentUnitExperienceRewardDefinition reward,
+            string path,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (reward == null) return;
+            if (reward.experienceAmount < 0)
+            {
+                Add(diagnostics, "unit-experience-reward.amount-invalid", path + ".experienceAmount",
+                    "Experience amount must be non-negative.");
+            }
+            if (reward.experienceType != null && String.IsNullOrWhiteSpace(reward.experienceType))
+            {
+                Add(diagnostics, "unit-experience-reward.type-invalid", path + ".experienceType",
+                    "Experience type must be non-empty when provided.");
+            }
+            if (reward.bonusMultiplier < 0)
+            {
+                Add(diagnostics, "unit-experience-reward.bonus-multiplier-invalid", path + ".bonusMultiplier",
+                    "Bonus multiplier must be non-negative.");
             }
         }
 
