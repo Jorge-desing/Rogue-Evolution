@@ -148,6 +148,16 @@ public sealed class LandscapeGenerator
 {
 }
 
+public sealed class MutableBalanceRow
+{
+    public float moveSpeed;
+    public float armorValue;
+    public float damage;
+    public float weaponRange;
+    public float detectionRange;
+    public float healAmount;
+}
+
 public sealed class EntityValueModifier
 {
     public float value;

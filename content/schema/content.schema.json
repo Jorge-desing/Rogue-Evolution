@@ -1191,6 +1191,7 @@
             "coinReward",
             "startCrystalReward",
             "researchPointsReward",
+            "maxAscensionLevel",
             "twoWayBranchingProbability",
             "shopWeight",
             "restSiteWeight",
@@ -1251,7 +1252,8 @@
                   "maxWidth",
                   "coinReward",
                   "startCrystalReward",
-                  "researchPointsReward"
+                  "researchPointsReward",
+                  "maxAscensionLevel"
                 ]
               }
             },

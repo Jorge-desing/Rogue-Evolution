@@ -660,6 +660,50 @@ var tests = new (string Name, Action Run)[]
         mutationManager.MutateActiveAiBehaviour(manager, "detectionRange", 20.0f);
         if (behaviour.detectionRange != 20.0f) throw new InvalidOperationException("AI detectionRange mutation failed.");
     }),
+    ("expanded ParamMap contains all canonical ChangeableValue keys", () =>
+    {
+        FieldInfo? field = typeof(RuntimeContentMutator).GetField("ParamMap",
+            BindingFlags.NonPublic | BindingFlags.Static);
+        if (field == null) throw new InvalidOperationException("ParamMap field not found.");
+        var map = field.GetValue(null) as IDictionary;
+        if (map == null) throw new InvalidOperationException("ParamMap is null.");
+        string[] required =
+        {
+            "Cost", "ProductionDuration", "MaxCapacity", "MaxHealth", "MaxShield", "MaxMana",
+            "MaxRank", "MoveSpeed", "SightRadius", "Damage1", "Damage2", "WeaponRange",
+            "Attack1Cooldown", "Attack2Cooldown", "EffectRadius1", "EffectRadius2", "SkillRange",
+            "HealAmount1", "HealAmount2", "GainCreditsAmount", "SkillManaCost", "Duration1",
+            "SpawnTtl", "ManaRechargePerSecond", "MaxArmor", "ArmorProtection",
+            "AttackSpeed", "ArmorValue", "Damage"
+        };
+        foreach (string key in required)
+        {
+            if (!map.Contains(key))
+                throw new InvalidOperationException("ParamMap missing key: " + key);
+        }
+    }),
+    ("ApplyUnitMutations field names are accepted by the mutation manager", () =>
+    {
+        var mutationManager = new RuntimeMutationManager(msg => { });
+        var row = new EntityValueModifier { value = 1.0f };
+        // Balance row stand-in uses a generic object with the matching fields.
+        var balanceRow = new
+        {
+            moveSpeed = 0f,
+            armorValue = 0f,
+            damage = 0f,
+            weaponRange = 0f,
+            detectionRange = 0f,
+            healAmount = 0f
+        };
+        // MutateFloat requires settable fields; use reflection-friendly mutable holder.
+        var holder = new MutableBalanceRow();
+        foreach (string fieldName in new[] { "moveSpeed", "armorValue", "damage", "weaponRange", "detectionRange", "healAmount" })
+        {
+            if (!mutationManager.MutateFloat(holder, fieldName, 1.25f))
+                throw new InvalidOperationException("MutateFloat failed for field: " + fieldName);
+        }
+    }),
     ("runtime mutation handles invalid targets and fields", () =>
     {
         var mutationManager = new RuntimeMutationManager(msg => { });
@@ -4089,6 +4133,37 @@ var tests = new (string Name, Action Run)[]
                 "stage.parameter-override-invalid");
         });
     }),
+    ("stage parameter override maxAscensionLevel validates 0-10 range", () =>
+    {
+        WithPackage(nativeSample, (pack, root) =>
+        {
+            pack.stages[0].parameterOverrides =
+            [
+                new ContentStageParameterOverride { name = "maxAscensionLevel", value = "0" }
+            ];
+            ExpectValid(pack, root, new EmptySnapshot(), new KnownModuleValidator());
+
+            pack.stages[0].parameterOverrides =
+            [
+                new ContentStageParameterOverride { name = "maxAscensionLevel", value = "10" }
+            ];
+            ExpectValid(pack, root, new EmptySnapshot(), new KnownModuleValidator());
+
+            pack.stages[0].parameterOverrides =
+            [
+                new ContentStageParameterOverride { name = "maxAscensionLevel", value = "-1" }
+            ];
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "stage.parameter-override-invalid");
+
+            pack.stages[0].parameterOverrides =
+            [
+                new ContentStageParameterOverride { name = "maxAscensionLevel", value = "11" }
+            ];
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "stage.parameter-override-invalid");
+        });
+    }),
     ("balance overrides accept rarity enum and reject invalid enum values", () =>
     {
         WithPackage(nativeSample, (pack, root) =>
@@ -4717,9 +4792,13 @@ sealed class KnownModuleValidator : IAiModuleValidator
             return HarvesterRaiderParameterParser.TryParse(parameters, out _, out diagnostic);
         }
         if (moduleId == "sample:siege-assault")
-        {
-            return SiegeAssaultParameterParser.TryParse(parameters, out _, out diagnostic);
-        }
+                {
+                    return SiegeAssaultParameterParser.TryParse(parameters, out _, out diagnostic);
+                }
+                if (moduleId == "sample:retreat-and-regroup")
+                {
+                    return RetreatAndRegroupParameterParser.TryParse(parameters, out _, out diagnostic);
+                }
 
         bool known = moduleId is "sample:scheduled-base-build" or "sample:reactive-base-defense" or "sample:trace-default";
         diagnostic = known ? string.Empty : "Unknown compiled AI module: " + moduleId;

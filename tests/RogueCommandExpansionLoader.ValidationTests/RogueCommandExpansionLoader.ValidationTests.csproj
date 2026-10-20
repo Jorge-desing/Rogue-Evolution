@@ -70,9 +70,13 @@
     <Compile Include="../../src/RogueCommandExpansionLoader/Modules/HarvesterRaiderAiModule.cs"
              Link="Modules/HarvesterRaiderAiModule.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Modules/SiegeAssaultParameters.cs"
-             Link="Modules/SiegeAssaultParameters.cs" />
-    <Compile Include="../../src/RogueCommandExpansionLoader/Modules/SiegeAssaultAiModule.cs"
-             Link="Modules/SiegeAssaultAiModule.cs" />
+                 Link="Modules/SiegeAssaultParameters.cs" />
+        <Compile Include="../../src/RogueCommandExpansionLoader/Modules/SiegeAssaultAiModule.cs"
+                 Link="Modules/SiegeAssaultAiModule.cs" />
+        <Compile Include="../../src/RogueCommandExpansionLoader/Modules/RetreatAndRegroupParameters.cs"
+                 Link="Modules/RetreatAndRegroupParameters.cs" />
+        <Compile Include="../../src/RogueCommandExpansionLoader/Modules/RetreatAndRegroupAiModule.cs"
+                 Link="Modules/RetreatAndRegroupAiModule.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Contracts/IRogueCommandAiModule.cs"
              Link="Contracts/IRogueCommandAiModule.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Modules/AiModuleRegistry.cs"

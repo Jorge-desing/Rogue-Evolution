@@ -2469,6 +2469,7 @@ namespace RogueCommandExpansionLoader.Content
                 case "coinReward":
                 case "startCrystalReward":
                 case "researchPointsReward":
+                case "maxAscensionLevel":
                     int integerValue;
                     if (!Int32.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out integerValue))
                     {
@@ -2477,6 +2478,7 @@ namespace RogueCommandExpansionLoader.Content
 
                     if (name == "levelCount") return integerValue >= 1 && integerValue <= 32;
                     if (name == "maxWidth") return integerValue >= 1 && integerValue <= 64;
+                    if (name == "maxAscensionLevel") return integerValue >= 0 && integerValue <= 10;
                     return integerValue >= 0 && integerValue <= 1000000;
                 case "twoWayBranchingProbability":
                 case "shopWeight":

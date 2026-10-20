@@ -45,6 +45,7 @@ namespace RogueCommandExpansionLoader
                 modules.Register(new ReactiveBaseDefenseAiModule());
                 modules.Register(new HarvesterRaiderAiModule());
                 modules.Register(new SiegeAssaultAiModule());
+                modules.Register(new RetreatAndRegroupAiModule());
 
                 string packsRoot = System.IO.Path.Combine(
                     Paths.PluginPath,

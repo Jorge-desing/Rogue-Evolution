@@ -27,8 +27,11 @@ namespace UnityEngine
             this.z = z;
         }
 
-        public static Vector3 operator -(Vector3 left, Vector3 right) =>
+public static Vector3 operator -(Vector3 left, Vector3 right) =>
             new(left.x - right.x, left.y - right.y, left.z - right.z);
+
+        public static Vector3 operator +(Vector3 left, Vector3 right) =>
+            new(left.x + right.x, left.y + right.y, left.z + right.z);
 
         public static float Distance(Vector3 left, Vector3 right) =>
             (float)System.Math.Sqrt((left - right).sqrMagnitude);

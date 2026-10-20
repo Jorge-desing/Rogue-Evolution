@@ -813,6 +813,54 @@ namespace RogueCommandExpansionLoader.Content
                         }
                     }
                 }
+                // Apply movement sub-definition
+                if (unit.Definition.movement != null)
+                {
+                    if (_mutationManager.MutateFloat(unit.BalanceRow, "moveSpeed", unit.Definition.movement.moveSpeed))
+                        _mutationSuccessCount++;
+                    else
+                        _mutationFailureCount++;
+                }
+                // Apply armor sub-definition
+                if (unit.Definition.armor != null)
+                {
+                    if (_mutationManager.MutateFloat(unit.BalanceRow, "armorValue", unit.Definition.armor.armorValue))
+                        _mutationSuccessCount++;
+                    else
+                        _mutationFailureCount++;
+                }
+                // Apply weapon sub-definitions
+                if (unit.Definition.weapons != null)
+                {
+                    foreach (var weapon in unit.Definition.weapons)
+                    {
+                        if (weapon == null) continue;
+                        if (_mutationManager.MutateFloat(unit.BalanceRow, "damage", weapon.damage))
+                            _mutationSuccessCount++;
+                        else
+                            _mutationFailureCount++;
+                        if (_mutationManager.MutateFloat(unit.BalanceRow, "weaponRange", weapon.range))
+                            _mutationSuccessCount++;
+                        else
+                            _mutationFailureCount++;
+                    }
+                }
+                // Apply detection sub-definition
+                if (unit.Definition.detection != null)
+                {
+                    if (_mutationManager.MutateFloat(unit.BalanceRow, "detectionRange", unit.Definition.detection.detectionRange))
+                        _mutationSuccessCount++;
+                    else
+                        _mutationFailureCount++;
+                }
+                // Apply healing sub-definition
+                if (unit.Definition.healing != null)
+                {
+                    if (_mutationManager.MutateFloat(unit.BalanceRow, "healAmount", unit.Definition.healing.healAmount))
+                        _mutationSuccessCount++;
+                    else
+                        _mutationFailureCount++;
+                }
             }
         }
         }
@@ -6197,7 +6245,8 @@ namespace RogueCommandExpansionLoader.Content
                         CultureInfo.InvariantCulture, out parsed) ||
                         (stageOverride.name == "levelCount" && (parsed < 1 || parsed > 32)) ||
                         (stageOverride.name == "maxWidth" && (parsed < 1 || parsed > 64)) ||
-                        (stageOverride.name != "levelCount" && stageOverride.name != "maxWidth" &&
+                        (stageOverride.name == "maxAscensionLevel" && (parsed < 0 || parsed > 10)) ||
+                        (stageOverride.name != "levelCount" && stageOverride.name != "maxWidth" && stageOverride.name != "maxAscensionLevel" &&
                             (parsed < 0 || parsed > 1000000)))
                     {
                         throw new InvalidDataException("Etapa " + stageId + " en '" + packageName +
