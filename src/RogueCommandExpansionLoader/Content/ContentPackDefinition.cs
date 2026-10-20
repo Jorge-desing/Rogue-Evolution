@@ -108,6 +108,15 @@ namespace RogueCommandExpansionLoader.Content
     }
 
     [Serializable]
+    public sealed class ContentUnitStatusEffectDefinition
+    {
+        public string id;
+        public string effectType;
+        public float duration;
+        public float magnitude;
+    }
+
+    [Serializable]
     public sealed class ContentUnitDefinition
     {
         public string id;
@@ -133,6 +142,7 @@ namespace RogueCommandExpansionLoader.Content
         public ContentUnitSynergyDefinition[] synergies;
         public ContentUnitVisualVariantDefinition[] visualVariants;
         public ContentUnitSpawnDefinition spawn;
+        public ContentUnitStatusEffectDefinition[] statusEffects;
         public ContentBalanceOverride[] balanceOverrides;
         public ContentUnitLocalizationDefinition[] localizations;
         public ContentProductionBuildingDefinition productionBuilding;
@@ -369,6 +379,7 @@ namespace RogueCommandExpansionLoader.Content
                 synergies = CloneArray(source.synergies, CloneUnitSynergy),
                 visualVariants = CloneArray(source.visualVariants, CloneUnitVisualVariant),
                 spawn = CloneUnitSpawn(source.spawn),
+                statusEffects = CloneArray(source.statusEffects, CloneUnitStatusEffect),
                 productionBuilding = CloneProductionBuilding(source.productionBuilding)
             };
         }
@@ -447,6 +458,17 @@ namespace RogueCommandExpansionLoader.Content
                 maxSpawnCount = source.maxSpawnCount,
                 spawnCooldown = source.spawnCooldown,
                 spawnLocation = source.spawnLocation
+            };
+        }
+
+        private static ContentUnitStatusEffectDefinition CloneUnitStatusEffect(ContentUnitStatusEffectDefinition source)
+        {
+            return source == null ? null : new ContentUnitStatusEffectDefinition
+            {
+                id = source.id,
+                effectType = source.effectType,
+                duration = source.duration,
+                magnitude = source.magnitude
             };
         }
 

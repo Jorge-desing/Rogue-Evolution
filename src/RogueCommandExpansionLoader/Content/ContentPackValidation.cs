@@ -375,6 +375,7 @@ namespace RogueCommandExpansionLoader.Content
                 ValidateUnitSynergies(unit.synergies, itemPath + ".synergies", allIds, diagnostics);
                 ValidateUnitVisualVariants(unit.visualVariants, itemPath + ".visualVariants", bundleIds, diagnostics);
                 ValidateUnitSpawn(unit.spawn, itemPath + ".spawn", diagnostics);
+                ValidateUnitStatusEffects(unit.statusEffects, itemPath + ".statusEffects", diagnostics);
                 ValidateProductionBuilding(unit.productionBuilding, itemPath + ".productionBuilding",
                     allIds, productionBuildingIds, bundleIds, registrySnapshot, diagnostics);
                 ValidateProfileCardEligibility(unit, itemPath, diagnostics);
@@ -1547,6 +1548,35 @@ namespace RogueCommandExpansionLoader.Content
             {
                 Add(diagnostics, "unit-spawn.cooldown-invalid", path + ".spawnCooldown",
                     "Spawn cooldown must be non-negative.");
+            }
+        }
+
+        private static void ValidateUnitStatusEffects(
+            ContentUnitStatusEffectDefinition[] effects,
+            string path,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (effects == null) return;
+            for (int i = 0; i < effects.Length; i++)
+            {
+                var effect = effects[i];
+                string itemPath = path + "[" + i + "]";
+                if (effect == null)
+                {
+                    Add(diagnostics, "entry.null", itemPath, "Status effect entries cannot be null.");
+                    continue;
+                }
+                ValidateNamespacedId(effect.id, itemPath + ".id", diagnostics);
+                if (String.IsNullOrWhiteSpace(effect.effectType))
+                {
+                    Add(diagnostics, "unit-status-effect.type-required", itemPath + ".effectType",
+                        "Status effect type must be non-empty.");
+                }
+                if (effect.duration < 0)
+                {
+                    Add(diagnostics, "unit-status-effect.duration-invalid", itemPath + ".duration",
+                        "Status effect duration must be non-negative.");
+                }
             }
         }
 
