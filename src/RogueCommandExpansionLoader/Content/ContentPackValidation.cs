@@ -147,6 +147,8 @@ namespace RogueCommandExpansionLoader.Content
         private static readonly HashSet<string> SupportedUnitLocalizationLanguages = new HashSet<string>(
             new[] { "en-US", "de-DE", "ja-JP", "ko-KR", "zh-CN", "zh-TW", "fr-FR", "es-XL", "pt-BR", "ru-RU" },
             StringComparer.Ordinal);
+        private static readonly HashSet<string> SupportedUnitTypes = new HashSet<string>(
+            new[] { "Ground", "Air", "Support", "Stationary" }, StringComparer.Ordinal);
         private static readonly HashSet<string> SupportedRelicRarities = new HashSet<string>(
             new[] { "Common", "Rare", "UltraRare" }, StringComparer.Ordinal);
         private static readonly HashSet<string> SupportedRelicTechs = new HashSet<string>(
@@ -300,6 +302,10 @@ namespace RogueCommandExpansionLoader.Content
                 }
 
                 RegisterId(unit.id, itemPath + ".id", "unit", allIds, registrySnapshot, diagnostics);
+                if (!String.IsNullOrWhiteSpace(unit.unitType) && !SupportedUnitTypes.Contains(unit.unitType))
+                {
+                    Add(diagnostics, "unit.type-invalid", itemPath + ".unitType", "Unit type must be one of the game's supported unit types.");
+                }
                 if (IsNamespacedId(unit.id))
                 {
                     unitIds.Add(unit.id);

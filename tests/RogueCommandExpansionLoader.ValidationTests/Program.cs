@@ -41,6 +41,14 @@ ContentPackDefinition reactiveAiSample = JsonSerializer.Deserialize<ContentPackD
 
 var tests = new (string Name, Action Run)[]
 {
+    ("unit type validation rejects unsupported types", () =>
+    {
+        WithPackage(sample, (pack, root) =>
+        {
+            pack.units[0].unitType = "InvalidType";
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(), "unit.type-invalid");
+        });
+    }),
     ("visual socket discovery accepts canonical IDs and exact legacy suffixes only", () =>
     {
         if (!RogueCommandSocketCatalog.TryResolveCanonicalSocketName("Socket_TurretPivot", out string canonical) ||
