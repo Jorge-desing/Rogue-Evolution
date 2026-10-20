@@ -89,6 +89,16 @@ namespace RogueCommandExpansionLoader.Content
     }
 
     [Serializable]
+    public sealed class ContentUnitVisualVariantDefinition
+    {
+        public string id;
+        public string visualAssetName;
+        public string visualRootPath;
+        public string colorTint;
+        public float scale;
+    }
+
+    [Serializable]
     public sealed class ContentUnitDefinition
     {
         public string id;
@@ -112,6 +122,7 @@ namespace RogueCommandExpansionLoader.Content
         public ContentUnitUpgradeDefinition[] upgrades;
         public ContentUnitExperienceDefinition experience;
         public ContentUnitSynergyDefinition[] synergies;
+        public ContentUnitVisualVariantDefinition[] visualVariants;
         public ContentBalanceOverride[] balanceOverrides;
         public ContentUnitLocalizationDefinition[] localizations;
         public ContentProductionBuildingDefinition productionBuilding;
@@ -346,6 +357,7 @@ namespace RogueCommandExpansionLoader.Content
                 upgrades = CloneArray(source.upgrades, CloneUnitUpgrade),
                 experience = CloneUnitExperience(source.experience),
                 synergies = CloneArray(source.synergies, CloneUnitSynergy),
+                visualVariants = CloneArray(source.visualVariants, CloneUnitVisualVariant),
                 productionBuilding = CloneProductionBuilding(source.productionBuilding)
             };
         }
@@ -401,6 +413,18 @@ namespace RogueCommandExpansionLoader.Content
                 multiplier = source.multiplier,
                 radius = source.radius,
                 targetUnitIds = source.targetUnitIds == null ? null : (string[])source.targetUnitIds.Clone()
+            };
+        }
+
+        private static ContentUnitVisualVariantDefinition CloneUnitVisualVariant(ContentUnitVisualVariantDefinition source)
+        {
+            return source == null ? null : new ContentUnitVisualVariantDefinition
+            {
+                id = source.id,
+                visualAssetName = source.visualAssetName,
+                visualRootPath = source.visualRootPath,
+                colorTint = source.colorTint,
+                scale = source.scale
             };
         }
 

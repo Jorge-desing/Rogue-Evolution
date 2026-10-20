@@ -373,6 +373,7 @@ namespace RogueCommandExpansionLoader.Content
                 ValidateUnitUpgrades(unit.upgrades, itemPath + ".upgrades", allIds, diagnostics);
                 ValidateUnitExperience(unit.experience, itemPath + ".experience", diagnostics);
                 ValidateUnitSynergies(unit.synergies, itemPath + ".synergies", allIds, diagnostics);
+                ValidateUnitVisualVariants(unit.visualVariants, itemPath + ".visualVariants", bundleIds, diagnostics);
                 ValidateProductionBuilding(unit.productionBuilding, itemPath + ".productionBuilding",
                     allIds, productionBuildingIds, bundleIds, registrySnapshot, diagnostics);
                 ValidateProfileCardEligibility(unit, itemPath, diagnostics);
@@ -1488,6 +1489,39 @@ namespace RogueCommandExpansionLoader.Content
                                 "Synergy target unit must be a declared or native unit ID.");
                         }
                     }
+                }
+            }
+        }
+
+        private static void ValidateUnitVisualVariants(
+            ContentUnitVisualVariantDefinition[] variants,
+            string path,
+            HashSet<string> bundleIds,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (variants == null) return;
+            for (int i = 0; i < variants.Length; i++)
+            {
+                var variant = variants[i];
+                string itemPath = path + "[" + i + "]";
+                if (variant == null)
+                {
+                    Add(diagnostics, "entry.null", itemPath, "Visual variant entries cannot be null.");
+                    continue;
+                }
+                ValidateNamespacedId(variant.id, itemPath + ".id", diagnostics);
+                if (!String.IsNullOrWhiteSpace(variant.visualAssetName))
+                {
+                    ValidateAssetName(variant.visualAssetName, itemPath + ".visualAssetName", diagnostics);
+                }
+                if (!String.IsNullOrWhiteSpace(variant.visualRootPath))
+                {
+                    ValidateVisualRootPath(variant.visualRootPath, itemPath + ".visualRootPath", diagnostics);
+                }
+                if (variant.scale < 0 || variant.scale > 10)
+                {
+                    Add(diagnostics, "unit-visual-variant.scale-invalid", itemPath + ".scale",
+                        "Visual variant scale must be between 0 and 10.");
                 }
             }
         }
