@@ -259,6 +259,18 @@
           "items": {
             "$ref": "#/$defs/aiOverride"
           }
+        },
+        "activeSkills": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/activeSkill"
+          }
+        },
+        "combatBoosts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/combatBoost"
+          }
         }
       },
       "oneOf": [
@@ -1568,6 +1580,69 @@
         },
         "value": {
           "type": "string"
+        }
+      }
+    },
+    "activeSkill": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "skillType"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/namespacedId"
+        },
+        "skillType": {
+          "type": "string",
+          "enum": [
+            "Position",
+            "Target",
+            "Self"
+          ]
+        },
+        "cooldown": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 300
+        },
+        "manaCost": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1000
+        },
+        "effectValue": {
+          "type": "number"
+        }
+      }
+    },
+    "combatBoost": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "statName",
+        "multiplier"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/namespacedId"
+        },
+        "statName": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "multiplier": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 10
+        },
+        "duration": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 300
         }
       }
     }

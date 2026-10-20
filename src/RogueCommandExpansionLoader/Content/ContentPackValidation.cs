@@ -368,6 +368,8 @@ namespace RogueCommandExpansionLoader.Content
                 ValidateBalanceOverrides(unit.balanceOverrides, itemPath + ".balanceOverrides", "unit", "unit", diagnostics);
                 ValidateAbilities(unit.abilities, itemPath + ".abilities", diagnostics);
                 ValidateAiOverrides(unit.aiOverrides, itemPath + ".aiOverrides", diagnostics);
+                ValidateActiveSkills(unit.activeSkills, itemPath + ".activeSkills", diagnostics);
+                ValidateCombatBoosts(unit.combatBoosts, itemPath + ".combatBoosts", diagnostics);
                 ValidateProductionBuilding(unit.productionBuilding, itemPath + ".productionBuilding",
                     allIds, productionBuildingIds, bundleIds, registrySnapshot, diagnostics);
                 ValidateProfileCardEligibility(unit, itemPath, diagnostics);
@@ -1302,6 +1304,74 @@ namespace RogueCommandExpansionLoader.Content
                 if (ovr.value == null)
                 {
                     Add(diagnostics, "ai-override.value-required", itemPath + ".value", "AI override value must be provided.");
+                }
+            }
+        }
+        private static void ValidateActiveSkills(
+            ContentActiveSkillDefinition[] skills,
+            string path,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (skills == null) return;
+            for (int i = 0; i < skills.Length; i++)
+            {
+                var skill = skills[i];
+                string itemPath = path + "[" + i + "]";
+                if (skill == null)
+                {
+                    Add(diagnostics, "entry.null", itemPath, "Active skill entries cannot be null.");
+                    continue;
+                }
+                ValidateNamespacedId(skill.id, itemPath + ".id", diagnostics);
+                if (String.IsNullOrWhiteSpace(skill.skillType) ||
+                    (skill.skillType != "Position" && skill.skillType != "Target" && skill.skillType != "Self"))
+                {
+                    Add(diagnostics, "active-skill.type-invalid", itemPath + ".skillType",
+                        "Active skill type must be Position, Target, or Self.");
+                }
+                if (skill.cooldown < 0 || skill.cooldown > 300)
+                {
+                    Add(diagnostics, "active-skill.cooldown-invalid", itemPath + ".cooldown",
+                        "Active skill cooldown must be between 0 and 300.");
+                }
+                if (skill.manaCost < 0 || skill.manaCost > 1000)
+                {
+                    Add(diagnostics, "active-skill.manaCost-invalid", itemPath + ".manaCost",
+                        "Active skill mana cost must be between 0 and 1000.");
+                }
+            }
+        }
+
+        private static void ValidateCombatBoosts(
+            ContentCombatBoostDefinition[] boosts,
+            string path,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (boosts == null) return;
+            for (int i = 0; i < boosts.Length; i++)
+            {
+                var boost = boosts[i];
+                string itemPath = path + "[" + i + "]";
+                if (boost == null)
+                {
+                    Add(diagnostics, "entry.null", itemPath, "Combat boost entries cannot be null.");
+                    continue;
+                }
+                ValidateNamespacedId(boost.id, itemPath + ".id", diagnostics);
+                if (String.IsNullOrWhiteSpace(boost.statName))
+                {
+                    Add(diagnostics, "combat-boost.statName-required", itemPath + ".statName",
+                        "Combat boost stat name must be non-empty.");
+                }
+                if (boost.multiplier < 0 || boost.multiplier > 10)
+                {
+                    Add(diagnostics, "combat-boost.multiplier-invalid", itemPath + ".multiplier",
+                        "Combat boost multiplier must be between 0 and 10.");
+                }
+                if (boost.duration < 0 || boost.duration > 300)
+                {
+                    Add(diagnostics, "combat-boost.duration-invalid", itemPath + ".duration",
+                        "Combat boost duration must be between 0 and 300.");
                 }
             }
         }

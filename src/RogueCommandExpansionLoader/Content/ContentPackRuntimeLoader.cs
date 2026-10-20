@@ -777,8 +777,27 @@ namespace RogueCommandExpansionLoader.Content
                         }
                     }
                 }
+                // Apply combat boosts
+                if (unit.Definition.combatBoosts != null)
+                {
+                    foreach (var boost in unit.Definition.combatBoosts)
+                    {
+                        if (boost == null || String.IsNullOrWhiteSpace(boost.statName))
+                        {
+                            continue;
+                        }
+                        if (_mutationManager.MutateFloat(unit.BalanceRow, boost.statName, boost.multiplier))
+                        {
+                            _mutationSuccessCount++;
+                        }
+                        else
+                        {
+                            _mutationFailureCount++;
+                        }
+                    }
+                }
             }
-            }
+        }
         }
 
         public bool TryFindBlueprintPool(string poolId, out object pool)

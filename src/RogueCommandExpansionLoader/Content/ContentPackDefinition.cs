@@ -42,6 +42,25 @@ namespace RogueCommandExpansionLoader.Content
     }
 
     [Serializable]
+    public sealed class ContentActiveSkillDefinition
+    {
+        public string id;
+        public string skillType;
+        public float cooldown;
+        public float manaCost;
+        public float effectValue;
+    }
+
+    [Serializable]
+    public sealed class ContentCombatBoostDefinition
+    {
+        public string id;
+        public string statName;
+        public float multiplier;
+        public float duration;
+    }
+
+    [Serializable]
     public sealed class ContentUnitDefinition
     {
         public string id;
@@ -60,6 +79,8 @@ namespace RogueCommandExpansionLoader.Content
         public bool isForSpecialists;
         public ContentAbilityDefinition[] abilities;
         public ContentAiOverrideDefinition[] aiOverrides;
+        public ContentActiveSkillDefinition[] activeSkills;
+        public ContentCombatBoostDefinition[] combatBoosts;
         public ContentBalanceOverride[] balanceOverrides;
         public ContentUnitLocalizationDefinition[] localizations;
         public ContentProductionBuildingDefinition productionBuilding;
@@ -289,6 +310,8 @@ namespace RogueCommandExpansionLoader.Content
                 localizations = CloneArray(source.localizations, CloneUnitLocalization),
                 abilities = CloneArray(source.abilities, CloneAbility),
                 aiOverrides = CloneArray(source.aiOverrides, CloneAiOverride),
+                activeSkills = CloneArray(source.activeSkills, CloneActiveSkill),
+                combatBoosts = CloneArray(source.combatBoosts, CloneCombatBoost),
                 productionBuilding = CloneProductionBuilding(source.productionBuilding)
             };
         }
@@ -301,6 +324,16 @@ namespace RogueCommandExpansionLoader.Content
         private static ContentAiOverrideDefinition CloneAiOverride(ContentAiOverrideDefinition source)
         {
             return source == null ? null : new ContentAiOverrideDefinition { parameter = source.parameter, value = source.value };
+        }
+
+        private static ContentActiveSkillDefinition CloneActiveSkill(ContentActiveSkillDefinition source)
+        {
+            return source == null ? null : new ContentActiveSkillDefinition { id = source.id, skillType = source.skillType, cooldown = source.cooldown, manaCost = source.manaCost, effectValue = source.effectValue };
+        }
+
+        private static ContentCombatBoostDefinition CloneCombatBoost(ContentCombatBoostDefinition source)
+        {
+            return source == null ? null : new ContentCombatBoostDefinition { id = source.id, statName = source.statName, multiplier = source.multiplier, duration = source.duration };
         }
 
         private static ContentProductionBuildingDefinition CloneProductionBuilding(
