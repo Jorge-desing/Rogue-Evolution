@@ -176,6 +176,14 @@ namespace RogueCommandExpansionLoader.Content
     }
 
     [Serializable]
+    public sealed class ContentUnitStealthDefinition
+    {
+        public float stealthLevel;
+        public float cloakDuration;
+        public float detectionReduction;
+    }
+
+    [Serializable]
     public sealed class ContentUnitDefinition
     {
         public string id;
@@ -209,6 +217,7 @@ namespace RogueCommandExpansionLoader.Content
         public ContentUnitWeaponDefinition[] weapons;
         public ContentUnitArmorDefinition armor;
         public ContentUnitHealingDefinition healing;
+        public ContentUnitStealthDefinition stealth;
         public ContentBalanceOverride[] balanceOverrides;
         public ContentUnitLocalizationDefinition[] localizations;
         public ContentProductionBuildingDefinition productionBuilding;
@@ -453,6 +462,7 @@ namespace RogueCommandExpansionLoader.Content
                 weapons = CloneArray(source.weapons, CloneUnitWeapon),
                 armor = CloneUnitArmor(source.armor),
                 healing = CloneUnitHealing(source.healing),
+                stealth = CloneUnitStealth(source.stealth),
                 productionBuilding = CloneProductionBuilding(source.productionBuilding)
             };
         }
@@ -615,6 +625,16 @@ namespace RogueCommandExpansionLoader.Content
                 healRange = source.healRange,
                 healRate = source.healRate,
                 repairAmount = source.repairAmount
+            };
+        }
+
+        private static ContentUnitStealthDefinition CloneUnitStealth(ContentUnitStealthDefinition source)
+        {
+            return source == null ? null : new ContentUnitStealthDefinition
+            {
+                stealthLevel = source.stealthLevel,
+                cloakDuration = source.cloakDuration,
+                detectionReduction = source.detectionReduction
             };
         }
 

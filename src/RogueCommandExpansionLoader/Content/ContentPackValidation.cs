@@ -383,6 +383,7 @@ namespace RogueCommandExpansionLoader.Content
                 ValidateUnitWeapons(unit.weapons, itemPath + ".weapons", diagnostics);
                 ValidateUnitArmor(unit.armor, itemPath + ".armor", diagnostics);
                 ValidateUnitHealing(unit.healing, itemPath + ".healing", diagnostics);
+                ValidateUnitStealth(unit.stealth, itemPath + ".stealth", diagnostics);
                 ValidateProductionBuilding(unit.productionBuilding, itemPath + ".productionBuilding",
                     allIds, productionBuildingIds, bundleIds, registrySnapshot, diagnostics);
                 ValidateProfileCardEligibility(unit, itemPath, diagnostics);
@@ -1779,6 +1780,29 @@ namespace RogueCommandExpansionLoader.Content
             {
                 Add(diagnostics, "unit-healing.repair-invalid", path + ".repairAmount",
                     "Repair amount must be non-negative.");
+            }
+        }
+
+        private static void ValidateUnitStealth(
+            ContentUnitStealthDefinition stealth,
+            string path,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (stealth == null) return;
+            if (stealth.stealthLevel < 0 || stealth.stealthLevel > 10)
+            {
+                Add(diagnostics, "unit-stealth.level-invalid", path + ".stealthLevel",
+                    "Stealth level must be between 0 and 10.");
+            }
+            if (stealth.cloakDuration < 0)
+            {
+                Add(diagnostics, "unit-stealth.duration-invalid", path + ".cloakDuration",
+                    "Cloak duration must be non-negative.");
+            }
+            if (stealth.detectionReduction < 0 || stealth.detectionReduction > 1)
+            {
+                Add(diagnostics, "unit-stealth.reduction-invalid", path + ".detectionReduction",
+                    "Detection reduction must be between 0 and 1.");
             }
         }
 
