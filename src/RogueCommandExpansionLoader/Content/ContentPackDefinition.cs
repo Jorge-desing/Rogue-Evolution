@@ -133,6 +133,14 @@ namespace RogueCommandExpansionLoader.Content
     }
 
     [Serializable]
+    public sealed class ContentUnitMovementDefinition
+    {
+        public float moveSpeed;
+        public float turnRate;
+        public float acceleration;
+    }
+
+    [Serializable]
     public sealed class ContentUnitDefinition
     {
         public string id;
@@ -161,6 +169,7 @@ namespace RogueCommandExpansionLoader.Content
         public ContentUnitStatusEffectDefinition[] statusEffects;
         public ContentUnitProductionQueueDefinition productionQueue;
         public ContentUnitResourceCostDefinition[] resourceCosts;
+        public ContentUnitMovementDefinition movement;
         public ContentBalanceOverride[] balanceOverrides;
         public ContentUnitLocalizationDefinition[] localizations;
         public ContentProductionBuildingDefinition productionBuilding;
@@ -400,6 +409,7 @@ namespace RogueCommandExpansionLoader.Content
                 statusEffects = CloneArray(source.statusEffects, CloneUnitStatusEffect),
                 productionQueue = CloneUnitProductionQueue(source.productionQueue),
                 resourceCosts = CloneArray(source.resourceCosts, CloneUnitResourceCost),
+                movement = CloneUnitMovement(source.movement),
                 productionBuilding = CloneProductionBuilding(source.productionBuilding)
             };
         }
@@ -509,6 +519,16 @@ namespace RogueCommandExpansionLoader.Content
             {
                 resourceType = source.resourceType,
                 amount = source.amount
+            };
+        }
+
+        private static ContentUnitMovementDefinition CloneUnitMovement(ContentUnitMovementDefinition source)
+        {
+            return source == null ? null : new ContentUnitMovementDefinition
+            {
+                moveSpeed = source.moveSpeed,
+                turnRate = source.turnRate,
+                acceleration = source.acceleration
             };
         }
 

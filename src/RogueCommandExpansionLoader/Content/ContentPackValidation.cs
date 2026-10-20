@@ -378,6 +378,7 @@ namespace RogueCommandExpansionLoader.Content
                 ValidateUnitStatusEffects(unit.statusEffects, itemPath + ".statusEffects", diagnostics);
                 ValidateUnitProductionQueue(unit.productionQueue, itemPath + ".productionQueue", diagnostics);
                 ValidateUnitResourceCosts(unit.resourceCosts, itemPath + ".resourceCosts", diagnostics);
+                ValidateUnitMovement(unit.movement, itemPath + ".movement", diagnostics);
                 ValidateProductionBuilding(unit.productionBuilding, itemPath + ".productionBuilding",
                     allIds, productionBuildingIds, bundleIds, registrySnapshot, diagnostics);
                 ValidateProfileCardEligibility(unit, itemPath, diagnostics);
@@ -1635,6 +1636,29 @@ namespace RogueCommandExpansionLoader.Content
                     Add(diagnostics, "unit-resource-cost.amount-invalid", itemPath + ".amount",
                         "Resource amount must be non-negative.");
                 }
+            }
+        }
+
+        private static void ValidateUnitMovement(
+            ContentUnitMovementDefinition movement,
+            string path,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (movement == null) return;
+            if (movement.moveSpeed < 0)
+            {
+                Add(diagnostics, "unit-movement.speed-invalid", path + ".moveSpeed",
+                    "Move speed must be non-negative.");
+            }
+            if (movement.turnRate < 0)
+            {
+                Add(diagnostics, "unit-movement.turn-rate-invalid", path + ".turnRate",
+                    "Turn rate must be non-negative.");
+            }
+            if (movement.acceleration < 0)
+            {
+                Add(diagnostics, "unit-movement.acceleration-invalid", path + ".acceleration",
+                    "Acceleration must be non-negative.");
             }
         }
 
