@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Reflection;
 
 namespace RogueCommandExpansionLoader.Runtime
@@ -9,10 +10,33 @@ namespace RogueCommandExpansionLoader.Runtime
     public sealed class RuntimeMutationManager
     {
         private readonly Action<string> _log;
+        private readonly Dictionary<Type, Dictionary<string, FieldInfo>> _fieldCache =
+            new Dictionary<Type, Dictionary<string, FieldInfo>>();
 
         public RuntimeMutationManager(Action<string> logger)
         {
             _log = logger ?? (msg => { });
+        }
+
+        private FieldInfo GetCachedField(Type type, string fieldName)
+        {
+            Dictionary<string, FieldInfo> typeCache;
+            if (!_fieldCache.TryGetValue(type, out typeCache))
+            {
+                typeCache = new Dictionary<string, FieldInfo>(StringComparer.Ordinal);
+                _fieldCache[type] = typeCache;
+            }
+
+            FieldInfo field;
+            if (typeCache.TryGetValue(fieldName, out field))
+            {
+                return field;
+            }
+
+            field = type.GetField(fieldName, BindingFlags.Public | BindingFlags.NonPublic |
+                BindingFlags.Instance | BindingFlags.FlattenHierarchy);
+            typeCache[fieldName] = field;
+            return field;
         }
 
         /// <summary>
@@ -29,7 +53,7 @@ namespace RogueCommandExpansionLoader.Runtime
             try
             {
                 Type type = target.GetType();
-                FieldInfo field = type.GetField(fieldName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.FlattenHierarchy);
+                FieldInfo field = GetCachedField(type, fieldName);
 
                 if (field == null)
                 {
@@ -62,10 +86,21 @@ namespace RogueCommandExpansionLoader.Runtime
         {
             try
             {
-                FieldInfo activeBehaviourField = manager.GetType().GetField("activeBehaviour", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.FlattenHierarchy);
+                Type managerType = manager.GetType();
+                FieldInfo activeBehaviourField = GetCachedField(managerType, "activeBehaviour");
+
                 if (activeBehaviourField == null)
                 {
-                    _log("Mutation failed: AiBehaviourManager.activeBehaviour field not found.");
+                    foreach (var altName in new[] { "m_activeBehaviour", "_activeBehaviour", "activeBehaviourInstance", "behaviour" })
+                    {
+                        activeBehaviourField = GetCachedField(managerType, altName);
+                        if (activeBehaviourField != null) break;
+                    }
+                }
+
+                if (activeBehaviourField == null)
+                {
+                    _log("Mutation failed: AiBehaviourManager active behaviour field not found.");
                     return false;
                 }
 
