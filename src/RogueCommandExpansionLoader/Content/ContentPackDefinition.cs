@@ -51,6 +51,10 @@ namespace RogueCommandExpansionLoader.Content
     {
         public string id;
         public string nativeTemplateId;
+        public string assetBundleId;
+        public string cardImageAssetName;
+        public string visualAssetName;
+        public string visualRootPath;
         public ContentBalanceOverride[] balanceOverrides;
         public ContentUnitLocalizationDefinition[] localizations;
     }
@@ -272,6 +276,10 @@ namespace RogueCommandExpansionLoader.Content
             {
                 id = source.id,
                 nativeTemplateId = source.nativeTemplateId,
+                assetBundleId = source.assetBundleId,
+                cardImageAssetName = source.cardImageAssetName,
+                visualAssetName = source.visualAssetName,
+                visualRootPath = source.visualRootPath,
                 balanceOverrides = CloneArray(source.balanceOverrides, CloneBalanceOverride),
                 localizations = CloneArray(source.localizations, CloneUnitLocalization)
             };

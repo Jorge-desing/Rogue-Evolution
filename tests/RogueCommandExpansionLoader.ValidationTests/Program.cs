@@ -899,6 +899,55 @@ var tests = new (string Name, Action Run)[]
             }
         }
     }),
+    ("production building reward card accepts a Sprite from its declared bundle", () =>
+    {
+        WithPackage(nativeSample, (pack, root) =>
+        {
+            ContentProductionBuildingDefinition building = pack.units[0].productionBuilding;
+            building.assetBundleId = pack.assetBundles[0].id;
+            building.cardImageAssetName = "assets/factory-card.png";
+            ExpectValid(pack, root, new EmptySnapshot(), new KnownModuleValidator());
+        });
+    }),
+    ("production building reward card asset path is validated", () =>
+    {
+        WithPackage(nativeSample, (pack, root) =>
+        {
+            ContentProductionBuildingDefinition building = pack.units[0].productionBuilding;
+            building.assetBundleId = pack.assetBundles[0].id;
+            building.cardImageAssetName = "../outside.png";
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "asset.name-invalid");
+        });
+        WithPackage(nativeSample, (pack, root) =>
+        {
+            ContentProductionBuildingDefinition building = pack.units[0].productionBuilding;
+            building.assetBundleId = "sample-native:missing-assets";
+            building.cardImageAssetName = "assets/factory-card.png";
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "reference.bundle-unresolved");
+        });
+    }),
+    ("production building visual-source compatibility is explicit and independent", () =>
+    {
+        WithPackage(nativeSample, (pack, root) =>
+        {
+            ContentUnitDefinition unit = pack.units[0];
+            ContentProductionBuildingDefinition building = unit.productionBuilding;
+            string originalUnitBundleId = unit.assetBundleId;
+            string originalUnitCardImageAssetName = unit.cardImageAssetName;
+            building.assetBundleId = pack.assetBundles[0].id;
+            building.visualAssetName = "FactoryVisual";
+            building.visualRootPath = "FactoryModel";
+            ExpectValid(pack, root, new EmptySnapshot(), new KnownModuleValidator());
+            if (unit.assetBundleId != originalUnitBundleId ||
+                unit.cardImageAssetName != originalUnitCardImageAssetName ||
+                building.assetBundleId != pack.assetBundles[0].id ||
+                building.visualAssetName != "FactoryVisual" ||
+                building.visualRootPath != "FactoryModel")
+                throw new InvalidOperationException("Factory visual content should not mutate product unit asset fields.");
+        });
+    }),
     ("production-building fallback eligibility follows its produced unit", () =>
     {
         var factoryRow = new ProductionBuildingEligibilityTestRow();
@@ -999,18 +1048,94 @@ var tests = new (string Name, Action Run)[]
     }),
     ("production building deep clones preserve independent balance and localization", () =>
     {
-        ContentPackDefinition copy = ContentPackCopy.DeepClone(nativeSample);
+        ContentPackDefinition source = ContentPackCopy.DeepClone(nativeSample);
+        ContentProductionBuildingDefinition sourceBuilding = source.units[0].productionBuilding;
+        sourceBuilding.cardImageAssetName = "FactoryCard";
+        sourceBuilding.assetBundleId = "sample-native:assets";
+        sourceBuilding.visualAssetName = "FactoryVisual";
+        sourceBuilding.visualRootPath = "FactoryModel";
+        ContentPackDefinition copy = ContentPackCopy.DeepClone(source);
+        if (copy.units[0].productionBuilding.assetBundleId != "sample-native:assets" ||
+            copy.units[0].productionBuilding.visualAssetName != "FactoryVisual" ||
+            copy.units[0].productionBuilding.visualRootPath != "FactoryModel" ||
+            copy.units[0].productionBuilding.cardImageAssetName != "FactoryCard")
+        {
+            throw new InvalidOperationException("Deep cloning dropped production-building visual overlay fields.");
+        }
+
         copy.units[0].productionBuilding.id = "test:changed-factory";
+        copy.units[0].productionBuilding.assetBundleId = "test:changed-assets";
+        copy.units[0].productionBuilding.visualAssetName = "ChangedVisual";
+        copy.units[0].productionBuilding.visualRootPath = "ChangedRoot";
+        copy.units[0].productionBuilding.cardImageAssetName = "ChangedCard";
         copy.units[0].productionBuilding.balanceOverrides[0].value = "9999";
         copy.units[0].productionBuilding.localizations[0].name = "Changed";
         copy.units.Single(unit => unit.id == "sample-native:skirmish-bike")
             .localizations[0].skillDescription = "Changed skill text";
-        if (nativeSample.units[0].productionBuilding.id == "test:changed-factory" ||
-            nativeSample.units[0].productionBuilding.balanceOverrides[0].value == "9999" ||
-            nativeSample.units[0].productionBuilding.localizations[0].name == "Changed" ||
-            nativeSample.units.Single(unit => unit.id == "sample-native:skirmish-bike")
+        if (sourceBuilding.id == "test:changed-factory" ||
+            sourceBuilding.assetBundleId != "sample-native:assets" ||
+            sourceBuilding.visualAssetName != "FactoryVisual" ||
+            sourceBuilding.visualRootPath != "FactoryModel" ||
+            sourceBuilding.cardImageAssetName != "FactoryCard" ||
+            sourceBuilding.balanceOverrides[0].value == "9999" ||
+            sourceBuilding.localizations[0].name == "Changed" ||
+            source.units.Single(unit => unit.id == "sample-native:skirmish-bike")
                 .localizations[0].skillDescription == "Changed skill text")
-            throw new InvalidOperationException("Production building data shared mutable arrays with the source pack.");
+            throw new InvalidOperationException("Production-building overlay data or nested arrays shared mutable state with the source pack.");
+    }),
+
+    ("production building visual overlay accepts an explicit package bundle", () =>
+    {
+        WithPackage(nativeSample, (pack, root) =>
+        {
+            ContentProductionBuildingDefinition building = pack.units[0].productionBuilding;
+            building.assetBundleId = pack.assetBundles[0].id;
+            building.visualAssetName = "FactoryVisual";
+            building.visualRootPath = "FactoryModel";
+            ExpectValid(pack, root, new EmptySnapshot(), new KnownModuleValidator());
+        });
+    }),
+    ("production building visual overlay requires paired asset and root fields", () =>
+    {
+        WithPackage(nativeSample, (pack, root) =>
+        {
+            ContentProductionBuildingDefinition building = pack.units[0].productionBuilding;
+            building.assetBundleId = pack.assetBundles[0].id;
+            building.visualAssetName = "FactoryVisual";
+            building.visualRootPath = null;
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "production-building.visual-source-invalid");
+        });
+        WithPackage(nativeSample, (pack, root) =>
+        {
+            ContentProductionBuildingDefinition building = pack.units[0].productionBuilding;
+            building.assetBundleId = pack.assetBundles[0].id;
+            building.visualAssetName = null;
+            building.visualRootPath = "FactoryModel";
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "production-building.visual-source-invalid");
+        });
+    }),
+    ("production building visual bundle and root path are validated", () =>
+    {
+        WithPackage(nativeSample, (pack, root) =>
+        {
+            ContentProductionBuildingDefinition building = pack.units[0].productionBuilding;
+            building.assetBundleId = "sample-native:missing-assets";
+            building.visualAssetName = "FactoryVisual";
+            building.visualRootPath = "FactoryModel";
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "reference.bundle-unresolved");
+        });
+        WithPackage(nativeSample, (pack, root) =>
+        {
+            ContentProductionBuildingDefinition building = pack.units[0].productionBuilding;
+            building.assetBundleId = pack.assetBundles[0].id;
+            building.visualAssetName = "FactoryVisual";
+            building.visualRootPath = "FactoryModel/../FactoryRoot";
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "production-building.visual-root-path-invalid");
+        });
     }),
     ("relic clone and localization preserve independent player card data", () =>
     {
@@ -1198,10 +1323,15 @@ var tests = new (string Name, Action Run)[]
         var expectedUnlockLevels = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["sample-native:scout-tank"] = "0",
-            ["sample-native:skirmish-bike"] = "1",
-            ["sample-native:assault-walker"] = "2",
-            ["sample-native:surge-tank"] = "3",
-            ["sample-native:heavy-artillery"] = "4"
+            ["sample-native:skirmish-bike"] = "0",
+            ["sample-native:assault-walker"] = "0",
+            ["sample-native:surge-tank"] = "0",
+            ["sample-native:heavy-artillery"] = "0"
+        };
+        var expectedFactoryCardImages = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["sample-native:heavy-artillery"] = "assets/roguecommandexpansionsample/colossussiegecard.png",
+            ["sample-native:assault-walker"] = "assets/roguecommandexpansionsample/ironcladwalkercard.png"
         };
         string[] requiredCardStats =
         [
@@ -1240,6 +1370,38 @@ var tests = new (string Name, Action Run)[]
             {
                 throw new InvalidOperationException(
                     $"Card {unit.id} does not mirror its level {expected.Value} unlock and rarity on its factory.");
+            }
+
+            if (expectedFactoryCardImages.TryGetValue(unit.id, out string? expectedFactoryCard) &&
+                (unit.productionBuilding.assetBundleId != nativeSample.assetBundles[0].id ||
+                 unit.productionBuilding.cardImageAssetName != expectedFactoryCard))
+            {
+                throw new InvalidOperationException($"Factory {unit.productionBuilding.id} is missing its independent reward-card Sprite mapping.");
+            }
+        }
+
+        var expectedRosterUnlockLevels = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["sample-native:scout-tank"] = "0",
+            ["sample-native:heavy-artillery"] = "0",
+            ["sample-native:assault-walker"] = "0",
+            ["sample-native:atlas-crane-mech"] = "0",
+            ["sample-native:bastion-siege-mech"] = "0",
+            ["sample-native:arachnid-hexapod"] = "0",
+            ["sample-native:overlord-command-hq"] = "0",
+            ["sample-native:skirmish-bike"] = "0",
+            ["sample-native:surge-tank"] = "0"
+        };
+        foreach (ContentUnitDefinition unit in nativeSample.units)
+        {
+            string productLevel = unit.balanceOverrides.Single(entry => entry.name == "neededExperienceLevel").value;
+            string buildingLevel = unit.productionBuilding.balanceOverrides
+                .Single(entry => entry.name == "neededExperienceLevel").value;
+            if (!expectedRosterUnlockLevels.TryGetValue(unit.id, out string? expectedLevel) ||
+                productLevel != expectedLevel || buildingLevel != expectedLevel)
+            {
+                throw new InvalidOperationException(
+                    $"Card {unit.id} and its factory must retain their expected matching profile unlock level.");
             }
         }
 

@@ -109,7 +109,7 @@
         { "name": "effectRadius1", "value": "1.5" },
         { "name": "armorProtection", "value": "2" },
         { "name": "rarity", "value": "Common" },
-        { "name": "neededExperienceLevel", "value": "4" },
+        { "name": "neededExperienceLevel", "value": "0" },
         { "name": "productionDuration", "value": "50" },
         { "name": "maxCapacity", "value": "4" },
         { "name": "maxShield", "value": "0" },
@@ -133,9 +133,11 @@
       "productionBuilding": {
         "id": "sample-native:heavy-artillery-factory",
         "nativeTemplateId": "ArtilleryTankFactory",
+        "assetBundleId": "sample-native:assets",
+        "cardImageAssetName": "assets/roguecommandexpansionsample/colossussiegecard.png",
         "balanceOverrides": [
           { "name": "cost", "value": "800" },
-          { "name": "neededExperienceLevel", "value": "4" },
+          { "name": "neededExperienceLevel", "value": "0" },
           { "name": "rarity", "value": "Common" }
         ],
         "localizations": [
@@ -170,7 +172,7 @@
         { "name": "weaponRange", "value": "6" },
         { "name": "armorProtection", "value": "1" },
         { "name": "rarity", "value": "Common" },
-        { "name": "neededExperienceLevel", "value": "2" },
+        { "name": "neededExperienceLevel", "value": "0" },
         { "name": "productionDuration", "value": "36" },
         { "name": "maxCapacity", "value": "4" },
         { "name": "maxShield", "value": "0" },
@@ -195,9 +197,11 @@
       "productionBuilding": {
         "id": "sample-native:assault-walker-factory",
         "nativeTemplateId": "GatlingWalkerFactory",
+        "assetBundleId": "sample-native:assets",
+        "cardImageAssetName": "assets/roguecommandexpansionsample/ironcladwalkercard.png",
         "balanceOverrides": [
           { "name": "cost", "value": "1100" },
-          { "name": "neededExperienceLevel", "value": "2" },
+          { "name": "neededExperienceLevel", "value": "0" },
           { "name": "rarity", "value": "Common" }
         ],
         "localizations": [
@@ -236,7 +240,7 @@
         { "name": "weaponRange", "value": "6" },
         { "name": "armorProtection", "value": "1" },
         { "name": "rarity", "value": "Common" },
-        { "name": "neededExperienceLevel", "value": "2" },
+        { "name": "neededExperienceLevel", "value": "0" },
         { "name": "productionDuration", "value": "36" },
         { "name": "maxCapacity", "value": "4" },
         { "name": "maxShield", "value": "0" },
@@ -263,7 +267,7 @@
         "nativeTemplateId": "GatlingWalkerFactory",
         "balanceOverrides": [
           { "name": "cost", "value": "1100" },
-          { "name": "neededExperienceLevel", "value": "2" },
+          { "name": "neededExperienceLevel", "value": "0" },
           { "name": "rarity", "value": "Common" }
         ],
         "localizations": [
@@ -300,7 +304,7 @@
         { "name": "weaponRange", "value": "5.0" },
         { "name": "armorProtection", "value": "1" },
         { "name": "rarity", "value": "Common" },
-        { "name": "neededExperienceLevel", "value": "2" },
+        { "name": "neededExperienceLevel", "value": "0" },
         { "name": "productionDuration", "value": "42" },
         { "name": "maxCapacity", "value": "4" },
         { "name": "maxShield", "value": "0" },
@@ -327,12 +331,152 @@
         "nativeTemplateId": "GatlingWalkerFactory",
         "balanceOverrides": [
           { "name": "cost", "value": "1100" },
-          { "name": "neededExperienceLevel", "value": "2" },
+          { "name": "neededExperienceLevel", "value": "0" },
           { "name": "rarity", "value": "Common" }
         ],
         "localizations": [
           { "language": "en-US", "name": "Bastion Siege Foundry", "description": "Produces Bastion Siege Mechs." },
           { "language": "es-XL", "name": "Fundición del Bastión", "description": "Produce mechas de asedio Bastión." }
+        ]
+      }
+    },
+    {
+      "id": "sample-native:arachnid-hexapod",
+      "nativeTemplateId": "GatlingWalker",
+      "assetBundleId": "sample-native:assets",
+      "visualAssetName": "assets/roguecommandexpansionsample/visualonly/prefabs/arachnidhexapodvisual.prefab",
+      "visualRootPath": "RoboMarine_Mesh",
+      "isAllowedAsStartingBlueprint": false,
+      "isAllowedForAi": false,
+      "isAllowedForDemo": false,
+      "isForSpecialists": false,
+      "localizations": [
+        {
+          "language": "en-US",
+          "name": "Arachnid Hexapod",
+          "description": "A heavy assault platform with durable armor and deliberate mid-range fire."
+        },
+        {
+          "language": "es-XL",
+          "name": "Hexápodo Arácnido",
+          "description": "Una plataforma de asalto pesado con blindaje resistente y fuego sostenido a media distancia."
+        }
+      ],
+      "balanceOverrides": [
+        { "name": "cost", "value": "500" },
+        { "name": "maxHealth", "value": "420" },
+        { "name": "moveSpeed", "value": "12" },
+        { "name": "sightRadius", "value": "7" },
+        { "name": "weaponRange", "value": "5.5" },
+        { "name": "attackCooldown", "value": "1" },
+        { "name": "rarity", "value": "Common" },
+        { "name": "neededExperienceLevel", "value": "0" },
+        { "name": "productionDuration", "value": "45" },
+        { "name": "maxCapacity", "value": "4" },
+        { "name": "maxShield", "value": "0" },
+        { "name": "maxMana", "value": "0" },
+        { "name": "maxArmor", "value": "0" },
+        { "name": "armorProtection", "value": "1" },
+        { "name": "attackType", "value": "Single" },
+        { "name": "skillType", "value": "None" },
+        { "name": "damage1", "value": "5" },
+        { "name": "damage2", "value": "0" },
+        { "name": "firePointCount", "value": "2" },
+        { "name": "attack2Cooldown", "value": "0" },
+        { "name": "effectRadius1", "value": "0" },
+        { "name": "effectRadius2", "value": "0" },
+        { "name": "skillRange", "value": "0" },
+        { "name": "healAmount1", "value": "0" },
+        { "name": "healAmount2", "value": "0" },
+        { "name": "gainCreditsAmount", "value": "0" },
+        { "name": "skillManaCost", "value": "0" },
+        { "name": "duration1", "value": "0" },
+        { "name": "duration2", "value": "0" }
+      ],
+      "productionBuilding": {
+        "id": "sample-native:arachnid-hexapod-factory",
+        "nativeTemplateId": "GatlingWalkerFactory",
+        "assetBundleId": "sample-native:assets",
+        "visualAssetName": "assets/roguecommandexpansionsample/visualonly/prefabs/arachnidhexapodfactoryvisual.prefab",
+        "visualRootPath": "GatlingWalkerFactory",
+        "balanceOverrides": [
+          { "name": "cost", "value": "1100" },
+          { "name": "neededExperienceLevel", "value": "0" },
+          { "name": "rarity", "value": "Common" }
+        ],
+        "localizations": [
+          { "language": "en-US", "name": "Arachnid Hexapod Gantry", "description": "Produces Arachnid Hexapods." },
+          { "language": "es-XL", "name": "Pórtico de ensamblaje Arácnido", "description": "Produce hexápodos Arácnidos." }
+        ]
+      }
+    },
+    {
+      "id": "sample-native:overlord-command-hq",
+      "nativeTemplateId": "PCXBaseTank",
+      "assetBundleId": "sample-native:assets",
+      "visualAssetName": "assets/roguecommandexpansionsample/visualonly/prefabs/overlordcommandhqvisual.prefab",
+      "visualRootPath": "Vehicle",
+      "isAllowedAsStartingBlueprint": false,
+      "isAllowedForAi": false,
+      "isAllowedForDemo": false,
+      "isForSpecialists": false,
+      "localizations": [
+        {
+          "language": "en-US",
+          "name": "Overlord Command HQ",
+          "description": "A mobile command vehicle with a durable chassis and conventional cannon for holding the frontline."
+        },
+        {
+          "language": "es-XL",
+          "name": "Cuartel de Mando Overlord",
+          "description": "Un vehículo de mando móvil con chasis resistente y cañón convencional para sostener la línea del frente."
+        }
+      ],
+      "balanceOverrides": [
+        { "name": "cost", "value": "240" },
+        { "name": "maxHealth", "value": "220" },
+        { "name": "moveSpeed", "value": "10.5" },
+        { "name": "sightRadius", "value": "6" },
+        { "name": "weaponRange", "value": "4.2" },
+        { "name": "attackCooldown", "value": "3" },
+        { "name": "rarity", "value": "Common" },
+        { "name": "neededExperienceLevel", "value": "0" },
+        { "name": "productionDuration", "value": "48" },
+        { "name": "maxCapacity", "value": "5" },
+        { "name": "maxShield", "value": "0" },
+        { "name": "maxMana", "value": "0" },
+        { "name": "maxArmor", "value": "0" },
+        { "name": "armorProtection", "value": "1" },
+        { "name": "attackType", "value": "Single" },
+        { "name": "skillType", "value": "None" },
+        { "name": "damage1", "value": "8" },
+        { "name": "damage2", "value": "0" },
+        { "name": "firePointCount", "value": "2" },
+        { "name": "attack2Cooldown", "value": "0" },
+        { "name": "effectRadius1", "value": "0.2" },
+        { "name": "effectRadius2", "value": "0" },
+        { "name": "skillRange", "value": "0" },
+        { "name": "healAmount1", "value": "0" },
+        { "name": "healAmount2", "value": "0" },
+        { "name": "gainCreditsAmount", "value": "0" },
+        { "name": "skillManaCost", "value": "0" },
+        { "name": "duration1", "value": "0" },
+        { "name": "duration2", "value": "0" }
+      ],
+      "productionBuilding": {
+        "id": "sample-native:overlord-command-hq-factory",
+        "nativeTemplateId": "PCXBaseTankFactory",
+        "assetBundleId": "sample-native:assets",
+        "visualAssetName": "assets/roguecommandexpansionsample/visualonly/prefabs/overlordcommandhqfactoryvisual.prefab",
+        "visualRootPath": "PCXBaseTankFactory",
+        "balanceOverrides": [
+          { "name": "cost", "value": "700" },
+          { "name": "neededExperienceLevel", "value": "0" },
+          { "name": "rarity", "value": "Common" }
+        ],
+        "localizations": [
+          { "language": "en-US", "name": "Overlord Command Motor Pool", "description": "Produces Overlord Command HQ vehicles." },
+          { "language": "es-XL", "name": "Parque de vehículos Overlord", "description": "Produce vehículos del Cuartel General Overlord." }
         ]
       }
     },
@@ -368,7 +512,7 @@
         { "name": "effectRadius1", "value": "1.8" },
         { "name": "attackType", "value": "AoE" },
         { "name": "rarity", "value": "Common" },
-        { "name": "neededExperienceLevel", "value": "1" },
+        { "name": "neededExperienceLevel", "value": "0" },
         { "name": "productionDuration", "value": "10" },
         { "name": "maxCapacity", "value": "10" },
         { "name": "maxShield", "value": "0" },
@@ -396,7 +540,7 @@
         "nativeTemplateId": "BombBikeFactory",
         "balanceOverrides": [
           { "name": "cost", "value": "280" },
-          { "name": "neededExperienceLevel", "value": "1" },
+          { "name": "neededExperienceLevel", "value": "0" },
           { "name": "rarity", "value": "Common" }
         ],
         "localizations": [
@@ -433,7 +577,7 @@
         { "name": "weaponRange", "value": "4.5" },
         { "name": "armorProtection", "value": "2" },
         { "name": "rarity", "value": "Common" },
-        { "name": "neededExperienceLevel", "value": "3" },
+        { "name": "neededExperienceLevel", "value": "0" },
         { "name": "productionDuration", "value": "30" },
         { "name": "maxCapacity", "value": "5" },
         { "name": "maxShield", "value": "5" },
@@ -460,7 +604,7 @@
         "nativeTemplateId": "LightningTankFactory",
         "balanceOverrides": [
           { "name": "cost", "value": "650" },
-          { "name": "neededExperienceLevel", "value": "3" },
+          { "name": "neededExperienceLevel", "value": "0" },
           { "name": "rarity", "value": "Common" }
         ],
         "localizations": [
@@ -527,6 +671,8 @@
         "sample-native:assault-walker",
         "sample-native:atlas-crane-mech",
         "sample-native:bastion-siege-mech",
+        "sample-native:arachnid-hexapod",
+        "sample-native:overlord-command-hq",
         "sample-native:surge-tank"
       ],
       "aiProfileIds": [
@@ -555,6 +701,8 @@
         "sample-native:assault-walker",
         "sample-native:atlas-crane-mech",
         "sample-native:bastion-siege-mech",
+        "sample-native:arachnid-hexapod",
+        "sample-native:overlord-command-hq",
         "sample-native:skirmish-bike",
         "sample-native:surge-tank"
       ],

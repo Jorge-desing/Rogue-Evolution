@@ -2754,7 +2754,7 @@ namespace RogueCommandExpansionLoader.Content
                     temporaryUnits.Add(new LoadedUnit(unit.id, definition.packId, prefabKey, imageKey,
                         row, unit, false, unit.productionBuilding.id));
                     temporaryUnits.Add(CreateProductionBuilding(unit, unit.productionBuilding, definition.packId,
-                        packageName, temporaryNativePrefabs, temporaryResources));
+                        packageName, temporaryBundles, temporaryNativePrefabs, temporaryResources));
                 }
 
                 for (int i = 0; i < definition.stages.Length; i++)
@@ -3713,6 +3713,7 @@ namespace RogueCommandExpansionLoader.Content
             ContentProductionBuildingDefinition building,
             string packId,
             string packageName,
+            Dictionary<string, AssetBundle> temporaryBundles,
             List<GameObject> temporaryNativePrefabs,
             Dictionary<string, UnityEngine.Object> temporaryResources)
         {
@@ -3762,9 +3763,37 @@ namespace RogueCommandExpansionLoader.Content
             {
                 id = building.id,
                 nativeTemplateId = building.nativeTemplateId,
+                assetBundleId = building.assetBundleId,
+                cardImageAssetName = building.cardImageAssetName,
+                visualAssetName = building.visualAssetName,
+                visualRootPath = building.visualRootPath,
                 localizations = building.localizations
             };
             ValidateUnitPrefab(nativeTemplate, localizationDefinition, packageName, false);
+
+            GameObject visualTemplate = null;
+            AssetBundle buildingAssetBundle = null;
+            if (!String.IsNullOrWhiteSpace(building.cardImageAssetName) ||
+                !String.IsNullOrWhiteSpace(building.visualAssetName))
+            {
+                buildingAssetBundle = GetBundle(temporaryBundles, building.assetBundleId, packageName);
+                if (!String.IsNullOrWhiteSpace(building.cardImageAssetName))
+                {
+                    Sprite cardImage = LoadRequiredAsset(buildingAssetBundle, building.cardImageAssetName,
+                        typeof(Sprite), "production-building Sprite card image", packageName) as Sprite;
+                    string imageKey = ResourceKey(building.id, "image");
+                    temporaryResources.Add(imageKey, cardImage);
+                    _imageLocationField.SetValue(row, imageKey);
+                }
+
+                if (!String.IsNullOrWhiteSpace(building.visualAssetName))
+                {
+                    visualTemplate = LoadRequiredAsset(buildingAssetBundle, building.visualAssetName,
+                        typeof(GameObject), "visual-only production-building GameObject prefab", packageName) as GameObject;
+                    ValidateVisualPrefab(visualTemplate, localizationDefinition, packageName,
+                        "Edificio de producción");
+                }
+            }
 
             GameObject nativePrefabClone = InstantiateDormantPrefab(nativeTemplate);
             if (nativePrefabClone == null)
@@ -3773,6 +3802,12 @@ namespace RogueCommandExpansionLoader.Content
             }
 
             temporaryNativePrefabs.Add(nativePrefabClone);
+            if (visualTemplate != null)
+            {
+                ApplyVisualOverlay(nativePrefabClone, visualTemplate, localizationDefinition, packageName,
+                    "Edificio de producción", true);
+            }
+
             EntityController clonedController = nativePrefabClone.GetComponent<EntityController>();
             if (clonedController == null)
             {
@@ -3976,28 +4011,32 @@ namespace RogueCommandExpansionLoader.Content
             }
         }
 
-        private static void ValidateVisualPrefab(GameObject prefab, ContentUnitDefinition unit, string packageName)
+        private static void ValidateVisualPrefab(
+            GameObject prefab,
+            ContentUnitDefinition unit,
+            string packageName,
+            string ownerLabel = "Unidad")
         {
             if (prefab == null)
             {
-                throw new InvalidDataException("Unidad " + unit.id + " en '" + packageName +
+                throw new InvalidDataException(ownerLabel + " " + unit.id + " en '" + packageName +
                     "': el prefab visual está vacío.");
             }
 
             if (!ContentPackValidator.PrefabReferenceMatchesObjectName(unit.visualAssetName, prefab.name))
             {
-                throw new InvalidDataException("Unidad " + unit.id + " en '" + packageName +
+                throw new InvalidDataException(ownerLabel + " " + unit.id + " en '" + packageName +
                     "': el nombre interno del prefab visual '" + prefab.name +
                     "' no coincide con el alias visualAssetName '" + unit.visualAssetName + "'.");
             }
 
-            ValidateNoMissingPrefabComponents(prefab, packageName, "Visual de unidad " + unit.id);
+            ValidateNoMissingPrefabComponents(prefab, packageName, "Visual de " + ownerLabel + " " + unit.id);
             Component[] components = prefab.GetComponentsInChildren<Component>(true);
             for (int i = 0; i < components.Length; i++)
             {
                 if (components[i] is MonoBehaviour)
                 {
-                    throw new InvalidDataException("Visual de unidad " + unit.id + " en '" + packageName +
+                    throw new InvalidDataException("Visual de " + ownerLabel + " " + unit.id + " en '" + packageName +
                         "': los modelos de bundle no pueden incluir componentes MonoBehaviour.");
                 }
             }
@@ -4016,7 +4055,7 @@ namespace RogueCommandExpansionLoader.Content
 
             if (!hasEnabledRenderer)
             {
-                throw new InvalidDataException("Visual de unidad " + unit.id + " en '" + packageName +
+                throw new InvalidDataException("Visual de " + ownerLabel + " " + unit.id + " en '" + packageName +
                     "': el prefab debe contener al menos un Renderer habilitado.");
             }
         }
@@ -4041,26 +4080,39 @@ namespace RogueCommandExpansionLoader.Content
             GameObject nativePrefab,
             GameObject visualTemplate,
             ContentUnitDefinition unit,
-            string packageName)
+            string packageName,
+            string ownerLabel = "Unidad",
+            bool meshRenderersOnly = false)
         {
             Transform target = FindUniqueTransformPath(nativePrefab.transform, unit.visualRootPath);
             if (target == null)
             {
-                throw new InvalidDataException("Unidad " + unit.id + " en '" + packageName +
+                throw new InvalidDataException(ownerLabel + " " + unit.id + " en '" + packageName +
                     "': visualRootPath '" + unit.visualRootPath +
                     "' no identifica una única ruta dentro de la jerarquía del prefab nativo.");
             }
 
-            Renderer[] originalRenderers = target.GetComponentsInChildren<Renderer>(true);
-            if (originalRenderers.Length == 0)
+            Renderer[] renderersUnderTarget = target.GetComponentsInChildren<Renderer>(true);
+            var originalRenderers = new List<Renderer>();
+            for (int i = 0; i < renderersUnderTarget.Length; i++)
             {
-                throw new InvalidDataException("Unidad " + unit.id + " en '" + packageName +
+                Renderer renderer = renderersUnderTarget[i];
+                if (renderer != null && (!meshRenderersOnly ||
+                    renderer is MeshRenderer || renderer is SkinnedMeshRenderer))
+                {
+                    originalRenderers.Add(renderer);
+                }
+            }
+
+            if (originalRenderers.Count == 0)
+            {
+                throw new InvalidDataException(ownerLabel + " " + unit.id + " en '" + packageName +
                     "': visualRootPath '" + unit.visualRootPath + "' no contiene Renderer nativos que reemplazar.");
             }
 
-            Material fallbackMaterial = FindNativeVisualMaterial(originalRenderers);
+            Material fallbackMaterial = FindNativeVisualMaterial(originalRenderers.ToArray());
 
-            for (int i = 0; i < originalRenderers.Length; i++)
+            for (int i = 0; i < originalRenderers.Count; i++)
             {
                 originalRenderers[i].enabled = false;
             }
@@ -4068,7 +4120,7 @@ namespace RogueCommandExpansionLoader.Content
             GameObject visualClone = UnityEngine.Object.Instantiate(visualTemplate, target, false);
             if (visualClone == null)
             {
-                throw new InvalidDataException("Unidad " + unit.id + " en '" + packageName +
+                throw new InvalidDataException(ownerLabel + " " + unit.id + " en '" + packageName +
                     "': Unity no pudo instanciar el prefab visual.");
             }
 
@@ -4076,7 +4128,7 @@ namespace RogueCommandExpansionLoader.Content
             visualClone.transform.localPosition = Vector3.zero;
             visualClone.transform.localRotation = Quaternion.identity;
             visualClone.transform.localScale = Vector3.one;
-            ApplyFallbackVisualMaterial(visualClone, fallbackMaterial, unit, packageName);
+            ApplyFallbackVisualMaterial(visualClone, fallbackMaterial, unit, packageName, ownerLabel);
             visualClone.SetActive(true);
         }
 
@@ -4145,7 +4197,8 @@ namespace RogueCommandExpansionLoader.Content
             GameObject visualClone,
             Material fallbackMaterial,
             ContentUnitDefinition unit,
-            string packageName)
+            string packageName,
+            string ownerLabel = "Unidad")
         {
             Renderer[] renderers = visualClone.GetComponentsInChildren<Renderer>(true);
             for (int i = 0; i < renderers.Length; i++)
@@ -4168,7 +4221,7 @@ namespace RogueCommandExpansionLoader.Content
 
                 if (fallbackMaterial == null)
                 {
-                    throw new InvalidDataException("Unidad " + unit.id + " en '" + packageName +
+                    throw new InvalidDataException(ownerLabel + " " + unit.id + " en '" + packageName +
                         "': el modelo visual no tiene materiales y la plantilla nativa no ofrece un material MeshRenderer.");
                 }
 

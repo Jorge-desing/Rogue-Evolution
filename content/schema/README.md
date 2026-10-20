@@ -24,6 +24,8 @@ Run `.venv\Scripts\python.exe tools/validate_native_visual_roots.py content/pack
 `sample:siege-assault` accepts `baseIndex` (integer 0–31), `cooldownSeconds` (finite 10–300 seconds; default 30), `minSquadSize` (integer 1–12; default 4), `targetPriority` (`ClosestBuilding`, `Refinery`, `Hq`; default `ClosestBuilding`), and `minGameTimeSeconds` (finite 0–600 seconds; default 30). It scans known player buildings (`PlayerBuildingsKnownToAi`, `PlayerRefineries`, or `EngineeringHq`), gathers combat units from the specified AI base, and dispatches coordinated assault strike waves to dismantle player fortifications.
 - Include empty arrays when a section has no entries. The validator reports package-local diagnostics and does not mutate the registry.
 
+Production-building visuals may also specify `assetBundleId` and `cardImageAssetName`. The latter is a typed Sprite address for that factory's reward card; leave it absent to retain the native factory icon. `visualAssetName` plus `visualRootPath` remain optional, paired overlay fields. A shared building bundle can provide both.
+
 ## AI unit entries
 
 An AI profile may optionally declare `unitEntries` to append namespaced units to one `AiBase` in an isolated, stage-scoped native profile. Each entry selects the `aiBases` index, the starting ascension level, the number of units spawned at base setup, and the native `maxLiving` value. The referenced unit must be declared by this pack or another loaded/declared pack; the loader resolves that dependency before loading the profile. Custom AI prefabs and unscoped templates cannot use `unitEntries`, so the native AI template remains unchanged. `unitEntries` may be omitted when unused; sample manifests include an empty array for clarity.
@@ -139,6 +141,8 @@ Each `cardChanges` entry uses the pack's `valueToChange`, `operation`, `value`, 
   ]
 }
 ```
+
+`productionBuilding` can optionally replace the native factory's mesh with a visual-only prefab by declaring `assetBundleId`, `visualAssetName`, and `visualRootPath` together. The bundle ID must name an `assetBundles` entry; the asset reference must resolve to a script-free GameObject prefab with an enabled Renderer; and the path must identify exactly one subtree in the cloned native factory. The loader hides only `MeshRenderer` and `SkinnedMeshRenderer` components in that subtree, then attaches the authored visual at its origin, so native factory roles, particles, lights, and other components remain. Choose a subtree that contains only the intended factory geometry: mesh renderers such as native build indicators inside the selected subtree are hidden too.
 
 ## Profile-level card unlocks
 

@@ -361,7 +361,7 @@ namespace RogueCommandExpansionLoader.Content
                 ValidateUnitLocalizations(unit, itemPath + ".localizations", hasNativeTemplate, diagnostics);
                 ValidateBalanceOverrides(unit.balanceOverrides, itemPath + ".balanceOverrides", "unit", "unit", diagnostics);
                 ValidateProductionBuilding(unit.productionBuilding, itemPath + ".productionBuilding",
-                    allIds, productionBuildingIds, registrySnapshot, diagnostics);
+                    allIds, productionBuildingIds, bundleIds, registrySnapshot, diagnostics);
                 ValidateProfileCardEligibility(unit, itemPath, diagnostics);
             }
 
@@ -916,6 +916,7 @@ namespace RogueCommandExpansionLoader.Content
             string path,
             HashSet<string> allIds,
             HashSet<string> productionBuildingIds,
+            HashSet<string> bundleIds,
             IContentRegistrySnapshot registrySnapshot,
             List<ContentDiagnostic> diagnostics)
         {
@@ -938,6 +939,44 @@ namespace RogueCommandExpansionLoader.Content
             {
                 Add(diagnostics, "production-building.template-id-too-long",
                     path + ".nativeTemplateId", "Native production building template IDs cannot exceed 256 characters.");
+            }
+
+            bool hasVisualAsset = !String.IsNullOrWhiteSpace(productionBuilding.visualAssetName);
+            bool hasVisualRoot = !String.IsNullOrWhiteSpace(productionBuilding.visualRootPath);
+            if (hasVisualAsset != hasVisualRoot)
+            {
+                Add(diagnostics, "production-building.visual-source-invalid", path,
+                    "A production-building visual requires visualAssetName and visualRootPath together.");
+            }
+
+            if (hasVisualAsset || hasVisualRoot ||
+                !String.IsNullOrWhiteSpace(productionBuilding.cardImageAssetName))
+            {
+                ValidateBundleReference(productionBuilding.assetBundleId, path + ".assetBundleId",
+                    bundleIds, diagnostics);
+                if (!String.IsNullOrWhiteSpace(productionBuilding.cardImageAssetName))
+                {
+                    ValidateAssetName(productionBuilding.cardImageAssetName,
+                        path + ".cardImageAssetName", diagnostics);
+                }
+
+                if (hasVisualAsset)
+                {
+                    ValidateAssetName(productionBuilding.visualAssetName,
+                        path + ".visualAssetName", diagnostics);
+                }
+
+                if (hasVisualRoot)
+                {
+                    ValidateVisualRootPath(productionBuilding.visualRootPath,
+                        path + ".visualRootPath", diagnostics,
+                        "production-building.visual-root-path-invalid");
+                }
+            }
+            else if (!String.IsNullOrWhiteSpace(productionBuilding.assetBundleId))
+            {
+                Add(diagnostics, "production-building.bundle-unused", path + ".assetBundleId",
+                    "A production building only declares a bundle when it supplies a visual overlay.");
             }
 
             ValidateBalanceOverrides(productionBuilding.balanceOverrides,
@@ -1109,15 +1148,40 @@ namespace RogueCommandExpansionLoader.Content
             if (string.IsNullOrWhiteSpace(assetName))
             {
                 Add(diagnostics, "asset-name.required", path, "Asset names must be non-empty.");
+                return;
+            }
+
+            if (assetName.StartsWith("/", StringComparison.Ordinal) ||
+                assetName.EndsWith("/", StringComparison.Ordinal) ||
+                assetName.IndexOf('\\') >= 0 || assetName.IndexOf(':') >= 0)
+            {
+                Add(diagnostics, "asset.name-invalid", path,
+                    "Asset names must be relative Unity asset paths using forward slashes.");
+                return;
+            }
+
+            string[] segments = assetName.Split('/');
+            for (int i = 0; i < segments.Length; i++)
+            {
+                if (string.IsNullOrWhiteSpace(segments[i]) || segments[i] == "." || segments[i] == "..")
+                {
+                    Add(diagnostics, "asset.name-invalid", path,
+                        "Asset names cannot contain empty, current-directory, or parent-directory path segments.");
+                    return;
+                }
             }
         }
 
-        private static void ValidateVisualRootPath(string value, string path, List<ContentDiagnostic> diagnostics)
+        private static void ValidateVisualRootPath(
+            string value,
+            string path,
+            List<ContentDiagnostic> diagnostics,
+            string diagnosticCode = "unit.visual-root-path-invalid")
         {
             if (String.IsNullOrWhiteSpace(value) || value.StartsWith("/", StringComparison.Ordinal) ||
                 value.EndsWith("/", StringComparison.Ordinal) || value.IndexOf('\\') >= 0)
             {
-                Add(diagnostics, "unit.visual-root-path-invalid", path,
+                Add(diagnostics, diagnosticCode, path,
                     "visualRootPath must be a relative Unity Transform path using forward slashes.");
                 return;
             }
@@ -1127,7 +1191,7 @@ namespace RogueCommandExpansionLoader.Content
             {
                 if (String.IsNullOrWhiteSpace(segments[i]) || segments[i] == "." || segments[i] == "..")
                 {
-                    Add(diagnostics, "unit.visual-root-path-invalid", path,
+                    Add(diagnostics, diagnosticCode, path,
                         "visualRootPath cannot contain empty, current-directory, or parent-directory segments.");
                     return;
                 }

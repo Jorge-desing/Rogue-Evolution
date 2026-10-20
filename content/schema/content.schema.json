@@ -78,6 +78,12 @@
       "type": "string",
       "pattern": "^[a-z][a-z0-9._-]*:[a-z0-9][a-z0-9._-]*$"
     },
+    "assetName": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S",
+      "description": "Unity AssetBundle address, preferably the project-relative path including extension."
+    },
     "assetBundle": {
       "type": "object",
       "additionalProperties": false,
@@ -241,6 +247,8 @@
       "required": ["id", "nativeTemplateId", "localizations"],
       "properties": {
         "id": { "$ref": "#/$defs/namespacedId" },
+        "assetBundleId": { "$ref": "#/$defs/namespacedId" },
+        "cardImageAssetName": { "$ref": "#/$defs/assetName" },
         "nativeTemplateId": {
           "type": "string",
           "minLength": 1,
@@ -248,6 +256,8 @@
           "pattern": "\\S",
           "description": "Native entity template ID. Runtime must reject templates that do not have the game's Factory role."
         },
+        "visualAssetName": { "type": "string", "minLength": 1, "pattern": "\\S", "description": "AssetBundle address for a visual-only factory GameObject prefab." },
+        "visualRootPath": { "type": "string", "minLength": 1, "pattern": "\\S", "description": "Relative path to one native factory visual subtree." },
         "balanceOverrides": {
           "type": "array",
           "maxItems": 64,
@@ -266,7 +276,25 @@
             "required": ["language", "name"]
           }
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": { "required": ["cardImageAssetName"] },
+          "then": { "required": ["assetBundleId"] }
+        },
+        {
+          "if": { "required": ["visualAssetName"], "properties": { "visualAssetName": { "type": "string", "minLength": 1 } } },
+          "then": { "required": ["assetBundleId", "visualRootPath"] }
+        },
+        {
+          "if": { "required": ["visualRootPath"], "properties": { "visualRootPath": { "type": "string", "minLength": 1 } } },
+          "then": { "required": ["assetBundleId", "visualAssetName"] }
+        },
+        {
+          "if": { "required": ["assetBundleId"], "properties": { "assetBundleId": { "type": "string", "minLength": 1 } } },
+          "then": { "anyOf": [{ "required": ["cardImageAssetName"] }, { "required": ["visualAssetName"] }, { "required": ["visualRootPath"] }] }
+        }
+      ]
     },
     "balanceOverride": {
       "type": "object",
