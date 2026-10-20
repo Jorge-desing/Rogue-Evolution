@@ -372,6 +372,7 @@ namespace RogueCommandExpansionLoader.Content
                 ValidateCombatBoosts(unit.combatBoosts, itemPath + ".combatBoosts", diagnostics);
                 ValidateUnitUpgrades(unit.upgrades, itemPath + ".upgrades", allIds, diagnostics);
                 ValidateUnitExperience(unit.experience, itemPath + ".experience", diagnostics);
+                ValidateUnitSynergies(unit.synergies, itemPath + ".synergies", allIds, diagnostics);
                 ValidateProductionBuilding(unit.productionBuilding, itemPath + ".productionBuilding",
                     allIds, productionBuildingIds, bundleIds, registrySnapshot, diagnostics);
                 ValidateProfileCardEligibility(unit, itemPath, diagnostics);
@@ -1441,6 +1442,53 @@ namespace RogueCommandExpansionLoader.Content
             {
                 Add(diagnostics, "unit-experience.level-up-bonus-invalid", path + ".levelUpBonus",
                     "Level up bonus must be non-negative.");
+            }
+        }
+
+        private static void ValidateUnitSynergies(
+            ContentUnitSynergyDefinition[] synergies,
+            string path,
+            HashSet<string> allIds,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (synergies == null) return;
+            for (int i = 0; i < synergies.Length; i++)
+            {
+                var synergy = synergies[i];
+                string itemPath = path + "[" + i + "]";
+                if (synergy == null)
+                {
+                    Add(diagnostics, "entry.null", itemPath, "Synergy entries cannot be null.");
+                    continue;
+                }
+                ValidateNamespacedId(synergy.id, itemPath + ".id", diagnostics);
+                if (String.IsNullOrWhiteSpace(synergy.statName))
+                {
+                    Add(diagnostics, "unit-synergy.statName-required", itemPath + ".statName",
+                        "Synergy stat name must be non-empty.");
+                }
+                if (synergy.multiplier < 0 || synergy.multiplier > 10)
+                {
+                    Add(diagnostics, "unit-synergy.multiplier-invalid", itemPath + ".multiplier",
+                        "Synergy multiplier must be between 0 and 10.");
+                }
+                if (synergy.radius < 0)
+                {
+                    Add(diagnostics, "unit-synergy.radius-invalid", itemPath + ".radius",
+                        "Synergy radius must be non-negative.");
+                }
+                if (synergy.targetUnitIds != null)
+                {
+                    for (int j = 0; j < synergy.targetUnitIds.Length; j++)
+                    {
+                        if (String.IsNullOrWhiteSpace(synergy.targetUnitIds[j]) ||
+                            !allIds.Contains(synergy.targetUnitIds[j]))
+                        {
+                            Add(diagnostics, "unit-synergy.target-unknown", itemPath + ".targetUnitIds[" + j + "]",
+                                "Synergy target unit must be a declared or native unit ID.");
+                        }
+                    }
+                }
             }
         }
 

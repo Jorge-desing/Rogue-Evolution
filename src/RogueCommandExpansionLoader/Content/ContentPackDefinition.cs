@@ -79,6 +79,16 @@ namespace RogueCommandExpansionLoader.Content
     }
 
     [Serializable]
+    public sealed class ContentUnitSynergyDefinition
+    {
+        public string id;
+        public string statName;
+        public float multiplier;
+        public float radius;
+        public string[] targetUnitIds;
+    }
+
+    [Serializable]
     public sealed class ContentUnitDefinition
     {
         public string id;
@@ -101,6 +111,7 @@ namespace RogueCommandExpansionLoader.Content
         public ContentCombatBoostDefinition[] combatBoosts;
         public ContentUnitUpgradeDefinition[] upgrades;
         public ContentUnitExperienceDefinition experience;
+        public ContentUnitSynergyDefinition[] synergies;
         public ContentBalanceOverride[] balanceOverrides;
         public ContentUnitLocalizationDefinition[] localizations;
         public ContentProductionBuildingDefinition productionBuilding;
@@ -334,6 +345,7 @@ namespace RogueCommandExpansionLoader.Content
                 combatBoosts = CloneArray(source.combatBoosts, CloneCombatBoost),
                 upgrades = CloneArray(source.upgrades, CloneUnitUpgrade),
                 experience = CloneUnitExperience(source.experience),
+                synergies = CloneArray(source.synergies, CloneUnitSynergy),
                 productionBuilding = CloneProductionBuilding(source.productionBuilding)
             };
         }
@@ -377,6 +389,18 @@ namespace RogueCommandExpansionLoader.Content
                 maxLevel = source.maxLevel,
                 experienceGainMultiplier = source.experienceGainMultiplier,
                 levelUpBonus = source.levelUpBonus
+            };
+        }
+
+        private static ContentUnitSynergyDefinition CloneUnitSynergy(ContentUnitSynergyDefinition source)
+        {
+            return source == null ? null : new ContentUnitSynergyDefinition
+            {
+                id = source.id,
+                statName = source.statName,
+                multiplier = source.multiplier,
+                radius = source.radius,
+                targetUnitIds = source.targetUnitIds == null ? null : (string[])source.targetUnitIds.Clone()
             };
         }
 
