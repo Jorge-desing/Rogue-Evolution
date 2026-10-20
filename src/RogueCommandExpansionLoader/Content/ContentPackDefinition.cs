@@ -158,6 +158,15 @@ namespace RogueCommandExpansionLoader.Content
     }
 
     [Serializable]
+    public sealed class ContentUnitArmorDefinition
+    {
+        public string armorType;
+        public float armorValue;
+        public float shieldValue;
+        public float damageReduction;
+    }
+
+    [Serializable]
     public sealed class ContentUnitDefinition
     {
         public string id;
@@ -189,6 +198,7 @@ namespace RogueCommandExpansionLoader.Content
         public ContentUnitMovementDefinition movement;
         public ContentUnitDetectionDefinition detection;
         public ContentUnitWeaponDefinition[] weapons;
+        public ContentUnitArmorDefinition armor;
         public ContentBalanceOverride[] balanceOverrides;
         public ContentUnitLocalizationDefinition[] localizations;
         public ContentProductionBuildingDefinition productionBuilding;
@@ -431,6 +441,7 @@ namespace RogueCommandExpansionLoader.Content
                 movement = CloneUnitMovement(source.movement),
                 detection = CloneUnitDetection(source.detection),
                 weapons = CloneArray(source.weapons, CloneUnitWeapon),
+                armor = CloneUnitArmor(source.armor),
                 productionBuilding = CloneProductionBuilding(source.productionBuilding)
             };
         }
@@ -571,6 +582,17 @@ namespace RogueCommandExpansionLoader.Content
                 damage = source.damage,
                 range = source.range,
                 fireRate = source.fireRate
+            };
+        }
+
+        private static ContentUnitArmorDefinition CloneUnitArmor(ContentUnitArmorDefinition source)
+        {
+            return source == null ? null : new ContentUnitArmorDefinition
+            {
+                armorType = source.armorType,
+                armorValue = source.armorValue,
+                shieldValue = source.shieldValue,
+                damageReduction = source.damageReduction
             };
         }
 

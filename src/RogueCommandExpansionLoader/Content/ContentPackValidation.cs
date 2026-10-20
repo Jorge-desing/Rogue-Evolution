@@ -381,6 +381,7 @@ namespace RogueCommandExpansionLoader.Content
                 ValidateUnitMovement(unit.movement, itemPath + ".movement", diagnostics);
                 ValidateUnitDetection(unit.detection, itemPath + ".detection", diagnostics);
                 ValidateUnitWeapons(unit.weapons, itemPath + ".weapons", diagnostics);
+                ValidateUnitArmor(unit.armor, itemPath + ".armor", diagnostics);
                 ValidateProductionBuilding(unit.productionBuilding, itemPath + ".productionBuilding",
                     allIds, productionBuildingIds, bundleIds, registrySnapshot, diagnostics);
                 ValidateProfileCardEligibility(unit, itemPath, diagnostics);
@@ -1719,6 +1720,36 @@ namespace RogueCommandExpansionLoader.Content
                     Add(diagnostics, "unit-weapon.fire-rate-invalid", itemPath + ".fireRate",
                         "Weapon fire rate must be non-negative.");
                 }
+            }
+        }
+
+        private static void ValidateUnitArmor(
+            ContentUnitArmorDefinition armor,
+            string path,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (armor == null) return;
+            if (!String.IsNullOrWhiteSpace(armor.armorType) &&
+                armor.armorType != "Light" && armor.armorType != "Medium" &&
+                armor.armorType != "Heavy" && armor.armorType != "Energy")
+            {
+                Add(diagnostics, "unit-armor.type-invalid", path + ".armorType",
+                    "Armor type must be Light, Medium, Heavy, or Energy.");
+            }
+            if (armor.armorValue < 0)
+            {
+                Add(diagnostics, "unit-armor.value-invalid", path + ".armorValue",
+                    "Armor value must be non-negative.");
+            }
+            if (armor.shieldValue < 0)
+            {
+                Add(diagnostics, "unit-armor.shield-invalid", path + ".shieldValue",
+                    "Shield value must be non-negative.");
+            }
+            if (armor.damageReduction < 0 || armor.damageReduction > 1)
+            {
+                Add(diagnostics, "unit-armor.reduction-invalid", path + ".damageReduction",
+                    "Damage reduction must be between 0 and 1.");
             }
         }
 
