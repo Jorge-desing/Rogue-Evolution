@@ -44,6 +44,8 @@ namespace RogueCommandExpansionLoader.Content
         public bool isAllowedForAi;
         public bool isAllowedForDemo;
         public bool isForSpecialists;
+        public ContentAbilityDefinition[] abilities;
+        public ContentAiOverrideDefinition[] aiOverrides;
         public ContentBalanceOverride[] balanceOverrides;
         public ContentUnitLocalizationDefinition[] localizations;
         public ContentProductionBuildingDefinition productionBuilding;
@@ -270,8 +272,20 @@ namespace RogueCommandExpansionLoader.Content
                 isForSpecialists = source.isForSpecialists,
                 balanceOverrides = CloneArray(source.balanceOverrides, CloneBalanceOverride),
                 localizations = CloneArray(source.localizations, CloneUnitLocalization),
+                abilities = CloneArray(source.abilities, CloneAbility),
+                aiOverrides = CloneArray(source.aiOverrides, CloneAiOverride),
                 productionBuilding = CloneProductionBuilding(source.productionBuilding)
             };
+        }
+
+        private static ContentAbilityDefinition CloneAbility(ContentAbilityDefinition source)
+        {
+            return source == null ? null : new ContentAbilityDefinition { id = source.id, value = source.value };
+        }
+
+        private static ContentAiOverrideDefinition CloneAiOverride(ContentAiOverrideDefinition source)
+        {
+            return source == null ? null : new ContentAiOverrideDefinition { parameter = source.parameter, value = source.value };
         }
 
         private static ContentProductionBuildingDefinition CloneProductionBuilding(

@@ -1,0 +1,89 @@
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using UnityEngine;
+
+namespace RogueCommandExpansionLoader.Content
+{
+    /// <summary>
+    /// Central registry for all mod-loaded AssetBundles.
+    /// Ensures that bundles are not loaded multiple times and provides a single point of access.
+    /// </summary>
+    public sealed class GlobalBundleRegistry
+    {
+        private readonly Dictionary<string, AssetBundle> _bundles = new Dictionary<string, AssetBundle>(StringComparer.Ordinal);
+        private readonly object _lock = new object();
+
+        /// <summary>
+        /// Loads an AssetBundle asynchronously from the specified path.
+        /// If the bundle is already loaded, returns the existing instance.
+        /// </summary>
+        public async Task<AssetBundle> LoadBundleAsync(string bundleId, string path)
+        {
+            lock (_lock)
+            {
+                if (_bundles.TryGetValue(bundleId, out var existing))
+                {
+                    return existing;
+                }
+            }
+
+            AssetBundleCreateRequest request = AssetBundle.LoadFromFileAsync(path);
+            while (!request.isDone)
+            {
+                await Task.Yield();
+            }
+
+            AssetBundle bundle = request.assetBundle;
+
+            if (bundle == null)
+            {
+                throw new InvalidOperationException($"Failed to load AssetBundle '{bundleId}' from path '{path}'.");
+            }
+
+            lock (_lock)
+            {
+                if (_bundles.TryGetValue(bundleId, out var existing))
+                {
+                    // Another thread loaded it in the meantime.
+                    // Since LoadFromFileAsync creates a new instance if not cached by Unity, 
+                    // and we want to maintain a single instance, we should be careful.
+                    // However, Unity's internal cache usually handles this.
+                    return existing;
+                }
+
+                _bundles[bundleId] = bundle;
+                return bundle;
+            }
+        }
+
+        /// <summary>
+        /// Retrieves a loaded AssetBundle by its ID.
+        /// </summary>
+        public bool TryGetBundle(string bundleId, out AssetBundle bundle)
+        {
+            lock (_lock)
+            {
+                return _bundles.TryGetValue(bundleId, out bundle);
+            }
+        }
+
+        /// <summary>
+        /// Unloads all registered bundles.
+        /// </summary>
+        public void UnloadAll(bool unloadAllLoadedObjects)
+        {
+            lock (_lock)
+            {
+                foreach (var bundle in _bundles.Values)
+                {
+                    if (bundle != null)
+                    {
+                        bundle.Unload(unloadAllLoadedObjects);
+                    }
+                }
+                _bundles.Clear();
+            }
+        }
+    }
+}

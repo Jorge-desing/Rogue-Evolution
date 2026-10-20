@@ -366,6 +366,8 @@ namespace RogueCommandExpansionLoader.Content
 
                 ValidateUnitLocalizations(unit, itemPath + ".localizations", hasNativeTemplate, diagnostics);
                 ValidateBalanceOverrides(unit.balanceOverrides, itemPath + ".balanceOverrides", "unit", "unit", diagnostics);
+                ValidateAbilities(unit.abilities, itemPath + ".abilities", diagnostics);
+                ValidateAiOverrides(unit.aiOverrides, itemPath + ".aiOverrides", diagnostics);
                 ValidateProductionBuilding(unit.productionBuilding, itemPath + ".productionBuilding",
                     allIds, productionBuildingIds, bundleIds, registrySnapshot, diagnostics);
                 ValidateProfileCardEligibility(unit, itemPath, diagnostics);
@@ -1249,6 +1251,60 @@ namespace RogueCommandExpansionLoader.Content
             }
         }
 
+        private static void ValidateAbilities(
+            ContentAbilityDefinition[] abilities,
+            string path,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (abilities == null)
+            {
+                return;
+            }
+            for (int i = 0; i < abilities.Length; i++)
+            {
+                var ability = abilities[i];
+                string itemPath = path + "[" + i + "]";
+                if (ability == null)
+                {
+                    Add(diagnostics, "entry.null", itemPath, "Ability entries cannot be null.");
+                    continue;
+                }
+                ValidateNamespacedId(ability.id, itemPath + ".id", diagnostics);
+                if (float.IsNaN(ability.value) || float.IsInfinity(ability.value))
+                {
+                    Add(diagnostics, "ability.value-invalid", itemPath + ".value", "Ability value must be a finite number.");
+                }
+            }
+        }
+
+        private static void ValidateAiOverrides(
+            ContentAiOverrideDefinition[] overrides,
+            string path,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (overrides == null)
+            {
+                return;
+            }
+            for (int i = 0; i < overrides.Length; i++)
+            {
+                var ovr = overrides[i];
+                string itemPath = path + "[" + i + "]";
+                if (ovr == null)
+                {
+                    Add(diagnostics, "entry.null", itemPath, "AI override entries cannot be null.");
+                    continue;
+                }
+                if (String.IsNullOrWhiteSpace(ovr.parameter))
+                {
+                    Add(diagnostics, "ai-override.parameter-required", itemPath + ".parameter", "AI override parameter must be non-empty.");
+                }
+                if (ovr.value == null)
+                {
+                    Add(diagnostics, "ai-override.value-required", itemPath + ".value", "AI override value must be provided.");
+                }
+            }
+        }
         private static void ValidateUnitLocalizations(
             ContentUnitDefinition unit,
             string path,

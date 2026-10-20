@@ -83,7 +83,24 @@ public sealed class LandscapeGenerator
 {
 }
 
+public sealed class EntityValueModifier
+{
+    public float value;
+}
+
+public sealed class AiBehaviour
+{
+    public float tickRate = 1.0f;
+    public float detectionRange = 10.0f;
+}
+
+public sealed class AiBehaviourManager
+{
+    public AiBehaviour activeBehaviour;
+}
+
 public sealed class DefaultAiBehaviour
+
 {
     public static List<EntityInAiDeck> ActiveConstructableEntities { get; set; } = new();
     public static Func<string, int, EntityController> CreateBuildingHandler { get; set; }

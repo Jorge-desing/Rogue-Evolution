@@ -625,6 +625,24 @@ var tests = new (string Name, Action Run)[]
                 "An offered-product truncated report hid its independent ID or pool-query omission counters.");
         }
     }),
+    ("runtime mutation modifies buff and ai behaviour", () =>
+    {
+        var mutationManager = new RuntimeMutationManager(msg => Console.WriteLine(msg));
+        
+        // Test Buff Mutation
+        var buff = new EntityValueModifier { value = 1.0f };
+        mutationManager.MutateFloat(buff, "value", 2.5f);
+        if (buff.value != 2.5f) throw new InvalidOperationException("Buff value mutation failed.");
+
+        // Test AI Behaviour Mutation
+        var behaviour = new AiBehaviour { tickRate = 1.0f, detectionRange = 10.0f };
+        var manager = new AiBehaviourManager { activeBehaviour = behaviour };
+        mutationManager.MutateActiveAiBehaviour(manager, "tickRate", 0.5f);
+        if (behaviour.tickRate != 0.5f) throw new InvalidOperationException("AI tickRate mutation failed.");
+        
+        mutationManager.MutateActiveAiBehaviour(manager, "detectionRange", 20.0f);
+        if (behaviour.detectionRange != 20.0f) throw new InvalidOperationException("AI detectionRange mutation failed.");
+    }),
     ("demo reward stage index follows visible stages and tutorial substitution", () =>
     {
         var nativeHiddenStage = new object();

@@ -208,7 +208,8 @@
           "$ref": "#/$defs/productionBuilding"
         },
         "isAllowedAsStartingBlueprint": {
-          "type": "boolean"
+          "type": "boolean",
+          "description": "Allows the product's dedicated production factory to enter the initial stage-0 blueprint offer; the native start-offer and pool filters remain in force."
         },
         "isAllowedForAi": {
           "type": "boolean"
@@ -245,6 +246,18 @@
           "type": "object",
           "additionalProperties": {
             "type": "number"
+          }
+        },
+        "abilities": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ability"
+          }
+        },
+        "aiOverrides": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/aiOverride"
           }
         }
       },
@@ -1518,6 +1531,40 @@
         "name": {
           "type": "string",
           "pattern": "^[A-Za-z][A-Za-z0-9._-]*$"
+        },
+        "value": {
+          "type": "string"
+        }
+      }
+    },
+    "ability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "value"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/namespacedId"
+        },
+        "value": {
+          "type": "number"
+        }
+      }
+    },
+    "aiOverride": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "parameter",
+        "value"
+      ],
+      "properties": {
+        "parameter": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
         },
         "value": {
           "type": "string"
