@@ -1869,6 +1869,37 @@ namespace RogueCommandExpansionLoader.Content
             try
             {
                 bound.RuntimeBehaviour.OnInitialized();
+                // Apply AI overrides from units referenced in this profile
+                if (profile.Definition.unitEntries != null)
+                {
+                    foreach (var entry in profile.Definition.unitEntries)
+                    {
+                        if (entry == null || String.IsNullOrWhiteSpace(entry.unitId))
+                        {
+                            continue;
+                        }
+                        LoadedUnit unit;
+                        if (_units.TryGetValue(entry.unitId, out unit) && unit != null &&
+                            unit.Definition != null && unit.Definition.aiOverrides != null)
+                        {
+                            foreach (var ovr in unit.Definition.aiOverrides)
+                            {
+                                if (ovr == null || String.IsNullOrWhiteSpace(ovr.parameter))
+                                {
+                                    continue;
+                                }
+                                if (_mutationManager.MutateActiveAiBehaviour(behaviour, ovr.parameter, ovr.value))
+                                {
+                                    _mutationSuccessCount++;
+                                }
+                                else
+                                {
+                                    _mutationFailureCount++;
+                                }
+                            }
+                        }
+                    }
+                }
                 bool stillRegistered = false;
                 lock (_gate)
                 {
