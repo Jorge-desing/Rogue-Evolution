@@ -117,6 +117,15 @@ namespace RogueCommandExpansionLoader.Content
     }
 
     [Serializable]
+    public sealed class ContentUnitProductionQueueDefinition
+    {
+        public float buildTime;
+        public float resourceCost;
+        public int queueSize;
+        public int productionPriority;
+    }
+
+    [Serializable]
     public sealed class ContentUnitDefinition
     {
         public string id;
@@ -143,6 +152,7 @@ namespace RogueCommandExpansionLoader.Content
         public ContentUnitVisualVariantDefinition[] visualVariants;
         public ContentUnitSpawnDefinition spawn;
         public ContentUnitStatusEffectDefinition[] statusEffects;
+        public ContentUnitProductionQueueDefinition productionQueue;
         public ContentBalanceOverride[] balanceOverrides;
         public ContentUnitLocalizationDefinition[] localizations;
         public ContentProductionBuildingDefinition productionBuilding;
@@ -380,6 +390,7 @@ namespace RogueCommandExpansionLoader.Content
                 visualVariants = CloneArray(source.visualVariants, CloneUnitVisualVariant),
                 spawn = CloneUnitSpawn(source.spawn),
                 statusEffects = CloneArray(source.statusEffects, CloneUnitStatusEffect),
+                productionQueue = CloneUnitProductionQueue(source.productionQueue),
                 productionBuilding = CloneProductionBuilding(source.productionBuilding)
             };
         }
@@ -469,6 +480,17 @@ namespace RogueCommandExpansionLoader.Content
                 effectType = source.effectType,
                 duration = source.duration,
                 magnitude = source.magnitude
+            };
+        }
+
+        private static ContentUnitProductionQueueDefinition CloneUnitProductionQueue(ContentUnitProductionQueueDefinition source)
+        {
+            return source == null ? null : new ContentUnitProductionQueueDefinition
+            {
+                buildTime = source.buildTime,
+                resourceCost = source.resourceCost,
+                queueSize = source.queueSize,
+                productionPriority = source.productionPriority
             };
         }
 

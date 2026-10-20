@@ -376,6 +376,7 @@ namespace RogueCommandExpansionLoader.Content
                 ValidateUnitVisualVariants(unit.visualVariants, itemPath + ".visualVariants", bundleIds, diagnostics);
                 ValidateUnitSpawn(unit.spawn, itemPath + ".spawn", diagnostics);
                 ValidateUnitStatusEffects(unit.statusEffects, itemPath + ".statusEffects", diagnostics);
+                ValidateUnitProductionQueue(unit.productionQueue, itemPath + ".productionQueue", diagnostics);
                 ValidateProductionBuilding(unit.productionBuilding, itemPath + ".productionBuilding",
                     allIds, productionBuildingIds, bundleIds, registrySnapshot, diagnostics);
                 ValidateProfileCardEligibility(unit, itemPath, diagnostics);
@@ -1577,6 +1578,34 @@ namespace RogueCommandExpansionLoader.Content
                     Add(diagnostics, "unit-status-effect.duration-invalid", itemPath + ".duration",
                         "Status effect duration must be non-negative.");
                 }
+            }
+        }
+
+        private static void ValidateUnitProductionQueue(
+            ContentUnitProductionQueueDefinition queue,
+            string path,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (queue == null) return;
+            if (queue.buildTime < 0)
+            {
+                Add(diagnostics, "unit-production-queue.build-time-invalid", path + ".buildTime",
+                    "Build time must be non-negative.");
+            }
+            if (queue.resourceCost < 0)
+            {
+                Add(diagnostics, "unit-production-queue.resource-cost-invalid", path + ".resourceCost",
+                    "Resource cost must be non-negative.");
+            }
+            if (queue.queueSize < 0)
+            {
+                Add(diagnostics, "unit-production-queue.queue-size-invalid", path + ".queueSize",
+                    "Queue size must be non-negative.");
+            }
+            if (queue.productionPriority < 0)
+            {
+                Add(diagnostics, "unit-production-queue.priority-invalid", path + ".productionPriority",
+                    "Production priority must be non-negative.");
             }
         }
 
