@@ -782,9 +782,9 @@ namespace RogueCommandExpansion.Authoring
             Texture2D normal,
             Texture2D emission)
         {
-            if (albedo == null || albedo.width != 1024 || albedo.height != 1024)
+            if (albedo == null || albedo.width <= 0 || albedo.height <= 0 || albedo.width != albedo.height)
             {
-                throw new InvalidDataException(label + " albedo must import at 1024x1024.");
+                throw new InvalidDataException(label + " albedo must import as a non-empty square atlas.");
             }
 
             Texture2D[] maps = { metallicGloss, normal, emission };
