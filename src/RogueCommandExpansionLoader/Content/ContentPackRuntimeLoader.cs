@@ -47,6 +47,7 @@ namespace RogueCommandExpansionLoader.Content
         private readonly RelicContentRuntimeRegistrar _relicRegistrar;
         private readonly AiModuleRegistry _moduleRegistry;
         private readonly Action<string> _log;
+        private readonly RuntimeMutationManager _mutationManager;
         private readonly Type _entityRowType;
         private readonly Type _entityBalanceAssetType;
         private readonly Type _entityControllerType;
@@ -174,6 +175,8 @@ namespace RogueCommandExpansionLoader.Content
         private readonly object _logGate = new object();
 
         private long _loadedAssetBundleBytes;
+        private int _mutationSuccessCount;
+        private int _mutationFailureCount;
         private string _resolvedPacksRoot;
         private string _packRootError;
         private bool _nativeRegistryReady;
@@ -205,6 +208,7 @@ namespace RogueCommandExpansionLoader.Content
             _relicRegistrar = new RelicContentRuntimeRegistrar(_gameAssembly);
             _moduleRegistry = moduleRegistry ?? throw new ArgumentNullException("moduleRegistry");
             _log = logger;
+            _mutationManager = new RuntimeMutationManager(_log ?? (msg => { }));
 
             _entityRowType = FindUniqueType("EntityBalancingParameters");
             if (!_entityRowType.IsValueType)
@@ -734,6 +738,46 @@ namespace RogueCommandExpansionLoader.Content
                         Log("No se pudo recalcular un BlueprintPool de contenido: " + exception.GetBaseException().Message);
                     }
                 }
+            }
+            ApplyUnitMutations();
+        }
+
+            private void ApplyUnitMutations()
+            {
+            lock (_gate)
+            {
+            if (!_runtimeContentReady)
+            {
+                return;
+            }
+
+            foreach (var pair in _units)
+            {
+                LoadedUnit unit = pair.Value;
+                if (unit == null || unit.Definition == null)
+                {
+                    continue;
+                }
+
+                if (unit.Definition.abilities != null)
+                {
+                    foreach (var ability in unit.Definition.abilities)
+                    {
+                        if (ability == null || String.IsNullOrWhiteSpace(ability.id))
+                        {
+                            continue;
+                        }
+                        if (_mutationManager.MutateFloat(unit.BalanceRow, ability.id, ability.value))
+                        {
+                            _mutationSuccessCount++;
+                        }
+                        else
+                        {
+                            _mutationFailureCount++;
+                        }
+                    }
+                }
+            }
             }
         }
 
