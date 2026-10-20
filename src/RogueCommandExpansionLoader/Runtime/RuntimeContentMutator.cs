@@ -538,6 +538,30 @@ namespace RogueCommandExpansionLoader.Runtime
                             throw new InvalidOperationException("Cached image for '" + entityId + "' could not be invalidated.");
                         }
                     }
+
+                    // Invalidate value caches for the registered entity to ensure fresh parameters are used.
+                    if (index.Contains(entityId))
+                    {
+                        int entityToken = Convert.ToInt32(index[entityId]);
+                        
+                        foreach (string fieldName in intValueCache.Keys)
+                        {
+                            IDictionary innerCache = intValueCache[fieldName] as IDictionary;
+                            if (innerCache != null && innerCache.Contains(entityToken))
+                            {
+                                innerCache.Remove(entityToken);
+                            }
+                        }
+
+                        foreach (string fieldName in floatValueCache.Keys)
+                        {
+                            IDictionary innerCache = floatValueCache[fieldName] as IDictionary;
+                            if (innerCache != null && innerCache.Contains(entityToken))
+                            {
+                                innerCache.Remove(entityToken);
+                            }
+                        }
+                    }
                 }
 
                 for (int i = 0; i < entityIdsToAppend.Count; i++)
