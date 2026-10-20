@@ -380,6 +380,7 @@ namespace RogueCommandExpansionLoader.Content
                 ValidateUnitResourceCosts(unit.resourceCosts, itemPath + ".resourceCosts", diagnostics);
                 ValidateUnitMovement(unit.movement, itemPath + ".movement", diagnostics);
                 ValidateUnitDetection(unit.detection, itemPath + ".detection", diagnostics);
+                ValidateUnitWeapons(unit.weapons, itemPath + ".weapons", diagnostics);
                 ValidateProductionBuilding(unit.productionBuilding, itemPath + ".productionBuilding",
                     allIds, productionBuildingIds, bundleIds, registrySnapshot, diagnostics);
                 ValidateProfileCardEligibility(unit, itemPath, diagnostics);
@@ -1680,6 +1681,44 @@ namespace RogueCommandExpansionLoader.Content
             {
                 Add(diagnostics, "unit-detection.sensor-type-invalid", path + ".sensorType",
                     "Sensor type must be Visual, Radar, Sonar, or Thermal.");
+            }
+        }
+
+        private static void ValidateUnitWeapons(
+            ContentUnitWeaponDefinition[] weapons,
+            string path,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (weapons == null) return;
+            for (int i = 0; i < weapons.Length; i++)
+            {
+                var weapon = weapons[i];
+                string itemPath = path + "[" + i + "]";
+                if (weapon == null)
+                {
+                    Add(diagnostics, "entry.null", itemPath, "Weapon entries cannot be null.");
+                    continue;
+                }
+                if (String.IsNullOrWhiteSpace(weapon.weaponType))
+                {
+                    Add(diagnostics, "unit-weapon.type-required", itemPath + ".weaponType",
+                        "Weapon type must be non-empty.");
+                }
+                if (weapon.damage < 0)
+                {
+                    Add(diagnostics, "unit-weapon.damage-invalid", itemPath + ".damage",
+                        "Weapon damage must be non-negative.");
+                }
+                if (weapon.range < 0)
+                {
+                    Add(diagnostics, "unit-weapon.range-invalid", itemPath + ".range",
+                        "Weapon range must be non-negative.");
+                }
+                if (weapon.fireRate < 0)
+                {
+                    Add(diagnostics, "unit-weapon.fire-rate-invalid", itemPath + ".fireRate",
+                        "Weapon fire rate must be non-negative.");
+                }
             }
         }
 
