@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Threading.Tasks;
 using UnityEngine;
 
@@ -58,6 +59,57 @@ namespace RogueCommandExpansionLoader.Content
         }
 
         /// <summary>
+        /// Loads a bundle asynchronously from a caller-validated stream. The caller owns the stream
+        /// and must keep it open until the returned bundle is unloaded.
+        /// </summary>
+        public async Task<AssetBundle> LoadBundleAsync(string bundleId, Stream stream)
+        {
+            if (String.IsNullOrWhiteSpace(bundleId))
+            {
+                throw new ArgumentException("A bundle ID is required.", nameof(bundleId));
+            }
+            if (stream == null)
+            {
+                throw new ArgumentNullException(nameof(stream));
+            }
+
+            lock (_lock)
+            {
+                if (_bundles.TryGetValue(bundleId, out var existing))
+                {
+                    return existing;
+                }
+            }
+
+            AssetBundleCreateRequest request = AssetBundle.LoadFromStreamAsync(stream, 0, 0);
+            while (!request.isDone)
+            {
+                await Task.Yield();
+            }
+
+            AssetBundle bundle = request.assetBundle;
+            if (bundle == null)
+            {
+                throw new InvalidOperationException("Failed to load AssetBundle '" + bundleId + "' from stream.");
+            }
+
+            lock (_lock)
+            {
+                if (_bundles.TryGetValue(bundleId, out var existing))
+                {
+                    if (!System.Object.ReferenceEquals(existing, bundle))
+                    {
+                        bundle.Unload(true);
+                    }
+                    return existing;
+                }
+
+                _bundles[bundleId] = bundle;
+                return bundle;
+            }
+        }
+
+        /// <summary>
         /// Retrieves a loaded AssetBundle by its ID.
         /// </summary>
         public bool TryGetBundle(string bundleId, out AssetBundle bundle)
@@ -65,6 +117,24 @@ namespace RogueCommandExpansionLoader.Content
             lock (_lock)
             {
                 return _bundles.TryGetValue(bundleId, out bundle);
+            }
+        }
+
+        /// <summary>
+        /// Removes a specific bundle from the registry without unloading it. The owner decides
+        /// when to unload it and dispose any associated stream.
+        /// </summary>
+        public bool RemoveBundle(string bundleId, AssetBundle expectedBundle)
+        {
+            lock (_lock)
+            {
+                if (!_bundles.TryGetValue(bundleId, out var existing) ||
+                    !System.Object.ReferenceEquals(existing, expectedBundle))
+                {
+                    return false;
+                }
+
+                return _bundles.Remove(bundleId);
             }
         }
 

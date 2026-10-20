@@ -7,6 +7,7 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading.Tasks;
 using Microsoft.Win32.SafeHandles;
 using Newtonsoft.Json;
 using RogueCommandExpansionLoader.Contracts;
@@ -148,8 +149,6 @@ namespace RogueCommandExpansionLoader.Content
         private readonly BlueprintPoolScopeRegistry _blueprintPoolScopeRegistry =
             new BlueprintPoolScopeRegistry();
         private readonly GlobalBundleRegistry _bundleRegistry = new GlobalBundleRegistry();
-        private Task _loadingTask;
-        private readonly Dictionary<string, GameObject> _prefabClones = new Dictionary<string, GameObject>(StringComparer.Ordinal);
         private readonly Dictionary<string, UnityEngine.Object> _resourceAssets =
             new Dictionary<string, UnityEngine.Object>(StringComparer.Ordinal);
         private readonly Dictionary<string, LoadedAiProfile> _aiProfiles =
@@ -181,6 +180,7 @@ namespace RogueCommandExpansionLoader.Content
         private bool _registryUnavailableLogged;
         private bool _runtimeContentReady;
         private bool _loaded;
+        private Task _loadingTask;
         private bool _aiStartDistanceFailureLogged;
         private bool _blueprintRewardScopeFailureLogged;
         private bool _stageMapOrderFailureLogged;
@@ -1374,26 +1374,6 @@ namespace RogueCommandExpansionLoader.Content
             {
                 if (resourcePath != null && _resourceAssets.TryGetValue(resourcePath, out asset) && asset != null)
                 {
-                    if (asset is GameObject prefab)
-                    {
-                        if (_prefabClones.TryGetValue(resourcePath, out GameObject clone) && clone != null)
-                        {
-                            asset = clone;
-                            return true;
-                        }
-
-                        GameObject newClone = InstantiateDormantPrefab(prefab);
-                        if (newClone == null) return false;
-
-                        newClone.name = "RCL_JIT_" + resourcePath.Replace('/', '_');
-                        newClone.SetActive(false);
-                        newClone.hideFlags = HideFlags.HideAndDontSave;
-                        UnityEngine.Object.DontDestroyOnLoad(newClone);
-
-                        _prefabClones[resourcePath] = newClone;
-                        asset = newClone;
-                        return true;
-                    }
                     return true;
                 }
             }
@@ -1992,23 +1972,206 @@ namespace RogueCommandExpansionLoader.Content
                 {
                     bound.Failed = true;
                     RemoveAiBehaviourBindingIfCurrentLocked(behaviour, bound);
-                
-        private async Task LoadAllPacksAsync()
+                }
+
+                SafeDestroyAiRuntimeBehaviour(bound, profile.Definition.id);
+                Log("El módulo AI de " + profile.Definition.id + " falló durante Tick para la instancia " +
+                    behaviour.gameObject.name + "; se desactiva su despacho: " +
+                    exception.GetType().Name + ": " + exception.Message);
+            }
+        }
+
+        public void OnAiBehaviourDestroyed(object gameBehaviour)
         {
+            if (gameBehaviour == null)
+            {
+                return;
+            }
+
+            BoundAiRuntimeBehaviour bound;
+            lock (_gate)
+            {
+                if (!_boundAiBehaviours.TryGetValue(gameBehaviour, out bound))
+                {
+                    return;
+                }
+
+                _boundAiBehaviours.Remove(gameBehaviour);
+            }
+
+            SafeDestroyAiRuntimeBehaviour(bound, "<AI>");
+        }
+
+        /// <summary>
+        /// Cleans compiled module state when the plugin component is destroyed. Loaded packs and
+        /// Unity assets remain game-session registrations; this does not promise hot-unload support.
+        /// </summary>
+        public void ShutdownRuntimeBehaviours()
+        {
+            var behaviours = new List<object>();
+            lock (_gate)
+            {
+                foreach (KeyValuePair<object, BoundAiRuntimeBehaviour> binding in _boundAiBehaviours)
+                {
+                    behaviours.Add(binding.Key);
+                }
+            }
+
+            for (int i = 0; i < behaviours.Count; i++)
+            {
+                OnAiBehaviourDestroyed(behaviours[i]);
+            }
+        }
+
+        private void RemoveAiBehaviourBindingIfCurrentLocked(
+            DefaultAiBehaviour behaviour,
+            BoundAiRuntimeBehaviour expected)
+        {
+            BoundAiRuntimeBehaviour current;
+            if (_boundAiBehaviours.TryGetValue(behaviour, out current) &&
+                System.Object.ReferenceEquals(current, expected))
+            {
+                _boundAiBehaviours.Remove(behaviour);
+            }
+        }
+
+        private bool TryGetAiProfile(DefaultAiBehaviour behaviour, out LoadedAiProfile profile)
+        {
+            profile = null;
+            // LoadScene sets the spawned instance's AI tag after Instantiate and before
+            // the first Update-driven Init hook; the prefab asset itself need not carry it.
+            if (behaviour == null || behaviour.gameObject == null ||
+                !String.Equals(behaviour.gameObject.tag, "AI", StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            string aiResourceName = behaviour.gameObject.name;
+            const string unityCloneSuffix = "(Clone)";
+            if (aiResourceName.EndsWith(unityCloneSuffix, StringComparison.Ordinal))
+            {
+                aiResourceName = aiResourceName.Substring(0, aiResourceName.Length - unityCloneSuffix.Length);
+            }
+
+            lock (_gate)
+            {
+                return _aiProfilesByResourceName.TryGetValue(aiResourceName, out profile);
+            }
+        }
+
+        private void SafeDestroyAiRuntimeBehaviour(BoundAiRuntimeBehaviour bound, string profileId)
+        {
+            if (bound == null)
+            {
+                return;
+            }
+
+            lock (_gate)
+            {
+                if (bound.Destroyed)
+                {
+                    return;
+                }
+
+                bound.Destroyed = true;
+            }
+
+            if (bound.RuntimeBehaviour == null)
+            {
+                return;
+            }
+
             try
             {
-                if (_loaded || !_nativeRegistryReady) return;
-                _loaded = true;
-                _packRootError = null;
-                _packCandidates.Clear();
+                bound.RuntimeBehaviour.OnDestroyed();
+            }
+            catch (Exception exception)
+            {
+                Log("El módulo AI no pudo limpiar la instancia " + profileId + ": " + exception.Message);
+            }
+        }
 
+        private void RefreshNativeUnitIds()
+        {
+            _nativeUnitIds.Clear();
+            _nativeFactoryIds.Clear();
+            IDictionary index = _entityIndexField.GetValue(null) as IDictionary;
+            if (index == null)
+            {
+                if (!_registryUnavailableLogged)
+                {
+                    Log("El índice nativo de unidades aún no está inicializado; se aplaza la carga de paquetes.");
+                    _registryUnavailableLogged = true;
+                }
+
+                _nativeRegistryReady = false;
+                return;
+            }
+
+            _nativeRegistryReady = true;
+            _registryUnavailableLogged = false;
+            IList rows = _nativeEntityRowsField.GetValue(null) as IList;
+
+            foreach (object key in index.Keys)
+            {
+                string id = key as string;
+                if (!String.IsNullOrWhiteSpace(id))
+                {
+                    _nativeUnitIds.Add(id);
+                    try
+                    {
+                        if (rows == null || !index.Contains(id))
+                        {
+                            continue;
+                        }
+
+                        int rowIndex = Convert.ToInt32(index[id], CultureInfo.InvariantCulture);
+                        if (rowIndex < 0 || rowIndex >= rows.Count)
+                        {
+                            continue;
+                        }
+
+                        object row = rows[rowIndex];
+                        if (row == null || row.GetType() != _entityRowType)
+                        {
+                            continue;
+                        }
+
+                        object nullableString = _factoryForEntityIdField.GetValue(row);
+                        if (nullableString != null &&
+                            (bool)_nullableStringHasValueField.GetValue(nullableString))
+                        {
+                            _nativeFactoryIds.Add(id);
+                        }
+                    }
+                    catch (Exception exception)
+                    {
+                        Log("No se pudo clasificar el ID nativo " + id + " como producto o fábrica: " +
+                            exception.GetBaseException().Message);
+                    }
+                }
+            }
+        }
+
+        private async Task LoadAllPacksAsync()
+        {
+            if (_loaded || !_nativeRegistryReady)
+            {
+                return;
+            }
+
+            _loaded = true;
+            _packRootError = null;
+            _packCandidates.Clear();
+            try
+            {
                 if (!HasNoReparsePointsInPath(_packsRoot, out string rootFailure))
                 {
                     throw new InvalidDataException("La raíz de paquetes no es segura: " + rootFailure);
                 }
 
                 Directory.CreateDirectory(_packsRoot);
-                if (!HasNoReparsePointsHInPath(_packsRoot, out rootFailure))
+                if (!HasNoReparsePointsInPath(_packsRoot, out rootFailure))
                 {
                     throw new InvalidDataException("La raíz de paquetes dejó de ser segura: " + rootFailure);
                 }
@@ -2019,6 +2182,7 @@ namespace RogueCommandExpansionLoader.Content
                     {
                         throw new InvalidDataException("No se pudo fijar la raíz de paquetes: " + rootFailure);
                     }
+
                     _resolvedPacksRoot = GetFinalPath(rootHandle);
                 }
 
@@ -2057,7 +2221,10 @@ namespace RogueCommandExpansionLoader.Content
                 for (int i = 0; i < candidates.Count; i++)
                 {
                     PackCandidate candidate = candidates[i];
-                    if (candidate.Disabled) continue;
+                    if (candidate.Disabled)
+                    {
+                        continue;
+                    }
 
                     ContentPackValidationResult validation = ContentPackValidator.Validate(
                         candidate.Definition, candidate.Root,
@@ -2082,21 +2249,362 @@ namespace RogueCommandExpansionLoader.Content
                 await LoadPacksInDependencyOrderAsync(candidates);
 
                 int productionBuildingCount = 0;
-                foreach (LoadedUnit unit in _units.Values)
+                int productUnitCount;
+                int contributionCount;
+                lock (_gate)
                 {
-                    if (unit.IsProductionBuilding) productionBuildingCount++;
+                    foreach (LoadedUnit unit in _units.Values)
+                    {
+                        if (unit.IsProductionBuilding)
+                        {
+                            productionBuildingCount++;
+                        }
+                    }
+
+                    productUnitCount = _units.Count - productionBuildingCount;
+                    contributionCount = _contributions.Count;
                 }
 
-                int productUnitCount = _units.Count - productionBuildingCount;
-                Log("Carga asíncrona finalizada: " + _contributions.Count + " paquete(s) de progresión y " +
-                    _units.Count + " entidad(es) nuevas (" + productUnitCount + " unidad(es) y " +
+                Log("Carga finalizada: " + contributionCount + " paquete(s) de progresión y " +
+                    (productUnitCount + productionBuildingCount) + " entidad(es) nuevas (" + productUnitCount + " unidad(es) y " +
                     productionBuildingCount + " edificio(s) de producción).");
             }
             catch (Exception exception)
             {
-                _loaded = false;
-                _packRootError = exception.GetType().Name + ": " + exception.Message;
-                Log("No se pudo recorrer la carpeta de paquetes (async): " + _packRootError);
+                lock (_gate)
+                {
+                    _loaded = false;
+                    _packRootError = exception.GetType().Name + ": " + exception.Message;
+                }
+                Log("No se pudo recorrer la carpeta de paquetes: " + _packRootError);
+            }
+        }
+
+        private bool TryReadPackDefinition(
+            string packageRoot,
+            string packageName,
+            out ContentPackDefinition definition,
+            out string diagnostic)
+        {
+            definition = null;
+            diagnostic = null;
+            string manifestPath = Path.Combine(packageRoot, "content.json");
+            if (!IsRegularPackageFile(packageRoot, manifestPath, out string pathFailure))
+            {
+                diagnostic = pathFailure;
+                Log("Paquete '" + packageName + "' desactivado: " + diagnostic);
+                return false;
+            }
+
+            try
+            {
+                FileStream manifestStream;
+                if (!TryOpenContainedFile(packageRoot, manifestPath, out manifestStream, out pathFailure))
+                {
+                    diagnostic = pathFailure;
+                    Log("Paquete '" + packageName + "' desactivado: " + diagnostic);
+                    return false;
+                }
+
+                using (var stream = manifestStream)
+                {
+                    if (stream.Length <= 0 || stream.Length > MaxManifestBytes)
+                    {
+                        diagnostic = "content.json está vacío o supera 1 MiB.";
+                        Log("Paquete '" + packageName + "' desactivado: " + diagnostic);
+                        return false;
+                    }
+
+                    using (var reader = new StreamReader(stream))
+                    {
+                        definition = JsonConvert.DeserializeObject<ContentPackDefinition>(reader.ReadToEnd());
+                    }
+                }
+
+                if (definition == null)
+                {
+                    diagnostic = "content.json no contiene un objeto de paquete.";
+                    Log("Paquete '" + packageName + "' desactivado: " + diagnostic);
+                    return false;
+                }
+
+                return true;
+            }
+            catch (Exception exception)
+            {
+                diagnostic = "no se pudo leer content.json: " + exception.Message;
+                Log("Paquete '" + packageName + "' desactivado: " + diagnostic);
+                return false;
+            }
+        }
+
+        private void DisableCrossPackIdCollisions(List<PackCandidate> candidates)
+        {
+            var claims = new Dictionary<string, List<PackCandidate>>(StringComparer.Ordinal);
+            for (int i = 0; i < candidates.Count; i++)
+            {
+                PackCandidate candidate = candidates[i];
+                var localIds = new HashSet<string>(StringComparer.Ordinal);
+                foreach (string id in EnumerateDefinitionIds(candidate.Definition))
+                {
+                    if (String.IsNullOrWhiteSpace(id) || !localIds.Add(id))
+                    {
+                        continue;
+                    }
+
+                    List<PackCandidate> owners;
+                    if (!claims.TryGetValue(id, out owners))
+                    {
+                        owners = new List<PackCandidate>();
+                        claims.Add(id, owners);
+                    }
+
+                    owners.Add(candidate);
+                }
+            }
+
+            foreach (KeyValuePair<string, List<PackCandidate>> claim in claims)
+            {
+                if (claim.Value.Count < 2)
+                {
+                    continue;
+                }
+
+                for (int i = 0; i < claim.Value.Count; i++)
+                {
+                    PackCandidate candidate = claim.Value[i];
+                    if (!candidate.Disabled)
+                    {
+                        candidate.Disabled = true;
+                        candidate.StatusReason = "el ID '" + claim.Key + "' también está declarado por otro paquete.";
+                        Log("Paquete '" + candidate.Name + "' desactivado: " + candidate.StatusReason);
+                    }
+                }
+            }
+        }
+
+        private static IEnumerable<string> EnumerateDefinitionIds(ContentPackDefinition definition)
+        {
+            if (definition == null)
+            {
+                yield break;
+            }
+
+            yield return definition.packId;
+            if (definition.assetBundles != null)
+            {
+                for (int i = 0; i < definition.assetBundles.Length; i++)
+                {
+                    if (definition.assetBundles[i] != null) yield return definition.assetBundles[i].id;
+                }
+            }
+
+            if (definition.units != null)
+            {
+                for (int i = 0; i < definition.units.Length; i++)
+                {
+                    ContentUnitDefinition unit = definition.units[i];
+                    if (unit == null)
+                    {
+                        continue;
+                    }
+
+                    yield return unit.id;
+                    if (unit.productionBuilding != null)
+                    {
+                        yield return unit.productionBuilding.id;
+                    }
+                }
+            }
+
+            if (definition.stages != null)
+            {
+                for (int i = 0; i < definition.stages.Length; i++)
+                {
+                    if (definition.stages[i] != null) yield return definition.stages[i].id;
+                }
+            }
+
+            if (definition.aiProfiles != null)
+            {
+                for (int i = 0; i < definition.aiProfiles.Length; i++)
+                {
+                    if (definition.aiProfiles[i] != null) yield return definition.aiProfiles[i].id;
+                }
+            }
+        }
+
+        private static void BuildDeclaredContentIndex(
+            List<PackCandidate> candidates,
+            out Dictionary<string, PackCandidate> unitOwners,
+            out Dictionary<string, PackCandidate> profileOwners,
+            out HashSet<string> declaredUnitIds,
+            out HashSet<string> declaredProfileIds)
+        {
+            var unitClaims = new Dictionary<string, List<PackCandidate>>(StringComparer.Ordinal);
+            var profileClaims = new Dictionary<string, List<PackCandidate>>(StringComparer.Ordinal);
+            for (int i = 0; i < candidates.Count; i++)
+            {
+                PackCandidate candidate = candidates[i];
+                if (candidate.Definition.units != null)
+                {
+                    for (int unitIndex = 0; unitIndex < candidate.Definition.units.Length; unitIndex++)
+                    {
+                        ContentUnitDefinition unit = candidate.Definition.units[unitIndex];
+                        if (unit != null) AddClaim(unitClaims, unit.id, candidate);
+                    }
+                }
+
+                if (candidate.Definition.aiProfiles != null)
+                {
+                    for (int profileIndex = 0; profileIndex < candidate.Definition.aiProfiles.Length; profileIndex++)
+                    {
+                        ContentAiProfileDefinition profile = candidate.Definition.aiProfiles[profileIndex];
+                        if (profile != null) AddClaim(profileClaims, profile.id, candidate);
+                    }
+                }
+            }
+
+            unitOwners = GetUnambiguousOwners(unitClaims);
+            profileOwners = GetUnambiguousOwners(profileClaims);
+            declaredUnitIds = new HashSet<string>(unitOwners.Keys, StringComparer.Ordinal);
+            declaredProfileIds = new HashSet<string>(profileOwners.Keys, StringComparer.Ordinal);
+        }
+
+        private static void AddClaim(
+            Dictionary<string, List<PackCandidate>> claims,
+            string id,
+            PackCandidate candidate)
+        {
+            if (String.IsNullOrWhiteSpace(id))
+            {
+                return;
+            }
+
+            List<PackCandidate> owners;
+            if (!claims.TryGetValue(id, out owners))
+            {
+                owners = new List<PackCandidate>();
+                claims.Add(id, owners);
+            }
+
+            if (!owners.Contains(candidate))
+            {
+                owners.Add(candidate);
+            }
+        }
+
+        private static Dictionary<string, PackCandidate> GetUnambiguousOwners(
+            Dictionary<string, List<PackCandidate>> claims)
+        {
+            var owners = new Dictionary<string, PackCandidate>(StringComparer.Ordinal);
+            foreach (KeyValuePair<string, List<PackCandidate>> claim in claims)
+            {
+                if (claim.Value.Count == 1)
+                {
+                    owners.Add(claim.Key, claim.Value[0]);
+                }
+            }
+
+            return owners;
+        }
+
+        private static void ResolvePackDependencies(
+            PackCandidate candidate,
+            Dictionary<string, PackCandidate> unitOwners,
+            Dictionary<string, PackCandidate> profileOwners)
+        {
+            ContentStageDefinition[] stages = candidate.ValidatedDefinition.stages;
+            for (int i = 0; i < stages.Length; i++)
+            {
+                ContentStageDefinition stage = stages[i];
+                if (stage == null)
+                {
+                    continue;
+                }
+
+                string[] unitIds = stage.unitIds ?? new string[0];
+                for (int j = 0; j < unitIds.Length; j++)
+                {
+                    PackCandidate owner;
+                    if (unitOwners.TryGetValue(unitIds[j], out owner) && !System.Object.ReferenceEquals(owner, candidate))
+                    {
+                        candidate.Dependencies.Add(owner);
+                    }
+                }
+
+                string[] profileIds = stage.aiProfileIds ?? new string[0];
+                for (int j = 0; j < profileIds.Length; j++)
+                {
+                    PackCandidate owner;
+                    if (profileOwners.TryGetValue(profileIds[j], out owner) && !System.Object.ReferenceEquals(owner, candidate))
+                    {
+                        candidate.Dependencies.Add(owner);
+                    }
+                }
+            }
+
+            ContentAiProfileDefinition[] profiles = candidate.ValidatedDefinition.aiProfiles;
+            for (int i = 0; i < profiles.Length; i++)
+            {
+                ContentAiProfileDefinition profile = profiles[i];
+                if (profile == null)
+                {
+                    continue;
+                }
+
+                string[] unitDependencies = profile.unitDependencies ?? new string[0];
+                for (int j = 0; j < unitDependencies.Length; j++)
+                {
+                    string unitId = unitDependencies[j];
+                    if (String.IsNullOrWhiteSpace(unitId))
+                    {
+                        continue;
+                    }
+
+                    PackCandidate owner;
+                    if (unitOwners.TryGetValue(unitId, out owner) &&
+                        !System.Object.ReferenceEquals(owner, candidate))
+                    {
+                        candidate.Dependencies.Add(owner);
+                    }
+                }
+
+                ContentAiUnitEntryDefinition[] unitEntries = profile.unitEntries ??
+                    new ContentAiUnitEntryDefinition[0];
+                for (int j = 0; j < unitEntries.Length; j++)
+                {
+                    ContentAiUnitEntryDefinition unitEntry = unitEntries[j];
+                    if (unitEntry == null || String.IsNullOrWhiteSpace(unitEntry.unitId))
+                    {
+                        continue;
+                    }
+
+                    PackCandidate owner;
+                    if (unitOwners.TryGetValue(unitEntry.unitId, out owner) &&
+                        !System.Object.ReferenceEquals(owner, candidate))
+                    {
+                        candidate.Dependencies.Add(owner);
+                    }
+                }
+
+                ContentAiProductionBuildingEntryDefinition[] buildingEntries =
+                    profile.productionBuildingEntries ?? new ContentAiProductionBuildingEntryDefinition[0];
+                for (int j = 0; j < buildingEntries.Length; j++)
+                {
+                    ContentAiProductionBuildingEntryDefinition buildingEntry = buildingEntries[j];
+                    if (buildingEntry == null || String.IsNullOrWhiteSpace(buildingEntry.unitId))
+                    {
+                        continue;
+                    }
+
+                    PackCandidate owner;
+                    if (unitOwners.TryGetValue(buildingEntry.unitId, out owner) &&
+                        !System.Object.ReferenceEquals(owner, candidate))
+                    {
+                        candidate.Dependencies.Add(owner);
+                    }
+                }
             }
         }
 
@@ -2111,54 +2619,87 @@ namespace RogueCommandExpansionLoader.Content
                 }
             }
 
-            HashSet<PackCandidate> loaded = new HashSet<PackCandidate>();
-
             while (pending.Count > 0)
             {
-                var wave = new List<PackCandidate>();
+                bool advanced = false;
                 for (int i = pending.Count - 1; i >= 0; i--)
                 {
                     PackCandidate candidate = pending[i];
-                    bool ready = true;
+                    PackCandidate failedDependency = null;
+                    bool waitingForDependency = false;
                     foreach (PackCandidate dependency in candidate.Dependencies)
                     {
-                        if (!loaded.Contains(dependency))
+                        if (dependency.Disabled || dependency.ValidatedDefinition == null ||
+                            dependency.LoadAttempted && !dependency.LoadSucceeded)
                         {
-                            ready = false;
+                            failedDependency = dependency;
                             break;
                         }
+
+                        if (!dependency.LoadSucceeded)
+                        {
+                            waitingForDependency = true;
+                        }
                     }
-                    if (ready)
+
+                    if (failedDependency != null)
                     {
-                        wave.Add(candidate);
+                        lock (_gate)
+                        {
+                            candidate.Disabled = true;
+                            candidate.StatusReason = "depende del paquete '" + failedDependency.Name + "', que no pudo cargarse.";
+                        }
+                        Log("Paquete '" + candidate.Name + "' desactivado: " + candidate.StatusReason);
                         pending.RemoveAt(i);
+                        advanced = true;
+                        continue;
                     }
+
+                    if (waitingForDependency)
+                    {
+                        continue;
+                    }
+
+                    lock (_gate)
+                    {
+                        candidate.LoadAttempted = true;
+                    }
+
+                    bool loadSucceeded = await LoadOnePackAsync(candidate);
+                    lock (_gate)
+                    {
+                        candidate.LoadSucceeded = loadSucceeded;
+                        if (!loadSucceeded)
+                        {
+                            candidate.Disabled = true;
+                        }
+                        else
+                        {
+                            candidate.StatusReason = null;
+                        }
+                    }
+
+                    pending.RemoveAt(i);
+                    advanced = true;
                 }
 
-                if (wave.Count == 0)
+                if (!advanced)
                 {
-                    foreach (var p in pending)
+                    lock (_gate)
                     {
-                        p.Disabled = true;
-                        p.StatusReason = "se detectó una dependencia circular entre paquetes.";
-                        Log("Paquete '" + p.Name + "' desactivado: " + p.StatusReason);
+                        for (int i = 0; i < pending.Count; i++)
+                        {
+                            pending[i].Disabled = true;
+                            pending[i].StatusReason = "se detectó una dependencia circular entre paquetes.";
+                        }
                     }
+
+                    for (int i = 0; i < pending.Count; i++)
+                    {
+                        Log("Paquete '" + pending[i].Name + "' desactivado: " + pending[i].StatusReason);
+                    }
+
                     break;
-                }
-
-                var tasks = wave.Select(c => LoadOnePackAsync(c)).ToList();
-                bool[] results = await Task.WhenAll(tasks);
-
-                for (int i = 0; i < wave.Count; i++)
-                {
-                    if (results[i])
-                    {
-                        loaded.Add(wave[i]);
-                    }
-                    else
-                    {
-                        wave[i].Disabled = true;
-                    }
                 }
             }
         }
@@ -2168,14 +2709,25 @@ namespace RogueCommandExpansionLoader.Content
             string packageRoot = candidate.Root;
             string packageName = candidate.Name;
             ContentPackDefinition definition = candidate.ValidatedDefinition;
-            if (definition == null) return false;
+            if (definition == null)
+            {
+                return false;
+            }
 
             var temporaryBundles = new Dictionary<string, AssetBundle>(StringComparer.Ordinal);
+            var temporaryBundleStreams = new List<FileStream>();
             var temporaryResources = new Dictionary<string, UnityEngine.Object>(StringComparer.Ordinal);
+            var temporaryNativePrefabs = new List<GameObject>();
+            var temporaryStageParameterClones = new List<ScriptableObject>();
+            var temporaryBlueprintPoolClones = new List<ScriptableObject>();
+            var temporaryLandscapeClones = new List<ScriptableObject>();
             var temporaryUnits = new List<LoadedUnit>();
             var temporaryStages = new List<LoadedStage>();
             var temporaryProfiles = new List<LoadedAiProfile>();
             HashSet<string> reservedBlueprintPoolIds = null;
+            AssetBundle manifestBundle = null;
+            FileStream manifestStream = null;
+            string manifestBundleRegistryKey = null;
             long packBundleBytes = 0;
             string pathFailure;
 
@@ -2185,19 +2737,44 @@ namespace RogueCommandExpansionLoader.Content
                 if (definition.assetBundles.Length > 0)
                 {
                     string manifestFullPath;
-                    if (!TryResolveBundleFile(packageRoot, definition.assetBundleManifestPath, out manifestFullPath, out pathFailure))
+                    if (!TryResolveBundleFile(packageRoot, definition.assetBundleManifestPath,
+                            out manifestFullPath, out pathFailure))
                     {
                         throw new InvalidDataException("Manifiesto de AssetBundles: " + pathFailure);
                     }
 
-                    string manifestPath = manifestFullPath;
-                    AssetBundle manifestBundle = await _bundleRegistry.LoadBundleAsync(definition.assetBundleManifestPath, manifestPath);
-                    AssetBundleManifest unityManifest = manifestBundle.LoadAsset<AssetBundleManifest>("AssetBundleManifest");
+                    if (!TryOpenContainedFile(packageRoot, manifestFullPath, out manifestStream, out pathFailure))
+                    {
+                        throw new InvalidDataException("Manifiesto de AssetBundles: " + pathFailure);
+                    }
+
+                    ValidateBundleStreamSize(manifestStream, definition.assetBundleManifestPath,
+                        ContentPackValidator.MaxManifestBundleBytes, "manifiesto");
+                    manifestBundleRegistryKey = BundleRegistryKey(
+                        definition.packId, "manifest:" + definition.assetBundleManifestPath);
+                    manifestBundle = await _bundleRegistry.LoadBundleAsync(
+                        manifestBundleRegistryKey, manifestStream);
+
+                    if (manifestBundle == null)
+                    {
+                        throw new InvalidDataException("No se pudo abrir el AssetBundle de manifiesto '" +
+                            definition.assetBundleManifestPath + "'.");
+                    }
+
+                    AssetBundleManifest unityManifest = manifestBundle.LoadAsset<AssetBundleManifest>(
+                        "AssetBundleManifest");
                     if (unityManifest == null)
                     {
-                        throw new InvalidDataException("El bundle '" + definition.assetBundleManifestPath + "' no contiene AssetBundleManifest.");
+                        throw new InvalidDataException("El bundle '" + definition.assetBundleManifestPath +
+                            "' no contiene AssetBundleManifest.");
                     }
+
                     loadOrder = GetBundleLoadOrder(unityManifest, definition.assetBundles, packageName);
+                    _bundleRegistry.RemoveBundle(manifestBundleRegistryKey, manifestBundle);
+                    manifestBundle.Unload(true);
+                    manifestBundle = null;
+                    manifestStream.Dispose();
+                    manifestStream = null;
                 }
 
                 for (int i = 0; i < loadOrder.Count; i++)
@@ -2209,15 +2786,54 @@ namespace RogueCommandExpansionLoader.Content
                         throw new InvalidDataException(pathFailure);
                     }
 
-                    AssetBundle bundle = await _bundleRegistry.LoadBundleAsync(bundleDefinition.id, fullPath);
-                    packBundleBytes += 0; 
+                    FileStream stream;
+                    if (!TryOpenContainedFile(packageRoot, fullPath, out stream, out pathFailure))
+                    {
+                        _log?.Invoke("Warning: Bundle file missing at '" + fullPath + "'; attempting global fallback if configured.");
+
+                        // Implement global-fallback mechanism
+                        string fallbackPath = GetGlobalFallbackBundlePath();
+                        if (!String.IsNullOrWhiteSpace(fallbackPath) && TryOpenContainedFile(packageRoot, fallbackPath, out stream, out pathFailure))
+                        {
+                            _log?.Invoke("Successfully loaded fallback bundle: " + fallbackPath);
+                        }
+                        else
+                        {
+                            throw new InvalidDataException(pathFailure);
+                        }
+                    }
+
+                    temporaryBundleStreams.Add(stream);
+                    long bundleBytes = ValidateBundleStreamSize(stream, bundleDefinition.path,
+                        ContentPackValidator.MaxAssetBundleBytes, "AssetBundle");
+                    if (_loadedAssetBundleBytes > ContentPackValidator.MaxTotalContentBundleBytes ||
+                        packBundleBytes > ContentPackValidator.MaxTotalContentBundleBytes - _loadedAssetBundleBytes ||
+                        bundleBytes > ContentPackValidator.MaxTotalContentBundleBytes -
+                            _loadedAssetBundleBytes - packBundleBytes)
+                    {
+                        throw new InvalidDataException("La carga de contenido superaría el límite global de " +
+                            ContentPackValidator.MaxTotalContentBundleBytes + " bytes en AssetBundles.");
+                    }
+
+                    packBundleBytes += bundleBytes;
+                    AssetBundle bundle = await _bundleRegistry.LoadBundleAsync(
+                        BundleRegistryKey(definition.packId, bundleDefinition.id), stream);
+                    if (bundle == null)
+                    {
+                        throw new InvalidDataException("AssetBundle no válido: " + bundleDefinition.path);
+                    }
+
                     temporaryBundles.Add(bundleDefinition.id, bundle);
                 }
 
                 for (int i = 0; i < definition.units.Length; i++)
                 {
                     ContentUnitDefinition unit = definition.units[i];
-                    if (unit.productionBuilding == null) throw new InvalidDataException("Unidad " + unit.id + " debe declarar productionBuilding.");
+                    if (unit.productionBuilding == null)
+                    {
+                        throw new InvalidDataException("La unidad " + unit.id + " en '" + packageName +
+                            "' debe declarar productionBuilding.");
+                    }
 
                     bool usesNativeTemplate = !String.IsNullOrWhiteSpace(unit.nativeTemplateId);
                     object row;
@@ -2228,18 +2844,66 @@ namespace RogueCommandExpansionLoader.Content
                         row = CopyNativeBalanceRow(unit.nativeTemplateId, packageName, unit.id);
                         string nativePrefabPath = _prefabLocationField.GetValue(row) as string;
                         string nativeImagePath = _imageLocationField.GetValue(row) as string;
-                        
-                        GameObject nativeTemplate = Resources.Load<GameObject>(nativePrefabPath) ?? Resources.Load<GameObject>(nativePrefabPath.ToLowerInvariant());
-                        if (nativeTemplate == null) throw new InvalidDataException("No se pudo cargar el prefab nativo de " + unit.id);
-                        
+                        if (String.IsNullOrWhiteSpace(nativePrefabPath) || String.IsNullOrWhiteSpace(nativeImagePath))
+                        {
+                            throw new InvalidDataException("La unidad plantilla '" + unit.nativeTemplateId +
+                                "' no contiene rutas nativas de prefab e imagen válidas.");
+                        }
+
+                        GameObject nativeTemplate = Resources.Load<GameObject>(nativePrefabPath);
+                        if (nativeTemplate == null)
+                        {
+                            nativeTemplate = Resources.Load<GameObject>(nativePrefabPath.ToLowerInvariant());
+                        }
+
+                        if (nativeTemplate == null)
+                        {
+                            throw new InvalidDataException("La unidad " + unit.id + " no pudo cargar el prefab nativo '" +
+                                nativePrefabPath + "' de la plantilla " + unit.nativeTemplateId + ".");
+                        }
+                        ValidateUnitPrefab(nativeTemplate, unit, packageName, false);
+
+                        GameObject visualTemplate = null;
+                        if (!String.IsNullOrWhiteSpace(unit.visualAssetName))
+                        {
+                            AssetBundle visualBundle = GetBundle(temporaryBundles, unit.assetBundleId, packageName);
+                            visualTemplate = LoadRequiredAsset(visualBundle, unit.visualAssetName,
+                                typeof(GameObject), "visual-only GameObject prefab", packageName) as GameObject;
+                            ValidateVisualPrefab(visualTemplate, unit, packageName);
+                        }
+
+                        GameObject nativePrefabClone = InstantiateDormantPrefab(nativeTemplate);
+                        if (nativePrefabClone == null)
+                        {
+                            throw new InvalidDataException("No se pudo clonar el prefab nativo de " + unit.id + ".");
+                        }
+                        temporaryNativePrefabs.Add(nativePrefabClone);
+                        if (visualTemplate != null)
+                        {
+                            ApplyVisualOverlay(nativePrefabClone, visualTemplate, unit, packageName);
+                        }
+
+                        EntityController clonedController = nativePrefabClone.GetComponent<EntityController>();
+                        if (clonedController == null)
+                        {
+                            throw new InvalidDataException("El clon nativo de " + unit.id +
+                                " perdió su EntityController raíz.");
+                        }
+
+                        EntityControllerIdentity.Assign(_entityControllerIdField, clonedController, unit.id,
+                            "Unidad " + unit.id + " en '" + packageName + "'");
+                        nativePrefabClone.name = "RCL_Native_" + unit.id.Replace(':', '_');
+                        nativePrefabClone.SetActive(false);
+                        nativePrefabClone.hideFlags = HideFlags.HideAndDontSave;
+                        UnityEngine.Object.DontDestroyOnLoad(nativePrefabClone);
                         prefabKey = ResourceKey(unit.id, "prefab");
-                        temporaryResources.Add(prefabKey, nativeTemplate);
-                        
+                        temporaryResources.Add(prefabKey, nativePrefabClone);
                         imageKey = nativeImagePath;
                         if (!String.IsNullOrWhiteSpace(unit.cardImageAssetName))
                         {
                             AssetBundle cardBundle = GetBundle(temporaryBundles, unit.assetBundleId, packageName);
-                            Sprite cardImage = LoadRequiredAsset(cardBundle, unit.cardImageAssetName, typeof(Sprite), "Sprite card image", packageName) as Sprite;
+                            Sprite cardImage = LoadRequiredAsset(cardBundle, unit.cardImageAssetName,
+                                typeof(Sprite), "Sprite card image", packageName) as Sprite;
                             imageKey = ResourceKey(unit.id, "image");
                             temporaryResources.Add(imageKey, cardImage);
                         }
@@ -2256,16 +2920,31 @@ namespace RogueCommandExpansionLoader.Content
                     else
                     {
                         AssetBundle bundle = GetBundle(temporaryBundles, unit.assetBundleId, packageName);
-                        UnityEngine.Object balanceAsset = LoadRequiredAsset(bundle, unit.balanceAssetName, _entityBalanceAssetType, "EntityBalancingScriptableObject", packageName);
-                        var prefab = LoadRequiredAsset(bundle, unit.prefabAssetName, typeof(GameObject), "GameObject prefab", packageName) as GameObject;
-                        Sprite cardImage = LoadRequiredAsset(bundle, unit.cardImageAssetName, typeof(Sprite), "Sprite card image", packageName) as Sprite;
-                        
+                        UnityEngine.Object balanceAsset = LoadRequiredAsset(bundle, unit.balanceAssetName,
+                            _entityBalanceAssetType, "EntityBalancingScriptableObject", packageName);
+                        var prefab = LoadRequiredAsset(bundle, unit.prefabAssetName,
+                            typeof(GameObject), "GameObject prefab", packageName) as GameObject;
+                        Sprite cardImage = LoadRequiredAsset(bundle, unit.cardImageAssetName,
+                            typeof(Sprite), "Sprite card image", packageName) as Sprite;
+                        ValidateUnitPrefab(prefab, unit, packageName, true);
+                        row = ReadSingleBalanceRow(balanceAsset, packageName, unit.id);
+
+                        GameObject customPrefabClone = InstantiateDormantPrefab(prefab);
+                        if (customPrefabClone == null)
+                        {
+                            throw new InvalidDataException("No se pudo clonar el prefab propio de " + unit.id + ".");
+                        }
+                        temporaryNativePrefabs.Add(customPrefabClone);
+                        EntityController customController = customPrefabClone.GetComponent<EntityController>();
+                        EntityControllerIdentity.Assign(_entityControllerIdField, customController, unit.id,
+                            "Unidad " + unit.id + " en '" + packageName + "'");
+                        customPrefabClone.name = "RCL_Custom_" + unit.id.Replace(':', '_');
+                        customPrefabClone.SetActive(false);
+                        customPrefabClone.hideFlags = HideFlags.HideAndDontSave;
+                        UnityEngine.Object.DontDestroyOnLoad(customPrefabClone);
+
                         prefabKey = ResourceKey(unit.id, "prefab");
                         imageKey = ResourceKey(unit.id, "image");
-                        temporaryResources.Add(prefabKey, prefab);
-                        temporaryResources.Add(imageKey, cardImage);
-                        
-                        row = ReadSingleBalanceRow(balanceAsset, packageName, unit.id);
                         ApplyBalanceOverrides(row, unit.balanceOverrides, packageName, unit.id);
                         _entityIdField.SetValue(row, unit.id);
                         _prefabLocationField.SetValue(row, prefabKey);
@@ -2274,24 +2953,3743 @@ namespace RogueCommandExpansionLoader.Content
                         _allowedForAiField.SetValue(row, unit.isAllowedForAi);
                         _allowedForDemoField.SetValue(row, unit.isAllowedForDemo);
                         _isForSpecialistsField.SetValue(row, unit.isForSpecialists);
+
+                        temporaryResources.Add(prefabKey, customPrefabClone);
+                        temporaryResources.Add(imageKey, cardImage);
                     }
 
-                    if (HasRoleFlag(row, "Factory")) throw new InvalidDataException("Unidad " + unit.id + " no puede ser Factory.");
+                    if (HasRoleFlag(row, "Factory"))
+                    {
+                        throw new InvalidDataException("La fila de unidad " + unit.id + " en '" + packageName +
+                            "' tiene el rol Factory; debe ser un producto. Declara la fábrica en productionBuilding.");
+                    }
+
                     _factoryForEntityIdField.SetValue(row, CreateEmptyNullableString());
                     _allowedBlueprintField.SetValue(row, false);
                     _allowedStartingBlueprintField.SetValue(row, false);
-                    temporaryUnits.Add(new LoadedUnit(unit.id, definition.packId, prefabKey, imageKey, row, unit, false, unit.productionBuilding.id));
-                    temporaryUnits.Add(CreateProductionBuilding(unit, unit.productionBuilding, definition.packId, packageName, temporaryBundles, new List<GameObject>(), temporaryResources));
+                    temporaryUnits.Add(new LoadedUnit(unit.id, definition.packId, prefabKey, imageKey,
+                        row, unit, false, unit.productionBuilding.id));
+                    temporaryUnits.Add(CreateProductionBuilding(unit, unit.productionBuilding, definition.packId,
+                        packageName, temporaryBundles, temporaryNativePrefabs, temporaryResources));
                 }
 
-                CommitPack(definition, temporaryBundles, new List<FileStream>(), packBundleBytes, temporaryResources, temporaryUnits, temporaryStages, temporaryProfiles);
+                for (int i = 0; i < definition.stages.Length; i++)
+                {
+                    ContentStageDefinition stage = definition.stages[i];
+                    UnityEngine.Object parameters;
+                    UnityEngine.Object nativeSourceParameters = null;
+                    if (!String.IsNullOrWhiteSpace(stage.nativeTemplateId))
+                    {
+                        UnityEngine.Object nativeParameters = FindNativeStageTemplate(
+                            stage.nativeTemplateId, packageName, stage.id);
+                        nativeSourceParameters = nativeParameters;
+                        parameters = UnityEngine.Object.Instantiate(nativeParameters);
+                        if (parameters == null || !_stageParametersType.IsInstanceOfType(parameters))
+                        {
+                            throw new InvalidDataException("No se pudo clonar la plantilla de etapa " +
+                                stage.nativeTemplateId + " para " + stage.id + ".");
+                        }
+
+                        temporaryStageParameterClones.Add((ScriptableObject)parameters);
+                    }
+                    else
+                    {
+                        AssetBundle bundle = GetBundle(temporaryBundles, stage.assetBundleId, packageName);
+                        UnityEngine.Object stageAsset = LoadRequiredAsset(bundle, stage.assetName,
+                            _stageParametersType, "StageParametersScriptableObject", packageName);
+                        parameters = UnityEngine.Object.Instantiate(stageAsset);
+                        if (parameters == null || !_stageParametersType.IsInstanceOfType(parameters))
+                        {
+                            throw new InvalidDataException("No se pudo clonar el asset de etapa " +
+                                stage.assetName + " para " + stage.id + ".");
+                        }
+
+                        temporaryStageParameterClones.Add((ScriptableObject)parameters);
+                    }
+
+                    parameters.name = "RCL_Stage_" + stage.id.Replace(':', '_');
+                    parameters.hideFlags = HideFlags.HideAndDontSave;
+                    ApplyStageParameterOverrides(parameters, stage.parameterOverrides, packageName, stage.id);
+                    List<object> stageWorlds;
+                    List<object> pools = ValidateStageParameters(parameters, packageName, stage.id,
+                        out stageWorlds);
+                    HashSet<string> scopedUnitIds = GetStageModUnitIds(stage, temporaryUnits);
+                    var stagePoolScopes = new List<BlueprintPoolScopeRegistration>();
+                    if (scopedUnitIds.Count > 0)
+                    {
+                        if (reservedBlueprintPoolIds == null)
+                        {
+                            reservedBlueprintPoolIds = LoadNativeBlueprintPoolIds();
+                        }
+
+                        pools = CloneStageBlueprintPools(parameters, definition.packId, stage,
+                            packageName, pools, scopedUnitIds, reservedBlueprintPoolIds,
+                            temporaryBlueprintPoolClones, stagePoolScopes);
+                    }
+
+                    LoadedLandscape landscape = stage.landscape == null
+                        ? null
+                        : CreateStageLandscape(stage, packageName, stageWorlds, temporaryResources,
+                            temporaryLandscapeClones);
+                    object runtimeStage = CreateStage(stage, parameters, packageName);
+                    UnityEngine.Object fallback = ResolveStageFallback(stage, nativeSourceParameters, stageWorlds, packageName);
+                    temporaryStages.Add(new LoadedStage(stage, definition.packId, runtimeStage,
+                        pools, stageWorlds, landscape, stagePoolScopes, scopedUnitIds, fallback));
+                }
+
+                Dictionary<string, Vector2Int> scopedAiStageRanges = BuildScopedAiStageRanges(
+                    temporaryStages, definition.aiProfiles, packageName);
+                for (int i = 0; i < definition.aiProfiles.Length; i++)
+                {
+                    ContentAiProfileDefinition profile = definition.aiProfiles[i];
+                    GameObject prefab;
+                    DefaultAiBehaviour[] nativeBehaviours;
+                    string resourceName;
+                    if (!String.IsNullOrWhiteSpace(profile.nativeTemplateId))
+                    {
+                        DefaultAiBehaviour nativeBehaviour = FindNativeAiTemplate(
+                            profile.nativeTemplateId, packageName, profile.id);
+                        prefab = nativeBehaviour.gameObject;
+                        nativeBehaviours = new[] { nativeBehaviour };
+                        resourceName = profile.nativeTemplateId;
+                        if (profile.scopeToReferencedStages)
+                        {
+                            Vector2Int stageRange;
+                            if (!scopedAiStageRanges.TryGetValue(profile.id, out stageRange))
+                            {
+                                throw new InvalidDataException("El perfil AI " + profile.id +
+                                    " no tiene un rango de etapas de pack calculado.");
+                            }
+
+                            if (!ContentPackValidator.TryBuildScopedAiResourceName(profile.id, out resourceName))
+                            {
+                                throw new InvalidDataException("El ID del perfil AI " + profile.id +
+                                    " no produce un alias de recurso RCL_ válido.");
+                            }
+
+                            string scopedResourcePath = "AI/" + resourceName;
+                            if (Resources.Load<GameObject>(scopedResourcePath) != null)
+                            {
+                                throw new InvalidDataException("El alias de recurso AI '" + scopedResourcePath +
+                                    "' ya existe en el juego.");
+                            }
+
+                            GameObject templateHolder;
+                            GameObject scopedPrefab = InstantiateResourceTemplate(prefab, out templateHolder);
+                            if (scopedPrefab == null || templateHolder == null)
+                            {
+                                throw new InvalidDataException("No se pudo clonar de forma aislada el template AI " +
+                                    profile.nativeTemplateId + " para " + profile.id + ".");
+                            }
+
+                            temporaryNativePrefabs.Add(templateHolder);
+                            scopedPrefab.name = resourceName;
+                            scopedPrefab.hideFlags = HideFlags.HideAndDontSave;
+                            DefaultAiBehaviour scopedBehaviour = scopedPrefab.GetComponent<DefaultAiBehaviour>();
+                            if (scopedBehaviour == null)
+                            {
+                                throw new InvalidDataException("El clon del perfil AI " + profile.id +
+                                    " perdió su DefaultAiBehaviour raíz.");
+                            }
+
+                            _aiStageRangeField.SetValue(scopedBehaviour, stageRange);
+                            prefab = scopedPrefab;
+                            nativeBehaviours = new[] { scopedBehaviour };
+                            UnityEngine.Object.DontDestroyOnLoad(templateHolder);
+                        }
+                    }
+                    else
+                    {
+                        AssetBundle bundle = GetBundle(temporaryBundles, profile.assetBundleId, packageName);
+                        prefab = LoadRequiredAsset(bundle, profile.prefabAssetName,
+                            typeof(GameObject), "active AI GameObject prefab", packageName) as GameObject;
+                        nativeBehaviours = prefab == null ? new DefaultAiBehaviour[0] : prefab.GetComponents<DefaultAiBehaviour>();
+                        resourceName = profile.prefabAssetName;
+                    }
+
+                    if (prefab == null || !prefab.activeSelf)
+                    {
+                        throw new InvalidDataException("Perfil AI " + profile.id +
+                            ": el prefab debe estar activo para que el clon creado por Rogue Command ejecute su ciclo de vida.");
+                    }
+
+                    if (!String.Equals(prefab.name, resourceName, StringComparison.Ordinal))
+                    {
+                        throw new InvalidDataException("Perfil AI " + profile.id + ": el nombre interno del prefab '" +
+                            prefab.name + "' no coincide con el nombre de recurso esperado '" + resourceName + "'.");
+                    }
+
+                    ValidateNoMissingPrefabComponents(prefab, packageName, "Perfil AI " + profile.id);
+
+                    Component[] aiComponents = prefab.GetComponents(_defaultAiBehaviourType);
+                    if (aiComponents == null || aiComponents.Length != 1 || !(aiComponents[0] is DefaultAiBehaviour))
+                    {
+                        throw new InvalidDataException("Perfil AI " + profile.id +
+                            ": el prefab debe contener exactamente un componente DefaultAiBehaviour en la raíz.");
+                    }
+
+                    if (nativeBehaviours == null || nativeBehaviours.Length != 1)
+                    {
+                        throw new InvalidDataException("Perfil AI " + profile.id +
+                            ": el prefab debe contener exactamente un componente DefaultAiBehaviour.");
+                    }
+
+                    if ((bool)_aiDeactivatedField.GetValue(nativeBehaviours[0]))
+                    {
+                        throw new InvalidDataException("Perfil AI " + profile.id +
+                            ": AiBehaviour.isDeactivated está activado; el juego excluirá este perfil al seleccionar AI.");
+                    }
+
+                    IList aiBases = _aiBasesField.GetValue(nativeBehaviours[0]) as IList;
+                    if (aiBases == null || aiBases.Count == 0)
+                    {
+                        throw new InvalidDataException("Perfil AI " + profile.id +
+                            ": AiBehaviour.aiBases debe contener al menos una base configurada.");
+                    }
+
+                    AppendAiUnitEntries(profile, aiBases, temporaryUnits, packageName);
+                    AppendAiProductionBuildingEntries(profile, aiBases, temporaryUnits, packageName);
+
+                    int totalDeckEntries = 0;
+                    for (int baseIndex = 0; baseIndex < aiBases.Count; baseIndex++)
+                    {
+                        object aiBase = aiBases[baseIndex];
+                        if (aiBase == null || aiBase.GetType() != _aiBaseType)
+                        {
+                            throw new InvalidDataException("Perfil AI " + profile.id +
+                                ": aiBases contiene una entrada nula o de tipo inesperado.");
+                        }
+
+                        IList deckEntries = _aiBaseEntitiesInDeckField.GetValue(aiBase) as IList;
+                        if (deckEntries == null)
+                        {
+                            throw new InvalidDataException("Perfil AI " + profile.id +
+                                ": AiBase.entitiesInAiDeck es nulo.");
+                        }
+
+                        totalDeckEntries += deckEntries.Count;
+                        for (int deckIndex = 0; deckIndex < deckEntries.Count; deckIndex++)
+                        {
+                            object entry = deckEntries[deckIndex];
+                            if (entry == null || entry.GetType() != _aiDeckEntryType)
+                            {
+                                throw new InvalidDataException("Perfil AI " + profile.id +
+                                    ": entitiesInAiDeck contiene una entrada nula o de tipo inesperado.");
+                            }
+
+                            string deckEntityId = _aiDeckEntryEntityIdField.GetValue(entry) as string;
+                            if (String.IsNullOrWhiteSpace(deckEntityId))
+                            {
+                                throw new InvalidDataException("Perfil AI " + profile.id +
+                                    ": la unidad de deck '" + deckEntityId + "' no está registrada ni se declara en este paquete.");
+                            }
+
+                            if (!IsDeckEntityNativeOrPackLocal(deckEntityId, temporaryUnits) &&
+                                !DeclaresAiDeckEntityDependency(profile, deckEntityId, temporaryUnits))
+                            {
+                                throw new InvalidDataException("Perfil AI " + profile.id +
+                                    ": la unidad de deck externa '" + deckEntityId +
+                                    "' debe declararse en unitDependencies, unitEntries o " +
+                                    "productionBuildingEntries para fijar su orden de carga.");
+                            }
+
+                            if (!IsDeckEntityAvailable(deckEntityId, temporaryUnits))
+                            {
+                                throw new InvalidDataException("Perfil AI " + profile.id +
+                                    ": la unidad de deck '" + deckEntityId + "' no está registrada ni se declara en este paquete.");
+                            }
+                        }
+                    }
+
+                    if (totalDeckEntries == 0)
+                    {
+                        throw new InvalidDataException("Perfil AI " + profile.id +
+                            ": sus aiBases no contienen ninguna unidad en entitiesInAiDeck.");
+                    }
+
+                    string resourcePath = "AI/" + resourceName;
+                    if (!String.IsNullOrWhiteSpace(profile.nativeTemplateId) &&
+                        temporaryResources.ContainsKey(resourcePath))
+                    {
+                        throw new InvalidDataException("Perfil AI " + profile.id +
+                            ": la ruta de recurso " + resourcePath + " está duplicada en el paquete.");
+                    }
+
+                    if (String.IsNullOrWhiteSpace(profile.nativeTemplateId) || profile.scopeToReferencedStages)
+                    {
+                        if (temporaryResources.ContainsKey(resourcePath))
+                        {
+                            throw new InvalidDataException("Perfil AI " + profile.id +
+                                ": la ruta de recurso " + resourcePath + " está duplicada en el paquete.");
+                        }
+
+                        temporaryResources.Add(resourcePath, prefab);
+                    }
+
+                    var behaviours = new List<object> { nativeBehaviours[0] };
+                    temporaryProfiles.Add(new LoadedAiProfile(profile, definition.packId, resourceName,
+                        behaviours, prefab));
+                }
+
+                ValidateStageGenerationCompatibility(temporaryStages, temporaryProfiles, packageName);
+
+                lock (_gate)
+                {
+                    CommitPack(definition, temporaryBundles, temporaryBundleStreams, packBundleBytes,
+                        temporaryResources, temporaryUnits, temporaryStages, temporaryProfiles);
+                    _nativePrefabClones.AddRange(temporaryNativePrefabs);
+                    _stageParameterClones.AddRange(temporaryStageParameterClones);
+                    _blueprintPoolClones.AddRange(temporaryBlueprintPoolClones);
+                    _landscapeClones.AddRange(temporaryLandscapeClones);
+                    candidate.LoadedBytes = packBundleBytes;
+                }
                 return true;
             }
             catch (Exception exception)
             {
-                candidate.StatusReason = exception.GetType().Name + ": " + exception.Message;
+                lock (_gate)
+                {
+                    candidate.StatusReason = exception.GetType().Name + ": " + exception.Message;
+                }
+                for (int prefabIndex = 0; prefabIndex < temporaryNativePrefabs.Count; prefabIndex++)
+                {
+                    GameObject prefab = temporaryNativePrefabs[prefabIndex];
+                    if (prefab != null)
+                    {
+                        UnityEngine.Object.Destroy(prefab);
+                    }
+                }
+
+                for (int stageIndex = 0; stageIndex < temporaryStageParameterClones.Count; stageIndex++)
+                {
+                    UnityEngine.Object stageParameters = temporaryStageParameterClones[stageIndex];
+                    if (stageParameters != null)
+                    {
+                        UnityEngine.Object.Destroy(stageParameters);
+                    }
+                }
+
+                for (int poolIndex = 0; poolIndex < temporaryBlueprintPoolClones.Count; poolIndex++)
+                {
+                    ScriptableObject poolClone = temporaryBlueprintPoolClones[poolIndex];
+                    if (poolClone != null)
+                    {
+                        UnityEngine.Object.Destroy(poolClone);
+                    }
+                }
+
+                for (int landscapeIndex = 0; landscapeIndex < temporaryLandscapeClones.Count; landscapeIndex++)
+                {
+                    ScriptableObject landscape = temporaryLandscapeClones[landscapeIndex];
+                    if (landscape != null)
+                    {
+                        UnityEngine.Object.Destroy(landscape);
+                    }
+                }
+
+                try
+                {
+                    if (manifestBundle != null)
+                    {
+                        if (!String.IsNullOrEmpty(manifestBundleRegistryKey))
+                        {
+                            _bundleRegistry.RemoveBundle(manifestBundleRegistryKey, manifestBundle);
+                        }
+                        manifestBundle.Unload(true);
+                    }
+                }
+                catch { }
+                try { if (manifestStream != null) manifestStream.Dispose(); } catch { }
+                foreach (KeyValuePair<string, AssetBundle> entry in temporaryBundles)
+                {
+                    try
+                    {
+                        _bundleRegistry.RemoveBundle(BundleRegistryKey(definition.packId, entry.Key), entry.Value);
+                        if (entry.Value != null) entry.Value.Unload(true);
+                    }
+                    catch { }
+                }
+
+                for (int i = 0; i < temporaryBundleStreams.Count; i++)
+                {
+                    try { if (temporaryBundleStreams[i] != null) temporaryBundleStreams[i].Dispose(); } catch { }
+                }
+
+                Log("Paquete '" + (String.IsNullOrWhiteSpace(definition.packId) ? packageName : definition.packId) +
+                    "' desactivado sin registrar contenido: " + exception.GetType().Name + ": " + exception.Message);
                 return false;
             }
         }
 
+        private static List<ContentAssetBundleDefinition> GetBundleLoadOrder(
+            AssetBundleManifest unityManifest,
+            ContentAssetBundleDefinition[] declaredBundles,
+            string packageName)
+        {
+            if (unityManifest == null || declaredBundles == null || declaredBundles.Length == 0 ||
+                declaredBundles.Length > ContentPackValidator.MaxAssetBundlesPerPack)
+            {
+                throw new InvalidDataException("El paquete '" + packageName +
+                    "' no tiene una lista o un manifiesto de AssetBundles válido (máximo " +
+                    ContentPackValidator.MaxAssetBundlesPerPack + " bundles).");
+            }
+
+            var bundlesByName = new Dictionary<string, ContentAssetBundleDefinition>(StringComparer.Ordinal);
+            for (int i = 0; i < declaredBundles.Length; i++)
+            {
+                ContentAssetBundleDefinition definition = declaredBundles[i];
+                string fileName;
+                if (definition == null || !ContentPackValidator.TryGetBundleFileName(definition.path, out fileName))
+                {
+                    throw new InvalidDataException("El paquete '" + packageName +
+                        "' contiene una ruta de bundle fuera del formato bundles/<nombre>.bundle.");
+                }
+
+                string bundleName = fileName;
+                if (bundlesByName.ContainsKey(bundleName))
+                {
+                    throw new InvalidDataException("El paquete '" + packageName +
+                        "' declara dos bundles con el mismo nombre de archivo '" + bundleName + "'.");
+                }
+
+                bundlesByName.Add(bundleName, definition);
+            }
+
+            string[] manifestNames = unityManifest.GetAllAssetBundles();
+            if (manifestNames == null || manifestNames.Length != bundlesByName.Count)
+            {
+                throw new InvalidDataException("El manifiesto de Unity del paquete '" + packageName +
+                    "' no coincide con la lista assetBundles declarada.");
+            }
+
+            var manifestNameSet = new HashSet<string>(StringComparer.Ordinal);
+            for (int i = 0; i < manifestNames.Length; i++)
+            {
+                if (String.IsNullOrWhiteSpace(manifestNames[i]) ||
+                    !manifestNameSet.Add(manifestNames[i]) || !bundlesByName.ContainsKey(manifestNames[i]))
+                {
+                    throw new InvalidDataException("El manifiesto de Unity del paquete '" + packageName +
+                        "' contiene un bundle no declarado o duplicado: '" + manifestNames[i] + "'.");
+                }
+            }
+
+            var states = new Dictionary<string, byte>(StringComparer.Ordinal);
+            var loadOrder = new List<ContentAssetBundleDefinition>(bundlesByName.Count);
+            for (int i = 0; i < declaredBundles.Length; i++)
+            {
+                string bundleName;
+                ContentPackValidator.TryGetBundleFileName(declaredBundles[i].path, out bundleName);
+                VisitBundleDependencies(bundleName, unityManifest, bundlesByName, states,
+                    loadOrder, packageName);
+            }
+
+            return loadOrder;
+        }
+
+        private static long ValidateBundleStreamSize(
+            FileStream stream,
+            string relativePath,
+            long maximumBytes,
+            string description)
+        {
+            if (stream == null || !stream.CanSeek)
+            {
+                throw new InvalidDataException("El " + description + " '" + relativePath +
+                    "' no tiene un stream legible y seekable.");
+            }
+
+            long length = stream.Length;
+            if (length <= 0 || length > maximumBytes)
+            {
+                throw new InvalidDataException("El " + description + " '" + relativePath + "' ocupa " +
+                    length + " bytes; el límite permitido es 1–" + maximumBytes + " bytes.");
+            }
+
+            return length;
+        }
+
+        private static void VisitBundleDependencies(
+            string bundleName,
+            AssetBundleManifest unityManifest,
+            Dictionary<string, ContentAssetBundleDefinition> bundlesByName,
+            Dictionary<string, byte> states,
+            List<ContentAssetBundleDefinition> loadOrder,
+            string packageName)
+        {
+            byte state;
+            if (states.TryGetValue(bundleName, out state))
+            {
+                if (state == 1)
+                {
+                    throw new InvalidDataException("El manifiesto del paquete '" + packageName +
+                        "' contiene una dependencia circular en '" + bundleName + "'.");
+                }
+
+                return;
+            }
+
+            ContentAssetBundleDefinition definition;
+            if (!bundlesByName.TryGetValue(bundleName, out definition))
+            {
+                throw new InvalidDataException("El manifiesto del paquete '" + packageName +
+                    "' requiere el bundle no declarado '" + bundleName + "'.");
+            }
+
+            states.Add(bundleName, 1);
+            string[] dependencies = unityManifest.GetDirectDependencies(bundleName);
+            if (dependencies != null)
+            {
+                for (int i = 0; i < dependencies.Length; i++)
+                {
+                    if (String.IsNullOrWhiteSpace(dependencies[i]))
+                    {
+                        throw new InvalidDataException("El manifiesto del paquete '" + packageName +
+                            "' contiene un nombre de dependencia vacío para '" + bundleName + "'.");
+                    }
+
+                    VisitBundleDependencies(dependencies[i], unityManifest, bundlesByName,
+                        states, loadOrder, packageName);
+                }
+            }
+
+            states[bundleName] = 2;
+            loadOrder.Add(definition);
+        }
+
+        private void CommitPack(
+            ContentPackDefinition definition,
+            Dictionary<string, AssetBundle> bundles,
+            List<FileStream> bundleStreams,
+            long bundleBytes,
+            Dictionary<string, UnityEngine.Object> resources,
+            List<LoadedUnit> units,
+            List<LoadedStage> stages,
+            List<LoadedAiProfile> profiles)
+        {
+            var profileById = new Dictionary<string, LoadedAiProfile>(StringComparer.Ordinal);
+            for (int i = 0; i < profiles.Count; i++)
+            {
+                profileById.Add(profiles[i].Id, profiles[i]);
+            }
+
+            var localKnownIds = new List<string>();
+            localKnownIds.Add(definition.packId);
+            for (int i = 0; i < definition.assetBundles.Length; i++) localKnownIds.Add(definition.assetBundles[i].id);
+            for (int i = 0; i < units.Count; i++) localKnownIds.Add(units[i].Id);
+            for (int i = 0; i < stages.Count; i++) localKnownIds.Add(stages[i].Definition.id);
+            for (int i = 0; i < profiles.Count; i++) localKnownIds.Add(profiles[i].Id);
+            for (int i = 0; i < (definition.relics ?? new ContentRelicDefinition[0]).Length; i++)
+            {
+                localKnownIds.Add(definition.relics[i].id);
+            }
+
+            var contributionStages = new List<object>();
+            var contributionAi = new List<object>();
+            var poolScopeRegistrations = new List<BlueprintPoolScopeRegistration>();
+            var blueprintUnitIds = new HashSet<string>(StringComparer.Ordinal);
+            var startingBlueprintUnitIds = new HashSet<string>(StringComparer.Ordinal);
+            for (int i = 0; i < units.Count; i++)
+            {
+                if (units[i].Definition.isAllowedAsStartingBlueprint)
+                {
+                    startingBlueprintUnitIds.Add(units[i].Id);
+                    // Starting-deck eligibility is separate from normal blueprint eligibility.
+                    // Stage unit IDs add their dedicated production factories below.
+                }
+            }
+
+            var seenBehaviourReferences = new HashSet<object>(ReferenceComparer.Instance);
+            for (int i = 0; i < stages.Count; i++)
+            {
+                LoadedStage stage = stages[i];
+                contributionStages.Add(stage.RuntimeStage);
+                poolScopeRegistrations.AddRange(stage.BlueprintPoolScopes);
+                string[] profileIds = stage.Definition.aiProfileIds ?? new string[0];
+                for (int profileIndex = 0; profileIndex < profileIds.Length; profileIndex++)
+                {
+                    LoadedAiProfile profile;
+                    if (!profileById.TryGetValue(profileIds[profileIndex], out profile))
+                    {
+                        _aiProfiles.TryGetValue(profileIds[profileIndex], out profile);
+                    }
+
+                    if (profile == null)
+                    {
+                        throw new InvalidDataException("El perfil AI " + profileIds[profileIndex] +
+                            " no está cargado para la etapa " + stage.Definition.id + ".");
+                    }
+
+                    if (profile.ScopeToReferencedStages &&
+                        !String.Equals(profile.PackId, definition.packId, StringComparison.Ordinal))
+                    {
+                        throw new InvalidDataException("La etapa " + stage.Definition.id +
+                            " no puede ampliar el rango del perfil AI de etapa " + profile.Id +
+                            " porque pertenece a otro paquete. Incluya las etapas asociadas en el paquete del perfil.");
+                    }
+
+                    for (int behaviourIndex = 0; behaviourIndex < profile.Behaviours.Count; behaviourIndex++)
+                    {
+                        object behaviour = profile.Behaviours[behaviourIndex];
+                        if (seenBehaviourReferences.Add(behaviour))
+                        {
+                            contributionAi.Add(behaviour);
+                        }
+                    }
+                }
+
+                string[] unitIds = stage.Definition.unitIds ?? new string[0];
+                for (int unitIndex = 0; unitIndex < unitIds.Length; unitIndex++)
+                {
+                    LoadedUnit unit;
+                    if (TryGetLoadedUnit(unitIds[unitIndex], units, out unit))
+                    {
+                        if (unit.IsProductionBuilding)
+                        {
+                            throw new InvalidDataException("La etapa " + stage.Definition.id +
+                                " debe declarar IDs de producto; no puede declarar directamente el edificio " +
+                                unit.Id + ".");
+                        }
+
+                        blueprintUnitIds.Add(String.IsNullOrWhiteSpace(unit.ProductionFactoryId)
+                            ? unit.Id
+                            : unit.ProductionFactoryId);
+                    }
+                    else if (_nativeUnitIds.Contains(unitIds[unitIndex]))
+                    {
+                        if (_nativeFactoryIds.Contains(unitIds[unitIndex]))
+                        {
+                            throw new InvalidDataException("La etapa " + stage.Definition.id +
+                                " debe declarar IDs de producto; no puede declarar directamente la fábrica nativa " +
+                                unitIds[unitIndex] + ".");
+                        }
+
+                        // Existing game rows keep their authored flags; the stage pool still decides eligibility.
+                    }
+                    else
+                    {
+                        throw new InvalidDataException("La unidad " + unitIds[unitIndex] +
+                            " de la etapa " + stage.Definition.id + " no está disponible.");
+                    }
+                }
+            }
+
+            for (int i = 0; i < units.Count; i++)
+            {
+                if (_units.ContainsKey(units[i].Id))
+                {
+                    throw new InvalidDataException("La unidad duplicada " + units[i].Id + " ya fue registrada.");
+                }
+            }
+
+            for (int i = 0; i < profiles.Count; i++)
+            {
+                if (_aiProfiles.ContainsKey(profiles[i].Id))
+                {
+                    throw new InvalidDataException("El perfil AI duplicado " + profiles[i].Id + " ya fue registrado.");
+                }
+
+                if (_aiProfilesByResourceName.ContainsKey(profiles[i].ResourceName))
+                {
+                    throw new InvalidDataException("La ruta de prefab AI duplicada AI/" +
+                        profiles[i].ResourceName + " ya está registrada.");
+                }
+            }
+
+            _blueprintPoolScopeRegistry.ValidateCanRegister(poolScopeRegistrations);
+
+            // All checks above complete before any pack-owned runtime registry is updated.
+            _relicRegistrar.Register(definition.relics, delegate(ContentRelicDefinition relic)
+            {
+                AssetBundle bundle = GetBundle(bundles, relic.assetBundleId, definition.packId);
+                return bundle.LoadAsset<Sprite>(relic.imageAssetName);
+            }, _retainedRelicObjects);
+
+            for (int i = 0; i < units.Count; i++)
+            {
+                _units.Add(units[i].Id, units[i]);
+                _entityRows.Add(units[i].BalanceRow);
+            }
+
+            for (int i = 0; i < (definition.relics ?? new ContentRelicDefinition[0]).Length; i++)
+            {
+                _relicDefinitions.Add(definition.relics[i].id, definition.relics[i]);
+            }
+
+            _blueprintPoolScopeRegistry.Register(poolScopeRegistrations);
+
+            for (int i = 0; i < profiles.Count; i++)
+            {
+                _aiProfiles.Add(profiles[i].Id, profiles[i]);
+                _aiProfilesByResourceName.Add(profiles[i].ResourceName, profiles[i]);
+            }
+
+            for (int i = 0; i < stages.Count; i++)
+            {
+                _stages.Add(stages[i]);
+                if (stages[i].Landscape != null)
+                {
+                    _landscapesByLocalizationId.Add(stages[i].Landscape.LocalizationId,
+                        stages[i].Landscape);
+                }
+
+                List<object> stagePools = stages[i].BlueprintPools;
+                for (int poolIndex = 0; poolIndex < stagePools.Count; poolIndex++)
+                {
+                    bool alreadyRegistered = false;
+                    for (int existingIndex = 0; existingIndex < _blueprintPools.Count; existingIndex++)
+                    {
+                        if (System.Object.ReferenceEquals(_blueprintPools[existingIndex], stagePools[poolIndex]))
+                        {
+                            alreadyRegistered = true;
+                            break;
+                        }
+                    }
+
+                    if (!alreadyRegistered)
+                    {
+                        _blueprintPools.Add(stagePools[poolIndex]);
+                    }
+                }
+            }
+
+            foreach (KeyValuePair<string, UnityEngine.Object> resource in resources)
+            {
+                _resourceAssets.Add(resource.Key, resource.Value);
+            }
+
+            foreach (KeyValuePair<string, AssetBundle> bundle in bundles)
+            {
+                _assetBundles.Add(bundle.Value);
+            }
+
+            _assetBundleStreams.AddRange(bundleStreams);
+            _loadedAssetBundleBytes += bundleBytes;
+
+            _knownIds.Add(definition.packId);
+            for (int i = 0; i < localKnownIds.Count; i++)
+            {
+                _knownIds.Add(localKnownIds[i]);
+            }
+
+            foreach (string unitId in blueprintUnitIds)
+            {
+                _blueprintUnitIds.Add(unitId);
+            }
+
+            foreach (string unitId in startingBlueprintUnitIds)
+            {
+                _startingBlueprintUnitIds.Add(unitId);
+            }
+
+            _contributions.Add(new ProgressionContentContribution(
+                definition.packId, contributionStages, contributionAi));
+            int productionBuildingCount = 0;
+            for (int i = 0; i < units.Count; i++)
+            {
+                if (units[i].IsProductionBuilding)
+                {
+                    productionBuildingCount++;
+                }
+            }
+
+            Log("Paquete '" + definition.packId + "' cargado: " +
+                (units.Count - productionBuildingCount) + " unidad(es), " + productionBuildingCount +
+                " edificio(s) de producción, " +
+                stages.Count + " etapa(s), " + profiles.Count + " perfil(es) AI.");
+        }
+
+        private void ApplyBlueprintEligibility()
+        {
+            foreach (string unitId in _blueprintUnitIds)
+            {
+                LoadedUnit unit;
+                if (_units.TryGetValue(unitId, out unit))
+                {
+                    _allowedBlueprintField.SetValue(unit.BalanceRow, true);
+                }
+            }
+
+            foreach (string unitId in _startingBlueprintUnitIds)
+            {
+                LoadedUnit unit;
+                if (_units.TryGetValue(unitId, out unit))
+                {
+                    _allowedStartingBlueprintField.SetValue(unit.BalanceRow, true);
+                }
+            }
+        }
+
+        private HashSet<string> GetStageModUnitIds(
+            ContentStageDefinition stage,
+            List<LoadedUnit> currentPackUnits)
+        {
+            var result = new HashSet<string>(StringComparer.Ordinal);
+            string[] unitIds = stage.unitIds ?? new string[0];
+            for (int i = 0; i < unitIds.Length; i++)
+            {
+                LoadedUnit unit;
+                if (TryGetLoadedUnit(unitIds[i], currentPackUnits, out unit) && !unit.IsProductionBuilding)
+                {
+                    result.Add(String.IsNullOrWhiteSpace(unit.ProductionFactoryId)
+                        ? unit.Id
+                        : unit.ProductionFactoryId);
+                }
+            }
+
+            return result;
+        }
+
+        private bool TryGetLoadedUnit(string unitId, List<LoadedUnit> temporaryUnits, out LoadedUnit unit)
+        {
+            if (temporaryUnits != null)
+            {
+                for (int i = 0; i < temporaryUnits.Count; i++)
+                {
+                    if (String.Equals(temporaryUnits[i].Id, unitId, StringComparison.Ordinal))
+                    {
+                        unit = temporaryUnits[i];
+                        return true;
+                    }
+                }
+            }
+
+            return _units.TryGetValue(unitId, out unit);
+        }
+
+        private HashSet<string> LoadNativeBlueprintPoolIds()
+        {
+            var result = new HashSet<string>(StringComparer.Ordinal);
+            UnityEngine.Object[] pools = Resources.LoadAll("BlueprintPools", _blueprintPoolType);
+            for (int i = 0; pools != null && i < pools.Length; i++)
+            {
+                UnityEngine.Object pool = pools[i];
+                if (pool == null || pool.GetType() != _blueprintPoolType)
+                {
+                    continue;
+                }
+
+                string poolId = _blueprintPoolIdField.GetValue(pool) as string;
+                if (!String.IsNullOrWhiteSpace(poolId))
+                {
+                    result.Add(poolId);
+                }
+            }
+
+            return result;
+        }
+
+        private List<object> CloneStageBlueprintPools(
+            UnityEngine.Object stageParameters,
+            string packId,
+            ContentStageDefinition stage,
+            string packageName,
+            List<object> validatedPools,
+            HashSet<string> scopedUnitIds,
+            HashSet<string> reservedPoolIds,
+            List<ScriptableObject> temporaryClones,
+            List<BlueprintPoolScopeRegistration> registrations)
+        {
+            ScriptableObject sourceList = _stageParametersBlueprintPoolListField.GetValue(stageParameters)
+                as ScriptableObject;
+            if (sourceList == null || sourceList.GetType() != _blueprintPoolListType)
+            {
+                throw new InvalidDataException("Etapa " + stage.id + " en '" + packageName +
+                    "' no tiene una BlueprintPoolList clonable.");
+            }
+
+            ScriptableObject clonedList = UnityEngine.Object.Instantiate(sourceList);
+            if (clonedList == null || clonedList.GetType() != _blueprintPoolListType)
+            {
+                throw new InvalidDataException("No se pudo clonar la lista de BlueprintPool de " + stage.id + ".");
+            }
+
+            temporaryClones.Add(clonedList);
+            clonedList.name = "RCL_BlueprintPoolList_" + stage.id.Replace(':', '_');
+            clonedList.hideFlags = HideFlags.HideAndDontSave;
+            IList clonedPools = _blueprintPoolsField.GetValue(clonedList) as IList;
+            if (clonedPools == null || clonedPools.Count != validatedPools.Count)
+            {
+                throw new InvalidDataException("La lista de BlueprintPool clonada para " + stage.id +
+                    " cambió de forma inesperada.");
+            }
+
+            var result = new List<object>(clonedPools.Count);
+            for (int i = 0; i < clonedPools.Count; i++)
+            {
+                UnityEngine.Object sourcePool = clonedPools[i] as UnityEngine.Object;
+                if (sourcePool == null || sourcePool.GetType() != _blueprintPoolType)
+                {
+                    throw new InvalidDataException("La lista clonada de la etapa " + stage.id +
+                        " contiene un BlueprintPool inválido.");
+                }
+
+                UnityEngine.Object clonedPool = UnityEngine.Object.Instantiate(sourcePool);
+                if (clonedPool == null || clonedPool.GetType() != _blueprintPoolType)
+                {
+                    throw new InvalidDataException("No se pudo clonar un BlueprintPool de la etapa " + stage.id + ".");
+                }
+
+                var poolClone = (ScriptableObject)clonedPool;
+                temporaryClones.Add(poolClone);
+                string originalPoolId = _blueprintPoolIdField.GetValue(sourcePool) as string;
+                string scopedPoolId = CreateScopedBlueprintPoolId(
+                    packId, stage.id, originalPoolId, reservedPoolIds);
+                poolClone.name = "RCL_BlueprintPool_" + scopedPoolId.Substring("RCL_POOL_".Length, 16);
+                poolClone.hideFlags = HideFlags.HideAndDontSave;
+                _blueprintPoolIdField.SetValue(poolClone, scopedPoolId);
+                clonedPools[i] = poolClone;
+
+                bool exclusive = (bool)_blueprintPoolExclusiveField.GetValue(poolClone);
+                registrations.Add(new BlueprintPoolScopeRegistration(
+                    scopedPoolId, stage.id, poolClone, scopedUnitIds, exclusive, originalPoolId));
+                result.Add(poolClone);
+            }
+
+            _stageParametersBlueprintPoolListField.SetValue(stageParameters, clonedList);
+            return result;
+        }
+
+        private string CreateScopedBlueprintPoolId(
+            string packId,
+            string stageId,
+            string originalPoolId,
+            HashSet<string> reservedPoolIds)
+        {
+            string identity = (packId ?? String.Empty) + "\n" + (stageId ?? String.Empty) + "\n" +
+                (originalPoolId ?? String.Empty);
+            byte[] digest;
+            using (SHA256 sha256 = SHA256.Create())
+            {
+                digest = sha256.ComputeHash(Encoding.UTF8.GetBytes(identity));
+            }
+
+            var token = new StringBuilder(digest.Length * 2);
+            for (int i = 0; i < digest.Length; i++)
+            {
+                token.Append(digest[i].ToString("x2", CultureInfo.InvariantCulture));
+            }
+
+            string poolId = "RCL_POOL_" + token;
+            if (_blueprintPoolScopeRegistry.ContainsPoolId(poolId) || !reservedPoolIds.Add(poolId))
+            {
+                throw new InvalidDataException("El ID de BlueprintPool generado " + poolId +
+                    " ya está ocupado por otro pool.");
+            }
+
+            return poolId;
+        }
+
+        private object ReadSingleBalanceRow(UnityEngine.Object balanceAsset, string packageName, string unitId)
+        {
+            IList rows = _entityParametersField.GetValue(balanceAsset) as IList;
+            if (rows == null || rows.Count != 1)
+            {
+                throw new InvalidDataException("Unidad " + unitId + " en '" + packageName +
+                    "': el asset de balance debe contener exactamente una fila EntityBalancingParameters.");
+            }
+
+            object row = rows[0];
+            if (row == null || row.GetType() != _entityRowType)
+            {
+                throw new InvalidDataException("El asset de balance de " + unitId +
+                    " contiene una fila con tipo inesperado.");
+            }
+
+            string rowEntityId = _entityIdField.GetValue(row) as string;
+            if (!String.Equals(rowEntityId, unitId, StringComparison.Ordinal))
+            {
+                throw new InvalidDataException("El asset de balance de " + unitId +
+                    " declara entityId '" + rowEntityId + "' en vez del ID de unidad del paquete.");
+            }
+
+            return row;
+        }
+
+        private object CopyNativeBalanceRow(string templateId, string packageName, string unitId)
+        {
+            IList rows = _nativeEntityRowsField.GetValue(null) as IList;
+            IDictionary index = _entityIndexField.GetValue(null) as IDictionary;
+            if (rows == null || index == null || !index.Contains(templateId))
+            {
+                throw new InvalidDataException("La unidad " + unitId + " en '" + packageName +
+                    "' referencia una plantilla nativa no registrada: '" + templateId + "'.");
+            }
+
+            int rowIndex;
+            try
+            {
+                rowIndex = Convert.ToInt32(index[templateId], CultureInfo.InvariantCulture);
+            }
+            catch (Exception exception)
+            {
+                throw new InvalidDataException("El índice de la plantilla nativa '" + templateId +
+                    "' no es válido.", exception);
+            }
+
+            if (rowIndex < 0 || rowIndex >= rows.Count)
+            {
+                throw new InvalidDataException("El índice de la plantilla nativa '" + templateId +
+                    "' sale de la lista de balance.");
+            }
+
+            // EntityBalancingParameters is verified as a value type above; reading through non-generic IList
+            // boxes a copy. Overrides and namespaced identity fields are applied to that detached copy, which
+            // RuntimeContentMutator later appends as a new row without changing rows[rowIndex].
+            object row = rows[rowIndex];
+            if (row == null || row.GetType() != _entityRowType ||
+                !String.Equals(_entityIdField.GetValue(row) as string, templateId, StringComparison.Ordinal))
+            {
+                throw new InvalidDataException("El índice de la plantilla nativa '" + templateId +
+                    "' no apunta a su fila EntityBalancingParameters.");
+            }
+
+            return row;
+        }
+
+        private LoadedUnit CreateProductionBuilding(
+            ContentUnitDefinition product,
+            ContentProductionBuildingDefinition building,
+            string packId,
+            string packageName,
+            Dictionary<string, AssetBundle> temporaryBundles,
+            List<GameObject> temporaryNativePrefabs,
+            Dictionary<string, UnityEngine.Object> temporaryResources)
+        {
+            if (product == null || building == null || String.IsNullOrWhiteSpace(product.id) ||
+                String.IsNullOrWhiteSpace(building.id) || String.IsNullOrWhiteSpace(building.nativeTemplateId) ||
+                String.Equals(product.id, building.id, StringComparison.Ordinal))
+            {
+                throw new InvalidDataException("La unidad o su productionBuilding contiene una referencia vacía o IDs " +
+                    "iguales en '" + packageName + "'.");
+            }
+
+            object row = CopyNativeBalanceRow(building.nativeTemplateId, packageName, building.id);
+            if (!HasProductionBuildingRoles(row))
+            {
+                throw new InvalidDataException("El nativeTemplateId '" + building.nativeTemplateId + "' de " +
+                    building.id + " en '" + packageName + "' no tiene los roles Building y Factory.");
+            }
+
+            string nativeProductId = ReadFactoryProductId(row);
+            if (String.IsNullOrWhiteSpace(nativeProductId) || !_nativeUnitIds.Contains(nativeProductId))
+            {
+                throw new InvalidDataException("La plantilla de fábrica " + building.nativeTemplateId +
+                    " no declara un factoryForEntityId de producto nativo registrado.");
+            }
+
+            string nativePrefabPath = _prefabLocationField.GetValue(row) as string;
+            string nativeImagePath = _imageLocationField.GetValue(row) as string;
+            if (String.IsNullOrWhiteSpace(nativePrefabPath) || String.IsNullOrWhiteSpace(nativeImagePath))
+            {
+                throw new InvalidDataException("El edificio plantilla '" + building.nativeTemplateId +
+                    "' no contiene rutas nativas de prefab e imagen válidas.");
+            }
+
+            GameObject nativeTemplate = Resources.Load<GameObject>(nativePrefabPath);
+            if (nativeTemplate == null)
+            {
+                nativeTemplate = Resources.Load<GameObject>(nativePrefabPath.ToLowerInvariant());
+            }
+
+            if (nativeTemplate == null)
+            {
+                throw new InvalidDataException("El edificio " + building.id + " no pudo cargar el prefab nativo '" +
+                    nativePrefabPath + "' de la plantilla " + building.nativeTemplateId + ".");
+            }
+
+            var localizationDefinition = new ContentUnitDefinition
+            {
+                id = building.id,
+                nativeTemplateId = building.nativeTemplateId,
+                assetBundleId = building.assetBundleId,
+                cardImageAssetName = building.cardImageAssetName,
+                visualAssetName = building.visualAssetName,
+                visualRootPath = building.visualRootPath,
+                localizations = building.localizations
+            };
+            ValidateUnitPrefab(nativeTemplate, localizationDefinition, packageName, false);
+
+            GameObject visualTemplate = null;
+            AssetBundle buildingAssetBundle = null;
+            string imagePath = nativeImagePath;
+            if (!String.IsNullOrWhiteSpace(building.cardImageAssetName) ||
+                !String.IsNullOrWhiteSpace(building.visualAssetName))
+            {
+                buildingAssetBundle = GetBundle(temporaryBundles, building.assetBundleId, packageName);
+            }
+            if (!String.IsNullOrWhiteSpace(building.cardImageAssetName))
+            {
+                AssetBundle cardBundle = buildingAssetBundle ??
+                    GetBundle(temporaryBundles, building.assetBundleId, packageName);
+                Sprite cardImage = LoadRequiredAsset(cardBundle, building.cardImageAssetName,
+                    typeof(Sprite), "production-building Sprite card image", packageName) as Sprite;
+                imagePath = ResourceKey(building.id, "image");
+                temporaryResources.Add(imagePath, cardImage);
+            }
+
+            if (!String.IsNullOrWhiteSpace(building.visualAssetName))
+            {
+                visualTemplate = LoadRequiredAsset(buildingAssetBundle, building.visualAssetName,
+                    typeof(GameObject), "visual-only production-building GameObject prefab", packageName) as GameObject;
+                ValidateVisualPrefab(visualTemplate, localizationDefinition, packageName,
+                    "Edificio de producción");
+            }
+
+            GameObject nativePrefabClone = InstantiateDormantPrefab(nativeTemplate);
+            if (nativePrefabClone == null)
+            {
+                throw new InvalidDataException("No se pudo clonar el prefab del edificio " + building.id + ".");
+            }
+
+            temporaryNativePrefabs.Add(nativePrefabClone);
+            if (visualTemplate != null)
+            {
+                ApplyVisualOverlay(nativePrefabClone, visualTemplate, localizationDefinition, packageName,
+                    "Edificio de producción", true);
+            }
+
+            EntityController clonedController = nativePrefabClone.GetComponent<EntityController>();
+            if (clonedController == null)
+            {
+                throw new InvalidDataException("El clon nativo del edificio " + building.id +
+                    " perdió su EntityController raíz.");
+            }
+
+            EntityControllerIdentity.Assign(_entityControllerIdField, clonedController, building.id,
+                "Edificio de producción " + building.id + " en '" + packageName + "'");
+            nativePrefabClone.name = "RCL_NativeFactory_" + building.id.Replace(':', '_');
+            nativePrefabClone.SetActive(false);
+            nativePrefabClone.hideFlags = HideFlags.HideAndDontSave;
+            UnityEngine.Object.DontDestroyOnLoad(nativePrefabClone);
+
+            string prefabKey = ResourceKey(building.id, "prefab");
+            ApplyBalanceOverrides(row, building.balanceOverrides, packageName, building.id);
+            _entityIdField.SetValue(row, building.id);
+            _prefabLocationField.SetValue(row, prefabKey);
+            _imageLocationField.SetValue(row, imagePath);
+            _inactiveField.SetValue(row, false);
+            _allowedBlueprintField.SetValue(row, false);
+            ProductionBuildingEligibility.ApplyToFactoryRow(product, row,
+                _allowedStartingBlueprintField, _allowedForAiField, _allowedForDemoField);
+            _factoryForEntityIdField.SetValue(row, CreateNullableString(product.id));
+            temporaryResources.Add(prefabKey, nativePrefabClone);
+
+            return new LoadedUnit(building.id, packId, prefabKey, imagePath,
+                row, localizationDefinition, true, null);
+        }
+
+        private object CreateNullableString(string value)
+        {
+            object nullableString = Activator.CreateInstance(_factoryForEntityIdField.FieldType);
+            _nullableStringValueField.SetValue(nullableString, value);
+            _nullableStringHasValueField.SetValue(nullableString, true);
+            return nullableString;
+        }
+
+        private object CreateEmptyNullableString()
+        {
+            return Activator.CreateInstance(_factoryForEntityIdField.FieldType);
+        }
+
+        private string ReadFactoryProductId(object row)
+        {
+            object nullableString = _factoryForEntityIdField.GetValue(row);
+            if (nullableString == null ||
+                !(bool)_nullableStringHasValueField.GetValue(nullableString))
+            {
+                return null;
+            }
+
+            return _nullableStringValueField.GetValue(nullableString) as string;
+        }
+
+        private bool HasProductionBuildingRoles(object row)
+        {
+            if (row == null || row.GetType() != _entityRowType)
+            {
+                return false;
+            }
+
+            object value = _entityRolesField.GetValue(row);
+            if (!(value is Enum))
+            {
+                return false;
+            }
+
+            return HasRoleFlag(row, "Factory") && HasRoleFlag(row, "Building");
+        }
+
+        private bool HasRoleFlag(object row, string roleName)
+        {
+            if (row == null || row.GetType() != _entityRowType)
+            {
+                return false;
+            }
+
+            object value = _entityRolesField.GetValue(row);
+            if (!(value is Enum))
+            {
+                return false;
+            }
+
+            try
+            {
+                Enum roles = (Enum)value;
+                Enum requiredRole = (Enum)Enum.Parse(_entityRolesField.FieldType, roleName, false);
+                return roles.HasFlag(requiredRole);
+            }
+            catch (Exception exception)
+            {
+                throw new InvalidDataException("No se pudo interpretar el rol " + roleName +
+                    " en EntityBalancingParameters.", exception);
+            }
+        }
+
+        private void ApplyBalanceOverrides(
+            object row,
+            ContentBalanceOverride[] overrides,
+            string packageName,
+            string unitId)
+        {
+            if (overrides == null)
+            {
+                return;
+            }
+
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            for (int i = 0; i < overrides.Length; i++)
+            {
+                ContentBalanceOverride balanceOverride = overrides[i];
+                if (balanceOverride == null || String.IsNullOrWhiteSpace(balanceOverride.name) ||
+                    !seen.Add(balanceOverride.name))
+                {
+                    throw new InvalidDataException("Unidad " + unitId + " en '" + packageName +
+                        "': hay un override de balance nulo, vacío o duplicado.");
+                }
+
+                FieldInfo field = FindField(_entityRowType, balanceOverride.name, InstanceFields);
+                object value;
+                if (field.FieldType == typeof(int))
+                {
+                    int parsed;
+                    if (!Int32.TryParse(balanceOverride.value, NumberStyles.Integer,
+                        CultureInfo.InvariantCulture, out parsed) || parsed < 0)
+                    {
+                        throw new InvalidDataException("Unidad " + unitId + " en '" + packageName +
+                            "': valor entero inválido para " + balanceOverride.name + ".");
+                    }
+                    value = parsed;
+                }
+                else if (field.FieldType == typeof(float))
+                {
+                    float parsed;
+                    if (!Single.TryParse(balanceOverride.value, NumberStyles.Float,
+                        CultureInfo.InvariantCulture, out parsed) || Single.IsNaN(parsed) ||
+                        Single.IsInfinity(parsed) || parsed < 0f)
+                    {
+                        throw new InvalidDataException("Unidad " + unitId + " en '" + packageName +
+                            "': valor decimal inválido para " + balanceOverride.name + ".");
+                    }
+                    value = parsed;
+                }
+                else if (field.FieldType.IsEnum)
+                {
+                    try
+                    {
+                        value = Enum.Parse(field.FieldType, balanceOverride.value, true);
+                    }
+                    catch
+                    {
+                        throw new InvalidDataException("Unidad " + unitId + " en '" + packageName +
+                            "': valor de enum inválido para " + balanceOverride.name + ".");
+                    }
+                }
+                else
+                {
+                    throw new InvalidDataException("Unidad " + unitId + " en '" + packageName +
+                        "': el campo " + balanceOverride.name + " no es un override compatible.");
+                }
+
+                field.SetValue(row, value);
+            }
+        }
+
+        private void ValidateUnitPrefab(GameObject prefab, ContentUnitDefinition unit, string packageName)
+        {
+            ValidateUnitPrefab(prefab, unit, packageName, true);
+        }
+
+        private void ValidateUnitPrefab(
+            GameObject prefab,
+            ContentUnitDefinition unit,
+            string packageName,
+            bool validateAssetName)
+        {
+            if (prefab == null)
+            {
+                throw new InvalidDataException("Unidad " + unit.id + " en '" + packageName + "': el prefab está vacío.");
+            }
+
+            if (validateAssetName && !ContentPackValidator.PrefabReferenceMatchesObjectName(
+                unit.prefabAssetName, prefab.name))
+            {
+                throw new InvalidDataException("Unidad " + unit.id + " en '" + packageName + "': el nombre interno del prefab '" +
+                    prefab.name + "' no coincide con prefabAssetName '" + unit.prefabAssetName + "'.");
+            }
+
+            ValidateNoMissingPrefabComponents(prefab, packageName, "Unidad " + unit.id);
+            if (prefab.GetComponent(_entityControllerType) == null)
+            {
+                throw new InvalidDataException("Unidad " + unit.id + " en '" + packageName +
+                    "': el prefab debe tener EntityController en el GameObject raíz.");
+            }
+
+            if (prefab.GetComponentsInChildren<Renderer>(true).Length == 0)
+            {
+                throw new InvalidDataException("Unidad " + unit.id + " en '" + packageName +
+                    "': el prefab no contiene ningún Renderer en su jerarquía visual.");
+            }
+        }
+
+        private static void ValidateVisualPrefab(
+            GameObject prefab,
+            ContentUnitDefinition unit,
+            string packageName,
+            string ownerLabel = "Unidad")
+        {
+            if (prefab == null)
+            {
+                throw new InvalidDataException(ownerLabel + " " + unit.id + " en '" + packageName +
+                    "': el prefab visual está vacío.");
+            }
+
+            if (!ContentPackValidator.PrefabReferenceMatchesObjectName(unit.visualAssetName, prefab.name))
+            {
+                throw new InvalidDataException(ownerLabel + " " + unit.id + " en '" + packageName +
+                    "': el nombre interno del prefab visual '" + prefab.name +
+                    "' no coincide con el alias visualAssetName '" + unit.visualAssetName + "'.");
+            }
+
+            ValidateNoMissingPrefabComponents(prefab, packageName, "Visual de " + ownerLabel + " " + unit.id);
+            Component[] components = prefab.GetComponentsInChildren<Component>(true);
+            for (int i = 0; i < components.Length; i++)
+            {
+                if (components[i] is MonoBehaviour)
+                {
+                    throw new InvalidDataException("Visual de " + ownerLabel + " " + unit.id + " en '" + packageName +
+                        "': los modelos de bundle no pueden incluir componentes MonoBehaviour.");
+                }
+            }
+
+            Renderer[] renderers = prefab.GetComponentsInChildren<Renderer>(true);
+            bool hasEnabledRenderer = false;
+            for (int i = 0; i < renderers.Length; i++)
+            {
+                if (renderers[i] != null && renderers[i].enabled &&
+                    IsActiveVisualHierarchy(renderers[i].transform, prefab.transform))
+                {
+                    hasEnabledRenderer = true;
+                    break;
+                }
+            }
+
+            if (!hasEnabledRenderer)
+            {
+                throw new InvalidDataException("Visual de " + ownerLabel + " " + unit.id + " en '" + packageName +
+                    "': el prefab debe contener al menos un Renderer habilitado.");
+            }
+        }
+
+        private static bool IsActiveVisualHierarchy(Transform target, Transform prefabRoot)
+        {
+            Transform current = target;
+            while (current != null && !System.Object.ReferenceEquals(current, prefabRoot))
+            {
+                if (!current.gameObject.activeSelf)
+                {
+                    return false;
+                }
+
+                current = current.parent;
+            }
+
+            return current != null;
+        }
+
+        private static void ApplyVisualOverlay(
+            GameObject nativePrefab,
+            GameObject visualTemplate,
+            ContentUnitDefinition unit,
+            string packageName,
+            string ownerLabel = "Unidad",
+            bool meshRenderersOnly = false)
+        {
+            Transform target = FindUniqueTransformPath(nativePrefab.transform, unit.visualRootPath);
+            if (target == null)
+            {
+                throw new InvalidDataException(ownerLabel + " " + unit.id + " en '" + packageName +
+                    "': visualRootPath '" + unit.visualRootPath +
+                    "' no identifica una única ruta dentro de la jerarquía del prefab nativo.");
+            }
+
+            Renderer[] renderersUnderTarget = target.GetComponentsInChildren<Renderer>(true);
+            var originalRenderers = new List<Renderer>();
+            for (int i = 0; i < renderersUnderTarget.Length; i++)
+            {
+                Renderer renderer = renderersUnderTarget[i];
+                if (renderer != null && (!meshRenderersOnly ||
+                    renderer is MeshRenderer || renderer is SkinnedMeshRenderer))
+                {
+                    originalRenderers.Add(renderer);
+                }
+            }
+
+            if (originalRenderers.Count == 0)
+            {
+                throw new InvalidDataException(ownerLabel + " " + unit.id + " en '" + packageName +
+                    "': visualRootPath '" + unit.visualRootPath + "' no contiene Renderer nativos que reemplazar.");
+            }
+
+            Material fallbackMaterial = FindNativeVisualMaterial(originalRenderers.ToArray());
+
+            for (int i = 0; i < originalRenderers.Count; i++)
+            {
+                originalRenderers[i].enabled = false;
+            }
+
+            GameObject visualClone = UnityEngine.Object.Instantiate(visualTemplate, target, false);
+            if (visualClone == null)
+            {
+                throw new InvalidDataException(ownerLabel + " " + unit.id + " en '" + packageName +
+                    "': Unity no pudo instanciar el prefab visual.");
+            }
+
+            visualClone.name = "RCL_Visual_" + unit.id.Replace(':', '_');
+            visualClone.transform.localPosition = Vector3.zero;
+            visualClone.transform.localRotation = Quaternion.identity;
+            visualClone.transform.localScale = Vector3.one;
+            ApplyFallbackVisualMaterial(visualClone, fallbackMaterial, unit, packageName, ownerLabel);
+            visualClone.SetActive(true);
+        }
+
+        private static Transform FindUniqueTransformPath(Transform root, string path)
+        {
+            if (root == null || String.IsNullOrWhiteSpace(path))
+            {
+                return null;
+            }
+
+            string[] segments = path.Split('/');
+            Transform current = root;
+            for (int segmentIndex = 0; segmentIndex < segments.Length; segmentIndex++)
+            {
+                Transform match = null;
+                for (int childIndex = 0; childIndex < current.childCount; childIndex++)
+                {
+                    Transform child = current.GetChild(childIndex);
+                    if (!String.Equals(child.name, segments[segmentIndex], StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+
+                    if (match != null)
+                    {
+                        return null;
+                    }
+
+                    match = child;
+                }
+
+                if (match == null)
+                {
+                    return null;
+                }
+
+                current = match;
+            }
+
+            return current;
+        }
+
+        private static Material FindNativeVisualMaterial(Renderer[] renderers)
+        {
+            for (int i = 0; i < renderers.Length; i++)
+            {
+                if (!(renderers[i] is MeshRenderer) && !(renderers[i] is SkinnedMeshRenderer))
+                {
+                    continue;
+                }
+
+                Material[] materials = renderers[i].sharedMaterials;
+                for (int materialIndex = 0; materialIndex < materials.Length; materialIndex++)
+                {
+                    if (materials[materialIndex] != null)
+                    {
+                        return materials[materialIndex];
+                    }
+                }
+            }
+
+            return null;
+        }
+
+        private static void ApplyFallbackVisualMaterial(
+            GameObject visualClone,
+            Material fallbackMaterial,
+            ContentUnitDefinition unit,
+            string packageName,
+            string ownerLabel = "Unidad")
+        {
+            Renderer[] renderers = visualClone.GetComponentsInChildren<Renderer>(true);
+            for (int i = 0; i < renderers.Length; i++)
+            {
+                Material[] materials = renderers[i].sharedMaterials;
+                bool hasMaterial = false;
+                for (int materialIndex = 0; materialIndex < materials.Length; materialIndex++)
+                {
+                    if (materials[materialIndex] != null)
+                    {
+                        hasMaterial = true;
+                        break;
+                    }
+                }
+
+                if (hasMaterial)
+                {
+                    continue;
+                }
+
+                if (fallbackMaterial == null)
+                {
+                    throw new InvalidDataException(ownerLabel + " " + unit.id + " en '" + packageName +
+                        "': el modelo visual no tiene materiales y la plantilla nativa no ofrece un material MeshRenderer.");
+                }
+
+                renderers[i].sharedMaterial = fallbackMaterial;
+            }
+        }
+
+        private static GameObject InstantiateResourceTemplate(GameObject template, out GameObject holder)
+        {
+            holder = null;
+            if (template == null)
+            {
+                return null;
+            }
+
+            holder = new GameObject("RCL_ResourceTemplateHolder");
+            holder.hideFlags = HideFlags.HideAndDontSave;
+            holder.SetActive(false);
+            try
+            {
+                // Keep activeSelf on the stored template so a game Instantiate produces an active AI,
+                // while its inactive parent suppresses Awake/OnEnable on this registry-only clone.
+                GameObject clone = UnityEngine.Object.Instantiate(template, holder.transform, false);
+                if (clone == null)
+                {
+                    UnityEngine.Object.Destroy(holder);
+                    holder = null;
+                    return null;
+                }
+
+                clone.transform.localPosition = Vector3.zero;
+                clone.transform.localRotation = Quaternion.identity;
+                clone.transform.localScale = Vector3.one;
+                return clone;
+            }
+            catch
+            {
+                if (holder != null)
+                {
+                    UnityEngine.Object.Destroy(holder);
+                }
+                holder = null;
+                throw;
+            }
+        }
+
+        private static GameObject InstantiateDormantPrefab(GameObject template)
+        {
+            if (template == null)
+            {
+                return null;
+            }
+
+            var inactiveHolder = new GameObject("RCL_DormantTemplateHolder");
+            inactiveHolder.SetActive(false);
+            GameObject clone = null;
+            try
+            {
+                // Instantiate beneath an inactive parent so active native prefabs do not
+                // run Awake/OnEnable on the loader's stored template clone.
+                clone = UnityEngine.Object.Instantiate(template, inactiveHolder.transform, false);
+                if (clone != null)
+                {
+                    clone.SetActive(false);
+                    clone.transform.SetParent(null, false);
+                }
+
+                return clone;
+            }
+            catch
+            {
+                if (clone != null)
+                {
+                    UnityEngine.Object.Destroy(clone);
+                }
+
+                throw;
+            }
+            finally
+            {
+                if (inactiveHolder != null)
+                {
+                    UnityEngine.Object.Destroy(inactiveHolder);
+                }
+            }
+        }
+
+        private UnityEngine.Object ResolveStageFallback(ContentStageDefinition stage,
+            UnityEngine.Object nativeSourceParameters, List<object> worlds, string packageName)
+        {
+            object balancing = _gameBalancingAssetField.GetValue(null);
+            IList fallbacks = balancing == null ? null : _fallbackLandscapeGeneratorsField.GetValue(balancing) as IList;
+            if (fallbacks == null || fallbacks.Count == 0)
+            {
+                throw new InvalidDataException("Etapa " + stage.id + ": no hay generadores de respaldo nativos.");
+            }
+
+            bool isDemo = (bool)_gameIsDemoField.GetValue(balancing) && stage.isPartOfDemo;
+            if (nativeSourceParameters != null)
+            {
+                foreach (FieldInfo profileField in _progressionFields)
+                {
+                    object profile = profileField.GetValue(balancing);
+                    IList nativeStages = profile == null ? null : _progressionStagesField.GetValue(profile) as IList;
+                    if (nativeStages == null) continue;
+                    for (int i = 0; i < nativeStages.Count && i < fallbacks.Count; i++)
+                    {
+                        if (nativeStages[i] != null && System.Object.ReferenceEquals(
+                            _stageParametersField.GetValue(nativeStages[i]), nativeSourceParameters) &&
+                            IsCompatibleStageFallback(fallbacks[i], stage, worlds, isDemo))
+                        {
+                            return (UnityEngine.Object)fallbacks[i];
+                        }
+                    }
+                }
+            }
+
+            // Bundled stages and templates absent from the progression use a native
+            // fallback of compatible size/worlds, with stable list order breaking ties.
+            UnityEngine.Object selected = null;
+            double bestDistance = Double.MaxValue;
+            double midpoint = (stage.mapSizeMin + stage.mapSizeMax) / 2.0;
+            foreach (object candidate in fallbacks)
+            {
+                if (!IsCompatibleStageFallback(candidate, stage, worlds, isDemo)) continue;
+                double distance = Math.Abs((int)_landscapeMapSizeField.GetValue(candidate) - midpoint);
+                if (distance < bestDistance)
+                {
+                    selected = (UnityEngine.Object)candidate;
+                    bestDistance = distance;
+                }
+            }
+
+            if (selected == null)
+            {
+                throw new InvalidDataException("Etapa " + stage.id + " en '" + packageName +
+                    "': ningún generador de respaldo nativo respeta su tamaño, demo y Worlds.");
+            }
+
+            return selected;
+        }
+
+        private bool IsCompatibleStageFallback(object candidate, ContentStageDefinition stage,
+            List<object> worlds, bool isDemo)
+        {
+            if (!(candidate is UnityEngine.Object) || candidate.GetType() != _landscapeGeneratorType)
+                return false;
+            int size = (int)_landscapeMapSizeField.GetValue(candidate);
+            if (size < stage.mapSizeMin || size > stage.mapSizeMax || size % 2 == 0 ||
+                (isDemo && !(bool)_landscapeAllowedForDemoField.GetValue(candidate)))
+                return false;
+
+            IList restrictions = _landscapeRestrictedWorldsField.GetValue(candidate) as IList;
+            if (restrictions == null) return false;
+            if (restrictions.Count == 0) return true;
+            foreach (object world in worlds)
+            {
+                if ((bool)_worldDeactivatedField.GetValue(world) ||
+                    (isDemo && !(bool)_worldAllowedForDemoField.GetValue(world))) continue;
+                bool found = false;
+                foreach (object allowed in restrictions)
+                    if (System.Object.ReferenceEquals(allowed, world)) { found = true; break; }
+                if (!found) return false;
+            }
+
+            return true;
+        }
+
+        private UnityEngine.Object FindNativeStageTemplate(string templateId, string packageName, string stageId)
+        {
+            UnityEngine.Object[] candidates = Resources.FindObjectsOfTypeAll(_stageParametersType);
+            UnityEngine.Object match = null;
+            for (int i = 0; i < candidates.Length; i++)
+            {
+                UnityEngine.Object candidate = candidates[i];
+                if (candidate == null || !String.Equals(candidate.name, templateId, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                if (match != null)
+                {
+                    throw new InvalidDataException("Etapa " + stageId + " en '" + packageName +
+                        "': la plantilla nativa '" + templateId + "' no es única entre los objetos cargados.");
+                }
+
+                match = candidate;
+            }
+
+            if (match == null)
+            {
+                throw new InvalidDataException("Etapa " + stageId + " en '" + packageName +
+                    "': no se encontró la plantilla StageParametersScriptableObject '" + templateId +
+                    "' en los recursos cargados del juego.");
+            }
+
+            return match;
+        }
+
+        private DefaultAiBehaviour FindNativeAiTemplate(string templateId, string packageName, string profileId)
+        {
+            UnityEngine.Object[] candidates = Resources.FindObjectsOfTypeAll(_defaultAiBehaviourType);
+            DefaultAiBehaviour match = null;
+            for (int i = 0; i < candidates.Length; i++)
+            {
+                DefaultAiBehaviour candidate = candidates[i] as DefaultAiBehaviour;
+                if (candidate == null || candidate.gameObject == null ||
+                    !String.Equals(candidate.gameObject.name, templateId, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                if (match != null && !System.Object.ReferenceEquals(match, candidate))
+                {
+                    throw new InvalidDataException("Perfil AI " + profileId + " en '" + packageName +
+                        "': la plantilla nativa '" + templateId + "' no es única entre los objetos cargados.");
+                }
+
+                match = candidate;
+            }
+
+            if (match == null)
+            {
+                throw new InvalidDataException("Perfil AI " + profileId + " en '" + packageName +
+                    "': no se encontró DefaultAiBehaviour nativo '" + templateId + "'.");
+            }
+
+            return match;
+        }
+
+        private static void ValidateNoMissingPrefabComponents(GameObject prefab, string packageName, string owner)
+        {
+            Component[] components = prefab.GetComponentsInChildren<Component>(true);
+            for (int i = 0; i < components.Length; i++)
+            {
+                if (components[i] == null)
+                {
+                    throw new InvalidDataException(owner + " en '" + packageName +
+                        "': el prefab contiene un script sin resolver en un componente de su jerarquía.");
+                }
+            }
+        }
+
+        private void AppendAiUnitEntries(
+            ContentAiProfileDefinition profile,
+            IList aiBases,
+            List<LoadedUnit> temporaryUnits,
+            string packageName)
+        {
+            ContentAiUnitEntryDefinition[] unitEntries = profile.unitEntries ??
+                new ContentAiUnitEntryDefinition[0];
+            if (unitEntries.Length == 0)
+            {
+                return;
+            }
+
+            if (String.IsNullOrWhiteSpace(profile.nativeTemplateId) || !profile.scopeToReferencedStages)
+            {
+                throw new InvalidDataException("Perfil AI " + profile.id + " en '" + packageName +
+                    "': las entradas de unidad requieren un clon nativo aislado y limitado a sus etapas.");
+            }
+
+            for (int i = 0; i < unitEntries.Length; i++)
+            {
+                ContentAiUnitEntryDefinition definition = unitEntries[i];
+                if (definition == null || String.IsNullOrWhiteSpace(definition.unitId))
+                {
+                    throw new InvalidDataException("Perfil AI " + profile.id + " en '" + packageName +
+                        "': la entrada de unidad " + i + " está vacía.");
+                }
+
+                if (!IsProductUnitAvailable(definition.unitId, temporaryUnits))
+                {
+                    throw new InvalidDataException("Perfil AI " + profile.id + " en '" + packageName +
+                        "': la unidad " + definition.unitId + " no está registrada ni disponible.");
+                }
+
+                if (!IsProductUnitAllowedForAi(definition.unitId, temporaryUnits))
+                {
+                    throw new InvalidDataException("Perfil AI " + profile.id + " en '" + packageName +
+                        "': la unidad " + definition.unitId +
+                        " no tiene isAllowedForAi habilitado.");
+                }
+
+                if (definition.baseIndex < 0 || definition.baseIndex >= aiBases.Count)
+                {
+                    throw new InvalidDataException("Perfil AI " + profile.id + " en '" + packageName +
+                        "': baseIndex " + definition.baseIndex + " no existe en la plantilla nativa.");
+                }
+
+                if (definition.startingInAscensionLevel < 0 ||
+                    definition.startingInAscensionLevel > ContentPackValidator.MaxAiUnitStartingAscensionLevel ||
+                    definition.countAtStart < 1 ||
+                    definition.countAtStart > ContentPackValidator.MaxAiUnitCountAtStart ||
+                    definition.maxLiving < definition.countAtStart ||
+                    definition.maxLiving > ContentPackValidator.MaxAiUnitMaxLiving)
+                {
+                    throw new InvalidDataException("Perfil AI " + profile.id + " en '" + packageName +
+                        "': la configuración de cantidad o ascensión de " + definition.unitId + " no es válida.");
+                }
+
+                object aiBase = aiBases[definition.baseIndex];
+                if (aiBase == null || aiBase.GetType() != _aiBaseType)
+                {
+                    throw new InvalidDataException("Perfil AI " + profile.id + " en '" + packageName +
+                        "': la base " + definition.baseIndex + " tiene un tipo inesperado.");
+                }
+
+                IList deckEntries = _aiBaseEntitiesInDeckField.GetValue(aiBase) as IList;
+                if (deckEntries == null)
+                {
+                    throw new InvalidDataException("Perfil AI " + profile.id + " en '" + packageName +
+                        "': entitiesInAiDeck es nulo en la base " + definition.baseIndex + ".");
+                }
+
+                for (int deckIndex = 0; deckIndex < deckEntries.Count; deckIndex++)
+                {
+                    object current = deckEntries[deckIndex];
+                    if (current == null || current.GetType() != _aiDeckEntryType)
+                    {
+                        throw new InvalidDataException("Perfil AI " + profile.id + " en '" + packageName +
+                            "': una entrada nativa de entitiesInAiDeck tiene un tipo inesperado.");
+                    }
+
+                    string existingId = _aiDeckEntryEntityIdField.GetValue(current) as string;
+                    if (String.Equals(existingId, definition.unitId, StringComparison.Ordinal))
+                    {
+                        throw new InvalidDataException("Perfil AI " + profile.id + " en '" + packageName +
+                            "': la unidad " + definition.unitId + " ya aparece en el deck de la base " +
+                            definition.baseIndex + ".");
+                    }
+                }
+
+                object newEntry = Activator.CreateInstance(_aiDeckEntryType);
+                _aiDeckEntryEntityIdField.SetValue(newEntry, definition.unitId);
+                _aiDeckEntryStartingInAscensionLevelField.SetValue(
+                    newEntry, definition.startingInAscensionLevel);
+
+                object countPerStage = Activator.CreateInstance(_aiDeckEntryCountPerStageField.FieldType);
+                IList counts = countPerStage as IList;
+                if (counts == null)
+                {
+                    throw new InvalidDataException("Perfil AI " + profile.id + " en '" + packageName +
+                        "': no se pudo crear la lista countPerStage de EntityInAiDeck.");
+                }
+
+                // EntityInAiDeck clamps stage access to the last list item. A single pair therefore
+                // supplies the same starting/max-living values throughout this scoped AI profile.
+                counts.Add(new Vector2Int(definition.countAtStart, definition.maxLiving));
+                _aiDeckEntryCountPerStageField.SetValue(newEntry, countPerStage);
+                deckEntries.Add(newEntry);
+            }
+        }
+
+        private void AppendAiProductionBuildingEntries(
+            ContentAiProfileDefinition profile,
+            IList aiBases,
+            List<LoadedUnit> temporaryUnits,
+            string packageName)
+        {
+            ContentAiProductionBuildingEntryDefinition[] entries = profile.productionBuildingEntries ??
+                new ContentAiProductionBuildingEntryDefinition[0];
+            if (entries.Length == 0)
+            {
+                return;
+            }
+
+            if (String.IsNullOrWhiteSpace(profile.nativeTemplateId) || !profile.scopeToReferencedStages)
+            {
+                throw new InvalidDataException("Perfil AI " + profile.id + " en '" + packageName +
+                    "': las fábricas requieren un clon nativo aislado y limitado a sus etapas.");
+            }
+
+            for (int i = 0; i < entries.Length; i++)
+            {
+                ContentAiProductionBuildingEntryDefinition definition = entries[i];
+                if (definition == null || String.IsNullOrWhiteSpace(definition.unitId))
+                {
+                    throw new InvalidDataException("Perfil AI " + profile.id + " en '" + packageName +
+                        "': la entrada de fábrica " + i + " está vacía.");
+                }
+
+                LoadedUnit product;
+                if (!TryGetLoadedUnit(definition.unitId, temporaryUnits, out product) ||
+                    product.IsProductionBuilding || String.IsNullOrWhiteSpace(product.ProductionFactoryId))
+                {
+                    throw new InvalidDataException("Perfil AI " + profile.id + " en '" + packageName +
+                        "': la unidad " + definition.unitId + " no tiene una fábrica de producción cargada.");
+                }
+
+                if (!product.Definition.isAllowedForAi)
+                {
+                    throw new InvalidDataException("Perfil AI " + profile.id + " en '" + packageName +
+                        "': la unidad " + definition.unitId + " no tiene isAllowedForAi habilitado.");
+                }
+
+                LoadedUnit factory;
+                if (!TryGetLoadedUnit(product.ProductionFactoryId, temporaryUnits, out factory) ||
+                    !factory.IsProductionBuilding || !(bool)_allowedForAiField.GetValue(factory.BalanceRow))
+                {
+                    throw new InvalidDataException("Perfil AI " + profile.id + " en '" + packageName +
+                        "': la fábrica " + product.ProductionFactoryId + " no está habilitada para AI.");
+                }
+
+                if (definition.baseIndex < 0 || definition.baseIndex >= aiBases.Count)
+                {
+                    throw new InvalidDataException("Perfil AI " + profile.id + " en '" + packageName +
+                        "': baseIndex " + definition.baseIndex + " no existe en la plantilla nativa.");
+                }
+
+                if (definition.startingInAscensionLevel < 0 ||
+                    definition.startingInAscensionLevel > ContentPackValidator.MaxAiUnitStartingAscensionLevel ||
+                    definition.maxLiving < 1 ||
+                    definition.maxLiving > ContentPackValidator.MaxAiUnitMaxLiving)
+                {
+                    throw new InvalidDataException("Perfil AI " + profile.id + " en '" + packageName +
+                        "': la configuración de cantidad o ascensión de la fábrica " +
+                        product.ProductionFactoryId + " no es válida.");
+                }
+
+                object aiBase = aiBases[definition.baseIndex];
+                if (aiBase == null || aiBase.GetType() != _aiBaseType)
+                {
+                    throw new InvalidDataException("Perfil AI " + profile.id + " en '" + packageName +
+                        "': la base " + definition.baseIndex + " tiene un tipo inesperado.");
+                }
+
+                IList deckEntries = _aiBaseEntitiesInDeckField.GetValue(aiBase) as IList;
+                if (deckEntries == null)
+                {
+                    throw new InvalidDataException("Perfil AI " + profile.id + " en '" + packageName +
+                        "': entitiesInAiDeck es nulo en la base " + definition.baseIndex + ".");
+                }
+
+                for (int deckIndex = 0; deckIndex < deckEntries.Count; deckIndex++)
+                {
+                    object current = deckEntries[deckIndex];
+                    if (current == null || current.GetType() != _aiDeckEntryType)
+                    {
+                        throw new InvalidDataException("Perfil AI " + profile.id + " en '" + packageName +
+                            "': una entrada nativa de entitiesInAiDeck tiene un tipo inesperado.");
+                    }
+
+                    string existingId = _aiDeckEntryEntityIdField.GetValue(current) as string;
+                    if (String.Equals(existingId, product.ProductionFactoryId, StringComparison.Ordinal))
+                    {
+                        throw new InvalidDataException("Perfil AI " + profile.id + " en '" + packageName +
+                            "': la fábrica " + product.ProductionFactoryId + " ya aparece en el deck de la base " +
+                            definition.baseIndex + ".");
+                    }
+                }
+
+                object newEntry = Activator.CreateInstance(_aiDeckEntryType);
+                _aiDeckEntryEntityIdField.SetValue(newEntry, product.ProductionFactoryId);
+                _aiDeckEntryStartingInAscensionLevelField.SetValue(
+                    newEntry, definition.startingInAscensionLevel);
+
+                object countPerStage = Activator.CreateInstance(_aiDeckEntryCountPerStageField.FieldType);
+                IList counts = countPerStage as IList;
+                if (counts == null)
+                {
+                    throw new InvalidDataException("Perfil AI " + profile.id + " en '" + packageName +
+                        "': no se pudo crear la lista countPerStage de EntityInAiDeck.");
+                }
+
+                // The native build helper sees the factory as constructable, but base setup does not
+                // start one for free. The scheduled module can build it when the profile requests it.
+                counts.Add(new Vector2Int(0, definition.maxLiving));
+                _aiDeckEntryCountPerStageField.SetValue(newEntry, countPerStage);
+                deckEntries.Add(newEntry);
+            }
+        }
+
+        private bool DeclaresAiDeckEntityDependency(
+            ContentAiProfileDefinition profile,
+            string deckEntityId,
+            List<LoadedUnit> temporaryUnits)
+        {
+            if (ContentPackValidator.DeclaresAiUnitDependency(profile, deckEntityId))
+            {
+                return true;
+            }
+
+            foreach (ContentAiProductionBuildingEntryDefinition entry in
+                profile.productionBuildingEntries ?? new ContentAiProductionBuildingEntryDefinition[0])
+            {
+                if (entry == null || String.IsNullOrWhiteSpace(entry.unitId))
+                {
+                    continue;
+                }
+
+                LoadedUnit product;
+                if (TryGetLoadedUnit(entry.unitId, temporaryUnits, out product) &&
+                    !product.IsProductionBuilding &&
+                    String.Equals(product.ProductionFactoryId, deckEntityId, StringComparison.Ordinal) &&
+                    ContentPackValidator.DeclaresAiUnitDependency(profile, entry.unitId))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private bool IsProductUnitAvailable(string entityId, List<LoadedUnit> temporaryUnits)
+        {
+            if (_nativeUnitIds.Contains(entityId) && !_nativeFactoryIds.Contains(entityId))
+            {
+                return true;
+            }
+
+            LoadedUnit unit;
+            return TryGetLoadedUnit(entityId, temporaryUnits, out unit) && !unit.IsProductionBuilding;
+        }
+
+        private bool IsProductUnitAllowedForAi(string entityId, List<LoadedUnit> temporaryUnits)
+        {
+            LoadedUnit loadedUnit;
+            if (TryGetLoadedUnit(entityId, temporaryUnits, out loadedUnit))
+            {
+                return loadedUnit != null && !loadedUnit.IsProductionBuilding &&
+                    loadedUnit.Definition != null && loadedUnit.Definition.isAllowedForAi;
+            }
+
+            if (!_nativeUnitIds.Contains(entityId) || _nativeFactoryIds.Contains(entityId))
+            {
+                return false;
+            }
+
+            IList rows = _nativeEntityRowsField.GetValue(null) as IList;
+            IDictionary index = _entityIndexField.GetValue(null) as IDictionary;
+            if (rows == null || index == null || !index.Contains(entityId))
+            {
+                return false;
+            }
+
+            object rowIndexValue = index[entityId];
+            if (!(rowIndexValue is int))
+            {
+                return false;
+            }
+
+            int rowIndex = (int)rowIndexValue;
+
+            if (rowIndex < 0 || rowIndex >= rows.Count)
+            {
+                return false;
+            }
+
+            object row = rows[rowIndex];
+            return row != null && row.GetType() == _entityRowType &&
+                String.Equals(_entityIdField.GetValue(row) as string, entityId, StringComparison.Ordinal) &&
+                (bool)_allowedForAiField.GetValue(row);
+        }
+
+        private bool IsDeckEntityAvailable(string entityId, List<LoadedUnit> temporaryUnits)
+        {
+            if (_nativeUnitIds.Contains(entityId))
+            {
+                return true;
+            }
+
+            LoadedUnit unit;
+            return TryGetLoadedUnit(entityId, temporaryUnits, out unit);
+        }
+
+        private bool IsDeckEntityNativeOrPackLocal(string entityId, List<LoadedUnit> temporaryUnits)
+        {
+            if (_nativeUnitIds.Contains(entityId))
+            {
+                return true;
+            }
+
+            if (temporaryUnits == null)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < temporaryUnits.Count; i++)
+            {
+                if (String.Equals(temporaryUnits[i].Id, entityId, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool ContainsString(string[] values, string expected)
+        {
+            if (values == null)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < values.Length; i++)
+            {
+                if (String.Equals(values[i], expected, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private List<object> ValidateStageParameters(
+            UnityEngine.Object asset,
+            string packageName,
+            string stageId,
+            out List<object> validatedWorlds)
+        {
+            validatedWorlds = new List<object>();
+            Type type = asset.GetType();
+            int levelCount = ReadIntField(type, asset, "levelCount");
+            int maxWidth = ReadIntField(type, asset, "maxWidth");
+            if (levelCount < 1 || maxWidth < 1)
+            {
+                throw new InvalidDataException("Etapa " + stageId + " en '" + packageName +
+                    "' debe tener levelCount y maxWidth mayores que cero.");
+            }
+
+            object poolList = FindField(type, "blueprintPoolList", InstanceFields).GetValue(asset);
+            object worldList = FindField(type, "worldList", InstanceFields).GetValue(asset);
+            if (poolList == null || poolList.GetType() != _blueprintPoolListType ||
+                worldList == null || worldList.GetType() != _worldListType)
+            {
+                throw new InvalidDataException("Etapa " + stageId +
+                    " debe contener BlueprintPoolList y WorldList del tipo nativo esperado.");
+            }
+
+            IList pools = _blueprintPoolsField.GetValue(poolList) as IList;
+            IList worlds = _worldsField.GetValue(worldList) as IList;
+            if (pools == null || pools.Count == 0 || worlds == null || worlds.Count == 0)
+            {
+                throw new InvalidDataException("Etapa " + stageId +
+                    " debe incluir al menos un BlueprintPool y un World.");
+            }
+
+            var result = new List<object>();
+            var poolIds = new HashSet<string>(StringComparer.Ordinal);
+            for (int i = 0; i < pools.Count; i++)
+            {
+                object pool = pools[i];
+                if (pool == null || pool.GetType() != _blueprintPoolType ||
+                    (pool as UnityEngine.Object) == null)
+                {
+                    throw new InvalidDataException("Etapa " + stageId + " contiene un elemento que no es BlueprintPool.");
+                }
+
+                string poolId = _blueprintPoolIdField.GetValue(pool) as string;
+                if (String.IsNullOrWhiteSpace(poolId) || !poolIds.Add(poolId))
+                {
+                    throw new InvalidDataException("Etapa " + stageId +
+                        " contiene IDs de BlueprintPool vacíos o duplicados.");
+                }
+
+                if (IsNullOrDestroyedUnityObject(_blueprintFilterField.GetValue(pool)))
+                {
+                    throw new InvalidDataException("BlueprintPool " + poolId + " de la etapa " + stageId +
+                        " no tiene un filtro de blueprint.");
+                }
+
+                MethodInfo refresh = pool.GetType().GetMethod("OnBlueprintFilterChanged", InstanceFields);
+                if (refresh == null || refresh.GetParameters().Length != 0 || refresh.ReturnType != typeof(void))
+                {
+                    throw new InvalidDataException("BlueprintPool de la etapa " + stageId +
+                        " no contiene OnBlueprintFilterChanged(): void.");
+                }
+
+                result.Add(pool);
+            }
+
+            for (int i = 0; i < worlds.Count; i++)
+            {
+                object world = worlds[i];
+                Component map = world as Component;
+                if (world == null || map == null || world.GetType() != _initMapType)
+                {
+                    throw new InvalidDataException("Etapa " + stageId +
+                        " contiene un World nulo, de tipo inesperado o inactivo.");
+                }
+
+                object worldGenerator = _worldGeneratorField.GetValue(world);
+                if (IsNullOrDestroyedUnityObject(worldGenerator))
+                {
+                    throw new InvalidDataException("Etapa " + stageId +
+                        " referencia un InitMap sin WorldGenerator.");
+                }
+
+                ValidateNoMissingPrefabComponents(map.gameObject, packageName, "World de la etapa " + stageId);
+                validatedWorlds.Add(world);
+            }
+
+            return result;
+        }
+
+        private LoadedLandscape CreateStageLandscape(
+            ContentStageDefinition stage,
+            string packageName,
+            IList<object> stageWorlds,
+            Dictionary<string, UnityEngine.Object> temporaryResources,
+            List<ScriptableObject> temporaryLandscapeClones)
+        {
+            ContentStageLandscapeDefinition definition = stage.landscape;
+            string resourceName;
+            if (!ContentPackValidator.TryBuildLandscapeResourceName(stage.id, out resourceName))
+            {
+                throw new InvalidDataException("La etapa " + stage.id + " no produce un nombre Landscape RCL_ válido.");
+            }
+
+            string resourcePath = "LandscapeGenerators/" + resourceName;
+            if (temporaryResources.ContainsKey(resourcePath) || _resourceAssets.ContainsKey(resourcePath) ||
+                Resources.Load(resourcePath, _landscapeGeneratorType) != null)
+            {
+                throw new InvalidDataException("La ruta de recurso Landscape '" + resourcePath +
+                    "' ya existe en el juego o en otro paquete.");
+            }
+
+            UnityEngine.Object template = FindNativeLandscapeTemplate(
+                definition.nativeTemplateId, packageName, stage.id);
+            UnityEngine.Object landscapeObject = UnityEngine.Object.Instantiate(template);
+            if (landscapeObject == null || landscapeObject.GetType() != _landscapeGeneratorType)
+            {
+                if (landscapeObject != null)
+                {
+                    UnityEngine.Object.Destroy(landscapeObject);
+                }
+                throw new InvalidDataException("No se pudo clonar el LandscapeGenerator para " + stage.id + ".");
+            }
+
+            ScriptableObject landscapeClone = landscapeObject as ScriptableObject;
+            if (landscapeClone == null)
+            {
+                UnityEngine.Object.Destroy(landscapeObject);
+                throw new InvalidDataException("LandscapeGenerator no deriva de ScriptableObject en este build.");
+            }
+
+            temporaryLandscapeClones.Add(landscapeClone);
+            landscapeClone.name = resourceName;
+            landscapeClone.hideFlags = HideFlags.HideAndDontSave;
+            _landscapeMapSizeField.SetValue(landscapeClone, definition.mapSize);
+            _landscapeRandomSeedField.SetValue(landscapeClone, definition.randomSeed);
+            _landscapeAlwaysUseSameSeedField.SetValue(landscapeClone, definition.alwaysUseSameSeed);
+            _landscapeDeactivatedField.SetValue(landscapeClone, false);
+            _landscapeAllowedForDemoField.SetValue(landscapeClone, stage.isPartOfDemo);
+            string localizationId = LandscapeLocalizationId(resourceName);
+            _landscapeNameLocaIdField.SetValue(landscapeClone, localizationId);
+
+            IList restrictedWorlds = _landscapeRestrictedWorldsField.GetValue(landscapeClone) as IList;
+            if (restrictedWorlds == null)
+            {
+                throw new InvalidDataException("LandscapeGenerator " + resourceName +
+                    " contiene restrictedToWorlds nulo.");
+            }
+            restrictedWorlds.Clear();
+
+            if (stageWorlds == null || stageWorlds.Count == 0)
+            {
+                throw new InvalidDataException("La etapa " + stage.id + " no tiene Worlds para validar su mapa.");
+            }
+
+            temporaryResources.Add(resourcePath, landscapeClone);
+            return new LoadedLandscape(resourceName, resourcePath, localizationId,
+                landscapeClone, definition);
+        }
+
+        private UnityEngine.Object FindNativeLandscapeTemplate(
+            string templateId,
+            string packageName,
+            string stageId)
+        {
+            object balancing = _gameBalancingAssetField.GetValue(null);
+            object progression = balancing == null ? null : _progressionFields[0].GetValue(balancing);
+            IList landscapes = progression == null ? null :
+                _progressionLandscapesField.GetValue(progression) as IList;
+            if (landscapes == null)
+            {
+                throw new InvalidDataException("No se pudo leer la lista nativa de LandscapeGenerator para " +
+                    "resolver " + templateId + " en " + stageId + ".");
+            }
+
+            UnityEngine.Object match = null;
+            for (int i = 0; i < landscapes.Count; i++)
+            {
+                UnityEngine.Object candidate = landscapes[i] as UnityEngine.Object;
+                if (candidate == null || candidate.GetType() != _landscapeGeneratorType ||
+                    !String.Equals(candidate.name, templateId, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                if (match != null && !System.Object.ReferenceEquals(match, candidate))
+                {
+                    throw new InvalidDataException("La plantilla nativa Landscape '" + templateId +
+                        "' es ambigua en la progresión default para la etapa " + stageId + ".");
+                }
+
+                match = candidate;
+            }
+
+            if (match == null)
+            {
+                throw new InvalidDataException("La etapa " + stageId + " en '" + packageName +
+                    "' referencia un LandscapeGenerator nativo que no existe en la progresión default: '" +
+                    templateId + "'.");
+            }
+
+            return match;
+        }
+
+        private static string LandscapeLocalizationId(string resourceName)
+        {
+            return resourceName.ToLowerInvariant() + "_name";
+        }
+
+        private void ValidateStageGenerationCompatibility(
+            List<LoadedStage> candidateStages,
+            List<LoadedAiProfile> candidateProfiles,
+            string packageName)
+        {
+            if (candidateStages == null || candidateStages.Count == 0)
+            {
+                return;
+            }
+
+            object balancing = _gameBalancingAssetField.GetValue(null);
+            if (balancing == null)
+            {
+                throw new InvalidDataException("No se pudo validar la generación de etapas en '" + packageName +
+                    "': GameBalancingStore aún no tiene su GameBalancingScriptableObject.");
+            }
+
+            bool isDemo = (bool)_gameIsDemoField.GetValue(balancing);
+            // MetaGame clamps CurrentAscensionLevel to maxAscensionLevel in every mode,
+            // including demo; maxAscensionLevelDemo is not the runtime selection cap.
+            int maxAscensionLevel = (int)_gameMaxAscensionLevelField.GetValue(balancing);
+            object defaultProgression = _progressionFields[0].GetValue(balancing);
+            object[] progressionProfiles = StageGenerationCompatibility.ResolveProgressionProfiles(
+                defaultProgression,
+                _progressionFields[1].GetValue(balancing),
+                _progressionFields[2].GetValue(balancing));
+            var profileById = new Dictionary<string, LoadedAiProfile>(StringComparer.Ordinal);
+            for (int i = 0; i < candidateProfiles.Count; i++)
+            {
+                profileById.Add(candidateProfiles[i].Id, candidateProfiles[i]);
+            }
+
+            var loadedStages = new List<LoadedStage>(_stages.Count + candidateStages.Count);
+            loadedStages.AddRange(_stages);
+            loadedStages.AddRange(candidateStages);
+            int validatedProgressionCount = 0;
+            for (int progressionFieldIndex = 0; progressionFieldIndex < _progressionFields.Length;
+                progressionFieldIndex++)
+            {
+                FieldInfo progressionField = _progressionFields[progressionFieldIndex];
+                object progression = progressionProfiles[progressionFieldIndex];
+
+                if (progression == null)
+                {
+                    continue;
+                }
+
+                IList nativeStages = _progressionStagesField.GetValue(progression) as IList;
+                IList nativeAis = _progressionAisField.GetValue(progression) as IList;
+                IList nativeLandscapes = _progressionLandscapesField.GetValue(progression) as IList;
+                if (nativeStages == null || nativeAis == null || nativeLandscapes == null)
+                {
+                    throw new InvalidDataException("La progresión '" + progressionField.Name +
+                        "' contiene una lista nula de stages, AI o LandscapeGenerator.");
+                }
+
+                List<StageGenerationAiCandidate> aiCandidates =
+                    BuildProgressionAiCandidates(nativeAis, loadedStages, profileById, packageName);
+                List<StageGenerationLandscapeCandidate> landscapeCandidates =
+                    BuildLandscapeCandidates(nativeLandscapes, "progresión " + progressionField.Name);
+                List<StageGenerationStageCandidate> stageCandidates =
+                    BuildProgressionStageCandidates(nativeStages, loadedStages, packageName, progressionField.Name);
+                var projectedStages = new ArrayList(nativeStages);
+                foreach (LoadedStage loadedStage in loadedStages)
+                {
+                    bool exists = false;
+                    foreach (object existingStage in projectedStages)
+                        if (System.Object.ReferenceEquals(existingStage, loadedStage.RuntimeStage)) { exists = true; break; }
+                    if (!exists) projectedStages.Add(loadedStage.RuntimeStage);
+                }
+                // Reject the pack before publishing any objects if an appended slot
+                // could reach the game's positional fallback lookup without a mapping.
+                StageFallbackSnapshot.Build(_fallbackLandscapeGeneratorsField.GetValue(balancing) as IList,
+                    projectedStages, delegate(object runtimeStage)
+                    {
+                        foreach (LoadedStage loadedStage in loadedStages)
+                            if (System.Object.ReferenceEquals(loadedStage.RuntimeStage, runtimeStage))
+                                return loadedStage.FallbackLandscape;
+                        return null;
+                    });
+                bool heatIsActive = progressionFieldIndex == 1;
+                string diagnostic;
+                if (!StageGenerationCompatibility.TryValidateStages(
+                    progressionField.Name,
+                    isDemo,
+                    heatIsActive,
+                    maxAscensionLevel,
+                    stageCandidates,
+                    aiCandidates,
+                    landscapeCandidates,
+                    out diagnostic))
+                {
+                    throw new InvalidDataException("Incompatibilidad de generación en el paquete '" +
+                        packageName + "': " + diagnostic);
+                }
+
+                validatedProgressionCount++;
+            }
+
+            if (validatedProgressionCount == 0)
+            {
+                throw new InvalidDataException("No hay una progresión activa para validar las etapas del paquete '" +
+                    packageName + "'.");
+            }
+        }
+
+        private Dictionary<string, Vector2Int> BuildScopedAiStageRanges(
+            List<LoadedStage> candidateStages,
+            ContentAiProfileDefinition[] profileDefinitions,
+            string packageName)
+        {
+            var targetStageIdsByProfile = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
+            if (profileDefinitions == null || candidateStages == null)
+            {
+                return new Dictionary<string, Vector2Int>(StringComparer.Ordinal);
+            }
+
+            for (int profileIndex = 0; profileIndex < profileDefinitions.Length; profileIndex++)
+            {
+                ContentAiProfileDefinition profile = profileDefinitions[profileIndex];
+                if (profile == null || !profile.scopeToReferencedStages)
+                {
+                    continue;
+                }
+
+                var targetStageIds = new HashSet<string>(StringComparer.Ordinal);
+                for (int stageIndex = 0; stageIndex < candidateStages.Count; stageIndex++)
+                {
+                    ContentStageDefinition stage = candidateStages[stageIndex].Definition;
+                    string[] profileIds = stage.aiProfileIds ?? new string[0];
+                    for (int referencedIndex = 0; referencedIndex < profileIds.Length; referencedIndex++)
+                    {
+                        if (String.Equals(profileIds[referencedIndex], profile.id, StringComparison.Ordinal))
+                        {
+                            targetStageIds.Add(stage.id);
+                            break;
+                        }
+                    }
+                }
+
+                if (targetStageIds.Count == 0)
+                {
+                    throw new InvalidDataException("El perfil AI de etapa " + profile.id + " en '" + packageName +
+                        "' debe estar asociado a una etapa declarada por el mismo paquete.");
+                }
+
+                targetStageIdsByProfile.Add(profile.id, targetStageIds);
+            }
+
+            var result = new Dictionary<string, Vector2Int>(StringComparer.Ordinal);
+            if (targetStageIdsByProfile.Count == 0)
+            {
+                return result;
+            }
+
+            object balancing = _gameBalancingAssetField.GetValue(null);
+            if (balancing == null)
+            {
+                throw new InvalidDataException("No se pudo calcular el rango de AI por etapa en '" + packageName +
+                    "': GameBalancingStore aún no tiene su GameBalancingScriptableObject.");
+            }
+
+            var allStages = new List<LoadedStage>(_stages.Count + candidateStages.Count);
+            allStages.AddRange(_stages);
+            allStages.AddRange(candidateStages);
+            var stageReferences = new List<object>(allStages.Count);
+            for (int i = 0; i < allStages.Count; i++)
+            {
+                stageReferences.Add(allStages[i].RuntimeStage);
+            }
+
+            object defaultProgression = _progressionFields[0].GetValue(balancing);
+            object[] progressionProfiles = StageGenerationCompatibility.ResolveProgressionProfiles(
+                defaultProgression,
+                _progressionFields[1].GetValue(balancing),
+                _progressionFields[2].GetValue(balancing));
+            int validatedProgressionCount = 0;
+            for (int progressionIndex = 0; progressionIndex < progressionProfiles.Length; progressionIndex++)
+            {
+                object progression = progressionProfiles[progressionIndex];
+                if (progression == null)
+                {
+                    continue;
+                }
+
+                IList progressionStages = _progressionStagesField.GetValue(progression) as IList;
+                int[] stageIndices;
+                string indexDiagnostic;
+                if (!StageGenerationCompatibility.TryBuildStageIndices(
+                    progressionStages,
+                    stageReferences,
+                    _progressionFields[progressionIndex].Name,
+                    out stageIndices,
+                    out indexDiagnostic))
+                {
+                    throw new InvalidDataException("No se pudo calcular el alcance de AI por etapa en '" + packageName +
+                        "': " + indexDiagnostic);
+                }
+
+                var indexByStageId = new Dictionary<string, int>(StringComparer.Ordinal);
+                for (int stageIndex = 0; stageIndex < allStages.Count; stageIndex++)
+                {
+                    indexByStageId.Add(allStages[stageIndex].Definition.id, stageIndices[stageIndex]);
+                }
+
+                foreach (KeyValuePair<string, HashSet<string>> scopedProfile in targetStageIdsByProfile)
+                {
+                    var eligibleIndices = new List<int>(scopedProfile.Value.Count);
+                    foreach (string stageId in scopedProfile.Value)
+                    {
+                        int stageIndex;
+                        if (!indexByStageId.TryGetValue(stageId, out stageIndex))
+                        {
+                            throw new InvalidDataException("La etapa '" + stageId + "' asociada al perfil AI " +
+                                scopedProfile.Key + " no aparece en la progresión '" +
+                                _progressionFields[progressionIndex].Name + "'.");
+                        }
+                        eligibleIndices.Add(stageIndex);
+                    }
+
+                    int minimumStage;
+                    int maximumStage;
+                    string rangeDiagnostic;
+                    if (!StageGenerationCompatibility.TryBuildContiguousStageRange(
+                        eligibleIndices, out minimumStage, out maximumStage, out rangeDiagnostic))
+                    {
+                        throw new InvalidDataException("Las etapas asociadas al perfil AI de etapa " +
+                            scopedProfile.Key + " no forman un rango válido: " + rangeDiagnostic);
+                    }
+
+                    var range = new Vector2Int(minimumStage, maximumStage);
+                    Vector2Int existingRange;
+                    if (result.TryGetValue(scopedProfile.Key, out existingRange) &&
+                        (existingRange.x != range.x || existingRange.y != range.y))
+                    {
+                        throw new InvalidDataException("Las progresiones default, heat y first-run asignan índices " +
+                            "distintos a las etapas del perfil AI " + scopedProfile.Key + ".");
+                    }
+
+                    result[scopedProfile.Key] = range;
+                }
+
+                validatedProgressionCount++;
+            }
+
+            if (validatedProgressionCount == 0)
+            {
+                throw new InvalidDataException("No hay una progresión activa para calcular los rangos AI en '" +
+                    packageName + "'.");
+            }
+
+            return result;
+        }
+
+        private List<StageGenerationStageCandidate> BuildProgressionStageCandidates(
+            IList progressionStages,
+            IList<LoadedStage> loadedStages,
+            string packageName,
+            string progressionName)
+        {
+            var loadedStageReferences = new List<object>(loadedStages.Count);
+            for (int i = 0; i < loadedStages.Count; i++)
+            {
+                loadedStageReferences.Add(loadedStages[i].RuntimeStage);
+            }
+
+            int[] expectedStageIndices;
+            string indexDiagnostic;
+            if (!StageGenerationCompatibility.TryBuildStageIndices(
+                progressionStages, loadedStageReferences, progressionName,
+                out expectedStageIndices, out indexDiagnostic))
+            {
+                throw new InvalidDataException(indexDiagnostic + " Package '" + packageName + "'.");
+            }
+
+            var result = new List<StageGenerationStageCandidate>(loadedStages.Count);
+            for (int i = 0; i < loadedStages.Count; i++)
+            {
+                LoadedStage stage = loadedStages[i];
+                result.Add(new StageGenerationStageCandidate
+                {
+                    Id = stage.Definition.id,
+                    StageIndex = expectedStageIndices[i],
+                    MapSizeMin = stage.Definition.mapSizeMin,
+                    MapSizeMax = stage.Definition.mapSizeMax,
+                    IsPartOfDemo = stage.Definition.isPartOfDemo,
+                    Worlds = BuildWorldCandidates(stage.Worlds, stage.Definition.id),
+                    Landscape = stage.Landscape == null
+                        ? null
+                        : BuildLandscapeCandidate(stage.Landscape.Asset)
+                });
+            }
+
+            return result;
+        }
+
+        private List<StageGenerationAiCandidate> BuildProgressionAiCandidates(
+            IList nativeAis,
+            IList<LoadedStage> stages,
+            Dictionary<string, LoadedAiProfile> candidateProfiles,
+            string packageName)
+        {
+            var behaviours = new List<object>();
+            var seenBehaviours = new HashSet<object>(ReferenceComparer.Instance);
+            for (int i = 0; i < nativeAis.Count; i++)
+            {
+                AddAiBehaviourCandidate(nativeAis[i], behaviours, seenBehaviours,
+                    "progresión nativa", packageName);
+            }
+
+            for (int stageIndex = 0; stageIndex < stages.Count; stageIndex++)
+            {
+                string[] profileIds = stages[stageIndex].Definition.aiProfileIds ?? new string[0];
+                for (int profileIndex = 0; profileIndex < profileIds.Length; profileIndex++)
+                {
+                    LoadedAiProfile profile;
+                    if (!candidateProfiles.TryGetValue(profileIds[profileIndex], out profile) &&
+                        !_aiProfiles.TryGetValue(profileIds[profileIndex], out profile))
+                    {
+                        throw new InvalidDataException("El perfil AI '" + profileIds[profileIndex] +
+                            "' no está cargado para la etapa '" + stages[stageIndex].Definition.id +
+                            "' del paquete '" + packageName + "'.");
+                    }
+
+                    for (int behaviourIndex = 0; behaviourIndex < profile.Behaviours.Count; behaviourIndex++)
+                    {
+                        AddAiBehaviourCandidate(profile.Behaviours[behaviourIndex], behaviours,
+                            seenBehaviours, profile.Id, packageName);
+                    }
+                }
+            }
+
+            var candidates = new List<StageGenerationAiCandidate>(behaviours.Count);
+            for (int i = 0; i < behaviours.Count; i++)
+            {
+                object behaviour = behaviours[i];
+                Vector2Int stageRange = (Vector2Int)_aiStageRangeField.GetValue(behaviour);
+                Vector2Int ascensionRange = (Vector2Int)_aiAscensionRangeField.GetValue(behaviour);
+                IList bases = _aiBasesField.GetValue(behaviour) as IList;
+                var baseCandidates = new List<StageGenerationAiBaseCandidate>();
+                if (bases != null)
+                {
+                    for (int baseIndex = 0; baseIndex < bases.Count; baseIndex++)
+                    {
+                        object aiBase = bases[baseIndex];
+                        if (aiBase == null || aiBase.GetType() != _aiBaseType)
+                        {
+                            throw new InvalidDataException("AI '" + GetObjectName(behaviour) +
+                                "' contiene una AiBase nula o de tipo inesperado.");
+                        }
+
+                        baseCandidates.Add(new StageGenerationAiBaseCandidate
+                        {
+                            StartingInStage = (int)_aiBaseStartingStageField.GetValue(aiBase),
+                            StartingInAscensionLevel = (int)_aiBaseStartingAscensionField.GetValue(aiBase)
+                        });
+                    }
+                }
+
+                IList restrictedMaps = _aiRestrictedMapsField.GetValue(behaviour) as IList;
+                if (restrictedMaps == null)
+                {
+                    throw new InvalidDataException("AI '" + GetObjectName(behaviour) +
+                        "' contiene una lista restrictedToMaps nula.");
+                }
+
+                candidates.Add(new StageGenerationAiCandidate
+                {
+                    Id = GetObjectName(behaviour),
+                    IsDeactivated = (bool)_aiDeactivatedField.GetValue(behaviour),
+                    IsAllowedForDemo = (bool)_aiAllowedForDemoField.GetValue(behaviour),
+                    StageMin = stageRange.x,
+                    StageMax = stageRange.y,
+                    AscensionMin = ascensionRange.x,
+                    AscensionMax = ascensionRange.y,
+                    Bases = baseCandidates,
+                    RestrictedMaps = BuildRestrictedMapCandidates(restrictedMaps,
+                        "AI " + GetObjectName(behaviour))
+                });
+            }
+
+            return candidates;
+        }
+
+        private void AddAiBehaviourCandidate(
+            object behaviour,
+            List<object> behaviours,
+            HashSet<object> seenBehaviours,
+            string source,
+            string packageName)
+        {
+            if (behaviour == null || behaviour.GetType() != _defaultAiBehaviourType)
+            {
+                throw new InvalidDataException("El paquete '" + packageName + "' encontró un DefaultAiBehaviour " +
+                    "nulo o de tipo inesperado en " + source + ".");
+            }
+
+            if (seenBehaviours.Add(behaviour))
+            {
+                behaviours.Add(behaviour);
+            }
+        }
+
+        private List<StageGenerationLandscapeCandidate> BuildLandscapeCandidates(
+            IList landscapes,
+            string source)
+        {
+            var candidates = new List<StageGenerationLandscapeCandidate>(landscapes.Count);
+            for (int i = 0; i < landscapes.Count; i++)
+            {
+                object landscape = landscapes[i];
+                if (landscape == null || landscape.GetType() != _landscapeGeneratorType)
+                {
+                    throw new InvalidDataException(source + " contiene un LandscapeGenerator nulo o de tipo inesperado.");
+                }
+
+                candidates.Add(BuildLandscapeCandidate(landscape));
+            }
+
+            return candidates;
+        }
+
+        private StageGenerationLandscapeCandidate BuildLandscapeCandidate(object landscape)
+        {
+            string landscapeName = GetObjectName(landscape);
+            return new StageGenerationLandscapeCandidate
+            {
+                Id = landscapeName,
+                MapSize = (int)_landscapeMapSizeField.GetValue(landscape),
+                IsDeactivated = (bool)_landscapeDeactivatedField.GetValue(landscape),
+                IsAllowedForDemo = (bool)_landscapeAllowedForDemoField.GetValue(landscape),
+                RestrictedWorlds = BuildRestrictedWorldCandidates(
+                    _landscapeRestrictedWorldsField.GetValue(landscape) as IList,
+                    "LandscapeGenerator " + landscapeName)
+            };
+        }
+
+        private List<StageGenerationLandscapeCandidate> BuildRestrictedMapCandidates(
+            IList landscapes,
+            string source)
+        {
+            if (landscapes == null)
+            {
+                throw new InvalidDataException(source + " contiene una lista restrictedToMaps nula.");
+            }
+
+            var candidates = new List<StageGenerationLandscapeCandidate>(landscapes.Count);
+            for (int i = 0; i < landscapes.Count; i++)
+            {
+                object landscape = landscapes[i];
+                if (landscape == null || landscape.GetType() != _landscapeGeneratorType)
+                {
+                    throw new InvalidDataException(source +
+                        " contiene un LandscapeGenerator nulo o de tipo inesperado en restrictedToMaps.");
+                }
+
+                candidates.Add(BuildLandscapeCandidate(landscape));
+            }
+
+            return candidates;
+        }
+
+        private List<StageGenerationWorldCandidate> BuildRestrictedWorldCandidates(
+            IList worlds,
+            string source)
+        {
+            if (worlds == null)
+            {
+                return null;
+            }
+
+            var candidates = new List<StageGenerationWorldCandidate>(worlds.Count);
+            for (int i = 0; i < worlds.Count; i++)
+            {
+                object world = worlds[i];
+                if (world == null)
+                {
+                    candidates.Add(null);
+                    continue;
+                }
+
+                if (world.GetType() != _initMapType)
+                {
+                    throw new InvalidDataException(source +
+                        " contiene un World de tipo inesperado en restrictedToWorlds.");
+                }
+
+                candidates.Add(new StageGenerationWorldCandidate
+                {
+                    Id = GetObjectName(world),
+                    IsDeactivated = (bool)_worldDeactivatedField.GetValue(world),
+                    IsAllowedForDemo = (bool)_worldAllowedForDemoField.GetValue(world)
+                });
+            }
+
+            return candidates;
+        }
+
+        private List<StageGenerationWorldCandidate> BuildWorldCandidates(
+            IList worlds,
+            string stageId)
+        {
+            if (worlds == null)
+            {
+                throw new InvalidDataException("La etapa '" + stageId + "' no tiene una lista de World validada.");
+            }
+
+            var candidates = new List<StageGenerationWorldCandidate>(worlds.Count);
+            for (int i = 0; i < worlds.Count; i++)
+            {
+                object world = worlds[i];
+                if (world == null || world.GetType() != _initMapType)
+                {
+                    throw new InvalidDataException("La etapa '" + stageId +
+                        "' contiene un World nulo o de tipo inesperado.");
+                }
+
+                IList restrictedMaps = _worldRestrictedMapsField.GetValue(world) as IList;
+                if (restrictedMaps == null)
+                {
+                    throw new InvalidDataException("World '" + GetObjectName(world) +
+                        "' contiene una lista restrictedToMaps nula.");
+                }
+
+                candidates.Add(new StageGenerationWorldCandidate
+                {
+                    Id = GetObjectName(world),
+                    IsDeactivated = (bool)_worldDeactivatedField.GetValue(world),
+                    IsAllowedForDemo = (bool)_worldAllowedForDemoField.GetValue(world),
+                    RestrictedMaps = BuildRestrictedMapCandidates(restrictedMaps,
+                        "World " + GetObjectName(world))
+                });
+            }
+
+            return candidates;
+        }
+
+        private static string GetObjectName(object value)
+        {
+            UnityEngine.Object unityObject = value as UnityEngine.Object;
+            return unityObject == null || String.IsNullOrWhiteSpace(unityObject.name)
+                ? "<sin nombre>"
+                : unityObject.name;
+        }
+
+        private static bool IsNullOrDestroyedUnityObject(object value)
+        {
+            if (System.Object.ReferenceEquals(value, null))
+            {
+                return true;
+            }
+
+            UnityEngine.Object unityObject = value as UnityEngine.Object;
+            return !System.Object.ReferenceEquals(unityObject, null) && unityObject == null;
+        }
+
+        private object CreateStage(ContentStageDefinition definition, UnityEngine.Object parameters, string packageName)
+        {
+            object stage = Activator.CreateInstance(_stageType);
+            if (stage == null)
+            {
+                throw new InvalidDataException("No se pudo crear el contenedor Stage para " + definition.id + ".");
+            }
+
+            _stageParametersField.SetValue(stage, parameters);
+            _stageMapSizeField.SetValue(stage, new Vector2Int(definition.mapSizeMin, definition.mapSizeMax));
+            _stageDemoField.SetValue(stage, definition.isPartOfDemo);
+            return stage;
+        }
+
+        private void ApplyStageParameterOverrides(
+            UnityEngine.Object parameters,
+            ContentStageParameterOverride[] overrides,
+            string packageName,
+            string stageId)
+        {
+            if (overrides == null)
+            {
+                return;
+            }
+
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            for (int i = 0; i < overrides.Length; i++)
+            {
+                ContentStageParameterOverride stageOverride = overrides[i];
+                if (stageOverride == null || String.IsNullOrWhiteSpace(stageOverride.name) ||
+                    !seen.Add(stageOverride.name))
+                {
+                    throw new InvalidDataException("Etapa " + stageId + " en '" + packageName +
+                        "': hay un override nulo, vacío o duplicado.");
+                }
+
+                FieldInfo field = FindField(_stageParametersType, stageOverride.name, InstanceFields);
+                object value;
+                if (field.FieldType == typeof(int))
+                {
+                    int parsed;
+                    if (!Int32.TryParse(stageOverride.value, NumberStyles.Integer,
+                        CultureInfo.InvariantCulture, out parsed) ||
+                        (stageOverride.name == "levelCount" && (parsed < 1 || parsed > 32)) ||
+                        (stageOverride.name == "maxWidth" && (parsed < 1 || parsed > 64)) ||
+                        (stageOverride.name != "levelCount" && stageOverride.name != "maxWidth" &&
+                            (parsed < 0 || parsed > 1000000)))
+                    {
+                        throw new InvalidDataException("Etapa " + stageId + " en '" + packageName +
+                            "': valor entero inválido para " + stageOverride.name + ".");
+                    }
+
+                    value = parsed;
+                }
+                else if (field.FieldType == typeof(float))
+                {
+                    float parsed;
+                    if (!Single.TryParse(stageOverride.value, NumberStyles.Float,
+                        CultureInfo.InvariantCulture, out parsed) || Single.IsNaN(parsed) ||
+                        Single.IsInfinity(parsed) || parsed < 0f ||
+                        (stageOverride.name == "twoWayBranchingProbability" && parsed > 1f) ||
+                        (stageOverride.name != "twoWayBranchingProbability" && parsed > 1000f))
+                    {
+                        throw new InvalidDataException("Etapa " + stageId + " en '" + packageName +
+                            "': valor decimal inválido para " + stageOverride.name + ".");
+                    }
+
+                    value = parsed;
+                }
+                else if (field.FieldType == typeof(bool))
+                {
+                    bool parsed;
+                    if (!Boolean.TryParse(stageOverride.value, out parsed))
+                    {
+                        throw new InvalidDataException("Etapa " + stageId + " en '" + packageName +
+                            "': valor booleano inválido para " + stageOverride.name + ".");
+                    }
+
+                    value = parsed;
+                }
+                else
+                {
+                    throw new InvalidDataException("Etapa " + stageId + " en '" + packageName +
+                        "': el campo " + stageOverride.name + " no es un parámetro compatible.");
+                }
+
+                field.SetValue(parameters, value);
+            }
+        }
+
+        private static UnityEngine.Object LoadRequiredAsset(
+            AssetBundle bundle,
+            string assetName,
+            Type expectedType,
+            string expectedDescription,
+            string packageName)
+        {
+            UnityEngine.Object asset;
+            try
+            {
+                // Request the expected type here instead of loading the bundle's main object
+                // first. Texture assets may expose a Sprite sub-object under the same file name.
+                asset = bundle.LoadAsset(assetName, expectedType);
+            }
+            catch (Exception exception)
+            {
+                throw new InvalidDataException("Paquete '" + packageName + "': no se pudo cargar el asset '" +
+                    assetName + "': " + exception.Message);
+            }
+
+            if (asset == null || !expectedType.IsInstanceOfType(asset))
+            {
+                throw new InvalidDataException("Paquete '" + packageName + "': el asset '" + assetName +
+                    "' falta o no es " + expectedDescription + ".");
+            }
+
+            return asset;
+        }
+
+        private static AssetBundle GetBundle(Dictionary<string, AssetBundle> bundles, string id, string packageName)
+        {
+            AssetBundle bundle;
+            if (!bundles.TryGetValue(id ?? string.Empty, out bundle) || bundle == null)
+            {
+                throw new InvalidDataException("Paquete '" + packageName + "': bundle declarado no disponible: " + id);
+            }
+
+            return bundle;
+        }
+
+        private bool TryResolveBundleFile(string packageRoot, string relativePath, out string fullPath, out string failure)
+        {
+            fullPath = null;
+            failure = null;
+            if (String.IsNullOrWhiteSpace(relativePath) || relativePath.IndexOf('\\') >= 0 ||
+                relativePath[0] == '/' || Path.IsPathRooted(relativePath))
+            {
+                failure = "Ruta de bundle inválida; solo se aceptan rutas relativas con '/'.";
+                return false;
+            }
+
+            string root = Path.GetFullPath(packageRoot);
+            string candidate = Path.GetFullPath(Path.Combine(root,
+                relativePath.Replace('/', Path.DirectorySeparatorChar)));
+            string prefix = root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) +
+                Path.DirectorySeparatorChar;
+            if (!candidate.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            {
+                failure = "La ruta del bundle sale de la carpeta del paquete.";
+                return false;
+            }
+
+            if (!IsRegularPackageFile(root, candidate, out failure))
+            {
+                return false;
+            }
+
+            fullPath = candidate;
+            return true;
+        }
+
+        private bool TryOpenContainedFile(
+            string packageRoot,
+            string path,
+            out FileStream stream,
+            out string failure)
+        {
+            stream = null;
+            failure = null;
+            if (String.IsNullOrWhiteSpace(_resolvedPacksRoot))
+            {
+                failure = "La raíz física de paquetes no está fijada.";
+                return false;
+            }
+
+            if (!IsRegularPackageFile(packageRoot, path, out failure))
+            {
+                return false;
+            }
+
+            try
+            {
+                using (SafeFileHandle packageHandle = OpenDirectoryHandle(packageRoot, out failure))
+                {
+                    if (packageHandle == null)
+                    {
+                        return false;
+                    }
+
+                    string finalPackagePath = GetFinalPath(packageHandle);
+                    if (!IsPathWithin(_resolvedPacksRoot, finalPackagePath))
+                    {
+                        failure = "La carpeta del paquete resuelve fuera de la raíz de paquetes verificada.";
+                        return false;
+                    }
+
+                    SafeFileHandle fileHandle = OpenRegularFileHandle(path, out failure);
+                    if (fileHandle == null)
+                    {
+                        return false;
+                    }
+
+                    try
+                    {
+                        string finalFilePath = GetFinalPath(fileHandle);
+                        if (!IsPathWithin(finalPackagePath, finalFilePath))
+                        {
+                            failure = "El archivo abierto resuelve fuera de la carpeta física del paquete.";
+                            return false;
+                        }
+
+                        stream = new FileStream(fileHandle, FileAccess.Read);
+                        fileHandle = null;
+                        return true;
+                    }
+                    finally
+                    {
+                        if (fileHandle != null)
+                        {
+                            fileHandle.Dispose();
+                        }
+                    }
+                }
+            }
+            catch (Exception exception)
+            {
+                failure = "No se pudo abrir de forma segura el archivo del paquete: " +
+                    exception.GetType().Name + ": " + exception.Message;
+                if (stream != null)
+                {
+                    stream.Dispose();
+                    stream = null;
+                }
+
+                return false;
+            }
+        }
+
+        private static SafeFileHandle OpenDirectoryHandle(string path, out string failure)
+        {
+            failure = null;
+            SafeFileHandle handle = NativeCreateFile(path, 0,
+                ShareRead | ShareWrite | ShareDelete, IntPtr.Zero, OpenExisting,
+                OpenReparsePoint | BackupSemantics, IntPtr.Zero);
+            if (handle == null || handle.IsInvalid)
+            {
+                int error = Marshal.GetLastWin32Error();
+                if (handle != null) handle.Dispose();
+                failure = "No se pudo abrir la carpeta (Win32 " + error + ").";
+                return null;
+            }
+
+            FileAttributeTagInfo information;
+            if (!NativeGetFileInformationByHandleEx(handle, FileAttributeTagInfoClass,
+                out information, (uint)Marshal.SizeOf(typeof(FileAttributeTagInfo))))
+            {
+                int error = Marshal.GetLastWin32Error();
+                handle.Dispose();
+                failure = "No se pudieron verificar los atributos de la carpeta (Win32 " + error + ").";
+                return null;
+            }
+
+            if ((information.FileAttributes & DirectoryAttribute) == 0 ||
+                (information.FileAttributes & ReparsePointAttribute) != 0)
+            {
+                handle.Dispose();
+                failure = "La ruta no es una carpeta normal o es un reparse point.";
+                return null;
+            }
+
+            return handle;
+        }
+
+        private static SafeFileHandle OpenRegularFileHandle(string path, out string failure)
+        {
+            failure = null;
+            SafeFileHandle handle = NativeCreateFile(path, GenericRead, ShareRead,
+                IntPtr.Zero, OpenExisting, OpenReparsePoint | SequentialScan, IntPtr.Zero);
+            if (handle == null || handle.IsInvalid)
+            {
+                int error = Marshal.GetLastWin32Error();
+                if (handle != null) handle.Dispose();
+                failure = "No se pudo abrir el archivo (Win32 " + error + ").";
+                return null;
+            }
+
+            FileAttributeTagInfo information;
+            if (!NativeGetFileInformationByHandleEx(handle, FileAttributeTagInfoClass,
+                out information, (uint)Marshal.SizeOf(typeof(FileAttributeTagInfo))))
+            {
+                int error = Marshal.GetLastWin32Error();
+                handle.Dispose();
+                failure = "No se pudieron verificar los atributos del archivo (Win32 " + error + ").";
+                return null;
+            }
+
+            if ((information.FileAttributes & (DirectoryAttribute | ReparsePointAttribute)) != 0)
+            {
+                handle.Dispose();
+                failure = "El archivo es una carpeta o un reparse point.";
+                return null;
+            }
+
+            return handle;
+        }
+
+        private static string GetFinalPath(SafeFileHandle handle)
+        {
+            var buffer = new StringBuilder(512);
+            uint required = NativeGetFinalPathNameByHandle(handle, buffer, (uint)buffer.Capacity, 0);
+            if (required == 0)
+            {
+                throw new IOException("GetFinalPathNameByHandle falló (Win32 " +
+                    Marshal.GetLastWin32Error() + ").");
+            }
+
+            if (required >= buffer.Capacity)
+            {
+                buffer = new StringBuilder(checked((int)required + 1));
+                required = NativeGetFinalPathNameByHandle(handle, buffer, (uint)buffer.Capacity, 0);
+                if (required == 0 || required >= buffer.Capacity)
+                {
+                    throw new IOException("No se pudo obtener la ruta física completa del handle.");
+                }
+            }
+
+            return buffer.ToString();
+        }
+
+        private static bool IsPathWithin(string root, string candidate)
+        {
+            string normalizedRoot = root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            string normalizedCandidate = candidate.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            string prefix = normalizedRoot + Path.DirectorySeparatorChar;
+            return normalizedCandidate.StartsWith(prefix, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool HasNoReparsePointsInPath(string path, out string failure)
+        {
+            failure = null;
+            try
+            {
+                string fullPath = Path.GetFullPath(path);
+                string current = Path.GetPathRoot(fullPath);
+                if (String.IsNullOrEmpty(current))
+                {
+                    failure = "No se pudo identificar la raíz del volumen.";
+                    return false;
+                }
+
+                if (Directory.Exists(current) &&
+                    (File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0)
+                {
+                    failure = "La raíz del volumen es un reparse point.";
+                    return false;
+                }
+
+                string remainder = fullPath.Substring(current.Length);
+                string[] segments = remainder.Split(
+                    new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar },
+                    StringSplitOptions.RemoveEmptyEntries);
+                for (int i = 0; i < segments.Length; i++)
+                {
+                    current = Path.Combine(current, segments[i]);
+                    if (!Directory.Exists(current) && !File.Exists(current))
+                    {
+                        break;
+                    }
+
+                    if ((File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0)
+                    {
+                        failure = "La ruta contiene un enlace, junction u otro reparse point.";
+                        return false;
+                    }
+                }
+
+                return true;
+            }
+            catch (Exception exception)
+            {
+                failure = exception.GetType().Name + ": " + exception.Message;
+                return false;
+            }
+        }
+
+        private static bool IsRegularPackageFile(string packageRoot, string candidate, out string failure)
+        {
+            failure = null;
+            try
+            {
+                string root = Path.GetFullPath(packageRoot);
+                string path = Path.GetFullPath(candidate);
+                string prefix = root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) +
+                    Path.DirectorySeparatorChar;
+                if (!path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                {
+                    failure = "La ruta no permanece dentro de la carpeta del paquete.";
+                    return false;
+                }
+
+                if (!HasNoReparsePointsInPath(root, out failure))
+                {
+                    return false;
+                }
+
+                if ((File.GetAttributes(root) & FileAttributes.ReparsePoint) != 0)
+                {
+                    failure = "La carpeta del paquete no puede ser un enlace simbólico o junction.";
+                    return false;
+                }
+
+                string remaining = path.Substring(prefix.Length);
+                string[] segments = remaining.Split(new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar },
+                    StringSplitOptions.RemoveEmptyEntries);
+                string current = root;
+                for (int i = 0; i < segments.Length; i++)
+                {
+                    current = Path.Combine(current, segments[i]);
+                    FileAttributes attributes = File.GetAttributes(current);
+                    if ((attributes & FileAttributes.ReparsePoint) != 0)
+                    {
+                        failure = "La ruta del paquete atraviesa un enlace o reparse point.";
+                        return false;
+                    }
+                }
+
+                if (!File.Exists(path) || (File.GetAttributes(path) & FileAttributes.Directory) != 0)
+                {
+                    failure = "El archivo de paquete no existe o no es un archivo regular.";
+                    return false;
+                }
+
+                return true;
+            }
+            catch (Exception exception)
+            {
+                failure = "No se pudo verificar la ruta del paquete: " + exception.Message;
+                return false;
+            }
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct FileAttributeTagInfo
+        {
+            public uint FileAttributes;
+            public uint ReparseTag;
+        }
+
+        [DllImport("kernel32.dll", EntryPoint = "CreateFileW", CharSet = CharSet.Unicode,
+            SetLastError = true, ExactSpelling = true)]
+        private static extern SafeFileHandle NativeCreateFile(
+            string fileName,
+            uint desiredAccess,
+            uint shareMode,
+            IntPtr securityAttributes,
+            uint creationDisposition,
+            uint flagsAndAttributes,
+            IntPtr templateFile);
+
+        [DllImport("kernel32.dll", EntryPoint = "GetFileInformationByHandleEx", SetLastError = true,
+            ExactSpelling = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool NativeGetFileInformationByHandleEx(
+            SafeFileHandle file,
+            int fileInformationClass,
+            out FileAttributeTagInfo fileInformation,
+            uint bufferSize);
+
+        [DllImport("kernel32.dll", EntryPoint = "GetFinalPathNameByHandleW", CharSet = CharSet.Unicode,
+            SetLastError = true, ExactSpelling = true)]
+        private static extern uint NativeGetFinalPathNameByHandle(
+            SafeFileHandle file,
+            StringBuilder path,
+            uint pathLength,
+            uint flags);
+
+        private static string BundleRegistryKey(string packId, string bundleId)
+        {
+            return (packId ?? String.Empty) + "\u001f" + (bundleId ?? String.Empty);
+        }
+
+        private static string ResourceKey(string entityId, string kind)
+        {
+            return "RogueCommandExpansionLoader/" + entityId.Replace(':', '/') + "/" + kind;
+        }
+
+        private void LogDiagnostics(string packageName, IReadOnlyList<ContentDiagnostic> diagnostics)
+        {
+            for (int i = 0; i < diagnostics.Count; i++)
+            {
+                Log("Paquete '" + packageName + "' desactivado: " + diagnostics[i]);
+            }
+        }
+
+        private int ReadIntField(Type ownerType, object instance, string name)
+        {
+            FieldInfo field = FindField(ownerType, name, InstanceFields);
+            if (field.FieldType != typeof(int))
+            {
+                throw new InvalidDataException("Campo " + ownerType.Name + "." + name + " no es int.");
+            }
+
+            return (int)field.GetValue(instance);
+        }
+
+        private FieldInfo RequireField(Type type, string name, Type fieldType)
+        {
+            FieldInfo field = FindField(type, name, InstanceFields);
+            if (field.FieldType != fieldType || field.IsInitOnly)
+            {
+                throw new InvalidOperationException(type.Name + "." + name +
+                    " no coincide con el tipo mutable esperado " + fieldType.FullName + ".");
+            }
+
+            return field;
+        }
+
+        private static bool EnumHasName(Type enumType, string name)
+        {
+            return enumType != null && enumType.IsEnum &&
+                Array.IndexOf(Enum.GetNames(enumType), name) >= 0;
+        }
+
+        private Type FindUniqueType(string name)
+        {
+            Type[] types;
+            try
+            {
+                types = _gameAssembly.GetTypes();
+            }
+            catch (ReflectionTypeLoadException exception)
+            {
+                types = exception.Types;
+            }
+
+            Type match = null;
+            for (int i = 0; i < types.Length; i++)
+            {
+                Type type = types[i];
+                if (type == null || !String.Equals(type.Name, name, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                if (match != null)
+                {
+                    throw new InvalidOperationException("El tipo de juego '" + name + "' es ambiguo.");
+                }
+
+                match = type;
+            }
+
+            if (match == null)
+            {
+                throw new InvalidOperationException("No se encontró el tipo de juego '" + name + "'.");
+            }
+
+            return match;
+        }
+
+        private static FieldInfo FindField(Type type, string name, BindingFlags flags)
+        {
+            FieldInfo field = type.GetField(name, flags);
+            if (field == null)
+            {
+                throw new InvalidOperationException("No se encontró el campo " + type.FullName + "." + name + ".");
+            }
+
+            return field;
+        }
+
+        private static bool IsExactList(Type collectionType, Type itemType)
+        {
+            return collectionType != null && collectionType.IsGenericType &&
+                collectionType.GetGenericTypeDefinition() == typeof(List<>) &&
+                collectionType.GetGenericArguments()[0] == itemType;
+        }
+
+        private void Log(string message)
+        {
+            if (message != null)
+            {
+                lock (_logGate)
+                {
+                    _recentLogs.Enqueue(DateTime.Now.ToString("HH:mm:ss") + " " + message);
+                    while (_recentLogs.Count > 100)
+                    {
+                        _recentLogs.Dequeue();
+                    }
+                }
+            }
+
+            if (_log == null)
+            {
+                return;
+            }
+
+            try { _log("[ExpansionLoader] " + message); }
+            catch { }
+        }
+
+        private sealed class RegistrySnapshot : IContentRegistrySnapshot
+        {
+            private readonly ContentPackRuntimeLoader _owner;
+            private readonly HashSet<string> _declaredUnitIds;
+            private readonly HashSet<string> _declaredProfileIds;
+
+            public RegistrySnapshot(
+                ContentPackRuntimeLoader owner,
+                HashSet<string> declaredUnitIds,
+                HashSet<string> declaredProfileIds)
+            {
+                _owner = owner;
+                _declaredUnitIds = declaredUnitIds;
+                _declaredProfileIds = declaredProfileIds;
+            }
+
+            public bool ContainsId(string id)
+            {
+                return _owner._nativeUnitIds.Contains(id) || _owner._knownIds.Contains(id);
+            }
+
+            public bool ContainsUnit(string id)
+            {
+                if ((_owner._nativeUnitIds.Contains(id) && !_owner._nativeFactoryIds.Contains(id)) ||
+                    _declaredUnitIds.Contains(id))
+                {
+                    return true;
+                }
+
+                LoadedUnit unit;
+                return _owner._units.TryGetValue(id, out unit) && !unit.IsProductionBuilding;
+            }
+
+            public bool ContainsAiProfile(string id)
+            {
+                return _owner._aiProfiles.ContainsKey(id) || _declaredProfileIds.Contains(id);
+            }
+        }
+
+        private sealed class PackCandidate
+        {
+            public PackCandidate(string root, string name, ContentPackDefinition definition)
+            {
+                Root = root;
+                Name = name;
+                Definition = definition;
+                Dependencies = new HashSet<PackCandidate>();
+            }
+
+            public string Root { get; private set; }
+            public string Name { get; private set; }
+            public ContentPackDefinition Definition { get; private set; }
+            public ContentPackDefinition ValidatedDefinition { get; set; }
+            public HashSet<PackCandidate> Dependencies { get; private set; }
+            public bool Disabled { get; set; }
+            public bool LoadAttempted { get; set; }
+            public bool LoadSucceeded { get; set; }
+            public string StatusReason { get; set; }
+            public long LoadedBytes { get; set; }
+        }
+
+        private sealed class LoadedUnit
+        {
+            public LoadedUnit(
+                string id,
+                string packId,
+                string prefabKey,
+                string imageKey,
+                object balanceRow,
+                ContentUnitDefinition definition,
+                bool isProductionBuilding,
+                string productionFactoryId)
+            {
+                Id = id;
+                PackId = packId;
+                PrefabKey = prefabKey;
+                ImageKey = imageKey;
+                BalanceRow = balanceRow;
+                Definition = definition;
+                IsProductionBuilding = isProductionBuilding;
+                ProductionFactoryId = productionFactoryId;
+            }
+
+            public string Id { get; private set; }
+            public string PackId { get; private set; }
+            public string PrefabKey { get; private set; }
+            public string ImageKey { get; private set; }
+            public object BalanceRow { get; private set; }
+            public ContentUnitDefinition Definition { get; private set; }
+            public bool IsProductionBuilding { get; private set; }
+            public string ProductionFactoryId { get; private set; }
+        }
+
+        private sealed class LoadedStage
+        {
+            public LoadedStage(
+                ContentStageDefinition definition,
+                string packId,
+                object runtimeStage,
+                List<object> blueprintPools,
+                List<object> worlds,
+                LoadedLandscape landscape,
+                List<BlueprintPoolScopeRegistration> blueprintPoolScopes,
+                HashSet<string> blueprintFactoryIds,
+                UnityEngine.Object fallbackLandscape)
+            {
+                Definition = definition;
+                PackId = packId;
+                RuntimeStage = runtimeStage;
+                BlueprintPools = blueprintPools;
+                Worlds = worlds;
+                Landscape = landscape;
+                BlueprintPoolScopes = blueprintPoolScopes;
+                BlueprintFactoryIds = new HashSet<string>(blueprintFactoryIds, StringComparer.Ordinal);
+                FallbackLandscape = fallbackLandscape;
+            }
+
+            public ContentStageDefinition Definition { get; private set; }
+            public string PackId { get; private set; }
+            public object RuntimeStage { get; private set; }
+            public List<object> BlueprintPools { get; private set; }
+            public List<object> Worlds { get; private set; }
+            public LoadedLandscape Landscape { get; private set; }
+            public List<BlueprintPoolScopeRegistration> BlueprintPoolScopes { get; private set; }
+            public HashSet<string> BlueprintFactoryIds { get; private set; }
+            public UnityEngine.Object FallbackLandscape { get; private set; }
+        }
+
+        private sealed class LoadedLandscape
+        {
+            public LoadedLandscape(
+                string resourceName,
+                string resourcePath,
+                string localizationId,
+                UnityEngine.Object asset,
+                ContentStageLandscapeDefinition definition)
+            {
+                ResourceName = resourceName;
+                ResourcePath = resourcePath;
+                LocalizationId = localizationId;
+                Asset = asset;
+                Definition = definition;
+            }
+
+            public string ResourceName { get; private set; }
+            public string ResourcePath { get; private set; }
+            public string LocalizationId { get; private set; }
+            public UnityEngine.Object Asset { get; private set; }
+            public ContentStageLandscapeDefinition Definition { get; private set; }
+        }
+
+        private sealed class StageLandscapeMutation : IDisposable
+        {
+            private ContentPackRuntimeLoader _owner;
+
+            public StageLandscapeMutation(ContentPackRuntimeLoader owner)
+            {
+                _owner = owner;
+                Entries = new List<ScopedLandscapeListEntry>();
+            }
+
+            public List<ScopedLandscapeListEntry> Entries { get; private set; }
+
+            public void Record(IList list, UnityEngine.Object landscape)
+            {
+                Entries.Add(new ScopedLandscapeListEntry(list, landscape));
+            }
+
+            public void Dispose()
+            {
+                ContentPackRuntimeLoader owner = _owner;
+                if (owner == null)
+                {
+                    return;
+                }
+
+                _owner = null;
+                owner.RestoreStageLandscapeMutation(this);
+            }
+        }
+
+        private sealed class ScopedLandscapeListEntry
+        {
+            public ScopedLandscapeListEntry(IList list, UnityEngine.Object landscape)
+            {
+                List = list;
+                Landscape = landscape;
+            }
+
+            public IList List { get; private set; }
+            public UnityEngine.Object Landscape { get; private set; }
+        }
+
+        private sealed class LoadedAiProfile
+        {
+            public LoadedAiProfile(
+                ContentAiProfileDefinition definition,
+                string packId,
+                string resourceName,
+                List<object> behaviours,
+                GameObject prefab)
+            {
+                Definition = definition;
+                PackId = packId;
+                ResourceName = resourceName;
+                Behaviours = behaviours;
+                Prefab = prefab;
+                var moduleIds = new List<string>();
+                ContentAiModuleDefinition[] modules = definition.modules ?? new ContentAiModuleDefinition[0];
+                for (int i = 0; i < modules.Length; i++)
+                {
+                    if (modules[i] != null && !String.IsNullOrWhiteSpace(modules[i].moduleId))
+                    {
+                        moduleIds.Add(modules[i].moduleId);
+                    }
+                }
+                ModuleIds = moduleIds.ToArray();
+            }
+
+            public ContentAiProfileDefinition Definition { get; private set; }
+            public string PackId { get; private set; }
+            public string Id { get { return Definition.id; } }
+            public string ResourceName { get; private set; }
+            public bool ScopeToReferencedStages { get { return Definition.scopeToReferencedStages; } }
+            public string[] ModuleIds { get; private set; }
+            public List<object> Behaviours { get; private set; }
+            public GameObject Prefab { get; private set; }
+        }
+
+        private sealed class BoundAiRuntimeBehaviour
+        {
+            public BoundAiRuntimeBehaviour(
+                IRogueCommandAiRuntimeBehaviour runtimeBehaviour,
+                string failure,
+                string profileId)
+            {
+                RuntimeBehaviour = runtimeBehaviour;
+                Failed = !String.IsNullOrEmpty(failure);
+                ProfileId = profileId;
+            }
+
+            public IRogueCommandAiRuntimeBehaviour RuntimeBehaviour { get; set; }
+            public string ProfileId { get; private set; }
+            public bool Initialized { get; set; }
+            public bool Initializing { get; set; }
+            public bool Failed { get; set; }
+            public bool Destroyed { get; set; }
+        }
+
+        private sealed class ReferenceComparer : IEqualityComparer<object>
+        {
+            public static readonly ReferenceComparer Instance = new ReferenceComparer();
+            public new bool Equals(object left, object right) { return System.Object.ReferenceEquals(left, right); }
+            public int GetHashCode(object value) { return System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(value); }
+        }
+    }
 }

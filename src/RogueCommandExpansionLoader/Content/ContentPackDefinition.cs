@@ -28,6 +28,20 @@ namespace RogueCommandExpansionLoader.Content
     }
 
     [Serializable]
+    public sealed class ContentAbilityDefinition
+    {
+        public string id;
+        public float value;
+    }
+
+    [Serializable]
+    public sealed class ContentAiOverrideDefinition
+    {
+        public string parameter;
+        public float value;
+    }
+
+    [Serializable]
     public sealed class ContentUnitDefinition
     {
         public string id;
@@ -53,6 +67,7 @@ namespace RogueCommandExpansionLoader.Content
 
     [Serializable]
     public sealed class ContentProductionBuildingDefinition
+
     {
         public string id;
         public string nativeTemplateId;

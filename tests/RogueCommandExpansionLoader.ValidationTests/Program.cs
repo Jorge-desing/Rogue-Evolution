@@ -643,6 +643,66 @@ var tests = new (string Name, Action Run)[]
         mutationManager.MutateActiveAiBehaviour(manager, "detectionRange", 20.0f);
         if (behaviour.detectionRange != 20.0f) throw new InvalidOperationException("AI detectionRange mutation failed.");
     }),
+    ("runtime mutation handles invalid targets and fields", () =>
+    {
+        var mutationManager = new RuntimeMutationManager(msg => { });
+        
+        // Null target
+        if (mutationManager.MutateField(null!, "someField", 1.0f)) 
+            throw new InvalidOperationException("Mutation should fail for null target.");
+
+        // Non-existent field
+        var target = new object();
+        if (mutationManager.MutateField(target, "NonExistentField", 1.0f)) 
+            throw new InvalidOperationException("Mutation should fail for non-existent field.");
+
+        // Wrong type
+        var buff = new EntityValueModifier { value = 1.0f };
+        if (mutationManager.MutateField(buff, "value", "not a float")) 
+            throw new InvalidOperationException("Mutation should fail for type mismatch.");
+
+        // AI Behaviour: null manager
+        if (mutationManager.MutateActiveAiBehaviour(null!, "tickRate", 0.5f)) 
+            throw new InvalidOperationException("AI mutation should fail for null manager.");
+
+        // AI Behaviour: null activeBehaviour
+        var manager = new AiBehaviourManager { activeBehaviour = null! };
+        if (mutationManager.MutateActiveAiBehaviour(manager, "tickRate", 0.5f)) 
+            throw new InvalidOperationException("AI mutation should fail for null activeBehaviour.");
+    }),
+    ("ability validation rejects null entries and non-finite values", () =>
+    {
+        WithPackage(sample, (pack, root) =>
+        {
+            pack.units[0].abilities = [null!];
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(), "entry.null");
+        });
+        WithPackage(sample, (pack, root) =>
+        {
+            pack.units[0].abilities = [new ContentAbilityDefinition { id = "test", value = Single.NaN }];
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(), "ability.value-invalid");
+        });
+        WithPackage(sample, (pack, root) =>
+        {
+            pack.units[0].abilities = [new ContentAbilityDefinition { id = "test", value = Single.PositiveInfinity }];
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(), "ability.value-invalid");
+        });
+    }),
+    ("AI override validation rejects null entries and empty parameters", () =>
+    {
+        WithPackage(sample, (pack, root) =>
+        {
+            pack.units[0].aiOverrides = [null!];
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(), "entry.null");
+        });
+        WithPackage(sample, (pack, root) =>
+        {
+            pack.units[0].aiOverrides = [new ContentAiOverrideDefinition { parameter = "", value = 1.0f }];
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(), "ai-override.parameter-required");
+        });
+    }),
+
+
     ("demo reward stage index follows visible stages and tutorial substitution", () =>
     {
         var nativeHiddenStage = new object();

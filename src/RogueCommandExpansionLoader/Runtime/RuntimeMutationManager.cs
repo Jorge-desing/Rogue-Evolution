@@ -6,7 +6,7 @@ namespace RogueCommandExpansionLoader.Runtime
     /// <summary>
     /// Provides functionality to mutate existing game object instances at runtime.
     /// </summary>
-    internal sealed class RuntimeMutationManager
+    public sealed class RuntimeMutationManager
     {
         private readonly Action<string> _log;
 

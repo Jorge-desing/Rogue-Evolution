@@ -343,6 +343,7 @@
     {
       "id": "sample-native:arachnid-hexapod",
       "nativeTemplateId": "GatlingWalker",
+      "unitType": "Ground",
       "assetBundleId": "sample-native:assets",
       "visualAssetName": "assets/roguecommandexpansionsample/visualonly/prefabs/arachnidhexapodvisual.prefab",
       "visualRootPath": "RoboMarine_Mesh",
@@ -413,6 +414,7 @@
     {
       "id": "sample-native:overlord-command-hq",
       "nativeTemplateId": "PCXBaseTank",
+      "unitType": "Ground",
       "assetBundleId": "sample-native:assets",
       "visualAssetName": "assets/roguecommandexpansionsample/visualonly/prefabs/overlordcommandhqvisual.prefab",
       "visualRootPath": "Vehicle",
