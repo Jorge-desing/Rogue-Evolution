@@ -58,10 +58,14 @@ Every added unit must declare its own namespaced `productionBuilding`.
 - Native factory mappings are strictly preserved.
 - The stage offers the factory blueprint in randomized reward pools; player purchase and placement produce the unit.
 - Stage `unitIds` and AI `unitEntries` reference the produced unit ID.
-- Five product/building pairs are currently declared in `sample-native-expansion`:
+- Nine product/building pairs are currently declared in `sample-native-expansion`:
   - `sample-native:scout-tank` $\leftrightarrow$ `sample-native:scout-tank-factory`
   - `sample-native:heavy-artillery` $\leftrightarrow$ `sample-native:heavy-artillery-factory`
   - `sample-native:assault-walker` $\leftrightarrow$ `sample-native:assault-walker-factory`
+  - `sample-native:atlas-crane-mech` $\leftrightarrow$ `sample-native:atlas-crane-mech-factory`
+  - `sample-native:bastion-siege-mech` $\leftrightarrow$ `sample-native:bastion-siege-mech-factory`
+  - `sample-native:arachnid-hexapod` $\leftrightarrow$ `sample-native:arachnid-hexapod-factory`
+  - `sample-native:overlord-command-hq` $\leftrightarrow$ `sample-native:overlord-command-hq-factory`
   - `sample-native:skirmish-bike` $\leftrightarrow$ `sample-native:skirmish-bike-factory`
   - `sample-native:surge-tank` $\leftrightarrow$ `sample-native:surge-tank-factory`
 

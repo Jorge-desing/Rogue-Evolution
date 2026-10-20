@@ -85,7 +85,7 @@ El paquete aparece en `artifacts/packages/` y conserva la estructura `BepInEx/pl
 3. Coloca cada paquete en `BepInEx/plugins/RogueCommandExpansionLoader/content/packs/<carpeta-del-pack>/` con su `content.json` y, cuando los use, sus AssetBundles.
 4. Conserva `Rogue Command/Mod/` para las sobrescrituras TSV nativas; el loader externo no reemplaza ese formato.
 
-`content/packs/sample-native-expansion/content.json` añade cinco unidades con balance sobre controladores nativos: Sandlance en `PCXBaseTank/Vehicle`, Bike en `BombBike/GameObject/BombBike`, Colossus en `ArtilleryTank/Tank`, Ironclad en `GatlingWalker` y Surge en `LightningTank/PCX TankHolder`. Cuatro unidades usan overlays visuales; Ironclad conserva el visual articulado nativo mientras su prototipo personalizado siga sin rig. Cada unidad tiene una nueva fábrica, según la tabla siguiente.
+`content/packs/sample-native-expansion/content.json` declara nueve productos con balance sobre filas nativas: Sandlance (`PCXBaseTank`), Bike (`BombBike`), Colossus (`ArtilleryTank`), Ironclad, Atlas, Bastion y Arachnid (`GatlingWalker`), Overlord (`PCXBaseTank`) y Surge (`LightningTank`). Cada producto tiene una fábrica namespaced propia, según la tabla siguiente.
 
 La etapa `training-variant` añade una variante procedural del LandscapeGenerator nativo, con semilla fija, tamaño 31 y nombre localizado. El loader la expone durante la generación de esa etapa y restaura las listas temporales mediante un finalizer de Harmony. Los perfiles AI nativos se clonan con un rango calculado a partir de sus etapas, preservando sus plantillas globales. Las nuevas etapas reciben también un fallback nativo validado en un snapshot que conserva los nueve slots originales.
 
@@ -102,6 +102,10 @@ Cada unidad del mod declara un edificio propio en `productionBuilding`. El edifi
 | Sandlance Scout | Planta de ensamblaje Sandlance | `sample-native:scout-tank-factory` |
 | Colossus Siege Platform | Fábrica de asedio Coloso | `sample-native:heavy-artillery-factory` |
 | Ironclad Gatling Walker | Fundición de caminantes Ironclad | `sample-native:assault-walker-factory` |
+| Atlas Crane Mech | Fábrica de Mechas Grúa Atlas | `sample-native:atlas-crane-mech-factory` |
+| Bastion Siege Mech | Fundición del Bastión | `sample-native:bastion-siege-mech-factory` |
+| Arachnid Hexapod | Pórtico de ensamblaje Arácnido | `sample-native:arachnid-hexapod-factory` |
+| Overlord Command HQ | Parque de vehículos Overlord | `sample-native:overlord-command-hq-factory` |
 | Skirmish Strike Bike | Taller de motos de asalto | `sample-native:skirmish-bike-factory` |
 | Surge Arc Tank | Planta de tanques Surge Arc | `sample-native:surge-tank-factory` |
 

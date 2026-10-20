@@ -4,7 +4,10 @@ using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 using UnityEditor;
+using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.Rendering;
+using UnityEngine.SceneManagement;
 
 namespace RogueCommandExpansion.Authoring
 {
@@ -22,6 +25,7 @@ namespace RogueCommandExpansion.Authoring
         private const float FactoryNewWearStrength = 0.25f;
         private const string SampleModelRoot = "Assets/RogueCommandExpansionSample/Models";
         private const string SampleTextureRoot = SampleModelRoot + "/Textures";
+        private const string VisualOnlyRoot = "Assets/RogueCommandExpansionSample/VisualOnly";
 
         [Serializable]
         private sealed class ModelInput
@@ -129,10 +133,113 @@ namespace RogueCommandExpansion.Authoring
             BuildSampleVisualPreview("SalvageHauler", "SkyguardSAM");
         }
 
+        [MenuItem("Rogue Command/Visual Preview/Build Minefield Sower + Longshot Tankette")]
+        public static void BuildMinefieldSowerAndLongshotTankettePreview()
+        {
+            BuildSampleVisualPreview("MinefieldSower", "LongshotTankette");
+        }
+
         [MenuItem("Rogue Command/Visual Preview/Build Tidebreaker Hovercraft + Deep Space Relay")]
         public static void BuildTidebreakerAndDeepSpaceRelayPreview()
         {
             BuildSampleVisualPreview("TidebreakerHovercraft", "DeepSpaceRelay");
+        }
+
+        [MenuItem("Rogue Command/Visual Preview/Bind Tidebreaker + Deep Space PBR Prefabs")]
+        public static void BuildTidebreakerAndDeepSpaceRelayPbrPrefabs()
+        {
+            try
+            {
+                ConfigureSampleSourceTextureImports("TidebreakerHovercraft", "DeepSpaceRelay");
+                BuildVisualOnlyPbrPrefab("TidebreakerHovercraft");
+                BuildVisualOnlyPbrPrefab("DeepSpaceRelay");
+                AssetDatabase.SaveAssets();
+                AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
+                Debug.Log("Created persistent, script-free PBR visual prefabs for Tidebreaker Hovercraft and " +
+                    "Deep Space Relay under " + VisualOnlyRoot + ". No gameplay or pack registration was changed.");
+                if (Application.isBatchMode) EditorApplication.Exit(0);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception);
+                if (Application.isBatchMode) EditorApplication.Exit(1);
+            }
+        }
+
+        [MenuItem("Rogue Command/Visual Preview/Render Tidebreaker + Deep Space at RTS Scale")]
+        public static void RenderTidebreakerAndDeepSpaceAtRtsScale()
+        {
+            RenderVisualPrefabsAtRtsScale(
+                new[] { "TidebreakerHovercraft", "DeepSpaceRelay" },
+                new[] { 30, 50, 120, 300 });
+        }
+
+        [MenuItem("Rogue Command/Visual Preview/Render Arachnid + Overlord Models at RTS Scale")]
+        public static void RenderArachnidAndOverlordAtRtsScale()
+        {
+            RenderVisualPrefabsAtRtsScale(
+                new[]
+                {
+                    "ArachnidHexapod",
+                    "OverlordCommandHQ",
+                    "ArachnidHexapodFactory",
+                    "OverlordCommandHQFactory"
+                },
+                new[] { 50, 120, 300 });
+        }
+
+        private static void RenderVisualPrefabsAtRtsScale(string[] modelNames, int[] targetScreenHeights)
+        {
+            RenderPipelineAsset originalDefaultPipeline = GraphicsSettings.defaultRenderPipeline;
+            RenderPipelineAsset originalQualityPipeline = QualitySettings.renderPipeline;
+            bool originalColorTemperature = GraphicsSettings.lightsUseColorTemperature;
+            int exitCode = 0;
+            try
+            {
+                if (!Application.isBatchMode)
+                {
+                    throw new InvalidOperationException(
+                        "RTS scale renders run in a dedicated Unity batch process so the open authoring scene is untouched.");
+                }
+
+                string projectRoot = Directory.GetParent(Application.dataPath).FullName;
+                string runId = DateTime.UtcNow.ToString("yyyyMMdd_HHmmss");
+                string pairName = String.Join("-", modelNames.Select(name => name.ToLowerInvariant()));
+                string outputRoot = Path.GetFullPath(Path.Combine(projectRoot, "..", "..", "artifacts",
+                    "visual-previews", "rts-scale-" + pairName + "-" + runId));
+                Directory.CreateDirectory(outputRoot);
+
+                // URP's editor preview path currently throws while creating its volume stack because the
+                // project has duplicate Bloom registrations. Use a temporary Standard-shader adapter here;
+                // persistent prefabs and materials remain on the project's URP shader.
+                GraphicsSettings.defaultRenderPipeline = null;
+                QualitySettings.renderPipeline = null;
+
+                for (int i = 0; i < targetScreenHeights.Length; i++)
+                {
+                    for (int modelIndex = 0; modelIndex < modelNames.Length; modelIndex++)
+                    {
+                        RenderVisualPrefabAtScreenHeight(modelNames[modelIndex], 512,
+                            targetScreenHeights[i], outputRoot);
+                    }
+                }
+
+                Debug.Log("Rendered " + String.Join(", ", modelNames) + " at " +
+                    String.Join(", ", targetScreenHeights.Select(height => height + "px")) +
+                    " RTS scales under " + outputRoot + ".");
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception);
+                exitCode = 1;
+            }
+            finally
+            {
+                GraphicsSettings.defaultRenderPipeline = originalDefaultPipeline;
+                QualitySettings.renderPipeline = originalQualityPipeline;
+                GraphicsSettings.lightsUseColorTemperature = originalColorTemperature;
+            }
+            if (Application.isBatchMode) EditorApplication.delayCall += () => EditorApplication.Exit(exitCode);
         }
 
         [MenuItem("Rogue Command/Visual Preview/Build Wraith Stealth Wing + Subterranean Mole")]
@@ -238,12 +345,388 @@ namespace RogueCommandExpansion.Authoring
             string textureStem = SampleTextureRoot + "/" + modelName;
             return new ModelInput
             {
-                fbxPath = ToAbsolutePath(projectRoot, SampleModelRoot + "/" + modelName + ".fbx"),
+                fbxPath = ToAbsolutePath(projectRoot, ResolveSampleModelAssetPath(modelName)),
                 albedoPath = ToAbsolutePath(projectRoot, textureStem + "_Albedo.png"),
                 metallicGlossPath = ToAbsolutePath(projectRoot, textureStem + "_MetallicGloss.png"),
                 normalPath = ToAbsolutePath(projectRoot, textureStem + "_Normal.png"),
                 emissionPath = ToAbsolutePath(projectRoot, textureStem + "_Emission.png")
             };
+        }
+
+        private static string ResolveSampleModelAssetPath(string modelName)
+        {
+            string[] candidates =
+            {
+                SampleModelRoot + "/" + modelName + "_LODs.fbx",
+                SampleModelRoot + "/" + modelName + "_Atlas.fbx",
+                SampleModelRoot + "/" + modelName + ".fbx"
+            };
+            string projectRoot = Directory.GetParent(Application.dataPath).FullName;
+            for (int i = 0; i < candidates.Length; i++)
+            {
+                if (File.Exists(ToAbsolutePath(projectRoot, candidates[i]))) return candidates[i];
+            }
+            throw new FileNotFoundException("No sample model FBX was found for " + modelName + ".");
+        }
+
+        private static void BuildVisualOnlyPbrPrefab(string modelName)
+        {
+            string modelAssetPath = ResolveSampleModelAssetPath(modelName);
+            if (!modelAssetPath.EndsWith("_Atlas.fbx", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidDataException(modelName + " must use its unified _Atlas.fbx for atlas texturing.");
+            }
+
+            string albedoPath = SampleTextureRoot + "/" + modelName + "_Albedo.png";
+            string metallicGlossPath = SampleTextureRoot + "/" + modelName + "_MetallicGloss.png";
+            string normalPath = SampleTextureRoot + "/" + modelName + "_Normal.png";
+            string emissionPath = SampleTextureRoot + "/" + modelName + "_Emission.png";
+            Texture2D albedo = LoadTexture(albedoPath, modelName + " albedo");
+            Texture2D metallicGloss = LoadTexture(metallicGlossPath, modelName + " MetallicGloss");
+            Texture2D normal = LoadTexture(normalPath, modelName + " normal");
+            Texture2D emission = LoadTexture(emissionPath, modelName + " emission");
+            ValidateTextureSet(modelName, albedo, metallicGloss, normal, emission);
+            LogTextureImporter(albedoPath, albedo);
+            LogTextureImporter(metallicGlossPath, metallicGloss);
+            LogTextureImporter(normalPath, normal);
+            LogTextureImporter(emissionPath, emission);
+
+            GameObject modelAsset = AssetDatabase.LoadAssetAtPath<GameObject>(modelAssetPath);
+            if (modelAsset == null)
+            {
+                throw new InvalidDataException("Unity did not import " + modelAssetPath + ".");
+            }
+            ValidateImportedMeshVertexColors(modelAsset, modelName);
+
+            EnsureAssetFolder(VisualOnlyRoot + "/Materials");
+            EnsureAssetFolder(VisualOnlyRoot + "/Prefabs");
+            string materialPath = VisualOnlyRoot + "/Materials/" + modelName + "_Atlas.mat";
+            Material atlasMaterial = CreateOrUpdateVisualOnlyMaterial(materialPath, modelName + "_Atlas",
+                albedo, metallicGloss, normal, emission);
+
+            string prefabPath = VisualOnlyRoot + "/Prefabs/" + modelName + "Visual.prefab";
+            GameObject root = new GameObject(modelName + "Visual");
+            try
+            {
+                GameObject model = PrefabUtility.InstantiatePrefab(modelAsset) as GameObject;
+                if (model == null) model = Instantiate(modelAsset);
+                model.name = Path.GetFileNameWithoutExtension(modelAssetPath);
+                model.transform.SetParent(root.transform, false);
+
+                Renderer[] renderers = model.GetComponentsInChildren<Renderer>(true);
+                if (renderers.Length == 0)
+                {
+                    throw new InvalidDataException(modelName + " atlas FBX has no renderers.");
+                }
+                for (int rendererIndex = 0; rendererIndex < renderers.Length; rendererIndex++)
+                {
+                    Material[] previousMaterials = renderers[rendererIndex].sharedMaterials;
+                    int slotCount = previousMaterials == null || previousMaterials.Length == 0
+                        ? 1
+                        : previousMaterials.Length;
+                    var assignedMaterials = new Material[slotCount];
+                    for (int slot = 0; slot < slotCount; slot++) assignedMaterials[slot] = atlasMaterial;
+                    renderers[rendererIndex].sharedMaterials = assignedMaterials;
+                }
+
+                bool success;
+                PrefabUtility.SaveAsPrefabAsset(root, prefabPath, out success);
+                if (!success) throw new IOException("Unity could not save " + prefabPath + ".");
+            }
+            finally
+            {
+                DestroyImmediate(root);
+            }
+
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
+            GameObject savedPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+            ValidateScriptFreePrefab(savedPrefab, modelName, ShaderName);
+            ValidateVisualOnlyPrefabTextureBindings(savedPrefab, albedo, metallicGloss, normal, emission,
+                modelName);
+            Debug.Log("Bound all four canonical PBR maps to the unified atlas prefab " + prefabPath +
+                " using " + modelAssetPath + ".");
+        }
+
+        private static Material CreateOrUpdateVisualOnlyMaterial(
+            string materialPath,
+            string materialName,
+            Texture2D albedo,
+            Texture2D metallicGloss,
+            Texture2D normal,
+            Texture2D emission)
+        {
+            Shader shader = Shader.Find(ShaderName);
+            if (shader == null) throw new InvalidOperationException("Shader.Find failed for " + ShaderName + ".");
+            Material updated = CreatePreviewMaterial(shader, materialName, albedo, metallicGloss, normal, emission);
+            Material existing = AssetDatabase.LoadAssetAtPath<Material>(materialPath);
+            if (existing == null)
+            {
+                AssetDatabase.CreateAsset(updated, materialPath);
+                return updated;
+            }
+
+            EditorUtility.CopySerialized(updated, existing);
+            DestroyImmediate(updated);
+            EditorUtility.SetDirty(existing);
+            return existing;
+        }
+
+        private static void ValidateVisualOnlyPrefabTextureBindings(
+            GameObject prefab,
+            Texture2D albedo,
+            Texture2D metallicGloss,
+            Texture2D normal,
+            Texture2D emission,
+            string label)
+        {
+            Renderer[] renderers = prefab.GetComponentsInChildren<Renderer>(true);
+            int materialCount = 0;
+            for (int rendererIndex = 0; rendererIndex < renderers.Length; rendererIndex++)
+            {
+                Material[] materials = renderers[rendererIndex].sharedMaterials;
+                for (int slot = 0; slot < materials.Length; slot++)
+                {
+                    Material material = materials[slot];
+                    if (material == null || material.GetTexture("_BaseMap") != albedo ||
+                        material.GetTexture("_MetallicGlossMap") != metallicGloss ||
+                        material.GetTexture("_BumpMap") != normal ||
+                        material.GetTexture("_EmissionMap") != emission)
+                    {
+                        throw new InvalidDataException(label + " prefab has a renderer/material slot that does not " +
+                            "reference the four canonical PBR maps.");
+                    }
+                    materialCount++;
+                }
+            }
+            if (materialCount == 0)
+            {
+                throw new InvalidDataException(label + " prefab contains no material bindings.");
+            }
+            Debug.Log("Verified " + label + " prefab material bindings: " + renderers.Length +
+                " renderers, " + materialCount + " slots; canonical Albedo, MetallicGloss, Normal and Emission.");
+        }
+
+        private static void RenderVisualPrefabAtScreenHeight(
+            string modelName,
+            int renderSize,
+            int targetScreenHeight,
+            string outputRoot)
+        {
+            string prefabPath = VisualOnlyRoot + "/Prefabs/" + modelName + "Visual.prefab";
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+            if (prefab == null) throw new FileNotFoundException("Missing visual-only prefab " + prefabPath + ".");
+
+            Scene previousScene = SceneManager.GetActiveScene();
+            Scene previewScene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            RenderTexture renderTexture = null;
+            Texture2D screenshot = null;
+            var temporaryMaterials = new List<Material>();
+            try
+            {
+                GameObject instance = PrefabUtility.InstantiatePrefab(prefab, previewScene) as GameObject;
+                if (instance == null)
+                {
+                    instance = Instantiate(prefab);
+                    SceneManager.MoveGameObjectToScene(instance, previewScene);
+                }
+
+                SceneManager.SetActiveScene(previewScene);
+                RenderSettings.ambientMode = AmbientMode.Flat;
+                RenderSettings.ambientLight = new Color(0.65f, 0.68f, 0.72f, 1.0f);
+
+                Renderer[] renderers = instance.GetComponentsInChildren<Renderer>(true);
+                if (renderers.Length == 0) throw new InvalidDataException(modelName + " prefab has no renderers.");
+                ConfigureBuiltInPreviewMaterials(renderers, temporaryMaterials);
+                Bounds bounds = renderers[0].bounds;
+                for (int i = 1; i < renderers.Length; i++) bounds.Encapsulate(renderers[i].bounds);
+                float modelHeight = Mathf.Max(bounds.size.y, 0.01f);
+
+                GameObject lightObject = new GameObject(modelName + "_PreviewKeyLight");
+                SceneManager.MoveGameObjectToScene(lightObject, previewScene);
+                Light keyLight = lightObject.AddComponent<Light>();
+                keyLight.type = LightType.Directional;
+                keyLight.intensity = 1.35f;
+                keyLight.color = Color.white;
+                keyLight.shadows = LightShadows.Soft;
+                lightObject.transform.rotation = Quaternion.Euler(42.0f, -32.0f, 0.0f);
+
+                GameObject cameraObject = new GameObject(modelName + "_PreviewCamera");
+                SceneManager.MoveGameObjectToScene(cameraObject, previewScene);
+                Camera camera = cameraObject.AddComponent<Camera>();
+                camera.enabled = false;
+                camera.clearFlags = CameraClearFlags.SolidColor;
+                camera.backgroundColor = new Color(0.22f, 0.26f, 0.30f, 1.0f);
+                camera.orthographic = true;
+                camera.aspect = 1.0f;
+                camera.allowHDR = true;
+                camera.useOcclusionCulling = false;
+                camera.nearClipPlane = 0.01f;
+                Vector3 viewDirection = new Vector3(1.0f, 0.78f, 1.0f).normalized;
+                float cameraDistance = Mathf.Max(modelHeight * 3.0f, 2.0f);
+                camera.farClipPlane = cameraDistance + modelHeight * 4.0f;
+                camera.transform.position = bounds.center + viewDirection * cameraDistance;
+                camera.transform.LookAt(bounds.center, Vector3.up);
+                Vector3 extents = bounds.extents;
+                Vector3 cameraUp = camera.transform.up;
+                float projectedHeight =
+                    Mathf.Abs(Vector3.Dot(cameraUp, Vector3.right)) * extents.x +
+                    Mathf.Abs(Vector3.Dot(cameraUp, Vector3.up)) * extents.y +
+                    Mathf.Abs(Vector3.Dot(cameraUp, Vector3.forward)) * extents.z;
+                camera.orthographicSize = Mathf.Max(projectedHeight, 0.01f) * renderSize /
+                    targetScreenHeight;
+                float initialPixelHeight = MeasureProjectedMeshHeight(camera, renderers, renderSize);
+                if (initialPixelHeight <= 0.0f)
+                {
+                    throw new InvalidDataException(modelName + " has no measurable projected mesh geometry.");
+                }
+                camera.orthographicSize *= initialPixelHeight / targetScreenHeight;
+                float fittedPixelHeight = MeasureProjectedMeshHeight(camera, renderers, renderSize);
+                if (Mathf.Abs(fittedPixelHeight - targetScreenHeight) > 0.75f)
+                {
+                    throw new InvalidDataException(modelName + " RTS scale fit missed target " +
+                        targetScreenHeight + "px (measured " + fittedPixelHeight + "px).");
+                }
+
+                renderTexture = new RenderTexture(renderSize, renderSize, 24,
+                    RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
+                renderTexture.name = modelName + "_RTSPreview_" + targetScreenHeight + "px";
+                renderTexture.antiAliasing = 1;
+                renderTexture.Create();
+                camera.targetTexture = renderTexture;
+                camera.Render();
+
+                RenderTexture.active = renderTexture;
+                screenshot = new Texture2D(renderSize, renderSize, TextureFormat.RGBA32, false, false);
+                screenshot.ReadPixels(new Rect(0, 0, renderSize, renderSize), 0, 0, false);
+                screenshot.Apply(false, false);
+
+                string outputPath = Path.Combine(outputRoot,
+                    modelName + "_" + targetScreenHeight + "px.png");
+                File.WriteAllBytes(outputPath, screenshot.EncodeToPNG());
+                Debug.Log("Rendered " + modelName + " at target " + targetScreenHeight + "px model height: " +
+                    outputPath + "; worldBounds=" + bounds.size + ", projectedHeight=" + projectedHeight +
+                    ", measuredPixelHeight=" + fittedPixelHeight + "px, orthoSize=" +
+                    camera.orthographicSize + ".");
+            }
+            finally
+            {
+                RenderTexture.active = null;
+                if (screenshot != null) DestroyImmediate(screenshot);
+                for (int i = temporaryMaterials.Count - 1; i >= 0; i--)
+                {
+                    if (temporaryMaterials[i] != null) DestroyImmediate(temporaryMaterials[i]);
+                }
+                if (renderTexture != null)
+                {
+                    renderTexture.Release();
+                    DestroyImmediate(renderTexture);
+                }
+                if (previousScene.IsValid() && previousScene.isLoaded) SceneManager.SetActiveScene(previousScene);
+            }
+        }
+
+        private static float MeasureProjectedMeshHeight(Camera camera, Renderer[] renderers, int renderSize)
+        {
+            float minimumY = float.PositiveInfinity;
+            float maximumY = float.NegativeInfinity;
+            bool foundVertex = false;
+
+            foreach (Renderer renderer in renderers)
+            {
+                MeshFilter filter = renderer.GetComponent<MeshFilter>();
+                Mesh mesh = filter != null ? filter.sharedMesh : null;
+                if (mesh != null)
+                {
+                    Vector3[] vertices = mesh.vertices;
+                    for (int vertexIndex = 0; vertexIndex < vertices.Length; vertexIndex++)
+                    {
+                        float screenY = camera.WorldToViewportPoint(
+                            renderer.transform.TransformPoint(vertices[vertexIndex])).y;
+                        minimumY = Mathf.Min(minimumY, screenY);
+                        maximumY = Mathf.Max(maximumY, screenY);
+                        foundVertex = true;
+                    }
+                    continue;
+                }
+
+                Bounds rendererBounds = renderer.bounds;
+                Vector3 extents = rendererBounds.extents;
+                Vector3 center = rendererBounds.center;
+                for (int corner = 0; corner < 8; corner++)
+                {
+                    Vector3 point = center + new Vector3(
+                        (corner & 1) == 0 ? -extents.x : extents.x,
+                        (corner & 2) == 0 ? -extents.y : extents.y,
+                        (corner & 4) == 0 ? -extents.z : extents.z);
+                    float screenY = camera.WorldToViewportPoint(point).y;
+                    minimumY = Mathf.Min(minimumY, screenY);
+                    maximumY = Mathf.Max(maximumY, screenY);
+                    foundVertex = true;
+                }
+            }
+
+            if (!foundVertex) return 0.0f;
+            return (maximumY - minimumY) * renderSize;
+        }
+
+        private static void ConfigureBuiltInPreviewMaterials(Renderer[] renderers, List<Material> ownedMaterials)
+        {
+            Shader standard = Shader.Find("Standard");
+            if (standard == null) throw new InvalidOperationException("Unity Standard shader is unavailable.");
+
+            var replacements = new Dictionary<int, Material>();
+            foreach (Renderer renderer in renderers)
+            {
+                Material[] sourceMaterials = renderer.sharedMaterials;
+                var previewMaterials = new Material[sourceMaterials.Length];
+                for (int slot = 0; slot < sourceMaterials.Length; slot++)
+                {
+                    Material source = sourceMaterials[slot];
+                    if (source == null) continue;
+
+                    int sourceId = source.GetInstanceID();
+                    Material preview;
+                    if (!replacements.TryGetValue(sourceId, out preview))
+                    {
+                        preview = new Material(standard);
+                        preview.name = source.name + "_RTSPreview";
+                        if (source.HasProperty("_BaseMap"))
+                        {
+                            preview.SetTexture("_MainTex", source.GetTexture("_BaseMap"));
+                            preview.SetTextureScale("_MainTex", source.GetTextureScale("_BaseMap"));
+                            preview.SetTextureOffset("_MainTex", source.GetTextureOffset("_BaseMap"));
+                        }
+                        if (source.HasProperty("_BaseColor")) preview.SetColor("_Color", source.GetColor("_BaseColor"));
+                        if (source.HasProperty("_MetallicGlossMap"))
+                        {
+                            preview.SetTexture("_MetallicGlossMap", source.GetTexture("_MetallicGlossMap"));
+                            // A low-metal inspection response keeps the baked albedo readable without an
+                            // environment cubemap; the source map still drives per-pixel metalness.
+                            preview.SetFloat("_Metallic", 0.18f);
+                            preview.SetFloat("_GlossMapScale", source.GetFloat("_GlossMapScale") * 0.35f);
+                            preview.EnableKeyword("_METALLICGLOSSMAP");
+                        }
+                        if (source.HasProperty("_BumpMap") && source.GetTexture("_BumpMap") != null)
+                        {
+                            preview.SetTexture("_BumpMap", source.GetTexture("_BumpMap"));
+                            preview.SetFloat("_BumpScale", source.GetFloat("_BumpScale"));
+                            preview.EnableKeyword("_NORMALMAP");
+                        }
+                        if (source.HasProperty("_EmissionMap") && source.GetTexture("_EmissionMap") != null)
+                        {
+                            preview.SetTexture("_EmissionMap", source.GetTexture("_EmissionMap"));
+                            preview.SetColor("_EmissionColor", source.GetColor("_EmissionColor"));
+                            preview.EnableKeyword("_EMISSION");
+                        }
+
+                        replacements.Add(sourceId, preview);
+                        ownedMaterials.Add(preview);
+                    }
+                    previewMaterials[slot] = preview;
+                }
+                renderer.sharedMaterials = previewMaterials;
+            }
         }
 
         private static string ToAbsolutePath(string projectRoot, string assetPath)

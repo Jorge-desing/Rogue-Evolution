@@ -1149,6 +1149,12 @@ namespace RogueCommandExpansionLoader.Content
             Log(message);
         }
 
+        private string GetGlobalFallbackBundlePath()
+        {
+            // In a real scenario, this would read from a mod configuration file.
+            return null;
+        }
+
         private bool TryRestorePendingStageMapOrder(bool progressionWasApplied)
         {
             if (_pendingStageMapSnapshotOwner == null || !_runtimeContentReady)
@@ -1567,6 +1573,46 @@ namespace RogueCommandExpansionLoader.Content
                     stages,
                     profiles,
                     recentLogs);
+            }
+        }
+
+        public IEnumerable<BalanceOverride> GetBalanceOverrides()
+        {
+            lock (_gate)
+            {
+                if (!_runtimeContentReady)
+                {
+                    return new List<BalanceOverride>();
+                }
+
+                var overrides = new List<BalanceOverride>();
+                foreach (var candidate in _packCandidates)
+                {
+                    if (candidate == null || candidate.Definition == null)
+                    {
+                        continue;
+                    }
+
+                    if (candidate.Definition.units == null)
+                    {
+                        continue;
+                    }
+
+                    foreach (var unit in candidate.Definition.units)
+                    {
+                        if (unit == null || unit.customBalance == null)
+                        {
+                            continue;
+                        }
+
+                        overrides.Add(new BalanceOverride
+                        {
+                            EntityId = unit.id,
+                            Parameters = unit.customBalance
+                        });
+                    }
+                }
+                return overrides;
             }
         }
 
@@ -2585,7 +2631,18 @@ namespace RogueCommandExpansionLoader.Content
                     FileStream stream;
                     if (!TryOpenContainedFile(packageRoot, fullPath, out stream, out pathFailure))
                     {
-                        throw new InvalidDataException(pathFailure);
+                        _log?.Invoke("Warning: Bundle file missing at '" + fullPath + "'; attempting global fallback if configured.");
+                        
+                        // Implement global-fallback mechanism
+                        string fallbackPath = GetGlobalFallbackBundlePath();
+                        if (!String.IsNullOrWhiteSpace(fallbackPath) && TryOpenContainedFile(packageRoot, fallbackPath, out stream, out pathFailure))
+                        {
+                            _log?.Invoke("Successfully loaded fallback bundle: " + fallbackPath);
+                        }
+                        else
+                        {
+                            throw new InvalidDataException(pathFailure);
+                        }
                     }
 
                     temporaryBundleStreams.Add(stream);

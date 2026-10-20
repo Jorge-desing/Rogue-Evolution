@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any, Dict, Sequence, Tuple
 
 import bpy, bmesh
-from mathutils import Vector, Euler, Quaternion
+from mathutils import Vector, Euler, Quaternion, Matrix
 
 DEFAULT_FACE_BUDGET = 7500
 
@@ -8955,6 +8955,13 @@ def create_single_material_atlas_model(
     unified_obj.name = f"{prefix}_UnifiedMesh"
     unified_obj.data.name = f"{prefix}_UnifiedMesh_Data"
 
+    # A joined atlas mesh inherits the active batch object's nonzero origin.
+    # Bake its world transform into the vertices before FBX export so the
+    # single-mesh export matches the source batches in Unity world space.
+    unified_obj.data.transform(unified_obj.matrix_world.copy())
+    unified_obj.data.update()
+    unified_obj.matrix_world = Matrix.Identity(4)
+
     atlas_mat = bpy.data.materials.new(f"{prefix}_Material_Atlas")
     atlas_mat.use_nodes = True
     nodes = atlas_mat.node_tree.nodes
@@ -9001,6 +9008,13 @@ def create_single_material_atlas_model(
     unified_obj.data.materials.append(atlas_mat)
     for poly in unified_obj.data.polygons:
         poly.material_index = 0
+
+    # The atlas is a static single-mesh export. A joined batch can inherit an
+    # Armature modifier from its active source mesh; evaluating it would deform
+    # the consolidated geometry even though this export contains no armature.
+    for modifier in list(unified_obj.modifiers):
+        if modifier.type == "ARMATURE":
+            unified_obj.modifiers.remove(modifier)
 
     output_fbx_path.parent.mkdir(parents=True, exist_ok=True)
     export_unity_fbx(output_fbx_path, [unified_obj], include_empties=False)

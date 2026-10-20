@@ -195,15 +195,13 @@ En una ejecución observada, el botón `Start Run Button` de `RunSetup` abrió `
 
 El nivel persistente de perfil (`MetaGame.CurrentExperienceLevel`) es distinto del nivel del run, nodo del mapa y progresión de etapa. La inspección estática documentada en el handoff indica que la experiencia persistente se actualiza al terminar el run; pasar un encuentro intermedio no actualiza por sí solo el nivel de perfil. Una unidad con `neededExperienceLevel` solo puede entrar en candidatos cuando se cumple ese nivel, y el sorteo sigue siendo aleatorio.
 
-En `sample-native-expansion`, cada producto y su fábrica declaran el mismo `rarity` y `neededExperienceLevel`. Niveles configurados actualmente:
+En `sample-native-expansion`, cada producto y su fábrica declaran el mismo `rarity` y `neededExperienceLevel`. Para probar el roster completo, todas las cartas y fábricas están configuradas en el nivel persistente mínimo, `0`:
 
-| Nivel de perfil | Carta | Rareza |
+| Nivel de perfil | Cartas | Rareza |
 |---:|---|---|
-| 0 | Sandlance Scout | Common |
-| 1 | Skirmish Strike Bike | Common |
-| 2 | Ironclad Gatling Walker | Common |
-| 3 | Surge Arc Tank | Common |
-| 4 | Colossus Siege Platform | Common |
+| 0 | Sandlance Scout; Skirmish Strike Bike; Ironclad Gatling Walker; Colossus Siege Platform; Surge Arc Tank; Atlas Crane Mech; Bastion Siege Mech; Arachnid Hexapod; Overlord Command HQ | Common |
+
+El umbral de perfil no elimina la disponibilidad por stage: cada unidad sigue sujeta a los stages y filtros de oferta declarados para el pack, y la extracción de cartas es aleatoria. La elegibilidad a nivel 0 no garantiza que aparezca en una oferta del stage nativo actual.
 
 Las estadísticas de coste, producción, capacidad, salud, escudo/armadura, movilidad, visión, ataque, daño, alcance, recarga y habilidad deben declararse en los overrides de la unidad. El manifiesto y el validador local comprueban estos datos; la inspección de una oferta visible comprueba otra cosa y sigue siendo evidencia de partida.
 

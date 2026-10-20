@@ -41,6 +41,14 @@ namespace RogueCommandExpansion.Authoring
         private const string SurgeArcTankPrefabPath = AssetRoot + "/SurgeArcTankVisual.prefab";
         private const string SurgeArcTankCardSpritePath = AssetRoot + "/SurgeArcTankCard.png";
         private const string SurgeArcTankModelPath = AssetRoot + "/Models/SurgeArcTank.fbx";
+        private const string ArachnidHexapodVisualPrefabPath =
+            AssetRoot + "/VisualOnly/Prefabs/ArachnidHexapodVisual.prefab";
+        private const string ArachnidHexapodFactoryVisualPrefabPath =
+            AssetRoot + "/VisualOnly/Prefabs/ArachnidHexapodFactoryVisual.prefab";
+        private const string OverlordCommandHQVisualPrefabPath =
+            AssetRoot + "/VisualOnly/Prefabs/OverlordCommandHQVisual.prefab";
+        private const string OverlordCommandHQFactoryVisualPrefabPath =
+            AssetRoot + "/VisualOnly/Prefabs/OverlordCommandHQFactoryVisual.prefab";
         private const string MaterialRoot = AssetRoot + "/Materials";
         private const string VertexWearShaderName = "RogueCommand/VehiclePBR_VertexWear";
         private const float FactoryNewWearStrength = 0.25f;
@@ -276,6 +284,7 @@ namespace RogueCommandExpansion.Authoring
                 ImportCardSprite(BastionSiegeMechCardSpritePath, true);
                 string surgeArcTankPrefabPath = CreateSurgeArcTankVisual();
                 ImportCardSprite(SurgeArcTankCardSpritePath);
+                ConfigureArachnidOverlordPbrTextureImports();
                 string outputPath = Path.GetFullPath(Path.Combine(projectRoot, BundleOutputPath));
                 Directory.CreateDirectory(outputPath);
 
@@ -290,7 +299,9 @@ namespace RogueCommandExpansion.Authoring
                         ironcladPrefabPath, IroncladCardSpritePath,
                         atlasCraneMechPrefabPath, AtlasCraneMechCardSpritePath,
                         bastionSiegeMechPrefabPath, BastionSiegeMechCardSpritePath,
-                        surgeArcTankPrefabPath, SurgeArcTankCardSpritePath
+                        surgeArcTankPrefabPath, SurgeArcTankCardSpritePath,
+                        ArachnidHexapodVisualPrefabPath, ArachnidHexapodFactoryVisualPrefabPath,
+                        OverlordCommandHQVisualPrefabPath, OverlordCommandHQFactoryVisualPrefabPath
                     }
                 };
                 AssetBundleManifest manifest = BuildPipeline.BuildAssetBundles(outputPath,
@@ -380,6 +391,10 @@ namespace RogueCommandExpansion.Authoring
                 EnsureExistingBundleAsset(SurgeArcTankCardSpritePath, typeof(Sprite));
                 EnsureExistingBundleAsset(BastionEngineLoopAudioPath, typeof(AudioClip));
                 EnsureExistingBundleAsset(BastionWeaponShotAudioPath, typeof(AudioClip));
+                EnsureExistingBundleAsset(ArachnidHexapodVisualPrefabPath, typeof(GameObject));
+                EnsureExistingBundleAsset(ArachnidHexapodFactoryVisualPrefabPath, typeof(GameObject));
+                EnsureExistingBundleAsset(OverlordCommandHQVisualPrefabPath, typeof(GameObject));
+                EnsureExistingBundleAsset(OverlordCommandHQFactoryVisualPrefabPath, typeof(GameObject));
 
                 GameObject bastionPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(BastionSiegeMechPrefabPath);
                 AudioSource[] bastionAudioSources = bastionPrefab.GetComponentsInChildren<AudioSource>(true);
@@ -397,6 +412,7 @@ namespace RogueCommandExpansion.Authoring
                 }
 
                 EnsureUrpAuthoringPipeline();
+                ConfigureArachnidOverlordPbrTextureImports();
                 string outputPath = Path.GetFullPath(Path.Combine(projectRoot, BundleOutputPath));
                 Directory.CreateDirectory(outputPath);
                 var build = new AssetBundleBuild
@@ -410,7 +426,9 @@ namespace RogueCommandExpansion.Authoring
                         IroncladPrefabPath, IroncladCardSpritePath,
                         AtlasCraneMechPrefabPath, AtlasCraneMechCardSpritePath,
                         BastionSiegeMechPrefabPath, BastionSiegeMechCardSpritePath,
-                        SurgeArcTankPrefabPath, SurgeArcTankCardSpritePath
+                        SurgeArcTankPrefabPath, SurgeArcTankCardSpritePath,
+                        ArachnidHexapodVisualPrefabPath, ArachnidHexapodFactoryVisualPrefabPath,
+                        OverlordCommandHQVisualPrefabPath, OverlordCommandHQFactoryVisualPrefabPath
                     }
                 };
                 AssetBundleManifest manifest = BuildPipeline.BuildAssetBundles(outputPath,
@@ -442,7 +460,8 @@ namespace RogueCommandExpansion.Authoring
                     Path.Combine(packBundles, "assetbundle-manifest.bundle"));
 
                 Debug.Log("Rebuilt and reopened " + BundleName + " from existing sample assets; no prefabs or " +
-                    "model/material scaffolding was run. Bastion includes its two authored AudioSources.");
+                    "model/material scaffolding was run. It includes the Arachnid Hexapod and Overlord HQ unit " +
+                    "and factory visual overlays. Bastion includes its two authored AudioSources.");
                 if (Application.isBatchMode)
                 {
                     EditorApplication.Exit(0);
@@ -470,6 +489,94 @@ namespace RogueCommandExpansion.Authoring
                 throw new FileNotFoundException("Targeted bundle build requires an existing " +
                     requiredType.Name + " at " + assetPath + ". It will not create or repair it.");
             }
+        }
+
+        private static void ConfigureArachnidOverlordPbrTextureImports()
+        {
+            string[] modelNames =
+            {
+                "ArachnidHexapod",
+                "OverlordCommandHQ",
+                "ArachnidHexapodFactory",
+                "OverlordCommandHQFactory"
+            };
+
+            for (int i = 0; i < modelNames.Length; i++)
+            {
+                string textureRoot = AssetRoot + "/Models/Textures/" + modelNames[i];
+                ConfigurePbrTextureImporter(textureRoot + "_Albedo.png", TextureImporterType.Default,
+                    true, true, modelNames[i] + " albedo");
+                ConfigurePbrTextureImporter(textureRoot + "_MetallicGloss.png", TextureImporterType.Default,
+                    false, true, modelNames[i] + " MetallicGloss");
+                ConfigurePbrTextureImporter(textureRoot + "_Normal.png", TextureImporterType.NormalMap,
+                    false, false, modelNames[i] + " normal");
+                ConfigurePbrTextureImporter(textureRoot + "_Emission.png", TextureImporterType.Default,
+                    true, false, modelNames[i] + " emission");
+            }
+        }
+
+        private static void ConfigurePbrTextureImporter(
+            string assetPath,
+            TextureImporterType textureType,
+            bool sRgbTexture,
+            bool preserveInputAlpha,
+            string label)
+        {
+            TextureImporter importer = AssetImporter.GetAtPath(assetPath) as TextureImporter;
+            if (importer == null)
+            {
+                throw new FileNotFoundException("Unity did not import the " + label + " map at " + assetPath + ".");
+            }
+
+            importer.textureType = textureType;
+            importer.sRGBTexture = sRgbTexture;
+            importer.mipmapEnabled = true;
+            importer.maxTextureSize = 2048;
+            importer.filterMode = FilterMode.Trilinear;
+            importer.anisoLevel = 8;
+            importer.textureCompression = TextureImporterCompression.CompressedHQ;
+            importer.compressionQuality = 100;
+            if (preserveInputAlpha)
+            {
+                importer.alphaSource = TextureImporterAlphaSource.FromInput;
+                importer.alphaIsTransparency = false;
+            }
+
+            TextureImporterPlatformSettings standalone = importer.GetPlatformTextureSettings("Standalone");
+            standalone.name = "Standalone";
+            standalone.overridden = true;
+            standalone.maxTextureSize = 2048;
+            standalone.textureCompression = TextureImporterCompression.CompressedHQ;
+            standalone.compressionQuality = 100;
+            standalone.crunchedCompression = false;
+            importer.SetPlatformTextureSettings(standalone);
+            importer.SaveAndReimport();
+
+            TextureImporter verifiedImporter = AssetImporter.GetAtPath(assetPath) as TextureImporter;
+            TextureImporterPlatformSettings verifiedStandalone = verifiedImporter == null
+                ? null
+                : verifiedImporter.GetPlatformTextureSettings("Standalone");
+            Texture2D texture = AssetDatabase.LoadAssetAtPath<Texture2D>(assetPath);
+            if (verifiedImporter == null || texture == null || texture.width != 2048 || texture.height != 2048 ||
+                verifiedImporter.textureType != textureType || verifiedImporter.sRGBTexture != sRgbTexture ||
+                !verifiedImporter.mipmapEnabled || verifiedImporter.maxTextureSize != 2048 ||
+                verifiedImporter.filterMode != FilterMode.Trilinear || verifiedImporter.anisoLevel != 8 ||
+                verifiedImporter.textureCompression != TextureImporterCompression.CompressedHQ ||
+                verifiedStandalone == null || !verifiedStandalone.overridden ||
+                verifiedStandalone.maxTextureSize != 2048 ||
+                verifiedStandalone.textureCompression != TextureImporterCompression.CompressedHQ ||
+                verifiedStandalone.compressionQuality != 100 || verifiedStandalone.crunchedCompression ||
+                (preserveInputAlpha && (verifiedImporter.alphaSource != TextureImporterAlphaSource.FromInput ||
+                    verifiedImporter.alphaIsTransparency)))
+            {
+                throw new InvalidDataException("Unity did not preserve the required 2048px high-quality PBR import " +
+                    "settings for " + label + " at " + assetPath + ".");
+            }
+
+            Debug.Log("Verified PBR texture import " + assetPath + ": " + texture.width + "x" + texture.height +
+                ", type=" + verifiedImporter.textureType + ", sRGB=" + verifiedImporter.sRGBTexture +
+                ", compression=" + verifiedStandalone.textureCompression + ", quality=" +
+                verifiedStandalone.compressionQuality + ", alpha=" + verifiedImporter.alphaSource + ".");
         }
 
         private static void ValidateRiggedWalkerSources(string projectRoot)
@@ -1999,6 +2106,22 @@ namespace RogueCommandExpansion.Authoring
                     "bastionsiegemechcard.png", "BastionSiegeMechCard", "Bastion Siege Mech", true);
                 ValidateVisualBundleAssets(bundle, assetNames, "surgearctankvisual.prefab", "SurgeArcTankVisual",
                     "surgearctankcard.png", "SurgeArcTankCard", 6, "Surge Arc Tank");
+                ValidateVisualBundleAssets(bundle, assetNames, "arachnidhexapodvisual.prefab",
+                    "ArachnidHexapodVisual", null, null, 1, "Arachnid Hexapod");
+                ValidateVisualBundleAssets(bundle, assetNames, "arachnidhexapodfactoryvisual.prefab",
+                    "ArachnidHexapodFactoryVisual", null, null, 1, "Arachnid Hexapod Factory");
+                ValidateVisualBundleAssets(bundle, assetNames, "overlordcommandhqvisual.prefab",
+                    "OverlordCommandHQVisual", null, null, 1, "Overlord Command HQ");
+                ValidateVisualBundleAssets(bundle, assetNames, "overlordcommandhqfactoryvisual.prefab",
+                    "OverlordCommandHQFactoryVisual", null, null, 1, "Overlord Command HQ Factory");
+                ValidatePbrVisualBundlePrefab(bundle, assetNames, "arachnidhexapodvisual.prefab",
+                    "ArachnidHexapodVisual", "Arachnid Hexapod");
+                ValidatePbrVisualBundlePrefab(bundle, assetNames, "arachnidhexapodfactoryvisual.prefab",
+                    "ArachnidHexapodFactoryVisual", "Arachnid Hexapod Factory");
+                ValidatePbrVisualBundlePrefab(bundle, assetNames, "overlordcommandhqvisual.prefab",
+                    "OverlordCommandHQVisual", "Overlord Command HQ");
+                ValidatePbrVisualBundlePrefab(bundle, assetNames, "overlordcommandhqfactoryvisual.prefab",
+                    "OverlordCommandHQFactoryVisual", "Overlord Command HQ Factory");
             }
             finally
             {
@@ -2345,6 +2468,149 @@ namespace RogueCommandExpansion.Authoring
                     throw new InvalidDataException(visualLabel +
                         " visual bundle contains a missing or scripted component.");
                 }
+            }
+        }
+
+        private static void ValidatePbrVisualBundlePrefab(
+            AssetBundle bundle,
+            string[] assetNames,
+            string prefabSuffix,
+            string prefabName,
+            string visualLabel)
+        {
+            string prefabPath = FindUniqueAssetPath(assetNames, prefabSuffix, visualLabel + " prefab");
+            GameObject prefab = bundle.LoadAsset<GameObject>(prefabPath);
+            if (prefab == null || !String.Equals(prefab.name, prefabName, StringComparison.Ordinal))
+            {
+                throw new InvalidDataException(visualLabel + " PBR prefab could not be loaded from the bundle.");
+            }
+
+            Component[] components = prefab.GetComponentsInChildren<Component>(true);
+            for (int i = 0; i < components.Length; i++)
+            {
+                if (components[i] == null || components[i] is MonoBehaviour)
+                {
+                    throw new InvalidDataException(visualLabel + " PBR prefab contains a missing or scripted component.");
+                }
+            }
+
+            MeshFilter[] meshFilters = prefab.GetComponentsInChildren<MeshFilter>(true);
+            SkinnedMeshRenderer[] skinnedRenderers = prefab.GetComponentsInChildren<SkinnedMeshRenderer>(true);
+            int checkedMeshCount = 0;
+            var checkedMeshIds = new HashSet<int>();
+            for (int i = 0; i < meshFilters.Length; i++)
+            {
+                ValidatePbrMeshVertexColors(meshFilters[i] == null ? null : meshFilters[i].sharedMesh,
+                    visualLabel, checkedMeshIds, ref checkedMeshCount);
+            }
+            for (int i = 0; i < skinnedRenderers.Length; i++)
+            {
+                ValidatePbrMeshVertexColors(skinnedRenderers[i] == null ? null : skinnedRenderers[i].sharedMesh,
+                    visualLabel, checkedMeshIds, ref checkedMeshCount);
+            }
+            if (checkedMeshCount == 0)
+            {
+                throw new InvalidDataException(visualLabel + " PBR prefab has no mesh to render.");
+            }
+
+            Renderer[] renderers = prefab.GetComponentsInChildren<Renderer>(true);
+            int materialCount = 0;
+            for (int i = 0; i < renderers.Length; i++)
+            {
+                if (!(renderers[i] is MeshRenderer) && !(renderers[i] is SkinnedMeshRenderer))
+                {
+                    continue;
+                }
+
+                Material[] materials = renderers[i].sharedMaterials;
+                if (materials == null || materials.Length == 0)
+                {
+                    throw new InvalidDataException(visualLabel + " mesh renderer has no material.");
+                }
+                for (int materialIndex = 0; materialIndex < materials.Length; materialIndex++)
+                {
+                    Material material = materials[materialIndex];
+                    if (material == null || material.shader == null ||
+                        !String.Equals(material.shader.name, VertexWearShaderName, StringComparison.Ordinal) ||
+                        !material.HasProperty("_WearStrength") ||
+                        Mathf.Abs(material.GetFloat("_WearStrength") - FactoryNewWearStrength) > 0.001f)
+                    {
+                        throw new InvalidDataException(visualLabel + " material is missing " + VertexWearShaderName +
+                            " or the expected vertex-wear setting.");
+                    }
+
+                    ValidatePbrMaterialTexture(material, "_BaseMap", true, visualLabel, "Albedo");
+                    ValidatePbrMaterialTexture(material, "_MetallicGlossMap", true, visualLabel, "MetallicGloss");
+                    ValidatePbrMaterialTexture(material, "_BumpMap", true, visualLabel, "Normal");
+                    ValidatePbrMaterialTexture(material, "_EmissionMap", true, visualLabel, "Emission");
+                    if (!material.IsKeywordEnabled("_METALLICSPECGLOSSMAP") ||
+                        !material.IsKeywordEnabled("_NORMALMAP") || !material.IsKeywordEnabled("_EMISSION"))
+                    {
+                        throw new InvalidDataException(visualLabel + " material has a PBR texture without its shader keyword.");
+                    }
+                    materialCount++;
+                }
+            }
+
+            if (materialCount == 0)
+            {
+                throw new InvalidDataException(visualLabel + " PBR prefab has no mesh material bindings.");
+            }
+
+            Debug.Log("Reopened PBR bundle asset " + visualLabel + ": " + checkedMeshCount +
+                " mesh(es), " + materialCount + " material slot(s), RGBA vertex colors and four 2048px maps.");
+        }
+
+        private static void ValidatePbrMeshVertexColors(
+            Mesh mesh,
+            string visualLabel,
+            HashSet<int> checkedMeshIds,
+            ref int checkedMeshCount)
+        {
+            if (mesh == null || !checkedMeshIds.Add(mesh.GetInstanceID()))
+            {
+                if (mesh == null)
+                {
+                    throw new InvalidDataException(visualLabel + " PBR prefab contains a renderer with no mesh.");
+                }
+                return;
+            }
+
+            // Imported FBX meshes are intentionally non-readable in the shipped bundle.
+            // Query the vertex attribute layout instead of mesh.colors32, which throws when
+            // ModelImporter.isReadable is false even though Unity retained the GPU stream.
+            if (!mesh.HasVertexAttribute(VertexAttribute.Color) ||
+                mesh.GetVertexAttributeDimension(VertexAttribute.Color) != 4)
+            {
+                throw new InvalidDataException(visualLabel + " mesh " + mesh.name +
+                    " lost its RGBA vertex-color stream.");
+            }
+            checkedMeshCount++;
+        }
+
+        private static void ValidatePbrMaterialTexture(
+            Material material,
+            string propertyName,
+            bool required,
+            string visualLabel,
+            string mapLabel)
+        {
+            if (!material.HasProperty(propertyName))
+            {
+                if (required) throw new InvalidDataException(visualLabel + " material lacks " + mapLabel + " property " + propertyName + ".");
+                return;
+            }
+
+            Texture texture = material.GetTexture(propertyName);
+            if (texture == null)
+            {
+                if (required) throw new InvalidDataException(visualLabel + " material has no " + mapLabel + " texture.");
+                return;
+            }
+            if (texture.width != 2048 || texture.height != 2048)
+            {
+                throw new InvalidDataException(visualLabel + " " + mapLabel + " imported at " + texture.width + "x" +
+                    texture.height + "; expected 2048x2048.");
             }
         }
 

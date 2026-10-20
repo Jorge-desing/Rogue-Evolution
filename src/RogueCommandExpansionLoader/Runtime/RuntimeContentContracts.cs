@@ -10,6 +10,12 @@ namespace RogueCommandExpansionLoader.Runtime
     /// TryLoadResource must resolve from mod-owned assets and must not call Resources.Load for the
     /// same requested path.
     /// </summary>
+    public sealed class BalanceOverride
+    {
+        public string EntityId { get; set; }
+        public Dictionary<string, float> Parameters { get; set; }
+    }
+
     public interface IRuntimeContentProvider
     {
         string TargetGameVersion { get; }
@@ -27,6 +33,9 @@ namespace RogueCommandExpansionLoader.Runtime
         void OnEntityRowsRegistered();
 
         IEnumerable<object> GetEntityParameterRows();
+
+        /// <summary>Returns balance overrides for existing entities defined in content packs.</summary>
+        IEnumerable<BalanceOverride> GetBalanceOverrides();
 
         /// <summary>Resolves a localized name or description for a registered mod unit.</summary>
         bool TryGetUnitLocalization(string unitId, bool description, out string value);

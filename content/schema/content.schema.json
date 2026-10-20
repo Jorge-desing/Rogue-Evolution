@@ -60,16 +60,71 @@
   },
   "allOf": [
     {
-      "if": { "properties": { "assetBundles": { "minItems": 1 } }, "required": ["assetBundles"] },
-      "then": { "required": ["assetBundleManifestPath"] },
-      "else": { "not": { "required": ["assetBundleManifestPath"] } }
+      "if": {
+        "properties": {
+          "assetBundles": {
+            "minItems": 1
+          }
+        },
+        "required": [
+          "assetBundles"
+        ]
+      },
+      "then": {
+        "required": [
+          "assetBundleManifestPath"
+        ]
+      },
+      "else": {
+        "not": {
+          "required": [
+            "assetBundleManifestPath"
+          ]
+        }
+      }
     },
     {
       "anyOf": [
-        { "required": ["units"], "properties": { "units": { "minItems": 1 } } },
-        { "required": ["stages"], "properties": { "stages": { "minItems": 1 } } },
-        { "required": ["aiProfiles"], "properties": { "aiProfiles": { "minItems": 1 } } },
-        { "required": ["relics"], "properties": { "relics": { "minItems": 1 } } }
+        {
+          "required": [
+            "units"
+          ],
+          "properties": {
+            "units": {
+              "minItems": 1
+            }
+          }
+        },
+        {
+          "required": [
+            "stages"
+          ],
+          "properties": {
+            "stages": {
+              "minItems": 1
+            }
+          }
+        },
+        {
+          "required": [
+            "aiProfiles"
+          ],
+          "properties": {
+            "aiProfiles": {
+              "minItems": 1
+            }
+          }
+        },
+        {
+          "required": [
+            "relics"
+          ],
+          "properties": {
+            "relics": {
+              "minItems": 1
+            }
+          }
+        }
       ]
     }
   ],
@@ -87,168 +142,573 @@
     "assetBundle": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "path"],
+      "required": [
+        "id",
+        "path"
+      ],
       "properties": {
-        "id": { "$ref": "#/$defs/namespacedId" },
-        "path": { "type": "string", "pattern": "^bundles/(?!(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\\.|$))[a-z0-9][a-z0-9._-]*\\.bundle$" }
+        "id": {
+          "$ref": "#/$defs/namespacedId"
+        },
+        "path": {
+          "type": "string",
+          "pattern": "^bundles/(?!(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\\.|$))[a-z0-9][a-z0-9._-]*\\.bundle$"
+        }
       }
     },
     "unit": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "productionBuilding"],
+      "required": [
+        "id",
+        "productionBuilding"
+      ],
       "properties": {
-        "id": { "$ref": "#/$defs/namespacedId" },
-        "assetBundleId": { "$ref": "#/$defs/namespacedId" },
-        "balanceAssetName": { "type": "string", "minLength": 1, "pattern": "\\S", "description": "Unity AssetBundle address, preferably the project-relative path including extension." },
-        "prefabAssetName": { "type": "string", "minLength": 1, "pattern": "\\S", "description": "Unity AssetBundle address, preferably the project-relative path including extension." },
-        "cardImageAssetName": { "type": "string", "minLength": 1, "pattern": "\\S", "description": "Unity AssetBundle address for a Sprite; prefer the project-relative path including extension." },
-        "visualAssetName": { "type": "string", "minLength": 1, "pattern": "\\S", "description": "Unity AssetBundle address, preferably the project-relative path including extension." },
-        "visualRootPath": { "type": "string", "minLength": 1, "pattern": "\\S" },
-        "nativeTemplateId": { "type": "string", "minLength": 1, "pattern": "\\S" },
-        "productionBuilding": { "$ref": "#/$defs/productionBuilding" },
-        "isAllowedAsStartingBlueprint": { "type": "boolean" },
-        "isAllowedForAi": { "type": "boolean" },
-        "isAllowedForDemo": { "type": "boolean" },
-        "isForSpecialists": { "type": "boolean" },
+        "id": {
+          "$ref": "#/$defs/namespacedId"
+        },
+        "assetBundleId": {
+          "$ref": "#/$defs/namespacedId"
+        },
+        "balanceAssetName": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S",
+          "description": "Unity AssetBundle address, preferably the project-relative path including extension."
+        },
+        "prefabAssetName": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S",
+          "description": "Unity AssetBundle address, preferably the project-relative path including extension."
+        },
+        "cardImageAssetName": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S",
+          "description": "Unity AssetBundle address for a Sprite; prefer the project-relative path including extension."
+        },
+        "visualAssetName": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S",
+          "description": "Unity AssetBundle address, preferably the project-relative path including extension."
+        },
+        "visualRootPath": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "nativeTemplateId": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "productionBuilding": {
+          "$ref": "#/$defs/productionBuilding"
+        },
+        "isAllowedAsStartingBlueprint": {
+          "type": "boolean"
+        },
+        "isAllowedForAi": {
+          "type": "boolean"
+        },
+        "isAllowedForDemo": {
+          "type": "boolean"
+        },
+        "isForSpecialists": {
+          "type": "boolean"
+        },
         "localizations": {
           "type": "array",
           "minItems": 1,
-          "items": { "$ref": "#/$defs/unitLocalization" }
+          "items": {
+            "$ref": "#/$defs/unitLocalization"
+          }
         },
         "balanceOverrides": {
           "type": "array",
-          "items": { "$ref": "#/$defs/balanceOverride" }
+          "items": {
+            "$ref": "#/$defs/balanceOverride"
+          }
+        },
+        "unitType": {
+          "type": "string",
+          "enum": [
+            "Ground",
+            "Air",
+            "Support",
+            "Stationary"
+          ]
+        },
+        "customBalance": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number"
+          }
         }
       },
       "oneOf": [
         {
-          "required": ["nativeTemplateId"],
-          "not": { "anyOf": [{ "required": ["balanceAssetName"] }, { "required": ["prefabAssetName"] }] }
+          "required": [
+            "nativeTemplateId"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "balanceAssetName"
+                ]
+              },
+              {
+                "required": [
+                  "prefabAssetName"
+                ]
+              }
+            ]
+          }
         },
         {
-          "required": ["assetBundleId", "balanceAssetName", "prefabAssetName", "cardImageAssetName"],
-          "not": { "anyOf": [{ "required": ["nativeTemplateId"] }, { "required": ["visualAssetName"] }, { "required": ["visualRootPath"] }] }
+          "required": [
+            "assetBundleId",
+            "balanceAssetName",
+            "prefabAssetName",
+            "cardImageAssetName"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "nativeTemplateId"
+                ]
+              },
+              {
+                "required": [
+                  "visualAssetName"
+                ]
+              },
+              {
+                "required": [
+                  "visualRootPath"
+                ]
+              }
+            ]
+          }
         }
       ],
       "allOf": [
         {
-          "if": { "required": ["localizations"] },
+          "if": {
+            "required": [
+              "localizations"
+            ]
+          },
           "then": {
             "properties": {
               "localizations": {
                 "contains": {
-                  "properties": { "language": { "const": "en-US" } },
-                  "required": ["language", "name"]
+                  "properties": {
+                    "language": {
+                      "const": "en-US"
+                    }
+                  },
+                  "required": [
+                    "language",
+                    "name"
+                  ]
                 }
               }
             }
           }
         },
         {
-          "if": { "not": { "required": ["nativeTemplateId"] } },
-          "then": { "required": ["localizations"] }
+          "if": {
+            "not": {
+              "required": [
+                "nativeTemplateId"
+              ]
+            }
+          },
+          "then": {
+            "required": [
+              "localizations"
+            ]
+          }
         },
         {
-          "if": { "required": ["cardImageAssetName"] },
-          "then": { "required": ["assetBundleId"] }
+          "if": {
+            "required": [
+              "cardImageAssetName"
+            ]
+          },
+          "then": {
+            "required": [
+              "assetBundleId"
+            ]
+          }
         },
         {
-          "if": { "required": ["nativeTemplateId", "assetBundleId"] },
-          "then": { "anyOf": [{ "required": ["cardImageAssetName"] }, { "required": ["visualAssetName"] }] }
+          "if": {
+            "required": [
+              "nativeTemplateId",
+              "assetBundleId"
+            ]
+          },
+          "then": {
+            "anyOf": [
+              {
+                "required": [
+                  "cardImageAssetName"
+                ]
+              },
+              {
+                "required": [
+                  "visualAssetName"
+                ]
+              }
+            ]
+          }
         },
         {
-          "if": { "required": ["visualAssetName"] },
-          "then": { "required": ["nativeTemplateId", "assetBundleId", "visualRootPath"] }
+          "if": {
+            "required": [
+              "visualAssetName"
+            ]
+          },
+          "then": {
+            "required": [
+              "nativeTemplateId",
+              "assetBundleId",
+              "visualRootPath"
+            ]
+          }
         },
         {
-          "if": { "required": ["visualRootPath"] },
-          "then": { "required": ["nativeTemplateId", "visualAssetName"] }
+          "if": {
+            "required": [
+              "visualRootPath"
+            ]
+          },
+          "then": {
+            "required": [
+              "nativeTemplateId",
+              "visualAssetName"
+            ]
+          }
         }
       ]
     },
     "unitLocalization": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["language", "name"],
+      "required": [
+        "language",
+        "name"
+      ],
       "properties": {
-        "language": { "enum": ["en-US", "de-DE", "ja-JP", "ko-KR", "zh-CN", "zh-TW", "fr-FR", "es-XL", "pt-BR", "ru-RU"] },
-        "name": { "type": "string", "minLength": 1, "pattern": "\\S" },
-        "description": { "type": "string", "pattern": "\\S" },
-        "skillDescription": { "type": "string", "minLength": 1, "pattern": "\\S" }
+        "language": {
+          "enum": [
+            "en-US",
+            "de-DE",
+            "ja-JP",
+            "ko-KR",
+            "zh-CN",
+            "zh-TW",
+            "fr-FR",
+            "es-XL",
+            "pt-BR",
+            "ru-RU"
+          ]
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "description": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "skillDescription": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        }
       }
     },
     "relic": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "assetBundleId", "imageAssetName", "rarity", "tech", "offeredSystemTags", "neededSystemTags", "neededExperienceLevel", "isAllowedForDemo", "isForSpecialists", "localizations", "cardChanges"],
+      "required": [
+        "id",
+        "assetBundleId",
+        "imageAssetName",
+        "rarity",
+        "tech",
+        "offeredSystemTags",
+        "neededSystemTags",
+        "neededExperienceLevel",
+        "isAllowedForDemo",
+        "isForSpecialists",
+        "localizations",
+        "cardChanges"
+      ],
       "properties": {
-        "id": { "$ref": "#/$defs/namespacedId" },
-        "assetBundleId": { "$ref": "#/$defs/namespacedId" },
-        "imageAssetName": { "type": "string", "minLength": 1, "pattern": "\\S" },
-        "rarity": { "enum": ["Common", "Rare", "UltraRare"] },
-        "tech": { "enum": ["None", "Colorless", "Mech", "Tank", "Ancient", "Specialist", "All"] },
-        "offeredSystemTags": { "enum": ["None", "Melee", "Shield", "Spawn", "Armor", "Mech", "Robo", "Heal", "Turret", "Fire", "Bounty", "Panic", "Slow", "Stun", "Teleport", "AoE", "ManaUse", "Rush", "Turbo", "Strength", "Robust", "SkillRangeUse", "Bomb", "Tank", "Vehicle", "EffectDuration", "SpawnDuration", "CriticalHits", "Stealth", "Zombo", "Sniper", "Regen", "EconomySupport", "All"] },
-        "neededSystemTags": { "enum": ["None", "Melee", "Shield", "Spawn", "Armor", "Mech", "Robo", "Heal", "Turret", "Fire", "Bounty", "Panic", "Slow", "Stun", "Teleport", "AoE", "ManaUse", "Rush", "Turbo", "Strength", "Robust", "SkillRangeUse", "Bomb", "Tank", "Vehicle", "EffectDuration", "SpawnDuration", "CriticalHits", "Stealth", "Zombo", "Sniper", "Regen", "EconomySupport", "All"] },
-        "neededExperienceLevel": { "type": "integer", "minimum": 0, "maximum": 10000 },
-        "isAllowedForDemo": { "type": "boolean" },
-        "isForSpecialists": { "type": "boolean" },
+        "id": {
+          "$ref": "#/$defs/namespacedId"
+        },
+        "assetBundleId": {
+          "$ref": "#/$defs/namespacedId"
+        },
+        "imageAssetName": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "rarity": {
+          "enum": [
+            "Common",
+            "Rare",
+            "UltraRare"
+          ]
+        },
+        "tech": {
+          "enum": [
+            "None",
+            "Colorless",
+            "Mech",
+            "Tank",
+            "Ancient",
+            "Specialist",
+            "All"
+          ]
+        },
+        "offeredSystemTags": {
+          "enum": [
+            "None",
+            "Melee",
+            "Shield",
+            "Spawn",
+            "Armor",
+            "Mech",
+            "Robo",
+            "Heal",
+            "Turret",
+            "Fire",
+            "Bounty",
+            "Panic",
+            "Slow",
+            "Stun",
+            "Teleport",
+            "AoE",
+            "ManaUse",
+            "Rush",
+            "Turbo",
+            "Strength",
+            "Robust",
+            "SkillRangeUse",
+            "Bomb",
+            "Tank",
+            "Vehicle",
+            "EffectDuration",
+            "SpawnDuration",
+            "CriticalHits",
+            "Stealth",
+            "Zombo",
+            "Sniper",
+            "Regen",
+            "EconomySupport",
+            "All"
+          ]
+        },
+        "neededSystemTags": {
+          "enum": [
+            "None",
+            "Melee",
+            "Shield",
+            "Spawn",
+            "Armor",
+            "Mech",
+            "Robo",
+            "Heal",
+            "Turret",
+            "Fire",
+            "Bounty",
+            "Panic",
+            "Slow",
+            "Stun",
+            "Teleport",
+            "AoE",
+            "ManaUse",
+            "Rush",
+            "Turbo",
+            "Strength",
+            "Robust",
+            "SkillRangeUse",
+            "Bomb",
+            "Tank",
+            "Vehicle",
+            "EffectDuration",
+            "SpawnDuration",
+            "CriticalHits",
+            "Stealth",
+            "Zombo",
+            "Sniper",
+            "Regen",
+            "EconomySupport",
+            "All"
+          ]
+        },
+        "neededExperienceLevel": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        },
+        "isAllowedForDemo": {
+          "type": "boolean"
+        },
+        "isForSpecialists": {
+          "type": "boolean"
+        },
         "localizations": {
           "type": "array",
           "minItems": 1,
           "maxItems": 10,
-          "items": { "$ref": "#/$defs/relicLocalization" },
+          "items": {
+            "$ref": "#/$defs/relicLocalization"
+          },
           "contains": {
-            "properties": { "language": { "const": "en-US" }, "name": { "type": "string", "minLength": 1, "pattern": "\\S" } },
-            "required": ["language", "name"]
+            "properties": {
+              "language": {
+                "const": "en-US"
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "\\S"
+              }
+            },
+            "required": [
+              "language",
+              "name"
+            ]
           }
         },
         "cardChanges": {
           "type": "array",
           "minItems": 1,
           "maxItems": 16,
-          "items": { "$ref": "#/$defs/cardChange" }
+          "items": {
+            "$ref": "#/$defs/cardChange"
+          }
         }
       }
     },
     "relicLocalization": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["language", "name", "description"],
+      "required": [
+        "language",
+        "name",
+        "description"
+      ],
       "properties": {
-        "language": { "enum": ["en-US", "de-DE", "ja-JP", "ko-KR", "zh-CN", "zh-TW", "fr-FR", "es-XL", "pt-BR", "ru-RU"] },
-        "name": { "type": "string", "minLength": 1, "pattern": "\\S" },
-        "description": { "type": "string", "minLength": 1, "pattern": "\\S" }
+        "language": {
+          "enum": [
+            "en-US",
+            "de-DE",
+            "ja-JP",
+            "ko-KR",
+            "zh-CN",
+            "zh-TW",
+            "fr-FR",
+            "es-XL",
+            "pt-BR",
+            "ru-RU"
+          ]
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        }
       }
     },
     "cardChange": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["valueToChange", "operation", "value", "side", "multiplyValueWithCurrentHeatLevel", "onlyForTheseEntityIds"],
+      "required": [
+        "valueToChange",
+        "operation",
+        "value",
+        "side",
+        "multiplyValueWithCurrentHeatLevel",
+        "onlyForTheseEntityIds"
+      ],
       "properties": {
-        "valueToChange": { "const": "Health" },
-        "operation": { "enum": ["Add", "Multiply"] },
-        "value": { "type": "number", "exclusiveMinimum": 0, "maximum": 10000 },
-        "side": { "enum": ["False", "True", "Irrelevant"] },
-        "multiplyValueWithCurrentHeatLevel": { "const": false },
-        "multiplyValueWithMetaProgressionMultiplier": { "type": "string", "minLength": 1, "pattern": "\\S" },
+        "valueToChange": {
+          "const": "Health"
+        },
+        "operation": {
+          "enum": [
+            "Add",
+            "Multiply"
+          ]
+        },
+        "value": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 10000
+        },
+        "side": {
+          "enum": [
+            "False",
+            "True",
+            "Irrelevant"
+          ]
+        },
+        "multiplyValueWithCurrentHeatLevel": {
+          "const": false
+        },
+        "multiplyValueWithMetaProgressionMultiplier": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
         "onlyForTheseEntityIds": {
           "type": "array",
           "minItems": 1,
           "maxItems": 128,
           "uniqueItems": true,
-          "items": { "$ref": "#/$defs/namespacedId" }
+          "items": {
+            "$ref": "#/$defs/namespacedId"
+          }
         }
       }
     },
     "productionBuilding": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "nativeTemplateId", "localizations"],
+      "required": [
+        "id",
+        "nativeTemplateId",
+        "localizations"
+      ],
       "properties": {
-        "id": { "$ref": "#/$defs/namespacedId" },
-        "assetBundleId": { "$ref": "#/$defs/namespacedId" },
-        "cardImageAssetName": { "$ref": "#/$defs/assetName" },
+        "id": {
+          "$ref": "#/$defs/namespacedId"
+        },
+        "assetBundleId": {
+          "$ref": "#/$defs/namespacedId"
+        },
+        "cardImageAssetName": {
+          "$ref": "#/$defs/assetName"
+        },
         "nativeTemplateId": {
           "type": "string",
           "minLength": 1,
@@ -256,191 +716,554 @@
           "pattern": "\\S",
           "description": "Native entity template ID. Runtime must reject templates that do not have the game's Factory role."
         },
-        "visualAssetName": { "type": "string", "minLength": 1, "pattern": "\\S", "description": "AssetBundle address for a visual-only factory GameObject prefab." },
-        "visualRootPath": { "type": "string", "minLength": 1, "pattern": "\\S", "description": "Relative path to one native factory visual subtree." },
+        "visualAssetName": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S",
+          "description": "AssetBundle address for a visual-only factory GameObject prefab."
+        },
+        "visualRootPath": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S",
+          "description": "Relative path to one native factory visual subtree."
+        },
         "balanceOverrides": {
           "type": "array",
           "maxItems": 64,
-          "items": { "$ref": "#/$defs/balanceOverride" }
+          "items": {
+            "$ref": "#/$defs/balanceOverride"
+          }
         },
         "localizations": {
           "type": "array",
           "minItems": 1,
           "maxItems": 10,
-          "items": { "$ref": "#/$defs/unitLocalization" },
+          "items": {
+            "$ref": "#/$defs/unitLocalization"
+          },
           "contains": {
             "properties": {
-              "language": { "const": "en-US" },
-              "name": { "type": "string", "minLength": 1, "pattern": "\\S" }
+              "language": {
+                "const": "en-US"
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "\\S"
+              }
             },
-            "required": ["language", "name"]
+            "required": [
+              "language",
+              "name"
+            ]
           }
         }
       },
       "allOf": [
         {
-          "if": { "required": ["cardImageAssetName"] },
-          "then": { "required": ["assetBundleId"] }
+          "if": {
+            "required": [
+              "cardImageAssetName"
+            ]
+          },
+          "then": {
+            "required": [
+              "assetBundleId"
+            ]
+          }
         },
         {
-          "if": { "required": ["visualAssetName"], "properties": { "visualAssetName": { "type": "string", "minLength": 1 } } },
-          "then": { "required": ["assetBundleId", "visualRootPath"] }
+          "if": {
+            "required": [
+              "visualAssetName"
+            ],
+            "properties": {
+              "visualAssetName": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "assetBundleId",
+              "visualRootPath"
+            ]
+          }
         },
         {
-          "if": { "required": ["visualRootPath"], "properties": { "visualRootPath": { "type": "string", "minLength": 1 } } },
-          "then": { "required": ["assetBundleId", "visualAssetName"] }
+          "if": {
+            "required": [
+              "visualRootPath"
+            ],
+            "properties": {
+              "visualRootPath": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "assetBundleId",
+              "visualAssetName"
+            ]
+          }
         },
         {
-          "if": { "required": ["assetBundleId"], "properties": { "assetBundleId": { "type": "string", "minLength": 1 } } },
-          "then": { "anyOf": [{ "required": ["cardImageAssetName"] }, { "required": ["visualAssetName"] }, { "required": ["visualRootPath"] }] }
+          "if": {
+            "required": [
+              "assetBundleId"
+            ],
+            "properties": {
+              "assetBundleId": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          "then": {
+            "anyOf": [
+              {
+                "required": [
+                  "cardImageAssetName"
+                ]
+              },
+              {
+                "required": [
+                  "visualAssetName"
+                ]
+              },
+              {
+                "required": [
+                  "visualRootPath"
+                ]
+              }
+            ]
+          }
         }
       ]
     },
     "balanceOverride": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["name", "value"],
+      "required": [
+        "name",
+        "value"
+      ],
       "properties": {
         "name": {
-          "enum": ["coinsAmount", "cost", "maxCapacity", "combatValue", "maxHealth", "maxShield", "maxMana", "maxRank", "sightRadius", "skillRange", "firePointCount", "neededExperienceLevel", "gridSize", "productionDuration", "cardModelScalingFactor", "maxArmor", "armorProtection", "moveSpeed", "damage1", "damage2", "weaponRange", "attackCooldown", "attack2Cooldown", "effectRadius1", "effectRadius2", "healAmount1", "healAmount2", "gainCreditsAmount", "skillManaCost", "duration1", "duration2", "rarity", "attackType", "skillType"]
+          "enum": [
+            "coinsAmount",
+            "cost",
+            "maxCapacity",
+            "combatValue",
+            "maxHealth",
+            "maxShield",
+            "maxMana",
+            "maxRank",
+            "sightRadius",
+            "skillRange",
+            "firePointCount",
+            "neededExperienceLevel",
+            "gridSize",
+            "productionDuration",
+            "cardModelScalingFactor",
+            "maxArmor",
+            "armorProtection",
+            "moveSpeed",
+            "damage1",
+            "damage2",
+            "weaponRange",
+            "attackCooldown",
+            "attack2Cooldown",
+            "effectRadius1",
+            "effectRadius2",
+            "healAmount1",
+            "healAmount2",
+            "gainCreditsAmount",
+            "skillManaCost",
+            "duration1",
+            "duration2",
+            "rarity",
+            "attackType",
+            "skillType"
+          ]
         },
-        "value": { "type": "string" }
+        "value": {
+          "type": "string"
+        }
       },
       "allOf": [
         {
           "if": {
             "properties": {
-              "name": { "enum": ["rarity"] }
+              "name": {
+                "enum": [
+                  "rarity"
+                ]
+              }
             },
-            "required": ["name"]
+            "required": [
+              "name"
+            ]
           },
-          "then": { "properties": { "value": { "pattern": "^(?:Common|Rare|UltraRare)$" } } }
+          "then": {
+            "properties": {
+              "value": {
+                "pattern": "^(?:Common|Rare|UltraRare)$"
+              }
+            }
+          }
         },
         {
           "if": {
             "properties": {
-              "name": { "enum": ["attackType"] }
+              "name": {
+                "enum": [
+                  "attackType"
+                ]
+              }
             },
-            "required": ["name"]
+            "required": [
+              "name"
+            ]
           },
-          "then": { "properties": { "value": { "pattern": "^(?:None|Single|AoE|Multi|MultiAoE|Beam|Artillery|MultiArtillery)$" } } }
+          "then": {
+            "properties": {
+              "value": {
+                "pattern": "^(?:None|Single|AoE|Multi|MultiAoE|Beam|Artillery|MultiArtillery)$"
+              }
+            }
+          }
         },
         {
           "if": {
             "properties": {
-              "name": { "enum": ["skillType"] }
+              "name": {
+                "enum": [
+                  "skillType"
+                ]
+              }
             },
-            "required": ["name"]
+            "required": [
+              "name"
+            ]
           },
-          "then": { "properties": { "value": { "pattern": "^(?:None|Toggle|Location|LocationAoE|LocationMultiTargets|Self|SelfAoE|Target|TargetMultiTarget|TargetAoE|SelfMultiTarget)$" } } }
+          "then": {
+            "properties": {
+              "value": {
+                "pattern": "^(?:None|Toggle|Location|LocationAoE|LocationMultiTargets|Self|SelfAoE|Target|TargetMultiTarget|TargetAoE|SelfMultiTarget)$"
+              }
+            }
+          }
         },
         {
           "if": {
             "properties": {
-              "name": { "not": { "enum": ["rarity", "attackType", "skillType"] } }
+              "name": {
+                "not": {
+                  "enum": [
+                    "rarity",
+                    "attackType",
+                    "skillType"
+                  ]
+                }
+              }
             },
-            "required": ["name"]
+            "required": [
+              "name"
+            ]
           },
-          "then": { "properties": { "value": { "pattern": "^(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?$" } } }
+          "then": {
+            "properties": {
+              "value": {
+                "pattern": "^(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?$"
+              }
+            }
+          }
         },
         {
           "if": {
             "properties": {
-              "name": { "enum": ["coinsAmount", "cost", "maxCapacity", "combatValue", "maxHealth", "maxShield", "maxMana", "maxRank", "sightRadius", "skillRange", "firePointCount", "neededExperienceLevel", "gridSize"] }
+              "name": {
+                "enum": [
+                  "coinsAmount",
+                  "cost",
+                  "maxCapacity",
+                  "combatValue",
+                  "maxHealth",
+                  "maxShield",
+                  "maxMana",
+                  "maxRank",
+                  "sightRadius",
+                  "skillRange",
+                  "firePointCount",
+                  "neededExperienceLevel",
+                  "gridSize"
+                ]
+              }
             },
-            "required": ["name"]
+            "required": [
+              "name"
+            ]
           },
-          "then": { "properties": { "value": { "pattern": "^[0-9]+$" } } }
+          "then": {
+            "properties": {
+              "value": {
+                "pattern": "^[0-9]+$"
+              }
+            }
+          }
         }
       ]
     },
     "stage": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "mapSizeMin", "mapSizeMax", "unitIds", "aiProfileIds"],
+      "required": [
+        "id",
+        "mapSizeMin",
+        "mapSizeMax",
+        "unitIds",
+        "aiProfileIds"
+      ],
       "properties": {
-        "id": { "$ref": "#/$defs/namespacedId" },
-        "assetBundleId": { "$ref": "#/$defs/namespacedId" },
-        "assetName": { "type": "string", "minLength": 1, "pattern": "\\S", "description": "Unity AssetBundle address, preferably the project-relative path including extension." },
-        "nativeTemplateId": { "type": "string", "minLength": 1, "pattern": "\\S" },
+        "id": {
+          "$ref": "#/$defs/namespacedId"
+        },
+        "assetBundleId": {
+          "$ref": "#/$defs/namespacedId"
+        },
+        "assetName": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S",
+          "description": "Unity AssetBundle address, preferably the project-relative path including extension."
+        },
+        "nativeTemplateId": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
         "parameterOverrides": {
           "type": "array",
-          "items": { "$ref": "#/$defs/stageParameterOverride" }
+          "items": {
+            "$ref": "#/$defs/stageParameterOverride"
+          }
         },
-        "mapSizeMin": { "type": "integer", "minimum": 1, "maximum": 256 },
-        "mapSizeMax": { "type": "integer", "minimum": 1, "maximum": 256 },
-        "isPartOfDemo": { "type": "boolean", "default": false },
-        "landscape": { "$ref": "#/$defs/stageLandscape" },
+        "mapSizeMin": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 256
+        },
+        "mapSizeMax": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 256
+        },
+        "isPartOfDemo": {
+          "type": "boolean",
+          "default": false
+        },
+        "landscape": {
+          "$ref": "#/$defs/stageLandscape"
+        },
         "unitIds": {
           "type": "array",
-          "items": { "$ref": "#/$defs/namespacedId" },
+          "items": {
+            "$ref": "#/$defs/namespacedId"
+          },
           "uniqueItems": true
         },
         "aiProfileIds": {
           "type": "array",
-          "items": { "$ref": "#/$defs/namespacedId" },
+          "items": {
+            "$ref": "#/$defs/namespacedId"
+          },
           "uniqueItems": true
         }
       },
       "oneOf": [
         {
-          "required": ["nativeTemplateId"],
-          "not": { "anyOf": [{ "required": ["assetBundleId"] }, { "required": ["assetName"] }] }
+          "required": [
+            "nativeTemplateId"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "assetBundleId"
+                ]
+              },
+              {
+                "required": [
+                  "assetName"
+                ]
+              }
+            ]
+          }
         },
         {
-          "required": ["assetBundleId", "assetName"],
-          "not": { "required": ["nativeTemplateId"] }
+          "required": [
+            "assetBundleId",
+            "assetName"
+          ],
+          "not": {
+            "required": [
+              "nativeTemplateId"
+            ]
+          }
         }
       ]
     },
     "stageParameterOverride": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["name", "value"],
+      "required": [
+        "name",
+        "value"
+      ],
       "properties": {
         "name": {
-          "enum": ["levelCount", "maxWidth", "coinReward", "startCrystalReward", "researchPointsReward", "twoWayBranchingProbability", "shopWeight", "restSiteWeight", "cardRewardWeight", "upgradeRewardWeight", "relicRewardWeight", "researchRewardWeight", "coinRewardWeight", "startCrystalRewardWeight", "researchPointsRewardWeight", "dropRewardWeight", "fillFirstLevelWithCardRewards", "putDefaultCardRewardInCenter", "fillLastLevelWithShops"]
+          "enum": [
+            "levelCount",
+            "maxWidth",
+            "coinReward",
+            "startCrystalReward",
+            "researchPointsReward",
+            "twoWayBranchingProbability",
+            "shopWeight",
+            "restSiteWeight",
+            "cardRewardWeight",
+            "upgradeRewardWeight",
+            "relicRewardWeight",
+            "researchRewardWeight",
+            "coinRewardWeight",
+            "startCrystalRewardWeight",
+            "researchPointsRewardWeight",
+            "dropRewardWeight",
+            "fillFirstLevelWithCardRewards",
+            "putDefaultCardRewardInCenter",
+            "fillLastLevelWithShops"
+          ]
         },
-        "value": { "type": "string" }
+        "value": {
+          "type": "string"
+        }
       },
       "allOf": [
         {
           "if": {
             "properties": {
-              "name": { "enum": ["fillFirstLevelWithCardRewards", "putDefaultCardRewardInCenter", "fillLastLevelWithShops"] }
+              "name": {
+                "enum": [
+                  "fillFirstLevelWithCardRewards",
+                  "putDefaultCardRewardInCenter",
+                  "fillLastLevelWithShops"
+                ]
+              }
             },
-            "required": ["name"]
+            "required": [
+              "name"
+            ]
           },
-          "then": { "properties": { "value": { "pattern": "^(?:true|false)$" } } },
-          "else": { "properties": { "value": { "pattern": "^(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?$" } } }
+          "then": {
+            "properties": {
+              "value": {
+                "pattern": "^(?:true|false)$"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "value": {
+                "pattern": "^(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?$"
+              }
+            }
+          }
         },
         {
           "if": {
             "properties": {
-              "name": { "enum": ["levelCount", "maxWidth", "coinReward", "startCrystalReward", "researchPointsReward"] }
+              "name": {
+                "enum": [
+                  "levelCount",
+                  "maxWidth",
+                  "coinReward",
+                  "startCrystalReward",
+                  "researchPointsReward"
+                ]
+              }
             },
-            "required": ["name"]
+            "required": [
+              "name"
+            ]
           },
-          "then": { "properties": { "value": { "pattern": "^[0-9]+$" } } }
+          "then": {
+            "properties": {
+              "value": {
+                "pattern": "^[0-9]+$"
+              }
+            }
+          }
         }
       ]
     },
     "stageLandscape": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["nativeTemplateId", "randomSeed", "alwaysUseSameSeed", "mapSize", "localizations"],
+      "required": [
+        "nativeTemplateId",
+        "randomSeed",
+        "alwaysUseSameSeed",
+        "mapSize",
+        "localizations"
+      ],
       "properties": {
-        "nativeTemplateId": { "type": "string", "minLength": 1, "pattern": "\\S" },
-        "randomSeed": { "type": "integer", "minimum": 0, "maximum": 99998 },
-        "alwaysUseSameSeed": { "type": "boolean" },
-        "mapSize": { "type": "integer", "minimum": 1, "maximum": 255, "not": { "multipleOf": 2 } },
+        "nativeTemplateId": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "randomSeed": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 99998
+        },
+        "alwaysUseSameSeed": {
+          "type": "boolean"
+        },
+        "mapSize": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 255,
+          "not": {
+            "multipleOf": 2
+          }
+        },
         "localizations": {
           "type": "array",
           "minItems": 1,
-          "items": { "$ref": "#/$defs/landscapeLocalization" },
+          "items": {
+            "$ref": "#/$defs/landscapeLocalization"
+          },
           "contains": {
-            "properties": { "language": { "const": "en-US" }, "name": { "type": "string", "minLength": 1, "pattern": "\\S" } },
-            "required": ["language", "name"]
+            "properties": {
+              "language": {
+                "const": "en-US"
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "\\S"
+              }
+            },
+            "required": [
+              "language",
+              "name"
+            ]
           }
         }
       }
@@ -448,116 +1271,257 @@
     "landscapeLocalization": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["language", "name"],
+      "required": [
+        "language",
+        "name"
+      ],
       "properties": {
-        "language": { "enum": ["en-US", "de-DE", "ja-JP", "ko-KR", "zh-CN", "zh-TW", "fr-FR", "es-XL", "pt-BR", "ru-RU"] },
-        "name": { "type": "string", "minLength": 1, "pattern": "\\S" }
+        "language": {
+          "enum": [
+            "en-US",
+            "de-DE",
+            "ja-JP",
+            "ko-KR",
+            "zh-CN",
+            "zh-TW",
+            "fr-FR",
+            "es-XL",
+            "pt-BR",
+            "ru-RU"
+          ]
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        }
       }
     },
     "aiProfile": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "modules"],
+      "required": [
+        "id",
+        "modules"
+      ],
       "properties": {
-        "id": { "$ref": "#/$defs/namespacedId" },
-        "assetBundleId": { "$ref": "#/$defs/namespacedId" },
-        "prefabAssetName": { "type": "string", "pattern": "^RCL_[A-Za-z0-9_]{1,92}$" },
-        "nativeTemplateId": { "type": "string", "minLength": 1, "pattern": "\\S" },
-        "scopeToReferencedStages": { "type": "boolean" },
+        "id": {
+          "$ref": "#/$defs/namespacedId"
+        },
+        "assetBundleId": {
+          "$ref": "#/$defs/namespacedId"
+        },
+        "prefabAssetName": {
+          "type": "string",
+          "pattern": "^RCL_[A-Za-z0-9_]{1,92}$"
+        },
+        "nativeTemplateId": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "scopeToReferencedStages": {
+          "type": "boolean"
+        },
         "unitDependencies": {
           "type": "array",
           "maxItems": 64,
-          "items": { "$ref": "#/$defs/namespacedId" }
+          "items": {
+            "$ref": "#/$defs/namespacedId"
+          }
         },
         "unitEntries": {
           "type": "array",
           "maxItems": 32,
-          "items": { "$ref": "#/$defs/aiUnitEntry" }
+          "items": {
+            "$ref": "#/$defs/aiUnitEntry"
+          }
         },
         "productionBuildingEntries": {
           "type": "array",
           "maxItems": 32,
-          "items": { "$ref": "#/$defs/aiProductionBuildingEntry" }
+          "items": {
+            "$ref": "#/$defs/aiProductionBuildingEntry"
+          }
         },
         "modules": {
           "type": "array",
           "minItems": 1,
           "maxItems": 8,
-          "items": { "$ref": "#/$defs/aiModule" }
+          "items": {
+            "$ref": "#/$defs/aiModule"
+          }
         }
       },
       "oneOf": [
         {
-          "required": ["nativeTemplateId"],
-          "not": { "anyOf": [{ "required": ["assetBundleId"] }, { "required": ["prefabAssetName"] }] }
+          "required": [
+            "nativeTemplateId"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "assetBundleId"
+                ]
+              },
+              {
+                "required": [
+                  "prefabAssetName"
+                ]
+              }
+            ]
+          }
         },
         {
-          "required": ["assetBundleId", "prefabAssetName"],
-          "not": { "required": ["nativeTemplateId"] }
+          "required": [
+            "assetBundleId",
+            "prefabAssetName"
+          ],
+          "not": {
+            "required": [
+              "nativeTemplateId"
+            ]
+          }
         }
       ],
       "allOf": [
         {
-          "if": { "required": ["nativeTemplateId"] },
+          "if": {
+            "required": [
+              "nativeTemplateId"
+            ]
+          },
           "then": {
-            "required": ["scopeToReferencedStages"],
-            "properties": { "scopeToReferencedStages": { "const": true } }
+            "required": [
+              "scopeToReferencedStages"
+            ],
+            "properties": {
+              "scopeToReferencedStages": {
+                "const": true
+              }
+            }
           }
         },
         {
           "if": {
-            "required": ["scopeToReferencedStages"],
-            "properties": { "scopeToReferencedStages": { "const": true } }
+            "required": [
+              "scopeToReferencedStages"
+            ],
+            "properties": {
+              "scopeToReferencedStages": {
+                "const": true
+              }
+            }
           },
-          "then": { "required": ["nativeTemplateId"] }
+          "then": {
+            "required": [
+              "nativeTemplateId"
+            ]
+          }
         }
       ]
     },
     "aiUnitEntry": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["unitId", "baseIndex", "startingInAscensionLevel", "countAtStart", "maxLiving"],
+      "required": [
+        "unitId",
+        "baseIndex",
+        "startingInAscensionLevel",
+        "countAtStart",
+        "maxLiving"
+      ],
       "properties": {
-        "unitId": { "$ref": "#/$defs/namespacedId" },
-        "baseIndex": { "type": "integer", "minimum": 0, "maximum": 31 },
-        "startingInAscensionLevel": { "type": "integer", "minimum": 0, "maximum": 19 },
-        "countAtStart": { "type": "integer", "minimum": 1, "maximum": 8 },
-        "maxLiving": { "type": "integer", "minimum": 1, "maximum": 32 }
+        "unitId": {
+          "$ref": "#/$defs/namespacedId"
+        },
+        "baseIndex": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 31
+        },
+        "startingInAscensionLevel": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 19
+        },
+        "countAtStart": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8
+        },
+        "maxLiving": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 32
+        }
       }
     },
     "aiProductionBuildingEntry": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["unitId", "baseIndex", "startingInAscensionLevel", "maxLiving"],
+      "required": [
+        "unitId",
+        "baseIndex",
+        "startingInAscensionLevel",
+        "maxLiving"
+      ],
       "properties": {
-        "unitId": { "$ref": "#/$defs/namespacedId" },
-        "baseIndex": { "type": "integer", "minimum": 0, "maximum": 31 },
-        "startingInAscensionLevel": { "type": "integer", "minimum": 0, "maximum": 19 },
-        "maxLiving": { "type": "integer", "minimum": 1, "maximum": 32 }
+        "unitId": {
+          "$ref": "#/$defs/namespacedId"
+        },
+        "baseIndex": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 31
+        },
+        "startingInAscensionLevel": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 19
+        },
+        "maxLiving": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 32
+        }
       }
     },
     "aiModule": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["moduleId", "parameters"],
+      "required": [
+        "moduleId",
+        "parameters"
+      ],
       "properties": {
-        "moduleId": { "$ref": "#/$defs/namespacedId" },
+        "moduleId": {
+          "$ref": "#/$defs/namespacedId"
+        },
         "parameters": {
           "type": "array",
-          "items": { "$ref": "#/$defs/moduleParameter" }
+          "items": {
+            "$ref": "#/$defs/moduleParameter"
+          }
         }
       }
     },
     "moduleParameter": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["name", "value"],
+      "required": [
+        "name",
+        "value"
+      ],
       "properties": {
         "name": {
           "type": "string",
           "pattern": "^[A-Za-z][A-Za-z0-9._-]*$"
         },
-        "value": { "type": "string" }
+        "value": {
+          "type": "string"
+        }
       }
     }
   }

@@ -643,7 +643,9 @@
       },
       "unitIds": [
         "sample-native:scout-tank",
-        "sample-native:skirmish-bike"
+        "sample-native:skirmish-bike",
+        "sample-native:arachnid-hexapod",
+        "sample-native:overlord-command-hq"
       ],
       "aiProfileIds": [
         "sample-native:quick-hunter-extension"

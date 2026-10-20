@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace RogueCommandExpansionLoader.Content
 {
@@ -30,6 +31,8 @@ namespace RogueCommandExpansionLoader.Content
     public sealed class ContentUnitDefinition
     {
         public string id;
+        public string unitType;
+        public Dictionary<string, float> customBalance;
         public string assetBundleId;
         public string balanceAssetName;
         public string prefabAssetName;
@@ -252,6 +255,8 @@ namespace RogueCommandExpansionLoader.Content
             return source == null ? null : new ContentUnitDefinition
             {
                 id = source.id,
+                unitType = source.unitType,
+                customBalance = source.customBalance == null ? null : new Dictionary<string, float>(source.customBalance),
                 assetBundleId = source.assetBundleId,
                 balanceAssetName = source.balanceAssetName,
                 prefabAssetName = source.prefabAssetName,

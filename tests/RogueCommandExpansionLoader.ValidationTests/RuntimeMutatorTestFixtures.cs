@@ -166,6 +166,8 @@ internal sealed class RuntimeMutatorTestProvider : IRuntimeContentProvider, IBlu
 
     public void OnEntityRowsRegistered() => EntityRowsRegisteredCount++;
 
+    public IEnumerable<BalanceOverride> GetBalanceOverrides() => new List<BalanceOverride>();
+
     public IEnumerable<object> GetEntityParameterRows() => EntityRows;
 
     public bool TryGetUnitLocalization(string unitId, bool description, out string value)

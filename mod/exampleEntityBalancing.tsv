@@ -1,0 +1,647 @@
+entityId	cost	productionDuration	maxCapacity	tech	maxHealth	maxShield	maxMana	skillManaCost	armorProtection	maxRank	moveSpeed	sightRadius	damage1	attackCooldown	damage2	attack2Cooldown	weaponRange	effectRadius1	effectRadius2	skillRange	healAmount1	healAmount2	maxArmor	gainCreditsAmount	duration1	duration2	neededExperienceLevel	offeredSystemTags	coinsAmount	inactive	isAllowedAsBlueprint	isAllowedAsStartingBlueprint
+AdvancedArmory	250	0	1	Colorless	150	0	30	10	0	0	0	4	0	0	0	0	0	0	0	-1	0	0	0	0	0	60	8	Robust, SpawnDuration	150	false	true	false
+AIFakeFactoryToDieAndTriggerVictoryAfterTime	150	0	0	None	350	0	0	0	0	0	0	5	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	150	false	false	false
+AncientAccelerationCrystal	0	0	0	Ancient	800	0	0	0	0	0	0	3	0	0	0	0	0	3	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+AncientCrystalAltar	0	0	0	Ancient	800	0	0	0	0	0	0	3	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+AncientHealingTree	0	0	0	Ancient	500	0	0	0	0	0	0	3	0	0	0	0	0	0	0	2	0	0	0	0	0	0	0	None	0	false	false	false
+AncientPowerCrystal	0	0	0	Ancient	800	0	0	0	0	0	0	3	0	0	0	0	0	3	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+AncientProtectionTurret	0	0	0	Ancient	1000	0	0	0	2	5	0	10	15	2	0	0	7.5	1	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+AncientWatchTower	0	0	0	Ancient	500	0	0	0	0	0	0	2	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+AncientWellOfRegen	0	0	0	Ancient	400	0	50	0	0	0	0	3	0	0	0	0	0	0	0	0	0	0	0	0	10	0	0	None	0	false	false	false
+AncientWellOfStrength	0	0	0	Ancient	400	0	40	0	0	0	0	3	0	0	0	0	0	0	0	0	0	0	0	0	240	0	0	None	0	false	false	false
+AncientWisdome	0	0	0	Ancient	1200	0	90	0	0	0	0	2	0	0	0	0	0	0	0	3	0	0	0	0	0	0	0	None	0	false	false	false
+ArmoredRefineryTurret	0	0	0	Colorless	300	0	0	0	1	5	0	6	4	0.8	0	0	5	0	0	0	25	0	0	0	0	0	0	Turret	0	false	false	false
+ArmoredSpaceOilCollector	400	40	5	Colorless	140	0	40	40	3	5	13	6	3.5	1.5	0	0	5	0	0	4	0	0	2.4	100	0	60	0	Armor, SpawnDuration	0	false	false	false
+ArmoredSpaceOilCollectorFactory	1800	0	4	Colorless	1600	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	250	false	false	false
+ArmoredTractor	100	18	6	Colorless	120	0	15	10	1	5	12	5	4.8	2.5	0	0	3	0.5	0.5	4	0	0	0	0	0	10	12	Armor, Heal, AoE, Vehicle, CriticalHits, Regen	0	false	false	false
+ArmoredTractorFactory	400	0	10	Colorless	500	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	12	None	150	false	true	true
+ArmorPack	0	0	0	Colorless	100	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	20	0	0	0	0	0	0	None	0	false	false	false
+ArtilleryTank	320	50	4	Colorless	80	0	0	0	0	5	13	6	45	7	0	0	18	1.2	0	0	0	0	0	0	0	0	0	AoE, Vehicle, Sniper	0	false	false	false
+ArtilleryTankFactory	700	0	3	Colorless	600	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	250	false	true	false
+BambooEntity	0	0	0	Ancient	44	0	0	0	0	0	0	0	10	0	0	0	0	0.6	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+BambooEntity1	0	0	0	Ancient	55	0	0	0	0	0	0	0	10	0	0	0	0	0.6	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+BambooEntity4	0	0	0	Ancient	29	0	0	0	0	0	0	0	10	0	0	0	0	0.6	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+BaseMovementTower	400	0	3	Colorless	150	0	0	0	0	0	0	8	0	0	0	0	0	0	0	8	0	0	0	0	0	0	0	SkillRangeUse	200	false	false	false
+BenevolentGhostRelicSpawn	0	0	0	Colorless	40000	0	0	0	0	0	0	5	0	0	0	0	0	1	0	0	1	0	0	0	0	0	0	None	0	false	false	false
+BigEnergyExplosion	0	0	0	None	0	0	0	0	0	0	0	0	15	0	0	0	0	1	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+BigExplosion	0	0	0	None	0	0	0	0	0	0	0	0	25	0	0	0	0	1	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+BlockadeTank	240	26	5	Colorless	180	0	8	8	2	5	13	6	10	2	0	0	6	0.4	0	0	0	0	0	0	0	30	0	Armor, Turret, AoE, ManaUse, Tank, SpawnDuration	0	false	false	false
+BlockadeTankFactory	600	0	6	Colorless	600	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	0	false	true	false
+BlockadeWall	0	0	0	Colorless	200	0	0	0	1	0	0	3	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+BlueprintChest	0	0	0	Ancient	100	0	0	0	0	0	0	0	100	0	0	0	0	2	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+BombBike	45	10	10	Colorless	60	0	0	0	0	5	22	5	36	0	0	0	0	1.75	0	4	0	0	0	0	0	120	42	AoE, Bomb, Vehicle, SpawnDuration	150	false	false	false
+BombBikeFactory	320	0	8	Colorless	450	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	42	None	150	false	true	false
+BombCreep	0	0	10	Colorless	5	0	0	0	0	5	20	7	30	0	0	0	0	0.75	0	0	0	0	0	0	0	0	0	Spawn, Bomb	150	false	false	false
+BoulderCannonTurret	550	0	4	Colorless	250	0	25	25	0	5	0	18	20	5	0	0	18	0.8	0	0	0	0	0	0	0	10	37	Turret, AoE, Sniper	250	false	true	false
+BountyEaterStaticField	0	0	0	None	1	0	0	0	0	0	0	0	25	0	0	0	0	1.5	0	0	0	0	0	0	0	5	0	None	0	false	false	false
+BountyTank	140	30	3	Colorless, Specialist	160	0	16	16	2	5	13	6	10	0.8	0	0	5	0	1.25	5	1	0	0	0	0	15	0	Armor, Robust, SkillRangeUse, SpawnDuration	0	false	false	false
+BountyTankFactory	500	0	1	Colorless, Specialist	500	0	0	0	0	0	0	5	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	200	false	false	false
+BucklerMech	520	45	4	Colorless	460	0	20	20	3	5	16	5	14	0.8	0	0	0	0	2	0	0	0	0	0	0	15	0	Melee, Mech, AoE, Robust	0	false	false	false
+BucklerMechFactory	1500	0	3	Colorless	800	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	200	false	true	false
+CallbackSpire	250	0	2	Colorless	300	0	20	15	0	0	0	5	0	0	0	0	0	0	2	-1	0	0	0	0	0	0	0	Teleport, AoE, ManaUse	150	false	true	false
+CannonWalkerMech	420	45	3	Colorless	300	0	10	10	1	5	13	7	10	2.5	60	0	4.5	0.5	0	6	0	0	0	0	0	0	26	Armor, Mech, AoE, ManaUse, SkillRangeUse	0	false	false	false
+CannonWalkerMechFactory	1000	0	3	Colorless	700	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	26	None	250	false	true	false
+CareTank	300	40	3	Colorless	120	0	16	16	1	5	12	6	8	1.2	0	0	5.5	0	1	5	2	0	0	0	0	15	0	Armor, Heal, AoE, ManaUse, Tank, SpawnDuration	0	false	false	false
+CareTankFactory	900	0	2	Colorless	500	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	150	false	true	false
+Castle	1200	0	3	Colorless	1600	0	30	30	1	5	0	8	12	2	45	0	7	0.5	1.25	-1	0	0	0	0	0	0	0	None	0	false	false	false
+CastleRoofHealSpire	0	0	0	Colorless	100	0	0	0	0	5	0	1	0	0	0	0	0	0	0	6	4	0	0	0	0	0	0	Heal	0	false	false	false
+CastleRoofLauncher	0	0	0	Colorless	100	0	0	0	0	5	0	9	20	4	0	0	8	0.8	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+CastleRoofMachineGun	0	0	0	Colorless	100	0	0	0	0	5	0	8	4.6	0.12	0	0	7	0	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+CF0.5	40	12	10	None	40	0	0	0	0	5	15	5	3.6	0.7	0	0	2.6	0	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+CF0.5Factory	300	0	0	None	260	0	0	0	0	0	0	5	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	150	false	false	false
+CF1	30	14	5	None	60	0	0	0	0	5	12	5	8	2.2	0	0	3.6	0	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+CF1Factory	200	0	0	None	300	0	0	0	0	0	0	5	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	150	false	false	false
+CF2	160	36	10	None	140	0	15	10	0	5	13	6	6.5	2	10	0	3.2	0	1	4	0	0	0	0	0	5	0	None	0	false	false	false
+CF2Factory	300	0	0	None	600	0	0	0	0	0	0	3	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+CF3	80	20	5	None	90	0	0	0	0	5	13	5	5	1.6	0	0	4.1	0	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+CF3Factory	300	0	0	None	500	0	0	0	0	0	0	4	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	150	false	false	false
+CF4Sniper	240	70	3	None	60	0	8	8	0	5	12	8	25	3	30	0	6.8	0	0	8	0	0	0	0	0	5	0	Sniper	0	false	false	false
+CF4SniperFactory	560	0	0	None	500	0	0	0	0	0	0	4	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	150	false	false	false
+CF5	240	35	5	None	200	0	0	0	0	5	15	6	8	0.8	0	0	4.2	0	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+CF5Factory	750	0	0	None	600	0	0	0	0	0	0	5	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	150	false	false	false
+CFRespawnBackpack	0	0	0	None	8	0	6	6	0	5	0	1	0	0	0	0	0	0	0	0	0	0	0	0	0	20	0	None	0	false	false	false
+CFTransporter	800	130	1	None	250	0	25	25	1	5	12	6	12	0.6	0	0	5.2	0	0	3	0	0	0	0	0	30	0	None	0	false	false	false
+CFTransporterFactory	1200	0	2	None	800	0	0	0	0	0	0	2	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+ChainLightningTurret	260	0	15	Colorless	400	10	0	0	0	5	0	7	7	2	0	0	6	0.5	0	0	0	0	0	0	0	0	30	Turret, AoE	200	false	true	false
+ChargeLaserTank	500	40	3	Colorless	80	5	15	15	1	5	11	11	50	5	0	0	10	0	0	10	0	0	0	0	0	25	0	Armor, Teleport, SkillRangeUse, Tank, SpawnDuration, Stealth, Sniper	0	false	false	false
+ChargeLaserTankFactory	1000	0	4	Colorless	450	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	200	false	true	false
+CoinPickup	0	0	0	Ancient	100	0	0	20	0	0	0	0	100	0	0	0	0	1	0	0	0	0	0	10	0	0	0	None	0	false	false	false
+CombatEngineer	0	0	1	Colorless	240	0	0	0	3	0	14	6	10	1.6	0	0	5	1.25	0	5	0	0	0	4	0	0	0	None	0	false	false	false
+CommandoMech	360	40	5	Colorless	160	5	10	10	0	5	14	7	3.3	0.6	15	0	4.5	0	1.5	6	0	0	0	0	0	0	0	Shield, Mech, SkillRangeUse	0	false	false	false
+CommandoMechFactory	800	0	3	Colorless	500	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	250	false	true	false
+CommandoTankRallyBeacon	0	0	0	Colorless	20	0	0	0	0	0	0	2	0	0	0	0	0	0	0	5	0	0	0	0	2	0	25	None	0	false	false	false
+CoolingField	0	0	0	None	110	0	0	0	0	0	0	0	0	0	0	0	0	1	0	0	2	0	0	0	2	0	0	None	0	false	false	false
+CoreHarvester	280	30	8	Colorless	30	5	5	5	0	5	20	4	0	0	0	0	0	0	1.5	10	100	0	0.24	0	0	0	0	None	0	false	false	false
+CoreHarvesterFactory	1600	0	5	Colorless	500	0	0	0	0	0	0	5	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	200	false	false	false
+CorrosiveFog	0	0	0	None	50	0	0	0	0	0	0	0	5	0	20	0	0	1	0	0	0	0	0	50	3	0	0	None	0	false	false	false
+CrawlMine	0	0	0	Colorless	5	0	0	0	0	0	0	0	20	0	0	0	0	1.25	0	0	0	0	0	0	0	0	0	Spawn, Bomb	0	false	false	false
+CreditExtractor	150	0	5	None	120	0	0	0	0	0	0	1	0	0	0	0	0	0	0	0	0	0	0	6	0	0	0	None	0	false	false	false
+CreditsChest	0	0	0	None	100	0	0	0	0	0	0	0	100	0	0	0	0	2	0	0	0	0	0	50	0	0	0	None	0	false	false	false
+CreditsChest100	0	0	0	Ancient	100	0	0	0	0	0	0	0	100	0	0	0	0	2	0	0	0	0	0	100	0	0	0	None	0	false	false	false
+CreditsChest500	0	0	0	None	100	0	0	0	0	0	0	0	100	0	0	0	0	2	0	0	0	0	0	500	0	0	0	None	0	false	false	false
+CrystalBear	0	0	10	Ancient	800	0	0	0	5	5	8	7	40	1.5	0	0	1	0	0	0	0	0	0	0	2	0	0	None	0	false	false	false
+CrystalDustCatcher	300	0	3	Colorless	60	0	0	0	0	0	0	3	0	0	0	0	0	0	0	0	0	0	2	0	0	0	0	EconomySupport	0	false	true	false
+CrystallineAmplifier	250	0	3	Colorless	200	0	25	20	0	0	0	4	0	0	0	0	0	0	0	10	150	0	0	0	0	0	40	EconomySupport	0	false	true	false
+CrystalMatrixReader	500	0	3	Colorless	300	0	25	25	0	0	0	5	0	0	0	0	0	0	1	-1	0	0	80	0	0	0	50	EconomySupport	0	false	true	false
+CrystalNormal	0	0	0	Ancient	700	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+CrystalPickup	0	0	0	Ancient	100	0	0	0	0	0	0	0	100	0	0	0	0	1	0	0	0	0	0	10	0	0	0	None	0	false	false	false
+CrystalRich	0	0	0	Ancient	40000	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+CrystalRoot	0	0	0	Ancient	4000	0	0	0	0	0	0	0	0	0	0	0	0	3	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+CrystalRootAI	0	0	0	Ancient	4000	0	0	0	0	0	0	0	0	0	0	0	0	3	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+CrystalRootRich	0	0	0	Ancient	80000	0	0	0	0	0	0	0	0	0	0	0	0	3	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+CrystalRootStartingField	0	0	0	Ancient	4000	0	0	0	0	0	0	0	0	0	0	0	0	3	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+CrystalSmall	0	0	0	Ancient	450	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+CrystalSynthesizer	0	0	0	Ancient	200	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+CrystalTower	0	0	0	Ancient	800	0	0	0	0	0	0	2	0	0	0	0	0	0	0	3	0	0	0	5	0	0	0	None	0	false	false	false
+CullTurret	240	0	15	Colorless	500	0	0	0	0	5	0	7	6	0.8	5	0	6	0	0	0	0	0	0	0	0	0	33	Turret	200	false	true	false
+DeadRoboRemainder	0	0	0	Colorless	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+Doggobot	0	0	10	Colorless	100	0	0	0	0	5	13	8	3	1	0	0	0	0	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+DoubleCannonTurret	460	0	15	Colorless	750	0	0	0	1	5	0	7	10	2	0	0	6	0.4	0	0	0	0	0	0	0	0	34	Armor, Turret, AoE	200	false	true	false
+DropArmoredProduction	0	0	0	Colorless	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	-1	0	0	0	0	0	0	0	None	100	false	false	false
+DropBeastMode	0	0	0	Colorless	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	-1	0	0	0	0	0	0	0	None	100	false	false	false
+DropCollectors	0	0	0	Colorless	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	-1	0	0	0	0	30	30	0	None	50	false	false	false
+DropCrystalField	0	0	0	Colorless	0	0	0	0	0	0	0	0	0	0	0	0	0	0.3	0	-1	0	0	0	1000	30	30	0	None	150	false	false	false
+DropCrystalGrowth	0	0	0	Colorless	0	0	0	0	0	0	0	0	0	0	0	0	0	0.3	0	-1	0	0	0	1000	30	30	0	None	100	false	false	false
+DropCrystalMeteor	0	0	0	Colorless	0	0	0	0	0	0	0	0	1500	0	0	0	0	2.5	2.5	-1	0	0	0	0	30	30	0	None	100	false	false	false
+DropCrystals	0	0	0	Colorless	0	0	0	0	0	0	0	0	0	0	0	0	0	0.3	0	-1	0	0	0	200	30	30	0	None	100	false	false	false
+DropDuplication	0	0	0	Colorless	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	-1	0	0	0	0	30	30	45	None	150	false	false	false
+DropFavoriteToy	0	0	0	Colorless	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	-1	0	0	0	0	0	0	0	None	100	false	false	false
+DropFireMissiles	0	0	0	Colorless	0	0	0	0	0	0	0	0	15	1	0	0	0	5	0	-1	0	0	0	0	15	30	0	None	100	false	false	false
+DropHeal	0	0	0	Colorless	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	-1	0	0	0	0	30	30	0	None	50	false	false	false
+DropHealingSpire	0	0	0	Colorless	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	-1	0	0	0	0	30	30	0	None	80	false	false	false
+DropInstaBuild	0	0	0	None	0	0	0	0	0	0	0	0	0	0	0	0	0	0.3	0	-1	0	0	0	0	30	30	0	None	150	false	false	false
+DropInvincibility	0	0	0	Colorless	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	-1	0	0	0	0	10	10	45	None	150	false	false	false
+DropLightningStrike	0	0	0	Colorless	0	0	0	0	0	0	0	0	120	1	0	0	0	3	3	-1	0	0	0	0	15	0	0	None	100	false	false	false
+DropMana	0	0	0	Colorless	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	-1	0	0	0	0	30	30	0	None	50	false	false	false
+DropMarines	0	0	0	Colorless	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	-1	0	0	0	0	30	0	0	None	50	false	false	false
+DropMechs	0	0	0	Colorless	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	-1	0	0	0	0	30	30	14	None	100	false	false	false
+DropMeteorStrike	0	0	0	Colorless	0	0	0	0	0	0	0	0	1500	0	0	0	0	2.8	2.8	-1	0	0	0	0	30	30	41	None	50	false	false	false
+DropMGTurrets	0	0	0	Colorless	0	0	0	0	0	0	0	0	0	0	0	0	0	0.3	0	-1	0	0	0	0	30	30	0	None	100	false	false	false
+DropMines	0	0	0	Colorless	0	0	0	0	0	0	0	0	0	0	0	0	0	0	2.5	-1	0	0	0	0	30	30	15	None	100	false	false	false
+DropMissileField	0	0	0	Colorless	0	0	0	0	0	0	0	0	6	3	0	0	900	5	5	-1	0	0	0	0	30	30	0	None	100	false	false	false
+DropMonsterMode	0	0	0	Colorless	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	-1	0	0	0	0	0	0	0	None	100	false	false	false
+DropOrbitalArtillery	0	0	0	Colorless	0	0	0	0	0	0	0	0	80	1	0	0	0	2.25	0	-1	0	0	0	0	0	40	0	None	50	false	false	false
+DropOrbitalSalvo	0	0	0	Colorless	0	0	0	0	0	0	0	0	15	10	0	0	0	0.6	0	-1	0	0	0	0	0	0	0	None	50	false	false	false
+DropPod	0	0	0	Ancient	1	0	0	0	0	0	0	8	20	0	0	0	0	50	0	0	50	0	0	0	10	0	0	None	0	false	false	false
+DropPrecisionStrike	0	0	0	Colorless	0	0	0	0	0	0	0	0	800	1	0	0	0	1.5	1.5	-1	0	0	0	0	0	0	0	None	100	false	false	false
+DropRage	0	0	0	Colorless	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	-1	0	0	0	0	30	30	0	None	50	false	false	false
+DropRefinerySpot	0	0	0	Colorless	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	-1	0	0	0	0	30	30	0	None	150	false	false	false
+DropReveal	0	0	0	Colorless	0	0	0	0	0	0	0	0	0	0	0	0	0	0	1200	-1	0	0	0	0	10	10	0	None	100	false	false	false
+DropShields	0	0	0	Colorless	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	-1	0	0	0	0	120	60	0	None	50	false	false	false
+DropStrength	0	0	0	Colorless	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	-1	0	0	0	0	60	60	34	None	50	false	false	false
+DropTanks	0	0	0	Colorless	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	-1	0	0	0	0	30	30	0	None	100	false	false	false
+DropTurbo	0	0	0	Colorless	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	-1	0	0	0	0	60	60	41	None	50	false	false	false
+DropTurrets	0	0	0	Colorless	0	0	0	0	0	0	0	0	0	0	0	0	0	0.3	0	-1	0	0	0	0	30	30	34	None	100	false	false	false
+DropVampirism	0	0	0	Colorless	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	-1	0	0	0	0	60	60	27	None	50	false	false	false
+DropVeterancy	0	0	0	Colorless	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	-1	0	0	0	0	0	0	25	None	100	false	false	false
+DropXXLBomb	0	0	0	Colorless	0	0	0	0	0	0	0	0	400	1	0	0	0	2.5	0	-1	0	0	0	0	0	0	0	None	180	false	false	false
+ElectricFire	0	0	0	Colorless	0	0	0	0	0	0	0	0	5	0	0	0	0	1	0	0	0	0	0	0	1	0	0	None	0	false	false	false
+ElectroDeer	0	0	10	Ancient	80	0	0	0	0	5	7.5	9	2.5	1	0	0	0.4	0	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+ElectroStag	0	0	10	Ancient	140	0	0	0	0	5	6	6	4	1	0	0	0.4	0	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+EliteBotTechnoFog	0	0	0	None	50	0	0	0	0	0	0	0	5	0	20	0	0	1	1	0	0	0	0	50	5	0	0	None	0	false	false	false
+EnergoSaurus	100	20	6	Colorless	100	0	15	10	0	5	15	5	30	4	0	0	3	0	0	4	0	0	0	0	0	15	48	Mech, AoE, SkillRangeUse	0	false	false	false
+EnergoSaurusFactory	300	0	8	Colorless	400	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	48	None	200	false	true	true
+EnergyHunter	65	18	8	Colorless	50	4	10	8	0	5	18	6	4.2	2	0	0	3.5	0	0	0	0	0	0	0	0	10	19	Shield, Turbo, Vehicle	0	false	false	false
+EnergyHunterFactory	320	0	12	Colorless	400	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	19	None	150	false	true	true
+EnergyMedicTank	280	40	4	Colorless	80	5	30	0	1	5	13	8	10	2.5	0	0	6	0	0	4	3	1	0	0	5	0	27	Shield, Armor, Heal, ManaUse, Turbo, SkillRangeUse, EffectDuration	0	false	false	false
+EnergyMedicTankFactory	800	0	2	Colorless	500	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	27	None	200	false	true	false
+EnergySniperMech	420	38	4	Colorless	50	5	0	0	0	5	13	6	25	5	0	0	8	0	0	0	0	0	0	0	30	0	22	Shield, Mech, Turbo, Sniper	0	false	false	false
+EnergySniperMechFactory	1400	0	4	Colorless	500	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	22	None	200	false	true	false
+EnergyTransferTurret	320	0	10	Colorless	400	10	0	0	0	5	0	7	8	3.5	0	0	7	0	0	0	0	0	0	0	2	0	0	Shield, Turret, Slow, EffectDuration	200	false	true	false
+Engineer	0	0	1	None	80	0	0	0	0	0	18	8	8	0.8	0	0	3.5	0.75	0	6	0	0	0	5	0	0	0	None	0	false	false	false
+EngineerDead	150	3	10	None	65	0	0	0	0	5	0	2	0	0	0	0	0	0	0	3	0	0	0	0	0	0	0	None	0	false	false	false
+EventPCXTransportCrash	0	0	0	Ancient	1500	0	100	0	0	0	0	3	0	0	500	0	0	6	6	7	0	0	0	0	0	0	0	None	0	false	false	false
+ExciterBeamJeep	260	32	5	Colorless	60	0	0	0	0	5	14	8	3.5	0.55	0	0	7	0	0	0	0	0	0	0	0	0	0	Vehicle, Sniper	0	false	false	false
+ExciterBeamJeepFactory	800	0	2	Colorless	400	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	200	false	true	false
+ExplosivePlant	0	0	0	Ancient	29	0	0	0	0	0	0	0	12	0	0	0	0	1.2	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+FireArtillery	280	40	5	Colorless	90	0	0	0	0	5	14	6	25	8	0	0	12	0.8	0	0	0	0	0	0	15	0	31	Fire, AoE, Vehicle, EffectDuration, Sniper	0	false	false	false
+FireArtilleryFactory	800	0	1	Colorless	700	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	31	None	250	false	true	false
+FireBallTank	350	25	5	Colorless	180	0	12	12	2	5	14	5	10	1.5	40	0	3	0.25	1	6	0	0	0	0	4	10	36	Armor, Fire, SkillRangeUse, Tank	0	false	false	false
+FireBallTankFactory	800	0	3	Colorless	600	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	36	None	250	false	true	false
+FireBooster	160	20	6	Colorless	90	4	20	15	0	5	15	7	5.5	1.2	0	0	4	0	1.25	5	0	0	0	0	0	15	42	Shield, Mech, Fire, ManaUse, SkillRangeUse, CriticalHits	0	false	false	false
+FireBoosterFactory	350	0	4	Colorless	600	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	42	None	200	false	true	false
+FirebrandAI	150	35	5	Colorless	60	0	8	8	0	5	11	6	10	3	10	0	4.8	0	0.65	6	0	0	0	0	5	10	0	None	0	false	false	false
+FirebrandFactoryAI	250	0	0	Colorless	700	0	0	0	0	0	0	5	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	250	false	false	false
+Firecaller	200	20	2	Colorless, Specialist	150	0	10	10	1	5	12	5	3	1.2	20	0	5	0	1.1	6	0	0	0	0	10	25	0	Robo, Fire, AoE, ManaUse, SkillRangeUse, SpawnDuration	0	false	false	false
+FirecallerFactory	500	0	1	Colorless, Specialist	450	0	0	0	0	0	0	3	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	150	false	false	false
+FireDrag	50	12	8	Colorless	140	0	0	0	0	5	17	4	40	0	0	0	0	0.8	0	0	0	0	0	0	0	20	0	Fire, Bomb, Vehicle	0	false	false	false
+FireDragFactory	240	0	10	Colorless	400	0	0	0	0	0	0	5	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	200	false	true	false
+FireMech	300	50	3	Colorless	200	0	25	25	0	5	14	6	8	1.6	20	0	3	0	0.75	5	0	0	1	0	4	10	17	Mech, Fire	0	false	false	false
+FireMechFactory	800	0	2	Colorless	600	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	17	None	250	false	true	false
+FireMine	0	0	0	Colorless	2	0	0	0	0	0	0	0	40	0	0	0	0	1.8	0	0	0	0	0	0	0	15	0	Spawn, Fire, Bomb	0	false	false	false
+FireShaman	240	16	5	Colorless	80	0	15	15	0	5	12	5	5	2	0	0	4.5	0	1.25	4	3	0	0	0	4	20	23	Robo, Heal, Fire, ManaUse, SpawnDuration	0	false	false	false
+FireShamanFactory	600	0	2	Colorless	700	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	23	None	200	false	true	false
+FlameArrow	120	15	8	Colorless	60	3	15	15	0	5	20	5	10	3.5	0	0	4	0.3	1	4	0	0	0	0	5	90	0	Shield, Fire, AoE, Vehicle, EffectDuration	0	false	false	false
+FlameArrowAI	50	20	8	None	80	3	0	8	0	5	15	4	6	4	0	0	3.5	0.35	0	0	0	0	0	0	7	5	0	None	0	false	false	false
+FlameArrowFactory	500	0	3	Colorless	450	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	200	false	true	false
+FlameArrowFactoryAI	220	0	0	None	500	0	0	0	0	0	0	5	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	200	false	false	false
+FlameTurret	200	0	15	Colorless	450	0	0	0	0	5	0	6	5	3.5	0	0	5	0.75	0	0	0	0	0	0	0	4	48	Turret, Fire, AoE, EffectDuration	200	false	true	false
+FlameTurretAI	150	20	0	None	260	0	0	0	0	5	0	6	5	3.5	0	0	6	0.6	0	0	0	0	0	0	0	4	0	None	200	false	false	false
+FlameWalker	120	25	5	Colorless	90	0	0	0	0	5	13	7	6	5	0	0	6	0	0	0	0	0	0	0	10	0	14	Robo, Fire	0	false	false	false
+FlameWalkerFactory	320	0	10	Colorless	300	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	14	None	150	false	true	true
+Furnace	500	0	2	Colorless	200	0	25	25	0	5	0	5	3	0	30	0	0	0	2	-1	0	0	0	0	0	15	15	Fire, ManaUse, SpawnDuration	150	false	true	false
+GatlingWalker	500	36	4	Colorless	400	0	0	0	0	5	14	7	2	0.6	0	0	5	0	0	0	0	0	1	0	0	0	0	Mech	0	false	false	false
+GatlingWalkerFactory	1400	0	2	Colorless	600	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	250	false	true	false
+GiveShieldChest	0	0	0	Ancient	100	0	0	0	0	0	0	0	100	0	0	0	0	2	0	0	100000	0	0	0	0	0	0	None	0	false	false	false
+GlobalHealTower	800	0	1	Colorless	150	0	0	0	0	0	0	3	0	0	0	0	0	0	0	0	1	0	0	0	0	0	0	Heal	200	false	true	false
+GlobalTurboTower	550	0	2	Colorless	150	0	30	30	0	0	0	5	0	0	0	0	0	0	0	0	0	0	0	0	0	20	0	ManaUse, Turbo	200	false	true	false
+GrenadeLauncherVan	300	40	4	Colorless	60	0	0	0	0	5	13	6	8	5	0	0	8	0.5	0	0	0	0	0	0	2	0	23	Stun, AoE, Vehicle, EffectDuration, Sniper	0	false	false	false
+GrenadeLauncherVanFactory	800	0	3	Colorless	600	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	23	None	200	false	true	false
+GrenadierJeep	80	22	6	Colorless	50	0	0	0	0	5	14	7	12	3.5	0	0	7	1	0	0	0	0	0	0	5	0	0	Slow, AoE, Vehicle	0	false	false	false
+GrenadierJeepFactory	340	0	3	Colorless	450	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	150	false	true	false
+HackSpeeder	240	36	4	Colorless	40	4	24	24	0	5	20	6	5	1.5	0	0	4	0	0	0	0	0	0	0	3	10	32	Shield, Slow, Vehicle, EffectDuration, SpawnDuration	0	false	false	false
+HackSpeederFactory	800	0	2	Colorless	350	0	0	0	0	0	0	5	0	0	0	0	0	0	0	0	0	0	0	0	0	0	32	None	200	false	true	false
+HarvestTuner	300	0	3	Colorless	200	0	0	0	0	0	0	5	0	0	0	0	0	0	0	10	0	0	0	0	0	0	0	EconomySupport	150	false	true	false
+Headhunter	380	45	5	Colorless	280	6	16	12	1	5	14	7	10	1.6	0	0	4	0	1.3	6	0	0	0	0	0	10	0	Shield, Armor, Mech, Bounty, AoE, SkillRangeUse, SpawnDuration	0	false	false	false
+HeadhunterFactory	800	0	2	Colorless	500	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	250	false	true	false
+HealChest	0	0	0	Ancient	100	0	0	0	0	0	0	0	100	0	0	0	0	2	0	0	100000	0	0	0	0	0	0	None	0	false	false	false
+HealingSpire	500	0	3	Colorless	450	0	0	0	0	5	0	8	0	0	0	0	0	0	0	8	4	0	0	0	0	0	0	Heal	200	false	true	false
+HealthPickup	0	0	0	Colorless	100	0	0	0	0	0	0	0	100	0	0	0	0	0.75	0	0	80	0	0	0	0	0	0	Heal	0	false	false	false
+HeatToCreditConverter	250	0	3	Colorless	250	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	5	0	0	0	None	200	false	false	false
+HeavyMachineGunTruck	300	28	5	Colorless	50	0	20	20	0	5	10	5	3	4	0	0	6.5	0	0	5	0	0	0	0	0	15	0	ManaUse, Turbo, Vehicle, SpawnDuration	0	false	false	false
+HeavyMachineGunTruckFactory	800	0	2	Colorless	500	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	200	false	true	false
+HeavyMGTank	500	45	3	Colorless	300	0	15	15	2	5	13	6	5	0.6	0	0	4	0	0	0	0	0	0	0	0	15	16	Armor, Turbo, Tank	0	false	false	false
+HeavyMGTankFactory	1600	0	4	Colorless	600	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	16	None	200	false	true	false
+HeavyRocketLauncher	600	0	2	Colorless	250	0	30	30	0	5	0	4	0	0	350	0	0	0	2.2	-1	0	0	0	0	0	0	25	AoE, ManaUse	200	false	true	false
+HomingMissileTurret	300	0	15	Colorless	600	0	0	0	1	5	0	8	14	4	0	0	7	0.5	0	0	0	0	0	0	0	0	10	Turret, AoE	250	false	true	false
+HomingMissileTurretAI	180	30	0	None	300	0	0	0	0	5	0	7	15	4	0	0	6.5	0.4	0	0	0	0	0	0	0	0	0	None	250	false	false	false
+HornetTank	360	32	6	Colorless	160	6	0	0	0	5	14	6	4	0.7	0	0	4	0	0	0	0	0	0	0	0	0	38	Shield, Tank	0	false	false	false
+HornetTankFactory	1000	0	3	Colorless	600	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	38	None	250	false	true	false
+HoverSniper	120	25	8	Colorless	70	0	30	20	0	5	18	8	14	4	0	0	7.5	0	0	2	0	0	0	0	0	60	0	Vehicle, SpawnDuration, Sniper	0	false	false	false
+HoverSniperFactory	420	0	4	Colorless	550	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	150	false	true	false
+HoverSpaceOilCollector	260	28	15	Colorless	40	10	25	20	0	5	24	4	0	0	0	0	0	0	0	0	0	0	1.5	35	0	40	0	None	0	false	false	false
+HoverSpaceOilCollectorFactory	2000	0	3	Colorless	1500	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	200	false	false	false
+HoverTank	220	18	8	Colorless	100	8	5	5	1	5	18	6	1.8	0.2	0	0	4.2	0	1.5	6	0	0	0	0	0	0	37	Shield, Teleport, AoE, Vehicle	0	false	false	false
+HoverTankFactory	700	0	5	Colorless	600	0	0	0	0	0	0	5	0	0	0	0	0	0	0	0	0	0	0	0	0	0	37	None	200	false	true	false
+IceCrystal	0	0	0	Ancient	59	0	0	0	0	0	0	0	10	0	0	0	0	0.7	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+IceFox	0	0	10	Ancient	30	0	0	0	0	5	9.5	6	2	1	0	0	0.6	0	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+ImmediateProductionChest	0	0	0	Ancient	100	0	0	0	0	0	0	0	100	0	0	0	0	2	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+IncendiaryHovercraft	180	30	8	Colorless	90	0	0	0	1	5	17	6	8	1	0	0	4	0	0	0	0	0	0	0	15	0	35	Armor, Fire, Vehicle, EffectDuration	0	false	false	false
+IncendiaryHovercraftFactory	800	0	3	Colorless	500	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	35	None	200	false	true	false
+Incinerator	280	20	3	Colorless, Specialist	280	0	15	15	0	5	13	7	4	0.9	18	0	5	0	0.4	12	0	0	0	0	5	8	0	Fire, SkillRangeUse, SpawnDuration	0	false	false	false
+IncineratorFactory	600	0	1	Colorless, Specialist	500	0	0	0	0	0	0	5	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	200	false	false	false
+JeepFactory	400	0	8	Colorless	450	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	150	false	true	true
+JeepWithMachineGun	80	20	8	Colorless	90	0	15	15	0	5	17	7	1.8	0.75	0	0	4	0	0	5	0	0	0	0	0	30	0	Strength, Vehicle, SpawnDuration	0	false	false	false
+LargeCreditExtractor	1000	0	10	None	250	0	0	0	0	0	0	1	0	0	0	0	0	0	0	0	0	0	0	15	0	0	0	None	0	false	false	false
+LargeMine	0	0	0	Colorless	10	0	0	0	0	0	0	0	60	0	0	0	0	2	0	0	0	0	0	0	0	0	0	Spawn, Stun, Bomb	0	false	false	false
+LaserCannonTurret	220	0	15	Colorless	400	10	0	0	0	5	0	7	3.5	0.35	0	0	6	0	0	0	0	0	0	0	0	0	46	Shield, Turret	150	false	true	false
+LaserCannonTurretAI	140	16	0	None	120	12	0	0	0	5	0	6	6	0.4	0	0	6	0	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+LaserTank	180	22	6	Colorless	160	0	16	10	1	5	13	5	5	0.7	0	0	5	0	0	6	0	0	0	0	0	10	0	Armor, Teleport, Turbo, Tank	0	false	false	false
+LaserTankFactory	480	0	10	Colorless	500	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	150	false	true	true
+LavaDweller	120	16	0	Ancient	460	0	0	0	0	0	0	9	13	3	0	0	8	1.25	0	0	0	0	0	0	0	0	0	None	150	false	false	false
+LightArtillery	250	0	5	Colorless	200	0	10	10	0	5	0	4	0	0	25	0	0	0	1	-1	0	0	0	0	0	0	0	AoE, ManaUse	200	false	true	false
+LightningTank	180	30	5	Colorless	120	5	0	0	1	5	14	6	7	1.5	0	0	3	0	0	0	0	0	0	0	0	0	5	Shield, Armor, SkillRangeUse, Tank	0	false	false	false
+LightningTankFactory	460	0	10	Colorless	500	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	5	None	200	false	true	true
+LightningTower	500	0	8	Colorless	400	0	40	40	0	5	0	9	40	4	250	0	8	0	0	-1	0	0	0	0	0	0	0	Turret, Slow, ManaUse	200	false	true	false
+LittleLighter	70	15	8	Colorless	70	0	0	0	0	5	15	5	2.5	3.2	0	0	3.2	0	0	0	0	0	0	0	3	0	0	Fire, AoE, Vehicle	0	false	false	false
+LittleLighterAI	90	16	10	None	90	0	0	0	0	5	14	5	8	1	0	0	3	0	0	0	0	0	0	0	3	0	0	None	0	false	false	false
+LittleLighterFactory	360	0	12	Colorless	400	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	150	false	true	true
+LittleLighterFactoryAI	140	0	0	None	500	0	0	0	0	0	0	5	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	150	false	false	false
+MachineGunMech	260	30	4	Colorless	200	5	8	8	0	5	15	6	3.5	0.4	0	0	3.5	0	0	8	0	0	0	0	0	10	7	Mech, Teleport, ManaUse, Turbo, SkillRangeUse, SpawnDuration	0	false	false	false
+MachineGunMechFactory	700	0	4	Colorless	500	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	7	None	250	false	true	false
+MachineGunTurret	250	0	15	Colorless	600	0	0	0	0	5	0	6	1.8	0.4	0	0	5	0	0	0	0	0	0	0	0	0	0	Turret	150	false	true	false
+MachineGunTurretAI	250	0	0	None	400	0	0	0	0	5	0	6	3.5	0.8	0	0	5.5	0	0	0	0	0	0	0	0	0	0	None	150	false	false	false
+ManaChest	0	0	0	Ancient	100	0	0	0	0	0	0	0	100	0	0	0	0	2	0	0	100000	0	0	0	0	0	0	None	150	false	false	false
+ManaField	0	0	0	Colorless	110	0	0	0	0	0	0	0	0	0	0	0	0	1	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+MantisMech	300	12	1	Colorless, Specialist	1000	0	10	10	3	5	16	6	16	0.75	0	0	0	1.8	0	6	0	0	0	0	0	25	37	Melee, Mech, AoE, SkillRangeUse, SpawnDuration	0	false	false	false
+MantisMechFactory	600	0	1	Colorless, Specialist	600	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	37	None	250	false	false	false
+MarineBlastTower	400	0	3	Colorless	250	0	30	30	0	5	0	4	0	0	0	0	0	0	1.5	-1	0	0	0	0	0	10	12	Stun, AoE, ManaUse, SpawnDuration	200	false	true	false
+MechCommander	350	60	3	Colorless	250	0	30	30	2	5	13	6	20	3.5	0	0	6.5	0.6	0	4	0	0	0	0	0	10	35	Spawn, Armor, Mech, SkillRangeUse, SpawnDuration	0	false	false	false
+MechCommanderFactory	800	0	1	Colorless	700	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	35	None	250	false	true	false
+MedWalker	480	50	5	Colorless	400	0	25	25	0	5	13	6	6	4	0	0	5	0	0	5	3	100	0	0	0	10	34	Mech, Heal, ManaUse, SkillRangeUse, Regen	0	false	false	false
+MedWalkerFactory	1000	0	2	Colorless	800	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	34	None	250	false	true	false
+MGTank	180	22	3	Colorless	100	0	16	16	1	5	13	6	2	0.6	0	0	4.5	0	0.75	6	0	0	0	0	0	3	22	Armor, Panic, AoE, ManaUse, SkillRangeUse, Tank, SpawnDuration	0	false	false	false
+MGTankFactory	450	0	8	Colorless	600	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	22	None	200	false	true	true
+MineLayingHoverbike	100	18	8	Colorless	80	5	16	6	0	5	22	6	6	1	0	0	4.5	0	1.5	5	0	0	0	0	0	300	35	Shield, Spawn, ManaUse, Vehicle, SpawnDuration	0	false	false	false
+MineLayingHoverbikeFactory	300	0	4	Colorless	450	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	35	None	200	false	true	false
+MissileArtillery	400	0	3	Colorless	300	5	15	15	0	5	0	5	3	8	30	0	10	0	1.25	-1	0	0	0	0	0	0	0	Turret, AoE, ManaUse	200	false	true	false
+MissileHoverCraft	280	40	4	Colorless	70	5	0	0	0	5	14	6	10	6	0	0	18	0	0	0	0	0	0	0	0	0	47	Shield, Vehicle, Sniper	0	false	false	false
+MissileHoverCraftFactory	800	0	2	Colorless	450	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	47	None	0	false	true	false
+MissileMech	450	40	3	Colorless	180	8	0	0	0	5	13	9	10	8	0	0	8	0.35	0	0	0	0	0	0	0	0	0	Shield, Mech, AoE	0	false	false	false
+MissileMechFactory	900	0	3	Colorless	550	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	250	false	true	false
+MissileTruck	180	40	5	Colorless	30	0	0	0	0	5	7.5	5	6	6	0	0	18	0.45	0	0	0	0	0	0	0	0	29	Shield, AoE, Vehicle, Sniper	0	false	false	false
+MissileTruckFactory	700	0	2	Colorless	400	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	29	None	250	false	true	false
+MobileRefinerySpawn	0	0	0	Colorless	80	0	0	0	0	0	0	5	0	0	0	0	0	0	0	0	0	0	0	0	0	120	0	Spawn, EconomySupport	150	false	false	false
+MobileRefinerySpawner	120	24	2	Colorless	160	0	50	30	0	5	14	5	5	1.5	0	0	4	0	0	2	0	0	0	0	0	180	50	None	0	false	false	false
+MobileRefinerySpawnerFactory	400	0	3	Colorless	450	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	50	EconomySupport	150	false	true	false
+NeutralEngineer	0	0	10	Ancient	50	0	0	0	0	5	7	4	1.5	4	0	0	1.5	0.2	0	3	0	0	0	0	0	0	0	None	0	false	false	false
+ObstacleStaticBush	0	0	0	Ancient	32	0	0	0	0	0	0	0	5	0	0	0	0	3	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+ObstacleUnstableBush	0	0	0	Ancient	32	0	0	0	0	0	0	0	0	0	0	0	0	2	2	0	0	0	0	0	0	0	0	None	0	false	false	false
+ObstacleWithCrystalGrowth	0	0	0	Ancient	50	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+ObstacleWithCrystalSeed	0	0	0	Ancient	8000	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+ObstacleWithDanger	0	0	0	Ancient	38	0	0	0	0	0	0	0	50	0	20	0	0	1.75	1.75	0	0	0	0	0	0	0	0	None	0	false	false	false
+OilTrap	0	0	0	Colorless	5	0	0	0	0	0	0	0	0	0	0	0	0	0	1	0	0	0	0	0	1	10	0	None	0	false	false	false
+PanicTurret	420	0	10	Colorless	500	0	0	0	0	5	0	6	12	3.5	0	0	6	0	0	0	0	0	0	0	2	0	42	Turret, Panic	150	false	true	false
+PCXAbductotron	500	80	1	None	800	0	20	12	2	5	12	6	15	1.4	10	0	5	0.4	1.5	6	0	0	0	0	10	0	0	None	0	false	false	false
+PCXAbductotronFactory	1000	0	0	None	1000	0	0	0	0	0	0	3	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	250	false	false	false
+PCXAbductotronSkillTrap	0	0	0	None	1	0	0	0	0	0	0	0	0	0	0	0	0	1.5	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+PCXAccelerator	800	60	0	None	300	0	0	0	0	0	0	2	0	0	0	0	0	0	0	0	0	0	0	0	60	0	0	None	0	false	false	false
+PCXAmmoTank	400	160	3	None	460	0	0	0	3	5	11	8	25	1.5	0	0	4.5	0	0	0	10	0	0	0	0	0	0	None	0	false	false	false
+PCXAmmoTankFactory	900	0	0	None	800	0	0	0	0	0	0	4	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	250	false	false	false
+PCXArmory	1200	0	0	None	200	0	30	30	0	0	0	2	0	0	0	0	0	0	0	-1	0	0	0	0	0	30	0	None	0	false	false	false
+PCXArtilleryTurret	300	0	0	None	200	0	0	0	0	5	0	16	50	10	0	0	18	1	0	0	0	0	0	0	0	0	0	None	250	false	false	false
+PCXBarrageTruck	750	260	3	None	80	0	0	0	0	5	9	20	40	12	0	0	18	1.1	0	0	0	0	0	0	3	20	0	None	0	false	false	false
+PCXBarrageTruckFactory	500	0	0	None	600	0	0	0	0	0	0	5	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	150	false	false	false
+PCXBaseControl	500	0	0	None	500	8	0	0	0	0	0	2	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+PCXBaseTank	200	42	5	None	180	0	0	0	1	5	11	5	8	3	0	0	3.8	0.2	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+PCXBaseTankFactory	600	0	0	None	400	0	0	0	0	0	0	3	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+PCXBeamJeep	240	140	3	None	40	0	0	0	0	5	11	7	2.8	0.2	0	0	7	0	0	0	0	0	0	0	2	0	0	None	0	false	false	false
+PCXBeamJeepFactory	700	0	0	None	500	0	0	0	0	0	0	4	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	200	false	false	false
+PCXBigBomber	140	70	3	None	260	0	0	0	3	5	10	4	400	0	0	0	0	1.3	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+PCXBigBomberFactory	500	0	0	None	700	0	0	0	0	0	0	5	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	150	false	false	false
+PCXBigHunter	400	100	10	None	360	10	10	6	1	5	16	5	16	0.7	0	0	3.8	0	0	0	0	0	0	0	0	15	0	None	0	false	false	false
+PCXBigHunterFactory	800	0	0	None	600	0	0	0	0	0	0	5	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+PCXBigHunterRoofTurretOnlyAsChild	0	0	0	Colorless	0	0	0	0	0	0	0	5	3.6	0.35	0	0	4.6	1	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+PCXBlinkWalker	260	45	3	None	200	0	10	10	2	5	15	7	8	0.6	25	0	3.8	0	1.25	7	0	0	0	0	0	5	0	None	0	false	false	false
+PCXBlinkWalkerFactory	600	0	0	None	500	0	0	0	0	0	0	5	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+PCXBomber	40	16	5	None	60	0	0	0	0	5	16	5	60	0	0	0	0	1.3	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+PCXBomberFactory	140	0	0	None	500	0	0	0	0	0	0	5	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	150	false	false	false
+PCXBroodMech	500	100	1	None	600	0	16	10	3	5	12	6	12	1.5	0	0	5	0	0	5	0	0	0	0	0	30	0	None	0	false	false	false
+PCXBroodMechFactory	1600	0	0	None	1000	0	0	0	0	0	0	3	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	150	false	false	false
+PCXBugTank	700	160	3	None	1100	0	16	10	3	5	16	6	16	0.6	0	0	5	0	0	-1	0	0	0	0	0	30	0	None	0	false	false	false
+PCXBugTankFactory	1600	0	0	None	800	0	0	0	0	0	0	3	0	0	0	0	0	0	0	0	30	0	0	0	0	0	0	None	150	false	false	false
+PCXBuilderBase	800	0	0	None	500	0	0	0	0	0	0	2	0	0	0	0	0	0	0	10	0	0	0	0	0	0	0	None	0	false	false	false
+PCXBuilderDrone	80	40	1	None	50	0	0	0	0	5	13	5	0	0	0	0	0	0	0	2	0	0	0	2.5	0	0	0	None	0	false	false	false
+PCXCapacityExtender	200	60	0	None	80	0	0	0	0	0	0	2	0	0	0	0	0	0	0	0	0	0	0	0	60	0	0	None	0	false	false	false
+PCXCFBurner	70	18	5	None	80	0	0	0	0	5	14	5	10	2.2	0	0	3	0	0	0	0	0	0	0	4	0	0	None	0	false	false	false
+PCXCFBurnerFactory	400	0	0	None	400	0	0	0	0	0	0	3	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	200	false	false	false
+PCXCFTank	120	26	5	None	100	0	0	0	2	5	12	5	3.2	1.5	0	0	4.6	0	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+PCXCFTankFactory	440	0	0	None	300	0	0	0	0	0	0	3	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	200	false	false	false
+PCXCloudBattery	600	0	0	None	800	0	0	0	0	0	0	1	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+PCXCloudCaller	1600	220	1	None	2000	20	32	32	0	5	15	8	20	2.2	25	0	8	1.5	0	6	0	0	0	0	3	10	0	None	0	false	false	false
+PCXCloudCallerFactory	3000	0	0	None	2000	0	0	0	0	0	0	10	15	2	0	0	7	0	0	0	20	0	0	0	0	0	0	None	150	false	false	false
+PCXCloudCallerWeatherWalkerStaticField	0	0	0	None	11	0	0	0	0	0	0	0	36	0	0	0	0	1.5	0	0	0	0	0	0	0	5	0	None	0	false	false	false
+PCXCocoon	300	160	0	None	800	0	0	0	0	0	0	2	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	250	false	false	false
+PCXCocooner	600	0	0	None	800	0	0	0	0	0	0	5	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	250	false	false	false
+PCXCoinStorage	300	60	0	None	250	0	0	0	0	0	0	1	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+PCXCoinTransport	150	750	3	None	80	0	15	0	0	5	12	5	0	0	0	0	0	2	0	2	0	0	0	0	0	0	0	None	0	false	false	false
+PCXConquerer	1600	180	1	None	1600	0	5	5	3	5	11	8	16	2.8	240	0	3.4	0.8	0.5	7	0	0	0	0	0	0	0	None	0	false	false	false
+PCXConquererFactory	4000	0	5	None	2000	0	0	0	0	0	0	3	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	250	false	false	false
+PCXConstructionSite1	0	0	0	None	100	0	0	0	0	0	0	1	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+PCXConstructionSite2	0	0	0	None	300	0	0	0	0	0	0	1	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+PCXCorrosiveTractor	350	26	10	None	240	0	0	0	1	5	13	6	10	1.5	0	0	4.2	0	0	0	0	0	0	0	4	0	0	None	0	false	false	false
+PCXCorrosiveTractorFactory	700	0	0	None	500	0	0	0	0	0	0	5	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	150	false	false	false
+PCXCrystalCleaner	800	120	1	None	1800	0	30	20	3	5	7.5	8	16	3.4	250	0	7	3	5	0	1	0	0	0	5	30	0	None	0	false	false	false
+PCXCrystalCollector	100	29	4	None	90	0	0	0	0	5	10	3	5	1	0	0	2	0	0	0	0	0	0	15	0	0	0	None	0	false	false	false
+PCXCrystalConverter	500	0	3	None	500	0	0	0	0	0	0	5	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	150	false	false	false
+PCXCrystalSilo	200	60	0	None	80	0	0	0	0	0	0	1	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+PCXDeadSurveyorDead	0	1.4	1	None	45	0	0	0	0	5	0	0	0	0	0	0	0	0	0	3	1	0	0	1	0	0	0	None	0	false	false	false
+PCXDecelerator	100	35	3	None	40	3	0	0	0	5	11.5	6	8	2	0	0	5.5	0	0	0	0	0	0	0	5	0	0	None	0	false	false	false
+PCXDeceleratorFactory	360	0	0	None	500	0	0	0	0	0	0	5	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+PCXDeconstructorTank	500	100	2	None	160	0	0	0	3	5	12	7	8	0.2	0	0	6	0	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+PCXDeconstructorTankFactory	1000	0	0	None	700	0	0	0	0	0	0	5	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+PCXDefectDetector	300	0	0	None	300	0	60	60	0	0	0	1	0	0	0	0	0	0	0	-1	0	0	0	0	0	0	0	None	0	false	false	false
+PCXDragonBug	300	60	3	None	460	0	0	0	1	5	15	6	20	2	0	0	3	0	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+PCXDragonBugNest	600	0	0	None	700	0	0	0	0	0	0	5	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	200	false	false	false
+PCXDrone	50	7	10	None	80	0	0	0	0	5	10	3	0	0	0	0	0	0	0	0	0	0	0	5	0	0	0	None	0	false	false	false
+PCXEmergencyAntenna	500	0	0	None	200	0	90	90	0	0	0	1	0	0	0	0	0	0	0	-1	0	0	0	0	0	0	0	None	0	false	false	false
+PCXEnergyHunter	120	20	6	None	40	3	0	0	0	5	18	5	4.8	1.8	0	0	3	0	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+PCXEnergyHunterFactory	340	0	0	None	500	0	0	0	0	0	0	5	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	150	false	false	false
+PCXEngineerCharger	300	60	0	None	360	0	0	0	0	0	0	3	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+PCXEngineeringArchive	3000	60	0	None	4000	0	0	0	0	0	0	10	0	0	0	0	0	0	0	0	0	0	0	0	0	20	0	None	0	false	false	false
+PCXEngineerMkII	150	50	1	None	120	0	50	0	0	5	13	6	0	0	0	0	0	0	0	3	3	0	0	0	0	0	0	None	0	false	false	false
+PCXEradicator	800	60	5	None	300	0	0	0	1	5	11	10	50	4	0	0	8	0	0	0	0	0	0	0	0	0	0	Armor, Tank	0	false	false	false
+PCXEradicatorFactory	1500	0	2	None	1200	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	250	false	false	false
+PCXExitGrenade	0	0	0	None	40	0	5	0	0	5	0	1	50	0	0	0	0	1.2	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+PCXFactoryProtectionTurret	0	0	0	Colorless	11	0	0	0	0	0	0	7	4	1.8	0	0	6	1	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+PCXFireDrag	100	40	10	None	60	0	0	0	0	5	14	6	30	0	0	0	0	1.2	0	0	0	0	1	0	0	10	0	None	0	false	false	false
+PCXFireDragFactory	200	0	0	None	500	0	0	0	0	0	0	5	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	200	false	false	false
+PCXFortress	1200	20	0	None	800	0	0	0	3	5	0	7	25	1.8	0	0	6	0.6	0	0	0	0	0	0	0	0	0	None	250	false	false	false
+PCXGargantoMech	1200	180	1	None	1400	0	14	12	5	5	9	8	24	0.5	40	0	5.5	0	0.5	7	60	0	0	0	0	0	0	None	0	false	false	false
+PCXGargantoMechFactory	2400	0	5	None	2000	0	0	0	0	0	0	3	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	250	false	false	false
+PCXGrenadierJeep	180	40	5	None	40	0	0	0	0	5	12	6	15	2.5	0	0	5.5	0.7	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+PCXGrenadierJeepFactory	500	0	5	None	500	0	0	0	0	0	0	5	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	150	false	false	false
+PCXGunRunner	90	18	5	None	50	0	0	0	0	5	17	5	3.8	1.6	0	0	3	2.5	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+PCXGunRunnerFactory	340	0	0	None	400	0	0	0	0	0	0	5	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	150	false	false	false
+PCXHistoryCapsule	0	0	0	None	100	0	0	0	0	0	0	0	100	0	0	0	0	2	0	0	0	0	0	200	0	0	0	None	0	false	false	false
+PCXHullSoftener	300	0	0	None	400	0	0	0	0	0	0	2	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+PCXHunterJeep	120	24	5	None	80	0	5	5	0	5	15	5	5	0.8	15	0	4.4	2.5	0	5	0	0	0	0	6	0	0	None	0	false	false	false
+PCXHunterJeepFactory	460	0	0	None	500	0	0	0	0	0	0	5	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	150	false	false	false
+PCXHuntingDrop	250	60	0	None	800	0	0	0	0	0	0	1	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	250	false	false	false
+PCXKnowledgeProcessor	300	60	0	None	250	0	45	45	0	0	0	1	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+PCXLargeCrystalSilo	500	60	0	None	500	0	0	0	0	0	0	1	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	150	false	false	false
+PCXLauncher	360	140	3	None	100	0	0	0	1	5	9	11	10	15	0	0	11	0	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+PCXLauncherFactory	1200	0	10	None	500	0	0	0	0	5	0	7	15	4	0	0	7	0.3	0	0	0	0	0	0	0	0	0	None	250	false	false	false
+PCXLightArtilleryTank	180	90	1	None	60	0	0	0	0	5	9	8	30	6	0	0	6	0.6	0	0	0	0	0	0	3	0	0	None	0	false	false	false
+PCXLightArtilleryTankFactory	750	0	1	None	500	0	0	0	0	0	0	5	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	150	false	false	false
+PCXMechI	500	80	1	None	420	0	25	20	3	5	12.5	7	20	1.1	100	0	4.5	0	1.2	5	30	0	0	0	10	0	0	None	0	false	false	false
+PCXMechIFactory	1200	0	0	None	700	0	0	0	0	0	0	3	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	250	false	false	false
+PCXMGTank	240	72	3	None	250	0	0	0	2	5	11	5	6	0.8	0	0	3.5	0	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+PCXMGTankFactory	500	0	0	None	700	0	0	0	0	0	0	3	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	200	false	false	false
+PCXMissileArtillery	600	0	10	None	170	0	50	50	0	5	0	3	50	20	60	0	250	1	8	-1	0	0	0	0	0	0	0	None	0	false	false	false
+PCXMissileBuggy	180	45	30	None	30	0	0	0	0	5	15	7	15	3.5	0	0	6.5	0.5	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+PCXMissileBuggyFactory	500	0	0	None	500	0	0	0	0	0	0	5	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	150	false	false	false
+PCXMobileCommand	150	90	1	None	180	5	0	0	1	5	13	6	12	1	0	0	4.5	0	0	0	0	0	1	0	0	0	0	None	0	false	false	false
+PCXMobileCommandFactory	300	0	0	None	500	0	0	0	0	0	0	5	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	150	false	false	false
+PCXNanoHunter	60	16	6	None	35	0	5	5	0	5	14	5	7	0.8	0	0	0	0	0	0	0	0	0	0	0	5	0	None	0	false	false	false
+PCXNanoHunterFactory	400	0	0	None	240	0	0	0	0	0	0	5	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	150	false	false	false
+PCXNuclearMissileSilo	2000	0	10	None	800	0	80	80	0	5	0	4	0	0	1800	0	0	0	1.3	-1	0	0	0	0	0	0	0	None	0	false	false	false
+PCXObelisq	2500	0	0	None	1600	25	0	0	3	0	0	5	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	250	false	false	false
+PCXOverseerWalker	400	90	3	None	400	5	30	5	1	5	11	7	14	1.4	0	0	6.5	0	0	5	50	0	0	0	2	0	0	None	0	false	false	false
+PCXOverseerWalkerFactory	1000	0	0	None	600	0	0	0	0	0	0	4	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	200	false	false	false
+PCXPerforator	400	80	3	None	360	5	25	25	2	5	11	7	20	2	20	0	5	0.5	0.5	6	0	0	0	0	10	60	0	None	0	false	false	false
+PCXPerforatorFactory	1200	0	0	None	700	0	0	0	0	0	0	3	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	250	false	false	false
+PCXPoker	260	26	10	None	200	0	0	0	1	5	16	5	10	0.6	0	0	0	0	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+PCXPokerFactory	600	0	0	None	500	0	0	0	0	0	0	5	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	150	false	false	false
+PCXPowerline	300	30	0	None	300	0	0	0	0	0	0	7	0	0	0	0	0	0	0	7	0	0	0	1	0	0	0	None	150	false	false	false
+PCXPrison	300	0	0	None	200	0	0	0	0	0	0	8	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	150	false	false	false
+PCXQAModule	300	0	0	None	300	0	0	0	0	0	0	2	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+PCXRefinery	150	0	0	None	700	0	0	0	0	0	0	5	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	150	false	false	false
+PCXReinforcerBeacon	800	0	0	None	300	0	0	0	0	0	0	2	0	0	0	0	0	0	0	-1	0	0	0	0	0	0	0	None	0	false	false	false
+PCXReinforcerAntenna	800	0	0	None	300	0	30	30	0	0	0	2	0	0	0	0	0	0	0	-1	0	0	0	0	0	0	0	None	0	false	false	false
+PCXRepairTank	280	80	5	None	160	0	40	0	1	5	10.5	5	12	2.4	0	0	5.5	0.15	0	0	5	0	0	0	0	0	0	None	0	false	false	false
+PCXRepairTankFactory	800	0	0	None	600	0	0	0	0	0	0	3	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+PCXScoutingBlimp	10	20	1	None	30	0	0	0	0	5	16	8	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+PCXScoutingBlimpFactory	160	0	0	None	260	0	0	0	0	0	0	1	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+PCXScoutJeep	100	60	3	None	70	0	15	15	0	5	11	8	10	1	0	0	6	0	0	0	4	0	0	0	2	7	0	None	0	false	false	false
+PCXScoutJeepFactory	360	0	0	None	500	0	0	0	0	0	0	4	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	200	false	false	false
+PCXScytheHead	800	110	10	None	1000	0	0	0	0	5	19	7	12	0.5	0	0	0	1.6	0	0	40	0	0	0	0	0	0	None	0	false	false	false
+PCXScytheHeadFactory	2000	0	0	None	1200	0	0	0	0	0	0	5	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+PCXScytheHeadFactoryWinCondition	2000	0	0	None	1400	0	0	0	0	0	0	5	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+PCXSectorControl	2000	0	0	None	2500	0	50	50	5	0	0	5	0	0	0	0	0	0	0	8	0	0	0	0	0	20	0	None	0	false	false	false
+PCXSeeker	400	50	5	None	260	0	12	8	1	5	14	7	7	0.9	60	0	5.2	0	0	9	0	0	0	0	0	0	0	None	0	false	false	false
+PCXSeekerFactory	1200	0	0	None	600	0	0	0	0	0	0	3	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+PCXShieldExpander	600	60	0	None	200	0	0	0	0	0	0	2	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+PCXShieldingTruck	260	100	3	None	90	3	16	12	1	5	13	6	8	0.35	0	0	4.5	0	3	0	5	0	0	0	0	15	0	None	0	false	false	false
+PCXShieldingTruckFactory	600	0	5	None	500	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	200	false	false	false
+PCXShockTurret	1200	0	3	None	1200	0	30	30	3	5	0	12	50	2	0	0	12	1	0	0	0	0	0	0	0	20	0	None	250	false	false	false
+PCXSiegeArmor	500	120	2	None	70	0	0	0	0	5	9.5	15	50	8	0	0	14	1.5	0	0	0	0	1	0	3	0	0	None	0	false	false	false
+PCXSiegeArmorFactory	1200	0	3	None	800	0	0	0	0	0	0	5	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	250	false	false	false
+PCXSiegeMech	800	300	1	None	800	0	40	30	3	5	11	5	20	2.5	5	0	5	0.6	0	5	0	0	0	0	0	10	0	None	0	false	false	false
+PCXSiegeMechFactory	1800	0	0	None	1000	0	0	0	0	0	0	3	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	250	false	false	false
+PCXSiegeTower	500	240	1	None	800	0	15	15	3	5	9.5	17	10	0.8	12	0	5	0	0.8	17	0	0	0	0	0	6	0	None	0	false	false	false
+PCXSiegeTowerFactory	900	0	3	None	1000	0	0	0	0	0	0	5	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	250	false	false	false
+PCXSlimeBig	300	45	10	None	180	0	0	0	1	5	14	7	18	0.8	0	0	0	0	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+PCXSlimeBlaster	900	150	1	None	800	0	8	8	0	5	14	7	8	0.7	10	0	4.6	0	0	5	0	0	0	0	5	10	0	None	0	false	false	false
+PCXSlimeBlasterFactory	1600	0	3	None	1000	0	0	0	0	0	0	5	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+PCXSlimeGiant	700	130	10	None	600	0	8	8	3	5	12	7	30	0.8	40	0	6	0	2.2	0	0	0	0	0	0	3	0	None	0	false	false	false
+PCXSlimeGiantNest	1800	0	0	None	700	0	0	0	0	0	0	5	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	200	false	false	false
+PCXSlimeMid	50	0	10	None	60	0	0	0	0	5	15	7	6.5	0.6	0	0	0	0	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+PCXSlimer	80	20	10	None	120	0	0	0	0	5	13	8	0	3.5	0	0	7	0	0	0	0	0	0	0	0	30	0	None	0	false	false	false
+PCXSlimerFactory	700	0	0	None	600	0	0	0	0	0	0	5	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	200	false	false	false
+PCXSlimeSmall	20	0	10	None	25	0	0	0	0	5	17	5	3	0.38	0	0	0	0	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+PCXSpawn	0	0	0	None	20	0	0	0	0	0	17	5	4	1.3	0	0	0	0	0	0	0	0	0	0	5	0	0	None	0	false	false	false
+PCXSpawnNest	250	60	0	None	600	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	250	false	false	false
+PCXSpawnNestSpawner	250	60	0	None	900	0	0	0	0	0	0	1	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	250	false	false	false
+PCXSpawnTank	130	39	10	None	190	0	0	0	0	5	13	7	15	8	0	0	6	0	0	0	0	0	0	0	6	25	0	None	0	false	false	false
+PCXSpawnTankFactory	300	0	0	None	500	0	0	0	0	0	0	5	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	250	false	false	false
+PCXSpidertank	100	25	10	None	130	0	0	0	0	5	15	5	8	1.4	0	0	3.5	0	0	4	0	0	0	0	0	15	0	None	0	false	false	false
+PCXSpidertankFactory	400	0	0	None	450	0	0	0	0	0	0	5	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	200	false	false	false
+PCXStorageTank	300	0	0	None	80	0	0	0	0	0	0	1	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+PCXStunBomb	40	35	10	None	60	2	0	0	0	5	16	5	40	0	0	0	0	1	0	0	0	0	0	0	5	10	0	None	0	false	false	false
+PCXStunBombFactory	120	0	0	None	500	0	0	0	0	0	0	5	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	150	false	false	false
+PCXSupplyTank	100	0	0	None	100	0	0	0	0	0	0	1	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+PCXSurveyLocation	0	0	0	None	2000	0	0	0	0	0	0	2	0	0	0	0	0	0	0	5	0	0	0	0	0	0	0	None	0	false	false	false
+PCXSurveyor	50	47	1	None	340	0	0	0	0	5	11	7	30	2	0	0	3	1	0	3	1	0	0	2.5	0	0	0	None	0	false	false	false
+PCXSurveyorSeat	250	0	0	None	2700	0	0	0	0	0	0	5	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	150	false	false	false
+PCXTacticonnection	800	0	0	None	300	0	60	60	0	0	0	8	0	0	0	0	0	0	0	-1	0	0	0	0	0	0	0	None	0	false	false	false
+PCXTank	900	130	10	None	640	0	0	0	3	5	11	6	25	1.2	0	0	4.8	0.45	0	0	0.5	0	0	0	0	0	0	None	0	false	false	false
+PCXTankFactory	2000	0	0	None	1000	0	0	0	3	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+PCXTankRoofMachineGun	0	0	0	Colorless	10	0	0	0	0	5	0	5	2.2	1.25	0	0	5	0	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+PCXTermiteHover	200	60	2	None	80	0	0	0	0	5	20	6	180	0	0	0	0	1	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+PCXTermiteHoverFactory	600	0	0	None	700	0	0	0	0	0	0	3	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+PCXTunneler	800	0	0	None	800	0	25	25	0	0	0	5	0	0	0	0	0	0	0	-1	0	0	0	0	0	0	0	None	250	false	false	false
+PCXTunnelExit	500	120	0	None	300	0	0	0	1	0	0	2	0	0	0	0	0	0	0	1	0	0	0	0	0	0	0	None	0	false	false	false
+PCXTurbineMech	500	240	1	None	1000	10	15	15	3	5	11	7	20	1	100	0	5.5	0.6	0	7	0	0	0	0	10	20	0	None	0	false	false	false
+PCXTurbineMechFactory	1200	0	0	None	1000	0	0	0	0	0	0	4	0	0	0	0	0	0	0	0	0	0	0	0	30	0	0	None	250	false	false	false
+PCXTurret	180	20	0	None	250	0	0	0	0	5	0	6	5	0.8	0	0	6	0	0	0	0	0	0	0	0	0	0	None	200	false	false	false
+PCXTurretAmplifier	800	30	0	None	80	0	0	0	0	0	0	5	0	0	0	0	0	0	0	10	5	0	0	0	0	0	0	None	150	false	false	false
+PCXUltraLaserTank	1400	160	10	None	1400	0	0	0	3	5	12	7	13	0.7	0	0	5.5	0	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+PCXUltraLaserTankFactory	2400	0	0	None	2000	0	0	0	3	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+PCXVacuon	1000	120	1	None	800	0	20	12	1	5	20	8	7	1	0	0	6	0	2	5	0	0	0	0	0	120	0	None	0	false	false	false
+PCXVacuonFactory	2500	0	0	None	1000	0	0	0	0	0	0	3	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	150	false	false	false
+PCXWaypointMarker	0	0	0	None	2	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+PerforatorSlimeSpawner	0	0	0	None	40	0	5	5	1	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	30	0	None	0	false	false	false
+PhaseWalker	300	22	2	Colorless, Specialist	500	0	15	8	2	5	14	6	7	1.25	0	0	4	0	1.8	12	0	0	0	0	0	20	25	Armor, Mech, Teleport, AoE, ManaUse	0	false	false	false
+PhaseWalkerFactory	500	0	1	Colorless, Specialist	500	0	0	0	0	0	0	5	0	0	0	0	0	0	0	0	0	0	0	0	0	0	25	None	250	false	false	false
+PiercingAmmoForge	300	0	3	Colorless	400	0	0	15	0	0	0	3	0	0	0	0	0	0	0	5	0	0	0	0	0	0	0	None	150	false	false	false
+PlanetaryCoreExtractor	2500	0	0	None	800	0	0	0	0	0	0	10	0	0	0	0	0	0	0	0	1	0	0	2	0	0	0	None	200	false	false	false
+PlanetaryCoreExtractorII	500	0	0	None	800	0	0	0	0	0	0	5	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	200	false	false	false
+PlanetaryCoreExtractorIII	500	0	0	None	800	0	0	0	0	0	0	5	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	200	false	false	false
+Plant	0	0	0	Ancient	37	0	0	0	0	0	0	0	10	0	0	0	0	2	4	2	0	0	0	0	0	0	0	None	0	false	false	false
+PlantedTurret	0	0	0	Colorless	250	0	0	0	0	5	0	5	7	1.5	0	0	5.5	0	0	0	0	0	0	0	0	0	0	Turret	0	false	false	false
+PlanterTank	180	30	5	Colorless	120	0	20	15	1	5	14	6	4	1.2	0	0	4	0	0	4	0	0	0	0	0	120	0	Armor, Turret, SkillRangeUse, Tank, SpawnDuration	150	false	false	false
+PlanterTankFactory	500	0	4	Colorless	500	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	150	false	true	false
+PowerSpike	420	0	3	Colorless	300	0	25	25	0	0	0	3	0	0	0	0	0	0	1.6	-1	0	0	0	0	0	15	26	ManaUse, Strength, SpawnDuration	150	false	true	false
+PrecisionArtillery	320	0	5	Colorless	300	0	12	12	0	5	0	4	0	0	100	0	0	0	0	-1	0	0	0	0	0	0	37	ManaUse	200	false	true	false
+ProductionBoostTower	600	0	1	Colorless	200	0	40	40	0	0	0	5	0	0	0	0	0	0	1	15	0	0	0	0	0	60	19	ManaUse, SkillRangeUse, SpawnDuration	200	false	true	false
+ProductionJammer	400	0	2	Colorless	200	0	40	40	0	0	0	4	0	0	0	0	0	0	0	-1	0	0	0	0	0	60	13	ManaUse, SpawnDuration	200	false	true	false
+ProtectivePlatePile	360	0	3	Colorless	300	0	15	15	0	0	0	6	0	0	0	0	0	0	1.6	-1	2	0	0	0	0	60	28	None	150	false	true	false
+RailgunTank	800	50	5	Colorless	150	0	0	0	1	5	11	10	50	4	0	0	8	0	0	0	0	0	0	0	0	0	18	Armor, Tank	0	false	false	false
+RailgunTankFactory	1500	0	2	Colorless	600	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	18	None	250	false	true	false
+RailgunTurret	500	0	15	Colorless	350	0	0	0	0	5	0	6	30	3.5	0	0	12	0	0	0	0	0	0	0	0	0	28	Turret	150	false	true	false
+RangerTank	320	40	6	Colorless	90	0	10	10	2	5	13	9	14	3	0	0	7.5	0	0	0	0	0	0	0	0	30	3	Armor, Tank, SpawnDuration, Sniper	0	false	false	false
+RangerTankFactory	700	0	2	Colorless	600	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	3	None	200	false	true	false
+RangerTurret	450	0	15	Colorless	500	0	8	8	0	5	0	9	8	3	0	0	7	0	0	0	0	0	0	0	5	0	9	Turret, EffectDuration, CriticalHits, Sniper	200	false	true	false
+RapidCannonTurret	200	0	15	Colorless	500	0	20	15	0	5	0	7	4	0.5	0	0	5	0	1.5	6	0	0	0	0	0	300	0	Spawn, Turret, SkillRangeUse, SpawnDuration	150	false	true	false
+ReachEngineer	0	0	1	Colorless	20	5	0	0	0	0	15	12	4	0.4	0	0	8	0	0	30	0	0	0	2	0	0	0	None	0	false	false	false
+Reclaimer	300	0	2	Colorless	300	0	0	0	0	0	0	4	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	EconomySupport	0	false	true	false
+RepairTrike	180	22	5	Colorless	120	0	10	10	0	5	13	5	2.6	1.5	0	0	5	0	4.2	0	0	80	0	0	0	0	25	Heal, Vehicle	0	false	false	false
+RepairTrikeFactory	460	0	4	Colorless	450	0	0	0	0	0	0	5	0	0	0	0	0	0	0	0	0	0	0	0	0	0	25	None	200	false	true	false
+RoboBerzerker	250	15	4	Colorless	450	0	8	8	3	5	16	5	8	0.6	15	0	0	0.4	1.6	0	0	0	0	0	10	10	15	Melee, Robo, AoE	0	false	false	false
+RoboBerzerkerFactory	600	0	1	Colorless	600	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	15	None	200	false	false	false
+RoboBladeBot	150	20	8	Colorless	180	0	15	15	1	5	17	6	8	0.6	0	0	0	0.8	1.25	5	0	0	0	0	0	6	0	Melee, Armor, Robo, Slow, AoE, ManaUse, SkillRangeUse, SpawnDuration	0	false	false	false
+RoboBladeBotFactory	600	0	6	Colorless	500	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	200	false	true	false
+RoboBomb	35	8	15	Colorless	50	0	0	0	0	5	15	5	40	0	0	0	0	0.8	0	0	0	0	0	0	0	0	3	Robo, AoE, Bomb	0	false	false	false
+RoboBombBattery	350	0	3	Colorless	200	0	25	25	0	5	0	4	0	0	25	0	0	0	1.25	-1	0	0	0	0	0	0	11	Spawn, ManaUse, Bomb	200	false	true	false
+RoboBombFactory	120	0	10	Colorless	300	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	3	None	150	false	true	false
+RoboBountyBot	70	14	10	Colorless	60	5	10	10	0	3	13	6	3.5	0.7	10	0	3.2	0	0	4	0	0	0	0	0	3	12	Shield, Robo, Bounty, ManaUse	0	false	false	false
+RoboBountyBotFactory	180	0	10	Colorless	400	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	12	None	150	false	true	true
+RoboBountyEater	380	40	5	Colorless, Specialist	180	0	20	20	0	5	13	8	4	2.5	0	0	4	1.5	1.5	6	0	0	3	10	0	15	32	Mech	0	false	false	false
+RoboBountyEaterFactory	700	0	1	Colorless	600	0	0	0	0	0	0	4	0	0	0	0	0	0	0	0	0	0	0	0	0	0	32	None	250	false	true	false
+RoboClawBot	45	9	15	Colorless	70	0	5	5	0	5	16	6	3.6	0.5	0	0	0	0	0	5	0	0	0	0	0	15	0	Melee, Robo, Teleport, ManaUse, SkillRangeUse	0	false	false	false
+RoboClawBotFactory	140	0	10	Colorless	400	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	150	false	true	true
+RoboCoreSniper	150	25	5	Colorless	60	0	15	15	0	5	12	7	10	5	40	0	7	0	1.25	7	0	0	0	0	0	5	5	Robo, Stun, AoE, SkillRangeUse, SpawnDuration, Sniper	0	false	false	false
+RoboCoreSniperFactory	360	0	3	Colorless	600	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	5	None	150	false	true	false
+RoboCrystalHarvester	80	20	8	Colorless	50	0	30	30	0	5	14	4	3	0.8	0	0	0	0	0	0	0	0	1.4	10	0	30	0	None	0	false	false	false
+RoboCrystalHarvesterSpawn	0	0	0	Colorless	50	0	0	0	0	5	14	4	3	0.8	0	0	0	0	0	0	0	0	1.4	10	0	0	0	None	0	false	false	false
+RoboCrystalMill	1000	0	8	Colorless	800	0	0	0	0	0	0	5	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+RoboFactoryCharger	500	0	3	Colorless	200	0	40	40	0	0	0	4	0	0	0	0	0	0	0	5	0	0	0	0	0	0	0	ManaUse	150	false	true	false
+RoboFireStarter	60	15	8	Colorless	70	0	0	0	0	5	13	5	4.5	4	0	0	3.5	0	0	0	0	0	0	0	5	0	22	Robo, Fire	0	false	false	false
+RoboFireStarterFactory	220	0	10	Colorless	450	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	22	None	150	false	true	true
+RoboGrenadier	60	20	5	Colorless	60	0	0	0	0	5	10	10	20	4	0	0	10	0.7	0	0	0	0	0	0	0	0	46	Robo, AoE, Sniper	0	false	false	false
+RoboGrenadierFactory	180	0	5	Colorless	500	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	46	None	200	false	true	false
+RoboManaChannelizer	500	0	1	Colorless	200	0	25	25	0	0	0	3	0	0	0	0	0	0	0	-1	0	0	0	0	0	0	0	ManaUse	200	false	true	false
+RoboMarine	55	12	15	Colorless	80	0	6	6	0	5	12	5	3.2	2	0	0	3.8	0	0.7	5	0	0	0	0	0	5	0	Robo, Bounty, AoE, ManaUse, SkillRangeUse, SpawnDuration	0	false	false	false
+RoboMarineFactory	160	0	10	Colorless	450	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	150	false	true	true
+RoboMedic	100	26	5	Colorless	75	0	10	10	0	5	11.5	6	5	1.4	0	0	5	0	0.5	5	2	0	0	0	0	15	0	Robo, Heal, ManaUse, SkillRangeUse, SpawnDuration	0	false	false	false
+RoboMedicFactory	370	0	5	Colorless	400	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	150	false	true	false
+RoboMGBot	180	20	8	Colorless	120	0	15	15	0	5	14	5	6	0.4	0	0	4.4	0	0	0	0	0	0	0	0	15	39	Robo, ManaUse	0	false	false	false
+RoboMGBotFactory	400	0	8	Colorless	500	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	39	None	200	false	true	false
+RoboMGNest	0	0	0	Colorless	350	0	0	0	0	5	0	6	2	0.3	0	0	5.5	0	0	0	0	0	0	0	0	0	0	Spawn, Turret	0	false	false	false
+RoboMGNestBot	160	25	5	Colorless	80	0	16	12	0	5	13	5	2.2	0.5	0	0	3	0	0	4	0	0	0	0	0	300	18	Spawn, Robo, Turret, ManaUse, SkillRangeUse, SpawnDuration	0	false	false	false
+RoboMGNestBotFactory	400	0	4	Colorless	400	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	18	None	200	false	true	false
+RoboMicro	50	10	15	Colorless	50	0	8	8	0	5	14	5	2.6	0.7	0	0	2.8	0	0	0	0	0	0	0	5	10	2	Robo, Stealth, Regen	0	false	false	false
+RoboMicroFactory	130	0	10	Colorless	260	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	2	None	150	false	true	true
+RoboMPChargeBot	60	12	8	Colorless	75	0	8	8	0	5	13	6	2.8	1.1	0	0	3.5	0	0	0	0	0	0	0	5	10	0	Robo, Fire, ManaUse, Robust, SpawnDuration	0	false	false	false
+RoboMPChargeBotFactory	200	0	10	Colorless	400	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	150	false	true	true
+RoboNecroFieldGenerator	320	0	4	Colorless	250	0	20	15	0	0	0	5	0	0	0	0	0	0	4	-1	0	0	0	0	0	40	13	Spawn, AoE, ManaUse, SpawnDuration	200	false	true	false
+RoboPoker	60	14	8	Colorless	80	0	8	8	0	5	14	4	5	0.8	0	0	1.5	0	1	5	0	0	0	0	0	8	0	Melee, Robo, Slow, Turbo, SkillRangeUse, SpawnDuration	0	false	false	false
+RoboPokerFactory	180	0	10	Colorless	450	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	150	false	true	false
+RoboRecon	240	20	10	Colorless	80	0	25	25	1	5	13	9	2	0.5	0	0	4	0	0	4	0	0	0	0	0	60	0	Armor, Robo, Heal, Turret, ManaUse, SkillRangeUse, SpawnDuration	0	false	false	false
+RoboReconFactory	500	0	3	Colorless	600	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	200	false	true	false
+RoboReconForwardBase	0	0	0	Colorless	300	0	0	0	1	5	0	6	2	0.54	0	0	4.5	0	0	3	2	0	0	0	0	0	0	Armor, Heal, Turret, ManaUse	0	false	false	false
+RoboRecycler	80	12	6	Colorless, Specialist	80	0	20	10	0	5	12	5	8	0.6	0	0	4.5	0	1.1	5	0	0	0	0	0	60	0	Spawn, Robo, AoE, ManaUse, SkillRangeUse, SpawnDuration, Zombo	0	false	false	false
+RoboRecyclerFactory	400	0	1	Colorless, Specialist	450	0	0	0	0	0	0	3	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	150	false	false	false
+RoboRefurbisher	400	0	2	Colorless	200	0	25	20	0	0	0	6	0	0	0	0	0	0	2.5	-1	0	0	0	0	0	40	40	Spawn, AoE, ManaUse, SpawnDuration	0	false	true	false
+RoboReplicator	100	16	5	Colorless	80	0	6	6	0	5	13	7	4	0.8	0	0	3	0	0	6	0	0	0	0	10	0	0	Robo, ManaUse, SkillRangeUse	0	false	false	false
+RoboReplicatorFactory	320	0	4	Colorless	500	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	200	false	true	false
+RoboRocketMarine	80	16	5	Colorless	40	4	0	0	0	5	13	7	10	3	30	0	5.5	0	1.5	7	0	0	0	0	0	0	0	Shield, Robo, AoE, SkillRangeUse, Bomb	0	false	false	false
+RoboRocketMarineFactory	200	0	10	Colorless	450	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	150	false	true	true
+RoboRushBeacon	160	0	3	Colorless, Specialist	600	0	10	10	0	5	0	7	5	1.5	0	0	7	0	0	7	0	0	0	0	0	0	0	Spawn, Turret, ManaUse, Rush, SkillRangeUse	150	false	false	false
+RoboRushBeaconExtender	0	0	0	Colorless, Specialist	260	0	10	10	0	5	0	7	5	1.5	0	0	7	0	0	7	0	0	0	0	0	0	0	Spawn, ManaUse, Rush	0	false	false	false
+RoboShotgunBot	80	14	8	Colorless	80	0	10	10	0	5	13	5	2.8	3	25	0	4	0.5	0.75	4	0	0	0	0	0	10	0	Robo, Fire, AoE, ManaUse, SkillRangeUse, SpawnDuration	0	false	false	false
+RoboShotgunBotFactory	200	0	10	Colorless	500	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	150	false	true	false
+RoboSniper	180	25	3	Colorless	50	0	30	25	0	5	13	8	20	3	0	0	7	0	0	0	0	0	0	0	0	20	17	Robo, ManaUse, Rush, SpawnDuration, Stealth, Sniper	0	false	false	false
+RoboSniperFactory	500	0	4	Colorless	600	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	17	None	150	false	true	false
+RoboTimeOuter	50	14	8	Colorless	70	0	0	0	0	5	18	5	100	0	0	0	4	0	0	0	0	0	0	0	20	0	48	Robo, Stun, Bomb	0	false	false	false
+RoboTimeOuterAI	40	10.4	10	None	70	0	0	0	0	5	13	4	30	0	0	0	2	0	0	0	0	0	0	0	10	0	0	None	0	false	false	false
+RoboTimeOuterFactory	280	0	5	Colorless	300	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	48	None	200	false	true	false
+RoboTimeOuterFactoryAI	200	0	5	Colorless	500	0	0	0	0	0	0	5	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	200	false	false	false
+RoboWarlock	180	35	3	Colorless	80	0	15	15	0	5	13	6	15	3	50	0	5	0.3	1	6	0	0	0	0	5	10	14	Robo, Fire, Stun, AoE, SkillRangeUse, SpawnDuration	0	false	false	false
+RoboWarlockFactory	500	0	1	Colorless	800	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	14	None	250	false	true	false
+RoboZombo	0	0	1	Colorless	70	0	0	0	0	5	14	4	3.5	1.5	0	0	0	0	0	0	0	0	0	0	0	0	0	Melee, Spawn, Robo, Zombo	0	false	false	false
+RockBoulderBig	0	0	0	Ancient	240	0	0	0	0	0	0	0	10	0	0	0	0	0.7	0	2	0	0	0	0	0	0	0	None	0	false	false	false
+RockBoulderSmall	0	0	0	Ancient	180	0	0	0	0	0	0	0	10	0	0	0	0	0.7	0	2	0	0	0	0	0	0	0	None	0	false	false	false
+RocketSwarmer	380	38	3	Colorless	50	0	0	0	0	5	11	5	5	10	0	0	6.2	0	0	0	0	0	0	0	3	0	10	Fire, Vehicle, Sniper	0	false	false	false
+RocketSwarmTruckFactory	1500	0	3	Colorless	600	0	0	0	0	0	0	5	0	0	0	0	0	0	0	0	0	0	0	0	0	0	10	None	200	false	true	false
+RocketTruck	300	24	3	Colorless	80	0	0	0	0	5	15	6	15	5	0	0	8	1.2	0	0	0	0	0	0	5	0	4	Slow, AoE, Vehicle, EffectDuration, Sniper	0	false	false	false
+RocketTruckFactory	500	0	4	Colorless	600	0	0	0	0	0	0	5	0	0	0	0	0	0	0	0	0	0	0	0	0	0	4	None	200	false	true	false
+RocketWalker	120	20	6	Colorless	30	6	10	8	0	5	14	6	5	3	0	0	5	0	2	0	0	0	0	0	0	5	0	Shield, Mech, ManaUse, Turbo	0	false	false	false
+RocketWalkerFactory	380	0	10	Colorless	500	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	150	false	true	true
+RushFog	0	0	0	Colorless	0	0	0	0	0	0	0	1	0	0	0	0	0	1	0	0	0	0	0	0	10	0	0	None	0	false	false	false
+Rushmore	120	30	5	Colorless	80	5	0	0	0	5	20	7	5	3	0	0	4.5	0	0	0	0	0	0	0	3	0	0	Shield, Slow, Vehicle, EffectDuration	0	false	false	false
+RushmoreFactory	600	0	4	Colorless	600	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	200	false	true	false
+SafetyBeacon	0	0	0	Colorless	15	0	0	0	0	0	0	2	0	0	0	0	0	0	0	2	0	0	0	0	0	0	0	Spawn	150	false	false	false
+SentryBike	25	13	5	Colorless	70	0	25	20	0	5	20	8	0	0	0	0	0	0	0	5	0	0	0	0	0	180	0	Spawn, ManaUse, SkillRangeUse, SpawnDuration	150	false	false	false
+SentryBikeFactory	140	0	5	Colorless	600	0	0	0	0	0	0	5	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	150	false	false	false
+ShotExplosionFireArtilleryTruckShotExplosionAndFire	0	0	0	None	99999	0	0	0	0	0	0	1	1	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+ShotgunTurret	260	0	15	Colorless	600	0	0	0	0	5	0	6	4	2	0	0	5	0	0	0	0	0	0	0	0	0	6	Turret	150	false	true	false
+SiegeBomb	180	18	8	Colorless	180	0	0	0	1	5	9	5	100	0	0	0	0	1.3	0	0	0	0	0	0	0	0	20	AoE, Bomb, Tank, SpawnDuration	150	false	false	false
+SiegeBombFactory	500	0	5	Colorless	500	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	20	None	150	false	true	false
+SilverArrow	120	18	5	Colorless	40	0	25	20	0	5	18	10	12	2.2	0	0	7	0	0	8	0	0	0	0	0	180	18	ManaUse, SkillRangeUse, Vehicle, SpawnDuration, Sniper	0	false	false	false
+SilverArrowFactory	440	0	5	Colorless	450	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	18	None	200	false	true	false
+SingleCannonTurret	280	0	20	Colorless	600	0	0	0	1	5	0	6	10	1.8	0	0	6	0	0	0	0	0	0	0	0	0	0	Armor, Turret	150	false	true	false
+Skill_ChainLightningArrow	0	0	0	None	0	0	0	0	0	0	0	0	3	0	0	0	0	0	0	1	0	0	0	0	3	0	0	None	0	false	false	false
+SKILL_EngiDeathStunner	0	0	0	None	0	0	0	0	0	0	0	1	0	0	0	0	0	1	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+Skill_FieldOfLightning	0	0	0	None	0	0	0	0	0	0	0	0	1	0	0	0	0	1	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+SKILL_Scan	0	0	0	None	0	0	0	0	0	0	0	1	0	0	0	0	0	1	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+SKILLEnergyBeamSpirit	0	0	0	None	0	0	0	0	0	0	0	5	4.2	1	0	0	5	0	0	0	0	0	0	0	0	0	0	Spawn	0	false	false	false
+SKILLEnergyBeamSpirit5Sec	0	0	0	None	0	0	0	0	0	0	0	5	1	0	0	0	3	0	0	0	0	0	0	0	5	0	0	None	0	false	false	false
+SKILLFireBallTankFireball	0	0	0	None	1	0	0	0	0	0	0	0	0	0	40	0	0	0	0	0	0	0	0	0	0	10	0	None	0	false	false	false
+SKILLFireBoosterSkillSpawn	0	0	0	None	0	0	0	0	0	0	0	0	1	0	8	0	0	2	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+SKILLRailgunChargedShot	0	0	0	None	99999	0	0	0	0	0	0	0	25	0	10	0	0	3	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+SKILLSpiderEgg	0	0	0	None	40000	0	0	0	0	0	0	5	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+SkillSpiderThump	0	0	0	None	0	0	0	0	0	0	0	0	80	0	0	0	0	1	2	0	0	0	0	0	6	0	0	None	0	false	false	false
+SkillSpikeTankWallOfPain	0	0	0	None	0	0	0	0	0	0	0	0	30	0	0	0	0	1	0	0	0	0	0	0	5	6	0	None	0	false	false	false
+SlowingFog	0	0	0	None	50	0	0	0	0	0	0	0	10	0	0	0	0	1	0	0	0	0	0	50	0	0	0	None	0	false	false	false
+SlowTreeEntity	0	0	0	Ancient	28	0	0	0	0	0	0	0	10	0	0	0	0	1	0	2	0	0	0	0	0	0	0	None	0	false	false	false
+SmallFire	0	0	0	None	0	0	0	0	0	0	0	0	1	0	0	0	0	0.5	0	0	0	0	0	0	2	5	0	None	0	false	false	false
+SmallFireAI	0	0	0	None	0	0	0	0	0	0	0	0	1	0	0	0	0	0.5	0	0	0	0	0	0	2	5	0	None	0	false	false	false
+SmallFireChanceToSpawnONLYONEMoreFire	0	0	0	None	0	0	0	0	0	0	0	0	1.25	0	0	0	0	0.4	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+SmallFirePlayer	0	0	0	None	0	0	0	0	0	0	0	0	1	0	0	0	0	0.5	0	0	0	0	0	0	2	5	0	None	0	false	false	false
+SmallFireWithVisuals	0	0	0	None	0	0	0	0	0	0	0	0	1.25	0	0	0	0	0.5	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+SmallHealingSpire	250	0	5	Colorless	200	0	0	0	0	0	0	7	0	0	0	0	0	0	0	5	3	0	0	0	0	0	0	Heal, SkillRangeUse	150	false	true	false
+SmallHealingSpireAI	400	0	0	None	400	0	0	0	0	0	0	4	0	0	0	0	0	0	0	5	3	0	0	0	0	0	0	None	150	false	false	false
+SmallShieldCharger	250	0	3	Colorless	100	10	25	20	0	0	0	7	0	0	0	0	0	0	1.5	6	1	10	0	0	0	30	28	Shield, ManaUse, SkillRangeUse, SpawnDuration	150	false	true	false
+SmartGrenadeMarine	140	20	4	Colorless	60	5	25	15	0	5	13	6	10	4	0	0	5	0	1	6	0	0	0	0	0	4	0	Shield, Robo, Stun, AoE, ManaUse, SkillRangeUse, SpawnDuration	0	false	false	false
+SmartGrenadeMarineFactory	440	0	3	Colorless	400	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	200	false	true	false
+SniperTurret	320	0	12	Colorless	500	0	20	15	0	5	0	8	12	2	0	0	8	0	0	-1	0	0	0	0	0	0	0	Turret, ManaUse, Sniper	200	false	true	false
+SpawnAiTurretChest	0	0	0	Ancient	100	0	0	0	0	0	0	0	100	0	0	0	0	2	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+SpawnAiUnitChest	0	0	0	Ancient	100	0	0	0	0	0	0	0	100	0	0	0	0	2	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+SpawnPlayerBuildingChest	0	0	0	Ancient	100	0	0	0	0	0	0	0	100	0	0	0	0	2	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+SpawnPlayerTurretChest	0	0	0	Ancient	100	0	0	0	0	0	0	0	100	0	0	0	0	2	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+SpawnPlayerUnitChest	0	0	0	Ancient	100	0	0	0	0	0	0	0	100	0	0	0	0	2	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+SpeedBeacon	0	0	0	Colorless	20	0	0	0	0	0	0	2	0	0	0	0	0	0	0	5	0	0	0	0	3	0	0	None	150	false	false	false
+SpiderSpawn	0	0	0	Colorless	5	0	0	0	0	0	16	6	2	1	0	0	0	0	0	0	0	0	0	0	0	0	0	Melee, Spawn	0	false	false	false
+SpiderSpawner	200	30	3	Colorless	90	0	0	0	0	5	14	7	0	3	0	0	7	0	0	0	0	0	0	0	0	10	0	Melee, Spawn, Vehicle, SpawnDuration	0	false	false	false
+SpiderSpawnerFactory	750	0	3	Colorless	600	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	200	false	true	false
+SpikeTank	200	30	5	Colorless	120	0	20	15	2	5	14	6	4.5	3.5	0	0	3	0	1.5	4	0	0	0	0	0	10	0	Armor, Slow, ManaUse, SkillRangeUse, Tank	0	false	false	false
+SpikeTankFactory	600	0	8	Colorless	800	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	200	false	true	true
+SpyCam	0	0	0	Colorless	40	0	0	0	0	0	0	7	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	Spawn	0	false	false	false
+SpyTower	200	0	4	Colorless	200	0	15	15	0	0	0	20	0	0	0	0	0	0	5	-1	0	0	0	0	0	10	0	ManaUse	150	false	true	false
+StunMine	0	0	0	Colorless	5	0	0	0	0	0	0	0	10	0	0	0	0	0	1.5	0	0	0	0	0	5	0	0	Spawn, Stun, Bomb	0	false	false	false
+StunWalker	110	25	8	Colorless	80	5	20	20	0	3	16	5	3.4	1.4	20	0	3	0	0.6	6	0	0	0	0	0	3	0	Shield, Mech, Stun, ManaUse, SkillRangeUse, EffectDuration, SpawnDuration	0	false	false	false
+StunWalkerFactory	380	0	8	Colorless	450	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	200	false	true	false
+SupportSwarmArtillery	800	0	2	Colorless	150	0	20	20	0	0	0	5	20	3.5	0	0	500	1	1	-1	0	0	0	0	0	30	29	AoE, ManaUse, SpawnDuration	0	false	true	false
+Swarmer	65	12	8	Colorless	75	0	10	10	0	5	20	5	2.8	1	10	0	2.8	0	1.25	5	0	0	0	0	0	5	30	Bounty, ManaUse, SkillRangeUse, Vehicle, SpawnDuration	0	false	false	false
+SwarmerFactory	260	0	8	Colorless	500	0	0	0	0	0	0	5	0	0	0	0	0	0	0	0	0	0	0	0	0	0	30	None	200	false	true	false
+T0ArtilleryTank	240	30	5	Colorless	50	0	0	0	2	5	12	5	8	2	0	0	9	0.9	0	0	0	0	0	0	0	0	0	Armor, AoE, Sniper	0	false	false	false
+T0ArtilleryTankFactory	600	0	2	Colorless	450	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	250	false	true	false
+T3GatlingTank	480	45	5	Colorless	240	0	0	0	1	5	13	6	4.2	0.25	0	0	5	0	0	0	0	0	0	0	0	0	0	Armor, Tank	0	false	false	false
+T3GatlingTankFactory	1200	0	3	Colorless	800	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	250	false	true	false
+TankArmorCoatingStorage	150	0	5	Colorless	275	0	200	0	0	0	0	2	0	0	0	0	0	0	0	1	1	0	0	0	0	0	0	None	150	false	false	false
+TankMower	160	15	4	Colorless	110	0	0	0	3	5	15	5	7	2	0	0	0.4	0.75	0	0	0	0	0	0	0	0	0	Armor, AoE	0	false	false	false
+TankMowerFactory	300	0	5	Colorless	700	0	0	0	0	0	0	4	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	150	false	false	false
+TankTier3	620	50	8	Colorless	460	0	0	0	3	5	14	6	20	1.8	0	0	4.5	0.6	0	0	0	0	0	0	0	0	0	Armor, AoE, Tank	0	false	false	false
+TankTier3Factory	2000	0	3	Colorless	1000	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	250	false	true	false
+TankWreck	0	0	10	Colorless	210	0	0	0	0	5	0	2	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+TeleportSpire	200	0	3	Colorless	100	0	20	15	0	0	0	5	0	0	0	0	0	0	2.5	-1	0	0	0	0	0	0	0	Teleport, ManaUse, SkillRangeUse	150	false	true	false
+TickTank	80	25	5	Colorless	100	0	20	20	0	5	15	6	3	2	20	0	4	0	1.5	5	0	0	0	0	0	25	0	Melee, Spawn, Mech, SkillRangeUse, SpawnDuration	0	false	false	false
+TickTankFactory	360	0	12	Colorless	500	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	150	false	true	true
+Tier0Tank	140	20	6	Colorless	125	0	15	15	1	5	12	6	6	3	0	0	4.5	0.4	0	0	0	0	0	0	0	20	0	Armor, Heal, AoE, ManaUse, Tank	0	false	false	false
+Tier0TankFactory	350	0	10	Colorless	500	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	150	false	true	true
+Tier1Mk2Tank	200	26	6	Colorless	120	0	12	10	2	5	13	6	8	1	0	0	5	0	0	0	0	0	0	0	0	15	1	Armor, Turret, ManaUse, Tank, SpawnDuration	0	false	false	false
+Tier1Mk2TankFactory	800	0	8	Colorless	800	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	1	None	200	false	true	false
+Tier1Mk2TankRoofTurret	0	0	0	Colorless	100	0	0	0	0	5	0	5	2.5	0.125	0	0	5.5	0	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+Tier1Tank	340	30	6	Colorless	160	5	0	0	3	5	13	6	15	1.8	0	0	5	0	0	0	0	0	0	0	0	0	0	Shield, Armor, Tank	0	false	false	false
+Tier1TankFactory	700	0	6	Colorless	500	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	200	false	true	false
+Tier2Tank	500	40	5	Colorless	260	0	25	20	3	5	14	6	20	2	0	0	4	0	0	0	0	0	0	0	0	8	48	Armor, AoE, ManaUse, Tank	0	false	false	false
+Tier2TankFactory	1600	0	4	Colorless	600	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	48	None	250	false	true	false
+TreeEntity	0	0	0	Ancient	78	0	0	0	0	0	0	0	0	0	0	0	0	2	4	2	0	0	0	0	0	0	0	None	0	false	false	false
+TreeEntity1	0	0	0	Ancient	95	0	0	0	0	0	0	0	0	0	0	0	0	1	2	2	1	0	0	0	0	0	0	None	0	false	false	false
+TurboBeacon	0	0	0	Colorless	20	0	0	0	0	0	0	1	0	0	0	0	0	0	0	3	0	0	0	0	0	5	0	Turbo	150	false	false	false
+UltraGunBot	140	20	5	Colorless	60	3	15	15	0	5	13	6	4.5	1	0	0	3	0	0	0	0	0	0	0	10	30	0	Shield, Spawn, Robo, ManaUse, SpawnDuration	0	false	false	false
+UltraGunBotFactory	480	0	4	Colorless	450	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	200	false	true	false
+UltraTurret	700	0	3	Colorless	300	0	25	25	0	5	0	5	32	0.8	0	0	600	0.35	0	0	0	0	0	0	0	20	0	AoE, ManaUse, SpawnDuration, Sniper	250	false	true	false
+VampireWalker	180	20	3	Colorless, Specialist	200	0	15	15	0	5	14	7	10	1.1	0	0	5	0	0.7	6	0	0	0	0	0	15	25	Melee, Spawn, Mech, Slow, AoE, ManaUse, SkillRangeUse	0	false	false	false
+VampireWalkerFactory	500	0	1	Colorless, Specialist	450	0	0	0	0	0	0	5	0	0	0	0	0	0	0	0	0	0	0	0	0	0	25	None	250	false	false	false
+VampWalkerSkillEgg	0	0	0	Colorless	1	0	0	0	0	0	0	5	5	1	0	0	0	0	1.5	0	0	0	0	0	3	15	0	None	0	false	false	false
+WallBlock	100	0	40	Colorless	700	0	0	0	1	0	0	3	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	150	false	true	false
+WeatherEffect	0	0	0	Ancient	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+WeatherEffectAcidicClouds	0	0	0	Ancient	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+WeatherEffectEMP	0	0	0	Ancient	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+WeatherEffectHeatWave	0	0	0	Ancient	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	0	false	false	false
+WeatherTower	650	0	3	Colorless	300	0	25	25	0	5	0	8	10	3	80	0	7	0	1.5	-1	0	0	0	0	0	5	5	Stun, ManaUse, EffectDuration	200	false	true	false
+WeldingJeep	100	14	8	Colorless	80	0	15	10	0	5	16	6	2	0.3	0	0	2.5	0	1.25	5	0	0	0	0	3	240	0	Spawn, Fire, Slow, AoE, ManaUse, Turbo, SpawnDuration	0	false	false	false
+WeldingJeepFactory	280	0	10	Colorless	500	0	0	0	0	0	0	6	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	None	200	false	true	true

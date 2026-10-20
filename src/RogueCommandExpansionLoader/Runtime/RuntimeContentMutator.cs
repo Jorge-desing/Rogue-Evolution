@@ -14,6 +14,16 @@ namespace RogueCommandExpansionLoader.Runtime
     /// </summary>
     internal sealed class RuntimeContentMutator
     {
+        private enum ParameterType { Int, Float }
+        private static readonly Dictionary<string, ParameterType> ParamMap = new Dictionary<string, ParameterType> {
+            { "AttackSpeed", ParameterType.Float },
+            { "ArmorValue", ParameterType.Int },
+            { "MaxHealth", ParameterType.Int },
+            { "MaxShield", ParameterType.Int },
+            { "MoveSpeed", ParameterType.Float },
+            { "Damage", ParameterType.Float },
+        };
+
         private const BindingFlags StaticFields = BindingFlags.Public | BindingFlags.NonPublic |
             BindingFlags.Static | BindingFlags.FlattenHierarchy;
         private const BindingFlags InstanceFields = BindingFlags.Public | BindingFlags.NonPublic |
@@ -304,7 +314,98 @@ namespace RogueCommandExpansionLoader.Runtime
                 }
             }
 
+            if (registrationSucceeded)
+            {
+                ApplyBalanceOverrides();
+            }
+
             return registrationSucceeded;
+        }
+
+        public void ApplyBalanceOverrides()
+        {
+            if (!EnsureUnityMainThread("balance overrides"))
+            {
+                return;
+            }
+
+            lock (_gate)
+            {
+                var overrides = _provider.GetBalanceOverrides();
+                if (overrides == null)
+                {
+                    return;
+                }
+
+                IDictionary intValueCache = _changeableIntValueCacheField.GetValue(null) as IDictionary;
+                IDictionary floatValueCache = _changeableFloatValueCacheField.GetValue(null) as IDictionary;
+
+                if (intValueCache == null || floatValueCache == null)
+                {
+                    Log("Balance caches not initialized; could not apply overrides.");
+                    return;
+                }
+
+                IDictionary index = _entityIndexField.GetValue(null) as IDictionary;
+
+                foreach (var ovr in overrides)
+                {
+                    if (ovr == null || string.IsNullOrWhiteSpace(ovr.EntityId))
+                    {
+                        continue;
+                    }
+
+                    if (!index.Contains(ovr.EntityId))
+                    {
+                        continue;
+                    }
+
+                    if (ovr.Parameters == null)
+                    {
+                        continue;
+                    }
+
+                    foreach (var param in ovr.Parameters)
+                    {
+                        string name = param.Key;
+                        float value = param.Value;
+
+                        if (!ParamMap.TryGetValue(name, out ParameterType type))
+                        {
+                            continue;
+                        }
+
+                        try
+                        {
+                            Type enumType = _balancingType.GetNestedType("ChangeableValue");
+                            object enumValue = Enum.Parse(enumType, name, true);
+
+                            if (type == ParameterType.Int)
+                            {
+                                if (!intValueCache.Contains(ovr.EntityId))
+                                {
+                                    intValueCache[ovr.EntityId] = Activator.CreateInstance(typeof(Dictionary<,>).MakeGenericType(enumType, typeof(int)));
+                                }
+                                var inner = intValueCache[ovr.EntityId] as IDictionary;
+                                inner[enumValue] = (int)value;
+                            }
+                            else
+                            {
+                                if (!floatValueCache.Contains(ovr.EntityId))
+                                {
+                                    floatValueCache[ovr.EntityId] = Activator.CreateInstance(typeof(Dictionary<,>).MakeGenericType(enumType, typeof(float)));
+                                }
+                                var inner = floatValueCache[ovr.EntityId] as IDictionary;
+                                inner[enumValue] = value;
+                            }
+                        }
+                        catch (Exception exception)
+                        {
+                            Log("Could not apply balance parameter '" + name + "' to '" + ovr.EntityId + "': " + exception.Message);
+                        }
+                    }
+                }
+            }
         }
 
         public void ApplyProgressionFrom(object gameBalancingScriptableObject)
