@@ -33,6 +33,7 @@ public static class EntityBalancingStore
     public static List<EntityBalancingParameters> EntityBalancingParametersList = new();
     public static Dictionary<string, int> ParameterListIndexOf = new(StringComparer.Ordinal);
     public static Dictionary<string, string> FactoryEntityIdOf = new(StringComparer.Ordinal);
+    public static Dictionary<string, UnityEngine.Sprite> ImageOf = new(StringComparer.Ordinal);
     public static Dictionary<string, Dictionary<ChangeableValue, int>> ChangeableIntValueCache = new(StringComparer.Ordinal);
     public static Dictionary<string, Dictionary<ChangeableValue, float>> ChangeableFloatValueCache = new(StringComparer.Ordinal);
     public static HashSet<string> BuildingEntityIds = new(StringComparer.Ordinal);
@@ -44,6 +45,7 @@ public static class EntityBalancingStore
         EntityBalancingParametersList.Clear();
         ParameterListIndexOf = new Dictionary<string, int>(indexComparer ?? StringComparer.Ordinal);
         FactoryEntityIdOf.Clear();
+        ImageOf.Clear();
         ChangeableIntValueCache = new Dictionary<string, Dictionary<ChangeableValue, int>>(StringComparer.Ordinal);
         ChangeableFloatValueCache = new Dictionary<string, Dictionary<ChangeableValue, float>>(StringComparer.Ordinal);
         BuildingEntityIds.Clear();

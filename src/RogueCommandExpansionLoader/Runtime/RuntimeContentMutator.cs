@@ -39,6 +39,7 @@ namespace RogueCommandExpansionLoader.Runtime
         private readonly FieldInfo _entityRowsField;
         private readonly FieldInfo _entityIndexField;
         private readonly FieldInfo _factoryEntityIdOfField;
+        private readonly FieldInfo _imageOfField;
         private readonly FieldInfo _changeableIntValueCacheField;
         private readonly FieldInfo _changeableFloatValueCacheField;
         private readonly FieldInfo[] _progressionFields;
@@ -146,6 +147,14 @@ namespace RogueCommandExpansionLoader.Runtime
                     "FactoryEntityIdOf is not Dictionary<string, string>.");
             }
 
+            _imageOfField = RuntimeReflection.FindField(entityStoreType, "ImageOf", StaticFields);
+            if (!_imageOfField.IsStatic ||
+                _imageOfField.FieldType != typeof(Dictionary<string, UnityEngine.Sprite>))
+            {
+                throw new InvalidOperationException(
+                    "ImageOf is not Dictionary<string, Sprite>.");
+            }
+
             Type changeableValueType = entityStoreType.GetNestedType("ChangeableValue",
                 BindingFlags.Public | BindingFlags.NonPublic);
             if (changeableValueType == null || !changeableValueType.IsEnum)
@@ -243,12 +252,13 @@ namespace RogueCommandExpansionLoader.Runtime
                 IList rowsList = _entityRowsField.GetValue(null) as IList;
                 IDictionary index = _entityIndexField.GetValue(null) as IDictionary;
                 IDictionary factoryMap = _factoryEntityIdOfField.GetValue(null) as IDictionary;
+                IDictionary imageCache = _imageOfField.GetValue(null) as IDictionary;
                 IDictionary intValueCache = _changeableIntValueCacheField.GetValue(null) as IDictionary;
                 IDictionary floatValueCache = _changeableFloatValueCacheField.GetValue(null) as IDictionary;
-                if (rowsList == null || index == null || factoryMap == null ||
+                if (rowsList == null || index == null || factoryMap == null || imageCache == null ||
                     intValueCache == null || floatValueCache == null)
                 {
-                    Log("Entity balancing rows, index, factory map, or value caches are not initialized; " +
+                    Log("Entity balancing rows, index, factory map, image cache, or value caches are not initialized; " +
                         "content rows were not added.");
                     return false;
                 }
@@ -265,7 +275,7 @@ namespace RogueCommandExpansionLoader.Runtime
                         }
                     }
 
-                    if (!TryRegisterEntityRows(materializedRows, rowsList, index, factoryMap,
+                    if (!TryRegisterEntityRows(materializedRows, rowsList, index, factoryMap, imageCache,
                             intValueCache, floatValueCache))
                     {
                         return false;
@@ -343,6 +353,7 @@ namespace RogueCommandExpansionLoader.Runtime
             IList rows,
             IDictionary index,
             IDictionary factoryMap,
+            IDictionary imageCache,
             IDictionary intValueCache,
             IDictionary floatValueCache)
         {
@@ -491,6 +502,7 @@ namespace RogueCommandExpansionLoader.Runtime
                 new List<KeyValuePair<string, string>>(factoryByProduct.Count);
             List<KeyValuePair<string, string>> attemptedFactoryMappings =
                 new List<KeyValuePair<string, string>>(factoryByProduct.Count);
+            var attemptedImageIds = new List<string>(entityIdsToAppend.Count);
             List<KeyValuePair<string, object>> attemptedIntValueCacheEntries =
                 new List<KeyValuePair<string, object>>(rowsToAppend.Count);
             List<KeyValuePair<string, object>> addedIntValueCacheEntries =
@@ -506,6 +518,26 @@ namespace RogueCommandExpansionLoader.Runtime
                     rows.Add(rowsToAppend[i]);
                     appendedRows.Add(rowsToAppend[i]);
                     appendedRowIds.Add(entityIdsToAppend[i]);
+                }
+
+                for (int i = 0; i < entityIdsToAppend.Count; i++)
+                {
+                    string entityId = entityIdsToAppend[i];
+                    if (!imageCache.Contains(entityId))
+                    {
+                        continue;
+                    }
+
+                    object previousImage = imageCache[entityId];
+                    if (previousImage == null)
+                    {
+                        attemptedImageIds.Add(entityId);
+                        imageCache.Remove(entityId);
+                        if (imageCache.Contains(entityId))
+                        {
+                            throw new InvalidOperationException("Cached image for '" + entityId + "' could not be invalidated.");
+                        }
+                    }
                 }
 
                 for (int i = 0; i < entityIdsToAppend.Count; i++)
@@ -551,6 +583,7 @@ namespace RogueCommandExpansionLoader.Runtime
             catch (Exception exception)
             {
                 bool rollbackComplete = RollbackEntityRegistration(rows, index, factoryMap,
+                    imageCache, attemptedImageIds,
                     intValueCache, floatValueCache,
                     appendedRows, appendedRowIds, attemptedIndexMappings,
                     addedIndexMappings, attemptedFactoryMappings, addedFactoryMappings,
@@ -849,6 +882,8 @@ namespace RogueCommandExpansionLoader.Runtime
             IList rows,
             IDictionary index,
             IDictionary factoryMap,
+            IDictionary imageCache,
+            IList<string> attemptedImageIds,
             IDictionary intValueCache,
             IDictionary floatValueCache,
             IList<object> appendedRows,
@@ -1053,6 +1088,40 @@ namespace RogueCommandExpansionLoader.Runtime
                 }
             }
 
+            for (int i = attemptedImageIds.Count - 1; i >= 0; i--)
+            {
+                string entityId = attemptedImageIds[i];
+
+                if (preserveRegistrationIds.Contains(entityId))
+                {
+                    rollbackComplete = false;
+                    continue;
+                }
+
+                try
+                {
+                    if (imageCache.Contains(entityId))
+                    {
+                        if (imageCache[entityId] != null)
+                        {
+                            preserveRegistrationIds.Add(entityId);
+                            rollbackComplete = false;
+                            Log("Preserved a newly populated image cache entry for '" + entityId + "' during rollback.");
+                        }
+                        else
+                        {
+                            imageCache.Remove(entityId);
+                        }
+                    }
+                }
+                catch (Exception exception)
+                {
+                    preserveRegistrationIds.Add(entityId);
+                    rollbackComplete = false;
+                    Log("Could not safely remove the image cache entry for '" + entityId +
+                        "' during rollback: " + exception.Message);
+                }
+            }
             bool[] removedRows = new bool[appendedRows.Count];
             for (int i = appendedRows.Count - 1; i >= 0; i--)
             {

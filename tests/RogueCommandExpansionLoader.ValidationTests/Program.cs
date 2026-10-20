@@ -3540,6 +3540,37 @@ var tests = new (string Name, Action Run)[]
             EntityBalancingStore.Reset();
         }
     }),
+    ("runtime entity registration invalidates cached image misses for new unit and factory IDs", () =>
+    {
+        EntityBalancingStore.Reset();
+        try
+        {
+            EntityBalancingStore.ImageOf.Add("sample:product", null!);
+            var cachedFactorySprite = new UnityEngine.Sprite();
+            EntityBalancingStore.ImageOf.Add("sample:factory", cachedFactorySprite);
+            var provider = new RuntimeMutatorTestProvider();
+            provider.EntityRows.Add(RuntimeMutatorTestData.Row("sample:product"));
+            provider.EntityRows.Add(RuntimeMutatorTestData.Row("sample:factory", "sample:product"));
+            var mutator = new RuntimeContentMutator(typeof(EntityBalancingStore).Assembly, provider, null);
+
+            bool registered = mutator.RegisterEntityRows();
+            if (!registered || EntityBalancingStore.ImageOf.ContainsKey("sample:product") ||
+                !EntityBalancingStore.ImageOf.ContainsKey("sample:factory") ||
+                !ReferenceEquals(EntityBalancingStore.ImageOf["sample:factory"], cachedFactorySprite))
+            {
+                throw new InvalidOperationException("Entity registration cache state mismatch. registered=" + registered +
+                    ", imageCount=" + EntityBalancingStore.ImageOf.Count +
+                    ", product=" + EntityBalancingStore.ImageOf.ContainsKey("sample:product") +
+                    ", factory=" + EntityBalancingStore.ImageOf.ContainsKey("sample:factory") +
+                    ", sameSprite=" + (EntityBalancingStore.ImageOf.ContainsKey("sample:factory") &&
+                        ReferenceEquals(EntityBalancingStore.ImageOf["sample:factory"], cachedFactorySprite)));
+            }
+        }
+        finally
+        {
+            EntityBalancingStore.Reset();
+        }
+    }),
     ("all native sample production pairs append without replacing the native factory mapping", () =>
     {
         EntityBalancingStore.Reset();

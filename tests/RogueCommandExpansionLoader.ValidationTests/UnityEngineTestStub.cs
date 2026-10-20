@@ -38,6 +38,10 @@ namespace UnityEngine
     {
     }
 
+    public class Sprite : Object
+    {
+    }
+
     public enum HideFlags
     {
         HideAndDontSave = 61
