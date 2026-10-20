@@ -384,6 +384,7 @@ namespace RogueCommandExpansionLoader.Content
                 ValidateUnitArmor(unit.armor, itemPath + ".armor", diagnostics);
                 ValidateUnitHealing(unit.healing, itemPath + ".healing", diagnostics);
                 ValidateUnitStealth(unit.stealth, itemPath + ".stealth", diagnostics);
+                ValidateUnitCommand(unit.command, itemPath + ".command", diagnostics);
                 ValidateProductionBuilding(unit.productionBuilding, itemPath + ".productionBuilding",
                     allIds, productionBuildingIds, bundleIds, registrySnapshot, diagnostics);
                 ValidateProfileCardEligibility(unit, itemPath, diagnostics);
@@ -1803,6 +1804,31 @@ namespace RogueCommandExpansionLoader.Content
             {
                 Add(diagnostics, "unit-stealth.reduction-invalid", path + ".detectionReduction",
                     "Detection reduction must be between 0 and 1.");
+            }
+        }
+
+        private static void ValidateUnitCommand(
+            ContentUnitCommandDefinition command,
+            string path,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (command == null) return;
+            if (command.commandRange < 0)
+            {
+                Add(diagnostics, "unit-command.range-invalid", path + ".commandRange",
+                    "Command range must be non-negative.");
+            }
+            if (!String.IsNullOrWhiteSpace(command.commandType) &&
+                command.commandType != "Move" && command.commandType != "Attack" &&
+                command.commandType != "Defend" && command.commandType != "Support")
+            {
+                Add(diagnostics, "unit-command.type-invalid", path + ".commandType",
+                    "Command type must be Move, Attack, Defend, or Support.");
+            }
+            if (command.maxCommandChain < 0)
+            {
+                Add(diagnostics, "unit-command.chain-invalid", path + ".maxCommandChain",
+                    "Max command chain must be non-negative.");
             }
         }
 

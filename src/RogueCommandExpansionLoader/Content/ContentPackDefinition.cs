@@ -184,6 +184,14 @@ namespace RogueCommandExpansionLoader.Content
     }
 
     [Serializable]
+    public sealed class ContentUnitCommandDefinition
+    {
+        public float commandRange;
+        public string commandType;
+        public int maxCommandChain;
+    }
+
+    [Serializable]
     public sealed class ContentUnitDefinition
     {
         public string id;
@@ -218,6 +226,7 @@ namespace RogueCommandExpansionLoader.Content
         public ContentUnitArmorDefinition armor;
         public ContentUnitHealingDefinition healing;
         public ContentUnitStealthDefinition stealth;
+        public ContentUnitCommandDefinition command;
         public ContentBalanceOverride[] balanceOverrides;
         public ContentUnitLocalizationDefinition[] localizations;
         public ContentProductionBuildingDefinition productionBuilding;
@@ -463,6 +472,7 @@ namespace RogueCommandExpansionLoader.Content
                 armor = CloneUnitArmor(source.armor),
                 healing = CloneUnitHealing(source.healing),
                 stealth = CloneUnitStealth(source.stealth),
+                command = CloneUnitCommand(source.command),
                 productionBuilding = CloneProductionBuilding(source.productionBuilding)
             };
         }
@@ -635,6 +645,16 @@ namespace RogueCommandExpansionLoader.Content
                 stealthLevel = source.stealthLevel,
                 cloakDuration = source.cloakDuration,
                 detectionReduction = source.detectionReduction
+            };
+        }
+
+        private static ContentUnitCommandDefinition CloneUnitCommand(ContentUnitCommandDefinition source)
+        {
+            return source == null ? null : new ContentUnitCommandDefinition
+            {
+                commandRange = source.commandRange,
+                commandType = source.commandType,
+                maxCommandChain = source.maxCommandChain
             };
         }
 
