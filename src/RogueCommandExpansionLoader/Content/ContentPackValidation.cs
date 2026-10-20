@@ -377,6 +377,7 @@ namespace RogueCommandExpansionLoader.Content
                 ValidateUnitSpawn(unit.spawn, itemPath + ".spawn", diagnostics);
                 ValidateUnitStatusEffects(unit.statusEffects, itemPath + ".statusEffects", diagnostics);
                 ValidateUnitProductionQueue(unit.productionQueue, itemPath + ".productionQueue", diagnostics);
+                ValidateUnitResourceCosts(unit.resourceCosts, itemPath + ".resourceCosts", diagnostics);
                 ValidateProductionBuilding(unit.productionBuilding, itemPath + ".productionBuilding",
                     allIds, productionBuildingIds, bundleIds, registrySnapshot, diagnostics);
                 ValidateProfileCardEligibility(unit, itemPath, diagnostics);
@@ -1606,6 +1607,34 @@ namespace RogueCommandExpansionLoader.Content
             {
                 Add(diagnostics, "unit-production-queue.priority-invalid", path + ".productionPriority",
                     "Production priority must be non-negative.");
+            }
+        }
+
+        private static void ValidateUnitResourceCosts(
+            ContentUnitResourceCostDefinition[] costs,
+            string path,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (costs == null) return;
+            for (int i = 0; i < costs.Length; i++)
+            {
+                var cost = costs[i];
+                string itemPath = path + "[" + i + "]";
+                if (cost == null)
+                {
+                    Add(diagnostics, "entry.null", itemPath, "Resource cost entries cannot be null.");
+                    continue;
+                }
+                if (String.IsNullOrWhiteSpace(cost.resourceType))
+                {
+                    Add(diagnostics, "unit-resource-cost.type-required", itemPath + ".resourceType",
+                        "Resource type must be non-empty.");
+                }
+                if (cost.amount < 0)
+                {
+                    Add(diagnostics, "unit-resource-cost.amount-invalid", itemPath + ".amount",
+                        "Resource amount must be non-negative.");
+                }
             }
         }
 

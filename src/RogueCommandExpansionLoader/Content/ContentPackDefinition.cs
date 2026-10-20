@@ -126,6 +126,13 @@ namespace RogueCommandExpansionLoader.Content
     }
 
     [Serializable]
+    public sealed class ContentUnitResourceCostDefinition
+    {
+        public string resourceType;
+        public float amount;
+    }
+
+    [Serializable]
     public sealed class ContentUnitDefinition
     {
         public string id;
@@ -153,6 +160,7 @@ namespace RogueCommandExpansionLoader.Content
         public ContentUnitSpawnDefinition spawn;
         public ContentUnitStatusEffectDefinition[] statusEffects;
         public ContentUnitProductionQueueDefinition productionQueue;
+        public ContentUnitResourceCostDefinition[] resourceCosts;
         public ContentBalanceOverride[] balanceOverrides;
         public ContentUnitLocalizationDefinition[] localizations;
         public ContentProductionBuildingDefinition productionBuilding;
@@ -391,6 +399,7 @@ namespace RogueCommandExpansionLoader.Content
                 spawn = CloneUnitSpawn(source.spawn),
                 statusEffects = CloneArray(source.statusEffects, CloneUnitStatusEffect),
                 productionQueue = CloneUnitProductionQueue(source.productionQueue),
+                resourceCosts = CloneArray(source.resourceCosts, CloneUnitResourceCost),
                 productionBuilding = CloneProductionBuilding(source.productionBuilding)
             };
         }
@@ -491,6 +500,15 @@ namespace RogueCommandExpansionLoader.Content
                 resourceCost = source.resourceCost,
                 queueSize = source.queueSize,
                 productionPriority = source.productionPriority
+            };
+        }
+
+        private static ContentUnitResourceCostDefinition CloneUnitResourceCost(ContentUnitResourceCostDefinition source)
+        {
+            return source == null ? null : new ContentUnitResourceCostDefinition
+            {
+                resourceType = source.resourceType,
+                amount = source.amount
             };
         }
 
