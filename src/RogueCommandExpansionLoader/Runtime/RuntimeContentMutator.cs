@@ -64,6 +64,7 @@ namespace RogueCommandExpansionLoader.Runtime
         private readonly Type _defaultAiType;
         private readonly Type _intValueCacheEntryType;
         private readonly Type _floatValueCacheEntryType;
+        private readonly Type _changeableValueType;
 
         private readonly FieldInfo _entityIdField;
         private readonly FieldInfo _factoryForEntityIdField;
@@ -195,6 +196,8 @@ namespace RogueCommandExpansionLoader.Runtime
                 throw new InvalidOperationException(
                     "EntityBalancingStore.ChangeableValue is not the verified enum type.");
             }
+
+            _changeableValueType = changeableValueType;
 
             _intValueCacheEntryType = typeof(Dictionary<,>).MakeGenericType(
                 changeableValueType, typeof(int));
@@ -400,7 +403,7 @@ namespace RogueCommandExpansionLoader.Runtime
 
                         try
                         {
-                            Type enumType = _balancingType.GetNestedType("ChangeableValue");
+                            Type enumType = _changeableValueType;
                             object enumValue = Enum.Parse(enumType, name, true);
 
                             if (type == ParameterType.Int)

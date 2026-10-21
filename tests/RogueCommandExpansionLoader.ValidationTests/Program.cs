@@ -809,6 +809,81 @@ var tests = new (string Name, Action Run)[]
             throw new InvalidOperationException("An explicit row balance override should suppress the derived cache override.");
         }
     }),
+    ("runtime entity registration applies structured MoveSpeed to the native float cache", () =>
+    {
+        EntityBalancingStore.Reset();
+        try
+        {
+            var unit = new ContentUnitDefinition
+            {
+                id = "sample:move-cache",
+                movement = new ContentUnitMovementDefinition { moveSpeed = 12.5f }
+            };
+            var provider = new RuntimeMutatorTestProvider();
+            provider.EntityRows.Add(RuntimeMutatorTestData.Row(unit.id));
+            provider.BalanceOverrides.Add(new BalanceOverride
+            {
+                EntityId = unit.id,
+                Parameters = UnitBalanceOverrideMapper.CreateCustomBalance(unit)
+            });
+            var mutator = new RuntimeContentMutator(
+                typeof(EntityBalancingStore).Assembly, provider, null);
+
+            if (!mutator.RegisterEntityRows())
+            {
+                throw new InvalidOperationException("Entity registration failed.");
+            }
+
+            if (!EntityBalancingStore.ChangeableFloatValueCache.TryGetValue(unit.id, out var values) ||
+                !values.TryGetValue(EntityBalancingStore.ChangeableValue.MoveSpeed, out float actual) ||
+                actual != 12.5f)
+            {
+                throw new InvalidOperationException(
+                    "Structured MoveSpeed was not written to EntityBalancingStore.ChangeableFloatValueCache.");
+            }
+        }
+        finally
+        {
+            EntityBalancingStore.Reset();
+        }
+    }),
+    ("runtime entity registration applies provider MaxHealth overrides to the native int cache", () =>
+    {
+        EntityBalancingStore.Reset();
+        try
+        {
+            const string entityId = "sample:max-health-cache";
+            var provider = new RuntimeMutatorTestProvider();
+            provider.EntityRows.Add(RuntimeMutatorTestData.Row(entityId));
+            provider.BalanceOverrides.Add(new BalanceOverride
+            {
+                EntityId = entityId,
+                Parameters = new Dictionary<string, float>(StringComparer.Ordinal)
+                {
+                    ["MaxHealth"] = 450f
+                }
+            });
+            var mutator = new RuntimeContentMutator(
+                typeof(EntityBalancingStore).Assembly, provider, null);
+
+            if (!mutator.RegisterEntityRows())
+            {
+                throw new InvalidOperationException("Entity registration failed.");
+            }
+
+            if (!EntityBalancingStore.ChangeableIntValueCache.TryGetValue(entityId, out var values) ||
+                !values.TryGetValue(EntityBalancingStore.ChangeableValue.MaxHealth, out int actual) ||
+                actual != 450)
+            {
+                throw new InvalidOperationException(
+                    "MaxHealth was not written to EntityBalancingStore.ChangeableIntValueCache.");
+            }
+        }
+        finally
+        {
+            EntityBalancingStore.Reset();
+        }
+    }),
     ("unit movement speed mapper ignores non-finite positive values", () =>
     {
         var unit = new ContentUnitDefinition
