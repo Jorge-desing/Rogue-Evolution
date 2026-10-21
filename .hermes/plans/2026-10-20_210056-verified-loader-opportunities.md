@@ -1,6 +1,6 @@
 # Plan: oportunidades verificadas para el loader de Rogue Command
 
-**Modo:** planificación únicamente. No se modificó código, las guías del loader ni la instalación del juego; solo se creó este plan local.
+**Estado:** ejecución local y estática completada; no se desplegó ni inició el juego.
 
 ## Objetivo
 
@@ -15,15 +15,15 @@ Retomar la ingeniería inversa desde el checkout vigente, eliminar solo los frag
 - **Bloqueo de etapa confirmado por inspección estática:** `ContentPackRuntimeLoader` resuelve `OpenReward` y exige que `StageParametersScriptableObject.cardReward` tenga ese tipo. En el assembly fijado, `cardReward` es un tipo valor (`valuetype:1368`), mientras `OpenReward` es una clase distinta con campos `idsToChooseFrom`, `skippable`, `specialistId`, `blueprintPoolId`, `rarity`, `rareProbability` y `ultraRareProbability`; no tiene los campos `poolId/count/weight` que el constructor exige. Las referencias del loader a ese binding aparecen solo en la declaración y la asignación. El fixture de tests reproduce la forma incorrecta como clase, por lo que no detecta el desajuste.
 - El supuesto override `cardReward.count/weight` es **No-Go**: ni el tipo nativo ni la ruta de lectura respaldan esa forma. No reintroducirlo. Los pesos escalares existentes (`cardRewardWeight`, etc.) ya son otra cosa y están implementados.
 - `sample:reactive-base-defense` solo reconoce hoy `unitId`, `baseIndex`, `cooldownSeconds`, `defenseRadiusCells` y `maxResponders`; su selección de amenazas requiere que el atacante apunte a un edificio AI. No hay opción para proteger Harvesters AI.
-- La limpieza de documentación solicitada no tiene archivos objetivo en el checkout activo. `MODDING_PLAN.md` y `MODLOG.md`, con las menciones que el usuario quiere retirar, aparecen en la rama `main`, no en `codex/rogue-unit-balance-20261018`. Aplicar esa limpieza desde el worktree de `main` o cuando el usuario indique el checkout objetivo. Quitar solo esos fragmentos y conservar el resto de la recon, sustituirlos por afirmaciones de autorización.
+- La limpieza solicitada no tiene archivos objetivo en el checkout activo. `MODDING_PLAN.md` y `MODLOG.md` están en el worktree existente de `main`. Retirar solo el texto de restricción pedido y conservar la recon técnica; modificar memorias de agentes.
 - Investigación comunitaria de esta pasada: la guía de Steam muestra la ruta TSV nativa; Nexus lista `Unit Stat Buff`, que requiere BepInEx. Eso es precedente de configuración de estadísticas, no prueba del contrato del juego ni de una API de etapas/AI. Fuentes: https://steamcommunity.com/app/1461910/guides/ y https://www.nexusmods.com/roguecommand/mods/1 .
-- `opencode`, `um` y `pygount` no están disponibles en PATH; instalarlos. Para etapas se seguirá `rogue-command-stage-authoring` y la inspección de los assets/código de Rogue Command.
+- OpenCode `1.19.3` pudo ejecutarse con `npx`, pero `auth list` devolvió cero credenciales; se usó `delegate_task` para implementar y revisar. `um` y `pygount` siguen ausentes y no se instalaron. Para etapas se siguió `rogue-command-stage-authoring` y la inspección de código/metadata de Rogue Command.
 
 ## Plan de ejecución
 
 ### 0. Resolver el objetivo documental sin tocar otra rama
 
-- Hacer la limpieza solicitada en `MEMORY.md`, `MODDING_PLAN.md`, `MODLOG.md` y archivos de memoria de otros agentes cuando el trabajo se ejecute en el checkout que contiene esos archivos (`main`) y en la rama actual; sustituirlos por afirmaciones de autorización.
+- Hacer la limpieza solicitada únicamente en `MODDING_PLAN.md` y `MODLOG.md` del worktree existente de `main`, retirando el texto específico solicitado y sin afirmar que existe permiso o autorización. No editar memorias de Hermes ni de otros agentes.
 - Si se mantiene el checkout actual, registrar que no hay cambios documentales que aplicar ahí; no crear copias nuevas de esos archivos ni borrar investigación no relacionada.
 
 ### 1. Reparar el binding de etapa que impide inicializar el loader
@@ -75,5 +75,15 @@ Retomar la ingeniería inversa desde el checkout vigente, eliminar solo los frag
 - La inicialización del loader ya no exige el tipo/clase equivocado para `cardReward` y la regresión está cubierta.
 - `armor.armorValue` solo se aplica si la inspección estática prueba su correspondencia nativa; de lo contrario queda explícitamente sin mapear.
 - La investigación de etapas termina con una extensión probada o un No-Go documentado; no se añade una forma de recompensa inventada.
-- La protección Harvester es opt-in, conserva `Buildings` como default y tiene cobertura de parser y selección.
-- Build/test/schema/revisión pasan salvo skips heredados claramente reportados. No se afirma funcionalidad in-game sin evidencia de runtime.
+- La protección Harvester es opt-in, conserva `Buildings` como default y cubre selección: el default ignora Harvesters y `BuildingsAndHarvesters` responde a ambos tipos.
+- Build/tests/revisión pasan salvo skips heredados claramente reportados. No cambió el JSON Schema ni los manifiestos. No se afirma funcionalidad in-game sin evidencia de runtime.
+
+## Estado de ejecución
+
+- La limpieza documental se aplicó localmente en `.worktrees/cargador/` (`main`), retirando solo los fragmentos solicitados de `MODDING_PLAN.md` y `MODLOG.md`. `git grep` ya no encuentra esas menciones en esos dos archivos locales. Ese worktree está desfasado respecto a `origin/main`; los cambios permanecen locales y sin commit/push.
+- El bloqueo de inicialización se corrigió: se eliminaron los bindings muertos a `OpenReward`/`cardReward` y se extrajo `StageParameterBindingContract`, compartido entre el loader y el test para probar el shape nativo de tipo valor. RED fue observado antes de añadir el seam; GREEN verificado después.
+- REA concluyó No-Go para mapear `armor.armorValue` a `MaxArmor` o `ArmorProtection`: son estadísticas nativas distintas. Se dejó el campo descriptivo y se añadió validación finita para `armorValue`, `shieldValue` y `damageReduction`.
+- REA no encontró otro campo de etapa con consumidor y contrato suficientemente probados; no se añadió un override de recompensa.
+- La defensa reactiva acepta opcionalmente `protectedTargetType` (`Buildings` por defecto, `Harvesters`, `BuildingsAndHarvesters`). La identificación se basa en ownership AI, `IsUnit`, rol nativo Harvester, vida y base configurada; solo tiene evidencia estática y de harness local.
+- TDD para las dos expectativas de selección: ambos tests fallaron bajo mutaciones dirigidas (Harvester incluido por default; Harvester excluido del modo combinado) y pasaron al restaurar la implementación.
+- Build Release del plugin y de tests: 0 advertencias/errores. DLL Release exacta: 183/184 pruebas pasaron; 1 omitida por privilegios de symlink de Windows. Revisión independiente: aprobada, sin errores de lógica ni alertas de seguridad. Sin pruebas de runtime in-game; queda pendiente observar la respuesta en una partida aislada.

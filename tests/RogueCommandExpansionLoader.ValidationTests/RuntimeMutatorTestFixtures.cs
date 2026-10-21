@@ -118,18 +118,15 @@ public sealed class Stage
     public StageParametersScriptableObject stageParameters = new();
 }
 
-public sealed class OpenReward
+public struct StageCardReward
 {
-    public string poolId;
-    public int count;
-    public float weight;
 }
 
 public sealed class StageParametersScriptableObject
 {
     public bool fillFirstLevelWithCardRewards;
     public bool putDefaultCardRewardInCenter;
-    public OpenReward cardReward = new();
+    public StageCardReward cardReward;
     public BlueprintPoolList blueprintPoolList = new();
 }
 

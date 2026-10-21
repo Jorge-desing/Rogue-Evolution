@@ -21,6 +21,8 @@
              Link="Content/ContentPackValidation.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Content/StageParameterOverrideParser.cs"
              Link="Content/StageParameterOverrideParser.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Content/StageParameterBindingContract.cs"
+             Link="Content/StageParameterBindingContract.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Content/BalanceOverrideFlags.cs"
              Link="Content/BalanceOverrideFlags.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Content/RelicLocalizationResolver.cs"

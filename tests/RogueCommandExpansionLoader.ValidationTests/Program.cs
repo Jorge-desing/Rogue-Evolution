@@ -41,6 +41,46 @@ ContentPackDefinition reactiveAiSample = JsonSerializer.Deserialize<ContentPackD
 
 var tests = new (string Name, Action Run)[]
 {
+    ("stage parameter binding contract accepts the native value-type reward fixture", () =>
+    {
+        Type? contractType = typeof(ContentPackDefinition).Assembly.GetType(
+            "RogueCommandExpansionLoader.Content.StageParameterBindingContract");
+        MethodInfo? resolveMethod = contractType?.GetMethod("Resolve",
+            BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+        if (contractType == null || resolveMethod == null)
+        {
+            throw new InvalidOperationException("The production stage binding contract is not exposed to offline validation.");
+        }
+
+        object? bindings = resolveMethod.Invoke(null,
+            [typeof(StageParametersScriptableObject), typeof(BlueprintPoolList),
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic]);
+        (string propertyName, string fieldName, Type fieldType)[] expectedFields =
+        [
+            ("BlueprintPoolListField", "blueprintPoolList", typeof(BlueprintPoolList)),
+            ("FirstLevelCardsField", "fillFirstLevelWithCardRewards", typeof(bool)),
+            ("DefaultCenterField", "putDefaultCardRewardInCenter", typeof(bool))
+        ];
+        foreach ((string propertyName, string fieldName, Type fieldType) expected in expectedFields)
+        {
+            PropertyInfo? property = contractType.GetProperty(expected.propertyName,
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            FieldInfo? field = property?.GetValue(bindings) as FieldInfo;
+            if (field == null || field.DeclaringType != typeof(StageParametersScriptableObject) ||
+                field.Name != expected.fieldName || field.FieldType != expected.fieldType)
+            {
+                throw new InvalidOperationException("The stage binding contract resolved an unexpected field: " +
+                    expected.fieldName + ".");
+            }
+        }
+
+        FieldInfo? cardRewardField = typeof(StageParametersScriptableObject).GetField(
+            "cardReward", BindingFlags.Instance | BindingFlags.Public);
+        if (cardRewardField == null || !cardRewardField.FieldType.IsValueType)
+        {
+            throw new InvalidOperationException("StageParametersScriptableObject.cardReward must use its native value-type fixture.");
+        }
+    }),
     ("unit type validation rejects unsupported types", () =>
     {
         WithPackage(sample, (pack, root) =>
@@ -794,10 +834,46 @@ var tests = new (string Name, Action Run)[]
                 "unit-movement.speed-invalid");
         });
     }),
+    ("unit armor validation rejects non-finite armor values", () =>
+    {
+        foreach (float value in new[] { Single.NaN, Single.PositiveInfinity, Single.NegativeInfinity })
+        {
+            WithPackage(sample, (pack, root) =>
+            {
+                pack.units[0].armor = new ContentUnitArmorDefinition { armorValue = value };
+                ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                    "unit-armor.value-invalid");
+            });
+        }
+    }),
+    ("unit armor validation rejects non-finite shield values", () =>
+    {
+        foreach (float value in new[] { Single.NaN, Single.PositiveInfinity, Single.NegativeInfinity })
+        {
+            WithPackage(sample, (pack, root) =>
+            {
+                pack.units[0].armor = new ContentUnitArmorDefinition { shieldValue = value };
+                ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                    "unit-armor.shield-invalid");
+            });
+        }
+    }),
+    ("unit armor validation rejects non-finite damage reduction", () =>
+    {
+        foreach (float value in new[] { Single.NaN, Single.PositiveInfinity, Single.NegativeInfinity })
+        {
+            WithPackage(sample, (pack, root) =>
+            {
+                pack.units[0].armor = new ContentUnitArmorDefinition { damageReduction = value };
+                ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                    "unit-armor.reduction-invalid");
+            });
+        }
+    }),
     ("runtime mutation handles invalid targets and fields", () =>
     {
         var mutationManager = new RuntimeMutationManager(msg => { });
-        
+
         // Null target
         if (mutationManager.MutateField(null!, "someField", 1.0f)) 
             throw new InvalidOperationException("Mutation should fail for null target.");
@@ -2955,7 +3031,7 @@ var tests = new (string Name, Action Run)[]
         if (!ReactiveBaseDefenseParameterParser.TryParse(null, out ReactiveBaseDefenseSettings defaults,
             out string diagnostic) || diagnostic != null || defaults.BaseIndex != 0 ||
             defaults.UnitId != null || defaults.CooldownSeconds != 1f || defaults.DefenseRadiusCells != 12f ||
-            defaults.MaximumResponders != 2)
+            defaults.MaximumResponders != 2 || defaults.ProtectedTargetType != "Buildings")
         {
             throw new InvalidOperationException("The reactive AI parser did not return its documented defaults.");
         }
@@ -3014,6 +3090,31 @@ var tests = new (string Name, Action Run)[]
                 diagnostic == null)
             {
                 throw new InvalidOperationException("The reactive AI parser accepted invalid input " + i + ".");
+            }
+        }
+    }),
+    ("reactive base-defense parser accepts explicit protected target types", () =>
+    {
+        ContentModuleParameter[] parameters =
+        [new ContentModuleParameter { name = "protectedTargetType", value = "BuildingsAndHarvesters" }];
+        if (!ReactiveBaseDefenseParameterParser.TryParse(parameters, out _, out string diagnostic) || diagnostic != null)
+        {
+            throw new InvalidOperationException("The parser did not retain the requested protected target types.");
+        }
+
+        ContentModuleParameter[][] invalid =
+        [
+            [new ContentModuleParameter { name = "protectedTargetType", value = "" }],
+            [new ContentModuleParameter { name = "protectedTargetType", value = "Other" }],
+            [new ContentModuleParameter { name = "protectedTargetType", value = "Buildings" },
+                new ContentModuleParameter { name = "protectedTargetType", value = "Harvesters" }],
+            [new ContentModuleParameter { name = "protectedTargetType", value = "Buildings,Buildings" }]
+        ];
+        foreach (ContentModuleParameter[] value in invalid)
+        {
+            if (ReactiveBaseDefenseParameterParser.TryParse(value, out _, out diagnostic) || diagnostic == null)
+            {
+                throw new InvalidOperationException("The parser accepted an empty, unknown, or duplicate target type.");
             }
         }
     }),
@@ -3128,6 +3229,64 @@ var tests = new (string Name, Action Run)[]
 
         ExistingControllers.Instance.Reset();
     }),
+    ("reactive base-defense default Buildings mode ignores Harvester targets", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        IRogueCommandAiRuntimeBehaviour? behaviour = null;
+        try
+        {
+            UnityEngine.Time.time = 10f;
+            var harvester = new EntityController
+            {
+                IsControlledByAi = true,
+                IsUnit = true,
+                Role = UnitRole.Harvester,
+                aiBaseIndex = 0,
+                CurrentCell = new UnityEngine.Vector2Int(10, 10),
+                UniqueEntityId = 410
+            };
+            var attacker = new EntityController
+            {
+                IsControlledByPlayer = true,
+                IsUnit = true,
+                CanAttackAndIsAttackEnabled = true,
+                CurrentAttackTarget = harvester,
+                CurrentCell = new UnityEngine.Vector2Int(11, 10),
+                Position = new UnityEngine.Vector3(11f, 0f, 10f),
+                UniqueEntityId = 411
+            };
+            var defender = new EntityController
+            {
+                IsControlledByAi = true,
+                IsUnit = true,
+                CanAttackAndIsAttackEnabled = true,
+                CanMoveAndMovementIsEnabled = true,
+                IsCombatUnit = true,
+                aiBaseIndex = 0,
+                CurrentPlayerCommandName = EntityCommand.Command.DoNothing,
+                CurrentCell = new UnityEngine.Vector2Int(12, 10),
+                UniqueEntityId = 412
+            };
+            ExistingControllers.Instance.PlayerUnits().Add(attacker);
+            ExistingControllers.Instance.AiUnits().Add(harvester);
+            ExistingControllers.Instance.AiUnits().Add(defender);
+
+            behaviour = new ReactiveBaseDefenseAiModule().CreateBehaviour(
+                new DefaultAiBehaviour(), Array.Empty<ContentModuleParameter>());
+            behaviour.OnInitialized();
+            behaviour.Tick();
+            if (defender.LastExecutedCommand != null)
+            {
+                throw new InvalidOperationException("The default Buildings mode responded to an attack on an AI Harvester.");
+            }
+        }
+        finally
+        {
+            behaviour?.OnDestroyed();
+            ExistingControllers.Instance.Reset();
+            DefaultAiBehaviour.ResetRuntimeState();
+        }
+    }),
     ("reactive base-defense rejects out-of-radius attacks and other AI bases", () =>
     {
         ExistingControllers.Instance.Reset();
@@ -3185,6 +3344,137 @@ var tests = new (string Name, Action Run)[]
         }
 
         ExistingControllers.Instance.Reset();
+    }),
+    ("reactive base-defense optionally protects live AI harvesters at the configured base", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        UnityEngine.Time.time = 10f;
+        var harvester = new EntityController
+        {
+            IsControlledByAi = true,
+            IsUnit = true,
+            Role = UnitRole.Harvester,
+            aiBaseIndex = 0,
+            CurrentCell = new UnityEngine.Vector2Int(10, 10)
+        };
+        var wrongOwner = new EntityController
+        {
+            IsControlledByPlayer = true, IsUnit = true, Role = UnitRole.Harvester,
+            aiBaseIndex = 0, CurrentCell = new UnityEngine.Vector2Int(10, 10)
+        };
+        var wrongBase = new EntityController
+        {
+            IsControlledByAi = true, IsUnit = true, Role = UnitRole.Harvester,
+            aiBaseIndex = 1, CurrentCell = new UnityEngine.Vector2Int(10, 10)
+        };
+        var wrongRole = new EntityController
+        {
+            IsControlledByAi = true, IsUnit = true, Role = UnitRole.Robo,
+            aiBaseIndex = 0, CurrentCell = new UnityEngine.Vector2Int(10, 10)
+        };
+        var dead = new EntityController
+        {
+            IsControlledByAi = true, IsUnit = true, Role = UnitRole.Harvester,
+            aiBaseIndex = 0, IsDestroyed = true, CurrentCell = new UnityEngine.Vector2Int(10, 10)
+        };
+        var targets = new[] { wrongOwner, wrongBase, wrongRole, dead, harvester };
+        foreach (EntityController target in targets)
+        {
+            var attacker = new EntityController
+            {
+                IsControlledByPlayer = true, IsUnit = true, CanAttackAndIsAttackEnabled = true,
+                CurrentAttackTarget = target, CurrentCell = new UnityEngine.Vector2Int(11, 10),
+                Position = target == harvester
+                    ? new UnityEngine.Vector3(44f, 0f, 44f)
+                    : new UnityEngine.Vector3(11f, 0f, 10f),
+            };
+            ExistingControllers.Instance.PlayerUnits().Add(attacker);
+        }
+        var defender = new EntityController
+        {
+            IsControlledByAi = true, IsUnit = true, CanAttackAndIsAttackEnabled = true,
+            CanMoveAndMovementIsEnabled = true, IsCombatUnit = true, aiBaseIndex = 0,
+            CurrentPlayerCommandName = EntityCommand.Command.DoNothing,
+            CurrentCell = new UnityEngine.Vector2Int(12, 10)
+        };
+        ExistingControllers.Instance.AiUnits().Add(defender);
+        var module = new ReactiveBaseDefenseAiModule();
+        IRogueCommandAiRuntimeBehaviour behaviour = module.CreateBehaviour(new DefaultAiBehaviour(),
+        [new ContentModuleParameter { name = "protectedTargetType", value = "Harvesters" }]);
+        behaviour.OnInitialized();
+        behaviour.Tick();
+        if (defender.LastExecutedCommand == null || defender.LastExecutedCommand.position.x != 44f ||
+            defender.LastExecutedCommand.position.z != 44f)
+        {
+            throw new InvalidOperationException("The AI defender did not respond to its live base Harvester.");
+        }
+        ExistingControllers.Instance.Reset();
+    }),
+    ("reactive base-defense BuildingsAndHarvesters protects both target types", () =>
+    {
+        foreach (bool harvesterTarget in new[] { false, true })
+        {
+            ExistingControllers.Instance.Reset();
+            IRogueCommandAiRuntimeBehaviour? behaviour = null;
+            try
+            {
+                UnityEngine.Time.time = 10f;
+                var protectedTarget = new EntityController
+                {
+                    IsControlledByAi = true,
+                    IsBuilding = !harvesterTarget,
+                    IsUnit = harvesterTarget,
+                    Role = harvesterTarget ? UnitRole.Harvester : UnitRole.None,
+                    aiBaseIndex = 0,
+                    CurrentCell = new UnityEngine.Vector2Int(10, 10),
+                    UniqueEntityId = harvesterTarget ? 422 : 420
+                };
+                var attacker = new EntityController
+                {
+                    IsControlledByPlayer = true,
+                    IsUnit = true,
+                    CanAttackAndIsAttackEnabled = true,
+                    CurrentAttackTarget = protectedTarget,
+                    CurrentCell = new UnityEngine.Vector2Int(11, 10),
+                    Position = new UnityEngine.Vector3(harvesterTarget ? 44f : 40f, 0f, 10f),
+                    UniqueEntityId = harvesterTarget ? 423 : 421
+                };
+                var defender = new EntityController
+                {
+                    IsControlledByAi = true,
+                    IsUnit = true,
+                    CanAttackAndIsAttackEnabled = true,
+                    CanMoveAndMovementIsEnabled = true,
+                    IsCombatUnit = true,
+                    aiBaseIndex = 0,
+                    CurrentPlayerCommandName = EntityCommand.Command.DoNothing,
+                    CurrentCell = new UnityEngine.Vector2Int(12, 10),
+                    UniqueEntityId = harvesterTarget ? 425 : 424
+                };
+                ExistingControllers.Instance.PlayerUnits().Add(attacker);
+                ExistingControllers.Instance.AiUnits().Add(protectedTarget);
+                ExistingControllers.Instance.AiUnits().Add(defender);
+
+                behaviour = new ReactiveBaseDefenseAiModule().CreateBehaviour(
+                    new DefaultAiBehaviour(),
+                    [new ContentModuleParameter { name = "protectedTargetType", value = "BuildingsAndHarvesters" }]);
+                behaviour.OnInitialized();
+                behaviour.Tick();
+                if (defender.LastExecutedCommand == null ||
+                    defender.LastExecutedCommand.position.x != attacker.Position.x ||
+                    defender.LastExecutedCommand.position.z != attacker.Position.z)
+                {
+                    throw new InvalidOperationException("The union target mode did not respond to an AI " +
+                        (harvesterTarget ? "Harvester." : "building."));
+                }
+            }
+            finally
+            {
+                behaviour?.OnDestroyed();
+                ExistingControllers.Instance.Reset();
+                DefaultAiBehaviour.ResetRuntimeState();
+            }
+        }
     }),
     ("scheduled base-build AI parser rejects unknown duplicate and null parameters", () =>
     {

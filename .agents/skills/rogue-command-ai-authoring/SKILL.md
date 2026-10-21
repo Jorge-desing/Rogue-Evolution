@@ -67,6 +67,7 @@ Use this skill when implementing an AI profile, adding a compiled module, or cha
 
 ## Be precise about behavior
 
+- When a module makes protected target classes configurable, test that the default still excludes newly supported classes and that each class in a combined mode triggers the expected dispatch. Parser acceptance alone does not prove selection; keep offline harness results separate from in-game evidence.
 - `AiBase.entitiesInAiDeck` can contain mobile units as well as buildings. Static inspection of the pinned 1.0.9 assembly found that `AiBehaviour.BuildBaseStartSetup` sends non-building entries through `EntityFactory.InstantiateEntity`, tags them as AI, and assigns their AI base index. Add mod units through `unitEntries` on a `scopeToReferencedStages: true` native profile so only its isolated clone changes; the loader validates the unit reference and target base index and resolves cross-pack unit dependencies. `countAtStart` controls starting units; `maxLiving` preserves the native deck field and is bounded against it. This is static and offline-validation evidence, not in-game proof.
 - `unitEntries` establishes cross-pack load order itself. The full runtime deck check must accept that declaration after appending those entries; do not require the same ID again in `unitDependencies`. External IDs authored directly into a custom AI prefab's serialized deck still require `unitDependencies`.
 

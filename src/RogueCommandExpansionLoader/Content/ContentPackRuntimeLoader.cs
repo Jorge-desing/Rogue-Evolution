@@ -107,11 +107,6 @@ namespace RogueCommandExpansionLoader.Content
         private readonly FieldInfo _stageParametersBlueprintPoolListField;
         private readonly FieldInfo _stageParametersFirstLevelCardsField;
         private readonly FieldInfo _stageParametersDefaultCenterField;
-        private readonly FieldInfo _stageParametersPoolRewardField;
-        private readonly FieldInfo _stagePoolRewardIdField;
-        private readonly FieldInfo _stagePoolRewardCountField;
-        private readonly FieldInfo _stagePoolRewardWeightField;
-        private readonly Type _stageRewardType;
         private readonly FieldInfo _aiAllowedForDemoField;
         private readonly FieldInfo _aiStageRangeField;
         private readonly FieldInfo _aiAscensionRangeField;
@@ -261,7 +256,6 @@ namespace RogueCommandExpansionLoader.Content
             _stageParametersType = FindUniqueType("StageParametersScriptableObject");
             Type gameBalancingType = FindUniqueType("GameBalancingScriptableObject");
             Type progressionType = FindUniqueType("LevelProgressionParametersScriptableObject");
-            _stageRewardType = FindUniqueType("OpenReward");
             Type landscapeGeneratorType = FindUniqueType("LandscapeGenerator");
             _landscapeGeneratorType = landscapeGeneratorType;
             _aiBehaviourType = FindUniqueType("AiBehaviour");
@@ -415,16 +409,11 @@ namespace RogueCommandExpansionLoader.Content
                 throw new InvalidOperationException(
                     "StageParametersScriptableObject.worldList is not WorldList.");
             }
-            _stageParametersBlueprintPoolListField = RequireField(
-                _stageParametersType, "blueprintPoolList", _blueprintPoolListType);
-            _stageParametersFirstLevelCardsField = RequireField(
-                _stageParametersType, "fillFirstLevelWithCardRewards", typeof(bool));
-            _stageParametersDefaultCenterField = RequireField(
-                _stageParametersType, "putDefaultCardRewardInCenter", typeof(bool));
-            _stageParametersPoolRewardField = RequireField(_stageParametersType, "cardReward", _stageRewardType);
-            _stagePoolRewardIdField = RequireField(_stageRewardType, "poolId", typeof(string));
-            _stagePoolRewardCountField = RequireField(_stageRewardType, "count", typeof(int));
-            _stagePoolRewardWeightField = RequireField(_stageRewardType, "weight", typeof(float));
+            StageParameterBindingContract stageParameterBindings = StageParameterBindingContract.Resolve(
+                _stageParametersType, _blueprintPoolListType, InstanceFields);
+            _stageParametersBlueprintPoolListField = stageParameterBindings.BlueprintPoolListField;
+            _stageParametersFirstLevelCardsField = stageParameterBindings.FirstLevelCardsField;
+            _stageParametersDefaultCenterField = stageParameterBindings.DefaultCenterField;
 
             _aiDeactivatedField = RequireField(_aiBehaviourType, "isDeactivated", typeof(bool));
             _aiAllowedForDemoField = RequireField(_aiBehaviourType, "isAllowedForDemo", typeof(bool));

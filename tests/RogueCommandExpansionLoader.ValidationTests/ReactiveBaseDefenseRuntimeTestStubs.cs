@@ -21,6 +21,7 @@ public sealed class EntityController
     public bool HasSkillActivationInCommandChain { get; set; }
     public bool IsTargetInRange { get; set; }
     public bool IsBuilding { get; set; }
+    public UnitRole Role { get; set; }
     public int aiBaseIndex { get; set; }
 public float CurrentHealth { get; set; } = 100f;
     public float MaxHealth { get; set; } = 100f;
@@ -42,7 +43,7 @@ public float CurrentHealth { get; set; } = 100f;
         ExecuteBeforeCurrentCommand
     }
 
-    public bool HasRole(UnitRole role) => _roles.Contains(role);
+    public bool HasRole(UnitRole role) => _roles.Contains(role) || (Role & role) == role;
 
     public bool CurrentCommandIsTaggedWith(string tag) =>
         tag != null && string.Equals(CurrentCommandTag, tag, System.StringComparison.Ordinal);

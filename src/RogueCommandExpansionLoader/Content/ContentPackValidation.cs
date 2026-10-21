@@ -1840,20 +1840,21 @@ namespace RogueCommandExpansionLoader.Content
                 Add(diagnostics, "unit-armor.type-invalid", path + ".armorType",
                     "Armor type must be Light, Medium, Heavy, or Energy.");
             }
-            if (armor.armorValue < 0)
+            if (Single.IsNaN(armor.armorValue) || Single.IsInfinity(armor.armorValue) || armor.armorValue < 0)
             {
                 Add(diagnostics, "unit-armor.value-invalid", path + ".armorValue",
-                    "Armor value must be non-negative.");
+                    "Armor value must be finite and non-negative.");
             }
-            if (armor.shieldValue < 0)
+            if (Single.IsNaN(armor.shieldValue) || Single.IsInfinity(armor.shieldValue) || armor.shieldValue < 0)
             {
                 Add(diagnostics, "unit-armor.shield-invalid", path + ".shieldValue",
-                    "Shield value must be non-negative.");
+                    "Shield value must be finite and non-negative.");
             }
-            if (armor.damageReduction < 0 || armor.damageReduction > 1)
+            if (Single.IsNaN(armor.damageReduction) || Single.IsInfinity(armor.damageReduction) ||
+                armor.damageReduction < 0 || armor.damageReduction > 1)
             {
                 Add(diagnostics, "unit-armor.reduction-invalid", path + ".damageReduction",
-                    "Damage reduction must be between 0 and 1.");
+                    "Damage reduction must be finite and between 0 and 1.");
             }
         }
 
