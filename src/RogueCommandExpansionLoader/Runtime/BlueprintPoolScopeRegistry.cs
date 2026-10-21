@@ -12,11 +12,12 @@ namespace RogueCommandExpansionLoader.Runtime
     public sealed class BlueprintPoolScopeRegistration
     {
         private readonly HashSet<string> _unitIds;
+        private readonly Dictionary<string, HashSet<string>> _unitIdsBySourcePool;
         private HashSet<string> _eligibleExclusiveUnitIds = new HashSet<string>(StringComparer.Ordinal);
 
         public BlueprintPoolScopeRegistration(
             string poolId,
-            string scopeId,
+            string stageId,
             object pool,
             IEnumerable<string> unitIds,
             bool blueprintsAreExclusive,
@@ -32,14 +33,14 @@ namespace RogueCommandExpansionLoader.Runtime
                 throw new ArgumentNullException("pool");
             }
 
-            if (String.IsNullOrWhiteSpace(scopeId))
+            if (String.IsNullOrWhiteSpace(stageId))
             {
-                throw new ArgumentException("A stage scope ID is required.", "scopeId");
+                throw new ArgumentException("A stage scope ID is required.", "stageId");
             }
 
             PoolId = poolId;
             SourcePoolId = sourcePoolId;
-            ScopeId = scopeId;
+            ScopeId = stageId;
             Pool = pool;
             BlueprintsAreExclusive = blueprintsAreExclusive;
             _unitIds = new HashSet<string>(StringComparer.Ordinal);
@@ -54,9 +55,10 @@ namespace RogueCommandExpansionLoader.Runtime
                 }
             }
 
-            if (_unitIds.Count == 0)
+            _unitIdsBySourcePool = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
+            if (!String.IsNullOrEmpty(sourcePoolId))
             {
-                throw new ArgumentException("A scoped blueprint pool must own at least one unit ID.", "unitIds");
+                _unitIdsBySourcePool[sourcePoolId] = new HashSet<string>(_unitIds, StringComparer.Ordinal);
             }
         }
 
@@ -73,6 +75,13 @@ namespace RogueCommandExpansionLoader.Runtime
         public bool ContainsUnit(string unitId)
         {
             return !String.IsNullOrEmpty(unitId) && _unitIds.Contains(unitId);
+        }
+
+        public bool ContainsUnitInSourcePool(string sourcePoolId, string unitId)
+        {
+            HashSet<string> scopedIds;
+            return !String.IsNullOrEmpty(sourcePoolId) && !String.IsNullOrEmpty(unitId) &&
+                _unitIdsBySourcePool.TryGetValue(sourcePoolId, out scopedIds) && scopedIds.Contains(unitId);
         }
 
         internal void SetEligibleExclusiveUnitIds(IEnumerable<string> unitIds)
@@ -238,7 +247,8 @@ namespace RogueCommandExpansionLoader.Runtime
             {
                 BlueprintPoolScopeRegistration registration;
                 return pool != null && _byReference.TryGetValue(pool, out registration) &&
-                    registration.ContainsUnit(unitId) && (!isDemo || isAllowedForDemo) &&
+                    registration.ContainsUnit(unitId) &&
+                    (!isDemo || isAllowedForDemo) &&
                     (!isStartingBlueprintSelection || isAllowedAsStartingBlueprint);
             }
         }
