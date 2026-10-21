@@ -1749,20 +1749,23 @@ namespace RogueCommandExpansionLoader.Content
             List<ContentDiagnostic> diagnostics)
         {
             if (movement == null) return;
-            if (movement.moveSpeed < 0)
+            if (Single.IsNaN(movement.moveSpeed) || Single.IsInfinity(movement.moveSpeed) ||
+                movement.moveSpeed < 0)
             {
                 Add(diagnostics, "unit-movement.speed-invalid", path + ".moveSpeed",
-                    "Move speed must be non-negative.");
+                    "Move speed must be finite and non-negative.");
             }
-            if (movement.turnRate < 0)
+            if (Single.IsNaN(movement.turnRate) || Single.IsInfinity(movement.turnRate) ||
+                movement.turnRate < 0)
             {
                 Add(diagnostics, "unit-movement.turn-rate-invalid", path + ".turnRate",
-                    "Turn rate must be non-negative.");
+                    "Turn rate must be finite and non-negative.");
             }
-            if (movement.acceleration < 0)
+            if (Single.IsNaN(movement.acceleration) || Single.IsInfinity(movement.acceleration) ||
+                movement.acceleration < 0)
             {
                 Add(diagnostics, "unit-movement.acceleration-invalid", path + ".acceleration",
-                    "Acceleration must be non-negative.");
+                    "Acceleration must be finite and non-negative.");
             }
         }
 
@@ -2459,6 +2462,12 @@ namespace RogueCommandExpansionLoader.Content
 
             switch (name)
             {
+                case "startCountRange":
+                {
+                    int minimum;
+                    int maximum;
+                    return StageParameterOverrideParser.TryParseStartCountRange(value, out minimum, out maximum);
+                }
                 case "fillFirstLevelWithCardRewards":
                 case "putDefaultCardRewardInCenter":
                 case "fillLastLevelWithShops":
@@ -2469,7 +2478,6 @@ namespace RogueCommandExpansionLoader.Content
                 case "coinReward":
                 case "startCrystalReward":
                 case "researchPointsReward":
-                case "maxAscensionLevel":
                     int integerValue;
                     if (!Int32.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out integerValue))
                     {
@@ -2478,7 +2486,6 @@ namespace RogueCommandExpansionLoader.Content
 
                     if (name == "levelCount") return integerValue >= 1 && integerValue <= 32;
                     if (name == "maxWidth") return integerValue >= 1 && integerValue <= 64;
-                    if (name == "maxAscensionLevel") return integerValue >= 0 && integerValue <= 10;
                     return integerValue >= 0 && integerValue <= 1000000;
                 case "twoWayBranchingProbability":
                 case "shopWeight":

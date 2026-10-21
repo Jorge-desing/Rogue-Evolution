@@ -271,6 +271,69 @@
           "items": {
             "$ref": "#/$defs/combatBoost"
           }
+        },
+        "upgrades": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/unitUpgrade" }
+        },
+        "experience": {
+          "$ref": "#/$defs/unitExperience"
+        },
+        "synergies": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/unitSynergy" }
+        },
+        "visualVariants": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/unitVisualVariant" }
+        },
+        "spawn": {
+          "$ref": "#/$defs/unitSpawn"
+        },
+        "statusEffects": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/unitStatusEffect" }
+        },
+        "productionQueue": {
+          "$ref": "#/$defs/unitProductionQueue"
+        },
+        "resourceCosts": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/unitResourceCost" }
+        },
+        "movement": {
+          "$ref": "#/$defs/unitMovement"
+        },
+        "detection": {
+          "$ref": "#/$defs/unitDetection"
+        },
+        "weapons": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/unitWeapon" }
+        },
+        "armor": {
+          "$ref": "#/$defs/unitArmor"
+        },
+        "healing": {
+          "$ref": "#/$defs/unitHealing"
+        },
+        "stealth": {
+          "$ref": "#/$defs/unitStealth"
+        },
+        "command": {
+          "$ref": "#/$defs/unitCommand"
+        },
+        "experienceReward": {
+          "$ref": "#/$defs/unitExperienceReward"
+        },
+        "aura": {
+          "$ref": "#/$defs/unitAura"
+        },
+        "resourceGathering": {
+          "$ref": "#/$defs/unitResourceGathering"
+        },
+        "aiBehavior": {
+          "$ref": "#/$defs/unitAiBehavior"
         }
       },
       "oneOf": [
@@ -1186,12 +1249,12 @@
       "properties": {
         "name": {
           "enum": [
+            "startCountRange",
             "levelCount",
             "maxWidth",
             "coinReward",
             "startCrystalReward",
             "researchPointsReward",
-            "maxAscensionLevel",
             "twoWayBranchingProbability",
             "shopWeight",
             "restSiteWeight",
@@ -1236,9 +1299,28 @@
             }
           },
           "else": {
-            "properties": {
-              "value": {
-                "pattern": "^(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?$"
+            "if": {
+              "properties": {
+                "name": {
+                  "const": "startCountRange"
+                }
+              },
+              "required": [
+                "name"
+              ]
+            },
+            "then": {
+              "properties": {
+                "value": {
+                  "pattern": "^[1-9][0-9]*,[1-9][0-9]*$"
+                }
+              }
+            },
+            "else": {
+              "properties": {
+                "value": {
+                  "pattern": "^(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?$"
+                }
               }
             }
           }
@@ -1252,8 +1334,7 @@
                   "maxWidth",
                   "coinReward",
                   "startCrystalReward",
-                  "researchPointsReward",
-                  "maxAscensionLevel"
+                  "researchPointsReward"
                 ]
               }
             },
@@ -1700,6 +1781,202 @@
           "minimum": 0,
           "maximum": 300
         }
+      }
+    },
+    "unitUpgrade": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["targetUnitId"],
+      "properties": {
+        "targetUnitId": { "type": "string", "minLength": 1, "pattern": "\\S" },
+        "requiredExperienceLevel": { "type": "integer", "minimum": 0 },
+        "cost": { "type": "number", "minimum": 0 },
+        "description": { "type": "string" }
+      }
+    },
+    "unitExperience": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "experiencePerLevel": { "type": "integer", "minimum": 0 },
+        "maxLevel": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "experienceGainMultiplier": { "type": "number", "minimum": 0, "maximum": 10 },
+        "levelUpBonus": { "type": "number", "minimum": 0 }
+      }
+    },
+    "unitSynergy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "statName"],
+      "properties": {
+        "id": { "$ref": "#/$defs/namespacedId" },
+        "statName": { "type": "string", "minLength": 1, "pattern": "\\S" },
+        "multiplier": { "type": "number", "minimum": 0, "maximum": 10 },
+        "radius": { "type": "number", "minimum": 0 },
+        "targetUnitIds": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "pattern": "\\S" }
+        }
+      }
+    },
+    "unitVisualVariant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id"],
+      "properties": {
+        "id": { "$ref": "#/$defs/namespacedId" },
+        "visualAssetName": { "$ref": "#/$defs/assetName" },
+        "visualRootPath": { "type": "string", "minLength": 1, "pattern": "\\S" },
+        "colorTint": { "type": "string" },
+        "scale": { "type": "number", "minimum": 0, "maximum": 10 }
+      }
+    },
+    "unitSpawn": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "spawnRate": { "type": "number", "minimum": 0 },
+        "maxSpawnCount": { "type": "integer", "minimum": 0 },
+        "spawnCooldown": { "type": "number", "minimum": 0 },
+        "spawnLocation": { "type": "string" }
+      }
+    },
+    "unitStatusEffect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "effectType"],
+      "properties": {
+        "id": { "$ref": "#/$defs/namespacedId" },
+        "effectType": { "type": "string", "minLength": 1, "pattern": "\\S" },
+        "duration": { "type": "number", "minimum": 0 },
+        "magnitude": { "type": "number" }
+      }
+    },
+    "unitProductionQueue": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "buildTime": { "type": "number", "minimum": 0 },
+        "resourceCost": { "type": "number", "minimum": 0 },
+        "queueSize": { "type": "integer", "minimum": 0 },
+        "productionPriority": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "unitResourceCost": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["resourceType"],
+      "properties": {
+        "resourceType": { "type": "string", "minLength": 1, "pattern": "\\S" },
+        "amount": { "type": "number", "minimum": 0 }
+      }
+    },
+    "unitMovement": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "moveSpeed": { "type": "number", "minimum": 0 },
+        "turnRate": { "type": "number", "minimum": 0 },
+        "acceleration": { "type": "number", "minimum": 0 }
+      }
+    },
+    "unitDetection": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "detectionRange": { "type": "number", "minimum": 0 },
+        "sensorType": { "type": "string", "enum": ["Visual", "Radar", "Sonar", "Thermal"] },
+        "stealthDetection": { "type": "boolean" }
+      }
+    },
+    "unitWeapon": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["weaponType"],
+      "properties": {
+        "weaponType": { "type": "string", "minLength": 1, "pattern": "\\S" },
+        "damage": { "type": "number", "minimum": 0 },
+        "range": { "type": "number", "minimum": 0 },
+        "fireRate": { "type": "number", "minimum": 0 }
+      }
+    },
+    "unitArmor": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "armorType": { "type": "string", "enum": ["Light", "Medium", "Heavy", "Energy"] },
+        "armorValue": { "type": "number", "minimum": 0 },
+        "shieldValue": { "type": "number", "minimum": 0 },
+        "damageReduction": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "unitHealing": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "healAmount": { "type": "number", "minimum": 0 },
+        "healRange": { "type": "number", "minimum": 0 },
+        "healRate": { "type": "number", "minimum": 0 },
+        "repairAmount": { "type": "number", "minimum": 0 }
+      }
+    },
+    "unitStealth": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "stealthLevel": { "type": "number", "minimum": 0, "maximum": 10 },
+        "cloakDuration": { "type": "number", "minimum": 0 },
+        "detectionReduction": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "unitCommand": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "commandRange": { "type": "number", "minimum": 0 },
+        "commandType": { "type": "string", "enum": ["Move", "Attack", "Defend", "Support"] },
+        "maxCommandChain": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "unitExperienceReward": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "experienceAmount": { "type": "integer", "minimum": 0 },
+        "experienceType": { "type": "string", "minLength": 1, "pattern": "\\S" },
+        "bonusMultiplier": { "type": "number", "minimum": 0 }
+      }
+    },
+    "unitAura": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "auraRadius": { "type": "number", "minimum": 0 },
+        "auraType": { "type": "string", "enum": ["Buff", "Debuff", "Heal", "Shield"] },
+        "buffAmount": { "type": "number", "minimum": 0 },
+        "affectsAllies": { "type": "boolean" },
+        "affectsEnemies": { "type": "boolean" }
+      }
+    },
+    "unitResourceGathering": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["resourceType"],
+      "properties": {
+        "resourceType": { "type": "string", "minLength": 1, "pattern": "\\S" },
+        "gatherRate": { "type": "number", "minimum": 0 },
+        "carryCapacity": { "type": "integer", "minimum": 0 },
+        "gatherRange": { "type": "number", "minimum": 0 }
+      }
+    },
+    "unitAiBehavior": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "unitCap": { "type": "integer", "minimum": 0 },
+        "combatUnitCap": { "type": "integer", "minimum": 0 },
+        "skillActivationCheckInterval": { "type": "number", "minimum": 0 },
+        "aiTag": { "type": "string" }
       }
     }
   }

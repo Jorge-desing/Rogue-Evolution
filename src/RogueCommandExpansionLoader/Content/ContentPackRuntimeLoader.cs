@@ -756,113 +756,6 @@ namespace RogueCommandExpansionLoader.Content
                     }
                 }
             }
-            ApplyUnitMutations();
-        }
-
-            private void ApplyUnitMutations()
-            {
-            lock (_gate)
-            {
-            if (!_runtimeContentReady)
-            {
-                return;
-            }
-
-            foreach (var pair in _units)
-            {
-                LoadedUnit unit = pair.Value;
-                if (unit == null || unit.Definition == null)
-                {
-                    continue;
-                }
-
-                if (unit.Definition.abilities != null)
-                {
-                    foreach (var ability in unit.Definition.abilities)
-                    {
-                        if (ability == null || String.IsNullOrWhiteSpace(ability.id))
-                        {
-                            continue;
-                        }
-                        if (_mutationManager.MutateFloat(unit.BalanceRow, ability.id, ability.value))
-                        {
-                            _mutationSuccessCount++;
-                        }
-                        else
-                        {
-                            _mutationFailureCount++;
-                        }
-                    }
-                }
-                // Apply combat boosts
-                if (unit.Definition.combatBoosts != null)
-                {
-                    foreach (var boost in unit.Definition.combatBoosts)
-                    {
-                        if (boost == null || String.IsNullOrWhiteSpace(boost.statName))
-                        {
-                            continue;
-                        }
-                        if (_mutationManager.MutateFloat(unit.BalanceRow, boost.statName, boost.multiplier))
-                        {
-                            _mutationSuccessCount++;
-                        }
-                        else
-                        {
-                            _mutationFailureCount++;
-                        }
-                    }
-                }
-                // Apply movement sub-definition
-                if (unit.Definition.movement != null)
-                {
-                    if (_mutationManager.MutateFloat(unit.BalanceRow, "moveSpeed", unit.Definition.movement.moveSpeed))
-                        _mutationSuccessCount++;
-                    else
-                        _mutationFailureCount++;
-                }
-                // Apply armor sub-definition
-                if (unit.Definition.armor != null)
-                {
-                    if (_mutationManager.MutateFloat(unit.BalanceRow, "armorValue", unit.Definition.armor.armorValue))
-                        _mutationSuccessCount++;
-                    else
-                        _mutationFailureCount++;
-                }
-                // Apply weapon sub-definitions
-                if (unit.Definition.weapons != null)
-                {
-                    foreach (var weapon in unit.Definition.weapons)
-                    {
-                        if (weapon == null) continue;
-                        if (_mutationManager.MutateFloat(unit.BalanceRow, "damage", weapon.damage))
-                            _mutationSuccessCount++;
-                        else
-                            _mutationFailureCount++;
-                        if (_mutationManager.MutateFloat(unit.BalanceRow, "weaponRange", weapon.range))
-                            _mutationSuccessCount++;
-                        else
-                            _mutationFailureCount++;
-                    }
-                }
-                // Apply detection sub-definition
-                if (unit.Definition.detection != null)
-                {
-                    if (_mutationManager.MutateFloat(unit.BalanceRow, "detectionRange", unit.Definition.detection.detectionRange))
-                        _mutationSuccessCount++;
-                    else
-                        _mutationFailureCount++;
-                }
-                // Apply healing sub-definition
-                if (unit.Definition.healing != null)
-                {
-                    if (_mutationManager.MutateFloat(unit.BalanceRow, "healAmount", unit.Definition.healing.healAmount))
-                        _mutationSuccessCount++;
-                    else
-                        _mutationFailureCount++;
-                }
-            }
-        }
         }
 
         public bool TryFindBlueprintPool(string poolId, out object pool)
@@ -1853,7 +1746,13 @@ namespace RogueCommandExpansionLoader.Content
 
                     foreach (var unit in candidate.Definition.units)
                     {
-                        if (unit == null || unit.customBalance == null)
+                        if (unit == null)
+                        {
+                            continue;
+                        }
+
+                        Dictionary<string, float> parameters = UnitBalanceOverrideMapper.CreateCustomBalance(unit);
+                        if (parameters.Count == 0)
                         {
                             continue;
                         }
@@ -1861,7 +1760,7 @@ namespace RogueCommandExpansionLoader.Content
                         overrides.Add(new BalanceOverride
                         {
                             EntityId = unit.id,
-                            Parameters = unit.customBalance
+                            Parameters = parameters
                         });
                     }
                 }
@@ -6226,6 +6125,7 @@ namespace RogueCommandExpansionLoader.Content
             }
 
             var seen = new HashSet<string>(StringComparer.Ordinal);
+            bool hasStartCountRangeOverride = false;
             for (int i = 0; i < overrides.Length; i++)
             {
                 ContentStageParameterOverride stageOverride = overrides[i];
@@ -6238,15 +6138,29 @@ namespace RogueCommandExpansionLoader.Content
 
                 FieldInfo field = FindField(_stageParametersType, stageOverride.name, InstanceFields);
                 object value;
-                if (field.FieldType == typeof(int))
+                if (field.FieldType == typeof(Vector2Int) &&
+                    String.Equals(stageOverride.name, "startCountRange", StringComparison.Ordinal))
+                {
+                    int minimum;
+                    int maximum;
+                    if (!StageParameterOverrideParser.TryParseStartCountRange(
+                        stageOverride.value, out minimum, out maximum))
+                    {
+                        throw new InvalidDataException("Etapa " + stageId + " en '" + packageName +
+                            "': rango startCountRange inválido.");
+                    }
+
+                    value = new Vector2Int(minimum, maximum);
+                    hasStartCountRangeOverride = true;
+                }
+                else if (field.FieldType == typeof(int))
                 {
                     int parsed;
                     if (!Int32.TryParse(stageOverride.value, NumberStyles.Integer,
                         CultureInfo.InvariantCulture, out parsed) ||
                         (stageOverride.name == "levelCount" && (parsed < 1 || parsed > 32)) ||
                         (stageOverride.name == "maxWidth" && (parsed < 1 || parsed > 64)) ||
-                        (stageOverride.name == "maxAscensionLevel" && (parsed < 0 || parsed > 10)) ||
-                        (stageOverride.name != "levelCount" && stageOverride.name != "maxWidth" && stageOverride.name != "maxAscensionLevel" &&
+                        (stageOverride.name != "levelCount" && stageOverride.name != "maxWidth" &&
                             (parsed < 0 || parsed > 1000000)))
                     {
                         throw new InvalidDataException("Etapa " + stageId + " en '" + packageName +
@@ -6288,6 +6202,20 @@ namespace RogueCommandExpansionLoader.Content
                 }
 
                 field.SetValue(parameters, value);
+            }
+
+            if (hasStartCountRangeOverride)
+            {
+                FieldInfo rangeField = FindField(_stageParametersType, "startCountRange", InstanceFields);
+                FieldInfo widthField = FindField(_stageParametersType, "maxWidth", InstanceFields);
+                Vector2Int range = (Vector2Int)rangeField.GetValue(parameters);
+                int maximumWidth = (int)widthField.GetValue(parameters);
+                if (!StageParameterOverrideParser.IsStartCountRangeWithinWidth(
+                    range.x, range.y, maximumWidth))
+                {
+                    throw new InvalidDataException("Etapa " + stageId + " en '" + packageName +
+                        "': startCountRange debe caber en maxWidth.");
+                }
             }
         }
 

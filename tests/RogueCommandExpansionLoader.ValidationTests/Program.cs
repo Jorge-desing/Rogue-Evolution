@@ -49,6 +49,62 @@ var tests = new (string Name, Action Run)[]
             ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(), "unit.type-invalid");
         });
     }),
+    ("unit schema exposes every supported sub-definition DTO field", () =>
+    {
+        using JsonDocument schemaDocument = JsonDocument.Parse(File.ReadAllText(
+            Path.Combine(repositoryRoot, "content", "schema", "content.schema.json")));
+        JsonElement definitions = schemaDocument.RootElement.GetProperty("$defs");
+        JsonElement unitProperties = definitions.GetProperty("unit").GetProperty("properties");
+        var subDefinitions = new (string PropertyName, string SchemaName, Type DtoType, bool IsArray)[]
+        {
+            ("upgrades", "unitUpgrade", typeof(ContentUnitUpgradeDefinition), true),
+            ("experience", "unitExperience", typeof(ContentUnitExperienceDefinition), false),
+            ("synergies", "unitSynergy", typeof(ContentUnitSynergyDefinition), true),
+            ("visualVariants", "unitVisualVariant", typeof(ContentUnitVisualVariantDefinition), true),
+            ("spawn", "unitSpawn", typeof(ContentUnitSpawnDefinition), false),
+            ("statusEffects", "unitStatusEffect", typeof(ContentUnitStatusEffectDefinition), true),
+            ("productionQueue", "unitProductionQueue", typeof(ContentUnitProductionQueueDefinition), false),
+            ("resourceCosts", "unitResourceCost", typeof(ContentUnitResourceCostDefinition), true),
+            ("movement", "unitMovement", typeof(ContentUnitMovementDefinition), false),
+            ("detection", "unitDetection", typeof(ContentUnitDetectionDefinition), false),
+            ("weapons", "unitWeapon", typeof(ContentUnitWeaponDefinition), true),
+            ("armor", "unitArmor", typeof(ContentUnitArmorDefinition), false),
+            ("healing", "unitHealing", typeof(ContentUnitHealingDefinition), false),
+            ("stealth", "unitStealth", typeof(ContentUnitStealthDefinition), false),
+            ("command", "unitCommand", typeof(ContentUnitCommandDefinition), false),
+            ("experienceReward", "unitExperienceReward", typeof(ContentUnitExperienceRewardDefinition), false),
+            ("aura", "unitAura", typeof(ContentUnitAuraDefinition), false),
+            ("resourceGathering", "unitResourceGathering", typeof(ContentUnitResourceGatheringDefinition), false),
+            ("aiBehavior", "unitAiBehavior", typeof(ContentUnitAiBehaviorDefinition), false)
+        };
+
+        foreach (var entry in subDefinitions)
+        {
+            if (!unitProperties.TryGetProperty(entry.PropertyName, out JsonElement property))
+            {
+                throw new InvalidOperationException("Unit schema is missing property " + entry.PropertyName + ".");
+            }
+
+            JsonElement referencedSchema = entry.IsArray ? property.GetProperty("items") : property;
+            string expectedReference = "#/$defs/" + entry.SchemaName;
+            if (referencedSchema.GetProperty("$ref").GetString() != expectedReference)
+            {
+                throw new InvalidOperationException("Unit schema property " + entry.PropertyName +
+                    " must reference " + expectedReference + ".");
+            }
+
+            HashSet<string> dtoFields = entry.DtoType.GetFields(BindingFlags.Instance | BindingFlags.Public)
+                .Select(field => field.Name).ToHashSet(StringComparer.Ordinal);
+            HashSet<string> schemaFields = definitions.GetProperty(entry.SchemaName).GetProperty("properties")
+                .EnumerateObject().Select(propertyDefinition => propertyDefinition.Name)
+                .ToHashSet(StringComparer.Ordinal);
+            if (!dtoFields.SetEquals(schemaFields))
+            {
+                throw new InvalidOperationException("Unit schema definition " + entry.SchemaName +
+                    " does not match its DTO fields.");
+            }
+        }
+    }),
     ("visual socket discovery accepts canonical IDs and exact legacy suffixes only", () =>
     {
         if (!RogueCommandSocketCatalog.TryResolveCanonicalSocketName("Socket_TurretPivot", out string canonical) ||
@@ -682,27 +738,61 @@ var tests = new (string Name, Action Run)[]
                 throw new InvalidOperationException("ParamMap missing key: " + key);
         }
     }),
-    ("ApplyUnitMutations field names are accepted by the mutation manager", () =>
+    ("unit movement speed maps to the native MoveSpeed balance cache without overriding explicit values", () =>
     {
-        var mutationManager = new RuntimeMutationManager(msg => { });
-        var row = new EntityValueModifier { value = 1.0f };
-        // Balance row stand-in uses a generic object with the matching fields.
-        var balanceRow = new
+        var unit = new ContentUnitDefinition
         {
-            moveSpeed = 0f,
-            armorValue = 0f,
-            damage = 0f,
-            weaponRange = 0f,
-            detectionRange = 0f,
-            healAmount = 0f
+            id = "sample:movement",
+            movement = new ContentUnitMovementDefinition { moveSpeed = 12.5f }
         };
-        // MutateFloat requires settable fields; use reflection-friendly mutable holder.
-        var holder = new MutableBalanceRow();
-        foreach (string fieldName in new[] { "moveSpeed", "armorValue", "damage", "weaponRange", "detectionRange", "healAmount" })
+        Dictionary<string, float> mapped = UnitBalanceOverrideMapper.CreateCustomBalance(unit);
+        if (!mapped.TryGetValue("MoveSpeed", out float mappedSpeed) || mappedSpeed != 12.5f)
         {
-            if (!mutationManager.MutateFloat(holder, fieldName, 1.25f))
-                throw new InvalidOperationException("MutateFloat failed for field: " + fieldName);
+            throw new InvalidOperationException("Movement moveSpeed was not mapped to the native MoveSpeed key.");
         }
+
+        unit.customBalance = new Dictionary<string, float>(StringComparer.Ordinal)
+        {
+            ["MoveSpeed"] = 7.5f
+        };
+        mapped = UnitBalanceOverrideMapper.CreateCustomBalance(unit);
+        if (!mapped.TryGetValue("MoveSpeed", out mappedSpeed) || mappedSpeed != 7.5f)
+        {
+            throw new InvalidOperationException("An explicit customBalance MoveSpeed should override the structured movement value.");
+        }
+
+        unit.customBalance = null;
+        unit.balanceOverrides = [new ContentBalanceOverride { name = "moveSpeed", value = "4.5" }];
+        mapped = UnitBalanceOverrideMapper.CreateCustomBalance(unit);
+        if (mapped.ContainsKey("MoveSpeed"))
+        {
+            throw new InvalidOperationException("An explicit row balance override should suppress the derived cache override.");
+        }
+    }),
+    ("unit movement speed mapper ignores non-finite positive values", () =>
+    {
+        var unit = new ContentUnitDefinition
+        {
+            id = "sample:movement",
+            movement = new ContentUnitMovementDefinition { moveSpeed = Single.PositiveInfinity }
+        };
+        Dictionary<string, float> mapped = UnitBalanceOverrideMapper.CreateCustomBalance(unit);
+        if (mapped.ContainsKey("MoveSpeed"))
+        {
+            throw new InvalidOperationException("Non-finite movement speed must not enter the native balance cache mapping.");
+        }
+    }),
+    ("unit movement speed rejects non-finite values before cache mapping", () =>
+    {
+        WithPackage(sample, (pack, root) =>
+        {
+            pack.units[0].movement = new ContentUnitMovementDefinition
+            {
+                moveSpeed = Single.PositiveInfinity
+            };
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "unit-movement.speed-invalid");
+        });
     }),
     ("runtime mutation handles invalid targets and fields", () =>
     {
@@ -4133,36 +4223,54 @@ var tests = new (string Name, Action Run)[]
                 "stage.parameter-override-invalid");
         });
     }),
-    ("stage parameter override maxAscensionLevel validates 0-10 range", () =>
+    ("stage startCountRange override validates ordered native bounds", () =>
     {
         WithPackage(nativeSample, (pack, root) =>
         {
             pack.stages[0].parameterOverrides =
             [
-                new ContentStageParameterOverride { name = "maxAscensionLevel", value = "0" }
+                new ContentStageParameterOverride { name = "startCountRange", value = "2,6" }
             ];
             ExpectValid(pack, root, new EmptySnapshot(), new KnownModuleValidator());
 
-            pack.stages[0].parameterOverrides =
-            [
-                new ContentStageParameterOverride { name = "maxAscensionLevel", value = "10" }
-            ];
-            ExpectValid(pack, root, new EmptySnapshot(), new KnownModuleValidator());
-
-            pack.stages[0].parameterOverrides =
-            [
-                new ContentStageParameterOverride { name = "maxAscensionLevel", value = "-1" }
-            ];
-            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
-                "stage.parameter-override-invalid");
-
-            pack.stages[0].parameterOverrides =
-            [
-                new ContentStageParameterOverride { name = "maxAscensionLevel", value = "11" }
-            ];
-            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
-                "stage.parameter-override-invalid");
+            foreach (string invalidValue in new[] { "0,2", "2,1", "1,65", "1,2,3", "1.5,3", " 1,3" })
+            {
+                pack.stages[0].parameterOverrides =
+                [
+                    new ContentStageParameterOverride { name = "startCountRange", value = invalidValue }
+                ];
+                ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                    "stage.parameter-override-invalid");
+            }
         });
+    }),
+    ("stage overrides reject fields absent from native StageParametersScriptableObject", () =>
+    {
+        WithPackage(nativeSample, (pack, root) =>
+        {
+            foreach (string unsupportedName in new[]
+                     { "maxAscensionLevel", "aiBuildDistance", "cardRewardCount", "shopCardCount" })
+            {
+                pack.stages[0].parameterOverrides =
+                [
+                    new ContentStageParameterOverride { name = unsupportedName, value = "1" }
+                ];
+                ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                    "stage.parameter-override-invalid");
+            }
+        });
+    }),
+    ("stage startCountRange fits the final maxWidth", () =>
+    {
+        if (!StageParameterOverrideParser.IsStartCountRangeWithinWidth(2, 6, 6) ||
+            !StageParameterOverrideParser.IsStartCountRangeWithinWidth(1, 1, 1) ||
+            StageParameterOverrideParser.IsStartCountRangeWithinWidth(2, 6, 5) ||
+            StageParameterOverrideParser.IsStartCountRangeWithinWidth(0, 1, 4) ||
+            StageParameterOverrideParser.IsStartCountRangeWithinWidth(3, 2, 4) ||
+            StageParameterOverrideParser.IsStartCountRangeWithinWidth(1, 65, 64))
+        {
+            throw new InvalidOperationException("startCountRange must be ordered and fit the final maxWidth.");
+        }
     }),
     ("balance overrides accept rarity enum and reject invalid enum values", () =>
     {
@@ -4521,6 +4629,87 @@ var tests = new (string Name, Action Run)[]
             {
                 throw new InvalidOperationException("The retreat-and-regroup AI parser accepted invalid input " + i + ".");
             }
+        }
+    }),
+    ("patrol-and-intercept AI parser applies documented defaults and accepts upper bounds", () =>
+    {
+        if (!PatrolAndInterceptParameterParser.TryParse(null, out PatrolAndInterceptSettings defaults,
+                out string diagnostic) || diagnostic != null || defaults.BaseIndex != 0 ||
+            defaults.PatrolRadiusCells != 15 || defaults.InterceptRadiusCells != 10 ||
+            defaults.ScanIntervalSeconds != 8f || defaults.MaxPatrolUnits != 3)
+        {
+            throw new InvalidOperationException("Patrol-and-intercept defaults do not match the content contract.");
+        }
+
+        ContentModuleParameter[] upperBounds =
+        [
+            new ContentModuleParameter { name = "baseIndex", value = "31" },
+            new ContentModuleParameter { name = "patrolRadiusCells", value = "32" },
+            new ContentModuleParameter { name = "interceptRadiusCells", value = "32" },
+            new ContentModuleParameter { name = "scanIntervalSeconds", value = "60" },
+            new ContentModuleParameter { name = "maxPatrolUnits", value = "8" }
+        ];
+        if (!PatrolAndInterceptParameterParser.TryParse(upperBounds,
+                out PatrolAndInterceptSettings maximums, out diagnostic) || diagnostic != null ||
+            maximums.BaseIndex != 31 || maximums.PatrolRadiusCells != 32 ||
+            maximums.InterceptRadiusCells != 32 || maximums.ScanIntervalSeconds != 60f ||
+            maximums.MaxPatrolUnits != 8)
+        {
+            throw new InvalidOperationException("Patrol-and-intercept rejected a documented upper bound.");
+        }
+    }),
+    ("patrol-and-intercept AI parser rejects invalid and duplicate parameters", () =>
+    {
+        ContentModuleParameter[][] invalidInputs =
+        [
+            [new ContentModuleParameter { name = "unknown", value = "1" }],
+            [new ContentModuleParameter { name = "baseIndex", value = "0" }, new ContentModuleParameter { name = "baseIndex", value = "1" }],
+            [null!],
+            [new ContentModuleParameter { name = "baseIndex", value = "32" }],
+            [new ContentModuleParameter { name = "patrolRadiusCells", value = "4" }],
+            [new ContentModuleParameter { name = "patrolRadiusCells", value = "33" }],
+            [new ContentModuleParameter { name = "interceptRadiusCells", value = "4" }],
+            [new ContentModuleParameter { name = "interceptRadiusCells", value = "33" }],
+            [new ContentModuleParameter { name = "scanIntervalSeconds", value = "1" }],
+            [new ContentModuleParameter { name = "scanIntervalSeconds", value = "61" }],
+            [new ContentModuleParameter { name = "maxPatrolUnits", value = "0" }],
+            [new ContentModuleParameter { name = "maxPatrolUnits", value = "9" }]
+        ];
+        for (int i = 0; i < invalidInputs.Length; i++)
+        {
+            if (PatrolAndInterceptParameterParser.TryParse(invalidInputs[i], out _, out string diagnostic) ||
+                diagnostic == null)
+            {
+                throw new InvalidOperationException("Patrol-and-intercept accepted invalid input " + i + ".");
+            }
+        }
+    }),
+    ("patrol waypoint selection chooses the nearest reachable distinct cell", () =>
+    {
+        UnityEngine.Vector2Int[] cells =
+        [
+            new UnityEngine.Vector2Int(8, 0),
+            new UnityEngine.Vector2Int(3, 0),
+            new UnityEngine.Vector2Int(1, 1)
+        ];
+        if (!PatrolAndInterceptWaypointResolver.TrySelectNearest(
+                new UnityEngine.Vector2Int(0, 0), cells, 5, out int selected) || selected != 2)
+        {
+            throw new InvalidOperationException("Patrol did not choose the nearest non-current waypoint inside its radius.");
+        }
+
+        if (PatrolAndInterceptWaypointResolver.TrySelectNearest(
+                new UnityEngine.Vector2Int(0, 0),
+                [new UnityEngine.Vector2Int(0, 0), new UnityEngine.Vector2Int(6, 0)], 5, out _))
+        {
+            throw new InvalidOperationException("Patrol accepted only a no-op or out-of-radius waypoint.");
+        }
+
+        if (PatrolAndInterceptWaypointResolver.TrySelectNearest(
+                new UnityEngine.Vector2Int(Int32.MaxValue, Int32.MaxValue),
+                [new UnityEngine.Vector2Int(Int32.MinValue, Int32.MinValue)], 5, out _))
+        {
+            throw new InvalidOperationException("Extreme cell coordinates overflowed the squared-distance check.");
         }
     }),
     ("managed assemblies are rejected from content packs", () =>
