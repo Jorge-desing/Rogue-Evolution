@@ -4473,6 +4473,56 @@ var tests = new (string Name, Action Run)[]
             }
         }
     }),
+    ("retreat-and-regroup AI parameter parser supplies bounded defaults and validates limits", () =>
+    {
+        if (!RetreatAndRegroupParameterParser.TryParse(null, out RetreatAndRegroupSettings defaults,
+            out string diagnostic) || diagnostic != null || defaults.BaseIndex != 0 ||
+            defaults.HealthThresholdPercent != 30 || defaults.RegroupRadiusCells != 8 ||
+            defaults.CooldownSeconds != 20f)
+        {
+            throw new InvalidOperationException("The retreat-and-regroup AI parser did not return its documented defaults.");
+        }
+
+        ContentModuleParameter[] boundaries =
+        [
+            new ContentModuleParameter { name = "baseIndex", value = "31" },
+            new ContentModuleParameter { name = "healthThresholdPercent", value = "99" },
+            new ContentModuleParameter { name = "regroupRadiusCells", value = "32" },
+            new ContentModuleParameter { name = "cooldownSeconds", value = "300" }
+        ];
+        if (!RetreatAndRegroupParameterParser.TryParse(boundaries, out RetreatAndRegroupSettings maximums,
+            out diagnostic) || diagnostic != null || maximums.BaseIndex != 31 ||
+            maximums.HealthThresholdPercent != 99 || maximums.RegroupRadiusCells != 32 ||
+            maximums.CooldownSeconds != 300f)
+        {
+            throw new InvalidOperationException("The retreat-and-regroup AI parser rejected valid upper-bound values.");
+        }
+    }),
+    ("retreat-and-regroup AI parameter parser rejects invalid values and unknown parameters", () =>
+    {
+        ContentModuleParameter[][] invalidInputs =
+        [
+            [new ContentModuleParameter { name = "unknownParam", value = "1" }],
+            [new ContentModuleParameter { name = "baseIndex", value = "0" }, new ContentModuleParameter { name = "baseIndex", value = "1" }],
+            [null!],
+            [new ContentModuleParameter { name = "baseIndex", value = "32" }],
+            [new ContentModuleParameter { name = "healthThresholdPercent", value = "0" }],
+            [new ContentModuleParameter { name = "healthThresholdPercent", value = "100" }],
+            [new ContentModuleParameter { name = "regroupRadiusCells", value = "0" }],
+            [new ContentModuleParameter { name = "regroupRadiusCells", value = "33" }],
+            [new ContentModuleParameter { name = "cooldownSeconds", value = "4" }],
+            [new ContentModuleParameter { name = "cooldownSeconds", value = "301" }]
+        ];
+
+        for (int i = 0; i < invalidInputs.Length; i++)
+        {
+            if (RetreatAndRegroupParameterParser.TryParse(invalidInputs[i], out _, out string diagnostic) ||
+                diagnostic == null)
+            {
+                throw new InvalidOperationException("The retreat-and-regroup AI parser accepted invalid input " + i + ".");
+            }
+        }
+    }),
     ("managed assemblies are rejected from content packs", () =>
     {
         WithPackage(sample, (pack, root) =>
