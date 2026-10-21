@@ -92,10 +92,11 @@ Never promote one tier to another.
 
 ### References
 
+- `references/skill-search-and-adoption.md` — workflow for searching, evaluating, and adopting external skills into the project.
 - `docs/research/AGENT-HANDOFF.md` — project handoff and state
 - `docs/research/BASELINE.md` — compatibility baseline
 - `tools/Decompile-ManagedType.ps1` — pinned ILSpy script
-- Universal modder skills (installed in `C:\Users\Alex\AppData\Local\hermes\skills\universal-modder\`) — general reverse engineering patterns
+- Universal modder skills (7 remaining: asset-pipeline, fal-assets, game-automation, mashup-mods, reverse-engineering, share-field-notes, showcase-video) — general reverse engineering patterns
 - `reverse-engineering` skill — general tool selection and workflow
 - `game-recon` skill — game fingerprinting and modding route selection
 
