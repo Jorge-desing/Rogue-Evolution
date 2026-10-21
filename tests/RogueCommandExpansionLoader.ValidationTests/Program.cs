@@ -2885,27 +2885,29 @@ var tests = new (string Name, Action Run)[]
         try
         {
             behaviour.Tick();
-            EntityCommand firstRaidOrder = raider.LastExecutedCommand;
-            if (firstRaidOrder == null || firstRaidOrder.description != "Harvester raid strike" ||
-                firstRaidOrder.position.x != target.Position.x ||
-                immobileCombatant.LastExecutedCommand != null)
+            if (!raider.LastExecutedCommand.HasValue ||
+                raider.LastExecutedCommand.Value.intent != "Harvester raid strike" ||
+                raider.LastExecutedCommand.Value.destination.x != target.Position.x ||
+                immobileCombatant.LastExecutedCommand.HasValue)
             {
                 throw new InvalidOperationException("The harvester raid did not select a mobile raider for the target.");
             }
 
+            int firstRaidOrderCallCount = raider.ExecuteCommandCallCount;
             UnityEngine.Time.time = 20f;
             behaviour.Tick();
-            if (!System.Object.ReferenceEquals(firstRaidOrder, raider.LastExecutedCommand))
+            if (raider.ExecuteCommandCallCount != firstRaidOrderCallCount)
             {
                 throw new InvalidOperationException("The active raid order was duplicated during its cooldown scan.");
             }
 
             raider.ExecuteCommand(new EntityCommand { tag = "native:other-order" },
                 EntityController.CommandProcessingType.ExecuteBeforeCurrentCommand);
+            int reassignmentCallCount = raider.ExecuteCommandCallCount;
             UnityEngine.Time.time = 22f;
             behaviour.Tick();
-            if (System.Object.ReferenceEquals(firstRaidOrder, raider.LastExecutedCommand) ||
-                raider.LastExecutedCommand?.description != "Harvester raid strike")
+            if (raider.ExecuteCommandCallCount == reassignmentCallCount ||
+                raider.LastExecutedCommand?.intent != "Harvester raid strike")
             {
                 throw new InvalidOperationException("The raider did not become eligible after its raid command ended.");
             }
@@ -2980,41 +2982,44 @@ var tests = new (string Name, Action Run)[]
         try
         {
             behaviour.Tick();
-            EntityCommand firstOrder = first.LastExecutedCommand;
-            EntityCommand secondOrder = second.LastExecutedCommand;
-            if (firstOrder?.description != "Siege assault operation" ||
-                secondOrder?.description != "Siege assault operation" ||
-                firstOrder.position.x != target.Position.x ||
-                secondOrder.position.x != target.Position.x ||
-                immobileCombatant.LastExecutedCommand != null)
+            if (!first.LastExecutedCommand.HasValue || !second.LastExecutedCommand.HasValue ||
+                first.LastExecutedCommand.Value.intent != "Siege assault operation" ||
+                second.LastExecutedCommand.Value.intent != "Siege assault operation" ||
+                first.LastExecutedCommand.Value.destination.x != target.Position.x ||
+                second.LastExecutedCommand.Value.destination.x != target.Position.x ||
+                immobileCombatant.LastExecutedCommand.HasValue)
             {
                 throw new InvalidOperationException("The siege assault did not dispatch the required mobile squad to its known target.");
             }
 
+            int firstOrderCallCount = first.ExecuteCommandCallCount;
+            int secondOrderCallCount = second.ExecuteCommandCallCount;
             UnityEngine.Time.time = 40f;
             behaviour.Tick();
-            if (!System.Object.ReferenceEquals(firstOrder, first.LastExecutedCommand) ||
-                !System.Object.ReferenceEquals(secondOrder, second.LastExecutedCommand))
+            if (first.ExecuteCommandCallCount != firstOrderCallCount ||
+                second.ExecuteCommandCallCount != secondOrderCallCount)
             {
                 throw new InvalidOperationException("The siege module duplicated orders while its squad was still assigned.");
             }
 
             first.ExecuteCommand(new EntityCommand { tag = "native:other-order" },
                 EntityController.CommandProcessingType.ExecuteBeforeCurrentCommand);
+            int firstOtherOrderCallCount = first.ExecuteCommandCallCount;
             UnityEngine.Time.time = 45f;
             behaviour.Tick();
             if (first.LastExecutedCommand?.tag != "native:other-order" ||
-                !System.Object.ReferenceEquals(secondOrder, second.LastExecutedCommand))
+                second.ExecuteCommandCallCount != secondOrderCallCount)
             {
                 throw new InvalidOperationException("The siege module dispatched before the minimum squad had reassembled.");
             }
 
             second.ExecuteCommand(new EntityCommand { tag = "native:other-order" },
                 EntityController.CommandProcessingType.ExecuteBeforeCurrentCommand);
+            int secondOtherOrderCallCount = second.ExecuteCommandCallCount;
             UnityEngine.Time.time = 50f;
             behaviour.Tick();
-            if (System.Object.ReferenceEquals(firstOrder, first.LastExecutedCommand) ||
-                System.Object.ReferenceEquals(secondOrder, second.LastExecutedCommand))
+            if (first.ExecuteCommandCallCount != firstOtherOrderCallCount + 1 ||
+                second.ExecuteCommandCallCount != secondOtherOrderCallCount + 1)
             {
                 throw new InvalidOperationException("The completed siege squad could not be reused in a later assault.");
             }
@@ -3216,12 +3221,12 @@ var tests = new (string Name, Action Run)[]
         behaviour.OnInitialized();
         behaviour.Tick();
 
-        if (defender.LastExecutedCommand == null || closerNativeDefender.LastExecutedCommand != null ||
-            defender.LastExecutedCommand.description != "Reactive base defense" ||
-            defender.LastExecutedCommand.position.x != attacker.Position.x ||
-            defender.LastExecutedCommand.position.z != attacker.Position.z ||
+        if (!defender.LastExecutedCommand.HasValue || closerNativeDefender.LastExecutedCommand.HasValue ||
+            defender.LastExecutedCommand.Value.intent != "Reactive base defense" ||
+            defender.LastExecutedCommand.Value.destination.x != attacker.Position.x ||
+            defender.LastExecutedCommand.Value.destination.z != attacker.Position.z ||
             defender.LastCommandProcessingType != EntityController.CommandProcessingType.ExecuteBeforeCurrentCommand ||
-            !defender.CurrentCommandIsTaggedWith(defender.LastExecutedCommand.tag))
+            !defender.CurrentCommandIsTaggedWith(defender.LastExecutedCommand.Value.tag))
         {
             throw new InvalidOperationException(
                 "The in-range attack order was not dispatched before the defender's current command.");
@@ -3275,7 +3280,7 @@ var tests = new (string Name, Action Run)[]
                 new DefaultAiBehaviour(), Array.Empty<ContentModuleParameter>());
             behaviour.OnInitialized();
             behaviour.Tick();
-            if (defender.LastExecutedCommand != null)
+            if (defender.LastExecutedCommand.HasValue)
             {
                 throw new InvalidOperationException("The default Buildings mode responded to an attack on an AI Harvester.");
             }
@@ -3329,7 +3334,7 @@ var tests = new (string Name, Action Run)[]
         IRogueCommandAiRuntimeBehaviour behaviour = module.CreateBehaviour(new DefaultAiBehaviour(), null);
         behaviour.OnInitialized();
         behaviour.Tick();
-        if (defender.LastExecutedCommand != null)
+        if (defender.LastExecutedCommand.HasValue)
         {
             throw new InvalidOperationException("An attacker outside the defense radius triggered a response.");
         }
@@ -3338,7 +3343,7 @@ var tests = new (string Name, Action Run)[]
         attacker.CurrentCell = new UnityEngine.Vector2Int(12, 10);
         UnityEngine.Time.time = 20f;
         behaviour.Tick();
-        if (defender.LastExecutedCommand != null)
+        if (defender.LastExecutedCommand.HasValue)
         {
             throw new InvalidOperationException("An attack on a different AI base triggered a response.");
         }
@@ -3403,8 +3408,8 @@ var tests = new (string Name, Action Run)[]
         [new ContentModuleParameter { name = "protectedTargetType", value = "Harvesters" }]);
         behaviour.OnInitialized();
         behaviour.Tick();
-        if (defender.LastExecutedCommand == null || defender.LastExecutedCommand.position.x != 44f ||
-            defender.LastExecutedCommand.position.z != 44f)
+        if (!defender.LastExecutedCommand.HasValue || defender.LastExecutedCommand.Value.destination.x != 44f ||
+            defender.LastExecutedCommand.Value.destination.z != 44f)
         {
             throw new InvalidOperationException("The AI defender did not respond to its live base Harvester.");
         }
@@ -3460,9 +3465,9 @@ var tests = new (string Name, Action Run)[]
                     [new ContentModuleParameter { name = "protectedTargetType", value = "BuildingsAndHarvesters" }]);
                 behaviour.OnInitialized();
                 behaviour.Tick();
-                if (defender.LastExecutedCommand == null ||
-                    defender.LastExecutedCommand.position.x != attacker.Position.x ||
-                    defender.LastExecutedCommand.position.z != attacker.Position.z)
+                if (!defender.LastExecutedCommand.HasValue ||
+                    defender.LastExecutedCommand.Value.destination.x != attacker.Position.x ||
+                    defender.LastExecutedCommand.Value.destination.z != attacker.Position.z)
                 {
                     throw new InvalidOperationException("The union target mode did not respond to an AI " +
                         (harvesterTarget ? "Harvester." : "building."));
@@ -4926,7 +4931,8 @@ var tests = new (string Name, Action Run)[]
         if (!PatrolAndInterceptParameterParser.TryParse(null, out PatrolAndInterceptSettings defaults,
                 out string diagnostic) || diagnostic != null || defaults.BaseIndex != 0 ||
             defaults.PatrolRadiusCells != 15 || defaults.InterceptRadiusCells != 10 ||
-            defaults.ScanIntervalSeconds != 8f || defaults.MaxPatrolUnits != 3)
+            defaults.ScanIntervalSeconds != 8f || defaults.MaxPatrolUnits != 3 ||
+            defaults.PatrolMode != "AttackMove")
         {
             throw new InvalidOperationException("Patrol-and-intercept defaults do not match the content contract.");
         }
@@ -4946,6 +4952,40 @@ var tests = new (string Name, Action Run)[]
             maximums.MaxPatrolUnits != 8)
         {
             throw new InvalidOperationException("Patrol-and-intercept rejected a documented upper bound.");
+        }
+    }),
+    ("patrol-and-intercept parser accepts both supported patrol modes", () =>
+    {
+        foreach (string mode in new[] { "AttackMove", "Native" })
+        {
+            ContentModuleParameter[] parameters =
+            [new ContentModuleParameter { name = "patrolMode", value = mode }];
+            if (!PatrolAndInterceptParameterParser.TryParse(parameters,
+                    out PatrolAndInterceptSettings settings, out string diagnostic) ||
+                diagnostic != null || settings.PatrolMode != mode)
+            {
+                throw new InvalidOperationException("Patrol-and-intercept rejected supported mode " + mode + ".");
+            }
+        }
+    }),
+    ("patrol-and-intercept parser rejects invalid or duplicate patrol modes", () =>
+    {
+        ContentModuleParameter[][] invalidModes =
+        [
+            [new ContentModuleParameter { name = "patrolMode", value = "" }],
+            [new ContentModuleParameter { name = "patrolMode", value = "Unknown" }],
+            [
+                new ContentModuleParameter { name = "patrolMode", value = "Native" },
+                new ContentModuleParameter { name = "patrolMode", value = "AttackMove" }
+            ]
+        ];
+        for (int i = 0; i < invalidModes.Length; i++)
+        {
+            if (PatrolAndInterceptParameterParser.TryParse(invalidModes[i], out _, out string diagnostic) ||
+                diagnostic == null)
+            {
+                throw new InvalidOperationException("Patrol-and-intercept accepted invalid patrol mode input " + i + ".");
+            }
         }
     }),
     ("patrol-and-intercept AI parser rejects invalid and duplicate parameters", () =>
@@ -5000,6 +5040,306 @@ var tests = new (string Name, Action Run)[]
                 [new UnityEngine.Vector2Int(Int32.MinValue, Int32.MinValue)], 5, out _))
         {
             throw new InvalidOperationException("Extreme cell coordinates overflowed the squared-distance check.");
+        }
+    }),
+    ("native patrol route selects nearest distinct cells within the output cap", () =>
+    {
+        UnityEngine.Vector2Int[] cells =
+        [
+            new UnityEngine.Vector2Int(1, 0),
+            new UnityEngine.Vector2Int(1, 0),
+            new UnityEngine.Vector2Int(0, 1),
+            new UnityEngine.Vector2Int(3, 0),
+            new UnityEngine.Vector2Int(0, 0),
+            new UnityEngine.Vector2Int(6, 0)
+        ];
+        int[] selected = new int[8];
+        int count = PatrolAndInterceptWaypointResolver.SelectNearestRoute(
+            new UnityEngine.Vector2Int(0, 0), cells, 5, selected);
+        if (count != 3 || selected[0] != 2 || selected[1] != 0 || selected[2] != 3)
+        {
+            throw new InvalidOperationException("Native patrol route did not select unique nearest cells in deterministic order.");
+        }
+
+        int[] capped = new int[2];
+        count = PatrolAndInterceptWaypointResolver.SelectNearestRoute(
+            new UnityEngine.Vector2Int(0, 0), cells, 5, capped);
+        if (count != 2 || capped[0] != 2 || capped[1] != 0)
+        {
+            throw new InvalidOperationException("Native patrol route exceeded its caller-provided output capacity.");
+        }
+    }),
+    ("patrol-and-intercept default still dispatches attack-move waypoint orders", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        IRogueCommandAiRuntimeBehaviour? behaviour = null;
+        try
+        {
+            UnityEngine.Time.time = 10f;
+            ExistingControllers.Instance.AiBuildings().Add(new EntityController
+            {
+                IsControlledByAi = true,
+                IsBuilding = true,
+                aiBaseIndex = 0,
+                CurrentCell = new UnityEngine.Vector2Int(10, 10),
+                Position = new UnityEngine.Vector3(10f, 0f, 10f)
+            });
+            var defender = new EntityController
+            {
+                IsControlledByAi = true,
+                IsUnit = true,
+                IsCombatUnit = true,
+                CanAttackAndIsAttackEnabled = true,
+                CanMoveAndMovementIsEnabled = true,
+                aiBaseIndex = 0,
+                CurrentPlayerCommandName = EntityCommand.Command.DoNothing,
+                CurrentCell = new UnityEngine.Vector2Int(9, 10)
+            };
+            ExistingControllers.Instance.AiUnits().Add(defender);
+
+            behaviour = new PatrolAndInterceptAiModule().CreateBehaviour(
+                new DefaultAiBehaviour(), null);
+            behaviour.OnInitialized();
+            behaviour.Tick();
+
+            if (!defender.LastExecutedCommand.HasValue ||
+                defender.LastExecutedCommand.Value.command != EntityCommand.Command.AttackMoveOnPosition ||
+                defender.LastExecutedCommand.Value.destination.x != 10f ||
+                defender.LastExecutedCommand.Value.destination.z != 10f ||
+                defender.PatrolPositions.Count != 0)
+            {
+                throw new InvalidOperationException("The default patrol mode no longer uses attack-move waypoint orders.");
+            }
+        }
+        finally
+        {
+            behaviour?.OnDestroyed();
+            ExistingControllers.Instance.Reset();
+            DefaultAiBehaviour.ResetRuntimeState();
+        }
+    }),
+    ("native patrol mode assigns capped routes only to idle defenders", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        IRogueCommandAiRuntimeBehaviour? behaviour = null;
+        try
+        {
+            UnityEngine.Time.time = 10f;
+            var targetBuilding = new EntityController
+            {
+                IsControlledByAi = true,
+                IsBuilding = true,
+                aiBaseIndex = 0,
+                CurrentCell = new UnityEngine.Vector2Int(10, 10),
+                Position = new UnityEngine.Vector3(10f, 0f, 10f),
+                UniqueEntityId = 900
+            };
+            ExistingControllers.Instance.AiBuildings().Add(targetBuilding);
+            for (int i = 1; i < 10; i++)
+            {
+                ExistingControllers.Instance.AiBuildings().Add(new EntityController
+                {
+                    IsControlledByAi = true,
+                    IsBuilding = true,
+                    aiBaseIndex = 0,
+                    CurrentCell = new UnityEngine.Vector2Int(10 + i, 10),
+                    Position = new UnityEngine.Vector3(10f + i, 0f, 10f),
+                    UniqueEntityId = 900 + i
+                });
+            }
+
+            var threat = new EntityController
+            {
+                IsControlledByPlayer = true,
+                IsUnit = true,
+                CanAttackAndIsAttackEnabled = true,
+                CurrentAttackTarget = targetBuilding,
+                CurrentCell = new UnityEngine.Vector2Int(10, 11),
+                Position = new UnityEngine.Vector3(30f, 0f, 40f),
+                UniqueEntityId = 930
+            };
+            ExistingControllers.Instance.PlayerUnits().Add(threat);
+
+            var idleA = new EntityController
+            {
+                IsControlledByAi = true,
+                IsUnit = true,
+                IsCombatUnit = true,
+                CanAttackAndIsAttackEnabled = true,
+                CanMoveAndMovementIsEnabled = true,
+                aiBaseIndex = 0,
+                CurrentPlayerCommandName = EntityCommand.Command.DoNothing,
+                CurrentCell = new UnityEngine.Vector2Int(9, 10),
+                UniqueEntityId = 920
+            };
+            var idleB = new EntityController
+            {
+                IsControlledByAi = true,
+                IsUnit = true,
+                IsCombatUnit = true,
+                CanAttackAndIsAttackEnabled = true,
+                CanMoveAndMovementIsEnabled = true,
+                aiBaseIndex = 0,
+                CurrentPlayerCommandName = EntityCommand.Command.DoNothing,
+                CurrentCell = new UnityEngine.Vector2Int(8, 10),
+                UniqueEntityId = 921
+            };
+            var idleC = new EntityController
+            {
+                IsControlledByAi = true,
+                IsUnit = true,
+                IsCombatUnit = true,
+                CanAttackAndIsAttackEnabled = true,
+                CanMoveAndMovementIsEnabled = true,
+                aiBaseIndex = 0,
+                CurrentPlayerCommandName = EntityCommand.Command.DoNothing,
+                CurrentCell = new UnityEngine.Vector2Int(13, 10),
+                UniqueEntityId = 923
+            };
+            var moving = new EntityController
+            {
+                IsControlledByAi = true,
+                IsUnit = true,
+                IsCombatUnit = true,
+                CanAttackAndIsAttackEnabled = true,
+                CanMoveAndMovementIsEnabled = true,
+                aiBaseIndex = 0,
+                CurrentPlayerCommandName = EntityCommand.Command.Move,
+                CurrentCell = new UnityEngine.Vector2Int(9, 11),
+                UniqueEntityId = 922
+            };
+            idleA.AddPatrolPosition(new UnityEngine.Vector3(-1f, 0f, -1f));
+            idleB.AddPatrolPosition(new UnityEngine.Vector3(-2f, 0f, -2f));
+            idleC.AddPatrolPosition(new UnityEngine.Vector3(-4f, 0f, -4f));
+            moving.AddPatrolPosition(new UnityEngine.Vector3(-3f, 0f, -3f));
+            ExistingControllers.Instance.AiUnits().Add(idleA);
+            ExistingControllers.Instance.AiUnits().Add(idleB);
+            ExistingControllers.Instance.AiUnits().Add(idleC);
+            ExistingControllers.Instance.AiUnits().Add(moving);
+
+            behaviour = new PatrolAndInterceptAiModule().CreateBehaviour(
+                new DefaultAiBehaviour { instanceId = 902 },
+                [
+                    new ContentModuleParameter { name = "patrolMode", value = "Native" },
+                    new ContentModuleParameter { name = "patrolRadiusCells", value = "32" },
+                    new ContentModuleParameter { name = "maxPatrolUnits", value = "2" }
+                ]);
+            behaviour.OnInitialized();
+            behaviour.Tick();
+
+            if (!idleA.LastExecutedCommand.HasValue ||
+                idleA.LastExecutedCommand.Value.command != EntityCommand.Command.AttackMoveOnPosition ||
+                idleA.LastExecutedCommand.Value.destination.x != threat.Position.x ||
+                idleA.LastExecutedCommand.Value.destination.z != threat.Position.z ||
+                !idleA.CurrentCommandIsTaggedWith(idleA.LastExecutedCommand.Value.tag) ||
+                idleA.ClearPatrolPositionsCallCount != 0 || idleA.PatrolPositions.Count != 1)
+            {
+                throw new InvalidOperationException("Native patrol mode changed the existing attack-move intercept behavior.");
+            }
+
+            EntityController[] remainingIdleDefenders = [idleB, idleC];
+            int nativePatrolDispatches = 0;
+            int untouchedIdleDefenders = 0;
+            foreach (EntityController defender in remainingIdleDefenders)
+            {
+                if (defender.LastExecutedCommand?.command == EntityCommand.Command.Patrol)
+                {
+                    nativePatrolDispatches++;
+                    if (defender.LastExecutedCommand.Value.intValue != 0 ||
+                        defender.LastCommandProcessingType != EntityController.CommandProcessingType.ExecuteBeforeCurrentCommand ||
+                        !defender.CurrentCommandIsTaggedWith(defender.LastExecutedCommand.Value.tag) ||
+                        defender.ClearPatrolPositionsCallCount != 1 || defender.PatrolPositions.Count != 8 ||
+                        defender.PatrolPositions[0].x != 10f || defender.PatrolPositions[7].x != 17f)
+                    {
+                        throw new InvalidOperationException("Native patrol did not install the bounded nearest route at index zero.");
+                    }
+                    continue;
+                }
+
+                if (defender.LastExecutedCommand.HasValue || defender.ClearPatrolPositionsCallCount != 0 ||
+                    defender.PatrolPositions.Count != 1)
+                {
+                    throw new InvalidOperationException("Native patrol changed an idle defender after reaching its shared dispatch cap.");
+                }
+                untouchedIdleDefenders++;
+            }
+
+            if (nativePatrolDispatches != 1 || untouchedIdleDefenders != 1 || moving.LastExecutedCommand.HasValue ||
+                moving.ClearPatrolPositionsCallCount != 0 || moving.PatrolPositions.Count != 1)
+            {
+                throw new InvalidOperationException("Native patrol exceeded its cap, used an invalid route, or changed a moving defender.");
+            }
+        }
+        finally
+        {
+            behaviour?.OnDestroyed();
+            ExistingControllers.Instance.Reset();
+            DefaultAiBehaviour.ResetRuntimeState();
+        }
+    }),
+    ("native patrol mode preserves a queued Move behind DoNothing", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        IRogueCommandAiRuntimeBehaviour? behaviour = null;
+        try
+        {
+            UnityEngine.Time.time = 10f;
+            var building = new EntityController
+            {
+                IsControlledByAi = true,
+                IsBuilding = true,
+                aiBaseIndex = 0,
+                CurrentCell = new UnityEngine.Vector2Int(10, 10),
+                Position = new UnityEngine.Vector3(10f, 0f, 10f),
+                UniqueEntityId = 900
+            };
+            ExistingControllers.Instance.AiBuildings().Add(building);
+
+            var defender = new EntityController
+            {
+                IsControlledByAi = true,
+                IsUnit = true,
+                IsCombatUnit = true,
+                CanAttackAndIsAttackEnabled = true,
+                CanMoveAndMovementIsEnabled = true,
+                aiBaseIndex = 0,
+                CurrentPlayerCommandName = EntityCommand.Command.DoNothing,
+                CurrentCell = new UnityEngine.Vector2Int(9, 10),
+                UniqueEntityId = 924
+            };
+            defender.CommandChainForTest.AddLast(new EntityCommand
+            {
+                command = EntityCommand.Command.Move,
+                destination = new UnityEngine.Vector3(20f, 0f, 20f)
+            });
+            defender.AddPatrolPosition(new UnityEngine.Vector3(-5f, 0f, -5f));
+            ExistingControllers.Instance.AiUnits().Add(defender);
+
+            behaviour = new PatrolAndInterceptAiModule().CreateBehaviour(
+                new DefaultAiBehaviour { instanceId = 903 },
+                [
+                    new ContentModuleParameter { name = "patrolMode", value = "Native" },
+                    new ContentModuleParameter { name = "patrolRadiusCells", value = "15" },
+                    new ContentModuleParameter { name = "maxPatrolUnits", value = "1" }
+                ]);
+            behaviour.OnInitialized();
+            behaviour.Tick();
+
+            LinkedListNode<EntityCommand>? firstQueuedCommand = defender.CommandChainForTest.First;
+            if (defender.LastExecutedCommand.HasValue || defender.ExecuteCommandCallCount != 0 ||
+                defender.ClearPatrolPositionsCallCount != 0 || defender.PatrolPositions.Count != 1 ||
+                defender.PatrolPositions[0].x != -5f || defender.CommandChainForTest.Count != 1 ||
+                firstQueuedCommand == null || firstQueuedCommand.Value.command != EntityCommand.Command.Move ||
+                firstQueuedCommand.Value.destination.x != 20f || firstQueuedCommand.Value.destination.z != 20f)
+            {
+                throw new InvalidOperationException("Native patrol superseded a queued Move behind a DoNothing current command.");
+            }
+        }
+        finally
+        {
+            behaviour?.OnDestroyed();
+            ExistingControllers.Instance.Reset();
+            DefaultAiBehaviour.ResetRuntimeState();
         }
     }),
     ("managed assemblies are rejected from content packs", () =>

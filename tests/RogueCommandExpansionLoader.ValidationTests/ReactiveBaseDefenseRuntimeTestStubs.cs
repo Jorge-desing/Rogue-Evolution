@@ -4,6 +4,7 @@ using UnityEngine;
 public sealed class EntityController
 {
     private readonly HashSet<UnitRole> _roles = new();
+    private readonly LinkedList<EntityCommand> _commandChain = new();
 
     public bool IsDestroyed { get; set; }
     public bool DestroyHasBeenStarted { get; set; }
@@ -33,8 +34,12 @@ public float CurrentHealth { get; set; } = 100f;
     public Vector3 Position { get; set; }
     public EntityController CurrentAttackTarget { get; set; }
     public EntityCommand.Command CurrentPlayerCommandName { get; set; }
+    public LinkedList<EntityCommand> CommandChainForTest { get { return _commandChain; } }
+    public List<Vector3> PatrolPositions { get; } = new();
+    public int ClearPatrolPositionsCallCount { get; private set; }
     public GameObject gameObject { get; set; } = new("test-entity");
-    public EntityCommand LastExecutedCommand { get; private set; }
+    public EntityCommand? LastExecutedCommand { get; private set; }
+    public int ExecuteCommandCallCount { get; private set; }
     public CommandProcessingType LastCommandProcessingType { get; private set; }
     public string CurrentCommandTag { get; private set; }
 
@@ -48,9 +53,20 @@ public float CurrentHealth { get; set; } = 100f;
     public bool CurrentCommandIsTaggedWith(string tag) =>
         tag != null && string.Equals(CurrentCommandTag, tag, System.StringComparison.Ordinal);
 
+    public void ClearPatrolPositions()
+    {
+        PatrolPositions.Clear();
+        ClearPatrolPositionsCallCount++;
+    }
+
+    public void AddPatrolPosition(Vector3 position) => PatrolPositions.Add(position);
+
+    public bool ArePatrolPositionsEmpty() => PatrolPositions.Count < 1;
+
     public void ExecuteCommand(EntityCommand command, CommandProcessingType processingType)
     {
         LastExecutedCommand = command;
+        ExecuteCommandCallCount++;
         LastCommandProcessingType = processingType;
         CurrentCommandTag = command.tag;
     }
@@ -95,28 +111,61 @@ public enum UnitRole : int
     All = -1
 }
 
-public sealed class EntityCommand
+public struct EntityCommand
 {
     public string tag;
-    public Vector3 position;
-    public string description;
+    public Vector3 destination;
+    public string intent;
     public Role role;
+    public Command command;
+    public int intValue;
 
     public enum Command
     {
-        DoNothing,
-        Move
+        DoNothing = 0,
+        Move = 1,
+        FollowTarget = 2,
+        Attack = 3,
+        AttackMoveOnTarget = 4,
+        AttackMoveOnPosition = 5,
+        ActiveSkillWithoutTarget = 6,
+        ActiveSkillOnTarget = 7,
+        ActiveSkillAtPosition = 8,
+        FollowPosition = 9,
+        PlaceBuilding = 10,
+        HoldPosition = 11,
+        AddAiTag = 12,
+        RemoveAllAiTags = 13,
+        RemoveAiTag = 14,
+        WaitUntilTimestamp = 15,
+        SetTempChangedOriginalMoveSpeed = 16,
+        ResetTempChangedOriginalMoveSpeed = 17,
+        GiveAiGroupId = 18,
+        Stop = 19,
+        Patrol = 20
     }
 
     public enum Role
     {
-        None
+        None = 0,
+        ThisCommandWantsPathToBeCleared = 1,
+        PathClearingCommand = 2,
+        GetUnstuckCommand = 3
     }
 
-    public static EntityCommand AttackMoveOnPosition(Vector3 position, Role role, string description)
+    public static EntityCommand AttackMoveOnPosition(Vector3 destination, Role role, string intent)
     {
-        return new EntityCommand { position = position, role = role, description = description };
+        return new EntityCommand
+        {
+            destination = destination,
+            role = role,
+            intent = intent,
+            command = Command.AttackMoveOnPosition
+        };
     }
+
+    public static EntityCommand Patrol(int patrolIndex) =>
+        new() { command = Command.Patrol, intValue = patrolIndex };
 }
 
 public sealed class ExistingControllers
