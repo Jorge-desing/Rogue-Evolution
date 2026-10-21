@@ -20,49 +20,228 @@ Use this skill when implementing an AI profile, adding a compiled module, or cha
 
 ## AI Behavior Patterns (enriched from game-ai and unity-navmesh)
 
+Source patterns: gamedev-skills/awesome-gamedev-agent-skills `unity-navmesh` and `game-ai` (Apache-2.0). Adapt to Rogue Command's Unity 6 / URP runtime and compiled `IRogueCommandAiModule` boundaries; keep decision, steering, and pathing decoupled.
+
+### Layering
+
+1. **Decide** what to do (FSM/BT/utility) -> intent (target position/action).
+2. **Path** how to route (engine NavMesh or bounded A*) -> waypoints.
+3. **Steer** how to move (NavMeshAgent or steering forces) -> motion.
+
+Keep modules bounded: timer-gated repaths, capped target counts, and fail-safe cleanup.
+
 ### Finite State Machine (FSM)
+
 - States: Idle, Patrol, Chase, Attack, Flee, Dead
 - Transitions triggered by: distance to target, health threshold, cooldown timers, line-of-sight
 - Implementation: enum-based state with switch in `Update()`, transition checks in `CheckTransitions()`
+- One state owns one behavior; keep transitions inside the state, not scattered `if state == ...`
 - Bound all timers and counters to prevent runaway loops
 
 ### Behavior Tree (BT)
-- Nodes: Selector (OR), Sequence (AND), Action, Condition, Decorator
-- Blackboard pattern: shared key-value store for cross-node communication
-- Hot-reload: serialize tree structure to JSON, reload at runtime
-- Use for complex AI that FSM cannot express cleanly (e.g., multi-priority defense)
+
+Node taxonomy and status model (`SUCCESS`, `FAILURE`, `RUNNING`):
+
+| Category | Node | Behavior |
+|---|---|---|
+| Composite | Sequence | Tick children left->right; return on first non-SUCCESS (logical AND) |
+| Composite | Selector (Fallback) | Tick children left->right; return on first non-FAILURE (logical OR) |
+| Composite | Parallel | Tick all children; succeed/fail on a policy (e.g. N must succeed) |
+| Decorator | Inverter | Swap SUCCESS<->FAILURE; pass RUNNING through |
+| Decorator | Repeat / RepeatUntilFail | Re-tick a child N times |
+| Decorator | Cooldown / Timeout | Gate or time-limit a child |
+| Leaf | Condition | Test world/blackboard -> SUCCESS/FAILURE (no side effects) |
+| Leaf | Action | Do something; return RUNNING until complete |
+
+Stateful composites must remember the running child index and resume there; naive composites restart from the first child every tick and break multi-frame actions.
+
+Blackboard pattern: shared key-value store on the agent for cross-node communication (`player`, `home`, `path`, `target`, timers). Conditions read it, actions write it; no node holds a hard reference to another. This lets the same `MoveTo` action serve chase, patrol, and flee subtrees.
+
+Hot-reload: serialize tree structure to JSON and reload at runtime when authoring tools support it.
+
+Use BT when many behaviors, priorities, interruption, reuse, or data-driven tuning are needed; use FSM for 2-5 clear states. Many games use an FSM for top-level mode (Idle/Combat/Dead) and a BT inside Combat.
+
+Leaf examples:
+
+```csharp
+// Condition leaf: pure test, no side effects.
+public sealed class CanSeePlayer : IBtNode
+{
+    public BtStatus Tick(AiContext ctx, float dt)
+        => ctx.Agent.CanSee(ctx.Blackboard.Player) ? BtStatus.Success : BtStatus.Failure;
+}
+
+// Action leaf: multi-frame, returns RUNNING until it arrives.
+public sealed class MoveTo : IBtNode
+{
+    private readonly string _key;
+    public MoveTo(string key) => _key = key;
+    public BtStatus Tick(AiContext ctx, float dt)
+    {
+        var dest = ctx.Blackboard.Get<Vector3?>(_key);
+        if (dest is null) return BtStatus.Failure;
+        ctx.Agent.MoveToward(dest.Value, dt);
+        return ctx.Agent.Position.DistanceTo(dest.Value) < 4.0f
+            ? BtStatus.Success : BtStatus.Running;
+    }
+}
+```
+
+Guard tree:
+
+```
+Selector
+├── Sequence            # attack branch (highest priority)
+│   ├── CanSeePlayer
+│   ├── MoveTo(player)
+│   └── Attack
+└── Patrol              # fallback when nothing else applies
+```
+
+Utility AI: score each candidate action with a utility function and pick the highest; use for nuanced trade-offs (heal vs attack vs flee by health/ammo/distance). Harder to debug than a tree.
 
 ### Steering Behaviors
-- Seek, Flee, Arrive, Pursue, Evade, Wander, Obstacle Avoidance
-- Combine with weighted blending for smooth movement
-- Rogue Command uses `EntityController` movement; steer toward target position
 
-### A* Pathfinding (Unity NavMesh)
-- NavMeshAgent for ground units; custom pathfinding for flying units
-- Obstacle avoidance via NavMeshObstacle components
-- Dynamic obstacles: destructible buildings update navmesh at runtime
-- Rogue Command stages use procedurally generated maps; ensure navmesh bakes after stage generation
+Seek, Flee, Arrive, Pursue, Evade, Wander, Obstacle Avoidance. Combine with weighted blending for smooth movement. Rogue Command uses `EntityController` movement; steer toward target position. Always scale motion by `dt`; arrive ramps speed down inside `slowRadius` to stop cleanly. Follow the next waypoint, not the final goal, so agents round corners.
 
-### Utility AI
-- Score-based action selection: each action has a utility function
-- Consider: distance, health, ammo, threat level, objective priority
-- Use for AI that needs to choose between multiple valid actions
+### A* Pathfinding (Unity NavMesh + custom)
+
+- NavMeshAgent for ground units; custom pathfinding for flying units.
+- Obstacle avoidance via NavMeshObstacle components.
+- Dynamic obstacles: destructible buildings update navmesh at runtime.
+- Rogue Command stages use procedurally generated maps; ensure navmesh bakes after stage generation.
+- Recompute on a timer or when the goal moves; cache the path; only the waypoint index advances. Never pathfind every frame.
+
+A* correctness (engine-neutral):
+
+- `f(n) = g(n) + h(n)`; priority queue ordered by smallest f; goal checked when popping, not pushing.
+- Relaxation: accept an edge only if `newCost < costSoFar[nxt]`.
+- Tie-breaker: monotonic counter alongside node so the heap never compares nodes.
+- Heuristic must be admissible (never overestimate true remaining cost) for optimal paths; match movement: Manhattan for 4-dir, octile for 8-dir, Euclidean for any-angle.
+- `h = 0` degenerates to Dijkstra. Weighted A* (overestimating h) is faster but non-optimal; use deliberately.
+
+Grid adapter sketch:
+
+```csharp
+public sealed class GridGraph
+{
+    private readonly HashSet<(int,int)> _walls;
+    private readonly int _w, _h;
+    public bool InBounds((int,int) p) => p.Item1 >= 0 && p.Item1 < _w && p.Item2 >= 0 && p.Item2 < _h;
+    public bool Passable((int,int) p) => !_walls.Contains(p);
+    public IEnumerable<(int,int)> Neighbors((int,int) p)
+    {
+        var (x,y) = p;
+        var c = new[] { (x+1,y),(x-1,y),(x,y+1),(x,y-1) }; // add diagonals for octile
+        foreach (var n in c) if (InBounds(n) && Passable(n)) yield return n;
+    }
+    public float Cost((int,int) a, (int,int) b) => 1.0f; // terrain weight for varied cost
+}
+```
+
+Performance: shrink graph first (merge open areas, waypoint graphs), cap pathfinding work per frame (budget N searches, queue rest), flow field (one Dijkstra from goal) for many agents to one goal.
+
+Prefer engine navmesh for 3D arbitrary geometry, dynamic obstacle avoidance, agent radius/height; use A* directly for discrete grid/graph or full cost control.
+
+### Unity NavMesh API Patterns
+
+Version note: Unity 6 baking is component-based via AI Navigation package (`com.unity.ai.navigation`); old Navigation window is gone. Runtime `NavMeshAgent`/`NavMesh` API stays in `UnityEngine.AI`.
+
+Core workflow:
+
+1. Install AI Navigation package.
+2. Bake: add `NavMeshSurface` to static level geometry, set agent type/area, click Bake. Re-bake when geometry/modifiers/settings change.
+3. Add `NavMeshAgent` to each moving NPC; radius/height/speed must match baked agent type; spawn on baked mesh.
+4. Drive with `SetDestination(targetPos)`; agent steers and avoids other agents. Detect arrival via `remainingDistance`/`pathPending`.
+5. Dynamic blockers via `NavMeshObstacle` (carving).
+6. Verify with AI Navigation overlay and `NavMeshPath.status`.
+
+Chase/seek:
+
+```csharp
+using UnityEngine;
+using UnityEngine.AI;
+
+[RequireComponent(typeof(NavMeshAgent))]
+public sealed class Chaser : MonoBehaviour
+{
+    [SerializeField] private Transform target;
+    private NavMeshAgent _agent;
+    private void Awake() => _agent = GetComponent<NavMeshAgent>();
+    private void Update()
+    {
+        if (target) _agent.SetDestination(target.position); // re-path toward target
+    }
+    private bool HasArrived() =>
+        !_agent.pathPending && _agent.remainingDistance <= _agent.stoppingDistance;
+}
+```
+
+Reachability check:
+
+```csharp
+using UnityEngine.AI;
+public bool CanReach(NavMeshAgent agent, Vector3 destination)
+{
+    var path = new NavMeshPath();
+    agent.CalculatePath(destination, path);
+    return path.status == NavMeshPathStatus.PathComplete; // vs Partial / Invalid
+}
+```
+
+Runtime bake (procedural/streamed levels):
+
+```csharp
+using Unity.AI.Navigation;
+[SerializeField] private NavMeshSurface surface;
+public void RebuildNav() => surface.BuildNavMesh(); // after spawning level geometry
+```
+
+Snap agent to mesh if not on it: `NavMesh.SamplePosition`.
+
+Dynamic obstacle (carving): add `NavMeshObstacle` with `carving = true` to door/crate; while present it cuts a hole so agents route around; remove/disable to reopen path without re-bake.
+
+Bridge separate mesh islands with `NavMeshLink` (`Unity.AI.Navigation`): assign Start/End Transforms, Width (0 = point-to-point), toggle Bidirectional. Replaces deprecated built-in `OffMeshLink`.
+
+Pitfalls:
+
+- Agent not on baked mesh / no surface baked -> warps to origin; bake and spawn on mesh.
+- Runtime-spawned obstacles need `NavMeshObstacle` carving or `surface.BuildNavMesh()` re-bake.
+- `SetDestination` every frame is wasteful; re-path on timer (e.g. 0.2s).
+- Agent radius/height mismatch with baked agent type -> stuck/float.
+- Agents jitter -> tune `avoidancePriority`/quality, or use obstacle for static blockers.
+- `CalculatePath` returns `PathPartial` when destination is on a different baked island; bridge with `NavMeshLink` or extend geometry.
+- `OffMeshLink` deprecated in AI Navigation 2.0; use `NavMeshLink`.
+
+### Obstacle Avoidance (dynamic navmesh updates for destructible buildings)
+
+- Static blockers: `NavMeshObstacle` with carving for doors/crates.
+- Destructible buildings in Rogue Command: when a building is destroyed, either remove/disable its `NavMeshObstacle` (reopen path) or re-bake affected `NavMeshSurface` via `BuildNavMesh()` if geometry changes.
+- For dynamic runtime geometry changes, prefer carving obstacles for discrete objects; full re-bake for structural changes.
+- Ensure navmesh bakes after procedural stage generation before spawning AI agents.
+- Add stuck/timeout checks: if an agent fails to progress, force repath or state change.
 
 ### Rogue Command AI Module Pattern
-- Modules implement `IRogueCommandAiModule` with `Initialize`, `Update`, `Destroy` callbacks
-- String-pair parameters bound at load time
-- Fail-safe: disable module on exception, cleanup in reverse order
-- Static evidence only: in-game runtime proof required for acceptance
+
+- Modules implement `IRogueCommandAiModule` with `Initialize`, `Update`, `Destroy` callbacks.
+- String-pair parameters bound at load time; reject unknown/duplicate/out-of-range.
+- Fail-safe: disable module on exception, cleanup in reverse order.
+- Bound time, attempts, target count, and repeated work.
+- Static evidence only: in-game runtime proof required for acceptance.
 
 ### Integration with Existing AI Authoring
-- `AiBase.entitiesInAiDeck` includes mobile units and buildings
-- `unitEntries` on native profiles establish cross-pack load order
-- `countAtStart` controls starting units; `maxLiving` bounds native deck field
-- Stage-scoped native AI uses isolated `RCL_` alias and contiguous stage range
+
+- `AiBase.entitiesInAiDeck` includes mobile units and buildings.
+- `unitEntries` on native profiles establish cross-pack load order.
+- `countAtStart` controls starting units; `maxLiving` bounds native deck field.
+- Stage-scoped native AI uses isolated `RCL_` alias and contiguous stage range.
 
 ### References
-- gamedev-skills game-ai: FSM/BT/steering/pathfinding (Apache-2.0)
+
+- gamedev-skills game-ai: FSM/BT/steering/A* (Apache-2.0)
+- gamedev-skills unity-navmesh: Unity 6 NavMesh API (Apache-2.0)
 - Unity NavMesh documentation: https://docs.unity3d.com/Manual/nav-NavigationSystem.html
+- AI Navigation package manual: https://docs.unity3d.com/Packages/com.unity.ai.navigation@2.0/manual/index.html
 - Rogue Command AI module contract: `src/RogueCommandExpansionLoader/Ai/IRogueCommandAiModule.cs`
 
 ## Be precise about behavior
