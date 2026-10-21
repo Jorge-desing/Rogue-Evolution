@@ -23,7 +23,7 @@ Reverse engineering of Rogue Command 1.0.9 (e.g. `GatlingWalker` in `resources.a
    - Single Armature with standardized bone names (`Bone_Root`, `Bone_Pelvis`, `Bone_Thigh_*`, `Bone_Shin_*`, `Bone_Foot_*`).
    - Rigid vertex weighting ($1.0$ weight per mechanical armor plate) preventing rubbery mesh deformation.
    - Four baked in-place NLA Actions (`Action_Idle`, `Action_Walk`, `Action_FireRecoil`, `Action_Death`).
-   - Driven autonomously at runtime by [`RuntimeVisualDirector`](file:///c:/Users/Alex/Documents/Mod%20Rogue%20Command/src/RogueCommandExpansionLoader/Runtime/Visual/RuntimeVisualDirector.cs) via parameters `RCL_IsMoving`, `RCL_Fire`, and `RCL_Death`.
+   - Driven autonomously at runtime by [`RuntimeVisualDirector`](../../../src/RogueCommandExpansionLoader/Runtime/Visual/RuntimeVisualDirector.cs) via parameters `RCL_IsMoving`, `RCL_Fire`, and `RCL_Death`.
 
 ---
 

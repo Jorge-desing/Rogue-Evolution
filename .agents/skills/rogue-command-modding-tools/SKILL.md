@@ -95,6 +95,6 @@ um render3d model.glb out/ --views 16 --size 256 --ortho --transparent --aa 4
 ## References
 - `references/skill-search-and-adoption.md` — search, evaluate, and adopt external skills.
 - Universal modder skills (7 remaining: asset-pipeline, fal-assets, game-automation, mashup-mods, reverse-engineering, share-field-notes, showcase-video) — general reverse engineering patterns
-- Rogue Command reverse engineering: [rogue-command-reverse-engineering/SKILL.md](rogue-command-reverse-engineering/SKILL.md)
-- Rogue Command project continuity: [rogue-command-project-continuity/SKILL.md](rogue-command-project-continuity/SKILL.md)
+- Rogue Command reverse engineering: [rogue-command-reverse-engineering/SKILL.md](../rogue-command-reverse-engineering/SKILL.md)
+- Rogue Command project continuity (Hermes skill: software-development/rogue-command-project-continuity)
 - Content authoring tools: docs/research/CONTENT-AUTHORING-TOOLS.md

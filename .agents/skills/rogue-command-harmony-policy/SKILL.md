@@ -7,7 +7,7 @@ author: Hermes Agent
 metadata:
   hermes:
     tags: [Rogue Command, Unity, Mono, BepInEx, Harmony, IL2CPP, patching, SHA256, MVID, assembly verification]
-    related_skills: [rogue-command-reverse-engineering, rogue-command-game-research, rogue-command-steam-runtime-validation, rogue-command-pack-validation, rogue-command-unity-authoring]
+    related_skills: [rogue-command-reverse-engineering, rogue-command-game-research, rogue-command-steam-runtime-validation, rogue-command-pack-validation, rogue-command-unit-authoring]
 ---
 
 # Rogue Command Harmony Policy
