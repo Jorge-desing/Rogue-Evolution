@@ -93,7 +93,8 @@ um render3d model.glb out/ --views 16 --size 256 --ortho --transparent --aa 4
 - Never promote one evidence tier to another
 
 ## References
-- Universal modder skills: `C:\Users\Alex\AppData\Local\hermes\skills\universal-modder\`
-- Rogue Command reverse engineering: `.agents/skills/rogue-command-reverse-engineering/SKILL.md`
-- Rogue Command project continuity: `.agents/skills/rogue-command-project-continuity/SKILL.md`
-- Content authoring tools: `docs/research/CONTENT-AUTHORING-TOOLS.md`
+- Universal modder skills (7 remaining): asset-pipeline, fal-assets, game-automation, mashup-mods, reverse-engineering, share-field-notes, showcase-video — installed in C:\Users\Alex\AppData\Local\hermes\skills\universal-modder\
+- Removed skills (not applicable): game-recon, mod-any-game, port-a-mod, game-research-websearch, publish-mod
+- Rogue Command reverse engineering: .agents/skills/rogue-command-reverse-engineering/SKILL.md
+- Rogue Command project continuity: .agents/skills/rogue-command-project-continuity/SKILL.md
+- Content authoring tools: docs/research/CONTENT-AUTHORING-TOOLS.md
