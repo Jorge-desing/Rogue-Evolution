@@ -1861,6 +1861,45 @@ var tests = new (string Name, Action Run)[]
                 "A pool-only custom product must grant only its factory blueprint eligibility.");
         }
     }),
+    ("named stage pools use only their listed products while unlisted pools stay stage-wide", () =>
+    {
+        ContentStagePoolEntryDefinition[] entries =
+        [
+            new ContentStagePoolEntryDefinition
+            {
+                poolId = "pool-a",
+                unitIds = ["sample:pool-a-product", "native:pool-a-unit"]
+            },
+            new ContentStagePoolEntryDefinition
+            {
+                poolId = "pool-b",
+                unitIds = ["sample:pool-b-product"]
+            }
+        ];
+        Dictionary<string, HashSet<string>> unitsByPool =
+            StageBlueprintPoolFactoryIds.CollectByPool(
+                new[] { "sample:stage-factory" },
+                new[] { "pool-a", "pool-b", "pool-c" },
+                entries,
+                unitId => unitId switch
+                {
+                    "sample:pool-a-product" => "sample:pool-a-factory",
+                    "sample:pool-b-product" => "sample:pool-b-factory",
+                    _ => null
+                });
+
+        if (!unitsByPool["pool-a"].SetEquals(
+                new[] { "sample:pool-a-factory", "native:pool-a-unit" }) ||
+            !unitsByPool["pool-b"].SetEquals(new[] { "sample:pool-b-factory" }) ||
+            !unitsByPool["pool-c"].SetEquals(new[] { "sample:stage-factory" }))
+        {
+            throw new InvalidOperationException(
+                "Named pools must contain only their explicit products, while unlisted pools retain stage-wide " +
+                "products: pool-a=[" + String.Join(",", unitsByPool["pool-a"]) + "], " +
+                "pool-b=[" + String.Join(",", unitsByPool["pool-b"]) + "], " +
+                "pool-c=[" + String.Join(",", unitsByPool["pool-c"]) + "].");
+        }
+    }),
     ("stage pool entries deep clone their unit ID arrays", () =>
     {
         ContentPackDefinition source = Clone(nativeSample);
@@ -1873,6 +1912,62 @@ var tests = new (string Name, Action Run)[]
         clone.stages[0].blueprintPoolEntries[0].unitIds[0] = "changed:unit";
         if (source.stages[0].blueprintPoolEntries[0].unitIds[0] != "sample-native:atlas-crane-mech")
             throw new InvalidOperationException("Stage pool override unit IDs shared mutable state.");
+    }),
+    ("sample-native-expansion stage factory IDs are collected through the new loader helpers", () =>
+    {
+        ContentStageDefinition stage = nativeSample.stages.Single(
+            candidate => candidate.id == "sample-native:training-variant");
+
+        Dictionary<string, string> factoryMap = nativeSample.units
+            .Where(unit => unit.productionBuilding != null)
+            .ToDictionary(unit => unit.id, unit => unit.productionBuilding.id, StringComparer.Ordinal);
+
+        HashSet<string> factoryIds = StageBlueprintFactoryIds.CollectLoaderFactoryIds(
+            stage, productId => factoryMap.TryGetValue(productId, out string factoryId) ? factoryId : null);
+
+        if (factoryIds.Count != 4 ||
+            !factoryIds.SetEquals(new[]
+            {
+                "sample-native:scout-tank-factory",
+                "sample-native:skirmish-bike-factory",
+                "sample-native:arachnid-hexapod-factory",
+                "sample-native:overlord-command-hq-factory"
+            }))
+        {
+            throw new InvalidOperationException(
+                "Expected 4 loader factory IDs for sample-native:training-variant, got: " +
+                String.Join(",", factoryIds));
+        }
+
+        string[] availablePoolIds =
+        [
+            "BP_CheaperVehicles",
+            "BP_CheaperRobos",
+            "BP_CheaperMechs",
+            "BP_CheaperTanks"
+        ];
+
+        Dictionary<string, HashSet<string>> idsByPool = StageBlueprintPoolFactoryIds.CollectByPool(
+            factoryIds,
+            availablePoolIds,
+            stage.blueprintPoolEntries,
+            productId => factoryMap.TryGetValue(productId, out string factoryId) ? factoryId : null);
+
+        if (!idsByPool["BP_CheaperVehicles"].SetEquals(new[]
+                { "sample-native:scout-tank-factory", "sample-native:skirmish-bike-factory" }) ||
+            !idsByPool["BP_CheaperRobos"].SetEquals(new[]
+                { "sample-native:arachnid-hexapod-factory", "sample-native:overlord-command-hq-factory" }) ||
+            !idsByPool["BP_CheaperMechs"].SetEquals(new[]
+                { "sample-native:arachnid-hexapod-factory", "sample-native:overlord-command-hq-factory" }) ||
+            !idsByPool["BP_CheaperTanks"].SetEquals(factoryIds))
+        {
+            throw new InvalidOperationException(
+                "Pool factory IDs did not match expected values: " +
+                "BP_CheaperVehicles=[" + String.Join(",", idsByPool["BP_CheaperVehicles"]) + "], " +
+                "BP_CheaperRobos=[" + String.Join(",", idsByPool["BP_CheaperRobos"]) + "], " +
+                "BP_CheaperMechs=[" + String.Join(",", idsByPool["BP_CheaperMechs"]) + "], " +
+                "BP_CheaperTanks=[" + String.Join(",", idsByPool["BP_CheaperTanks"]) + "].");
+        }
     }),
     ("stage landscape rejects unsafe size, seed, and localization values", () =>
     {
@@ -1995,7 +2090,11 @@ var tests = new (string Name, Action Run)[]
 
             foreach (string stat in requiredCardStats)
             {
-                if (unit.balanceOverrides == null || !unit.balanceOverrides.Any(entry => entry.name == stat))
+                bool hasRawBalance = unit.balanceOverrides != null &&
+                    unit.balanceOverrides.Any(entry => entry.name == stat);
+                bool hasCustomDamage = stat == "damage1" && unit.customBalance != null &&
+                    unit.customBalance.ContainsKey("Damage1");
+                if (!hasRawBalance && !hasCustomDamage)
                 {
                     throw new InvalidOperationException($"Card {unit.id} is missing its explicit {stat} value.");
                 }

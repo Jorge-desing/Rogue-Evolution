@@ -414,10 +414,6 @@
           "value": "12.0"
         },
         {
-          "name": "damage1",
-          "value": "4"
-        },
-        {
           "name": "attackCooldown",
           "value": "0.4"
         },
@@ -598,10 +594,6 @@
         {
           "name": "moveSpeed",
           "value": "12.0"
-        },
-        {
-          "name": "damage1",
-          "value": "4"
         },
         {
           "name": "attackCooldown",

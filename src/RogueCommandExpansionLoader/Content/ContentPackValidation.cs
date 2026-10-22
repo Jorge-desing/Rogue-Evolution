@@ -365,7 +365,7 @@ namespace RogueCommandExpansionLoader.Content
                 }
 
                 ValidateUnitLocalizations(unit, itemPath + ".localizations", hasNativeTemplate, diagnostics);
-                ValidateBalanceOverrides(unit.balanceOverrides, itemPath + ".balanceOverrides", "unit", "unit", diagnostics, false);
+                ValidateUnitBalanceOverrides(unit, itemPath + ".balanceOverrides", diagnostics);
                 ValidateUnitCustomBalance(unit.customBalance, itemPath + ".customBalance", diagnostics);
                 ValidateAbilities(unit.abilities, itemPath + ".abilities", diagnostics);
                 ValidateAiOverrides(unit.aiOverrides, itemPath + ".aiOverrides", diagnostics);
@@ -1361,6 +1361,58 @@ namespace RogueCommandExpansionLoader.Content
                 if (!TryValidateBalanceOverrideValue(balanceOverride.name, balanceOverride.value, ownerLabel, isFactoryRow))
                 {
                     Add(diagnostics, codePrefix + ".balance-override-invalid", itemPath,
+                        "The override must target an allowlisted balance field and contain a valid invariant-culture value.");
+                }
+            }
+        }
+
+        private static void ValidateUnitBalanceOverrides(
+            ContentUnitDefinition unit,
+            string path,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (unit == null || unit.balanceOverrides == null)
+            {
+                return;
+            }
+
+            var parameterMap = UnitBalanceOverrideMapper.CreateBalanceParameterMap();
+            var names = new HashSet<string>(StringComparer.Ordinal);
+            for (int i = 0; i < unit.balanceOverrides.Length; i++)
+            {
+                ContentBalanceOverride balanceOverride = unit.balanceOverrides[i];
+                string itemPath = path + "[" + i + "]";
+                if (balanceOverride == null)
+                {
+                    Add(diagnostics, "entry.null", itemPath,
+                        "Balance override entries for a unit cannot be null.");
+                    continue;
+                }
+
+                if (String.IsNullOrWhiteSpace(balanceOverride.name) ||
+                    !names.Add(balanceOverride.name))
+                {
+                    Add(diagnostics, "unit.balance-override-name-invalid", itemPath + ".name",
+                        "Balance override names must be non-empty and unique within the unit.");
+                }
+
+                if (unit.customBalance != null)
+                {
+                    foreach (var parameter in parameterMap)
+                    {
+                        if (String.Equals(parameter.Value.RowFieldName, balanceOverride.name, StringComparison.Ordinal) &&
+                            unit.customBalance.ContainsKey(parameter.Key))
+                        {
+                            Add(diagnostics, "unit.balance-override-redundant-with-custom", itemPath,
+                                "This balance override is redundant because customBalance already defines the same parameter.");
+                            break;
+                        }
+                    }
+                }
+
+                if (!TryValidateBalanceOverrideValue(balanceOverride.name, balanceOverride.value, "unit", false))
+                {
+                    Add(diagnostics, "unit.balance-override-invalid", itemPath,
                         "The override must target an allowlisted balance field and contain a valid invariant-culture value.");
                 }
             }
