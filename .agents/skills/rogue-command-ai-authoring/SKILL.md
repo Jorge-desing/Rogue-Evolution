@@ -229,6 +229,24 @@ Pitfalls:
 - Bound time, attempts, target count, and repeated work.
 - Static evidence only: in-game runtime proof required for acceptance.
 
+### Implementation checklist for a new compiled module
+
+1. Create `Modules/<Name>Parameters.cs` with a parser that rejects unknown, duplicate, and out-of-range values, plus documented defaults.
+2. Write parser tests in `tests/RogueCommandExpansionLoader.ValidationTests/Program.cs` before implementing the parser; expect the RED failure, then make them GREEN.
+3. Create `Modules/<Name>AiModule.cs` implementing `IRogueCommandAiModule`; keep the runtime behaviour private and timer-gated.
+4. Add `<Compile Include=\"...\">` entries for both new source files in `RogueCommandExpansionLoader.ValidationTests.csproj`; otherwise the offline harness will not see the module.
+5. Register the module in `RogueCommandExpansionPlugin.Awake()` before content packs load.
+6. Document the module and its parameter bounds in `content/schema/README.md`.
+7. Re-run the full validation harness and a Release build before committing.
+
+Pitfalls:
+
+- The validation harness compiles source files through explicit `Compile` links; a new module that builds in the plugin but is absent from the test project's links will leave parser tests unable to compile.
+- Command dispatch must be guarded by null checks and wrapped in try/catch; a single native call failure must not abort the whole module tick.
+- Tag every issued command and skip units already tagged with the same tag; otherwise a timer-gated scan can repeatedly stack orders on the same units.
+- Use `ExistingControllers` as the source of truth for AI units, harvesters, and player units; do not cache entity lists across ticks.
+- Keep scan intervals and target counts bounded and fail closed on missing native fields or incompatible types.
+
 ### Integration with Existing AI Authoring
 
 - `AiBase.entitiesInAiDeck` includes mobile units and buildings.
