@@ -85,6 +85,10 @@
                  Link="Modules/PatrolAndInterceptParameters.cs" />
         <Compile Include="../../src/RogueCommandExpansionLoader/Modules/PatrolAndInterceptAiModule.cs"
                  Link="Modules/PatrolAndInterceptAiModule.cs" />
+        <Compile Include="../../src/RogueCommandExpansionLoader/Modules/HarvesterEscortParameters.cs"
+                 Link="Modules/HarvesterEscortParameters.cs" />
+        <Compile Include="../../src/RogueCommandExpansionLoader/Modules/HarvesterEscortAiModule.cs"
+                 Link="Modules/HarvesterEscortAiModule.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Contracts/IRogueCommandAiModule.cs"
              Link="Contracts/IRogueCommandAiModule.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Modules/AiModuleRegistry.cs"

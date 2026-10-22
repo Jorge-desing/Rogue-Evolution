@@ -3,6 +3,7 @@ using System.Collections;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using RogueCommandExpansionLoader.Compatibility;
 using RogueCommandExpansionLoader.Content;
 using RogueCommandExpansionLoader.Contracts;
@@ -193,6 +194,30 @@ var tests = new (string Name, Action Run)[]
                 throw new InvalidOperationException("customBalance schema must use the native Single bound for " +
                     parameter.Key + ".");
             }
+        }
+    }),
+    ("balanceOverrides schema caps integer values at the native Single boundary", () =>
+    {
+        using JsonDocument schemaDocument = JsonDocument.Parse(File.ReadAllText(
+            Path.Combine(repositoryRoot, "content", "schema", "content.schema.json")));
+        JsonElement balanceOverride = schemaDocument.RootElement.GetProperty("$defs")
+            .GetProperty("balanceOverride");
+        JsonElement integerRule = balanceOverride.GetProperty("allOf").EnumerateArray()
+            .First(rule =>
+            {
+                JsonElement conditionName = rule.GetProperty("if").GetProperty("properties")
+                    .GetProperty("name");
+                return conditionName.TryGetProperty("enum", out JsonElement names) &&
+                    names.EnumerateArray().Any(name => name.GetString() == "maxHealth");
+            });
+        string pattern = integerRule.GetProperty("then").GetProperty("properties")
+            .GetProperty("value").GetProperty("pattern").GetString()!;
+
+        if (!Regex.IsMatch("0", pattern) || !Regex.IsMatch("16777216", pattern) ||
+            Regex.IsMatch("16777217", pattern))
+        {
+            throw new InvalidOperationException(
+                "Integer balanceOverrides must accept the 2^24 boundary and reject larger values in the schema.");
         }
     }),
     ("visual socket discovery accepts canonical IDs and exact legacy suffixes only", () =>
@@ -1812,6 +1837,29 @@ var tests = new (string Name, Action Run)[]
         }];
         WithPackage(invalid, (pack, root) => ExpectDiagnostic(pack, root,
             new SnapshotWithUnits(Array.Empty<string>()), new KnownModuleValidator(), "reference.unit-unresolved"));
+    }),
+    ("stage pool entries include their products' factories without stage unitIds", () =>
+    {
+        var stage = new ContentStageDefinition
+        {
+            unitIds = Array.Empty<string>(),
+            blueprintPoolEntries =
+            [
+                new ContentStagePoolEntryDefinition
+                {
+                    poolId = "BP_CheaperTanks",
+                    unitIds = ["sample:scout-tank", "native:NativeTank"]
+                }
+            ]
+        };
+        HashSet<string> factoryIds = StageBlueprintFactoryIds.CollectLoaderFactoryIds(stage,
+            unitId => unitId == "sample:scout-tank" ? "sample:scout-tank-factory" : null);
+
+        if (!factoryIds.SetEquals(new[] { "sample:scout-tank-factory" }))
+        {
+            throw new InvalidOperationException(
+                "A pool-only custom product must grant only its factory blueprint eligibility.");
+        }
     }),
     ("stage pool entries deep clone their unit ID arrays", () =>
     {
@@ -5361,6 +5409,67 @@ var tests = new (string Name, Action Run)[]
             {
                 throw new InvalidOperationException("The retreat-and-regroup AI parser accepted invalid input " + i + ".");
             }
+        }
+    }),
+    ("harvester-escort AI parser supplies bounded defaults", () =>
+    {
+        if (!HarvesterEscortParameterParser.TryParse(null, out HarvesterEscortSettings defaults,
+            out string diagnostic) || diagnostic != null || defaults.BaseIndex != 0 ||
+            defaults.EscortRadiusCells != 8 || defaults.ScanIntervalSeconds != 5f ||
+            defaults.MaxEscorts != 3 || !defaults.EngageAttackers)
+        {
+            throw new InvalidOperationException("The harvester-escort AI parser did not return its documented defaults.");
+        }
+
+        ContentModuleParameter[] boundaryValues =
+        [
+            new ContentModuleParameter { name = "baseIndex", value = "31" },
+            new ContentModuleParameter { name = "escortRadiusCells", value = "64" },
+            new ContentModuleParameter { name = "scanIntervalSeconds", value = "60" },
+            new ContentModuleParameter { name = "maxEscorts", value = "16" },
+            new ContentModuleParameter { name = "engageAttackers", value = "false" }
+        ];
+        if (!HarvesterEscortParameterParser.TryParse(boundaryValues, out HarvesterEscortSettings maximums,
+            out diagnostic) || maximums.BaseIndex != 31 || maximums.EscortRadiusCells != 64 ||
+            maximums.ScanIntervalSeconds != 60f || maximums.MaxEscorts != 16 || maximums.EngageAttackers)
+        {
+            throw new InvalidOperationException("The harvester-escort AI parser rejected valid upper-bound values.");
+        }
+    }),
+    ("harvester-escort AI parser rejects invalid and duplicate parameters", () =>
+    {
+        string[] invalidInputs =
+        [
+            "baseIndex=32",
+            "escortRadiusCells=0",
+            "scanIntervalSeconds=0",
+            "maxEscorts=0",
+            "engageAttackers=maybe",
+            "unknown=value"
+        ];
+
+        for (int i = 0; i < invalidInputs.Length; i++)
+        {
+            string[] parts = invalidInputs[i].Split('=');
+            ContentModuleParameter[] parameters =
+            [
+                new ContentModuleParameter { name = parts[0], value = parts[1] }
+            ];
+
+            if (HarvesterEscortParameterParser.TryParse(parameters, out _, out _))
+            {
+                throw new InvalidOperationException("The harvester-escort AI parser accepted invalid input " + i + ".");
+            }
+        }
+
+        ContentModuleParameter[] duplicate =
+        [
+            new ContentModuleParameter { name = "baseIndex", value = "0" },
+            new ContentModuleParameter { name = "baseIndex", value = "1" }
+        ];
+        if (HarvesterEscortParameterParser.TryParse(duplicate, out _, out _))
+        {
+            throw new InvalidOperationException("The harvester-escort AI parser accepted a duplicate parameter.");
         }
     }),
     ("patrol-and-intercept AI parser applies documented defaults and accepts upper bounds", () =>
