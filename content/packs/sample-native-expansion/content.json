@@ -1783,14 +1783,6 @@
       ],
       "blueprintPoolEntries": [
         {
-          "poolId": "BP_CheaperTanks",
-          "unitIds": [
-            "sample-native:scout-tank",
-            "sample-native:heavy-artillery",
-            "sample-native:surge-tank"
-          ]
-        },
-        {
           "poolId": "BP_CheaperRobos",
           "unitIds": [
             "sample-native:assault-walker",
@@ -1864,14 +1856,6 @@
         "sample-native:surge-tank"
       ],
       "blueprintPoolEntries": [
-        {
-          "poolId": "BP_CheaperTanks",
-          "unitIds": [
-            "sample-native:scout-tank",
-            "sample-native:heavy-artillery",
-            "sample-native:surge-tank"
-          ]
-        },
         {
           "poolId": "BP_CheaperRobos",
           "unitIds": [
