@@ -395,6 +395,8 @@ namespace RogueCommandExpansionLoader.Content
                 ValidateProfileCardEligibility(unit, itemPath, diagnostics);
             }
 
+            ValidateUnitProductionBuildingIdsUnique(units, "units", diagnostics);
+
             for (int i = 0; i < aiProfiles.Length; i++)
             {
                 var profile = aiProfiles[i];
@@ -479,6 +481,8 @@ namespace RogueCommandExpansionLoader.Content
 
                     resourceName = profile.prefabAssetName;
                 }
+
+                ValidateAiProfileStageRangeContiguity(profile, itemPath, stages, diagnostics);
 
                 if (!String.IsNullOrWhiteSpace(resourceName) && !aiResourceNames.Add(resourceName))
                 {
@@ -706,6 +710,8 @@ namespace RogueCommandExpansionLoader.Content
                 ValidateStagePoolEntries(stage.blueprintPoolEntries,
                     itemPath + ".blueprintPoolEntries", unitIds, registrySnapshot, diagnostics);
 
+                ValidateStageBlueprintPoolEntriesUnique(stage, itemPath, diagnostics);
+
                 var stageAiProfiles = RequireArray(stage.aiProfileIds, itemPath + ".aiProfileIds", diagnostics);
                 ValidateReferences(stageAiProfiles, itemPath + ".aiProfileIds", aiProfileIds, registrySnapshot, false, diagnostics);
             }
@@ -799,6 +805,43 @@ namespace RogueCommandExpansionLoader.Content
 
                 Add(diagnostics, "reference.unit-unresolved", path + "[" + i + "]",
                     "Unit ID '" + id + "' is neither declared by this pack nor registered by the game.");
+            }
+        }
+
+        internal static void ValidateStageBlueprintPoolEntriesUnique(
+            ContentStageDefinition stage,
+            string path,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (stage == null || stage.blueprintPoolEntries == null)
+            {
+                return;
+            }
+
+            for (int i = 0; i < stage.blueprintPoolEntries.Length; i++)
+            {
+                ContentStagePoolEntryDefinition entry = stage.blueprintPoolEntries[i];
+                if (entry == null || entry.unitIds == null)
+                {
+                    continue;
+                }
+
+                var seen = new HashSet<string>(StringComparer.Ordinal);
+                for (int j = 0; j < entry.unitIds.Length; j++)
+                {
+                    string unitId = entry.unitIds[j];
+                    if (String.IsNullOrWhiteSpace(unitId))
+                    {
+                        continue;
+                    }
+
+                    if (!seen.Add(unitId))
+                    {
+                        Add(diagnostics, "stage.blueprint-pool-unit-id-duplicate",
+                            path + "[" + i + "].unitIds[" + j + "]",
+                            "A stage pool entry must not repeat the same unit ID.");
+                    }
+                }
             }
         }
 
@@ -1160,6 +1203,42 @@ namespace RogueCommandExpansionLoader.Content
                 Add(diagnostics, "unit.card-rarity-mismatch",
                     path + ".productionBuilding.balanceOverrides.rarity",
                     "The production building and its unit must use the same card rarity.");
+            }
+        }
+
+        internal static void ValidateUnitProductionBuildingIdsUnique(
+            ContentUnitDefinition[] units,
+            string path,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (units == null)
+            {
+                return;
+            }
+
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            for (int i = 0; i < units.Length; i++)
+            {
+                ContentUnitDefinition unit = units[i];
+                if (unit == null)
+                {
+                    continue;
+                }
+
+                string factoryId = unit.productionBuilding != null
+                    ? unit.productionBuilding.id
+                    : null;
+                if (String.IsNullOrWhiteSpace(factoryId))
+                {
+                    continue;
+                }
+
+                if (!seen.Add(factoryId))
+                {
+                    Add(diagnostics, "unit.production-building.id-duplicate",
+                        path + "[" + i + "].productionBuilding.id",
+                        "Each unit's production building must use a distinct ID within the pack.");
+                }
             }
         }
 
@@ -2713,6 +2792,53 @@ namespace RogueCommandExpansionLoader.Content
             catch (Exception exception)
             {
                 Add(diagnostics, "module.validator-failed", path, "AI module validation failed: " + exception.Message);
+            }
+        }
+
+        internal static void ValidateAiProfileStageRangeContiguity(
+            ContentAiProfileDefinition profile,
+            string path,
+            ContentStageDefinition[] stages,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (profile == null || !profile.scopeToReferencedStages || stages == null)
+            {
+                return;
+            }
+
+            var referencedIds = new HashSet<string>(StringComparer.Ordinal);
+            foreach (string stageId in profile.referencedStageIds ?? new string[0])
+            {
+                if (!String.IsNullOrWhiteSpace(stageId))
+                {
+                    referencedIds.Add(stageId);
+                }
+            }
+
+            if (referencedIds.Count == 0)
+            {
+                return;
+            }
+
+            var indices = new List<int>();
+            for (int i = 0; i < stages.Length; i++)
+            {
+                if (referencedIds.Contains(stages[i].id))
+                {
+                    indices.Add(i);
+                }
+            }
+
+            indices.Sort();
+            for (int i = 1; i < indices.Count; i++)
+            {
+                if (indices[i] != indices[i - 1] + 1)
+                {
+                    Add(diagnostics, "ai-profile.stage-range-not-contiguous",
+                        path,
+                        "A stage-scoped AI profile must reference a contiguous range of stage indices.");
+                    break;
+                }
             }
         }
 

@@ -73,6 +73,10 @@
     </Reference>
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="RogueCommandExpansionLoader.ValidationTests" />
+  </ItemGroup>
+
   <Target Name="ValidateGameAndLoaderReferences" BeforeTargets="ResolveReferences">
     <Error Condition="!Exists('$(GameManagedPath)\Assembly-CSharp.dll')" Text="GameManagedPath must point to a Rogue Command installation containing Assembly-CSharp.dll. Set GameRoot to override the default." />
     <Error Condition="!Exists('$(BepInExCorePath)\BepInEx.dll')" Text="BepInEx 5.4.23.5 references are missing. Extract the official win-x64 distribution to .tools or set BepInExCorePath." />

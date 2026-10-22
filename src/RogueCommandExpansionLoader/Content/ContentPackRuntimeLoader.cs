@@ -1690,6 +1690,51 @@ namespace RogueCommandExpansionLoader.Content
                 }
                 profiles.Sort((left, right) => StringComparer.Ordinal.Compare(left.ProfileId, right.ProfileId));
 
+                var unitFactories = new List<UnitFactoryDiagnosticReport>(_units.Count);
+                foreach (LoadedUnit unit in _units.Values)
+                {
+                    string factoryId = unit.ProductionFactoryId ?? string.Empty;
+                    bool isLoaded = !string.IsNullOrEmpty(factoryId) &&
+                        (_units.ContainsKey(factoryId) || _nativeUnitIds.Contains(factoryId));
+                    string status = unit.IsProductionBuilding
+                        ? "Production building."
+                        : (isLoaded ? "Factory loaded." : "Factory missing.");
+                    unitFactories.Add(new UnitFactoryDiagnosticReport(unit.Id, factoryId, isLoaded, status));
+                }
+                unitFactories.Sort((left, right) => StringComparer.Ordinal.Compare(left.UnitId, right.UnitId));
+
+                var stagePoolScopes = new List<StagePoolScopeDiagnosticReport>();
+                foreach (LoadedStage stage in _stages)
+                {
+                    foreach (BlueprintPoolScopeRegistration scope in stage.BlueprintPoolScopes)
+                    {
+                        stagePoolScopes.Add(new StagePoolScopeDiagnosticReport(
+                            stage.Definition.id,
+                            scope.PoolId,
+                            scope.UnitIds));
+                    }
+                }
+                stagePoolScopes.Sort((left, right) =>
+                {
+                    int cmp = StringComparer.Ordinal.Compare(left.StageId, right.StageId);
+                    if (cmp != 0) return cmp;
+                    return StringComparer.Ordinal.Compare(left.PoolId, right.PoolId);
+                });
+
+                var aiProfileStageRanges = new List<AiProfileStageRangeDiagnosticReport>();
+                foreach (LoadedAiProfile profile in _aiProfiles.Values)
+                {
+                    if (profile.ScopeToReferencedStages)
+                    {
+                        aiProfileStageRanges.Add(new AiProfileStageRangeDiagnosticReport(
+                            profile.Id,
+                            profile.StageMin,
+                            profile.StageMax,
+                            true));
+                    }
+                }
+                aiProfileStageRanges.Sort((left, right) => StringComparer.Ordinal.Compare(left.ProfileId, right.ProfileId));
+
                 string[] recentLogs;
                 lock (_logGate)
                 {
@@ -1707,6 +1752,9 @@ namespace RogueCommandExpansionLoader.Content
                     units,
                     stages,
                     profiles,
+                    unitFactories,
+                    stagePoolScopes,
+                    aiProfileStageRanges,
                     recentLogs);
             }
         }
@@ -3332,8 +3380,17 @@ namespace RogueCommandExpansionLoader.Content
                     }
 
                     var behaviours = new List<object> { nativeBehaviours[0] };
-                    temporaryProfiles.Add(new LoadedAiProfile(profile, definition.packId, resourceName,
-                        behaviours, prefab));
+                    Vector2Int profileStageRange;
+                    if (scopedAiStageRanges.TryGetValue(profile.id, out profileStageRange))
+                    {
+                        temporaryProfiles.Add(new LoadedAiProfile(profile, definition.packId, resourceName,
+                            behaviours, prefab, profileStageRange.x, profileStageRange.y));
+                    }
+                    else
+                    {
+                        temporaryProfiles.Add(new LoadedAiProfile(profile, definition.packId, resourceName,
+                            behaviours, prefab));
+                    }
                 }
 
                 ValidateStageGenerationCompatibility(temporaryStages, temporaryProfiles, packageName);
@@ -6899,7 +6956,9 @@ namespace RogueCommandExpansionLoader.Content
                 string packId,
                 string resourceName,
                 List<object> behaviours,
-                GameObject prefab)
+                GameObject prefab,
+                int stageMin = 0,
+                int stageMax = -1)
             {
                 Definition = definition;
                 PackId = packId;
@@ -6916,6 +6975,8 @@ namespace RogueCommandExpansionLoader.Content
                     }
                 }
                 ModuleIds = moduleIds.ToArray();
+                StageMin = stageMin;
+                StageMax = stageMax;
             }
 
             public ContentAiProfileDefinition Definition { get; private set; }
@@ -6926,6 +6987,8 @@ namespace RogueCommandExpansionLoader.Content
             public string[] ModuleIds { get; private set; }
             public List<object> Behaviours { get; private set; }
             public GameObject Prefab { get; private set; }
+            public int StageMin { get; private set; }
+            public int StageMax { get; private set; }
         }
 
         private sealed class BoundAiRuntimeBehaviour

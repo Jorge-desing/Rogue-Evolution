@@ -122,6 +122,64 @@ namespace RogueCommandExpansionLoader.Runtime
         public int ActiveAiInstances { get; private set; }
     }
 
+    public sealed class UnitFactoryDiagnosticReport
+    {
+        public UnitFactoryDiagnosticReport(string unitId, string factoryId, bool isLoaded, string statusMessage)
+        {
+            UnitId = unitId ?? string.Empty;
+            FactoryId = factoryId ?? string.Empty;
+            IsLoaded = isLoaded;
+            StatusMessage = statusMessage ?? string.Empty;
+        }
+
+        public string UnitId { get; private set; }
+        public string FactoryId { get; private set; }
+        public bool IsLoaded { get; private set; }
+        public string StatusMessage { get; private set; }
+    }
+
+    public sealed class StagePoolScopeDiagnosticReport
+    {
+        public StagePoolScopeDiagnosticReport(string stageId, string poolId, IReadOnlyList<string> factoryIds)
+        {
+            StageId = stageId ?? string.Empty;
+            PoolId = poolId ?? string.Empty;
+            if (factoryIds == null || factoryIds.Count == 0)
+            {
+                FactoryIds = Array.AsReadOnly(new string[0]);
+            }
+            else
+            {
+                var copy = new string[factoryIds.Count];
+                for (int i = 0; i < factoryIds.Count; i++)
+                {
+                    copy[i] = factoryIds[i];
+                }
+                FactoryIds = Array.AsReadOnly(copy);
+            }
+        }
+
+        public string StageId { get; private set; }
+        public string PoolId { get; private set; }
+        public IReadOnlyList<string> FactoryIds { get; private set; }
+    }
+
+    public sealed class AiProfileStageRangeDiagnosticReport
+    {
+        public AiProfileStageRangeDiagnosticReport(string profileId, int stageMin, int stageMax, bool isContiguous)
+        {
+            ProfileId = profileId ?? string.Empty;
+            StageMin = stageMin;
+            StageMax = stageMax;
+            IsContiguous = isContiguous;
+        }
+
+        public string ProfileId { get; private set; }
+        public int StageMin { get; private set; }
+        public int StageMax { get; private set; }
+        public bool IsContiguous { get; private set; }
+    }
+
     public sealed class LoaderDiagnosticsSnapshot
     {
         public LoaderDiagnosticsSnapshot(
@@ -135,6 +193,9 @@ namespace RogueCommandExpansionLoader.Runtime
             IReadOnlyList<UnitDiagnosticReport> units,
             IReadOnlyList<StageDiagnosticReport> stages,
             IReadOnlyList<AiProfileDiagnosticReport> aiProfiles,
+            IReadOnlyList<UnitFactoryDiagnosticReport> unitFactories,
+            IReadOnlyList<StagePoolScopeDiagnosticReport> stagePoolScopes,
+            IReadOnlyList<AiProfileStageRangeDiagnosticReport> aiProfileStageRanges,
             IReadOnlyList<string> recentLogs)
         {
             TargetGameVersion = targetGameVersion ?? string.Empty;
@@ -147,6 +208,9 @@ namespace RogueCommandExpansionLoader.Runtime
             Units = CopyReadOnly(units);
             Stages = CopyReadOnly(stages);
             AiProfiles = CopyReadOnly(aiProfiles);
+            UnitFactories = CopyReadOnly(unitFactories);
+            StagePoolScopes = CopyReadOnly(stagePoolScopes);
+            AiProfileStageRanges = CopyReadOnly(aiProfileStageRanges);
             RecentLogs = CopyReadOnly(recentLogs);
         }
 
@@ -160,6 +224,9 @@ namespace RogueCommandExpansionLoader.Runtime
         public IReadOnlyList<UnitDiagnosticReport> Units { get; private set; }
         public IReadOnlyList<StageDiagnosticReport> Stages { get; private set; }
         public IReadOnlyList<AiProfileDiagnosticReport> AiProfiles { get; private set; }
+        public IReadOnlyList<UnitFactoryDiagnosticReport> UnitFactories { get; private set; }
+        public IReadOnlyList<StagePoolScopeDiagnosticReport> StagePoolScopes { get; private set; }
+        public IReadOnlyList<AiProfileStageRangeDiagnosticReport> AiProfileStageRanges { get; private set; }
         public IReadOnlyList<string> RecentLogs { get; private set; }
 
         private static IReadOnlyList<T> CopyReadOnly<T>(IReadOnlyList<T> source)

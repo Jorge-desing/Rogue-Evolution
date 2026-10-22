@@ -1923,7 +1923,7 @@ var tests = new (string Name, Action Run)[]
             .ToDictionary(unit => unit.id, unit => unit.productionBuilding.id, StringComparer.Ordinal);
 
         HashSet<string> factoryIds = StageBlueprintFactoryIds.CollectLoaderFactoryIds(
-            stage, productId => factoryMap.TryGetValue(productId, out string factoryId) ? factoryId : null);
+            stage, productId => factoryMap.TryGetValue(productId, out string? factoryId) ? factoryId : null);
 
         if (factoryIds.Count != 4 ||
             !factoryIds.SetEquals(new[]
@@ -1951,7 +1951,7 @@ var tests = new (string Name, Action Run)[]
             factoryIds,
             availablePoolIds,
             stage.blueprintPoolEntries,
-            productId => factoryMap.TryGetValue(productId, out string factoryId) ? factoryId : null);
+            productId => factoryMap.TryGetValue(productId, out string? factoryId) ? factoryId : null);
 
         if (!idsByPool["BP_CheaperVehicles"].SetEquals(new[]
                 { "sample-native:scout-tank-factory", "sample-native:skirmish-bike-factory" }) ||
@@ -2100,11 +2100,17 @@ var tests = new (string Name, Action Run)[]
                 }
             }
 
-            string productLevel = unit.balanceOverrides.Single(entry => entry.name == "neededExperienceLevel").value;
-            string buildingLevel = unit.productionBuilding.balanceOverrides
+            var productBalanceOverrides = unit.balanceOverrides ??
+                throw new InvalidOperationException($"Unit {unit.id} has no balance overrides.");
+            var productionBuilding = unit.productionBuilding ??
+                throw new InvalidOperationException($"Unit {unit.id} has no production building.");
+            var buildingBalanceOverrides = productionBuilding.balanceOverrides ??
+                throw new InvalidOperationException($"Factory {productionBuilding.id} has no balance overrides.");
+            string productLevel = productBalanceOverrides.Single(entry => entry.name == "neededExperienceLevel").value;
+            string buildingLevel = buildingBalanceOverrides
                 .Single(entry => entry.name == "neededExperienceLevel").value;
-            string productRarity = unit.balanceOverrides.Single(entry => entry.name == "rarity").value;
-            string buildingRarity = unit.productionBuilding.balanceOverrides
+            string productRarity = productBalanceOverrides.Single(entry => entry.name == "rarity").value;
+            string buildingRarity = buildingBalanceOverrides
                 .Single(entry => entry.name == "rarity").value;
             if (productLevel != expected.Value || buildingLevel != expected.Value ||
                 productRarity != "Common" || buildingRarity != productRarity)
@@ -5995,7 +6001,64 @@ var tests = new (string Name, Action Run)[]
             ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
                 "package.dll-forbidden");
         });
-    })
+    }),
+    ("units must not share the same productionBuilding.id within a pack", () =>
+    {
+        ContentUnitDefinition[] units =
+        [
+            new ContentUnitDefinition { id = "sample:duplicate-factory-a", productionBuilding = new ContentProductionBuildingDefinition { id = "sample:shared-factory" } },
+            new ContentUnitDefinition { id = "sample:duplicate-factory-b", productionBuilding = new ContentProductionBuildingDefinition { id = "sample:shared-factory" } }
+        ];
+
+        var diagnostics = new List<ContentDiagnostic>();
+        ContentPackValidator.ValidateUnitProductionBuildingIdsUnique(units, "units", diagnostics);
+
+        if (!diagnostics.Any(d => d.Code == "unit.production-building.id-duplicate"))
+        {
+            throw new InvalidOperationException("Duplicate productionBuilding IDs must be rejected.");
+        }
+    }),
+    ("stage pool entries must not repeat unit IDs", () =>
+    {
+        ContentStageDefinition stage = new ContentStageDefinition
+        {
+            id = "sample:dup-pool-stage",
+            blueprintPoolEntries =
+            [
+                new ContentStagePoolEntryDefinition { poolId = "pool-a", unitIds = new[] { "sample:a", "sample:a" } }
+            ]
+        };
+
+        var diagnostics = new List<ContentDiagnostic>();
+        ContentPackValidator.ValidateStageBlueprintPoolEntriesUnique(stage, "stages[0]", diagnostics);
+
+        if (!diagnostics.Any(d => d.Code == "stage.blueprint-pool-unit-id-duplicate"))
+        {
+            throw new InvalidOperationException("Duplicate unit IDs in a pool entry must be rejected.");
+        }
+    }),
+    ("scoped AI profiles must reference contiguous stage indices", () =>
+    {
+        ContentAiProfileDefinition profile = new ContentAiProfileDefinition
+        {
+            id = "sample:non-contiguous-ai",
+            scopeToReferencedStages = true
+        };
+        ContentStageDefinition[] stages =
+        [
+            new ContentStageDefinition { id = "stage-0", aiProfileIds = new[] { profile.id } },
+            new ContentStageDefinition { id = "stage-1" },
+            new ContentStageDefinition { id = "stage-2", aiProfileIds = new[] { profile.id } }
+        ];
+
+        var diagnostics = new List<ContentDiagnostic>();
+        ContentPackValidator.ValidateAiProfileStageRangeContiguity(profile, "aiProfiles[0]", stages, diagnostics);
+
+        if (!diagnostics.Any(d => d.Code == "ai-profile.stage-range-not-contiguous"))
+        {
+            throw new InvalidOperationException("Non-contiguous AI stage ranges must be rejected.");
+        }
+    }),
 };
 
 int failures = 0;
