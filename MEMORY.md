@@ -21,7 +21,7 @@ This is a compact, durable orientation for agents. For the changing checkout sta
 ## Evidence boundaries and known gaps
 
 - Steam/BepInEx MCP evidence from 2026-10-21 confirmed the row-based `sample-native:scout-tank` provider row and native getters returned `MoveSpeed=15.75`, `MaxHealth=137`, `Damage1=7.25`, and `Attack1Cooldown=1.15`, including after cache invalidation. This proves row/getter behavior in the game process only—not custom-unit instantiation or gameplay consumption. See the artifact and evidence notes in the handoff.
-- The fresh Release plugin/harness builds had zero warnings/errors; the exact Release harness passed `200/201`, with one Windows symlink-privilege skip. This is local build/test evidence, not gameplay acceptance.
+- The latest fresh non-incremental Debug/Release harness builds and Release plugin build recorded in the 2026-10-22 handoff had zero warnings/errors; both exact harness DLLs passed `201/202`, with one Windows symlink-privilege skip. This is local build/test evidence, not gameplay acceptance.
 - Still unverified in a natural Steam run: eligible modded reward through selection and factory placement, custom-unit production/spawn, rendering and stat consumption, reactive AI response, and Native patrol route behavior. Treat offer, placement, production, rendering, stage generation, and AI action as separate acceptance steps.
 - Label findings as static inspection, local validation, or live Steam runtime. Never promote one evidence tier into another.
 
