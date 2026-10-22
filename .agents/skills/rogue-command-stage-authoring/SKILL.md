@@ -12,6 +12,7 @@ Use this skill for stage declarations, stage progression, world/map assets, and 
 - `nativeTemplateId` clones a native `StageParametersScriptableObject` and applies bounded numeric overrides. It reuses the template's world and blueprint-pool references; describe it as a progression variant, not a new map.
 - A custom stage requires a complete bundled stage asset with valid world, generator/map, and blueprint-pool references. Do not substitute a placeholder bundle when any serialized reference is missing.
 - A stage can list `unitIds` and `aiProfileIds`; validate those references before any registry mutation. Blueprint eligibility is a global entity-row flag, and shared pools may make a unit selectable outside the stage that declared it.
+- `blueprintPoolEntries` scopes mod products to explicitly named native pools. A listed pool receives only its listed products; unlisted pools retain the broad `stage.unitIds` set. Product IDs in an entry need not be repeated in `stage.unitIds`, but `stage.unitIds` still governs broader stage eligibility. Native per-pool filters (`blueprintFilter.IsBlueprintValid`) are preserved. Verify pool IDs against generated research or native objects before editing.
 
 ## Check game-specific generation constraints
 
