@@ -3068,11 +3068,10 @@ namespace RogueCommandExpansionLoader.Content
                     {
                         availablePoolIds.Add(_blueprintPoolIdField.GetValue(pools[poolIndex]) as string);
                     }
-                    var nativePoolUnits = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
                     HashSet<string> scopedUnitIds = GetStageModUnitIds(
-                        stage, temporaryUnits, availablePoolIds, nativePoolUnits);
+                        stage, temporaryUnits, availablePoolIds);
                     Dictionary<string, HashSet<string>> unitsByPool = GetStagePoolUnitIds(
-                        stage, scopedUnitIds, nativePoolUnits, temporaryUnits, availablePoolIds);
+                        stage, scopedUnitIds, temporaryUnits, availablePoolIds);
                     var stagePoolScopes = new List<BlueprintPoolScopeRegistration>();
                     if (scopedUnitIds.Count > 0 ||
                         (stage.blueprintPoolEntries != null && stage.blueprintPoolEntries.Length > 0))
@@ -3656,9 +3655,6 @@ namespace RogueCommandExpansionLoader.Content
                                 unit.Id + ".");
                         }
 
-                        blueprintUnitIds.Add(String.IsNullOrWhiteSpace(unit.ProductionFactoryId)
-                            ? unit.Id
-                            : unit.ProductionFactoryId);
                     }
                     else if (_nativeUnitIds.Contains(unitIds[unitIndex]))
                     {
@@ -3677,6 +3673,28 @@ namespace RogueCommandExpansionLoader.Content
                             " de la etapa " + stage.Definition.id + " no está disponible.");
                     }
                 }
+
+                blueprintUnitIds.UnionWith(StageBlueprintFactoryIds.CollectLoaderFactoryIds(
+                    stage.Definition,
+                    delegate(string productId)
+                    {
+                        LoadedUnit unit;
+                        if (!TryGetLoadedUnit(productId, units, out unit))
+                        {
+                            return null;
+                        }
+
+                        if (unit.IsProductionBuilding)
+                        {
+                            throw new InvalidDataException("La etapa " + stage.Definition.id +
+                                " debe declarar IDs de producto; no puede declarar directamente el edificio " +
+                                unit.Id + ".");
+                        }
+
+                        return String.IsNullOrWhiteSpace(unit.ProductionFactoryId)
+                            ? unit.Id
+                            : unit.ProductionFactoryId;
+                    }));
             }
 
             for (int i = 0; i < units.Count; i++)
@@ -3828,8 +3846,7 @@ namespace RogueCommandExpansionLoader.Content
         private HashSet<string> GetStageModUnitIds(
             ContentStageDefinition stage,
             List<LoadedUnit> currentPackUnits,
-            HashSet<string> allowedPoolIds,
-            Dictionary<string, HashSet<string>> nativePoolUnits)
+            HashSet<string> allowedPoolIds)
         {
             var scopedUnitIds = new HashSet<string>(StringComparer.Ordinal);
             var unitIds = stage.unitIds ?? new string[0];
@@ -3856,7 +3873,6 @@ namespace RogueCommandExpansionLoader.Content
                             (entry == null ? "<nulo>" : entry.poolId));
                     }
 
-                    var nativeUnitIds = new HashSet<string>(StringComparer.Ordinal);
                     for (int j = 0; entry.unitIds != null && j < entry.unitIds.Length; j++)
                     {
                         LoadedUnit unit;
@@ -3867,13 +3883,8 @@ namespace RogueCommandExpansionLoader.Content
                                 throw new InvalidDataException("La etapa " + stage.id +
                                     " declara un edificio de producción como producto de pool: " + entry.unitIds[j]);
                             }
-                            scopedUnitIds.Add(String.IsNullOrWhiteSpace(unit.ProductionFactoryId)
-                                ? unit.Id
-                                : unit.ProductionFactoryId);
                         }
-                        else nativeUnitIds.Add(entry.unitIds[j]);
                     }
-                    nativePoolUnits[entry.poolId] = nativeUnitIds;
                 }
             }
 
@@ -3883,57 +3894,31 @@ namespace RogueCommandExpansionLoader.Content
         private Dictionary<string, HashSet<string>> GetStagePoolUnitIds(
             ContentStageDefinition stage,
             HashSet<string> scopedUnitIds,
-            Dictionary<string, HashSet<string>> nativePoolUnits,
             List<LoadedUnit> currentPackUnits,
             IEnumerable<string> availablePoolIds)
         {
-            var result = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
-            var explicitPoolIds = new HashSet<string>(StringComparer.Ordinal);
-            for (int i = 0; stage.blueprintPoolEntries != null && i < stage.blueprintPoolEntries.Length; i++)
-            {
-                if (stage.blueprintPoolEntries[i] != null)
-                {
-                    explicitPoolIds.Add(stage.blueprintPoolEntries[i].poolId);
-                }
-            }
-            foreach (string poolId in availablePoolIds)
-            {
-                if (!explicitPoolIds.Contains(poolId))
-                {
-                    result[poolId] = new HashSet<string>(scopedUnitIds, StringComparer.Ordinal);
-                }
-            }
-            if (stage.blueprintPoolEntries == null)
-            {
-                return result;
-            }
-
-            for (int i = 0; i < stage.blueprintPoolEntries.Length; i++)
-            {
-                ContentStagePoolEntryDefinition entry = stage.blueprintPoolEntries[i];
-                HashSet<string> poolUnitIds;
-                if (!result.TryGetValue(entry.poolId, out poolUnitIds))
-                {
-                    poolUnitIds = new HashSet<string>(StringComparer.Ordinal);
-                    result.Add(entry.poolId, poolUnitIds);
-                }
-                for (int j = 0; entry.unitIds != null && j < entry.unitIds.Length; j++)
+            return StageBlueprintPoolFactoryIds.CollectByPool(
+                scopedUnitIds,
+                availablePoolIds,
+                stage.blueprintPoolEntries,
+                delegate(string productId)
                 {
                     LoadedUnit unit;
-                    if (TryGetLoadedUnit(entry.unitIds[j], currentPackUnits, out unit))
+                    if (!TryGetLoadedUnit(productId, currentPackUnits, out unit))
                     {
-                        string id = String.IsNullOrWhiteSpace(unit.ProductionFactoryId)
-                            ? unit.Id : unit.ProductionFactoryId;
-                        poolUnitIds.Add(id);
+                        return null;
                     }
-                    else
+
+                    if (unit.IsProductionBuilding)
                     {
-                        poolUnitIds.Add(entry.unitIds[j]);
+                        throw new InvalidDataException("La etapa " + stage.id +
+                            " declara un edificio de producción como producto de pool: " + productId);
                     }
-                }
-                result[entry.poolId] = poolUnitIds;
-            }
-            return result;
+
+                    return String.IsNullOrWhiteSpace(unit.ProductionFactoryId)
+                        ? unit.Id
+                        : unit.ProductionFactoryId;
+                });
         }
 
         private void AddLoadedFactoryId(
@@ -4000,7 +3985,6 @@ namespace RogueCommandExpansionLoader.Content
             string packageName,
             List<object> validatedPools,
             HashSet<string> scopedUnitIds,
-            Dictionary<string, HashSet<string>> nativePoolUnits,
             List<LoadedUnit> currentPackUnits,
             HashSet<string> reservedPoolIds,
             List<ScriptableObject> temporaryClones,
@@ -4036,7 +4020,7 @@ namespace RogueCommandExpansionLoader.Content
                 sourcePoolIds.Add(_blueprintPoolIdField.GetValue(validatedPools[poolIndex]) as string);
             }
             Dictionary<string, HashSet<string>> unitsByPool = GetStagePoolUnitIds(
-                stage, scopedUnitIds, nativePoolUnits, currentPackUnits, sourcePoolIds);
+                stage, scopedUnitIds, currentPackUnits, sourcePoolIds);
             var result = new List<object>(clonedPools.Count);
             for (int i = 0; i < clonedPools.Count; i++)
             {

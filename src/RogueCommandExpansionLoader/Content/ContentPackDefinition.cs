@@ -600,6 +600,154 @@ namespace RogueCommandExpansionLoader.Content
         public string[] unitIds;
     }
 
+#nullable enable
+    internal static class StageBlueprintFactoryIds
+    {
+        public static HashSet<string> CollectLoaderFactoryIds(
+            ContentStageDefinition stage,
+            Func<string, string?> resolveFactoryId)
+        {
+            if (stage == null)
+            {
+                throw new ArgumentNullException(nameof(stage));
+            }
+
+            if (resolveFactoryId == null)
+            {
+                throw new ArgumentNullException(nameof(resolveFactoryId));
+            }
+
+            var factoryIds = new HashSet<string>(StringComparer.Ordinal);
+            AddLoaderFactoryIds(stage.unitIds, resolveFactoryId, factoryIds);
+
+            ContentStagePoolEntryDefinition[] poolEntries = stage.blueprintPoolEntries;
+            for (int i = 0; poolEntries != null && i < poolEntries.Length; i++)
+            {
+                if (poolEntries[i] != null)
+                {
+                    AddLoaderFactoryIds(poolEntries[i].unitIds, resolveFactoryId, factoryIds);
+                }
+            }
+
+            return factoryIds;
+        }
+
+        private static void AddLoaderFactoryIds(
+            string[] productIds,
+            Func<string, string?> resolveFactoryId,
+            HashSet<string> factoryIds)
+        {
+            for (int i = 0; productIds != null && i < productIds.Length; i++)
+            {
+                if (String.IsNullOrWhiteSpace(productIds[i]))
+                {
+                    continue;
+                }
+
+                string? factoryId = resolveFactoryId(productIds[i]);
+                if (!String.IsNullOrWhiteSpace(factoryId))
+                {
+                    factoryIds.Add(factoryId);
+                }
+            }
+        }
+    }
+
+    internal static class StageBlueprintPoolFactoryIds
+    {
+        public static Dictionary<string, HashSet<string>> CollectByPool(
+            IEnumerable<string> stageFactoryIds,
+            IEnumerable<string> availablePoolIds,
+            ContentStagePoolEntryDefinition[] poolEntries,
+            Func<string, string?> resolveFactoryId)
+        {
+            if (stageFactoryIds == null)
+            {
+                throw new ArgumentNullException(nameof(stageFactoryIds));
+            }
+
+            if (availablePoolIds == null)
+            {
+                throw new ArgumentNullException(nameof(availablePoolIds));
+            }
+
+            if (resolveFactoryId == null)
+            {
+                throw new ArgumentNullException(nameof(resolveFactoryId));
+            }
+
+            var stageIds = new HashSet<string>(StringComparer.Ordinal);
+            foreach (string stageFactoryId in stageFactoryIds)
+            {
+                if (!String.IsNullOrWhiteSpace(stageFactoryId))
+                {
+                    stageIds.Add(stageFactoryId);
+                }
+            }
+
+            var explicitPoolIds = new HashSet<string>(StringComparer.Ordinal);
+            for (int i = 0; poolEntries != null && i < poolEntries.Length; i++)
+            {
+                ContentStagePoolEntryDefinition entry = poolEntries[i];
+                if (entry == null)
+                {
+                    continue;
+                }
+
+                if (String.IsNullOrWhiteSpace(entry.poolId))
+                {
+                    throw new ArgumentException("A stage pool entry must name a pool.", nameof(poolEntries));
+                }
+
+                explicitPoolIds.Add(entry.poolId);
+            }
+
+            var result = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
+            foreach (string poolId in availablePoolIds)
+            {
+                if (!String.IsNullOrWhiteSpace(poolId) && !result.ContainsKey(poolId))
+                {
+                    HashSet<string> initialUnitIds = explicitPoolIds.Contains(poolId)
+                        ? new HashSet<string>(StringComparer.Ordinal)
+                        : new HashSet<string>(stageIds, StringComparer.Ordinal);
+                    result.Add(poolId, initialUnitIds);
+                }
+            }
+
+            for (int i = 0; poolEntries != null && i < poolEntries.Length; i++)
+            {
+                ContentStagePoolEntryDefinition entry = poolEntries[i];
+                if (entry == null)
+                {
+                    continue;
+                }
+
+                HashSet<string>? poolUnitIds;
+                if (!result.TryGetValue(entry.poolId, out poolUnitIds) || poolUnitIds == null)
+                {
+                    poolUnitIds = new HashSet<string>(StringComparer.Ordinal);
+                    result[entry.poolId] = poolUnitIds;
+                }
+
+                for (int j = 0; entry.unitIds != null && j < entry.unitIds.Length; j++)
+                {
+                    string productId = entry.unitIds[j];
+                    if (String.IsNullOrWhiteSpace(productId))
+                    {
+                        continue;
+                    }
+
+                    string? factoryId = resolveFactoryId(productId);
+                    string poolUnitId = String.IsNullOrWhiteSpace(factoryId) ? productId : factoryId;
+                    poolUnitIds.Add(poolUnitId);
+                }
+            }
+
+            return result;
+        }
+    }
+#nullable restore
+
     [Serializable]
     public sealed class ContentAiProfileDefinition
     {
