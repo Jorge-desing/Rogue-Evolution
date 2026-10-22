@@ -1783,15 +1783,6 @@
       ],
       "blueprintPoolEntries": [
         {
-          "poolId": "BP_CheaperVehicles",
-          "unitIds": [
-            "sample-native:scout-tank",
-            "sample-native:heavy-artillery",
-            "sample-native:surge-tank",
-            "sample-native:skirmish-bike"
-          ]
-        },
-        {
           "poolId": "BP_CheaperTanks",
           "unitIds": [
             "sample-native:scout-tank",
@@ -1873,15 +1864,6 @@
         "sample-native:surge-tank"
       ],
       "blueprintPoolEntries": [
-        {
-          "poolId": "BP_CheaperVehicles",
-          "unitIds": [
-            "sample-native:scout-tank",
-            "sample-native:heavy-artillery",
-            "sample-native:skirmish-bike",
-            "sample-native:surge-tank"
-          ]
-        },
         {
           "poolId": "BP_CheaperTanks",
           "unitIds": [
