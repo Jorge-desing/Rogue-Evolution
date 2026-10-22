@@ -51,9 +51,8 @@
         { "name": "armorProtection", "value": "1" },
         { "name": "attackType", "value": "AoE" },
         { "name": "skillType", "value": "None" },
-        { "name": "damage1", "value": "8" },
         { "name": "damage2", "value": "0" },
-        { "name": "firePointCount", "value": "6" },
+        { "name": "firePointCount", "value": "2" },
         { "name": "attack2Cooldown", "value": "0" },
         { "name": "effectRadius1", "value": "0.2" },
         { "name": "effectRadius2", "value": "0" },
@@ -65,6 +64,9 @@
         { "name": "duration1", "value": "0" },
         { "name": "duration2", "value": "0" }
       ],
+      "customBalance": {
+        "Damage1": 4.0
+      },
       "productionBuilding": {
         "id": "sample-native:scout-tank-factory",
         "nativeTemplateId": "PCXBaseTankFactory",
@@ -200,6 +202,9 @@
         { "name": "duration1", "value": "0" },
         { "name": "duration2", "value": "0" }
       ],
+      "customBalance": {
+        "Damage1": 2.8
+      },
       "productionBuilding": {
         "id": "sample-native:assault-walker-factory",
         "nativeTemplateId": "GatlingWalkerFactory",
@@ -270,6 +275,9 @@
         { "name": "duration1", "value": "0" },
         { "name": "duration2", "value": "0" }
       ],
+      "customBalance": {
+        "Damage1": 2.8
+      },
       "productionBuilding": {
         "id": "sample-native:atlas-crane-mech-factory",
         "nativeTemplateId": "GatlingWalkerFactory",
@@ -667,6 +675,29 @@
         "sample-native:arachnid-hexapod",
         "sample-native:overlord-command-hq"
       ],
+      "blueprintPoolEntries": [
+        {
+          "poolId": "BP_CheaperVehicles",
+          "unitIds": [
+            "sample-native:scout-tank",
+            "sample-native:skirmish-bike"
+          ]
+        },
+        {
+          "poolId": "BP_CheaperRobos",
+          "unitIds": [
+            "sample-native:arachnid-hexapod",
+            "sample-native:overlord-command-hq"
+          ]
+        },
+        {
+          "poolId": "BP_CheaperMechs",
+          "unitIds": [
+            "sample-native:arachnid-hexapod",
+            "sample-native:overlord-command-hq"
+          ]
+        }
+      ],
       "aiProfileIds": [
         "sample-native:quick-hunter-extension"
       ]
@@ -696,6 +727,45 @@
         "sample-native:arachnid-hexapod",
         "sample-native:overlord-command-hq",
         "sample-native:surge-tank"
+      ],
+      "blueprintPoolEntries": [
+        {
+          "poolId": "BP_CheaperVehicles",
+          "unitIds": [
+            "sample-native:scout-tank",
+            "sample-native:heavy-artillery",
+            "sample-native:surge-tank",
+            "sample-native:skirmish-bike"
+          ]
+        },
+        {
+          "poolId": "BP_CheaperTanks",
+          "unitIds": [
+            "sample-native:scout-tank",
+            "sample-native:heavy-artillery",
+            "sample-native:surge-tank"
+          ]
+        },
+        {
+          "poolId": "BP_CheaperRobos",
+          "unitIds": [
+            "sample-native:assault-walker",
+            "sample-native:atlas-crane-mech",
+            "sample-native:bastion-siege-mech",
+            "sample-native:arachnid-hexapod",
+            "sample-native:overlord-command-hq"
+          ]
+        },
+        {
+          "poolId": "BP_CheaperMechs",
+          "unitIds": [
+            "sample-native:assault-walker",
+            "sample-native:atlas-crane-mech",
+            "sample-native:bastion-siege-mech",
+            "sample-native:arachnid-hexapod",
+            "sample-native:overlord-command-hq"
+          ]
+        }
       ],
       "aiProfileIds": [
         "sample-native:quick-hunter-extension",
@@ -727,6 +797,45 @@
         "sample-native:overlord-command-hq",
         "sample-native:skirmish-bike",
         "sample-native:surge-tank"
+      ],
+      "blueprintPoolEntries": [
+        {
+          "poolId": "BP_CheaperVehicles",
+          "unitIds": [
+            "sample-native:scout-tank",
+            "sample-native:heavy-artillery",
+            "sample-native:skirmish-bike",
+            "sample-native:surge-tank"
+          ]
+        },
+        {
+          "poolId": "BP_CheaperTanks",
+          "unitIds": [
+            "sample-native:scout-tank",
+            "sample-native:heavy-artillery",
+            "sample-native:surge-tank"
+          ]
+        },
+        {
+          "poolId": "BP_CheaperRobos",
+          "unitIds": [
+            "sample-native:assault-walker",
+            "sample-native:atlas-crane-mech",
+            "sample-native:bastion-siege-mech",
+            "sample-native:arachnid-hexapod",
+            "sample-native:overlord-command-hq"
+          ]
+        },
+        {
+          "poolId": "BP_CheaperMechs",
+          "unitIds": [
+            "sample-native:assault-walker",
+            "sample-native:atlas-crane-mech",
+            "sample-native:bastion-siege-mech",
+            "sample-native:arachnid-hexapod",
+            "sample-native:overlord-command-hq"
+          ]
+        }
       ],
       "aiProfileIds": [
         "sample-native:quick-hunter-extension",
