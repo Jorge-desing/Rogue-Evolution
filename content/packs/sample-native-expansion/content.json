@@ -33,36 +33,126 @@
         }
       ],
       "balanceOverrides": [
-        { "name": "roles", "value": "Unit, Vehicle, Scout" },
-        { "name": "offeredSystemTags", "value": "Vehicle, Turbo" },
-        { "name": "cost", "value": "70" },
-        { "name": "maxHealth", "value": "130" },
-        { "name": "moveSpeed", "value": "14.5" },
-        { "name": "sightRadius", "value": "8" },
-        { "name": "weaponRange", "value": "3.5" },
-        { "name": "attackCooldown", "value": "0.9" },
-        { "name": "rarity", "value": "Common" },
-        { "name": "neededExperienceLevel", "value": "0" },
-        { "name": "productionDuration", "value": "42" },
-        { "name": "maxCapacity", "value": "5" },
-        { "name": "maxShield", "value": "0" },
-        { "name": "maxMana", "value": "0" },
-        { "name": "maxArmor", "value": "0" },
-        { "name": "armorProtection", "value": "1" },
-        { "name": "attackType", "value": "AoE" },
-        { "name": "skillType", "value": "None" },
-        { "name": "damage2", "value": "0" },
-        { "name": "firePointCount", "value": "2" },
-        { "name": "attack2Cooldown", "value": "0" },
-        { "name": "effectRadius1", "value": "0.2" },
-        { "name": "effectRadius2", "value": "0" },
-        { "name": "skillRange", "value": "0" },
-        { "name": "healAmount1", "value": "0" },
-        { "name": "healAmount2", "value": "0" },
-        { "name": "gainCreditsAmount", "value": "0" },
-        { "name": "skillManaCost", "value": "0" },
-        { "name": "duration1", "value": "0" },
-        { "name": "duration2", "value": "0" }
+        {
+          "name": "roles",
+          "value": "Unit, Vehicle, Scout"
+        },
+        {
+          "name": "offeredSystemTags",
+          "value": "Vehicle, Turbo"
+        },
+        {
+          "name": "cost",
+          "value": "70"
+        },
+        {
+          "name": "maxHealth",
+          "value": "130"
+        },
+        {
+          "name": "moveSpeed",
+          "value": "14.5"
+        },
+        {
+          "name": "sightRadius",
+          "value": "8"
+        },
+        {
+          "name": "weaponRange",
+          "value": "3.5"
+        },
+        {
+          "name": "attackCooldown",
+          "value": "0.9"
+        },
+        {
+          "name": "rarity",
+          "value": "Common"
+        },
+        {
+          "name": "neededExperienceLevel",
+          "value": "0"
+        },
+        {
+          "name": "productionDuration",
+          "value": "42"
+        },
+        {
+          "name": "maxCapacity",
+          "value": "5"
+        },
+        {
+          "name": "maxShield",
+          "value": "0"
+        },
+        {
+          "name": "maxMana",
+          "value": "0"
+        },
+        {
+          "name": "maxArmor",
+          "value": "0"
+        },
+        {
+          "name": "armorProtection",
+          "value": "1"
+        },
+        {
+          "name": "attackType",
+          "value": "AoE"
+        },
+        {
+          "name": "skillType",
+          "value": "None"
+        },
+        {
+          "name": "damage2",
+          "value": "0"
+        },
+        {
+          "name": "firePointCount",
+          "value": "2"
+        },
+        {
+          "name": "attack2Cooldown",
+          "value": "0"
+        },
+        {
+          "name": "effectRadius1",
+          "value": "0.2"
+        },
+        {
+          "name": "effectRadius2",
+          "value": "0"
+        },
+        {
+          "name": "skillRange",
+          "value": "0"
+        },
+        {
+          "name": "healAmount1",
+          "value": "0"
+        },
+        {
+          "name": "healAmount2",
+          "value": "0"
+        },
+        {
+          "name": "gainCreditsAmount",
+          "value": "0"
+        },
+        {
+          "name": "skillManaCost",
+          "value": "0"
+        },
+        {
+          "name": "duration1",
+          "value": "0"
+        },
+        {
+          "name": "duration2",
+          "value": "0"
+        }
       ],
       "customBalance": {
         "Damage1": 4.0
@@ -71,15 +161,37 @@
         "id": "sample-native:scout-tank-factory",
         "nativeTemplateId": "PCXBaseTankFactory",
         "balanceOverrides": [
-          { "name": "cost", "value": "500" },
-          { "name": "maxCapacity", "value": "3" },
-          { "name": "neededExperienceLevel", "value": "0" },
-          { "name": "rarity", "value": "Common" }
+          {
+            "name": "cost",
+            "value": "500"
+          },
+          {
+            "name": "maxCapacity",
+            "value": "3"
+          },
+          {
+            "name": "neededExperienceLevel",
+            "value": "0"
+          },
+          {
+            "name": "rarity",
+            "value": "Common"
+          }
         ],
         "localizations": [
-          { "language": "en-US", "name": "Sandlance Assembly Plant", "description": "Produces Sandlance Scout units." },
-          { "language": "es-XL", "name": "Planta de ensamblaje Sandlance", "description": "Produce exploradores Sandlance." }
-        ]
+          {
+            "language": "en-US",
+            "name": "Sandlance Assembly Plant",
+            "description": "Produces Sandlance Scout units."
+          },
+          {
+            "language": "es-XL",
+            "name": "Planta de ensamblaje Sandlance",
+            "description": "Produce exploradores Sandlance."
+          }
+        ],
+        "assetBundleId": "sample-native:assets",
+        "cardImageAssetName": "assets/roguecommandexpansionsample/sandlancescoutcard.png"
       }
     },
     {
@@ -104,37 +216,130 @@
         }
       ],
       "balanceOverrides": [
-        { "name": "roles", "value": "Unit, Tank, Sniper" },
-        { "name": "offeredSystemTags", "value": "Tank, AoE, Sniper" },
-        { "name": "cost", "value": "300" },
-        { "name": "maxHealth", "value": "160" },
-        { "name": "moveSpeed", "value": "9.0" },
-        { "name": "damage1", "value": "55" },
-        { "name": "weaponRange", "value": "18.5" },
-        { "name": "attackCooldown", "value": "4.0" },
-        { "name": "effectRadius1", "value": "1.5" },
-        { "name": "armorProtection", "value": "2" },
-        { "name": "rarity", "value": "Common" },
-        { "name": "neededExperienceLevel", "value": "0" },
-        { "name": "productionDuration", "value": "50" },
-        { "name": "maxCapacity", "value": "4" },
-        { "name": "maxShield", "value": "0" },
-        { "name": "maxMana", "value": "0" },
-        { "name": "maxArmor", "value": "0" },
-        { "name": "sightRadius", "value": "6" },
-        { "name": "attackType", "value": "Artillery" },
-        { "name": "skillType", "value": "Toggle" },
-        { "name": "damage2", "value": "0" },
-        { "name": "firePointCount", "value": "1" },
-        { "name": "attack2Cooldown", "value": "0" },
-        { "name": "effectRadius2", "value": "0" },
-        { "name": "skillRange", "value": "0" },
-        { "name": "healAmount1", "value": "0" },
-        { "name": "healAmount2", "value": "0" },
-        { "name": "gainCreditsAmount", "value": "0" },
-        { "name": "skillManaCost", "value": "0" },
-        { "name": "duration1", "value": "0" },
-        { "name": "duration2", "value": "0" }
+        {
+          "name": "roles",
+          "value": "Unit, Tank, Sniper"
+        },
+        {
+          "name": "offeredSystemTags",
+          "value": "Tank, AoE, Sniper"
+        },
+        {
+          "name": "cost",
+          "value": "300"
+        },
+        {
+          "name": "maxHealth",
+          "value": "160"
+        },
+        {
+          "name": "moveSpeed",
+          "value": "9.0"
+        },
+        {
+          "name": "damage1",
+          "value": "55"
+        },
+        {
+          "name": "weaponRange",
+          "value": "18.5"
+        },
+        {
+          "name": "attackCooldown",
+          "value": "4.0"
+        },
+        {
+          "name": "effectRadius1",
+          "value": "1.5"
+        },
+        {
+          "name": "armorProtection",
+          "value": "2"
+        },
+        {
+          "name": "rarity",
+          "value": "Common"
+        },
+        {
+          "name": "neededExperienceLevel",
+          "value": "0"
+        },
+        {
+          "name": "productionDuration",
+          "value": "50"
+        },
+        {
+          "name": "maxCapacity",
+          "value": "4"
+        },
+        {
+          "name": "maxShield",
+          "value": "0"
+        },
+        {
+          "name": "maxMana",
+          "value": "0"
+        },
+        {
+          "name": "maxArmor",
+          "value": "0"
+        },
+        {
+          "name": "sightRadius",
+          "value": "6"
+        },
+        {
+          "name": "attackType",
+          "value": "Artillery"
+        },
+        {
+          "name": "skillType",
+          "value": "Toggle"
+        },
+        {
+          "name": "damage2",
+          "value": "0"
+        },
+        {
+          "name": "firePointCount",
+          "value": "1"
+        },
+        {
+          "name": "attack2Cooldown",
+          "value": "0"
+        },
+        {
+          "name": "effectRadius2",
+          "value": "0"
+        },
+        {
+          "name": "skillRange",
+          "value": "0"
+        },
+        {
+          "name": "healAmount1",
+          "value": "0"
+        },
+        {
+          "name": "healAmount2",
+          "value": "0"
+        },
+        {
+          "name": "gainCreditsAmount",
+          "value": "0"
+        },
+        {
+          "name": "skillManaCost",
+          "value": "0"
+        },
+        {
+          "name": "duration1",
+          "value": "0"
+        },
+        {
+          "name": "duration2",
+          "value": "0"
+        }
       ],
       "productionBuilding": {
         "id": "sample-native:heavy-artillery-factory",
@@ -142,13 +347,30 @@
         "assetBundleId": "sample-native:assets",
         "cardImageAssetName": "assets/roguecommandexpansionsample/colossussiegecard.png",
         "balanceOverrides": [
-          { "name": "cost", "value": "800" },
-          { "name": "neededExperienceLevel", "value": "0" },
-          { "name": "rarity", "value": "Common" }
+          {
+            "name": "cost",
+            "value": "800"
+          },
+          {
+            "name": "neededExperienceLevel",
+            "value": "0"
+          },
+          {
+            "name": "rarity",
+            "value": "Common"
+          }
         ],
         "localizations": [
-          { "language": "en-US", "name": "Colossus Siege Works", "description": "Produces Colossus Siege Platforms." },
-          { "language": "es-XL", "name": "Fábrica de asedio Coloso", "description": "Produce plataformas de asedio Coloso." }
+          {
+            "language": "en-US",
+            "name": "Colossus Siege Works",
+            "description": "Produces Colossus Siege Platforms."
+          },
+          {
+            "language": "es-XL",
+            "name": "Fábrica de asedio Coloso",
+            "description": "Produce plataformas de asedio Coloso."
+          }
         ]
       }
     },
@@ -170,37 +392,130 @@
         }
       ],
       "balanceOverrides": [
-        { "name": "roles", "value": "Unit, Mech, MassDestruction" },
-        { "name": "offeredSystemTags", "value": "Mech, Armor, AoE" },
-        { "name": "cost", "value": "380" },
-        { "name": "maxHealth", "value": "420" },
-        { "name": "moveSpeed", "value": "12.0" },
-        { "name": "damage1", "value": "4" },
-        { "name": "attackCooldown", "value": "0.4" },
-        { "name": "weaponRange", "value": "6" },
-        { "name": "armorProtection", "value": "1" },
-        { "name": "rarity", "value": "Common" },
-        { "name": "neededExperienceLevel", "value": "0" },
-        { "name": "productionDuration", "value": "36" },
-        { "name": "maxCapacity", "value": "4" },
-        { "name": "maxShield", "value": "0" },
-        { "name": "maxMana", "value": "0" },
-        { "name": "maxArmor", "value": "1" },
-        { "name": "sightRadius", "value": "7" },
-        { "name": "attackType", "value": "Single" },
-        { "name": "skillType", "value": "None" },
-        { "name": "damage2", "value": "0" },
-        { "name": "firePointCount", "value": "2" },
-        { "name": "attack2Cooldown", "value": "0" },
-        { "name": "effectRadius1", "value": "0" },
-        { "name": "effectRadius2", "value": "0" },
-        { "name": "skillRange", "value": "0" },
-        { "name": "healAmount1", "value": "0" },
-        { "name": "healAmount2", "value": "0" },
-        { "name": "gainCreditsAmount", "value": "0" },
-        { "name": "skillManaCost", "value": "0" },
-        { "name": "duration1", "value": "0" },
-        { "name": "duration2", "value": "0" }
+        {
+          "name": "roles",
+          "value": "Unit, Mech, MassDestruction"
+        },
+        {
+          "name": "offeredSystemTags",
+          "value": "Mech, Armor, AoE"
+        },
+        {
+          "name": "cost",
+          "value": "380"
+        },
+        {
+          "name": "maxHealth",
+          "value": "420"
+        },
+        {
+          "name": "moveSpeed",
+          "value": "12.0"
+        },
+        {
+          "name": "damage1",
+          "value": "4"
+        },
+        {
+          "name": "attackCooldown",
+          "value": "0.4"
+        },
+        {
+          "name": "weaponRange",
+          "value": "6"
+        },
+        {
+          "name": "armorProtection",
+          "value": "1"
+        },
+        {
+          "name": "rarity",
+          "value": "Common"
+        },
+        {
+          "name": "neededExperienceLevel",
+          "value": "0"
+        },
+        {
+          "name": "productionDuration",
+          "value": "36"
+        },
+        {
+          "name": "maxCapacity",
+          "value": "4"
+        },
+        {
+          "name": "maxShield",
+          "value": "0"
+        },
+        {
+          "name": "maxMana",
+          "value": "0"
+        },
+        {
+          "name": "maxArmor",
+          "value": "1"
+        },
+        {
+          "name": "sightRadius",
+          "value": "7"
+        },
+        {
+          "name": "attackType",
+          "value": "Single"
+        },
+        {
+          "name": "skillType",
+          "value": "None"
+        },
+        {
+          "name": "damage2",
+          "value": "0"
+        },
+        {
+          "name": "firePointCount",
+          "value": "2"
+        },
+        {
+          "name": "attack2Cooldown",
+          "value": "0"
+        },
+        {
+          "name": "effectRadius1",
+          "value": "0"
+        },
+        {
+          "name": "effectRadius2",
+          "value": "0"
+        },
+        {
+          "name": "skillRange",
+          "value": "0"
+        },
+        {
+          "name": "healAmount1",
+          "value": "0"
+        },
+        {
+          "name": "healAmount2",
+          "value": "0"
+        },
+        {
+          "name": "gainCreditsAmount",
+          "value": "0"
+        },
+        {
+          "name": "skillManaCost",
+          "value": "0"
+        },
+        {
+          "name": "duration1",
+          "value": "0"
+        },
+        {
+          "name": "duration2",
+          "value": "0"
+        }
       ],
       "customBalance": {
         "Damage1": 2.8
@@ -211,15 +526,34 @@
         "assetBundleId": "sample-native:assets",
         "cardImageAssetName": "assets/roguecommandexpansionsample/ironcladwalkercard.png",
         "balanceOverrides": [
-          { "name": "cost", "value": "1100" },
-          { "name": "neededExperienceLevel", "value": "0" },
-          { "name": "rarity", "value": "Common" }
+          {
+            "name": "cost",
+            "value": "1100"
+          },
+          {
+            "name": "neededExperienceLevel",
+            "value": "0"
+          },
+          {
+            "name": "rarity",
+            "value": "Common"
+          }
         ],
         "localizations": [
-          { "language": "en-US", "name": "Ironclad Walker Foundry", "description": "Produces Ironclad Gatling Walkers." },
-          { "language": "es-XL", "name": "Fundición de caminantes Ironclad", "description": "Produce caminantes Gatling acorazados." }
+          {
+            "language": "en-US",
+            "name": "Ironclad Walker Foundry",
+            "description": "Produces Ironclad Gatling Walkers."
+          },
+          {
+            "language": "es-XL",
+            "name": "Fundición de caminantes Ironclad",
+            "description": "Produce caminantes Gatling acorazados."
+          }
         ]
-      }
+      },
+      "visualAssetName": "assets/roguecommandexpansionsample/ironcladwalkervisual.prefab",
+      "visualRootPath": "RoboMarine_Mesh"
     },
     {
       "id": "sample-native:atlas-crane-mech",
@@ -243,37 +577,130 @@
         }
       ],
       "balanceOverrides": [
-        { "name": "roles", "value": "Unit, Mech, Supporter" },
-        { "name": "offeredSystemTags", "value": "Mech, Heal, EconomySupport" },
-        { "name": "cost", "value": "380" },
-        { "name": "maxHealth", "value": "420" },
-        { "name": "moveSpeed", "value": "12.0" },
-        { "name": "damage1", "value": "4" },
-        { "name": "attackCooldown", "value": "0.4" },
-        { "name": "weaponRange", "value": "6" },
-        { "name": "armorProtection", "value": "1" },
-        { "name": "rarity", "value": "Common" },
-        { "name": "neededExperienceLevel", "value": "0" },
-        { "name": "productionDuration", "value": "36" },
-        { "name": "maxCapacity", "value": "4" },
-        { "name": "maxShield", "value": "0" },
-        { "name": "maxMana", "value": "0" },
-        { "name": "maxArmor", "value": "1" },
-        { "name": "sightRadius", "value": "7" },
-        { "name": "attackType", "value": "Single" },
-        { "name": "skillType", "value": "None" },
-        { "name": "damage2", "value": "0" },
-        { "name": "firePointCount", "value": "2" },
-        { "name": "attack2Cooldown", "value": "0" },
-        { "name": "effectRadius1", "value": "0" },
-        { "name": "effectRadius2", "value": "0" },
-        { "name": "skillRange", "value": "0" },
-        { "name": "healAmount1", "value": "0" },
-        { "name": "healAmount2", "value": "0" },
-        { "name": "gainCreditsAmount", "value": "0" },
-        { "name": "skillManaCost", "value": "0" },
-        { "name": "duration1", "value": "0" },
-        { "name": "duration2", "value": "0" }
+        {
+          "name": "roles",
+          "value": "Unit, Mech, Supporter"
+        },
+        {
+          "name": "offeredSystemTags",
+          "value": "Mech, Heal, EconomySupport"
+        },
+        {
+          "name": "cost",
+          "value": "380"
+        },
+        {
+          "name": "maxHealth",
+          "value": "420"
+        },
+        {
+          "name": "moveSpeed",
+          "value": "12.0"
+        },
+        {
+          "name": "damage1",
+          "value": "4"
+        },
+        {
+          "name": "attackCooldown",
+          "value": "0.4"
+        },
+        {
+          "name": "weaponRange",
+          "value": "6"
+        },
+        {
+          "name": "armorProtection",
+          "value": "1"
+        },
+        {
+          "name": "rarity",
+          "value": "Common"
+        },
+        {
+          "name": "neededExperienceLevel",
+          "value": "0"
+        },
+        {
+          "name": "productionDuration",
+          "value": "36"
+        },
+        {
+          "name": "maxCapacity",
+          "value": "4"
+        },
+        {
+          "name": "maxShield",
+          "value": "0"
+        },
+        {
+          "name": "maxMana",
+          "value": "0"
+        },
+        {
+          "name": "maxArmor",
+          "value": "1"
+        },
+        {
+          "name": "sightRadius",
+          "value": "7"
+        },
+        {
+          "name": "attackType",
+          "value": "Single"
+        },
+        {
+          "name": "skillType",
+          "value": "None"
+        },
+        {
+          "name": "damage2",
+          "value": "0"
+        },
+        {
+          "name": "firePointCount",
+          "value": "2"
+        },
+        {
+          "name": "attack2Cooldown",
+          "value": "0"
+        },
+        {
+          "name": "effectRadius1",
+          "value": "0"
+        },
+        {
+          "name": "effectRadius2",
+          "value": "0"
+        },
+        {
+          "name": "skillRange",
+          "value": "0"
+        },
+        {
+          "name": "healAmount1",
+          "value": "0"
+        },
+        {
+          "name": "healAmount2",
+          "value": "0"
+        },
+        {
+          "name": "gainCreditsAmount",
+          "value": "0"
+        },
+        {
+          "name": "skillManaCost",
+          "value": "0"
+        },
+        {
+          "name": "duration1",
+          "value": "0"
+        },
+        {
+          "name": "duration2",
+          "value": "0"
+        }
       ],
       "customBalance": {
         "Damage1": 2.8
@@ -282,14 +709,33 @@
         "id": "sample-native:atlas-crane-mech-factory",
         "nativeTemplateId": "GatlingWalkerFactory",
         "balanceOverrides": [
-          { "name": "cost", "value": "1100" },
-          { "name": "neededExperienceLevel", "value": "0" },
-          { "name": "rarity", "value": "Common" }
+          {
+            "name": "cost",
+            "value": "1100"
+          },
+          {
+            "name": "neededExperienceLevel",
+            "value": "0"
+          },
+          {
+            "name": "rarity",
+            "value": "Common"
+          }
         ],
         "localizations": [
-          { "language": "en-US", "name": "Atlas Crane Foundry", "description": "Produces Atlas Crane Mechs." },
-          { "language": "es-XL", "name": "Fábrica de Mechas Grúa Atlas", "description": "Produce mechas grúa Atlas." }
-        ]
+          {
+            "language": "en-US",
+            "name": "Atlas Crane Foundry",
+            "description": "Produces Atlas Crane Mechs."
+          },
+          {
+            "language": "es-XL",
+            "name": "Fábrica de Mechas Grúa Atlas",
+            "description": "Produce mechas grúa Atlas."
+          }
+        ],
+        "assetBundleId": "sample-native:assets",
+        "cardImageAssetName": "assets/roguecommandexpansionsample/atlascranemechcard.png"
       }
     },
     {
@@ -312,50 +758,162 @@
         }
       ],
       "balanceOverrides": [
-        { "name": "roles", "value": "Unit, Mech, MassDestruction" },
-        { "name": "offeredSystemTags", "value": "Mech, Armor, AoE" },
-        { "name": "cost", "value": "410" },
-        { "name": "maxHealth", "value": "420" },
-        { "name": "moveSpeed", "value": "11.0" },
-        { "name": "damage1", "value": "4" },
-        { "name": "attackCooldown", "value": "1.0" },
-        { "name": "weaponRange", "value": "5.0" },
-        { "name": "armorProtection", "value": "1" },
-        { "name": "rarity", "value": "Common" },
-        { "name": "neededExperienceLevel", "value": "0" },
-        { "name": "productionDuration", "value": "42" },
-        { "name": "maxCapacity", "value": "4" },
-        { "name": "maxShield", "value": "0" },
-        { "name": "maxMana", "value": "0" },
-        { "name": "maxArmor", "value": "1" },
-        { "name": "sightRadius", "value": "7" },
-        { "name": "attackType", "value": "Single" },
-        { "name": "skillType", "value": "None" },
-        { "name": "damage2", "value": "0" },
-        { "name": "firePointCount", "value": "2" },
-        { "name": "attack2Cooldown", "value": "0" },
-        { "name": "effectRadius1", "value": "0" },
-        { "name": "effectRadius2", "value": "0" },
-        { "name": "skillRange", "value": "0" },
-        { "name": "healAmount1", "value": "0" },
-        { "name": "healAmount2", "value": "0" },
-        { "name": "gainCreditsAmount", "value": "0" },
-        { "name": "skillManaCost", "value": "0" },
-        { "name": "duration1", "value": "0" },
-        { "name": "duration2", "value": "0" }
+        {
+          "name": "roles",
+          "value": "Unit, Mech, MassDestruction"
+        },
+        {
+          "name": "offeredSystemTags",
+          "value": "Mech, Armor, AoE"
+        },
+        {
+          "name": "cost",
+          "value": "410"
+        },
+        {
+          "name": "maxHealth",
+          "value": "420"
+        },
+        {
+          "name": "moveSpeed",
+          "value": "11.0"
+        },
+        {
+          "name": "damage1",
+          "value": "4"
+        },
+        {
+          "name": "attackCooldown",
+          "value": "1.0"
+        },
+        {
+          "name": "weaponRange",
+          "value": "5.0"
+        },
+        {
+          "name": "armorProtection",
+          "value": "1"
+        },
+        {
+          "name": "rarity",
+          "value": "Common"
+        },
+        {
+          "name": "neededExperienceLevel",
+          "value": "0"
+        },
+        {
+          "name": "productionDuration",
+          "value": "42"
+        },
+        {
+          "name": "maxCapacity",
+          "value": "4"
+        },
+        {
+          "name": "maxShield",
+          "value": "0"
+        },
+        {
+          "name": "maxMana",
+          "value": "0"
+        },
+        {
+          "name": "maxArmor",
+          "value": "1"
+        },
+        {
+          "name": "sightRadius",
+          "value": "7"
+        },
+        {
+          "name": "attackType",
+          "value": "Single"
+        },
+        {
+          "name": "skillType",
+          "value": "None"
+        },
+        {
+          "name": "damage2",
+          "value": "0"
+        },
+        {
+          "name": "firePointCount",
+          "value": "2"
+        },
+        {
+          "name": "attack2Cooldown",
+          "value": "0"
+        },
+        {
+          "name": "effectRadius1",
+          "value": "0"
+        },
+        {
+          "name": "effectRadius2",
+          "value": "0"
+        },
+        {
+          "name": "skillRange",
+          "value": "0"
+        },
+        {
+          "name": "healAmount1",
+          "value": "0"
+        },
+        {
+          "name": "healAmount2",
+          "value": "0"
+        },
+        {
+          "name": "gainCreditsAmount",
+          "value": "0"
+        },
+        {
+          "name": "skillManaCost",
+          "value": "0"
+        },
+        {
+          "name": "duration1",
+          "value": "0"
+        },
+        {
+          "name": "duration2",
+          "value": "0"
+        }
       ],
       "productionBuilding": {
         "id": "sample-native:bastion-siege-mech-factory",
         "nativeTemplateId": "GatlingWalkerFactory",
         "balanceOverrides": [
-          { "name": "cost", "value": "1100" },
-          { "name": "neededExperienceLevel", "value": "0" },
-          { "name": "rarity", "value": "Common" }
+          {
+            "name": "cost",
+            "value": "1100"
+          },
+          {
+            "name": "neededExperienceLevel",
+            "value": "0"
+          },
+          {
+            "name": "rarity",
+            "value": "Common"
+          }
         ],
         "localizations": [
-          { "language": "en-US", "name": "Bastion Siege Foundry", "description": "Produces Bastion Siege Mechs." },
-          { "language": "es-XL", "name": "Fundición del Bastión", "description": "Produce mechas de asedio Bastión." }
-        ]
+          {
+            "language": "en-US",
+            "name": "Bastion Siege Foundry",
+            "description": "Produces Bastion Siege Mechs."
+          },
+          {
+            "language": "es-XL",
+            "name": "Fundición del Bastión",
+            "description": "Produce mechas de asedio Bastión."
+          }
+        ],
+        "assetBundleId": "sample-native:assets",
+        "cardImageAssetName": "assets/roguecommandexpansionsample/bastionsiegemechcard.png"
       }
     },
     {
@@ -382,37 +940,130 @@
         }
       ],
       "balanceOverrides": [
-        { "name": "roles", "value": "Unit, Mech, FrontalAttacker" },
-        { "name": "offeredSystemTags", "value": "Mech, Melee, Robust" },
-        { "name": "cost", "value": "500" },
-        { "name": "maxHealth", "value": "420" },
-        { "name": "moveSpeed", "value": "12" },
-        { "name": "sightRadius", "value": "7" },
-        { "name": "weaponRange", "value": "5.5" },
-        { "name": "attackCooldown", "value": "1" },
-        { "name": "rarity", "value": "Common" },
-        { "name": "neededExperienceLevel", "value": "0" },
-        { "name": "productionDuration", "value": "45" },
-        { "name": "maxCapacity", "value": "4" },
-        { "name": "maxShield", "value": "0" },
-        { "name": "maxMana", "value": "0" },
-        { "name": "maxArmor", "value": "0" },
-        { "name": "armorProtection", "value": "1" },
-        { "name": "attackType", "value": "Single" },
-        { "name": "skillType", "value": "None" },
-        { "name": "damage1", "value": "5" },
-        { "name": "damage2", "value": "0" },
-        { "name": "firePointCount", "value": "2" },
-        { "name": "attack2Cooldown", "value": "0" },
-        { "name": "effectRadius1", "value": "0" },
-        { "name": "effectRadius2", "value": "0" },
-        { "name": "skillRange", "value": "0" },
-        { "name": "healAmount1", "value": "0" },
-        { "name": "healAmount2", "value": "0" },
-        { "name": "gainCreditsAmount", "value": "0" },
-        { "name": "skillManaCost", "value": "0" },
-        { "name": "duration1", "value": "0" },
-        { "name": "duration2", "value": "0" }
+        {
+          "name": "roles",
+          "value": "Unit, Mech, FrontalAttacker"
+        },
+        {
+          "name": "offeredSystemTags",
+          "value": "Mech, Melee, Robust"
+        },
+        {
+          "name": "cost",
+          "value": "500"
+        },
+        {
+          "name": "maxHealth",
+          "value": "420"
+        },
+        {
+          "name": "moveSpeed",
+          "value": "12"
+        },
+        {
+          "name": "sightRadius",
+          "value": "7"
+        },
+        {
+          "name": "weaponRange",
+          "value": "5.5"
+        },
+        {
+          "name": "attackCooldown",
+          "value": "1"
+        },
+        {
+          "name": "rarity",
+          "value": "Common"
+        },
+        {
+          "name": "neededExperienceLevel",
+          "value": "0"
+        },
+        {
+          "name": "productionDuration",
+          "value": "45"
+        },
+        {
+          "name": "maxCapacity",
+          "value": "4"
+        },
+        {
+          "name": "maxShield",
+          "value": "0"
+        },
+        {
+          "name": "maxMana",
+          "value": "0"
+        },
+        {
+          "name": "maxArmor",
+          "value": "0"
+        },
+        {
+          "name": "armorProtection",
+          "value": "1"
+        },
+        {
+          "name": "attackType",
+          "value": "Single"
+        },
+        {
+          "name": "skillType",
+          "value": "None"
+        },
+        {
+          "name": "damage1",
+          "value": "5"
+        },
+        {
+          "name": "damage2",
+          "value": "0"
+        },
+        {
+          "name": "firePointCount",
+          "value": "2"
+        },
+        {
+          "name": "attack2Cooldown",
+          "value": "0"
+        },
+        {
+          "name": "effectRadius1",
+          "value": "0"
+        },
+        {
+          "name": "effectRadius2",
+          "value": "0"
+        },
+        {
+          "name": "skillRange",
+          "value": "0"
+        },
+        {
+          "name": "healAmount1",
+          "value": "0"
+        },
+        {
+          "name": "healAmount2",
+          "value": "0"
+        },
+        {
+          "name": "gainCreditsAmount",
+          "value": "0"
+        },
+        {
+          "name": "skillManaCost",
+          "value": "0"
+        },
+        {
+          "name": "duration1",
+          "value": "0"
+        },
+        {
+          "name": "duration2",
+          "value": "0"
+        }
       ],
       "productionBuilding": {
         "id": "sample-native:arachnid-hexapod-factory",
@@ -421,13 +1072,30 @@
         "visualAssetName": "assets/roguecommandexpansionsample/visualonly/prefabs/arachnidhexapodfactoryvisual.prefab",
         "visualRootPath": "GatlingWalkerFactory",
         "balanceOverrides": [
-          { "name": "cost", "value": "1100" },
-          { "name": "neededExperienceLevel", "value": "0" },
-          { "name": "rarity", "value": "Common" }
+          {
+            "name": "cost",
+            "value": "1100"
+          },
+          {
+            "name": "neededExperienceLevel",
+            "value": "0"
+          },
+          {
+            "name": "rarity",
+            "value": "Common"
+          }
         ],
         "localizations": [
-          { "language": "en-US", "name": "Arachnid Hexapod Gantry", "description": "Produces Arachnid Hexapods." },
-          { "language": "es-XL", "name": "Pórtico de ensamblaje Arácnido", "description": "Produce hexápodos Arácnidos." }
+          {
+            "language": "en-US",
+            "name": "Arachnid Hexapod Gantry",
+            "description": "Produces Arachnid Hexapods."
+          },
+          {
+            "language": "es-XL",
+            "name": "Pórtico de ensamblaje Arácnido",
+            "description": "Produce hexápodos Arácnidos."
+          }
         ]
       }
     },
@@ -455,37 +1123,130 @@
         }
       ],
       "balanceOverrides": [
-        { "name": "roles", "value": "Unit, Vehicle, Supporter" },
-        { "name": "offeredSystemTags", "value": "Vehicle, Strength, EconomySupport" },
-        { "name": "cost", "value": "240" },
-        { "name": "maxHealth", "value": "220" },
-        { "name": "moveSpeed", "value": "10.5" },
-        { "name": "sightRadius", "value": "6" },
-        { "name": "weaponRange", "value": "4.2" },
-        { "name": "attackCooldown", "value": "3" },
-        { "name": "rarity", "value": "Common" },
-        { "name": "neededExperienceLevel", "value": "0" },
-        { "name": "productionDuration", "value": "48" },
-        { "name": "maxCapacity", "value": "5" },
-        { "name": "maxShield", "value": "0" },
-        { "name": "maxMana", "value": "0" },
-        { "name": "maxArmor", "value": "0" },
-        { "name": "armorProtection", "value": "1" },
-        { "name": "attackType", "value": "Single" },
-        { "name": "skillType", "value": "None" },
-        { "name": "damage1", "value": "8" },
-        { "name": "damage2", "value": "0" },
-        { "name": "firePointCount", "value": "2" },
-        { "name": "attack2Cooldown", "value": "0" },
-        { "name": "effectRadius1", "value": "0.2" },
-        { "name": "effectRadius2", "value": "0" },
-        { "name": "skillRange", "value": "0" },
-        { "name": "healAmount1", "value": "0" },
-        { "name": "healAmount2", "value": "0" },
-        { "name": "gainCreditsAmount", "value": "0" },
-        { "name": "skillManaCost", "value": "0" },
-        { "name": "duration1", "value": "0" },
-        { "name": "duration2", "value": "0" }
+        {
+          "name": "roles",
+          "value": "Unit, Vehicle, Supporter"
+        },
+        {
+          "name": "offeredSystemTags",
+          "value": "Vehicle, Strength, EconomySupport"
+        },
+        {
+          "name": "cost",
+          "value": "240"
+        },
+        {
+          "name": "maxHealth",
+          "value": "220"
+        },
+        {
+          "name": "moveSpeed",
+          "value": "10.5"
+        },
+        {
+          "name": "sightRadius",
+          "value": "6"
+        },
+        {
+          "name": "weaponRange",
+          "value": "4.2"
+        },
+        {
+          "name": "attackCooldown",
+          "value": "3"
+        },
+        {
+          "name": "rarity",
+          "value": "Common"
+        },
+        {
+          "name": "neededExperienceLevel",
+          "value": "0"
+        },
+        {
+          "name": "productionDuration",
+          "value": "48"
+        },
+        {
+          "name": "maxCapacity",
+          "value": "5"
+        },
+        {
+          "name": "maxShield",
+          "value": "0"
+        },
+        {
+          "name": "maxMana",
+          "value": "0"
+        },
+        {
+          "name": "maxArmor",
+          "value": "0"
+        },
+        {
+          "name": "armorProtection",
+          "value": "1"
+        },
+        {
+          "name": "attackType",
+          "value": "Single"
+        },
+        {
+          "name": "skillType",
+          "value": "None"
+        },
+        {
+          "name": "damage1",
+          "value": "8"
+        },
+        {
+          "name": "damage2",
+          "value": "0"
+        },
+        {
+          "name": "firePointCount",
+          "value": "2"
+        },
+        {
+          "name": "attack2Cooldown",
+          "value": "0"
+        },
+        {
+          "name": "effectRadius1",
+          "value": "0.2"
+        },
+        {
+          "name": "effectRadius2",
+          "value": "0"
+        },
+        {
+          "name": "skillRange",
+          "value": "0"
+        },
+        {
+          "name": "healAmount1",
+          "value": "0"
+        },
+        {
+          "name": "healAmount2",
+          "value": "0"
+        },
+        {
+          "name": "gainCreditsAmount",
+          "value": "0"
+        },
+        {
+          "name": "skillManaCost",
+          "value": "0"
+        },
+        {
+          "name": "duration1",
+          "value": "0"
+        },
+        {
+          "name": "duration2",
+          "value": "0"
+        }
       ],
       "productionBuilding": {
         "id": "sample-native:overlord-command-hq-factory",
@@ -494,13 +1255,30 @@
         "visualAssetName": "assets/roguecommandexpansionsample/visualonly/prefabs/overlordcommandhqfactoryvisual.prefab",
         "visualRootPath": "PCXBaseTankFactory",
         "balanceOverrides": [
-          { "name": "cost", "value": "700" },
-          { "name": "neededExperienceLevel", "value": "0" },
-          { "name": "rarity", "value": "Common" }
+          {
+            "name": "cost",
+            "value": "700"
+          },
+          {
+            "name": "neededExperienceLevel",
+            "value": "0"
+          },
+          {
+            "name": "rarity",
+            "value": "Common"
+          }
         ],
         "localizations": [
-          { "language": "en-US", "name": "Overlord Command Motor Pool", "description": "Produces Overlord Command HQ vehicles." },
-          { "language": "es-XL", "name": "Parque de vehículos Overlord", "description": "Produce vehículos del Cuartel General Overlord." }
+          {
+            "language": "en-US",
+            "name": "Overlord Command Motor Pool",
+            "description": "Produces Overlord Command HQ vehicles."
+          },
+          {
+            "language": "es-XL",
+            "name": "Parque de vehículos Overlord",
+            "description": "Produce vehículos del Cuartel General Overlord."
+          }
         ]
       }
     },
@@ -529,50 +1307,162 @@
         }
       ],
       "balanceOverrides": [
-        { "name": "roles", "value": "Unit, Vehicle, Bomb" },
-        { "name": "offeredSystemTags", "value": "Vehicle, Bomb, SpawnDuration" },
-        { "name": "cost", "value": "55" },
-        { "name": "maxHealth", "value": "75" },
-        { "name": "moveSpeed", "value": "24.0" },
-        { "name": "damage1", "value": "32" },
-        { "name": "effectRadius1", "value": "1.8" },
-        { "name": "attackType", "value": "AoE" },
-        { "name": "rarity", "value": "Common" },
-        { "name": "neededExperienceLevel", "value": "0" },
-        { "name": "productionDuration", "value": "10" },
-        { "name": "maxCapacity", "value": "10" },
-        { "name": "maxShield", "value": "0" },
-        { "name": "maxMana", "value": "0" },
-        { "name": "maxArmor", "value": "0" },
-        { "name": "armorProtection", "value": "0" },
-        { "name": "sightRadius", "value": "5" },
-        { "name": "skillType", "value": "Location" },
-        { "name": "damage2", "value": "0" },
-        { "name": "firePointCount", "value": "1" },
-        { "name": "weaponRange", "value": "0" },
-        { "name": "attackCooldown", "value": "0" },
-        { "name": "attack2Cooldown", "value": "0" },
-        { "name": "effectRadius2", "value": "0" },
-        { "name": "skillRange", "value": "4" },
-        { "name": "healAmount1", "value": "0" },
-        { "name": "healAmount2", "value": "0" },
-        { "name": "gainCreditsAmount", "value": "0" },
-        { "name": "skillManaCost", "value": "0" },
-        { "name": "duration1", "value": "0" },
-        { "name": "duration2", "value": "120" }
+        {
+          "name": "roles",
+          "value": "Unit, Vehicle, Bomb"
+        },
+        {
+          "name": "offeredSystemTags",
+          "value": "Vehicle, Bomb, SpawnDuration"
+        },
+        {
+          "name": "cost",
+          "value": "55"
+        },
+        {
+          "name": "maxHealth",
+          "value": "75"
+        },
+        {
+          "name": "moveSpeed",
+          "value": "24.0"
+        },
+        {
+          "name": "damage1",
+          "value": "32"
+        },
+        {
+          "name": "effectRadius1",
+          "value": "1.8"
+        },
+        {
+          "name": "attackType",
+          "value": "AoE"
+        },
+        {
+          "name": "rarity",
+          "value": "Common"
+        },
+        {
+          "name": "neededExperienceLevel",
+          "value": "0"
+        },
+        {
+          "name": "productionDuration",
+          "value": "10"
+        },
+        {
+          "name": "maxCapacity",
+          "value": "10"
+        },
+        {
+          "name": "maxShield",
+          "value": "0"
+        },
+        {
+          "name": "maxMana",
+          "value": "0"
+        },
+        {
+          "name": "maxArmor",
+          "value": "0"
+        },
+        {
+          "name": "armorProtection",
+          "value": "0"
+        },
+        {
+          "name": "sightRadius",
+          "value": "5"
+        },
+        {
+          "name": "skillType",
+          "value": "Location"
+        },
+        {
+          "name": "damage2",
+          "value": "0"
+        },
+        {
+          "name": "firePointCount",
+          "value": "1"
+        },
+        {
+          "name": "weaponRange",
+          "value": "0"
+        },
+        {
+          "name": "attackCooldown",
+          "value": "0"
+        },
+        {
+          "name": "attack2Cooldown",
+          "value": "0"
+        },
+        {
+          "name": "effectRadius2",
+          "value": "0"
+        },
+        {
+          "name": "skillRange",
+          "value": "4"
+        },
+        {
+          "name": "healAmount1",
+          "value": "0"
+        },
+        {
+          "name": "healAmount2",
+          "value": "0"
+        },
+        {
+          "name": "gainCreditsAmount",
+          "value": "0"
+        },
+        {
+          "name": "skillManaCost",
+          "value": "0"
+        },
+        {
+          "name": "duration1",
+          "value": "0"
+        },
+        {
+          "name": "duration2",
+          "value": "120"
+        }
       ],
       "productionBuilding": {
         "id": "sample-native:skirmish-bike-factory",
         "nativeTemplateId": "BombBikeFactory",
         "balanceOverrides": [
-          { "name": "cost", "value": "280" },
-          { "name": "neededExperienceLevel", "value": "0" },
-          { "name": "rarity", "value": "Common" }
+          {
+            "name": "cost",
+            "value": "280"
+          },
+          {
+            "name": "neededExperienceLevel",
+            "value": "0"
+          },
+          {
+            "name": "rarity",
+            "value": "Common"
+          }
         ],
         "localizations": [
-          { "language": "en-US", "name": "Skirmish Bike Garage", "description": "Produces Skirmish Strike Bikes." },
-          { "language": "es-XL", "name": "Taller de motos de asalto", "description": "Produce motos de asalto rápido." }
-        ]
+          {
+            "language": "en-US",
+            "name": "Skirmish Bike Garage",
+            "description": "Produces Skirmish Strike Bikes."
+          },
+          {
+            "language": "es-XL",
+            "name": "Taller de motos de asalto",
+            "description": "Produce motos de asalto rápido."
+          }
+        ],
+        "assetBundleId": "sample-native:assets",
+        "cardImageAssetName": "assets/roguecommandexpansionsample/skirmishbikecard.png"
       }
     },
     {
@@ -595,50 +1485,162 @@
         }
       ],
       "balanceOverrides": [
-        { "name": "roles", "value": "Unit, Tank, FrontalAttacker" },
-        { "name": "offeredSystemTags", "value": "Tank, Stun, Shield" },
-        { "name": "cost", "value": "210" },
-        { "name": "maxHealth", "value": "150" },
-        { "name": "moveSpeed", "value": "13.0" },
-        { "name": "damage1", "value": "12" },
-        { "name": "attackCooldown", "value": "1.8" },
-        { "name": "weaponRange", "value": "4.5" },
-        { "name": "armorProtection", "value": "2" },
-        { "name": "rarity", "value": "Common" },
-        { "name": "neededExperienceLevel", "value": "0" },
-        { "name": "productionDuration", "value": "30" },
-        { "name": "maxCapacity", "value": "5" },
-        { "name": "maxShield", "value": "5" },
-        { "name": "maxMana", "value": "0" },
-        { "name": "maxArmor", "value": "0" },
-        { "name": "sightRadius", "value": "6" },
-        { "name": "attackType", "value": "Beam" },
-        { "name": "skillType", "value": "None" },
-        { "name": "damage2", "value": "0" },
-        { "name": "firePointCount", "value": "1" },
-        { "name": "attack2Cooldown", "value": "0" },
-        { "name": "effectRadius1", "value": "0" },
-        { "name": "effectRadius2", "value": "0" },
-        { "name": "skillRange", "value": "0" },
-        { "name": "healAmount1", "value": "0" },
-        { "name": "healAmount2", "value": "0" },
-        { "name": "gainCreditsAmount", "value": "0" },
-        { "name": "skillManaCost", "value": "0" },
-        { "name": "duration1", "value": "0" },
-        { "name": "duration2", "value": "0" }
+        {
+          "name": "roles",
+          "value": "Unit, Tank, FrontalAttacker"
+        },
+        {
+          "name": "offeredSystemTags",
+          "value": "Tank, Stun, Shield"
+        },
+        {
+          "name": "cost",
+          "value": "210"
+        },
+        {
+          "name": "maxHealth",
+          "value": "150"
+        },
+        {
+          "name": "moveSpeed",
+          "value": "13.0"
+        },
+        {
+          "name": "damage1",
+          "value": "12"
+        },
+        {
+          "name": "attackCooldown",
+          "value": "1.8"
+        },
+        {
+          "name": "weaponRange",
+          "value": "4.5"
+        },
+        {
+          "name": "armorProtection",
+          "value": "2"
+        },
+        {
+          "name": "rarity",
+          "value": "Common"
+        },
+        {
+          "name": "neededExperienceLevel",
+          "value": "0"
+        },
+        {
+          "name": "productionDuration",
+          "value": "30"
+        },
+        {
+          "name": "maxCapacity",
+          "value": "5"
+        },
+        {
+          "name": "maxShield",
+          "value": "5"
+        },
+        {
+          "name": "maxMana",
+          "value": "0"
+        },
+        {
+          "name": "maxArmor",
+          "value": "0"
+        },
+        {
+          "name": "sightRadius",
+          "value": "6"
+        },
+        {
+          "name": "attackType",
+          "value": "Beam"
+        },
+        {
+          "name": "skillType",
+          "value": "None"
+        },
+        {
+          "name": "damage2",
+          "value": "0"
+        },
+        {
+          "name": "firePointCount",
+          "value": "1"
+        },
+        {
+          "name": "attack2Cooldown",
+          "value": "0"
+        },
+        {
+          "name": "effectRadius1",
+          "value": "0"
+        },
+        {
+          "name": "effectRadius2",
+          "value": "0"
+        },
+        {
+          "name": "skillRange",
+          "value": "0"
+        },
+        {
+          "name": "healAmount1",
+          "value": "0"
+        },
+        {
+          "name": "healAmount2",
+          "value": "0"
+        },
+        {
+          "name": "gainCreditsAmount",
+          "value": "0"
+        },
+        {
+          "name": "skillManaCost",
+          "value": "0"
+        },
+        {
+          "name": "duration1",
+          "value": "0"
+        },
+        {
+          "name": "duration2",
+          "value": "0"
+        }
       ],
       "productionBuilding": {
         "id": "sample-native:surge-tank-factory",
         "nativeTemplateId": "LightningTankFactory",
         "balanceOverrides": [
-          { "name": "cost", "value": "650" },
-          { "name": "neededExperienceLevel", "value": "0" },
-          { "name": "rarity", "value": "Common" }
+          {
+            "name": "cost",
+            "value": "650"
+          },
+          {
+            "name": "neededExperienceLevel",
+            "value": "0"
+          },
+          {
+            "name": "rarity",
+            "value": "Common"
+          }
         ],
         "localizations": [
-          { "language": "en-US", "name": "Surge Arc Foundry", "description": "Produces Surge Arc Tanks." },
-          { "language": "es-XL", "name": "Planta de tanques Surge Arc", "description": "Produce tanques de sobretensión de arco." }
-        ]
+          {
+            "language": "en-US",
+            "name": "Surge Arc Foundry",
+            "description": "Produces Surge Arc Tanks."
+          },
+          {
+            "language": "es-XL",
+            "name": "Planta de tanques Surge Arc",
+            "description": "Produce tanques de sobretensión de arco."
+          }
+        ],
+        "assetBundleId": "sample-native:assets",
+        "cardImageAssetName": "assets/roguecommandexpansionsample/surgearctankcard.png"
       }
     }
   ],
@@ -647,14 +1649,38 @@
       "id": "sample-native:training-variant",
       "nativeTemplateId": "StageParameters_Pools_Level1SimpleRoleChoiceWithPriceLimit",
       "parameterOverrides": [
-        { "name": "levelCount", "value": "8" },
-        { "name": "maxWidth", "value": "5" },
-        { "name": "coinReward", "value": "160" },
-        { "name": "twoWayBranchingProbability", "value": "0.6" },
-        { "name": "shopWeight", "value": "1.8" },
-        { "name": "cardRewardWeight", "value": "3.5" },
-        { "name": "fillFirstLevelWithCardRewards", "value": "true" },
-        { "name": "putDefaultCardRewardInCenter", "value": "true" }
+        {
+          "name": "levelCount",
+          "value": "8"
+        },
+        {
+          "name": "maxWidth",
+          "value": "5"
+        },
+        {
+          "name": "coinReward",
+          "value": "160"
+        },
+        {
+          "name": "twoWayBranchingProbability",
+          "value": "0.6"
+        },
+        {
+          "name": "shopWeight",
+          "value": "1.8"
+        },
+        {
+          "name": "cardRewardWeight",
+          "value": "3.5"
+        },
+        {
+          "name": "fillFirstLevelWithCardRewards",
+          "value": "true"
+        },
+        {
+          "name": "putDefaultCardRewardInCenter",
+          "value": "true"
+        }
       ],
       "mapSizeMin": 20,
       "mapSizeMax": 60,
@@ -665,8 +1691,14 @@
         "alwaysUseSameSeed": true,
         "mapSize": 31,
         "localizations": [
-          { "language": "en-US", "name": "Sandlance Training Ground" },
-          { "language": "es-XL", "name": "Campo de Entrenamiento Sandlance" }
+          {
+            "language": "en-US",
+            "name": "Sandlance Training Ground"
+          },
+          {
+            "language": "es-XL",
+            "name": "Campo de Entrenamiento Sandlance"
+          }
         ]
       },
       "unitIds": [
@@ -706,14 +1738,38 @@
       "id": "sample-native:fortified-frontline",
       "nativeTemplateId": "StageParameters_Pools_Level3",
       "parameterOverrides": [
-        { "name": "levelCount", "value": "10" },
-        { "name": "maxWidth", "value": "6" },
-        { "name": "coinReward", "value": "240" },
-        { "name": "startCrystalReward", "value": "80" },
-        { "name": "twoWayBranchingProbability", "value": "0.75" },
-        { "name": "upgradeRewardWeight", "value": "3.0" },
-        { "name": "shopWeight", "value": "2.0" },
-        { "name": "fillLastLevelWithShops", "value": "true" }
+        {
+          "name": "levelCount",
+          "value": "10"
+        },
+        {
+          "name": "maxWidth",
+          "value": "6"
+        },
+        {
+          "name": "coinReward",
+          "value": "240"
+        },
+        {
+          "name": "startCrystalReward",
+          "value": "80"
+        },
+        {
+          "name": "twoWayBranchingProbability",
+          "value": "0.75"
+        },
+        {
+          "name": "upgradeRewardWeight",
+          "value": "3.0"
+        },
+        {
+          "name": "shopWeight",
+          "value": "2.0"
+        },
+        {
+          "name": "fillLastLevelWithShops",
+          "value": "true"
+        }
       ],
       "mapSizeMin": 35,
       "mapSizeMax": 80,
@@ -776,13 +1832,34 @@
       "id": "sample-native:core-battleground",
       "nativeTemplateId": "StageParameters_Pools_Level3",
       "parameterOverrides": [
-        { "name": "levelCount", "value": "12" },
-        { "name": "maxWidth", "value": "7" },
-        { "name": "coinReward", "value": "350" },
-        { "name": "startCrystalReward", "value": "150" },
-        { "name": "twoWayBranchingProbability", "value": "0.85" },
-        { "name": "relicRewardWeight", "value": "2.5" },
-        { "name": "upgradeRewardWeight", "value": "3.5" }
+        {
+          "name": "levelCount",
+          "value": "12"
+        },
+        {
+          "name": "maxWidth",
+          "value": "7"
+        },
+        {
+          "name": "coinReward",
+          "value": "350"
+        },
+        {
+          "name": "startCrystalReward",
+          "value": "150"
+        },
+        {
+          "name": "twoWayBranchingProbability",
+          "value": "0.85"
+        },
+        {
+          "name": "relicRewardWeight",
+          "value": "2.5"
+        },
+        {
+          "name": "upgradeRewardWeight",
+          "value": "3.5"
+        }
       ],
       "mapSizeMin": 35,
       "mapSizeMax": 80,
@@ -854,9 +1931,18 @@
         {
           "moduleId": "sample:scheduled-base-build",
           "parameters": [
-            { "name": "intervalSeconds", "value": "8" },
-            { "name": "maxSuccessfulBuilds", "value": "2" },
-            { "name": "maxAttempts", "value": "4" }
+            {
+              "name": "intervalSeconds",
+              "value": "8"
+            },
+            {
+              "name": "maxSuccessfulBuilds",
+              "value": "2"
+            },
+            {
+              "name": "maxAttempts",
+              "value": "4"
+            }
           ]
         }
       ]
@@ -870,9 +1956,18 @@
         {
           "moduleId": "sample:scheduled-base-build",
           "parameters": [
-            { "name": "intervalSeconds", "value": "12" },
-            { "name": "maxSuccessfulBuilds", "value": "3" },
-            { "name": "maxAttempts", "value": "5" }
+            {
+              "name": "intervalSeconds",
+              "value": "12"
+            },
+            {
+              "name": "maxSuccessfulBuilds",
+              "value": "3"
+            },
+            {
+              "name": "maxAttempts",
+              "value": "5"
+            }
           ]
         }
       ]
@@ -886,29 +1981,68 @@
         {
           "moduleId": "sample:scheduled-base-build",
           "parameters": [
-            { "name": "intervalSeconds", "value": "10" },
-            { "name": "maxSuccessfulBuilds", "value": "2" },
-            { "name": "maxAttempts", "value": "3" }
+            {
+              "name": "intervalSeconds",
+              "value": "10"
+            },
+            {
+              "name": "maxSuccessfulBuilds",
+              "value": "2"
+            },
+            {
+              "name": "maxAttempts",
+              "value": "3"
+            }
           ]
         },
         {
           "moduleId": "sample:harvester-raider",
           "parameters": [
-            { "name": "baseIndex", "value": "0" },
-            { "name": "scanIntervalSeconds", "value": "12" },
-            { "name": "cooldownSeconds", "value": "25" },
-            { "name": "raidSquadSize", "value": "3" },
-            { "name": "minGameTimeSeconds", "value": "15" }
+            {
+              "name": "baseIndex",
+              "value": "0"
+            },
+            {
+              "name": "scanIntervalSeconds",
+              "value": "12"
+            },
+            {
+              "name": "cooldownSeconds",
+              "value": "25"
+            },
+            {
+              "name": "raidSquadSize",
+              "value": "3"
+            },
+            {
+              "name": "minGameTimeSeconds",
+              "value": "15"
+            }
           ]
         },
         {
           "moduleId": "sample:siege-assault",
           "parameters": [
-            { "name": "baseIndex", "value": "0" },
-            { "name": "cooldownSeconds", "value": "45" },
-            { "name": "minSquadSize", "value": "3" },
-            { "name": "targetPriority", "value": "Refinery" },
-            { "name": "minGameTimeSeconds", "value": "25" }
+            {
+              "name": "baseIndex",
+              "value": "0"
+            },
+            {
+              "name": "cooldownSeconds",
+              "value": "45"
+            },
+            {
+              "name": "minSquadSize",
+              "value": "3"
+            },
+            {
+              "name": "targetPriority",
+              "value": "Refinery"
+            },
+            {
+              "name": "minGameTimeSeconds",
+              "value": "25"
+            }
           ]
         }
       ]
