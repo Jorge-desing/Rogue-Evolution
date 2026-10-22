@@ -1781,21 +1781,7 @@
         "sample-native:overlord-command-hq",
         "sample-native:surge-tank"
       ],
-      "blueprintPoolEntries": [
-        {
-          "poolId": "BP_CheaperMechs",
-          "unitIds": [
-            "sample-native:scout-tank",
-            "sample-native:heavy-artillery",
-            "sample-native:assault-walker",
-            "sample-native:atlas-crane-mech",
-            "sample-native:bastion-siege-mech",
-            "sample-native:arachnid-hexapod",
-            "sample-native:overlord-command-hq",
-            "sample-native:surge-tank"
-          ]
-        }
-      ],
+      "blueprintPoolEntries": null,
       "aiProfileIds": [
         "sample-native:quick-hunter-extension",
         "sample-native:horde-swarm-assault"
@@ -1848,22 +1834,7 @@
         "sample-native:skirmish-bike",
         "sample-native:surge-tank"
       ],
-      "blueprintPoolEntries": [
-        {
-          "poolId": "BP_CheaperMechs",
-          "unitIds": [
-            "sample-native:scout-tank",
-            "sample-native:heavy-artillery",
-            "sample-native:assault-walker",
-            "sample-native:atlas-crane-mech",
-            "sample-native:bastion-siege-mech",
-            "sample-native:arachnid-hexapod",
-            "sample-native:overlord-command-hq",
-            "sample-native:skirmish-bike",
-            "sample-native:surge-tank"
-          ]
-        }
-      ],
+      "blueprintPoolEntries": null,
       "aiProfileIds": [
         "sample-native:quick-hunter-extension",
         "sample-native:horde-swarm-assault",
