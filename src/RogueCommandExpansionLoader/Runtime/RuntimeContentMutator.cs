@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Threading;
+using RogueCommandExpansionLoader.Content;
 
 namespace RogueCommandExpansionLoader.Runtime
 {
@@ -14,38 +15,8 @@ namespace RogueCommandExpansionLoader.Runtime
     /// </summary>
     internal sealed class RuntimeContentMutator
     {
-        private enum ParameterType { Int, Float }
-        private static readonly Dictionary<string, ParameterType> ParamMap = new Dictionary<string, ParameterType> {
-            { "AttackSpeed", ParameterType.Float },
-            { "ArmorValue", ParameterType.Int },
-            { "MaxHealth", ParameterType.Int },
-            { "MaxShield", ParameterType.Int },
-            { "MoveSpeed", ParameterType.Float },
-            { "Damage", ParameterType.Float },
-            { "Cost", ParameterType.Int },
-            { "ProductionDuration", ParameterType.Float },
-            { "MaxCapacity", ParameterType.Int },
-            { "MaxMana", ParameterType.Int },
-            { "MaxRank", ParameterType.Int },
-            { "SightRadius", ParameterType.Int },
-            { "Damage1", ParameterType.Float },
-            { "Damage2", ParameterType.Float },
-            { "WeaponRange", ParameterType.Float },
-            { "Attack1Cooldown", ParameterType.Float },
-            { "Attack2Cooldown", ParameterType.Float },
-            { "EffectRadius1", ParameterType.Float },
-            { "EffectRadius2", ParameterType.Float },
-            { "SkillRange", ParameterType.Int },
-            { "HealAmount1", ParameterType.Float },
-            { "HealAmount2", ParameterType.Float },
-            { "GainCreditsAmount", ParameterType.Float },
-            { "SkillManaCost", ParameterType.Float },
-            { "Duration1", ParameterType.Float },
-            { "SpawnTtl", ParameterType.Float },
-            { "ManaRechargePerSecond", ParameterType.Float },
-            { "MaxArmor", ParameterType.Float },
-            { "ArmorProtection", ParameterType.Float },
-        };
+        private static readonly Dictionary<string, BalanceParameterDefinition> ParamMap =
+            UnitBalanceOverrideMapper.CreateBalanceParameterMap();
 
         private const BindingFlags StaticFields = BindingFlags.Public | BindingFlags.NonPublic |
             BindingFlags.Static | BindingFlags.FlattenHierarchy;
@@ -64,7 +35,6 @@ namespace RogueCommandExpansionLoader.Runtime
         private readonly Type _defaultAiType;
         private readonly Type _intValueCacheEntryType;
         private readonly Type _floatValueCacheEntryType;
-        private readonly Type _changeableValueType;
 
         private readonly FieldInfo _entityIdField;
         private readonly FieldInfo _factoryForEntityIdField;
@@ -197,8 +167,6 @@ namespace RogueCommandExpansionLoader.Runtime
                     "EntityBalancingStore.ChangeableValue is not the verified enum type.");
             }
 
-            _changeableValueType = changeableValueType;
-
             _intValueCacheEntryType = typeof(Dictionary<,>).MakeGenericType(
                 changeableValueType, typeof(int));
             _floatValueCacheEntryType = typeof(Dictionary<,>).MakeGenericType(
@@ -311,6 +279,12 @@ namespace RogueCommandExpansionLoader.Runtime
                         }
                     }
 
+                    if (!TryApplyBalanceOverridesToRows(materializedRows,
+                            _provider.GetBalanceOverrides()))
+                    {
+                        return false;
+                    }
+
                     if (!TryRegisterEntityRows(materializedRows, rowsList, index, factoryMap, imageCache,
                             intValueCache, floatValueCache))
                     {
@@ -340,98 +314,150 @@ namespace RogueCommandExpansionLoader.Runtime
                 }
             }
 
-            if (registrationSucceeded)
-            {
-                ApplyBalanceOverrides();
-            }
-
             return registrationSucceeded;
         }
 
-        public void ApplyBalanceOverrides()
+        // Write base stats into the incoming value-type rows before registration.
+        // The native store then owns cache population and re-applies its card changes.
+        private bool TryApplyBalanceOverridesToRows(
+            IList<object> rows,
+            IEnumerable<BalanceOverride> overrides)
         {
-            if (!EnsureUnityMainThread("balance overrides"))
+            if (overrides == null)
             {
-                return;
+                return true;
             }
 
-            lock (_gate)
+            var rowIndices = new Dictionary<string, int>(StringComparer.Ordinal);
+            for (int i = 0; i < rows.Count; i++)
             {
-                var overrides = _provider.GetBalanceOverrides();
-                if (overrides == null)
+                object row = rows[i];
+                if (row == null || row.GetType() != _entityRowType)
                 {
-                    return;
+                    Log("Entity balance overrides could not be applied because the supplied row has an unexpected type.");
+                    return false;
                 }
 
-                IDictionary intValueCache = _changeableIntValueCacheField.GetValue(null) as IDictionary;
-                IDictionary floatValueCache = _changeableFloatValueCacheField.GetValue(null) as IDictionary;
-
-                if (intValueCache == null || floatValueCache == null)
+                string entityId = ReadEntityId(row);
+                if (String.IsNullOrWhiteSpace(entityId) || !rowIndices.TryAdd(entityId, i))
                 {
-                    Log("Balance caches not initialized; could not apply overrides.");
-                    return;
-                }
-
-                IDictionary index = _entityIndexField.GetValue(null) as IDictionary;
-
-                foreach (var ovr in overrides)
-                {
-                    if (ovr == null || string.IsNullOrWhiteSpace(ovr.EntityId))
-                    {
-                        continue;
-                    }
-
-                    if (!index.Contains(ovr.EntityId))
-                    {
-                        continue;
-                    }
-
-                    if (ovr.Parameters == null)
-                    {
-                        continue;
-                    }
-
-                    foreach (var param in ovr.Parameters)
-                    {
-                        string name = param.Key;
-                        float value = param.Value;
-
-                        if (!ParamMap.TryGetValue(name, out ParameterType type))
-                        {
-                            continue;
-                        }
-
-                        try
-                        {
-                            Type enumType = _changeableValueType;
-                            object enumValue = Enum.Parse(enumType, name, true);
-
-                            if (type == ParameterType.Int)
-                            {
-                                if (!intValueCache.Contains(ovr.EntityId))
-                                {
-                                    intValueCache[ovr.EntityId] = Activator.CreateInstance(typeof(Dictionary<,>).MakeGenericType(enumType, typeof(int)));
-                                }
-                                var inner = intValueCache[ovr.EntityId] as IDictionary;
-                                inner[enumValue] = (int)value;
-                            }
-                            else
-                            {
-                                if (!floatValueCache.Contains(ovr.EntityId))
-                                {
-                                    floatValueCache[ovr.EntityId] = Activator.CreateInstance(typeof(Dictionary<,>).MakeGenericType(enumType, typeof(float)));
-                                }
-                                var inner = floatValueCache[ovr.EntityId] as IDictionary;
-                                inner[enumValue] = value;
-                            }
-                        }
-                        catch (Exception exception)
-                        {
-                            Log("Could not apply balance parameter '" + name + "' to '" + ovr.EntityId + "': " + exception.Message);
-                        }
-                    }
+                    Log("Entity balance overrides could not be applied because supplied row IDs are empty or duplicated.");
+                    return false;
                 }
             }
+
+            var seenOverrideIds = new HashSet<string>(StringComparer.Ordinal);
+            var assignments = new List<(object Row, FieldInfo Field, object Value)>();
+            foreach (BalanceOverride balanceOverride in overrides)
+            {
+                if (balanceOverride == null || String.IsNullOrWhiteSpace(balanceOverride.EntityId) ||
+                    !seenOverrideIds.Add(balanceOverride.EntityId))
+                {
+                    Log("Entity balance overrides contain an empty or duplicated entity ID.");
+                    return false;
+                }
+
+                if (!rowIndices.TryGetValue(balanceOverride.EntityId, out int rowIndex))
+                {
+                    Log("Balance override target '" + balanceOverride.EntityId +
+                        "' is not present in the supplied entity rows.");
+                    return false;
+                }
+
+                if (balanceOverride.Parameters == null)
+                {
+                    continue;
+                }
+
+                object row = rows[rowIndex];
+                foreach (KeyValuePair<string, double> parameter in balanceOverride.Parameters)
+                {
+                    if (!ParamMap.TryGetValue(parameter.Key, out BalanceParameterDefinition definition))
+                    {
+                        Log("Unknown balance parameter '" + parameter.Key + "' for '" +
+                            balanceOverride.EntityId + "'.");
+                        return false;
+                    }
+
+                    Type expectedFieldType = definition.StorageType == BalanceParameterType.Int
+                        ? typeof(int)
+                        : typeof(float);
+                    FieldInfo field;
+                    try
+                    {
+                        field = RuntimeReflection.FindField(_entityRowType, definition.RowFieldName, InstanceFields);
+                    }
+                    catch (Exception exception)
+                    {
+                        Log("Could not resolve balance row field '" + definition.RowFieldName + "': " +
+                            exception.Message);
+                        return false;
+                    }
+
+                    if (field.IsStatic || field.FieldType != expectedFieldType ||
+                        !TryConvertBalanceParameter(parameter.Value, definition.StorageType, out object value))
+                    {
+                        Log("Balance parameter '" + parameter.Key + "' does not match the verified row field '" +
+                            definition.RowFieldName + "' or has an invalid value.");
+                        return false;
+                    }
+
+                    assignments.Add((row, field, value));
+                }
+            }
+
+            foreach ((object row, FieldInfo field, object value) in assignments)
+            {
+                try
+                {
+                    field.SetValue(row, value);
+                }
+                catch (Exception exception)
+                {
+                    Log("Could not apply balance row field '" + field.Name + "': " + exception.Message);
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static bool TryConvertBalanceParameter(
+            double value,
+            BalanceParameterType parameterType,
+            out object convertedValue)
+        {
+            convertedValue = null;
+            if (Double.IsNaN(value) || Double.IsInfinity(value) || value < 0d)
+            {
+                return false;
+            }
+
+            if (parameterType == BalanceParameterType.Int)
+            {
+                if (Math.Truncate(value) != value ||
+                    value > UnitBalanceOverrideMapper.MaximumContiguousSingleExactInteger)
+                {
+                    return false;
+                }
+
+                convertedValue = (int)value;
+                return true;
+            }
+
+            if (value > Single.MaxValue)
+            {
+                return false;
+            }
+
+            float singleValue = (float)value;
+            if (Single.IsNaN(singleValue) || Single.IsInfinity(singleValue))
+            {
+                return false;
+            }
+
+            convertedValue = singleValue;
+            return true;
         }
 
         public void ApplyProgressionFrom(object gameBalancingScriptableObject)

@@ -15,6 +15,8 @@ public struct EntityBalancingParameters
 {
     public string entityId;
     public NullableString factoryForEntityId;
+    public float moveSpeed;
+    public int maxHealth;
     public UnitRole roles;
     public SystemTags offeredSystemTags;
 }
@@ -87,6 +89,12 @@ public static class EntityBalancingStore
     public static HashSet<string> BuildingEntityIds = new(StringComparer.Ordinal);
 
     public static bool IsBuilding(string entityId) => BuildingEntityIds.Contains(entityId);
+
+    public static void InvalidateCache(string entityId)
+    {
+        ChangeableIntValueCache[entityId].Clear();
+        ChangeableFloatValueCache[entityId].Clear();
+    }
 
     public static void Reset(IEqualityComparer<string> indexComparer = null)
     {

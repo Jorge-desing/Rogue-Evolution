@@ -13,7 +13,7 @@ namespace RogueCommandExpansionLoader.Runtime
     public sealed class BalanceOverride
     {
         public string EntityId { get; set; }
-        public Dictionary<string, float> Parameters { get; set; }
+        public Dictionary<string, double> Parameters { get; set; }
     }
 
     public interface IRuntimeContentProvider
@@ -34,7 +34,7 @@ namespace RogueCommandExpansionLoader.Runtime
 
         IEnumerable<object> GetEntityParameterRows();
 
-        /// <summary>Returns balance overrides for existing entities defined in content packs.</summary>
+        /// <summary>Returns per-unit values to apply to incoming balance rows before registration.</summary>
         IEnumerable<BalanceOverride> GetBalanceOverrides();
 
         /// <summary>Resolves a localized name or description for a registered mod unit.</summary>

@@ -366,6 +366,7 @@ namespace RogueCommandExpansionLoader.Content
 
                 ValidateUnitLocalizations(unit, itemPath + ".localizations", hasNativeTemplate, diagnostics);
                 ValidateBalanceOverrides(unit.balanceOverrides, itemPath + ".balanceOverrides", "unit", "unit", diagnostics, false);
+                ValidateUnitCustomBalance(unit.customBalance, itemPath + ".customBalance", diagnostics);
                 ValidateAbilities(unit.abilities, itemPath + ".abilities", diagnostics);
                 ValidateAiOverrides(unit.aiOverrides, itemPath + ".aiOverrides", diagnostics);
                 ValidateActiveSkills(unit.activeSkills, itemPath + ".activeSkills", diagnostics);
@@ -1769,6 +1770,26 @@ namespace RogueCommandExpansionLoader.Content
             }
         }
 
+        private static void ValidateUnitCustomBalance(
+            Dictionary<string, double> customBalance,
+            string path,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (customBalance == null) return;
+            foreach (KeyValuePair<string, double> parameter in customBalance)
+            {
+                if (!UnitBalanceOverrideMapper.TryValidateCustomBalanceValue(
+                        parameter.Key, parameter.Value, out string diagnostic))
+                {
+                    string parameterPath = path + "." + (String.IsNullOrEmpty(parameter.Key) ? "<empty>" : parameter.Key);
+                    string code = UnitBalanceOverrideMapper.TryGetBalanceParameterDefinition(parameter.Key, out _)
+                        ? "unit-custom-balance.value-invalid"
+                        : "unit-custom-balance.parameter-invalid";
+                    Add(diagnostics, code, parameterPath, diagnostic);
+                }
+            }
+        }
+
         private static void ValidateUnitDetection(
             ContentUnitDetectionDefinition detection,
             string path,
@@ -2359,7 +2380,9 @@ namespace RogueCommandExpansionLoader.Content
                 case "gridSize":
                     int integerValue;
                     return Int32.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture,
-                        out integerValue) && integerValue >= 0;
+                        out integerValue) && integerValue >= 0 &&
+                        (!UnitBalanceOverrideMapper.IsNativeIntegerBalanceRowField(name) ||
+                            integerValue <= UnitBalanceOverrideMapper.MaximumContiguousSingleExactInteger);
                 case "neededExperienceLevel":
                     int experienceLevel;
                     return Int32.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture,

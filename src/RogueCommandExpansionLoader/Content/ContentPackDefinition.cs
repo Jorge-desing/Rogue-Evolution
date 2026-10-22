@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using RogueCommandExpansionLoader.Runtime;
 
 namespace RogueCommandExpansionLoader.Content
 {
@@ -232,7 +233,7 @@ namespace RogueCommandExpansionLoader.Content
     {
         public string id;
         public string unitType;
-        public Dictionary<string, float> customBalance;
+        public Dictionary<string, double> customBalance;
         public string assetBundleId;
         public string balanceAssetName;
         public string prefabAssetName;
@@ -272,11 +273,132 @@ namespace RogueCommandExpansionLoader.Content
         public ContentProductionBuildingDefinition productionBuilding;
     }
 
+    internal enum BalanceParameterType
+    {
+        Int,
+        Float
+    }
+
+    internal readonly struct BalanceParameterDefinition
+    {
+        public BalanceParameterDefinition(string rowFieldName, BalanceParameterType storageType)
+        {
+            RowFieldName = rowFieldName;
+            StorageType = storageType;
+        }
+
+        public string RowFieldName { get; }
+        public BalanceParameterType StorageType { get; }
+    }
+
     internal static class UnitBalanceOverrideMapper
     {
-        public static Dictionary<string, float> CreateCustomBalance(ContentUnitDefinition unit)
+        public const int MaximumContiguousSingleExactInteger = 1 << 24;
+
+        // Bind only per-unit ChangeableValue members to the fields read from
+        // EntityBalancingParameters by the pinned EntityBalancingStore. Global-only
+        // values such as ManaRechargePerSecond must not become per-unit row overrides.
+        private static readonly Dictionary<string, BalanceParameterDefinition> BalanceParameters =
+            new Dictionary<string, BalanceParameterDefinition>(StringComparer.Ordinal)
+            {
+                ["Cost"] = new BalanceParameterDefinition("cost", BalanceParameterType.Int),
+                ["ProductionDuration"] = new BalanceParameterDefinition("productionDuration", BalanceParameterType.Float),
+                ["MaxCapacity"] = new BalanceParameterDefinition("maxCapacity", BalanceParameterType.Int),
+                ["MaxHealth"] = new BalanceParameterDefinition("maxHealth", BalanceParameterType.Int),
+                ["MaxShield"] = new BalanceParameterDefinition("maxShield", BalanceParameterType.Int),
+                ["MaxMana"] = new BalanceParameterDefinition("maxMana", BalanceParameterType.Int),
+                ["MaxRank"] = new BalanceParameterDefinition("maxRank", BalanceParameterType.Int),
+                ["MoveSpeed"] = new BalanceParameterDefinition("moveSpeed", BalanceParameterType.Float),
+                ["SightRadius"] = new BalanceParameterDefinition("sightRadius", BalanceParameterType.Int),
+                ["Damage1"] = new BalanceParameterDefinition("damage1", BalanceParameterType.Float),
+                ["Damage2"] = new BalanceParameterDefinition("damage2", BalanceParameterType.Float),
+                ["WeaponRange"] = new BalanceParameterDefinition("weaponRange", BalanceParameterType.Float),
+                ["Attack1Cooldown"] = new BalanceParameterDefinition("attackCooldown", BalanceParameterType.Float),
+                ["Attack2Cooldown"] = new BalanceParameterDefinition("attack2Cooldown", BalanceParameterType.Float),
+                ["EffectRadius1"] = new BalanceParameterDefinition("effectRadius1", BalanceParameterType.Float),
+                ["EffectRadius2"] = new BalanceParameterDefinition("effectRadius2", BalanceParameterType.Float),
+                ["SkillRange"] = new BalanceParameterDefinition("skillRange", BalanceParameterType.Int),
+                ["HealAmount1"] = new BalanceParameterDefinition("healAmount1", BalanceParameterType.Float),
+                ["HealAmount2"] = new BalanceParameterDefinition("healAmount2", BalanceParameterType.Float),
+                ["GainCreditsAmount"] = new BalanceParameterDefinition("gainCreditsAmount", BalanceParameterType.Float),
+                ["SkillManaCost"] = new BalanceParameterDefinition("skillManaCost", BalanceParameterType.Float),
+                ["Duration1"] = new BalanceParameterDefinition("duration1", BalanceParameterType.Float),
+                ["SpawnTtl"] = new BalanceParameterDefinition("duration2", BalanceParameterType.Float),
+                ["MaxArmor"] = new BalanceParameterDefinition("maxArmor", BalanceParameterType.Float),
+                ["ArmorProtection"] = new BalanceParameterDefinition("armorProtection", BalanceParameterType.Float)
+            };
+
+        public static Dictionary<string, BalanceParameterDefinition> CreateBalanceParameterMap()
         {
-            var parameters = new Dictionary<string, float>(StringComparer.Ordinal);
+            return new Dictionary<string, BalanceParameterDefinition>(BalanceParameters, StringComparer.Ordinal);
+        }
+
+        public static bool TryGetBalanceParameterDefinition(
+            string name,
+            out BalanceParameterDefinition parameterDefinition)
+        {
+            if (name == null)
+            {
+                parameterDefinition = default(BalanceParameterDefinition);
+                return false;
+            }
+
+            return BalanceParameters.TryGetValue(name, out parameterDefinition);
+        }
+
+        public static bool IsNativeIntegerBalanceRowField(string rowFieldName)
+        {
+            if (rowFieldName == null)
+            {
+                return false;
+            }
+
+            foreach (BalanceParameterDefinition parameterDefinition in BalanceParameters.Values)
+            {
+                if (parameterDefinition.StorageType == BalanceParameterType.Int &&
+                    String.Equals(parameterDefinition.RowFieldName, rowFieldName, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        public static bool TryValidateCustomBalanceValue(string name, double value, out string diagnostic)
+        {
+            if (!TryGetBalanceParameterDefinition(name, out BalanceParameterDefinition parameterDefinition))
+            {
+                diagnostic = "Custom balance keys must target per-unit ChangeableValue members with a native row field.";
+                return false;
+            }
+
+            if (Double.IsNaN(value) || Double.IsInfinity(value) || value < 0d)
+            {
+                diagnostic = "Custom balance values must be finite and non-negative.";
+                return false;
+            }
+
+            if (parameterDefinition.StorageType == BalanceParameterType.Int &&
+                (Math.Truncate(value) != value || value > MaximumContiguousSingleExactInteger))
+            {
+                diagnostic = "Integer-backed balance fields require whole-number values within the exact native Single integer range.";
+                return false;
+            }
+
+            if (parameterDefinition.StorageType == BalanceParameterType.Float && value > Single.MaxValue)
+            {
+                diagnostic = "Float-backed balance values must fit the native Single range.";
+                return false;
+            }
+
+            diagnostic = null;
+            return true;
+        }
+
+        public static Dictionary<string, double> CreateCustomBalance(ContentUnitDefinition unit)
+        {
+            var parameters = new Dictionary<string, double>(StringComparer.Ordinal);
             if (unit == null)
             {
                 return parameters;
@@ -284,13 +406,19 @@ namespace RogueCommandExpansionLoader.Content
 
             if (unit.customBalance != null)
             {
-                foreach (KeyValuePair<string, float> parameter in unit.customBalance)
+                foreach (KeyValuePair<string, double> parameter in unit.customBalance)
                 {
+                    if (!TryGetBalanceParameterDefinition(parameter.Key, out _))
+                    {
+                        throw new InvalidOperationException("Unsupported per-unit balance parameter '" +
+                            parameter.Key + "'.");
+                    }
+
                     parameters[parameter.Key] = parameter.Value;
                 }
             }
 
-            // Apply only a positive structured speed. A zero in a JsonUtility DTO is
+            // Apply only a positive structured speed. A zero in this DTO is
             // indistinguishable from an omitted value; explicit zero belongs in the
             // native balanceOverrides list. Explicit raw row overrides take priority.
             if (unit.movement != null && unit.movement.moveSpeed > 0f &&
@@ -301,6 +429,39 @@ namespace RogueCommandExpansionLoader.Content
             }
 
             return parameters;
+        }
+
+        public static List<BalanceOverride> CreateBalanceOverridesForLoadedUnits(
+            IEnumerable<ContentUnitDefinition> candidateUnits,
+            ISet<string> registeredUnitIds)
+        {
+            var overrides = new List<BalanceOverride>();
+            if (candidateUnits == null || registeredUnitIds == null)
+            {
+                return overrides;
+            }
+
+            foreach (ContentUnitDefinition unit in candidateUnits)
+            {
+                if (unit == null || String.IsNullOrWhiteSpace(unit.id) || !registeredUnitIds.Contains(unit.id))
+                {
+                    continue;
+                }
+
+                Dictionary<string, double> parameters = CreateCustomBalance(unit);
+                if (parameters.Count == 0)
+                {
+                    continue;
+                }
+
+                overrides.Add(new BalanceOverride
+                {
+                    EntityId = unit.id,
+                    Parameters = parameters
+                });
+            }
+
+            return overrides;
         }
 
         private static bool HasExplicitRowOverride(ContentUnitDefinition unit, string fieldName)
@@ -540,7 +701,7 @@ namespace RogueCommandExpansionLoader.Content
             {
                 id = source.id,
                 unitType = source.unitType,
-                customBalance = source.customBalance == null ? null : new Dictionary<string, float>(source.customBalance),
+                customBalance = source.customBalance == null ? null : new Dictionary<string, double>(source.customBalance),
                 assetBundleId = source.assetBundleId,
                 balanceAssetName = source.balanceAssetName,
                 prefabAssetName = source.prefabAssetName,

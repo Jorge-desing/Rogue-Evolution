@@ -1720,40 +1720,34 @@ namespace RogueCommandExpansionLoader.Content
                     return new List<BalanceOverride>();
                 }
 
-                var overrides = new List<BalanceOverride>();
+                var candidateUnits = new List<ContentUnitDefinition>();
                 foreach (var candidate in _packCandidates)
                 {
-                    if (candidate == null || candidate.Definition == null)
+                    if (candidate == null || candidate.Disabled || !candidate.LoadSucceeded ||
+                        candidate.ValidatedDefinition == null)
                     {
                         continue;
                     }
 
-                    if (candidate.Definition.units == null)
+                    if (candidate.ValidatedDefinition.units == null)
                     {
                         continue;
                     }
 
-                    foreach (var unit in candidate.Definition.units)
+                    candidateUnits.AddRange(candidate.ValidatedDefinition.units);
+                }
+
+                var registeredUnitIds = new HashSet<string>(StringComparer.Ordinal);
+                foreach (LoadedUnit unit in _units.Values)
+                {
+                    if (unit != null && !unit.IsProductionBuilding && !String.IsNullOrWhiteSpace(unit.Id))
                     {
-                        if (unit == null)
-                        {
-                            continue;
-                        }
-
-                        Dictionary<string, float> parameters = UnitBalanceOverrideMapper.CreateCustomBalance(unit);
-                        if (parameters.Count == 0)
-                        {
-                            continue;
-                        }
-
-                        overrides.Add(new BalanceOverride
-                        {
-                            EntityId = unit.id,
-                            Parameters = parameters
-                        });
+                        registeredUnitIds.Add(unit.Id);
                     }
                 }
-                return overrides;
+
+                return UnitBalanceOverrideMapper.CreateBalanceOverridesForLoadedUnits(
+                    candidateUnits, registeredUnitIds);
             }
         }
 
@@ -4412,7 +4406,9 @@ namespace RogueCommandExpansionLoader.Content
                 {
                     int parsed;
                     if (!Int32.TryParse(balanceOverride.value, NumberStyles.Integer,
-                        CultureInfo.InvariantCulture, out parsed) || parsed < 0)
+                        CultureInfo.InvariantCulture, out parsed) || parsed < 0 ||
+                        (UnitBalanceOverrideMapper.IsNativeIntegerBalanceRowField(balanceOverride.name) &&
+                            parsed > UnitBalanceOverrideMapper.MaximumContiguousSingleExactInteger))
                     {
                         throw new InvalidDataException("Unidad " + unitId + " en '" + packageName +
                             "': valor entero inválido para " + balanceOverride.name + ".");

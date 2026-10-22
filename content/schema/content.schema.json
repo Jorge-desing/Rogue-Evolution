@@ -244,9 +244,34 @@
         },
         "customBalance": {
           "type": "object",
-          "additionalProperties": {
-            "type": "number"
-          }
+          "properties": {
+            "Cost": { "type": "integer", "minimum": 0, "maximum": 16777216 },
+            "ProductionDuration": { "type": "number", "minimum": 0, "maximum": 3.4028234663852886e+38 },
+            "MaxCapacity": { "type": "integer", "minimum": 0, "maximum": 16777216 },
+            "MaxHealth": { "type": "integer", "minimum": 0, "maximum": 16777216 },
+            "MaxShield": { "type": "integer", "minimum": 0, "maximum": 16777216 },
+            "MaxMana": { "type": "integer", "minimum": 0, "maximum": 16777216 },
+            "MaxRank": { "type": "integer", "minimum": 0, "maximum": 16777216 },
+            "MoveSpeed": { "type": "number", "minimum": 0, "maximum": 3.4028234663852886e+38 },
+            "SightRadius": { "type": "integer", "minimum": 0, "maximum": 16777216 },
+            "Damage1": { "type": "number", "minimum": 0, "maximum": 3.4028234663852886e+38 },
+            "Damage2": { "type": "number", "minimum": 0, "maximum": 3.4028234663852886e+38 },
+            "WeaponRange": { "type": "number", "minimum": 0, "maximum": 3.4028234663852886e+38 },
+            "Attack1Cooldown": { "type": "number", "minimum": 0, "maximum": 3.4028234663852886e+38 },
+            "Attack2Cooldown": { "type": "number", "minimum": 0, "maximum": 3.4028234663852886e+38 },
+            "EffectRadius1": { "type": "number", "minimum": 0, "maximum": 3.4028234663852886e+38 },
+            "EffectRadius2": { "type": "number", "minimum": 0, "maximum": 3.4028234663852886e+38 },
+            "SkillRange": { "type": "integer", "minimum": 0, "maximum": 16777216 },
+            "HealAmount1": { "type": "number", "minimum": 0, "maximum": 3.4028234663852886e+38 },
+            "HealAmount2": { "type": "number", "minimum": 0, "maximum": 3.4028234663852886e+38 },
+            "GainCreditsAmount": { "type": "number", "minimum": 0, "maximum": 3.4028234663852886e+38 },
+            "SkillManaCost": { "type": "number", "minimum": 0, "maximum": 3.4028234663852886e+38 },
+            "Duration1": { "type": "number", "minimum": 0, "maximum": 3.4028234663852886e+38 },
+            "SpawnTtl": { "type": "number", "minimum": 0, "maximum": 3.4028234663852886e+38 },
+            "MaxArmor": { "type": "number", "minimum": 0, "maximum": 3.4028234663852886e+38 },
+            "ArmorProtection": { "type": "number", "minimum": 0, "maximum": 3.4028234663852886e+38 }
+          },
+          "additionalProperties": false
         },
         "abilities": {
           "type": "array",

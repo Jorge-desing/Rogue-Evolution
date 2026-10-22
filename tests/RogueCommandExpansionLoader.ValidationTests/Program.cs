@@ -145,6 +145,56 @@ var tests = new (string Name, Action Run)[]
             }
         }
     }),
+    ("customBalance schema matches per-unit row fields and storage types", () =>
+    {
+        using JsonDocument schemaDocument = JsonDocument.Parse(File.ReadAllText(
+            Path.Combine(repositoryRoot, "content", "schema", "content.schema.json")));
+        JsonElement customBalance = schemaDocument.RootElement.GetProperty("$defs").GetProperty("unit")
+            .GetProperty("properties").GetProperty("customBalance");
+        if (!customBalance.TryGetProperty("properties", out JsonElement schemaParameters))
+        {
+            throw new InvalidOperationException("customBalance schema must enumerate supported per-unit balance parameters.");
+        }
+
+        Dictionary<string, BalanceParameterDefinition> balanceParameters =
+            UnitBalanceOverrideMapper.CreateBalanceParameterMap();
+        HashSet<string> schemaNames = schemaParameters.EnumerateObject()
+            .Select(parameter => parameter.Name).ToHashSet(StringComparer.Ordinal);
+        if (!schemaNames.SetEquals(balanceParameters.Keys) ||
+            !customBalance.TryGetProperty("additionalProperties", out JsonElement additionalProperties) ||
+            additionalProperties.ValueKind != JsonValueKind.False)
+        {
+            throw new InvalidOperationException("customBalance schema permits keys outside the per-unit row contract.");
+        }
+
+        foreach (KeyValuePair<string, BalanceParameterDefinition> parameter in balanceParameters)
+        {
+            string expectedType = parameter.Value.StorageType == BalanceParameterType.Int ? "integer" : "number";
+            JsonElement parameterSchema = schemaParameters.GetProperty(parameter.Key);
+            if (parameterSchema.GetProperty("type").GetString() != expectedType ||
+                parameterSchema.GetProperty("minimum").GetDouble() != 0d)
+            {
+                throw new InvalidOperationException("customBalance schema has an invalid type or minimum for " +
+                    parameter.Key + ".");
+            }
+
+            if (parameter.Value.StorageType == BalanceParameterType.Int &&
+                (!parameterSchema.TryGetProperty("maximum", out JsonElement maximum) ||
+                    maximum.GetInt64() != UnitBalanceOverrideMapper.MaximumContiguousSingleExactInteger))
+            {
+                throw new InvalidOperationException("customBalance schema must use the exact native Single integer bound for " +
+                    parameter.Key + ".");
+            }
+
+            if (parameter.Value.StorageType == BalanceParameterType.Float &&
+                (!parameterSchema.TryGetProperty("maximum", out JsonElement floatMaximum) ||
+                    floatMaximum.GetDouble() != (double)Single.MaxValue))
+            {
+                throw new InvalidOperationException("customBalance schema must use the native Single bound for " +
+                    parameter.Key + ".");
+            }
+        }
+    }),
     ("visual socket discovery accepts canonical IDs and exact legacy suffixes only", () =>
     {
         if (!RogueCommandSocketCatalog.TryResolveCanonicalSocketName("Socket_TurretPivot", out string canonical) ||
@@ -756,60 +806,116 @@ var tests = new (string Name, Action Run)[]
         mutationManager.MutateActiveAiBehaviour(manager, "detectionRange", 20.0f);
         if (behaviour.detectionRange != 20.0f) throw new InvalidOperationException("AI detectionRange mutation failed.");
     }),
-    ("expanded ParamMap contains all canonical ChangeableValue keys", () =>
+    ("unit balance map targets only row-backed native parameters", () =>
     {
         FieldInfo? field = typeof(RuntimeContentMutator).GetField("ParamMap",
             BindingFlags.NonPublic | BindingFlags.Static);
-        if (field == null) throw new InvalidOperationException("ParamMap field not found.");
-        var map = field.GetValue(null) as IDictionary;
-        if (map == null) throw new InvalidOperationException("ParamMap is null.");
-        string[] required =
+        IDictionary? map = field?.GetValue(null) as IDictionary;
+        if (map == null || map.Count != 25 || map.Contains("ManaRechargePerSecond"))
         {
-            "Cost", "ProductionDuration", "MaxCapacity", "MaxHealth", "MaxShield", "MaxMana",
-            "MaxRank", "MoveSpeed", "SightRadius", "Damage1", "Damage2", "WeaponRange",
-            "Attack1Cooldown", "Attack2Cooldown", "EffectRadius1", "EffectRadius2", "SkillRange",
-            "HealAmount1", "HealAmount2", "GainCreditsAmount", "SkillManaCost", "Duration1",
-            "SpawnTtl", "ManaRechargePerSecond", "MaxArmor", "ArmorProtection",
-            "AttackSpeed", "ArmorValue", "Damage"
+            throw new InvalidOperationException("The runtime map must exclude global-only values and contain 25 per-unit parameters.");
+        }
+        var expectedRowFields = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["Cost"] = "cost",
+            ["ProductionDuration"] = "productionDuration",
+            ["MaxCapacity"] = "maxCapacity",
+            ["MaxHealth"] = "maxHealth",
+            ["MaxShield"] = "maxShield",
+            ["MaxMana"] = "maxMana",
+            ["MaxRank"] = "maxRank",
+            ["MoveSpeed"] = "moveSpeed",
+            ["SightRadius"] = "sightRadius",
+            ["Damage1"] = "damage1",
+            ["Damage2"] = "damage2",
+            ["WeaponRange"] = "weaponRange",
+            ["Attack1Cooldown"] = "attackCooldown",
+            ["Attack2Cooldown"] = "attack2Cooldown",
+            ["EffectRadius1"] = "effectRadius1",
+            ["EffectRadius2"] = "effectRadius2",
+            ["SkillRange"] = "skillRange",
+            ["HealAmount1"] = "healAmount1",
+            ["HealAmount2"] = "healAmount2",
+            ["GainCreditsAmount"] = "gainCreditsAmount",
+            ["SkillManaCost"] = "skillManaCost",
+            ["Duration1"] = "duration1",
+            ["SpawnTtl"] = "duration2",
+            ["MaxArmor"] = "maxArmor",
+            ["ArmorProtection"] = "armorProtection"
         };
-        foreach (string key in required)
+        if (map.Count != expectedRowFields.Count)
         {
-            if (!map.Contains(key))
-                throw new InvalidOperationException("ParamMap missing key: " + key);
+            throw new InvalidOperationException("Runtime balance map contains an unexpected number of row-backed members.");
+        }
+        string? ReadRowField(string key)
+        {
+            object? definition = map[key];
+            PropertyInfo? rowFieldName = definition?.GetType().GetProperty("RowFieldName",
+                BindingFlags.Public | BindingFlags.Instance);
+            return rowFieldName?.GetValue(definition) as string;
+        }
+        foreach (KeyValuePair<string, string> expected in expectedRowFields)
+        {
+            if (!map.Contains(expected.Key) || ReadRowField(expected.Key) != expected.Value)
+            {
+                throw new InvalidOperationException("Native ChangeableValue " + expected.Key +
+                    " must map to unit-row field " + expected.Value + ".");
+            }
         }
     }),
-    ("unit movement speed maps to the native MoveSpeed balance cache without overriding explicit values", () =>
+    ("unit balance mapper preserves custom raw and structured movement precedence", () =>
     {
         var unit = new ContentUnitDefinition
         {
             id = "sample:movement",
-            movement = new ContentUnitMovementDefinition { moveSpeed = 12.5f }
+            movement = new ContentUnitMovementDefinition { moveSpeed = 12.5f },
+            balanceOverrides = [new ContentBalanceOverride { name = "moveSpeed", value = "4.5" }]
         };
-        Dictionary<string, float> mapped = UnitBalanceOverrideMapper.CreateCustomBalance(unit);
-        if (!mapped.TryGetValue("MoveSpeed", out float mappedSpeed) || mappedSpeed != 12.5f)
-        {
-            throw new InvalidOperationException("Movement moveSpeed was not mapped to the native MoveSpeed key.");
-        }
-
-        unit.customBalance = new Dictionary<string, float>(StringComparer.Ordinal)
-        {
-            ["MoveSpeed"] = 7.5f
-        };
-        mapped = UnitBalanceOverrideMapper.CreateCustomBalance(unit);
-        if (!mapped.TryGetValue("MoveSpeed", out mappedSpeed) || mappedSpeed != 7.5f)
-        {
-            throw new InvalidOperationException("An explicit customBalance MoveSpeed should override the structured movement value.");
-        }
-
-        unit.customBalance = null;
-        unit.balanceOverrides = [new ContentBalanceOverride { name = "moveSpeed", value = "4.5" }];
-        mapped = UnitBalanceOverrideMapper.CreateCustomBalance(unit);
+        Dictionary<string, double> mapped = UnitBalanceOverrideMapper.CreateCustomBalance(unit);
         if (mapped.ContainsKey("MoveSpeed"))
         {
-            throw new InvalidOperationException("An explicit row balance override should suppress the derived cache override.");
+            throw new InvalidOperationException("A raw moveSpeed row override must suppress the derived movement value.");
+        }
+
+        unit.customBalance = new Dictionary<string, double>(StringComparer.Ordinal)
+        {
+            ["MoveSpeed"] = 14.5d
+        };
+        mapped = UnitBalanceOverrideMapper.CreateCustomBalance(unit);
+        if (!mapped.TryGetValue("MoveSpeed", out double customSpeed) || customSpeed != 14.5d)
+        {
+            throw new InvalidOperationException("Explicit customBalance.MoveSpeed must remain available to override the raw row value.");
         }
     }),
-    ("runtime entity registration applies structured MoveSpeed to the native float cache", () =>
+    ("balance overrides exclude units without registered entity rows", () =>
+    {
+        var registeredUnit = new ContentUnitDefinition
+        {
+            id = "sample:registered",
+            customBalance = new Dictionary<string, double>(StringComparer.Ordinal)
+            {
+                ["MoveSpeed"] = 14.5d
+            }
+        };
+        var rejectedUnit = new ContentUnitDefinition
+        {
+            id = "sample:rejected",
+            customBalance = new Dictionary<string, double>(StringComparer.Ordinal)
+            {
+                ["MaxHealth"] = 16777217d
+            }
+        };
+        List<BalanceOverride> overrides = UnitBalanceOverrideMapper.CreateBalanceOverridesForLoadedUnits(
+            new[] { registeredUnit, rejectedUnit },
+            new HashSet<string>(new[] { registeredUnit.id }, StringComparer.Ordinal));
+        if (overrides.Count != 1 || overrides[0].EntityId != registeredUnit.id ||
+            !overrides[0].Parameters.TryGetValue("MoveSpeed", out double moveSpeed) || moveSpeed != 14.5d ||
+            overrides.Any(balanceOverride => balanceOverride.EntityId == rejectedUnit.id))
+        {
+            throw new InvalidOperationException("Only balance overrides for units with registered entity rows may be returned.");
+        }
+    }),
+    ("runtime entity registration stores MoveSpeed on the row across cache invalidation", () =>
     {
         EntityBalancingStore.Reset();
         try
@@ -820,7 +926,9 @@ var tests = new (string Name, Action Run)[]
                 movement = new ContentUnitMovementDefinition { moveSpeed = 12.5f }
             };
             var provider = new RuntimeMutatorTestProvider();
-            provider.EntityRows.Add(RuntimeMutatorTestData.Row(unit.id));
+            EntityBalancingParameters row = RuntimeMutatorTestData.Row(unit.id);
+            row.moveSpeed = 1f;
+            provider.EntityRows.Add(row);
             provider.BalanceOverrides.Add(new BalanceOverride
             {
                 EntityId = unit.id,
@@ -834,12 +942,14 @@ var tests = new (string Name, Action Run)[]
                 throw new InvalidOperationException("Entity registration failed.");
             }
 
-            if (!EntityBalancingStore.ChangeableFloatValueCache.TryGetValue(unit.id, out var values) ||
-                !values.TryGetValue(EntityBalancingStore.ChangeableValue.MoveSpeed, out float actual) ||
-                actual != 12.5f)
+            EntityBalancingStore.InvalidateCache(unit.id);
+            EntityBalancingParameters registered = EntityBalancingStore.EntityBalancingParametersList[0];
+            EntityBalancingParameters source = (EntityBalancingParameters)provider.EntityRows[0];
+            if (registered.moveSpeed != 12.5f || source.moveSpeed != 12.5f ||
+                EntityBalancingStore.ChangeableFloatValueCache[unit.id].Count != 0)
             {
                 throw new InvalidOperationException(
-                    "Structured MoveSpeed was not written to EntityBalancingStore.ChangeableFloatValueCache.");
+                    "Structured MoveSpeed must remain in both provider and registered rows after cache invalidation.");
             }
         }
         finally
@@ -847,20 +957,22 @@ var tests = new (string Name, Action Run)[]
             EntityBalancingStore.Reset();
         }
     }),
-    ("runtime entity registration applies provider MaxHealth overrides to the native int cache", () =>
+    ("runtime entity registration stores MaxHealth on the row across cache invalidation", () =>
     {
         EntityBalancingStore.Reset();
         try
         {
             const string entityId = "sample:max-health-cache";
             var provider = new RuntimeMutatorTestProvider();
-            provider.EntityRows.Add(RuntimeMutatorTestData.Row(entityId));
+            EntityBalancingParameters row = RuntimeMutatorTestData.Row(entityId);
+            row.maxHealth = 100;
+            provider.EntityRows.Add(row);
             provider.BalanceOverrides.Add(new BalanceOverride
             {
                 EntityId = entityId,
-                Parameters = new Dictionary<string, float>(StringComparer.Ordinal)
+                Parameters = new Dictionary<string, double>(StringComparer.Ordinal)
                 {
-                    ["MaxHealth"] = 450f
+                    ["MaxHealth"] = 450d
                 }
             });
             var mutator = new RuntimeContentMutator(
@@ -871,12 +983,44 @@ var tests = new (string Name, Action Run)[]
                 throw new InvalidOperationException("Entity registration failed.");
             }
 
-            if (!EntityBalancingStore.ChangeableIntValueCache.TryGetValue(entityId, out var values) ||
-                !values.TryGetValue(EntityBalancingStore.ChangeableValue.MaxHealth, out int actual) ||
-                actual != 450)
+            EntityBalancingStore.InvalidateCache(entityId);
+            EntityBalancingParameters registered = EntityBalancingStore.EntityBalancingParametersList[0];
+            EntityBalancingParameters source = (EntityBalancingParameters)provider.EntityRows[0];
+            if (registered.maxHealth != 450 || source.maxHealth != 450 ||
+                EntityBalancingStore.ChangeableIntValueCache[entityId].Count != 0)
             {
                 throw new InvalidOperationException(
-                    "MaxHealth was not written to EntityBalancingStore.ChangeableIntValueCache.");
+                    "MaxHealth must remain in both provider and registered rows after cache invalidation.");
+            }
+        }
+        finally
+        {
+            EntityBalancingStore.Reset();
+        }
+    }),
+    ("runtime entity registration rejects integers rounded by the native getter", () =>
+    {
+        EntityBalancingStore.Reset();
+        try
+        {
+            const string entityId = "sample:rounded-max-health";
+            var provider = new RuntimeMutatorTestProvider();
+            provider.EntityRows.Add(RuntimeMutatorTestData.Row(entityId));
+            provider.BalanceOverrides.Add(new BalanceOverride
+            {
+                EntityId = entityId,
+                Parameters = new Dictionary<string, double>(StringComparer.Ordinal)
+                {
+                    ["MaxHealth"] = 16777217d
+                }
+            });
+            var mutator = new RuntimeContentMutator(
+                typeof(EntityBalancingStore).Assembly, provider, null);
+
+            if (mutator.RegisterEntityRows() || EntityBalancingStore.EntityBalancingParametersList.Count != 0)
+            {
+                throw new InvalidOperationException(
+                    "An integer balance override rounded by the native getter must not be registered.");
             }
         }
         finally
@@ -891,13 +1035,13 @@ var tests = new (string Name, Action Run)[]
             id = "sample:movement",
             movement = new ContentUnitMovementDefinition { moveSpeed = Single.PositiveInfinity }
         };
-        Dictionary<string, float> mapped = UnitBalanceOverrideMapper.CreateCustomBalance(unit);
+        Dictionary<string, double> mapped = UnitBalanceOverrideMapper.CreateCustomBalance(unit);
         if (mapped.ContainsKey("MoveSpeed"))
         {
-            throw new InvalidOperationException("Non-finite movement speed must not enter the native balance cache mapping.");
+            throw new InvalidOperationException("Non-finite movement speed must not enter the native balance row mapping.");
         }
     }),
-    ("unit movement speed rejects non-finite values before cache mapping", () =>
+    ("unit movement speed rejects non-finite values before row mapping", () =>
     {
         WithPackage(sample, (pack, root) =>
         {
@@ -2163,6 +2307,224 @@ var tests = new (string Name, Action Run)[]
                 new ContentBalanceOverride { name = "rarity", value = "Common" }
             ];
             ExpectValid(pack, root, new EmptySnapshot(), new KnownModuleValidator());
+        });
+    }),
+    ("unit customBalance accepts a canonical float row value", () =>
+    {
+        WithPackage(sample, (pack, root) =>
+        {
+            pack.units[0].customBalance = new Dictionary<string, double>(StringComparer.Ordinal)
+            {
+                ["MoveSpeed"] = 14.5d
+            };
+            ExpectValid(pack, root, new EmptySnapshot(), new KnownModuleValidator());
+        });
+    }),
+    ("unit customBalance accepts a canonical integer row value", () =>
+    {
+        WithPackage(sample, (pack, root) =>
+        {
+            pack.units[0].customBalance = new Dictionary<string, double>(StringComparer.Ordinal)
+            {
+                ["MaxHealth"] = 130d
+            };
+            ExpectValid(pack, root, new EmptySnapshot(), new KnownModuleValidator());
+        });
+    }),
+    ("unit customBalance preserves the native exact integer boundary through row registration", () =>
+    {
+        const int expectedMaxHealth = 16777216;
+        ContentUnitDefinition unit = JsonSerializer.Deserialize<ContentUnitDefinition>(
+            "{\"id\":\"sample:exact-integer\",\"customBalance\":{\"MaxHealth\":16777216}}",
+            jsonOptions)
+            ?? throw new InvalidOperationException("The custom balance test unit did not deserialize.");
+        if (unit.customBalance == null ||
+            !unit.customBalance.TryGetValue("MaxHealth", out var parsedMaxHealth) ||
+            Convert.ToDouble(parsedMaxHealth) != expectedMaxHealth)
+        {
+            throw new InvalidOperationException("JSON deserialization rounded an integer-backed customBalance value.");
+        }
+
+        WithPackage(sample, (pack, root) =>
+        {
+            pack.units[0].customBalance = unit.customBalance;
+            ExpectValid(pack, root, new EmptySnapshot(), new KnownModuleValidator());
+        });
+
+        EntityBalancingStore.Reset();
+        try
+        {
+            var provider = new RuntimeMutatorTestProvider();
+            provider.EntityRows.Add(RuntimeMutatorTestData.Row(unit.id));
+            provider.BalanceOverrides.Add(new BalanceOverride
+            {
+                EntityId = unit.id,
+                Parameters = UnitBalanceOverrideMapper.CreateCustomBalance(unit)
+            });
+            var mutator = new RuntimeContentMutator(
+                typeof(EntityBalancingStore).Assembly, provider, null);
+            if (!mutator.RegisterEntityRows())
+            {
+                throw new InvalidOperationException("Entity registration failed.");
+            }
+
+            EntityBalancingParameters registered = EntityBalancingStore.EntityBalancingParametersList[0];
+            EntityBalancingParameters source = (EntityBalancingParameters)provider.EntityRows[0];
+            if (registered.maxHealth != expectedMaxHealth || source.maxHealth != expectedMaxHealth)
+            {
+                throw new InvalidOperationException("Integer-backed customBalance precision was lost before row registration.");
+            }
+        }
+        finally
+        {
+            EntityBalancingStore.Reset();
+        }
+    }),
+    ("unit customBalance accepts the largest contiguous native exact integer", () =>
+    {
+        WithPackage(sample, (pack, root) =>
+        {
+            pack.units[0].customBalance = new Dictionary<string, double>(StringComparer.Ordinal)
+            {
+                ["MaxHealth"] = 16777216d
+            };
+            ExpectValid(pack, root, new EmptySnapshot(), new KnownModuleValidator());
+        });
+    }),
+    ("unit customBalance rejects integers rounded by the native getter", () =>
+    {
+        ContentUnitDefinition unit = JsonSerializer.Deserialize<ContentUnitDefinition>(
+            "{\"id\":\"sample:rounded-max-health\",\"customBalance\":{\"MaxHealth\":16777217}}",
+            jsonOptions)
+            ?? throw new InvalidOperationException("The over-range integer-precision unit JSON is empty.");
+        if (unit.customBalance == null ||
+            !unit.customBalance.TryGetValue("MaxHealth", out double parsedMaxHealth) ||
+            parsedMaxHealth != 16777217d)
+        {
+            throw new InvalidOperationException("JSON deserialization rounded an integer before native range validation.");
+        }
+
+        WithPackage(sample, (pack, root) =>
+        {
+            pack.units[0].customBalance = unit.customBalance;
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "unit-custom-balance.value-invalid");
+        });
+    }),
+    ("unit balanceOverrides reject integers rounded by the native getter", () =>
+    {
+        WithPackage(nativeSample, (pack, root) =>
+        {
+            pack.units[0].balanceOverrides = (pack.units[0].balanceOverrides ?? Array.Empty<ContentBalanceOverride>())
+                .Where(entry => entry == null || entry.name != "maxHealth")
+                .Append(new ContentBalanceOverride { name = "maxHealth", value = "16777217" })
+                .ToArray();
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "unit.balance-override-invalid");
+        });
+    }),
+    ("unit balanceOverrides accept the largest contiguous native exact integer", () =>
+    {
+        WithPackage(nativeSample, (pack, root) =>
+        {
+            pack.units[0].balanceOverrides = (pack.units[0].balanceOverrides ?? Array.Empty<ContentBalanceOverride>())
+                .Where(entry => entry == null || entry.name != "maxHealth")
+                .Append(new ContentBalanceOverride { name = "maxHealth", value = "16777216" })
+                .ToArray();
+            ExpectValid(pack, root, new EmptySnapshot(), new KnownModuleValidator());
+        });
+    }),
+    ("unit customBalance rejects a global-only balance member", () =>
+    {
+        WithPackage(sample, (pack, root) =>
+        {
+            pack.units[0].customBalance = new Dictionary<string, double>(StringComparer.Ordinal)
+            {
+                ["ManaRechargePerSecond"] = 1d
+            };
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "unit-custom-balance.parameter-invalid");
+        });
+    }),
+    ("unit customBalance rejects aliases outside the per-unit balance contract", () =>
+    {
+        WithPackage(sample, (pack, root) =>
+        {
+            pack.units[0].customBalance = new Dictionary<string, double>(StringComparer.Ordinal)
+            {
+                ["Damage"] = 12d
+            };
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "unit-custom-balance.parameter-invalid");
+        });
+    }),
+    ("unit customBalance rejects negative balance values", () =>
+    {
+        WithPackage(sample, (pack, root) =>
+        {
+            pack.units[0].customBalance = new Dictionary<string, double>(StringComparer.Ordinal)
+            {
+                ["MoveSpeed"] = -1d
+            };
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "unit-custom-balance.value-invalid");
+        });
+    }),
+    ("unit customBalance rejects non-finite balance values", () =>
+    {
+        WithPackage(sample, (pack, root) =>
+        {
+            pack.units[0].customBalance = new Dictionary<string, double>(StringComparer.Ordinal)
+            {
+                ["MoveSpeed"] = Double.NaN
+            };
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "unit-custom-balance.value-invalid");
+        });
+        WithPackage(sample, (pack, root) =>
+        {
+            pack.units[0].customBalance = new Dictionary<string, double>(StringComparer.Ordinal)
+            {
+                ["MoveSpeed"] = Double.PositiveInfinity
+            };
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "unit-custom-balance.value-invalid");
+        });
+    }),
+    ("unit customBalance rejects values outside native Single range", () =>
+    {
+        WithPackage(sample, (pack, root) =>
+        {
+            pack.units[0].customBalance = new Dictionary<string, double>(StringComparer.Ordinal)
+            {
+                ["MoveSpeed"] = Double.MaxValue
+            };
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "unit-custom-balance.value-invalid");
+        });
+    }),
+    ("unit customBalance rejects fractional integer-backed values", () =>
+    {
+        WithPackage(sample, (pack, root) =>
+        {
+            pack.units[0].customBalance = new Dictionary<string, double>(StringComparer.Ordinal)
+            {
+                ["MaxHealth"] = 130.5d
+            };
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "unit-custom-balance.value-invalid");
+        });
+    }),
+    ("unit customBalance rejects integer-backed values outside Int32 range", () =>
+    {
+        WithPackage(sample, (pack, root) =>
+        {
+            pack.units[0].customBalance = new Dictionary<string, double>(StringComparer.Ordinal)
+            {
+                ["MaxHealth"] = 2147483648d
+            };
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "unit-custom-balance.value-invalid");
         });
     }),
     ("custom unit requires an English display name", () =>
