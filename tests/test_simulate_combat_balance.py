@@ -88,6 +88,13 @@ class ContentPackBalanceSimulationTests(unittest.TestCase):
                     json.dumps({"units": [{"id": "test:unit", "nativeTemplateId": template_id}]})
                 )
 
+    def test_custom_unit_without_native_template_id_loads(self) -> None:
+        profile = self._load_unit({"id": "test:custom-unit"})
+
+        self.assertEqual(profile.unit_id, "test:custom-unit")
+        self.assertEqual(profile.source, "mod")
+        self.assertIsNone(profile.template_id)
+
     def test_rejects_malformed_localizations(self) -> None:
         invalid_values = (None, {}, "bad", [], [None], [[]], [{"language": []}], [{"language": "en-US", "name": None}])
         for localizations in invalid_values:
