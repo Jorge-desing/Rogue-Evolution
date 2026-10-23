@@ -17,6 +17,10 @@ Use this skill when implementing an AI profile, adding a compiled module, or cha
 
 - A native-template profile must set `scopeToReferencedStages: true`. The loader creates an isolated `RCL_` alias and calculates the contiguous stage range; validation rejects missing, cross-pack, or non-contiguous references. Native templates stay unchanged.
 - Custom AI prefabs must satisfy the schema's active state, reserved `RCL_` name, single `DefaultAiBehaviour`, and serialized data requirements. Do not infer that the Unity Editor can author these components from precompiled game assemblies.
+- AI rosters must reference produced unit IDs, never factory IDs. `unitEntries` and `productionBuildingEntries` both use unit IDs; production-building entries grant buildable factories only through their product unit.
+- A scoped native profile can only include units present in its referenced stages. Use `stage.unitIds` as the availability boundary before adding roster entries.
+- Set `isAllowedForAi` to `true` for every unit included in any AI roster; buildings and command HQs should remain `false`.
+- Keep `countAtStart` and `maxLiving` bounded and conservative; production-building entries normally use `maxLiving: 1`.
 
 ## AI Behavior Patterns (enriched from game-ai and unity-navmesh)
 

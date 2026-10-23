@@ -11,6 +11,7 @@ using RogueCommandExpansionLoader.Modules;
 using RogueCommandExpansionLoader.Runtime;
 using RogueCommandExpansionLoader.Runtime.Visual;
 
+bool isUnitGraphStackProbe = Environment.GetEnvironmentVariable("RCL_UNIT_GRAPH_STACK_PROBE") == "1";
 if (args.Length != 1)
 {
     Console.Error.WriteLine("Pass the repository root as the only argument.");
@@ -38,7 +39,52 @@ ContentPackDefinition nativeSample = JsonSerializer.Deserialize<ContentPackDefin
     ?? throw new InvalidDataException("The native sample content manifest is empty.");
 ContentPackDefinition reactiveAiSample = JsonSerializer.Deserialize<ContentPackDefinition>(
     File.ReadAllText(reactiveAiSampleManifestPath), jsonOptions)
-    ?? throw new InvalidDataException("The reactive AI sample content manifest is empty.");
+    ?? throw new InvalidDataException("The reactive AI sample is empty.");
+
+if (isUnitGraphStackProbe)
+{
+    const int deepUnitCount = 4096;
+    Action validateDeepGraph = () => WithPackage(sample, (pack, root) =>
+    {
+        ContentUnitDefinition[] originalUnits = pack.units;
+        var expandedUnits = new ContentUnitDefinition[originalUnits.Length + deepUnitCount];
+        Array.Copy(originalUnits, expandedUnits, originalUnits.Length);
+        string templateJson = JsonSerializer.Serialize(originalUnits[0], jsonOptions);
+        for (int i = 0; i < deepUnitCount; i++)
+        {
+            ContentUnitDefinition deepUnit = JsonSerializer.Deserialize<ContentUnitDefinition>(templateJson, jsonOptions)
+                ?? throw new InvalidOperationException("Could not clone the deep graph fixture unit.");
+            deepUnit.id = "sample:stack-probe-" + i;
+            deepUnit.productionBuilding.id = "sample:stack-probe-factory-" + i;
+            deepUnit.upgrades = Array.Empty<ContentUnitUpgradeDefinition>();
+            deepUnit.synergies = i < deepUnitCount - 1
+                ? new[]
+                {
+                    new ContentUnitSynergyDefinition
+                    {
+                        id = "sample:stack-probe-link-" + i,
+                        statName = "damage", multiplier = 1.0f, radius = 1.0f,
+                        targetUnitIds = new[] { "sample:stack-probe-" + (i + 1) }
+                    }
+                }
+                : Array.Empty<ContentUnitSynergyDefinition>();
+            expandedUnits[originalUnits.Length + i] = deepUnit;
+        }
+        pack.units = expandedUnits;
+
+        ContentPackValidationResult result = ContentPackValidator.Validate(
+            pack, root, new EmptySnapshot(), new KnownModuleValidator());
+        if (!result.Diagnostics.Any(d => d.Code == "unit-synergy.depth-exceeded"))
+        {
+            throw new InvalidOperationException("Deep graph did not preserve the maximum-depth diagnostic.");
+        }
+    });
+    var probeThread = new Thread(new ThreadStart(validateDeepGraph), 128 * 1024);
+    probeThread.Start();
+    probeThread.Join();
+    Console.WriteLine("UNIT-GRAPH-STACK-PROBE-PASS");
+    return 0;
+}
 
 var tests = new (string Name, Action Run)[]
 {
@@ -468,6 +514,32 @@ var tests = new (string Name, Action Run)[]
             !registry.AllowsModUnitInPool(siblingPool, "sample:beta"))
             throw new InvalidOperationException("A stage's pool-specific unit allowlist leaked to a sibling pool.");
     }),
+    ("blueprint pool registrations expose immutable, deterministic unit-ID snapshots", () =>
+    {
+        var suppliedUnitIds = new List<string> { "sample:zeta", "sample:alpha" };
+        var registration = new BlueprintPoolScopeRegistration(
+            "RCL_POOL_SNAPSHOT", "sample:stage", new object(), suppliedUnitIds,
+            blueprintsAreExclusive: false);
+        suppliedUnitIds.Clear();
+
+        IReadOnlyList<string> unitIds = registration.UnitIds;
+        if (unitIds.Count != 2 || unitIds[0] != "sample:alpha" || unitIds[1] != "sample:zeta")
+        {
+            throw new InvalidOperationException(
+                "Blueprint pool unit IDs must be an immutable snapshot in ordinal order.");
+        }
+
+        var reverseRegistration = new BlueprintPoolScopeRegistration(
+            "RCL_POOL_REVERSED", "sample:stage", new object(),
+            new[] { "sample:alpha", "sample:zeta" }, blueprintsAreExclusive: false);
+        IReadOnlyList<string> reversedUnitIds = reverseRegistration.UnitIds;
+        if (reversedUnitIds.Count != unitIds.Count ||
+            reversedUnitIds[0] != unitIds[0] || reversedUnitIds[1] != unitIds[1])
+        {
+            throw new InvalidOperationException(
+                "Blueprint pool unit-ID ordering must not depend on input enumeration order.");
+        }
+    }),
     ("stage-scoped blueprint pools use object identity and isolate mod eligibility", () =>
     {
         var registry = new BlueprintPoolScopeRegistry();
@@ -840,51 +912,56 @@ var tests = new (string Name, Action Run)[]
         {
             throw new InvalidOperationException("The runtime map must exclude global-only values and contain 25 per-unit parameters.");
         }
-        var expectedRowFields = new Dictionary<string, string>(StringComparer.Ordinal)
+        var expectedRowFields = new Dictionary<string, (string RowField, BalanceParameterType StorageType)>(StringComparer.Ordinal)
         {
-            ["Cost"] = "cost",
-            ["ProductionDuration"] = "productionDuration",
-            ["MaxCapacity"] = "maxCapacity",
-            ["MaxHealth"] = "maxHealth",
-            ["MaxShield"] = "maxShield",
-            ["MaxMana"] = "maxMana",
-            ["MaxRank"] = "maxRank",
-            ["MoveSpeed"] = "moveSpeed",
-            ["SightRadius"] = "sightRadius",
-            ["Damage1"] = "damage1",
-            ["Damage2"] = "damage2",
-            ["WeaponRange"] = "weaponRange",
-            ["Attack1Cooldown"] = "attackCooldown",
-            ["Attack2Cooldown"] = "attack2Cooldown",
-            ["EffectRadius1"] = "effectRadius1",
-            ["EffectRadius2"] = "effectRadius2",
-            ["SkillRange"] = "skillRange",
-            ["HealAmount1"] = "healAmount1",
-            ["HealAmount2"] = "healAmount2",
-            ["GainCreditsAmount"] = "gainCreditsAmount",
-            ["SkillManaCost"] = "skillManaCost",
-            ["Duration1"] = "duration1",
-            ["SpawnTtl"] = "duration2",
-            ["MaxArmor"] = "maxArmor",
-            ["ArmorProtection"] = "armorProtection"
+            ["Cost"] = ("cost", BalanceParameterType.Int),
+            ["ProductionDuration"] = ("productionDuration", BalanceParameterType.Float),
+            ["MaxCapacity"] = ("maxCapacity", BalanceParameterType.Int),
+            ["MaxHealth"] = ("maxHealth", BalanceParameterType.Int),
+            ["MaxShield"] = ("maxShield", BalanceParameterType.Int),
+            ["MaxMana"] = ("maxMana", BalanceParameterType.Int),
+            ["MaxRank"] = ("maxRank", BalanceParameterType.Int),
+            ["MoveSpeed"] = ("moveSpeed", BalanceParameterType.Float),
+            ["SightRadius"] = ("sightRadius", BalanceParameterType.Int),
+            ["Damage1"] = ("damage1", BalanceParameterType.Float),
+            ["Damage2"] = ("damage2", BalanceParameterType.Float),
+            ["WeaponRange"] = ("weaponRange", BalanceParameterType.Float),
+            ["Attack1Cooldown"] = ("attackCooldown", BalanceParameterType.Float),
+            ["Attack2Cooldown"] = ("attack2Cooldown", BalanceParameterType.Float),
+            ["EffectRadius1"] = ("effectRadius1", BalanceParameterType.Float),
+            ["EffectRadius2"] = ("effectRadius2", BalanceParameterType.Float),
+            ["SkillRange"] = ("skillRange", BalanceParameterType.Int),
+            ["HealAmount1"] = ("healAmount1", BalanceParameterType.Float),
+            ["HealAmount2"] = ("healAmount2", BalanceParameterType.Float),
+            ["GainCreditsAmount"] = ("gainCreditsAmount", BalanceParameterType.Float),
+            ["SkillManaCost"] = ("skillManaCost", BalanceParameterType.Float),
+            ["Duration1"] = ("duration1", BalanceParameterType.Float),
+            ["SpawnTtl"] = ("duration2", BalanceParameterType.Float),
+            ["MaxArmor"] = ("maxArmor", BalanceParameterType.Float),
+            ["ArmorProtection"] = ("armorProtection", BalanceParameterType.Float)
         };
         if (map.Count != expectedRowFields.Count)
         {
             throw new InvalidOperationException("Runtime balance map contains an unexpected number of row-backed members.");
         }
-        string? ReadRowField(string key)
+        foreach (KeyValuePair<string, (string RowField, BalanceParameterType StorageType)> expected in expectedRowFields)
         {
-            object? definition = map[key];
-            PropertyInfo? rowFieldName = definition?.GetType().GetProperty("RowFieldName",
-                BindingFlags.Public | BindingFlags.Instance);
-            return rowFieldName?.GetValue(definition) as string;
-        }
-        foreach (KeyValuePair<string, string> expected in expectedRowFields)
-        {
-            if (!map.Contains(expected.Key) || ReadRowField(expected.Key) != expected.Value)
+            if (!map.Contains(expected.Key))
+            {
+                throw new InvalidOperationException("The runtime map is missing native ChangeableValue " + expected.Key + ".");
+            }
+
+            if (!(map[expected.Key] is BalanceParameterDefinition definition))
+            {
+                throw new InvalidOperationException("Runtime balance map entry " + expected.Key + " has an unexpected definition type.");
+            }
+
+            if (definition.RowFieldName != expected.Value.RowField ||
+                definition.StorageType != expected.Value.StorageType)
             {
                 throw new InvalidOperationException("Native ChangeableValue " + expected.Key +
-                    " must map to unit-row field " + expected.Value + ".");
+                    " must map to unit-row field " + expected.Value.RowField + " as " +
+                    expected.Value.StorageType + ".");
             }
         }
     }),
@@ -5114,6 +5191,47 @@ var tests = new (string Name, Action Run)[]
             EntityBalancingStore.Reset();
         }
     }),
+    ("rejected balance-row registration leaves provider-owned source rows unchanged", () =>
+    {
+        EntityBalancingStore.Reset();
+        try
+        {
+            EntityBalancingParameters existingRow = RuntimeMutatorTestData.Row("sample:existing");
+            existingRow.moveSpeed = 3f;
+            EntityBalancingStore.EntityBalancingParametersList.Add(existingRow);
+            EntityBalancingStore.ParameterListIndexOf.Add("sample:existing", 0);
+
+            var provider = new RuntimeMutatorTestProvider();
+            EntityBalancingParameters sourceRow = RuntimeMutatorTestData.Row("sample:existing");
+            sourceRow.moveSpeed = 11f;
+            provider.EntityRows.Add(sourceRow);
+            provider.BalanceOverrides.Add(new BalanceOverride
+            {
+                EntityId = "sample:existing",
+                Parameters = new Dictionary<string, double>(StringComparer.Ordinal)
+                {
+                    ["MoveSpeed"] = 14.5d
+                }
+            });
+            var mutator = new RuntimeContentMutator(typeof(EntityBalancingStore).Assembly, provider, null);
+
+            bool registered = mutator.RegisterEntityRows();
+            EntityBalancingParameters providerRow = (EntityBalancingParameters)provider.EntityRows[0];
+            EntityBalancingParameters registeredRow = EntityBalancingStore.EntityBalancingParametersList[0];
+            if (registered || providerRow.moveSpeed != 11f || registeredRow.moveSpeed != 3f ||
+                EntityBalancingStore.EntityBalancingParametersList.Count != 1 ||
+                EntityBalancingStore.ParameterListIndexOf.Count != 1 ||
+                EntityBalancingStore.FactoryEntityIdOf.Count != 0 ||
+                provider.EntityRowsRegisteredCount != 0)
+            {
+                throw new InvalidOperationException("A rejected row registration mutated provider-owned balance data or committed registry changes.");
+            }
+        }
+        finally
+        {
+            EntityBalancingStore.Reset();
+        }
+    }),
     ("runtime entity mutator rolls back rows and value caches after index insertion fails", () =>
     {
         var comparer = new ThrowOnFirstTargetHashComparer("sample:product");
@@ -6330,7 +6448,7 @@ var tests = new (string Name, Action Run)[]
             new AiProfileStageRangeDiagnosticReport("test:ai", 2, 4, true));
 
         if (factoryLine != "test:unit -> test:factory (Factory loaded.)" ||
-            poolLine != "test:stage / pool-a: native:unit, test:factory" ||
+            poolLine != "test:stage / pool-a candidates: native:unit, test:factory" ||
             aiRangeLine != "test:ai: 2-4 (contiguous)")
         {
             throw new InvalidOperationException("Loader diagnostics formatting omitted a registered factory, pool, or AI stage range.");
@@ -6389,6 +6507,80 @@ var tests = new (string Name, Action Run)[]
         if (missing[0].PrefabResolved || missing[0].CardImageResolved || missing[0].VisualResolved)
         {
             throw new InvalidOperationException("Unresolved unit resources must be reported as missing.");
+        }
+    }),
+    ("unrequested unit visual is not reported as resolved", () =>
+    {
+        UnitDiagnosticReport[] units =
+        [
+            new UnitDiagnosticReport("test:unit-no-visual", "test:pack", "unit-prefab", "unit-card",
+                false, true, false, true, false)
+        ];
+        var resolvedResources = new HashSet<string>(new[] { "unit-prefab", "unit-card" }, StringComparer.Ordinal);
+        IReadOnlyList<UnitAssetResolutionDiagnosticReport> assets =
+            LoaderUnitDiagnosticsBuilder.CreateAssetResolutionReports(
+                units, resolvedResources, new HashSet<string>(StringComparer.Ordinal),
+                new HashSet<string>(StringComparer.Ordinal));
+
+        if (assets.Count != 1 || assets[0].VisualRequested || assets[0].VisualResolved ||
+            LoaderUnitDiagnosticsBuilder.GetAssetResolutionSeverity(assets[0]) != UnitAssetResolutionSeverity.Muted ||
+            !assets[0].StatusMessage.Contains("custom visual not requested", StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("A unit without a custom visual request must be explicitly neutral, not reported as resolved.");
+        }
+    }),
+    ("unit asset diagnostics distinguish missing, unresolved, and resolved requests", () =>
+    {
+        UnitDiagnosticReport[] units =
+        [
+            new UnitDiagnosticReport("test:unit-visual", "test:pack", "unit-prefab", "unit-card",
+                false, true, false, true, false)
+        ];
+
+        IReadOnlyList<UnitAssetResolutionDiagnosticReport> missingVisual =
+            LoaderUnitDiagnosticsBuilder.CreateAssetResolutionReports(
+                units,
+                new HashSet<string>(new[] { "unit-prefab", "unit-card" }, StringComparer.Ordinal),
+                new HashSet<string>(new[] { "test:unit-visual" }, StringComparer.Ordinal),
+                new HashSet<string>(StringComparer.Ordinal));
+        IReadOnlyList<UnitAssetResolutionDiagnosticReport> unverifiedNativeCard =
+            LoaderUnitDiagnosticsBuilder.CreateAssetResolutionReports(
+                units,
+                new HashSet<string>(new[] { "unit-prefab" }, StringComparer.Ordinal),
+                new HashSet<string>(StringComparer.Ordinal),
+                new HashSet<string>(StringComparer.Ordinal));
+        IReadOnlyList<UnitAssetResolutionDiagnosticReport> resolvedVisual =
+            LoaderUnitDiagnosticsBuilder.CreateAssetResolutionReports(
+                units,
+                new HashSet<string>(new[] { "unit-prefab", "unit-card" }, StringComparer.Ordinal),
+                new HashSet<string>(new[] { "test:unit-visual" }, StringComparer.Ordinal),
+                new HashSet<string>(new[] { "test:unit-visual" }, StringComparer.Ordinal));
+
+        if (LoaderUnitDiagnosticsBuilder.GetAssetResolutionSeverity(missingVisual[0]) !=
+                UnitAssetResolutionSeverity.Error ||
+            LoaderUnitDiagnosticsBuilder.GetAssetResolutionSeverity(unverifiedNativeCard[0]) !=
+                UnitAssetResolutionSeverity.Warning ||
+            LoaderUnitDiagnosticsBuilder.GetAssetResolutionSeverity(resolvedVisual[0]) !=
+                UnitAssetResolutionSeverity.Success)
+        {
+            throw new InvalidOperationException("Asset diagnostics must preserve error, warning, and success severity.");
+        }
+    }),
+    ("eligibility reflection failures are reported as unknown instead of ineligible", () =>
+    {
+        UnitDiagnosticReport[] units =
+        [
+            new UnitDiagnosticReport("test:unit-unknown-eligibility", "test:pack", "prefab", "card",
+                false, false, false, false, false, "AllowedAsBlueprint")
+        ];
+        IReadOnlyList<UnitEligibilityDiagnosticReport> reports =
+            LoaderUnitDiagnosticsBuilder.CreateEligibilityReports(units);
+
+        if (reports.Count != 1 || reports[0].IsResolved ||
+            LoaderDiagnosticsFormatter.FormatUnitEligibility(reports[0]) !=
+                "test:unit-unknown-eligibility [Eligibility=Unknown; failed fields=AllowedAsBlueprint]")
+        {
+            throw new InvalidOperationException("A failed native eligibility read must be distinguished from a false flag.");
         }
     }),
     ("unit active skill rejects non-finite effect values", () =>
@@ -6550,6 +6742,423 @@ var tests = new (string Name, Action Run)[]
             throw new InvalidOperationException("Loader registry tool failed: " + output);
         }
     }),
+    ("unit upgrade graph rejects circular references", () =>
+    {
+        WithPackage(sample, (pack, root) =>
+        {
+            pack.units = new ContentUnitDefinition[3];
+            for (int i = 0; i < 3; i++)
+            {
+                pack.units[i] = new ContentUnitDefinition
+                {
+                    id = "sample:upgrade-" + i,
+                    nativeTemplateId = "native:base"
+                };
+            }
+            pack.units[0].upgrades = new[]
+            {
+                new ContentUnitUpgradeDefinition { targetUnitId = "sample:upgrade-1" }
+            };
+            pack.units[1].upgrades = new[]
+            {
+                new ContentUnitUpgradeDefinition { targetUnitId = "sample:upgrade-2" }
+            };
+            pack.units[2].upgrades = new[]
+            {
+                new ContentUnitUpgradeDefinition { targetUnitId = "sample:upgrade-0" }
+            };
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "unit-upgrade.cycle-detected");
+        });
+    }),
+    ("unit upgrade graph rejects depth exceeded", () =>
+    {
+        WithPackage(sample, (pack, root) =>
+        {
+            int count = 7;
+            pack.units = new ContentUnitDefinition[count];
+            for (int i = 0; i < count; i++)
+            {
+                pack.units[i] = new ContentUnitDefinition
+                {
+                    id = "sample:upgrade-" + i,
+                    nativeTemplateId = "native:base"
+                };
+            }
+            for (int i = 0; i < count - 1; i++)
+            {
+                pack.units[i].upgrades = new[]
+                {
+                    new ContentUnitUpgradeDefinition { targetUnitId = "sample:upgrade-" + (i + 1) }
+                };
+            }
+            pack.units[count - 1].upgrades = Array.Empty<ContentUnitUpgradeDefinition>();
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "unit-upgrade.depth-exceeded");
+        });
+    }),
+    ("unit upgrade graph accepts exactly five edges", () =>
+        {
+            WithPackage(nativeSample, (pack, root) =>
+        {
+            const int count = 6;
+            for (int i = 0; i < count; i++)
+            {
+                pack.units[i].upgrades = i < count - 1
+                    ? new[] { new ContentUnitUpgradeDefinition { targetUnitId = pack.units[i + 1].id } }
+                    : Array.Empty<ContentUnitUpgradeDefinition>();
+            }
+            ContentPackValidationResult result = ContentPackValidator.Validate(
+                pack, root, new EmptySnapshot(), new KnownModuleValidator());
+            if (!result.IsValid || result.Diagnostics.Any(d => d.Code == "unit-upgrade.depth-exceeded"))
+            {
+                throw new InvalidOperationException("A five-edge upgrade chain must validate cleanly: " +
+                    string.Join(", ", result.Diagnostics.Select(d => d.Code)));
+            }
+        });
+    }),
+    ("unit upgrade depth check handles convergent paths", () =>
+    {
+        WithPackage(sample, (pack, root) =>
+        {
+            const int count = 7;
+            pack.units = new ContentUnitDefinition[count];
+            for (int i = 0; i < count; i++)
+            {
+                pack.units[i] = new ContentUnitDefinition
+                {
+                    id = "sample:upgrade-join-" + i,
+                    nativeTemplateId = "native:base",
+                    upgrades = Array.Empty<ContentUnitUpgradeDefinition>()
+                };
+            }
+
+            pack.units[0].upgrades = new[]
+            {
+                new ContentUnitUpgradeDefinition { targetUnitId = "sample:upgrade-join-5" },
+                new ContentUnitUpgradeDefinition { targetUnitId = "sample:upgrade-join-1" }
+            };
+            for (int i = 1; i < 5; i++)
+            {
+                pack.units[i].upgrades = new[]
+                {
+                    new ContentUnitUpgradeDefinition { targetUnitId = "sample:upgrade-join-" + (i + 1) }
+                };
+            }
+            pack.units[5].upgrades = new[]
+            {
+                new ContentUnitUpgradeDefinition { targetUnitId = "sample:upgrade-join-6" }
+            };
+
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "unit-upgrade.depth-exceeded");
+        });
+    }),
+    ("unit synergy graph rejects circular references", () =>
+    {
+        WithPackage(sample, (pack, root) =>
+        {
+            pack.units = new ContentUnitDefinition[2];
+            for (int i = 0; i < 2; i++)
+            {
+                pack.units[i] = new ContentUnitDefinition
+                {
+                    id = "sample:synergy-" + i,
+                    nativeTemplateId = "native:base"
+                };
+            }
+            pack.units[0].synergies = new[]
+            {
+                new ContentUnitSynergyDefinition
+                {
+                    id = "sample:s1",
+                    statName = "damage",
+                    multiplier = 1.0f,
+                    radius = 1.0f,
+                    targetUnitIds = new[] { "sample:synergy-1" }
+                }
+            };
+            pack.units[1].synergies = new[]
+            {
+                new ContentUnitSynergyDefinition
+                {
+                    id = "sample:s2",
+                    statName = "damage",
+                    multiplier = 1.0f,
+                    radius = 1.0f,
+                    targetUnitIds = new[] { "sample:synergy-0" }
+                }
+            };
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "unit-synergy.cycle-detected");
+        });
+    }),
+    ("unit synergy graph rejects excessive chain depth", () =>
+    {
+        WithPackage(sample, (pack, root) =>
+        {
+            const int count = 7;
+            pack.units = new ContentUnitDefinition[count];
+            for (int i = 0; i < count; i++)
+            {
+                pack.units[i] = new ContentUnitDefinition
+                {
+                    id = "sample:synergy-depth-" + i,
+                    nativeTemplateId = "native:base"
+                };
+                pack.units[i].synergies = i < count - 1
+                    ? new[]
+                    {
+                        new ContentUnitSynergyDefinition
+                        {
+                            id = "sample:synergy-depth-link-" + i,
+                            statName = "damage",
+                            multiplier = 1.0f,
+                            radius = 1.0f,
+                            targetUnitIds = new[] { "sample:synergy-depth-" + (i + 1) }
+                        }
+                    }
+                    : Array.Empty<ContentUnitSynergyDefinition>();
+            }
+
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "unit-synergy.depth-exceeded");
+        });
+    }),
+    ("unit synergy depth check handles convergent paths", () =>
+    {
+        WithPackage(sample, (pack, root) =>
+        {
+            const int count = 7;
+            pack.units = new ContentUnitDefinition[count];
+            for (int i = 0; i < count; i++)
+            {
+                pack.units[i] = new ContentUnitDefinition
+                {
+                    id = "sample:synergy-join-" + i,
+                    nativeTemplateId = "native:base"
+                };
+                pack.units[i].synergies = Array.Empty<ContentUnitSynergyDefinition>();
+            }
+
+            pack.units[0].synergies = new[]
+            {
+                new ContentUnitSynergyDefinition
+                {
+                    id = "sample:synergy-join-root",
+                    statName = "damage",
+                    multiplier = 1.0f,
+                    radius = 1.0f,
+                    targetUnitIds = new[] { "sample:synergy-join-5", "sample:synergy-join-1" }
+                }
+            };
+            for (int i = 1; i < 5; i++)
+            {
+                pack.units[i].synergies = new[]
+                {
+                    new ContentUnitSynergyDefinition
+                    {
+                        id = "sample:synergy-join-link-" + i,
+                        statName = "damage",
+                        multiplier = 1.0f,
+                        radius = 1.0f,
+                        targetUnitIds = new[] { "sample:synergy-join-" + (i + 1) }
+                    }
+                };
+            }
+            pack.units[5].synergies = new[]
+            {
+                new ContentUnitSynergyDefinition
+                {
+                    id = "sample:synergy-join-tail",
+                    statName = "damage",
+                    multiplier = 1.0f,
+                    radius = 1.0f,
+                    targetUnitIds = new[] { "sample:synergy-join-6" }
+                }
+            };
+
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "unit-synergy.depth-exceeded");
+        });
+    }),
+    ("unit synergy graph accepts exactly five edges", () =>
+        {
+            WithPackage(nativeSample, (pack, root) =>
+        {
+            const int count = 6;
+            for (int i = 0; i < count; i++)
+            {
+                pack.units[i].synergies = i < count - 1
+                    ? new[]
+                    {
+                        new ContentUnitSynergyDefinition
+                        {
+                            id = "sample:synergy-boundary-link-" + i,
+                            statName = "damage", multiplier = 1.0f, radius = 1.0f,
+                            targetUnitIds = new[] { pack.units[i + 1].id }
+                        }
+                    }
+                    : Array.Empty<ContentUnitSynergyDefinition>();
+            }
+            ContentPackValidationResult result = ContentPackValidator.Validate(
+                pack, root, new EmptySnapshot(), new KnownModuleValidator());
+            if (!result.IsValid || result.Diagnostics.Any(d => d.Code == "unit-synergy.depth-exceeded"))
+            {
+                throw new InvalidOperationException("A five-edge synergy chain must validate cleanly: " +
+                    string.Join(", ", result.Diagnostics.Select(d => d.Code)));
+            }
+        });
+    }),
+    ("unit synergy graph accepts convergent DAG", () =>
+    {
+
+        WithPackage(nativeSample, (pack, root) =>
+        {
+            const int count = 4;
+            for (int i = 0; i < count; i++)
+            {
+                pack.units[i].synergies = Array.Empty<ContentUnitSynergyDefinition>();
+            }
+            pack.units[0].synergies = new[]
+            {
+                new ContentUnitSynergyDefinition
+                {
+                    id = "sample:d1",
+                    statName = "damage",
+                    multiplier = 1.0f,
+                    radius = 1.0f,
+                    targetUnitIds = new[] { pack.units[1].id, pack.units[2].id }
+                }
+            };
+            pack.units[1].synergies = new[]
+            {
+                new ContentUnitSynergyDefinition
+                {
+                    id = "sample:d2",
+                    statName = "damage",
+                    multiplier = 1.0f,
+                    radius = 1.0f,
+                    targetUnitIds = new[] { pack.units[3].id }
+                }
+            };
+            pack.units[2].synergies = new[]
+            {
+                new ContentUnitSynergyDefinition
+                {
+                    id = "sample:d3",
+                    statName = "damage",
+                    multiplier = 1.0f,
+                    radius = 1.0f,
+                    targetUnitIds = new[] { pack.units[3].id }
+                }
+            };
+            pack.units[3].synergies = Array.Empty<ContentUnitSynergyDefinition>();
+            ContentPackValidationResult result = ContentPackValidator.Validate(pack, root, new EmptySnapshot(), new KnownModuleValidator());
+            if (!result.IsValid || result.Diagnostics.Any(d =>
+                    d.Code == "unit-synergy.cycle-detected" || d.Code == "unit-synergy.depth-exceeded"))
+            {
+                throw new InvalidOperationException("Convergent DAG must be fully valid without cycle/depth diagnostics: " +
+                    string.Join(", ", result.Diagnostics.Select(d => d.Code)));
+            }
+        });
+    }),
+    ("unit reference graph validation is stack-safe for a deep chain", () =>
+    {
+        var process = new System.Diagnostics.Process();
+        process.StartInfo.FileName = "dotnet";
+        process.StartInfo.ArgumentList.Add("exec");
+        process.StartInfo.ArgumentList.Add(Assembly.GetExecutingAssembly().Location);
+        process.StartInfo.ArgumentList.Add(repositoryRoot);
+        process.StartInfo.Environment["RCL_UNIT_GRAPH_STACK_PROBE"] = "1";
+        process.StartInfo.UseShellExecute = false;
+        process.StartInfo.RedirectStandardOutput = true;
+        process.StartInfo.RedirectStandardError = true;
+        process.StartInfo.CreateNoWindow = true;
+        process.Start();
+        string output = process.StandardOutput.ReadToEnd();
+        string error = process.StandardError.ReadToEnd();
+        process.WaitForExit();
+        if (process.ExitCode != 0 || !output.Contains("UNIT-GRAPH-STACK-PROBE-PASS", StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("Deep graph child failed (exit " + process.ExitCode + "). stdout=" +
+                output + " stderr=" + error);
+        }
+    }),
+    ("production queue feasibility reports mismatched buildTime and resourceCost", () =>
+        {
+            WithPackage(nativeSample, (pack, root) =>
+        {
+            pack.units[0].productionQueue = new ContentUnitProductionQueueDefinition
+            {
+                buildTime = 10,
+                resourceCost = 0,
+                queueSize = 1
+            };
+            ContentPackValidationResult result = ContentPackValidator.Validate(
+                pack, root, new EmptySnapshot(), new KnownModuleValidator());
+            ContentDiagnostic warning = result.Diagnostics.Single(d => d.Code == "unit-production-queue.resource-cost-required");
+            if (warning.Severity != DiagnosticSeverity.Warning || !result.IsValid)
+            {
+                throw new InvalidOperationException("Production queue feasibility diagnostic must be a non-invalidating warning.");
+            }
+        });
+    }),
+    ("production queue feasibility reports missing queueSize when buildTime is positive", () =>
+        {
+            WithPackage(nativeSample, (pack, root) =>
+        {
+            pack.units[0].productionQueue = new ContentUnitProductionQueueDefinition
+            {
+                buildTime = 10,
+                resourceCost = 10,
+                queueSize = 0
+            };
+            ContentPackValidationResult result = ContentPackValidator.Validate(
+                pack, root, new EmptySnapshot(), new KnownModuleValidator());
+            ContentDiagnostic warning = result.Diagnostics.Single(d => d.Code == "unit-production-queue.queue-size-required");
+            if (warning.Severity != DiagnosticSeverity.Warning || !result.IsValid)
+            {
+                throw new InvalidOperationException("Production queue feasibility diagnostic must be a non-invalidating warning.");
+            }
+        });
+    }),
+    ("loader localization coverage report snapshots available languages", () =>
+    {
+        UnitDiagnosticReport[] units =
+        [
+            new UnitDiagnosticReport("test:unit", "test:pack", "unit-prefab", "unit-card",
+                false, true, false, true, false)
+        ];
+        var sourceLanguages = new List<string> { "en-US", "es-XL" };
+        IReadOnlyList<UnitLocalizationCoverageDiagnosticReport> reports =
+            LoaderUnitDiagnosticsBuilder.CreateLocalizationCoverageReports(
+                units, id => sourceLanguages, id => true);
+        sourceLanguages[0] = "fr-FR";
+
+        if (reports.Count != 1 || reports[0].AvailableLanguages.Count != 2 ||
+            reports[0].AvailableLanguages[0] != "en-US" ||
+            reports[0].AvailableLanguages[1] != "es-XL" ||
+            !reports[0].HasEnglish || !reports[0].HasNativeTemplate)
+        {
+            throw new InvalidOperationException("Localization coverage report must snapshot language data and fallback coverage.");
+        }
+
+        IList<string>? mutableLanguages = reports[0].AvailableLanguages as IList<string>;
+        if (mutableLanguages != null && !mutableLanguages.IsReadOnly)
+        {
+            throw new InvalidOperationException("Localization coverage report language snapshots must be immutable.");
+        }
+
+        string line = LoaderDiagnosticsFormatter.FormatUnitLocalizationCoverage(reports[0]);
+        if (!line.Contains("Languages=en-US, es-XL", StringComparison.Ordinal) ||
+            !line.Contains("English=True", StringComparison.Ordinal) ||
+            !line.Contains("NativeTemplate=True", StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("Localization coverage formatter did not include expected language details: " + line);
+        }
+    }),
+
 };
 
 int failures = 0;

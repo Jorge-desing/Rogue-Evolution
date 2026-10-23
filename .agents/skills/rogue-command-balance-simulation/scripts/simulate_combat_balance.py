@@ -57,6 +57,38 @@ CANONICAL_STATS = [
     "ArmorProtection",
 ]
 
+SIMULATED_CUSTOM_BALANCE_FIELDS: Dict[str, str] = {
+    "Cost": "cost",
+    "ProductionDuration": "production_duration",
+    "MaxHealth": "max_health",
+    "MaxShield": "max_shield",
+    "ArmorProtection": "armor_protection",
+    "MoveSpeed": "move_speed",
+    "SightRadius": "sight_radius",
+    "Damage1": "damage1",
+    "Damage2": "damage2",
+    "Attack1Cooldown": "attack_cooldown",
+    "Attack2Cooldown": "attack2_cooldown",
+    "WeaponRange": "weapon_range",
+    "EffectRadius1": "effect_radius1",
+}
+
+
+def _reject_json_constant(value: str) -> None:
+    raise ValueError(f"Invalid non-finite JSON number: {value}")
+
+
+def _finite_number(value: Any, context: str) -> float:
+    if isinstance(value, bool):
+        raise ValueError(f"Invalid numeric value for {context}: {value!r}")
+    try:
+        number = float(value)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise ValueError(f"Invalid numeric value for {context}: {value!r}") from exc
+    if not math.isfinite(number):
+        raise ValueError(f"Non-finite numeric value for {context}: {value!r}")
+    return number
+
 # Built-in fallback archetype stats from Rogue Command 1.0.9 verified dataset
 BUILTIN_NATIVE_ARCHETYPES: Dict[str, Dict[str, Any]] = {
     "PCXBaseTank": {
@@ -761,27 +793,51 @@ class BalanceRepository:
                 sys.stderr.write(f"Warning: Failed to parse TSV at {self.tsv_path}: {e}\n")
 
     def load_content_pack(self, content_json_path: Path) -> List[str]:
-        """Loads a mod content.json pack, cloning native templates and applying balanceOverrides."""
+        """Loads a mod pack and applies raw, custom, and structured movement balance in runtime precedence."""
         loaded_units = []
         if not content_json_path.exists():
             return loaded_units
 
         with open(content_json_path, mode="r", encoding="utf-8") as f:
-            pack_data = json.load(f)
+            pack_data = json.load(f, parse_constant=_reject_json_constant)
+
+        if not isinstance(pack_data, dict):
+            raise ValueError("Invalid manifest: expected a JSON object")
 
         units = pack_data.get("units", [])
+        if not isinstance(units, list):
+            raise ValueError("Invalid manifest units: expected an array")
         for u in units:
+            if not isinstance(u, dict):
+                raise ValueError("Invalid unit entry: expected an object")
             uid = u.get("id")
-            if not uid:
-                continue
+            if not isinstance(uid, str) or not uid.strip():
+                raise ValueError("Invalid unit entry id: expected a non-empty string")
 
             template_id = u.get("nativeTemplateId")
+            if "nativeTemplateId" in u and (
+                not isinstance(template_id, str) or not template_id.strip()
+            ):
+                raise ValueError(f"Invalid nativeTemplateId for unit {uid}: expected a non-empty string")
             base = self.profiles.get(template_id) if template_id else None
 
             display_name = uid
-            for loc in u.get("localizations", []):
-                if loc.get("language") == "en-US":
-                    display_name = loc.get("name", uid)
+            localizations = u.get("localizations", [])
+            if not isinstance(localizations, list):
+                raise ValueError(f"Invalid localizations for {uid}: expected an array")
+            if "localizations" in u and not localizations:
+                raise ValueError(f"Invalid localizations for {uid}: expected at least one entry")
+            for index, loc in enumerate(localizations):
+                if not isinstance(loc, dict):
+                    raise ValueError(f"Invalid localizations[{index}] for {uid}: expected an object")
+                language = loc.get("language")
+                name = loc.get("name")
+                if not isinstance(language, str) or not language.strip():
+                    raise ValueError(f"Invalid localizations[{index}].language for {uid}: expected a non-empty string")
+                if not isinstance(name, str) or not name.strip():
+                    raise ValueError(f"Invalid localizations[{index}].name for {uid}: expected a non-empty string")
+                if language == "en-US":
+                    display_name = name
                     break
 
             if base:
@@ -798,15 +854,36 @@ class BalanceRepository:
                     template_id=template_id,
                 )
 
-            for override in u.get("balanceOverrides", []):
+            raw_overrides = u.get("balanceOverrides", [])
+            if not isinstance(raw_overrides, list):
+                raise ValueError(f"Invalid balanceOverrides for {uid}: expected an array")
+            raw_move_speed_overridden = False
+            for index, override in enumerate(raw_overrides):
+                if not isinstance(override, dict):
+                    raise ValueError(f"Invalid balanceOverrides[{index}] for {uid}: expected an object")
                 name = override.get("name", "")
-                raw_val = override.get("value", "")
-                try:
-                    val = float(raw_val)
-                except ValueError:
-                    val = 0.0
-
+                if not isinstance(name, str) or not name:
+                    raise ValueError(f"Invalid balanceOverrides[{index}].name for {uid}: expected a non-empty string")
+                if "value" not in override:
+                    raise ValueError(f"Invalid balanceOverrides[{index}].value for {uid}: missing value")
+                raw_val = override["value"]
                 key = name.lower()
+                if key == "attacktype":
+                    if not isinstance(raw_val, str):
+                        raise ValueError(f"Invalid attackType override for {uid}: expected a string")
+                    profile.attack_type = raw_val
+                    continue
+                if key not in {
+                    "cost", "productionduration", "maxhealth", "health", "maxshield", "shield",
+                    "armorprotection", "armor", "movespeed", "speed", "sightradius", "sight",
+                    "damage1", "damage", "attackcooldown", "cooldown", "damage2", "attack2cooldown",
+                    "firepointcount", "weaponrange", "range", "effectradius1", "effectradius", "aoe",
+                }:
+                    continue
+                val = _finite_number(raw_val, f"balanceOverrides[{index}].value for {uid}.{name}")
+
+                if key in ("movespeed", "speed"):
+                    raw_move_speed_overridden = True
                 if key == "cost":
                     profile.cost = val
                 elif key == "productionduration":
@@ -825,14 +902,40 @@ class BalanceRepository:
                     profile.damage1 = val
                 elif key in ("attackcooldown", "cooldown"):
                     profile.attack_cooldown = val
+                elif key == "damage2":
+                    profile.damage2 = val
+                elif key == "attack2cooldown":
+                    profile.attack2_cooldown = val
                 elif key == "firepointcount":
                     profile.fire_point_count = max(0, int(val))
                 elif key in ("weaponrange", "range"):
                     profile.weapon_range = val
                 elif key in ("effectradius1", "effectradius", "aoe"):
                     profile.effect_radius1 = val
-                elif key == "attacktype":
-                    profile.attack_type = str(raw_val)
+
+            custom_balance = u.get("customBalance", {})
+            if not isinstance(custom_balance, dict):
+                raise ValueError(f"Invalid customBalance for {uid}: expected an object")
+            for name, raw_val in custom_balance.items():
+                value = _finite_number(raw_val, f"customBalance {uid}.{name}")
+                profile_field = SIMULATED_CUSTOM_BALANCE_FIELDS.get(name)
+                if profile_field is not None:
+                    setattr(profile, profile_field, value)
+
+            movement = u.get("movement", {})
+            if not isinstance(movement, dict):
+                raise ValueError(f"Invalid movement for {uid}: expected an object")
+            movement_speed = (
+                _finite_number(movement["moveSpeed"], f"movement.moveSpeed for {uid}")
+                if "moveSpeed" in movement
+                else None
+            )
+            if (
+                not raw_move_speed_overridden
+                and "MoveSpeed" not in custom_balance
+                and movement_speed is not None
+            ):
+                profile.move_speed = movement_speed
 
             self.profiles[uid] = profile
             loaded_units.append(uid)

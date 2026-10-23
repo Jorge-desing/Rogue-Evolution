@@ -50,6 +50,7 @@ namespace RogueCommandExpansionLoader.Runtime
             bool isAllowedForAi = false,
             bool isAllowedForDemo = false,
             bool isForSpecialists = false,
+            string eligibilityReadError = null,
             int variantCount = 0)
         {
             UnitId = unitId ?? string.Empty;
@@ -61,6 +62,7 @@ namespace RogueCommandExpansionLoader.Runtime
             IsAllowedForAi = isAllowedForAi;
             IsAllowedForDemo = isAllowedForDemo;
             IsForSpecialists = isForSpecialists;
+            EligibilityReadError = eligibilityReadError ?? string.Empty;
             VariantCount = variantCount;
         }
 
@@ -73,6 +75,7 @@ namespace RogueCommandExpansionLoader.Runtime
         public bool IsAllowedForAi { get; private set; }
         public bool IsAllowedForDemo { get; private set; }
         public bool IsForSpecialists { get; private set; }
+        public string EligibilityReadError { get; private set; }
         public int VariantCount { get; private set; }
     }
 
@@ -143,29 +146,29 @@ namespace RogueCommandExpansionLoader.Runtime
 
     public sealed class StagePoolScopeDiagnosticReport
     {
-        public StagePoolScopeDiagnosticReport(string stageId, string poolId, IReadOnlyList<string> factoryIds)
+        public StagePoolScopeDiagnosticReport(string stageId, string poolId, IReadOnlyList<string> candidateIds)
         {
             StageId = stageId ?? string.Empty;
             PoolId = poolId ?? string.Empty;
-            if (factoryIds == null || factoryIds.Count == 0)
+            if (candidateIds == null || candidateIds.Count == 0)
             {
-                FactoryIds = Array.AsReadOnly(new string[0]);
+                CandidateIds = Array.AsReadOnly(new string[0]);
             }
             else
             {
-                var copy = new string[factoryIds.Count];
-                for (int i = 0; i < factoryIds.Count; i++)
+                var copy = new string[candidateIds.Count];
+                for (int i = 0; i < candidateIds.Count; i++)
                 {
-                    copy[i] = factoryIds[i];
+                    copy[i] = candidateIds[i];
                 }
                 Array.Sort(copy, StringComparer.Ordinal);
-                FactoryIds = Array.AsReadOnly(copy);
+                CandidateIds = Array.AsReadOnly(copy);
             }
         }
 
         public string StageId { get; private set; }
         public string PoolId { get; private set; }
-        public IReadOnlyList<string> FactoryIds { get; private set; }
+        public IReadOnlyList<string> CandidateIds { get; private set; }
     }
 
     public sealed class AiProfileStageRangeDiagnosticReport
@@ -192,7 +195,8 @@ namespace RogueCommandExpansionLoader.Runtime
             bool isAllowedAsStartingBlueprint,
             bool isAllowedForAi,
             bool isAllowedForDemo,
-            bool isForSpecialists)
+            bool isForSpecialists,
+            string eligibilityReadError = null)
         {
             UnitId = unitId ?? string.Empty;
             IsAllowedAsBlueprint = isAllowedAsBlueprint;
@@ -200,6 +204,8 @@ namespace RogueCommandExpansionLoader.Runtime
             IsAllowedForAi = isAllowedForAi;
             IsAllowedForDemo = isAllowedForDemo;
             IsForSpecialists = isForSpecialists;
+            EligibilityReadError = eligibilityReadError ?? string.Empty;
+            IsResolved = String.IsNullOrWhiteSpace(EligibilityReadError);
         }
 
         public string UnitId { get; private set; }
@@ -208,6 +214,16 @@ namespace RogueCommandExpansionLoader.Runtime
         public bool IsAllowedForAi { get; private set; }
         public bool IsAllowedForDemo { get; private set; }
         public bool IsForSpecialists { get; private set; }
+        public string EligibilityReadError { get; private set; }
+        public bool IsResolved { get; private set; }
+    }
+
+    public enum UnitAssetResolutionSeverity
+    {
+        Muted,
+        Success,
+        Warning,
+        Error
     }
 
     public sealed class UnitAssetResolutionDiagnosticReport
@@ -216,12 +232,14 @@ namespace RogueCommandExpansionLoader.Runtime
             string unitId,
             bool prefabResolved,
             bool cardImageResolved,
+            bool visualRequested,
             bool visualResolved,
             string statusMessage)
         {
             UnitId = unitId ?? string.Empty;
             PrefabResolved = prefabResolved;
             CardImageResolved = cardImageResolved;
+            VisualRequested = visualRequested;
             VisualResolved = visualResolved;
             StatusMessage = statusMessage ?? string.Empty;
         }
@@ -229,8 +247,35 @@ namespace RogueCommandExpansionLoader.Runtime
         public string UnitId { get; private set; }
         public bool PrefabResolved { get; private set; }
         public bool CardImageResolved { get; private set; }
+        public bool VisualRequested { get; private set; }
         public bool VisualResolved { get; private set; }
         public string StatusMessage { get; private set; }
+    }
+
+    public sealed class UnitLocalizationCoverageDiagnosticReport
+    {
+        public UnitLocalizationCoverageDiagnosticReport(
+            string unitId,
+            IReadOnlyList<string> availableLanguages,
+            bool hasEnglish,
+            bool hasNativeTemplate)
+        {
+            UnitId = unitId ?? string.Empty;
+            int languageCount = availableLanguages != null ? availableLanguages.Count : 0;
+            var languageCopy = new string[languageCount];
+            for (int i = 0; i < languageCount; i++)
+            {
+                languageCopy[i] = availableLanguages[i];
+            }
+            AvailableLanguages = Array.AsReadOnly(languageCopy);
+            HasEnglish = hasEnglish;
+            HasNativeTemplate = hasNativeTemplate;
+        }
+
+        public string UnitId { get; private set; }
+        public IReadOnlyList<string> AvailableLanguages { get; private set; }
+        public bool HasEnglish { get; private set; }
+        public bool HasNativeTemplate { get; private set; }
     }
 
     public sealed class LoaderDiagnosticsSnapshot
@@ -266,6 +311,7 @@ namespace RogueCommandExpansionLoader.Runtime
                 aiProfileStageRanges,
                 null,
                 null,
+                null,
                 recentLogs)
         {
         }
@@ -286,6 +332,7 @@ namespace RogueCommandExpansionLoader.Runtime
             IReadOnlyList<AiProfileStageRangeDiagnosticReport> aiProfileStageRanges,
             IReadOnlyList<UnitEligibilityDiagnosticReport> unitEligibilities,
             IReadOnlyList<UnitAssetResolutionDiagnosticReport> unitAssetResolutions,
+            IReadOnlyList<UnitLocalizationCoverageDiagnosticReport> unitLocalizationCoverage,
             IReadOnlyList<string> recentLogs)
         {
             TargetGameVersion = targetGameVersion ?? string.Empty;
@@ -303,6 +350,7 @@ namespace RogueCommandExpansionLoader.Runtime
             AiProfileStageRanges = CopyReadOnly(aiProfileStageRanges);
             UnitEligibilities = CopyReadOnly(unitEligibilities);
             UnitAssetResolutions = CopyReadOnly(unitAssetResolutions);
+            UnitLocalizationCoverage = CopyReadOnly(unitLocalizationCoverage);
             RecentLogs = CopyReadOnly(recentLogs);
         }
 
@@ -321,6 +369,7 @@ namespace RogueCommandExpansionLoader.Runtime
         public IReadOnlyList<AiProfileStageRangeDiagnosticReport> AiProfileStageRanges { get; private set; }
         public IReadOnlyList<UnitEligibilityDiagnosticReport> UnitEligibilities { get; private set; }
         public IReadOnlyList<UnitAssetResolutionDiagnosticReport> UnitAssetResolutions { get; private set; }
+        public IReadOnlyList<UnitLocalizationCoverageDiagnosticReport> UnitLocalizationCoverage { get; private set; }
         public IReadOnlyList<string> RecentLogs { get; private set; }
 
         private static IReadOnlyList<T> CopyReadOnly<T>(IReadOnlyList<T> source)
@@ -362,7 +411,8 @@ namespace RogueCommandExpansionLoader.Runtime
                         unit.IsAllowedAsStartingBlueprint,
                         unit.IsAllowedForAi,
                         unit.IsAllowedForDemo,
-                        unit.IsForSpecialists));
+                        unit.IsForSpecialists,
+                        unit.EligibilityReadError));
                 }
             }
 
@@ -396,7 +446,7 @@ namespace RogueCommandExpansionLoader.Runtime
                     !String.IsNullOrWhiteSpace(unit.ImageKey) &&
                     !unit.ImageKey.StartsWith("RogueCommandExpansionLoader/", StringComparison.Ordinal);
                 bool visualRequested = Contains(visualRequests, unit.UnitId);
-                bool visualResolved = !visualRequested || Contains(resolvedVisuals, unit.UnitId);
+                bool visualResolved = visualRequested && Contains(resolvedVisuals, unit.UnitId);
                 var missing = new List<string>();
                 if (!prefabResolved) missing.Add("prefab");
                 if (!cardImageResolved && !cardImagePathUnverified) missing.Add("card image");
@@ -419,7 +469,76 @@ namespace RogueCommandExpansionLoader.Runtime
                 }
 
                 reports.Add(new UnitAssetResolutionDiagnosticReport(
-                    unit.UnitId, prefabResolved, cardImageResolved, visualResolved, String.Join(" ", statusParts)));
+                    unit.UnitId, prefabResolved, cardImageResolved, visualRequested,
+                    visualResolved, String.Join(" ", statusParts)));
+            }
+
+            reports.Sort((left, right) => StringComparer.Ordinal.Compare(left.UnitId, right.UnitId));
+            return reports.AsReadOnly();
+        }
+
+        public static UnitAssetResolutionSeverity GetAssetResolutionSeverity(
+            UnitAssetResolutionDiagnosticReport report)
+        {
+            if (report == null)
+            {
+                throw new ArgumentNullException(nameof(report));
+            }
+
+            if (report.StatusMessage.StartsWith("Missing:", StringComparison.Ordinal))
+            {
+                return UnitAssetResolutionSeverity.Error;
+            }
+
+            if (report.StatusMessage.IndexOf("not independently resolved", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return UnitAssetResolutionSeverity.Warning;
+            }
+
+            return report.VisualRequested
+                ? UnitAssetResolutionSeverity.Success
+                : UnitAssetResolutionSeverity.Muted;
+        }
+
+        public static IReadOnlyList<UnitLocalizationCoverageDiagnosticReport> CreateLocalizationCoverageReports(
+            IReadOnlyList<UnitDiagnosticReport> units,
+            Func<string, IReadOnlyList<string>> languageResolver,
+            Func<string, bool> hasNativeTemplateResolver)
+        {
+            var reports = new List<UnitLocalizationCoverageDiagnosticReport>();
+            if (units == null)
+            {
+                return reports.AsReadOnly();
+            }
+
+            for (int i = 0; i < units.Count; i++)
+            {
+                UnitDiagnosticReport unit = units[i];
+                if (unit == null)
+                {
+                    continue;
+                }
+
+                IReadOnlyList<string> availableLanguages = languageResolver != null
+                    ? (languageResolver(unit.UnitId) ?? new List<string>())
+                    : new List<string>();
+
+                bool hasEnglish = false;
+                foreach (string lang in availableLanguages)
+                {
+                    if (String.Equals(lang, "en-US", StringComparison.Ordinal))
+                    {
+                        hasEnglish = true;
+                        break;
+                    }
+                }
+
+                bool hasNativeTemplate = hasNativeTemplateResolver != null
+                    ? hasNativeTemplateResolver(unit.UnitId)
+                    : false;
+
+                reports.Add(new UnitLocalizationCoverageDiagnosticReport(
+                    unit.UnitId, availableLanguages, hasEnglish, hasNativeTemplate));
             }
 
             reports.Sort((left, right) => StringComparer.Ordinal.Compare(left.UnitId, right.UnitId));
@@ -456,10 +575,10 @@ namespace RogueCommandExpansionLoader.Runtime
                 throw new ArgumentNullException(nameof(report));
             }
 
-            string ids = report.FactoryIds.Count > 0
-                ? String.Join(", ", report.FactoryIds)
+            string ids = report.CandidateIds.Count > 0
+                ? String.Join(", ", report.CandidateIds)
                 : "Ninguno";
-            return report.StageId + " / " + report.PoolId + ": " + ids;
+            return report.StageId + " / " + report.PoolId + " candidates: " + ids;
         }
 
         public static string FormatAiProfileStageRange(AiProfileStageRangeDiagnosticReport report)
@@ -480,6 +599,12 @@ namespace RogueCommandExpansionLoader.Runtime
                 throw new ArgumentNullException(nameof(report));
             }
 
+            if (!report.IsResolved)
+            {
+                return report.UnitId + " [Eligibility=Unknown; failed fields=" +
+                    report.EligibilityReadError + "]";
+            }
+
             return report.UnitId + " [Blueprint=" + report.IsAllowedAsBlueprint +
                 ", StartingBlueprint=" + report.IsAllowedAsStartingBlueprint +
                 ", AI=" + report.IsAllowedForAi + ", Demo=" + report.IsAllowedForDemo +
@@ -496,6 +621,21 @@ namespace RogueCommandExpansionLoader.Runtime
             return report.UnitId + " [Prefab=" + report.PrefabResolved +
                 ", Card=" + report.CardImageResolved + ", Visual=" + report.VisualResolved +
                 "] " + report.StatusMessage;
+        }
+
+        public static string FormatUnitLocalizationCoverage(UnitLocalizationCoverageDiagnosticReport report)
+        {
+            if (report == null)
+            {
+                throw new ArgumentNullException(nameof(report));
+            }
+
+            string langs = report.AvailableLanguages.Count > 0
+                ? String.Join(", ", report.AvailableLanguages)
+                : "none";
+            return report.UnitId + " [Languages=" + langs +
+                ", English=" + report.HasEnglish +
+                ", NativeTemplate=" + report.HasNativeTemplate + "]";
         }
     }
 }

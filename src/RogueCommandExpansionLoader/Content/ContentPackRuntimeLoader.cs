@@ -1633,22 +1633,24 @@ namespace RogueCommandExpansionLoader.Content
                     bool allowedForAi = false;
                     bool allowedForDemo = false;
                     bool isForSpecialists = false;
+                    var eligibilityReadErrors = new List<string>();
                     try { allowedAsBlueprint = (bool)_allowedBlueprintField.GetValue(unit.BalanceRow); }
-                    catch { }
+                    catch { eligibilityReadErrors.Add("AllowedAsBlueprint"); }
                     try { allowedAsStartingBlueprint = (bool)_allowedStartingBlueprintField.GetValue(unit.BalanceRow); }
-                    catch { }
+                    catch { eligibilityReadErrors.Add("AllowedAsStartingBlueprint"); }
                     try { allowedForAi = (bool)_allowedForAiField.GetValue(unit.BalanceRow); }
-                    catch { }
+                    catch { eligibilityReadErrors.Add("AllowedForAi"); }
                     try { allowedForDemo = (bool)_allowedForDemoField.GetValue(unit.BalanceRow); }
-                    catch { }
+                    catch { eligibilityReadErrors.Add("AllowedForDemo"); }
                     try { isForSpecialists = (bool)_isForSpecialistsField.GetValue(unit.BalanceRow); }
-                    catch { }
+                    catch { eligibilityReadErrors.Add("IsForSpecialists"); }
                     // Count declarations on the loaded product only; no loadout is selected or applied here.
                     int variantCount = !unit.IsProductionBuilding && unit.Definition != null &&
                         unit.Definition.variants != null ? unit.Definition.variants.Length : 0;
                     units.Add(new UnitDiagnosticReport(
                         unit.Id, unit.PackId, unit.PrefabKey, unit.ImageKey, allowedAsBlueprint,
-                        allowedAsStartingBlueprint, allowedForAi, allowedForDemo, isForSpecialists, variantCount));
+                        allowedAsStartingBlueprint, allowedForAi, allowedForDemo, isForSpecialists,
+                        String.Join(", ", eligibilityReadErrors), variantCount));
                 }
                 units.Sort((left, right) => StringComparer.Ordinal.Compare(left.UnitId, right.UnitId));
 
@@ -1677,6 +1679,42 @@ namespace RogueCommandExpansionLoader.Content
 
                 IReadOnlyList<UnitEligibilityDiagnosticReport> unitEligibilities =
                     LoaderUnitDiagnosticsBuilder.CreateEligibilityReports(units);
+                var unitDefinitionsById = new Dictionary<string, ContentUnitDefinition>(StringComparer.Ordinal);
+                foreach (LoadedUnit unit in _units.Values)
+                {
+                    if (unit != null && !String.IsNullOrWhiteSpace(unit.Id))
+                    {
+                        unitDefinitionsById[unit.Id] = unit.Definition;
+                    }
+                }
+                IReadOnlyList<UnitLocalizationCoverageDiagnosticReport> unitLocalizationCoverage =
+                    LoaderUnitDiagnosticsBuilder.CreateLocalizationCoverageReports(
+                        units,
+                        id =>
+                        {
+                            ContentUnitDefinition definition;
+                            if (!unitDefinitionsById.TryGetValue(id, out definition) ||
+                                definition == null || definition.localizations == null)
+                            {
+                                return Array.Empty<string>();
+                            }
+
+                            var languages = new SortedSet<string>(StringComparer.Ordinal);
+                            foreach (ContentUnitLocalizationDefinition localization in definition.localizations)
+                            {
+                                if (localization != null && !String.IsNullOrWhiteSpace(localization.language))
+                                {
+                                    languages.Add(localization.language);
+                                }
+                            }
+                            return languages.ToArray();
+                        },
+                        id =>
+                        {
+                            ContentUnitDefinition definition;
+                            return unitDefinitionsById.TryGetValue(id, out definition) &&
+                                definition != null && !String.IsNullOrWhiteSpace(definition.nativeTemplateId);
+                        });
                 IReadOnlyList<UnitAssetResolutionDiagnosticReport> unitAssetResolutions = null;
 
                 var stages = new List<StageDiagnosticReport>(_stages.Count);
@@ -1791,6 +1829,7 @@ namespace RogueCommandExpansionLoader.Content
                     aiProfileStageRanges,
                     unitEligibilities,
                     unitAssetResolutions,
+                    unitLocalizationCoverage,
                     recentLogs);
             }
         }

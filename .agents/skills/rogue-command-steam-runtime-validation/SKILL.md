@@ -16,6 +16,16 @@ Use this skill when an acceptance claim requires observing a loader, unit, stage
 - If a BepInEx MCP bridge or runtime inspector is available, verify its connected target and use read-only observations first. Use at most one runtime inspector in a test profile and remove it during cleanup. Do not assume a tool is connected because its files are installed locally.
 - Prefer BepInEx MCP over Computer Use for controls exposed by the bridge. The bridge has operated in this project without the game window focused; do not request focus or invoke Computer Use solely to click a control when a bridge call can do it.
 
+## BepInEx MCP control path
+
+- Resolve the bridge URL and command shape from the installed `BepInExMCP` plugin, not assumptions. Prefer the current `BepInEx/LogOutput.log` listener line; if absent, verify the base URL and routes in `ModdersHelperApp.py`/`bridge_client.py` and match the listening port to the `Rogue Command.exe` process before any read-only probe. Do not infer a bridge target from unrelated local MCP transport ports; this session confirmed the game bridge at `http://127.0.0.1:8080/mcp/`, not `http://localhost:54321/mcp`.
+- Commands are path-based (`http://127.0.0.1:8080/mcp/<command>`), with query parameters for filters such as `componentName`. A JSON body with a `method` field is not the protocol for this bridge.
+- Useful commands include `system/ping`, `scene/list_root_gameobjects`, `scene:find_objects_with_component?componentName=...`, `gameobject/inspect_components`, `component/get_details`, `component/get_member`, `component/call_method`, and `mod:inject_class`.
+- Loader pack registration can be deferred until `EntityFactory` initialization. To inspect registered mod templates from `MainMenu` without starting a run, invoke `RogueCommandExpansionLoader.Runtime.RuntimeHooks.BeforeEntityFactory()` through an injected `MonoBehaviour` using reflection; calling the internal type directly will fail to compile.
+- `scene:find_objects_with_component` returns the component-bearing objects for the queried type. Save the raw response before filtering; DontDestroyOnLoad templates may not appear in scene-root snapshots or name searches.
+- `scene/search_gameobjects` is limited and noisy; filter its results by exact names and do not treat UI matches as loader evidence.
+- Record the BepInEx log lines that show pack loading and any injected probe. A successful MCP response alone is not evidence that registration occurred.
+
 ## Skip FirstRun only on an isolated QA profile
 
 - For Steam acceptance runs that do not test the tutorial, use a dedicated QA profile created or selected through the game's native profile-management flow. Never run the bypass on the user's active profile or on a profile that contains user saves/progression. Resolve the actual selector through `ProfileManager.CurrentProfileTextPath` under `Application.persistentDataPath`; do not trust legacy selectors in the installation directory.

@@ -1781,7 +1781,6 @@
         "sample-native:overlord-command-hq",
         "sample-native:surge-tank"
       ],
-      "blueprintPoolEntries": null,
       "aiProfileIds": [
         "sample-native:quick-hunter-extension",
         "sample-native:horde-swarm-assault"
@@ -1834,7 +1833,6 @@
         "sample-native:skirmish-bike",
         "sample-native:surge-tank"
       ],
-      "blueprintPoolEntries": null,
       "aiProfileIds": [
         "sample-native:quick-hunter-extension",
         "sample-native:horde-swarm-assault",

@@ -26,18 +26,27 @@ namespace RogueCommandExpansionLoader.Content
         bool TryValidate(string moduleId, ContentModuleParameter[] parameters, out string diagnostic);
     }
 
+    public enum DiagnosticSeverity
+    {
+        Error,
+        Warning,
+        Info
+    }
+
     public sealed class ContentDiagnostic
     {
-        public ContentDiagnostic(string code, string path, string message)
+        public ContentDiagnostic(string code, string path, string message, DiagnosticSeverity severity = DiagnosticSeverity.Error)
         {
             Code = code;
             Path = path;
             Message = message;
+            Severity = severity;
         }
 
         public string Code { get; private set; }
         public string Path { get; private set; }
         public string Message { get; private set; }
+        public DiagnosticSeverity Severity { get; private set; }
 
         public override string ToString()
         {
@@ -57,7 +66,20 @@ namespace RogueCommandExpansionLoader.Content
         }
 
         public ContentPackDefinition Pack { get { return ContentPackCopy.DeepClone(pack); } }
-        public bool IsValid { get { return diagnostics.Count == 0; } }
+        public bool IsValid
+        {
+            get
+            {
+                foreach (ContentDiagnostic diagnostic in diagnostics)
+                {
+                    if (diagnostic.Severity == DiagnosticSeverity.Error)
+                    {
+                        return false;
+                    }
+                }
+                return true;
+            }
+        }
         public IReadOnlyList<ContentDiagnostic> Diagnostics { get { return diagnostics.AsReadOnly(); } }
     }
 
@@ -294,6 +316,14 @@ namespace RogueCommandExpansionLoader.Content
 
             for (int i = 0; i < units.Length; i++)
             {
+                if (units[i] != null)
+                {
+                    RegisterId(units[i].id, "units[" + i + "].id", "unit", allIds, registrySnapshot, diagnostics);
+                }
+            }
+
+            for (int i = 0; i < units.Length; i++)
+            {
                 var unit = units[i];
                 string itemPath = "units[" + i + "]";
                 if (unit == null)
@@ -302,7 +332,6 @@ namespace RogueCommandExpansionLoader.Content
                     continue;
                 }
 
-                RegisterId(unit.id, itemPath + ".id", "unit", allIds, registrySnapshot, diagnostics);
                 if (!String.IsNullOrWhiteSpace(unit.unitType) && !SupportedUnitTypes.Contains(unit.unitType))
                 {
                     Add(diagnostics, "unit.type-invalid", itemPath + ".unitType", "Unit type must be one of the game's supported unit types.");
@@ -380,6 +409,7 @@ namespace RogueCommandExpansionLoader.Content
                 ValidateUnitSpawn(unit.spawn, itemPath + ".spawn", diagnostics);
                 ValidateUnitStatusEffects(unit.statusEffects, itemPath + ".statusEffects", diagnostics);
                 ValidateUnitProductionQueue(unit.productionQueue, itemPath + ".productionQueue", diagnostics);
+                ValidateUnitProductionQueueFeasibility(unit.productionQueue, itemPath + ".productionQueue", diagnostics);
                 ValidateUnitResourceCosts(unit.resourceCosts, itemPath + ".resourceCosts", diagnostics);
                 ValidateUnitMovement(unit.movement, itemPath + ".movement", diagnostics);
                 ValidateUnitDetection(unit.detection, itemPath + ".detection", diagnostics);
@@ -396,6 +426,9 @@ namespace RogueCommandExpansionLoader.Content
                                     allIds, productionBuildingIds, bundleIds, registrySnapshot, diagnostics);
                 ValidateProfileCardEligibility(unit, itemPath, diagnostics);
             }
+
+            ValidateUnitUpgradeGraph(units, "units", diagnostics);
+            ValidateUnitSynergyGraph(units, "units", diagnostics);
 
             ValidateUnitProductionBuildingIdsUnique(units, "units", diagnostics);
 
@@ -1750,6 +1783,217 @@ namespace RogueCommandExpansionLoader.Content
                 }
             }
         }
+
+        private const int MaxUpgradeChainDepth = 5;
+        private const int MaxSynergyChainDepth = 5;
+
+        private sealed class UnitReferenceGraphFrame
+        {
+            public UnitReferenceGraphFrame(string id) { Id = id; }
+            public string Id;
+            public int NextTarget;
+            public int MaximumChildDepth;
+        }
+
+        private static void AnalyzeUnitReferenceGraph(ContentUnitDefinition[] units,
+            Dictionary<string, List<string>> graph, string path, string cycleCode,
+            string depthCode, int maxDepth, bool depthOnCycles, List<ContentDiagnostic> diagnostics)
+        {
+            var indexes = new Dictionary<string, int>(StringComparer.Ordinal);
+            for (int i = 0; i < units.Length; i++)
+                if (units[i] != null && !String.IsNullOrWhiteSpace(units[i].id) && !indexes.ContainsKey(units[i].id))
+                    indexes.Add(units[i].id, i);
+
+            var state = new byte[units.Length];
+            var depths = new int[units.Length];
+            var cycles = new bool[units.Length];
+            var stack = new List<UnitReferenceGraphFrame>();
+            for (int root = 0; root < units.Length; root++)
+            {
+                if (units[root] == null || String.IsNullOrWhiteSpace(units[root].id) || state[root] != 0) continue;
+                state[root] = 1;
+                stack.Add(new UnitReferenceGraphFrame(units[root].id));
+                while (stack.Count != 0)
+                {
+                    UnitReferenceGraphFrame frame = stack[stack.Count - 1];
+                    if (graph.TryGetValue(frame.Id, out List<string> targets) && frame.NextTarget < targets.Count)
+                    {
+                        string target = targets[frame.NextTarget++];
+                        if (!indexes.TryGetValue(target, out int child)) continue;
+                        if (state[child] == 0)
+                        {
+                            state[child] = 1;
+                            stack.Add(new UnitReferenceGraphFrame(target));
+                            continue;
+                        }
+                        if (state[child] == 1)
+                        {
+                            for (int j = stack.Count - 1; j >= 0; j--)
+                            {
+                                cycles[indexes[stack[j].Id]] = true;
+                                if (String.Equals(stack[j].Id, target, StringComparison.Ordinal)) break;
+                            }
+                            continue;
+                        }
+                        int parent = indexes[frame.Id];
+                        cycles[parent] |= cycles[child];
+                        frame.MaximumChildDepth = Math.Max(frame.MaximumChildDepth, 1 + depths[child]);
+                        continue;
+                    }
+
+                    int completed = indexes[frame.Id];
+                    depths[completed] = frame.MaximumChildDepth;
+                    state[completed] = 2;
+                    stack.RemoveAt(stack.Count - 1);
+                    if (stack.Count != 0)
+                    {
+                        UnitReferenceGraphFrame parent = stack[stack.Count - 1];
+                        int parentIndex = indexes[parent.Id];
+                        cycles[parentIndex] |= cycles[completed];
+                        parent.MaximumChildDepth = Math.Max(parent.MaximumChildDepth, 1 + depths[completed]);
+                    }
+                }
+            }
+
+            bool upgrade = String.Equals(cycleCode, "unit-upgrade.cycle-detected", StringComparison.Ordinal);
+            for (int i = 0; i < units.Length; i++)
+            {
+                if (units[i] == null || String.IsNullOrWhiteSpace(units[i].id) || !graph.ContainsKey(units[i].id)) continue;
+                string itemPath = path + "[" + i + "]." + (upgrade ? "upgrades" : "synergies");
+                if (cycles[i]) Add(diagnostics, cycleCode, itemPath,
+                    upgrade ? "Unit upgrade chain contains a circular reference." : "Unit synergy graph contains a circular reference.");
+                if (depths[i] > maxDepth && (!cycles[i] || depthOnCycles))
+                    Add(diagnostics, depthCode, itemPath,
+                        (upgrade ? "Unit upgrade chain" : "Unit synergy chain") + " exceeds maximum depth of " + maxDepth + ".");
+            }
+        }
+
+        private static void ValidateUnitUpgradeGraph(
+            ContentUnitDefinition[] units,
+            string path,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (units == null)
+            {
+                return;
+            }
+
+            var adjacency = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+            for (int i = 0; i < units.Length; i++)
+            {
+                ContentUnitDefinition unit = units[i];
+                if (unit == null || String.IsNullOrWhiteSpace(unit.id))
+                {
+                    continue;
+                }
+
+                foreach (ContentUnitUpgradeDefinition upgrade in unit.upgrades ?? new ContentUnitUpgradeDefinition[0])
+                {
+                    if (upgrade == null || String.IsNullOrWhiteSpace(upgrade.targetUnitId))
+                    {
+                        continue;
+                    }
+
+                    if (!adjacency.TryGetValue(unit.id, out List<string> targets))
+                    {
+                        targets = new List<string>();
+                        adjacency[unit.id] = targets;
+                    }
+
+                    targets.Add(upgrade.targetUnitId);
+                }
+            }
+
+            AnalyzeUnitReferenceGraph(units, adjacency, path, "unit-upgrade.cycle-detected",
+                "unit-upgrade.depth-exceeded", MaxUpgradeChainDepth, depthOnCycles: true, diagnostics);
+        }
+
+
+        private static void ValidateUnitSynergyGraph(
+            ContentUnitDefinition[] units,
+            string path,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (units == null)
+            {
+                return;
+            }
+
+            var adjacency = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+            for (int i = 0; i < units.Length; i++)
+            {
+                ContentUnitDefinition unit = units[i];
+                if (unit == null || String.IsNullOrWhiteSpace(unit.id))
+                {
+                    continue;
+                }
+
+                foreach (ContentUnitSynergyDefinition synergy in unit.synergies ?? new ContentUnitSynergyDefinition[0])
+                {
+                    if (synergy == null || synergy.targetUnitIds == null)
+                    {
+                        continue;
+                    }
+
+                    foreach (string target in synergy.targetUnitIds)
+                    {
+                        if (String.IsNullOrWhiteSpace(target))
+                        {
+                            continue;
+                        }
+
+                        if (!adjacency.TryGetValue(unit.id, out List<string> targets))
+                        {
+                            targets = new List<string>();
+                            adjacency[unit.id] = targets;
+                        }
+
+                        targets.Add(target);
+                    }
+                }
+            }
+
+            AnalyzeUnitReferenceGraph(units, adjacency, path, "unit-synergy.cycle-detected",
+                "unit-synergy.depth-exceeded", MaxSynergyChainDepth, depthOnCycles: false, diagnostics);
+        }
+
+
+        private static void ValidateUnitProductionQueueFeasibility(
+            ContentUnitProductionQueueDefinition queue,
+            string path,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (queue == null)
+            {
+                return;
+            }
+
+            bool hasBuildTime = queue.buildTime > 0;
+            bool hasResourceCost = queue.resourceCost > 0;
+            bool hasQueueSize = queue.queueSize > 0;
+
+            if (hasBuildTime != hasResourceCost)
+            {
+                Add(diagnostics, "unit-production-queue.resource-cost-required",
+                    path, "Production queue must specify both buildTime and resourceCost, or neither.",
+                    DiagnosticSeverity.Warning);
+            }
+
+            if (hasBuildTime && !hasQueueSize)
+            {
+                Add(diagnostics, "unit-production-queue.queue-size-required",
+                    path, "Production queue must specify queueSize when buildTime is positive.",
+                    DiagnosticSeverity.Warning);
+            }
+
+            if (hasQueueSize && !hasBuildTime)
+            {
+                Add(diagnostics, "unit-production-queue.build-time-required",
+                    path, "Production queue must specify buildTime when queueSize is positive.",
+                    DiagnosticSeverity.Warning);
+            }
+        }
+
 
         private static void ValidateUnitVariants(
             ContentUnitVariantDefinition[] variants,
@@ -3313,9 +3557,9 @@ namespace RogueCommandExpansionLoader.Content
             return !Single.IsNaN(value) && !Single.IsInfinity(value);
         }
 
-        private static void Add(List<ContentDiagnostic> diagnostics, string code, string path, string message)
+        private static void Add(List<ContentDiagnostic> diagnostics, string code, string path, string message, DiagnosticSeverity severity = DiagnosticSeverity.Error)
         {
-            diagnostics.Add(new ContentDiagnostic(code, path, message));
+            diagnostics.Add(new ContentDiagnostic(code, path, message, severity));
         }
     }
 }

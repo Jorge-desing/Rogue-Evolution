@@ -1,6 +1,6 @@
 # Rogue Evolution — expansión de contenido para Rogue Command
 
-Este repositorio desarrolla un **mod de expansión para añadir unidades, etapas y AI a Rogue Command**. El cargador externo BepInEx 5 con Harmony es la infraestructura que permite registrar y ejecutar ese contenido; no es el objetivo final del mod. Los paquetes de muestra incluyen cinco unidades, sus edificios de producción, cuatro etapas y cuatro perfiles AI. La sección de evidencia distingue lo observado en Steam de las rutas pendientes de aceptación.
+Este repositorio desarrolla un **mod de expansión para añadir unidades, etapas y AI a Rogue Command**. El cargador externo BepInEx 5 con Harmony es la infraestructura que permite registrar y ejecutar ese contenido; no es el objetivo final del mod. Los manifests del repositorio declaran diez unidades y diez edificios de producción, cinco etapas y cinco perfiles AI. El ZIP instalable distribuye nueve unidades en `sample-native-expansion` y la etapa/perfil de `sample-reactive-ai`; `sample-expansion` permanece fuera hasta contar con sus assets completos.
 
 El trabajo prioriza contenido original que se pueda jugar: unidades con identidad visual y balance propios, etapas con una experiencia de mapa reconocible y perfiles de AI con decisiones nuevas. Cada entrega debe separar la inspección estática, la compilación local y la comprobación en una partida iniciada por Steam. Conserva `mod/manifest.json` para los ajustes TSV de balance que admite el juego de forma nativa.
 

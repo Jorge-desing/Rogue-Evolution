@@ -270,17 +270,20 @@ namespace RogueCommandExpansionLoader.Runtime
                 try
                 {
                     IEnumerable<object> rows = _provider.GetEntityParameterRows();
+                    List<object> providerRows = new List<object>();
                     List<object> materializedRows = new List<object>();
                     if (rows != null)
                     {
                         foreach (object row in rows)
                         {
-                            materializedRows.Add(row);
+                            providerRows.Add(row);
+                            materializedRows.Add(RuntimeHelpers.GetObjectValue(row));
                         }
                     }
 
+                    List<(int RowIndex, FieldInfo Field, object Value)> balanceAssignments;
                     if (!TryApplyBalanceOverridesToRows(materializedRows,
-                            _provider.GetBalanceOverrides()))
+                            _provider.GetBalanceOverrides(), out balanceAssignments))
                     {
                         return false;
                     }
@@ -289,6 +292,11 @@ namespace RogueCommandExpansionLoader.Runtime
                             intValueCache, floatValueCache))
                     {
                         return false;
+                    }
+
+                    if (!TryCommitBalanceOverridesToProviderRows(providerRows, balanceAssignments))
+                    {
+                        Log("Entity rows were registered, but provider-owned source rows could not be synchronized.");
                     }
 
                     _entityRegistrationCompleted = true;
@@ -321,8 +329,10 @@ namespace RogueCommandExpansionLoader.Runtime
         // The native store then owns cache population and re-applies its card changes.
         private bool TryApplyBalanceOverridesToRows(
             IList<object> rows,
-            IEnumerable<BalanceOverride> overrides)
+            IEnumerable<BalanceOverride> overrides,
+            out List<(int RowIndex, FieldInfo Field, object Value)> assignments)
         {
+            assignments = new List<(int RowIndex, FieldInfo Field, object Value)>();
             if (overrides == null)
             {
                 return true;
@@ -347,7 +357,6 @@ namespace RogueCommandExpansionLoader.Runtime
             }
 
             var seenOverrideIds = new HashSet<string>(StringComparer.Ordinal);
-            var assignments = new List<(object Row, FieldInfo Field, object Value)>();
             foreach (BalanceOverride balanceOverride in overrides)
             {
                 if (balanceOverride == null || String.IsNullOrWhiteSpace(balanceOverride.EntityId) ||
@@ -402,19 +411,56 @@ namespace RogueCommandExpansionLoader.Runtime
                         return false;
                     }
 
-                    assignments.Add((row, field, value));
+                    assignments.Add((rowIndex, field, value));
                 }
             }
 
-            foreach ((object row, FieldInfo field, object value) in assignments)
+            foreach ((int rowIndex, FieldInfo field, object value) in assignments)
             {
                 try
                 {
-                    field.SetValue(row, value);
+                    field.SetValue(rows[rowIndex], value);
                 }
                 catch (Exception exception)
                 {
                     Log("Could not apply balance row field '" + field.Name + "': " + exception.Message);
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private bool TryCommitBalanceOverridesToProviderRows(
+            IList<object> providerRows,
+            IList<(int RowIndex, FieldInfo Field, object Value)> assignments)
+        {
+            if (assignments == null || assignments.Count == 0)
+            {
+                return true;
+            }
+
+            for (int i = 0; i < assignments.Count; i++)
+            {
+                int rowIndex = assignments[i].RowIndex;
+                if (rowIndex < 0 || rowIndex >= providerRows.Count ||
+                    providerRows[rowIndex] == null || providerRows[rowIndex].GetType() != _entityRowType)
+                {
+                    Log("Could not synchronize balance override because the provider row changed during registration.");
+                    return false;
+                }
+            }
+
+            for (int i = 0; i < assignments.Count; i++)
+            {
+                try
+                {
+                    assignments[i].Field.SetValue(providerRows[assignments[i].RowIndex], assignments[i].Value);
+                }
+                catch (Exception exception)
+                {
+                    Log("Could not synchronize provider balance field '" + assignments[i].Field.Name + "': " +
+                        exception.Message);
                     return false;
                 }
             }

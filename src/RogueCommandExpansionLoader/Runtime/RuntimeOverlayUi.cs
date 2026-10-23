@@ -453,6 +453,16 @@ namespace RogueCommandExpansionLoader.Runtime
         private void DrawDiagnosticsTab(LoaderDiagnosticsSnapshot snapshot)
         {
             GUILayout.Space(8);
+            if (snapshot != null)
+            {
+                DrawUnitEligibilityDiagnostics(snapshot);
+                DrawUnitFactoryDiagnostics(snapshot);
+                DrawStagePoolScopeDiagnostics(snapshot);
+                DrawAiProfileStageRangeDiagnostics(snapshot);
+                DrawUnitAssetResolutionDiagnostics(snapshot);
+                DrawUnitLocalizationCoverageDiagnostics(snapshot);
+            }
+
             GUILayout.BeginHorizontal();
             GUILayout.Label("Filtro:", _styleLabelRegular, GUILayout.Width(45));
             _logFilter = GUILayout.TextField(_logFilter, _styleFilterField, GUILayout.Width(220));
@@ -497,6 +507,128 @@ namespace RogueCommandExpansionLoader.Runtime
                 GUILayout.Label(line, lineStyle);
             }
             EndCard();
+        }
+
+        private void DrawUnitFactoryDiagnostics(LoaderDiagnosticsSnapshot snapshot)
+        {
+            if (snapshot.UnitFactories.Count == 0)
+            {
+                return;
+            }
+
+            BeginCard("Relaciones unidad-fabrica (" + snapshot.UnitFactories.Count + ")");
+            for (int i = 0; i < snapshot.UnitFactories.Count; i++)
+            {
+                UnitFactoryDiagnosticReport report = snapshot.UnitFactories[i];
+                GUIStyle style = String.IsNullOrWhiteSpace(report.FactoryId)
+                    ? _styleLabelMuted
+                    : (report.IsLoaded ? _styleLabelSuccess : _styleLabelError);
+                GUILayout.Label(LoaderDiagnosticsFormatter.FormatUnitFactory(report), style);
+            }
+            EndCard();
+            GUILayout.Space(6);
+        }
+
+        private void DrawStagePoolScopeDiagnostics(LoaderDiagnosticsSnapshot snapshot)
+        {
+            if (snapshot.StagePoolScopes.Count == 0)
+            {
+                return;
+            }
+
+            BeginCard("Alcance registrado por pool (" + snapshot.StagePoolScopes.Count + ")");
+            for (int i = 0; i < snapshot.StagePoolScopes.Count; i++)
+            {
+                StagePoolScopeDiagnosticReport report = snapshot.StagePoolScopes[i];
+                GUIStyle style = report.CandidateIds.Count > 0 ? _styleLabelRegular : _styleLabelMuted;
+                GUILayout.Label(LoaderDiagnosticsFormatter.FormatStagePoolScope(report), style);
+            }
+            EndCard();
+            GUILayout.Space(6);
+        }
+
+        private void DrawAiProfileStageRangeDiagnostics(LoaderDiagnosticsSnapshot snapshot)
+        {
+            if (snapshot.AiProfileStageRanges.Count == 0)
+            {
+                return;
+            }
+
+            BeginCard("Rangos de etapas por perfil IA (" + snapshot.AiProfileStageRanges.Count + ")");
+            for (int i = 0; i < snapshot.AiProfileStageRanges.Count; i++)
+            {
+                AiProfileStageRangeDiagnosticReport report = snapshot.AiProfileStageRanges[i];
+                GUILayout.Label(
+                    LoaderDiagnosticsFormatter.FormatAiProfileStageRange(report),
+                    report.IsContiguous ? _styleLabelSuccess : _styleLabelError);
+            }
+            EndCard();
+            GUILayout.Space(6);
+        }
+
+        private void DrawUnitEligibilityDiagnostics(LoaderDiagnosticsSnapshot snapshot)
+        {
+            if (snapshot.UnitEligibilities.Count == 0)
+            {
+                return;
+            }
+
+            BeginCard("Elegibilidad de unidades (" + snapshot.UnitEligibilities.Count + ")");
+            for (int i = 0; i < snapshot.UnitEligibilities.Count; i++)
+            {
+                UnitEligibilityDiagnosticReport report = snapshot.UnitEligibilities[i];
+                GUILayout.Label(
+                    LoaderDiagnosticsFormatter.FormatUnitEligibility(report),
+                    report.IsResolved ? _styleLabelRegular : _styleLabelWarning);
+            }
+            EndCard();
+            GUILayout.Space(6);
+        }
+
+        private void DrawUnitAssetResolutionDiagnostics(LoaderDiagnosticsSnapshot snapshot)
+        {
+            if (snapshot.UnitAssetResolutions.Count == 0)
+            {
+                return;
+            }
+
+            BeginCard("Resolución de recursos de unidades (" + snapshot.UnitAssetResolutions.Count + ")");
+            for (int i = 0; i < snapshot.UnitAssetResolutions.Count; i++)
+            {
+                UnitAssetResolutionDiagnosticReport report = snapshot.UnitAssetResolutions[i];
+                UnitAssetResolutionSeverity severity =
+                    LoaderUnitDiagnosticsBuilder.GetAssetResolutionSeverity(report);
+                GUIStyle style = severity == UnitAssetResolutionSeverity.Error
+                    ? _styleLabelError
+                    : (severity == UnitAssetResolutionSeverity.Warning
+                        ? _styleLabelWarning
+                        : (severity == UnitAssetResolutionSeverity.Muted
+                            ? _styleLabelMuted
+                            : _styleLabelSuccess));
+                GUILayout.Label(LoaderDiagnosticsFormatter.FormatUnitAssetResolution(report), style);
+            }
+            EndCard();
+            GUILayout.Space(6);
+        }
+
+        private void DrawUnitLocalizationCoverageDiagnostics(LoaderDiagnosticsSnapshot snapshot)
+        {
+            if (snapshot.UnitLocalizationCoverage.Count == 0)
+            {
+                return;
+            }
+
+            BeginCard("Cobertura de localización de unidades (" + snapshot.UnitLocalizationCoverage.Count + ")");
+            for (int i = 0; i < snapshot.UnitLocalizationCoverage.Count; i++)
+            {
+                UnitLocalizationCoverageDiagnosticReport report = snapshot.UnitLocalizationCoverage[i];
+                GUIStyle style = report.HasEnglish
+                    ? _styleLabelSuccess
+                    : (report.HasNativeTemplate ? _styleLabelRegular : _styleLabelWarning);
+                GUILayout.Label(LoaderDiagnosticsFormatter.FormatUnitLocalizationCoverage(report), style);
+            }
+            EndCard();
+            GUILayout.Space(6);
         }
 
         private void BeginCard(string title)
