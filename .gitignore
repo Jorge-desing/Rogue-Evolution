@@ -9,6 +9,7 @@ Desktop.ini
 /htmlcov/
 /build/
 /dist/
+/.hermes/
 /artifacts/
 content/source-art/*.blend1
 **/bin/
