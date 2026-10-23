@@ -1643,8 +1643,12 @@ namespace RogueCommandExpansionLoader.Content
                     catch { }
                     try { isForSpecialists = (bool)_isForSpecialistsField.GetValue(unit.BalanceRow); }
                     catch { }
+                    // Count declarations on the loaded product only; no loadout is selected or applied here.
+                    int variantCount = !unit.IsProductionBuilding && unit.Definition != null &&
+                        unit.Definition.variants != null ? unit.Definition.variants.Length : 0;
                     units.Add(new UnitDiagnosticReport(
-                        unit.Id, unit.PackId, unit.PrefabKey, unit.ImageKey, allowedAsBlueprint, allowedAsStartingBlueprint, allowedForAi, allowedForDemo, isForSpecialists));
+                        unit.Id, unit.PackId, unit.PrefabKey, unit.ImageKey, allowedAsBlueprint,
+                        allowedAsStartingBlueprint, allowedForAi, allowedForDemo, isForSpecialists, variantCount));
                 }
                 units.Sort((left, right) => StringComparer.Ordinal.Compare(left.UnitId, right.UnitId));
 

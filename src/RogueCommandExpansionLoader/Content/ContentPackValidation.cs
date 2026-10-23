@@ -127,6 +127,7 @@ namespace RogueCommandExpansionLoader.Content
         }
         public const int MaxAssetBundlesPerPack = 128;
         public const int MaxBalanceOverridesPerDefinition = 64;
+        public const int MaxUnitVariantsPerUnit = 8;
         public const int MaxLocalizationsPerDefinition = 10;
         public const int MaxNeededExperienceLevel = 10000;
         public const int MaxAiModulesPerProfile = 8;
@@ -366,6 +367,7 @@ namespace RogueCommandExpansionLoader.Content
 
                 ValidateUnitLocalizations(unit, itemPath + ".localizations", hasNativeTemplate, diagnostics);
                 ValidateUnitBalanceOverrides(unit, itemPath + ".balanceOverrides", diagnostics);
+                ValidateUnitVariants(unit.variants, itemPath + ".variants", diagnostics);
                 ValidateUnitCustomBalance(unit.customBalance, itemPath + ".customBalance", diagnostics);
                 ValidateAbilities(unit.abilities, itemPath + ".abilities", diagnostics);
                 ValidateAiOverrides(unit.aiOverrides, itemPath + ".aiOverrides", diagnostics);
@@ -1747,6 +1749,70 @@ namespace RogueCommandExpansionLoader.Content
                     }
                 }
             }
+        }
+
+        private static void ValidateUnitVariants(
+            ContentUnitVariantDefinition[] variants,
+            string path,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (variants == null)
+            {
+                return;
+            }
+
+            if (variants.Length > MaxUnitVariantsPerUnit)
+            {
+                Add(diagnostics, "unit.variants-limit", path,
+                    "A unit can declare at most " + MaxUnitVariantsPerUnit + " loadout variants.");
+            }
+
+            var ids = new HashSet<string>(StringComparer.Ordinal);
+            for (int i = 0; i < variants.Length; i++)
+            {
+                ContentUnitVariantDefinition variant = variants[i];
+                string itemPath = path + "[" + i + "]";
+                if (variant == null)
+                {
+                    Add(diagnostics, "entry.null", itemPath, "Unit loadout variants cannot be null.");
+                    continue;
+                }
+
+                if (!IsValidUnitVariantId(variant.id) || !ids.Add(variant.id))
+                {
+                    Add(diagnostics, "unit.variant-id-invalid", itemPath + ".id",
+                        "Variant IDs must be unique lowercase ASCII local IDs of at most 64 characters.");
+                }
+
+                if (variant.loadout != null && variant.loadout != "AP" && variant.loadout != "HE")
+                {
+                    Add(diagnostics, "unit.variant-loadout-invalid", itemPath + ".loadout",
+                        "A declared variant loadout must be AP or HE.");
+                }
+
+                ValidateBalanceOverrides(variant.balanceOverrides, itemPath + ".balanceOverrides",
+                    "unit.variant", "unit", diagnostics, false);
+            }
+        }
+
+        private static bool IsValidUnitVariantId(string id)
+        {
+            if (String.IsNullOrEmpty(id) || id.Length > 64 || id[0] < 'a' || id[0] > 'z')
+            {
+                return false;
+            }
+
+            for (int i = 1; i < id.Length; i++)
+            {
+                char c = id[i];
+                if ((c < 'a' || c > 'z') && (c < '0' || c > '9') &&
+                    c != '.' && c != '_' && c != '-')
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         private static void ValidateUnitVisualVariants(

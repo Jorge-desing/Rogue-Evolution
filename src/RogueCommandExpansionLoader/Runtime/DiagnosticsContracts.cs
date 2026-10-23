@@ -49,7 +49,8 @@ namespace RogueCommandExpansionLoader.Runtime
             bool isAllowedAsStartingBlueprint = false,
             bool isAllowedForAi = false,
             bool isAllowedForDemo = false,
-            bool isForSpecialists = false)
+            bool isForSpecialists = false,
+            int variantCount = 0)
         {
             UnitId = unitId ?? string.Empty;
             PackId = packId ?? string.Empty;
@@ -60,6 +61,7 @@ namespace RogueCommandExpansionLoader.Runtime
             IsAllowedForAi = isAllowedForAi;
             IsAllowedForDemo = isAllowedForDemo;
             IsForSpecialists = isForSpecialists;
+            VariantCount = variantCount;
         }
 
         public string UnitId { get; private set; }
@@ -71,6 +73,7 @@ namespace RogueCommandExpansionLoader.Runtime
         public bool IsAllowedForAi { get; private set; }
         public bool IsAllowedForDemo { get; private set; }
         public bool IsForSpecialists { get; private set; }
+        public int VariantCount { get; private set; }
     }
 
     public sealed class StageDiagnosticReport

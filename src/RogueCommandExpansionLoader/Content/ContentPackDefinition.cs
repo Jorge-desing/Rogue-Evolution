@@ -100,6 +100,14 @@ namespace RogueCommandExpansionLoader.Content
     }
 
     [Serializable]
+    public sealed class ContentUnitVariantDefinition
+    {
+        public string id;
+        public string loadout;
+        public ContentBalanceOverride[] balanceOverrides;
+    }
+
+    [Serializable]
     public sealed class ContentUnitSpawnDefinition
     {
         public float spawnRate;
@@ -253,6 +261,7 @@ namespace RogueCommandExpansionLoader.Content
         public ContentUnitExperienceDefinition experience;
         public ContentUnitSynergyDefinition[] synergies;
         public ContentUnitVisualVariantDefinition[] visualVariants;
+        public ContentUnitVariantDefinition[] variants;
         public ContentUnitSpawnDefinition spawn;
         public ContentUnitStatusEffectDefinition[] statusEffects;
         public ContentUnitProductionQueueDefinition productionQueue;
@@ -871,6 +880,7 @@ namespace RogueCommandExpansionLoader.Content
                 experience = CloneUnitExperience(source.experience),
                 synergies = CloneArray(source.synergies, CloneUnitSynergy),
                 visualVariants = CloneArray(source.visualVariants, CloneUnitVisualVariant),
+                variants = CloneArray(source.variants, CloneUnitVariant),
                 spawn = CloneUnitSpawn(source.spawn),
                 statusEffects = CloneArray(source.statusEffects, CloneUnitStatusEffect),
                 productionQueue = CloneUnitProductionQueue(source.productionQueue),
@@ -953,6 +963,16 @@ namespace RogueCommandExpansionLoader.Content
                 visualRootPath = source.visualRootPath,
                 colorTint = source.colorTint,
                 scale = source.scale
+            };
+        }
+
+        private static ContentUnitVariantDefinition CloneUnitVariant(ContentUnitVariantDefinition source)
+        {
+            return source == null ? null : new ContentUnitVariantDefinition
+            {
+                id = source.id,
+                loadout = source.loadout,
+                balanceOverrides = CloneArray(source.balanceOverrides, CloneBalanceOverride)
             };
         }
 

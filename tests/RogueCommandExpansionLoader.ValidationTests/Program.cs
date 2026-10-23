@@ -888,6 +888,263 @@ var tests = new (string Name, Action Run)[]
             }
         }
     }),
+    ("unit loadout variants deserialize AP and HE declarations", () =>
+    {
+        ContentUnitDefinition parsed = JsonSerializer.Deserialize<ContentUnitDefinition>(
+            "{\"variants\":[{\"id\":\"ap\",\"loadout\":\"AP\",\"balanceOverrides\":[{\"name\":\"damage1\",\"value\":\"12\"}]},{\"id\":\"he\",\"loadout\":\"HE\"}]}",
+            jsonOptions) ?? throw new InvalidOperationException("Variant fixture did not deserialize.");
+        FieldInfo? variantsField = typeof(ContentUnitDefinition).GetField("variants");
+        Array? variants = variantsField?.GetValue(parsed) as Array;
+        if (variantsField == null || variants == null || variants.Length != 2)
+        {
+            throw new InvalidOperationException("The unit DTO did not deserialize two loadout variants.");
+        }
+        Type variantType = variants.GetType().GetElementType()!;
+        FieldInfo? id = variantType.GetField("id");
+        FieldInfo? loadout = variantType.GetField("loadout");
+        FieldInfo? overrides = variantType.GetField("balanceOverrides");
+        if (!variantType.IsDefined(typeof(SerializableAttribute), inherit: false) ||
+            id?.GetValue(variants.GetValue(0)) as string != "ap" ||
+            loadout?.GetValue(variants.GetValue(0)) as string != "AP" ||
+            loadout.GetValue(variants.GetValue(1)) as string != "HE" ||
+            overrides?.GetValue(variants.GetValue(0)) is not ContentBalanceOverride[] rows ||
+            rows.Length != 1 || rows[0].name != "damage1" || rows[0].value != "12")
+        {
+            throw new InvalidOperationException("Variant JSON lost AP/HE labels, local IDs, or raw damage1 overrides.");
+        }
+    }),
+    ("unit loadout variants accept AP HE and an omitted loadout", () =>
+    {
+        WithPackage(nativeSample, (pack, root) =>
+        {
+            SetUnitLoadoutVariants(pack.units[0],
+                """[{"id":"ap","loadout":"AP","balanceOverrides":[{"name":"damage1","value":"12"}]},{"id":"he","loadout":"HE"},{"id":"default"}]""");
+            ExpectValid(pack, root, new EmptySnapshot(), new KnownModuleValidator());
+        });
+    }),
+    ("unit loadout variants accept eight local IDs including the 64-character boundary", () =>
+    {
+        WithPackage(nativeSample, (pack, root) =>
+        {
+            string longest = "a" + new string('z', 63);
+            string variantsJson = "[" + string.Join(",", new[]
+            {
+                longest, "a_0", "b-1", "c.2", "d3", "e4", "f5", "g6"
+            }.Select(id => "{\"id\":\"" + id + "\"}")) + "]";
+            SetUnitLoadoutVariants(pack.units[0], variantsJson);
+            ExpectValid(pack, root, new EmptySnapshot(), new KnownModuleValidator());
+        });
+    }),
+    ("unit loadout variant IDs are local to each parent unit", () =>
+    {
+        WithPackage(nativeSample, (pack, root) =>
+        {
+            SetUnitLoadoutVariants(pack.units[0], """[{"id":"ap"}]""");
+            SetUnitLoadoutVariants(pack.units[1], """[{"id":"ap"}]""");
+            ExpectValid(pack, root, new EmptySnapshot(), new KnownModuleValidator());
+        });
+    }),
+    ("unit loadout variants deep clone nested mutable override values", () =>
+    {
+        ContentPackDefinition source = ContentPackCopy.DeepClone(nativeSample);
+        SetUnitLoadoutVariants(source.units[0],
+            """[{"id":"ap","loadout":"AP","balanceOverrides":[{"name":"damage1","value":"12"}]}]""");
+        ContentPackDefinition copy = ContentPackCopy.DeepClone(source);
+        FieldInfo field = typeof(ContentUnitDefinition).GetField("variants")
+            ?? throw new InvalidOperationException("The unit variants field is missing.");
+        Array originals = (Array)(field.GetValue(source.units[0])
+            ?? throw new InvalidOperationException("Source variants were dropped."));
+        Array clones = (Array)(field.GetValue(copy.units[0])
+            ?? throw new InvalidOperationException("Cloned variants were dropped."));
+        object original = originals.GetValue(0)!;
+        object cloned = clones.GetValue(0)!;
+        FieldInfo id = cloned.GetType().GetField("id")!;
+        FieldInfo loadout = cloned.GetType().GetField("loadout")!;
+        FieldInfo overrides = cloned.GetType().GetField("balanceOverrides")!;
+        ContentBalanceOverride[] sourceOverrides = (ContentBalanceOverride[])overrides.GetValue(original)!;
+        ContentBalanceOverride[] clonedOverrides = (ContentBalanceOverride[])overrides.GetValue(cloned)!;
+        if (ReferenceEquals(originals, clones) || ReferenceEquals(original, cloned) ||
+            ReferenceEquals(sourceOverrides, clonedOverrides) ||
+            ReferenceEquals(sourceOverrides[0], clonedOverrides[0]))
+        {
+            throw new InvalidOperationException("Variant DTOs or their override entries share mutable state.");
+        }
+        id.SetValue(cloned, "changed");
+        loadout.SetValue(cloned, "HE");
+        clonedOverrides[0].name = "damage2";
+        clonedOverrides[0].value = "99";
+        clones.SetValue(null, 0);
+        if (id.GetValue(original) as string != "ap" || loadout.GetValue(original) as string != "AP" ||
+            sourceOverrides[0].name != "damage1" || sourceOverrides[0].value != "12" ||
+            originals.GetValue(0) == null)
+        {
+            throw new InvalidOperationException("Mutating a variant clone modified its source.");
+        }
+    }),
+    ("unit loadout variants reject null entries", () =>
+    {
+        ExpectUnitLoadoutVariantDiagnostic(nativeSample, "[null]", "entry.null", "units[0].variants[0]");
+    }),
+    ("unit loadout variants reject more than eight entries", () =>
+    {
+        string json = "[" + string.Join(",", Enumerable.Range(0, 9)
+            .Select(i => "{\"id\":\"v" + i + "\"}")) + "]";
+        ExpectUnitLoadoutVariantDiagnostic(nativeSample, json, "unit.variants-limit", "units[0].variants");
+    }),
+    ("unit loadout variants reject null IDs", () =>
+    {
+        ExpectUnitLoadoutVariantDiagnostic(nativeSample, """[{"id":null}]""",
+            "unit.variant-id-invalid", "units[0].variants[0].id");
+    }),
+    ("unit loadout variants reject blank IDs", () =>
+    {
+        foreach (string json in new[] { """[{"id":""}]""", """[{"id":"  "}]""" })
+        {
+            ExpectUnitLoadoutVariantDiagnostic(nativeSample, json,
+                "unit.variant-id-invalid", "units[0].variants[0].id");
+        }
+    }),
+    ("unit loadout variants reject nonlocal or non-ASCII IDs", () =>
+    {
+        foreach (string id in new[] { "AP", "0ap", "unit:ap", "áp", "a b", "a/../b", "a" + new string('x', 64) })
+        {
+            ExpectUnitLoadoutVariantDiagnostic(nativeSample,
+                "[{\"id\":" + JsonSerializer.Serialize(id) + "}]",
+                "unit.variant-id-invalid", "units[0].variants[0].id");
+        }
+    }),
+    ("unit loadout variants reject duplicate IDs in the same unit", () =>
+    {
+        ExpectUnitLoadoutVariantDiagnostic(nativeSample, """[{"id":"ap"},{"id":"ap"}]""",
+            "unit.variant-id-invalid", "units[0].variants[1].id");
+    }),
+    ("unit loadout variants reject invalid present loadouts", () =>
+    {
+        foreach (string loadout in new[] { "", " ", "ap", "HE ", "INC" })
+        {
+            ExpectUnitLoadoutVariantDiagnostic(nativeSample,
+                "[{\"id\":\"ap\",\"loadout\":" + JsonSerializer.Serialize(loadout) + "}]",
+                "unit.variant-loadout-invalid", "units[0].variants[0].loadout");
+        }
+    }),
+    ("unit loadout variants reject invalid raw damage overrides", () =>
+    {
+        foreach (string json in new[]
+        {
+            """[{"id":"ap","balanceOverrides":[{"name":"noSuchRow","value":"1"}]}]""",
+            """[{"id":"ap","balanceOverrides":[{"name":"damage1","value":"-1"}]}]"""
+        })
+        {
+            ExpectUnitLoadoutVariantDiagnostic(nativeSample, json,
+                "unit.variant.balance-override-invalid", "units[0].variants[0].balanceOverrides[0]");
+        }
+    }),
+    ("unit loadout variants reject duplicate raw damage1 overrides", () =>
+    {
+        ExpectUnitLoadoutVariantDiagnostic(nativeSample,
+            """[{"id":"ap","balanceOverrides":[{"name":"damage1","value":"12"},{"name":"damage1","value":"15"}]}]""",
+            "unit.variant.balance-override-name-invalid", "units[0].variants[0].balanceOverrides[1].name");
+    }),
+    ("unit loadout variants reject null raw override entries", () =>
+    {
+        ExpectUnitLoadoutVariantDiagnostic(nativeSample,
+            """[{"id":"ap","balanceOverrides":[null]}]""",
+            "entry.null", "units[0].variants[0].balanceOverrides[0]");
+    }),
+    ("unit loadout variants do not change base registration or mapping", () =>
+    {
+        EntityBalancingStore.Reset();
+        try
+        {
+            ContentUnitDefinition unit = ContentPackCopy.DeepClone(nativeSample).units[0];
+            unit.customBalance = new Dictionary<string, double>(StringComparer.Ordinal) { ["MoveSpeed"] = 14.5d };
+            unit.balanceOverrides = [new ContentBalanceOverride { name = "maxHealth", value = "5" }];
+            Dictionary<string, double> original = UnitBalanceOverrideMapper.CreateCustomBalance(unit);
+            SetUnitLoadoutVariants(unit,
+                """[{"id":"ap","loadout":"AP","balanceOverrides":[{"name":"maxHealth","value":"99"}]},{"id":"he","loadout":"HE","balanceOverrides":[{"name":"moveSpeed","value":"200"}]}]""");
+            Dictionary<string, double> mapped = UnitBalanceOverrideMapper.CreateCustomBalance(unit);
+            List<BalanceOverride> mappedRows = UnitBalanceOverrideMapper.CreateBalanceOverridesForLoadedUnits(
+                [unit], new HashSet<string>([unit.id], StringComparer.Ordinal));
+            if (unit.id != nativeSample.units[0].id || unit.productionBuilding.id != nativeSample.units[0].productionBuilding.id ||
+                unit.balanceOverrides.Length != 1 || unit.balanceOverrides[0].name != "maxHealth" ||
+                unit.balanceOverrides[0].value != "5" ||
+                mapped.Count != original.Count || !mapped.TryGetValue("MoveSpeed", out double speed) ||
+                speed != original["MoveSpeed"] || mappedRows.Count != 1 ||
+                mappedRows[0].EntityId != unit.id || mappedRows[0].Parameters.Count != original.Count ||
+                mappedRows[0].Parameters["MoveSpeed"] != original["MoveSpeed"])
+            {
+                throw new InvalidOperationException("Variant overrides leaked into the base unit mapping or identity.");
+            }
+
+            EntityBalancingParameters nativeProduct = RuntimeMutatorTestData.Row("NativeUnit");
+            EntityBalancingParameters nativeFactory = RuntimeMutatorTestData.Row("NativeFactory", "NativeUnit");
+            EntityBalancingStore.EntityBalancingParametersList.Add(nativeProduct);
+            EntityBalancingStore.EntityBalancingParametersList.Add(nativeFactory);
+            EntityBalancingStore.ParameterListIndexOf.Add("NativeUnit", 0);
+            EntityBalancingStore.ParameterListIndexOf.Add("NativeFactory", 1);
+            EntityBalancingStore.ChangeableIntValueCache.Add("NativeUnit", new());
+            EntityBalancingStore.ChangeableFloatValueCache.Add("NativeUnit", new());
+            EntityBalancingStore.ChangeableIntValueCache.Add("NativeFactory", new());
+            EntityBalancingStore.ChangeableFloatValueCache.Add("NativeFactory", new());
+            EntityBalancingStore.FactoryEntityIdOf.Add("NativeUnit", "NativeFactory");
+            var provider = new RuntimeMutatorTestProvider();
+            EntityBalancingParameters productRow = RuntimeMutatorTestData.Row(unit.id);
+            productRow.maxHealth = 5;
+            provider.EntityRows.Add(productRow);
+            provider.EntityRows.Add(RuntimeMutatorTestData.Row(unit.productionBuilding.id, unit.id));
+            provider.BalanceOverrides.Add(mappedRows[0]);
+            var mutator = new RuntimeContentMutator(typeof(EntityBalancingStore).Assembly, provider, null);
+            if (!mutator.RegisterEntityRows() ||
+                EntityBalancingStore.EntityBalancingParametersList.Count != 4 ||
+                EntityBalancingStore.FactoryEntityIdOf.Count != 2 ||
+                EntityBalancingStore.FactoryEntityIdOf["NativeUnit"] != "NativeFactory" ||
+                EntityBalancingStore.FactoryEntityIdOf[unit.id] != unit.productionBuilding.id ||
+                EntityBalancingStore.EntityBalancingParametersList[2].maxHealth != 5 ||
+                EntityBalancingStore.EntityBalancingParametersList[2].moveSpeed != 14.5f)
+            {
+                throw new InvalidOperationException("Declaring variants changed base/native row registration or factory mapping.");
+            }
+        }
+        finally
+        {
+            EntityBalancingStore.Reset();
+        }
+    }),
+    ("unit loadout variants omission preserves base balance mapping", () =>
+    {
+        ContentUnitDefinition unit = ContentPackCopy.DeepClone(nativeSample).units[0];
+        if (typeof(ContentUnitDefinition).GetField("variants")?.GetValue(unit) != null)
+        {
+            throw new InvalidOperationException("Omitted variants must stay null on the unit DTO.");
+        }
+        Dictionary<string, double> baseline = UnitBalanceOverrideMapper.CreateCustomBalance(unit);
+        List<BalanceOverride> mappedRows = UnitBalanceOverrideMapper.CreateBalanceOverridesForLoadedUnits(
+            [unit], new HashSet<string>([unit.id], StringComparer.Ordinal));
+        if (baseline.Count != mappedRows.Count ||
+            mappedRows.Any(row => row.EntityId != unit.id || row.Parameters.Count != baseline.Count))
+        {
+            throw new InvalidOperationException("Omitting variants changed base mapper output.");
+        }
+    }),
+    ("unit diagnostic report variant count defaults to zero and accepts two", () =>
+    {
+        var defaultReport = new UnitDiagnosticReport("test:unit", "test:pack", "prefab", "card", false);
+        PropertyInfo? count = typeof(UnitDiagnosticReport).GetProperty("VariantCount");
+        ConstructorInfo? constructor = typeof(UnitDiagnosticReport).GetConstructors()
+            .SingleOrDefault(candidate => candidate.GetParameters().LastOrDefault()?.Name == "variantCount");
+        if (count == null || count.PropertyType != typeof(int) || constructor == null ||
+            !constructor.GetParameters().Last().IsOptional ||
+            count.GetValue(defaultReport) is not int defaultCount || defaultCount != 0)
+        {
+            throw new InvalidOperationException("VariantCount must be an optional final constructor parameter defaulting to zero.");
+        }
+        var twoReport = new UnitDiagnosticReport("test:unit", "test:pack", "prefab", "card", false,
+            variantCount: 2);
+        if (count.GetValue(twoReport) is not int declaredCount || declaredCount != 2)
+        {
+            throw new InvalidOperationException("The diagnostic report lost its explicitly declared variant count.");
+        }
+    }),
     ("unit balance mapper preserves custom raw and structured movement precedence", () =>
     {
         var unit = new ContentUnitDefinition
@@ -6545,6 +6802,39 @@ static ContentPackDefinition Clone(ContentPackDefinition source)
     var options = new JsonSerializerOptions { IncludeFields = true };
     return JsonSerializer.Deserialize<ContentPackDefinition>(JsonSerializer.Serialize(source, options), options)
         ?? throw new InvalidDataException("Could not clone the sample definition.");
+}
+
+static void SetUnitLoadoutVariants(ContentUnitDefinition unit, string variantsJson)
+{
+    FieldInfo variantsField = typeof(ContentUnitDefinition).GetField("variants")
+        ?? throw new InvalidOperationException("The unit variants DTO field is missing.");
+    if (!variantsField.FieldType.IsArray)
+    {
+        throw new InvalidOperationException("The unit variants DTO field must be an array.");
+    }
+
+    Array variants = (Array)(JsonSerializer.Deserialize(variantsJson, variantsField.FieldType,
+        new JsonSerializerOptions { IncludeFields = true })
+        ?? throw new InvalidOperationException("Variant JSON did not deserialize into an array."));
+    variantsField.SetValue(unit, variants);
+}
+
+static void ExpectUnitLoadoutVariantDiagnostic(
+    ContentPackDefinition source, string variantsJson, string expectedCode, string expectedPath)
+{
+    WithPackage(source, (pack, root) =>
+    {
+        SetUnitLoadoutVariants(pack.units[0], variantsJson);
+        ContentPackValidationResult result = ContentPackValidator.Validate(
+            pack, root, new EmptySnapshot(), new KnownModuleValidator());
+        if (result.IsValid || !result.Diagnostics.Any(diagnostic =>
+                diagnostic.Code == expectedCode && diagnostic.Path == expectedPath))
+        {
+            throw new InvalidOperationException(
+                $"Expected error '{expectedCode}' at '{expectedPath}', got: " +
+                string.Join(", ", result.Diagnostics.Select(d => $"{d.Code} at {d.Path}")));
+        }
+    });
 }
 
 static void ExpectValid(

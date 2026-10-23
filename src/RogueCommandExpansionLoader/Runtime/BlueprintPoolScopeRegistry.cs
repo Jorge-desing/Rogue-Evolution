@@ -101,6 +101,17 @@ namespace RogueCommandExpansionLoader.Runtime
             _eligibleExclusiveUnitIds = eligible;
         }
 
+        public IReadOnlyList<string> UnitIds
+        {
+            get
+            {
+                var result = new string[_unitIds.Count];
+                _unitIds.CopyTo(result);
+                Array.Sort(result, StringComparer.Ordinal);
+                return Array.AsReadOnly(result);
+            }
+        }
+
         internal void AddEligibleExclusiveUnitIds(HashSet<string> destination)
         {
             foreach (string unitId in _eligibleExclusiveUnitIds)
