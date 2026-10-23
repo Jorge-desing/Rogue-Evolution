@@ -65,8 +65,21 @@ class UnitVariantSchemaTests(unittest.TestCase):
             [{"id": f"loadout-{index}"} for index in range(9)], [], "maxItems"
         )
 
+    def test_more_than_64_variant_balance_overrides_are_rejected(self) -> None:
+        overrides = [{"name": "damage1", "value": "9"} for _ in range(65)]
+        self.assert_variant_rejected(
+            [{"id": "ap", "balanceOverrides": overrides}],
+            [0, "balanceOverrides"], "maxItems",
+        )
+
     def test_invalid_or_blank_local_ids_are_rejected(self) -> None:
         for invalid in ("", " ", " AP", "AP", "1ap", "ap:he", "ap/he", "éclair", "a" * 65):
+            with self.subTest(id=invalid):
+                self.assert_variant_rejected([{"id": invalid}], [0, "id"], "pattern")
+
+    def test_local_ids_reject_trailing_line_terminators(self) -> None:
+        for invalid in ("ap" + chr(10), "ap" + chr(13), "ap" + chr(13) + chr(10),
+                        "ap" + chr(0x2028), "ap" + chr(0x2029)):
             with self.subTest(id=invalid):
                 self.assert_variant_rejected([{"id": invalid}], [0, "id"], "pattern")
 

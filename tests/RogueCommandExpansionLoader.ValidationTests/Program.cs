@@ -1221,6 +1221,11 @@ var tests = new (string Name, Action Run)[]
         {
             throw new InvalidOperationException("The diagnostic report lost its explicitly declared variant count.");
         }
+        if (UnitVariantDiagnosticsFormatter.FormatVariantCount(twoReport) !=
+            "Variantes declaradas (solo metadatos): 2")
+        {
+            throw new InvalidOperationException("The unit diagnostics label must expose the metadata-only variant count.");
+        }
     }),
     ("unit balance mapper preserves custom raw and structured movement precedence", () =>
     {

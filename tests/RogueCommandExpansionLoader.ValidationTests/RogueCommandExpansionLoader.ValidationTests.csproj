@@ -35,6 +35,8 @@
              Link="Runtime/RuntimeBuildGuard.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/DiagnosticsContracts.cs"
              Link="Runtime/DiagnosticsContracts.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/UnitVariantDiagnosticsFormatter.cs"
+             Link="Runtime/UnitVariantDiagnosticsFormatter.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeContentContracts.cs"
              Link="Runtime/RuntimeContentContracts.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/BlueprintPoolScopeRegistry.cs"

@@ -386,6 +386,7 @@ namespace RogueCommandExpansionLoader.Runtime
 
                 GUILayout.Label("Prefab Resource Key: " + unit.PrefabKey, _styleLabelMuted);
                 GUILayout.Label("Sprite Card Key: " + unit.ImageKey, _styleLabelMuted);
+                GUILayout.Label(UnitVariantDiagnosticsFormatter.FormatVariantCount(unit), _styleLabelMuted);
 
                 EndCard();
                 GUILayout.Space(6);

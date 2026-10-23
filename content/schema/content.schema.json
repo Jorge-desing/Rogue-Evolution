@@ -1866,10 +1866,11 @@
       "additionalProperties": false,
       "required": ["id"],
       "properties": {
-        "id": { "type": "string", "pattern": "^[a-z][a-z0-9._-]{0,63}$" },
+        "id": { "type": "string", "pattern": "^(?!.*[\\n\\r\\u2028\\u2029])[a-z][a-z0-9._-]{0,63}$" },
         "loadout": { "type": "string", "enum": ["AP", "HE"] },
         "balanceOverrides": {
           "type": "array",
+          "maxItems": 64,
           "items": { "$ref": "#/$defs/balanceOverride" }
         }
       }
