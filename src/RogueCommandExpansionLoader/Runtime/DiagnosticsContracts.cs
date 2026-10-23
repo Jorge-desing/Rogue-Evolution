@@ -155,6 +155,7 @@ namespace RogueCommandExpansionLoader.Runtime
                 {
                     copy[i] = factoryIds[i];
                 }
+                Array.Sort(copy, StringComparer.Ordinal);
                 FactoryIds = Array.AsReadOnly(copy);
             }
         }
@@ -180,6 +181,52 @@ namespace RogueCommandExpansionLoader.Runtime
         public bool IsContiguous { get; private set; }
     }
 
+    public sealed class UnitEligibilityDiagnosticReport
+    {
+        public UnitEligibilityDiagnosticReport(
+            string unitId,
+            bool isAllowedAsStartingBlueprint,
+            bool isAllowedForAi,
+            bool isAllowedForDemo,
+            bool isForSpecialists)
+        {
+            UnitId = unitId ?? string.Empty;
+            IsAllowedAsStartingBlueprint = isAllowedAsStartingBlueprint;
+            IsAllowedForAi = isAllowedForAi;
+            IsAllowedForDemo = isAllowedForDemo;
+            IsForSpecialists = isForSpecialists;
+        }
+
+        public string UnitId { get; private set; }
+        public bool IsAllowedAsStartingBlueprint { get; private set; }
+        public bool IsAllowedForAi { get; private set; }
+        public bool IsAllowedForDemo { get; private set; }
+        public bool IsForSpecialists { get; private set; }
+    }
+
+    public sealed class UnitAssetResolutionDiagnosticReport
+    {
+        public UnitAssetResolutionDiagnosticReport(
+            string unitId,
+            bool prefabResolved,
+            bool cardImageResolved,
+            bool visualResolved,
+            string statusMessage)
+        {
+            UnitId = unitId ?? string.Empty;
+            PrefabResolved = prefabResolved;
+            CardImageResolved = cardImageResolved;
+            VisualResolved = visualResolved;
+            StatusMessage = statusMessage ?? string.Empty;
+        }
+
+        public string UnitId { get; private set; }
+        public bool PrefabResolved { get; private set; }
+        public bool CardImageResolved { get; private set; }
+        public bool VisualResolved { get; private set; }
+        public string StatusMessage { get; private set; }
+    }
+
     public sealed class LoaderDiagnosticsSnapshot
     {
         public LoaderDiagnosticsSnapshot(
@@ -197,6 +244,43 @@ namespace RogueCommandExpansionLoader.Runtime
             IReadOnlyList<StagePoolScopeDiagnosticReport> stagePoolScopes,
             IReadOnlyList<AiProfileStageRangeDiagnosticReport> aiProfileStageRanges,
             IReadOnlyList<string> recentLogs)
+            : this(
+                targetGameVersion,
+                isNativeRegistryReady,
+                isLoaded,
+                activePackCount,
+                failedPackCount,
+                totalBundleBytes,
+                packs,
+                units,
+                stages,
+                aiProfiles,
+                unitFactories,
+                stagePoolScopes,
+                aiProfileStageRanges,
+                null,
+                null,
+                recentLogs)
+        {
+        }
+
+        public LoaderDiagnosticsSnapshot(
+            string targetGameVersion,
+            bool isNativeRegistryReady,
+            bool isLoaded,
+            int activePackCount,
+            int failedPackCount,
+            long totalBundleBytes,
+            IReadOnlyList<PackDiagnosticReport> packs,
+            IReadOnlyList<UnitDiagnosticReport> units,
+            IReadOnlyList<StageDiagnosticReport> stages,
+            IReadOnlyList<AiProfileDiagnosticReport> aiProfiles,
+            IReadOnlyList<UnitFactoryDiagnosticReport> unitFactories,
+            IReadOnlyList<StagePoolScopeDiagnosticReport> stagePoolScopes,
+            IReadOnlyList<AiProfileStageRangeDiagnosticReport> aiProfileStageRanges,
+            IReadOnlyList<UnitEligibilityDiagnosticReport> unitEligibilities,
+            IReadOnlyList<UnitAssetResolutionDiagnosticReport> unitAssetResolutions,
+            IReadOnlyList<string> recentLogs)
         {
             TargetGameVersion = targetGameVersion ?? string.Empty;
             IsNativeRegistryReady = isNativeRegistryReady;
@@ -211,6 +295,8 @@ namespace RogueCommandExpansionLoader.Runtime
             UnitFactories = CopyReadOnly(unitFactories);
             StagePoolScopes = CopyReadOnly(stagePoolScopes);
             AiProfileStageRanges = CopyReadOnly(aiProfileStageRanges);
+            UnitEligibilities = CopyReadOnly(unitEligibilities);
+            UnitAssetResolutions = CopyReadOnly(unitAssetResolutions);
             RecentLogs = CopyReadOnly(recentLogs);
         }
 
@@ -227,6 +313,8 @@ namespace RogueCommandExpansionLoader.Runtime
         public IReadOnlyList<UnitFactoryDiagnosticReport> UnitFactories { get; private set; }
         public IReadOnlyList<StagePoolScopeDiagnosticReport> StagePoolScopes { get; private set; }
         public IReadOnlyList<AiProfileStageRangeDiagnosticReport> AiProfileStageRanges { get; private set; }
+        public IReadOnlyList<UnitEligibilityDiagnosticReport> UnitEligibilities { get; private set; }
+        public IReadOnlyList<UnitAssetResolutionDiagnosticReport> UnitAssetResolutions { get; private set; }
         public IReadOnlyList<string> RecentLogs { get; private set; }
 
         private static IReadOnlyList<T> CopyReadOnly<T>(IReadOnlyList<T> source)
@@ -243,6 +331,163 @@ namespace RogueCommandExpansionLoader.Runtime
             }
 
             return Array.AsReadOnly(copy);
+        }
+    }
+
+    public static class LoaderUnitDiagnosticsBuilder
+    {
+        public static IReadOnlyList<UnitEligibilityDiagnosticReport> CreateEligibilityReports(
+            IReadOnlyList<UnitDiagnosticReport> units)
+        {
+            var reports = new List<UnitEligibilityDiagnosticReport>();
+            if (units != null)
+            {
+                for (int i = 0; i < units.Count; i++)
+                {
+                    UnitDiagnosticReport unit = units[i];
+                    if (unit == null)
+                    {
+                        continue;
+                    }
+
+                    reports.Add(new UnitEligibilityDiagnosticReport(
+                        unit.UnitId,
+                        unit.IsAllowedAsStartingBlueprint,
+                        unit.IsAllowedForAi,
+                        unit.IsAllowedForDemo,
+                        unit.IsForSpecialists));
+                }
+            }
+
+            reports.Sort((left, right) => StringComparer.Ordinal.Compare(left.UnitId, right.UnitId));
+            return reports.AsReadOnly();
+        }
+
+        public static IReadOnlyList<UnitAssetResolutionDiagnosticReport> CreateAssetResolutionReports(
+            IReadOnlyList<UnitDiagnosticReport> units,
+            ISet<string> resolvedResources,
+            ISet<string> visualRequests,
+            ISet<string> resolvedVisuals)
+        {
+            var reports = new List<UnitAssetResolutionDiagnosticReport>();
+            if (units == null)
+            {
+                return reports.AsReadOnly();
+            }
+
+            for (int i = 0; i < units.Count; i++)
+            {
+                UnitDiagnosticReport unit = units[i];
+                if (unit == null)
+                {
+                    continue;
+                }
+
+                bool prefabResolved = Contains(resolvedResources, unit.PrefabKey);
+                bool cardImageResolved = Contains(resolvedResources, unit.ImageKey);
+                bool cardImagePathUnverified = !cardImageResolved &&
+                    !String.IsNullOrWhiteSpace(unit.ImageKey) &&
+                    !unit.ImageKey.StartsWith("RogueCommandExpansionLoader/", StringComparison.Ordinal);
+                bool visualRequested = Contains(visualRequests, unit.UnitId);
+                bool visualResolved = !visualRequested || Contains(resolvedVisuals, unit.UnitId);
+                var missing = new List<string>();
+                if (!prefabResolved) missing.Add("prefab");
+                if (!cardImageResolved && !cardImagePathUnverified) missing.Add("card image");
+                if (visualRequested && !visualResolved) missing.Add("visual");
+
+                var statusParts = new List<string>();
+                if (missing.Count > 0)
+                {
+                    statusParts.Add("Missing: " + String.Join(", ", missing) + ".");
+                }
+                if (cardImagePathUnverified)
+                {
+                    statusParts.Add("Native card image path not independently resolved by loader.");
+                }
+                if (statusParts.Count == 0)
+                {
+                    statusParts.Add(visualRequested
+                        ? "All requested assets resolved."
+                        : "Prefab and card image resolved; custom visual not requested.");
+                }
+
+                reports.Add(new UnitAssetResolutionDiagnosticReport(
+                    unit.UnitId, prefabResolved, cardImageResolved, visualResolved, String.Join(" ", statusParts)));
+            }
+
+            reports.Sort((left, right) => StringComparer.Ordinal.Compare(left.UnitId, right.UnitId));
+            return reports.AsReadOnly();
+        }
+
+        private static bool Contains(ISet<string> values, string value)
+        {
+            return values != null && !String.IsNullOrWhiteSpace(value) && values.Contains(value);
+        }
+    }
+
+    public static class LoaderDiagnosticsFormatter
+    {
+        public static string FormatUnitFactory(UnitFactoryDiagnosticReport report)
+        {
+            if (report == null)
+            {
+                throw new ArgumentNullException(nameof(report));
+            }
+
+            if (String.IsNullOrWhiteSpace(report.FactoryId))
+            {
+                return report.UnitId + " - " + report.StatusMessage;
+            }
+
+            return report.UnitId + " -> " + report.FactoryId + " (" + report.StatusMessage + ")";
+        }
+
+        public static string FormatStagePoolScope(StagePoolScopeDiagnosticReport report)
+        {
+            if (report == null)
+            {
+                throw new ArgumentNullException(nameof(report));
+            }
+
+            string ids = report.FactoryIds.Count > 0
+                ? String.Join(", ", report.FactoryIds)
+                : "Ninguno";
+            return report.StageId + " / " + report.PoolId + ": " + ids;
+        }
+
+        public static string FormatAiProfileStageRange(AiProfileStageRangeDiagnosticReport report)
+        {
+            if (report == null)
+            {
+                throw new ArgumentNullException(nameof(report));
+            }
+
+            string status = report.IsContiguous ? "contiguous" : "not contiguous";
+            return report.ProfileId + ": " + report.StageMin + "-" + report.StageMax + " (" + status + ")";
+        }
+
+        public static string FormatUnitEligibility(UnitEligibilityDiagnosticReport report)
+        {
+            if (report == null)
+            {
+                throw new ArgumentNullException(nameof(report));
+            }
+
+            return report.UnitId + " [Blueprint=" + report.IsAllowedAsStartingBlueprint +
+                ", AI=" + report.IsAllowedForAi + ", Demo=" + report.IsAllowedForDemo +
+                ", Specialist=" + report.IsForSpecialists + "]";
+        }
+
+        public static string FormatUnitAssetResolution(UnitAssetResolutionDiagnosticReport report)
+        {
+            if (report == null)
+            {
+                throw new ArgumentNullException(nameof(report));
+            }
+
+            return report.UnitId + " [Prefab=" + report.PrefabResolved +
+                ", Card=" + report.CardImageResolved + ", Visual=" + report.VisualResolved +
+                "] " + report.StatusMessage;
         }
     }
 }

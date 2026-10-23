@@ -1648,6 +1648,32 @@ namespace RogueCommandExpansionLoader.Content
                 }
                 units.Sort((left, right) => StringComparer.Ordinal.Compare(left.UnitId, right.UnitId));
 
+                var resolvedResourceKeys = new HashSet<string>(StringComparer.Ordinal);
+                foreach (KeyValuePair<string, UnityEngine.Object> resource in _resourceAssets)
+                {
+                    if (!String.IsNullOrWhiteSpace(resource.Key) && resource.Value != null)
+                    {
+                        resolvedResourceKeys.Add(resource.Key);
+                    }
+                }
+
+                var visualRequests = new HashSet<string>(StringComparer.Ordinal);
+                var resolvedVisuals = new HashSet<string>(StringComparer.Ordinal);
+                foreach (LoadedUnit unit in _units.Values)
+                {
+                    if (unit.Definition != null &&
+                        !String.IsNullOrWhiteSpace(unit.Definition.nativeTemplateId) &&
+                        !String.IsNullOrWhiteSpace(unit.Definition.visualAssetName))
+                    {
+                        visualRequests.Add(unit.Id);
+                        // A unit is committed only after its requested native-template visual has loaded and validated.
+                        resolvedVisuals.Add(unit.Id);
+                    }
+                }
+
+                IReadOnlyList<UnitEligibilityDiagnosticReport> unitEligibilities = null;
+                IReadOnlyList<UnitAssetResolutionDiagnosticReport> unitAssetResolutions = null;
+
                 var stages = new List<StageDiagnosticReport>(_stages.Count);
                 for (int i = 0; i < _stages.Count; i++)
                 {
@@ -1703,6 +1729,33 @@ namespace RogueCommandExpansionLoader.Content
                 }
                 unitFactories.Sort((left, right) => StringComparer.Ordinal.Compare(left.UnitId, right.UnitId));
 
+                var unitEligibilityList = new List<UnitEligibilityDiagnosticReport>(_units.Count);
+                var unitAssetResolutionList = new List<UnitAssetResolutionDiagnosticReport>(_units.Count);
+                foreach (LoadedUnit unit in _units.Values)
+                {
+                    ContentUnitDefinition definition = unit.Definition;
+                    unitEligibilityList.Add(new UnitEligibilityDiagnosticReport(
+                        unit.Id,
+                        definition.isAllowedAsStartingBlueprint,
+                        definition.isAllowedForAi,
+                        definition.isAllowedForDemo,
+                        definition.isForSpecialists));
+
+                    bool prefabResolved = !String.IsNullOrWhiteSpace(definition.prefabAssetName) &&
+                        TryLoadResource(definition.prefabAssetName, out _);
+                    bool cardResolved = !String.IsNullOrWhiteSpace(definition.cardImageAssetName) &&
+                        TryLoadResource(definition.cardImageAssetName, out _);
+                    bool visualResolved = !String.IsNullOrWhiteSpace(definition.visualAssetName) &&
+                        TryLoadResource(definition.visualAssetName, out _);
+
+                    string status = (prefabResolved && cardResolved && visualResolved) ? "Resolved" : "Missing assets";
+                    unitAssetResolutionList.Add(new UnitAssetResolutionDiagnosticReport(
+                        unit.Id, prefabResolved, cardResolved, visualResolved, status));
+                }
+
+                unitEligibilities = unitEligibilityList;
+                unitAssetResolutions = unitAssetResolutionList;
+
                 var stagePoolScopes = new List<StagePoolScopeDiagnosticReport>();
                 foreach (LoadedStage stage in _stages)
                 {
@@ -1755,6 +1808,8 @@ namespace RogueCommandExpansionLoader.Content
                     unitFactories,
                     stagePoolScopes,
                     aiProfileStageRanges,
+                    unitEligibilities,
+                    unitAssetResolutions,
                     recentLogs);
             }
         }

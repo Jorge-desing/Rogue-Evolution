@@ -1574,16 +1574,34 @@ namespace RogueCommandExpansionLoader.Content
                     Add(diagnostics, "active-skill.type-invalid", itemPath + ".skillType",
                         "Active skill type must be Position, Target, or Self.");
                 }
-                if (skill.cooldown < 0 || skill.cooldown > 300)
+                if (!IsFiniteSingle(skill.cooldown) || skill.cooldown < 0 || skill.cooldown > 300)
                 {
                     Add(diagnostics, "active-skill.cooldown-invalid", itemPath + ".cooldown",
-                        "Active skill cooldown must be between 0 and 300.");
+                        "Active skill cooldown must be finite and between 0 and 300.");
                 }
-                if (skill.manaCost < 0 || skill.manaCost > 1000)
+                if (!IsFiniteSingle(skill.manaCost) || skill.manaCost < 0 || skill.manaCost > 1000)
                 {
                     Add(diagnostics, "active-skill.manaCost-invalid", itemPath + ".manaCost",
-                        "Active skill mana cost must be between 0 and 1000.");
+                        "Active skill mana cost must be finite and between 0 and 1000.");
                 }
+                ValidateActiveSkillEffectValue(skill, itemPath, diagnostics);
+            }
+        }
+
+        private static void ValidateActiveSkillEffectValue(
+            ContentActiveSkillDefinition skill,
+            string path,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (skill == null)
+            {
+                return;
+            }
+
+            if (Single.IsNaN(skill.effectValue) || Single.IsInfinity(skill.effectValue))
+            {
+                Add(diagnostics, "active-skill.effect-value-invalid", path + ".effectValue",
+                    "Active skill effect value must be finite.");
             }
         }
 
@@ -1608,15 +1626,15 @@ namespace RogueCommandExpansionLoader.Content
                     Add(diagnostics, "combat-boost.statName-required", itemPath + ".statName",
                         "Combat boost stat name must be non-empty.");
                 }
-                if (boost.multiplier < 0 || boost.multiplier > 10)
+                if (!IsFiniteSingle(boost.multiplier) || boost.multiplier < 0 || boost.multiplier > 10)
                 {
                     Add(diagnostics, "combat-boost.multiplier-invalid", itemPath + ".multiplier",
-                        "Combat boost multiplier must be between 0 and 10.");
+                        "Combat boost multiplier must be finite and between 0 and 10.");
                 }
-                if (boost.duration < 0 || boost.duration > 300)
+                if (!IsFiniteSingle(boost.duration) || boost.duration < 0 || boost.duration > 300)
                 {
                     Add(diagnostics, "combat-boost.duration-invalid", itemPath + ".duration",
-                        "Combat boost duration must be between 0 and 300.");
+                        "Combat boost duration must be finite and between 0 and 300.");
                 }
             }
         }
@@ -1651,10 +1669,10 @@ namespace RogueCommandExpansionLoader.Content
                     Add(diagnostics, "unit-upgrade.level-invalid", itemPath + ".requiredExperienceLevel",
                         "Required experience level must be non-negative.");
                 }
-                if (upgrade.cost < 0)
+                if (!IsFiniteSingle(upgrade.cost) || upgrade.cost < 0)
                 {
                     Add(diagnostics, "unit-upgrade.cost-invalid", itemPath + ".cost",
-                        "Upgrade cost must be non-negative.");
+                        "Upgrade cost must be finite and non-negative.");
                 }
             }
         }
@@ -1675,15 +1693,16 @@ namespace RogueCommandExpansionLoader.Content
                 Add(diagnostics, "unit-experience.max-level-invalid", path + ".maxLevel",
                     "Max level must be between 0 and 100.");
             }
-            if (experience.experienceGainMultiplier < 0 || experience.experienceGainMultiplier > 10)
+            if (!IsFiniteSingle(experience.experienceGainMultiplier) ||
+                experience.experienceGainMultiplier < 0 || experience.experienceGainMultiplier > 10)
             {
                 Add(diagnostics, "unit-experience.gain-multiplier-invalid", path + ".experienceGainMultiplier",
-                    "Experience gain multiplier must be between 0 and 10.");
+                    "Experience gain multiplier must be finite and between 0 and 10.");
             }
-            if (experience.levelUpBonus < 0)
+            if (!IsFiniteSingle(experience.levelUpBonus) || experience.levelUpBonus < 0)
             {
                 Add(diagnostics, "unit-experience.level-up-bonus-invalid", path + ".levelUpBonus",
-                    "Level up bonus must be non-negative.");
+                    "Level up bonus must be finite and non-negative.");
             }
         }
 
@@ -1709,16 +1728,12 @@ namespace RogueCommandExpansionLoader.Content
                     Add(diagnostics, "unit-synergy.statName-required", itemPath + ".statName",
                         "Synergy stat name must be non-empty.");
                 }
-                if (synergy.multiplier < 0 || synergy.multiplier > 10)
+                if (!IsFiniteSingle(synergy.multiplier) || synergy.multiplier < 0 || synergy.multiplier > 10)
                 {
                     Add(diagnostics, "unit-synergy.multiplier-invalid", itemPath + ".multiplier",
-                        "Synergy multiplier must be between 0 and 10.");
+                        "Synergy multiplier must be finite and between 0 and 10.");
                 }
-                if (synergy.radius < 0)
-                {
-                    Add(diagnostics, "unit-synergy.radius-invalid", itemPath + ".radius",
-                        "Synergy radius must be non-negative.");
-                }
+                ValidateSynergyRadius(synergy, itemPath, diagnostics);
                 if (synergy.targetUnitIds != null)
                 {
                     for (int j = 0; j < synergy.targetUnitIds.Length; j++)
@@ -1759,11 +1774,7 @@ namespace RogueCommandExpansionLoader.Content
                 {
                     ValidateVisualRootPath(variant.visualRootPath, itemPath + ".visualRootPath", diagnostics);
                 }
-                if (variant.scale < 0 || variant.scale > 10)
-                {
-                    Add(diagnostics, "unit-visual-variant.scale-invalid", itemPath + ".scale",
-                        "Visual variant scale must be between 0 and 10.");
-                }
+                ValidateVisualVariantScale(variant, itemPath, diagnostics);
             }
         }
 
@@ -1773,20 +1784,20 @@ namespace RogueCommandExpansionLoader.Content
             List<ContentDiagnostic> diagnostics)
         {
             if (spawn == null) return;
-            if (spawn.spawnRate < 0)
+            if (!IsFiniteSingle(spawn.spawnRate) || spawn.spawnRate < 0)
             {
                 Add(diagnostics, "unit-spawn.rate-invalid", path + ".spawnRate",
-                    "Spawn rate must be non-negative.");
+                    "Spawn rate must be finite and non-negative.");
             }
             if (spawn.maxSpawnCount < 0)
             {
                 Add(diagnostics, "unit-spawn.max-count-invalid", path + ".maxSpawnCount",
                     "Max spawn count must be non-negative.");
             }
-            if (spawn.spawnCooldown < 0)
+            if (!IsFiniteSingle(spawn.spawnCooldown) || spawn.spawnCooldown < 0)
             {
                 Add(diagnostics, "unit-spawn.cooldown-invalid", path + ".spawnCooldown",
-                    "Spawn cooldown must be non-negative.");
+                    "Spawn cooldown must be finite and non-negative.");
             }
         }
 
@@ -1811,11 +1822,12 @@ namespace RogueCommandExpansionLoader.Content
                     Add(diagnostics, "unit-status-effect.type-required", itemPath + ".effectType",
                         "Status effect type must be non-empty.");
                 }
-                if (effect.duration < 0)
+                if (!IsFiniteSingle(effect.duration) || effect.duration < 0)
                 {
                     Add(diagnostics, "unit-status-effect.duration-invalid", itemPath + ".duration",
-                        "Status effect duration must be non-negative.");
+                        "Status effect duration must be finite and non-negative.");
                 }
+                ValidateStatusEffectMagnitude(effect, itemPath, diagnostics);
             }
         }
 
@@ -1825,15 +1837,15 @@ namespace RogueCommandExpansionLoader.Content
             List<ContentDiagnostic> diagnostics)
         {
             if (queue == null) return;
-            if (queue.buildTime < 0)
+            if (!IsFiniteSingle(queue.buildTime) || queue.buildTime < 0)
             {
                 Add(diagnostics, "unit-production-queue.build-time-invalid", path + ".buildTime",
-                    "Build time must be non-negative.");
+                    "Build time must be finite and non-negative.");
             }
-            if (queue.resourceCost < 0)
+            if (!IsFiniteSingle(queue.resourceCost) || queue.resourceCost < 0)
             {
                 Add(diagnostics, "unit-production-queue.resource-cost-invalid", path + ".resourceCost",
-                    "Resource cost must be non-negative.");
+                    "Resource cost must be finite and non-negative.");
             }
             if (queue.queueSize < 0)
             {
@@ -1867,10 +1879,10 @@ namespace RogueCommandExpansionLoader.Content
                     Add(diagnostics, "unit-resource-cost.type-required", itemPath + ".resourceType",
                         "Resource type must be non-empty.");
                 }
-                if (cost.amount < 0)
+                if (!IsFiniteSingle(cost.amount) || cost.amount < 0)
                 {
                     Add(diagnostics, "unit-resource-cost.amount-invalid", itemPath + ".amount",
-                        "Resource amount must be non-negative.");
+                        "Resource amount must be finite and non-negative.");
                 }
             }
         }
@@ -1927,10 +1939,10 @@ namespace RogueCommandExpansionLoader.Content
             List<ContentDiagnostic> diagnostics)
         {
             if (detection == null) return;
-            if (detection.detectionRange < 0)
+            if (!IsFiniteSingle(detection.detectionRange) || detection.detectionRange < 0)
             {
                 Add(diagnostics, "unit-detection.range-invalid", path + ".detectionRange",
-                    "Detection range must be non-negative.");
+                    "Detection range must be finite and non-negative.");
             }
             if (!String.IsNullOrWhiteSpace(detection.sensorType) &&
                 detection.sensorType != "Visual" && detection.sensorType != "Radar" &&
@@ -1961,20 +1973,20 @@ namespace RogueCommandExpansionLoader.Content
                     Add(diagnostics, "unit-weapon.type-required", itemPath + ".weaponType",
                         "Weapon type must be non-empty.");
                 }
-                if (weapon.damage < 0)
+                if (!IsFiniteSingle(weapon.damage) || weapon.damage < 0)
                 {
                     Add(diagnostics, "unit-weapon.damage-invalid", itemPath + ".damage",
-                        "Weapon damage must be non-negative.");
+                        "Weapon damage must be finite and non-negative.");
                 }
-                if (weapon.range < 0)
+                if (!IsFiniteSingle(weapon.range) || weapon.range < 0)
                 {
                     Add(diagnostics, "unit-weapon.range-invalid", itemPath + ".range",
-                        "Weapon range must be non-negative.");
+                        "Weapon range must be finite and non-negative.");
                 }
-                if (weapon.fireRate < 0)
+                if (!IsFiniteSingle(weapon.fireRate) || weapon.fireRate < 0)
                 {
                     Add(diagnostics, "unit-weapon.fire-rate-invalid", itemPath + ".fireRate",
-                        "Weapon fire rate must be non-negative.");
+                        "Weapon fire rate must be finite and non-negative.");
                 }
             }
         }
@@ -2016,25 +2028,25 @@ namespace RogueCommandExpansionLoader.Content
             List<ContentDiagnostic> diagnostics)
         {
             if (healing == null) return;
-            if (healing.healAmount < 0)
+            if (!IsFiniteSingle(healing.healAmount) || healing.healAmount < 0)
             {
                 Add(diagnostics, "unit-healing.amount-invalid", path + ".healAmount",
-                    "Heal amount must be non-negative.");
+                    "Heal amount must be finite and non-negative.");
             }
-            if (healing.healRange < 0)
+            if (!IsFiniteSingle(healing.healRange) || healing.healRange < 0)
             {
                 Add(diagnostics, "unit-healing.range-invalid", path + ".healRange",
-                    "Heal range must be non-negative.");
+                    "Heal range must be finite and non-negative.");
             }
-            if (healing.healRate < 0)
+            if (!IsFiniteSingle(healing.healRate) || healing.healRate < 0)
             {
                 Add(diagnostics, "unit-healing.rate-invalid", path + ".healRate",
-                    "Heal rate must be non-negative.");
+                    "Heal rate must be finite and non-negative.");
             }
-            if (healing.repairAmount < 0)
+            if (!IsFiniteSingle(healing.repairAmount) || healing.repairAmount < 0)
             {
                 Add(diagnostics, "unit-healing.repair-invalid", path + ".repairAmount",
-                    "Repair amount must be non-negative.");
+                    "Repair amount must be finite and non-negative.");
             }
         }
 
@@ -2044,20 +2056,21 @@ namespace RogueCommandExpansionLoader.Content
             List<ContentDiagnostic> diagnostics)
         {
             if (stealth == null) return;
-            if (stealth.stealthLevel < 0 || stealth.stealthLevel > 10)
+            if (!IsFiniteSingle(stealth.stealthLevel) || stealth.stealthLevel < 0 || stealth.stealthLevel > 10)
             {
                 Add(diagnostics, "unit-stealth.level-invalid", path + ".stealthLevel",
-                    "Stealth level must be between 0 and 10.");
+                    "Stealth level must be finite and between 0 and 10.");
             }
-            if (stealth.cloakDuration < 0)
+            if (!IsFiniteSingle(stealth.cloakDuration) || stealth.cloakDuration < 0)
             {
                 Add(diagnostics, "unit-stealth.duration-invalid", path + ".cloakDuration",
-                    "Cloak duration must be non-negative.");
+                    "Cloak duration must be finite and non-negative.");
             }
-            if (stealth.detectionReduction < 0 || stealth.detectionReduction > 1)
+            if (!IsFiniteSingle(stealth.detectionReduction) ||
+                stealth.detectionReduction < 0 || stealth.detectionReduction > 1)
             {
                 Add(diagnostics, "unit-stealth.reduction-invalid", path + ".detectionReduction",
-                    "Detection reduction must be between 0 and 1.");
+                    "Detection reduction must be finite and between 0 and 1.");
             }
         }
 
@@ -2067,10 +2080,10 @@ namespace RogueCommandExpansionLoader.Content
             List<ContentDiagnostic> diagnostics)
         {
             if (command == null) return;
-            if (command.commandRange < 0)
+            if (!IsFiniteSingle(command.commandRange) || command.commandRange < 0)
             {
                 Add(diagnostics, "unit-command.range-invalid", path + ".commandRange",
-                    "Command range must be non-negative.");
+                    "Command range must be finite and non-negative.");
             }
             if (!String.IsNullOrWhiteSpace(command.commandType) &&
                 command.commandType != "Move" && command.commandType != "Attack" &&
@@ -2102,10 +2115,10 @@ namespace RogueCommandExpansionLoader.Content
                 Add(diagnostics, "unit-experience-reward.type-invalid", path + ".experienceType",
                     "Experience type must be non-empty when provided.");
             }
-            if (reward.bonusMultiplier < 0)
+            if (!IsFiniteSingle(reward.bonusMultiplier) || reward.bonusMultiplier < 0)
             {
                 Add(diagnostics, "unit-experience-reward.bonus-multiplier-invalid", path + ".bonusMultiplier",
-                    "Bonus multiplier must be non-negative.");
+                    "Bonus multiplier must be finite and non-negative.");
             }
         }
 
@@ -2115,10 +2128,10 @@ namespace RogueCommandExpansionLoader.Content
             List<ContentDiagnostic> diagnostics)
         {
             if (aura == null) return;
-            if (aura.auraRadius < 0)
+            if (!IsFiniteSingle(aura.auraRadius) || aura.auraRadius < 0)
             {
                 Add(diagnostics, "unit-aura.radius-invalid", path + ".auraRadius",
-                    "Aura radius must be non-negative.");
+                    "Aura radius must be finite and non-negative.");
             }
             if (!String.IsNullOrWhiteSpace(aura.auraType) &&
                 aura.auraType != "Buff" && aura.auraType != "Debuff" &&
@@ -2127,10 +2140,10 @@ namespace RogueCommandExpansionLoader.Content
                 Add(diagnostics, "unit-aura.type-invalid", path + ".auraType",
                     "Aura type must be Buff, Debuff, Heal, or Shield.");
             }
-            if (aura.buffAmount < 0)
+            if (!IsFiniteSingle(aura.buffAmount) || aura.buffAmount < 0)
             {
                 Add(diagnostics, "unit-aura.buff-invalid", path + ".buffAmount",
-                    "Buff amount must be non-negative.");
+                    "Buff amount must be finite and non-negative.");
             }
         }
 
@@ -2145,20 +2158,20 @@ namespace RogueCommandExpansionLoader.Content
                 Add(diagnostics, "unit-gathering.type-required", path + ".resourceType",
                     "Resource type is required.");
             }
-            if (gathering.gatherRate < 0)
+            if (!IsFiniteSingle(gathering.gatherRate) || gathering.gatherRate < 0)
             {
                 Add(diagnostics, "unit-gathering.rate-invalid", path + ".gatherRate",
-                    "Gather rate must be non-negative.");
+                    "Gather rate must be finite and non-negative.");
             }
             if (gathering.carryCapacity < 0)
             {
                 Add(diagnostics, "unit-gathering.capacity-invalid", path + ".carryCapacity",
                     "Carry capacity must be non-negative.");
             }
-            if (gathering.gatherRange < 0)
+            if (!IsFiniteSingle(gathering.gatherRange) || gathering.gatherRange < 0)
             {
                 Add(diagnostics, "unit-gathering.range-invalid", path + ".gatherRange",
-                    "Gather range must be non-negative.");
+                    "Gather range must be finite and non-negative.");
             }
         }
 
@@ -2178,10 +2191,11 @@ namespace RogueCommandExpansionLoader.Content
                 Add(diagnostics, "unit-ai.combat-cap-invalid", path + ".combatUnitCap",
                     "Combat unit cap must be non-negative.");
             }
-            if (aiBehavior.skillActivationCheckInterval < 0)
+            if (!IsFiniteSingle(aiBehavior.skillActivationCheckInterval) ||
+                aiBehavior.skillActivationCheckInterval < 0)
             {
                 Add(diagnostics, "unit-ai.interval-invalid", path + ".skillActivationCheckInterval",
-                    "Skill activation check interval must be non-negative.");
+                    "Skill activation check interval must be finite and non-negative.");
             }
         }
 
@@ -2801,21 +2815,8 @@ namespace RogueCommandExpansionLoader.Content
             ContentStageDefinition[] stages,
             List<ContentDiagnostic> diagnostics)
         {
-            if (profile == null || !profile.scopeToReferencedStages || stages == null)
-            {
-                return;
-            }
-
-            var referencedIds = new HashSet<string>(StringComparer.Ordinal);
-            foreach (string stageId in profile.referencedStageIds ?? new string[0])
-            {
-                if (!String.IsNullOrWhiteSpace(stageId))
-                {
-                    referencedIds.Add(stageId);
-                }
-            }
-
-            if (referencedIds.Count == 0)
+            if (profile == null || !profile.scopeToReferencedStages || stages == null ||
+                String.IsNullOrWhiteSpace(profile.id))
             {
                 return;
             }
@@ -2823,9 +2824,19 @@ namespace RogueCommandExpansionLoader.Content
             var indices = new List<int>();
             for (int i = 0; i < stages.Length; i++)
             {
-                if (referencedIds.Contains(stages[i].id))
+                ContentStageDefinition stage = stages[i];
+                if (stage == null || stage.aiProfileIds == null)
                 {
-                    indices.Add(i);
+                    continue;
+                }
+
+                for (int j = 0; j < stage.aiProfileIds.Length; j++)
+                {
+                    if (String.Equals(stage.aiProfileIds[j], profile.id, StringComparison.Ordinal))
+                    {
+                        indices.Add(i);
+                        break;
+                    }
                 }
             }
 
@@ -3177,6 +3188,63 @@ namespace RogueCommandExpansionLoader.Content
         {
             string trimmed = path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
             return trimmed + Path.DirectorySeparatorChar;
+        }
+
+        private static void ValidateStatusEffectMagnitude(
+            ContentUnitStatusEffectDefinition effect,
+            string path,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (effect == null)
+            {
+                return;
+            }
+
+            if (Single.IsNaN(effect.magnitude) || Single.IsInfinity(effect.magnitude))
+            {
+                Add(diagnostics, "unit-status-effect.magnitude-invalid", path + ".magnitude",
+                    "Status effect magnitude must be finite.");
+            }
+        }
+
+        private static void ValidateVisualVariantScale(
+            ContentUnitVisualVariantDefinition variant,
+            string path,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (variant == null)
+            {
+                return;
+            }
+
+            if (Single.IsNaN(variant.scale) || Single.IsInfinity(variant.scale) ||
+                variant.scale < 0 || variant.scale > 10)
+            {
+                Add(diagnostics, "unit-visual-variant.scale-invalid", path + ".scale",
+                    "Visual variant scale must be finite and between 0 and 10.");
+            }
+        }
+
+        private static void ValidateSynergyRadius(
+            ContentUnitSynergyDefinition synergy,
+            string path,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (synergy == null)
+            {
+                return;
+            }
+
+            if (Single.IsNaN(synergy.radius) || Single.IsInfinity(synergy.radius) || synergy.radius < 0)
+            {
+                Add(diagnostics, "unit-synergy.radius-invalid", path + ".radius",
+                    "Synergy radius must be finite and non-negative.");
+            }
+        }
+
+        private static bool IsFiniteSingle(float value)
+        {
+            return !Single.IsNaN(value) && !Single.IsInfinity(value);
         }
 
         private static void Add(List<ContentDiagnostic> diagnostics, string code, string path, string message)

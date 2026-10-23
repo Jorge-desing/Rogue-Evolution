@@ -2096,7 +2096,11 @@ var tests = new (string Name, Action Run)[]
                     unit.customBalance.ContainsKey("Damage1");
                 if (!hasRawBalance && !hasCustomDamage)
                 {
-                    throw new InvalidOperationException($"Card {unit.id} is missing its explicit {stat} value.");
+                    string customBalanceKeys = unit.customBalance == null
+                        ? "<null>"
+                        : string.Join(",", unit.customBalance.Keys);
+                    throw new InvalidOperationException(
+                        $"Card {unit.id} is missing its explicit {stat} value; customBalance keys: {customBalanceKeys}.");
                 }
             }
 
@@ -6057,6 +6061,236 @@ var tests = new (string Name, Action Run)[]
         if (!diagnostics.Any(d => d.Code == "ai-profile.stage-range-not-contiguous"))
         {
             throw new InvalidOperationException("Non-contiguous AI stage ranges must be rejected.");
+        }
+    }),
+    ("loader diagnostic formatter exposes factory, pool, and AI range details", () =>
+    {
+        string factoryLine = LoaderDiagnosticsFormatter.FormatUnitFactory(
+            new UnitFactoryDiagnosticReport("test:unit", "test:factory", true, "Factory loaded."));
+        string poolLine = LoaderDiagnosticsFormatter.FormatStagePoolScope(
+            new StagePoolScopeDiagnosticReport("test:stage", "pool-a", new[] { "test:factory", "native:unit" }));
+        string aiRangeLine = LoaderDiagnosticsFormatter.FormatAiProfileStageRange(
+            new AiProfileStageRangeDiagnosticReport("test:ai", 2, 4, true));
+
+        if (factoryLine != "test:unit -> test:factory (Factory loaded.)" ||
+            poolLine != "test:stage / pool-a: native:unit, test:factory" ||
+            aiRangeLine != "test:ai: 2-4 (contiguous)")
+        {
+            throw new InvalidOperationException("Loader diagnostics formatting omitted a registered factory, pool, or AI stage range.");
+        }
+    }),
+    ("loader diagnostics snapshot preserves its pre-extension constructor", () =>
+    {
+        var snapshot = new LoaderDiagnosticsSnapshot(
+            "1.0.9", true, true, 0, 0, 0,
+            Array.Empty<PackDiagnosticReport>(),
+            Array.Empty<UnitDiagnosticReport>(),
+            Array.Empty<StageDiagnosticReport>(),
+            Array.Empty<AiProfileDiagnosticReport>(),
+            Array.Empty<UnitFactoryDiagnosticReport>(),
+            Array.Empty<StagePoolScopeDiagnosticReport>(),
+            Array.Empty<AiProfileStageRangeDiagnosticReport>(),
+            Array.Empty<string>());
+
+        if (snapshot.UnitEligibilities.Count != 0 || snapshot.UnitAssetResolutions.Count != 0)
+        {
+            throw new InvalidOperationException("The legacy snapshot constructor must initialize new diagnostic lists as empty.");
+        }
+    }),
+    ("loader unit diagnostic builder reports eligibility and asset resolution", () =>
+    {
+        UnitDiagnosticReport[] units =
+        [
+            new UnitDiagnosticReport("test:unit", "test:pack", "unit-prefab", "unit-card",
+                true, true, false, true, false)
+        ];
+        var resolvedResources = new HashSet<string>(new[] { "unit-prefab", "unit-card" }, StringComparer.Ordinal);
+        var visualRequests = new HashSet<string>(new[] { "test:unit" }, StringComparer.Ordinal);
+        var resolvedVisuals = new HashSet<string>(new[] { "test:unit" }, StringComparer.Ordinal);
+
+        IReadOnlyList<UnitEligibilityDiagnosticReport> eligibility =
+            LoaderUnitDiagnosticsBuilder.CreateEligibilityReports(units);
+        IReadOnlyList<UnitAssetResolutionDiagnosticReport> assets =
+            LoaderUnitDiagnosticsBuilder.CreateAssetResolutionReports(
+                units, resolvedResources, visualRequests, resolvedVisuals);
+
+        string eligibilityLine = LoaderDiagnosticsFormatter.FormatUnitEligibility(eligibility[0]);
+        if (eligibility.Count != 1 ||
+            !eligibility[0].IsAllowedAsStartingBlueprint || eligibility[0].IsAllowedForAi ||
+            !eligibility[0].IsAllowedForDemo ||
+            eligibilityLine != "test:unit [Blueprint=True, AI=False, Demo=True, Specialist=False]" ||
+            assets.Count != 1 || !assets[0].PrefabResolved || !assets[0].CardImageResolved ||
+            !assets[0].VisualResolved)
+        {
+            throw new InvalidOperationException("Loader diagnostics did not preserve unit eligibility and resolved asset state.");
+        }
+
+        IReadOnlyList<UnitAssetResolutionDiagnosticReport> missing =
+            LoaderUnitDiagnosticsBuilder.CreateAssetResolutionReports(
+                units, new HashSet<string>(StringComparer.Ordinal), visualRequests,
+                new HashSet<string>(StringComparer.Ordinal));
+        if (missing[0].PrefabResolved || missing[0].CardImageResolved || missing[0].VisualResolved)
+        {
+            throw new InvalidOperationException("Unresolved unit resources must be reported as missing.");
+        }
+    }),
+    ("unit active skill rejects non-finite effect values", () =>
+    {
+        WithPackage(sample, (pack, root) =>
+        {
+            pack.units[0].activeSkills = new[]
+            {
+                new ContentActiveSkillDefinition { id = "sample:bad-effect", skillType = "Self", effectValue = Single.NaN }
+            };
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "active-skill.effect-value-invalid");
+        });
+    }),
+    ("unit synergy rejects non-finite radius", () =>
+    {
+        WithPackage(sample, (pack, root) =>
+        {
+            pack.units[0].synergies = new[]
+            {
+                new ContentUnitSynergyDefinition { id = "sample:bad-radius", statName = "Damage1", radius = Single.PositiveInfinity }
+            };
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "unit-synergy.radius-invalid");
+        });
+    }),
+    ("unit visual variant rejects non-finite scale", () =>
+    {
+        WithPackage(sample, (pack, root) =>
+        {
+            pack.units[0].visualVariants = new[]
+            {
+                new ContentUnitVisualVariantDefinition { id = "sample:bad-scale", scale = Single.NaN }
+            };
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "unit-visual-variant.scale-invalid");
+        });
+    }),
+    ("unit status effect rejects non-finite magnitude", () =>
+    {
+        WithPackage(sample, (pack, root) =>
+        {
+            pack.units[0].statusEffects = new[]
+            {
+                new ContentUnitStatusEffectDefinition { id = "sample:bad-magnitude", effectType = "Damage", magnitude = Single.NegativeInfinity }
+            };
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "unit-status-effect.magnitude-invalid");
+        });
+    }),
+    ("unit effect values and visual scale preserve schema-allowed signed and zero values", () =>
+    {
+        WithPackage(sample, (pack, root) =>
+        {
+            pack.units[0].activeSkills = new[]
+            {
+                new ContentActiveSkillDefinition { id = "sample:negative-effect", skillType = "Self", effectValue = -1 }
+            };
+            pack.units[0].statusEffects = new[]
+            {
+                new ContentUnitStatusEffectDefinition { id = "sample:negative-magnitude", effectType = "CustomEffect", magnitude = -1 }
+            };
+            pack.units[0].visualVariants = new[]
+            {
+                new ContentUnitVisualVariantDefinition { id = "sample:zero-scale", scale = 0 }
+            };
+            pack.units[0].weapons = new[]
+            {
+                new ContentUnitWeaponDefinition { weaponType = "CustomWeapon" }
+            };
+            pack.units[0].spawn = new ContentUnitSpawnDefinition { spawnLocation = "Orbit" };
+            pack.units[0].aiBehavior = new ContentUnitAiBehaviorDefinition { aiTag = "UnmappedTag" };
+            pack.units[0].experienceReward = new ContentUnitExperienceRewardDefinition
+            {
+                experienceType = "CustomExperience"
+            };
+            ExpectValid(pack, root, new EmptySnapshot(), new KnownModuleValidator());
+        });
+    }),
+    ("unit numeric sub-definitions reject non-finite values", () =>
+    {
+        var cases = new (Action<ContentPackDefinition> Configure, string DiagnosticCode)[]
+        {
+            (pack => pack.units[0].activeSkills = new[] { new ContentActiveSkillDefinition { id = "sample:bad-cooldown", skillType = "Self", cooldown = Single.NaN } }, "active-skill.cooldown-invalid"),
+            (pack => pack.units[0].activeSkills = new[] { new ContentActiveSkillDefinition { id = "sample:bad-mana", skillType = "Self", manaCost = Single.PositiveInfinity } }, "active-skill.manaCost-invalid"),
+            (pack => pack.units[0].combatBoosts = new[] { new ContentCombatBoostDefinition { id = "sample:bad-boost", statName = "Damage1", multiplier = Single.NaN } }, "combat-boost.multiplier-invalid"),
+            (pack => pack.units[0].combatBoosts = new[] { new ContentCombatBoostDefinition { id = "sample:bad-boost", statName = "Damage1", duration = Single.PositiveInfinity } }, "combat-boost.duration-invalid"),
+            (pack => pack.units[0].upgrades = new[] { new ContentUnitUpgradeDefinition { targetUnitId = pack.units[0].id, cost = Single.NaN } }, "unit-upgrade.cost-invalid"),
+            (pack => pack.units[0].experience = new ContentUnitExperienceDefinition { experienceGainMultiplier = Single.NaN }, "unit-experience.gain-multiplier-invalid"),
+            (pack => pack.units[0].experience = new ContentUnitExperienceDefinition { levelUpBonus = Single.PositiveInfinity }, "unit-experience.level-up-bonus-invalid"),
+            (pack => pack.units[0].synergies = new[] { new ContentUnitSynergyDefinition { id = "sample:bad-synergy", statName = "Damage1", multiplier = Single.NaN } }, "unit-synergy.multiplier-invalid"),
+            (pack => pack.units[0].spawn = new ContentUnitSpawnDefinition { spawnRate = Single.NaN }, "unit-spawn.rate-invalid"),
+            (pack => pack.units[0].spawn = new ContentUnitSpawnDefinition { spawnCooldown = Single.PositiveInfinity }, "unit-spawn.cooldown-invalid"),
+            (pack => pack.units[0].statusEffects = new[] { new ContentUnitStatusEffectDefinition { id = "sample:bad-duration", effectType = "Damage", duration = Single.NaN } }, "unit-status-effect.duration-invalid"),
+            (pack => pack.units[0].productionQueue = new ContentUnitProductionQueueDefinition { buildTime = Single.NaN }, "unit-production-queue.build-time-invalid"),
+            (pack => pack.units[0].productionQueue = new ContentUnitProductionQueueDefinition { resourceCost = Single.PositiveInfinity }, "unit-production-queue.resource-cost-invalid"),
+            (pack => pack.units[0].resourceCosts = new[] { new ContentUnitResourceCostDefinition { resourceType = "Credits", amount = Single.NaN } }, "unit-resource-cost.amount-invalid"),
+            (pack => pack.units[0].detection = new ContentUnitDetectionDefinition { detectionRange = Single.NaN }, "unit-detection.range-invalid"),
+            (pack => pack.units[0].weapons = new[] { new ContentUnitWeaponDefinition { weaponType = "CustomWeapon", damage = Single.NaN } }, "unit-weapon.damage-invalid"),
+            (pack => pack.units[0].weapons = new[] { new ContentUnitWeaponDefinition { weaponType = "CustomWeapon", range = Single.PositiveInfinity } }, "unit-weapon.range-invalid"),
+            (pack => pack.units[0].weapons = new[] { new ContentUnitWeaponDefinition { weaponType = "CustomWeapon", fireRate = Single.NaN } }, "unit-weapon.fire-rate-invalid"),
+            (pack => pack.units[0].healing = new ContentUnitHealingDefinition { healAmount = Single.NaN }, "unit-healing.amount-invalid"),
+            (pack => pack.units[0].healing = new ContentUnitHealingDefinition { healRange = Single.PositiveInfinity }, "unit-healing.range-invalid"),
+            (pack => pack.units[0].healing = new ContentUnitHealingDefinition { healRate = Single.NaN }, "unit-healing.rate-invalid"),
+            (pack => pack.units[0].healing = new ContentUnitHealingDefinition { repairAmount = Single.PositiveInfinity }, "unit-healing.repair-invalid"),
+            (pack => pack.units[0].stealth = new ContentUnitStealthDefinition { stealthLevel = Single.NaN }, "unit-stealth.level-invalid"),
+            (pack => pack.units[0].stealth = new ContentUnitStealthDefinition { cloakDuration = Single.PositiveInfinity }, "unit-stealth.duration-invalid"),
+            (pack => pack.units[0].stealth = new ContentUnitStealthDefinition { detectionReduction = Single.NaN }, "unit-stealth.reduction-invalid"),
+            (pack => pack.units[0].movement = new ContentUnitMovementDefinition { turnRate = Single.NaN }, "unit-movement.turn-rate-invalid"),
+            (pack => pack.units[0].movement = new ContentUnitMovementDefinition { acceleration = Single.PositiveInfinity }, "unit-movement.acceleration-invalid"),
+            (pack => pack.units[0].command = new ContentUnitCommandDefinition { commandRange = Single.NaN }, "unit-command.range-invalid"),
+            (pack => pack.units[0].experienceReward = new ContentUnitExperienceRewardDefinition { experienceType = "CustomExperience", bonusMultiplier = Single.PositiveInfinity }, "unit-experience-reward.bonus-multiplier-invalid"),
+            (pack => pack.units[0].aura = new ContentUnitAuraDefinition { auraRadius = Single.NaN }, "unit-aura.radius-invalid"),
+            (pack => pack.units[0].aura = new ContentUnitAuraDefinition { buffAmount = Single.PositiveInfinity }, "unit-aura.buff-invalid"),
+            (pack => pack.units[0].resourceGathering = new ContentUnitResourceGatheringDefinition { resourceType = "Credits", gatherRate = Single.NaN }, "unit-gathering.rate-invalid"),
+            (pack => pack.units[0].resourceGathering = new ContentUnitResourceGatheringDefinition { resourceType = "Credits", gatherRange = Single.PositiveInfinity }, "unit-gathering.range-invalid"),
+            (pack => pack.units[0].aiBehavior = new ContentUnitAiBehaviorDefinition { skillActivationCheckInterval = Single.NaN }, "unit-ai.interval-invalid")
+        };
+        var failures = new System.Collections.Generic.List<string>();
+        foreach (var testCase in cases)
+        {
+            try
+            {
+                WithPackage(sample, (pack, root) =>
+                {
+                    testCase.Configure(pack);
+                    ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(), testCase.DiagnosticCode);
+                });
+            }
+            catch (Exception exception)
+            {
+                failures.Add(testCase.DiagnosticCode + ": " + exception.Message);
+            }
+        }
+        if (failures.Count > 0)
+        {
+            throw new InvalidOperationException(string.Join(Environment.NewLine, failures));
+        }
+    }),
+    ("offline loader registry tool validates declared pack relationships", () =>
+    {
+        string output;
+        int exitCode;
+        using (var process = new System.Diagnostics.Process())
+        {
+            process.StartInfo.FileName = ".venv/Scripts/python.exe";
+            process.StartInfo.Arguments = "tools/validate_loader_registry.py";
+            process.StartInfo.UseShellExecute = false;
+            process.StartInfo.RedirectStandardOutput = true;
+            process.StartInfo.CreateNoWindow = true;
+            process.Start();
+            output = process.StandardOutput.ReadToEnd();
+            process.WaitForExit();
+            exitCode = process.ExitCode;
+        }
+
+        if (exitCode != 0 || !output.Contains("PASS checked 3 manifests"))
+        {
+            throw new InvalidOperationException("Loader registry tool failed: " + output);
         }
     }),
 };
