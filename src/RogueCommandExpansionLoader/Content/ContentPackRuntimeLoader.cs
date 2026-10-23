@@ -1671,7 +1671,8 @@ namespace RogueCommandExpansionLoader.Content
                     }
                 }
 
-                IReadOnlyList<UnitEligibilityDiagnosticReport> unitEligibilities = null;
+                IReadOnlyList<UnitEligibilityDiagnosticReport> unitEligibilities =
+                    LoaderUnitDiagnosticsBuilder.CreateEligibilityReports(units);
                 IReadOnlyList<UnitAssetResolutionDiagnosticReport> unitAssetResolutions = null;
 
                 var stages = new List<StageDiagnosticReport>(_stages.Count);
@@ -1729,32 +1730,8 @@ namespace RogueCommandExpansionLoader.Content
                 }
                 unitFactories.Sort((left, right) => StringComparer.Ordinal.Compare(left.UnitId, right.UnitId));
 
-                var unitEligibilityList = new List<UnitEligibilityDiagnosticReport>(_units.Count);
-                var unitAssetResolutionList = new List<UnitAssetResolutionDiagnosticReport>(_units.Count);
-                foreach (LoadedUnit unit in _units.Values)
-                {
-                    ContentUnitDefinition definition = unit.Definition;
-                    unitEligibilityList.Add(new UnitEligibilityDiagnosticReport(
-                        unit.Id,
-                        definition.isAllowedAsStartingBlueprint,
-                        definition.isAllowedForAi,
-                        definition.isAllowedForDemo,
-                        definition.isForSpecialists));
-
-                    bool prefabResolved = !String.IsNullOrWhiteSpace(definition.prefabAssetName) &&
-                        TryLoadResource(definition.prefabAssetName, out _);
-                    bool cardResolved = !String.IsNullOrWhiteSpace(definition.cardImageAssetName) &&
-                        TryLoadResource(definition.cardImageAssetName, out _);
-                    bool visualResolved = !String.IsNullOrWhiteSpace(definition.visualAssetName) &&
-                        TryLoadResource(definition.visualAssetName, out _);
-
-                    string status = (prefabResolved && cardResolved && visualResolved) ? "Resolved" : "Missing assets";
-                    unitAssetResolutionList.Add(new UnitAssetResolutionDiagnosticReport(
-                        unit.Id, prefabResolved, cardResolved, visualResolved, status));
-                }
-
-                unitEligibilities = unitEligibilityList;
-                unitAssetResolutions = unitAssetResolutionList;
+                unitAssetResolutions = LoaderUnitDiagnosticsBuilder.CreateAssetResolutionReports(
+                    units, resolvedResourceKeys, visualRequests, resolvedVisuals);
 
                 var stagePoolScopes = new List<StagePoolScopeDiagnosticReport>();
                 foreach (LoadedStage stage in _stages)

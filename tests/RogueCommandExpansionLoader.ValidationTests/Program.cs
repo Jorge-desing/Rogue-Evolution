@@ -6102,7 +6102,7 @@ var tests = new (string Name, Action Run)[]
         UnitDiagnosticReport[] units =
         [
             new UnitDiagnosticReport("test:unit", "test:pack", "unit-prefab", "unit-card",
-                true, true, false, true, false)
+                false, true, false, true, false)
         ];
         var resolvedResources = new HashSet<string>(new[] { "unit-prefab", "unit-card" }, StringComparer.Ordinal);
         var visualRequests = new HashSet<string>(new[] { "test:unit" }, StringComparer.Ordinal);
@@ -6115,10 +6115,10 @@ var tests = new (string Name, Action Run)[]
                 units, resolvedResources, visualRequests, resolvedVisuals);
 
         string eligibilityLine = LoaderDiagnosticsFormatter.FormatUnitEligibility(eligibility[0]);
-        if (eligibility.Count != 1 ||
+        if (eligibility.Count != 1 || eligibility[0].IsAllowedAsBlueprint ||
             !eligibility[0].IsAllowedAsStartingBlueprint || eligibility[0].IsAllowedForAi ||
             !eligibility[0].IsAllowedForDemo ||
-            eligibilityLine != "test:unit [Blueprint=True, AI=False, Demo=True, Specialist=False]" ||
+            eligibilityLine != "test:unit [Blueprint=False, StartingBlueprint=True, AI=False, Demo=True, Specialist=False]" ||
             assets.Count != 1 || !assets[0].PrefabResolved || !assets[0].CardImageResolved ||
             !assets[0].VisualResolved)
         {

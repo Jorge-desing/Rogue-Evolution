@@ -185,12 +185,14 @@ namespace RogueCommandExpansionLoader.Runtime
     {
         public UnitEligibilityDiagnosticReport(
             string unitId,
+            bool isAllowedAsBlueprint,
             bool isAllowedAsStartingBlueprint,
             bool isAllowedForAi,
             bool isAllowedForDemo,
             bool isForSpecialists)
         {
             UnitId = unitId ?? string.Empty;
+            IsAllowedAsBlueprint = isAllowedAsBlueprint;
             IsAllowedAsStartingBlueprint = isAllowedAsStartingBlueprint;
             IsAllowedForAi = isAllowedForAi;
             IsAllowedForDemo = isAllowedForDemo;
@@ -198,6 +200,7 @@ namespace RogueCommandExpansionLoader.Runtime
         }
 
         public string UnitId { get; private set; }
+        public bool IsAllowedAsBlueprint { get; private set; }
         public bool IsAllowedAsStartingBlueprint { get; private set; }
         public bool IsAllowedForAi { get; private set; }
         public bool IsAllowedForDemo { get; private set; }
@@ -352,6 +355,7 @@ namespace RogueCommandExpansionLoader.Runtime
 
                     reports.Add(new UnitEligibilityDiagnosticReport(
                         unit.UnitId,
+                        unit.IsAllowedAsBlueprint,
                         unit.IsAllowedAsStartingBlueprint,
                         unit.IsAllowedForAi,
                         unit.IsAllowedForDemo,
@@ -473,7 +477,8 @@ namespace RogueCommandExpansionLoader.Runtime
                 throw new ArgumentNullException(nameof(report));
             }
 
-            return report.UnitId + " [Blueprint=" + report.IsAllowedAsStartingBlueprint +
+            return report.UnitId + " [Blueprint=" + report.IsAllowedAsBlueprint +
+                ", StartingBlueprint=" + report.IsAllowedAsStartingBlueprint +
                 ", AI=" + report.IsAllowedForAi + ", Demo=" + report.IsAllowedForDemo +
                 ", Specialist=" + report.IsForSpecialists + "]";
         }
