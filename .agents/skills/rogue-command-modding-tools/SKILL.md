@@ -77,7 +77,7 @@ um render3d model.glb out/ --views 16 --size 256 --ortho --transparent --aa 4
 ### Rogue Command Runtime
 - Bridge: BepInEx MCP (read-only first)
 - Pause verification: `Time.timeScale == 0` or stable game clock
-- Profile safety: use isolated QA profiles (Profile 4+), never modify user's active profile
+- Profile safety: Profile2 is the user's dedicated QA profile (no tutorial); verify selector and save safety, preserve backups, and never modify active user profiles or switch to Profile3
 - Steam Cloud: keep in instructed state
 
 ## Showcase

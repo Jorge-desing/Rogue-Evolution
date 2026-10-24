@@ -11,7 +11,7 @@ Use this skill when an acceptance claim requires observing a loader, unit, stage
 
 - Read `AGENTS.md`, `docs/research/AGENT-HANDOFF.md`, and the current runtime notes in `README.md`. Before using reflected signatures, verify the complete identity tuple: game version, `Assembly-CSharp.dll` SHA-256, and MVID.
 - Before every live-game task, also read `docs/research/STEAM-RUNTIME-CONTROL.md`; it is the persistent runbook for the BepInEx MCP control path, profile handling, and cleanup.
-- Inspect the Steam/game process and deployment state first. Do not interfere with an already running game. Launch the game through Steam; do not start `RogueCommand.exe` directly.
+- Inspect the Steam/game process and deployment state first. Do not interfere with an already running game. Launch the game through Steam; do not start `Rogue Command.exe` directly.
 - Before changing the game folder, record the exact files and configuration that will be touched and their original hashes. Use a reversible test setup, keep the user's save data and Steam Cloud preference intact, and restore temporary deployment changes after the run. Acceptance that skips `FirstRun` may mutate only a dedicated isolated QA profile, never the user's profile.
 - If a BepInEx MCP bridge or runtime inspector is available, verify its connected target and use read-only observations first. Use at most one runtime inspector in a test profile and remove it during cleanup. Do not assume a tool is connected because its files are installed locally.
 - Prefer BepInEx MCP over Computer Use for controls exposed by the bridge. The bridge has operated in this project without the game window focused; do not request focus or invoke Computer Use solely to click a control when a bridge call can do it.
@@ -26,14 +26,23 @@ Use this skill when an acceptance claim requires observing a loader, unit, stage
 - `scene/search_gameobjects` is limited and noisy; filter its results by exact names and do not treat UI matches as loader evidence.
 - Record the BepInEx log lines that show pack loading and any injected probe. A successful MCP response alone is not evidence that registration occurred.
 
-## Skip FirstRun only on an isolated QA profile
+## Dedicated QA Profile Policy (Profile2 Invariant)
 
-- For Steam acceptance runs that do not test the tutorial, use a dedicated QA profile created or selected through the game's native profile-management flow. Never run the bypass on the user's active profile or on a profile that contains user saves/progression. Resolve the actual selector through `ProfileManager.CurrentProfileTextPath` under `Application.persistentDataPath`; do not trust legacy selectors in the installation directory.
-- Before selecting QA, record the original selector and SHA-256 hashes for every file in every user profile. Through the native profile-management flow, create/select a distinct QA profile without starting a run; then close the game and verify the actual selector points to QA, QA has no `savegame.dat` or saved run, and all user-profile hashes are unchanged. Do not clone a user profile or manually edit profile data. If a clean isolated QA profile cannot be established safely, stop and report the limitation; do not fall back to the user profile.
-- Perform the bypass only from `MainMenu` or `RunSetup`, before a run is active. Do not abandon, reset, or overwrite an active run to reach this step. Preserve the original selector value for restoration after the game exits.
-- Recheck the game version, `Assembly-CSharp.dll` SHA-256, and MVID together before using the native methods. On the currently verified build (`1.0.9`, SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, MVID `db0e9462-128d-4296-9900-de18b4bd0c00`), call `Game.TutorialState.FinishMainTutorial()` and `Game.TutorialState.OnPlayerHasFinishedLevel1()` once when their flags are false. These persist the two tutorial gates; `FinishMainTutorial()` also runs the game's `AutoFinishCustomTutorialsWithMainTutorial()` routine. The verified `GameBalancingStore.DetermineLevelProgressionModeForNewRun()` then selects `Default` or `Heat` instead of `FirstRun` when those gates are complete.
-- Verify both flags and the next-run mode before pressing `Start Run`; after the transition, verify `Game.CurrentLevelProgressionMode` is not `FirstRun`. If the mode remains `FirstRun`, stop and re-check the profile and build identity instead of advancing the tutorial. If the identity differs, inspect the exact signatures and effects before invoking anything.
-- The native tutorial-state change is allowed only inside QA and may remain there after acceptance. Never edit or delete `tutorialState.txt` directly, grant XP, reset a user profile, or use Harmony to bypass the tutorial. After the game exits, restore the original actual selector and verify all user-profile hashes match their pre-test values. Restore temporary installation files and remove any temporary runtime helper as usual. Do not delete the QA profile automatically.
+- **Profile2 Dedicated QA Invariant**: Profile2 is the user's dedicated QA profile and has no tutorial. Do not ask, inspect, infer, gate QA on tutorial status, or propose a bypass; use Profile2 after current save/selector safety checks and do not switch to Profile3.
+- **Historical Profile3 QA Caveat**: Historical Steam QA records document an authorized Profile2→Profile3 copy, Profile2 preserved, and a progressed Profile3 run. Do not assume rollback or switch to Profile3; recheck live process, profile, and installation before any runtime work.
+- **Save & Profile Safety Checks**:
+  - Always resolve the authoritative selector through `ProfileManager.CurrentProfileTextPath` under `Application.persistentDataPath`; do not trust legacy selectors in the installation directory.
+  - Before any live run, record the original selector and SHA-256 hashes for every file across all profiles.
+  - Preserve saves and backups; never overwrite a save without fresh safety checks and explicit user authorization.
+  - Never edit `tutorialState.txt` directly, grant XP, or use Harmony to bypass tutorial state.
+  - After the game exits, restore the original selector and verify user profile hashes match baseline.
+
+## Skip FirstRun on Native QA Flow (when applicable)
+
+- When an acceptance run requires an isolated profile without tutorial:
+  - Recheck the game version, `Assembly-CSharp.dll` SHA-256, and MVID together before using native methods. On the verified build (`1.0.9`, SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, MVID `db0e9462-128d-4296-9900-de18b4bd0c00`), invoke `Game.TutorialState.FinishMainTutorial()` and `Game.TutorialState.OnPlayerHasFinishedLevel1()` once when flags are false.
+  - Verify both flags and next-run mode before pressing `Start Run`; after transition, verify `Game.CurrentLevelProgressionMode` is not `FirstRun`.
+  - Perform tutorial-state changes only via native methods and only within dedicated QA profiles. Restore original selector and temporary installation files after exit.
 
 ## Verify the behavior that the claim names
 

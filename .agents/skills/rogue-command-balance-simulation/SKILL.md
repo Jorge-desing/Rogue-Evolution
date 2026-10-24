@@ -7,7 +7,7 @@ description: "Simulate and calibrate tactical combat balance, Lanchester dynamic
 
 Use this skill when designing, tuning, or reviewing combat balance for Rogue Command units and packs. It validates unit stats against reverse-engineered game mechanics and performs Lanchester differential combat simulations.
 
-Read `AGENTS.md`, `references/changeable-values-spec.md`, `references/lanchester-combat-math.md`, and `references/unit-stat-calibration-matrix.md` before adjusting `balanceOverrides` in `content.json`.
+Read `AGENTS.md`, `references/changeable-values-spec.md`, `references/lanchester-combat-math.md`, and `references/unit-stat-calibration-matrix.md` before adjusting `balanceOverrides` or `customBalance` in `content.json`.
 
 ---
 
@@ -27,6 +27,11 @@ Read `AGENTS.md`, `references/changeable-values-spec.md`, `references/lanchester
 - **Flat Armor Subtraction with Floor**: Damage after armor is calculated as $\max(0.1\text{f}, \text{RawDamage} - \text{ArmorProtection})$. Armor directly subtracts from damage; it does not reduce by a percentage.
 - **Weapon Ranges & Speeds**: Units close distance until within `weaponRange` before opening fire. If a unit is outranged and slower, it will take damage without dealing any back.
 - **Suicide Detonators**: Units with the `Bomb` tag or `is_suicide` close to contact ($\le 1.0\text{m}$), detonate their payload across `effectRadius1`, and immediately self-destruct.
+- **Balance Precedence & Value Overrides**:
+  - The simulator and runtime enforce identical balance precedence: `customBalance` > raw `balanceOverrides` > positive finite `movement.moveSpeed`.
+  - 25 verified per-unit `EntityBalancingStore.ChangeableValue` keys map to row fields; global-only `ManaRechargePerSecond` is excluded.
+  - Numeric limits enforce integer cap `16,777,216` and float cap `Single.MaxValue`.
+- **Custom Units Without Native Templates**: Custom units do not require a `nativeTemplateId`. As verified by `test_custom_unit_without_native_template_id_loads`, the simulator parses and benchmarks standalone custom units using their authored manifest stats.
 - **Attack delivery model limit**: In this simulator, `UnitProfile.attack_type` is descriptive metadata only; the game uses `AttackType` to select delivery and targeting behavior. Primary attacks model `firePointCount` as one same-tick projectile hit per firepoint, including shield-charge consumption per hit; `damage1` is per projectile and cooldown is per volley. Nominal DPS/CEI also includes `damage2` and `attack2Cooldown` when supplied, but timed duel and squad events execute only primary volleys; secondary delivery is not simulated. The model does not reproduce firepoint stagger, beam ticks, exact target ordering, or actual AoE victim counts. It reports `Unknown` when the input has no verified `AttackType`; do not treat `Continuous` as a game enum or as proof that damage is continuous.
 - **Squad geometry limit**: `--squad` assigns each unit an independent scalar distance, adds initial approach scatter, and moves each toward its own weapon range. It does not track pairwise positions, collision, formation, obstacles, line of sight, flanking, or retreat behavior; every firing unit can choose the lowest-HP surviving opponent regardless of that target's distance. Squad results are comparative estimates, and an infinite-kiting flag from the duel model remains a warning about range/speed matchups.
 
@@ -34,7 +39,7 @@ Read `AGENTS.md`, `references/changeable-values-spec.md`, `references/lanchester
 
 ## 3. Using the Simulation Tool
 
-The simulation engine is available at `tools/simulate_combat_balance.py` (with a byte-identical copy at `scripts/simulate_combat_balance.py` inside this skill).
+The simulation engine is available at `tools/simulate_combat_balance.py` (with a byte-identical copy at `scripts/simulate_combat_balance.py` inside this skill). Both copies must maintain 0-byte binary parity.
 
 Run it with the project's virtual environment:
 ```powershell
@@ -80,4 +85,4 @@ Run it with the project's virtual environment:
    - `ARMOR_LOCKOUT`: Attacker damage $\le$ defender armor.
    - `EXTREME_LOW_TTK`: Target dies in $< 1.5\text{s}$ with no counterplay window.
    - `ASYMMETRIC_SUPERIORITY`: Squad overwhelmingly dominates at equal or lower mineral investment.
-4. **Validate Pack**: Always run `dotnet run --project tests/RogueCommandExpansionLoader.ValidationTests -- .` to ensure schema constraints and game rules remain completely satisfied.
+4. **Validate Pack**: Always run `dotnet run --project tests/RogueCommandExpansionLoader.ValidationTests -- .` and `python -B -m unittest discover -s tests -v` to ensure schema constraints, simulator regressions, and game rules remain completely satisfied.

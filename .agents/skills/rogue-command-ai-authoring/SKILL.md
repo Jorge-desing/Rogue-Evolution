@@ -233,6 +233,28 @@ Pitfalls:
 - Bound time, attempts, target count, and repeated work.
 - Static evidence only: in-game runtime proof required for acceptance.
 
+### Registered AI Modules
+
+The loader includes 5 compiled AI modules available for content packs:
+
+1. **`sample:scheduled-base-build`**:
+   - Uses `DefaultAiBehaviour.CreateBuilding_Static` to construct a building already present in the active native deck.
+   - Parameters: `entityId` (namespaced string), `intervalSeconds` (finite 1–300s), `cooldownSeconds` (finite 0–300s), `maxAttempts` (integer 1–100), `maxSuccessfulBuilds` (integer 1–100).
+2. **`sample:reactive-base-defense`**:
+   - Intercepts player units attacking AI structures and inserts attack-move counterattacks before selected defenders' current commands.
+   - Parameters: `baseIndex` (0–31), `cooldownSeconds` (1–60s), `defenseRadiusCells` (1–64; default 12), `maxResponders` (1–4; default 2), `protectedTargetType` (`Buildings` [default], `Harvesters`, `BuildingsAndHarvesters`).
+3. **`sample:patrol-and-intercept`**:
+   - Manages tactical perimeter patrol and interception. `AttackMove` remains the default mode.
+   - Opt-in native Patrol route motion requires `CurrentPlayerCommandName == DoNothing` AND verified empty private `_commandChain` queue (`LinkedList<EntityCommand>`), failing closed otherwise to preserve queued orders.
+4. **`sample:harvester-raider`**:
+   - Actively hunts player crystal gatherers to disrupt enemy economy.
+   - Parameters: `baseIndex` (0–31), `scanIntervalSeconds` (2–120s; default 10s), `cooldownSeconds` (5–300s; default 25s), `raidSquadSize` (1–8; default 3), `minGameTimeSeconds` (0–600s; default 15s).
+   - Scans `ExistingControllers.Instance.Harvesters`, gathers combat units from the AI base, and dispatches attack-move orders directly against player harvesters.
+5. **`sample:siege-assault`**:
+   - Coordinates multi-unit assault waves against player fortifications and infrastructure.
+   - Parameters: `baseIndex` (0–31), `cooldownSeconds` (10–300s; default 30s), `minSquadSize` (1–12; default 4), `targetPriority` (`ClosestBuilding` [default], `Refinery`, `Hq`), `minGameTimeSeconds` (0–600s; default 30s).
+   - Scans known player structures (`PlayerBuildingsKnownToAi`, `PlayerRefineries`, or `EngineeringHq`), gathers available combat troops, and coordinates offensive siege strikes.
+
 ### Implementation checklist for a new compiled module
 
 1. Create `Modules/<Name>Parameters.cs` with a parser that rejects unknown, duplicate, and out-of-range values, plus documented defaults.
