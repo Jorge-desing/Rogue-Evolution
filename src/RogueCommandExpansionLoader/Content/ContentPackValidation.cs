@@ -422,6 +422,7 @@ namespace RogueCommandExpansionLoader.Content
                 ValidateUnitAura(unit.aura, itemPath + ".aura", diagnostics);
                 ValidateUnitResourceGathering(unit.resourceGathering, itemPath + ".resourceGathering", diagnostics);
                 ValidateUnitAiBehavior(unit.aiBehavior, itemPath + ".aiBehavior", diagnostics);
+                ValidateUnitBalancingParameters(unit, itemPath, diagnostics);
                 ValidateProductionBuilding(unit.productionBuilding, itemPath + ".productionBuilding",
                                     allIds, productionBuildingIds, bundleIds, registrySnapshot, diagnostics);
                 ValidateProfileCardEligibility(unit, itemPath, diagnostics);
@@ -2506,6 +2507,67 @@ namespace RogueCommandExpansionLoader.Content
             {
                 Add(diagnostics, "unit-ai.interval-invalid", path + ".skillActivationCheckInterval",
                     "Skill activation check interval must be finite and non-negative.");
+            }
+        }
+
+        private static void ValidateUnitBalancingParameters(
+            ContentUnitDefinition unit,
+            string path,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (unit == null)
+            {
+                return;
+            }
+
+            if (unit.combatValue.HasValue)
+            {
+                if (unit.combatValue.Value < 0 ||
+                    unit.combatValue.Value > UnitBalanceOverrideMapper.MaximumContiguousSingleExactInteger)
+                {
+                    Add(diagnostics, "unit.combatValue-invalid", path + ".combatValue",
+                        "combatValue must be a non-negative integer <= " +
+                        UnitBalanceOverrideMapper.MaximumContiguousSingleExactInteger + ".");
+                }
+            }
+
+            if (unit.gridSize.HasValue)
+            {
+                if (unit.gridSize.Value < 1 || unit.gridSize.Value > 16)
+                {
+                    Add(diagnostics, "unit.gridSize-invalid", path + ".gridSize",
+                        "gridSize must be an integer between 1 and 16.");
+                }
+            }
+
+            if (unit.cardModelScalingFactor.HasValue)
+            {
+                float factor = unit.cardModelScalingFactor.Value;
+                if (Single.IsNaN(factor) || Single.IsInfinity(factor) || factor <= 0.01f || factor > 100f)
+                {
+                    Add(diagnostics, "unit.cardModelScalingFactor-invalid", path + ".cardModelScalingFactor",
+                        "cardModelScalingFactor must be a finite positive number in range (0.01, 100.0].");
+                }
+            }
+
+            if (unit.coinsAmount.HasValue)
+            {
+                if (unit.coinsAmount.Value < 0 ||
+                    unit.coinsAmount.Value > UnitBalanceOverrideMapper.MaximumContiguousSingleExactInteger)
+                {
+                    Add(diagnostics, "unit.coinsAmount-invalid", path + ".coinsAmount",
+                        "coinsAmount must be a non-negative integer <= " +
+                        UnitBalanceOverrideMapper.MaximumContiguousSingleExactInteger + ".");
+                }
+            }
+
+            if (unit.firePointCount.HasValue)
+            {
+                if (unit.firePointCount.Value < 1 || unit.firePointCount.Value > 64)
+                {
+                    Add(diagnostics, "unit.firePointCount-invalid", path + ".firePointCount",
+                        "firePointCount must be an integer between 1 and 64.");
+                }
             }
         }
 

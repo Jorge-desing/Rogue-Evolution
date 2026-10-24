@@ -82,6 +82,11 @@ namespace RogueCommandExpansionLoader.Content
         private readonly FieldInfo _allowedForAiField;
         private readonly FieldInfo _allowedForDemoField;
         private readonly FieldInfo _isForSpecialistsField;
+        private readonly FieldInfo _combatValueField;
+        private readonly FieldInfo _gridSizeField;
+        private readonly FieldInfo _cardModelScalingFactorField;
+        private readonly FieldInfo _coinsAmountField;
+        private readonly FieldInfo _firePointCountField;
         private readonly FieldInfo _stageParametersField;
         private readonly FieldInfo _stageMapSizeField;
         private readonly FieldInfo _stageDemoField;
@@ -302,6 +307,11 @@ namespace RogueCommandExpansionLoader.Content
             _allowedForAiField = RequireField(_entityRowType, "isAllowedForAi", typeof(bool));
             _allowedForDemoField = RequireField(_entityRowType, "isAllowedForDemo", typeof(bool));
             _isForSpecialistsField = RequireField(_entityRowType, "isForSpecialists", typeof(bool));
+            _combatValueField = RequireField(_entityRowType, "combatValue", typeof(int));
+            _gridSizeField = RequireField(_entityRowType, "gridSize", typeof(int));
+            _cardModelScalingFactorField = RequireField(_entityRowType, "cardModelScalingFactor", typeof(float));
+            _coinsAmountField = RequireField(_entityRowType, "coinsAmount", typeof(int));
+            _firePointCountField = RequireField(_entityRowType, "firePointCount", typeof(int));
             _stageParametersField = RequireField(_stageType, "stageParameters", _stageParametersType);
             _stageMapSizeField = RequireField(_stageType, "mapSizeRange", typeof(Vector2Int));
             _stageDemoField = RequireField(_stageType, "isPartOfDemo", typeof(bool));
@@ -3080,6 +3090,7 @@ namespace RogueCommandExpansionLoader.Content
                         _allowedForAiField.SetValue(row, unit.isAllowedForAi);
                         _allowedForDemoField.SetValue(row, unit.isAllowedForDemo);
                         _isForSpecialistsField.SetValue(row, unit.isForSpecialists);
+                        ApplyStructuredUnitParameters(row, unit);
                     }
                     else
                     {
@@ -3117,6 +3128,7 @@ namespace RogueCommandExpansionLoader.Content
                         _allowedForAiField.SetValue(row, unit.isAllowedForAi);
                         _allowedForDemoField.SetValue(row, unit.isAllowedForDemo);
                         _isForSpecialistsField.SetValue(row, unit.isForSpecialists);
+                        ApplyStructuredUnitParameters(row, unit);
 
                         temporaryResources.Add(prefabKey, customPrefabClone);
                         temporaryResources.Add(imageKey, cardImage);
@@ -4448,6 +4460,35 @@ namespace RogueCommandExpansionLoader.Content
             }
 
             return _nullableStringValueField.GetValue(nullableString) as string;
+        }
+
+        private void ApplyStructuredUnitParameters(object row, ContentUnitDefinition unit)
+        {
+            if (row == null || unit == null)
+            {
+                return;
+            }
+
+            if (unit.combatValue.HasValue)
+            {
+                _combatValueField.SetValue(row, unit.combatValue.Value);
+            }
+            if (unit.gridSize.HasValue)
+            {
+                _gridSizeField.SetValue(row, unit.gridSize.Value);
+            }
+            if (unit.cardModelScalingFactor.HasValue)
+            {
+                _cardModelScalingFactorField.SetValue(row, unit.cardModelScalingFactor.Value);
+            }
+            if (unit.coinsAmount.HasValue)
+            {
+                _coinsAmountField.SetValue(row, unit.coinsAmount.Value);
+            }
+            if (unit.firePointCount.HasValue)
+            {
+                _firePointCountField.SetValue(row, unit.firePointCount.Value);
+            }
         }
 
         private bool HasProductionBuildingRoles(object row)

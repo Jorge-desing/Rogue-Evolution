@@ -27,14 +27,37 @@ namespace UnityEngine
             this.z = z;
         }
 
-public static Vector3 operator -(Vector3 left, Vector3 right) =>
+        public static Vector3 forward => new(0f, 0f, 1f);
+
+        public static Vector3 operator -(Vector3 left, Vector3 right) =>
             new(left.x - right.x, left.y - right.y, left.z - right.z);
 
         public static Vector3 operator +(Vector3 left, Vector3 right) =>
             new(left.x + right.x, left.y + right.y, left.z + right.z);
 
+        public static Vector3 operator *(Vector3 v, float f) =>
+            new(v.x * f, v.y * f, v.z * f);
+
+        public static Vector3 operator *(float f, Vector3 v) =>
+            new(v.x * f, v.y * f, v.z * f);
+
+        public Vector3 normalized
+        {
+            get
+            {
+                float mag = (float)System.Math.Sqrt(sqrMagnitude);
+                return mag > 1e-5f ? new(x / mag, y / mag, z / mag) : new(0f, 0f, 0f);
+            }
+        }
+
         public static float Distance(Vector3 left, Vector3 right) =>
             (float)System.Math.Sqrt((left - right).sqrMagnitude);
+    }
+
+    public struct Quaternion
+    {
+        public static Quaternion Euler(float x, float y, float z) => new Quaternion();
+        public static Vector3 operator *(Quaternion q, Vector3 v) => v;
     }
 
     public class Object
@@ -64,6 +87,7 @@ public static Vector3 operator -(Vector3 left, Vector3 right) =>
     public sealed class GameObject : Object
     {
         public string name { get; set; } = string.Empty;
+        public string tag { get; set; } = "Enemy";
 
         public GameObject(string name = "")
         {

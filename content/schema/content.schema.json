@@ -242,6 +242,36 @@
             "Stationary"
           ]
         },
+        "combatValue": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 16777216,
+          "description": "Native AI combat value metric."
+        },
+        "gridSize": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 16,
+          "description": "Footprint size on the WorldGrid."
+        },
+        "cardModelScalingFactor": {
+          "type": "number",
+          "exclusiveMinimum": 0.01,
+          "maximum": 100.0,
+          "description": "Visual scale factor for the 3D preview model on cards."
+        },
+        "coinsAmount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 16777216,
+          "description": "Secondary currency value or salvage reward."
+        },
+        "firePointCount": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64,
+          "description": "Number of weapon fire points for attack rate calculation."
+        },
         "customBalance": {
           "type": "object",
           "properties": {

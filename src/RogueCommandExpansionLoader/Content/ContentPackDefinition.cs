@@ -277,6 +277,11 @@ namespace RogueCommandExpansionLoader.Content
         public ContentUnitAuraDefinition aura;
         public ContentUnitResourceGatheringDefinition resourceGathering;
         public ContentUnitAiBehaviorDefinition aiBehavior;
+        public int? combatValue;
+        public int? gridSize;
+        public float? cardModelScalingFactor;
+        public int? coinsAmount;
+        public int? firePointCount;
         public ContentBalanceOverride[] balanceOverrides;
         public ContentUnitLocalizationDefinition[] localizations;
         public ContentProductionBuildingDefinition productionBuilding;
@@ -896,6 +901,11 @@ namespace RogueCommandExpansionLoader.Content
                 aura = CloneUnitAura(source.aura),
                 resourceGathering = CloneUnitResourceGathering(source.resourceGathering),
                 aiBehavior = CloneUnitAiBehavior(source.aiBehavior),
+                combatValue = source.combatValue,
+                gridSize = source.gridSize,
+                cardModelScalingFactor = source.cardModelScalingFactor,
+                coinsAmount = source.coinsAmount,
+                firePointCount = source.firePointCount,
                 productionBuilding = CloneProductionBuilding(source.productionBuilding)
             };
         }

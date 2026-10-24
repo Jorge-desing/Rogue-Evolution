@@ -91,6 +91,14 @@
                  Link="Modules/HarvesterEscortParameters.cs" />
         <Compile Include="../../src/RogueCommandExpansionLoader/Modules/HarvesterEscortAiModule.cs"
                  Link="Modules/HarvesterEscortAiModule.cs" />
+        <Compile Include="../../src/RogueCommandExpansionLoader/Modules/FactoryReinforcementParameters.cs"
+                 Link="Modules/FactoryReinforcementParameters.cs" />
+        <Compile Include="../../src/RogueCommandExpansionLoader/Modules/FactoryReinforcementAiModule.cs"
+                 Link="Modules/FactoryReinforcementAiModule.cs" />
+        <Compile Include="../../src/RogueCommandExpansionLoader/Modules/FlankingStrikeParameters.cs"
+                 Link="Modules/FlankingStrikeParameters.cs" />
+        <Compile Include="../../src/RogueCommandExpansionLoader/Modules/FlankingStrikeAiModule.cs"
+                 Link="Modules/FlankingStrikeAiModule.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Contracts/IRogueCommandAiModule.cs"
              Link="Contracts/IRogueCommandAiModule.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Modules/AiModuleRegistry.cs"

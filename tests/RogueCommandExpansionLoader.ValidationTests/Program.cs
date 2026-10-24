@@ -7163,6 +7163,205 @@ var tests = new (string Name, Action Run)[]
             throw new InvalidOperationException("Localization coverage formatter did not include expected language details: " + line);
         }
     }),
+    ("factory-reinforcement AI parameter parser supplies bounded defaults and validates limits", () =>
+    {
+        if (!FactoryReinforcementParameterParser.TryParse(null, out FactoryReinforcementSettings defaults,
+            out string diagnostic) || diagnostic != null || defaults.BaseIndex != -1 ||
+            defaults.CheckIntervalSeconds != 10f || defaults.MaxQueuePerFactory != 1 ||
+            defaults.MaxStandingArmy != 25 || !defaults.RequireEconomy || defaults.MinGameTimeSeconds != 15f)
+        {
+            throw new InvalidOperationException("The factory-reinforcement AI parser did not return its documented defaults.");
+        }
+
+        ContentModuleParameter[] boundaries =
+        [
+            new ContentModuleParameter { name = "baseIndex", value = "31" },
+            new ContentModuleParameter { name = "checkIntervalSeconds", value = "120" },
+            new ContentModuleParameter { name = "maxQueuePerFactory", value = "5" },
+            new ContentModuleParameter { name = "maxStandingArmy", value = "100" },
+            new ContentModuleParameter { name = "requireEconomy", value = "false" },
+            new ContentModuleParameter { name = "minGameTimeSeconds", value = "600" }
+        ];
+        if (!FactoryReinforcementParameterParser.TryParse(boundaries, out FactoryReinforcementSettings maximums,
+            out diagnostic) || diagnostic != null || maximums.BaseIndex != 31 ||
+            maximums.CheckIntervalSeconds != 120f || maximums.MaxQueuePerFactory != 5 ||
+            maximums.MaxStandingArmy != 100 || maximums.RequireEconomy != false || maximums.MinGameTimeSeconds != 600f)
+        {
+            throw new InvalidOperationException("The factory-reinforcement AI parser rejected valid upper-bound values.");
+        }
+    }),
+    ("factory-reinforcement AI parameter parser rejects invalid values and unknown parameters", () =>
+    {
+        ContentModuleParameter[][] invalidInputs =
+        [
+            [new ContentModuleParameter { name = "unknownParam", value = "1" }],
+            [new ContentModuleParameter { name = "baseIndex", value = "0" }, new ContentModuleParameter { name = "baseIndex", value = "1" }],
+            [null!],
+            [new ContentModuleParameter { name = "baseIndex", value = "-2" }],
+            [new ContentModuleParameter { name = "baseIndex", value = "32" }],
+            [new ContentModuleParameter { name = "checkIntervalSeconds", value = "0.5" }],
+            [new ContentModuleParameter { name = "checkIntervalSeconds", value = "121" }],
+            [new ContentModuleParameter { name = "maxQueuePerFactory", value = "0" }],
+            [new ContentModuleParameter { name = "maxQueuePerFactory", value = "6" }],
+            [new ContentModuleParameter { name = "maxStandingArmy", value = "0" }],
+            [new ContentModuleParameter { name = "maxStandingArmy", value = "101" }],
+            [new ContentModuleParameter { name = "requireEconomy", value = "maybe" }],
+            [new ContentModuleParameter { name = "minGameTimeSeconds", value = "-1" }],
+            [new ContentModuleParameter { name = "minGameTimeSeconds", value = "601" }]
+        ];
+
+        for (int i = 0; i < invalidInputs.Length; i++)
+        {
+            if (FactoryReinforcementParameterParser.TryParse(invalidInputs[i], out _, out string diagnostic) ||
+                diagnostic == null)
+            {
+                throw new InvalidOperationException("The factory-reinforcement AI parser accepted invalid input " + i + ".");
+            }
+        }
+    }),
+    ("flanking-strike AI parameter parser supplies bounded defaults and validates limits", () =>
+    {
+        if (!FlankingStrikeParameterParser.TryParse(null, out FlankingStrikeSettings defaults,
+            out string diagnostic) || diagnostic != null || defaults.BaseIndex != 0 ||
+            defaults.CooldownSeconds != 35f || defaults.SquadSize != 3 ||
+            defaults.FlankAngleDegrees != 60f || defaults.FlankDistance != 35f ||
+            defaults.MinGameTimeSeconds != 30f || defaults.TargetPreference != "Refinery")
+        {
+            throw new InvalidOperationException("The flanking-strike AI parser did not return its documented defaults.");
+        }
+
+        ContentModuleParameter[] boundaries =
+        [
+            new ContentModuleParameter { name = "baseIndex", value = "31" },
+            new ContentModuleParameter { name = "cooldownSeconds", value = "300" },
+            new ContentModuleParameter { name = "squadSize", value = "12" },
+            new ContentModuleParameter { name = "flankAngleDegrees", value = "90" },
+            new ContentModuleParameter { name = "flankDistance", value = "120" },
+            new ContentModuleParameter { name = "minGameTimeSeconds", value = "600" },
+            new ContentModuleParameter { name = "targetPreference", value = "Harvester" }
+        ];
+        if (!FlankingStrikeParameterParser.TryParse(boundaries, out FlankingStrikeSettings maximums,
+            out diagnostic) || diagnostic != null || maximums.BaseIndex != 31 ||
+            maximums.CooldownSeconds != 300f || maximums.SquadSize != 12 ||
+            maximums.FlankAngleDegrees != 90f || maximums.FlankDistance != 120f ||
+            maximums.MinGameTimeSeconds != 600f || maximums.TargetPreference != "Harvester")
+        {
+            throw new InvalidOperationException("The flanking-strike AI parser rejected valid upper-bound values.");
+        }
+    }),
+    ("flanking-strike AI parameter parser rejects invalid values and unknown parameters", () =>
+    {
+        ContentModuleParameter[][] invalidInputs =
+        [
+            [new ContentModuleParameter { name = "unknownParam", value = "1" }],
+            [new ContentModuleParameter { name = "baseIndex", value = "0" }, new ContentModuleParameter { name = "baseIndex", value = "1" }],
+            [null!],
+            [new ContentModuleParameter { name = "baseIndex", value = "-1" }],
+            [new ContentModuleParameter { name = "baseIndex", value = "32" }],
+            [new ContentModuleParameter { name = "cooldownSeconds", value = "4" }],
+            [new ContentModuleParameter { name = "cooldownSeconds", value = "301" }],
+            [new ContentModuleParameter { name = "squadSize", value = "0" }],
+            [new ContentModuleParameter { name = "squadSize", value = "13" }],
+            [new ContentModuleParameter { name = "flankAngleDegrees", value = "14" }],
+            [new ContentModuleParameter { name = "flankAngleDegrees", value = "91" }],
+            [new ContentModuleParameter { name = "flankDistance", value = "9" }],
+            [new ContentModuleParameter { name = "flankDistance", value = "121" }],
+            [new ContentModuleParameter { name = "minGameTimeSeconds", value = "-1" }],
+            [new ContentModuleParameter { name = "minGameTimeSeconds", value = "601" }],
+            [new ContentModuleParameter { name = "targetPreference", value = "InvalidPref" }]
+        ];
+
+        for (int i = 0; i < invalidInputs.Length; i++)
+        {
+            if (FlankingStrikeParameterParser.TryParse(invalidInputs[i], out _, out string diagnostic) ||
+                diagnostic == null)
+            {
+                throw new InvalidOperationException("The flanking-strike AI parser accepted invalid input " + i + ".");
+            }
+        }
+    }),
+    ("unit structured balancing parameters accept valid ranges and reject invalid or out-of-bounds values", () =>
+    {
+        WithPackage(nativeSample, (pack, root) =>
+        {
+            ContentUnitDefinition unit = pack.units[0];
+            unit.combatValue = 500;
+            unit.gridSize = 2;
+            unit.cardModelScalingFactor = 1.25f;
+            unit.coinsAmount = 75;
+            unit.firePointCount = 2;
+
+            ContentPackValidationResult result = ContentPackValidator.Validate(
+                pack, root, new EmptySnapshot(), new KnownModuleValidator());
+            if (result.Diagnostics.Any(d => d.Code.StartsWith("unit.") && d.Code.EndsWith("-invalid")))
+            {
+                throw new InvalidOperationException("Valid unit structured balancing parameters were rejected: " +
+                    string.Join(", ", result.Diagnostics.Select(d => d.Code)));
+            }
+
+            // Test boundary 16777216
+            unit.combatValue = UnitBalanceOverrideMapper.MaximumContiguousSingleExactInteger;
+            unit.coinsAmount = UnitBalanceOverrideMapper.MaximumContiguousSingleExactInteger;
+            result = ContentPackValidator.Validate(pack, root, new EmptySnapshot(), new KnownModuleValidator());
+            if (result.Diagnostics.Any(d => d.Code == "unit.combatValue-invalid" || d.Code == "unit.coinsAmount-invalid"))
+            {
+                throw new InvalidOperationException("Boundary 16,777,216 was rejected.");
+            }
+
+            // Test overflow 16777217
+            unit.combatValue = UnitBalanceOverrideMapper.MaximumContiguousSingleExactInteger + 1;
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(), "unit.combatValue-invalid");
+            unit.combatValue = 100;
+
+            unit.coinsAmount = UnitBalanceOverrideMapper.MaximumContiguousSingleExactInteger + 1;
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(), "unit.coinsAmount-invalid");
+            unit.coinsAmount = 50;
+
+            // Test negative combatValue
+            unit.combatValue = -1;
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(), "unit.combatValue-invalid");
+            unit.combatValue = null;
+
+            // Test invalid gridSize
+            unit.gridSize = 0;
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(), "unit.gridSize-invalid");
+            unit.gridSize = 17;
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(), "unit.gridSize-invalid");
+            unit.gridSize = null;
+
+            // Test invalid cardModelScalingFactor
+            unit.cardModelScalingFactor = 0f;
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(), "unit.cardModelScalingFactor-invalid");
+            unit.cardModelScalingFactor = 101f;
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(), "unit.cardModelScalingFactor-invalid");
+            unit.cardModelScalingFactor = float.NaN;
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(), "unit.cardModelScalingFactor-invalid");
+            unit.cardModelScalingFactor = null;
+
+            // Test invalid firePointCount
+            unit.firePointCount = 0;
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(), "unit.firePointCount-invalid");
+            unit.firePointCount = 65;
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(), "unit.firePointCount-invalid");
+            unit.firePointCount = null;
+        });
+    }),
+    ("new AI modules factory-reinforcement and flanking-strike are registered and validate parameters", () =>
+    {
+        var registry = new AiModuleRegistry();
+        registry.Register(new FactoryReinforcementAiModule());
+        registry.Register(new FlankingStrikeAiModule());
+
+        if (!registry.TryValidate("sample:factory-reinforcement", null, out string diagnostic) || diagnostic != null)
+        {
+            throw new InvalidOperationException("Factory reinforcement module failed validation: " + diagnostic);
+        }
+
+        if (!registry.TryValidate("sample:flanking-strike", null, out diagnostic) || diagnostic != null)
+        {
+            throw new InvalidOperationException("Flanking strike module failed validation: " + diagnostic);
+        }
+    }),
 
 };
 
@@ -7513,6 +7712,14 @@ sealed class KnownModuleValidator : IAiModuleValidator
                 if (moduleId == "sample:retreat-and-regroup")
                 {
                     return RetreatAndRegroupParameterParser.TryParse(parameters, out _, out diagnostic);
+                }
+                if (moduleId == "sample:factory-reinforcement")
+                {
+                    return FactoryReinforcementParameterParser.TryParse(parameters, out _, out diagnostic);
+                }
+                if (moduleId == "sample:flanking-strike")
+                {
+                    return FlankingStrikeParameterParser.TryParse(parameters, out _, out diagnostic);
                 }
 
         bool known = moduleId is "sample:scheduled-base-build" or "sample:reactive-base-defense" or "sample:trace-default";

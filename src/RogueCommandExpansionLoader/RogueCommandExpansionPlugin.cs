@@ -48,6 +48,8 @@ namespace RogueCommandExpansionLoader
                 modules.Register(new RetreatAndRegroupAiModule());
                 modules.Register(new HarvesterEscortAiModule());
                 modules.Register(new PatrolAndInterceptAiModule());
+                modules.Register(new FactoryReinforcementAiModule());
+                modules.Register(new FlankingStrikeAiModule());
 
                 string packsRoot = System.IO.Path.Combine(
                     Paths.PluginPath,

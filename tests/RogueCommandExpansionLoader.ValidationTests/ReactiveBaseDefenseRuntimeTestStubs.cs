@@ -22,6 +22,10 @@ public sealed class EntityController
     public bool HasSkillActivationInCommandChain { get; set; }
     public bool IsTargetInRange { get; set; }
     public bool IsBuilding { get; set; }
+    public bool IsFactory { get; set; }
+    public int? InProductionCount { get; set; }
+    public bool IsProductionPossible(int balance) => true;
+    public void Produce(bool instant = false, bool forFree = false, bool noEvent = false) { }
     public UnitRole Role { get; set; }
     public int aiBaseIndex { get; set; }
 public float CurrentHealth { get; set; } = 100f;
@@ -166,6 +170,11 @@ public struct EntityCommand
 
     public static EntityCommand Patrol(int patrolIndex) =>
         new() { command = Command.Patrol, intValue = patrolIndex };
+}
+
+public static class Bank
+{
+    public static int ActualBalance(string tag) => 1000;
 }
 
 public sealed class ExistingControllers
