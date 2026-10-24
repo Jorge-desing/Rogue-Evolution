@@ -7881,6 +7881,162 @@ var tests = new (string Name, Action Run)[]
             DefaultAiBehaviour.ResetRuntimeState();
         }
     }),
+    ("tactical-regroup ignores immobile or non-unit reinforcement candidates", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        DefaultAiBehaviour.ResetRuntimeState();
+        UnityEngine.Time.time = 0f;
+        IRogueCommandAiRuntimeBehaviour? behaviour = null;
+        try
+        {
+            var wounded = new EntityController
+            {
+                IsControlledByAi = true,
+                IsUnit = true,
+                IsCombatUnit = true,
+                CanAttackAndIsAttackEnabled = true,
+                CanMoveAndMovementIsEnabled = true,
+                aiBaseIndex = 0,
+                CurrentHealth = 20f,
+                MaxHealth = 100f,
+                Position = new UnityEngine.Vector3(20f, 0f, 0f)
+            };
+            ExistingControllers.Instance.AiUnits().Add(wounded);
+            ExistingControllers.Instance.AiBuildings().Add(new EntityController
+            {
+                IsControlledByAi = true,
+                IsBuilding = true,
+                aiBaseIndex = 0,
+                Position = UnityEngine.Vector3.zero
+            });
+            behaviour = new TacticalRegroupAiModule().CreateBehaviour(new DefaultAiBehaviour(),
+                [
+                    new ContentModuleParameter { name = "baseIndex", value = "0" },
+                    new ContentModuleParameter { name = "checkIntervalSeconds", value = "4" },
+                    new ContentModuleParameter { name = "regroupMinSquadSize", value = "2" }
+                ]);
+            behaviour.OnInitialized();
+            UnityEngine.Time.time = 4f;
+            behaviour.Tick();
+            if (wounded.LastExecutedCommand?.command != EntityCommand.Command.Move)
+            {
+                throw new InvalidOperationException("The wounded unit did not receive its initial retreat order.");
+            }
+
+            ExistingControllers.Instance.AiUnits().Add(new EntityController
+            {
+                IsControlledByAi = true,
+                IsUnit = false,
+                IsBuilding = true,
+                IsCombatUnit = true,
+                CanAttackAndIsAttackEnabled = true,
+                CanMoveAndMovementIsEnabled = true,
+                aiBaseIndex = 0,
+                Position = wounded.Position
+            });
+            ExistingControllers.Instance.AiUnits().Add(new EntityController
+            {
+                IsControlledByAi = true,
+                IsUnit = true,
+                IsCombatUnit = true,
+                CanAttackAndIsAttackEnabled = true,
+                CanMoveAndMovementIsEnabled = false,
+                aiBaseIndex = 0,
+                Position = wounded.Position
+            });
+
+            UnityEngine.Time.time = 8f;
+            behaviour.Tick();
+            if (wounded.ExecuteCommandCallCount != 1 ||
+                wounded.LastExecutedCommand?.command != EntityCommand.Command.Move)
+            {
+                throw new InvalidOperationException("Non-unit or immobile entities incorrectly satisfied the reinforcement threshold.");
+            }
+        }
+        finally
+        {
+            behaviour?.OnDestroyed();
+            ExistingControllers.Instance.Reset();
+            DefaultAiBehaviour.ResetRuntimeState();
+        }
+    }),
+    ("tactical-regroup preserves another module's active command when regrouping", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        DefaultAiBehaviour.ResetRuntimeState();
+        UnityEngine.Time.time = 0f;
+        IRogueCommandAiRuntimeBehaviour? behaviour = null;
+        try
+        {
+            var wounded = new EntityController
+            {
+                IsControlledByAi = true,
+                IsUnit = true,
+                IsCombatUnit = true,
+                CanAttackAndIsAttackEnabled = true,
+                CanMoveAndMovementIsEnabled = true,
+                aiBaseIndex = 0,
+                CurrentHealth = 20f,
+                MaxHealth = 100f,
+                Position = new UnityEngine.Vector3(20f, 0f, 0f)
+            };
+            ExistingControllers.Instance.AiUnits().Add(wounded);
+            ExistingControllers.Instance.AiBuildings().Add(new EntityController
+            {
+                IsControlledByAi = true,
+                IsBuilding = true,
+                aiBaseIndex = 0,
+                Position = UnityEngine.Vector3.zero
+            });
+
+            behaviour = new TacticalRegroupAiModule().CreateBehaviour(new DefaultAiBehaviour(),
+                [
+                    new ContentModuleParameter { name = "baseIndex", value = "0" },
+                    new ContentModuleParameter { name = "checkIntervalSeconds", value = "4" },
+                    new ContentModuleParameter { name = "regroupMinSquadSize", value = "2" }
+                ]);
+            behaviour.OnInitialized();
+            UnityEngine.Time.time = 4f;
+            behaviour.Tick();
+            if (wounded.LastExecutedCommand?.command != EntityCommand.Command.Move)
+            {
+                throw new InvalidOperationException("The wounded unit did not receive its initial retreat order.");
+            }
+
+            EntityCommand otherModuleCommand = EntityCommand.Attack(wounded);
+            otherModuleCommand.tag = "roguecommand.expansionloader.focus-fire.test";
+            wounded.ExecuteCommand(otherModuleCommand, EntityController.CommandProcessingType.ExecuteAndCancelCurrentCommand);
+            int commandCountBeforeRegroup = wounded.ExecuteCommandCallCount;
+            for (int i = 0; i < 2; i++)
+            {
+                ExistingControllers.Instance.AiUnits().Add(new EntityController
+                {
+                    IsControlledByAi = true,
+                    IsUnit = true,
+                    IsCombatUnit = true,
+                    CanAttackAndIsAttackEnabled = true,
+                    CanMoveAndMovementIsEnabled = true,
+                    aiBaseIndex = 0,
+                    Position = wounded.Position
+                });
+            }
+
+            UnityEngine.Time.time = 8f;
+            behaviour.Tick();
+            if (wounded.ExecuteCommandCallCount != commandCountBeforeRegroup ||
+                wounded.LastExecutedCommand?.command != EntityCommand.Command.Attack ||
+                !wounded.CurrentCommandIsTaggedWith("roguecommand.expansionloader.focus-fire.test"))
+            {
+                throw new InvalidOperationException("Regroup cancelled a command owned by another module.");
+            }
+        }
+        finally
+        {
+            behaviour?.OnDestroyed();
+            ExistingControllers.Instance.Reset();
+            DefaultAiBehaviour.ResetRuntimeState();
+        }
+    }),
     ("tactical AI modules focus-fire, construction-expansion, and tactical-regroup are registered", () =>
     {
         var registry = new AiModuleRegistry();

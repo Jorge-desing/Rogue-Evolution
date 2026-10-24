@@ -131,7 +131,10 @@ namespace RogueCommandExpansionLoader.Modules
                             try
                             {
                                 EntityCommand stopCommand = EntityCommand.Stop();
-                                unit.ExecuteCommand(stopCommand, EntityController.CommandProcessingType.ExecuteAndCancelCurrentCommand);
+                                if (unit.CurrentCommandIsTaggedWith(_commandTag))
+                                {
+                                    unit.ExecuteCommand(stopCommand, EntityController.CommandProcessingType.ExecuteAndCancelCurrentCommand);
+                                }
                             }
                             catch (Exception exception)
                             {
@@ -178,7 +181,8 @@ namespace RogueCommandExpansionLoader.Modules
                         continue;
                     }
 
-                    if (!other.IsCombatUnit || !other.CanAttackAndIsAttackEnabled)
+                    if (!other.IsUnit || !other.CanMoveAndMovementIsEnabled ||
+                        !other.IsCombatUnit || !other.CanAttackAndIsAttackEnabled)
                     {
                         continue;
                     }
