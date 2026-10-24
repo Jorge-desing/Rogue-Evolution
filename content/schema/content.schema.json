@@ -56,6 +56,14 @@
       "items": {
         "$ref": "#/$defs/relic"
       }
+    },
+    "buildings": {
+      "type": "array",
+      "maxItems": 128,
+      "items": {
+        "$ref": "#/$defs/building"
+      },
+      "description": "Optional standalone buildings (defensive turrets, support spires, walls, refineries) not bound to a produced unit."
     }
   },
   "allOf": [
@@ -662,6 +670,12 @@
           "maxItems": 16,
           "uniqueItems": true,
           "description": "Native StatusEffect bitmask flags applied intrinsically to the unit."
+        },
+        "maxCapacity": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Maximum living units/buildings allowed simultaneously on the map."
         }
       },
       "oneOf": [
@@ -1249,6 +1263,121 @@
               "name"
             ]
           }
+        },
+        "gridSize": {
+          "type": "integer",
+          "enum": [
+            1,
+            2
+          ],
+          "description": "Building footprint on the WorldGrid: 1 for 1x1, 2 for 2x2."
+        },
+        "maxCapacity": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Maximum simultaneous instances allowed on the map (native PlaceBuildings capacity cap)."
+        },
+        "cost": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000,
+          "description": "Crystal cost to build or place."
+        },
+        "buildTime": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Drop and construction duration in seconds."
+        },
+        "combatValue": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Tactical combat threat value used by AI prioritization and threat balance."
+        },
+        "cardModelScalingFactor": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Visual 3D model scale factor rendered inside card viewports."
+        },
+        "rarity": {
+          "type": "string",
+          "enum": [
+            "Common",
+            "Rare",
+            "UltraRare"
+          ],
+          "description": "Native card rarity governing visual frame styling and offer weighting."
+        },
+        "tech": {
+          "type": "string",
+          "enum": [
+            "None",
+            "Colorless",
+            "Mech",
+            "Tank",
+            "Ancient",
+            "Specialist",
+            "All"
+          ],
+          "description": "Native faction technology classification."
+        },
+        "neededExperienceLevel": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Minimum player meta-progression experience level required to offer this blueprint."
+        },
+        "roles": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 16,
+          "uniqueItems": true,
+          "description": "Native UnitRole bitmask flags classifying unit archetype (e.g. FrontalAttacker, Sniper, Tank, Mech)."
+        },
+        "systemTags": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "Melee",
+              "Shield",
+              "Spawn",
+              "Armor",
+              "Mech",
+              "Robo",
+              "Heal",
+              "Turret",
+              "Fire",
+              "Bounty",
+              "Panic",
+              "Slow",
+              "Stun",
+              "Teleport",
+              "AoE",
+              "ManaUse",
+              "Rush",
+              "Turbo",
+              "Strength",
+              "Robust",
+              "SkillRangeUse",
+              "Bomb",
+              "Tank",
+              "Vehicle",
+              "EffectDuration",
+              "SpawnDuration",
+              "CriticalHits",
+              "Stealth",
+              "Zombo",
+              "Sniper",
+              "Regen",
+              "EconomySupport"
+            ]
+          },
+          "maxItems": 16,
+          "uniqueItems": true,
+          "description": "Native SystemTags bitmask flags enabling meta-progression relic synergies."
         }
       },
       "allOf": [
@@ -2668,6 +2797,311 @@
           "type": "string"
         }
       }
+    },
+    "building": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "nativeTemplateId",
+        "localizations"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/namespacedId"
+        },
+        "nativeTemplateId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "\\S",
+          "description": "Native entity template ID with Building role (e.g. MachineGunTurret, FlameTurret, HealingSpire, WallBlock)."
+        },
+        "assetBundleId": {
+          "$ref": "#/$defs/namespacedId"
+        },
+        "cardImageAssetName": {
+          "$ref": "#/$defs/assetName"
+        },
+        "visualAssetName": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S",
+          "description": "AssetBundle address for visual-only building GameObject prefab."
+        },
+        "visualRootPath": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S",
+          "description": "Relative path to native building visual subtree."
+        },
+        "gridSize": {
+          "type": "integer",
+          "enum": [
+            1,
+            2
+          ],
+          "description": "Building footprint on the WorldGrid: 1 for 1x1, 2 for 2x2."
+        },
+        "maxCapacity": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Maximum simultaneous instances allowed on the map (native PlaceBuildings capacity cap)."
+        },
+        "cost": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000,
+          "description": "Crystal cost to build or place."
+        },
+        "buildTime": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Drop and construction duration in seconds."
+        },
+        "combatValue": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Tactical combat threat value used by AI prioritization and threat balance."
+        },
+        "rarity": {
+          "type": "string",
+          "enum": [
+            "Common",
+            "Rare",
+            "UltraRare"
+          ],
+          "description": "Native card rarity governing visual frame styling and offer weighting."
+        },
+        "tech": {
+          "type": "string",
+          "enum": [
+            "None",
+            "Colorless",
+            "Mech",
+            "Tank",
+            "Ancient",
+            "Specialist",
+            "All"
+          ],
+          "description": "Native faction technology classification."
+        },
+        "neededExperienceLevel": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Minimum player meta-progression experience level required to offer this blueprint."
+        },
+        "roles": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 16,
+          "uniqueItems": true,
+          "description": "Native UnitRole bitmask flags classifying unit archetype (e.g. FrontalAttacker, Sniper, Tank, Mech)."
+        },
+        "systemTags": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "Melee",
+              "Shield",
+              "Spawn",
+              "Armor",
+              "Mech",
+              "Robo",
+              "Heal",
+              "Turret",
+              "Fire",
+              "Bounty",
+              "Panic",
+              "Slow",
+              "Stun",
+              "Teleport",
+              "AoE",
+              "ManaUse",
+              "Rush",
+              "Turbo",
+              "Strength",
+              "Robust",
+              "SkillRangeUse",
+              "Bomb",
+              "Tank",
+              "Vehicle",
+              "EffectDuration",
+              "SpawnDuration",
+              "CriticalHits",
+              "Stealth",
+              "Zombo",
+              "Sniper",
+              "Regen",
+              "EconomySupport"
+            ]
+          },
+          "maxItems": 16,
+          "uniqueItems": true,
+          "description": "Native SystemTags bitmask flags enabling meta-progression relic synergies."
+        },
+        "cardModelScalingFactor": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Visual 3D model scale factor rendered inside card viewports."
+        },
+        "firePointCount": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64,
+          "description": "Structured integer copied to the native firePointCount row field; gameplay effect is not established here."
+        },
+        "damage1": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Primary weapon attack damage."
+        },
+        "attackCooldown": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Primary weapon attack interval/cooldown in seconds."
+        },
+        "weaponRange": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Primary weapon targeting range in cells/meters."
+        },
+        "damage2": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Secondary weapon attack damage."
+        },
+        "attack2Cooldown": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Secondary weapon attack interval/cooldown in seconds."
+        },
+        "attackType": {
+          "type": "string",
+          "enum": [
+            "None",
+            "Single",
+            "AoE",
+            "Multi",
+            "MultiAoE",
+            "Beam",
+            "Artillery",
+            "MultiArtillery"
+          ],
+          "description": "Native weapon firing archetype governing projectile/beam presentation and upgrade eligibility."
+        },
+        "skillType": {
+          "type": "string",
+          "enum": [
+            "None",
+            "Toggle",
+            "Location",
+            "LocationAoE",
+            "LocationMultiTargets",
+            "Self",
+            "SelfAoE",
+            "Target",
+            "TargetMultiTarget",
+            "TargetAoE",
+            "SelfMultiTarget"
+          ],
+          "description": "Native active skill targeting and HUD archetype."
+        },
+        "skillRange": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Active skill effect / target acquisition range."
+        },
+        "skillManaCost": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Mana consumed per active skill trigger."
+        },
+        "healAmount1": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Healing or repair rate/amount for support spires."
+        },
+        "healAmount2": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Secondary healing amount."
+        },
+        "effectRadius1": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Primary effect radius for auras, blasts, or repair fields."
+        },
+        "effectRadius2": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Secondary effect radius."
+        },
+        "duration1": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Primary effect duration in seconds."
+        },
+        "duration2": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Secondary effect duration in seconds."
+        },
+        "isAllowedAsBlueprint": {
+          "type": "boolean",
+          "description": "Whether this building is eligible as a blueprint reward card (defaults to true)."
+        },
+        "isAllowedAsStartingBlueprint": {
+          "type": "boolean",
+          "description": "Whether this building can appear in the initial starting draft."
+        },
+        "isAllowedForAi": {
+          "type": "boolean",
+          "description": "Whether AI bases can build this structure."
+        },
+        "isAllowedForDemo": {
+          "type": "boolean"
+        },
+        "isForSpecialists": {
+          "type": "boolean"
+        },
+        "balanceOverrides": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "$ref": "#/$defs/balanceOverride"
+          }
+        },
+        "localizations": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 10,
+          "items": {
+            "$ref": "#/$defs/unitLocalization"
+          },
+          "contains": {
+            "properties": {
+              "language": {
+                "const": "en-US"
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "\\S"
+              }
+            },
+            "required": [
+              "language",
+              "name"
+            ]
+          }
+        }
+      }
     }
   }
-}
+}

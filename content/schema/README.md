@@ -53,6 +53,38 @@ Run `.venv\Scripts\python.exe tools/validate_native_visual_roots.py content/pack
 
 Production-building visuals may also specify `assetBundleId` and `cardImageAssetName`. `assetBundleId` is required when either visual field or `cardImageAssetName` is set; that Sprite address supplies the factory's reward-card image. `visualAssetName` plus `visualRootPath` remain optional, paired overlay fields. A shared building bundle can provide both.
 
+
+
+## Standalone Buildings and Structured Building Parameters
+
+Packs can declare standalone buildings (`buildings[]`) and structured parameters on `productionBuilding` without requiring dummy units or opaque raw overrides:
+
+- **Standalone Buildings (`buildings[]`)**: Declares stationary defense posts, turrets, spires, or support structures directly constructed by the player on the placement grid (`Grid1x1` or `Grid2x2`):
+  - `id`: Unique namespaced identifier (`namespace:local-id`).
+  - `nativeTemplateId`: Registered native building template (e.g. `MachineGunTurret`, `LaserCannonTurret`, `HealingSpire`, `AdvancedArmory`, `WallBlock`).
+  - `gridSize`: Placement footprint integer (1 for 1x1, 2 for 2x2).
+  - `maxCapacity`: Maximum simultaneous active instances on the field (0–100); enforces native `PlaceBuildings.CanBuildingBePlaced` limit.
+  - `cost`: Crystal build cost (non-negative integer).
+  - `buildTime`: Construction duration in seconds (non-negative finite float; maps to native `productionDuration`).
+  - `combatValue`: Threat/combat weighting value (non-negative integer).
+  - `rarity`: Card tier (`Common`, `Rare`, `UltraRare`).
+  - `tech`: Tech tree alignment (`None`, `Colorless`, `Mech`, `Tank`, `Ancient`, `Specialist`, `All`).
+  - `neededExperienceLevel`: Player profile meta-progression unlock tier (0–100).
+  - `roles`: Bitmask array of native `UnitRole` strings (must include `Building`).
+  - `systemTags`: Bitmask array of native `SystemTags` strings (up to 16 flags, e.g. `Turret`, `Armor`).
+  - `cardModelScalingFactor`: Scaling factor for reward card 3D model render preview (0.01–100.0).
+  - `firePointCount`: Number of weapon muzzle points (1–16).
+  - **Combat & Weapons**: `damage1`, `attackCooldown`, `weaponRange`, `damage2`, `attack2Cooldown`, `attackType` (`None`, `Single`, `AoE`, `Multi`, `MultiAoE`, `Beam`, `Artillery`, `MultiArtillery`).
+  - **Skills & Auras**: `skillType` (`None`, `Toggle`, `Location`, `LocationAoE`, `LocationMultiTargets`, `Self`, `SelfAoE`, `Target`, `TargetMultiTarget`, `TargetAoE`, `SelfMultiTarget`), `skillRange`, `skillManaCost`, `healAmount1`, `healAmount2`, `duration1`, `duration2`, `effectRadius1`, `effectRadius2`.
+  - **Blueprint Eligibility**: `isAllowedAsBlueprint` (defaults to `true`), `isAllowedAsStartingBlueprint` (defaults to `false`), `isAllowedForAi` (defaults to `true`), `isAllowedForDemo` (defaults to `true`), `isForSpecialists` (defaults to `false`).
+  - **Visuals & Localization**: Optional `assetBundleId`, `cardImageAssetName`, `visualAssetName`, `visualRootPath`, `balanceOverrides`, and localized strings (`localizations[]`).
+
+- **Structured `productionBuilding` Parameters**: Production buildings assigned to units (`units[].productionBuilding`) now accept typed fields directly:
+  - `gridSize` (1 or 2), `maxCapacity` (0–100), `cost` (integer >= 0), `buildTime` (float >= 0), `combatValue` (integer >= 0), `cardModelScalingFactor` (0.01–100.0), `rarity`, `tech`, `neededExperienceLevel` (0–100), `roles` (preserves `Building` and `Factory`), and `systemTags` (offered tags for archetype relic synergy).
+  - `neededExperienceLevel` and `rarity` must match between the unit and its production building to preserve profile unlock consistency. Redundant raw `balanceOverrides` duplicating these structured fields are rejected.
+
+- **Unit `maxCapacity`**: Units (`units[]`) also accept `maxCapacity` (0–100) to cap maximum simultaneous units fielded at runtime.
+
 ## AI unit entries
 
 An AI profile may optionally declare `unitEntries` to append namespaced units to one `AiBase` in an isolated, stage-scoped native profile. Each entry selects the `aiBases` index, the starting ascension level, the number of units spawned at base setup, and the native `maxLiving` value. The referenced unit must be declared by this pack or another loaded/declared pack; the loader resolves that dependency before loading the profile. Custom AI prefabs and unscoped templates cannot use `unitEntries`, so the native AI template remains unchanged. `unitEntries` may be omitted when unused; sample manifests include an empty array for clarity.

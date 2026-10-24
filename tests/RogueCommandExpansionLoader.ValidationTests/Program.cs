@@ -8634,6 +8634,205 @@ var tests = new (string Name, Action Run)[]
         WithPackage(duplicateRoles, (pack, root) => ExpectDiagnostic(pack, root, new EmptySnapshot(),
             new KnownModuleValidator(), "relic.role-filter-duplicate"));
     }),
+    ("productionBuilding structured parameters accept valid ranges and reject invalid values", () =>
+    {
+        ContentPackDefinition pack = ContentPackCopy.DeepClone(nativeSample);
+        pack.units[0].balanceOverrides = pack.units[0].balanceOverrides
+            .Where(o => o.name != "neededExperienceLevel" && o.name != "rarity")
+            .ToArray();
+        var pb = pack.units[0].productionBuilding;
+        pb.balanceOverrides = Array.Empty<ContentBalanceOverride>();
+        pb.gridSize = 2;
+        pb.maxCapacity = 10;
+        pb.cost = 250;
+        pb.buildTime = 12.5f;
+        pb.combatValue = 45;
+        pb.cardModelScalingFactor = 1.2f;
+        pb.rarity = "Rare";
+        pb.tech = "Mech";
+        pb.neededExperienceLevel = 3;
+        pack.units[0].neededExperienceLevel = 3;
+        pack.units[0].rarity = "Rare";
+        pb.roles = new[] { "Building", "Factory", "Supporter" };
+        pb.systemTags = new[] { "Turret", "Armor" };
+
+        WithPackage(pack, (p, root) =>
+        {
+            ContentPackValidationResult result = ContentPackValidator.Validate(p, root,
+                new EmptySnapshot(), new KnownModuleValidator());
+            if (!result.IsValid)
+            {
+                throw new InvalidOperationException("Valid productionBuilding structured parameters produced unexpected errors: " +
+                    string.Join("; ", result.Diagnostics.Select(d => d.Message)));
+            }
+        });
+
+        // Test invalid gridSize
+        ContentPackDefinition invalidGrid = ContentPackCopy.DeepClone(pack);
+        invalidGrid.units[0].productionBuilding.gridSize = 3;
+        WithPackage(invalidGrid, (p, root) => ExpectDiagnostic(p, root, new EmptySnapshot(),
+            new KnownModuleValidator(), "production-building.grid-size-invalid"));
+
+        // Test invalid maxCapacity
+        ContentPackDefinition invalidCapacity = ContentPackCopy.DeepClone(pack);
+        invalidCapacity.units[0].productionBuilding.maxCapacity = 150;
+        WithPackage(invalidCapacity, (p, root) => ExpectDiagnostic(p, root, new EmptySnapshot(),
+            new KnownModuleValidator(), "production-building.max-capacity-invalid"));
+
+        // Test invalid cost
+        ContentPackDefinition invalidCost = ContentPackCopy.DeepClone(pack);
+        invalidCost.units[0].productionBuilding.cost = -10;
+        WithPackage(invalidCost, (p, root) => ExpectDiagnostic(p, root, new EmptySnapshot(),
+            new KnownModuleValidator(), "production-building.cost-invalid"));
+
+        // Test invalid buildTime
+        ContentPackDefinition invalidBuildTime = ContentPackCopy.DeepClone(pack);
+        invalidBuildTime.units[0].productionBuilding.buildTime = -1.0f;
+        WithPackage(invalidBuildTime, (p, root) => ExpectDiagnostic(p, root, new EmptySnapshot(),
+            new KnownModuleValidator(), "production-building.build-time-invalid"));
+    }),
+    ("productionBuilding structured parameters deep clone preserves isolation", () =>
+    {
+        ContentPackDefinition sourcePack = ContentPackCopy.DeepClone(nativeSample);
+        var sourcePb = sourcePack.units[0].productionBuilding;
+        sourcePb.gridSize = 2;
+        sourcePb.maxCapacity = 15;
+        sourcePb.cost = 300;
+        sourcePb.buildTime = 14.0f;
+        sourcePb.combatValue = 60;
+        sourcePb.cardModelScalingFactor = 1.5f;
+        sourcePb.rarity = "UltraRare";
+        sourcePb.tech = "Tank";
+        sourcePb.neededExperienceLevel = 5;
+        sourcePb.roles = new[] { "Building", "Factory" };
+        sourcePb.systemTags = new[] { "Tank", "Armor" };
+
+        ContentPackDefinition clonedPack = ContentPackCopy.DeepClone(sourcePack);
+        var clonedPb = clonedPack.units[0].productionBuilding;
+
+        if (clonedPb.gridSize != 2 || clonedPb.maxCapacity != 15 || clonedPb.cost != 300 ||
+            clonedPb.buildTime != 14.0f || clonedPb.combatValue != 60 ||
+            clonedPb.rarity != "UltraRare" || clonedPb.tech != "Tank" ||
+            clonedPb.neededExperienceLevel != 5)
+        {
+            throw new InvalidOperationException("productionBuilding structured scalar parameters were not cloned correctly.");
+        }
+
+        // Mutate clone and assert source isolation
+        clonedPb.gridSize = 1;
+        clonedPb.roles[0] = "Attacker";
+        clonedPb.systemTags[0] = "Robo";
+
+        if (sourcePb.gridSize != 2 || sourcePb.roles[0] != "Building" || sourcePb.systemTags[0] != "Tank")
+        {
+            throw new InvalidOperationException("productionBuilding deep clone shared mutable array references.");
+        }
+    }),
+    ("standalone buildings validate parameters, unique IDs, and deep clone isolation", () =>
+    {
+        ContentPackDefinition pack = ContentPackCopy.DeepClone(nativeSample);
+        pack.buildings = new[]
+        {
+            new ContentBuildingDefinition
+            {
+                id = "sample-native:turret-alpha",
+                nativeTemplateId = "MachineGunTurret",
+                gridSize = 2,
+                maxCapacity = 4,
+                cost = 175,
+                buildTime = 9.0f,
+                combatValue = 30,
+                rarity = "Common",
+                tech = "Tank",
+                neededExperienceLevel = 0,
+                roles = new[] { "Building", "Turret", "Supporter" },
+                systemTags = new[] { "Turret", "Armor" },
+                cardModelScalingFactor = 1.0f,
+                firePointCount = 2,
+                damage1 = 20.0f,
+                attackCooldown = 1.0f,
+                weaponRange = 15.0f,
+                damage2 = 40.0f,
+                attack2Cooldown = 3.0f,
+                attackType = "Single",
+                skillType = "None",
+                isAllowedAsBlueprint = true,
+                isAllowedAsStartingBlueprint = false,
+                isAllowedForAi = true,
+                isAllowedForDemo = true,
+                isForSpecialists = false,
+                localizations = new[]
+                {
+                    new ContentUnitLocalizationDefinition
+                    {
+                        language = "en-US",
+                        name = "Twin Defense Turret",
+                        description = "Automated perimeter defense gun."
+                    }
+                }
+            }
+        };
+
+        WithPackage(pack, (p, root) =>
+        {
+            ContentPackValidationResult result = ContentPackValidator.Validate(p, root,
+                new EmptySnapshot(), new KnownModuleValidator());
+            if (!result.IsValid)
+            {
+                throw new InvalidOperationException("Valid standalone building produced unexpected errors: " +
+                    string.Join("; ", result.Diagnostics.Select(d => d.Message)));
+            }
+        });
+
+        // Test building ID collision with unit
+        ContentPackDefinition collideWithUnit = ContentPackCopy.DeepClone(pack);
+        collideWithUnit.buildings[0].id = collideWithUnit.units[0].id;
+        WithPackage(collideWithUnit, (p, root) => ExpectDiagnostic(p, root, new EmptySnapshot(),
+            new KnownModuleValidator(), "id.duplicate-in-package"));
+
+        // Test duplicate building IDs
+        ContentPackDefinition duplicateBuildings = ContentPackCopy.DeepClone(pack);
+        duplicateBuildings.buildings = new[]
+        {
+            pack.buildings[0],
+            ContentPackCopy.DeepClone(pack).buildings[0]
+        };
+        WithPackage(duplicateBuildings, (p, root) => ExpectDiagnostic(p, root, new EmptySnapshot(),
+            new KnownModuleValidator(), "id.duplicate-in-package"));
+
+        // Test invalid building gridSize
+        ContentPackDefinition invalidGrid = ContentPackCopy.DeepClone(pack);
+        invalidGrid.buildings[0].gridSize = 0;
+        WithPackage(invalidGrid, (p, root) => ExpectDiagnostic(p, root, new EmptySnapshot(),
+            new KnownModuleValidator(), "building.grid-size-invalid"));
+
+        // Test invalid building maxCapacity
+        ContentPackDefinition invalidCap = ContentPackCopy.DeepClone(pack);
+        invalidCap.buildings[0].maxCapacity = -1;
+        WithPackage(invalidCap, (p, root) => ExpectDiagnostic(p, root, new EmptySnapshot(),
+            new KnownModuleValidator(), "building.max-capacity-invalid"));
+
+        // Test negative weapon damage
+        ContentPackDefinition invalidDamage = ContentPackCopy.DeepClone(pack);
+        invalidDamage.buildings[0].damage1 = -5.0f;
+        WithPackage(invalidDamage, (p, root) => ExpectDiagnostic(p, root, new EmptySnapshot(),
+            new KnownModuleValidator(), "building.damage1-invalid"));
+
+        // Deep clone test
+        ContentPackDefinition clonedPack = ContentPackCopy.DeepClone(pack);
+        var clonedBuilding = clonedPack.buildings[0];
+        if (clonedBuilding.damage1 != 20.0f || clonedBuilding.weaponRange != 15.0f ||
+            clonedBuilding.cost != 175 || clonedBuilding.gridSize != 2)
+        {
+            throw new InvalidOperationException("Standalone building fields were not cloned properly.");
+        }
+        clonedBuilding.roles[0] = "Attacker";
+        clonedBuilding.systemTags[0] = "Robo";
+        if (pack.buildings[0].roles[0] != "Building" || pack.buildings[0].systemTags[0] != "Turret")
+        {
+            throw new InvalidOperationException("Standalone building deep clone shared mutable array references.");
+        }
+    }),
 };
 
 int failures = 0;

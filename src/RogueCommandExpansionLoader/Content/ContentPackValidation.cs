@@ -252,11 +252,12 @@ namespace RogueCommandExpansionLoader.Content
             var stages = RequireArray(pack.stages, "stages", diagnostics);
             var aiProfiles = RequireArray(pack.aiProfiles, "aiProfiles", diagnostics);
             ContentRelicDefinition[] relics = pack.relics ?? new ContentRelicDefinition[0];
+            ContentBuildingDefinition[] buildings = pack.buildings ?? new ContentBuildingDefinition[0];
 
-            if (units.Length == 0 && stages.Length == 0 && aiProfiles.Length == 0 && relics.Length == 0)
+            if (units.Length == 0 && stages.Length == 0 && aiProfiles.Length == 0 && relics.Length == 0 && buildings.Length == 0)
             {
                 Add(diagnostics, "content.empty", "content.json",
-                    "A content pack must declare at least one unit, stage, or AI profile.");
+                    "A content pack must declare at least one unit, building, stage, AI profile, or relic.");
             }
 
             if (assetBundles.Length > MaxAssetBundlesPerPack)
@@ -727,6 +728,8 @@ namespace RogueCommandExpansionLoader.Content
                 ValidateRelic(relics[i], "relics[" + i + "]", allIds, bundleIds, unitIds,
                     registrySnapshot, diagnostics);
             }
+
+            ValidateBuildings(buildings, "buildings", allIds, bundleIds, registrySnapshot, diagnostics);
 
             for (int i = 0; i < stages.Length; i++)
             {
@@ -1219,6 +1222,97 @@ namespace RogueCommandExpansionLoader.Content
                     "A production building only declares a bundle when it supplies a card image or visual overlay.");
             }
 
+            if (productionBuilding.gridSize.HasValue)
+            {
+                if (productionBuilding.gridSize.Value != 1 && productionBuilding.gridSize.Value != 2)
+                {
+                    Add(diagnostics, "production-building.grid-size-invalid", path + ".gridSize",
+                        "gridSize must be 1 or 2.");
+                }
+            }
+
+            if (productionBuilding.maxCapacity.HasValue)
+            {
+                if (productionBuilding.maxCapacity.Value < 0 || productionBuilding.maxCapacity.Value > 100)
+                {
+                    Add(diagnostics, "production-building.max-capacity-invalid", path + ".maxCapacity",
+                        "maxCapacity must be an integer between 0 and 100.");
+                }
+            }
+
+            if (productionBuilding.cost.HasValue)
+            {
+                if (productionBuilding.cost.Value < 0)
+                {
+                    Add(diagnostics, "production-building.cost-invalid", path + ".cost",
+                        "cost must be a non-negative integer.");
+                }
+            }
+
+            if (productionBuilding.buildTime.HasValue)
+            {
+                if (Single.IsNaN(productionBuilding.buildTime.Value) || Single.IsInfinity(productionBuilding.buildTime.Value) || productionBuilding.buildTime.Value < 0f)
+                {
+                    Add(diagnostics, "production-building.build-time-invalid", path + ".buildTime",
+                        "buildTime must be a non-negative finite number.");
+                }
+            }
+
+            if (productionBuilding.combatValue.HasValue)
+            {
+                if (productionBuilding.combatValue.Value < 0)
+                {
+                    Add(diagnostics, "production-building.combat-value-invalid", path + ".combatValue",
+                        "combatValue must be a non-negative integer.");
+                }
+            }
+
+            if (!String.IsNullOrEmpty(productionBuilding.rarity))
+            {
+                if (!SupportedUnitRarities.Contains(productionBuilding.rarity))
+                {
+                    Add(diagnostics, "production-building.rarity-invalid", path + ".rarity",
+                        "rarity must be one of Common, Rare, UltraRare.");
+                }
+            }
+
+            if (!String.IsNullOrEmpty(productionBuilding.tech))
+            {
+                if (!SupportedUnitTechs.Contains(productionBuilding.tech))
+                {
+                    Add(diagnostics, "production-building.tech-invalid", path + ".tech",
+                        "tech must be one of the game's supported tech IDs.");
+                }
+            }
+
+            if (productionBuilding.neededExperienceLevel.HasValue)
+            {
+                if (productionBuilding.neededExperienceLevel.Value < 0 || productionBuilding.neededExperienceLevel.Value > 100)
+                {
+                    Add(diagnostics, "production-building.needed-experience-level-invalid", path + ".neededExperienceLevel",
+                        "neededExperienceLevel must be an integer between 0 and 100.");
+                }
+            }
+
+            if (productionBuilding.roles != null)
+            {
+                ValidateRolesList(productionBuilding.roles, path + ".roles", "production-building.roles-invalid", diagnostics);
+            }
+
+            if (productionBuilding.systemTags != null)
+            {
+                ValidateSystemTagsList(productionBuilding.systemTags, path + ".systemTags", "production-building.systemTags-invalid", "production-building.systemTags-duplicate", diagnostics);
+            }
+
+            if (productionBuilding.cardModelScalingFactor.HasValue)
+            {
+                if (Single.IsNaN(productionBuilding.cardModelScalingFactor.Value) || Single.IsInfinity(productionBuilding.cardModelScalingFactor.Value) || productionBuilding.cardModelScalingFactor.Value < 0f)
+                {
+                    Add(diagnostics, "production-building.card-model-scaling-factor-invalid", path + ".cardModelScalingFactor",
+                        "cardModelScalingFactor must be a non-negative finite number.");
+                }
+            }
+
             ValidateBalanceOverrides(productionBuilding.balanceOverrides,
                 path + ".balanceOverrides", "production-building", "production building", diagnostics, true);
             ValidateLocalizations(productionBuilding.localizations, path + ".localizations",
@@ -1247,6 +1341,11 @@ namespace RogueCommandExpansionLoader.Content
             }
             bool hasBuildingLevel = TryGetBalanceOverride(
                 building.balanceOverrides, "neededExperienceLevel", out buildingLevel);
+            if (building.neededExperienceLevel.HasValue)
+            {
+                hasBuildingLevel = true;
+                buildingLevel = building.neededExperienceLevel.Value.ToString(CultureInfo.InvariantCulture);
+            }
             if (!hasProductLevel || !hasBuildingLevel)
             {
                 Add(diagnostics, "unit.profile-unlock-required", path,
@@ -1278,6 +1377,11 @@ namespace RogueCommandExpansionLoader.Content
             }
             bool hasBuildingRarity = TryGetBalanceOverride(
                 building.balanceOverrides, "rarity", out buildingRarity);
+            if (!String.IsNullOrEmpty(building.rarity))
+            {
+                hasBuildingRarity = true;
+                buildingRarity = building.rarity;
+            }
             if (!hasProductRarity || !hasBuildingRarity)
             {
                 Add(diagnostics, "unit.card-rarity-required", path,
@@ -2603,6 +2707,15 @@ namespace RogueCommandExpansionLoader.Content
                 }
             }
 
+            if (unit.maxCapacity.HasValue)
+            {
+                if (unit.maxCapacity.Value < 0 || unit.maxCapacity.Value > 100)
+                {
+                    Add(diagnostics, "unit.maxCapacity-invalid", path + ".maxCapacity",
+                        "maxCapacity must be an integer between 0 and 100.");
+                }
+            }
+
             if (unit.gridSize.HasValue)
             {
                 if (unit.gridSize.Value < 1 || unit.gridSize.Value > 16)
@@ -3913,6 +4026,299 @@ namespace RogueCommandExpansionLoader.Content
         private static void Add(List<ContentDiagnostic> diagnostics, string code, string path, string message, DiagnosticSeverity severity = DiagnosticSeverity.Error)
         {
             diagnostics.Add(new ContentDiagnostic(code, path, message, severity));
+        }
+        private static void ValidateRolesList(
+            string[] roles,
+            string path,
+            string diagnosticCode,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (roles == null)
+            {
+                return;
+            }
+
+            if (roles.Length > 16)
+            {
+                Add(diagnostics, diagnosticCode, path, "roles list cannot exceed 16 elements.");
+            }
+
+            HashSet<string> seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            for (int i = 0; i < roles.Length; i++)
+            {
+                string role = roles[i];
+                string rolePath = path + "[" + i + "]";
+                if (String.IsNullOrWhiteSpace(role) || !SupportedUnitRoles.Contains(role))
+                {
+                    Add(diagnostics, diagnosticCode, rolePath, "Each role must be a supported UnitRole name.");
+                }
+                else if (!seen.Add(role))
+                {
+                    Add(diagnostics, diagnosticCode, rolePath, "Duplicate role '" + role + "' is not permitted.");
+                }
+            }
+        }
+
+        private static void ValidateSystemTagsList(
+            string[] systemTags,
+            string path,
+            string invalidCode,
+            string duplicateCode,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (systemTags == null)
+            {
+                return;
+            }
+
+            if (systemTags.Length > 16)
+            {
+                Add(diagnostics, invalidCode, path, "systemTags list cannot exceed 16 elements.");
+            }
+
+            HashSet<string> seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            for (int i = 0; i < systemTags.Length; i++)
+            {
+                string tag = systemTags[i];
+                string tagPath = path + "[" + i + "]";
+                if (String.IsNullOrWhiteSpace(tag) || !SupportedUnitSystemTags.Contains(tag))
+                {
+                    Add(diagnostics, invalidCode, tagPath, "Each systemTag must match a supported native SystemTags enum flag.");
+                }
+                else if (!seen.Add(tag))
+                {
+                    Add(diagnostics, duplicateCode, tagPath, "Duplicate systemTag '" + tag + "' is not permitted.");
+                }
+            }
+        }
+
+        private static void ValidateBuildings(
+            ContentBuildingDefinition[] buildings,
+            string path,
+            HashSet<string> allIds,
+            HashSet<string> bundleIds,
+            IContentRegistrySnapshot registrySnapshot,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (buildings == null)
+            {
+                return;
+            }
+
+            for (int i = 0; i < buildings.Length; i++)
+            {
+                ContentBuildingDefinition building = buildings[i];
+                string itemPath = path + "[" + i + "]";
+                if (building == null)
+                {
+                    Add(diagnostics, "entry.null", itemPath, "Building entries cannot be null.");
+                    continue;
+                }
+
+                RegisterId(building.id, itemPath + ".id", "building", allIds, registrySnapshot, diagnostics);
+                ValidateAssetName(building.nativeTemplateId, itemPath + ".nativeTemplateId", diagnostics);
+                if (!String.IsNullOrWhiteSpace(building.nativeTemplateId) && building.nativeTemplateId.Length > 256)
+                {
+                    Add(diagnostics, "building.template-id-too-long", itemPath + ".nativeTemplateId",
+                        "Native building template IDs cannot exceed 256 characters.");
+                }
+
+                bool hasVisualAsset = !String.IsNullOrWhiteSpace(building.visualAssetName);
+                bool hasVisualRoot = !String.IsNullOrWhiteSpace(building.visualRootPath);
+                if (hasVisualAsset != hasVisualRoot)
+                {
+                    Add(diagnostics, "building.visual-source-invalid", itemPath,
+                        "A building visual requires visualAssetName and visualRootPath together.");
+                }
+
+                if (hasVisualAsset || hasVisualRoot || !String.IsNullOrWhiteSpace(building.cardImageAssetName))
+                {
+                    ValidateBundleReference(building.assetBundleId, itemPath + ".assetBundleId", bundleIds, diagnostics);
+                    if (!String.IsNullOrWhiteSpace(building.cardImageAssetName))
+                    {
+                        ValidateAssetName(building.cardImageAssetName, itemPath + ".cardImageAssetName", diagnostics);
+                    }
+                    if (hasVisualAsset)
+                    {
+                        ValidateAssetName(building.visualAssetName, itemPath + ".visualAssetName", diagnostics);
+                    }
+                    if (hasVisualRoot)
+                    {
+                        ValidateVisualRootPath(building.visualRootPath, itemPath + ".visualRootPath", diagnostics,
+                            "building.visual-root-path-invalid");
+                    }
+                }
+                else if (!String.IsNullOrWhiteSpace(building.assetBundleId))
+                {
+                    Add(diagnostics, "building.bundle-unused", itemPath + ".assetBundleId",
+                        "A building only declares a bundle when it supplies a card image or visual overlay.");
+                }
+
+                ValidateStructuredBuildingParameters(building, itemPath, diagnostics);
+                ValidateBalanceOverrides(building.balanceOverrides, itemPath + ".balanceOverrides",
+                    "building", "building", diagnostics, true);
+                ValidateLocalizations(building.localizations, itemPath + ".localizations",
+                    false, "building", "Building", diagnostics);
+            }
+        }
+
+        private static void ValidateStructuredBuildingParameters(
+            ContentBuildingDefinition building,
+            string path,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (building == null)
+            {
+                return;
+            }
+
+            if (building.gridSize.HasValue)
+            {
+                if (building.gridSize.Value != 1 && building.gridSize.Value != 2)
+                {
+                    Add(diagnostics, "building.grid-size-invalid", path + ".gridSize",
+                        "gridSize must be 1 or 2.");
+                }
+            }
+
+            if (building.maxCapacity.HasValue)
+            {
+                if (building.maxCapacity.Value < 0 || building.maxCapacity.Value > 100)
+                {
+                    Add(diagnostics, "building.max-capacity-invalid", path + ".maxCapacity",
+                        "maxCapacity must be an integer between 0 and 100.");
+                }
+            }
+
+            if (building.cost.HasValue)
+            {
+                if (building.cost.Value < 0)
+                {
+                    Add(diagnostics, "building.cost-invalid", path + ".cost",
+                        "cost must be a non-negative integer.");
+                }
+            }
+
+            if (building.buildTime.HasValue)
+            {
+                if (Single.IsNaN(building.buildTime.Value) || Single.IsInfinity(building.buildTime.Value) || building.buildTime.Value < 0f)
+                {
+                    Add(diagnostics, "building.build-time-invalid", path + ".buildTime",
+                        "buildTime must be a non-negative finite number.");
+                }
+            }
+
+            if (building.combatValue.HasValue)
+            {
+                if (building.combatValue.Value < 0)
+                {
+                    Add(diagnostics, "building.combat-value-invalid", path + ".combatValue",
+                        "combatValue must be a non-negative integer.");
+                }
+            }
+
+            if (!String.IsNullOrEmpty(building.rarity))
+            {
+                if (!SupportedUnitRarities.Contains(building.rarity))
+                {
+                    Add(diagnostics, "building.rarity-invalid", path + ".rarity",
+                        "rarity must be one of Common, Rare, UltraRare.");
+                }
+            }
+
+            if (!String.IsNullOrEmpty(building.tech))
+            {
+                if (!SupportedUnitTechs.Contains(building.tech))
+                {
+                    Add(diagnostics, "building.tech-invalid", path + ".tech",
+                        "tech must be one of the game's supported tech IDs.");
+                }
+            }
+
+            if (building.neededExperienceLevel.HasValue)
+            {
+                if (building.neededExperienceLevel.Value < 0 || building.neededExperienceLevel.Value > 100)
+                {
+                    Add(diagnostics, "building.needed-experience-level-invalid", path + ".neededExperienceLevel",
+                        "neededExperienceLevel must be an integer between 0 and 100.");
+                }
+            }
+
+            if (building.roles != null)
+            {
+                ValidateRolesList(building.roles, path + ".roles", "building.roles-invalid", diagnostics);
+            }
+
+            if (building.systemTags != null)
+            {
+                ValidateSystemTagsList(building.systemTags, path + ".systemTags", "building.systemTags-invalid", "building.systemTags-duplicate", diagnostics);
+            }
+
+            if (building.cardModelScalingFactor.HasValue)
+            {
+                if (Single.IsNaN(building.cardModelScalingFactor.Value) || Single.IsInfinity(building.cardModelScalingFactor.Value) || building.cardModelScalingFactor.Value < 0f)
+                {
+                    Add(diagnostics, "building.card-model-scaling-factor-invalid", path + ".cardModelScalingFactor",
+                        "cardModelScalingFactor must be a non-negative finite number.");
+                }
+            }
+
+            if (building.firePointCount.HasValue)
+            {
+                if (building.firePointCount.Value < 0 || building.firePointCount.Value > 32)
+                {
+                    Add(diagnostics, "building.fire-point-count-invalid", path + ".firePointCount",
+                        "firePointCount must be between 0 and 32.");
+                }
+            }
+
+            ValidateNonNegativeFinite(building.damage1, path + ".damage1", "damage1", diagnostics);
+            ValidateNonNegativeFinite(building.attackCooldown, path + ".attackCooldown", "attackCooldown", diagnostics);
+            ValidateNonNegativeFinite(building.weaponRange, path + ".weaponRange", "weaponRange", diagnostics);
+            ValidateNonNegativeFinite(building.damage2, path + ".damage2", "damage2", diagnostics);
+            ValidateNonNegativeFinite(building.attack2Cooldown, path + ".attack2Cooldown", "attack2Cooldown", diagnostics);
+
+            if (!String.IsNullOrEmpty(building.attackType) && !SupportedAttackTypes.Contains(building.attackType))
+            {
+                Add(diagnostics, "building.attack-type-invalid", path + ".attackType",
+                    "attackType must match a supported native AttackType enum name.");
+            }
+
+            if (!String.IsNullOrEmpty(building.skillType) && !SupportedSkillTypes.Contains(building.skillType))
+            {
+                Add(diagnostics, "building.skill-type-invalid", path + ".skillType",
+                    "skillType must match a supported native SkillType enum name.");
+            }
+
+            if (building.skillRange.HasValue && building.skillRange.Value < 0)
+            {
+                Add(diagnostics, "building.skill-range-invalid", path + ".skillRange",
+                    "skillRange must be a non-negative integer.");
+            }
+
+            ValidateNonNegativeFinite(building.skillManaCost, path + ".skillManaCost", "skillManaCost", diagnostics);
+            ValidateNonNegativeFinite(building.healAmount1, path + ".healAmount1", "healAmount1", diagnostics);
+            ValidateNonNegativeFinite(building.healAmount2, path + ".healAmount2", "healAmount2", diagnostics);
+            ValidateNonNegativeFinite(building.effectRadius1, path + ".effectRadius1", "effectRadius1", diagnostics);
+            ValidateNonNegativeFinite(building.effectRadius2, path + ".effectRadius2", "effectRadius2", diagnostics);
+            ValidateNonNegativeFinite(building.duration1, path + ".duration1", "duration1", diagnostics);
+            ValidateNonNegativeFinite(building.duration2, path + ".duration2", "duration2", diagnostics);
+        }
+
+        private static void ValidateNonNegativeFinite(
+            float? value,
+            string path,
+            string fieldName,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (value.HasValue)
+            {
+                if (Single.IsNaN(value.Value) || Single.IsInfinity(value.Value) || value.Value < 0f)
+                {
+                    Add(diagnostics, "building." + fieldName + "-invalid", path,
+                        fieldName + " must be a non-negative finite number.");
+                }
+            }
         }
     }
 }

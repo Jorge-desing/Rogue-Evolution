@@ -145,6 +145,111 @@ class StructuredUnitParameterSchemaTests(unittest.TestCase):
                     manifest["relics"][0]["cardChanges"][0][field] = invalid_val
                 self.assertFalse(self.validator.is_valid(manifest), f"Expected schema to reject {field}={invalid_val}")
 
+    def test_production_building_structured_parameters_valid(self) -> None:
+        manifest = json.loads(json.dumps(self.sample))
+        pb = manifest["units"][0]["productionBuilding"]
+        pb["gridSize"] = 2
+        pb["maxCapacity"] = 10
+        pb["cost"] = 250
+        pb["buildTime"] = 12.5
+        pb["combatValue"] = 45
+        pb["cardModelScalingFactor"] = 1.2
+        pb["rarity"] = "Rare"
+        pb["tech"] = "Mech"
+        pb["neededExperienceLevel"] = 3
+        pb["roles"] = ["Building", "Factory", "Defense"]
+        pb["systemTags"] = ["Turret", "Armor"]
+        self.assertTrue(self.validator.is_valid(manifest))
+
+    def test_production_building_structured_parameters_invalid_rejected(self) -> None:
+        invalid_cases = [
+            ("gridSize", 0),
+            ("gridSize", 3),
+            ("maxCapacity", -1),
+            ("maxCapacity", 101),
+            ("cost", -5),
+            ("buildTime", -1.0),
+            ("combatValue", -10),
+            ("rarity", "Mythic"),
+            ("tech", "Alien"),
+            ("neededExperienceLevel", 101),
+            ("roles", ["Building", "Building"]),  # duplicate
+            ("systemTags", ["InvalidTag"]),
+        ]
+        for field, invalid_val in invalid_cases:
+            with self.subTest(field=field, value=invalid_val):
+                manifest = json.loads(json.dumps(self.sample))
+                manifest["units"][0]["productionBuilding"][field] = invalid_val
+                self.assertFalse(self.validator.is_valid(manifest), f"Expected schema to reject productionBuilding.{field}={invalid_val}")
+
+    def test_standalone_buildings_schema_valid(self) -> None:
+        manifest = json.loads(json.dumps(self.sample))
+        manifest["buildings"] = [
+            {
+                "id": "sample-native:test-defense-turret",
+                "nativeTemplateId": "MachineGunTurret",
+                "gridSize": 2,
+                "maxCapacity": 4,
+                "cost": 150,
+                "buildTime": 8.0,
+                "combatValue": 25,
+                "rarity": "Common",
+                "tech": "Tank",
+                "neededExperienceLevel": 0,
+                "roles": ["Building", "Turret", "Defense"],
+                "systemTags": ["Turret", "Armor"],
+                "cardModelScalingFactor": 1.0,
+                "firePointCount": 2,
+                "damage1": 15.0,
+                "attackCooldown": 1.0,
+                "weaponRange": 14.0,
+                "damage2": 30.0,
+                "attack2Cooldown": 3.0,
+                "attackType": "Single",
+                "skillType": "None",
+                "isAllowedAsBlueprint": True,
+                "isAllowedAsStartingBlueprint": False,
+                "isAllowedForAi": True,
+                "isAllowedForDemo": True,
+                "isForSpecialists": False,
+                "localizations": [
+                    {
+                        "language": "en-US",
+                        "name": "Twin Machinegun Turret",
+                        "description": "Stationary defense post.",
+                    }
+                ],
+            }
+        ]
+        self.assertTrue(self.validator.is_valid(manifest))
+
+    def test_standalone_buildings_schema_invalid_rejected(self) -> None:
+        invalid_cases = [
+            ("id", "invalid id with spaces"),
+            ("gridSize", 3),
+            ("maxCapacity", -1),
+            ("cost", -1),
+            ("buildTime", -0.5),
+            ("combatValue", -1),
+            ("damage1", -5.0),
+            ("weaponRange", -1.0),
+            ("roles", ["Building", "Building"]),  # duplicate
+            ("systemTags", ["InvalidTag"]),
+            ("attackType", "InvalidAttackType"),
+            ("rarity", "Legendary"),
+        ]
+        for field, invalid_val in invalid_cases:
+            with self.subTest(field=field, value=invalid_val):
+                manifest = json.loads(json.dumps(self.sample))
+                manifest["buildings"] = [
+                    {
+                        "id": "sample-native:test-turret",
+                        "nativeTemplateId": "MachineGunTurret",
+                        field: invalid_val,
+                    }
+                ]
+                self.assertFalse(self.validator.is_valid(manifest), f"Expected schema to reject building.{field}={invalid_val}")
+
 
 if __name__ == "__main__":
     unittest.main()

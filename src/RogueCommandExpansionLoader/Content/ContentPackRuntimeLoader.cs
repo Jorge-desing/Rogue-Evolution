@@ -94,6 +94,23 @@ namespace RogueCommandExpansionLoader.Content
         private readonly FieldInfo _techField;
         private readonly FieldInfo _neededExperienceLevelField;
         private readonly FieldInfo _offeredSystemTagsField;
+        private readonly FieldInfo _costField;
+        private readonly FieldInfo _productionDurationField;
+        private readonly FieldInfo _maxCapacityField;
+        private readonly FieldInfo _damage1Field;
+        private readonly FieldInfo _damage2Field;
+        private readonly FieldInfo _weaponRangeField;
+        private readonly FieldInfo _attackCooldownField;
+        private readonly FieldInfo _attack2CooldownField;
+        private readonly FieldInfo _effectRadius1Field;
+        private readonly FieldInfo _effectRadius2Field;
+        private readonly FieldInfo _skillRangeField;
+        private readonly FieldInfo _healAmount1Field;
+        private readonly FieldInfo _healAmount2Field;
+        private readonly FieldInfo _gainCreditsAmountField;
+        private readonly FieldInfo _skillManaCostField;
+        private readonly FieldInfo _duration1Field;
+        private readonly FieldInfo _duration2Field;
         private readonly FieldInfo _stageParametersField;
         private readonly FieldInfo _stageMapSizeField;
         private readonly FieldInfo _stageDemoField;
@@ -326,6 +343,23 @@ namespace RogueCommandExpansionLoader.Content
             _techField = FindField(_entityRowType, "tech", InstanceFields);
             _neededExperienceLevelField = RequireField(_entityRowType, "neededExperienceLevel", typeof(int));
             _offeredSystemTagsField = FindField(_entityRowType, "offeredSystemTags", InstanceFields);
+            _costField = RequireField(_entityRowType, "cost", typeof(int));
+            _productionDurationField = RequireField(_entityRowType, "productionDuration", typeof(float));
+            _maxCapacityField = RequireField(_entityRowType, "maxCapacity", typeof(int));
+            _damage1Field = FindField(_entityRowType, "damage1", InstanceFields);
+            _damage2Field = FindField(_entityRowType, "damage2", InstanceFields);
+            _weaponRangeField = FindField(_entityRowType, "weaponRange", InstanceFields);
+            _attackCooldownField = FindField(_entityRowType, "attackCooldown", InstanceFields);
+            _attack2CooldownField = FindField(_entityRowType, "attack2Cooldown", InstanceFields);
+            _effectRadius1Field = FindField(_entityRowType, "effectRadius1", InstanceFields);
+            _effectRadius2Field = FindField(_entityRowType, "effectRadius2", InstanceFields);
+            _skillRangeField = FindField(_entityRowType, "skillRange", InstanceFields);
+            _healAmount1Field = FindField(_entityRowType, "healAmount1", InstanceFields);
+            _healAmount2Field = FindField(_entityRowType, "healAmount2", InstanceFields);
+            _gainCreditsAmountField = FindField(_entityRowType, "gainCreditsAmount", InstanceFields);
+            _skillManaCostField = FindField(_entityRowType, "skillManaCost", InstanceFields);
+            _duration1Field = FindField(_entityRowType, "duration1", InstanceFields);
+            _duration2Field = FindField(_entityRowType, "duration2", InstanceFields);
             _stageParametersField = RequireField(_stageType, "stageParameters", _stageParametersType);
             _stageMapSizeField = RequireField(_stageType, "mapSizeRange", typeof(Vector2Int));
             _stageDemoField = RequireField(_stageType, "isPartOfDemo", typeof(bool));
@@ -2589,7 +2623,8 @@ namespace RogueCommandExpansionLoader.Content
 
             if (definition.units != null)
             {
-                for (int i = 0; i < definition.units.Length; i++)
+                int unitCount = definition.units == null ? 0 : definition.units.Length;
+                for (int i = 0; i < unitCount; i++)
                 {
                     ContentUnitDefinition unit = definition.units[i];
                     if (unit == null)
@@ -2601,6 +2636,18 @@ namespace RogueCommandExpansionLoader.Content
                     if (unit.productionBuilding != null)
                     {
                         yield return unit.productionBuilding.id;
+                    }
+                }
+            }
+
+            if (definition.buildings != null)
+            {
+                for (int i = 0; i < definition.buildings.Length; i++)
+                {
+                    ContentBuildingDefinition building = definition.buildings[i];
+                    if (building != null && !String.IsNullOrWhiteSpace(building.id))
+                    {
+                        yield return building.id;
                     }
                 }
             }
@@ -3161,6 +3208,19 @@ namespace RogueCommandExpansionLoader.Content
                         row, unit, false, unit.productionBuilding.id));
                     temporaryUnits.Add(CreateProductionBuilding(unit, unit.productionBuilding, definition.packId,
                         packageName, temporaryBundles, temporaryNativePrefabs, temporaryResources));
+                }
+
+                if (definition.buildings != null)
+                {
+                    for (int i = 0; i < definition.buildings.Length; i++)
+                    {
+                        ContentBuildingDefinition building = definition.buildings[i];
+                        if (building != null)
+                        {
+                            temporaryUnits.Add(CreateStandaloneBuilding(building, definition.packId,
+                                packageName, temporaryBundles, temporaryNativePrefabs, temporaryResources));
+                        }
+                    }
                 }
 
                 for (int i = 0; i < definition.stages.Length; i++)
@@ -3753,11 +3813,19 @@ namespace RogueCommandExpansionLoader.Content
             var startingBlueprintUnitIds = new HashSet<string>(StringComparer.Ordinal);
             for (int i = 0; i < units.Count; i++)
             {
-                if (units[i].Definition.isAllowedAsStartingBlueprint)
+                if (units[i].Definition != null && units[i].Definition.isAllowedAsStartingBlueprint)
                 {
                     startingBlueprintUnitIds.Add(units[i].Id);
                     // Starting-deck eligibility is separate from normal blueprint eligibility.
                     // Stage unit IDs add their dedicated production factories below.
+                }
+                if (!units[i].IsProductionBuilding && String.IsNullOrWhiteSpace(units[i].ProductionFactoryId) && HasRoleFlag(units[i].BalanceRow, "Building"))
+                {
+                    object allowedVal = _allowedBlueprintField.GetValue(units[i].BalanceRow);
+                    if (allowedVal is bool && (bool)allowedVal)
+                    {
+                        blueprintUnitIds.Add(units[i].Id);
+                    }
                 }
             }
 
@@ -4437,6 +4505,7 @@ namespace RogueCommandExpansionLoader.Content
 
             string prefabKey = ResourceKey(building.id, "prefab");
             ApplyBalanceOverrides(row, building.balanceOverrides, packageName, building.id, false, true);
+            ApplyStructuredProductionBuildingParameters(row, building);
             _entityIdField.SetValue(row, building.id);
             _prefabLocationField.SetValue(row, prefabKey);
             _imageLocationField.SetValue(row, imagePath);
@@ -4446,10 +4515,13 @@ namespace RogueCommandExpansionLoader.Content
                 _allowedStartingBlueprintField, _allowedForAiField, _allowedForDemoField);
             _factoryForEntityIdField.SetValue(row, CreateNullableString(product.id));
             _copyUpgradesToEntityIdField.SetValue(row, CreateNullableString(product.id));
-            if (product.systemTags != null && product.systemTags.Length > 0 && _offeredSystemTagsField != null)
+            string[] tagsToOffer = (building.systemTags != null && building.systemTags.Length > 0)
+                ? building.systemTags
+                : product.systemTags;
+            if (tagsToOffer != null && tagsToOffer.Length > 0 && _offeredSystemTagsField != null)
             {
                 int combinedTags = 0;
-                foreach (string tagName in product.systemTags)
+                foreach (string tagName in tagsToOffer)
                 {
                     if (!String.IsNullOrWhiteSpace(tagName))
                     {
@@ -4508,6 +4580,10 @@ namespace RogueCommandExpansionLoader.Content
             if (unit.gridSize.HasValue)
             {
                 _gridSizeField.SetValue(row, unit.gridSize.Value);
+            }
+            if (unit.maxCapacity.HasValue && _maxCapacityField != null)
+            {
+                _maxCapacityField.SetValue(row, unit.maxCapacity.Value);
             }
             if (unit.cardModelScalingFactor.HasValue)
             {
@@ -4599,6 +4675,391 @@ namespace RogueCommandExpansionLoader.Content
                 object tagsEnum = Enum.ToObject(_offeredSystemTagsField.FieldType, combinedTags);
                 _offeredSystemTagsField.SetValue(row, tagsEnum);
             }
+        }
+
+        private void ApplyStructuredProductionBuildingParameters(
+            object row,
+            ContentProductionBuildingDefinition building)
+        {
+            if (row == null || building == null)
+            {
+                return;
+            }
+
+            if (building.gridSize.HasValue && _gridSizeField != null)
+            {
+                _gridSizeField.SetValue(row, building.gridSize.Value);
+            }
+            if (building.maxCapacity.HasValue && _maxCapacityField != null)
+            {
+                _maxCapacityField.SetValue(row, building.maxCapacity.Value);
+            }
+            if (building.cost.HasValue && _costField != null)
+            {
+                _costField.SetValue(row, building.cost.Value);
+            }
+            if (building.buildTime.HasValue && _productionDurationField != null)
+            {
+                _productionDurationField.SetValue(row, building.buildTime.Value);
+            }
+            if (building.combatValue.HasValue && _combatValueField != null)
+            {
+                _combatValueField.SetValue(row, building.combatValue.Value);
+            }
+            if (building.cardModelScalingFactor.HasValue && _cardModelScalingFactorField != null)
+            {
+                _cardModelScalingFactorField.SetValue(row, building.cardModelScalingFactor.Value);
+            }
+            if (building.neededExperienceLevel.HasValue && _neededExperienceLevelField != null)
+            {
+                _neededExperienceLevelField.SetValue(row, building.neededExperienceLevel.Value);
+            }
+            if (!String.IsNullOrEmpty(building.rarity) && _rarityField != null)
+            {
+                try
+                {
+                    object rarityEnum = Enum.Parse(_rarityField.FieldType, building.rarity, true);
+                    _rarityField.SetValue(row, rarityEnum);
+                }
+                catch (Exception) { }
+            }
+            if (!String.IsNullOrEmpty(building.tech) && _techField != null)
+            {
+                try
+                {
+                    object techEnum = Enum.Parse(_techField.FieldType, building.tech, true);
+                    _techField.SetValue(row, techEnum);
+                }
+                catch (Exception) { }
+            }
+            if (building.roles != null && building.roles.Length > 0 && _entityRolesField != null)
+            {
+                int combinedRoles = 0;
+                foreach (string roleName in building.roles)
+                {
+                    if (!String.IsNullOrWhiteSpace(roleName))
+                    {
+                        try
+                        {
+                            combinedRoles |= Convert.ToInt32(Enum.Parse(_entityRolesField.FieldType, roleName, true));
+                        }
+                        catch (Exception) { }
+                    }
+                }
+                try
+                {
+                    combinedRoles |= Convert.ToInt32(Enum.Parse(_entityRolesField.FieldType, "Building", true));
+                    combinedRoles |= Convert.ToInt32(Enum.Parse(_entityRolesField.FieldType, "Factory", true));
+                }
+                catch (Exception) { }
+                object rolesEnum = Enum.ToObject(_entityRolesField.FieldType, combinedRoles);
+                _entityRolesField.SetValue(row, rolesEnum);
+            }
+        }
+
+        private void ApplyStructuredBuildingParameters(
+            object row,
+            ContentBuildingDefinition building)
+        {
+            if (row == null || building == null)
+            {
+                return;
+            }
+
+            if (building.gridSize.HasValue && _gridSizeField != null)
+            {
+                _gridSizeField.SetValue(row, building.gridSize.Value);
+            }
+            if (building.maxCapacity.HasValue && _maxCapacityField != null)
+            {
+                _maxCapacityField.SetValue(row, building.maxCapacity.Value);
+            }
+            if (building.cost.HasValue && _costField != null)
+            {
+                _costField.SetValue(row, building.cost.Value);
+            }
+            if (building.buildTime.HasValue && _productionDurationField != null)
+            {
+                _productionDurationField.SetValue(row, building.buildTime.Value);
+            }
+            if (building.combatValue.HasValue && _combatValueField != null)
+            {
+                _combatValueField.SetValue(row, building.combatValue.Value);
+            }
+            if (building.cardModelScalingFactor.HasValue && _cardModelScalingFactorField != null)
+            {
+                _cardModelScalingFactorField.SetValue(row, building.cardModelScalingFactor.Value);
+            }
+            if (building.firePointCount.HasValue && _firePointCountField != null)
+            {
+                _firePointCountField.SetValue(row, building.firePointCount.Value);
+            }
+            if (building.neededExperienceLevel.HasValue && _neededExperienceLevelField != null)
+            {
+                _neededExperienceLevelField.SetValue(row, building.neededExperienceLevel.Value);
+            }
+            if (building.damage1.HasValue && _damage1Field != null)
+            {
+                _damage1Field.SetValue(row, building.damage1.Value);
+            }
+            if (building.attackCooldown.HasValue && _attackCooldownField != null)
+            {
+                _attackCooldownField.SetValue(row, building.attackCooldown.Value);
+            }
+            if (building.weaponRange.HasValue && _weaponRangeField != null)
+            {
+                _weaponRangeField.SetValue(row, building.weaponRange.Value);
+            }
+            if (building.damage2.HasValue && _damage2Field != null)
+            {
+                _damage2Field.SetValue(row, building.damage2.Value);
+            }
+            if (building.attack2Cooldown.HasValue && _attack2CooldownField != null)
+            {
+                _attack2CooldownField.SetValue(row, building.attack2Cooldown.Value);
+            }
+            if (building.effectRadius1.HasValue && _effectRadius1Field != null)
+            {
+                _effectRadius1Field.SetValue(row, building.effectRadius1.Value);
+            }
+            if (building.effectRadius2.HasValue && _effectRadius2Field != null)
+            {
+                _effectRadius2Field.SetValue(row, building.effectRadius2.Value);
+            }
+            if (building.skillRange.HasValue && _skillRangeField != null)
+            {
+                _skillRangeField.SetValue(row, building.skillRange.Value);
+            }
+            if (building.skillManaCost.HasValue && _skillManaCostField != null)
+            {
+                _skillManaCostField.SetValue(row, building.skillManaCost.Value);
+            }
+            if (building.healAmount1.HasValue && _healAmount1Field != null)
+            {
+                _healAmount1Field.SetValue(row, building.healAmount1.Value);
+            }
+            if (building.healAmount2.HasValue && _healAmount2Field != null)
+            {
+                _healAmount2Field.SetValue(row, building.healAmount2.Value);
+            }
+            if (building.duration1.HasValue && _duration1Field != null)
+            {
+                _duration1Field.SetValue(row, building.duration1.Value);
+            }
+            if (building.duration2.HasValue && _duration2Field != null)
+            {
+                _duration2Field.SetValue(row, building.duration2.Value);
+            }
+            if (!String.IsNullOrEmpty(building.attackType) && _attackTypeField != null)
+            {
+                try
+                {
+                    object attackTypeEnum = Enum.Parse(_attackTypeField.FieldType, building.attackType, true);
+                    _attackTypeField.SetValue(row, attackTypeEnum);
+                }
+                catch (Exception) { }
+            }
+            if (!String.IsNullOrEmpty(building.skillType) && _skillTypeField != null)
+            {
+                try
+                {
+                    object skillTypeEnum = Enum.Parse(_skillTypeField.FieldType, building.skillType, true);
+                    _skillTypeField.SetValue(row, skillTypeEnum);
+                }
+                catch (Exception) { }
+            }
+            if (!String.IsNullOrEmpty(building.rarity) && _rarityField != null)
+            {
+                try
+                {
+                    object rarityEnum = Enum.Parse(_rarityField.FieldType, building.rarity, true);
+                    _rarityField.SetValue(row, rarityEnum);
+                }
+                catch (Exception) { }
+            }
+            if (!String.IsNullOrEmpty(building.tech) && _techField != null)
+            {
+                try
+                {
+                    object techEnum = Enum.Parse(_techField.FieldType, building.tech, true);
+                    _techField.SetValue(row, techEnum);
+                }
+                catch (Exception) { }
+            }
+            if (building.roles != null && building.roles.Length > 0 && _entityRolesField != null)
+            {
+                int combinedRoles = 0;
+                foreach (string roleName in building.roles)
+                {
+                    if (!String.IsNullOrWhiteSpace(roleName))
+                    {
+                        try
+                        {
+                            combinedRoles |= Convert.ToInt32(Enum.Parse(_entityRolesField.FieldType, roleName, true));
+                        }
+                        catch (Exception) { }
+                    }
+                }
+                try
+                {
+                    combinedRoles |= Convert.ToInt32(Enum.Parse(_entityRolesField.FieldType, "Building", true));
+                }
+                catch (Exception) { }
+                object rolesEnum = Enum.ToObject(_entityRolesField.FieldType, combinedRoles);
+                _entityRolesField.SetValue(row, rolesEnum);
+            }
+            if (building.systemTags != null && building.systemTags.Length > 0 && _offeredSystemTagsField != null)
+            {
+                int combinedTags = 0;
+                foreach (string tagName in building.systemTags)
+                {
+                    if (!String.IsNullOrWhiteSpace(tagName))
+                    {
+                        try
+                        {
+                            combinedTags |= Convert.ToInt32(Enum.Parse(_offeredSystemTagsField.FieldType, tagName, true));
+                        }
+                        catch (Exception) { }
+                    }
+                }
+                object tagsEnum = Enum.ToObject(_offeredSystemTagsField.FieldType, combinedTags);
+                _offeredSystemTagsField.SetValue(row, tagsEnum);
+            }
+        }
+
+        private LoadedUnit CreateStandaloneBuilding(
+            ContentBuildingDefinition building,
+            string packId,
+            string packageName,
+            Dictionary<string, AssetBundle> temporaryBundles,
+            List<GameObject> temporaryNativePrefabs,
+            Dictionary<string, UnityEngine.Object> temporaryResources)
+        {
+            if (building == null || String.IsNullOrWhiteSpace(building.id) ||
+                String.IsNullOrWhiteSpace(building.nativeTemplateId))
+            {
+                throw new InvalidDataException("El edificio contiene una referencia vacía en '" + packageName + "'.");
+            }
+
+            object row = CopyNativeBalanceRow(building.nativeTemplateId, packageName, building.id);
+            if (!HasRoleFlag(row, "Building"))
+            {
+                throw new InvalidDataException("El nativeTemplateId '" + building.nativeTemplateId + "' de " +
+                    building.id + " en '" + packageName + "' no tiene el rol Building.");
+            }
+
+            string nativePrefabPath = _prefabLocationField.GetValue(row) as string;
+            string nativeImagePath = _imageLocationField.GetValue(row) as string;
+            if (String.IsNullOrWhiteSpace(nativePrefabPath) || String.IsNullOrWhiteSpace(nativeImagePath))
+            {
+                throw new InvalidDataException("El edificio plantilla '" + building.nativeTemplateId +
+                    "' no contiene rutas nativas de prefab e imagen válidas.");
+            }
+
+            GameObject nativeTemplate = Resources.Load<GameObject>(nativePrefabPath);
+            if (nativeTemplate == null)
+            {
+                nativeTemplate = Resources.Load<GameObject>(nativePrefabPath.ToLowerInvariant());
+            }
+
+            if (nativeTemplate == null)
+            {
+                throw new InvalidDataException("El edificio " + building.id + " no pudo cargar el prefab nativo '" +
+                    nativePrefabPath + "' de la plantilla " + building.nativeTemplateId + ".");
+            }
+
+            var localizationDefinition = new ContentUnitDefinition
+            {
+                id = building.id,
+                nativeTemplateId = building.nativeTemplateId,
+                assetBundleId = building.assetBundleId,
+                cardImageAssetName = building.cardImageAssetName,
+                visualAssetName = building.visualAssetName,
+                visualRootPath = building.visualRootPath,
+                localizations = building.localizations,
+                isAllowedAsStartingBlueprint = building.isAllowedAsStartingBlueprint ?? false,
+                isAllowedForAi = building.isAllowedForAi ?? true,
+                isAllowedForDemo = building.isAllowedForDemo ?? true,
+                isForSpecialists = building.isForSpecialists ?? false
+            };
+            ValidateUnitPrefab(nativeTemplate, localizationDefinition, packageName, false);
+
+            GameObject visualTemplate = null;
+            AssetBundle buildingAssetBundle = null;
+            string imagePath = nativeImagePath;
+            if (!String.IsNullOrWhiteSpace(building.cardImageAssetName) ||
+                !String.IsNullOrWhiteSpace(building.visualAssetName))
+            {
+                buildingAssetBundle = GetBundle(temporaryBundles, building.assetBundleId, packageName);
+            }
+            if (!String.IsNullOrWhiteSpace(building.cardImageAssetName))
+            {
+                AssetBundle cardBundle = buildingAssetBundle ??
+                    GetBundle(temporaryBundles, building.assetBundleId, packageName);
+                Sprite cardImage = LoadRequiredAsset(cardBundle, building.cardImageAssetName,
+                    typeof(Sprite), "building Sprite card image", packageName) as Sprite;
+                imagePath = ResourceKey(building.id, "image");
+                temporaryResources.Add(imagePath, cardImage);
+            }
+
+            if (!String.IsNullOrWhiteSpace(building.visualAssetName))
+            {
+                visualTemplate = LoadRequiredAsset(buildingAssetBundle, building.visualAssetName,
+                    typeof(GameObject), "visual-only building GameObject prefab", packageName) as GameObject;
+                ValidateVisualPrefab(visualTemplate, localizationDefinition, packageName, "Edificio");
+            }
+
+            GameObject nativePrefabClone = InstantiateDormantPrefab(nativeTemplate);
+            if (nativePrefabClone == null)
+            {
+                throw new InvalidDataException("No se pudo clonar el prefab del edificio " + building.id + ".");
+            }
+
+            temporaryNativePrefabs.Add(nativePrefabClone);
+            if (visualTemplate != null)
+            {
+                ApplyVisualOverlay(nativePrefabClone, visualTemplate, localizationDefinition, packageName,
+                    "Edificio", true);
+            }
+
+            EntityController clonedController = nativePrefabClone.GetComponent<EntityController>();
+            if (clonedController == null)
+            {
+                throw new InvalidDataException("El clon nativo del edificio " + building.id +
+                    " perdió su EntityController raíz.");
+            }
+
+            EntityControllerIdentity.Assign(_entityControllerIdField, clonedController, building.id,
+                "Edificio " + building.id + " en '" + packageName + "'");
+            nativePrefabClone.name = "RCL_NativeBuilding_" + building.id.Replace(':', '_');
+            nativePrefabClone.SetActive(false);
+            nativePrefabClone.hideFlags = HideFlags.HideAndDontSave;
+            UnityEngine.Object.DontDestroyOnLoad(nativePrefabClone);
+
+            string prefabKey = ResourceKey(building.id, "prefab");
+            ApplyBalanceOverrides(row, building.balanceOverrides, packageName, building.id, false, false);
+            ApplyStructuredBuildingParameters(row, building);
+            _entityIdField.SetValue(row, building.id);
+            _prefabLocationField.SetValue(row, prefabKey);
+            _imageLocationField.SetValue(row, imagePath);
+            _inactiveField.SetValue(row, false);
+            _factoryForEntityIdField.SetValue(row, CreateEmptyNullableString());
+            _copyUpgradesToEntityIdField.SetValue(row, CreateEmptyNullableString());
+
+            bool isAllowedAsBlueprint = building.isAllowedAsBlueprint ?? true;
+            _allowedBlueprintField.SetValue(row, isAllowedAsBlueprint);
+            _allowedStartingBlueprintField.SetValue(row, building.isAllowedAsStartingBlueprint ?? false);
+            _allowedForAiField.SetValue(row, building.isAllowedForAi ?? true);
+            _allowedForDemoField.SetValue(row, building.isAllowedForDemo ?? true);
+            if (_isForSpecialistsField != null)
+            {
+                _isForSpecialistsField.SetValue(row, building.isForSpecialists ?? false);
+            }
+
+            temporaryResources.Add(prefabKey, nativePrefabClone);
+
+            return new LoadedUnit(building.id, packId, prefabKey, imagePath,
+                row, localizationDefinition, false, null);
         }
 
         private bool HasProductionBuildingRoles(object row)

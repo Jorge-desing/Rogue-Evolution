@@ -16,6 +16,7 @@ namespace RogueCommandExpansionLoader.Content
         public string assetBundleManifestPath;
         public ContentAssetBundleDefinition[] assetBundles;
         public ContentUnitDefinition[] units;
+        public ContentBuildingDefinition[] buildings;
         public ContentStageDefinition[] stages;
         public ContentAiProfileDefinition[] aiProfiles;
         public ContentRelicDefinition[] relics;
@@ -279,6 +280,7 @@ namespace RogueCommandExpansionLoader.Content
         public ContentUnitAiBehaviorDefinition aiBehavior;
         public int? combatValue;
         public int? gridSize;
+        public int? maxCapacity;
         public float? cardModelScalingFactor;
         public int? coinsAmount;
         public int? firePointCount;
@@ -510,7 +512,6 @@ namespace RogueCommandExpansionLoader.Content
 
     [Serializable]
     public sealed class ContentProductionBuildingDefinition
-
     {
         public string id;
         public string nativeTemplateId;
@@ -518,6 +519,62 @@ namespace RogueCommandExpansionLoader.Content
         public string cardImageAssetName;
         public string visualAssetName;
         public string visualRootPath;
+        public int? gridSize;
+        public int? maxCapacity;
+        public int? cost;
+        public float? buildTime;
+        public int? combatValue;
+        public string rarity;
+        public string tech;
+        public int? neededExperienceLevel;
+        public string[] roles;
+        public string[] systemTags;
+        public float? cardModelScalingFactor;
+        public ContentBalanceOverride[] balanceOverrides;
+        public ContentUnitLocalizationDefinition[] localizations;
+    }
+
+    [Serializable]
+    public sealed class ContentBuildingDefinition
+    {
+        public string id;
+        public string nativeTemplateId;
+        public string assetBundleId;
+        public string cardImageAssetName;
+        public string visualAssetName;
+        public string visualRootPath;
+        public int? gridSize;
+        public int? maxCapacity;
+        public int? cost;
+        public float? buildTime;
+        public int? combatValue;
+        public string rarity;
+        public string tech;
+        public int? neededExperienceLevel;
+        public string[] roles;
+        public string[] systemTags;
+        public float? cardModelScalingFactor;
+        public int? firePointCount;
+        public float? damage1;
+        public float? attackCooldown;
+        public float? weaponRange;
+        public float? damage2;
+        public float? attack2Cooldown;
+        public string attackType;
+        public string skillType;
+        public int? skillRange;
+        public float? skillManaCost;
+        public float? healAmount1;
+        public float? healAmount2;
+        public float? effectRadius1;
+        public float? effectRadius2;
+        public float? duration1;
+        public float? duration2;
+        public bool? isAllowedAsBlueprint;
+        public bool? isAllowedAsStartingBlueprint;
+        public bool? isAllowedForAi;
+        public bool? isAllowedForDemo;
+        public bool? isForSpecialists;
         public ContentBalanceOverride[] balanceOverrides;
         public ContentUnitLocalizationDefinition[] localizations;
     }
@@ -847,6 +904,7 @@ namespace RogueCommandExpansionLoader.Content
                 assetBundleManifestPath = source.assetBundleManifestPath,
                 assetBundles = CloneArray(source.assetBundles, CloneBundle),
                 units = CloneArray(source.units, CloneUnit),
+                buildings = CloneArray(source.buildings, CloneBuilding),
                 stages = CloneArray(source.stages, CloneStage),
                 aiProfiles = CloneArray(source.aiProfiles, CloneAiProfile),
                 relics = CloneArray(source.relics, CloneRelic)
@@ -920,6 +978,7 @@ namespace RogueCommandExpansionLoader.Content
                 aiBehavior = CloneUnitAiBehavior(source.aiBehavior),
                 combatValue = source.combatValue,
                 gridSize = source.gridSize,
+                maxCapacity = source.maxCapacity,
                 cardModelScalingFactor = source.cardModelScalingFactor,
                 coinsAmount = source.coinsAmount,
                 firePointCount = source.firePointCount,
@@ -1182,6 +1241,64 @@ namespace RogueCommandExpansionLoader.Content
                 cardImageAssetName = source.cardImageAssetName,
                 visualAssetName = source.visualAssetName,
                 visualRootPath = source.visualRootPath,
+                gridSize = source.gridSize,
+                maxCapacity = source.maxCapacity,
+                cost = source.cost,
+                buildTime = source.buildTime,
+                combatValue = source.combatValue,
+                rarity = source.rarity,
+                tech = source.tech,
+                neededExperienceLevel = source.neededExperienceLevel,
+                roles = source.roles != null ? (string[])source.roles.Clone() : null,
+                systemTags = source.systemTags != null ? (string[])source.systemTags.Clone() : null,
+                cardModelScalingFactor = source.cardModelScalingFactor,
+                balanceOverrides = CloneArray(source.balanceOverrides, CloneBalanceOverride),
+                localizations = CloneArray(source.localizations, CloneUnitLocalization)
+            };
+        }
+
+        private static ContentBuildingDefinition CloneBuilding(ContentBuildingDefinition source)
+        {
+            return source == null ? null : new ContentBuildingDefinition
+            {
+                id = source.id,
+                nativeTemplateId = source.nativeTemplateId,
+                assetBundleId = source.assetBundleId,
+                cardImageAssetName = source.cardImageAssetName,
+                visualAssetName = source.visualAssetName,
+                visualRootPath = source.visualRootPath,
+                gridSize = source.gridSize,
+                maxCapacity = source.maxCapacity,
+                cost = source.cost,
+                buildTime = source.buildTime,
+                combatValue = source.combatValue,
+                rarity = source.rarity,
+                tech = source.tech,
+                neededExperienceLevel = source.neededExperienceLevel,
+                roles = source.roles != null ? (string[])source.roles.Clone() : null,
+                systemTags = source.systemTags != null ? (string[])source.systemTags.Clone() : null,
+                cardModelScalingFactor = source.cardModelScalingFactor,
+                firePointCount = source.firePointCount,
+                damage1 = source.damage1,
+                attackCooldown = source.attackCooldown,
+                weaponRange = source.weaponRange,
+                damage2 = source.damage2,
+                attack2Cooldown = source.attack2Cooldown,
+                attackType = source.attackType,
+                skillType = source.skillType,
+                skillRange = source.skillRange,
+                skillManaCost = source.skillManaCost,
+                healAmount1 = source.healAmount1,
+                healAmount2 = source.healAmount2,
+                effectRadius1 = source.effectRadius1,
+                effectRadius2 = source.effectRadius2,
+                duration1 = source.duration1,
+                duration2 = source.duration2,
+                isAllowedAsBlueprint = source.isAllowedAsBlueprint,
+                isAllowedAsStartingBlueprint = source.isAllowedAsStartingBlueprint,
+                isAllowedForAi = source.isAllowedForAi,
+                isAllowedForDemo = source.isAllowedForDemo,
+                isForSpecialists = source.isForSpecialists,
                 balanceOverrides = CloneArray(source.balanceOverrides, CloneBalanceOverride),
                 localizations = CloneArray(source.localizations, CloneUnitLocalization)
             };
