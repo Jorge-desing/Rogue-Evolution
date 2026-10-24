@@ -87,6 +87,12 @@ namespace RogueCommandExpansionLoader.Content
         private readonly FieldInfo _cardModelScalingFactorField;
         private readonly FieldInfo _coinsAmountField;
         private readonly FieldInfo _firePointCountField;
+        private readonly FieldInfo _copyUpgradesToEntityIdField;
+        private readonly FieldInfo _attackTypeField;
+        private readonly FieldInfo _skillTypeField;
+        private readonly FieldInfo _rarityField;
+        private readonly FieldInfo _techField;
+        private readonly FieldInfo _neededExperienceLevelField;
         private readonly FieldInfo _stageParametersField;
         private readonly FieldInfo _stageMapSizeField;
         private readonly FieldInfo _stageDemoField;
@@ -312,6 +318,12 @@ namespace RogueCommandExpansionLoader.Content
             _cardModelScalingFactorField = RequireField(_entityRowType, "cardModelScalingFactor", typeof(float));
             _coinsAmountField = RequireField(_entityRowType, "coinsAmount", typeof(int));
             _firePointCountField = RequireField(_entityRowType, "firePointCount", typeof(int));
+            _copyUpgradesToEntityIdField = RequireField(_entityRowType, "copyUpgradesToEntityId", nullableStringType);
+            _attackTypeField = FindField(_entityRowType, "attackType", InstanceFields);
+            _skillTypeField = FindField(_entityRowType, "skillType", InstanceFields);
+            _rarityField = FindField(_entityRowType, "rarity", InstanceFields);
+            _techField = FindField(_entityRowType, "tech", InstanceFields);
+            _neededExperienceLevelField = RequireField(_entityRowType, "neededExperienceLevel", typeof(int));
             _stageParametersField = RequireField(_stageType, "stageParameters", _stageParametersType);
             _stageMapSizeField = RequireField(_stageType, "mapSizeRange", typeof(Vector2Int));
             _stageDemoField = RequireField(_stageType, "isPartOfDemo", typeof(bool));
@@ -4431,6 +4443,7 @@ namespace RogueCommandExpansionLoader.Content
             ProductionBuildingEligibility.ApplyToFactoryRow(product, row,
                 _allowedStartingBlueprintField, _allowedForAiField, _allowedForDemoField);
             _factoryForEntityIdField.SetValue(row, CreateNullableString(product.id));
+            _copyUpgradesToEntityIdField.SetValue(row, CreateNullableString(product.id));
             temporaryResources.Add(prefabKey, nativePrefabClone);
 
             return new LoadedUnit(building.id, packId, prefabKey, imagePath,
@@ -4488,6 +4501,67 @@ namespace RogueCommandExpansionLoader.Content
             if (unit.firePointCount.HasValue)
             {
                 _firePointCountField.SetValue(row, unit.firePointCount.Value);
+            }
+            if (!String.IsNullOrEmpty(unit.copyUpgradesToEntityId))
+            {
+                _copyUpgradesToEntityIdField.SetValue(row, CreateNullableString(unit.copyUpgradesToEntityId));
+            }
+            if (unit.roles != null && unit.roles.Length > 0 && _entityRolesField != null)
+            {
+                int combinedRoles = 0;
+                foreach (string roleName in unit.roles)
+                {
+                    if (!String.IsNullOrWhiteSpace(roleName))
+                    {
+                        try
+                        {
+                            combinedRoles |= Convert.ToInt32(Enum.Parse(_entityRolesField.FieldType, roleName, true));
+                        }
+                        catch (Exception) { }
+                    }
+                }
+                object rolesEnum = Enum.ToObject(_entityRolesField.FieldType, combinedRoles);
+                _entityRolesField.SetValue(row, rolesEnum);
+            }
+            if (!String.IsNullOrEmpty(unit.attackType) && _attackTypeField != null)
+            {
+                try
+                {
+                    object attackTypeEnum = Enum.Parse(_attackTypeField.FieldType, unit.attackType, true);
+                    _attackTypeField.SetValue(row, attackTypeEnum);
+                }
+                catch (Exception) { }
+            }
+            if (!String.IsNullOrEmpty(unit.skillType) && _skillTypeField != null)
+            {
+                try
+                {
+                    object skillTypeEnum = Enum.Parse(_skillTypeField.FieldType, unit.skillType, true);
+                    _skillTypeField.SetValue(row, skillTypeEnum);
+                }
+                catch (Exception) { }
+            }
+            if (!String.IsNullOrEmpty(unit.rarity) && _rarityField != null)
+            {
+                try
+                {
+                    object rarityEnum = Enum.Parse(_rarityField.FieldType, unit.rarity, true);
+                    _rarityField.SetValue(row, rarityEnum);
+                }
+                catch (Exception) { }
+            }
+            if (!String.IsNullOrEmpty(unit.tech) && _techField != null)
+            {
+                try
+                {
+                    object techEnum = Enum.Parse(_techField.FieldType, unit.tech, true);
+                    _techField.SetValue(row, techEnum);
+                }
+                catch (Exception) { }
+            }
+            if (unit.neededExperienceLevel.HasValue && _neededExperienceLevelField != null)
+            {
+                _neededExperienceLevelField.SetValue(row, unit.neededExperienceLevel.Value);
             }
         }
 

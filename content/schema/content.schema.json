@@ -246,60 +246,160 @@
           "type": "integer",
           "minimum": 0,
           "maximum": 16777216,
-          "description": "Native AI combat value metric."
+          "description": "Structured integer copied to the native combatValue row field; gameplay semantics are not established here."
         },
         "gridSize": {
           "type": "integer",
           "minimum": 1,
           "maximum": 16,
-          "description": "Footprint size on the WorldGrid."
+          "description": "Structured integer copied to the native gridSize row field; gameplay semantics are not established here."
         },
         "cardModelScalingFactor": {
           "type": "number",
-          "exclusiveMinimum": 0.01,
-          "maximum": 100.0,
-          "description": "Visual scale factor for the 3D preview model on cards."
+          "exclusiveMinimum": 0.01000000024214387,
+          "maximum": 100.00000381469727,
+          "description": "Structured float copied to the native cardModelScalingFactor row field; gameplay/display effect is not established here."
         },
         "coinsAmount": {
           "type": "integer",
           "minimum": 0,
           "maximum": 16777216,
-          "description": "Secondary currency value or salvage reward."
+          "description": "Structured integer copied to the native coinsAmount row field; gameplay semantics are not established here."
         },
         "firePointCount": {
           "type": "integer",
           "minimum": 1,
           "maximum": 64,
-          "description": "Number of weapon fire points for attack rate calculation."
+          "description": "Structured integer copied to the native firePointCount row field; gameplay effect is not established here."
         },
         "customBalance": {
           "type": "object",
           "properties": {
-            "Cost": { "type": "integer", "minimum": 0, "maximum": 16777216 },
-            "ProductionDuration": { "type": "number", "minimum": 0, "maximum": 3.4028234663852886e+38 },
-            "MaxCapacity": { "type": "integer", "minimum": 0, "maximum": 16777216 },
-            "MaxHealth": { "type": "integer", "minimum": 0, "maximum": 16777216 },
-            "MaxShield": { "type": "integer", "minimum": 0, "maximum": 16777216 },
-            "MaxMana": { "type": "integer", "minimum": 0, "maximum": 16777216 },
-            "MaxRank": { "type": "integer", "minimum": 0, "maximum": 16777216 },
-            "MoveSpeed": { "type": "number", "minimum": 0, "maximum": 3.4028234663852886e+38 },
-            "SightRadius": { "type": "integer", "minimum": 0, "maximum": 16777216 },
-            "Damage1": { "type": "number", "minimum": 0, "maximum": 3.4028234663852886e+38 },
-            "Damage2": { "type": "number", "minimum": 0, "maximum": 3.4028234663852886e+38 },
-            "WeaponRange": { "type": "number", "minimum": 0, "maximum": 3.4028234663852886e+38 },
-            "Attack1Cooldown": { "type": "number", "minimum": 0, "maximum": 3.4028234663852886e+38 },
-            "Attack2Cooldown": { "type": "number", "minimum": 0, "maximum": 3.4028234663852886e+38 },
-            "EffectRadius1": { "type": "number", "minimum": 0, "maximum": 3.4028234663852886e+38 },
-            "EffectRadius2": { "type": "number", "minimum": 0, "maximum": 3.4028234663852886e+38 },
-            "SkillRange": { "type": "integer", "minimum": 0, "maximum": 16777216 },
-            "HealAmount1": { "type": "number", "minimum": 0, "maximum": 3.4028234663852886e+38 },
-            "HealAmount2": { "type": "number", "minimum": 0, "maximum": 3.4028234663852886e+38 },
-            "GainCreditsAmount": { "type": "number", "minimum": 0, "maximum": 3.4028234663852886e+38 },
-            "SkillManaCost": { "type": "number", "minimum": 0, "maximum": 3.4028234663852886e+38 },
-            "Duration1": { "type": "number", "minimum": 0, "maximum": 3.4028234663852886e+38 },
-            "SpawnTtl": { "type": "number", "minimum": 0, "maximum": 3.4028234663852886e+38 },
-            "MaxArmor": { "type": "number", "minimum": 0, "maximum": 3.4028234663852886e+38 },
-            "ArmorProtection": { "type": "number", "minimum": 0, "maximum": 3.4028234663852886e+38 }
+            "Cost": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 16777216
+            },
+            "ProductionDuration": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 3.4028234663852886e+38
+            },
+            "MaxCapacity": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 16777216
+            },
+            "MaxHealth": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 16777216
+            },
+            "MaxShield": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 16777216
+            },
+            "MaxMana": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 16777216
+            },
+            "MaxRank": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 16777216
+            },
+            "MoveSpeed": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 3.4028234663852886e+38
+            },
+            "SightRadius": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 16777216
+            },
+            "Damage1": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 3.4028234663852886e+38
+            },
+            "Damage2": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 3.4028234663852886e+38
+            },
+            "WeaponRange": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 3.4028234663852886e+38
+            },
+            "Attack1Cooldown": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 3.4028234663852886e+38
+            },
+            "Attack2Cooldown": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 3.4028234663852886e+38
+            },
+            "EffectRadius1": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 3.4028234663852886e+38
+            },
+            "EffectRadius2": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 3.4028234663852886e+38
+            },
+            "SkillRange": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 16777216
+            },
+            "HealAmount1": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 3.4028234663852886e+38
+            },
+            "HealAmount2": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 3.4028234663852886e+38
+            },
+            "GainCreditsAmount": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 3.4028234663852886e+38
+            },
+            "SkillManaCost": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 3.4028234663852886e+38
+            },
+            "Duration1": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 3.4028234663852886e+38
+            },
+            "SpawnTtl": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 3.4028234663852886e+38
+            },
+            "MaxArmor": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 3.4028234663852886e+38
+            },
+            "ArmorProtection": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 3.4028234663852886e+38
+            }
           },
           "additionalProperties": false
         },
@@ -329,37 +429,49 @@
         },
         "upgrades": {
           "type": "array",
-          "items": { "$ref": "#/$defs/unitUpgrade" }
+          "items": {
+            "$ref": "#/$defs/unitUpgrade"
+          }
         },
         "experience": {
           "$ref": "#/$defs/unitExperience"
         },
         "synergies": {
           "type": "array",
-          "items": { "$ref": "#/$defs/unitSynergy" }
+          "items": {
+            "$ref": "#/$defs/unitSynergy"
+          }
         },
         "visualVariants": {
           "type": "array",
-          "items": { "$ref": "#/$defs/unitVisualVariant" }
+          "items": {
+            "$ref": "#/$defs/unitVisualVariant"
+          }
         },
         "variants": {
           "type": "array",
           "maxItems": 8,
-          "items": { "$ref": "#/$defs/unitVariant" }
+          "items": {
+            "$ref": "#/$defs/unitVariant"
+          }
         },
         "spawn": {
           "$ref": "#/$defs/unitSpawn"
         },
         "statusEffects": {
           "type": "array",
-          "items": { "$ref": "#/$defs/unitStatusEffect" }
+          "items": {
+            "$ref": "#/$defs/unitStatusEffect"
+          }
         },
         "productionQueue": {
           "$ref": "#/$defs/unitProductionQueue"
         },
         "resourceCosts": {
           "type": "array",
-          "items": { "$ref": "#/$defs/unitResourceCost" }
+          "items": {
+            "$ref": "#/$defs/unitResourceCost"
+          }
         },
         "movement": {
           "$ref": "#/$defs/unitMovement"
@@ -369,7 +481,9 @@
         },
         "weapons": {
           "type": "array",
-          "items": { "$ref": "#/$defs/unitWeapon" }
+          "items": {
+            "$ref": "#/$defs/unitWeapon"
+          }
         },
         "armor": {
           "$ref": "#/$defs/unitArmor"
@@ -394,6 +508,79 @@
         },
         "aiBehavior": {
           "$ref": "#/$defs/unitAiBehavior"
+        },
+        "copyUpgradesToEntityId": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_:-]+$",
+          "description": "Identifier of the entity that receives card upgrades assigned to this entity."
+        },
+        "roles": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 16,
+          "uniqueItems": true,
+          "description": "Native UnitRole bitmask flags classifying unit archetype (e.g. FrontalAttacker, Sniper, Tank, Mech)."
+        },
+        "attackType": {
+          "type": "string",
+          "enum": [
+            "None",
+            "Single",
+            "AoE",
+            "Multi",
+            "MultiAoE",
+            "Beam",
+            "Artillery",
+            "MultiArtillery"
+          ],
+          "description": "Native weapon firing archetype governing projectile/beam presentation and upgrade eligibility."
+        },
+        "skillType": {
+          "type": "string",
+          "enum": [
+            "None",
+            "Toggle",
+            "Location",
+            "LocationAoE",
+            "LocationMultiTargets",
+            "Self",
+            "SelfAoE",
+            "Target",
+            "TargetMultiTarget",
+            "TargetAoE",
+            "SelfMultiTarget"
+          ],
+          "description": "Native active skill targeting and HUD archetype."
+        },
+        "rarity": {
+          "type": "string",
+          "enum": [
+            "Common",
+            "Rare",
+            "UltraRare"
+          ],
+          "description": "Native card rarity governing visual frame styling and offer weighting."
+        },
+        "tech": {
+          "type": "string",
+          "enum": [
+            "None",
+            "Colorless",
+            "Mech",
+            "Tank",
+            "Ancient",
+            "Specialist",
+            "All"
+          ],
+          "description": "Native faction technology classification."
+        },
+        "neededExperienceLevel": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Minimum player meta-progression experience level required to offer this blueprint."
         }
       },
       "oneOf": [
@@ -1415,7 +1602,10 @@
     "stagePoolEntry": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["poolId", "unitIds"],
+      "required": [
+        "poolId",
+        "unitIds"
+      ],
       "properties": {
         "poolId": {
           "type": "string",
@@ -1427,12 +1617,13 @@
           "type": "array",
           "minItems": 1,
           "maxItems": 64,
-          "items": { "$ref": "#/$defs/namespacedId" },
+          "items": {
+            "$ref": "#/$defs/namespacedId"
+          },
           "uniqueItems": true
         }
       }
     },
-
     "stageLandscape": {
       "type": "object",
       "additionalProperties": false,
@@ -1846,62 +2037,139 @@
     "unitUpgrade": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["targetUnitId"],
+      "required": [
+        "targetUnitId"
+      ],
       "properties": {
-        "targetUnitId": { "type": "string", "minLength": 1, "pattern": "\\S" },
-        "requiredExperienceLevel": { "type": "integer", "minimum": 0 },
-        "cost": { "type": "number", "minimum": 0 },
-        "description": { "type": "string" }
+        "targetUnitId": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "requiredExperienceLevel": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "cost": {
+          "type": "number",
+          "minimum": 0
+        },
+        "description": {
+          "type": "string"
+        }
       }
     },
     "unitExperience": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "experiencePerLevel": { "type": "integer", "minimum": 0 },
-        "maxLevel": { "type": "integer", "minimum": 0, "maximum": 100 },
-        "experienceGainMultiplier": { "type": "number", "minimum": 0, "maximum": 10 },
-        "levelUpBonus": { "type": "number", "minimum": 0 }
+        "experiencePerLevel": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maxLevel": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "experienceGainMultiplier": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 10
+        },
+        "levelUpBonus": {
+          "type": "number",
+          "minimum": 0
+        }
       }
     },
     "unitSynergy": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "statName"],
+      "required": [
+        "id",
+        "statName"
+      ],
       "properties": {
-        "id": { "$ref": "#/$defs/namespacedId" },
-        "statName": { "type": "string", "minLength": 1, "pattern": "\\S" },
-        "multiplier": { "type": "number", "minimum": 0, "maximum": 10 },
-        "radius": { "type": "number", "minimum": 0 },
+        "id": {
+          "$ref": "#/$defs/namespacedId"
+        },
+        "statName": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "multiplier": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 10
+        },
+        "radius": {
+          "type": "number",
+          "minimum": 0
+        },
         "targetUnitIds": {
           "type": "array",
-          "items": { "type": "string", "minLength": 1, "pattern": "\\S" }
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          }
         }
       }
     },
     "unitVisualVariant": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id"],
+      "required": [
+        "id"
+      ],
       "properties": {
-        "id": { "$ref": "#/$defs/namespacedId" },
-        "visualAssetName": { "$ref": "#/$defs/assetName" },
-        "visualRootPath": { "type": "string", "minLength": 1, "pattern": "\\S" },
-        "colorTint": { "type": "string" },
-        "scale": { "type": "number", "minimum": 0, "maximum": 10 }
+        "id": {
+          "$ref": "#/$defs/namespacedId"
+        },
+        "visualAssetName": {
+          "$ref": "#/$defs/assetName"
+        },
+        "visualRootPath": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "colorTint": {
+          "type": "string"
+        },
+        "scale": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 10
+        }
       }
     },
     "unitVariant": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id"],
+      "required": [
+        "id"
+      ],
       "properties": {
-        "id": { "type": "string", "pattern": "^(?!.*[\\n\\r\\u2028\\u2029])[a-z][a-z0-9._-]{0,63}$" },
-        "loadout": { "type": "string", "enum": ["AP", "HE"] },
+        "id": {
+          "type": "string",
+          "pattern": "^(?!.*[\\n\\r\\u2028\\u2029])[a-z][a-z0-9._-]{0,63}$"
+        },
+        "loadout": {
+          "type": "string",
+          "enum": [
+            "AP",
+            "HE"
+          ]
+        },
         "balanceOverrides": {
           "type": "array",
           "maxItems": 64,
-          "items": { "$ref": "#/$defs/balanceOverride" }
+          "items": {
+            "$ref": "#/$defs/balanceOverride"
+          }
         }
       }
     },
@@ -1909,148 +2177,340 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "spawnRate": { "type": "number", "minimum": 0 },
-        "maxSpawnCount": { "type": "integer", "minimum": 0 },
-        "spawnCooldown": { "type": "number", "minimum": 0 },
-        "spawnLocation": { "type": "string" }
+        "spawnRate": {
+          "type": "number",
+          "minimum": 0
+        },
+        "maxSpawnCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "spawnCooldown": {
+          "type": "number",
+          "minimum": 0
+        },
+        "spawnLocation": {
+          "type": "string"
+        }
       }
     },
     "unitStatusEffect": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "effectType"],
+      "required": [
+        "id",
+        "effectType"
+      ],
       "properties": {
-        "id": { "$ref": "#/$defs/namespacedId" },
-        "effectType": { "type": "string", "minLength": 1, "pattern": "\\S" },
-        "duration": { "type": "number", "minimum": 0 },
-        "magnitude": { "type": "number" }
+        "id": {
+          "$ref": "#/$defs/namespacedId"
+        },
+        "effectType": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "duration": {
+          "type": "number",
+          "minimum": 0
+        },
+        "magnitude": {
+          "type": "number"
+        }
       }
     },
     "unitProductionQueue": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "buildTime": { "type": "number", "minimum": 0 },
-        "resourceCost": { "type": "number", "minimum": 0 },
-        "queueSize": { "type": "integer", "minimum": 0 },
-        "productionPriority": { "type": "integer", "minimum": 0 }
+        "buildTime": {
+          "type": "number",
+          "minimum": 0
+        },
+        "resourceCost": {
+          "type": "number",
+          "minimum": 0
+        },
+        "queueSize": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "productionPriority": {
+          "type": "integer",
+          "minimum": 0
+        }
       }
     },
     "unitResourceCost": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["resourceType"],
+      "required": [
+        "resourceType"
+      ],
       "properties": {
-        "resourceType": { "type": "string", "minLength": 1, "pattern": "\\S" },
-        "amount": { "type": "number", "minimum": 0 }
+        "resourceType": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "amount": {
+          "type": "number",
+          "minimum": 0
+        }
       }
     },
     "unitMovement": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "moveSpeed": { "type": "number", "minimum": 0 },
-        "turnRate": { "type": "number", "minimum": 0 },
-        "acceleration": { "type": "number", "minimum": 0 }
+        "moveSpeed": {
+          "type": "number",
+          "minimum": 0
+        },
+        "turnRate": {
+          "type": "number",
+          "minimum": 0
+        },
+        "acceleration": {
+          "type": "number",
+          "minimum": 0
+        }
       }
     },
     "unitDetection": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "detectionRange": { "type": "number", "minimum": 0 },
-        "sensorType": { "type": "string", "enum": ["Visual", "Radar", "Sonar", "Thermal"] },
-        "stealthDetection": { "type": "boolean" }
+        "detectionRange": {
+          "type": "number",
+          "minimum": 0
+        },
+        "sensorType": {
+          "type": "string",
+          "enum": [
+            "Visual",
+            "Radar",
+            "Sonar",
+            "Thermal"
+          ]
+        },
+        "stealthDetection": {
+          "type": "boolean"
+        }
       }
     },
     "unitWeapon": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["weaponType"],
+      "required": [
+        "weaponType"
+      ],
       "properties": {
-        "weaponType": { "type": "string", "minLength": 1, "pattern": "\\S" },
-        "damage": { "type": "number", "minimum": 0 },
-        "range": { "type": "number", "minimum": 0 },
-        "fireRate": { "type": "number", "minimum": 0 }
+        "weaponType": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "damage": {
+          "type": "number",
+          "minimum": 0
+        },
+        "range": {
+          "type": "number",
+          "minimum": 0
+        },
+        "fireRate": {
+          "type": "number",
+          "minimum": 0
+        }
       }
     },
     "unitArmor": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "armorType": { "type": "string", "enum": ["Light", "Medium", "Heavy", "Energy"] },
-        "armorValue": { "type": "number", "minimum": 0 },
-        "shieldValue": { "type": "number", "minimum": 0 },
-        "damageReduction": { "type": "number", "minimum": 0, "maximum": 1 }
+        "armorType": {
+          "type": "string",
+          "enum": [
+            "Light",
+            "Medium",
+            "Heavy",
+            "Energy"
+          ]
+        },
+        "armorValue": {
+          "type": "number",
+          "minimum": 0
+        },
+        "shieldValue": {
+          "type": "number",
+          "minimum": 0
+        },
+        "damageReduction": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
       }
     },
     "unitHealing": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "healAmount": { "type": "number", "minimum": 0 },
-        "healRange": { "type": "number", "minimum": 0 },
-        "healRate": { "type": "number", "minimum": 0 },
-        "repairAmount": { "type": "number", "minimum": 0 }
+        "healAmount": {
+          "type": "number",
+          "minimum": 0
+        },
+        "healRange": {
+          "type": "number",
+          "minimum": 0
+        },
+        "healRate": {
+          "type": "number",
+          "minimum": 0
+        },
+        "repairAmount": {
+          "type": "number",
+          "minimum": 0
+        }
       }
     },
     "unitStealth": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "stealthLevel": { "type": "number", "minimum": 0, "maximum": 10 },
-        "cloakDuration": { "type": "number", "minimum": 0 },
-        "detectionReduction": { "type": "number", "minimum": 0, "maximum": 1 }
+        "stealthLevel": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 10
+        },
+        "cloakDuration": {
+          "type": "number",
+          "minimum": 0
+        },
+        "detectionReduction": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
       }
     },
     "unitCommand": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "commandRange": { "type": "number", "minimum": 0 },
-        "commandType": { "type": "string", "enum": ["Move", "Attack", "Defend", "Support"] },
-        "maxCommandChain": { "type": "integer", "minimum": 0 }
+        "commandRange": {
+          "type": "number",
+          "minimum": 0
+        },
+        "commandType": {
+          "type": "string",
+          "enum": [
+            "Move",
+            "Attack",
+            "Defend",
+            "Support"
+          ]
+        },
+        "maxCommandChain": {
+          "type": "integer",
+          "minimum": 0
+        }
       }
     },
     "unitExperienceReward": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "experienceAmount": { "type": "integer", "minimum": 0 },
-        "experienceType": { "type": "string", "minLength": 1, "pattern": "\\S" },
-        "bonusMultiplier": { "type": "number", "minimum": 0 }
+        "experienceAmount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "experienceType": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "bonusMultiplier": {
+          "type": "number",
+          "minimum": 0
+        }
       }
     },
     "unitAura": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "auraRadius": { "type": "number", "minimum": 0 },
-        "auraType": { "type": "string", "enum": ["Buff", "Debuff", "Heal", "Shield"] },
-        "buffAmount": { "type": "number", "minimum": 0 },
-        "affectsAllies": { "type": "boolean" },
-        "affectsEnemies": { "type": "boolean" }
+        "auraRadius": {
+          "type": "number",
+          "minimum": 0
+        },
+        "auraType": {
+          "type": "string",
+          "enum": [
+            "Buff",
+            "Debuff",
+            "Heal",
+            "Shield"
+          ]
+        },
+        "buffAmount": {
+          "type": "number",
+          "minimum": 0
+        },
+        "affectsAllies": {
+          "type": "boolean"
+        },
+        "affectsEnemies": {
+          "type": "boolean"
+        }
       }
     },
     "unitResourceGathering": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["resourceType"],
+      "required": [
+        "resourceType"
+      ],
       "properties": {
-        "resourceType": { "type": "string", "minLength": 1, "pattern": "\\S" },
-        "gatherRate": { "type": "number", "minimum": 0 },
-        "carryCapacity": { "type": "integer", "minimum": 0 },
-        "gatherRange": { "type": "number", "minimum": 0 }
+        "resourceType": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "gatherRate": {
+          "type": "number",
+          "minimum": 0
+        },
+        "carryCapacity": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "gatherRange": {
+          "type": "number",
+          "minimum": 0
+        }
       }
     },
     "unitAiBehavior": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "unitCap": { "type": "integer", "minimum": 0 },
-        "combatUnitCap": { "type": "integer", "minimum": 0 },
-        "skillActivationCheckInterval": { "type": "number", "minimum": 0 },
-        "aiTag": { "type": "string" }
+        "unitCap": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "combatUnitCap": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "skillActivationCheckInterval": {
+          "type": "number",
+          "minimum": 0
+        },
+        "aiTag": {
+          "type": "string"
+        }
       }
     }
   }

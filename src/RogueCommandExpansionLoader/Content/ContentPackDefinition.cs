@@ -282,6 +282,13 @@ namespace RogueCommandExpansionLoader.Content
         public float? cardModelScalingFactor;
         public int? coinsAmount;
         public int? firePointCount;
+        public string copyUpgradesToEntityId;
+        public string[] roles;
+        public string attackType;
+        public string skillType;
+        public string rarity;
+        public string tech;
+        public int? neededExperienceLevel;
         public ContentBalanceOverride[] balanceOverrides;
         public ContentUnitLocalizationDefinition[] localizations;
         public ContentProductionBuildingDefinition productionBuilding;
@@ -906,6 +913,13 @@ namespace RogueCommandExpansionLoader.Content
                 cardModelScalingFactor = source.cardModelScalingFactor,
                 coinsAmount = source.coinsAmount,
                 firePointCount = source.firePointCount,
+                copyUpgradesToEntityId = source.copyUpgradesToEntityId,
+                roles = source.roles != null ? (string[])source.roles.Clone() : null,
+                attackType = source.attackType,
+                skillType = source.skillType,
+                rarity = source.rarity,
+                tech = source.tech,
+                neededExperienceLevel = source.neededExperienceLevel,
                 productionBuilding = CloneProductionBuilding(source.productionBuilding)
             };
         }

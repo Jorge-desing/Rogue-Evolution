@@ -170,6 +170,15 @@ public struct EntityCommand
 
     public static EntityCommand Patrol(int patrolIndex) =>
         new() { command = Command.Patrol, intValue = patrolIndex };
+
+    public static EntityCommand Attack(EntityController target) =>
+        new() { command = Command.Attack };
+
+    public static EntityCommand AttackMoveOnTarget(EntityController target, Role role) =>
+        new() { command = Command.AttackMoveOnTarget, role = role };
+
+    public static EntityCommand Move(Vector3 destination, Vector2Int? clickPositionCell, Role role) =>
+        new() { command = Command.Move, destination = destination, role = role };
 }
 
 public static class Bank
@@ -191,6 +200,7 @@ public sealed class ExistingControllers
     public EntityController EngineeringHqEntity { get; set; }
 
     public HashSet<EntityController> PlayerUnits() => _playerUnits;
+    public HashSet<EntityController> PlayerEntities() => _playerUnits;
     public HashSet<EntityController> AiUnits() => _aiUnits;
     public HashSet<EntityController> Harvesters => _harvesters;
     public HashSet<EntityController> PlayerRefineries() => _playerRefineries;

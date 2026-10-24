@@ -90,6 +90,15 @@ def collect_references(pack: dict[str, Any]) -> list[tuple[str, str, str, str]]:
         add(owner, "cardImageAssetName", unit.get("assetBundleId"), unit.get("cardImageAssetName"), "Sprite card image")
         add(owner, "visualAssetName", unit.get("assetBundleId"), unit.get("visualAssetName"), "GameObject prefab")
 
+        factory = unit.get("productionBuilding")
+        if isinstance(factory, dict):
+            factory_owner = f"productionBuilding:{factory.get('id', '<missing-id>')}"
+            factory_bundle_id = factory.get("assetBundleId") or ""
+            add(factory_owner, "cardImageAssetName", factory_bundle_id,
+                factory.get("cardImageAssetName"), "Sprite card image")
+            add(factory_owner, "visualAssetName", factory_bundle_id,
+                factory.get("visualAssetName"), "GameObject prefab")
+
     for stage in pack.get("stages") or []:
         if not stage.get("nativeTemplateId"):
             add(

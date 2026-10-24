@@ -2097,6 +2097,19 @@ var tests = new (string Name, Action Run)[]
         WithPackage(nativeSample, (pack, root) =>
             ExpectValid(pack, root, new EmptySnapshot(), new KnownModuleValidator()));
     }),
+    ("Ironclad declares its rigged native visual overlay and custom card", () =>
+    {
+        ContentUnitDefinition ironclad = nativeSample.units.Single(
+            unit => unit.id == "sample-native:assault-walker");
+        if (ironclad.visualAssetName != "assets/roguecommandexpansionsample/ironcladwalkervisual.prefab" ||
+            ironclad.visualRootPath != "RoboMarine_Mesh" ||
+            ironclad.cardImageAssetName != "assets/roguecommandexpansionsample/ironcladwalkercard.png" ||
+            ironclad.assetBundleId != "sample-native:assets")
+        {
+            throw new InvalidOperationException(
+                "Ironclad must declare its rigged native visual overlay and its independently bundled card Sprite.");
+        }
+    }),
     ("Atlas Crane declares its own factory, two firepoints, and random-pool offers", () =>
     {
         ContentUnitDefinition atlas = nativeSample.units.Single(
@@ -3136,6 +3149,94 @@ var tests = new (string Name, Action Run)[]
             pack.units[0].nativeTemplateId = "PCXBaseTank";
             ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
                 "unit.source-conflict");
+        });
+    }),
+    ("unit upgrade rejects a production factory target", () =>
+    {
+        WithPackage(sample, (pack, root) =>
+        {
+            pack.units[0].upgrades =
+            [
+                new ContentUnitUpgradeDefinition
+                {
+                    targetUnitId = pack.units[0].productionBuilding.id,
+                    requiredExperienceLevel = 1,
+                    cost = 10
+                }
+            ];
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "unit-upgrade.target-unknown");
+        });
+    }),
+    ("unit upgrade accepts a registered native target", () =>
+    {
+        WithPackage(sample, (pack, root) =>
+        {
+            pack.units[0].upgrades =
+            [
+                new ContentUnitUpgradeDefinition
+                {
+                    targetUnitId = "NativeWalker",
+                    requiredExperienceLevel = 1,
+                    cost = 10
+                }
+            ];
+            ExpectValid(pack, root, new SnapshotWithUnits(["NativeWalker"]), new KnownModuleValidator());
+        });
+    }),
+    ("unit upgrade accepts a unit declared by another pack", () =>
+    {
+        WithPackage(sample, (pack, root) =>
+        {
+            pack.units[0].upgrades =
+            [
+                new ContentUnitUpgradeDefinition
+                {
+                    targetUnitId = "other:registered-unit",
+                    requiredExperienceLevel = 1,
+                    cost = 10
+                }
+            ];
+            ExpectValid(pack, root,
+                new SnapshotWithUnits(["other:registered-unit"]), new KnownModuleValidator());
+        });
+    }),
+    ("unit synergy rejects a production factory target", () =>
+    {
+        WithPackage(sample, (pack, root) =>
+        {
+            pack.units[0].synergies =
+            [
+                new ContentUnitSynergyDefinition
+                {
+                    id = "sample:test-synergy-factory",
+                    statName = "damage",
+                    multiplier = 1,
+                    radius = 1,
+                    targetUnitIds = [pack.units[0].productionBuilding.id]
+                }
+            ];
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "unit-synergy.target-unknown");
+        });
+    }),
+    ("unit synergy accepts registered native and cross-pack targets", () =>
+    {
+        WithPackage(sample, (pack, root) =>
+        {
+            pack.units[0].synergies =
+            [
+                new ContentUnitSynergyDefinition
+                {
+                    id = "sample:test-synergy-native",
+                    statName = "damage",
+                    multiplier = 1,
+                    radius = 1,
+                    targetUnitIds = ["NativeWalker", "other:registered-unit"]
+                }
+            ];
+            ExpectValid(pack, root,
+                new SnapshotWithUnits(["NativeWalker", "other:registered-unit"]), new KnownModuleValidator());
         });
     }),
     ("unit upgrade requires a known target unit", () =>
@@ -7280,6 +7381,72 @@ var tests = new (string Name, Action Run)[]
             }
         }
     }),
+    ("structured unit values reject a duplicate raw override", () =>
+    {
+        var fields = new (string Name, string Value,
+            Action<ContentUnitDefinition> SetValue,
+            Action<ContentUnitDefinition> ClearValue)[]
+        {
+            ("combatValue", "500", unit => unit.combatValue = 500, unit => unit.combatValue = null),
+            ("gridSize", "2", unit => unit.gridSize = 2, unit => unit.gridSize = null),
+            ("cardModelScalingFactor", "1.25", unit => unit.cardModelScalingFactor = 1.25f,
+                unit => unit.cardModelScalingFactor = null),
+            ("coinsAmount", "75", unit => unit.coinsAmount = 75, unit => unit.coinsAmount = null),
+            ("firePointCount", "3", unit => unit.firePointCount = 3, unit => unit.firePointCount = null)
+        };
+
+        foreach (var field in fields)
+        {
+            ContentPackDefinition invalid = Clone(nativeSample);
+            ContentUnitDefinition unit = invalid.units[0];
+            field.SetValue(unit);
+            unit.balanceOverrides = unit.balanceOverrides
+                .Where(entry => entry.name != field.Name)
+                .Append(new ContentBalanceOverride { name = field.Name, value = "2" })
+                .ToArray();
+            WithPackage(invalid, (pack, root) =>
+            {
+                ContentPackValidationResult result = ContentPackValidator.Validate(
+                    pack, root, new EmptySnapshot(), new KnownModuleValidator());
+                int rawIndex = Array.FindIndex(pack.units[0].balanceOverrides,
+                    entry => entry != null && entry.name == field.Name);
+                string rawPath = "units[0].balanceOverrides[" + rawIndex + "]";
+                if (rawIndex < 0 || !result.Diagnostics.Any(diagnostic =>
+                        diagnostic.Code == "unit.balance-override-redundant-with-structured" &&
+                        diagnostic.Path == rawPath))
+                {
+                    throw new InvalidOperationException("Expected duplicate diagnostic for " + field.Name +
+                        " at " + rawPath + ", got: " +
+                        string.Join(", ", result.Diagnostics.Select(diagnostic => diagnostic.Code + " at " + diagnostic.Path)));
+                }
+            });
+
+            ContentPackDefinition valid = Clone(nativeSample);
+            unit = valid.units[0];
+            field.ClearValue(unit);
+            unit.balanceOverrides = unit.balanceOverrides
+                .Where(entry => entry.name != field.Name)
+                .Append(new ContentBalanceOverride { name = field.Name, value = field.Value })
+                .ToArray();
+            WithPackage(valid, (pack, root) =>
+            {
+                ContentPackValidationResult result = ContentPackValidator.Validate(
+                    pack, root, new EmptySnapshot(), new KnownModuleValidator());
+                int rawIndex = Array.FindIndex(pack.units[0].balanceOverrides,
+                    entry => entry != null && entry.name == field.Name);
+                string rawPath = "units[0].balanceOverrides[" + rawIndex + "]";
+                if (rawIndex < 0 || result.Diagnostics.Any(diagnostic =>
+                        diagnostic.Path == rawPath &&
+                        (diagnostic.Code == "unit.balance-override-invalid" ||
+                            diagnostic.Code == "unit.balance-override-redundant-with-structured")))
+                {
+                    throw new InvalidOperationException("Raw override " + field.Name +
+                        " without its structured value was rejected at " + rawPath + ": " +
+                        string.Join(", ", result.Diagnostics.Select(diagnostic => diagnostic.Code + " at " + diagnostic.Path)));
+                }
+            });
+        }
+    }),
     ("unit structured balancing parameters accept valid ranges and reject invalid or out-of-bounds values", () =>
     {
         WithPackage(nativeSample, (pack, root) =>
@@ -7360,6 +7527,202 @@ var tests = new (string Name, Action Run)[]
         if (!registry.TryValidate("sample:flanking-strike", null, out diagnostic) || diagnostic != null)
         {
             throw new InvalidOperationException("Flanking strike module failed validation: " + diagnostic);
+        }
+    }),
+    ("unit native grounding parameters accept valid values and reject invalid values", () =>
+    {
+        WithPackage(nativeSample, (pack, root) =>
+        {
+            ContentUnitDefinition unit = pack.units[0];
+            unit.balanceOverrides = null;
+
+            unit.copyUpgradesToEntityId = "sample:custom-tank";
+            unit.roles = new[] { "Unit", "Tank", "FrontalAttacker" };
+            unit.attackType = "Artillery";
+            unit.skillType = "LocationAoE";
+            unit.rarity = "Rare";
+            unit.tech = "Mech";
+            unit.neededExperienceLevel = 5;
+            unit.productionBuilding.balanceOverrides = new[]
+            {
+                new ContentBalanceOverride { name = "neededExperienceLevel", value = "5" },
+                new ContentBalanceOverride { name = "rarity", value = "Rare" }
+            };
+
+            ExpectValid(pack, root, new EmptySnapshot(), new KnownModuleValidator());
+
+            // copyUpgradesToEntityId cannot match unit.id
+            unit.copyUpgradesToEntityId = unit.id;
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(), "unit.copyUpgradesToEntityId-invalid");
+            unit.copyUpgradesToEntityId = null;
+
+            // duplicate roles rejected
+            unit.roles = new[] { "Tank", "Tank" };
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(), "unit.roles-invalid");
+
+            // invalid role name rejected
+            unit.roles = new[] { "NotARealRole" };
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(), "unit.roles-invalid");
+            unit.roles = null;
+
+            // invalid attackType rejected
+            unit.attackType = "LaserBeam";
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(), "unit.attackType-invalid");
+            unit.attackType = null;
+
+            // invalid skillType rejected
+            unit.skillType = "SuperNuke";
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(), "unit.skillType-invalid");
+            unit.skillType = null;
+
+            // invalid rarity rejected
+            unit.rarity = "Mythic";
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(), "unit.rarity-invalid");
+            unit.rarity = null;
+
+            // invalid tech rejected
+            unit.tech = "Alien";
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(), "unit.tech-invalid");
+            unit.tech = null;
+
+            // neededExperienceLevel out of bounds
+            unit.neededExperienceLevel = -1;
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(), "unit.neededExperienceLevel-invalid");
+            unit.neededExperienceLevel = 101;
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(), "unit.neededExperienceLevel-invalid");
+            unit.neededExperienceLevel = null;
+        });
+    }),
+    ("focus-fire AI module parses defaults and validates limits", () =>
+    {
+        if (!FocusFireParameterParser.TryParse(null, out FocusFireSettings settings, out string diagnostic) || diagnostic != null)
+        {
+            throw new InvalidOperationException("Focus-fire default parse failed: " + diagnostic);
+        }
+        if (settings.BaseIndex != -1 || settings.CheckIntervalSeconds != 3f || settings.MinUnitsInSquad != 2 || settings.PriorityMode != "LowestHealth")
+        {
+            throw new InvalidOperationException("Focus-fire default values did not match specification.");
+        }
+
+        var validParams = new[]
+        {
+            new ContentModuleParameter { name = "baseIndex", value = "1" },
+            new ContentModuleParameter { name = "checkIntervalSeconds", value = "5.0" },
+            new ContentModuleParameter { name = "squadRadius", value = "25.0" },
+            new ContentModuleParameter { name = "minUnitsInSquad", value = "4" },
+            new ContentModuleParameter { name = "priorityMode", value = "HighestThreat" },
+            new ContentModuleParameter { name = "targetRole", value = "Sniper" }
+        };
+        if (!FocusFireParameterParser.TryParse(validParams, out settings, out diagnostic) || diagnostic != null)
+        {
+            throw new InvalidOperationException("Focus-fire custom parse failed: " + diagnostic);
+        }
+        if (settings.BaseIndex != 1 || settings.SquadRadius != 25f || settings.PriorityMode != "HighestThreat")
+        {
+            throw new InvalidOperationException("Focus-fire parsed custom values incorrect.");
+        }
+
+        var invalidParams = new[]
+        {
+            new ContentModuleParameter { name = "priorityMode", value = "InvalidMode" }
+        };
+        if (FocusFireParameterParser.TryParse(invalidParams, out _, out diagnostic) || diagnostic == null)
+        {
+            throw new InvalidOperationException("Focus-fire should reject invalid priorityMode.");
+        }
+    }),
+    ("construction-expansion AI module parses defaults and validates limits", () =>
+    {
+        if (!ConstructionExpansionParameterParser.TryParse(null, out ConstructionExpansionSettings settings, out string diagnostic) || diagnostic != null)
+        {
+            throw new InvalidOperationException("Construction-expansion default parse failed: " + diagnostic);
+        }
+        if (settings.BaseIndex != 0 || settings.CheckIntervalSeconds != 12f || settings.DesiredCount != 2 || settings.BuildingId != "PCXTurret")
+        {
+            throw new InvalidOperationException("Construction-expansion default values did not match specification.");
+        }
+
+        var validParams = new[]
+        {
+            new ContentModuleParameter { name = "baseIndex", value = "2" },
+            new ContentModuleParameter { name = "checkIntervalSeconds", value = "20.0" },
+            new ContentModuleParameter { name = "buildingId", value = "PCXRefinery" },
+            new ContentModuleParameter { name = "desiredCount", value = "3" },
+            new ContentModuleParameter { name = "queuePriority", value = "15" },
+            new ContentModuleParameter { name = "minSurplusCrystals", value = "300" }
+        };
+        if (!ConstructionExpansionParameterParser.TryParse(validParams, out settings, out diagnostic) || diagnostic != null)
+        {
+            throw new InvalidOperationException("Construction-expansion custom parse failed: " + diagnostic);
+        }
+        if (settings.BaseIndex != 2 || settings.BuildingId != "PCXRefinery" || settings.MinSurplusCrystals != 300)
+        {
+            throw new InvalidOperationException("Construction-expansion parsed values incorrect.");
+        }
+
+        var invalidParams = new[]
+        {
+            new ContentModuleParameter { name = "desiredCount", value = "0" }
+        };
+        if (ConstructionExpansionParameterParser.TryParse(invalidParams, out _, out diagnostic) || diagnostic == null)
+        {
+            throw new InvalidOperationException("Construction-expansion should reject desiredCount < 1.");
+        }
+    }),
+    ("tactical-regroup AI module parses defaults and validates limits", () =>
+    {
+        if (!TacticalRegroupParameterParser.TryParse(null, out TacticalRegroupSettings settings, out string diagnostic) || diagnostic != null)
+        {
+            throw new InvalidOperationException("Tactical-regroup default parse failed: " + diagnostic);
+        }
+        if (settings.BaseIndex != -1 || settings.CheckIntervalSeconds != 4f || settings.HealthRetreatThreshold != 0.30f || settings.RegroupMinSquadSize != 3)
+        {
+            throw new InvalidOperationException("Tactical-regroup default values did not match specification.");
+        }
+
+        var validParams = new[]
+        {
+            new ContentModuleParameter { name = "baseIndex", value = "1" },
+            new ContentModuleParameter { name = "healthRetreatThreshold", value = "0.25" },
+            new ContentModuleParameter { name = "regroupMinSquadSize", value = "5" },
+            new ContentModuleParameter { name = "regroupDistanceToBase", value = "30.0" }
+        };
+        if (!TacticalRegroupParameterParser.TryParse(validParams, out settings, out diagnostic) || diagnostic != null)
+        {
+            throw new InvalidOperationException("Tactical-regroup custom parse failed: " + diagnostic);
+        }
+        if (settings.BaseIndex != 1 || settings.HealthRetreatThreshold != 0.25f || settings.RegroupMinSquadSize != 5)
+        {
+            throw new InvalidOperationException("Tactical-regroup parsed values incorrect.");
+        }
+
+        var invalidParams = new[]
+        {
+            new ContentModuleParameter { name = "healthRetreatThreshold", value = "0.80" }
+        };
+        if (TacticalRegroupParameterParser.TryParse(invalidParams, out _, out diagnostic) || diagnostic == null)
+        {
+            throw new InvalidOperationException("Tactical-regroup should reject retreat threshold > 0.60.");
+        }
+    }),
+    ("tactical AI modules focus-fire, construction-expansion, and tactical-regroup are registered", () =>
+    {
+        var registry = new AiModuleRegistry();
+        registry.Register(new FocusFireAiModule());
+        registry.Register(new ConstructionExpansionAiModule());
+        registry.Register(new TacticalRegroupAiModule());
+
+        if (!registry.TryValidate("sample:focus-fire", null, out string diagnostic) || diagnostic != null)
+        {
+            throw new InvalidOperationException("Focus-fire module failed registry validation: " + diagnostic);
+        }
+        if (!registry.TryValidate("sample:construction-expansion", null, out diagnostic) || diagnostic != null)
+        {
+            throw new InvalidOperationException("Construction-expansion module failed registry validation: " + diagnostic);
+        }
+        if (!registry.TryValidate("sample:tactical-regroup", null, out diagnostic) || diagnostic != null)
+        {
+            throw new InvalidOperationException("Tactical-regroup module failed registry validation: " + diagnostic);
         }
     }),
 
@@ -7720,6 +8083,18 @@ sealed class KnownModuleValidator : IAiModuleValidator
                 if (moduleId == "sample:flanking-strike")
                 {
                     return FlankingStrikeParameterParser.TryParse(parameters, out _, out diagnostic);
+                }
+                if (moduleId == "sample:focus-fire")
+                {
+                    return FocusFireParameterParser.TryParse(parameters, out _, out diagnostic);
+                }
+                if (moduleId == "sample:construction-expansion")
+                {
+                    return ConstructionExpansionParameterParser.TryParse(parameters, out _, out diagnostic);
+                }
+                if (moduleId == "sample:tactical-regroup")
+                {
+                    return TacticalRegroupParameterParser.TryParse(parameters, out _, out diagnostic);
                 }
 
         bool known = moduleId is "sample:scheduled-base-build" or "sample:reactive-base-defense" or "sample:trace-default";

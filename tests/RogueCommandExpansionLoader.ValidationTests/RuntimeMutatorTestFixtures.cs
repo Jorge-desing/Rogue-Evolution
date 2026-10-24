@@ -89,6 +89,7 @@ public static class EntityBalancingStore
     public static HashSet<string> BuildingEntityIds = new(StringComparer.Ordinal);
 
     public static bool IsBuilding(string entityId) => BuildingEntityIds.Contains(entityId);
+    public static int Cost(string entityId) => 100;
 
     public static void InvalidateCache(string entityId)
     {
@@ -177,6 +178,22 @@ public sealed class AiBehaviour
 public sealed class AiBehaviourManager
 {
     public AiBehaviour activeBehaviour;
+    public static readonly Priority_Queue.SimplePriorityQueue<string> ConstructionQueue = new();
+}
+
+namespace Priority_Queue
+{
+    public sealed class SimplePriorityQueue<TItem> : IEnumerable<TItem>
+    {
+        private readonly List<TItem> _items = new();
+        public int Count => _items.Count;
+        public void Enqueue(TItem item, float priority) { if (!_items.Contains(item)) _items.Add(item); }
+        public bool Contains(TItem item) => _items.Contains(item);
+        public TItem Dequeue() { var item = _items[0]; _items.RemoveAt(0); return item; }
+        public void Clear() => _items.Clear();
+        public IEnumerator<TItem> GetEnumerator() => _items.GetEnumerator();
+        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => _items.GetEnumerator();
+    }
 }
 
 public sealed class DefaultAiBehaviour

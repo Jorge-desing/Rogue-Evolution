@@ -27,7 +27,10 @@ namespace UnityEngine
             this.z = z;
         }
 
+        public static Vector3 zero => new(0f, 0f, 0f);
         public static Vector3 forward => new(0f, 0f, 1f);
+        public static Vector3 operator /(Vector3 v, float f) => new(v.x / f, v.y / f, v.z / f);
+        public static Vector3 operator /(Vector3 v, int i) => new(v.x / i, v.y / i, v.z / i);
 
         public static Vector3 operator -(Vector3 left, Vector3 right) =>
             new(left.x - right.x, left.y - right.y, left.z - right.z);

@@ -172,6 +172,24 @@ namespace RogueCommandExpansionLoader.Content
             StringComparer.Ordinal);
         private static readonly HashSet<string> SupportedUnitTypes = new HashSet<string>(
             new[] { "Ground", "Air", "Support", "Stationary" }, StringComparer.Ordinal);
+        private static readonly HashSet<string> SupportedUnitRarities = new HashSet<string>(
+            new[] { "Common", "Rare", "UltraRare" }, StringComparer.Ordinal);
+        private static readonly HashSet<string> SupportedUnitTechs = new HashSet<string>(
+            new[] { "None", "Colorless", "Mech", "Tank", "Ancient", "Specialist", "All" },
+            StringComparer.Ordinal);
+        private static readonly HashSet<string> SupportedAttackTypes = new HashSet<string>(
+            new[] { "None", "Single", "AoE", "Multi", "MultiAoE", "Beam", "Artillery", "MultiArtillery" },
+            StringComparer.Ordinal);
+        private static readonly HashSet<string> SupportedSkillTypes = new HashSet<string>(
+            new[] { "None", "Toggle", "Location", "LocationAoE", "LocationMultiTargets", "Self", "SelfAoE", "Target", "TargetMultiTarget", "TargetAoE", "SelfMultiTarget" },
+            StringComparer.Ordinal);
+        private static readonly HashSet<string> SupportedUnitRoles = new HashSet<string>(
+            new[] {
+                "None", "Spawn", "Harvester", "FrontalAttacker", "MassDestruction", "Fire", "Sniper", "Supporter",
+                "Rock", "Robo", "Spawner", "PCXCard", "Building", "Factory", "Turret", "Refinery", "Unit",
+                "Heal", "Specialist", "Skill", "Engineer", "Bomb", "Scout", "Chest", "Tank", "Vehicle",
+                "Mech", "Tree", "Melee", "Research", "Crystal", "Builder", "Drop", "All"
+            }, StringComparer.OrdinalIgnoreCase);
         private static readonly HashSet<string> SupportedRelicRarities = new HashSet<string>(
             new[] { "Common", "Rare", "UltraRare" }, StringComparer.Ordinal);
         private static readonly HashSet<string> SupportedRelicTechs = new HashSet<string>(
@@ -319,6 +337,10 @@ namespace RogueCommandExpansionLoader.Content
                 if (units[i] != null)
                 {
                     RegisterId(units[i].id, "units[" + i + "].id", "unit", allIds, registrySnapshot, diagnostics);
+                    if (IsNamespacedId(units[i].id))
+                    {
+                        unitIds.Add(units[i].id);
+                    }
                 }
             }
 
@@ -336,11 +358,6 @@ namespace RogueCommandExpansionLoader.Content
                 {
                     Add(diagnostics, "unit.type-invalid", itemPath + ".unitType", "Unit type must be one of the game's supported unit types.");
                 }
-                if (IsNamespacedId(unit.id))
-                {
-                    unitIds.Add(unit.id);
-                }
-
                 bool hasNativeTemplate = !String.IsNullOrWhiteSpace(unit.nativeTemplateId);
                 if (hasNativeTemplate)
                 {
@@ -402,9 +419,9 @@ namespace RogueCommandExpansionLoader.Content
                 ValidateAiOverrides(unit.aiOverrides, itemPath + ".aiOverrides", diagnostics);
                 ValidateActiveSkills(unit.activeSkills, itemPath + ".activeSkills", diagnostics);
                 ValidateCombatBoosts(unit.combatBoosts, itemPath + ".combatBoosts", diagnostics);
-                ValidateUnitUpgrades(unit.upgrades, itemPath + ".upgrades", allIds, diagnostics);
+                ValidateUnitUpgrades(unit.upgrades, itemPath + ".upgrades", unitIds, registrySnapshot, diagnostics);
                 ValidateUnitExperience(unit.experience, itemPath + ".experience", diagnostics);
-                ValidateUnitSynergies(unit.synergies, itemPath + ".synergies", allIds, diagnostics);
+                ValidateUnitSynergies(unit.synergies, itemPath + ".synergies", unitIds, registrySnapshot, diagnostics);
                 ValidateUnitVisualVariants(unit.visualVariants, itemPath + ".visualVariants", bundleIds, diagnostics);
                 ValidateUnitSpawn(unit.spawn, itemPath + ".spawn", diagnostics);
                 ValidateUnitStatusEffects(unit.statusEffects, itemPath + ".statusEffects", diagnostics);
@@ -1201,6 +1218,11 @@ namespace RogueCommandExpansionLoader.Content
             string buildingLevel;
             bool hasProductLevel = TryGetBalanceOverride(
                 unit.balanceOverrides, "neededExperienceLevel", out productLevel);
+            if (unit.neededExperienceLevel.HasValue)
+            {
+                hasProductLevel = true;
+                productLevel = unit.neededExperienceLevel.Value.ToString(CultureInfo.InvariantCulture);
+            }
             bool hasBuildingLevel = TryGetBalanceOverride(
                 building.balanceOverrides, "neededExperienceLevel", out buildingLevel);
             if (!hasProductLevel || !hasBuildingLevel)
@@ -1227,6 +1249,11 @@ namespace RogueCommandExpansionLoader.Content
             string productRarity;
             string buildingRarity;
             bool hasProductRarity = TryGetBalanceOverride(unit.balanceOverrides, "rarity", out productRarity);
+            if (!String.IsNullOrEmpty(unit.rarity))
+            {
+                hasProductRarity = true;
+                productRarity = unit.rarity;
+            }
             bool hasBuildingRarity = TryGetBalanceOverride(
                 building.balanceOverrides, "rarity", out buildingRarity);
             if (!hasProductRarity || !hasBuildingRarity)
@@ -1525,6 +1552,24 @@ namespace RogueCommandExpansionLoader.Content
                     }
                 }
 
+                bool structuredParameterAlreadySet =
+                    (balanceOverride.name == "combatValue" && unit.combatValue.HasValue) ||
+                    (balanceOverride.name == "gridSize" && unit.gridSize.HasValue) ||
+                    (balanceOverride.name == "cardModelScalingFactor" && unit.cardModelScalingFactor.HasValue) ||
+                    (balanceOverride.name == "coinsAmount" && unit.coinsAmount.HasValue) ||
+                    (balanceOverride.name == "firePointCount" && unit.firePointCount.HasValue) ||
+                    (balanceOverride.name == "copyUpgradesToEntityId" && !String.IsNullOrEmpty(unit.copyUpgradesToEntityId)) ||
+                    (balanceOverride.name == "attackType" && !String.IsNullOrEmpty(unit.attackType)) ||
+                    (balanceOverride.name == "skillType" && !String.IsNullOrEmpty(unit.skillType)) ||
+                    (balanceOverride.name == "rarity" && !String.IsNullOrEmpty(unit.rarity)) ||
+                    (balanceOverride.name == "tech" && !String.IsNullOrEmpty(unit.tech)) ||
+                    (balanceOverride.name == "neededExperienceLevel" && unit.neededExperienceLevel.HasValue);
+                if (structuredParameterAlreadySet)
+                {
+                    Add(diagnostics, "unit.balance-override-redundant-with-structured", itemPath,
+                        "This balance override duplicates a structured unit field; declare the value only once.");
+                }
+
                 if (!TryValidateBalanceOverrideValue(balanceOverride.name, balanceOverride.value, "unit", false))
                 {
                     Add(diagnostics, "unit.balance-override-invalid", itemPath,
@@ -1677,7 +1722,8 @@ namespace RogueCommandExpansionLoader.Content
         private static void ValidateUnitUpgrades(
             ContentUnitUpgradeDefinition[] upgrades,
             string path,
-            HashSet<string> allIds,
+            HashSet<string> localUnitIds,
+            IContentRegistrySnapshot registrySnapshot,
             List<ContentDiagnostic> diagnostics)
         {
             if (upgrades == null) return;
@@ -1695,7 +1741,8 @@ namespace RogueCommandExpansionLoader.Content
                     Add(diagnostics, "unit-upgrade.target-required", itemPath + ".targetUnitId",
                         "Upgrade target unit ID must be non-empty.");
                 }
-                else if (!allIds.Contains(upgrade.targetUnitId))
+                else if (!localUnitIds.Contains(upgrade.targetUnitId) &&
+                    (registrySnapshot == null || !registrySnapshot.ContainsUnit(upgrade.targetUnitId)))
                 {
                     Add(diagnostics, "unit-upgrade.target-unknown", itemPath + ".targetUnitId",
                         "Upgrade target unit must be a declared or native unit ID.");
@@ -1745,7 +1792,8 @@ namespace RogueCommandExpansionLoader.Content
         private static void ValidateUnitSynergies(
             ContentUnitSynergyDefinition[] synergies,
             string path,
-            HashSet<string> allIds,
+            HashSet<string> localUnitIds,
+            IContentRegistrySnapshot registrySnapshot,
             List<ContentDiagnostic> diagnostics)
         {
             if (synergies == null) return;
@@ -1775,7 +1823,8 @@ namespace RogueCommandExpansionLoader.Content
                     for (int j = 0; j < synergy.targetUnitIds.Length; j++)
                     {
                         if (String.IsNullOrWhiteSpace(synergy.targetUnitIds[j]) ||
-                            !allIds.Contains(synergy.targetUnitIds[j]))
+                            (!localUnitIds.Contains(synergy.targetUnitIds[j]) &&
+                                (registrySnapshot == null || !registrySnapshot.ContainsUnit(synergy.targetUnitIds[j]))))
                         {
                             Add(diagnostics, "unit-synergy.target-unknown", itemPath + ".targetUnitIds[" + j + "]",
                                 "Synergy target unit must be a declared or native unit ID.");
@@ -2567,6 +2616,87 @@ namespace RogueCommandExpansionLoader.Content
                 {
                     Add(diagnostics, "unit.firePointCount-invalid", path + ".firePointCount",
                         "firePointCount must be an integer between 1 and 64.");
+                }
+            }
+
+            if (!String.IsNullOrEmpty(unit.copyUpgradesToEntityId))
+            {
+                if (String.IsNullOrWhiteSpace(unit.copyUpgradesToEntityId) ||
+                    String.Equals(unit.copyUpgradesToEntityId, unit.id, StringComparison.Ordinal))
+                {
+                    Add(diagnostics, "unit.copyUpgradesToEntityId-invalid", path + ".copyUpgradesToEntityId",
+                        "copyUpgradesToEntityId must be a valid non-empty identifier distinct from the unit's own ID.");
+                }
+            }
+
+            if (unit.roles != null)
+            {
+                if (unit.roles.Length > 16)
+                {
+                    Add(diagnostics, "unit.roles-invalid", path + ".roles",
+                        "roles list cannot exceed 16 elements.");
+                }
+
+                HashSet<string> seenRoles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                for (int i = 0; i < unit.roles.Length; i++)
+                {
+                    string role = unit.roles[i];
+                    string rolePath = path + ".roles[" + i + "]";
+                    if (String.IsNullOrWhiteSpace(role) || !SupportedUnitRoles.Contains(role))
+                    {
+                        Add(diagnostics, "unit.roles-invalid", rolePath,
+                            "Each role must be a supported UnitRole name.");
+                    }
+                    else if (!seenRoles.Add(role))
+                    {
+                        Add(diagnostics, "unit.roles-invalid", rolePath,
+                            "Duplicate role '" + role + "' is not permitted.");
+                    }
+                }
+            }
+
+            if (!String.IsNullOrEmpty(unit.attackType))
+            {
+                if (!SupportedAttackTypes.Contains(unit.attackType))
+                {
+                    Add(diagnostics, "unit.attackType-invalid", path + ".attackType",
+                        "attackType must match a supported native AttackType enum name.");
+                }
+            }
+
+            if (!String.IsNullOrEmpty(unit.skillType))
+            {
+                if (!SupportedSkillTypes.Contains(unit.skillType))
+                {
+                    Add(diagnostics, "unit.skillType-invalid", path + ".skillType",
+                        "skillType must match a supported native SkillType enum name.");
+                }
+            }
+
+            if (!String.IsNullOrEmpty(unit.rarity))
+            {
+                if (!SupportedUnitRarities.Contains(unit.rarity))
+                {
+                    Add(diagnostics, "unit.rarity-invalid", path + ".rarity",
+                        "rarity must be 'Common', 'Rare', or 'UltraRare'.");
+                }
+            }
+
+            if (!String.IsNullOrEmpty(unit.tech))
+            {
+                if (!SupportedUnitTechs.Contains(unit.tech))
+                {
+                    Add(diagnostics, "unit.tech-invalid", path + ".tech",
+                        "tech must match a supported native Tech enum name.");
+                }
+            }
+
+            if (unit.neededExperienceLevel.HasValue)
+            {
+                if (unit.neededExperienceLevel.Value < 0 || unit.neededExperienceLevel.Value > 100)
+                {
+                    Add(diagnostics, "unit.neededExperienceLevel-invalid", path + ".neededExperienceLevel",
+                        "neededExperienceLevel must be an integer between 0 and 100.");
                 }
             }
         }
