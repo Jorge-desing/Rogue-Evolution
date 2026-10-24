@@ -1296,7 +1296,8 @@
         },
         "cardModelScalingFactor": {
           "type": "number",
-          "minimum": 0,
+          "exclusiveMinimum": 0.01,
+          "maximum": 100,
           "description": "Visual 3D model scale factor rendered inside card viewports."
         },
         "rarity": {
@@ -2947,7 +2948,8 @@
         },
         "cardModelScalingFactor": {
           "type": "number",
-          "minimum": 0,
+          "exclusiveMinimum": 0.01,
+          "maximum": 100,
           "description": "Visual 3D model scale factor rendered inside card viewports."
         },
         "firePointCount": {

@@ -1306,10 +1306,11 @@ namespace RogueCommandExpansionLoader.Content
 
             if (productionBuilding.cardModelScalingFactor.HasValue)
             {
-                if (Single.IsNaN(productionBuilding.cardModelScalingFactor.Value) || Single.IsInfinity(productionBuilding.cardModelScalingFactor.Value) || productionBuilding.cardModelScalingFactor.Value < 0f)
+                float factor = productionBuilding.cardModelScalingFactor.Value;
+                if (Single.IsNaN(factor) || Single.IsInfinity(factor) || factor <= 0.01f || factor > 100f)
                 {
                     Add(diagnostics, "production-building.card-model-scaling-factor-invalid", path + ".cardModelScalingFactor",
-                        "cardModelScalingFactor must be a non-negative finite number.");
+                        "cardModelScalingFactor must be a finite positive number in range (0.01, 100.0].");
                 }
             }
 
@@ -4256,19 +4257,20 @@ namespace RogueCommandExpansionLoader.Content
 
             if (building.cardModelScalingFactor.HasValue)
             {
-                if (Single.IsNaN(building.cardModelScalingFactor.Value) || Single.IsInfinity(building.cardModelScalingFactor.Value) || building.cardModelScalingFactor.Value < 0f)
+                float factor = building.cardModelScalingFactor.Value;
+                if (Single.IsNaN(factor) || Single.IsInfinity(factor) || factor <= 0.01f || factor > 100f)
                 {
                     Add(diagnostics, "building.card-model-scaling-factor-invalid", path + ".cardModelScalingFactor",
-                        "cardModelScalingFactor must be a non-negative finite number.");
+                        "cardModelScalingFactor must be a finite positive number in range (0.01, 100.0].");
                 }
             }
 
             if (building.firePointCount.HasValue)
             {
-                if (building.firePointCount.Value < 0 || building.firePointCount.Value > 32)
+                if (building.firePointCount.Value < 1 || building.firePointCount.Value > 64)
                 {
                     Add(diagnostics, "building.fire-point-count-invalid", path + ".firePointCount",
-                        "firePointCount must be between 0 and 32.");
+                        "firePointCount must be an integer between 1 and 64.");
                 }
             }
 
