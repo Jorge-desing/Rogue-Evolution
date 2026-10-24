@@ -7746,29 +7746,6 @@ var tests = new (string Name, Action Run)[]
                 aiBaseIndex = 0,
                 Position = UnityEngine.Vector3.zero
             });
-            for (int i = 0; i < 2; i++)
-            {
-                ExistingControllers.Instance.AiUnits().Add(new EntityController
-                {
-                    IsControlledByAi = true,
-                    IsUnit = true,
-                    IsCombatUnit = true,
-                    CanAttackAndIsAttackEnabled = true,
-                    CanMoveAndMovementIsEnabled = true,
-                    aiBaseIndex = 1,
-                    Position = wounded.Position
-                });
-                ExistingControllers.Instance.AiUnits().Add(new EntityController
-                {
-                    IsControlledByAi = true,
-                    IsUnit = true,
-                    CanAttackAndIsAttackEnabled = true,
-                    CanMoveAndMovementIsEnabled = true,
-                    aiBaseIndex = 0,
-                    Position = wounded.Position
-                });
-            }
-
             behaviour = new TacticalRegroupAiModule().CreateBehaviour(new DefaultAiBehaviour(),
                 [
                     new ContentModuleParameter { name = "baseIndex", value = "0" },
@@ -7784,9 +7761,30 @@ var tests = new (string Name, Action Run)[]
                 throw new InvalidOperationException("The wounded unit did not receive its initial retreat order.");
             }
 
+            var otherBaseReinforcements = new List<EntityController>();
+            for (int i = 0; i < 2; i++)
+            {
+                var reinforcement = new EntityController
+                {
+                    IsControlledByAi = true,
+                    IsUnit = true,
+                    IsCombatUnit = true,
+                    CanAttackAndIsAttackEnabled = true,
+                    CanMoveAndMovementIsEnabled = true,
+                    aiBaseIndex = 1,
+                    Position = wounded.Position
+                };
+                otherBaseReinforcements.Add(reinforcement);
+                ExistingControllers.Instance.AiUnits().Add(reinforcement);
+            }
+
             int initialOrderCount = wounded.ExecuteCommandCallCount;
             UnityEngine.Time.time = 8f;
             behaviour.Tick();
+            foreach (EntityController reinforcement in otherBaseReinforcements)
+            {
+                ExistingControllers.Instance.AiUnits().Remove(reinforcement);
+            }
             UnityEngine.Time.time = 12f;
             behaviour.Tick();
             if (wounded.ExecuteCommandCallCount != initialOrderCount)
@@ -7801,7 +7799,7 @@ var tests = new (string Name, Action Run)[]
             DefaultAiBehaviour.ResetRuntimeState();
         }
     }),
-    ("tactical-regroup does not duplicate a retreat order after reinforcement", () =>
+    ("tactical-regroup cancels its retreat command after reinforcement arrives", () =>
     {
         ExistingControllers.Instance.Reset();
         DefaultAiBehaviour.ResetRuntimeState();
@@ -7829,16 +7827,6 @@ var tests = new (string Name, Action Run)[]
                 aiBaseIndex = 0,
                 Position = UnityEngine.Vector3.zero
             });
-            ExistingControllers.Instance.AiUnits().Add(new EntityController
-            {
-                IsControlledByAi = true,
-                IsUnit = true,
-                IsCombatUnit = true,
-                CanAttackAndIsAttackEnabled = true,
-                CanMoveAndMovementIsEnabled = true,
-                aiBaseIndex = 0,
-                Position = wounded.Position
-            });
 
             behaviour = new TacticalRegroupAiModule().CreateBehaviour(new DefaultAiBehaviour(),
                 [
@@ -7849,12 +7837,41 @@ var tests = new (string Name, Action Run)[]
             behaviour.OnInitialized();
             UnityEngine.Time.time = 4f;
             behaviour.Tick();
-            int initialOrderCount = wounded.ExecuteCommandCallCount;
+            if (!wounded.LastExecutedCommand.HasValue ||
+                wounded.LastExecutedCommand.Value.command != EntityCommand.Command.Move)
+            {
+                throw new InvalidOperationException("The wounded unit did not receive its initial retreat order.");
+            }
+
+            for (int i = 0; i < 2; i++)
+            {
+                ExistingControllers.Instance.AiUnits().Add(new EntityController
+                {
+                    IsControlledByAi = true,
+                    IsUnit = true,
+                    IsCombatUnit = true,
+                    CanAttackAndIsAttackEnabled = true,
+                    CanMoveAndMovementIsEnabled = true,
+                    aiBaseIndex = 0,
+                    Position = wounded.Position
+                });
+            }
+
             UnityEngine.Time.time = 8f;
             behaviour.Tick();
-            if (wounded.ExecuteCommandCallCount != initialOrderCount)
+            if (wounded.ExecuteCommandCallCount != 2 ||
+                wounded.LastExecutedCommand?.command != EntityCommand.Command.Stop ||
+                wounded.LastCommandProcessingType != EntityController.CommandProcessingType.ExecuteAndCancelCurrentCommand)
             {
-                throw new InvalidOperationException("The retreat order was duplicated while the unit remained reinforced.");
+                throw new InvalidOperationException("Reinforcement should cancel the active retreat command.");
+            }
+
+            int stopOrderCount = wounded.ExecuteCommandCallCount;
+            UnityEngine.Time.time = 12f;
+            behaviour.Tick();
+            if (wounded.ExecuteCommandCallCount != stopOrderCount)
+            {
+                throw new InvalidOperationException("The retreat command was reissued while the unit remained reinforced.");
             }
         }
         finally
@@ -8357,6 +8374,109 @@ var tests = new (string Name, Action Run)[]
         {
             throw new InvalidOperationException("Wave-escalation module failed registry validation: " + diagnostic);
         }
+    }),
+    ("relic validation accepts canonical ChangeableValues and role/tech filters", () =>
+    {
+        ContentPackDefinition validPack = ContentPackCopy.DeepClone(nativeSample);
+        ContentRelicDefinition relic = validPack.relics[0];
+        relic.coinsAmount = 250;
+        relic.inactive = false;
+        relic.cardChanges = new[]
+        {
+            new ContentCardChangeDefinition
+            {
+                valueToChange = "MoveSpeed",
+                operation = "Multiply",
+                value = 1.15f,
+                side = "False",
+                cardMustHaveAllOfTheseRoles = new[] { "Mech" },
+                cardMustNotHaveOneOfTheseTechs = new[] { "Ancient" },
+                changeableValueHasToBeGreaterZero = true
+            },
+            new ContentCardChangeDefinition
+            {
+                valueToChange = "MaxArmor",
+                operation = "Add",
+                value = 20.0f,
+                side = "False",
+                cardMustHaveOneOfTheseRoles = new[] { "Tank", "Vehicle" }
+            },
+            new ContentCardChangeDefinition
+            {
+                valueToChange = "Damage1",
+                operation = "Add",
+                value = 4.0f,
+                side = "False",
+                onlyForTheseEntityIds = new[] { "sample-native:atlas-crane-mech" }
+            }
+        };
+
+        WithPackage(validPack, (pack, root) =>
+            ExpectValid(pack, root, new EmptySnapshot(), new KnownModuleValidator()));
+    }),
+    ("relic deep clone preserves coinsAmount, inactive, role filters, and exclusions", () =>
+    {
+        ContentPackDefinition sourcePack = ContentPackCopy.DeepClone(nativeSample);
+        ContentRelicDefinition sourceRelic = sourcePack.relics[0];
+        sourceRelic.coinsAmount = 350;
+        sourceRelic.inactive = true;
+        sourceRelic.cardChanges = new[]
+        {
+            new ContentCardChangeDefinition
+            {
+                valueToChange = "WeaponRange",
+                operation = "Multiply",
+                value = 1.25f,
+                side = "False",
+                cardMustHaveAllOfTheseRoles = new[] { "Sniper" },
+                cardMustNotHaveOneOfTheseTechs = new[] { "Ancient" },
+                entityIdsNotAllowed = new[] { "sample-native:scout-tank" },
+                changeableValueHasToBeGreaterZero = true
+            }
+        };
+
+        ContentPackDefinition clonedPack = ContentPackCopy.DeepClone(sourcePack);
+        ContentRelicDefinition clonedRelic = clonedPack.relics[0];
+
+        if (clonedRelic.coinsAmount != 350 || !clonedRelic.inactive)
+        {
+            throw new InvalidOperationException("Relic coinsAmount or inactive flag was not cloned correctly.");
+        }
+
+        // Mutate clone and assert source is isolated
+        clonedRelic.coinsAmount = 0;
+        clonedRelic.inactive = false;
+        clonedRelic.cardChanges[0].cardMustHaveAllOfTheseRoles[0] = "Tank";
+        clonedRelic.cardChanges[0].cardMustNotHaveOneOfTheseTechs[0] = "Laser";
+        clonedRelic.cardChanges[0].entityIdsNotAllowed[0] = "other:unit";
+
+        if (sourceRelic.coinsAmount != 350 || !sourceRelic.inactive ||
+            sourceRelic.cardChanges[0].cardMustHaveAllOfTheseRoles[0] != "Sniper" ||
+            sourceRelic.cardChanges[0].cardMustNotHaveOneOfTheseTechs[0] != "Ancient" ||
+            sourceRelic.cardChanges[0].entityIdsNotAllowed[0] != "sample-native:scout-tank")
+        {
+            throw new InvalidOperationException("Relic deep clone shared mutable role filters, tech filters, or entity exclusions.");
+        }
+    }),
+    ("relic validation rejects negative coinsAmount, invalid ChangeableValue, and duplicate roles", () =>
+    {
+        // Negative coinsAmount
+        ContentPackDefinition invalidCoins = ContentPackCopy.DeepClone(nativeSample);
+        invalidCoins.relics[0].coinsAmount = -50;
+        WithPackage(invalidCoins, (pack, root) => ExpectDiagnostic(pack, root, new EmptySnapshot(),
+            new KnownModuleValidator(), "relic.coins-amount-invalid"));
+
+        // Invalid ChangeableValue
+        ContentPackDefinition invalidStat = ContentPackCopy.DeepClone(nativeSample);
+        invalidStat.relics[0].cardChanges[0].valueToChange = "BogusAttribute";
+        WithPackage(invalidStat, (pack, root) => ExpectDiagnostic(pack, root, new EmptySnapshot(),
+            new KnownModuleValidator(), "relic.change-value-unsupported"));
+
+        // Duplicate role filter
+        ContentPackDefinition duplicateRoles = ContentPackCopy.DeepClone(nativeSample);
+        duplicateRoles.relics[0].cardChanges[0].cardMustHaveAllOfTheseRoles = new[] { "Mech", "Mech" };
+        WithPackage(duplicateRoles, (pack, root) => ExpectDiagnostic(pack, root, new EmptySnapshot(),
+            new KnownModuleValidator(), "relic.role-filter-duplicate"));
     }),
 };
 

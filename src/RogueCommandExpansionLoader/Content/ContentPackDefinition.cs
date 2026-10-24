@@ -541,9 +541,11 @@ namespace RogueCommandExpansionLoader.Content
         public string tech;
         public string offeredSystemTags;
         public string neededSystemTags;
+        public int coinsAmount;
         public int neededExperienceLevel;
         public bool isAllowedForDemo;
         public bool isForSpecialists;
+        public bool inactive;
         public ContentRelicLocalizationDefinition[] localizations;
         public ContentCardChangeDefinition[] cardChanges;
     }
@@ -566,6 +568,12 @@ namespace RogueCommandExpansionLoader.Content
         public bool multiplyValueWithCurrentHeatLevel;
         public string multiplyValueWithMetaProgressionMultiplier;
         public string[] onlyForTheseEntityIds;
+        public string[] cardMustHaveAllOfTheseRoles;
+        public string[] cardMustHaveOneOfTheseRoles;
+        public string[] cardMustNotHaveOneOfTheseRoles;
+        public string[] cardMustNotHaveOneOfTheseTechs;
+        public string[] entityIdsNotAllowed;
+        public bool changeableValueHasToBeGreaterZero;
     }
 
     [Serializable]
@@ -1281,9 +1289,11 @@ namespace RogueCommandExpansionLoader.Content
                 tech = source.tech,
                 offeredSystemTags = source.offeredSystemTags,
                 neededSystemTags = source.neededSystemTags,
+                coinsAmount = source.coinsAmount,
                 neededExperienceLevel = source.neededExperienceLevel,
                 isAllowedForDemo = source.isAllowedForDemo,
                 isForSpecialists = source.isForSpecialists,
+                inactive = source.inactive,
                 localizations = CloneArray(source.localizations, CloneRelicLocalization),
                 cardChanges = CloneArray(source.cardChanges, CloneCardChange)
             };
@@ -1312,7 +1322,23 @@ namespace RogueCommandExpansionLoader.Content
                 multiplyValueWithMetaProgressionMultiplier = source.multiplyValueWithMetaProgressionMultiplier,
                 onlyForTheseEntityIds = source.onlyForTheseEntityIds == null
                     ? null
-                    : (string[])source.onlyForTheseEntityIds.Clone()
+                    : (string[])source.onlyForTheseEntityIds.Clone(),
+                cardMustHaveAllOfTheseRoles = source.cardMustHaveAllOfTheseRoles == null
+                    ? null
+                    : (string[])source.cardMustHaveAllOfTheseRoles.Clone(),
+                cardMustHaveOneOfTheseRoles = source.cardMustHaveOneOfTheseRoles == null
+                    ? null
+                    : (string[])source.cardMustHaveOneOfTheseRoles.Clone(),
+                cardMustNotHaveOneOfTheseRoles = source.cardMustNotHaveOneOfTheseRoles == null
+                    ? null
+                    : (string[])source.cardMustNotHaveOneOfTheseRoles.Clone(),
+                cardMustNotHaveOneOfTheseTechs = source.cardMustNotHaveOneOfTheseTechs == null
+                    ? null
+                    : (string[])source.cardMustNotHaveOneOfTheseTechs.Clone(),
+                entityIdsNotAllowed = source.entityIdsNotAllowed == null
+                    ? null
+                    : (string[])source.entityIdsNotAllowed.Clone(),
+                changeableValueHasToBeGreaterZero = source.changeableValueHasToBeGreaterZero
             };
         }
 

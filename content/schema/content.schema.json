@@ -975,6 +975,10 @@
             "All"
           ]
         },
+        "coinsAmount": {
+          "type": "integer",
+          "minimum": 0
+        },
         "neededExperienceLevel": {
           "type": "integer",
           "minimum": 0,
@@ -984,6 +988,9 @@
           "type": "boolean"
         },
         "isForSpecialists": {
+          "type": "boolean"
+        },
+        "inactive": {
           "type": "boolean"
         },
         "localizations": {
@@ -1062,13 +1069,39 @@
         "valueToChange",
         "operation",
         "value",
-        "side",
-        "multiplyValueWithCurrentHeatLevel",
-        "onlyForTheseEntityIds"
+        "side"
       ],
       "properties": {
         "valueToChange": {
-          "const": "Health"
+          "enum": [
+            "Health",
+            "Cost",
+            "ProductionDuration",
+            "MaxCapacity",
+            "MaxHealth",
+            "MaxShield",
+            "MaxMana",
+            "MaxRank",
+            "MoveSpeed",
+            "SightRadius",
+            "Damage1",
+            "Damage2",
+            "WeaponRange",
+            "Attack1Cooldown",
+            "Attack2Cooldown",
+            "EffectRadius1",
+            "EffectRadius2",
+            "SkillRange",
+            "HealAmount1",
+            "HealAmount2",
+            "GainCreditsAmount",
+            "SkillManaCost",
+            "Duration1",
+            "SpawnTtl",
+            "ManaRechargePerSecond",
+            "MaxArmor",
+            "ArmorProtection"
+          ]
         },
         "operation": {
           "enum": [
@@ -1089,7 +1122,7 @@
           ]
         },
         "multiplyValueWithCurrentHeatLevel": {
-          "const": false
+          "type": "boolean"
         },
         "multiplyValueWithMetaProgressionMultiplier": {
           "type": "string",
@@ -1098,12 +1131,54 @@
         },
         "onlyForTheseEntityIds": {
           "type": "array",
-          "minItems": 1,
           "maxItems": 128,
           "uniqueItems": true,
           "items": {
             "$ref": "#/$defs/namespacedId"
           }
+        },
+        "cardMustHaveAllOfTheseRoles": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 16,
+          "uniqueItems": true
+        },
+        "cardMustHaveOneOfTheseRoles": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 16,
+          "uniqueItems": true
+        },
+        "cardMustNotHaveOneOfTheseRoles": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 16,
+          "uniqueItems": true
+        },
+        "cardMustNotHaveOneOfTheseTechs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 16,
+          "uniqueItems": true
+        },
+        "entityIdsNotAllowed": {
+          "type": "array",
+          "maxItems": 128,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/namespacedId"
+          }
+        },
+        "changeableValueHasToBeGreaterZero": {
+          "type": "boolean"
         }
       }
     },

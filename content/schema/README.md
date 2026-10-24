@@ -71,9 +71,22 @@ Landscape `localizations` use the same supported language IDs and require an `en
 
 ## Pack-authored relics
 
-A pack may declare `relics` to add passive relic entries to the native relic balance store. Each relic uses a namespaced `id`, an `assetBundleId`, an `imageAssetName` that resolves to a Sprite in that bundle, native rarity/tech/system-tag enum values, an experience-level threshold, demo/specialist eligibility flags, and localized names and descriptions. Provide an `en-US` localization; other supported languages such as `es-XL` are optional.
+A pack may declare `relics` to add passive relic entries to the native relic balance store. Each relic uses a namespaced `id`, an `assetBundleId`, an `imageAssetName` that resolves to a Sprite in that bundle, native rarity/tech/system-tag enum values, an optional `coinsAmount` (granting bonus currency on acquisition, non-negative integer), an optional `inactive` flag (defaults to false), an experience-level threshold, demo/specialist eligibility flags, and localized names and descriptions. Provide an `en-US` localization; other supported languages such as `es-XL` are optional.
 
-Each `cardChanges` entry uses the pack's `valueToChange`, `operation`, `value`, and `side` fields and must whitelist one or more namespaced unit IDs in `onlyForTheseEntityIds`. The current pack contract supports `Health` changes; the loader maps `Health` to Rogue Command's native `ChangeableValue.MaxHealth` enum member when it constructs a `CardChangeScriptableObject`. `side: "False"` targets player units, `"True"` targets enemy/AI units, and `"Irrelevant"` applies globally. Pack-authored relic changes must set `multiplyValueWithCurrentHeatLevel` to `false`; Heat scaling is rejected until the per-level balance budget is validated. Leave `multiplyValueWithMetaProgressionMultiplier` absent when the change should not scale with meta progression. Relic images are loaded as typed Sprites from the declared bundle, and localized names/descriptions use the active language with an `en-US` fallback.
+Each `cardChanges` entry defines a mutation using the following fields:
+- `valueToChange`: Supported for all 26 canonical native `ChangeableValue` attributes: `MaxHealth` (and alias `Health`), `MoveSpeed`, `AttackDamage1`, `AttackRange1`, `AttackInterval1`, `AttackDamage2`, `AttackRange2`, `AttackInterval2`, `AttackDamage3`, `AttackRange3`, `AttackInterval3`, `HealingAuraHealthPerSecond`, `HealingAuraRadius`, `PassiveHealthRegenerationPerSecond`, `MaxShield`, `ShieldRechargePerSecond`, `ShieldRechargeDelayInSeconds`, `ArmorProtection`, `PassiveDamageReflectPercentage`, `PassiveDamageReflectDirectDamage`, `CoinsPerHarvest`, `HarvestTime`, `CoinsPerSecond`, `VisionRange`, `DetectionRange`, and `ManaRechargePerSecond`.
+- `operation`: Calculation operator (`PercentAddition`, `AddValue`, `SubtractValue`, `PercentSubtraction`).
+- `value`: Finite numeric delta/modifier.
+- `side`: Target faction. `"False"` targets player units (`!IsAllowedForAi`), `"True"` targets enemy/AI units (`IsAllowedForAi`), and `"Irrelevant"` applies globally to both player and AI units.
+- `onlyForTheseEntityIds`: (Optional) Explicit array of namespaced entity IDs to restrict the card change. When omitted or empty, the change applies broadly across eligible units meeting the role/tech/side conditions.
+- `entityIdsNotAllowed`: (Optional) Array of namespaced entity IDs explicitly excluded from receiving this card change.
+- `cardMustHaveAllOfTheseRoles`: (Optional) Array of native `UnitRole` bitmask strings; the target card must have every declared role.
+- `cardMustHaveOneOfTheseRoles`: (Optional) Array of native `UnitRole` bitmask strings; the target card must possess at least one of these roles.
+- `cardMustNotHaveOneOfTheseRoles`: (Optional) Array of native `UnitRole` bitmask strings; target cards with any of these roles are excluded.
+- `cardMustNotHaveOneOfTheseTechs`: (Optional) Array of native `Tech` enum strings; target cards with any of these techs are excluded.
+- `changeableValueHasToBeGreaterZero`: (Optional) Boolean guard requiring the base parameter value to be strictly positive (> 0) before applying the change.
+
+Pack-authored relic changes must set `multiplyValueWithCurrentHeatLevel` to `false`; Heat scaling is rejected until the per-level balance budget is validated. Leave `multiplyValueWithMetaProgressionMultiplier` absent when the change should not scale with meta progression. Relic images are loaded as typed Sprites from the declared bundle, and localized names/descriptions use the active language with an `en-US` fallback.
 
 ## Example
 

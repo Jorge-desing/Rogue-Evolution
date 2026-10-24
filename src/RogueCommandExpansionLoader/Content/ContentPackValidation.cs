@@ -215,6 +215,14 @@ namespace RogueCommandExpansionLoader.Content
                 "Robust", "SkillRangeUse", "Bomb", "Tank", "Vehicle", "EffectDuration", "SpawnDuration",
                 "CriticalHits", "Stealth", "Zombo", "Sniper", "Regen", "EconomySupport", "All" },
             StringComparer.Ordinal);
+        private static readonly HashSet<string> SupportedRelicChangeableValues = new HashSet<string>(
+            new[] {
+                "Health", "Cost", "ProductionDuration", "MaxCapacity", "MaxHealth", "MaxShield", "MaxMana",
+                "MaxRank", "MoveSpeed", "SightRadius", "Damage1", "Damage2", "WeaponRange", "Attack1Cooldown",
+                "Attack2Cooldown", "EffectRadius1", "EffectRadius2", "SkillRange", "HealAmount1", "HealAmount2",
+                "GainCreditsAmount", "SkillManaCost", "Duration1", "SpawnTtl", "ManaRechargePerSecond",
+                "MaxArmor", "ArmorProtection"
+            }, StringComparer.Ordinal);
 
         public static ContentPackValidationResult Validate(
             ContentPackDefinition pack,
@@ -2829,6 +2837,12 @@ namespace RogueCommandExpansionLoader.Content
                     "Relic experience level must be between 0 and " + MaxNeededExperienceLevel + ".");
             }
 
+            if (relic.coinsAmount < 0)
+            {
+                Add(diagnostics, "relic.coins-amount-invalid", path + ".coinsAmount",
+                    "Relic coins amount cannot be negative.");
+            }
+
             ValidateRelicLocalizations(relic.localizations, path + ".localizations", diagnostics);
 
             ContentCardChangeDefinition[] changes = RequireArray(relic.cardChanges,
@@ -2855,10 +2869,11 @@ namespace RogueCommandExpansionLoader.Content
                     continue;
                 }
 
-                if (!String.Equals(change.valueToChange, "Health", StringComparison.Ordinal))
+                if (String.IsNullOrWhiteSpace(change.valueToChange) ||
+                    !SupportedRelicChangeableValues.Contains(change.valueToChange))
                 {
                     Add(diagnostics, "relic.change-value-unsupported", changePath + ".valueToChange",
-                        "Data-only relics currently support the Health changeable value (mapped to native MaxHealth).");
+                        "Card change valueToChange must be one of the game's supported ChangeableValue attributes.");
                 }
 
                 if (!String.Equals(change.operation, "Add", StringComparison.Ordinal) &&
@@ -2898,22 +2913,101 @@ namespace RogueCommandExpansionLoader.Content
                         "A meta progression multiplier key must be non-empty when provided.");
                 }
 
-                string[] targetIds = RequireArray(change.onlyForTheseEntityIds,
-                    changePath + ".onlyForTheseEntityIds", diagnostics);
-                if (targetIds.Length == 0)
+                ValidateRelicRoleFilter(change.cardMustHaveAllOfTheseRoles, changePath + ".cardMustHaveAllOfTheseRoles", diagnostics);
+                ValidateRelicRoleFilter(change.cardMustHaveOneOfTheseRoles, changePath + ".cardMustHaveOneOfTheseRoles", diagnostics);
+                ValidateRelicRoleFilter(change.cardMustNotHaveOneOfTheseRoles, changePath + ".cardMustNotHaveOneOfTheseRoles", diagnostics);
+
+                if (change.cardMustNotHaveOneOfTheseTechs != null)
+                {
+                    if (change.cardMustNotHaveOneOfTheseTechs.Length > 16)
+                    {
+                        Add(diagnostics, "relic.tech-filter-limit", changePath + ".cardMustNotHaveOneOfTheseTechs",
+                            "A card change can declare at most 16 excluded tech flags.");
+                    }
+                    var seenTechs = new HashSet<string>(StringComparer.Ordinal);
+                    for (int t = 0; t < change.cardMustNotHaveOneOfTheseTechs.Length; t++)
+                    {
+                        string techName = change.cardMustNotHaveOneOfTheseTechs[t];
+                        if (String.IsNullOrWhiteSpace(techName) || !SupportedUnitTechs.Contains(techName))
+                        {
+                            Add(diagnostics, "relic.tech-filter-invalid", changePath + ".cardMustNotHaveOneOfTheseTechs[" + t + "]",
+                                "Excluded tech must match one of the supported Tech values.");
+                        }
+                        else if (!seenTechs.Add(techName))
+                        {
+                            Add(diagnostics, "relic.tech-filter-duplicate", changePath + ".cardMustNotHaveOneOfTheseTechs[" + t + "]",
+                                "Duplicate tech '" + techName + "' in excluded tech list.");
+                        }
+                    }
+                }
+
+                bool hasTargetIds = change.onlyForTheseEntityIds != null && change.onlyForTheseEntityIds.Length > 0;
+                bool hasRoleFilter = (change.cardMustHaveAllOfTheseRoles != null && change.cardMustHaveAllOfTheseRoles.Length > 0) ||
+                                     (change.cardMustHaveOneOfTheseRoles != null && change.cardMustHaveOneOfTheseRoles.Length > 0);
+                bool hasSideFilter = String.Equals(change.side, "False", StringComparison.Ordinal) ||
+                                     String.Equals(change.side, "True", StringComparison.Ordinal);
+
+                if (hasTargetIds)
+                {
+                    if (change.onlyForTheseEntityIds.Length > 128)
+                    {
+                        Add(diagnostics, "relic.change-target-limit", changePath + ".onlyForTheseEntityIds",
+                            "A card change can target at most 128 unit IDs.");
+                    }
+
+                    ValidateReferences(change.onlyForTheseEntityIds, changePath + ".onlyForTheseEntityIds",
+                        unitIds, registrySnapshot, true, diagnostics);
+                }
+                else if (!hasRoleFilter && !hasSideFilter && !String.Equals(change.side, "Irrelevant", StringComparison.Ordinal))
                 {
                     Add(diagnostics, "relic.change-target-required", changePath + ".onlyForTheseEntityIds",
-                        "Every card change must target at least one namespaced unit ID.");
+                        "Every card change must specify target unit IDs, role filters, or a target side.");
                 }
 
-                if (targetIds.Length > 128)
+                if (change.entityIdsNotAllowed != null && change.entityIdsNotAllowed.Length > 0)
                 {
-                    Add(diagnostics, "relic.change-target-limit", changePath + ".onlyForTheseEntityIds",
-                        "A card change can target at most 128 unit IDs.");
-                }
+                    if (change.entityIdsNotAllowed.Length > 128)
+                    {
+                        Add(diagnostics, "relic.excluded-target-limit", changePath + ".entityIdsNotAllowed",
+                            "A card change can exclude at most 128 unit IDs.");
+                    }
 
-                ValidateReferences(targetIds, changePath + ".onlyForTheseEntityIds",
-                    unitIds, registrySnapshot, true, diagnostics);
+                    ValidateReferences(change.entityIdsNotAllowed, changePath + ".entityIdsNotAllowed",
+                        unitIds, registrySnapshot, true, diagnostics);
+                }
+            }
+        }
+
+        private static void ValidateRelicRoleFilter(
+            string[] roles,
+            string path,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (roles == null)
+            {
+                return;
+            }
+
+            if (roles.Length > 16)
+            {
+                Add(diagnostics, "relic.role-filter-limit", path,
+                    "A card change can declare at most 16 role flags per filter.");
+            }
+
+            var seenRoles = new HashSet<string>(StringComparer.Ordinal);
+            for (int i = 0; i < roles.Length; i++)
+            {
+                string role = roles[i];
+                if (String.IsNullOrWhiteSpace(role) || !SupportedUnitRoles.Contains(role))
+                {
+                    Add(diagnostics, "relic.role-filter-invalid", path + "[" + i + "]",
+                        "Relic role filter must be one of the supported UnitRole values.");
+                }
+                else if (!seenRoles.Add(role))
+                {
+                    Add(diagnostics, "relic.role-filter-duplicate", path + "[" + i + "]",
+                        "Duplicate role '" + role + "' in relic role filter.");
+                }
             }
         }
 

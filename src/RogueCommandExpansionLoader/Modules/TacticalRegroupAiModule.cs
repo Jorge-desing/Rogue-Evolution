@@ -128,6 +128,16 @@ namespace RogueCommandExpansionLoader.Modules
                         if (healed || reinforced)
                         {
                             _retreatingUnits.Remove(unit);
+                            try
+                            {
+                                EntityCommand stopCommand = EntityCommand.Stop();
+                                unit.ExecuteCommand(stopCommand, EntityController.CommandProcessingType.ExecuteAndCancelCurrentCommand);
+                            }
+                            catch (Exception exception)
+                            {
+                                Debug.LogWarning("[RogueCommandExpansionLoader] Tactical regroup could not cancel retreat for '" +
+                                    unit.gameObject.name + "': " + exception.GetType().Name + ": " + exception.Message);
+                            }
                         }
                     }
                     else if (healthFraction <= _settings.HealthRetreatThreshold &&

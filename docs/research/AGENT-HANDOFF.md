@@ -420,3 +420,21 @@ The generated unit models, prefab authoring outputs, compiled visual bundle, and
       - AssetBundle reference validator: **25 references / 0 errors**.
       - Registry validator: **3 manifests / 0 issues**.
       - Distributable package: Release build 0 warnings/errors (`artifacts/packages/RogueCommandExpansionLoader-1.19.0.zip`), clean of game/BepInEx binaries.
+
+13. **Comprehensive Roguelike Relics & Card Mutations Expansion and Tactical AI Regroup Retreat Fix (2026-10-24; static inspection and local validation only):**
+    - **Native Roguelike Relics & Mutations Architecture**: Grounded in native RelicBalancingStore, RelicScriptableObject, and CardChangeScriptableObject inspection.
+    - **Expanded Relic Definition (ContentRelicDefinition)**: Added coinsAmount (granting bonus currency on relic acquisition, non-negative integer) and inactive flag (boolean, defaults to false) with DTO, null-safe cloning, and JSON schema.
+    - **Expanded Card Change Capabilities (ContentCardChangeDefinition)**:
+      - Unlocked all 26 canonical native ChangeableValue attributes: MaxHealth (and alias Health), MoveSpeed, AttackDamage1-3, AttackRange1-3, AttackInterval1-3, HealingAuraHealthPerSecond, HealingAuraRadius, PassiveHealthRegenerationPerSecond, MaxShield, ShieldRechargePerSecond, ShieldRechargeDelayInSeconds, ArmorProtection, PassiveDamageReflectPercentage, PassiveDamageReflectDirectDamage, CoinsPerHarvest, HarvestTime, CoinsPerSecond, VisionRange, DetectionRange, and ManaRechargePerSecond.
+      - Bitmask Role Filters: cardMustHaveAllOfTheseRoles, cardMustHaveOneOfTheseRoles, cardMustNotHaveOneOfTheseRoles (array of native UnitRole bitmask strings parsed into native bitmasks).
+      - Tech Exclusions: cardMustNotHaveOneOfTheseTechs (array of native Tech enum strings).
+      - Exclusion & Guards: entityIdsNotAllowed and changeableValueHasToBeGreaterZero.
+      - Scope: onlyForTheseEntityIds is optional; when omitted, applies broadly to all eligible cards conforming to role/tech/side conditions.
+    - **Runtime Registrar (RelicContentRuntimeRegistrar)**: Uses case-insensitive parsing for UnitRole and Tech enums and populates RelicBalancingParameters and instantiated CardChangeScriptableObject.
+    - **Tactical Regroup Command Cancellation (sample:tactical-regroup)**: When a retreating unit heals or receives nearby friendly reinforcements, the module dispatches EntityCommand.Stop() with CommandProcessingType.ExecuteAndCancelCurrentCommand to cleanly halt retreat and allow normal combat AI resumption.
+    - **Comprehensive Validation Baseline**:
+      - C# validation harness: **298/299 passed** (1 Windows symlink-privilege skip).
+      - Python unittest suite: **57/57 passed** (py -3 -m unittest discover tests).
+      - AssetBundle reference validator: **25 references / 0 errors**.
+      - Registry validator: **3 manifests / 0 issues**.
+      - Distributable package: Release build 0 warnings/errors (rtifacts/packages/RogueCommandExpansionLoader-1.19.0.zip), clean of game/BepInEx binaries.

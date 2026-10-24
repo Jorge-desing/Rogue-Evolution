@@ -98,6 +98,52 @@ class StructuredUnitParameterSchemaTests(unittest.TestCase):
                 manifest["units"][0][field] = invalid_val
                 self.assertFalse(self.validator.is_valid(manifest), f"Expected schema to reject {field}={invalid_val}")
 
+    def test_relic_expanded_card_changes_valid(self) -> None:
+        manifest = json.loads(json.dumps(self.sample))
+        relic = manifest["relics"][0]
+        relic["coinsAmount"] = 150
+        relic["inactive"] = False
+        relic["cardChanges"] = [
+            {
+                "valueToChange": "MoveSpeed",
+                "operation": "Multiply",
+                "value": 1.25,
+                "side": "False",
+                "cardMustHaveAllOfTheseRoles": ["Mech", "Tank"],
+                "cardMustNotHaveOneOfTheseTechs": ["Ancient"],
+                "changeableValueHasToBeGreaterZero": True,
+            },
+            {
+                "valueToChange": "Damage1",
+                "operation": "Add",
+                "value": 5.0,
+                "side": "False",
+                "onlyForTheseEntityIds": ["sample-native:atlas-crane-mech"],
+            },
+            {
+                "valueToChange": "MaxArmor",
+                "operation": "Add",
+                "value": 15.0,
+                "side": "Irrelevant",
+            },
+        ]
+        self.assertTrue(self.validator.is_valid(manifest))
+
+    def test_relic_expanded_card_changes_invalid_rejected(self) -> None:
+        invalid_cases = [
+            ("valueToChange", "InvalidStatName"),
+            ("coinsAmount", -10),
+            ("cardMustHaveAllOfTheseRoles", ["Mech", "Mech"]),  # duplicate
+            ("cardMustNotHaveOneOfTheseTechs", ["Laser", "Laser"]),  # duplicate
+        ]
+        for field, invalid_val in invalid_cases:
+            with self.subTest(field=field, value=invalid_val):
+                manifest = json.loads(json.dumps(self.sample))
+                if field == "coinsAmount":
+                    manifest["relics"][0]["coinsAmount"] = invalid_val
+                else:
+                    manifest["relics"][0]["cardChanges"][0][field] = invalid_val
+                self.assertFalse(self.validator.is_valid(manifest), f"Expected schema to reject {field}={invalid_val}")
 
 
 if __name__ == "__main__":

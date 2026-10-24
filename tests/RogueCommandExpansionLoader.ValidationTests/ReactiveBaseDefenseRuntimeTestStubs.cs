@@ -178,6 +178,9 @@ public struct EntityCommand
     public static EntityCommand Patrol(int patrolIndex) =>
         new() { command = Command.Patrol, intValue = patrolIndex };
 
+    public static EntityCommand Stop() =>
+        new() { command = Command.Stop };
+
     public static EntityCommand Attack(EntityController target) =>
         new() { command = Command.Attack };
 
