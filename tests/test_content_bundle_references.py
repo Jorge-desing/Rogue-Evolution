@@ -176,5 +176,113 @@ class ContentBundleReferenceTests(unittest.TestCase):
         )
 
 
+
+    def test_factory_and_product_assets_resolve_from_their_own_declared_bundles(self) -> None:
+        pack: dict[str, Any] = {
+            "units": [
+                {
+                    "id": "sample:unit",
+                    "assetBundleId": "sample:product-assets",
+                    "cardImageAssetName": "assets/product.png",
+                    "visualAssetName": "assets/product.prefab",
+                    "productionBuilding": {
+                        "id": "sample:factory",
+                        "assetBundleId": "sample:factory-assets",
+                        "cardImageAssetName": "assets/factory-card.png",
+                        "visualAssetName": "assets/factory-visual.prefab",
+                    },
+                }
+            ]
+        }
+        bundle_entries = {
+            "sample:product-assets": [
+                ("assets/product.png", "Sprite"),
+                ("assets/product.prefab", "GameObject"),
+            ],
+            "sample:factory-assets": [
+                ("assets/factory-card.png", "Sprite"),
+                ("assets/factory-visual.prefab", "GameObject"),
+            ],
+        }
+
+        diagnostics, failures = validator.validate_references(
+            validator.collect_references(pack), bundle_entries
+        )
+
+        self.assertEqual(failures, 0)
+        self.assertEqual(
+            diagnostics,
+            [
+                "OK unit:sample:unit.cardImageAssetName: assets/product.png (Sprite)",
+                "OK unit:sample:unit.visualAssetName: assets/product.prefab (GameObject)",
+                "OK productionBuilding:sample:factory.cardImageAssetName: assets/factory-card.png (Sprite)",
+                "OK productionBuilding:sample:factory.visualAssetName: assets/factory-visual.prefab (GameObject)",
+            ],
+        )
+
+    def test_factory_reference_rejects_wrong_serialized_type(self) -> None:
+        pack: dict[str, Any] = {
+            "units": [
+                {
+                    "id": "sample:unit",
+                    "productionBuilding": {
+                        "id": "sample:factory",
+                        "assetBundleId": "sample:factory-assets",
+                        "cardImageAssetName": "assets/factory-card.png",
+                    },
+                }
+            ]
+        }
+        bundle_entries = {
+            "sample:factory-assets": [("assets/factory-card.png", "Texture2D")]
+        }
+
+        diagnostics, failures = validator.validate_references(
+            validator.collect_references(pack), bundle_entries
+        )
+
+        self.assertEqual(failures, 1)
+        self.assertEqual(
+            diagnostics,
+            [
+                "ERROR productionBuilding:sample:factory.cardImageAssetName: "
+                "assets/factory-card.png is Texture2D, expected Sprite card image (Sprite)"
+            ],
+        )
+
+    def test_factory_reference_rejects_ambiguous_serialized_matches(self) -> None:
+        pack: dict[str, Any] = {
+            "units": [
+                {
+                    "id": "sample:unit",
+                    "productionBuilding": {
+                        "id": "sample:factory",
+                        "assetBundleId": "sample:factory-assets",
+                        "cardImageAssetName": "factory-card.png",
+                    },
+                }
+            ]
+        }
+        bundle_entries = {
+            "sample:factory-assets": [
+                ("assets/factory-card.png", "Sprite"),
+                ("other/factory-card.png", "Sprite"),
+            ]
+        }
+
+        diagnostics, failures = validator.validate_references(
+            validator.collect_references(pack), bundle_entries
+        )
+
+        self.assertEqual(failures, 1)
+        self.assertEqual(
+            diagnostics,
+            [
+                "ERROR productionBuilding:sample:factory.cardImageAssetName: "
+                "'factory-card.png' is ambiguous: assets/factory-card.png (Sprite), "
+                "other/factory-card.png (Sprite)"
+            ],
+        )
+
 if __name__ == "__main__":
     unittest.main()

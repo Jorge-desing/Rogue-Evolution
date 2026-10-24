@@ -121,6 +121,45 @@ def collect_references(pack: dict[str, Any]) -> list[tuple[str, str, str, str]]:
     return references
 
 
+def validate_references(
+    references: list[tuple[str, str, str, str]],
+    bundle_entries: dict[str, list[tuple[str, str]]],
+) -> tuple[list[str], int]:
+    diagnostics: list[str] = []
+    failures = 0
+    for location, bundle_id, asset_name, expected_label in references:
+        if bundle_id not in bundle_entries:
+            diagnostics.append(f"ERROR {location}: AssetBundle ID {bundle_id!r} is not declared")
+            failures += 1
+            continue
+
+        matches = resolve_asset(bundle_entries[bundle_id], asset_name)
+        if not matches:
+            diagnostics.append(
+                f"ERROR {location}: {asset_name!r} does not match a serialized AssetBundle entry"
+            )
+            failures += 1
+            continue
+        if len(matches) != 1:
+            candidates = ", ".join(f"{path} ({kind})" for path, kind in matches)
+            diagnostics.append(f"ERROR {location}: {asset_name!r} is ambiguous: {candidates}")
+            failures += 1
+            continue
+
+        path, object_type = matches[0]
+        expected_types = EXPECTED_TYPES[expected_label]
+        if object_type not in expected_types:
+            diagnostics.append(
+                f"ERROR {location}: {path} is {object_type}, expected {expected_label} "
+                f"({', '.join(sorted(expected_types))})"
+            )
+            failures += 1
+            continue
+        diagnostics.append(f"OK {location}: {path} ({object_type})")
+
+    return diagnostics, failures
+
+
 def main() -> int:
     args = parse_args()
     pack_root = args.pack.resolve()
@@ -145,34 +184,9 @@ def main() -> int:
         print(f"Could not inspect pack bundles: {type(exc).__name__}: {exc}", file=sys.stderr)
         return 2
 
-    failures = 0
-    for location, bundle_id, asset_name, expected_label in references:
-        if bundle_id not in bundle_entries:
-            print(f"ERROR {location}: AssetBundle ID {bundle_id!r} is not declared")
-            failures += 1
-            continue
-
-        matches = resolve_asset(bundle_entries[bundle_id], asset_name)
-        if not matches:
-            print(f"ERROR {location}: {asset_name!r} does not match a serialized AssetBundle entry")
-            failures += 1
-            continue
-        if len(matches) != 1:
-            candidates = ", ".join(f"{path} ({kind})" for path, kind in matches)
-            print(f"ERROR {location}: {asset_name!r} is ambiguous: {candidates}")
-            failures += 1
-            continue
-
-        path, object_type = matches[0]
-        expected_types = EXPECTED_TYPES[expected_label]
-        if object_type not in expected_types:
-            print(
-                f"ERROR {location}: {path} is {object_type}, expected {expected_label} "
-                f"({', '.join(sorted(expected_types))})"
-            )
-            failures += 1
-            continue
-        print(f"OK {location}: {path} ({object_type})")
+    diagnostics, failures = validate_references(references, bundle_entries)
+    for diagnostic in diagnostics:
+        print(diagnostic)
 
     print(f"Checked {len(references)} AssetBundle reference(s); {failures} error(s).")
     return 1 if failures else 0
