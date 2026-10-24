@@ -190,6 +190,20 @@ namespace RogueCommandExpansionLoader.Content
                 "Heal", "Specialist", "Skill", "Engineer", "Bomb", "Scout", "Chest", "Tank", "Vehicle",
                 "Mech", "Tree", "Melee", "Research", "Crystal", "Builder", "Drop", "All"
             }, StringComparer.OrdinalIgnoreCase);
+        private static readonly HashSet<string> SupportedUnitSystemTags = new HashSet<string>(
+            new[] {
+                "Melee", "Shield", "Spawn", "Armor", "Mech", "Robo", "Heal", "Turret", "Fire",
+                "Bounty", "Panic", "Slow", "Stun", "Teleport", "AoE", "ManaUse", "Rush", "Turbo", "Strength",
+                "Robust", "SkillRangeUse", "Bomb", "Tank", "Vehicle", "EffectDuration", "SpawnDuration",
+                "CriticalHits", "Stealth", "Zombo", "Sniper", "Regen", "EconomySupport"
+            }, StringComparer.OrdinalIgnoreCase);
+        private static readonly HashSet<string> SupportedUnitStatusEffects = new HashSet<string>(
+            new[] {
+                "CombatBoost", "Defender", "SquadEffect", "Turbo", "SlowedDown", "Stun", "OnFire", "Spikes",
+                "CriticallyHitting", "Battered", "Reaper", "Regen", "Rage", "Attacker", "Invincible", "Leaking",
+                "Vampirism", "Robust", "Marked", "Rush", "Solo", "Stealth", "Taunt", "Armored", "AttackDeactivated",
+                "Panic", "Overclocked"
+            }, StringComparer.OrdinalIgnoreCase);
         private static readonly HashSet<string> SupportedRelicRarities = new HashSet<string>(
             new[] { "Common", "Rare", "UltraRare" }, StringComparer.Ordinal);
         private static readonly HashSet<string> SupportedRelicTechs = new HashSet<string>(
@@ -1563,7 +1577,8 @@ namespace RogueCommandExpansionLoader.Content
                     (balanceOverride.name == "skillType" && !String.IsNullOrEmpty(unit.skillType)) ||
                     (balanceOverride.name == "rarity" && !String.IsNullOrEmpty(unit.rarity)) ||
                     (balanceOverride.name == "tech" && !String.IsNullOrEmpty(unit.tech)) ||
-                    (balanceOverride.name == "neededExperienceLevel" && unit.neededExperienceLevel.HasValue);
+                    (balanceOverride.name == "neededExperienceLevel" && unit.neededExperienceLevel.HasValue) ||
+                    (balanceOverride.name == "offeredSystemTags" && unit.systemTags != null);
                 if (structuredParameterAlreadySet)
                 {
                     Add(diagnostics, "unit.balance-override-redundant-with-structured", itemPath,
@@ -2697,6 +2712,58 @@ namespace RogueCommandExpansionLoader.Content
                 {
                     Add(diagnostics, "unit.neededExperienceLevel-invalid", path + ".neededExperienceLevel",
                         "neededExperienceLevel must be an integer between 0 and 100.");
+                }
+            }
+
+            if (unit.systemTags != null)
+            {
+                if (unit.systemTags.Length > 16)
+                {
+                    Add(diagnostics, "unit.systemTags-invalid", path + ".systemTags",
+                        "systemTags list cannot exceed 16 elements.");
+                }
+
+                HashSet<string> seenTags = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                for (int i = 0; i < unit.systemTags.Length; i++)
+                {
+                    string tag = unit.systemTags[i];
+                    string tagPath = path + ".systemTags[" + i + "]";
+                    if (String.IsNullOrWhiteSpace(tag) || !SupportedUnitSystemTags.Contains(tag))
+                    {
+                        Add(diagnostics, "unit.systemTags-invalid", tagPath,
+                            "Each systemTag must match a supported native SystemTags enum flag.");
+                    }
+                    else if (!seenTags.Add(tag))
+                    {
+                        Add(diagnostics, "unit.systemTags-duplicate", tagPath,
+                            "Duplicate systemTag '" + tag + "' is not permitted.");
+                    }
+                }
+            }
+
+            if (unit.baselineStatusEffects != null)
+            {
+                if (unit.baselineStatusEffects.Length > 16)
+                {
+                    Add(diagnostics, "unit.baselineStatusEffects-invalid", path + ".baselineStatusEffects",
+                        "baselineStatusEffects list cannot exceed 16 elements.");
+                }
+
+                HashSet<string> seenEffects = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                for (int i = 0; i < unit.baselineStatusEffects.Length; i++)
+                {
+                    string effect = unit.baselineStatusEffects[i];
+                    string effectPath = path + ".baselineStatusEffects[" + i + "]";
+                    if (String.IsNullOrWhiteSpace(effect) || !SupportedUnitStatusEffects.Contains(effect))
+                    {
+                        Add(diagnostics, "unit.baselineStatusEffects-invalid", effectPath,
+                            "Each baselineStatusEffect must match a supported native StatusEffect enum flag.");
+                    }
+                    else if (!seenEffects.Add(effect))
+                    {
+                        Add(diagnostics, "unit.baselineStatusEffects-duplicate", effectPath,
+                            "Duplicate baselineStatusEffect '" + effect + "' is not permitted.");
+                    }
                 }
             }
         }

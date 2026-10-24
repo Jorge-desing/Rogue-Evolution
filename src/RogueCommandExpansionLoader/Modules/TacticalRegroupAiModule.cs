@@ -122,43 +122,58 @@ namespace RogueCommandExpansionLoader.Modules
                     {
                         // Check if unit is ready to resume combat (healed up or has nearby friendly reinforcements)
                         bool healed = healthFraction > (_settings.HealthRetreatThreshold + 0.15f);
-                        int nearbyFriends = CountNearbyFriendlyUnits(unit, aiUnits, 15f);
-                        bool reinforced = nearbyFriends >= _settings.RegroupMinSquadSize;
+                        bool reinforced = CountNearbyFriendlyCombatUnits(unit, aiUnits, 15f) >=
+                            _settings.RegroupMinSquadSize;
 
                         if (healed || reinforced)
                         {
                             _retreatingUnits.Remove(unit);
-                            // Unit is free to acquire new targets naturally
                         }
                     }
-                    else
+                    else if (healthFraction <= _settings.HealthRetreatThreshold &&
+                        CountNearbyFriendlyCombatUnits(unit, aiUnits, 15f) < _settings.RegroupMinSquadSize)
                     {
-                        // Check if unit should retreat
-                        if (healthFraction <= _settings.HealthRetreatThreshold)
+                        Vector3 dirToBase = (basePosition - unit.Position).normalized;
+                        Vector3 retreatTarget = basePosition - dirToBase * _settings.RegroupDistanceToBase;
+
+                        EntityCommand retreatCommand = EntityCommand.Move(
+                            retreatTarget,
+                            null,
+                            EntityCommand.Role.ThisCommandWantsPathToBeCleared);
+                        retreatCommand.tag = _commandTag;
+
+                        try
                         {
-                            Vector3 dirToBase = (basePosition - unit.Position).normalized;
-                            Vector3 retreatTarget = basePosition - dirToBase * _settings.RegroupDistanceToBase;
-
-                            EntityCommand retreatCommand = EntityCommand.Move(
-                                retreatTarget,
-                                null,
-                                EntityCommand.Role.ThisCommandWantsPathToBeCleared);
-                            retreatCommand.tag = _commandTag;
-
-                            unit.ExecuteCommand(retreatCommand, EntityController.CommandProcessingType.ExecuteBeforeCurrentCommand);
+                            unit.ExecuteCommand(retreatCommand,
+                                EntityController.CommandProcessingType.ExecuteBeforeCurrentCommand);
                             _retreatingUnits.Add(unit);
+                        }
+                        catch (Exception exception)
+                        {
+                            Debug.LogWarning("[RogueCommandExpansionLoader] Tactical regroup could not dispatch retreat for '" +
+                                unit.gameObject.name + "': " + exception.GetType().Name + ": " + exception.Message);
                         }
                     }
                 }
             }
 
-            private static int CountNearbyFriendlyUnits(EntityController unit, HashSet<EntityController> allUnits, float radius)
+            private static int CountNearbyFriendlyCombatUnits(EntityController unit, HashSet<EntityController> allUnits, float radius)
             {
                 float radiusSq = radius * radius;
                 int count = 0;
                 foreach (EntityController other in allUnits)
                 {
                     if (other == null || other == unit || other.IsDestroyed || other.DestroyHasBeenStarted)
+                    {
+                        continue;
+                    }
+
+                    if (!other.IsCombatUnit || !other.CanAttackAndIsAttackEnabled)
+                    {
+                        continue;
+                    }
+
+                    if (unit.aiBaseIndex >= 0 && other.aiBaseIndex != unit.aiBaseIndex)
                     {
                         continue;
                     }

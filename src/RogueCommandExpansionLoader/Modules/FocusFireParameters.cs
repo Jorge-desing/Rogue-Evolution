@@ -29,6 +29,13 @@ namespace RogueCommandExpansionLoader.Modules
         private const int DefaultMinUnitsInSquad = 2;
         private const string DefaultPriorityMode = "LowestHealth";
         private const string DefaultTargetRole = "None";
+        private static readonly HashSet<string> SupportedTargetRoles = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "None", "Spawn", "Harvester", "FrontalAttacker", "MassDestruction", "Fire", "Sniper", "Supporter",
+            "Rock", "Robo", "Spawner", "PCXCard", "Building", "Factory", "Turret", "Refinery", "Unit",
+            "Heal", "Specialist", "Skill", "Engineer", "Bomb", "Scout", "Chest", "Tank", "Vehicle",
+            "Mech", "Tree", "Melee", "Research", "Crystal", "Builder", "Drop"
+        };
 
         public static bool TryParse(
             ContentModuleParameter[] parameters,
@@ -111,9 +118,9 @@ namespace RogueCommandExpansionLoader.Modules
             string targetRole;
             if (values.TryGetValue("targetRole", out targetRole))
             {
-                if (String.IsNullOrWhiteSpace(targetRole))
+                if (String.IsNullOrWhiteSpace(targetRole) || !IsSupportedTargetRole(targetRole))
                 {
-                    diagnostic = "targetRole must be a non-empty string when supplied.";
+                    diagnostic = "targetRole must match a supported UnitRole name when supplied.";
                     return false;
                 }
             }

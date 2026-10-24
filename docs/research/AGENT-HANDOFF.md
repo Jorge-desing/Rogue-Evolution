@@ -408,3 +408,15 @@ The generated unit models, prefab authoring outputs, compiled visual bundle, and
       - AssetBundle reference validator: 25 references / 0 errors.
       - Registry validator: 3 manifests / 0 issues.
       - Distributable package: Release build 0 warnings/errors (`artifacts/packages/RogueCommandExpansionLoader-1.19.0.zip`), clean of game/BepInEx binaries.
+
+12. **Grounded Unit SystemTags, Relic Synergy Propagation, and Tactical AI Squad/Skill/Wave Modules (2026-10-24; static inspection and local validation only):**
+    - **Unit SystemTags & Relic Synergies**: Added `systemTags` (array of native `SystemTags` flags, max 16) and `baselineStatusEffects` (array of native `StatusEffect` flags, max 16) to `ContentUnitDefinition`. In native Rogue Command, `RelicBalancingStore.NeededSystemTags` gates relic offers on `(OfferedSystemTags(entityId) & neededTags) != 0`. The loader converts `systemTags` to the combined bitmask, assigns to unit row `offeredSystemTags`, and automatically propagates it to the dedicated factory row. Redundant raw `balanceOverrides` are rejected.
+    - **Tactical Squad Formation Module (`sample:squad-formation`)**: Coordinates escort units around heavy anchor units (Captains) using native `EntityController.SetCaptain` and `RemoveCaptain`. Followers converge around the captain in tactical flocking formations and are cleanly unassigned on captain destruction or module disposal.
+    - **Tactical Skill Activation Module (`sample:tactical-skill-activation`)**: Monitors AI combat units with active skills and executes them (`ActiveSkillWithoutTarget`, `ActiveSkillOnTarget`, or `ActiveSkillAtPosition`) using `EntityController.CommandProcessingType.ExecuteBeforeCurrentCommand` when enemies enter `enemyTriggerRadiusCells`.
+    - **Wave Escalation Module (`sample:wave-escalation`)**: Drives match pacing and wave progression by incrementing `AiBehaviourManager.CurrentAttackWaveNumber` via `AiBehaviourManager.IncrementAttackWaveNumber_Static()` at configured wave intervals, coordinating scalable assault strike waves against player defensive structures or HQ.
+    - **Comprehensive Validation Baseline**:
+      - C# validation harness: **295/296 passed** (1 Windows symlink-privilege skip).
+      - Python unittest suite: **55/55 passed** (`py -3 -m unittest discover tests`).
+      - AssetBundle reference validator: **25 references / 0 errors**.
+      - Registry validator: **3 manifests / 0 issues**.
+      - Distributable package: Release build 0 warnings/errors (`artifacts/packages/RogueCommandExpansionLoader-1.19.0.zip`), clean of game/BepInEx binaries.

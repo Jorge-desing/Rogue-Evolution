@@ -7705,6 +7705,165 @@ var tests = new (string Name, Action Run)[]
             throw new InvalidOperationException("Tactical-regroup should reject retreat threshold > 0.60.");
         }
     }),
+    ("focus-fire rejects an unknown targetRole when target-role priority is selected", () =>
+    {
+        var parameters = new[]
+        {
+            new ContentModuleParameter { name = "priorityMode", value = "TargetRole" },
+            new ContentModuleParameter { name = "targetRole", value = "NotAUnitRole" }
+        };
+        if (FocusFireParameterParser.TryParse(parameters, out _, out string diagnostic) ||
+            String.IsNullOrWhiteSpace(diagnostic))
+        {
+            throw new InvalidOperationException("Focus-fire should reject an unknown targetRole.");
+        }
+    }),
+    ("tactical-regroup does not count another base as regroup reinforcement", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        DefaultAiBehaviour.ResetRuntimeState();
+        UnityEngine.Time.time = 0f;
+        IRogueCommandAiRuntimeBehaviour? behaviour = null;
+        try
+        {
+            var wounded = new EntityController
+            {
+                IsControlledByAi = true,
+                IsUnit = true,
+                IsCombatUnit = true,
+                CanAttackAndIsAttackEnabled = true,
+                CanMoveAndMovementIsEnabled = true,
+                aiBaseIndex = 0,
+                CurrentHealth = 20f,
+                MaxHealth = 100f,
+                Position = new UnityEngine.Vector3(20f, 0f, 0f)
+            };
+            ExistingControllers.Instance.AiUnits().Add(wounded);
+            ExistingControllers.Instance.AiBuildings().Add(new EntityController
+            {
+                IsControlledByAi = true,
+                IsBuilding = true,
+                aiBaseIndex = 0,
+                Position = UnityEngine.Vector3.zero
+            });
+            for (int i = 0; i < 2; i++)
+            {
+                ExistingControllers.Instance.AiUnits().Add(new EntityController
+                {
+                    IsControlledByAi = true,
+                    IsUnit = true,
+                    IsCombatUnit = true,
+                    CanAttackAndIsAttackEnabled = true,
+                    CanMoveAndMovementIsEnabled = true,
+                    aiBaseIndex = 1,
+                    Position = wounded.Position
+                });
+                ExistingControllers.Instance.AiUnits().Add(new EntityController
+                {
+                    IsControlledByAi = true,
+                    IsUnit = true,
+                    CanAttackAndIsAttackEnabled = true,
+                    CanMoveAndMovementIsEnabled = true,
+                    aiBaseIndex = 0,
+                    Position = wounded.Position
+                });
+            }
+
+            behaviour = new TacticalRegroupAiModule().CreateBehaviour(new DefaultAiBehaviour(),
+                [
+                    new ContentModuleParameter { name = "baseIndex", value = "0" },
+                    new ContentModuleParameter { name = "checkIntervalSeconds", value = "4" },
+                    new ContentModuleParameter { name = "regroupMinSquadSize", value = "2" }
+                ]);
+            behaviour.OnInitialized();
+            UnityEngine.Time.time = 4f;
+            behaviour.Tick();
+            if (!wounded.LastExecutedCommand.HasValue ||
+                wounded.LastExecutedCommand.Value.command != EntityCommand.Command.Move)
+            {
+                throw new InvalidOperationException("The wounded unit did not receive its initial retreat order.");
+            }
+
+            int initialOrderCount = wounded.ExecuteCommandCallCount;
+            UnityEngine.Time.time = 8f;
+            behaviour.Tick();
+            UnityEngine.Time.time = 12f;
+            behaviour.Tick();
+            if (wounded.ExecuteCommandCallCount != initialOrderCount)
+            {
+                throw new InvalidOperationException("Units from another AI base incorrectly released the retreat state.");
+            }
+        }
+        finally
+        {
+            behaviour?.OnDestroyed();
+            ExistingControllers.Instance.Reset();
+            DefaultAiBehaviour.ResetRuntimeState();
+        }
+    }),
+    ("tactical-regroup does not duplicate a retreat order after reinforcement", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        DefaultAiBehaviour.ResetRuntimeState();
+        UnityEngine.Time.time = 0f;
+        IRogueCommandAiRuntimeBehaviour? behaviour = null;
+        try
+        {
+            var wounded = new EntityController
+            {
+                IsControlledByAi = true,
+                IsUnit = true,
+                IsCombatUnit = true,
+                CanAttackAndIsAttackEnabled = true,
+                CanMoveAndMovementIsEnabled = true,
+                aiBaseIndex = 0,
+                CurrentHealth = 20f,
+                MaxHealth = 100f,
+                Position = new UnityEngine.Vector3(20f, 0f, 0f)
+            };
+            ExistingControllers.Instance.AiUnits().Add(wounded);
+            ExistingControllers.Instance.AiBuildings().Add(new EntityController
+            {
+                IsControlledByAi = true,
+                IsBuilding = true,
+                aiBaseIndex = 0,
+                Position = UnityEngine.Vector3.zero
+            });
+            ExistingControllers.Instance.AiUnits().Add(new EntityController
+            {
+                IsControlledByAi = true,
+                IsUnit = true,
+                IsCombatUnit = true,
+                CanAttackAndIsAttackEnabled = true,
+                CanMoveAndMovementIsEnabled = true,
+                aiBaseIndex = 0,
+                Position = wounded.Position
+            });
+
+            behaviour = new TacticalRegroupAiModule().CreateBehaviour(new DefaultAiBehaviour(),
+                [
+                    new ContentModuleParameter { name = "baseIndex", value = "0" },
+                    new ContentModuleParameter { name = "checkIntervalSeconds", value = "4" },
+                    new ContentModuleParameter { name = "regroupMinSquadSize", value = "2" }
+                ]);
+            behaviour.OnInitialized();
+            UnityEngine.Time.time = 4f;
+            behaviour.Tick();
+            int initialOrderCount = wounded.ExecuteCommandCallCount;
+            UnityEngine.Time.time = 8f;
+            behaviour.Tick();
+            if (wounded.ExecuteCommandCallCount != initialOrderCount)
+            {
+                throw new InvalidOperationException("The retreat order was duplicated while the unit remained reinforced.");
+            }
+        }
+        finally
+        {
+            behaviour?.OnDestroyed();
+            ExistingControllers.Instance.Reset();
+            DefaultAiBehaviour.ResetRuntimeState();
+        }
+    }),
     ("tactical AI modules focus-fire, construction-expansion, and tactical-regroup are registered", () =>
     {
         var registry = new AiModuleRegistry();
@@ -7725,7 +7884,480 @@ var tests = new (string Name, Action Run)[]
             throw new InvalidOperationException("Tactical-regroup module failed registry validation: " + diagnostic);
         }
     }),
+    ("unit systemTags accepts valid flags and rejects unknown, duplicate, or out-of-bounds tags", () =>
+    {
+        WithPackage(nativeSample, (pack, root) =>
+        {
+            ContentUnitDefinition unit = pack.units[0];
+            unit.systemTags = new[] { "Mech", "Armor", "Tank" };
 
+            ContentPackValidationResult result = ContentPackValidator.Validate(
+                pack, root, new EmptySnapshot(), new KnownModuleValidator());
+            if (result.Diagnostics.Any(d => d.Code.Contains("systemTags")))
+            {
+                throw new InvalidOperationException("Valid systemTags were rejected: " +
+                    string.Join(", ", result.Diagnostics.Select(d => d.Code + " at " + d.Path)));
+            }
+
+            // Duplicate tag
+            unit.systemTags = new[] { "Mech", "Mech" };
+            result = ContentPackValidator.Validate(pack, root, new EmptySnapshot(), new KnownModuleValidator());
+            if (!result.Diagnostics.Any(d => d.Code == "unit.systemTags-duplicate"))
+            {
+                throw new InvalidOperationException("Duplicate systemTags was not rejected.");
+            }
+
+            // Unknown tag
+            unit.systemTags = new[] { "Mech", "InvalidTag" };
+            result = ContentPackValidator.Validate(pack, root, new EmptySnapshot(), new KnownModuleValidator());
+            if (!result.Diagnostics.Any(d => d.Code == "unit.systemTags-invalid"))
+            {
+                throw new InvalidOperationException("Unknown systemTags flag was not rejected.");
+            }
+
+            // Length > 16
+            unit.systemTags = Enumerable.Repeat("Mech", 17).ToArray();
+            result = ContentPackValidator.Validate(pack, root, new EmptySnapshot(), new KnownModuleValidator());
+            if (!result.Diagnostics.Any(d => d.Code == "unit.systemTags-invalid" && d.Message.Contains("16")))
+            {
+                throw new InvalidOperationException("systemTags exceeding 16 entries was not rejected.");
+            }
+        });
+    }),
+    ("unit baselineStatusEffects accepts valid flags and rejects unknown, duplicate, or out-of-bounds effects", () =>
+    {
+        WithPackage(nativeSample, (pack, root) =>
+        {
+            ContentUnitDefinition unit = pack.units[0];
+            unit.baselineStatusEffects = new[] { "OnFire", "SlowedDown" };
+
+            ContentPackValidationResult result = ContentPackValidator.Validate(
+                pack, root, new EmptySnapshot(), new KnownModuleValidator());
+            if (result.Diagnostics.Any(d => d.Code.Contains("baselineStatusEffects")))
+            {
+                throw new InvalidOperationException("Valid baselineStatusEffects were rejected: " +
+                    string.Join(", ", result.Diagnostics.Select(d => d.Code + " at " + d.Path)));
+            }
+
+            // Duplicate effect
+            unit.baselineStatusEffects = new[] { "OnFire", "OnFire" };
+            result = ContentPackValidator.Validate(pack, root, new EmptySnapshot(), new KnownModuleValidator());
+            if (!result.Diagnostics.Any(d => d.Code == "unit.baselineStatusEffects-duplicate"))
+            {
+                throw new InvalidOperationException("Duplicate baselineStatusEffect was not rejected.");
+            }
+
+            // Unknown effect
+            unit.baselineStatusEffects = new[] { "NotAStatusEffect" };
+            result = ContentPackValidator.Validate(pack, root, new EmptySnapshot(), new KnownModuleValidator());
+            if (!result.Diagnostics.Any(d => d.Code == "unit.baselineStatusEffects-invalid"))
+            {
+                throw new InvalidOperationException("Unknown baselineStatusEffects flag was not rejected.");
+            }
+
+            // Length > 16
+            unit.baselineStatusEffects = Enumerable.Repeat("OnFire", 17).ToArray();
+            result = ContentPackValidator.Validate(pack, root, new EmptySnapshot(), new KnownModuleValidator());
+            if (!result.Diagnostics.Any(d => d.Code == "unit.baselineStatusEffects-invalid" && d.Message.Contains("16")))
+            {
+                throw new InvalidOperationException("baselineStatusEffects exceeding 16 entries was not rejected.");
+            }
+        });
+    }),
+    ("unit deep clone safely duplicates systemTags and baselineStatusEffects arrays", () =>
+    {
+        var original = new ContentPackDefinition
+        {
+            units = new[]
+            {
+                new ContentUnitDefinition
+                {
+                    id = "test-unit",
+                    systemTags = new[] { "Mech", "Armor" },
+                    baselineStatusEffects = new[] { "OnFire" }
+                }
+            }
+        };
+        var cloned = ContentPackCopy.DeepClone(original);
+        if (cloned?.units == null || cloned.units.Length != 1)
+        {
+            throw new InvalidOperationException("Cloned pack or units was null.");
+        }
+        var clonedUnit = cloned.units[0];
+        if (clonedUnit.systemTags == null || clonedUnit.systemTags.Length != 2 || ReferenceEquals(clonedUnit.systemTags, original.units[0].systemTags))
+        {
+            throw new InvalidOperationException("systemTags was not deeply cloned.");
+        }
+        if (clonedUnit.baselineStatusEffects == null || clonedUnit.baselineStatusEffects.Length != 1 || ReferenceEquals(clonedUnit.baselineStatusEffects, original.units[0].baselineStatusEffects))
+        {
+            throw new InvalidOperationException("baselineStatusEffects was not deeply cloned.");
+        }
+
+        var nullArrays = new ContentPackDefinition
+        {
+            units = new[] { new ContentUnitDefinition { id = "null-unit" } }
+        };
+        var nullCloned = ContentPackCopy.DeepClone(nullArrays);
+        if (nullCloned.units[0].systemTags != null || nullCloned.units[0].baselineStatusEffects != null)
+        {
+            throw new InvalidOperationException("Null arrays should remain null after clone.");
+        }
+    }),
+    ("unit balance-override offeredSystemTags is rejected when structured systemTags is present", () =>
+    {
+        WithPackage(nativeSample, (pack, root) =>
+        {
+            ContentUnitDefinition unit = pack.units[0];
+            unit.systemTags = new[] { "Mech" };
+            unit.balanceOverrides = unit.balanceOverrides
+                .Concat(new[] { new ContentBalanceOverride { name = "offeredSystemTags", value = "16" } })
+                .ToArray();
+
+            ContentPackValidationResult result = ContentPackValidator.Validate(
+                pack, root, new EmptySnapshot(), new KnownModuleValidator());
+            if (!result.Diagnostics.Any(d => d.Code == "unit.balance-override-redundant-with-structured"))
+            {
+                throw new InvalidOperationException("Redundant offeredSystemTags balanceOverride was not rejected.");
+            }
+        });
+    }),
+    ("squad-formation AI module parses defaults and validates limits", () =>
+    {
+        if (!SquadFormationParameterParser.TryParse(null, out SquadFormationSettings settings, out string diagnostic) || diagnostic != null)
+        {
+            throw new InvalidOperationException("Squad-formation default parse failed: " + diagnostic);
+        }
+        if (settings.AnchorRole != "Tank" || settings.MaxFollowersPerCaptain != 4 || settings.FormationRadiusCells != 10f || settings.CooldownSeconds != 5f || settings.BaseIndex != -1)
+        {
+            throw new InvalidOperationException("Squad-formation default values did not match specification.");
+        }
+
+        var validParams = new[]
+        {
+            new ContentModuleParameter { name = "anchorRole", value = "Mech" },
+            new ContentModuleParameter { name = "maxFollowersPerCaptain", value = "6" },
+            new ContentModuleParameter { name = "formationRadiusCells", value = "20" },
+            new ContentModuleParameter { name = "cooldownSeconds", value = "2.5" },
+            new ContentModuleParameter { name = "baseIndex", value = "1" }
+        };
+        if (!SquadFormationParameterParser.TryParse(validParams, out settings, out diagnostic) || diagnostic != null)
+        {
+            throw new InvalidOperationException("Squad-formation custom parse failed: " + diagnostic);
+        }
+        if (settings.AnchorRole != "Mech" || settings.MaxFollowersPerCaptain != 6 || settings.FormationRadiusCells != 20f || settings.BaseIndex != 1)
+        {
+            throw new InvalidOperationException("Squad-formation parsed values incorrect.");
+        }
+
+        var invalidParams = new[]
+        {
+            new ContentModuleParameter { name = "maxFollowersPerCaptain", value = "25" }
+        };
+        if (SquadFormationParameterParser.TryParse(invalidParams, out _, out diagnostic) || diagnostic == null)
+        {
+            throw new InvalidOperationException("Squad-formation should reject maxFollowersPerCaptain > 16.");
+        }
+
+        var invalidRoleParams = new[]
+        {
+            new ContentModuleParameter { name = "anchorRole", value = "InvalidUnitRole" }
+        };
+        if (SquadFormationParameterParser.TryParse(invalidRoleParams, out _, out diagnostic) || diagnostic == null)
+        {
+            throw new InvalidOperationException("Squad-formation should reject invalid anchorRole.");
+        }
+    }),
+    ("squad-formation AI module binds followers to anchor captain and releases on destroy", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        DefaultAiBehaviour.ResetRuntimeState();
+        EntityBalancingStore.Reset();
+        UnityEngine.Time.time = 0f;
+        IRogueCommandAiRuntimeBehaviour? behaviour = null;
+        try
+        {
+            EntityBalancingStore.RolesOf["TankUnit"] = UnitRole.Tank;
+            EntityBalancingStore.RolesOf["TrooperUnit"] = UnitRole.Unit;
+
+            var captain = new EntityController
+            {
+                IsControlledByAi = true,
+                IsUnit = true,
+                IsCombatUnit = true,
+                EntityId = "TankUnit",
+                UniqueEntityId = 101,
+                aiBaseIndex = 0,
+                Position = UnityEngine.Vector3.zero
+            };
+            var follower = new EntityController
+            {
+                IsControlledByAi = true,
+                IsUnit = true,
+                IsCombatUnit = true,
+                EntityId = "TrooperUnit",
+                UniqueEntityId = 102,
+                aiBaseIndex = 0,
+                Position = new UnityEngine.Vector3(5f, 0f, 0f)
+            };
+
+            ExistingControllers.Instance.AiUnits().Add(captain);
+            ExistingControllers.Instance.AiUnits().Add(follower);
+
+            behaviour = new SquadFormationAiModule().CreateBehaviour(new DefaultAiBehaviour(),
+                [
+                    new ContentModuleParameter { name = "anchorRole", value = "Tank" },
+                    new ContentModuleParameter { name = "baseIndex", value = "0" },
+                    new ContentModuleParameter { name = "cooldownSeconds", value = "2" }
+                ]);
+            behaviour.OnInitialized();
+            UnityEngine.Time.time = 2f;
+            behaviour.Tick();
+
+            if (follower.CaptainOfThisEntity != captain)
+            {
+                throw new InvalidOperationException("Follower was not bound to captain.");
+            }
+
+            behaviour.OnDestroyed();
+            if (follower.CaptainOfThisEntity != null)
+            {
+                throw new InvalidOperationException("Follower captain was not released upon OnDestroyed().");
+            }
+        }
+        finally
+        {
+            behaviour?.OnDestroyed();
+            ExistingControllers.Instance.Reset();
+            DefaultAiBehaviour.ResetRuntimeState();
+            EntityBalancingStore.Reset();
+        }
+    }),
+    ("tactical-skill-activation AI module parses defaults and validates limits", () =>
+    {
+        if (!TacticalSkillActivationParameterParser.TryParse(null, out TacticalSkillActivationSettings settings, out string diagnostic) || diagnostic != null)
+        {
+            throw new InvalidOperationException("Tactical-skill-activation default parse failed: " + diagnostic);
+        }
+        if (settings.EnemyTriggerRadiusCells != 10f || settings.MinManaRatio != 0.5f || settings.CooldownSeconds != 4f || settings.BaseIndex != -1)
+        {
+            throw new InvalidOperationException("Tactical-skill-activation default values did not match specification.");
+        }
+
+        var validParams = new[]
+        {
+            new ContentModuleParameter { name = "enemyTriggerRadiusCells", value = "18" },
+            new ContentModuleParameter { name = "minManaRatio", value = "0.3" },
+            new ContentModuleParameter { name = "cooldownSeconds", value = "1.5" },
+            new ContentModuleParameter { name = "baseIndex", value = "2" }
+        };
+        if (!TacticalSkillActivationParameterParser.TryParse(validParams, out settings, out diagnostic) || diagnostic != null)
+        {
+            throw new InvalidOperationException("Tactical-skill-activation custom parse failed: " + diagnostic);
+        }
+        if (settings.EnemyTriggerRadiusCells != 18f || settings.MinManaRatio != 0.3f || settings.BaseIndex != 2)
+        {
+            throw new InvalidOperationException("Tactical-skill-activation parsed values incorrect.");
+        }
+
+        var invalidRadius = new[]
+        {
+            new ContentModuleParameter { name = "enemyTriggerRadiusCells", value = "100" }
+        };
+        if (TacticalSkillActivationParameterParser.TryParse(invalidRadius, out _, out diagnostic) || diagnostic == null)
+        {
+            throw new InvalidOperationException("Tactical-skill-activation should reject triggerRadius > 64.");
+        }
+
+        var invalidMana = new[]
+        {
+            new ContentModuleParameter { name = "minManaRatio", value = "1.5" }
+        };
+        if (TacticalSkillActivationParameterParser.TryParse(invalidMana, out _, out diagnostic) || diagnostic == null)
+        {
+            throw new InvalidOperationException("Tactical-skill-activation should reject minManaRatio > 1.0.");
+        }
+    }),
+    ("tactical-skill-activation AI module dispatches active skill when enemy is detected in range", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        DefaultAiBehaviour.ResetRuntimeState();
+        EntityBalancingStore.Reset();
+        UnityEngine.Time.time = 0f;
+        IRogueCommandAiRuntimeBehaviour? behaviour = null;
+        try
+        {
+            var aiCaster = new EntityController
+            {
+                IsControlledByAi = true,
+                IsUnit = true,
+                IsCombatUnit = true,
+                EntityId = "MageUnit",
+                UniqueEntityId = 201,
+                aiBaseIndex = 0,
+                Position = UnityEngine.Vector3.zero,
+                CurrentMana = 100f,
+                SkillInfo = new SkillInfo { targetOrigin = TargetOrigin.ChosenEntity }
+            };
+            var playerEnemy = new EntityController
+            {
+                IsControlledByPlayer = true,
+                IsUnit = true,
+                UniqueEntityId = 301,
+                Position = new UnityEngine.Vector3(8f, 0f, 0f)
+            };
+
+            ExistingControllers.Instance.AiUnits().Add(aiCaster);
+            ExistingControllers.Instance.PlayerEntities().Add(playerEnemy);
+
+            behaviour = new TacticalSkillActivationAiModule().CreateBehaviour(new DefaultAiBehaviour(),
+                [
+                    new ContentModuleParameter { name = "enemyTriggerRadiusCells", value = "12" },
+                    new ContentModuleParameter { name = "cooldownSeconds", value = "1" },
+                    new ContentModuleParameter { name = "baseIndex", value = "0" }
+                ]);
+            behaviour.OnInitialized();
+            UnityEngine.Time.time = 1f;
+            behaviour.Tick();
+
+            if (!aiCaster.LastExecutedCommand.HasValue ||
+                aiCaster.LastExecutedCommand.Value.command != EntityCommand.Command.ActiveSkillOnTarget)
+            {
+                throw new InvalidOperationException("Tactical-skill-activation did not execute ActiveSkillOnTarget command.");
+            }
+            if (aiCaster.LastCommandProcessingType != EntityController.CommandProcessingType.ExecuteBeforeCurrentCommand)
+            {
+                throw new InvalidOperationException("Tactical-skill-activation did not use ExecuteBeforeCurrentCommand.");
+            }
+        }
+        finally
+        {
+            behaviour?.OnDestroyed();
+            ExistingControllers.Instance.Reset();
+            DefaultAiBehaviour.ResetRuntimeState();
+            EntityBalancingStore.Reset();
+        }
+    }),
+    ("wave-escalation AI module parses defaults and validates limits", () =>
+    {
+        if (!WaveEscalationParameterParser.TryParse(null, out WaveEscalationSettings settings, out string diagnostic) || diagnostic != null)
+        {
+            throw new InvalidOperationException("Wave-escalation default parse failed: " + diagnostic);
+        }
+        if (settings.WaveIntervalSeconds != 60f || settings.MaxWaves != 10 || settings.BaseIndex != -1)
+        {
+            throw new InvalidOperationException("Wave-escalation default values did not match specification.");
+        }
+
+        var validParams = new[]
+        {
+            new ContentModuleParameter { name = "waveIntervalSeconds", value = "30" },
+            new ContentModuleParameter { name = "maxWaves", value = "5" },
+            new ContentModuleParameter { name = "baseIndex", value = "0" }
+        };
+        if (!WaveEscalationParameterParser.TryParse(validParams, out settings, out diagnostic) || diagnostic != null)
+        {
+            throw new InvalidOperationException("Wave-escalation custom parse failed: " + diagnostic);
+        }
+        if (settings.WaveIntervalSeconds != 30f || settings.MaxWaves != 5 || settings.BaseIndex != 0)
+        {
+            throw new InvalidOperationException("Wave-escalation parsed values incorrect.");
+        }
+
+        var invalidInterval = new[]
+        {
+            new ContentModuleParameter { name = "waveIntervalSeconds", value = "3" }
+        };
+        if (WaveEscalationParameterParser.TryParse(invalidInterval, out _, out diagnostic) || diagnostic == null)
+        {
+            throw new InvalidOperationException("Wave-escalation should reject waveIntervalSeconds < 5.");
+        }
+
+        var invalidMaxWaves = new[]
+        {
+            new ContentModuleParameter { name = "maxWaves", value = "150" }
+        };
+        if (WaveEscalationParameterParser.TryParse(invalidMaxWaves, out _, out diagnostic) || diagnostic == null)
+        {
+            throw new InvalidOperationException("Wave-escalation should reject maxWaves > 100.");
+        }
+    }),
+    ("wave-escalation AI module increments attack wave counter and orders assault", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        DefaultAiBehaviour.ResetRuntimeState();
+        AiBehaviourManager.CurrentAttackWaveNumber = 0;
+        UnityEngine.Time.time = 0f;
+        IRogueCommandAiRuntimeBehaviour? behaviour = null;
+        try
+        {
+            var hq = new EntityController
+            {
+                IsControlledByPlayer = true,
+                IsBuilding = true,
+                EntityId = "EngineeringHq",
+                Position = new UnityEngine.Vector3(50f, 0f, 0f)
+            };
+            ExistingControllers.Instance.EngineeringHqEntity = hq;
+
+            var aiUnit = new EntityController
+            {
+                IsControlledByAi = true,
+                IsUnit = true,
+                IsCombatUnit = true,
+                UniqueEntityId = 501,
+                aiBaseIndex = 0,
+                Position = UnityEngine.Vector3.zero
+            };
+            ExistingControllers.Instance.AiUnits().Add(aiUnit);
+
+            behaviour = new WaveEscalationAiModule().CreateBehaviour(new DefaultAiBehaviour(),
+                [
+                    new ContentModuleParameter { name = "waveIntervalSeconds", value = "10" },
+                    new ContentModuleParameter { name = "maxWaves", value = "3" },
+                    new ContentModuleParameter { name = "baseIndex", value = "0" }
+                ]);
+            behaviour.OnInitialized();
+            UnityEngine.Time.time = 10f;
+            behaviour.Tick();
+
+            if (AiBehaviourManager.CurrentAttackWaveNumber != 1)
+            {
+                throw new InvalidOperationException("Wave escalation did not increment CurrentAttackWaveNumber.");
+            }
+            if (!aiUnit.LastExecutedCommand.HasValue ||
+                aiUnit.LastExecutedCommand.Value.command != EntityCommand.Command.AttackMoveOnTarget)
+            {
+                throw new InvalidOperationException("Wave escalation did not dispatch AttackMoveOnTarget to HQ.");
+            }
+        }
+        finally
+        {
+            behaviour?.OnDestroyed();
+            ExistingControllers.Instance.Reset();
+            DefaultAiBehaviour.ResetRuntimeState();
+            AiBehaviourManager.CurrentAttackWaveNumber = 0;
+        }
+    }),
+    ("tactical AI modules squad-formation, tactical-skill-activation, and wave-escalation are registered", () =>
+    {
+        var registry = new AiModuleRegistry();
+        registry.Register(new SquadFormationAiModule());
+        registry.Register(new TacticalSkillActivationAiModule());
+        registry.Register(new WaveEscalationAiModule());
+
+        if (!registry.TryValidate("sample:squad-formation", null, out string diagnostic) || diagnostic != null)
+        {
+            throw new InvalidOperationException("Squad-formation module failed registry validation: " + diagnostic);
+        }
+        if (!registry.TryValidate("sample:tactical-skill-activation", null, out diagnostic) || diagnostic != null)
+        {
+            throw new InvalidOperationException("Tactical-skill-activation module failed registry validation: " + diagnostic);
+        }
+        if (!registry.TryValidate("sample:wave-escalation", null, out diagnostic) || diagnostic != null)
+        {
+            throw new InvalidOperationException("Wave-escalation module failed registry validation: " + diagnostic);
+        }
+    }),
 };
 
 int failures = 0;

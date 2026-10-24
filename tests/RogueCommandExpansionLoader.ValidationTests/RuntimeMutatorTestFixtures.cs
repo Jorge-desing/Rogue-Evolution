@@ -87,9 +87,15 @@ public static class EntityBalancingStore
     public static Dictionary<string, Dictionary<ChangeableValue, int>> ChangeableIntValueCache = new(StringComparer.Ordinal);
     public static Dictionary<string, Dictionary<ChangeableValue, float>> ChangeableFloatValueCache = new(StringComparer.Ordinal);
     public static HashSet<string> BuildingEntityIds = new(StringComparer.Ordinal);
+    public static Dictionary<string, UnitRole> RolesOf = new(StringComparer.Ordinal);
+    public static Dictionary<string, float> MaxManaOf = new(StringComparer.Ordinal);
 
     public static bool IsBuilding(string entityId) => BuildingEntityIds.Contains(entityId);
     public static int Cost(string entityId) => 100;
+    public static bool HasRole(string entityId, UnitRole role) =>
+        RolesOf.TryGetValue(entityId, out var r) ? (r & role) == role : false;
+    public static float MaxMana(string entityId) =>
+        MaxManaOf.TryGetValue(entityId, out var m) ? m : 100f;
 
     public static void InvalidateCache(string entityId)
     {
@@ -106,6 +112,8 @@ public static class EntityBalancingStore
         ChangeableIntValueCache = new Dictionary<string, Dictionary<ChangeableValue, int>>(StringComparer.Ordinal);
         ChangeableFloatValueCache = new Dictionary<string, Dictionary<ChangeableValue, float>>(StringComparer.Ordinal);
         BuildingEntityIds.Clear();
+        RolesOf.Clear();
+        MaxManaOf.Clear();
     }
 }
 
@@ -179,6 +187,11 @@ public sealed class AiBehaviourManager
 {
     public AiBehaviour activeBehaviour;
     public static readonly Priority_Queue.SimplePriorityQueue<string> ConstructionQueue = new();
+    public static int CurrentAttackWaveNumber { get; set; }
+    public static void IncrementAttackWaveNumber_Static()
+    {
+        CurrentAttackWaveNumber++;
+    }
 }
 
 namespace Priority_Queue

@@ -93,6 +93,7 @@ namespace RogueCommandExpansionLoader.Content
         private readonly FieldInfo _rarityField;
         private readonly FieldInfo _techField;
         private readonly FieldInfo _neededExperienceLevelField;
+        private readonly FieldInfo _offeredSystemTagsField;
         private readonly FieldInfo _stageParametersField;
         private readonly FieldInfo _stageMapSizeField;
         private readonly FieldInfo _stageDemoField;
@@ -324,6 +325,7 @@ namespace RogueCommandExpansionLoader.Content
             _rarityField = FindField(_entityRowType, "rarity", InstanceFields);
             _techField = FindField(_entityRowType, "tech", InstanceFields);
             _neededExperienceLevelField = RequireField(_entityRowType, "neededExperienceLevel", typeof(int));
+            _offeredSystemTagsField = FindField(_entityRowType, "offeredSystemTags", InstanceFields);
             _stageParametersField = RequireField(_stageType, "stageParameters", _stageParametersType);
             _stageMapSizeField = RequireField(_stageType, "mapSizeRange", typeof(Vector2Int));
             _stageDemoField = RequireField(_stageType, "isPartOfDemo", typeof(bool));
@@ -4444,6 +4446,23 @@ namespace RogueCommandExpansionLoader.Content
                 _allowedStartingBlueprintField, _allowedForAiField, _allowedForDemoField);
             _factoryForEntityIdField.SetValue(row, CreateNullableString(product.id));
             _copyUpgradesToEntityIdField.SetValue(row, CreateNullableString(product.id));
+            if (product.systemTags != null && product.systemTags.Length > 0 && _offeredSystemTagsField != null)
+            {
+                int combinedTags = 0;
+                foreach (string tagName in product.systemTags)
+                {
+                    if (!String.IsNullOrWhiteSpace(tagName))
+                    {
+                        try
+                        {
+                            combinedTags |= Convert.ToInt32(Enum.Parse(_offeredSystemTagsField.FieldType, tagName, true));
+                        }
+                        catch (Exception) { }
+                    }
+                }
+                object tagsEnum = Enum.ToObject(_offeredSystemTagsField.FieldType, combinedTags);
+                _offeredSystemTagsField.SetValue(row, tagsEnum);
+            }
             temporaryResources.Add(prefabKey, nativePrefabClone);
 
             return new LoadedUnit(building.id, packId, prefabKey, imagePath,
@@ -4562,6 +4581,23 @@ namespace RogueCommandExpansionLoader.Content
             if (unit.neededExperienceLevel.HasValue && _neededExperienceLevelField != null)
             {
                 _neededExperienceLevelField.SetValue(row, unit.neededExperienceLevel.Value);
+            }
+            if (unit.systemTags != null && unit.systemTags.Length > 0 && _offeredSystemTagsField != null)
+            {
+                int combinedTags = 0;
+                foreach (string tagName in unit.systemTags)
+                {
+                    if (!String.IsNullOrWhiteSpace(tagName))
+                    {
+                        try
+                        {
+                            combinedTags |= Convert.ToInt32(Enum.Parse(_offeredSystemTagsField.FieldType, tagName, true));
+                        }
+                        catch (Exception) { }
+                    }
+                }
+                object tagsEnum = Enum.ToObject(_offeredSystemTagsField.FieldType, combinedTags);
+                _offeredSystemTagsField.SetValue(row, tagsEnum);
             }
         }
 

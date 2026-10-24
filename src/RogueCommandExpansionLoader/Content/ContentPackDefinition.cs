@@ -289,6 +289,8 @@ namespace RogueCommandExpansionLoader.Content
         public string rarity;
         public string tech;
         public int? neededExperienceLevel;
+        public string[] systemTags;
+        public string[] baselineStatusEffects;
         public ContentBalanceOverride[] balanceOverrides;
         public ContentUnitLocalizationDefinition[] localizations;
         public ContentProductionBuildingDefinition productionBuilding;
@@ -920,6 +922,8 @@ namespace RogueCommandExpansionLoader.Content
                 rarity = source.rarity,
                 tech = source.tech,
                 neededExperienceLevel = source.neededExperienceLevel,
+                systemTags = source.systemTags != null ? (string[])source.systemTags.Clone() : null,
+                baselineStatusEffects = source.baselineStatusEffects != null ? (string[])source.baselineStatusEffects.Clone() : null,
                 productionBuilding = CloneProductionBuilding(source.productionBuilding)
             };
         }

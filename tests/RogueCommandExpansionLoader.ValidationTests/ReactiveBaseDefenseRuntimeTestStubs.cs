@@ -46,10 +46,17 @@ public float CurrentHealth { get; set; } = 100f;
     public int ExecuteCommandCallCount { get; private set; }
     public CommandProcessingType LastCommandProcessingType { get; private set; }
     public string CurrentCommandTag { get; private set; }
+    public EntityController CaptainOfThisEntity { get; set; }
+    public SkillInfo SkillInfo { get; set; }
+    public float CurrentMana { get; set; } = 100f;
+
+    public void SetCaptain(EntityController captain) { CaptainOfThisEntity = captain; }
+    public void RemoveCaptain(EntityController captain) { if (CaptainOfThisEntity == captain) CaptainOfThisEntity = null; }
 
     public enum CommandProcessingType
     {
-        ExecuteBeforeCurrentCommand
+        ExecuteBeforeCurrentCommand,
+        ExecuteAndCancelCurrentCommand
     }
 
     public bool HasRole(UnitRole role) => _roles.Contains(role) || (Role & role) == role;
@@ -179,6 +186,27 @@ public struct EntityCommand
 
     public static EntityCommand Move(Vector3 destination, Vector2Int? clickPositionCell, Role role) =>
         new() { command = Command.Move, destination = destination, role = role };
+
+    public static EntityCommand ActiveSkillWithoutTarget() =>
+        new() { command = Command.ActiveSkillWithoutTarget };
+
+    public static EntityCommand ActiveSkillOnTarget(EntityController target) =>
+        new() { command = Command.ActiveSkillOnTarget };
+
+    public static EntityCommand ActiveSkillAtPosition(Vector3 position) =>
+        new() { command = Command.ActiveSkillAtPosition, destination = position };
+}
+
+public enum TargetOrigin
+{
+    Self,
+    ChosenEntity,
+    ChosenLocation
+}
+
+public class SkillInfo
+{
+    public TargetOrigin targetOrigin { get; set; } = TargetOrigin.Self;
 }
 
 public static class Bank

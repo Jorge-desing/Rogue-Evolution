@@ -71,6 +71,8 @@ class StructuredUnitParameterSchemaTests(unittest.TestCase):
         unit["rarity"] = "Rare"
         unit["tech"] = "Mech"
         unit["neededExperienceLevel"] = 5
+        unit["systemTags"] = ["Mech", "Armor", "Tank"]
+        unit["baselineStatusEffects"] = ["OnFire", "SlowedDown"]
         self.assertTrue(self.validator.is_valid(manifest))
 
     def test_native_grounding_parameters_invalid_values_rejected(self) -> None:
@@ -83,6 +85,12 @@ class StructuredUnitParameterSchemaTests(unittest.TestCase):
             ("tech", "Alien"),
             ("neededExperienceLevel", 101),
             ("neededExperienceLevel", -1),
+            ("systemTags", ["InvalidSystemTag"]),
+            ("systemTags", ["Mech", "Mech"]),  # duplicate
+            ("baselineStatusEffects", ["NotAStatusEffect"]),
+            ("baselineStatusEffects", ["OnFire", "OnFire"]),  # duplicate
+            ("systemTags", ["Mech"] * 17),  # max 16
+            ("baselineStatusEffects", ["OnFire"] * 17),  # max 16
         ]
         for field, invalid_val in invalid_cases:
             with self.subTest(field=field, value=invalid_val):
