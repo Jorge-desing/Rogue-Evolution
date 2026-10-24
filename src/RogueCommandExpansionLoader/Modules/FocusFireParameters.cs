@@ -37,6 +37,11 @@ namespace RogueCommandExpansionLoader.Modules
             "Mech", "Tree", "Melee", "Research", "Crystal", "Builder", "Drop"
         };
 
+        private static bool IsSupportedTargetRole(string roleName)
+        {
+            return SupportedTargetRoles.Contains(roleName);
+        }
+
         public static bool TryParse(
             ContentModuleParameter[] parameters,
             out FocusFireSettings settings,
