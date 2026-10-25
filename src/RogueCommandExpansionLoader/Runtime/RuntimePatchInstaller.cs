@@ -237,11 +237,6 @@ namespace RogueCommandExpansionLoader.Runtime
                         parameters[2].ParameterType == typeof(bool) &&
                         !parameters[3].ParameterType.IsByRef && !parameters[3].ParameterType.IsPointer;
                 });
-            MethodInfo levelProgressionAwake = RuntimeReflection.FindUniqueMethod(levelProgression,
-                "Awake", delegate(MethodInfo method)
-                {
-                    return method.GetParameters().Length == 0;
-                });
             MethodInfo instantiateEntity = RuntimeReflection.FindUniqueMethod(entityFactory,
                 "InstantiateEntity", HasInstantiateEntityShape);
             MethodInfo createEntityMesh = RuntimeReflection.FindUniqueMethod(entityFactory,
@@ -362,7 +357,6 @@ namespace RogueCommandExpansionLoader.Runtime
                     return parameters.Length == 4 && parameters[0].ParameterType == typeof(float) && parameters[1].ParameterType == entityController;
                 });
             MethodInfo takeDamagePostfix = Hook("EntityTakeDamagePostfix");
-            MethodInfo levelProgressionAwakeProfileFallback = Hook("LevelProgressionAwakeProfileFallbackPrefix");
             MethodInfo loadPrefix = typeof(UnityResourcesLoadTypedPatch).GetMethod("Prefix",
                 BindingFlags.Public | BindingFlags.Static);
             if (loadPrefix == null)
@@ -412,7 +406,6 @@ namespace RogueCommandExpansionLoader.Runtime
             plan.Add(new PatchPlan(setupAiPrespawning, null, setupAiPrespawningPostfix));
             plan.Add(new PatchPlan(isTargetInRange, null, isTargetInRangePostfix));
             plan.Add(new PatchPlan(takeDamage, null, takeDamagePostfix));
-            plan.Add(new PatchPlan(levelProgressionAwake, levelProgressionAwakeProfileFallback, null));
             return plan;
         }
 
