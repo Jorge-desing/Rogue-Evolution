@@ -78,6 +78,28 @@ namespace RogueCommandExpansionLoader.Runtime
         bool TryGetLandscapeLocalization(string localizationId, out string value);
     }
 
+    public readonly struct PrespawnQuota
+    {
+        public PrespawnQuota(string entityId, int quota, bool isBuilding)
+        {
+            EntityId = entityId;
+            Quota = quota;
+            IsBuilding = isBuilding;
+        }
+
+        public string EntityId { get; }
+        public int Quota { get; }
+        public bool IsBuilding { get; }
+    }
+
+    /// <summary>
+    /// Optional bridge providing pre-spawning quotas to warm EntityFactory pools and eliminate combat frame hitches.
+    /// </summary>
+    public interface IPrespawnRuntimeProvider
+    {
+        IEnumerable<PrespawnQuota> GetPrespawnQuotas();
+    }
+
     public interface IStageFallbackRuntimeProvider
     {
         object GetFallbackLandscapeSnapshot(object nativeFallbacks);

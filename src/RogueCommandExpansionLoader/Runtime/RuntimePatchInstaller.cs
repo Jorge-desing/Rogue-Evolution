@@ -239,6 +239,12 @@ namespace RogueCommandExpansionLoader.Runtime
                 "InstantiateEntity", HasInstantiateEntityShape);
             MethodInfo createEntityMesh = RuntimeReflection.FindUniqueMethod(entityFactory,
                 "CreateEntityMesh", HasCreateEntityMeshShape);
+            MethodInfo setupPrespawning = RuntimeReflection.FindUniqueMethod(entityFactory, "SetupPrespawning",
+                delegate(MethodInfo method) { return method.GetParameters().Length == 0 && method.ReturnType == typeof(void); });
+            MethodInfo setupAiPrespawning = RuntimeReflection.FindUniqueMethod(entityFactory, "SetupAiPrespawning",
+                delegate(MethodInfo method) { return method.GetParameters().Length == 0 && method.ReturnType == typeof(void); });
+            MethodInfo setupPrespawningPostfix = Hook("EntityFactorySetupPrespawningPostfix");
+            MethodInfo setupAiPrespawningPostfix = Hook("EntityFactorySetupAiPrespawningPostfix");
             MethodInfo aiUpdate = RuntimeReflection.FindUniqueMethod(aiBehaviour, "Update",
                 delegate(MethodInfo method)
                 {
@@ -375,6 +381,8 @@ namespace RogueCommandExpansionLoader.Runtime
             plan.Add(new PatchPlan(allAllowedBlueprints, null, allAllowedBlueprintsPostfix));
             plan.Add(new PatchPlan(resourcesLoadTyped, loadPrefix, null));
             plan.Add(new PatchPlan(resourcesLoadUntyped, untypedLoadPrefix, null));
+            plan.Add(new PatchPlan(setupPrespawning, null, setupPrespawningPostfix));
+            plan.Add(new PatchPlan(setupAiPrespawning, null, setupAiPrespawningPostfix));
             return plan;
         }
 

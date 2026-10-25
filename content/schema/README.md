@@ -85,6 +85,33 @@ Packs can declare standalone buildings (`buildings[]`) and structured parameters
 
 - **Unit `maxCapacity`**: Units (`units[]`) also accept `maxCapacity` (0–100) to cap maximum simultaneous units fielded at runtime.
 
+## Unit & Building Behavioral Controls, Anti-Hitch Pre-Spawning, and Audio Safeguards
+
+Packs can declare advanced behavioral parameters, zero-allocation pre-spawning pools, and spatial audio/VFX hierarchy bindings on units (`units[]`) and standalone buildings (`buildings[]`):
+
+- **Tactical Behavioral Injections**:
+  - `rotationDegreesPerSecond`: Angular rotation speed in degrees per second for steering and turret traverse (finite float, 10.0-720.0). Maps to `EntityController.rotationDegreesPerSecond`.
+  - `collisionRadius`: Separation avoidance and placement radius (finite float, 0.5-50.0). Maps to `EntityController.collisionRadius`.
+  - `attackWarmUpTime`: Pre-attack charge delay before firing (finite float, 0.0-10.0 seconds). Maps to `EntityController.attackWarmUpTime`.
+  - `canAttackWhileMoving`: Whether the entity can fire weapons while moving or must halt (boolean). Maps to `EntityController.canAttackWhileMoving`.
+  - `shootAutomaticallyOnEnemiesWithinRange`: Autonomous target acquisition against hostiles within detection / weapon range (boolean). Maps to `EntityController.shootAutomaticallyOnEnemiesWithinRange`.
+  - `defendPositionAggressivelyWhenIdle`: Guard behavior when idle, engaging encroaching enemies without manual player commands (boolean). Maps to `EntityController.defendPositionAggressivelyWhenIdle`.
+  - `rangeToChooseNewTargetAutomatically`: Autonomous retargeting radius limit (integer, -1 to 1000 cells; -1 disables and relies on sight radius). Maps to `EntityController.rangeToChooseNewTargetAutomatically`.
+
+- **Zero-Allocation Anti-Hitch Pre-Spawning Pool**:
+  - `prespawnCount`: Pre-spawns and warms a stack of dormant instances in `EntityFactory.PrespawnedEntities` during level preparation (`EntityFactory.SetupPrespawning` and `SetupAiPrespawning`) (integer, 0-100).
+  - Eliminates combat frame hitches (>= 50 ms) caused by synchronous AssetBundle / GameObject instantiation during dense waves or rapid player production.
+
+- **Spatial Audio & Asset Auto-Wiring**:
+  - `selectionSoundAssetName`: AssetBundle address for the unit selection confirmation clip. Injected into `EntityController.selectionSound`.
+  - `engineSoundAssetName`: AssetBundle address for locomotion / engine hum loop. Injected into `EntityFlockingMovement._movementSoundAudioSource.clip`.
+  - `weaponSoundAssetName`: AssetBundle address for primary weapon firing sound effect. Injected into `ShootProjectile.shotSoundAudioSource.clip`.
+
+- **VFX & Muzzle Flash Hierarchy Safeguard**:
+  - The runtime loader automatically inspects `EntityController.Events` for `ShootProjectile` actions across all dormant prefabs.
+  - Native `ShootProjectile.Init()` requires every transform in `firePointsTransform` to possess a child with a `ParticleSystem` component (`child.GetChild(0).GetComponent<ParticleSystem>()`), or it wipes `_muzzleFlashEffects` and disables weapon muzzle flashes.
+  - The loader's `EnsureMuzzleFlashHierarchy` detects missing particle systems under `Socket_MuzzlePrimary` / fire points and safely synthesizes dormant fallback `ParticleSystem` components, guaranteeing weapon VFX are preserved.
+
 ## AI unit entries
 
 An AI profile may optionally declare `unitEntries` to append namespaced units to one `AiBase` in an isolated, stage-scoped native profile. Each entry selects the `aiBases` index, the starting ascension level, the number of units spawned at base setup, and the native `maxLiving` value. The referenced unit must be declared by this pack or another loaded/declared pack; the loader resolves that dependency before loading the profile. Custom AI prefabs and unscoped templates cannot use `unitEntries`, so the native AI template remains unchanged. `unitEntries` may be omitted when unused; sample manifests include an empty array for clarity.

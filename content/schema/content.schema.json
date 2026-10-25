@@ -676,6 +676,57 @@
           "minimum": 0,
           "maximum": 100,
           "description": "Maximum living units/buildings allowed simultaneously on the map."
+        },
+        "rotationDegreesPerSecond": {
+          "type": "number",
+          "minimum": 10.0,
+          "maximum": 720.0,
+          "description": "Entity angular rotation speed in degrees per second for steering and turret traverse."
+        },
+        "collisionRadius": {
+          "type": "number",
+          "minimum": 0.5,
+          "maximum": 50.0,
+          "description": "Collision and separation avoidance radius for flocking and placement."
+        },
+        "attackWarmUpTime": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 10.0,
+          "description": "Pre-attack warm-up / charging delay in seconds before projectile launch."
+        },
+        "canAttackWhileMoving": {
+          "type": "boolean",
+          "description": "Whether the entity can fire weapons while traversing or must stop to shoot."
+        },
+        "shootAutomaticallyOnEnemiesWithinRange": {
+          "type": "boolean",
+          "description": "Autonomous target acquisition against hostiles within detection / weapon range."
+        },
+        "defendPositionAggressivelyWhenIdle": {
+          "type": "boolean",
+          "description": "Aggressive guard behavior when idle, engaging encroaching enemies without player orders."
+        },
+        "rangeToChooseNewTargetAutomatically": {
+          "type": "integer",
+          "minimum": -1,
+          "maximum": 1000,
+          "description": "Automatic retargeting acquisition radius limit (-1 disables and uses sight radius)."
+        },
+        "prespawnCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Target instance count pre-warmed in EntityFactory.PrespawnedEntities to prevent mid-combat hitching."
+        },
+        "selectionSoundAssetName": {
+          "$ref": "#/$defs/assetName"
+        },
+        "engineSoundAssetName": {
+          "$ref": "#/$defs/assetName"
+        },
+        "weaponSoundAssetName": {
+          "$ref": "#/$defs/assetName"
         }
       },
       "oneOf": [
@@ -3102,8 +3153,59 @@
               "name"
             ]
           }
+        },
+        "rotationDegreesPerSecond": {
+          "type": "number",
+          "minimum": 10.0,
+          "maximum": 720.0,
+          "description": "Entity angular rotation speed in degrees per second for steering and turret traverse."
+        },
+        "collisionRadius": {
+          "type": "number",
+          "minimum": 0.5,
+          "maximum": 50.0,
+          "description": "Collision and separation avoidance radius for flocking and placement."
+        },
+        "attackWarmUpTime": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 10.0,
+          "description": "Pre-attack warm-up / charging delay in seconds before projectile launch."
+        },
+        "canAttackWhileMoving": {
+          "type": "boolean",
+          "description": "Whether the entity can fire weapons while traversing or must stop to shoot."
+        },
+        "shootAutomaticallyOnEnemiesWithinRange": {
+          "type": "boolean",
+          "description": "Autonomous target acquisition against hostiles within detection / weapon range."
+        },
+        "defendPositionAggressivelyWhenIdle": {
+          "type": "boolean",
+          "description": "Aggressive guard behavior when idle, engaging encroaching enemies without player orders."
+        },
+        "rangeToChooseNewTargetAutomatically": {
+          "type": "integer",
+          "minimum": -1,
+          "maximum": 1000,
+          "description": "Automatic retargeting acquisition radius limit (-1 disables and uses sight radius)."
+        },
+        "prespawnCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Target instance count pre-warmed in EntityFactory.PrespawnedEntities to prevent mid-combat hitching."
+        },
+        "selectionSoundAssetName": {
+          "$ref": "#/$defs/assetName"
+        },
+        "engineSoundAssetName": {
+          "$ref": "#/$defs/assetName"
+        },
+        "weaponSoundAssetName": {
+          "$ref": "#/$defs/assetName"
         }
       }
     }
   }
-}
+}

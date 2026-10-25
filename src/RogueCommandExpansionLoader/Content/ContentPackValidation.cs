@@ -83,6 +83,18 @@ namespace RogueCommandExpansionLoader.Content
         public IReadOnlyList<ContentDiagnostic> Diagnostics { get { return diagnostics.AsReadOnly(); } }
     }
 
+    internal sealed class CrossPackUnitGraphIssue
+    {
+        public CrossPackUnitGraphIssue(string packId, ContentDiagnostic diagnostic)
+        {
+            PackId = packId ?? String.Empty;
+            Diagnostic = diagnostic ?? throw new ArgumentNullException(nameof(diagnostic));
+        }
+
+        public string PackId { get; private set; }
+        public ContentDiagnostic Diagnostic { get; private set; }
+    }
+
     /// <summary>
     /// Performs package-local validation only. It never writes to, or mutates,
     /// the supplied registry snapshot and does not load AssetBundles or code.
@@ -406,18 +418,39 @@ namespace RogueCommandExpansionLoader.Content
                         ValidateVisualRootPath(unit.visualRootPath, itemPath + ".visualRootPath", diagnostics);
                     }
 
-                    if (!String.IsNullOrWhiteSpace(unit.cardImageAssetName) || hasVisualAsset)
+                    bool hasAudioAsset = !String.IsNullOrWhiteSpace(unit.selectionSoundAssetName) ||
+                                         !String.IsNullOrWhiteSpace(unit.engineSoundAssetName) ||
+                                         !String.IsNullOrWhiteSpace(unit.weaponSoundAssetName);
+                    if (hasAudioAsset && String.IsNullOrWhiteSpace(unit.assetBundleId))
+                    {
+                        Add(diagnostics, "unit.audio-bundle-missing", itemPath,
+                            "Specifying audio assets requires declaring an assetBundleId.");
+                    }
+
+                    if (!String.IsNullOrWhiteSpace(unit.cardImageAssetName) || hasVisualAsset || hasAudioAsset)
                     {
                         ValidateBundleReference(unit.assetBundleId, itemPath + ".assetBundleId", bundleIds, diagnostics);
                         if (!String.IsNullOrWhiteSpace(unit.cardImageAssetName))
                         {
                             ValidateAssetName(unit.cardImageAssetName, itemPath + ".cardImageAssetName", diagnostics);
                         }
+                        if (!String.IsNullOrWhiteSpace(unit.selectionSoundAssetName))
+                        {
+                            ValidateAssetName(unit.selectionSoundAssetName, itemPath + ".selectionSoundAssetName", diagnostics);
+                        }
+                        if (!String.IsNullOrWhiteSpace(unit.engineSoundAssetName))
+                        {
+                            ValidateAssetName(unit.engineSoundAssetName, itemPath + ".engineSoundAssetName", diagnostics);
+                        }
+                        if (!String.IsNullOrWhiteSpace(unit.weaponSoundAssetName))
+                        {
+                            ValidateAssetName(unit.weaponSoundAssetName, itemPath + ".weaponSoundAssetName", diagnostics);
+                        }
                     }
                     else if (!String.IsNullOrWhiteSpace(unit.assetBundleId))
                     {
                         Add(diagnostics, "unit.bundle-unused", itemPath + ".assetBundleId",
-                            "A native-template unit only declares a bundle when it supplies cardImageAssetName or a visual overlay.");
+                            "A native-template unit only declares a bundle when it supplies cardImageAssetName, a visual overlay, or audio assets.");
                     }
                 }
                 else
@@ -1962,6 +1995,141 @@ namespace RogueCommandExpansionLoader.Content
             }
         }
 
+        internal static IReadOnlyList<CrossPackUnitGraphIssue> ValidateCrossPackUnitReferenceGraphs(
+            IReadOnlyList<ContentPackDefinition> packs)
+        {
+            var issues = new List<CrossPackUnitGraphIssue>();
+            if (packs == null || packs.Count == 0)
+            {
+                return issues;
+            }
+
+            var validPacks = new List<ContentPackDefinition>();
+            var unitIdCounts = new Dictionary<string, int>(StringComparer.Ordinal);
+            for (int packIndex = 0; packIndex < packs.Count; packIndex++)
+            {
+                ContentPackDefinition pack = packs[packIndex];
+                if (pack == null || !IsNamespacedId(pack.packId))
+                {
+                    continue;
+                }
+
+                validPacks.Add(pack);
+                foreach (ContentUnitDefinition unit in pack.units ?? new ContentUnitDefinition[0])
+                {
+                    if (unit == null || !IsNamespacedId(unit.id))
+                    {
+                        continue;
+                    }
+
+                    unitIdCounts.TryGetValue(unit.id, out int count);
+                    unitIdCounts[unit.id] = count + 1;
+                }
+            }
+
+            validPacks.Sort((left, right) => StringComparer.Ordinal.Compare(left.packId, right.packId));
+            var mergedUnits = new List<ContentUnitDefinition>();
+            var mergedPackIds = new List<string>();
+            var mergedUnitIndexes = new List<int>();
+            var localIssueKeys = new HashSet<string>(StringComparer.Ordinal);
+
+            foreach (ContentPackDefinition pack in validPacks)
+            {
+                ContentUnitDefinition[] packUnits = pack.units ?? new ContentUnitDefinition[0];
+                var localDiagnostics = new List<ContentDiagnostic>();
+                ValidateUnitUpgradeGraph(packUnits, "units", localDiagnostics);
+                ValidateUnitSynergyGraph(packUnits, "units", localDiagnostics);
+                foreach (ContentDiagnostic diagnostic in localDiagnostics)
+                {
+                    if (TryGetUnitIndexFromGraphPath(diagnostic.Path, out int unitIndex) &&
+                        unitIndex < packUnits.Length && packUnits[unitIndex] != null &&
+                        unitIdCounts.TryGetValue(packUnits[unitIndex].id, out int count) && count == 1)
+                    {
+                        localIssueKeys.Add(CrossPackGraphIssueKey(packUnits[unitIndex].id, diagnostic.Code));
+                    }
+                }
+
+                for (int unitIndex = 0; unitIndex < packUnits.Length; unitIndex++)
+                {
+                    ContentUnitDefinition unit = packUnits[unitIndex];
+                    if (unit == null || !IsNamespacedId(unit.id) ||
+                        !unitIdCounts.TryGetValue(unit.id, out int count) || count != 1)
+                    {
+                        continue;
+                    }
+
+                    mergedUnits.Add(unit);
+                    mergedPackIds.Add(pack.packId);
+                    mergedUnitIndexes.Add(unitIndex);
+                }
+            }
+
+            ContentUnitDefinition[] graphUnits = mergedUnits.ToArray();
+            var graphDiagnostics = new List<ContentDiagnostic>();
+            ValidateUnitUpgradeGraph(graphUnits, "units", graphDiagnostics);
+            ValidateUnitSynergyGraph(graphUnits, "units", graphDiagnostics);
+            var issueKeys = new HashSet<string>(StringComparer.Ordinal);
+            foreach (ContentDiagnostic diagnostic in graphDiagnostics)
+            {
+                if (!TryGetUnitIndexFromGraphPath(diagnostic.Path, out int mergedIndex) ||
+                    mergedIndex >= mergedPackIds.Count)
+                {
+                    continue;
+                }
+
+                ContentUnitDefinition unit = graphUnits[mergedIndex];
+                if (localIssueKeys.Contains(CrossPackGraphIssueKey(unit.id, diagnostic.Code)))
+                {
+                    continue;
+                }
+
+                string packId = mergedPackIds[mergedIndex];
+                string issueKey = packId + "\u001f" + diagnostic.Code + "\u001f" + unit.id;
+                if (!issueKeys.Add(issueKey))
+                {
+                    continue;
+                }
+
+                string relationshipPath = diagnostic.Path.EndsWith(".upgrades", StringComparison.Ordinal)
+                    ? "upgrades"
+                    : "synergies";
+                var mappedDiagnostic = new ContentDiagnostic(diagnostic.Code,
+                    "units[" + mergedUnitIndexes[mergedIndex].ToString(CultureInfo.InvariantCulture) + "]." + relationshipPath,
+                    diagnostic.Message, diagnostic.Severity);
+                issues.Add(new CrossPackUnitGraphIssue(packId, mappedDiagnostic));
+            }
+
+            issues.Sort((left, right) =>
+            {
+                int compare = StringComparer.Ordinal.Compare(left.PackId, right.PackId);
+                if (compare != 0) return compare;
+                compare = StringComparer.Ordinal.Compare(left.Diagnostic.Code, right.Diagnostic.Code);
+                if (compare != 0) return compare;
+                return StringComparer.Ordinal.Compare(left.Diagnostic.Path, right.Diagnostic.Path);
+            });
+            return issues;
+        }
+
+        private static string CrossPackGraphIssueKey(string unitId, string diagnosticCode)
+        {
+            return unitId + "\u001f" + diagnosticCode;
+        }
+
+        private static bool TryGetUnitIndexFromGraphPath(string path, out int unitIndex)
+        {
+            unitIndex = -1;
+            if (String.IsNullOrEmpty(path))
+            {
+                return false;
+            }
+
+            int openBracket = path.IndexOf('[');
+            int closeBracket = openBracket >= 0 ? path.IndexOf(']', openBracket + 1) : -1;
+            return openBracket >= 0 && closeBracket > openBracket + 1 &&
+                Int32.TryParse(path.Substring(openBracket + 1, closeBracket - openBracket - 1),
+                    NumberStyles.None, CultureInfo.InvariantCulture, out unitIndex) && unitIndex >= 0;
+        }
+
         private const int MaxUpgradeChainDepth = 5;
         private const int MaxSynergyChainDepth = 5;
 
@@ -2753,6 +2921,56 @@ namespace RogueCommandExpansionLoader.Content
                 {
                     Add(diagnostics, "unit.firePointCount-invalid", path + ".firePointCount",
                         "firePointCount must be an integer between 1 and 64.");
+                }
+            }
+
+            if (unit.rotationDegreesPerSecond.HasValue)
+            {
+                float rot = unit.rotationDegreesPerSecond.Value;
+                if (Single.IsNaN(rot) || Single.IsInfinity(rot) || rot < 10.0f || rot > 720.0f)
+                {
+                    Add(diagnostics, "unit.rotationDegreesPerSecond-invalid", path + ".rotationDegreesPerSecond",
+                        "rotationDegreesPerSecond must be a finite number between 10.0 and 720.0.");
+                }
+            }
+
+            if (unit.collisionRadius.HasValue)
+            {
+                float col = unit.collisionRadius.Value;
+                if (Single.IsNaN(col) || Single.IsInfinity(col) || col < 0.5f || col > 50.0f)
+                {
+                    Add(diagnostics, "unit.collisionRadius-invalid", path + ".collisionRadius",
+                        "collisionRadius must be a finite number between 0.5 and 50.0.");
+                }
+            }
+
+            if (unit.attackWarmUpTime.HasValue)
+            {
+                float warm = unit.attackWarmUpTime.Value;
+                if (Single.IsNaN(warm) || Single.IsInfinity(warm) || warm < 0.0f || warm > 10.0f)
+                {
+                    Add(diagnostics, "unit.attackWarmUpTime-invalid", path + ".attackWarmUpTime",
+                        "attackWarmUpTime must be a finite non-negative number between 0.0 and 10.0.");
+                }
+            }
+
+            if (unit.rangeToChooseNewTargetAutomatically.HasValue)
+            {
+                int range = unit.rangeToChooseNewTargetAutomatically.Value;
+                if (range < -1 || range > 1000)
+                {
+                    Add(diagnostics, "unit.rangeToChooseNewTargetAutomatically-invalid", path + ".rangeToChooseNewTargetAutomatically",
+                        "rangeToChooseNewTargetAutomatically must be an integer between -1 and 1000.");
+                }
+            }
+
+            if (unit.prespawnCount.HasValue)
+            {
+                int count = unit.prespawnCount.Value;
+                if (count < 0 || count > 100)
+                {
+                    Add(diagnostics, "unit.prespawnCount-invalid", path + ".prespawnCount",
+                        "prespawnCount must be an integer between 0 and 100.");
                 }
             }
 
@@ -4132,7 +4350,16 @@ namespace RogueCommandExpansionLoader.Content
                         "A building visual requires visualAssetName and visualRootPath together.");
                 }
 
-                if (hasVisualAsset || hasVisualRoot || !String.IsNullOrWhiteSpace(building.cardImageAssetName))
+                bool hasAudioAsset = !String.IsNullOrWhiteSpace(building.selectionSoundAssetName) ||
+                                         !String.IsNullOrWhiteSpace(building.engineSoundAssetName) ||
+                                         !String.IsNullOrWhiteSpace(building.weaponSoundAssetName);
+                if (hasAudioAsset && String.IsNullOrWhiteSpace(building.assetBundleId))
+                {
+                    Add(diagnostics, "building.audio-bundle-missing", itemPath,
+                        "Specifying audio assets requires declaring an assetBundleId.");
+                }
+
+                if (hasVisualAsset || hasVisualRoot || !String.IsNullOrWhiteSpace(building.cardImageAssetName) || hasAudioAsset)
                 {
                     ValidateBundleReference(building.assetBundleId, itemPath + ".assetBundleId", bundleIds, diagnostics);
                     if (!String.IsNullOrWhiteSpace(building.cardImageAssetName))
@@ -4148,11 +4375,23 @@ namespace RogueCommandExpansionLoader.Content
                         ValidateVisualRootPath(building.visualRootPath, itemPath + ".visualRootPath", diagnostics,
                             "building.visual-root-path-invalid");
                     }
+                    if (!String.IsNullOrWhiteSpace(building.selectionSoundAssetName))
+                    {
+                        ValidateAssetName(building.selectionSoundAssetName, itemPath + ".selectionSoundAssetName", diagnostics);
+                    }
+                    if (!String.IsNullOrWhiteSpace(building.engineSoundAssetName))
+                    {
+                        ValidateAssetName(building.engineSoundAssetName, itemPath + ".engineSoundAssetName", diagnostics);
+                    }
+                    if (!String.IsNullOrWhiteSpace(building.weaponSoundAssetName))
+                    {
+                        ValidateAssetName(building.weaponSoundAssetName, itemPath + ".weaponSoundAssetName", diagnostics);
+                    }
                 }
                 else if (!String.IsNullOrWhiteSpace(building.assetBundleId))
                 {
                     Add(diagnostics, "building.bundle-unused", itemPath + ".assetBundleId",
-                        "A building only declares a bundle when it supplies a card image or visual overlay.");
+                        "A building only declares a bundle when it supplies a card image, visual overlay, or audio assets.");
                 }
 
                 ValidateStructuredBuildingParameters(building, itemPath, diagnostics);
@@ -4305,6 +4544,56 @@ namespace RogueCommandExpansionLoader.Content
             ValidateNonNegativeFinite(building.effectRadius2, path + ".effectRadius2", "effectRadius2", diagnostics);
             ValidateNonNegativeFinite(building.duration1, path + ".duration1", "duration1", diagnostics);
             ValidateNonNegativeFinite(building.duration2, path + ".duration2", "duration2", diagnostics);
+
+            if (building.rotationDegreesPerSecond.HasValue)
+            {
+                float rot = building.rotationDegreesPerSecond.Value;
+                if (Single.IsNaN(rot) || Single.IsInfinity(rot) || rot < 10.0f || rot > 720.0f)
+                {
+                    Add(diagnostics, "building.rotationDegreesPerSecond-invalid", path + ".rotationDegreesPerSecond",
+                        "rotationDegreesPerSecond must be a finite number between 10.0 and 720.0.");
+                }
+            }
+
+            if (building.collisionRadius.HasValue)
+            {
+                float col = building.collisionRadius.Value;
+                if (Single.IsNaN(col) || Single.IsInfinity(col) || col < 0.5f || col > 50.0f)
+                {
+                    Add(diagnostics, "building.collisionRadius-invalid", path + ".collisionRadius",
+                        "collisionRadius must be a finite number between 0.5 and 50.0.");
+                }
+            }
+
+            if (building.attackWarmUpTime.HasValue)
+            {
+                float warm = building.attackWarmUpTime.Value;
+                if (Single.IsNaN(warm) || Single.IsInfinity(warm) || warm < 0.0f || warm > 10.0f)
+                {
+                    Add(diagnostics, "building.attackWarmUpTime-invalid", path + ".attackWarmUpTime",
+                        "attackWarmUpTime must be a finite non-negative number between 0.0 and 10.0.");
+                }
+            }
+
+            if (building.rangeToChooseNewTargetAutomatically.HasValue)
+            {
+                int range = building.rangeToChooseNewTargetAutomatically.Value;
+                if (range < -1 || range > 1000)
+                {
+                    Add(diagnostics, "building.rangeToChooseNewTargetAutomatically-invalid", path + ".rangeToChooseNewTargetAutomatically",
+                        "rangeToChooseNewTargetAutomatically must be an integer between -1 and 1000.");
+                }
+            }
+
+            if (building.prespawnCount.HasValue)
+            {
+                int count = building.prespawnCount.Value;
+                if (count < 0 || count > 100)
+                {
+                    Add(diagnostics, "building.prespawnCount-invalid", path + ".prespawnCount",
+                        "prespawnCount must be an integer between 0 and 100.");
+                }
+            }
         }
 
         private static void ValidateNonNegativeFinite(

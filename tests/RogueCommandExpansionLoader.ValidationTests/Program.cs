@@ -374,7 +374,9 @@ var tests = new (string Name, Action Run)[]
             "PresentCardsToChooseFinalizer",
             "BlueprintPoolBlueprintsInPoolPostfix",
             "PresentCardAsRewardRecordPostfix",
-            "AllEntityIdsAllowedAsBlueprintsPostfix"
+            "AllEntityIdsAllowedAsBlueprintsPostfix",
+            "EntityFactorySetupPrespawningPostfix",
+            "EntityFactorySetupAiPrespawningPostfix"
         ];
 
         foreach (string hookName in hookNames)
@@ -8832,6 +8834,152 @@ var tests = new (string Name, Action Run)[]
         {
             throw new InvalidOperationException("Standalone building deep clone shared mutable array references.");
         }
+    }),
+    ("unit behavioral parameters and audio are validated and deep-cloned", () =>
+    {
+        ContentPackDefinition pack = ContentPackCopy.DeepClone(nativeSample);
+        var unit = pack.units[0];
+        unit.rotationDegreesPerSecond = 180f;
+        unit.collisionRadius = 8f;
+        unit.attackWarmUpTime = 0.5f;
+        unit.canAttackWhileMoving = false;
+        unit.shootAutomaticallyOnEnemiesWithinRange = true;
+        unit.defendPositionAggressivelyWhenIdle = true;
+        unit.rangeToChooseNewTargetAutomatically = 25;
+        unit.prespawnCount = 20;
+
+        WithPackage(pack, (p, root) =>
+        {
+            ExpectValid(p, root, new EmptySnapshot(), new KnownModuleValidator());
+        });
+
+        ContentPackDefinition clonedPack = ContentPackCopy.DeepClone(pack);
+        var clonedUnit = clonedPack.units[0];
+        if (clonedUnit.rotationDegreesPerSecond != 180f ||
+            clonedUnit.collisionRadius != 8f ||
+            clonedUnit.attackWarmUpTime != 0.5f ||
+            clonedUnit.canAttackWhileMoving != false ||
+            clonedUnit.shootAutomaticallyOnEnemiesWithinRange != true ||
+            clonedUnit.defendPositionAggressivelyWhenIdle != true ||
+            clonedUnit.rangeToChooseNewTargetAutomatically != 25 ||
+            clonedUnit.prespawnCount != 20)
+        {
+            throw new InvalidOperationException("Unit behavioral properties were not cloned properly.");
+        }
+
+        // Test invalid ranges
+        ContentPackDefinition invalidRot = ContentPackCopy.DeepClone(pack);
+        invalidRot.units[0].rotationDegreesPerSecond = 5f;
+        WithPackage(invalidRot, (p, root) => ExpectDiagnostic(p, root, new EmptySnapshot(),
+            new KnownModuleValidator(), "unit.rotationDegreesPerSecond-invalid"));
+
+        ContentPackDefinition invalidCol = ContentPackCopy.DeepClone(pack);
+        invalidCol.units[0].collisionRadius = 0.1f;
+        WithPackage(invalidCol, (p, root) => ExpectDiagnostic(p, root, new EmptySnapshot(),
+            new KnownModuleValidator(), "unit.collisionRadius-invalid"));
+
+        ContentPackDefinition invalidWarm = ContentPackCopy.DeepClone(pack);
+        invalidWarm.units[0].attackWarmUpTime = -1f;
+        WithPackage(invalidWarm, (p, root) => ExpectDiagnostic(p, root, new EmptySnapshot(),
+            new KnownModuleValidator(), "unit.attackWarmUpTime-invalid"));
+
+        ContentPackDefinition invalidRange = ContentPackCopy.DeepClone(pack);
+        invalidRange.units[0].rangeToChooseNewTargetAutomatically = -5;
+        WithPackage(invalidRange, (p, root) => ExpectDiagnostic(p, root, new EmptySnapshot(),
+            new KnownModuleValidator(), "unit.rangeToChooseNewTargetAutomatically-invalid"));
+
+        ContentPackDefinition invalidPrespawn = ContentPackCopy.DeepClone(pack);
+        invalidPrespawn.units[0].prespawnCount = -1;
+        WithPackage(invalidPrespawn, (p, root) => ExpectDiagnostic(p, root, new EmptySnapshot(),
+            new KnownModuleValidator(), "unit.prespawnCount-invalid"));
+
+        ContentPackDefinition missingBundle = ContentPackCopy.DeepClone(pack);
+        missingBundle.units[0].selectionSoundAssetName = "audio/select.wav";
+        missingBundle.units[0].assetBundleId = null;
+        WithPackage(missingBundle, (p, root) => ExpectDiagnostic(p, root, new EmptySnapshot(),
+            new KnownModuleValidator(), "unit.audio-bundle-missing"));
+    }),
+    ("standalone building behavioral parameters and audio are validated and deep-cloned", () =>
+    {
+        ContentPackDefinition pack = ContentPackCopy.DeepClone(nativeSample);
+        pack.buildings = new[]
+        {
+            new ContentBuildingDefinition
+            {
+                id = "sample-native:turret-beta",
+                nativeTemplateId = "MachineGunTurret",
+                gridSize = 2,
+                maxCapacity = 4,
+                cost = 175,
+                buildTime = 9.0f,
+                combatValue = 30,
+                rarity = "Common",
+                tech = "Tank",
+                neededExperienceLevel = 0,
+                roles = new[] { "Building", "Turret" },
+                systemTags = new[] { "Turret" },
+                rotationDegreesPerSecond = 90f,
+                collisionRadius = 12f,
+                attackWarmUpTime = 1.0f,
+                canAttackWhileMoving = false,
+                shootAutomaticallyOnEnemiesWithinRange = true,
+                defendPositionAggressivelyWhenIdle = true,
+                rangeToChooseNewTargetAutomatically = 30,
+                prespawnCount = 5,
+                localizations = new[]
+                {
+                    new ContentUnitLocalizationDefinition
+                    {
+                        language = "en-US",
+                        name = "Heavy Defense Turret",
+                        description = "Fortified defensive turret."
+                    }
+                }
+            }
+        };
+
+        WithPackage(pack, (p, root) =>
+        {
+            ExpectValid(p, root, new EmptySnapshot(), new KnownModuleValidator());
+        });
+
+        ContentPackDefinition clonedPack = ContentPackCopy.DeepClone(pack);
+        var clonedBuilding = clonedPack.buildings[0];
+        if (clonedBuilding.rotationDegreesPerSecond != 90f ||
+            clonedBuilding.collisionRadius != 12f ||
+            clonedBuilding.attackWarmUpTime != 1.0f ||
+            clonedBuilding.canAttackWhileMoving != false ||
+            clonedBuilding.prespawnCount != 5)
+        {
+            throw new InvalidOperationException("Building behavioral properties were not cloned properly.");
+        }
+
+        // Test invalid ranges
+        ContentPackDefinition invalidRot = ContentPackCopy.DeepClone(pack);
+        invalidRot.buildings[0].rotationDegreesPerSecond = 800f;
+        WithPackage(invalidRot, (p, root) => ExpectDiagnostic(p, root, new EmptySnapshot(),
+            new KnownModuleValidator(), "building.rotationDegreesPerSecond-invalid"));
+
+        ContentPackDefinition invalidCol = ContentPackCopy.DeepClone(pack);
+        invalidCol.buildings[0].collisionRadius = 60f;
+        WithPackage(invalidCol, (p, root) => ExpectDiagnostic(p, root, new EmptySnapshot(),
+            new KnownModuleValidator(), "building.collisionRadius-invalid"));
+
+        ContentPackDefinition invalidWarm = ContentPackCopy.DeepClone(pack);
+        invalidWarm.buildings[0].attackWarmUpTime = 15f;
+        WithPackage(invalidWarm, (p, root) => ExpectDiagnostic(p, root, new EmptySnapshot(),
+            new KnownModuleValidator(), "building.attackWarmUpTime-invalid"));
+
+        ContentPackDefinition invalidPrespawn = ContentPackCopy.DeepClone(pack);
+        invalidPrespawn.buildings[0].prespawnCount = 150;
+        WithPackage(invalidPrespawn, (p, root) => ExpectDiagnostic(p, root, new EmptySnapshot(),
+            new KnownModuleValidator(), "building.prespawnCount-invalid"));
+
+        ContentPackDefinition missingBundle = ContentPackCopy.DeepClone(pack);
+        missingBundle.buildings[0].selectionSoundAssetName = "audio/turret_select.wav";
+        missingBundle.buildings[0].assetBundleId = null;
+        WithPackage(missingBundle, (p, root) => ExpectDiagnostic(p, root, new EmptySnapshot(),
+            new KnownModuleValidator(), "building.audio-bundle-missing"));
     }),
 };
 

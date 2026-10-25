@@ -336,6 +336,70 @@ namespace RogueCommandExpansionLoader.Runtime
             }
         }
 
+        public static void OnSetupPrespawning()
+        {
+            SafeCall(delegate { ApplyModPrespawnQuotas(false); });
+        }
+
+        public static void OnSetupAiPrespawning()
+        {
+            SafeCall(delegate { ApplyModPrespawnQuotas(true); });
+        }
+
+        private static void ApplyModPrespawnQuotas(bool isAi)
+        {
+            RuntimeContentMutator mutator;
+            TryPrepareRuntimeContent(out mutator);
+
+            IPrespawnRuntimeProvider prespawnProvider;
+            lock (Gate) { prespawnProvider = _provider as IPrespawnRuntimeProvider; }
+            if (prespawnProvider == null || mutator == null || mutator.GameAssembly == null) return;
+
+            Type entityFactoryType = RuntimeReflection.FindUniqueType(mutator.GameAssembly, "EntityFactory");
+            if (entityFactoryType == null) return;
+
+            FieldInfo toPrespawnField = entityFactoryType.GetField("EntitiesToPrespawn",
+                BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public);
+            FieldInfo prespawnedField = entityFactoryType.GetField("PrespawnedEntities",
+                BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public);
+            if (toPrespawnField == null || prespawnedField == null) return;
+
+            System.Collections.IDictionary toPrespawn = toPrespawnField.GetValue(null) as System.Collections.IDictionary;
+            System.Collections.IDictionary prespawned = prespawnedField.GetValue(null) as System.Collections.IDictionary;
+            if (toPrespawn == null || prespawned == null) return;
+
+            IEnumerable<PrespawnQuota> quotas = prespawnProvider.GetPrespawnQuotas();
+            if (quotas == null) return;
+
+            Type entityControllerType = RuntimeReflection.FindUniqueType(mutator.GameAssembly, "EntityController");
+            if (entityControllerType == null) return;
+            Type stackType = typeof(Stack<>).MakeGenericType(entityControllerType);
+
+            foreach (PrespawnQuota quota in quotas)
+            {
+                if (String.IsNullOrEmpty(quota.EntityId) || quota.Quota <= 0) continue;
+
+                if (toPrespawn.Contains(quota.EntityId))
+                {
+                    int current = Convert.ToInt32(toPrespawn[quota.EntityId]);
+                    if (current < quota.Quota)
+                    {
+                        toPrespawn[quota.EntityId] = quota.Quota;
+                    }
+                }
+                else
+                {
+                    toPrespawn[quota.EntityId] = quota.Quota;
+                }
+
+                if (!prespawned.Contains(quota.EntityId))
+                {
+                    object stack = Activator.CreateInstance(stackType);
+                    prespawned[quota.EntityId] = stack;
+                }
+            }
+        }
+
         public static bool BlueprintNamePrefix(string __0, ref string __result)
         {
             return TryResolveUnitLocalization(__0, false, ref __result);
@@ -887,6 +951,16 @@ namespace RogueCommandExpansionLoader.Runtime
         public static void FallbackLandscapeGeneratorsPostfix(ref List<global::LandscapeGenerator> __result)
         {
             __result = (List<global::LandscapeGenerator>)RuntimeHooks.ResolveFallbackLandscapes(__result);
+        }
+
+        public static void EntityFactorySetupPrespawningPostfix()
+        {
+            RuntimeHooks.OnSetupPrespawning();
+        }
+
+        public static void EntityFactorySetupAiPrespawningPostfix()
+        {
+            RuntimeHooks.OnSetupAiPrespawning();
         }
 
         public static void EntityBalancingStoreInitPostfix()

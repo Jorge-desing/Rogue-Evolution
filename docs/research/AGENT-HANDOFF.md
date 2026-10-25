@@ -1,6 +1,6 @@
 # Rogue Command Content Expansion — Agent Handoff & Technical Baseline
 
-**Updated:** 2026-10-22
+**Updated:** 2026-10-24
 **Repository:** Mod Rogue Command (`c:\Users\Alex\Documents\Mod Rogue Command`)
 **Remote:** `origin` points to `https://github.com/Jorge-desing/Rogue-Evolution.git` (branch `codex/rogue-unit-balance-20261018`)
 **Mission:** Create a modular, content-first expansion mod for Rogue Command featuring original playable units, base production buildings, stages, tactical AI profiles, and custom 3D visuals. BepInEx and Harmony provide loader infrastructure; playable content and runtime stability are the mod's deliverables.
@@ -150,6 +150,19 @@ Verified against pinned `Assembly-CSharp.dll` (`d2da384df3318e7ac52db58eb13699ec
 | `ClearPatrolPositions` | `EntityController` | `0x06000888` | Instance `Void ClearPatrolPositions()` | Clears positions and resets the current patrol index/direction |
 | `AddPatrolPosition` | `EntityController` | `0x06000889` | Instance `Void AddPatrolPosition(Vector3)` | Appends a patrol route position |
 | `ArePatrolPositionsEmpty` | `EntityController` | `0x0600088a` | Instance `Boolean ArePatrolPositionsEmpty()` | Checks for a configured route point |
+| `EntitiesToPrespawn` | `EntityFactory` | `0x040003b5` | Private static `Dictionary<String, Int32> EntitiesToPrespawn` | Prespawning quota registry |
+| `PrespawnedEntities` | `EntityFactory` | `0x040003b6` | Private static `Dictionary<String, Stack<EntityController>> PrespawnedEntities` | Pre-warmed zero-allocation pool stack |
+| `rotationDegreesPerSecond` | `EntityController` | `0x040004ff` | Public `Single rotationDegreesPerSecond` | Angular rotation speed in deg/s |
+| `collisionRadius` | `EntityController` | `0x0400050b` | Public `Single collisionRadius` | Flocking avoidance and placement radius |
+| `attackWarmUpTime` | `EntityController` | `0x04000508` | Public `Single attackWarmUpTime` | Pre-attack charge delay before firing |
+| `canAttackWhileMoving` | `EntityController` | `0x04000506` | Public `Boolean canAttackWhileMoving` | Firing authorization while in motion |
+| `shootAutomaticallyOnEnemiesWithinRange` | `EntityController` | `0x04000509` | Public `Boolean shootAutomaticallyOnEnemiesWithinRange` | Autonomous target acquisition within weapon range |
+| `defendPositionAggressivelyWhenIdle` | `EntityController` | `0x0400050a` | Public `Boolean defendPositionAggressivelyWhenIdle` | Guard behavior engaging encroaching enemies |
+| `rangeToChooseNewTargetAutomatically` | `EntityController` | `0x0400050c` | Public `Int32 rangeToChooseNewTargetAutomatically` | Autonomous retargeting radius limit |
+| `selectionSound` | `EntityController` | `0x040004f7` | Public `AudioClip selectionSound` | Selection confirmation audio clip |
+| `_movementSoundAudioSource` | `EntityFlockingMovement` | `0x04000473` | Private `AudioSource _movementSoundAudioSource` | Engine locomotion sound audio source |
+| `shotSoundAudioSource` | `ShootProjectile` | `0x0400062b` | Public `AudioSource shotSoundAudioSource` | Weapon discharge audio source |
+| `_muzzleFlashEffects` | `ShootProjectile` | `0x0400062c` | Private `ParticleSystem[] _muzzleFlashEffects` | Weapon muzzle flash particle emitter array |
 
 ### REA Evidence Ledger
 - Parent Assembly Evidence: `ev_f31810ef788eb949c380fdc4129aebd5483da71763ee7836d3cede7d17a51572`

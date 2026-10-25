@@ -57,6 +57,8 @@ namespace RogueCommandExpansionLoader.Runtime
         private readonly int _unityMainThreadId;
         private bool _offThreadWarningLogged;
 
+        public Assembly GameAssembly { get; }
+
         public RuntimeContentMutator(
             Assembly gameAssembly,
             IRuntimeContentProvider provider,
@@ -66,6 +68,7 @@ namespace RogueCommandExpansionLoader.Runtime
             {
                 throw new ArgumentNullException("gameAssembly");
             }
+            GameAssembly = gameAssembly;
 
             if (provider == null)
             {

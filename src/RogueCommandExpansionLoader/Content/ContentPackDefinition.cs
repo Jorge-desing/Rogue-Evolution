@@ -293,6 +293,17 @@ namespace RogueCommandExpansionLoader.Content
         public int? neededExperienceLevel;
         public string[] systemTags;
         public string[] baselineStatusEffects;
+        public float? rotationDegreesPerSecond;
+        public float? collisionRadius;
+        public float? attackWarmUpTime;
+        public bool? canAttackWhileMoving;
+        public bool? shootAutomaticallyOnEnemiesWithinRange;
+        public bool? defendPositionAggressivelyWhenIdle;
+        public int? rangeToChooseNewTargetAutomatically;
+        public int? prespawnCount;
+        public string selectionSoundAssetName;
+        public string engineSoundAssetName;
+        public string weaponSoundAssetName;
         public ContentBalanceOverride[] balanceOverrides;
         public ContentUnitLocalizationDefinition[] localizations;
         public ContentProductionBuildingDefinition productionBuilding;
@@ -575,6 +586,17 @@ namespace RogueCommandExpansionLoader.Content
         public bool? isAllowedForAi;
         public bool? isAllowedForDemo;
         public bool? isForSpecialists;
+        public float? rotationDegreesPerSecond;
+        public float? collisionRadius;
+        public float? attackWarmUpTime;
+        public bool? canAttackWhileMoving;
+        public bool? shootAutomaticallyOnEnemiesWithinRange;
+        public bool? defendPositionAggressivelyWhenIdle;
+        public int? rangeToChooseNewTargetAutomatically;
+        public int? prespawnCount;
+        public string selectionSoundAssetName;
+        public string engineSoundAssetName;
+        public string weaponSoundAssetName;
         public ContentBalanceOverride[] balanceOverrides;
         public ContentUnitLocalizationDefinition[] localizations;
     }
@@ -950,6 +972,17 @@ namespace RogueCommandExpansionLoader.Content
                 isAllowedForAi = source.isAllowedForAi,
                 isAllowedForDemo = source.isAllowedForDemo,
                 isForSpecialists = source.isForSpecialists,
+                rotationDegreesPerSecond = source.rotationDegreesPerSecond,
+                collisionRadius = source.collisionRadius,
+                attackWarmUpTime = source.attackWarmUpTime,
+                canAttackWhileMoving = source.canAttackWhileMoving,
+                shootAutomaticallyOnEnemiesWithinRange = source.shootAutomaticallyOnEnemiesWithinRange,
+                defendPositionAggressivelyWhenIdle = source.defendPositionAggressivelyWhenIdle,
+                rangeToChooseNewTargetAutomatically = source.rangeToChooseNewTargetAutomatically,
+                prespawnCount = source.prespawnCount,
+                selectionSoundAssetName = source.selectionSoundAssetName,
+                engineSoundAssetName = source.engineSoundAssetName,
+                weaponSoundAssetName = source.weaponSoundAssetName,
                 balanceOverrides = CloneArray(source.balanceOverrides, CloneBalanceOverride),
                 localizations = CloneArray(source.localizations, CloneUnitLocalization),
                 abilities = CloneArray(source.abilities, CloneAbility),
@@ -1299,6 +1332,17 @@ namespace RogueCommandExpansionLoader.Content
                 isAllowedForAi = source.isAllowedForAi,
                 isAllowedForDemo = source.isAllowedForDemo,
                 isForSpecialists = source.isForSpecialists,
+                rotationDegreesPerSecond = source.rotationDegreesPerSecond,
+                collisionRadius = source.collisionRadius,
+                attackWarmUpTime = source.attackWarmUpTime,
+                canAttackWhileMoving = source.canAttackWhileMoving,
+                shootAutomaticallyOnEnemiesWithinRange = source.shootAutomaticallyOnEnemiesWithinRange,
+                defendPositionAggressivelyWhenIdle = source.defendPositionAggressivelyWhenIdle,
+                rangeToChooseNewTargetAutomatically = source.rangeToChooseNewTargetAutomatically,
+                prespawnCount = source.prespawnCount,
+                selectionSoundAssetName = source.selectionSoundAssetName,
+                engineSoundAssetName = source.engineSoundAssetName,
+                weaponSoundAssetName = source.weaponSoundAssetName,
                 balanceOverrides = CloneArray(source.balanceOverrides, CloneBalanceOverride),
                 localizations = CloneArray(source.localizations, CloneUnitLocalization)
             };

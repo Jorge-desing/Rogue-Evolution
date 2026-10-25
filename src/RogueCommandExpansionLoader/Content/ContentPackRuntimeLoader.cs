@@ -25,7 +25,8 @@ namespace RogueCommandExpansionLoader.Content
     public sealed class ContentPackRuntimeLoader : IRuntimeContentProvider, IUnitSkillLocalizationRuntimeProvider,
         IRelicLocalizationRuntimeProvider, IStageLandscapeRuntimeProvider,
         IBlueprintPoolRuntimeProvider, IStageFallbackRuntimeProvider,
-        IStageOwnedAiPlacementDistanceRuntimeProvider, IBlueprintRewardFactoryScopeProvider
+        IStageOwnedAiPlacementDistanceRuntimeProvider, IBlueprintRewardFactoryScopeProvider,
+        IPrespawnRuntimeProvider
     {
         private const int MaxManifestBytes = 1024 * 1024;
         private const uint GenericRead = 0x80000000;
@@ -74,6 +75,15 @@ namespace RogueCommandExpansionLoader.Content
         private readonly FieldInfo _nullableStringHasValueField;
         private readonly FieldInfo _entityRolesField;
         private readonly FieldInfo _entityControllerIdField;
+        private readonly FieldInfo _rotationDegreesPerSecondField;
+        private readonly FieldInfo _collisionRadiusField;
+        private readonly FieldInfo _attackWarmUpTimeField;
+        private readonly FieldInfo _canAttackWhileMovingField;
+        private readonly FieldInfo _shootAutomaticallyField;
+        private readonly FieldInfo _defendPositionAggressivelyField;
+        private readonly FieldInfo _rangeToChooseNewTargetField;
+        private readonly FieldInfo _selectionSoundField;
+        private readonly FieldInfo _movementSoundAudioSourceField;
         private readonly FieldInfo _prefabLocationField;
         private readonly FieldInfo _imageLocationField;
         private readonly FieldInfo _inactiveField;
@@ -323,6 +333,15 @@ namespace RogueCommandExpansionLoader.Content
                     "EntityBalancingParameters.roles must remain an enum containing Building and Factory.");
             }
             _entityControllerIdField = RequireField(_entityControllerType, "entityId", typeof(string));
+            _rotationDegreesPerSecondField = _entityControllerType.GetField("rotationDegreesPerSecond", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            _collisionRadiusField = _entityControllerType.GetField("collisionRadius", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            _attackWarmUpTimeField = _entityControllerType.GetField("attackWarmUpTime", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            _canAttackWhileMovingField = _entityControllerType.GetField("canAttackWhileMoving", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            _shootAutomaticallyField = _entityControllerType.GetField("shootAutomaticallyOnEnemiesWithinRange", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+            _defendPositionAggressivelyField = _entityControllerType.GetField("defendPositionAggressivelyWhenIdle", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            _rangeToChooseNewTargetField = _entityControllerType.GetField("rangeToChooseNewTargetAutomatically", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            _selectionSoundField = _entityControllerType.GetField("selectionSound", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+            _movementSoundAudioSourceField = _entityControllerType.GetField("movementSoundAudioSource", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
             _prefabLocationField = RequireField(_entityRowType, "prefabLocation", typeof(string));
             _imageLocationField = RequireField(_entityRowType, "imageLocation", typeof(string));
             _inactiveField = RequireField(_entityRowType, "inactive", typeof(bool));
@@ -3127,6 +3146,16 @@ namespace RogueCommandExpansionLoader.Content
 
                         EntityControllerIdentity.Assign(_entityControllerIdField, clonedController, unit.id,
                             "Unidad " + unit.id + " en '" + packageName + "'");
+                        ApplyEntityBehavioralParameters(nativePrefabClone, unit.rotationDegreesPerSecond, unit.collisionRadius,
+                            unit.attackWarmUpTime, unit.canAttackWhileMoving, unit.shootAutomaticallyOnEnemiesWithinRange,
+                            unit.defendPositionAggressivelyWhenIdle, unit.rangeToChooseNewTargetAutomatically);
+                        AssetBundle audioBundle = !String.IsNullOrWhiteSpace(unit.assetBundleId)
+                            ? GetBundle(temporaryBundles, unit.assetBundleId, packageName)
+                            : null;
+                        ApplyEntityAudioBindings(nativePrefabClone, audioBundle, unit.selectionSoundAssetName,
+                            unit.engineSoundAssetName, unit.weaponSoundAssetName, unit.id, packageName);
+                        EnsureMuzzleFlashHierarchy(nativePrefabClone);
+
                         nativePrefabClone.name = "RCL_Native_" + unit.id.Replace(':', '_');
                         nativePrefabClone.SetActive(false);
                         nativePrefabClone.hideFlags = HideFlags.HideAndDontSave;
@@ -3174,6 +3203,13 @@ namespace RogueCommandExpansionLoader.Content
                         EntityController customController = customPrefabClone.GetComponent<EntityController>();
                         EntityControllerIdentity.Assign(_entityControllerIdField, customController, unit.id,
                             "Unidad " + unit.id + " en '" + packageName + "'");
+                        ApplyEntityBehavioralParameters(customPrefabClone, unit.rotationDegreesPerSecond, unit.collisionRadius,
+                            unit.attackWarmUpTime, unit.canAttackWhileMoving, unit.shootAutomaticallyOnEnemiesWithinRange,
+                            unit.defendPositionAggressivelyWhenIdle, unit.rangeToChooseNewTargetAutomatically);
+                        ApplyEntityAudioBindings(customPrefabClone, bundle, unit.selectionSoundAssetName,
+                            unit.engineSoundAssetName, unit.weaponSoundAssetName, unit.id, packageName);
+                        EnsureMuzzleFlashHierarchy(customPrefabClone);
+
                         customPrefabClone.name = "RCL_Custom_" + unit.id.Replace(':', '_');
                         customPrefabClone.SetActive(false);
                         customPrefabClone.hideFlags = HideFlags.HideAndDontSave;
@@ -3204,8 +3240,9 @@ namespace RogueCommandExpansionLoader.Content
                     _factoryForEntityIdField.SetValue(row, CreateEmptyNullableString());
                     _allowedBlueprintField.SetValue(row, false);
                     _allowedStartingBlueprintField.SetValue(row, false);
+                    int unitPrespawn = unit.prespawnCount ?? ((unit.systemTags != null && Array.Exists(unit.systemTags, t => String.Equals(t, "Spawn", StringComparison.OrdinalIgnoreCase))) || HasRoleFlag(row, "Spawn") ? 50 : 20);
                     temporaryUnits.Add(new LoadedUnit(unit.id, definition.packId, prefabKey, imageKey,
-                        row, unit, false, unit.productionBuilding.id));
+                        row, unit, false, unit.productionBuilding.id, unitPrespawn, false));
                     temporaryUnits.Add(CreateProductionBuilding(unit, unit.productionBuilding, definition.packId,
                         packageName, temporaryBundles, temporaryNativePrefabs, temporaryResources));
                 }
@@ -4498,6 +4535,10 @@ namespace RogueCommandExpansionLoader.Content
 
             EntityControllerIdentity.Assign(_entityControllerIdField, clonedController, building.id,
                 "Edificio de producción " + building.id + " en '" + packageName + "'");
+            ApplyEntityBehavioralParameters(nativePrefabClone, null, building.gridSize.HasValue ? (float?)(building.gridSize.Value * 10f) : null,
+                null, false, false, false, -1);
+            EnsureMuzzleFlashHierarchy(nativePrefabClone);
+
             nativePrefabClone.name = "RCL_NativeFactory_" + building.id.Replace(':', '_');
             nativePrefabClone.SetActive(false);
             nativePrefabClone.hideFlags = HideFlags.HideAndDontSave;
@@ -4537,8 +4578,9 @@ namespace RogueCommandExpansionLoader.Content
             }
             temporaryResources.Add(prefabKey, nativePrefabClone);
 
+            int factoryPrespawn = 2;
             return new LoadedUnit(building.id, packId, prefabKey, imagePath,
-                row, localizationDefinition, true, null);
+                row, localizationDefinition, true, null, factoryPrespawn, false);
         }
 
         private object CreateNullableString(string value)
@@ -5031,6 +5073,13 @@ namespace RogueCommandExpansionLoader.Content
 
             EntityControllerIdentity.Assign(_entityControllerIdField, clonedController, building.id,
                 "Edificio " + building.id + " en '" + packageName + "'");
+            ApplyEntityBehavioralParameters(nativePrefabClone, building.rotationDegreesPerSecond, building.collisionRadius,
+                building.attackWarmUpTime, building.canAttackWhileMoving ?? false, building.shootAutomaticallyOnEnemiesWithinRange,
+                building.defendPositionAggressivelyWhenIdle, building.rangeToChooseNewTargetAutomatically);
+            ApplyEntityAudioBindings(nativePrefabClone, buildingAssetBundle, building.selectionSoundAssetName,
+                building.engineSoundAssetName, building.weaponSoundAssetName, building.id, packageName);
+            EnsureMuzzleFlashHierarchy(nativePrefabClone);
+
             nativePrefabClone.name = "RCL_NativeBuilding_" + building.id.Replace(':', '_');
             nativePrefabClone.SetActive(false);
             nativePrefabClone.hideFlags = HideFlags.HideAndDontSave;
@@ -5058,8 +5107,9 @@ namespace RogueCommandExpansionLoader.Content
 
             temporaryResources.Add(prefabKey, nativePrefabClone);
 
+            int buildingPrespawn = building.prespawnCount ?? 2;
             return new LoadedUnit(building.id, packId, prefabKey, imagePath,
-                row, localizationDefinition, false, null);
+                row, localizationDefinition, false, null, buildingPrespawn, true);
         }
 
         private bool HasProductionBuildingRoles(object row)
@@ -7504,6 +7554,226 @@ namespace RogueCommandExpansionLoader.Content
             public long LoadedBytes { get; set; }
         }
 
+        public IEnumerable<PrespawnQuota> GetPrespawnQuotas()
+        {
+            lock (_gate)
+            {
+                var quotas = new List<PrespawnQuota>(_units.Count);
+                foreach (LoadedUnit unit in _units.Values)
+                {
+                    quotas.Add(new PrespawnQuota(unit.Id, unit.PrespawnCount, unit.IsProductionBuilding || unit.IsStandaloneBuilding));
+                }
+                return quotas;
+            }
+        }
+
+        private void ApplyEntityBehavioralParameters(
+            GameObject prefabClone,
+            float? rotationDegreesPerSecond,
+            float? collisionRadius,
+            float? attackWarmUpTime,
+            bool? canAttackWhileMoving,
+            bool? shootAutomaticallyOnEnemiesWithinRange,
+            bool? defendPositionAggressivelyWhenIdle,
+            int? rangeToChooseNewTargetAutomatically)
+        {
+            if (prefabClone == null) return;
+            Component controller = prefabClone.GetComponent(_entityControllerType);
+            if (controller == null) return;
+
+            if (rotationDegreesPerSecond.HasValue && _rotationDegreesPerSecondField != null)
+            {
+                _rotationDegreesPerSecondField.SetValue(controller, rotationDegreesPerSecond.Value);
+            }
+            if (collisionRadius.HasValue && _collisionRadiusField != null)
+            {
+                _collisionRadiusField.SetValue(controller, collisionRadius.Value);
+            }
+            if (attackWarmUpTime.HasValue && _attackWarmUpTimeField != null)
+            {
+                _attackWarmUpTimeField.SetValue(controller, attackWarmUpTime.Value);
+            }
+            if (canAttackWhileMoving.HasValue && _canAttackWhileMovingField != null)
+            {
+                _canAttackWhileMovingField.SetValue(controller, canAttackWhileMoving.Value);
+            }
+            if (shootAutomaticallyOnEnemiesWithinRange.HasValue && _shootAutomaticallyField != null)
+            {
+                _shootAutomaticallyField.SetValue(controller, shootAutomaticallyOnEnemiesWithinRange.Value);
+            }
+            if (defendPositionAggressivelyWhenIdle.HasValue && _defendPositionAggressivelyField != null)
+            {
+                _defendPositionAggressivelyField.SetValue(controller, defendPositionAggressivelyWhenIdle.Value);
+            }
+            if (rangeToChooseNewTargetAutomatically.HasValue && _rangeToChooseNewTargetField != null)
+            {
+                _rangeToChooseNewTargetField.SetValue(controller, rangeToChooseNewTargetAutomatically.Value);
+            }
+        }
+
+        private void ApplyEntityAudioBindings(
+            GameObject prefabClone,
+            AssetBundle bundle,
+            string selectionSoundAssetName,
+            string engineSoundAssetName,
+            string weaponSoundAssetName,
+            string entityId,
+            string packageName)
+        {
+            if (prefabClone == null) return;
+            Component controller = prefabClone.GetComponent(_entityControllerType);
+
+            if (!String.IsNullOrWhiteSpace(selectionSoundAssetName) && bundle != null)
+            {
+                AudioClip selectionClip = LoadRequiredAsset(bundle, selectionSoundAssetName,
+                    typeof(AudioClip), "AudioClip selection sound", packageName) as AudioClip;
+                if (selectionClip != null && controller != null && _selectionSoundField != null)
+                {
+                    AudioSource audioSource = _selectionSoundField.GetValue(controller) as AudioSource;
+                    if (audioSource == null)
+                    {
+                        audioSource = prefabClone.AddComponent<AudioSource>();
+                        audioSource.playOnAwake = false;
+                        _selectionSoundField.SetValue(controller, audioSource);
+                    }
+                    audioSource.clip = selectionClip;
+                }
+            }
+
+            if (!String.IsNullOrWhiteSpace(engineSoundAssetName) && bundle != null)
+            {
+                AudioClip engineClip = LoadRequiredAsset(bundle, engineSoundAssetName,
+                    typeof(AudioClip), "AudioClip engine sound", packageName) as AudioClip;
+                if (engineClip != null && controller != null && _movementSoundAudioSourceField != null)
+                {
+                    AudioSource audioSource = _movementSoundAudioSourceField.GetValue(controller) as AudioSource;
+                    if (audioSource == null)
+                    {
+                        audioSource = prefabClone.AddComponent<AudioSource>();
+                        audioSource.playOnAwake = false;
+                        audioSource.loop = true;
+                        audioSource.spatialBlend = 1f;
+                        _movementSoundAudioSourceField.SetValue(controller, audioSource);
+                    }
+                    audioSource.clip = engineClip;
+                }
+            }
+
+            if (!String.IsNullOrWhiteSpace(weaponSoundAssetName) && bundle != null)
+            {
+                AudioClip weaponClip = LoadRequiredAsset(bundle, weaponSoundAssetName,
+                    typeof(AudioClip), "AudioClip weapon sound", packageName) as AudioClip;
+                if (weaponClip != null && controller is EntityController entityCtrl && entityCtrl.Events != null)
+                {
+                    foreach (EntityEvent evt in entityCtrl.Events)
+                    {
+                        if (evt.actions != null)
+                        {
+                            foreach (IEntityAction action in evt.actions)
+                            {
+                                if (action is ShootProjectile shoot)
+                                {
+                                    if (shoot.shotSoundAudioSource == null)
+                                    {
+                                        AudioSource audioSource = prefabClone.AddComponent<AudioSource>();
+                                        audioSource.playOnAwake = false;
+                                        audioSource.spatialBlend = 1f;
+                                        shoot.shotSoundAudioSource = audioSource;
+                                    }
+                                    shoot.shotSoundAudioSource.clip = weaponClip;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        private static void EnsureMuzzleFlashHierarchy(GameObject prefabClone)
+        {
+            if (prefabClone == null) return;
+            EntityController controller = prefabClone.GetComponent<EntityController>();
+            var firePointsTransforms = new List<Transform>();
+
+            if (controller != null && controller.Events != null)
+            {
+                foreach (EntityEvent evt in controller.Events)
+                {
+                    if (evt.actions != null)
+                    {
+                        foreach (IEntityAction action in evt.actions)
+                        {
+                            if (action is ShootProjectile shoot && shoot.firePointsTransform != null && !firePointsTransforms.Contains(shoot.firePointsTransform))
+                            {
+                                firePointsTransforms.Add(shoot.firePointsTransform);
+                            }
+                        }
+                    }
+                    if (evt.conditionalActions != null)
+                    {
+                        foreach (ConditionalEntityActions cond in evt.conditionalActions)
+                        {
+                            if (cond.actions != null)
+                            {
+                                foreach (IEntityAction action in cond.actions)
+                                {
+                                    if (action is ShootProjectile shoot && shoot.firePointsTransform != null && !firePointsTransforms.Contains(shoot.firePointsTransform))
+                                    {
+                                        firePointsTransforms.Add(shoot.firePointsTransform);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Also check for named sockets in hierarchy if no actions or in addition
+            Transform socketMuzzle = prefabClone.transform.Find("Socket_MuzzlePrimary");
+            if (socketMuzzle != null && !firePointsTransforms.Contains(socketMuzzle))
+            {
+                firePointsTransforms.Add(socketMuzzle);
+            }
+
+            for (int f = 0; f < firePointsTransforms.Count; f++)
+            {
+                Transform fpTransform = firePointsTransforms[f];
+                if (fpTransform == null) continue;
+
+                int count = fpTransform.childCount;
+                for (int i = 0; i < count; i++)
+                {
+                    Transform firePoint = fpTransform.GetChild(i);
+                    if (firePoint == null) continue;
+
+                    if (firePoint.childCount < 1)
+                    {
+                        GameObject fallbackChild = new GameObject("MuzzleFlash_Fallback");
+                        fallbackChild.transform.SetParent(firePoint, false);
+                        fallbackChild.transform.localPosition = Vector3.zero;
+                        fallbackChild.transform.localRotation = Quaternion.identity;
+                        ParticleSystem ps = fallbackChild.AddComponent<ParticleSystem>();
+                        var main = ps.main;
+                        main.playOnAwake = false;
+                        main.duration = 0.1f;
+                        ps.Stop();
+                    }
+                    else
+                    {
+                        Transform firstChild = firePoint.GetChild(0);
+                        if (firstChild != null && firstChild.GetComponent<ParticleSystem>() == null)
+                        {
+                            ParticleSystem ps = firstChild.gameObject.AddComponent<ParticleSystem>();
+                            var main = ps.main;
+                            main.playOnAwake = false;
+                            main.duration = 0.1f;
+                            ps.Stop();
+                        }
+                    }
+                }
+            }
+        }
+
         private sealed class LoadedUnit
         {
             public LoadedUnit(
@@ -7514,7 +7784,9 @@ namespace RogueCommandExpansionLoader.Content
                 object balanceRow,
                 ContentUnitDefinition definition,
                 bool isProductionBuilding,
-                string productionFactoryId)
+                string productionFactoryId,
+                int prespawnCount = 20,
+                bool isStandaloneBuilding = false)
             {
                 Id = id;
                 PackId = packId;
@@ -7524,6 +7796,8 @@ namespace RogueCommandExpansionLoader.Content
                 Definition = definition;
                 IsProductionBuilding = isProductionBuilding;
                 ProductionFactoryId = productionFactoryId;
+                PrespawnCount = prespawnCount;
+                IsStandaloneBuilding = isStandaloneBuilding;
             }
 
             public string Id { get; private set; }
@@ -7534,6 +7808,8 @@ namespace RogueCommandExpansionLoader.Content
             public ContentUnitDefinition Definition { get; private set; }
             public bool IsProductionBuilding { get; private set; }
             public string ProductionFactoryId { get; private set; }
+            public int PrespawnCount { get; private set; }
+            public bool IsStandaloneBuilding { get; private set; }
         }
 
         private sealed class LoadedStage

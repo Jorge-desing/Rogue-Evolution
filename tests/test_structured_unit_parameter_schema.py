@@ -237,6 +237,11 @@ class StructuredUnitParameterSchemaTests(unittest.TestCase):
             ("systemTags", ["InvalidTag"]),
             ("attackType", "InvalidAttackType"),
             ("rarity", "Legendary"),
+            ("rotationDegreesPerSecond", 5.0),
+            ("collisionRadius", 60.0),
+            ("attackWarmUpTime", 15.0),
+            ("rangeToChooseNewTargetAutomatically", -5),
+            ("prespawnCount", 150),
         ]
         for field, invalid_val in invalid_cases:
             with self.subTest(field=field, value=invalid_val):
@@ -249,6 +254,44 @@ class StructuredUnitParameterSchemaTests(unittest.TestCase):
                     }
                 ]
                 self.assertFalse(self.validator.is_valid(manifest), f"Expected schema to reject building.{field}={invalid_val}")
+
+    def test_unit_behavioral_and_audio_schema_valid(self) -> None:
+        manifest = json.loads(json.dumps(self.sample))
+        unit = manifest["units"][0]
+        unit["rotationDegreesPerSecond"] = 180.0
+        unit["collisionRadius"] = 2.5
+        unit["attackWarmUpTime"] = 0.3
+        unit["canAttackWhileMoving"] = True
+        unit["shootAutomaticallyOnEnemiesWithinRange"] = True
+        unit["defendPositionAggressivelyWhenIdle"] = True
+        unit["rangeToChooseNewTargetAutomatically"] = 15
+        unit["prespawnCount"] = 10
+        unit["selectionSoundAssetName"] = "audio/select.wav"
+        unit["engineSoundAssetName"] = "audio/engine_loop.wav"
+        unit["weaponSoundAssetName"] = "audio/shot.wav"
+        self.assertTrue(self.validator.is_valid(manifest))
+
+    def test_unit_behavioral_schema_invalid_rejected(self) -> None:
+        invalid_cases = [
+            ("rotationDegreesPerSecond", 9.9),
+            ("rotationDegreesPerSecond", 720.1),
+            ("collisionRadius", 0.49),
+            ("collisionRadius", 50.1),
+            ("attackWarmUpTime", -0.1),
+            ("attackWarmUpTime", 10.1),
+            ("rangeToChooseNewTargetAutomatically", -2),
+            ("rangeToChooseNewTargetAutomatically", 1001),
+            ("rangeToChooseNewTargetAutomatically", 12.5),
+            ("prespawnCount", -1),
+            ("prespawnCount", 101),
+            ("prespawnCount", 5.5),
+            ("canAttackWhileMoving", "true"),
+        ]
+        for field, invalid_val in invalid_cases:
+            with self.subTest(field=field, value=invalid_val):
+                manifest = json.loads(json.dumps(self.sample))
+                manifest["units"][0][field] = invalid_val
+                self.assertFalse(self.validator.is_valid(manifest), f"Expected schema to reject {field}={invalid_val}")
 
 
 if __name__ == "__main__":
