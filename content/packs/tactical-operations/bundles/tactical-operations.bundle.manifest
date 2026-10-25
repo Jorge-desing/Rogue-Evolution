@@ -1,15 +1,15 @@
 ManifestFileVersion: 0
-CRC: 4230329236
+CRC: 2774496989
 Hashes:
   AssetFileHash:
     serializedVersion: 2
-    Hash: dae40761740816fe849e72d367f4fb83
+    Hash: aca702907f11a2e9a627ed84d59faaa8
   TypeTreeHash:
     serializedVersion: 2
     Hash: 7cf8f98f471eb9f0b2869cfe40773e7d
   IncrementalBuildHash:
     serializedVersion: 2
-    Hash: dae40761740816fe849e72d367f4fb83
+    Hash: aca702907f11a2e9a627ed84d59faaa8
 HashAppended: 0
 ClassTypes:
 - Class: 1
@@ -43,7 +43,13 @@ Assets:
 - Assets/TacticalOperations/TidebreakerHovercraftCard.png
 - Assets/TacticalOperations/Prefabs/TidebreakerHovercraftVisual.prefab
 - Assets/TacticalOperations/SalvageHaulerCard.png
+- Assets/TacticalOperations/Prefabs/BulwarkSiegeTankVisual.prefab
 - Assets/TacticalOperations/Prefabs/SalvageHaulerVisual.prefab
+- Assets/TacticalOperations/fieldmedicrovercard.png
+- Assets/TacticalOperations/Prefabs/ArcLanceWalkerVisual.prefab
+- Assets/TacticalOperations/bulwarksiegetankcard.png
+- Assets/TacticalOperations/Prefabs/FieldMedicRoverVisual.prefab
 - Assets/TacticalOperations/SkyguardSAMCard.png
 - Assets/TacticalOperations/Prefabs/SkyguardSAMVisual.prefab
+- Assets/TacticalOperations/arclancewalkercard.png
 Dependencies: []

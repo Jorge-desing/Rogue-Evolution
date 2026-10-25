@@ -24,6 +24,15 @@ namespace RogueCommandExpansion.Authoring
         public const string SalvageHaulerPrefabPath = PrefabsFolder + "/SalvageHaulerVisual.prefab";
         public const string SkyguardSAMPrefabPath = PrefabsFolder + "/SkyguardSAMVisual.prefab";
 
+        // New units (reuse existing models as visual overlays)
+        public const string BulwarkSiegeTankCardPath = RootFolder + "/bulwarksiegetankcard.png";
+        public const string ArcLanceWalkerCardPath = RootFolder + "/arclancewalkercard.png";
+        public const string FieldMedicRoverCardPath = RootFolder + "/fieldmedicrovercard.png";
+
+        public const string BulwarkSiegeTankPrefabPath = PrefabsFolder + "/BulwarkSiegeTankVisual.prefab";
+        public const string ArcLanceWalkerPrefabPath = PrefabsFolder + "/ArcLanceWalkerVisual.prefab";
+        public const string FieldMedicRoverPrefabPath = PrefabsFolder + "/FieldMedicRoverVisual.prefab";
+
         public const string BundleName = "tactical-operations.bundle";
 
         [MenuItem("Rogue Command/Tactical Operations/Build Tactical Operations Pack Assets and Bundle")]
@@ -44,11 +53,17 @@ namespace RogueCommandExpansion.Authoring
                 ConfigureCardSprite(TidebreakerCardPath);
                 ConfigureCardSprite(SalvageHaulerCardPath);
                 ConfigureCardSprite(SkyguardSAMCardPath);
+                ConfigureCardSprite(BulwarkSiegeTankCardPath);
+                ConfigureCardSprite(ArcLanceWalkerCardPath);
+                ConfigureCardSprite(FieldMedicRoverCardPath);
 
                 // 2. Build Prefabs
                 string p1 = CreateTidebreakerHovercraftVisual();
                 string p2 = CreateSalvageHaulerVisual();
                 string p3 = CreateSkyguardSAMVisual();
+                string p4 = CreateBulwarkSiegeTankVisual();
+                string p5 = CreateArcLanceWalkerVisual();
+                string p6 = CreateFieldMedicRoverVisual();
 
                 AssetDatabase.SaveAssets();
                 AssetDatabase.Refresh();
@@ -65,7 +80,10 @@ namespace RogueCommandExpansion.Authoring
                     {
                         p1, TidebreakerCardPath,
                         p2, SalvageHaulerCardPath,
-                        p3, SkyguardSAMCardPath
+                        p3, SkyguardSAMCardPath,
+                        p4, BulwarkSiegeTankCardPath,
+                        p5, ArcLanceWalkerCardPath,
+                        p6, FieldMedicRoverCardPath
                     }
                 };
 
@@ -241,6 +259,126 @@ namespace RogueCommandExpansion.Authoring
                 PrefabUtility.SaveAsPrefabAsset(root, SkyguardSAMPrefabPath, out success);
                 if (!success) throw new InvalidOperationException("Could not save prefab to " + SkyguardSAMPrefabPath);
                 return SkyguardSAMPrefabPath;
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(root);
+            }
+        }
+
+        private static string CreateBulwarkSiegeTankVisual()
+        {
+            // Reuse SkyguardSAM model as heavy tank visual
+            GameObject modelAsset = AssetDatabase.LoadAssetAtPath<GameObject>(SkyguardSAMModelPath);
+            if (modelAsset == null) throw new FileNotFoundException("Model not found: " + SkyguardSAMModelPath);
+
+            var root = new GameObject("BulwarkSiegeTankVisual");
+            try
+            {
+                GameObject modelInstance = PrefabUtility.InstantiatePrefab(modelAsset) as GameObject;
+                if (modelInstance == null) modelInstance = UnityEngine.Object.Instantiate(modelAsset);
+                modelInstance.name = "BulwarkSiegeTankModel";
+                modelInstance.transform.SetParent(root.transform, false);
+                modelInstance.transform.localPosition = Vector3.zero;
+                modelInstance.transform.localRotation = Quaternion.identity;
+                modelInstance.transform.localScale = Vector3.one;
+
+                Dictionary<string, Material> mats = LoadMaterialsByPrefix("SkyguardSAM_");
+                AssignMaterials(modelInstance, mats);
+
+                FitBoxCollider(root, modelInstance);
+                VehiclePrefabBuilder.EnsureCanonicalVfxSockets(root, modelInstance);
+                VehiclePrefabBuilder.EnsureCanonicalVfxAndAudioComponents(root);
+
+                bool success;
+                PrefabUtility.SaveAsPrefabAsset(root, BulwarkSiegeTankPrefabPath, out success);
+                if (!success) throw new InvalidOperationException("Could not save prefab to " + BulwarkSiegeTankPrefabPath);
+                return BulwarkSiegeTankPrefabPath;
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(root);
+            }
+        }
+
+        private static string CreateArcLanceWalkerVisual()
+        {
+            // Reuse TidebreakerHovercraft model as mech visual
+            GameObject modelAsset = AssetDatabase.LoadAssetAtPath<GameObject>(TidebreakerModelPath);
+            if (modelAsset == null) throw new FileNotFoundException("Model not found: " + TidebreakerModelPath);
+
+            var root = new GameObject("ArcLanceWalkerVisual");
+            try
+            {
+                GameObject modelInstance = PrefabUtility.InstantiatePrefab(modelAsset) as GameObject;
+                if (modelInstance == null) modelInstance = UnityEngine.Object.Instantiate(modelAsset);
+                modelInstance.name = "ArcLanceWalkerModel";
+                modelInstance.transform.SetParent(root.transform, false);
+                modelInstance.transform.localPosition = Vector3.zero;
+                modelInstance.transform.localRotation = Quaternion.identity;
+                modelInstance.transform.localScale = Vector3.one;
+
+                Material atlasMat = AssetDatabase.LoadAssetAtPath<Material>(MaterialsFolder + "/TidebreakerHovercraft_Atlas.mat");
+                if (atlasMat == null)
+                {
+                    atlasMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/RogueCommandExpansionSample/VisualOnly/Materials/TidebreakerHovercraft_Atlas.mat");
+                }
+
+                if (atlasMat != null)
+                {
+                    Renderer[] renderers = modelInstance.GetComponentsInChildren<Renderer>(true);
+                    foreach (Renderer r in renderers)
+                    {
+                        int count = r.sharedMaterials != null && r.sharedMaterials.Length > 0 ? r.sharedMaterials.Length : 1;
+                        var mats = new Material[count];
+                        for (int i = 0; i < count; i++) mats[i] = atlasMat;
+                        r.sharedMaterials = mats;
+                    }
+                }
+
+                FitBoxCollider(root, modelInstance);
+                VehiclePrefabBuilder.EnsureCanonicalVfxSockets(root, modelInstance);
+                VehiclePrefabBuilder.EnsureCanonicalVfxAndAudioComponents(root);
+
+                bool success;
+                PrefabUtility.SaveAsPrefabAsset(root, ArcLanceWalkerPrefabPath, out success);
+                if (!success) throw new InvalidOperationException("Could not save prefab to " + ArcLanceWalkerPrefabPath);
+                return ArcLanceWalkerPrefabPath;
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(root);
+            }
+        }
+
+        private static string CreateFieldMedicRoverVisual()
+        {
+            // Reuse SalvageHauler model as support vehicle visual
+            GameObject modelAsset = AssetDatabase.LoadAssetAtPath<GameObject>(SalvageHaulerModelPath);
+            if (modelAsset == null) throw new FileNotFoundException("Model not found: " + SalvageHaulerModelPath);
+
+            var root = new GameObject("FieldMedicRoverVisual");
+            try
+            {
+                GameObject modelInstance = PrefabUtility.InstantiatePrefab(modelAsset) as GameObject;
+                if (modelInstance == null) modelInstance = UnityEngine.Object.Instantiate(modelAsset);
+                modelInstance.name = "FieldMedicRoverModel";
+                modelInstance.transform.SetParent(root.transform, false);
+                modelInstance.transform.localPosition = Vector3.zero;
+                modelInstance.transform.localRotation = Quaternion.identity;
+                modelInstance.transform.localScale = Vector3.one;
+
+                Dictionary<string, Material> mats = LoadMaterialsByPrefix("SalvageHauler_");
+                AssignMaterials(modelInstance, mats);
+
+                FitBoxCollider(root, modelInstance);
+                VehiclePrefabBuilder.EnsureCanonicalVfxSockets(root, modelInstance);
+                VehiclePrefabBuilder.EnsureCanonicalVfxAndAudioComponents(root);
+
+                bool success;
+                PrefabUtility.SaveAsPrefabAsset(root, FieldMedicRoverPrefabPath, out success);
+                if (!success) throw new InvalidOperationException("Could not save prefab to " + FieldMedicRoverPrefabPath);
+                return FieldMedicRoverPrefabPath;
             }
             finally
             {
