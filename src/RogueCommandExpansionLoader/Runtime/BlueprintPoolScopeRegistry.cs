@@ -129,7 +129,7 @@ namespace RogueCommandExpansionLoader.Runtime
     {
         private readonly object _gate = new object();
         private readonly Dictionary<string, BlueprintPoolScopeRegistration> _byId =
-            new Dictionary<string, BlueprintPoolScopeRegistration>(StringComparer.Ordinal);
+            new Dictionary<string, BlueprintPoolScopeRegistration>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<object, BlueprintPoolScopeRegistration> _byReference =
             new Dictionary<object, BlueprintPoolScopeRegistration>(ReferenceComparer.Instance);
         private readonly Dictionary<string, string> _localizationAliases =
@@ -162,12 +162,20 @@ namespace RogueCommandExpansionLoader.Runtime
                 for (int i = 0; i < batch.Count; i++)
                 {
                     BlueprintPoolScopeRegistration registration = batch[i];
-                    _byId.Add(registration.PoolId, registration);
-                    _byReference.Add(registration.Pool, registration);
+                    _byId[registration.PoolId] = registration;
+                    _byReference[registration.Pool] = registration;
                     _ordered.Add(registration);
                     if (!String.IsNullOrWhiteSpace(registration.SourcePoolId))
                     {
-                        _localizationAliases.Add(registration.PoolId, registration.SourcePoolId);
+                        string effectiveSource = registration.SourcePoolId;
+                        string rootSource;
+                        if (_localizationAliases.TryGetValue(effectiveSource, out rootSource) &&
+                            !String.IsNullOrWhiteSpace(rootSource))
+                        {
+                            effectiveSource = rootSource;
+                        }
+
+                        _localizationAliases[registration.PoolId] = effectiveSource;
                     }
                 }
             }
@@ -188,6 +196,16 @@ namespace RogueCommandExpansionLoader.Runtime
                 if (!String.IsNullOrEmpty(poolId) && _localizationAliases.TryGetValue(poolId, out sourcePoolId))
                 {
                     return true;
+                }
+
+                BlueprintPoolScopeRegistration registration;
+                if (!String.IsNullOrEmpty(poolId) && _byId.TryGetValue(poolId, out registration))
+                {
+                    if (!String.IsNullOrWhiteSpace(registration.SourcePoolId))
+                    {
+                        sourcePoolId = registration.SourcePoolId;
+                        return true;
+                    }
                 }
             }
 

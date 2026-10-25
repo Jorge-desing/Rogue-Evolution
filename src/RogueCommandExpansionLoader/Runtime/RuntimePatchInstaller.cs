@@ -329,6 +329,7 @@ namespace RogueCommandExpansionLoader.Runtime
             MethodInfo relicNamePrefix = Hook("RelicNamePrefix");
             MethodInfo relicDescriptionPrefix = Hook("RelicDescriptionPrefix");
             MethodInfo globalLocalizationPrefix = Hook("LandscapeLocalizationPrefix");
+            MethodInfo globalLocalizationFinalizer = Hook("LandscapeLocalizationFinalizer");
             MethodInfo fallbackLandscapesPostfix = Hook("FallbackLandscapeGeneratorsPostfix");
             MethodInfo outlyingStartAiBuildingDistancePrefix = Hook("OutlyingStartAiBuildingDistancePrefix");
             MethodInfo blueprintPoolEligibilityPrefix = Hook("BlueprintPoolIsInPoolPrefix");
@@ -376,7 +377,7 @@ namespace RogueCommandExpansionLoader.Runtime
             plan.Add(new PatchPlan(skillDescription, skillDescriptionPrefix, null));
             plan.Add(new PatchPlan(relicName, relicNamePrefix, null));
             plan.Add(new PatchPlan(relicDescription, relicDescriptionPrefix, null));
-            plan.Add(new PatchPlan(globalLocalization, globalLocalizationPrefix, null));
+            plan.Add(new PatchPlan(globalLocalization, globalLocalizationPrefix, null, globalLocalizationFinalizer));
             plan.Add(new PatchPlan(fallbackLandscapes, null, fallbackLandscapesPostfix));
             plan.Add(new PatchPlan(outlyingStartAiBuildingDistance,
                 outlyingStartAiBuildingDistancePrefix, null));

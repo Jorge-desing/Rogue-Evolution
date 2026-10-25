@@ -365,6 +365,7 @@ var tests = new (string Name, Action Run)[]
             "BlueprintDescriptionPrefix",
             "SkillDescriptionPrefix",
             "LandscapeLocalizationPrefix",
+            "LandscapeLocalizationFinalizer",
             "FallbackLandscapeGeneratorsPostfix",
             "OutlyingStartAiBuildingDistancePrefix",
             "BlueprintPoolIsInPoolPrefix",
@@ -1719,6 +1720,7 @@ var tests = new (string Name, Action Run)[]
 
         var provider = new RuntimeMutatorTestProvider();
         provider.PoolLocalizationAliases.Add("RCL_POOL_TEST", "NativePool");
+        provider.PoolLocalizationAliases.Add("RCL_POOL_CHAINED", "RCL_POOL_TEST");
         RuntimeHooks.Bind(null!, provider, null!);
         try
         {
@@ -1727,10 +1729,25 @@ var tests = new (string Name, Action Run)[]
             if (!RuntimeHarmonyPatches.LandscapeLocalizationPrefix(ref key, ref result) ||
                 key != "NativePool" || result != "unchanged")
                 throw new InvalidOperationException("The localization prefix did not forward the source key to the game.");
+            key = "RCL_POOL_CHAINED";
+            if (!RuntimeHarmonyPatches.LandscapeLocalizationPrefix(ref key, ref result) ||
+                key != "NativePool" || result != "unchanged")
+                throw new InvalidOperationException("The localization prefix did not resolve chained pool aliases.");
+            key = "RCL_POOL_UNKNOWN";
+            if (!RuntimeHarmonyPatches.LandscapeLocalizationPrefix(ref key, ref result) ||
+                key != "overworldMapBlueprintTooltip" || result != "unchanged")
+                throw new InvalidOperationException("The localization prefix did not fall back unknown RCL pools to overworldMapBlueprintTooltip.");
             key = "UnrelatedKey";
             if (!RuntimeHarmonyPatches.LandscapeLocalizationPrefix(ref key, ref result) ||
                 key != "UnrelatedKey" || result != "unchanged")
                 throw new InvalidOperationException("The localization prefix rewrote an unrelated key.");
+
+            string finalResult = "original";
+            Exception ex = RuntimeHarmonyPatches.LandscapeLocalizationFinalizer(new Exception("test translation failure"), ref finalResult);
+            if (ex != null || finalResult != "Blueprint")
+            {
+                throw new InvalidOperationException("The localization finalizer did not suppress the exception or fall back to Blueprint.");
+            }
         }
         finally { RuntimeHooks.Clear(null!); }
     }),

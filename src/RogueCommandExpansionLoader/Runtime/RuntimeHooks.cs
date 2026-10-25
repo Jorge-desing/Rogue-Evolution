@@ -600,12 +600,44 @@ namespace RogueCommandExpansionLoader.Runtime
             }
 
             IBlueprintPoolRuntimeProvider poolProvider = provider as IBlueprintPoolRuntimeProvider;
-            string sourcePoolId;
-            if (poolProvider != null && poolProvider.TryGetBlueprintPoolLocalizationId(__0, out sourcePoolId))
+            string sourcePoolId = null;
+            bool isRclPool = !String.IsNullOrEmpty(__0) &&
+                (__0.StartsWith("RCL_POOL_", StringComparison.OrdinalIgnoreCase) ||
+                 __0.StartsWith("rcl_pool_", StringComparison.OrdinalIgnoreCase));
+
+            if (isRclPool || (poolProvider != null && poolProvider.TryGetBlueprintPoolLocalizationId(__0, out sourcePoolId)))
             {
-                // Let the game's localization resolve language, variables, and fallback
-                // using the source pool's authored key instead of the generated registry ID.
-                __0 = sourcePoolId;
+                if (String.IsNullOrEmpty(sourcePoolId) && poolProvider != null)
+                {
+                    poolProvider.TryGetBlueprintPoolLocalizationId(__0, out sourcePoolId);
+                }
+
+                while (!String.IsNullOrEmpty(sourcePoolId) &&
+                       (sourcePoolId.StartsWith("RCL_POOL_", StringComparison.OrdinalIgnoreCase) ||
+                        sourcePoolId.StartsWith("rcl_pool_", StringComparison.OrdinalIgnoreCase)))
+                {
+                    string next;
+                    if (poolProvider != null && poolProvider.TryGetBlueprintPoolLocalizationId(sourcePoolId, out next) && next != sourcePoolId)
+                    {
+                        sourcePoolId = next;
+                    }
+                    else
+                    {
+                        break;
+                    }
+                }
+
+                if (!String.IsNullOrEmpty(sourcePoolId) &&
+                    !sourcePoolId.StartsWith("RCL_POOL_", StringComparison.OrdinalIgnoreCase) &&
+                    !sourcePoolId.StartsWith("rcl_pool_", StringComparison.OrdinalIgnoreCase))
+                {
+                    __0 = sourcePoolId;
+                    return true;
+                }
+
+                // If sourcePoolId could not be resolved or is still an RCL_POOL_,
+                // rewrite to native blueprint tooltip so native Loca.Global never throws 'No translation found'.
+                __0 = "overworldMapBlueprintTooltip";
                 return true;
             }
 
@@ -632,6 +664,30 @@ namespace RogueCommandExpansionLoader.Runtime
                 return true;
             }
         }
+
+        public static Exception LandscapeLocalizationFinalizer(Exception __exception, ref string __result)
+
+        {
+
+            if (__exception != null)
+
+            {
+
+                Log("Handled localization exception: " + __exception.Message);
+
+                __result = "Blueprint";
+
+                return null;
+
+            }
+
+
+
+            return null;
+
+        }
+
+
 
         public static bool BlueprintPoolIsInPoolPrefix(object __instance, string __0, ref bool __result)
         {
@@ -1236,6 +1292,11 @@ namespace RogueCommandExpansionLoader.Runtime
         public static bool LandscapeLocalizationPrefix(ref string __0, ref string __result)
         {
             return RuntimeHooks.LandscapeLocalizationPrefix(ref __0, ref __result);
+        }
+
+        public static Exception LandscapeLocalizationFinalizer(Exception __exception, ref string __result)
+        {
+            return RuntimeHooks.LandscapeLocalizationFinalizer(__exception, ref __result);
         }
 
         public static bool BlueprintPoolIsInPoolPrefix(object __instance, string __0, ref bool __result)

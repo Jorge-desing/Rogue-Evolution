@@ -3463,11 +3463,33 @@ namespace RogueCommandExpansionLoader.Content
                             reservedBlueprintPoolIds = LoadNativeBlueprintPoolIds();
                         }
 
+                        ScriptableObject clonedPoolList = UnityEngine.Object.Instantiate(stagePoolList);
+                        if (clonedPoolList == null)
+                        {
+                            throw new InvalidDataException("No se pudo clonar la lista de BlueprintPool de " + stage.id + ".");
+                        }
+
+                        clonedPoolList.name = "RCL_BlueprintPoolList_" + stage.id.Replace(':', '_');
+                        clonedPoolList.hideFlags = HideFlags.HideAndDontSave;
+                        temporaryBlueprintPoolClones.Add(clonedPoolList);
+                        _stageParametersBlueprintPoolListField.SetValue(parameters, clonedPoolList);
+                        poolList = _blueprintPoolsField.GetValue(clonedPoolList) as IList;
+                        if (poolList == null)
+                        {
+                            throw new InvalidDataException("La lista de BlueprintPool clonada para " + stage.id + " es inválida.");
+                        }
+
                         var clonedPools = new List<object>(poolList.Count);
                         for (int poolIndex = 0; poolIndex < pools.Count; poolIndex++)
                         {
                             object pool = pools[poolIndex];
                             string sourcePoolId = _blueprintPoolIdField.GetValue(pool) as string;
+                            string rootSourcePoolId;
+                            if (_blueprintPoolScopeRegistry.TryGetSourcePoolLocalizationId(sourcePoolId, out rootSourcePoolId) &&
+                                !String.IsNullOrWhiteSpace(rootSourcePoolId))
+                            {
+                                sourcePoolId = rootSourcePoolId;
+                            }
                             HashSet<string> additions;
                             if (!unitsByPool.TryGetValue(sourcePoolId, out additions) || additions.Count == 0)
                             {
