@@ -1,15 +1,15 @@
 ManifestFileVersion: 0
-CRC: 2774496989
+CRC: 466040820
 Hashes:
   AssetFileHash:
     serializedVersion: 2
-    Hash: aca702907f11a2e9a627ed84d59faaa8
+    Hash: c2d9597647af9b714108d1e817fab43a
   TypeTreeHash:
     serializedVersion: 2
     Hash: 7cf8f98f471eb9f0b2869cfe40773e7d
   IncrementalBuildHash:
     serializedVersion: 2
-    Hash: aca702907f11a2e9a627ed84d59faaa8
+    Hash: c2d9597647af9b714108d1e817fab43a
 HashAppended: 0
 ClassTypes:
 - Class: 1
@@ -45,6 +45,8 @@ Assets:
 - Assets/TacticalOperations/SalvageHaulerCard.png
 - Assets/TacticalOperations/Prefabs/BulwarkSiegeTankVisual.prefab
 - Assets/TacticalOperations/Prefabs/SalvageHaulerVisual.prefab
+- Assets/TacticalOperations/Materials/ArcLanceWalker_PBR.mat
+- Assets/TacticalOperations/Materials/FieldMedicRover_PBR.mat
 - Assets/TacticalOperations/fieldmedicrovercard.png
 - Assets/TacticalOperations/Prefabs/ArcLanceWalkerVisual.prefab
 - Assets/TacticalOperations/bulwarksiegetankcard.png
@@ -52,4 +54,5 @@ Assets:
 - Assets/TacticalOperations/SkyguardSAMCard.png
 - Assets/TacticalOperations/Prefabs/SkyguardSAMVisual.prefab
 - Assets/TacticalOperations/arclancewalkercard.png
+- Assets/TacticalOperations/Materials/BulwarkSiegeTank_PBR.mat
 Dependencies: []

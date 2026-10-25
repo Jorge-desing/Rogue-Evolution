@@ -15,6 +15,9 @@ namespace RogueCommandExpansion.Authoring
         public const string TidebreakerModelPath = "Assets/RogueCommandExpansionSample/Models/TidebreakerHovercraft_Atlas.fbx";
         public const string SalvageHaulerModelPath = "Assets/RogueCommandExpansionSample/Models/SalvageHauler.fbx";
         public const string SkyguardSAMModelPath = "Assets/RogueCommandExpansionSample/Models/SkyguardSAM.fbx";
+        public const string BulwarkSiegeTankModelPath = "Assets/RogueCommandExpansionSample/Models/BulwarkSiegeTank_Atlas.fbx";
+        public const string ArcLanceWalkerModelPath = "Assets/RogueCommandExpansionSample/Models/ArcLanceWalker_Atlas.fbx";
+        public const string FieldMedicRoverModelPath = "Assets/RogueCommandExpansionSample/Models/FieldMedicRover_Atlas.fbx";
 
         public const string TidebreakerCardPath = RootFolder + "/TidebreakerHovercraftCard.png";
         public const string SalvageHaulerCardPath = RootFolder + "/SalvageHaulerCard.png";
@@ -83,7 +86,10 @@ namespace RogueCommandExpansion.Authoring
                         p3, SkyguardSAMCardPath,
                         p4, BulwarkSiegeTankCardPath,
                         p5, ArcLanceWalkerCardPath,
-                        p6, FieldMedicRoverCardPath
+                        p6, FieldMedicRoverCardPath,
+                        MaterialsFolder + "/BulwarkSiegeTank_PBR.mat",
+                        MaterialsFolder + "/ArcLanceWalker_PBR.mat",
+                        MaterialsFolder + "/FieldMedicRover_PBR.mat"
                     }
                 };
 
@@ -268,9 +274,8 @@ namespace RogueCommandExpansion.Authoring
 
         private static string CreateBulwarkSiegeTankVisual()
         {
-            // Reuse SkyguardSAM model as heavy tank visual
-            GameObject modelAsset = AssetDatabase.LoadAssetAtPath<GameObject>(SkyguardSAMModelPath);
-            if (modelAsset == null) throw new FileNotFoundException("Model not found: " + SkyguardSAMModelPath);
+            GameObject modelAsset = AssetDatabase.LoadAssetAtPath<GameObject>(BulwarkSiegeTankModelPath);
+            if (modelAsset == null) throw new FileNotFoundException("Model not found: " + BulwarkSiegeTankModelPath);
 
             var root = new GameObject("BulwarkSiegeTankVisual");
             try
@@ -283,8 +288,18 @@ namespace RogueCommandExpansion.Authoring
                 modelInstance.transform.localRotation = Quaternion.identity;
                 modelInstance.transform.localScale = Vector3.one;
 
-                Dictionary<string, Material> mats = LoadMaterialsByPrefix("SkyguardSAM_");
-                AssignMaterials(modelInstance, mats);
+                Material pbrMat = CreatePbrMaterial("BulwarkSiegeTank");
+                if (pbrMat != null)
+                {
+                    Renderer[] renderers = modelInstance.GetComponentsInChildren<Renderer>(true);
+                    foreach (Renderer r in renderers)
+                    {
+                        int count = r.sharedMaterials != null && r.sharedMaterials.Length > 0 ? r.sharedMaterials.Length : 1;
+                        var mats = new Material[count];
+                        for (int i = 0; i < count; i++) mats[i] = pbrMat;
+                        r.sharedMaterials = mats;
+                    }
+                }
 
                 FitBoxCollider(root, modelInstance);
                 VehiclePrefabBuilder.EnsureCanonicalVfxSockets(root, modelInstance);
@@ -303,9 +318,8 @@ namespace RogueCommandExpansion.Authoring
 
         private static string CreateArcLanceWalkerVisual()
         {
-            // Reuse TidebreakerHovercraft model as mech visual
-            GameObject modelAsset = AssetDatabase.LoadAssetAtPath<GameObject>(TidebreakerModelPath);
-            if (modelAsset == null) throw new FileNotFoundException("Model not found: " + TidebreakerModelPath);
+            GameObject modelAsset = AssetDatabase.LoadAssetAtPath<GameObject>(ArcLanceWalkerModelPath);
+            if (modelAsset == null) throw new FileNotFoundException("Model not found: " + ArcLanceWalkerModelPath);
 
             var root = new GameObject("ArcLanceWalkerVisual");
             try
@@ -318,20 +332,15 @@ namespace RogueCommandExpansion.Authoring
                 modelInstance.transform.localRotation = Quaternion.identity;
                 modelInstance.transform.localScale = Vector3.one;
 
-                Material atlasMat = AssetDatabase.LoadAssetAtPath<Material>(MaterialsFolder + "/TidebreakerHovercraft_Atlas.mat");
-                if (atlasMat == null)
-                {
-                    atlasMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/RogueCommandExpansionSample/VisualOnly/Materials/TidebreakerHovercraft_Atlas.mat");
-                }
-
-                if (atlasMat != null)
+                Material pbrMat = CreatePbrMaterial("ArcLanceWalker");
+                if (pbrMat != null)
                 {
                     Renderer[] renderers = modelInstance.GetComponentsInChildren<Renderer>(true);
                     foreach (Renderer r in renderers)
                     {
                         int count = r.sharedMaterials != null && r.sharedMaterials.Length > 0 ? r.sharedMaterials.Length : 1;
                         var mats = new Material[count];
-                        for (int i = 0; i < count; i++) mats[i] = atlasMat;
+                        for (int i = 0; i < count; i++) mats[i] = pbrMat;
                         r.sharedMaterials = mats;
                     }
                 }
@@ -353,9 +362,8 @@ namespace RogueCommandExpansion.Authoring
 
         private static string CreateFieldMedicRoverVisual()
         {
-            // Reuse SalvageHauler model as support vehicle visual
-            GameObject modelAsset = AssetDatabase.LoadAssetAtPath<GameObject>(SalvageHaulerModelPath);
-            if (modelAsset == null) throw new FileNotFoundException("Model not found: " + SalvageHaulerModelPath);
+            GameObject modelAsset = AssetDatabase.LoadAssetAtPath<GameObject>(FieldMedicRoverModelPath);
+            if (modelAsset == null) throw new FileNotFoundException("Model not found: " + FieldMedicRoverModelPath);
 
             var root = new GameObject("FieldMedicRoverVisual");
             try
@@ -368,8 +376,18 @@ namespace RogueCommandExpansion.Authoring
                 modelInstance.transform.localRotation = Quaternion.identity;
                 modelInstance.transform.localScale = Vector3.one;
 
-                Dictionary<string, Material> mats = LoadMaterialsByPrefix("SalvageHauler_");
-                AssignMaterials(modelInstance, mats);
+                Material pbrMat = CreatePbrMaterial("FieldMedicRover");
+                if (pbrMat != null)
+                {
+                    Renderer[] renderers = modelInstance.GetComponentsInChildren<Renderer>(true);
+                    foreach (Renderer r in renderers)
+                    {
+                        int count = r.sharedMaterials != null && r.sharedMaterials.Length > 0 ? r.sharedMaterials.Length : 1;
+                        var mats = new Material[count];
+                        for (int i = 0; i < count; i++) mats[i] = pbrMat;
+                        r.sharedMaterials = mats;
+                    }
+                }
 
                 FitBoxCollider(root, modelInstance);
                 VehiclePrefabBuilder.EnsureCanonicalVfxSockets(root, modelInstance);
@@ -419,6 +437,90 @@ namespace RogueCommandExpansion.Authoring
                 }
                 r.sharedMaterials = shared;
             }
+        }
+
+        private static Material CreatePbrMaterial(string unitName)
+        {
+            Shader shader = Shader.Find("RogueCommand/VehiclePBR_VertexWear");
+            if (shader == null)
+                throw new InvalidOperationException("Shader 'RogueCommand/VehiclePBR_VertexWear' not found. Ensure the shader is in the project.");
+
+            string texBase = "Assets/RogueCommandExpansionSample/Models/Textures/" + unitName;
+            ConfigureTextureImporter(texBase + "_Albedo.png", false);
+            ConfigureTextureImporter(texBase + "_Emission.png", false);
+            ConfigureTextureImporter(texBase + "_MetallicGloss.png", true);
+            ConfigureTextureImporter(texBase + "_Normal.png", false, true);
+
+            AssetDatabase.ImportAsset(texBase + "_Albedo.png", ImportAssetOptions.ForceUpdate);
+            AssetDatabase.ImportAsset(texBase + "_MetallicGloss.png", ImportAssetOptions.ForceUpdate);
+            AssetDatabase.ImportAsset(texBase + "_Normal.png", ImportAssetOptions.ForceUpdate);
+            AssetDatabase.ImportAsset(texBase + "_Emission.png", ImportAssetOptions.ForceUpdate);
+
+            Texture2D albedo = AssetDatabase.LoadAssetAtPath<Texture2D>(texBase + "_Albedo.png");
+            Texture2D metallicGloss = AssetDatabase.LoadAssetAtPath<Texture2D>(texBase + "_MetallicGloss.png");
+            Texture2D normal = AssetDatabase.LoadAssetAtPath<Texture2D>(texBase + "_Normal.png");
+            Texture2D emission = AssetDatabase.LoadAssetAtPath<Texture2D>(texBase + "_Emission.png");
+
+            if (albedo == null || metallicGloss == null || normal == null || emission == null)
+                throw new FileNotFoundException("One or more PBR textures missing for " + unitName);
+
+            string matPath = MaterialsFolder + "/" + unitName + "_PBR.mat";
+            Material mat = AssetDatabase.LoadAssetAtPath<Material>(matPath);
+            if (mat == null)
+            {
+                mat = new Material(shader);
+                mat.name = unitName + "_PBR";
+                AssetDatabase.CreateAsset(mat, matPath);
+            }
+
+            mat.shader = shader;
+            mat.SetTexture("_BaseMap", albedo);
+            mat.SetTexture("_MetallicGlossMap", metallicGloss);
+            mat.SetTexture("_BumpMap", normal);
+            mat.SetTexture("_EmissionMap", emission);
+
+            mat.SetFloat("_GlossMapScale", 1.0f);
+            mat.SetFloat("_Metallic", 1.0f);
+            mat.SetFloat("_Smoothness", 1.0f);
+            mat.SetFloat("_BumpScale", 1.0f);
+            mat.SetColor("_BaseColor", Color.white);
+            mat.SetColor("_EmissionColor", Color.white);
+            mat.SetColor("_TeamColor", Color.white);
+            mat.EnableKeyword("_METALLICSPECGLOSSMAP");
+            mat.EnableKeyword("_NORMALMAP");
+            mat.EnableKeyword("_EMISSION");
+            mat.enableInstancing = true;
+
+            EditorUtility.SetDirty(mat);
+            return mat;
+        }
+
+        private static void ConfigureTextureImporter(string assetPath, bool linear, bool normalMap = false)
+        {
+            TextureImporter importer = AssetImporter.GetAtPath(assetPath) as TextureImporter;
+            if (importer == null)
+            {
+                AssetDatabase.ImportAsset(assetPath, ImportAssetOptions.ForceUpdate);
+                importer = AssetImporter.GetAtPath(assetPath) as TextureImporter;
+                if (importer == null) return;
+            }
+
+            bool changed = false;
+            if (normalMap)
+            {
+                if (importer.textureType != TextureImporterType.NormalMap) { importer.textureType = TextureImporterType.NormalMap; changed = true; }
+            }
+            else
+            {
+                if (importer.textureType != TextureImporterType.Default) { importer.textureType = TextureImporterType.Default; changed = true; }
+            }
+            // Normal maps and explicitly linear textures must never be sRGB
+            bool shouldBeSRGB = !linear && !normalMap;
+            if (importer.sRGBTexture != shouldBeSRGB) { importer.sRGBTexture = shouldBeSRGB; changed = true; }
+            if (importer.maxTextureSize != 2048) { importer.maxTextureSize = 2048; changed = true; }
+            if (!importer.mipmapEnabled) { importer.mipmapEnabled = true; changed = true; }
+            if (importer.wrapMode != TextureWrapMode.Clamp) { importer.wrapMode = TextureWrapMode.Clamp; changed = true; }
+            if (changed) importer.SaveAndReimport();
         }
 
         private static void FitBoxCollider(GameObject root, GameObject model)
