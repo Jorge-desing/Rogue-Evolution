@@ -119,16 +119,29 @@ namespace RogueCommandExpansionLoader.Modules
                 for (int i = 0; i < squad.Count; i++)
                 {
                     EntityController unit = squad[i];
+                    if (unit.CurrentCommandIsTaggedWith(_commandTag))
+                    {
+                        continue;
+                    }
+
                     EntityCommand flankCommand = EntityCommand.AttackMoveOnPosition(
                         flankWaypoint,
                         EntityCommand.Role.None,
                         "Flanking strike vector");
                     flankCommand.tag = _commandTag;
 
+                    EntityCommand assaultCommand = EntityCommand.AttackMoveOnPosition(
+                        targetPos,
+                        EntityCommand.Role.None,
+                        "Flanking strike assault");
+                    assaultCommand.tag = _commandTag;
+
                     try
                     {
                         unit.ExecuteCommand(flankCommand,
                             EntityController.CommandProcessingType.ExecuteBeforeCurrentCommand);
+                        unit.ExecuteCommand(assaultCommand,
+                            EntityController.CommandProcessingType.AppendToCommandChain);
                         dispatched++;
                     }
                     catch (Exception ex)

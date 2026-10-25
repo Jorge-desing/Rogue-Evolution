@@ -102,7 +102,9 @@ namespace RogueCommandExpansionLoader.Modules
                         continue;
                     }
 
-                    if (unit.IsEngineer || unit.HasRole(UnitRole.Engineer) || unit.HealAmount1 > 0f)
+                    if (unit.IsEngineer || unit.HasRole(UnitRole.Engineer) ||
+                        unit.HasRole(UnitRole.Heal) || unit.HasRole(UnitRole.Supporter) ||
+                        unit.HealAmount1 > 0f)
                     {
                         repairers.Add(unit);
                     }
@@ -198,18 +200,52 @@ namespace RogueCommandExpansionLoader.Modules
                         assignedCounts.TryGetValue(bestTarget.UniqueEntityId, out count);
                         assignedCounts[bestTarget.UniqueEntityId] = count + 1;
 
-                        // If not right next to target, dispatch movement toward target
-                        if (bestDistSq > 16.0f) // > 4m distance
+                        try
                         {
-                            try
+                            // If far from target (> 4m distance), dispatch movement toward target
+                            if (bestDistSq > 16.0f)
                             {
-                                repairer.MoveTo(bestTarget.Position, true);
+                                if (!repairer.CurrentCommandIsTaggedWith(_commandTag))
+                                {
+                                    EntityCommand moveCmd = EntityCommand.Move(bestTarget.Position);
+                                    moveCmd.tag = _commandTag;
+                                    repairer.ExecuteCommand(moveCmd, EntityController.CommandProcessingType.ExecuteAndDeleteCommandChain);
+                                }
                             }
-                            catch (Exception ex)
+                            else
                             {
-                                Debug.LogWarning("[RogueCommandExpansionLoader] Support repair could not direct '" +
-                                    repairer.gameObject.name + "': " + ex.Message);
+                                // Arrived within repair range: cancel movement if arriving via our command
+                                if (repairer.CurrentCommandIsTaggedWith(_commandTag))
+                                {
+                                    repairer.ExecuteCommand(EntityCommand.Stop(), EntityController.CommandProcessingType.ExecuteAndDeleteCommandChain);
+                                }
+
+                                // Apply active field repair / healing
+                                if (bestTarget.DeltaHealth > 0.01f)
+                                {
+                                    float healAmount = repairer.HealAmount1 > 0f ? repairer.HealAmount1 : 12f;
+                                    bestTarget.Heal(healAmount, repairer);
+                                }
+
+                                if (bestTarget.DeltaArmor > 0.01f)
+                                {
+                                    bestTarget.RepairArmor(6f, repairer, false);
+                                }
+
+                                // Trigger tactical active skill if ready (e.g. nanite pulse or area heal)
+                                if (repairer.SkillInfo != null && !repairer.HasSkillActivationInCommandChain &&
+                                    !repairer.CurrentCommandIsTaggedWith("RCL_Skill_" + repairer.UniqueEntityId))
+                                {
+                                    EntityCommand skillCmd = EntityCommand.ActiveSkillWithoutTarget();
+                                    skillCmd.tag = "RCL_Skill_" + repairer.UniqueEntityId;
+                                    repairer.ExecuteCommand(skillCmd, EntityController.CommandProcessingType.ExecuteBeforeCurrentCommand);
+                                }
                             }
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.LogWarning("[RogueCommandExpansionLoader] Support repair could not direct '" +
+                                repairer.gameObject.name + "': " + ex.Message);
                         }
                     }
                 }

@@ -31,8 +31,14 @@ public sealed class EntityController
     public void Produce(bool instant = false, bool forFree = false, bool noEvent = false) { }
     public UnitRole Role { get; set; }
     public int aiBaseIndex { get; set; }
-public float CurrentHealth { get; set; } = 100f;
+    public float CurrentHealth { get; set; } = 100f;
     public float MaxHealth { get; set; } = 100f;
+    public float DeltaHealth => MaxHealth - CurrentHealth;
+    public float CurrentArmor { get; set; } = 0f;
+    public float MaxArmor { get; set; } = 0f;
+    public float DeltaArmor => MaxArmor - CurrentArmor;
+    public void Heal(float amount, EntityController originator) { CurrentHealth = System.Math.Min(CurrentHealth + amount, MaxHealth); }
+    public void RepairArmor(float amount, EntityController originator, bool doNotFire = false) { CurrentArmor = System.Math.Min(CurrentArmor + amount, MaxArmor); }
     public float MoveSpeed { get; set; } = 10f;
     public float WeaponRange { get; set; } = 15f;
     public string EntityId { get => entityId; set => entityId = value; }
@@ -61,7 +67,9 @@ public float CurrentHealth { get; set; } = 100f;
     public enum CommandProcessingType
     {
         ExecuteBeforeCurrentCommand,
-        ExecuteAndCancelCurrentCommand
+        ExecuteAndCancelCurrentCommand,
+        ExecuteAndDeleteCommandChain,
+        AppendToCommandChain
     }
 
     public bool HasRole(UnitRole role) => _roles.Contains(role) || (Role & role) == role;
@@ -85,6 +93,10 @@ public float CurrentHealth { get; set; } = 100f;
         ExecuteCommandCallCount++;
         LastCommandProcessingType = processingType;
         CurrentCommandTag = command.tag;
+        if (command.command == EntityCommand.Command.Move)
+        {
+            MoveTo(command.destination);
+        }
     }
 }
 
@@ -192,7 +204,7 @@ public struct EntityCommand
     public static EntityCommand AttackMoveOnTarget(EntityController target, Role role) =>
         new() { command = Command.AttackMoveOnTarget, role = role };
 
-    public static EntityCommand Move(Vector3 destination, Vector2Int? clickPositionCell, Role role) =>
+    public static EntityCommand Move(Vector3 destination, Vector2Int? clickPositionCell = null, Role role = Role.None) =>
         new() { command = Command.Move, destination = destination, role = role };
 
     public static EntityCommand ActiveSkillWithoutTarget() =>
@@ -215,6 +227,14 @@ public enum TargetOrigin
 public class SkillInfo
 {
     public TargetOrigin targetOrigin { get; set; } = TargetOrigin.Self;
+    public float manaCost { get; set; } = 0f;
+}
+
+public sealed class WorldGrid
+{
+    public static WorldGrid Instance { get; set; } = new();
+    public Vector3 ClampToWorld(Vector3 position) => position;
+    public bool IsWithinWorld(Vector3 position) => true;
 }
 
 public static class Bank

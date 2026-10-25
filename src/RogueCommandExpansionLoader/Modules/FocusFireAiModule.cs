@@ -150,7 +150,12 @@ namespace RogueCommandExpansionLoader.Modules
                     for (int u = 0; u < squad.Count; u++)
                     {
                         EntityController unit = squad[u];
-                        if (unit.CurrentAttackTarget == priorityTarget && unit.CurrentCommandIsTaggedWith(_commandTag))
+                        if (unit == null || unit.IsDestroyed || unit.DestroyHasBeenStarted)
+                        {
+                            continue;
+                        }
+
+                        if (unit.CurrentCommandIsTaggedWith(_commandTag))
                         {
                             continue;
                         }

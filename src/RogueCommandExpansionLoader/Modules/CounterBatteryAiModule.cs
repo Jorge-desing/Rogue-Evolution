@@ -97,7 +97,7 @@ namespace RogueCommandExpansionLoader.Modules
                     return;
                 }
 
-                List<EntityController> interceptors = SelectInterceptors(existing, threat.Position);
+                List<EntityController> interceptors = SelectInterceptors(existing, threat);
                 if (interceptors.Count == 0)
                 {
                     _nextDispatchAt = now + 2.0f;
@@ -108,10 +108,9 @@ namespace RogueCommandExpansionLoader.Modules
                 for (int i = 0; i < interceptors.Count; i++)
                 {
                     EntityController unit = interceptors[i];
-                    EntityCommand attackCommand = EntityCommand.AttackMoveOnPosition(
-                        threat.Position,
-                        EntityCommand.Role.None,
-                        "Counter-battery strike vector");
+                    EntityCommand attackCommand = EntityCommand.AttackMoveOnTarget(
+                        threat,
+                        EntityCommand.Role.ThisCommandWantsPathToBeCleared);
                     attackCommand.tag = _commandTag;
 
                     try
@@ -205,9 +204,14 @@ namespace RogueCommandExpansionLoader.Modules
                 return closestThreat;
             }
 
-            private List<EntityController> SelectInterceptors(ExistingControllers existing, Vector3 threatPos)
+            private List<EntityController> SelectInterceptors(ExistingControllers existing, EntityController threat)
             {
                 var result = new List<EntityController>();
+                if (threat == null)
+                {
+                    return result;
+                }
+                Vector3 threatPos = threat.Position;
                 HashSet<EntityController> units = existing.AiUnits();
                 if (units == null || units.Count == 0)
                 {
@@ -238,6 +242,11 @@ namespace RogueCommandExpansionLoader.Modules
                     }
 
                     if (unit.CurrentCommandIsTaggedWith(_commandTag))
+                    {
+                        continue;
+                    }
+
+                    if (unit.CurrentAttackTarget == threat)
                     {
                         continue;
                     }

@@ -148,14 +148,20 @@ namespace RogueCommandExpansionLoader.Modules
                         continue;
                     }
 
-                    // Only order units not already actively engaging a target
+                    // Only order units not already actively engaging a target or executing wave command
                     if (unit.CurrentAttackTarget != null && !unit.CurrentAttackTarget.DestroyHasBeenStarted)
                     {
                         continue;
                     }
 
+                    string waveTag = "RCL_Wave_" + unit.UniqueEntityId;
+                    if (unit.CurrentCommandIsTaggedWith(waveTag))
+                    {
+                        continue;
+                    }
+
                     EntityCommand command = EntityCommand.AttackMoveOnTarget(targetBuilding, EntityCommand.Role.None);
-                    command.tag = "RCL_Wave_" + _dispatchedWaves + "_" + unit.UniqueEntityId;
+                    command.tag = waveTag;
                     unit.ExecuteCommand(command, EntityController.CommandProcessingType.ExecuteBeforeCurrentCommand);
                     dispatchCount++;
 

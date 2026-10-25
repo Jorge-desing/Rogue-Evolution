@@ -120,6 +120,19 @@ namespace RogueCommandExpansionLoader.Modules
                         continue;
                     }
 
+                    // Check if already executing or queued for skill
+                    if (unit.HasSkillActivationInCommandChain ||
+                        unit.CurrentCommandIsTaggedWith("RCL_Skill_" + unit.UniqueEntityId))
+                    {
+                        continue;
+                    }
+
+                    // Check mana requirement
+                    if (skillInfo.manaCost > unit.CurrentMana)
+                    {
+                        continue;
+                    }
+
                     // Check mana ratio requirement
                     float maxMana = EntityBalancingStore.MaxMana(unit.EntityId);
                     if (maxMana > 0f)

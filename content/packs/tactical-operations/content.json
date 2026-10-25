@@ -1128,6 +1128,106 @@
                             "value": "4"
                         }
                     ]
+                },
+                {
+                    "moduleId": "sample:skirmish-kiting",
+                    "parameters": [
+                        {
+                            "name": "retreatDistanceRatio",
+                            "value": "0.65"
+                        },
+                        {
+                            "name": "preferredEngagementRatio",
+                            "value": "0.90"
+                        },
+                        {
+                            "name": "minKiteSpeed",
+                            "value": "8.0"
+                        },
+                        {
+                            "name": "fleeDistance",
+                            "value": "8.0"
+                        },
+                        {
+                            "name": "maxKiteTargets",
+                            "value": "8"
+                        },
+                        {
+                            "name": "cooldownSeconds",
+                            "value": "1.2"
+                        }
+                    ]
+                },
+                {
+                    "moduleId": "sample:support-repair",
+                    "parameters": [
+                        {
+                            "name": "healthThresholdRatio",
+                            "value": "0.85"
+                        },
+                        {
+                            "name": "repairScanRadius",
+                            "value": "22.0"
+                        },
+                        {
+                            "name": "prioritizeHarvestersAndBuildings",
+                            "value": "true"
+                        },
+                        {
+                            "name": "maxAssignedRepairersPerTarget",
+                            "value": "2"
+                        },
+                        {
+                            "name": "cooldownSeconds",
+                            "value": "1.5"
+                        }
+                    ]
+                },
+                {
+                    "moduleId": "sample:counter-battery",
+                    "parameters": [
+                        {
+                            "name": "baseIndex",
+                            "value": "0"
+                        },
+                        {
+                            "name": "threatTriggerDistance",
+                            "value": "22.0"
+                        },
+                        {
+                            "name": "minInterceptorSpeed",
+                            "value": "9.0"
+                        },
+                        {
+                            "name": "maxInterceptors",
+                            "value": "3"
+                        },
+                        {
+                            "name": "cooldownSeconds",
+                            "value": "6.0"
+                        }
+                    ]
+                },
+                {
+                    "moduleId": "sample:tactical-skill-activation",
+                    "parameters": [
+                        {
+                            "name": "baseIndex",
+                            "value": "0"
+                        },
+                        {
+                            "name": "cooldownSeconds",
+                            "value": "3.5"
+                        },
+                        {
+                            "name": "enemyTriggerRadiusCells",
+                            "value": "10.0"
+                        },
+                        {
+                            "name": "minManaRatio",
+                            "value": "0.5"
+                        }
+                    ]
                 }
             ]
         }

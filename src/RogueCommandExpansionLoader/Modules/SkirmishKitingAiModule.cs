@@ -113,6 +113,12 @@ namespace RogueCommandExpansionLoader.Modules
                         continue;
                     }
 
+                    // If unit is currently executing an evasive kite retreat, allow it to complete
+                    if (unit.CurrentCommandIsTaggedWith(_commandTag))
+                    {
+                        continue;
+                    }
+
                     float retreatRange = unit.WeaponRange * _settings.RetreatDistanceRatio;
                     float retreatRangeSq = retreatRange * retreatRange;
                     float weaponRangeSq = unit.WeaponRange * unit.WeaponRange;
@@ -158,7 +164,7 @@ namespace RogueCommandExpansionLoader.Modules
                         float fdx = unitPos.x - threatPos.x;
                         float fdz = unitPos.z - threatPos.z;
                         float distSqThreat = fdx * fdx + fdz * fdz;
-                        if (distSqThreat < 0.001f)
+                        if (float.IsNaN(distSqThreat) || float.IsInfinity(distSqThreat) || distSqThreat < 0.001f)
                         {
                             fdx = 1f;
                             fdz = 0f;
@@ -175,9 +181,19 @@ namespace RogueCommandExpansionLoader.Modules
                             unitPos.y,
                             unitPos.z + fdz * _settings.FleeDistance);
 
+                        if (WorldGrid.Instance != null)
+                        {
+                            retreatPos = WorldGrid.Instance.ClampToWorld(retreatPos);
+                        }
+
                         try
                         {
-                            unit.MoveTo(retreatPos, true);
+                            EntityCommand retreatCmd = EntityCommand.Move(retreatPos);
+                            retreatCmd.tag = _commandTag;
+                            unit.ExecuteCommand(retreatCmd, EntityController.CommandProcessingType.ExecuteAndDeleteCommandChain);
+
+                            EntityCommand reengageCmd = EntityCommand.AttackMoveOnTarget(closestThreat, EntityCommand.Role.ThisCommandWantsPathToBeCleared);
+                            unit.ExecuteCommand(reengageCmd, EntityController.CommandProcessingType.AppendToCommandChain);
                             kitedCount++;
                         }
                         catch (Exception ex)
