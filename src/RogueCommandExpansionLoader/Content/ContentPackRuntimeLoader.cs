@@ -26,7 +26,7 @@ namespace RogueCommandExpansionLoader.Content
         IRelicLocalizationRuntimeProvider, IStageLandscapeRuntimeProvider,
         IBlueprintPoolRuntimeProvider, IStageFallbackRuntimeProvider,
         IStageOwnedAiPlacementDistanceRuntimeProvider, IBlueprintRewardFactoryScopeProvider,
-        IPrespawnRuntimeProvider, IGuaranteedModCardRewardProvider
+        IPrespawnRuntimeProvider, IGuaranteedModCardRewardProvider, IGlobalBlueprintCandidateProvider
     {
         private const int MaxManifestBytes = 1024 * 1024;
         private const uint GenericRead = 0x80000000;
@@ -1084,7 +1084,7 @@ namespace RogueCommandExpansionLoader.Content
                     !(bool)_gameAtLeastOneBlueprintAddedByPlayerField.GetValue(null);
                 bool isAllowedAsStartingBlueprint =
                     (bool)_allowedStartingBlueprintField.GetValue(unit.BalanceRow) ||
-                    (unit.Definition != null && unit.Definition.neededExperienceLevel <= 0);
+                    (unit.Definition != null && (unit.Definition.neededExperienceLevel ?? 0) <= 0);
                 if (isStartingBlueprintSelection && !isAllowedAsStartingBlueprint)
                 {
                     runOriginal = false;
@@ -1138,7 +1138,7 @@ namespace RogueCommandExpansionLoader.Content
                 if (!unit.IsProductionBuilding && !String.IsNullOrWhiteSpace(unit.ProductionFactoryId))
                 {
                     if (unit.Definition != null &&
-                        (unit.Definition.isAllowedAsStartingBlueprint || unit.Definition.neededExperienceLevel <= 0) &&
+                        (unit.Definition.isAllowedAsStartingBlueprint || (unit.Definition.neededExperienceLevel ?? 0) <= 0) &&
                         _blueprintUnitIds.Contains(unit.ProductionFactoryId))
                     {
                         LoadedUnit factory;
@@ -1154,7 +1154,7 @@ namespace RogueCommandExpansionLoader.Content
                 {
                     object startingVal = _allowedStartingBlueprintField.GetValue(unit.BalanceRow);
                     bool isStarting = (startingVal is bool && (bool)startingVal) ||
-                                      (unit.Definition != null && unit.Definition.neededExperienceLevel <= 0);
+                                      (unit.Definition != null && (unit.Definition.neededExperienceLevel ?? 0) <= 0);
                     if (isStarting)
                     {
                         if (_blueprintUnitIds.Contains(unit.Id) &&
@@ -1279,6 +1279,95 @@ namespace RogueCommandExpansionLoader.Content
                 int index = new System.Random().Next(0, selectedList.Count);
                 modProductId = selectedList[index].Id;
                 return true;
+            }
+        }
+
+        public IEnumerable<string> GetEligibleBlueprintFactories(
+            int rarity,
+            bool? startingBlueprints,
+            bool demoBlueprintsOnly,
+            int? maxNeededExperienceLevel)
+        {
+            lock (_gate)
+            {
+                var result = new List<string>();
+                foreach (LoadedUnit unit in _units.Values)
+                {
+                    if (!unit.IsProductionBuilding && !unit.IsStandaloneBuilding)
+                    {
+                        continue;
+                    }
+
+                    if (!_blueprintUnitIds.Contains(unit.Id))
+                    {
+                        continue;
+                    }
+
+                    if (_inactiveField != null && (bool)_inactiveField.GetValue(unit.BalanceRow))
+                    {
+                        continue;
+                    }
+
+                    if (demoBlueprintsOnly && _allowedForDemoField != null && !(bool)_allowedForDemoField.GetValue(unit.BalanceRow))
+                    {
+                        continue;
+                    }
+
+                    if (_rarityField != null && rarity >= 0)
+                    {
+                        object rowRarity = _rarityField.GetValue(unit.BalanceRow);
+                        if (rowRarity != null && Convert.ToInt32(rowRarity) != rarity)
+                        {
+                            continue;
+                        }
+                    }
+
+                    int neededXp = 0;
+                    if (unit.Definition != null && unit.Definition.neededExperienceLevel.HasValue)
+                    {
+                        neededXp = unit.Definition.neededExperienceLevel.Value;
+                    }
+                    else if (_neededExperienceLevelField != null)
+                    {
+                        object xpVal = _neededExperienceLevelField.GetValue(unit.BalanceRow);
+                        if (xpVal is int)
+                        {
+                            neededXp = (int)xpVal;
+                        }
+                    }
+
+                    if (maxNeededExperienceLevel.HasValue && neededXp > maxNeededExperienceLevel.Value)
+                    {
+                        continue;
+                    }
+
+                    if (startingBlueprints.HasValue)
+                    {
+                        bool isStartingEligible = false;
+                        if (_allowedStartingBlueprintField != null)
+                        {
+                            object val = _allowedStartingBlueprintField.GetValue(unit.BalanceRow);
+                            if (val is bool && (bool)val)
+                            {
+                                isStartingEligible = true;
+                            }
+                        }
+
+                        if (!isStartingEligible && unit.Definition != null)
+                        {
+                            isStartingEligible = unit.Definition.isAllowedAsStartingBlueprint || neededXp <= 0;
+                        }
+
+                        if (startingBlueprints.Value && !isStartingEligible)
+                        {
+                            continue;
+                        }
+                    }
+
+                    result.Add(unit.Id);
+                }
+
+                return result;
             }
         }
 
@@ -5927,7 +6016,7 @@ namespace RogueCommandExpansionLoader.Content
 
             // Compensate for Blender FBX 0.01x unit scaling
             float maxMeshExtent = CalculateLocalMeshExtent(visualClone);
-            float authoringCompensation = (maxMeshExtent > 0.001f && maxMeshExtent < 0.25f) ? 100f : 1f;
+            float authoringCompensation = (maxMeshExtent > 0.0001f && maxMeshExtent < 0.8f) ? 100f : (maxMeshExtent <= 0.0001f ? 100f : 1f);
 
             visualClone.transform.localScale = new Vector3(
                 invX * authoringCompensation,
@@ -5948,17 +6037,34 @@ namespace RogueCommandExpansionLoader.Content
             {
                 if (filters[i] != null && filters[i].sharedMesh != null)
                 {
-                    Vector3 ext = filters[i].sharedMesh.bounds.extents;
+                    Mesh mesh = filters[i].sharedMesh;
+                    Vector3 ext = mesh.bounds.extents;
+                    if (ext.sqrMagnitude < 1e-6f)
+                    {
+                        try { mesh.RecalculateBounds(); } catch { }
+                        ext = mesh.bounds.extents;
+                    }
                     maxExtent = Mathf.Max(maxExtent, Mathf.Max(ext.x, Mathf.Max(ext.y, ext.z)));
                 }
             }
             SkinnedMeshRenderer[] skinned = model.GetComponentsInChildren<SkinnedMeshRenderer>(true);
             for (int i = 0; i < skinned.Length; i++)
             {
-                if (skinned[i] != null && skinned[i].sharedMesh != null)
+                if (skinned[i] != null)
                 {
-                    Vector3 ext = skinned[i].sharedMesh.bounds.extents;
-                    maxExtent = Mathf.Max(maxExtent, Mathf.Max(ext.x, Mathf.Max(ext.y, ext.z)));
+                    if (skinned[i].sharedMesh != null)
+                    {
+                        Mesh mesh = skinned[i].sharedMesh;
+                        Vector3 ext = mesh.bounds.extents;
+                        if (ext.sqrMagnitude < 1e-6f)
+                        {
+                            try { mesh.RecalculateBounds(); } catch { }
+                            ext = mesh.bounds.extents;
+                        }
+                        maxExtent = Mathf.Max(maxExtent, Mathf.Max(ext.x, Mathf.Max(ext.y, ext.z)));
+                    }
+                    Vector3 localExt = skinned[i].localBounds.extents;
+                    maxExtent = Mathf.Max(maxExtent, Mathf.Max(localExt.x, Mathf.Max(localExt.y, localExt.z)));
                 }
             }
             return maxExtent;
@@ -6032,6 +6138,7 @@ namespace RogueCommandExpansionLoader.Content
             string packageName,
             string ownerLabel = "Unidad")
         {
+            Shader litShader = Shader.Find("Universal Render Pipeline/Lit");
             Renderer[] renderers = visualClone.GetComponentsInChildren<Renderer>(true);
             for (int i = 0; i < renderers.Length; i++)
             {
@@ -6050,17 +6157,35 @@ namespace RogueCommandExpansionLoader.Content
                                 mat.shader.name.IndexOf("Error", StringComparison.OrdinalIgnoreCase) >= 0 ||
                                 mat.shader.name.IndexOf("Hidden", StringComparison.OrdinalIgnoreCase) >= 0)
                             {
-                                if (fallbackMaterial != null && fallbackMaterial.shader != null && fallbackMaterial.shader.isSupported)
+                                if (litShader != null && litShader.isSupported)
+                                {
+                                    mat.shader = litShader;
+                                }
+                                else if (fallbackMaterial != null && fallbackMaterial.shader != null && fallbackMaterial.shader.isSupported)
                                 {
                                     mat.shader = fallbackMaterial.shader;
                                 }
-                                else
+                            }
+
+                            // Synchronize textures between _BaseMap and _MainTex so textures are never lost
+                            Texture mainTex = null;
+                            if (mat.HasProperty("_BaseMap"))
+                            {
+                                mainTex = mat.GetTexture("_BaseMap");
+                            }
+                            if (mainTex == null && mat.HasProperty("_MainTex"))
+                            {
+                                mainTex = mat.GetTexture("_MainTex");
+                            }
+                            if (mainTex != null)
+                            {
+                                if (mat.HasProperty("_BaseMap") && mat.GetTexture("_BaseMap") == null)
                                 {
-                                    Shader litShader = Shader.Find("Universal Render Pipeline/Lit");
-                                    if (litShader != null && litShader.isSupported)
-                                    {
-                                        mat.shader = litShader;
-                                    }
+                                    mat.SetTexture("_BaseMap", mainTex);
+                                }
+                                if (mat.HasProperty("_MainTex") && mat.GetTexture("_MainTex") == null)
+                                {
+                                    mat.SetTexture("_MainTex", mainTex);
                                 }
                             }
                         }

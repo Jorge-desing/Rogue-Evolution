@@ -1685,7 +1685,7 @@
         },
         {
           "name": "putDefaultCardRewardInCenter",
-          "value": "true"
+          "value": "false"
         }
       ],
       "mapSizeMin": 20,

@@ -143,6 +143,48 @@ namespace RogueCommandExpansionLoader.Runtime
             }
         }
 
+        public static void AddGlobalBlueprintRewardCandidates(object[] args, ref List<string> result)
+        {
+            if (result == null || args == null || args.Length < 2)
+            {
+                return;
+            }
+
+            try
+            {
+                int rarity = args[0] != null ? Convert.ToInt32(args[0]) : -1;
+                bool? startingBlueprints = args[1] as bool?;
+                bool demoOnly = args.Length > 2 && args[2] is bool ? (bool)args[2] : false;
+                int? maxExp = args.Length > 4 && args[4] is int ? (int?)args[4] : null;
+
+                IGlobalBlueprintCandidateProvider candidateProvider;
+                lock (Gate)
+                {
+                    candidateProvider = _provider as IGlobalBlueprintCandidateProvider;
+                }
+
+                if (candidateProvider != null)
+                {
+                    IEnumerable<string> modFactories = candidateProvider.GetEligibleBlueprintFactories(
+                        rarity, startingBlueprints, demoOnly, maxExp);
+                    if (modFactories != null)
+                    {
+                        foreach (string factoryId in modFactories)
+                        {
+                            if (!String.IsNullOrEmpty(factoryId) && !result.Contains(factoryId))
+                            {
+                                result.Add(factoryId);
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Log("Error in AddGlobalBlueprintRewardCandidates: " + ex.GetBaseException().Message);
+            }
+        }
+
         public static bool EnsureGuaranteedModCardOption(List<string> ids, int? forcedSlot = null)
         {
             if (ids == null || ids.Count == 0)
@@ -1439,8 +1481,9 @@ namespace RogueCommandExpansionLoader.Runtime
             RuntimeHooks.ObserveBlueprintRewardRecord(__3, __4);
         }
 
-        public static void AllEntityIdsAllowedAsBlueprintsPostfix(ref List<string> __result)
+        public static void AllEntityIdsAllowedAsBlueprintsPostfix(object[] __args, ref List<string> __result)
         {
+            RuntimeHooks.AddGlobalBlueprintRewardCandidates(__args, ref __result);
             RuntimeHooks.FilterGlobalBlueprintRewardCandidates(__result);
         }
 

@@ -67,7 +67,7 @@
                 },
                 {
                     "name": "rarity",
-                    "value": "Rare"
+                    "value": "Common"
                 },
                 {
                     "name": "neededExperienceLevel",
@@ -150,7 +150,7 @@
                     },
                     {
                         "name": "rarity",
-                        "value": "Rare"
+                        "value": "Common"
                     }
                 ],
                 "localizations": [
@@ -493,11 +493,11 @@
             "balanceOverrides": [
                 {
                     "name": "roles",
-                    "value": "Unit, Vehicle, Tank, Heavy"
+                    "value": "Unit, Vehicle, Tank, FrontalAttacker"
                 },
                 {
                     "name": "offeredSystemTags",
-                    "value": "Vehicle, Artillery, Armor"
+                    "value": "Vehicle, Tank, Armor"
                 },
                 {
                     "name": "cost",
@@ -651,7 +651,7 @@
                 },
                 {
                     "name": "offeredSystemTags",
-                    "value": "Mech, Laser, AoE"
+                    "value": "Mech, Stun, AoE"
                 },
                 {
                     "name": "cost",
@@ -726,8 +726,8 @@
             "activeSkills": [
                 {
                     "id": "tactical-operations:arc-lance-chain",
-                    "skillType": "TargetMultiTarget",
-                    "targetOrigin": "Target",
+                    "skillType": "TargetAoE",
+                    "targetOrigin": "ChosenEntity",
                     "cooldown": 10.0,
                     "manaCost": 0,
                     "range": 8.5,
@@ -832,7 +832,7 @@
                 },
                 {
                     "name": "rarity",
-                    "value": "Rare"
+                    "value": "Common"
                 },
                 {
                     "name": "neededExperienceLevel",
@@ -868,7 +868,7 @@
             },
             "onHitStatusEffects": [
                 {
-                    "statusEffect": "Heal",
+                    "statusEffect": "Regen",
                     "duration": 1.0,
                     "chance": 1.0
                 }
@@ -894,7 +894,7 @@
                     "range": 0.0,
                     "radius": 5.0,
                     "helpAiToActivate": true,
-                    "aiActivationTrigger": "AlliesInRange",
+                    "aiActivationTrigger": "LowHealth",
                     "aiSkillCooldown": 8.0
                 }
             ],
@@ -917,7 +917,7 @@
                     },
                     {
                         "name": "rarity",
-                        "value": "Rare"
+                        "value": "Common"
                     }
                 ],
                 "localizations": [
@@ -971,7 +971,7 @@
                 },
                 {
                     "name": "putDefaultCardRewardInCenter",
-                    "value": "true"
+                    "value": "false"
                 }
             ],
             "mapSizeMin": 20,

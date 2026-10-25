@@ -186,6 +186,18 @@ namespace RogueCommandExpansionLoader.Runtime
     }
 
     /// <summary>
+    /// Optional bridge providing registered mod production building IDs that qualify for global blueprint rolls.
+    /// </summary>
+    public interface IGlobalBlueprintCandidateProvider
+    {
+        IEnumerable<string> GetEligibleBlueprintFactories(
+            int rarity,
+            bool? startingBlueprints,
+            bool demoBlueprintsOnly,
+            int? maxNeededExperienceLevel);
+    }
+
+    /// <summary>
     /// Runtime references to objects loaded by the content pipeline. Values are kept
     /// object-typed here so this layer does not bind to Assembly-CSharp at compile time.
     /// </summary>
