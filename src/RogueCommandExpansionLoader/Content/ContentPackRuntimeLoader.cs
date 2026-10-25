@@ -2484,7 +2484,16 @@ namespace RogueCommandExpansionLoader.Content
                     }
 
                     candidate.ValidatedDefinition = validation.Pack;
-                    ResolvePackDependencies(candidate, unitOwners, profileOwners);
+                }
+
+                DisableCrossPackUnitGraphViolations(candidates);
+                for (int i = 0; i < candidates.Count; i++)
+                {
+                    PackCandidate candidate = candidates[i];
+                    if (!candidate.Disabled && candidate.ValidatedDefinition != null)
+                    {
+                        ResolvePackDependencies(candidate, unitOwners, profileOwners);
+                    }
                 }
 
                 await LoadPacksInDependencyOrderAsync(candidates);
@@ -2622,6 +2631,69 @@ namespace RogueCommandExpansionLoader.Content
                     }
                 }
             }
+        }
+
+        private void DisableCrossPackUnitGraphViolations(List<PackCandidate> candidates)
+        {
+            var validatedCandidates = new List<PackCandidate>();
+            var validatedPacks = new List<ContentPackDefinition>();
+            for (int i = 0; i < candidates.Count; i++)
+            {
+                PackCandidate candidate = candidates[i];
+                if (candidate == null || candidate.Disabled || candidate.ValidatedDefinition == null)
+                {
+                    continue;
+                }
+
+                validatedCandidates.Add(candidate);
+                validatedPacks.Add(candidate.ValidatedDefinition);
+            }
+
+            IReadOnlyList<CrossPackUnitGraphIssue> issues =
+                ContentPackValidator.ValidateCrossPackUnitReferenceGraphs(validatedPacks);
+            for (int issueIndex = 0; issueIndex < issues.Count; issueIndex++)
+            {
+                CrossPackUnitGraphIssue issue = issues[issueIndex];
+                PackCandidate owner = null;
+                int ownerCount = 0;
+                for (int candidateIndex = 0; candidateIndex < validatedCandidates.Count; candidateIndex++)
+                {
+                    PackCandidate candidate = validatedCandidates[candidateIndex];
+                    if (String.Equals(candidate.ValidatedDefinition.packId, issue.PackId, StringComparison.Ordinal))
+                    {
+                        owner = candidate;
+                        ownerCount++;
+                    }
+                }
+
+                if (ownerCount != 1 || owner == null)
+                {
+                    string failure = "No se pudo resolver de forma única el paquete propietario del diagnóstico " +
+                        issue.PackId + "; se desactivan todos los paquetes validados por seguridad.";
+                    for (int candidateIndex = 0; candidateIndex < validatedCandidates.Count; candidateIndex++)
+                    {
+                        PackCandidate candidate = validatedCandidates[candidateIndex];
+                        candidate.Disabled = true;
+                        candidate.StatusReason = AppendStatusReason(candidate.StatusReason, failure);
+                        Log("Paquete '" + candidate.Name + "' desactivado: " + failure);
+                    }
+                    return;
+                }
+
+                owner.Disabled = true;
+                owner.StatusReason = AppendStatusReason(owner.StatusReason, issue.Diagnostic.ToString());
+                Log("Paquete '" + owner.Name + "' desactivado: " + issue.Diagnostic);
+            }
+        }
+
+        private static string AppendStatusReason(string currentReason, string additionalReason)
+        {
+            if (String.IsNullOrWhiteSpace(currentReason))
+            {
+                return additionalReason;
+            }
+
+            return currentReason + " | " + additionalReason;
         }
 
         private static IEnumerable<string> EnumerateDefinitionIds(ContentPackDefinition definition)

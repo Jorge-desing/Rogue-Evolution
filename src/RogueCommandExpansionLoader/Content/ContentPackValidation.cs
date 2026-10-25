@@ -2066,8 +2066,8 @@ namespace RogueCommandExpansionLoader.Content
 
             ContentUnitDefinition[] graphUnits = mergedUnits.ToArray();
             var graphDiagnostics = new List<ContentDiagnostic>();
-            ValidateUnitUpgradeGraph(graphUnits, "units", graphDiagnostics);
-            ValidateUnitSynergyGraph(graphUnits, "units", graphDiagnostics);
+            ValidateUnitUpgradeGraph(graphUnits, "units", graphDiagnostics, markCycleAncestors: false);
+            ValidateUnitSynergyGraph(graphUnits, "units", graphDiagnostics, markCycleAncestors: false);
             var issueKeys = new HashSet<string>(StringComparer.Ordinal);
             foreach (ContentDiagnostic diagnostic in graphDiagnostics)
             {
@@ -2143,7 +2143,8 @@ namespace RogueCommandExpansionLoader.Content
 
         private static void AnalyzeUnitReferenceGraph(ContentUnitDefinition[] units,
             Dictionary<string, List<string>> graph, string path, string cycleCode,
-            string depthCode, int maxDepth, bool depthOnCycles, List<ContentDiagnostic> diagnostics)
+            string depthCode, int maxDepth, bool depthOnCycles, List<ContentDiagnostic> diagnostics,
+            bool markCycleAncestors = true)
         {
             var indexes = new Dictionary<string, int>(StringComparer.Ordinal);
             for (int i = 0; i < units.Length; i++)
@@ -2182,7 +2183,10 @@ namespace RogueCommandExpansionLoader.Content
                             continue;
                         }
                         int parent = indexes[frame.Id];
-                        cycles[parent] |= cycles[child];
+                        if (markCycleAncestors)
+                        {
+                            cycles[parent] |= cycles[child];
+                        }
                         frame.MaximumChildDepth = Math.Max(frame.MaximumChildDepth, 1 + depths[child]);
                         continue;
                     }
@@ -2195,7 +2199,10 @@ namespace RogueCommandExpansionLoader.Content
                     {
                         UnitReferenceGraphFrame parent = stack[stack.Count - 1];
                         int parentIndex = indexes[parent.Id];
-                        cycles[parentIndex] |= cycles[completed];
+                        if (markCycleAncestors)
+                        {
+                            cycles[parentIndex] |= cycles[completed];
+                        }
                         parent.MaximumChildDepth = Math.Max(parent.MaximumChildDepth, 1 + depths[completed]);
                     }
                 }
@@ -2217,7 +2224,8 @@ namespace RogueCommandExpansionLoader.Content
         private static void ValidateUnitUpgradeGraph(
             ContentUnitDefinition[] units,
             string path,
-            List<ContentDiagnostic> diagnostics)
+            List<ContentDiagnostic> diagnostics,
+            bool markCycleAncestors = true)
         {
             if (units == null)
             {
@@ -2251,14 +2259,16 @@ namespace RogueCommandExpansionLoader.Content
             }
 
             AnalyzeUnitReferenceGraph(units, adjacency, path, "unit-upgrade.cycle-detected",
-                "unit-upgrade.depth-exceeded", MaxUpgradeChainDepth, depthOnCycles: true, diagnostics);
+                "unit-upgrade.depth-exceeded", MaxUpgradeChainDepth, depthOnCycles: true, diagnostics,
+                markCycleAncestors: markCycleAncestors);
         }
 
 
         private static void ValidateUnitSynergyGraph(
             ContentUnitDefinition[] units,
             string path,
-            List<ContentDiagnostic> diagnostics)
+            List<ContentDiagnostic> diagnostics,
+            bool markCycleAncestors = true)
         {
             if (units == null)
             {
@@ -2300,7 +2310,8 @@ namespace RogueCommandExpansionLoader.Content
             }
 
             AnalyzeUnitReferenceGraph(units, adjacency, path, "unit-synergy.cycle-detected",
-                "unit-synergy.depth-exceeded", MaxSynergyChainDepth, depthOnCycles: false, diagnostics);
+                "unit-synergy.depth-exceeded", MaxSynergyChainDepth, depthOnCycles: false, diagnostics,
+                markCycleAncestors: markCycleAncestors);
         }
 
 

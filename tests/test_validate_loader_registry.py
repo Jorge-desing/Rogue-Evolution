@@ -226,6 +226,100 @@ class LoaderRegistryValidationTests(unittest.TestCase):
             for issue in report["issues"]
         ))
 
+    def _run_packs(self, packs: tuple[tuple[str, dict[str, Any]], ...]) -> tuple[int, dict[str, Any]]:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            for folder, pack in packs:
+                pack_directory = root / folder
+                pack_directory.mkdir()
+                (pack_directory / "content.json").write_text(
+                    json.dumps(pack), encoding="utf-8"
+                )
+            output = io.StringIO()
+            with mock.patch.object(VALIDATOR, "PACKS_ROOT", root):
+                with contextlib.redirect_stdout(output):
+                    exit_code = VALIDATOR.main(["--json"])
+        return exit_code, json.loads(output.getvalue())
+
+    def test_cross_pack_upgrade_cycle_is_reported(self) -> None:
+        packs = (
+            ("alpha", {
+                "packId": "test:alpha-pack",
+                "units": [{
+                    "id": "test:alpha-unit",
+                    "productionBuilding": {"id": "test:alpha-factory"},
+                    "upgrades": [{"targetUnitId": "test:beta-unit"}],
+                }],
+            }),
+            ("beta", {
+                "packId": "test:beta-pack",
+                "units": [{
+                    "id": "test:beta-unit",
+                    "productionBuilding": {"id": "test:beta-factory"},
+                    "upgrades": [{"targetUnitId": "test:alpha-unit"}],
+                }],
+            }),
+        )
+
+        exit_code, report = self._run_packs(packs)
+
+        self.assertEqual(exit_code, 1)
+        self.assertTrue(any(
+            "cross-pack unit-upgrade cycle" in issue["message"] and
+            "test:alpha-unit" in issue["message"] and
+            "test:beta-unit" in issue["message"]
+            for issue in report["issues"]
+        ), report["issues"])
+
+    def test_local_upgrade_cycle_is_not_misreported_as_cross_pack(self) -> None:
+        pack = {
+            "packId": "test:local-cycle",
+            "units": [{
+                "id": "test:unit-a",
+                "productionBuilding": {"id": "test:factory-a"},
+                "upgrades": [{"targetUnitId": "test:unit-a"}],
+            }],
+        }
+        exit_code, report = self._run_packs((("local", pack),))
+        self.assertEqual(exit_code, 0, report["issues"])
+        self.assertFalse(any(
+            "cross-pack unit-upgrade cycle" in issue["message"]
+            for issue in report["issues"]
+        ))
+
+    def test_cross_pack_synergy_depth_uses_five_edge_limit(self) -> None:
+        def make_packs(edge_count: int) -> tuple[tuple[str, dict[str, Any]], ...]:
+            units = []
+            for index in range(edge_count + 1):
+                unit: dict[str, Any] = {
+                    "id": f"test:unit-{index}",
+                    "productionBuilding": {"id": f"test:factory-{index}"},
+                }
+                if index < edge_count:
+                    unit["synergies"] = [{
+                        "id": f"test:synergy-{index}",
+                        "statName": "damage",
+                        "multiplier": 1.0,
+                        "radius": 1.0,
+                        "targetUnitIds": [f"test:unit-{index + 1}"],
+                    }]
+                units.append(unit)
+            return (
+                ("alpha", {"packId": "test:alpha-pack", "units": units[::2]}),
+                ("beta", {"packId": "test:beta-pack", "units": units[1::2]}),
+            )
+
+        accepted_exit, accepted_report = self._run_packs(make_packs(5))
+        self.assertEqual(accepted_exit, 0, accepted_report["issues"])
+
+        rejected_exit, rejected_report = self._run_packs(make_packs(6))
+        self.assertEqual(rejected_exit, 1)
+        self.assertTrue(any(
+            "cross-pack unit-synergy depth exceeds 5" in issue["message"] and
+            "test:unit-0" in issue["message"]
+            for issue in rejected_report["issues"]
+        ), rejected_report["issues"])
+
     def test_duplicate_unit_ids_within_manifest_fail_the_tool(self) -> None:
         pack = {
             "packId": "test:duplicate-units",

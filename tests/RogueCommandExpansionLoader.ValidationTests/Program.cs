@@ -6850,6 +6850,188 @@ var tests = new (string Name, Action Run)[]
             throw new InvalidOperationException("Loader registry tool failed: " + output);
         }
     }),
+    ("cross-pack unit upgrade graph rejects a cycle", () =>
+    {
+        var packs = new[]
+        {
+            new ContentPackDefinition
+            {
+                packId = "test:alpha-pack",
+                units = new[]
+                {
+                    new ContentUnitDefinition
+                    {
+                        id = "test:alpha-unit",
+                        upgrades = new[]
+                        {
+                            new ContentUnitUpgradeDefinition { targetUnitId = "test:beta-unit" }
+                        }
+                    }
+                }
+            },
+            new ContentPackDefinition
+            {
+                packId = "test:beta-pack",
+                units = new[]
+                {
+                    new ContentUnitDefinition
+                    {
+                        id = "test:beta-unit",
+                        upgrades = new[]
+                        {
+                            new ContentUnitUpgradeDefinition { targetUnitId = "test:alpha-unit" }
+                        }
+                    }
+                }
+            }
+        };
+
+        var issues = ContentPackValidator.ValidateCrossPackUnitReferenceGraphs(packs);
+        if (!issues.Any(issue => issue.PackId == "test:alpha-pack" &&
+                issue.Diagnostic.Code == "unit-upgrade.cycle-detected") ||
+            !issues.Any(issue => issue.PackId == "test:beta-pack" &&
+                issue.Diagnostic.Code == "unit-upgrade.cycle-detected"))
+        {
+            throw new InvalidOperationException("A cross-pack upgrade cycle must identify both owning packs.");
+        }
+    }),
+    ("cross-pack unit synergy graph rejects a cycle", () =>
+    {
+        ContentPackDefinition[] packs = CreateCrossPackUnitChain(2, synergy: true, closeCycle: true);
+        var issues = ContentPackValidator.ValidateCrossPackUnitReferenceGraphs(packs);
+        if (!issues.Any(issue => issue.PackId == "test:alpha-pack" &&
+                issue.Diagnostic.Code == "unit-synergy.cycle-detected") ||
+            !issues.Any(issue => issue.PackId == "test:beta-pack" &&
+                issue.Diagnostic.Code == "unit-synergy.cycle-detected"))
+        {
+            throw new InvalidOperationException("A cross-pack synergy cycle must identify both owning packs.");
+        }
+    }),
+    ("cross-pack unit upgrade graph accepts exactly five edges", () =>
+    {
+        ContentPackDefinition[] packs = CreateCrossPackUnitChain(5, synergy: false);
+        var issues = ContentPackValidator.ValidateCrossPackUnitReferenceGraphs(packs);
+        if (issues.Count != 0)
+        {
+            throw new InvalidOperationException("A five-edge cross-pack upgrade chain must be accepted without diagnostics: " +
+                string.Join(", ", issues.Select(issue => issue.Diagnostic.Code)));
+        }
+    }),
+    ("cross-pack unit synergy graph rejects six edges", () =>
+    {
+        ContentPackDefinition[] packs = CreateCrossPackUnitChain(6, synergy: true);
+        var issues = ContentPackValidator.ValidateCrossPackUnitReferenceGraphs(packs);
+        if (!issues.Any(issue => issue.PackId == "test:alpha-pack" &&
+                issue.Diagnostic.Code == "unit-synergy.depth-exceeded" &&
+                issue.Diagnostic.Path == "units[0].synergies"))
+        {
+            throw new InvalidOperationException("A six-edge cross-pack synergy chain must identify its origin pack and unit.");
+        }
+    }),
+    ("cross-pack graph cycle diagnostics exclude external predecessors", () =>
+    {
+        var packs = new[]
+        {
+            new ContentPackDefinition
+            {
+                packId = "test:alpha-pack",
+                units = new[]
+                {
+                    new ContentUnitDefinition
+                    {
+                        id = "test:alpha-unit",
+                        upgrades = new[] { new ContentUnitUpgradeDefinition { targetUnitId = "test:beta-unit" } }
+                    }
+                }
+            },
+            new ContentPackDefinition
+            {
+                packId = "test:beta-pack",
+                units = new[]
+                {
+                    new ContentUnitDefinition
+                    {
+                        id = "test:beta-unit",
+                        upgrades = new[] { new ContentUnitUpgradeDefinition { targetUnitId = "test:alpha-unit" } }
+                    }
+                }
+            },
+            new ContentPackDefinition
+            {
+                packId = "test:gamma-pack",
+                units = new[]
+                {
+                    new ContentUnitDefinition
+                    {
+                        id = "test:gamma-unit",
+                        upgrades = new[] { new ContentUnitUpgradeDefinition { targetUnitId = "test:alpha-unit" } }
+                    }
+                }
+            }
+        };
+
+        var issues = ContentPackValidator.ValidateCrossPackUnitReferenceGraphs(packs);
+        if (issues.Any(issue => issue.PackId == "test:gamma-pack") ||
+            !issues.Any(issue => issue.PackId == "test:alpha-pack") ||
+            !issues.Any(issue => issue.PackId == "test:beta-pack"))
+        {
+            throw new InvalidOperationException("Cycle diagnostics must include cycle owners, not external predecessors.");
+        }
+    }),
+    ("cross-pack acyclic unit graph is accepted", () =>
+    {
+        ContentPackDefinition[] packs = CreateCrossPackUnitChain(4, synergy: false);
+        var issues = ContentPackValidator.ValidateCrossPackUnitReferenceGraphs(packs);
+        if (issues.Count != 0)
+        {
+            throw new InvalidOperationException("An acyclic cross-pack unit graph must validate without diagnostics.");
+        }
+    }),
+    ("cross-pack unit graph ignores native targets and ambiguous IDs", () =>
+    {
+        var packs = new[]
+        {
+            new ContentPackDefinition
+            {
+                packId = "test:alpha-pack",
+                units = new[]
+                {
+                    new ContentUnitDefinition
+                    {
+                        id = "test:alpha-unit",
+                        upgrades = new[] { new ContentUnitUpgradeDefinition { targetUnitId = "native:unit" } }
+                    }
+                }
+            },
+            new ContentPackDefinition
+            {
+                packId = "test:beta-pack",
+                units = new[]
+                {
+                    new ContentUnitDefinition
+                    {
+                        id = "test:beta-unit",
+                        upgrades = new[] { new ContentUnitUpgradeDefinition { targetUnitId = "test:shared-unit" } }
+                    },
+                    new ContentUnitDefinition
+                    {
+                        id = "test:shared-unit",
+                        upgrades = new[] { new ContentUnitUpgradeDefinition { targetUnitId = "test:beta-unit" } }
+                    }
+                }
+            },
+            new ContentPackDefinition
+            {
+                packId = "test:gamma-pack",
+                units = new[] { new ContentUnitDefinition { id = "test:shared-unit" } }
+            }
+        };
+        var issues = ContentPackValidator.ValidateCrossPackUnitReferenceGraphs(packs);
+        if (issues.Count != 0)
+        {
+            throw new InvalidOperationException("Native or ambiguous IDs must not create graph edges.");
+        }
+    }),
     ("unit upgrade graph rejects circular references", () =>
     {
         WithPackage(sample, (pack, root) =>
@@ -9046,6 +9228,56 @@ static StageGenerationLandscapeCandidate ValidStageLandscape(string id, int mapS
         IsDeactivated = false,
         IsAllowedForDemo = true,
         RestrictedWorlds = []
+    };
+}
+
+static ContentPackDefinition[] CreateCrossPackUnitChain(int edgeCount, bool synergy, bool closeCycle = false)
+{
+    int unitCount = closeCycle ? edgeCount : edgeCount + 1;
+    var units = new ContentUnitDefinition[unitCount];
+    for (int i = 0; i < unitCount; i++)
+    {
+        units[i] = new ContentUnitDefinition { id = "test:unit-" + i };
+    }
+
+    for (int i = 0; i < edgeCount; i++)
+    {
+        int targetIndex = (i + 1) % unitCount;
+        if (synergy)
+        {
+            units[i].synergies = new[]
+            {
+                new ContentUnitSynergyDefinition
+                {
+                    id = "test:synergy-" + i,
+                    statName = "damage",
+                    multiplier = 1f,
+                    radius = 1f,
+                    targetUnitIds = new[] { units[targetIndex].id }
+                }
+            };
+        }
+        else
+        {
+            units[i].upgrades = new[]
+            {
+                new ContentUnitUpgradeDefinition { targetUnitId = units[targetIndex].id }
+            };
+        }
+    }
+
+    return new[]
+    {
+        new ContentPackDefinition
+        {
+            packId = "test:alpha-pack",
+            units = units.Where((_, index) => index % 2 == 0).ToArray()
+        },
+        new ContentPackDefinition
+        {
+            packId = "test:beta-pack",
+            units = units.Where((_, index) => index % 2 != 0).ToArray()
+        }
     };
 }
 

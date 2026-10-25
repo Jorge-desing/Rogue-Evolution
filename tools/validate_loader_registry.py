@@ -13,6 +13,7 @@ Run from the repository root:
 """
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -461,6 +462,154 @@ def check_cross_pack_duplicate_unit_ids(pack_items):
     ]
 
 
+def _analyze_unit_reference_graph(pack_items, unit_owner_by_id, relation):
+    unit_by_id = {}
+    for _, raw_pack in pack_items:
+        for unit in _iter_dicts(_as_dict(raw_pack).get("units")):
+            unit_id = unit.get("id")
+            if _nonempty_string(unit_id) and unit_id in unit_owner_by_id:
+                unit_by_id[unit_id] = unit
+
+    unit_ids = sorted(unit_by_id)
+    indexes = {unit_id: index for index, unit_id in enumerate(unit_ids)}
+    adjacency = {}
+    for unit_id, unit in unit_by_id.items():
+        targets = []
+        if relation == "unit-upgrade":
+            targets = [
+                entry.get("targetUnitId")
+                for entry in _iter_dicts(unit.get("upgrades"))
+            ]
+        else:
+            for entry in _iter_dicts(unit.get("synergies")):
+                targets.extend(_as_list(entry.get("targetUnitIds")))
+        adjacency[unit_id] = [
+            target for target in targets
+            if _nonempty_string(target) and target in indexes
+        ]
+
+    state = [0] * len(unit_ids)
+    depths = [0] * len(unit_ids)
+    cross_pack_depths = [0] * len(unit_ids)
+    cross_pack_cycle_ids = set()
+    stack = []
+    for root in range(len(unit_ids)):
+        if state[root] != 0:
+            continue
+        state[root] = 1
+        stack.append({"index": root, "next_target": 0, "maximum_child_depth": 0,
+                      "maximum_cross_pack_depth": 0})
+        while stack:
+            frame = stack[-1]
+            parent_index = frame["index"]
+            parent_id = unit_ids[parent_index]
+            targets = adjacency[parent_id]
+            if frame["next_target"] < len(targets):
+                target = targets[frame["next_target"]]
+                frame["next_target"] += 1
+                child = indexes[target]
+                if state[child] == 0:
+                    state[child] = 1
+                    stack.append({"index": child, "next_target": 0, "maximum_child_depth": 0,
+                                  "maximum_cross_pack_depth": 0})
+                    continue
+                if state[child] == 1:
+                    cycle_indexes = []
+                    for active in reversed(stack):
+                        cycle_indexes.append(active["index"])
+                        if active["index"] == child:
+                            break
+                    cycle_pack_ids = {
+                        unit_owner_by_id[unit_ids[index]] for index in cycle_indexes
+                    }
+                    if len(cycle_pack_ids) > 1:
+                        cross_pack_cycle_ids.update(unit_ids[index] for index in cycle_indexes)
+                    continue
+
+                candidate_depth = 1 + depths[child]
+                frame["maximum_child_depth"] = max(frame["maximum_child_depth"], candidate_depth)
+                if unit_owner_by_id[parent_id] != unit_owner_by_id[target]:
+                    candidate_cross_pack_depth = candidate_depth
+                elif cross_pack_depths[child] > 0:
+                    candidate_cross_pack_depth = 1 + cross_pack_depths[child]
+                else:
+                    candidate_cross_pack_depth = 0
+                frame["maximum_cross_pack_depth"] = max(
+                    frame["maximum_cross_pack_depth"], candidate_cross_pack_depth
+                )
+                continue
+
+            completed = frame["index"]
+            depths[completed] = frame["maximum_child_depth"]
+            cross_pack_depths[completed] = frame["maximum_cross_pack_depth"]
+            state[completed] = 2
+            stack.pop()
+            if stack:
+                parent = stack[-1]
+                parent_index = parent["index"]
+                parent_id = unit_ids[parent_index]
+                child_id = unit_ids[completed]
+                candidate_depth = 1 + depths[completed]
+                parent["maximum_child_depth"] = max(
+                    parent["maximum_child_depth"], candidate_depth
+                )
+                if unit_owner_by_id[parent_id] != unit_owner_by_id[child_id]:
+                    candidate_cross_pack_depth = candidate_depth
+                elif cross_pack_depths[completed] > 0:
+                    candidate_cross_pack_depth = 1 + cross_pack_depths[completed]
+                else:
+                    candidate_cross_pack_depth = 0
+                parent["maximum_cross_pack_depth"] = max(
+                    parent["maximum_cross_pack_depth"], candidate_cross_pack_depth
+                )
+
+    diagnostics = []
+    if cross_pack_cycle_ids:
+        owners = sorted({unit_owner_by_id[unit_id] for unit_id in cross_pack_cycle_ids})
+        diagnostics.append(
+            f"FAIL cross-pack {relation} cycle among units " +
+            ", ".join(sorted(cross_pack_cycle_ids)) +
+            " (packs " + ", ".join(owners) + ")"
+        )
+    for index, depth in enumerate(cross_pack_depths):
+        if depth > 5:
+            unit_id = unit_ids[index]
+            diagnostics.append(
+                f"FAIL cross-pack {relation} depth exceeds 5 at {unit_id} "
+                f"(pack {unit_owner_by_id[unit_id]})"
+            )
+    return diagnostics
+
+
+def check_cross_pack_unit_reference_graphs(pack_items):
+    pack_items = list(pack_items)
+    counts = {}
+    pack_ids_by_unit = {}
+    for pack_path, raw_pack in pack_items:
+        pack = _as_dict(raw_pack)
+        pack_id = pack.get("packId")
+        if not _nonempty_string(pack_id):
+            pack_id = pack_path.parent.name
+        for unit in _iter_dicts(pack.get("units")):
+            unit_id = unit.get("id")
+            if not _nonempty_string(unit_id) or not re.fullmatch(
+                r"[a-z][a-z0-9._-]*:[a-z0-9][a-z0-9._-]*", unit_id
+            ):
+                continue
+            counts[unit_id] = counts.get(unit_id, 0) + 1
+            pack_ids_by_unit.setdefault(unit_id, pack_id)
+
+    unique_owners = {
+        unit_id: pack_id
+        for unit_id, pack_id in pack_ids_by_unit.items()
+        if counts.get(unit_id) == 1
+    }
+    diagnostics = []
+    diagnostics.extend(_analyze_unit_reference_graph(pack_items, unique_owners, "unit-upgrade"))
+    diagnostics.extend(_analyze_unit_reference_graph(pack_items, unique_owners, "unit-synergy"))
+    return sorted(diagnostics)
+
+
 def check_cross_pack_duplicate_factory_ids(pack_items):
     pack_folders_by_factory = {}
     for pack_path, raw_pack in pack_items:
@@ -531,6 +680,10 @@ def main(argv=None):
     )
     issues.extend(
         {"packId": "<registry>", "message": message}
+        for message in check_cross_pack_unit_reference_graphs(loaded_packs.items())
+    )
+    issues.extend(
+        {"packId": "<registry>", "message": message}
         for message in check_cross_pack_duplicate_factory_ids(loaded_packs.items())
     )
     result = {
@@ -541,6 +694,7 @@ def main(argv=None):
         },
         "limitations": [
             "This structural/partial check does not replace JSON Schema or full C# package validation.",
+            "Upgrade and synergy graph diagnostics are structural checks only; they do not establish runtime gameplay behavior.",
             "AI stageMin/stageMax are pack-local array indices, not runtime progression indices.",
             "Unlisted pools derive eligibility only from stage.unitIds; blueprintPoolEntries do not broaden them.",
             "Cross-pack stage factory IDs use unique mappings from readable manifests; this static report does not prove runtime loading, map assignment, or offers.",
