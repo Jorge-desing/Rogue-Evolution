@@ -189,6 +189,14 @@ namespace RogueCommandExpansionLoader.Runtime
             }
         }
 
+        public bool ContainsPool(object pool)
+        {
+            lock (_gate)
+            {
+                return pool != null && _byReference.ContainsKey(pool);
+            }
+        }
+
         public bool TryGetSourcePoolLocalizationId(string poolId, out string sourcePoolId)
         {
             lock (_gate)

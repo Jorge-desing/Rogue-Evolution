@@ -518,6 +518,14 @@ var tests = new (string Name, Action Run)[]
             registry.AllowsModUnitInPool(firstPool, "sample:beta") ||
             !registry.AllowsModUnitInPool(siblingPool, "sample:beta"))
             throw new InvalidOperationException("A stage's pool-specific unit allowlist leaked to a sibling pool.");
+        var unregisteredPool = new object();
+        if (!registry.ContainsPool(firstPool) ||
+            !registry.ContainsPool(siblingPool) ||
+            registry.ContainsPool(unregisteredPool) ||
+            registry.ContainsPool(null))
+        {
+            throw new InvalidOperationException("ContainsPool must identify registered mod pools by object identity.");
+        }
     }),
     ("blueprint pool registrations expose immutable, deterministic unit-ID snapshots", () =>
     {

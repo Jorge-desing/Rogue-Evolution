@@ -1044,6 +1044,24 @@ namespace RogueCommandExpansionLoader.Content
             }
         }
 
+        private string GetProductIdForFactory(string factoryId)
+        {
+            if (String.IsNullOrWhiteSpace(factoryId))
+            {
+                return null;
+            }
+
+            foreach (LoadedUnit u in _units.Values)
+            {
+                if (!u.IsProductionBuilding && String.Equals(u.ProductionFactoryId, factoryId, StringComparison.Ordinal))
+                {
+                    return u.Id;
+                }
+            }
+
+            return null;
+        }
+
         public bool TryGetBlueprintPoolDecision(object pool, string unitId, out bool runOriginal)
         {
             lock (_gate)
@@ -1062,21 +1080,41 @@ namespace RogueCommandExpansionLoader.Content
                     !(bool)_gameAtLeastOneBlueprintAddedByPlayerField.GetValue(null);
                 bool isAllowedAsStartingBlueprint =
                     (bool)_allowedStartingBlueprintField.GetValue(unit.BalanceRow);
-                if (unit.IsProductionBuilding && _blueprintUnitIds.Contains(unitId) &&
-                    isStartingBlueprintSelection &&
-                    isAllowedAsStartingBlueprint && isAllowedForDemo &&
-                    IsNativeInitialStagePool(pool))
+                if (isStartingBlueprintSelection && !isAllowedAsStartingBlueprint)
                 {
-                    // Keep the native pool's own BlueprintFilter.IsBlueprintValid check. This
-                    // only lets an explicitly starting-eligible factory reach that filter for
-                    // the first offer in the first native stage.
+                    runOriginal = false;
+                    return true;
+                }
+
+                if (isDemo && !isAllowedForDemo)
+                {
+                    runOriginal = false;
+                    return true;
+                }
+
+                if (_blueprintPoolScopeRegistry.ContainsPool(pool))
+                {
+                    string productId = !unit.IsProductionBuilding && !String.IsNullOrWhiteSpace(unit.ProductionFactoryId)
+                        ? unit.Id
+                        : (unit.IsProductionBuilding ? GetProductIdForFactory(unit.Id) : unit.Id);
+
+                    runOriginal = _blueprintPoolScopeRegistry.AllowsModUnitInPool(
+                        pool, unitId, isDemo, isAllowedForDemo,
+                        isStartingBlueprintSelection, isAllowedAsStartingBlueprint) ||
+                        (!String.IsNullOrEmpty(productId) && _blueprintPoolScopeRegistry.AllowsModUnitInPool(
+                        pool, productId, isDemo, isAllowedForDemo,
+                        isStartingBlueprintSelection, isAllowedAsStartingBlueprint));
+                    return true;
+                }
+
+                if (_blueprintUnitIds.Contains(unitId) ||
+                    (!String.IsNullOrWhiteSpace(unit.ProductionFactoryId) && _blueprintUnitIds.Contains(unit.ProductionFactoryId)))
+                {
                     runOriginal = true;
                     return true;
                 }
 
-                runOriginal = _blueprintPoolScopeRegistry.AllowsModUnitInPool(
-                    pool, unitId, isDemo, isAllowedForDemo,
-                    isStartingBlueprintSelection, isAllowedAsStartingBlueprint);
+                runOriginal = false;
                 return true;
             }
         }
@@ -1090,25 +1128,34 @@ namespace RogueCommandExpansionLoader.Content
 
             object balancing = _gameBalancingAssetField.GetValue(null);
             bool isDemo = balancing != null && (bool)_gameIsDemoField.GetValue(balancing);
-            foreach (LoadedUnit product in _units.Values)
+            foreach (LoadedUnit unit in _units.Values)
             {
-                if (product.IsProductionBuilding || product.Definition == null ||
-                    !product.Definition.isAllowedAsStartingBlueprint ||
-                    String.IsNullOrWhiteSpace(product.ProductionFactoryId) ||
-                    !_blueprintUnitIds.Contains(product.ProductionFactoryId))
+                if (!unit.IsProductionBuilding && !String.IsNullOrWhiteSpace(unit.ProductionFactoryId))
                 {
-                    continue;
+                    if (unit.Definition != null && unit.Definition.isAllowedAsStartingBlueprint &&
+                        _blueprintUnitIds.Contains(unit.ProductionFactoryId))
+                    {
+                        LoadedUnit factory;
+                        if (_units.TryGetValue(unit.ProductionFactoryId, out factory) &&
+                            factory.IsProductionBuilding &&
+                            (!isDemo || (bool)_allowedForDemoField.GetValue(factory.BalanceRow)))
+                        {
+                            destination.Add(factory.Id);
+                        }
+                    }
                 }
-
-                LoadedUnit factory;
-                if (!_units.TryGetValue(product.ProductionFactoryId, out factory) ||
-                    !factory.IsProductionBuilding ||
-                    (isDemo && !(bool)_allowedForDemoField.GetValue(factory.BalanceRow)))
+                else if (unit.IsStandaloneBuilding)
                 {
-                    continue;
+                    object startingVal = _allowedStartingBlueprintField.GetValue(unit.BalanceRow);
+                    if (startingVal is bool && (bool)startingVal)
+                    {
+                        if (_blueprintUnitIds.Contains(unit.Id) &&
+                            (!isDemo || (bool)_allowedForDemoField.GetValue(unit.BalanceRow)))
+                        {
+                            destination.Add(unit.Id);
+                        }
+                    }
                 }
-
-                destination.Add(factory.Id);
             }
         }
 
@@ -1247,10 +1294,13 @@ namespace RogueCommandExpansionLoader.Content
 
                         bool isStartingBlueprintSelection =
                             !(bool)_gameAtLeastOneBlueprintAddedByPlayerField.GetValue(null);
-                        if (activeStageIndex == 0 && !activeStageIsPackOwned &&
-                            isStartingBlueprintSelection)
+                        if (isStartingBlueprintSelection)
                         {
                             AddInitialStageStartingFactories(stageFactoryIds);
+                        }
+                        else if (!activeStageIsPackOwned)
+                        {
+                            stageFactoryIds.UnionWith(_blueprintUnitIds);
                         }
                     }
                 }
@@ -4066,10 +4116,29 @@ namespace RogueCommandExpansionLoader.Content
                 if (units[i].Definition != null && units[i].Definition.isAllowedAsStartingBlueprint)
                 {
                     startingBlueprintUnitIds.Add(units[i].Id);
-                    // Starting-deck eligibility is separate from normal blueprint eligibility.
-                    // Stage unit IDs add their dedicated production factories below.
+                    if (!String.IsNullOrWhiteSpace(units[i].ProductionFactoryId))
+                    {
+                        startingBlueprintUnitIds.Add(units[i].ProductionFactoryId);
+                    }
                 }
-                if (!units[i].IsProductionBuilding && String.IsNullOrWhiteSpace(units[i].ProductionFactoryId) && HasRoleFlag(units[i].BalanceRow, "Building"))
+                else if (units[i].IsStandaloneBuilding)
+                {
+                    object startingVal = _allowedStartingBlueprintField.GetValue(units[i].BalanceRow);
+                    if (startingVal is bool && (bool)startingVal)
+                    {
+                        startingBlueprintUnitIds.Add(units[i].Id);
+                    }
+                }
+
+                if (units[i].IsProductionBuilding)
+                {
+                    object allowedVal = _allowedBlueprintField.GetValue(units[i].BalanceRow);
+                    if (allowedVal is bool && (bool)allowedVal)
+                    {
+                        blueprintUnitIds.Add(units[i].Id);
+                    }
+                }
+                else if (String.IsNullOrWhiteSpace(units[i].ProductionFactoryId) && HasRoleFlag(units[i].BalanceRow, "Building"))
                 {
                     object allowedVal = _allowedBlueprintField.GetValue(units[i].BalanceRow);
                     if (allowedVal is bool && (bool)allowedVal)
@@ -4758,13 +4827,13 @@ namespace RogueCommandExpansionLoader.Content
             UnityEngine.Object.DontDestroyOnLoad(nativePrefabClone);
 
             string prefabKey = ResourceKey(building.id, "prefab");
+            _allowedBlueprintField.SetValue(row, true);
             ApplyBalanceOverrides(row, building.balanceOverrides, packageName, building.id, false, true);
-            ApplyStructuredProductionBuildingParameters(row, building);
+            ApplyStructuredProductionBuildingParameters(row, building, product);
             _entityIdField.SetValue(row, building.id);
             _prefabLocationField.SetValue(row, prefabKey);
             _imageLocationField.SetValue(row, imagePath);
             _inactiveField.SetValue(row, false);
-            _allowedBlueprintField.SetValue(row, false);
             ProductionBuildingEligibility.ApplyToFactoryRow(product, row,
                 _allowedStartingBlueprintField, _allowedForAiField, _allowedForDemoField);
             _factoryForEntityIdField.SetValue(row, CreateNullableString(product.id));
@@ -4946,7 +5015,8 @@ namespace RogueCommandExpansionLoader.Content
 
         private void ApplyStructuredProductionBuildingParameters(
             object row,
-            ContentProductionBuildingDefinition building)
+            ContentProductionBuildingDefinition building,
+            ContentUnitDefinition product = null)
         {
             if (row == null || building == null)
             {
@@ -4977,24 +5047,70 @@ namespace RogueCommandExpansionLoader.Content
             {
                 _cardModelScalingFactorField.SetValue(row, building.cardModelScalingFactor.Value);
             }
-            if (building.neededExperienceLevel.HasValue && _neededExperienceLevelField != null)
+
+            int? effectiveExp = building.neededExperienceLevel ?? (product != null ? product.neededExperienceLevel : null);
+            if (!effectiveExp.HasValue && product != null && product.balanceOverrides != null)
             {
-                _neededExperienceLevelField.SetValue(row, building.neededExperienceLevel.Value);
+                for (int i = 0; i < product.balanceOverrides.Length; i++)
+                {
+                    if (product.balanceOverrides[i] != null &&
+                        String.Equals(product.balanceOverrides[i].name, "neededExperienceLevel", StringComparison.OrdinalIgnoreCase))
+                    {
+                        int exp;
+                        if (Int32.TryParse(product.balanceOverrides[i].value, out exp))
+                        {
+                            effectiveExp = exp;
+                        }
+                        break;
+                    }
+                }
             }
-            if (!String.IsNullOrEmpty(building.rarity) && _rarityField != null)
+            if (effectiveExp.HasValue && _neededExperienceLevelField != null)
+            {
+                _neededExperienceLevelField.SetValue(row, effectiveExp.Value);
+            }
+
+            string effectiveRarity = !String.IsNullOrEmpty(building.rarity) ? building.rarity : (product != null ? product.rarity : null);
+            if (String.IsNullOrEmpty(effectiveRarity) && product != null && product.balanceOverrides != null)
+            {
+                for (int i = 0; i < product.balanceOverrides.Length; i++)
+                {
+                    if (product.balanceOverrides[i] != null &&
+                        String.Equals(product.balanceOverrides[i].name, "rarity", StringComparison.OrdinalIgnoreCase))
+                    {
+                        effectiveRarity = product.balanceOverrides[i].value;
+                        break;
+                    }
+                }
+            }
+            if (!String.IsNullOrEmpty(effectiveRarity) && _rarityField != null)
             {
                 try
                 {
-                    object rarityEnum = Enum.Parse(_rarityField.FieldType, building.rarity, true);
+                    object rarityEnum = Enum.Parse(_rarityField.FieldType, effectiveRarity, true);
                     _rarityField.SetValue(row, rarityEnum);
                 }
                 catch (Exception) { }
             }
-            if (!String.IsNullOrEmpty(building.tech) && _techField != null)
+
+            string effectiveTech = !String.IsNullOrEmpty(building.tech) ? building.tech : (product != null ? product.tech : null);
+            if (String.IsNullOrEmpty(effectiveTech) && product != null && product.balanceOverrides != null)
+            {
+                for (int i = 0; i < product.balanceOverrides.Length; i++)
+                {
+                    if (product.balanceOverrides[i] != null &&
+                        String.Equals(product.balanceOverrides[i].name, "tech", StringComparison.OrdinalIgnoreCase))
+                    {
+                        effectiveTech = product.balanceOverrides[i].value;
+                        break;
+                    }
+                }
+            }
+            if (!String.IsNullOrEmpty(effectiveTech) && _techField != null)
             {
                 try
                 {
-                    object techEnum = Enum.Parse(_techField.FieldType, building.tech, true);
+                    object techEnum = Enum.Parse(_techField.FieldType, effectiveTech, true);
                     _techField.SetValue(row, techEnum);
                 }
                 catch (Exception) { }
