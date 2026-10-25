@@ -1229,8 +1229,17 @@ namespace RogueCommandExpansionLoader.Content
             if (hasVisualAsset || hasVisualRoot ||
                 !String.IsNullOrWhiteSpace(productionBuilding.cardImageAssetName))
             {
-                ValidateBundleReference(productionBuilding.assetBundleId, path + ".assetBundleId",
-                    bundleIds, diagnostics);
+                if (String.IsNullOrWhiteSpace(productionBuilding.assetBundleId))
+                {
+                    Add(diagnostics, "production-building.asset-bundle-required",
+                        path + ".assetBundleId",
+                        "A production building that supplies a card image or visual overlay must declare an assetBundleId.");
+                }
+                else
+                {
+                    ValidateBundleReference(productionBuilding.assetBundleId, path + ".assetBundleId",
+                        bundleIds, diagnostics);
+                }
                 if (!String.IsNullOrWhiteSpace(productionBuilding.cardImageAssetName))
                 {
                     ValidateAssetName(productionBuilding.cardImageAssetName,

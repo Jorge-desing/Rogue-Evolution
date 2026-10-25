@@ -3630,10 +3630,25 @@ namespace RogueCommandExpansionLoader.Content
                     _allowedBlueprintField.SetValue(row, false);
                     _allowedStartingBlueprintField.SetValue(row, false);
                     int unitPrespawn = unit.prespawnCount ?? ((unit.systemTags != null && Array.Exists(unit.systemTags, t => String.Equals(t, "Spawn", StringComparison.OrdinalIgnoreCase))) || HasRoleFlag(row, "Spawn") ? 50 : 20);
-                    temporaryUnits.Add(new LoadedUnit(unit.id, definition.packId, prefabKey, imageKey,
-                        row, unit, false, unit.productionBuilding.id, unitPrespawn, false));
-                    temporaryUnits.Add(CreateProductionBuilding(unit, unit.productionBuilding, definition.packId,
-                        packageName, temporaryBundles, temporaryNativePrefabs, temporaryResources));
+                    LoadedUnit productUnit = new LoadedUnit(unit.id, definition.packId, prefabKey, imageKey,
+                        row, unit, false, unit.productionBuilding.id, unitPrespawn, false);
+                    temporaryUnits.Add(productUnit);
+                    try
+                    {
+                        LoadedUnit factoryUnit = CreateProductionBuilding(unit, unit.productionBuilding, definition.packId,
+                            packageName, temporaryBundles, temporaryNativePrefabs, temporaryResources);
+                        if (factoryUnit == null)
+                        {
+                            temporaryUnits.Remove(productUnit);
+                            throw new InvalidDataException("CreateProductionBuilding returned null for " + unit.id);
+                        }
+                        temporaryUnits.Add(factoryUnit);
+                    }
+                    catch
+                    {
+                        temporaryUnits.Remove(productUnit);
+                        throw;
+                    }
                 }
 
                 if (definition.buildings != null)
@@ -5903,9 +5918,50 @@ namespace RogueCommandExpansionLoader.Content
             visualClone.name = "RCL_Visual_" + unit.id.Replace(':', '_');
             visualClone.transform.localPosition = Vector3.zero;
             visualClone.transform.localRotation = Quaternion.identity;
-            visualClone.transform.localScale = Vector3.one;
+
+            // Invert parent lossy scale so visualClone does not inherit arbitrary parent bone scales
+            Vector3 targetLossy = target.lossyScale;
+            float invX = Mathf.Abs(targetLossy.x) > 1e-5f ? (1f / targetLossy.x) : 1f;
+            float invY = Mathf.Abs(targetLossy.y) > 1e-5f ? (1f / targetLossy.y) : 1f;
+            float invZ = Mathf.Abs(targetLossy.z) > 1e-5f ? (1f / targetLossy.z) : 1f;
+
+            // Compensate for Blender FBX 0.01x unit scaling
+            float maxMeshExtent = CalculateLocalMeshExtent(visualClone);
+            float authoringCompensation = (maxMeshExtent > 0.001f && maxMeshExtent < 0.25f) ? 100f : 1f;
+
+            visualClone.transform.localScale = new Vector3(
+                invX * authoringCompensation,
+                invY * authoringCompensation,
+                invZ * authoringCompensation
+            );
+
             ApplyFallbackVisualMaterial(visualClone, fallbackMaterial, unit, packageName, ownerLabel);
             visualClone.SetActive(true);
+        }
+
+        private static float CalculateLocalMeshExtent(GameObject model)
+        {
+            if (model == null) return 0f;
+            float maxExtent = 0f;
+            MeshFilter[] filters = model.GetComponentsInChildren<MeshFilter>(true);
+            for (int i = 0; i < filters.Length; i++)
+            {
+                if (filters[i] != null && filters[i].sharedMesh != null)
+                {
+                    Vector3 ext = filters[i].sharedMesh.bounds.extents;
+                    maxExtent = Mathf.Max(maxExtent, Mathf.Max(ext.x, Mathf.Max(ext.y, ext.z)));
+                }
+            }
+            SkinnedMeshRenderer[] skinned = model.GetComponentsInChildren<SkinnedMeshRenderer>(true);
+            for (int i = 0; i < skinned.Length; i++)
+            {
+                if (skinned[i] != null && skinned[i].sharedMesh != null)
+                {
+                    Vector3 ext = skinned[i].sharedMesh.bounds.extents;
+                    maxExtent = Mathf.Max(maxExtent, Mathf.Max(ext.x, Mathf.Max(ext.y, ext.z)));
+                }
+            }
+            return maxExtent;
         }
 
         private static Transform FindUniqueTransformPath(Transform root, string path)
@@ -5980,28 +6036,47 @@ namespace RogueCommandExpansionLoader.Content
             for (int i = 0; i < renderers.Length; i++)
             {
                 Material[] materials = renderers[i].sharedMaterials;
-                bool hasMaterial = false;
-                for (int materialIndex = 0; materialIndex < materials.Length; materialIndex++)
+                bool hasAnyMaterial = false;
+                if (materials != null && materials.Length > 0)
                 {
-                    if (materials[materialIndex] != null)
+                    for (int materialIndex = 0; materialIndex < materials.Length; materialIndex++)
                     {
-                        hasMaterial = true;
-                        break;
+                        Material mat = materials[materialIndex];
+                        if (mat != null)
+                        {
+                            hasAnyMaterial = true;
+                            // Ensure shader is valid, supported, and not an error/fallback shader
+                            if (mat.shader == null || !mat.shader.isSupported ||
+                                mat.shader.name.IndexOf("Error", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                mat.shader.name.IndexOf("Hidden", StringComparison.OrdinalIgnoreCase) >= 0)
+                            {
+                                if (fallbackMaterial != null && fallbackMaterial.shader != null && fallbackMaterial.shader.isSupported)
+                                {
+                                    mat.shader = fallbackMaterial.shader;
+                                }
+                                else
+                                {
+                                    Shader litShader = Shader.Find("Universal Render Pipeline/Lit");
+                                    if (litShader != null && litShader.isSupported)
+                                    {
+                                        mat.shader = litShader;
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
 
-                if (hasMaterial)
+                if (!hasAnyMaterial)
                 {
-                    continue;
-                }
+                    if (fallbackMaterial == null)
+                    {
+                        throw new InvalidDataException(ownerLabel + " " + unit.id + " en '" + packageName +
+                            "': el modelo visual no tiene materiales y la plantilla nativa no ofrece un material MeshRenderer.");
+                    }
 
-                if (fallbackMaterial == null)
-                {
-                    throw new InvalidDataException(ownerLabel + " " + unit.id + " en '" + packageName +
-                        "': el modelo visual no tiene materiales y la plantilla nativa no ofrece un material MeshRenderer.");
+                    renderers[i].sharedMaterial = fallbackMaterial;
                 }
-
-                renderers[i].sharedMaterial = fallbackMaterial;
             }
         }
 

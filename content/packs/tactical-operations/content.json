@@ -165,7 +165,8 @@
             "description": "Fabrica escaramuzadores EMP anfibios Tidebreaker."
           }
         ]
-      }
+      },
+      "cardModelScalingFactor": 0.9
     },
     {
       "id": "tactical-operations:salvage-hauler",
@@ -318,7 +319,8 @@
             "description": "Fabrica transportes de reparación en campo Salvage."
           }
         ]
-      }
+      },
+      "cardModelScalingFactor": 1.0
     },
     {
       "id": "tactical-operations:skyguard-sam",
@@ -462,7 +464,8 @@
             "description": "Produce plataformas SAM móviles Skyguard."
           }
         ]
-      }
+      },
+      "cardModelScalingFactor": 1.0
     }
   ],
   "stages": [

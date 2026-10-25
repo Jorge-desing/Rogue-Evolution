@@ -2160,6 +2160,35 @@ var tests = new (string Name, Action Run)[]
                 "production-building.visual-root-path-invalid");
         });
     }),
+    ("production building asset requires a bundle", () =>
+    {
+        WithPackage(nativeSample, (pack, root) =>
+        {
+            ContentProductionBuildingDefinition building = pack.units[0].productionBuilding;
+            building.cardImageAssetName = "assets/factory-card.png";
+            building.assetBundleId = null;
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "production-building.asset-bundle-required");
+        });
+        WithPackage(nativeSample, (pack, root) =>
+        {
+            ContentProductionBuildingDefinition building = pack.units[0].productionBuilding;
+            building.cardImageAssetName = "assets/factory-card.png";
+            building.assetBundleId = pack.assetBundles[0].id;
+            ExpectValid(pack, root, new EmptySnapshot(), new KnownModuleValidator());
+        });
+    }),
+    ("production building asset rejects unknown bundle", () =>
+    {
+        WithPackage(nativeSample, (pack, root) =>
+        {
+            ContentProductionBuildingDefinition building = pack.units[0].productionBuilding;
+            building.cardImageAssetName = "assets/factory-card.png";
+            building.assetBundleId = "nonexistent:bundle";
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "reference.bundle-unresolved");
+        });
+    }),
     ("relic clone and localization preserve independent player card data", () =>
     {
         ContentRelicDefinition sourceRelic = nativeSample.relics.Single(

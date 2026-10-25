@@ -192,7 +192,8 @@
         ],
         "assetBundleId": "sample-native:assets",
         "cardImageAssetName": "assets/roguecommandexpansionsample/sandlancescoutcard.png"
-      }
+      },
+      "cardModelScalingFactor": 1.0
     },
     {
       "id": "sample-native:heavy-artillery",
@@ -373,7 +374,8 @@
           }
         ]
       },
-      "isAllowedForAi": true
+      "isAllowedForAi": true,
+      "cardModelScalingFactor": 1.0
     },
     {
       "id": "sample-native:assault-walker",
@@ -551,7 +553,8 @@
       },
       "visualAssetName": "assets/roguecommandexpansionsample/ironcladwalkervisual.prefab",
       "visualRootPath": "RoboMarine_Mesh",
-      "isAllowedForAi": true
+      "isAllowedForAi": true,
+      "cardModelScalingFactor": 1.0
     },
     {
       "id": "sample-native:atlas-crane-mech",
@@ -731,7 +734,8 @@
         "assetBundleId": "sample-native:assets",
         "cardImageAssetName": "assets/roguecommandexpansionsample/atlascranemechcard.png"
       },
-      "isAllowedForAi": true
+      "isAllowedForAi": true,
+      "cardModelScalingFactor": 1.0
     },
     {
       "id": "sample-native:bastion-siege-mech",
@@ -910,7 +914,8 @@
         "assetBundleId": "sample-native:assets",
         "cardImageAssetName": "assets/roguecommandexpansionsample/bastionsiegemechcard.png"
       },
-      "isAllowedForAi": true
+      "isAllowedForAi": true,
+      "cardModelScalingFactor": 0.85
     },
     {
       "id": "sample-native:arachnid-hexapod",
@@ -1093,7 +1098,8 @@
             "description": "Produce hexápodos Arácnidos."
           }
         ]
-      }
+      },
+      "cardModelScalingFactor": 0.85
     },
     {
       "id": "sample-native:overlord-command-hq",
@@ -1276,7 +1282,8 @@
             "description": "Produce vehículos del Cuartel General Overlord."
           }
         ]
-      }
+      },
+      "cardModelScalingFactor": 0.9
     },
     {
       "id": "sample-native:skirmish-bike",
@@ -1459,7 +1466,8 @@
         ],
         "assetBundleId": "sample-native:assets",
         "cardImageAssetName": "assets/roguecommandexpansionsample/skirmishbikecard.png"
-      }
+      },
+      "cardModelScalingFactor": 1.0
     },
     {
       "id": "sample-native:surge-tank",
@@ -1638,7 +1646,8 @@
         "assetBundleId": "sample-native:assets",
         "cardImageAssetName": "assets/roguecommandexpansionsample/surgearctankcard.png"
       },
-      "isAllowedForAi": true
+      "isAllowedForAi": true,
+      "cardModelScalingFactor": 1.0
     }
   ],
   "stages": [
