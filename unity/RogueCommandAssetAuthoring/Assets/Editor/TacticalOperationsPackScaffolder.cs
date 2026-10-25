@@ -32,8 +32,8 @@ namespace RogueCommandExpansion.Authoring
             try
             {
                 Debug.Log("[TacticalOperationsScaffolder] Starting build for Tactical Operations pack...");
-                string projectRoot = Directory.GetParent(Application.dataPath).FullName;
-                string repoRoot = Directory.GetParent(Directory.GetParent(Application.dataPath).FullName).FullName;
+                string projectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
+                string repoRoot = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "..", ".."));
 
                 Directory.CreateDirectory(Path.Combine(Application.dataPath, "TacticalOperations"));
                 Directory.CreateDirectory(Path.Combine(Application.dataPath, "TacticalOperations/Prefabs"));
