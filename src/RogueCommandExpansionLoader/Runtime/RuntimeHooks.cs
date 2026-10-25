@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Reflection;
 using UnityEngine;
 
@@ -424,6 +425,92 @@ namespace RogueCommandExpansionLoader.Runtime
             if (scopeProvider != null)
             {
                 SafeCall(delegate { scopeProvider.OnProgressionContentApplied(); });
+            }
+        }
+
+        public static void LevelProgressionAwakeProfileFallbackPrefix()
+        {
+            RuntimeContentMutator mutator;
+            lock (Gate)
+            {
+                mutator = _mutator;
+            }
+
+            if (mutator == null || mutator.GameAssembly == null)
+            {
+                return;
+            }
+
+            try
+            {
+                Type gameType = RuntimeReflection.FindUniqueType(mutator.GameAssembly, "Game");
+                if (gameType == null)
+                {
+                    return;
+                }
+
+                PropertyInfo stageMapProperty = gameType.GetProperty("StageMap",
+                    BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+                if (stageMapProperty != null && stageMapProperty.GetValue(null) != null)
+                {
+                    return;
+                }
+
+                MethodInfo saveGameExists = gameType.GetMethod("SaveGameFileExists",
+                    BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+                if (saveGameExists != null && (bool)saveGameExists.Invoke(null, null))
+                {
+                    return;
+                }
+
+                Type profileManagerType = RuntimeReflection.FindUniqueType(mutator.GameAssembly, "ProfileManager");
+                if (profileManagerType == null)
+                {
+                    return;
+                }
+
+                MethodInfo metaSaveGamePath = profileManagerType.GetMethod("MetaSaveGamePath",
+                    BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static,
+                    null, new Type[] { typeof(int) }, null);
+                if (metaSaveGamePath == null)
+                {
+                    return;
+                }
+
+                MethodInfo setCurrentProfile = profileManagerType.GetMethod("SetCurrentProfile",
+                    BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static,
+                    null, new Type[] { typeof(int) }, null);
+                if (setCurrentProfile == null)
+                {
+                    return;
+                }
+
+                int? bestProfile = null;
+                DateTime? bestTime = null;
+
+                for (int i = 1; i <= 3; i++)
+                {
+                    string profileDir = Path.GetDirectoryName((string)metaSaveGamePath.Invoke(null, new object[] { i }));
+                    string savePath = Path.Combine(profileDir, "savegame.dat");
+                    if (File.Exists(savePath))
+                    {
+                        DateTime writeTime = File.GetLastWriteTimeUtc(savePath);
+                        if (bestTime == null || writeTime > bestTime)
+                        {
+                            bestTime = writeTime;
+                            bestProfile = i;
+                        }
+                    }
+                }
+
+                if (bestProfile.HasValue)
+                {
+                    setCurrentProfile.Invoke(null, new object[] { bestProfile.Value });
+                }
+            }
+            catch (Exception exception)
+            {
+                Log("Profile fallback failed: " + exception.GetBaseException().Message);
             }
         }
 
@@ -1566,6 +1653,11 @@ namespace RogueCommandExpansionLoader.Runtime
         public static void EntityTakeDamagePostfix(object __instance, float __0, object __1)
         {
             RuntimeHooks.EntityTakeDamagePostfix(__instance, __0, __1);
+        }
+
+        public static void LevelProgressionAwakeProfileFallbackPrefix()
+        {
+            RuntimeHooks.LevelProgressionAwakeProfileFallbackPrefix();
         }
     }
 
