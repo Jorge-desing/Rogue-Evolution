@@ -7633,7 +7633,7 @@ namespace RogueCommandExpansionLoader.Content
                 var quotas = new List<PrespawnQuota>(_units.Count);
                 foreach (LoadedUnit unit in _units.Values)
                 {
-                    quotas.Add(new PrespawnQuota(unit.Id, unit.PrespawnCount, unit.IsProductionBuilding || unit.IsStandaloneBuilding));
+                    quotas.Add(new PrespawnQuota(unit.Id, unit.PrespawnCount, unit.IsProductionBuilding || unit.IsStandaloneBuilding, unit.ProductionFactoryId));
                 }
                 return quotas;
             }
@@ -7767,17 +7767,38 @@ namespace RogueCommandExpansionLoader.Content
             EntityController controller = prefabClone.GetComponent<EntityController>();
             var firePointsTransforms = new List<Transform>();
 
+            // 1. Recursive search for candidate muzzle sockets in the entire hierarchy
+            List<Transform> candidateMuzzleSockets = FindTransformsRecursively(prefabClone.transform, t =>
+            {
+                if (t == null) return false;
+                string name = t.name;
+                string socketName;
+                if (Runtime.Visual.RogueCommandSocketCatalog.TryResolveCanonicalSocketName(name, out socketName))
+                {
+                    if (socketName.StartsWith("Socket_Muzzle", StringComparison.OrdinalIgnoreCase))
+                    {
+                        return true;
+                    }
+                }
+                return name.StartsWith("Socket_Muzzle", StringComparison.OrdinalIgnoreCase) ||
+                       name.StartsWith("FirePoint", StringComparison.OrdinalIgnoreCase) ||
+                       string.Equals(name, "FirePoints", StringComparison.OrdinalIgnoreCase);
+            });
+
+            // 2. Discover all ShootProjectile actions on EntityController.Events
+            var shootActions = new List<ShootProjectile>();
             if (controller != null && controller.Events != null)
             {
                 foreach (EntityEvent evt in controller.Events)
                 {
+                    if (evt == null) continue;
                     if (evt.actions != null)
                     {
                         foreach (IEntityAction action in evt.actions)
                         {
-                            if (action is ShootProjectile shoot && shoot.firePointsTransform != null && !firePointsTransforms.Contains(shoot.firePointsTransform))
+                            if (action is ShootProjectile shoot)
                             {
-                                firePointsTransforms.Add(shoot.firePointsTransform);
+                                shootActions.Add(shoot);
                             }
                         }
                     }
@@ -7785,13 +7806,13 @@ namespace RogueCommandExpansionLoader.Content
                     {
                         foreach (ConditionalEntityActions cond in evt.conditionalActions)
                         {
-                            if (cond.actions != null)
+                            if (cond != null && cond.actions != null)
                             {
                                 foreach (IEntityAction action in cond.actions)
                                 {
-                                    if (action is ShootProjectile shoot && shoot.firePointsTransform != null && !firePointsTransforms.Contains(shoot.firePointsTransform))
+                                    if (action is ShootProjectile shoot)
                                     {
-                                        firePointsTransforms.Add(shoot.firePointsTransform);
+                                        shootActions.Add(shoot);
                                     }
                                 }
                             }
@@ -7800,17 +7821,56 @@ namespace RogueCommandExpansionLoader.Content
                 }
             }
 
-            // Also check for named sockets in hierarchy if no actions or in addition
-            Transform socketMuzzle = prefabClone.transform.Find("Socket_MuzzlePrimary");
-            if (socketMuzzle != null && !firePointsTransforms.Contains(socketMuzzle))
+            // 3. Ensure every ShootProjectile has a valid non-null firePointsTransform
+            foreach (ShootProjectile shoot in shootActions)
             {
-                firePointsTransforms.Add(socketMuzzle);
+                if (shoot.firePointsTransform == null)
+                {
+                    Transform bestSocket = null;
+                    if (candidateMuzzleSockets.Count > 0)
+                    {
+                        bestSocket = candidateMuzzleSockets[0];
+                    }
+                    else
+                    {
+                        GameObject muzzleObj = new GameObject("Socket_MuzzlePrimary");
+                        muzzleObj.transform.SetParent(prefabClone.transform, false);
+                        muzzleObj.transform.localPosition = new Vector3(0f, 1f, 1f);
+                        muzzleObj.transform.localRotation = Quaternion.identity;
+                        bestSocket = muzzleObj.transform;
+                        candidateMuzzleSockets.Add(bestSocket);
+                    }
+                    shoot.firePointsTransform = bestSocket;
+                }
+
+                if (!firePointsTransforms.Contains(shoot.firePointsTransform))
+                {
+                    firePointsTransforms.Add(shoot.firePointsTransform);
+                }
             }
 
+            // 4. Also validate any candidate muzzle sockets discovered in hierarchy
+            foreach (Transform muzzle in candidateMuzzleSockets)
+            {
+                if (muzzle != null && !firePointsTransforms.Contains(muzzle))
+                {
+                    firePointsTransforms.Add(muzzle);
+                }
+            }
+
+            // 5. Ensure valid ShootProjectile hierarchy on each firePointsTransform
             for (int f = 0; f < firePointsTransforms.Count; f++)
             {
                 Transform fpTransform = firePointsTransforms[f];
                 if (fpTransform == null) continue;
+
+                if (fpTransform.childCount == 0)
+                {
+                    GameObject fp0 = new GameObject("FirePoint_0");
+                    fp0.transform.SetParent(fpTransform, false);
+                    fp0.transform.localPosition = Vector3.zero;
+                    fp0.transform.localRotation = Quaternion.identity;
+                }
 
                 int count = fpTransform.childCount;
                 for (int i = 0; i < count; i++)
@@ -7844,6 +7904,27 @@ namespace RogueCommandExpansionLoader.Content
                     }
                 }
             }
+        }
+
+        private static List<Transform> FindTransformsRecursively(Transform root, Func<Transform, bool> predicate)
+        {
+            var results = new List<Transform>();
+            if (root == null) return results;
+            var queue = new Queue<Transform>();
+            queue.Enqueue(root);
+            while (queue.Count > 0)
+            {
+                Transform current = queue.Dequeue();
+                if (predicate(current))
+                {
+                    results.Add(current);
+                }
+                for (int i = 0; i < current.childCount; i++)
+                {
+                    queue.Enqueue(current.GetChild(i));
+                }
+            }
+            return results;
         }
 
         private sealed class LoadedUnit

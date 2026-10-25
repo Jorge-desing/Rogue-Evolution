@@ -9163,6 +9163,26 @@ var tests = new (string Name, Action Run)[]
         WithPackage(missingBundle, (p, root) => ExpectDiagnostic(p, root, new EmptySnapshot(),
             new KnownModuleValidator(), "building.audio-bundle-missing"));
     }),
+    ("prespawn quota binds production factory ID and preserves anti-hitch quotas", () =>
+    {
+        PrespawnQuota quota = new PrespawnQuota("sample:unit-scout", 20, false, "sample:building-scout-factory");
+        if (quota.EntityId != "sample:unit-scout" ||
+            quota.Quota != 20 ||
+            quota.IsBuilding != false ||
+            quota.FactoryId != "sample:building-scout-factory")
+        {
+            throw new InvalidOperationException("PrespawnQuota does not preserve entity ID, quota, building flag, or factory ID.");
+        }
+
+        PrespawnQuota standaloneQuota = new PrespawnQuota("sample:building-turret", 5, true);
+        if (standaloneQuota.EntityId != "sample:building-turret" ||
+            standaloneQuota.Quota != 5 ||
+            standaloneQuota.IsBuilding != true ||
+            standaloneQuota.FactoryId != null)
+        {
+            throw new InvalidOperationException("Standalone PrespawnQuota does not default factory ID to null.");
+        }
+    }),
 };
 
 int failures = 0;

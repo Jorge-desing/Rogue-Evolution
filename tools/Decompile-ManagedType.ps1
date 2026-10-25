@@ -1,7 +1,6 @@
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory = $true)]
-    [ValidateNotNullOrEmpty()]
+    [Parameter(Mandatory = $false)]
     [string]$AssemblyPath,
 
     [Parameter(Mandatory = $true)]
@@ -17,6 +16,17 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
+
+if ([string]::IsNullOrWhiteSpace($AssemblyPath)) {
+    $defaultManagedPath = 'C:\Program Files (x86)\Steam\steamapps\common\Rogue Command\Rogue Command_Data\Managed\Assembly-CSharp.dll'
+    if (Test-Path -LiteralPath $defaultManagedPath -PathType Leaf) {
+        $AssemblyPath = $defaultManagedPath
+    }
+    else {
+        throw "AssemblyPath was not specified and default Rogue Command Assembly-CSharp.dll was not found at $defaultManagedPath"
+    }
+}
+
 $resolvedAssemblyPath = (Resolve-Path -LiteralPath $AssemblyPath).Path
 $assemblyDirectory = Split-Path -Parent $resolvedAssemblyPath
 
@@ -77,11 +87,13 @@ $toolArguments = @(
 )
 
 try {
-    & $toolPath @toolArguments 1> $outputPath 2> $stderrPath
+    $decompiledLines = & $toolPath @toolArguments 2> $stderrPath
     if ($LASTEXITCODE -ne 0) {
         $toolError = Get-Content -LiteralPath $stderrPath -Raw -ErrorAction SilentlyContinue
         throw "ILSpyCmd failed to decompile '$TypeName' from '$resolvedAssemblyPath'. $toolError"
     }
+
+    [System.IO.File]::WriteAllLines($outputPath, $decompiledLines, [System.Text.UTF8Encoding]::new($false))
 
     if (-not (Test-Path -LiteralPath $outputPath -PathType Leaf) -or (Get-Item -LiteralPath $outputPath).Length -eq 0) {
         throw "ILSpyCmd returned success but produced no source for '$TypeName'."

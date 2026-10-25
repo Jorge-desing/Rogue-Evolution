@@ -375,6 +375,68 @@ namespace RogueCommandExpansionLoader.Runtime
             if (entityControllerType == null) return;
             Type stackType = typeof(Stack<>).MakeGenericType(entityControllerType);
 
+            MethodInfo prespawnEntityMethod = entityFactoryType.GetMethod("PrespawnEntity",
+                BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public);
+
+            HashSet<string> activeEntityIds = null;
+            try
+            {
+                Type gameType = RuntimeReflection.FindUniqueType(mutator.GameAssembly, "Game");
+                if (gameType != null)
+                {
+                    activeEntityIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    if (!isAi)
+                    {
+                        PropertyInfo cardsInDeckProp = gameType.GetProperty("CardsInDeck",
+                            BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+                        if (cardsInDeckProp != null)
+                        {
+                            IEnumerable<string> cards = cardsInDeckProp.GetValue(null) as IEnumerable<string>;
+                            if (cards != null)
+                            {
+                                foreach (string card in cards)
+                                {
+                                    if (!string.IsNullOrEmpty(card))
+                                    {
+                                        activeEntityIds.Add(card);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    else
+                    {
+                        Type defaultAiType = RuntimeReflection.FindUniqueType(mutator.GameAssembly, "DefaultAiBehaviour");
+                        MethodInfo constructablesMethod = defaultAiType?.GetMethod("ConstructableEntities_Static",
+                            BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+                        if (constructablesMethod != null)
+                        {
+                            System.Collections.IEnumerable constructables = constructablesMethod.Invoke(null, null) as System.Collections.IEnumerable;
+                            if (constructables != null)
+                            {
+                                foreach (object item in constructables)
+                                {
+                                    if (item != null)
+                                    {
+                                        FieldInfo idField = item.GetType().GetField("entityId",
+                                            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                                        string id = idField?.GetValue(item) as string;
+                                        if (!string.IsNullOrEmpty(id))
+                                        {
+                                            activeEntityIds.Add(id);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Log("Deck / AI constructable inspection failed: " + ex.GetBaseException().Message);
+            }
+
             foreach (PrespawnQuota quota in quotas)
             {
                 if (String.IsNullOrEmpty(quota.EntityId) || quota.Quota <= 0) continue;
@@ -396,6 +458,27 @@ namespace RogueCommandExpansionLoader.Runtime
                 {
                     object stack = Activator.CreateInstance(stackType);
                     prespawned[quota.EntityId] = stack;
+                }
+
+                bool isActive = activeEntityIds == null || activeEntityIds.Count == 0 ||
+                    activeEntityIds.Contains(quota.EntityId) ||
+                    (!string.IsNullOrEmpty(quota.FactoryId) && activeEntityIds.Contains(quota.FactoryId));
+
+                if (isActive && prespawnEntityMethod != null)
+                {
+                    try
+                    {
+                        int warmCount = Math.Min(2, quota.Quota);
+                        for (int w = 0; w < warmCount; w++)
+                        {
+                            object result = prespawnEntityMethod.Invoke(null, new object[] { quota.EntityId, warmCount });
+                            if (result is bool spawned && !spawned) break;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Log("Warm pre-spawn omitted for " + quota.EntityId + ": " + ex.GetBaseException().Message);
+                    }
                 }
             }
         }

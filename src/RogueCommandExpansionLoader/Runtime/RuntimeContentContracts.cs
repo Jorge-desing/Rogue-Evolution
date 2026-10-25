@@ -80,16 +80,18 @@ namespace RogueCommandExpansionLoader.Runtime
 
     public readonly struct PrespawnQuota
     {
-        public PrespawnQuota(string entityId, int quota, bool isBuilding)
+        public PrespawnQuota(string entityId, int quota, bool isBuilding, string factoryId = null)
         {
             EntityId = entityId;
             Quota = quota;
             IsBuilding = isBuilding;
+            FactoryId = factoryId;
         }
 
         public string EntityId { get; }
         public int Quota { get; }
         public bool IsBuilding { get; }
+        public string FactoryId { get; }
     }
 
     /// <summary>
