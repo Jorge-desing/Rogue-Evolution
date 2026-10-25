@@ -21,10 +21,10 @@ Use this skill when an acceptance claim requires observing a loader, unit, stage
 - Resolve the bridge URL and command shape from the installed `BepInExMCP` plugin, not assumptions. Prefer the current `BepInEx/LogOutput.log` listener line; if absent, verify the base URL and routes in `ModdersHelperApp.py`/`bridge_client.py` and match the listening port to the `Rogue Command.exe` process before any read-only probe. Do not infer a bridge target from unrelated local MCP transport ports; this session confirmed the game bridge at `http://127.0.0.1:8080/mcp/`, not `http://localhost:54321/mcp`.
 - Commands are path-based (`http://127.0.0.1:8080/mcp/<command>`), with query parameters for filters such as `componentName`. A JSON body with a `method` field is not the protocol for this bridge.
 - Useful commands include `system/ping`, `scene/list_root_gameobjects`, `scene:find_objects_with_component?componentName=...`, `gameobject/inspect_components`, `component/get_details`, `component/get_member`, `component/call_method`, and `mod:inject_class`.
-- Loader pack registration can be deferred until `EntityFactory` initialization. To inspect registered mod templates from `MainMenu` without starting a run, invoke `RogueCommandExpansionLoader.Runtime.RuntimeHooks.BeforeEntityFactory()` through an injected `MonoBehaviour` using reflection; calling the internal type directly will fail to compile.
 - `scene:find_objects_with_component` returns the component-bearing objects for the queried type. Save the raw response before filtering; DontDestroyOnLoad templates may not appear in scene-root snapshots or name searches.
 - `scene/search_gameobjects` is limited and noisy; filter its results by exact names and do not treat UI matches as loader evidence.
 - Record the BepInEx log lines that show pack loading and any injected probe. A successful MCP response alone is not evidence that registration occurred.
+- **MCP evidence boundary**: the bridge can enumerate scenes, objects, and components, but it does not replace visual confirmation of card rendering. If vision analysis is rate-limited or the bridge cannot drive the UI to the target scene, record the boundary explicitly and do not claim runtime success from menu navigation alone.
 
 ## Dedicated QA Profile Policy (Profile2 Invariant)
 

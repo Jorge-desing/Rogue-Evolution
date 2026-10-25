@@ -22,6 +22,10 @@ Use this skill when validating or packaging a Rogue Command loader/content chang
   - Integer overrides capped at `16,777,216`; float overrides capped at `Single.MaxValue`.
   - Balance precedence: `customBalance` > raw `balanceOverrides` > positive finite `movement.moveSpeed`.
   - 25 verified per-unit `ChangeableValue` keys mapped directly to row fields, excluding global `ManaRechargePerSecond`.
+- **Structured Parameter Type Safety**:
+  - When applying structured unit parameters, inspect the destination row field type before assignment. Passing a `float` to an `int`-backed row field (for example `EntityBalancingParameters.skillRange`) throws an unhandled `ArgumentException` that aborts pack loading. Detect the target type and round/convert explicitly.
+- **Skill Description Inheritance Guards**:
+  - `SkillDescriptionPrefix` and `TryResolveUnitLocalization` can throw on namespaced mod IDs because native `Loca` keys do not contain namespace prefixes. Guard these lookups so a missing native translation degrades to the mod's own description or a safe default instead of aborting initialization.
 - **Upgrade & Synergy Graph Analysis**:
   - Validates upgrade and synergy graphs iteratively with a 5-edge traversal limit, cycle detection, forward references, and convergent DAG handling.
   - Production queue feasibility mismatches are reported as warnings without invalidating otherwise valid packs.

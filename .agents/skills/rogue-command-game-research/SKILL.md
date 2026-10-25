@@ -20,3 +20,7 @@ Use this skill to answer a game-specific question about Rogue Command's managed 
 Label each conclusion as **static inspection**, **local build/validation**, or **in-game runtime evidence**. A successful build, bundle import, Harmony installation, or startup at the menu does not prove that a unit registers, a stage generates, or AI executes in a match.
 
 For runtime questions, launch through Steam as the user requires. Protect saves and Cloud state with a reversible test profile; restore temporary deployment changes after the run. Capture the observable event that answers the question rather than inferring success from startup logs.
+
+## Decompile managed types when source is insufficient
+
+When the loader source does not expose the exact initialization path or member layout, use `tools/Decompile-ManagedType.ps1` with ILSpy to produce offline decompiled C# for the native type under investigation. Read the decompiled file directly; decompilation is static evidence and does not prove runtime behavior, but it often reveals the exact call order, fallback paths, and string messages that drive card/menu rendering.
