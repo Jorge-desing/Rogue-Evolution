@@ -2738,6 +2738,8 @@ namespace RogueCommandExpansionLoader.Content
             _nativeUnitIds.Clear();
             _nativeFactoryIds.Clear();
             ClearMinAttackRanges();
+            ClearOnHitStatusEffects();
+            RuntimeUnitMechanicsDirector.ClearProfiles();
             IDictionary index = _entityIndexField.GetValue(null) as IDictionary;
             if (index == null)
             {
@@ -3625,6 +3627,7 @@ namespace RogueCommandExpansionLoader.Content
                             unit.defendPositionAggressivelyWhenIdle, unit.rangeToChooseNewTargetAutomatically, unit.minAttackRange, unit.id);
                         ApplyEntityActiveSkills(nativePrefabClone, unit.activeSkills, unit.id);
                         ApplyEntityCombatEnhancements(nativePrefabClone, unit.onHitStatusEffects, unit.criticalHitChance, unit.id);
+                        RegisterEntityMechanicsProfile(unit);
                         AssetBundle audioBundle = !String.IsNullOrWhiteSpace(unit.assetBundleId)
                             ? GetBundle(temporaryBundles, unit.assetBundleId, packageName)
                             : null;
@@ -3684,6 +3687,7 @@ namespace RogueCommandExpansionLoader.Content
                             unit.defendPositionAggressivelyWhenIdle, unit.rangeToChooseNewTargetAutomatically, unit.minAttackRange, unit.id);
                         ApplyEntityActiveSkills(customPrefabClone, unit.activeSkills, unit.id);
                         ApplyEntityCombatEnhancements(customPrefabClone, unit.onHitStatusEffects, unit.criticalHitChance, unit.id);
+                        RegisterEntityMechanicsProfile(unit);
                         ApplyEntityAudioBindings(customPrefabClone, bundle, unit.selectionSoundAssetName,
                             unit.engineSoundAssetName, unit.weaponSoundAssetName, unit.id, packageName);
                         EnsureMuzzleFlashHierarchy(customPrefabClone);
@@ -5691,6 +5695,7 @@ namespace RogueCommandExpansionLoader.Content
             ApplyEntityAudioBindings(nativePrefabClone, buildingAssetBundle, building.selectionSoundAssetName,
                 building.engineSoundAssetName, building.weaponSoundAssetName, building.id, packageName);
             ApplyEntityCombatEnhancements(nativePrefabClone, building.onHitStatusEffects, building.criticalHitChance, building.id);
+            RegisterBuildingMechanicsProfile(building);
             EnsureMuzzleFlashHierarchy(nativePrefabClone);
 
             nativePrefabClone.name = "RCL_NativeBuilding_" + building.id.Replace(':', '_');
@@ -8372,6 +8377,53 @@ namespace RogueCommandExpansionLoader.Content
                 {
                     _log?.Invoke("[ContentPackRuntimeLoader] Could not apply criticalHitChance to " + id + ": " + ex.Message);
                 }
+            }
+        }
+
+        private static void RegisterEntityMechanicsProfile(ContentUnitDefinition unit)
+        {
+            if (unit == null || string.IsNullOrWhiteSpace(unit.id))
+            {
+                return;
+            }
+
+            var profile = new UnitRuntimeMechanicsProfile
+            {
+                EntityId = unit.id,
+                Healing = unit.healing,
+                Aura = unit.aura,
+                BaselineStatusEffects = unit.baselineStatusEffects,
+                CombatBoosts = unit.combatBoosts,
+                Experience = unit.experience,
+                MinAttackRange = unit.minAttackRange,
+                CriticalHitChance = unit.criticalHitChance,
+                OnHitStatusEffects = unit.onHitStatusEffects
+            };
+
+            if (profile.HasAnyMechanics)
+            {
+                RuntimeUnitMechanicsDirector.RegisterProfile(unit.id, profile);
+            }
+        }
+
+        private static void RegisterBuildingMechanicsProfile(ContentBuildingDefinition building)
+        {
+            if (building == null || string.IsNullOrWhiteSpace(building.id))
+            {
+                return;
+            }
+
+            var profile = new UnitRuntimeMechanicsProfile
+            {
+                EntityId = building.id,
+                MinAttackRange = building.minAttackRange,
+                CriticalHitChance = building.criticalHitChance,
+                OnHitStatusEffects = building.onHitStatusEffects
+            };
+
+            if (profile.HasAnyMechanics)
+            {
+                RuntimeUnitMechanicsDirector.RegisterProfile(building.id, profile);
             }
         }
 

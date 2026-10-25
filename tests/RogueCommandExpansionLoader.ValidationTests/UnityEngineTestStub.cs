@@ -87,15 +87,61 @@ namespace UnityEngine
         }
     }
 
+    public class Component : Object
+    {
+        public GameObject gameObject { get; set; } = new();
+        public Transform transform { get; set; } = new();
+    }
+
+    public class MonoBehaviour : Component
+    {
+    }
+
     public sealed class GameObject : Object
     {
+        private readonly System.Collections.Generic.List<Component> _components = new();
         public string name { get; set; } = string.Empty;
         public string tag { get; set; } = "Enemy";
+        public bool activeInHierarchy { get; set; } = true;
 
         public GameObject(string name = "")
         {
             this.name = name;
         }
+
+        public T GetComponent<T>() where T : Component
+        {
+            for (int i = 0; i < _components.Count; i++)
+            {
+                if (_components[i] is T match)
+                {
+                    return match;
+                }
+            }
+
+            return null;
+        }
+
+        public T AddComponent<T>() where T : Component, new()
+        {
+            var comp = new T
+            {
+                gameObject = this
+            };
+            _components.Add(comp);
+            return comp;
+        }
+    }
+
+    public static class Mathf
+    {
+        public static float Clamp(float value, float min, float max) =>
+            value < min ? min : (value > max ? max : value);
+
+        public static int Max(int a, int b) => a > b ? a : b;
+        public static float Max(float a, float b) => a > b ? a : b;
+        public static int Min(int a, int b) => a < b ? a : b;
+        public static int RoundToInt(float f) => (int)System.Math.Round(f);
     }
 
     public sealed class Transform : Object

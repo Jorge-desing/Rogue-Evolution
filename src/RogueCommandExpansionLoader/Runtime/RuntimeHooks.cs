@@ -1282,6 +1282,8 @@ namespace RogueCommandExpansionLoader.Runtime
                     return;
                 }
 
+                RuntimeUnitMechanicsDirector.OnEntityDealtDamage(__instance, __0, __1);
+
                 List<RogueCommandExpansionLoader.Content.ContentOnHitStatusEffectDefinition> effects =
                     OnHitStatusEffectsResolver != null ? OnHitStatusEffectsResolver(originatorId) : null;
                 if (effects == null || effects.Count == 0)

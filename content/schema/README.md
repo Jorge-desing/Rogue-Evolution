@@ -112,6 +112,13 @@ Packs can declare advanced behavioral parameters, zero-allocation pre-spawning p
   - Native `ShootProjectile.Init()` requires every transform in `firePointsTransform` to possess a child with a `ParticleSystem` component (`child.GetChild(0).GetComponent<ParticleSystem>()`), or it wipes `_muzzleFlashEffects` and disables weapon muzzle flashes.
   - The loader's `EnsureMuzzleFlashHierarchy` detects missing particle systems under `Socket_MuzzlePrimary` / fire points and safely synthesizes dormant fallback `ParticleSystem` components, guaranteeing weapon VFX are preserved.
 
+- **Runtime Unit Mechanics (`RuntimeUnitMechanicsDirector`)**:
+  - `healing`: Autonomous field healing and armor repair pulses (`healAmount`, `healRange`, `healRate`, `repairAmount`) targeting the most damaged friendly unit or building within range via native `EntityController.Heal` and `EntityController.RepairArmor`.
+  - `aura`: Passive tactical aura pulses (`auraRadius`, `auraType` in `Buff`/`Debuff`/`Heal`/`Shield`, `buffAmount`, `affectsAllies`, `affectsEnemies`) applying native `StatusEffect` buffs/debuffs (`CombatBoost`, `Robust`, `SlowedDown`, `Marked`), health restoration, or shield recharge (`EntityController.ChargeShield`) to nearby units.
+  - `baselineStatusEffects`: Permanent passive `StatusEffect` flags (up to 16 values such as `Armored`, `Robust`, `Rush`, `Regen`) applied at entity instantiation and pool reuse via `EntityController.SetActiveStatusEffect(..., DurationType.Unlimited, 0f)`.
+  - `combatBoosts`: Timed combat buffs (`id`, `statName`, `multiplier`, `duration`) triggered when the unit deals damage in combat (`Turbo` for movement speed, `Overclocked` for attack speed, `Robust` for armor/defense, or `CombatBoost`).
+  - `experience`: Combat veterancy progression (`experiencePerLevel`, `maxLevel`, `experienceGainMultiplier`, `levelUpBonus`) tracking combat hits and kills per entity instance, promoting the unit via `EntityController.RankUp(1)` and restoring `levelUpBonus * MaxHealth` health and shield upon promotion.
+
 ## AI unit entries
 
 An AI profile may optionally declare `unitEntries` to append namespaced units to one `AiBase` in an isolated, stage-scoped native profile. Each entry selects the `aiBases` index, the starting ascension level, the number of units spawned at base setup, and the native `maxLiving` value. The referenced unit must be declared by this pack or another loaded/declared pack; the loader resolves that dependency before loading the profile. Custom AI prefabs and unscoped templates cannot use `unitEntries`, so the native AI template remains unchanged. `unitEntries` may be omitted when unused; sample manifests include an empty array for clarity.

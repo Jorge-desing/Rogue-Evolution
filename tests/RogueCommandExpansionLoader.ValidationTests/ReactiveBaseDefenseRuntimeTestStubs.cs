@@ -1,10 +1,41 @@
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
-public sealed class EntityController
+public enum StatusEffect
+{
+    SlowedDown,
+    OnFire,
+    Electrified,
+    Regen,
+    Panic,
+    Marked,
+    Turbo,
+    Overclocked,
+    Rush,
+    Stealth,
+    Robust,
+    Armored,
+    CombatBoost,
+    Hack,
+    Smoke,
+    Stun
+}
+
+public static class SetStatusEffect
+{
+    public enum DurationType
+    {
+        Unlimited = 0,
+        Seconds = 1
+    }
+}
+
+public sealed class EntityController : Component
 {
     private readonly HashSet<UnitRole> _roles = new();
     private readonly LinkedList<EntityCommand> _commandChain = new();
+    public List<(StatusEffect Effect, SetStatusEffect.DurationType DurationType, float Duration)> AppliedStatusEffects { get; } = new();
 
     public bool IsDestroyed { get; set; }
     public bool DestroyHasBeenStarted { get; set; }
@@ -37,8 +68,20 @@ public sealed class EntityController
     public float CurrentArmor { get; set; } = 0f;
     public float MaxArmor { get; set; } = 0f;
     public float DeltaArmor => MaxArmor - CurrentArmor;
+    public bool HasShield { get; set; }
+    public float CurrentShield { get; set; } = 0f;
+    public float MaxShield { get; set; } = 0f;
+    public int CurrentRank { get; set; } = 0;
+    public int MaxRank { get; set; } = 3;
     public void Heal(float amount, EntityController originator) { CurrentHealth = System.Math.Min(CurrentHealth + amount, MaxHealth); }
     public void RepairArmor(float amount, EntityController originator, bool doNotFire = false) { CurrentArmor = System.Math.Min(CurrentArmor + amount, MaxArmor); }
+    public void ChargeShield(float amount, bool displayDeltaInBar = true) { CurrentShield = System.Math.Min(CurrentShield + amount, MaxShield); }
+    public void RankUp(int amount) { CurrentRank = System.Math.Min(CurrentRank + amount, MaxRank); }
+    public bool IsEnemy(EntityController other) => other != null && (IsControlledByPlayer != other.IsControlledByPlayer || IsControlledByAi != other.IsControlledByAi);
+    public void SetActiveStatusEffect(StatusEffect effect, SetStatusEffect.DurationType durationType, float duration)
+    {
+        AppliedStatusEffects.Add((effect, durationType, duration));
+    }
     public float MoveSpeed { get; set; } = 10f;
     public float WeaponRange { get; set; } = 15f;
     public string EntityId { get => entityId; set => entityId = value; }
@@ -52,7 +95,6 @@ public sealed class EntityController
     public LinkedList<EntityCommand> CommandChainForTest { get { return _commandChain; } }
     public List<Vector3> PatrolPositions { get; } = new();
     public int ClearPatrolPositionsCallCount { get; private set; }
-    public GameObject gameObject { get; set; } = new("test-entity");
     public EntityCommand? LastExecutedCommand { get; private set; }
     public int ExecuteCommandCallCount { get; private set; }
     public CommandProcessingType LastCommandProcessingType { get; private set; }
@@ -258,6 +300,7 @@ public sealed class ExistingControllers
     public HashSet<EntityController> PlayerUnits() => _playerUnits;
     public HashSet<EntityController> PlayerEntities() => _playerUnits;
     public HashSet<EntityController> AiUnits() => _aiUnits;
+    public IEnumerable<EntityController> Entities() => _playerUnits.Concat(_aiUnits).Concat(_aiBuildings);
     public HashSet<EntityController> Harvesters => _harvesters;
     public HashSet<EntityController> PlayerRefineries() => _playerRefineries;
     public HashSet<EntityController> PlayerBuildingsKnownToAi() => _playerBuildingsKnownToAi;

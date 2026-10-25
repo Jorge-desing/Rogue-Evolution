@@ -61,6 +61,8 @@
              Link="Runtime/RuntimeMutationManager.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeHooks.cs"
              Link="Runtime/RuntimeHooks.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeUnitMechanicsDirector.cs"
+             Link="Runtime/RuntimeUnitMechanicsDirector.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Modules/ScheduledBaseBuildParameters.cs"
              Link="Modules/ScheduledBaseBuildParameters.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Modules/ScheduledBaseBuildAiModule.cs"

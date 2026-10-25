@@ -9693,6 +9693,168 @@ var tests = new (string Name, Action Run)[]
                 string.Join(", ", result.Diagnostics.Select(d => $"{d.Code} at {d.Path}: {d.Message}")));
         }
     }),
+    ("runtime unit mechanics director executes baseline status effects, combat boosts, veterancy rank-ups, healing, and auras", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        RuntimeUnitMechanicsDirector.ClearProfiles();
+        UnityEngine.Time.time = 10f;
+
+        try
+        {
+            var profile = new UnitRuntimeMechanicsProfile
+            {
+                EntityId = "test:mechanics-unit",
+                MinAttackRange = 4.5f,
+                CriticalHitChance = 0.25f,
+                OnHitStatusEffects = new[]
+                {
+                    new ContentOnHitStatusEffectDefinition { statusEffect = "Stun", duration = 2.0f, chance = 0.35f }
+                },
+                BaselineStatusEffects = new[] { "Armored", "Robust" },
+                Healing = new ContentUnitHealingDefinition
+                {
+                    healAmount = 15f,
+                    repairAmount = 20f,
+                    healRange = 4.0f,
+                    healRate = 1.0f
+                },
+                Aura = new ContentUnitAuraDefinition
+                {
+                    auraRadius = 4.0f,
+                    auraType = "Shield",
+                    buffAmount = 12f,
+                    affectsAllies = true,
+                    affectsEnemies = false
+                },
+                CombatBoosts = new[]
+                {
+                    new ContentCombatBoostDefinition
+                    {
+                        id = "test:boost-speed",
+                        statName = "MoveSpeed",
+                        multiplier = 1.3f,
+                        duration = 3.0f
+                    }
+                },
+                Experience = new ContentUnitExperienceDefinition
+                {
+                    experiencePerLevel = 1,
+                    maxLevel = 3,
+                    experienceGainMultiplier = 1.0f,
+                    levelUpBonus = 0.20f
+                }
+            };
+
+            RuntimeUnitMechanicsDirector.RegisterProfile("test:mechanics-unit", profile);
+            string summary = RuntimeUnitMechanicsDirector.FormatMechanicsSummary("test:mechanics-unit");
+            if (string.IsNullOrWhiteSpace(summary) ||
+                !summary.Contains("MinRange: 4.5m", StringComparison.Ordinal) ||
+                !summary.Contains("Crit: 25%", StringComparison.Ordinal) ||
+                !summary.Contains("OnHit: Stun", StringComparison.Ordinal) ||
+                !summary.Contains("Pasivos: Armored, Robust", StringComparison.Ordinal) ||
+                !summary.Contains("Curación: 15 HP / 20 Arm", StringComparison.Ordinal) ||
+                !summary.Contains("Aura: Shield", StringComparison.Ordinal) ||
+                !summary.Contains("Veteranía: Rango 3", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Unexpected mechanics summary: " + summary);
+            }
+
+            var self = new EntityController
+            {
+                entityId = "test:mechanics-unit",
+                UniqueEntityId = 101,
+                IsControlledByPlayer = true,
+                IsUnit = true,
+                CurrentHealth = 60f,
+                MaxHealth = 100f,
+                HasShield = true,
+                CurrentShield = 10f,
+                MaxShield = 50f,
+                CurrentRank = 0,
+                MaxRank = 3,
+                Position = new UnityEngine.Vector3(0f, 0f, 0f)
+            };
+            var ally = new EntityController
+            {
+                entityId = "test:ally",
+                UniqueEntityId = 102,
+                IsControlledByPlayer = true,
+                IsUnit = true,
+                CurrentHealth = 50f,
+                MaxHealth = 100f,
+                CurrentArmor = 30f,
+                MaxArmor = 100f,
+                HasShield = true,
+                CurrentShield = 20f,
+                MaxShield = 60f,
+                Position = new UnityEngine.Vector3(15f, 0f, 0f)
+            };
+            var enemy = new EntityController
+            {
+                entityId = "test:enemy",
+                UniqueEntityId = 201,
+                IsControlledByAi = true,
+                IsUnit = true,
+                CurrentHealth = 0f,
+                MaxHealth = 100f,
+                DestroyHasBeenStarted = true,
+                Position = new UnityEngine.Vector3(10f, 0f, 0f)
+            };
+
+            ExistingControllers.Instance.PlayerUnits().Add(self);
+            ExistingControllers.Instance.PlayerUnits().Add(ally);
+            ExistingControllers.Instance.AiUnits().Add(enemy);
+
+            RuntimeUnitMechanicsDirector.AttachIfApplicable(self);
+            if (!self.AppliedStatusEffects.Any(e => e.Effect == StatusEffect.Armored && e.DurationType == SetStatusEffect.DurationType.Unlimited) ||
+                !self.AppliedStatusEffects.Any(e => e.Effect == StatusEffect.Robust && e.DurationType == SetStatusEffect.DurationType.Unlimited))
+            {
+                throw new InvalidOperationException("AttachIfApplicable did not apply baseline unlimited status effects.");
+            }
+
+            var director = self.gameObject.GetComponent<RuntimeUnitMechanicsDirector>();
+            if (director == null)
+            {
+                throw new InvalidOperationException("AttachIfApplicable did not attach RuntimeUnitMechanicsDirector component.");
+            }
+
+            // Advance time past initial 0.5s check window and tick healing + aura
+            UnityEngine.Time.time = 11f;
+            director.TickMechanics();
+
+            if (ally.CurrentHealth != 65f || ally.CurrentArmor != 50f || ally.CurrentShield != 32f)
+            {
+                throw new InvalidOperationException(
+                    $"Expected ally HP=65, Armor=50, Shield=32 after healing+shield aura pulse, got HP={ally.CurrentHealth}, Armor={ally.CurrentArmor}, Shield={ally.CurrentShield}");
+            }
+
+            // Trigger OnEntityDealtDamage on a killed target (3 XP >= threshold 3 -> immediate RankUp + CombatBoost + levelUpBonus heal)
+            RuntimeUnitMechanicsDirector.OnEntityDealtDamage(enemy, 45f, self);
+
+            if (self.CurrentRank != 1)
+            {
+                throw new InvalidOperationException($"Expected self rank to promote to 1 on kill, got {self.CurrentRank}");
+            }
+            if (!self.AppliedStatusEffects.Any(e => e.Effect == StatusEffect.Turbo && e.DurationType == SetStatusEffect.DurationType.Seconds && e.Duration == 3.0f))
+            {
+                throw new InvalidOperationException("Expected MoveSpeed combatBoost to apply timed Turbo status effect.");
+            }
+            if (!self.AppliedStatusEffects.Any(e => e.Effect == StatusEffect.CombatBoost && e.DurationType == SetStatusEffect.DurationType.Unlimited))
+            {
+                throw new InvalidOperationException("Expected veterancy promotion to apply unlimited CombatBoost status effect.");
+            }
+            if (self.CurrentHealth <= 60f)
+            {
+                throw new InvalidOperationException($"Expected veterancy levelUpBonus to heal self above 60 HP, got {self.CurrentHealth}");
+            }
+        }
+        finally
+        {
+            RuntimeUnitMechanicsDirector.ClearProfiles();
+            ExistingControllers.Instance.Reset();
+            UnityEngine.Time.time = 0f;
+        }
+    }),
 };
 
 int failures = 0;

@@ -94,7 +94,11 @@ namespace RogueCommandExpansionLoader.Runtime
                 try
                 {
                     RuntimeHooks.Bind(mutator, provider, logger);
-                    RuntimeHooks.OnEntityInstantiated = Visual.RuntimeVisualDirector.AttachIfApplicable;
+                    RuntimeHooks.OnEntityInstantiated = delegate(object entityObj)
+                    {
+                        Visual.RuntimeVisualDirector.AttachIfApplicable(entityObj);
+                        RuntimeUnitMechanicsDirector.AttachIfApplicable(entityObj);
+                    };
                     harmony = new Harmony(HarmonyOwnerId);
                     for (int i = 0; i < patches.Count; i++)
                     {

@@ -166,7 +166,18 @@
                     }
                 ]
             },
-            "cardModelScalingFactor": 0.9
+            "cardModelScalingFactor": 0.9,
+            "baselineStatusEffects": [
+                "Rush"
+            ],
+            "combatBoosts": [
+                {
+                    "id": "tactical-operations:tidebreaker-surge",
+                    "statName": "MoveSpeed",
+                    "multiplier": 1.3,
+                    "duration": 3.0
+                }
+            ]
         },
         {
             "id": "tactical-operations:salvage-hauler",
@@ -320,7 +331,20 @@
                     }
                 ]
             },
-            "cardModelScalingFactor": 1.0
+            "cardModelScalingFactor": 1.0,
+            "healing": {
+                "healAmount": 12.0,
+                "healRange": 3.5,
+                "healRate": 0.8,
+                "repairAmount": 20.0
+            },
+            "aura": {
+                "auraRadius": 3.5,
+                "auraType": "Shield",
+                "buffAmount": 8.0,
+                "affectsAllies": true,
+                "affectsEnemies": false
+            }
         },
         {
             "id": "tactical-operations:skyguard-sam",
@@ -465,7 +489,13 @@
                     }
                 ]
             },
-            "cardModelScalingFactor": 1.0
+            "cardModelScalingFactor": 1.0,
+            "experience": {
+                "experiencePerLevel": 1,
+                "maxLevel": 3,
+                "experienceGainMultiplier": 1.0,
+                "levelUpBonus": 0.2
+            }
         },
         {
             "id": "tactical-operations:bulwark-siege-tank",
@@ -560,6 +590,23 @@
                 "Damage1": 80.0
             },
             "minAttackRange": 5.0,
+            "baselineStatusEffects": [
+                "Armored",
+                "Robust"
+            ],
+            "aura": {
+                "auraRadius": 3.5,
+                "auraType": "Buff",
+                "buffAmount": 1.0,
+                "affectsAllies": true,
+                "affectsEnemies": false
+            },
+            "experience": {
+                "experiencePerLevel": 1,
+                "maxLevel": 3,
+                "experienceGainMultiplier": 1.0,
+                "levelUpBonus": 0.15
+            },
             "aiModule": {
                 "moduleId": "sample:siege-assault",
                 "parameters": {
@@ -772,7 +819,21 @@
                     }
                 ]
             },
-            "cardModelScalingFactor": 1.0
+            "cardModelScalingFactor": 1.0,
+            "combatBoosts": [
+                {
+                    "id": "tactical-operations:arc-lance-overclock",
+                    "statName": "AttackSpeed",
+                    "multiplier": 1.25,
+                    "duration": 4.0
+                }
+            ],
+            "experience": {
+                "experiencePerLevel": 1,
+                "maxLevel": 3,
+                "experienceGainMultiplier": 1.0,
+                "levelUpBonus": 0.2
+            }
         },
         {
             "id": "tactical-operations:field-medic-rover",
@@ -868,9 +929,9 @@
             },
             "onHitStatusEffects": [
                 {
-                    "statusEffect": "Regen",
-                    "duration": 1.0,
-                    "chance": 1.0
+                    "statusEffect": "SlowedDown",
+                    "duration": 2.0,
+                    "chance": 0.5
                 }
             ],
             "aiModule": {
@@ -933,7 +994,20 @@
                     }
                 ]
             },
-            "cardModelScalingFactor": 0.8
+            "cardModelScalingFactor": 0.8,
+            "healing": {
+                "healAmount": 18.0,
+                "healRange": 4.5,
+                "healRate": 1.0,
+                "repairAmount": 12.0
+            },
+            "aura": {
+                "auraRadius": 4.0,
+                "auraType": "Heal",
+                "buffAmount": 6.0,
+                "affectsAllies": true,
+                "affectsEnemies": false
+            }
         }
     ],
     "stages": [
@@ -1226,6 +1300,56 @@
                         {
                             "name": "minManaRatio",
                             "value": "0.5"
+                        }
+                    ]
+                },
+                {
+                    "moduleId": "sample:focus-fire",
+                    "parameters": [
+                        {
+                            "name": "baseIndex",
+                            "value": "0"
+                        },
+                        {
+                            "name": "checkIntervalSeconds",
+                            "value": "3.0"
+                        },
+                        {
+                            "name": "squadRadius",
+                            "value": "18.0"
+                        },
+                        {
+                            "name": "minUnitsInSquad",
+                            "value": "2"
+                        },
+                        {
+                            "name": "priorityMode",
+                            "value": "LowestHealth"
+                        }
+                    ]
+                },
+                {
+                    "moduleId": "sample:siege-assault",
+                    "parameters": [
+                        {
+                            "name": "baseIndex",
+                            "value": "0"
+                        },
+                        {
+                            "name": "cooldownSeconds",
+                            "value": "30.0"
+                        },
+                        {
+                            "name": "minSquadSize",
+                            "value": "2"
+                        },
+                        {
+                            "name": "targetPriority",
+                            "value": "ClosestBuilding"
+                        },
+                        {
+                            "name": "minGameTimeSeconds",
+                            "value": "30.0"
                         }
                     ]
                 }

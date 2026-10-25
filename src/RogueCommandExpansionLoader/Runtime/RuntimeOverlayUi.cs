@@ -388,6 +388,12 @@ namespace RogueCommandExpansionLoader.Runtime
                 GUILayout.Label("Sprite Card Key: " + unit.ImageKey, _styleLabelMuted);
                 GUILayout.Label(UnitVariantDiagnosticsFormatter.FormatVariantCount(unit), _styleLabelMuted);
 
+                string mechanicsSummary = RuntimeUnitMechanicsDirector.FormatMechanicsSummary(unit.UnitId);
+                if (!string.IsNullOrEmpty(mechanicsSummary))
+                {
+                    GUILayout.Label("Mecanicas activas: " + mechanicsSummary, _styleLabelSuccess);
+                }
+
                 EndCard();
                 GUILayout.Space(6);
             }
