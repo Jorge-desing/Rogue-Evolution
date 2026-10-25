@@ -16,6 +16,7 @@ if ($ProcessId -eq 0) {
 }
 
 $process = Get-Process -Id $ProcessId -ErrorAction Stop
+$process.Refresh()
 $windowHandle = $process.MainWindowHandle
 if ($windowHandle -eq [IntPtr]::Zero) {
     throw "Process $ProcessId has no main window handle."

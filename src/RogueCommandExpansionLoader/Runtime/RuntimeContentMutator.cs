@@ -284,6 +284,11 @@ namespace RogueCommandExpansionLoader.Runtime
                         }
                     }
 
+                    if (materializedRows.Count == 0)
+                    {
+                        return false;
+                    }
+
                     List<(int RowIndex, FieldInfo Field, object Value)> balanceAssignments;
                     if (!TryApplyBalanceOverridesToRows(materializedRows,
                             _provider.GetBalanceOverrides(), out balanceAssignments))

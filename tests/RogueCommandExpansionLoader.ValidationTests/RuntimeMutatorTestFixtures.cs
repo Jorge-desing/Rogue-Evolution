@@ -244,11 +244,39 @@ public struct EntityInAiDeck
     public int MaxLiving { get; set; }
 }
 
+public sealed class OpenReward
+{
+    public string blueprintPoolId;
+}
+
+public static class Game
+{
+    public static bool AtLeastOneBlueprintHasBeenAddedByPlayer = true;
+    public static List<string> CardsInDeck { get; set; } = new();
+    public static List<OpenReward> OpenCardRewards = new();
+}
+
+public sealed class MetaGame
+{
+    public static MetaGame Instance { get; set; } = new();
+    public int CurrentExperienceLevel { get; set; }
+}
+
+namespace Shapes2D
+{
+    public static class Game { }
+}
+
 internal sealed class RuntimeMutatorTestProvider : IRuntimeContentProvider, IBlueprintPoolRuntimeProvider,
     IBlueprintRewardFactoryScopeProvider, IGuaranteedModCardRewardProvider
 {
     public HashSet<string> ModProducts { get; } = new(StringComparer.Ordinal);
     public string GuaranteedModProduct { get; set; }
+    public bool RequireRegisteredModProduct { get; set; }
+    public string LastPoolId { get; private set; }
+    public bool LastStartingSelection { get; private set; }
+    public int LastCurrentXpLevel { get; private set; }
+    public HashSet<string> LastExcludedProductIds { get; private set; } = new(StringComparer.Ordinal);
     public bool IsModUnitProduct(string productId) => !string.IsNullOrEmpty(productId) && ModProducts.Contains(productId);
     public bool TryGetGuaranteedModRewardProduct(
         string poolId,
@@ -257,8 +285,15 @@ internal sealed class RuntimeMutatorTestProvider : IRuntimeContentProvider, IBlu
         ICollection<string> excludedProductIds,
         out string modProductId)
     {
+        LastPoolId = poolId;
+        LastStartingSelection = isStartingSelection;
+        LastCurrentXpLevel = currentXpLevel;
+        LastExcludedProductIds = excludedProductIds == null
+            ? new HashSet<string>(StringComparer.Ordinal)
+            : new HashSet<string>(excludedProductIds, StringComparer.Ordinal);
         modProductId = GuaranteedModProduct;
-        return !string.IsNullOrEmpty(modProductId);
+        return !string.IsNullOrEmpty(modProductId) &&
+            (!RequireRegisteredModProduct || EntityBalancingStore.ParameterListIndexOf.ContainsKey(modProductId));
     }
     public Dictionary<string, string> PoolLocalizationAliases { get; } = new(StringComparer.OrdinalIgnoreCase);
     public Dictionary<object, string> PoolIds { get; } = new();

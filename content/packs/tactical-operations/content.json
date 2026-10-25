@@ -16,7 +16,7 @@
       "cardImageAssetName": "assets/tacticaloperations/tidebreakerhovercraftcard.png",
       "visualAssetName": "assets/tacticaloperations/prefabs/tidebreakerhovercraftvisual.prefab",
       "visualRootPath": "Vehicle",
-      "isAllowedAsStartingBlueprint": false,
+      "isAllowedAsStartingBlueprint": true,
       "isAllowedForAi": true,
       "isAllowedForDemo": true,
       "isForSpecialists": false,
@@ -39,7 +39,7 @@
         },
         {
           "name": "offeredSystemTags",
-          "value": "Vehicle, Turbo, Electricity"
+          "value": "Vehicle, Turbo, Stun"
         },
         {
           "name": "cost",
@@ -55,7 +55,7 @@
         },
         {
           "name": "sightRadius",
-          "value": "8.5"
+          "value": "8"
         },
         {
           "name": "weaponRange",
@@ -119,22 +119,22 @@
       },
       "activeSkills": [
         {
-          "id": "tidebreaker-emp-overcharge",
+          "id": "tactical-operations:tidebreaker-emp-overcharge",
           "skillType": "LocationAoE",
-          "targetOrigin": "TargetLocation",
+          "targetOrigin": "ChosenLocation",
           "cooldown": 12.0,
           "manaCost": 0,
           "range": 8.0,
           "radius": 4.0,
           "helpAiToActivate": true,
-          "aiActivationTrigger": "EnemyInRange",
+          "aiActivationTrigger": "EnemiesInRange",
           "aiSkillCooldown": 12.0
         }
       ],
       "productionBuilding": {
         "id": "tactical-operations:tidebreaker-factory",
         "nativeTemplateId": "PCXBaseTankFactory",
-        "isAllowedAsStartingBlueprint": false,
+        "isAllowedAsStartingBlueprint": true,
         "balanceOverrides": [
           {
             "name": "cost",
@@ -174,7 +174,7 @@
       "cardImageAssetName": "assets/tacticaloperations/salvagehaulercard.png",
       "visualAssetName": "assets/tacticaloperations/prefabs/salvagehaulervisual.prefab",
       "visualRootPath": "Vehicle",
-      "isAllowedAsStartingBlueprint": false,
+      "isAllowedAsStartingBlueprint": true,
       "isAllowedForAi": true,
       "isAllowedForDemo": true,
       "isForSpecialists": false,
@@ -193,11 +193,11 @@
       "balanceOverrides": [
         {
           "name": "roles",
-          "value": "Unit, Vehicle, Healer"
+          "value": "Unit, Vehicle, Supporter, Heal"
         },
         {
           "name": "offeredSystemTags",
-          "value": "Vehicle, Healing, Armor"
+          "value": "Vehicle, Heal, Armor"
         },
         {
           "name": "cost",
@@ -213,7 +213,7 @@
         },
         {
           "name": "sightRadius",
-          "value": "9.0"
+          "value": "9"
         },
         {
           "name": "weaponRange",
@@ -225,7 +225,7 @@
         },
         {
           "name": "rarity",
-          "value": "Uncommon"
+          "value": "Rare"
         },
         {
           "name": "neededExperienceLevel",
@@ -272,22 +272,22 @@
       },
       "activeSkills": [
         {
-          "id": "salvage-nanite-pulse",
-          "skillType": "SelfBuff",
+          "id": "tactical-operations:salvage-nanite-pulse",
+          "skillType": "SelfAoE",
           "targetOrigin": "Self",
           "cooldown": 18.0,
           "manaCost": 0,
           "range": 0.0,
           "radius": 6.0,
           "helpAiToActivate": true,
-          "aiActivationTrigger": "HealthBelowThreshold",
+          "aiActivationTrigger": "LowHealth",
           "aiSkillCooldown": 18.0
         }
       ],
       "productionBuilding": {
         "id": "tactical-operations:salvage-hauler-factory",
         "nativeTemplateId": "PCXBaseTankFactory",
-        "isAllowedAsStartingBlueprint": false,
+        "isAllowedAsStartingBlueprint": true,
         "balanceOverrides": [
           {
             "name": "cost",
@@ -303,7 +303,7 @@
           },
           {
             "name": "rarity",
-            "value": "Uncommon"
+            "value": "Rare"
           }
         ],
         "localizations": [
@@ -327,7 +327,7 @@
       "cardImageAssetName": "assets/tacticaloperations/skyguardsamcard.png",
       "visualAssetName": "assets/tacticaloperations/prefabs/skyguardsamvisual.prefab",
       "visualRootPath": "Vehicle",
-      "isAllowedAsStartingBlueprint": false,
+      "isAllowedAsStartingBlueprint": true,
       "isAllowedForAi": true,
       "isAllowedForDemo": true,
       "isForSpecialists": false,
@@ -346,11 +346,11 @@
       "balanceOverrides": [
         {
           "name": "roles",
-          "value": "Unit, Vehicle, Artillery"
+          "value": "Unit, Vehicle, Sniper"
         },
         {
           "name": "offeredSystemTags",
-          "value": "Vehicle, Rocket, LongRange"
+          "value": "Vehicle, Bomb, Sniper"
         },
         {
           "name": "cost",
@@ -366,7 +366,7 @@
         },
         {
           "name": "sightRadius",
-          "value": "13.0"
+          "value": "13"
         },
         {
           "name": "weaponRange",
@@ -412,26 +412,26 @@
       "customBalance": {
         "Damage1": 65.0
       },
-      "criticalHitChance": 0.30,
+      "criticalHitChance": 0.3,
       "minAttackRange": 4.5,
       "activeSkills": [
         {
-          "id": "skyguard-missile-salvo",
+          "id": "tactical-operations:skyguard-missile-salvo",
           "skillType": "LocationAoE",
-          "targetOrigin": "TargetLocation",
+          "targetOrigin": "ChosenLocation",
           "cooldown": 14.0,
           "manaCost": 0,
           "range": 13.0,
           "radius": 3.5,
           "helpAiToActivate": true,
-          "aiActivationTrigger": "EnemyInRange",
+          "aiActivationTrigger": "EnemiesInRange",
           "aiSkillCooldown": 14.0
         }
       ],
       "productionBuilding": {
         "id": "tactical-operations:skyguard-sam-factory",
         "nativeTemplateId": "PCXBaseTankFactory",
-        "isAllowedAsStartingBlueprint": false,
+        "isAllowedAsStartingBlueprint": true,
         "balanceOverrides": [
           {
             "name": "cost",
@@ -510,7 +510,7 @@
         "nativeTemplateId": "27 Circles",
         "randomSeed": 52084,
         "alwaysUseSameSeed": true,
-        "mapSize": 32,
+        "mapSize": 33,
         "localizations": [
           {
             "language": "en-US",
@@ -539,6 +539,78 @@
           "poolId": "BP_CheaperRobos",
           "unitIds": [
             "tactical-operations:salvage-hauler"
+          ]
+        }
+      ],
+      "aiProfileIds": [
+        "tactical-operations:skirmish-adversary"
+      ]
+    }
+  ],
+  "aiProfiles": [
+    {
+      "id": "tactical-operations:skirmish-adversary",
+      "nativeTemplateId": "_01_ Quick Hunter Enemy Var",
+      "scopeToReferencedStages": true,
+      "unitEntries": [
+        {
+          "unitId": "tactical-operations:tidebreaker-skirmisher",
+          "baseIndex": 0,
+          "startingInAscensionLevel": 0,
+          "countAtStart": 1,
+          "maxLiving": 3
+        },
+        {
+          "unitId": "tactical-operations:salvage-hauler",
+          "baseIndex": 0,
+          "startingInAscensionLevel": 0,
+          "countAtStart": 1,
+          "maxLiving": 2
+        },
+        {
+          "unitId": "tactical-operations:skyguard-sam",
+          "baseIndex": 0,
+          "startingInAscensionLevel": 0,
+          "countAtStart": 1,
+          "maxLiving": 2
+        }
+      ],
+      "productionBuildingEntries": [
+        {
+          "unitId": "tactical-operations:tidebreaker-skirmisher",
+          "baseIndex": 0,
+          "startingInAscensionLevel": 0,
+          "maxLiving": 1
+        },
+        {
+          "unitId": "tactical-operations:salvage-hauler",
+          "baseIndex": 0,
+          "startingInAscensionLevel": 0,
+          "maxLiving": 1
+        },
+        {
+          "unitId": "tactical-operations:skyguard-sam",
+          "baseIndex": 0,
+          "startingInAscensionLevel": 0,
+          "maxLiving": 1
+        }
+      ],
+      "modules": [
+        {
+          "moduleId": "sample:scheduled-base-build",
+          "parameters": [
+            {
+              "name": "intervalSeconds",
+              "value": "8"
+            },
+            {
+              "name": "maxSuccessfulBuilds",
+              "value": "2"
+            },
+            {
+              "name": "maxAttempts",
+              "value": "4"
+            }
           ]
         }
       ]

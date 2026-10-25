@@ -826,45 +826,63 @@ var tests = new (string Name, Action Run)[]
             throw new InvalidOperationException("The trace did not distinguish stage candidates from actual offers: " + trace);
         }
     }),
-    ("guaranteed mod card reward replaces non-mod slot and preserves natural rolls", () =>
+    ("guaranteed mod reward registers its balance row before injecting a card", () =>
     {
+        EntityBalancingStore.Reset();
+        Game.AtLeastOneBlueprintHasBeenAddedByPlayer = false;
+        Game.CardsInDeck = new List<string> { "native:owned" };
+        Game.OpenCardRewards = new List<OpenReward>
+        {
+            new() { blueprintPoolId = "BP_CheaperVehicles" }
+        };
+        MetaGame.Instance.CurrentExperienceLevel = 4;
         var mockProvider = new RuntimeMutatorTestProvider
         {
-            GuaranteedModProduct = "sample:unit-b"
+            GuaranteedModProduct = "sample:unit-b",
+            RequireRegisteredModProduct = true
         };
         mockProvider.ModProducts.Add("sample:unit-a");
         mockProvider.ModProducts.Add("sample:unit-b");
+        mockProvider.EntityRows.Add(RuntimeMutatorTestData.Row("sample:unit-b"));
+        var mutator = new RuntimeContentMutator(typeof(EntityBalancingStore).Assembly, mockProvider, null);
 
-        RuntimeHooks.Bind(null!, mockProvider, null!);
+        RuntimeHooks.Bind(mutator, mockProvider, null!);
         try
         {
-            // Case 1: All native cards -> slot replaced with guaranteed mod product
             var nativeCards = new List<string> { "native:tank", "native:turret", "native:scout" };
             bool injected = RuntimeHooks.EnsureGuaranteedModCardOption(nativeCards, forcedSlot: 1);
-            if (!injected || nativeCards[1] != "sample:unit-b" || nativeCards[0] != "native:tank" || nativeCards[2] != "native:scout")
+            if (!injected || nativeCards[1] != "sample:unit-b" ||
+                !EntityBalancingStore.ParameterListIndexOf.ContainsKey("sample:unit-b") ||
+                mockProvider.LastPoolId != "BP_CheaperVehicles" || !mockProvider.LastStartingSelection ||
+                mockProvider.LastCurrentXpLevel != 4 ||
+                !mockProvider.LastExcludedProductIds.SetEquals(new[]
+                    { "native:tank", "native:turret", "native:scout", "native:owned" }))
             {
-                throw new InvalidOperationException("Guaranteed mod card was not injected into forced slot 1.");
+                throw new InvalidOperationException(
+                    "A guaranteed mod card must register its row first and pass the active reward eligibility state.");
             }
 
-            // Case 2: List already contains a mod card -> no modification
             var mixedCards = new List<string> { "native:tank", "sample:unit-a", "native:scout" };
             bool injectedMixed = RuntimeHooks.EnsureGuaranteedModCardOption(mixedCards, forcedSlot: 0);
             if (injectedMixed || mixedCards[0] != "native:tank" || mixedCards[1] != "sample:unit-a")
             {
-                throw new InvalidOperationException("Guaranteed mod card should not alter list that already has a mod unit.");
+                throw new InvalidOperationException("A reward already containing a mod product must remain unchanged.");
             }
 
-            // Case 3: Empty / null list -> safe return false
             var emptyCards = new List<string>();
-            bool injectedEmpty = RuntimeHooks.EnsureGuaranteedModCardOption(emptyCards);
-            if (injectedEmpty)
+            if (RuntimeHooks.EnsureGuaranteedModCardOption(emptyCards))
             {
-                throw new InvalidOperationException("Empty list should not trigger injection.");
+                throw new InvalidOperationException("An empty reward list must not trigger injection.");
             }
         }
         finally
         {
-            RuntimeHooks.Clear(null!);
+            RuntimeHooks.Clear(mutator);
+            EntityBalancingStore.Reset();
+            Game.AtLeastOneBlueprintHasBeenAddedByPlayer = true;
+            Game.CardsInDeck = new List<string>();
+            Game.OpenCardRewards = new List<OpenReward>();
+            MetaGame.Instance.CurrentExperienceLevel = 0;
         }
     }),
     ("random reward trace output is bounded", () =>
@@ -9629,6 +9647,21 @@ var tests = new (string Name, Action Run)[]
             standaloneQuota.FactoryId != null)
         {
             throw new InvalidOperationException("Standalone PrespawnQuota does not default factory ID to null.");
+        }
+    }),
+    ("tactical-operations expansion manifest passes full content validation", () =>
+    {
+        string tacticalPath = Path.Combine(repositoryRoot, "content", "packs", "tactical-operations", "content.json");
+        string tacticalRoot = Path.GetDirectoryName(tacticalPath)!;
+        string json = File.ReadAllText(tacticalPath);
+        ContentPackDefinition pack = JsonSerializer.Deserialize<ContentPackDefinition>(json, jsonOptions)
+            ?? throw new InvalidDataException("The tactical-operations content manifest is empty.");
+        ContentPackValidationResult result = ContentPackValidator.Validate(
+            pack, tacticalRoot, new EmptySnapshot(), new KnownModuleValidator());
+        if (!result.IsValid)
+        {
+            throw new InvalidOperationException("tactical-operations manifest validation failed: " +
+                string.Join(", ", result.Diagnostics.Select(d => $"{d.Code} at {d.Path}: {d.Message}")));
         }
     }),
 };

@@ -150,6 +150,22 @@ namespace RogueCommandExpansionLoader.Runtime
                 return false;
             }
 
+            RuntimeContentMutator mutator;
+            if (!TryPrepareRuntimeContent(out mutator) || mutator == null || mutator.GameAssembly == null)
+            {
+                return false;
+            }
+
+            // The card coroutine can start before any EntityFactory call. Register packs before
+            // adding a mod ID, otherwise CardNew.Init cannot resolve its balance row.
+            bool rowsRegistered = false;
+            SafeCall(delegate { rowsRegistered = mutator.RegisterEntityRows(); });
+            if (!rowsRegistered)
+            {
+                Log("Mod card reward injection was skipped because entity rows are not registered.");
+                return false;
+            }
+
             IGuaranteedModCardRewardProvider guaranteedProvider = GetGuaranteedRewardProvider();
             if (guaranteedProvider == null)
             {
@@ -169,103 +185,83 @@ namespace RogueCommandExpansionLoader.Runtime
             int currentXpLevel = 0;
             HashSet<string> excluded = new HashSet<string>(ids, StringComparer.Ordinal);
 
-            RuntimeContentMutator mutator;
-            lock (Gate)
+            try
             {
-                mutator = _mutator;
+                // The game assembly also defines Shapes2D.Game; resolve only the global Game type.
+                Type gameType = mutator.GameAssembly.GetType("Game", false, false);
+                if (gameType != null)
+                {
+                    FieldInfo startingField = gameType.GetField("AtLeastOneBlueprintHasBeenAddedByPlayer",
+                        BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+                    if (startingField != null)
+                    {
+                        object value = startingField.GetValue(null);
+                        if (value is bool)
+                        {
+                            isStartingSelection = !(bool)value;
+                        }
+                    }
+
+                    PropertyInfo cardsInDeckProperty = gameType.GetProperty("CardsInDeck",
+                        BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+                    IEnumerable<string> cardsInDeck = cardsInDeckProperty == null
+                        ? null
+                        : cardsInDeckProperty.GetValue(null, null) as IEnumerable<string>;
+                    if (cardsInDeck != null)
+                    {
+                        foreach (string card in cardsInDeck)
+                        {
+                            if (!String.IsNullOrEmpty(card))
+                            {
+                                excluded.Add(card);
+                            }
+                        }
+                    }
+
+                    FieldInfo openCardRewardsField = gameType.GetField("OpenCardRewards",
+                        BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+                    System.Collections.IList openRewards = openCardRewardsField == null
+                        ? null
+                        : openCardRewardsField.GetValue(null) as System.Collections.IList;
+                    if (openRewards != null && openRewards.Count > 0 && openRewards[0] != null)
+                    {
+                        FieldInfo poolIdField = openRewards[0].GetType().GetField("blueprintPoolId",
+                            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                        if (poolIdField != null)
+                        {
+                            poolId = poolIdField.GetValue(openRewards[0]) as string;
+                        }
+                    }
+                }
+
+                Type metaGameType = mutator.GameAssembly.GetType("MetaGame", false, false);
+                PropertyInfo instanceProperty = metaGameType == null ? null : metaGameType.GetProperty("Instance",
+                    BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+                object metaGame = instanceProperty == null ? null : instanceProperty.GetValue(null, null);
+                PropertyInfo xpProperty = metaGame == null ? null : metaGameType.GetProperty("CurrentExperienceLevel",
+                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                object xpValue = xpProperty == null ? null : xpProperty.GetValue(metaGame, null);
+                if (xpValue is int)
+                {
+                    currentXpLevel = (int)xpValue;
+                }
             }
-
-            if (mutator != null && mutator.GameAssembly != null)
+            catch (Exception exception)
             {
-                try
-                {
-                    Type gameType = RuntimeReflection.FindUniqueType(mutator.GameAssembly, "Game");
-                    if (gameType != null)
-                    {
-                        FieldInfo startingField = gameType.GetField("AtLeastOneBlueprintHasBeenAddedByPlayer",
-                            BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
-                        if (startingField != null)
-                        {
-                            object val = startingField.GetValue(null);
-                            if (val is bool)
-                            {
-                                isStartingSelection = !(bool)val;
-                            }
-                        }
-
-                        PropertyInfo cardsInDeckProp = gameType.GetProperty("CardsInDeck",
-                            BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
-                        if (cardsInDeckProp != null)
-                        {
-                            IEnumerable<string> cards = cardsInDeckProp.GetValue(null) as IEnumerable<string>;
-                            if (cards != null)
-                            {
-                                foreach (string card in cards)
-                                {
-                                    if (!string.IsNullOrEmpty(card))
-                                    {
-                                        excluded.Add(card);
-                                    }
-                                }
-                            }
-                        }
-
-                        FieldInfo openCardRewardsField = gameType.GetField("OpenCardRewards",
-                            BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
-                        if (openCardRewardsField != null)
-                        {
-                            System.Collections.IList openRewards = openCardRewardsField.GetValue(null) as System.Collections.IList;
-                            if (openRewards != null && openRewards.Count > 0)
-                            {
-                                object firstReward = openRewards[0];
-                                if (firstReward != null)
-                                {
-                                    FieldInfo poolIdField = firstReward.GetType().GetField("blueprintPoolId",
-                                        BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-                                    if (poolIdField != null)
-                                    {
-                                        poolId = poolIdField.GetValue(firstReward) as string;
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    Type metaGameType = RuntimeReflection.FindUniqueType(mutator.GameAssembly, "MetaGame");
-                    if (metaGameType != null)
-                    {
-                        PropertyInfo instanceProp = metaGameType.GetProperty("Instance",
-                            BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
-                        object metaInstance = instanceProp != null ? instanceProp.GetValue(null) : null;
-                        if (metaInstance != null)
-                        {
-                            PropertyInfo xpProp = metaGameType.GetProperty("CurrentExperienceLevel",
-                                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-                            if (xpProp != null)
-                            {
-                                object xpVal = xpProp.GetValue(metaInstance);
-                                if (xpVal is int)
-                                {
-                                    currentXpLevel = (int)xpVal;
-                                }
-                            }
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Log("Warning: Could not inspect game state for guaranteed mod card reward: " + ex.Message);
-                }
+                Log("Warning: Could not inspect game state for guaranteed mod card reward: " +
+                    exception.GetBaseException().Message);
             }
 
             string modProductId;
             if (guaranteedProvider.TryGetGuaranteedModRewardProduct(
                 poolId, isStartingSelection, currentXpLevel, excluded, out modProductId))
             {
-                int slot = forcedSlot.HasValue ? Math.Abs(forcedSlot.Value) % ids.Count : _guaranteedRewardRandom.Next(0, ids.Count);
+                int slot = forcedSlot.HasValue
+                    ? Math.Abs(forcedSlot.Value) % ids.Count
+                    : _guaranteedRewardRandom.Next(0, ids.Count);
                 string replaced = ids[slot];
                 ids[slot] = modProductId;
-                Log(string.Format("[ExpansionLoader] Guaranteed mod unit card injected into slot {0} (replaced '{1}'): '{2}'",
+                Log(string.Format("Guaranteed mod unit card injected into slot {0} (replaced '{1}'): '{2}'",
                     slot, replaced, modProductId));
                 return true;
             }
@@ -511,7 +507,7 @@ namespace RogueCommandExpansionLoader.Runtime
             HashSet<string> activeEntityIds = null;
             try
             {
-                Type gameType = RuntimeReflection.FindUniqueType(mutator.GameAssembly, "Game");
+                Type gameType = mutator.GameAssembly.GetType("Game", false, false);
                 if (gameType != null)
                 {
                     activeEntityIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -695,6 +691,11 @@ namespace RogueCommandExpansionLoader.Runtime
 
             if (provider == null)
             {
+                if (__0 != null && __0.Contains(":"))
+                {
+                    __result = String.Empty;
+                    return false;
+                }
                 return true;
             }
 
@@ -703,6 +704,11 @@ namespace RogueCommandExpansionLoader.Runtime
                 string value;
                 if (!provider.TryGetUnitSkillDescription(__0, out value))
                 {
+                    if (__0 != null && __0.Contains(":"))
+                    {
+                        __result = String.Empty;
+                        return false;
+                    }
                     return true;
                 }
 
@@ -717,6 +723,11 @@ namespace RogueCommandExpansionLoader.Runtime
                         exception.GetType().Name + ": " + exception.Message);
                 }
 
+                if (__0 != null && __0.Contains(":"))
+                {
+                    __result = String.Empty;
+                    return false;
+                }
                 return true;
             }
         }
@@ -961,6 +972,11 @@ namespace RogueCommandExpansionLoader.Runtime
 
             if (provider == null)
             {
+                if (unitId != null && unitId.Contains(":"))
+                {
+                    result = description ? String.Empty : unitId;
+                    return false;
+                }
                 return true;
             }
 
@@ -969,6 +985,11 @@ namespace RogueCommandExpansionLoader.Runtime
                 string value;
                 if (!provider.TryGetUnitLocalization(unitId, description, out value))
                 {
+                    if (unitId != null && unitId.Contains(":"))
+                    {
+                        result = description ? String.Empty : unitId;
+                        return false;
+                    }
                     return true;
                 }
 
@@ -983,6 +1004,11 @@ namespace RogueCommandExpansionLoader.Runtime
                         exception.GetType().Name + ": " + exception.Message);
                 }
 
+                if (unitId != null && unitId.Contains(":"))
+                {
+                    result = description ? String.Empty : unitId;
+                    return false;
+                }
                 return true;
             }
         }

@@ -450,4 +450,20 @@ The generated unit models, prefab authoring outputs, compiled visual bundle, and
       - Python unittest suite: **57/57 passed** (py -3 -m unittest discover tests).
       - AssetBundle reference validator: **25 references / 0 errors**.
       - Registry validator: **3 manifests / 0 issues**.
-      - Distributable package: Release build 0 warnings/errors (rtifacts/packages/RogueCommandExpansionLoader-1.19.0.zip), clean of game/BepInEx binaries.
+      - Distributable package: Release build 0 warnings/errors (`artifacts/packages/RogueCommandExpansionLoader-1.19.0.zip), clean of game/BepInEx binaries.
+
+14. **Card reward rendering and modded unit availability fixes (2026-10-25; verified code baseline):**
+    - The supplied card fallback showed “You should never see this” with an empty 3D model pedestal for `sample-native:scout-tank` (“Explorador Sandlance”). `Player-prev.log` captured `ChooseCard.InstantiateCardsWithDelay` failing in `CardNew.Init` → `EntityBalancingStore.UnitRoles`: `EntityBalancingStore.EntityParameters` rejected `sample-native:scout-tank` as an unknown entity immediately after the reward hook injected it. The hook's reflection lookup also failed with `Expected one type named 'Game', found 2` (`Shapes2D.Game` conflict).
+    - **Root causes resolved:**
+      1. `RuntimeContentMutator.RegisterEntityRows()` previously marked `_entityRegistrationCompleted = true;` when invoked before async pack loading completed (with 0 rows), permanently locking out entity rows from `EntityBalancingStore`. Fixed: `if (materializedRows.Count == 0) return false;`. Pack loading was also initiated eagerly upon registry initialization (`_loadingTask = LoadAllPacksAsync();`).
+      2. In `ContentPackRuntimeLoader.ApplyStructuredUnitParameters`, `primarySkill.range` was passed as `float` to `EntityBalancingParameters.skillRange` (which is an `int`), throwing an unhandled `ArgumentException` that aborted loading `tactical-operations`. Fixed by detecting field type and rounding to `int`.
+      3. `tactical-operations/content.json` had 22 schema validation errors, missing AI profile association, and was completely disabled at startup. All schema issues were corrected, adding `tactical-operations:skirmish-adversary` AI profile with `sample:scheduled-base-build` module.
+      4. Limited unit variety: Only `scout-tank` was previously marked as an eligible starting blueprint. `ContentPackRuntimeLoader` now authorizes all mod units and their production factories with `neededExperienceLevel <= 0` (or `isAllowedAsStartingBlueprint == true`), allowing diverse Common, Rare, and UltraRare modded units to appear across starting decks and node rewards.
+      5. Guarded `SkillDescriptionPrefix` and `TryResolveUnitLocalization` to prevent namespaced mod IDs from throwing unhandled exceptions in native `Loca`.
+    - **Verification results:**
+      - Release plugin build: **0 warnings, 0 errors**.
+      - Harness: **322/323 passed, 1 Windows symlink skip**.
+      - Python suite: **69/69 passed**.
+      - Structural registry: **4 manifests / 0 issues**.
+      - Release package: `artifacts/packages/RogueCommandExpansionLoader-1.19.0.zip` verified.
+      - Binaries deployed to Steam game directory (`BepInEx/plugins/RogueCommandExpansionLoader.dll` & `.pdb` and `content/packs/tactical-operations/content.json`).

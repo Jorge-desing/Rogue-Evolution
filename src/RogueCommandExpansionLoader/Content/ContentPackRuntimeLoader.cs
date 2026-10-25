@@ -720,6 +720,10 @@ namespace RogueCommandExpansionLoader.Content
 
                 _nativeRegistryReady = true;
                 RefreshNativeUnitIds();
+                if (_loadingTask == null)
+                {
+                    _loadingTask = LoadAllPacksAsync();
+                }
             }
         }
 
@@ -4083,7 +4087,7 @@ namespace RogueCommandExpansionLoader.Content
                 }
 
                 Log("Paquete '" + (String.IsNullOrWhiteSpace(definition.packId) ? packageName : definition.packId) +
-                    "' desactivado sin registrar contenido: " + exception.GetType().Name + ": " + exception.Message);
+                    "' desactivado sin registrar contenido: " + exception.GetType().Name + ": " + exception.Message + "\n" + exception.StackTrace);
                 return false;
             }
         }
@@ -4257,7 +4261,12 @@ namespace RogueCommandExpansionLoader.Content
             var startingBlueprintUnitIds = new HashSet<string>(StringComparer.Ordinal);
             for (int i = 0; i < units.Count; i++)
             {
-                if (units[i].Definition != null && units[i].Definition.isAllowedAsStartingBlueprint)
+                bool isEligibleForStarting = units[i].Definition != null &&
+                    (units[i].Definition.isAllowedAsStartingBlueprint ||
+                     !units[i].Definition.neededExperienceLevel.HasValue ||
+                     units[i].Definition.neededExperienceLevel.Value <= 0);
+
+                if (isEligibleForStarting)
                 {
                     startingBlueprintUnitIds.Add(units[i].Id);
                     if (!String.IsNullOrWhiteSpace(units[i].ProductionFactoryId))
@@ -5148,11 +5157,25 @@ namespace RogueCommandExpansionLoader.Content
                 ContentActiveSkillDefinition primarySkill = unit.activeSkills[0];
                 if (primarySkill.range.HasValue && _skillRangeField != null)
                 {
-                    _skillRangeField.SetValue(row, primarySkill.range.Value);
+                    if (_skillRangeField.FieldType == typeof(int))
+                    {
+                        _skillRangeField.SetValue(row, (int)Math.Round(primarySkill.range.Value));
+                    }
+                    else
+                    {
+                        _skillRangeField.SetValue(row, primarySkill.range.Value);
+                    }
                 }
                 if (_skillManaCostField != null)
                 {
-                    _skillManaCostField.SetValue(row, primarySkill.manaCost);
+                    if (_skillManaCostField.FieldType == typeof(int))
+                    {
+                        _skillManaCostField.SetValue(row, (int)Math.Round(primarySkill.manaCost));
+                    }
+                    else
+                    {
+                        _skillManaCostField.SetValue(row, primarySkill.manaCost);
+                    }
                 }
             }
         }
