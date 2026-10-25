@@ -1,0 +1,49 @@
+ManifestFileVersion: 0
+CRC: 3467127237
+Hashes:
+  AssetFileHash:
+    serializedVersion: 2
+    Hash: 0936022f8da424344a7306cc1ea616a5
+  TypeTreeHash:
+    serializedVersion: 2
+    Hash: 7cf8f98f471eb9f0b2869cfe40773e7d
+  IncrementalBuildHash:
+    serializedVersion: 2
+    Hash: 0936022f8da424344a7306cc1ea616a5
+HashAppended: 0
+ClassTypes:
+- Class: 1
+  Script: {instanceID: 0}
+- Class: 4
+  Script: {instanceID: 0}
+- Class: 21
+  Script: {instanceID: 0}
+- Class: 23
+  Script: {instanceID: 0}
+- Class: 28
+  Script: {instanceID: 0}
+- Class: 33
+  Script: {instanceID: 0}
+- Class: 43
+  Script: {instanceID: 0}
+- Class: 48
+  Script: {instanceID: 0}
+- Class: 65
+  Script: {instanceID: 0}
+- Class: 82
+  Script: {instanceID: 0}
+- Class: 198
+  Script: {instanceID: 0}
+- Class: 199
+  Script: {instanceID: 0}
+- Class: 213
+  Script: {instanceID: 0}
+SerializeReferenceClassIdentifiers: []
+Assets:
+- Assets/TacticalOperations/TidebreakerHovercraftCard.png
+- Assets/TacticalOperations/Prefabs/TidebreakerHovercraftVisual.prefab
+- Assets/TacticalOperations/SalvageHaulerCard.png
+- Assets/TacticalOperations/Prefabs/SalvageHaulerVisual.prefab
+- Assets/TacticalOperations/SkyguardSAMCard.png
+- Assets/TacticalOperations/Prefabs/SkyguardSAMVisual.prefab
+Dependencies: []

@@ -6872,7 +6872,7 @@ var tests = new (string Name, Action Run)[]
             exitCode = process.ExitCode;
         }
 
-        if (exitCode != 0 || !output.Contains("PASS checked 3 manifests"))
+        if (exitCode != 0 || !System.Text.RegularExpressions.Regex.IsMatch(output, @"PASS checked \d+ manifests") || output.Contains("FAIL"))
         {
             throw new InvalidOperationException("Loader registry tool failed: " + output);
         }

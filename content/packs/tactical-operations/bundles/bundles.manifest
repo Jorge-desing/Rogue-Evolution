@@ -1,0 +1,7 @@
+ManifestFileVersion: 0
+CRC: 935993386
+AssetBundleManifest:
+  AssetBundleInfos:
+    Info_0:
+      Name: tactical-operations.bundle
+      Dependencies: {}

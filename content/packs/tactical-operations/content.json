@@ -1,0 +1,547 @@
+{
+  "schemaVersion": 1,
+  "packId": "tactical-operations:expansion",
+  "assetBundleManifestPath": "bundles/assetbundle-manifest.bundle",
+  "assetBundles": [
+    {
+      "id": "tactical-operations:assets",
+      "path": "bundles/tactical-operations.bundle"
+    }
+  ],
+  "units": [
+    {
+      "id": "tactical-operations:tidebreaker-skirmisher",
+      "nativeTemplateId": "PCXBaseTank",
+      "assetBundleId": "tactical-operations:assets",
+      "cardImageAssetName": "assets/tacticaloperations/tidebreakerhovercraftcard.png",
+      "visualAssetName": "assets/tacticaloperations/prefabs/tidebreakerhovercraftvisual.prefab",
+      "visualRootPath": "Vehicle",
+      "isAllowedAsStartingBlueprint": false,
+      "isAllowedForAi": true,
+      "isAllowedForDemo": true,
+      "isForSpecialists": false,
+      "localizations": [
+        {
+          "language": "en-US",
+          "name": "Tidebreaker EMP Skirmisher",
+          "description": "High-speed amphibious hovercraft equipped with pulsed EMP disruptors that stun enemy targets on impact."
+        },
+        {
+          "language": "es-XL",
+          "name": "Escaramuzador EMP Tidebreaker",
+          "description": "Aerodeslizador anfibio de alta velocidad equipado con disruptores EMP que aturden a los objetivos al impactar."
+        }
+      ],
+      "balanceOverrides": [
+        {
+          "name": "roles",
+          "value": "Unit, Vehicle, Scout"
+        },
+        {
+          "name": "offeredSystemTags",
+          "value": "Vehicle, Turbo, Electricity"
+        },
+        {
+          "name": "cost",
+          "value": "85"
+        },
+        {
+          "name": "maxHealth",
+          "value": "140"
+        },
+        {
+          "name": "moveSpeed",
+          "value": "13.8"
+        },
+        {
+          "name": "sightRadius",
+          "value": "8.5"
+        },
+        {
+          "name": "weaponRange",
+          "value": "7.5"
+        },
+        {
+          "name": "attackCooldown",
+          "value": "1.2"
+        },
+        {
+          "name": "rarity",
+          "value": "Rare"
+        },
+        {
+          "name": "neededExperienceLevel",
+          "value": "0"
+        },
+        {
+          "name": "productionDuration",
+          "value": "38"
+        },
+        {
+          "name": "maxCapacity",
+          "value": "6"
+        },
+        {
+          "name": "maxShield",
+          "value": "40"
+        },
+        {
+          "name": "maxMana",
+          "value": "0"
+        },
+        {
+          "name": "maxArmor",
+          "value": "0"
+        },
+        {
+          "name": "armorProtection",
+          "value": "1"
+        }
+      ],
+      "customBalance": {
+        "Damage1": 22.0
+      },
+      "onHitStatusEffects": [
+        {
+          "statusEffect": "Stun",
+          "duration": 2.2,
+          "chance": 0.35
+        }
+      ],
+      "aiModule": {
+        "moduleId": "sample:skirmish-kiting",
+        "parameters": {
+          "RetreatDistanceRatio": 0.65,
+          "DangerScanRadius": 10.0,
+          "StepBackDistance": 4.5,
+          "RepositionCooldown": 1.2
+        }
+      },
+      "activeSkills": [
+        {
+          "id": "tidebreaker-emp-overcharge",
+          "skillType": "LocationAoE",
+          "targetOrigin": "TargetLocation",
+          "cooldown": 12.0,
+          "manaCost": 0,
+          "range": 8.0,
+          "radius": 4.0,
+          "helpAiToActivate": true,
+          "aiActivationTrigger": "EnemyInRange",
+          "aiSkillCooldown": 12.0
+        }
+      ],
+      "productionBuilding": {
+        "id": "tactical-operations:tidebreaker-factory",
+        "nativeTemplateId": "PCXBaseTankFactory",
+        "isAllowedAsStartingBlueprint": false,
+        "balanceOverrides": [
+          {
+            "name": "cost",
+            "value": "550"
+          },
+          {
+            "name": "maxCapacity",
+            "value": "3"
+          },
+          {
+            "name": "neededExperienceLevel",
+            "value": "0"
+          },
+          {
+            "name": "rarity",
+            "value": "Rare"
+          }
+        ],
+        "localizations": [
+          {
+            "language": "en-US",
+            "name": "Tidebreaker Hover Foundry",
+            "description": "Manufactures amphibious Tidebreaker EMP Skirmishers."
+          },
+          {
+            "language": "es-XL",
+            "name": "Fundición de aerodeslizadores Tidebreaker",
+            "description": "Fabrica escaramuzadores EMP anfibios Tidebreaker."
+          }
+        ]
+      }
+    },
+    {
+      "id": "tactical-operations:salvage-hauler",
+      "nativeTemplateId": "PCXBaseTank",
+      "assetBundleId": "tactical-operations:assets",
+      "cardImageAssetName": "assets/tacticaloperations/salvagehaulercard.png",
+      "visualAssetName": "assets/tacticaloperations/prefabs/salvagehaulervisual.prefab",
+      "visualRootPath": "Vehicle",
+      "isAllowedAsStartingBlueprint": false,
+      "isAllowedForAi": true,
+      "isAllowedForDemo": true,
+      "isForSpecialists": false,
+      "localizations": [
+        {
+          "language": "en-US",
+          "name": "Salvage Field Repair Hauler",
+          "description": "Armored logistics crawler outfitted with autonomous nanite repair systems to maintain friendly units and production facilities."
+        },
+        {
+          "language": "es-XL",
+          "name": "Transporte de reparación en campo Salvage",
+          "description": "Oruga logística blindada equipada con sistemas nanorrobóticos autónomos para reparar unidades e instalaciones de producción aliadas."
+        }
+      ],
+      "balanceOverrides": [
+        {
+          "name": "roles",
+          "value": "Unit, Vehicle, Healer"
+        },
+        {
+          "name": "offeredSystemTags",
+          "value": "Vehicle, Healing, Armor"
+        },
+        {
+          "name": "cost",
+          "value": "110"
+        },
+        {
+          "name": "maxHealth",
+          "value": "280"
+        },
+        {
+          "name": "moveSpeed",
+          "value": "9.5"
+        },
+        {
+          "name": "sightRadius",
+          "value": "9.0"
+        },
+        {
+          "name": "weaponRange",
+          "value": "6.0"
+        },
+        {
+          "name": "attackCooldown",
+          "value": "1.0"
+        },
+        {
+          "name": "rarity",
+          "value": "Uncommon"
+        },
+        {
+          "name": "neededExperienceLevel",
+          "value": "0"
+        },
+        {
+          "name": "productionDuration",
+          "value": "45"
+        },
+        {
+          "name": "maxCapacity",
+          "value": "4"
+        },
+        {
+          "name": "maxShield",
+          "value": "0"
+        },
+        {
+          "name": "maxMana",
+          "value": "0"
+        },
+        {
+          "name": "maxArmor",
+          "value": "15"
+        },
+        {
+          "name": "armorProtection",
+          "value": "2"
+        }
+      ],
+      "customBalance": {
+        "Damage1": 15.0
+      },
+      "aiModule": {
+        "moduleId": "sample:support-repair",
+        "parameters": {
+          "ScanRadius": 16.0,
+          "HealthThresholdRatio": 0.85,
+          "HealScanInterval": 0.5,
+          "PrioritizeHarvesters": true,
+          "PrioritizeFactories": true,
+          "MaxRepairersPerTarget": 2
+        }
+      },
+      "activeSkills": [
+        {
+          "id": "salvage-nanite-pulse",
+          "skillType": "SelfBuff",
+          "targetOrigin": "Self",
+          "cooldown": 18.0,
+          "manaCost": 0,
+          "range": 0.0,
+          "radius": 6.0,
+          "helpAiToActivate": true,
+          "aiActivationTrigger": "HealthBelowThreshold",
+          "aiSkillCooldown": 18.0
+        }
+      ],
+      "productionBuilding": {
+        "id": "tactical-operations:salvage-hauler-factory",
+        "nativeTemplateId": "PCXBaseTankFactory",
+        "isAllowedAsStartingBlueprint": false,
+        "balanceOverrides": [
+          {
+            "name": "cost",
+            "value": "520"
+          },
+          {
+            "name": "maxCapacity",
+            "value": "3"
+          },
+          {
+            "name": "neededExperienceLevel",
+            "value": "0"
+          },
+          {
+            "name": "rarity",
+            "value": "Uncommon"
+          }
+        ],
+        "localizations": [
+          {
+            "language": "en-US",
+            "name": "Salvage Logistics Works",
+            "description": "Manufactures Salvage Field Repair Haulers."
+          },
+          {
+            "language": "es-XL",
+            "name": "Talleres logísticos Salvage",
+            "description": "Fabrica transportes de reparación en campo Salvage."
+          }
+        ]
+      }
+    },
+    {
+      "id": "tactical-operations:skyguard-sam",
+      "nativeTemplateId": "PCXBaseTank",
+      "assetBundleId": "tactical-operations:assets",
+      "cardImageAssetName": "assets/tacticaloperations/skyguardsamcard.png",
+      "visualAssetName": "assets/tacticaloperations/prefabs/skyguardsamvisual.prefab",
+      "visualRootPath": "Vehicle",
+      "isAllowedAsStartingBlueprint": false,
+      "isAllowedForAi": true,
+      "isAllowedForDemo": true,
+      "isForSpecialists": false,
+      "localizations": [
+        {
+          "language": "en-US",
+          "name": "Skyguard Mobile SAM Platform",
+          "description": "Heavy surface-to-air missile platform with precision targeting and long-range payload delivery, vulnerable to close-range assaults."
+        },
+        {
+          "language": "es-XL",
+          "name": "Plataforma SAM móvil Skyguard",
+          "description": "Plataforma pesada de misiles tierra-aire con puntería de precisión y largo alcance, vulnerable a asaltos a quemarropa."
+        }
+      ],
+      "balanceOverrides": [
+        {
+          "name": "roles",
+          "value": "Unit, Vehicle, Artillery"
+        },
+        {
+          "name": "offeredSystemTags",
+          "value": "Vehicle, Rocket, LongRange"
+        },
+        {
+          "name": "cost",
+          "value": "150"
+        },
+        {
+          "name": "maxHealth",
+          "value": "210"
+        },
+        {
+          "name": "moveSpeed",
+          "value": "7.8"
+        },
+        {
+          "name": "sightRadius",
+          "value": "13.0"
+        },
+        {
+          "name": "weaponRange",
+          "value": "12.5"
+        },
+        {
+          "name": "attackCooldown",
+          "value": "2.8"
+        },
+        {
+          "name": "rarity",
+          "value": "Rare"
+        },
+        {
+          "name": "neededExperienceLevel",
+          "value": "0"
+        },
+        {
+          "name": "productionDuration",
+          "value": "55"
+        },
+        {
+          "name": "maxCapacity",
+          "value": "3"
+        },
+        {
+          "name": "maxShield",
+          "value": "0"
+        },
+        {
+          "name": "maxMana",
+          "value": "0"
+        },
+        {
+          "name": "maxArmor",
+          "value": "5"
+        },
+        {
+          "name": "armorProtection",
+          "value": "1"
+        }
+      ],
+      "customBalance": {
+        "Damage1": 65.0
+      },
+      "criticalHitChance": 0.30,
+      "minAttackRange": 4.5,
+      "activeSkills": [
+        {
+          "id": "skyguard-missile-salvo",
+          "skillType": "LocationAoE",
+          "targetOrigin": "TargetLocation",
+          "cooldown": 14.0,
+          "manaCost": 0,
+          "range": 13.0,
+          "radius": 3.5,
+          "helpAiToActivate": true,
+          "aiActivationTrigger": "EnemyInRange",
+          "aiSkillCooldown": 14.0
+        }
+      ],
+      "productionBuilding": {
+        "id": "tactical-operations:skyguard-sam-factory",
+        "nativeTemplateId": "PCXBaseTankFactory",
+        "isAllowedAsStartingBlueprint": false,
+        "balanceOverrides": [
+          {
+            "name": "cost",
+            "value": "620"
+          },
+          {
+            "name": "maxCapacity",
+            "value": "2"
+          },
+          {
+            "name": "neededExperienceLevel",
+            "value": "0"
+          },
+          {
+            "name": "rarity",
+            "value": "Rare"
+          }
+        ],
+        "localizations": [
+          {
+            "language": "en-US",
+            "name": "Skyguard Missile Works",
+            "description": "Produces Skyguard Mobile SAM Platforms."
+          },
+          {
+            "language": "es-XL",
+            "name": "Fábrica de misiles Skyguard",
+            "description": "Produce plataformas SAM móviles Skyguard."
+          }
+        ]
+      }
+    }
+  ],
+  "stages": [
+    {
+      "id": "tactical-operations:skirmish-trial",
+      "nativeTemplateId": "StageParameters_Pools_Level1SimpleRoleChoiceWithPriceLimit",
+      "parameterOverrides": [
+        {
+          "name": "levelCount",
+          "value": "8"
+        },
+        {
+          "name": "maxWidth",
+          "value": "5"
+        },
+        {
+          "name": "coinReward",
+          "value": "180"
+        },
+        {
+          "name": "twoWayBranchingProbability",
+          "value": "0.6"
+        },
+        {
+          "name": "shopWeight",
+          "value": "1.8"
+        },
+        {
+          "name": "cardRewardWeight",
+          "value": "3.5"
+        },
+        {
+          "name": "fillFirstLevelWithCardRewards",
+          "value": "true"
+        },
+        {
+          "name": "putDefaultCardRewardInCenter",
+          "value": "true"
+        }
+      ],
+      "mapSizeMin": 20,
+      "mapSizeMax": 60,
+      "isPartOfDemo": false,
+      "landscape": {
+        "nativeTemplateId": "27 Circles",
+        "randomSeed": 52084,
+        "alwaysUseSameSeed": true,
+        "mapSize": 32,
+        "localizations": [
+          {
+            "language": "en-US",
+            "name": "Tactical Proving Grounds"
+          },
+          {
+            "language": "es-XL",
+            "name": "Campo de Pruebas Tácticas"
+          }
+        ]
+      },
+      "unitIds": [
+        "tactical-operations:tidebreaker-skirmisher",
+        "tactical-operations:salvage-hauler",
+        "tactical-operations:skyguard-sam"
+      ],
+      "blueprintPoolEntries": [
+        {
+          "poolId": "BP_CheaperVehicles",
+          "unitIds": [
+            "tactical-operations:tidebreaker-skirmisher",
+            "tactical-operations:skyguard-sam"
+          ]
+        },
+        {
+          "poolId": "BP_CheaperRobos",
+          "unitIds": [
+            "tactical-operations:salvage-hauler"
+          ]
+        }
+      ]
+    }
+  ]
+}
