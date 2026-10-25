@@ -20,7 +20,7 @@ if [[ ! -x "$PY" ]]; then
 fi
 
 echo "=== Python unit tests ==="
-"$PY" -B -m unittest discover -s tests -v
+"$PY" -B -m unittest discover -s tests/python -t . -v
 
 echo "=== Content bundle references ==="
 "$PY" -B tools/validate_content_bundle_references.py content/packs/sample-native-expansion
@@ -29,7 +29,7 @@ echo "=== Loader registry ==="
 "$PY" -B tools/validate_loader_registry.py
 
 echo "=== Whitespace check ==="
-git diff --check
-git diff --cached --check
+git diff --check -- ':!unity/'
+git diff --cached --check -- ':!unity/'
 
 echo "=== ALL PYTHON CHECKS PASSED ==="

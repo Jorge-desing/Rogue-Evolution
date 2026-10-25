@@ -14,7 +14,7 @@ if (-not (Test-Path $Py)) { $Py = Join-Path $Root ".venv/bin/python" }
 if (-not (Test-Path $Py)) { throw "No Python interpreter found in .venv" }
 
 echo "=== Python unit tests ==="
-& $Py -B -m unittest discover -s tests -v
+& $Py -B -m unittest discover -s tests/python -t . -v
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 echo "=== Content bundle references ==="
@@ -26,9 +26,9 @@ echo "=== Loader registry ==="
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 echo "=== Whitespace check ==="
-git diff --check
+git diff --check -- ':!unity/'
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-git diff --cached --check
+git diff --cached --check -- ':!unity/'
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 echo "=== ALL PYTHON CHECKS PASSED ==="

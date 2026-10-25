@@ -8,7 +8,7 @@ from pathlib import Path
 from jsonschema import Draft202012Validator, ValidationError
 
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[3]
 SCHEMA = ROOT / "content" / "schema" / "content.schema.json"
 SAMPLE = ROOT / "content" / "packs" / "sample-native-expansion" / "content.json"
 VARIANT_PATH = ["units", 0, "variants"]

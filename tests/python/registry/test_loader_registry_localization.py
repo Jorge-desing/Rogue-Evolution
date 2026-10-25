@@ -9,13 +9,9 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-SCRIPT = Path(__file__).resolve().parents[1] / "tools" / "validate_loader_registry.py"
-spec = importlib.util.spec_from_file_location("validate_loader_registry_localization", SCRIPT)
-if spec is None or spec.loader is None:
-    raise RuntimeError(f"Could not load {SCRIPT}")
-validator = importlib.util.module_from_spec(spec)
-sys.modules[spec.name] = validator
-spec.loader.exec_module(validator)
+from tests.python.helpers import load_tool_module
+
+validator = load_tool_module("validate_loader_registry_localization", "validate_loader_registry.py")
 
 
 class LoaderRegistryLocalizationTests(unittest.TestCase):

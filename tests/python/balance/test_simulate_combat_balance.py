@@ -8,18 +8,9 @@ from pathlib import Path
 from typing import Any
 
 
-def _load_simulator() -> Any:
-    script_path = Path(__file__).resolve().parents[1] / "tools" / "simulate_combat_balance.py"
-    spec = importlib.util.spec_from_file_location("simulate_combat_balance", script_path)
-    if spec is None or spec.loader is None:
-        raise RuntimeError(f"Could not load simulator from {script_path}")
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return module
+from tests.python.helpers import REPO_ROOT, SAMPLE_NATIVE_PATH, load_tool_module
 
-
-SIMULATOR = _load_simulator()
+SIMULATOR = load_tool_module("simulate_combat_balance")
 
 
 class ContentPackBalanceSimulationTests(unittest.TestCase):
@@ -217,7 +208,7 @@ class ContentPackBalanceSimulationTests(unittest.TestCase):
     def test_sample_scout_stays_within_light_recon_balance_band(self) -> None:
         repository = SIMULATOR.BalanceRepository()
         pack_path = (
-            Path(__file__).resolve().parents[1]
+            Path(__file__).resolve().parents[3]
             / "content"
             / "packs"
             / "sample-native-expansion"
@@ -247,7 +238,7 @@ class ContentPackBalanceSimulationTests(unittest.TestCase):
     def test_sample_heavy_mechs_stay_within_assault_mech_balance_band(self) -> None:
         repository = SIMULATOR.BalanceRepository()
         pack_path = (
-            Path(__file__).resolve().parents[1]
+            Path(__file__).resolve().parents[3]
             / "content"
             / "packs"
             / "sample-native-expansion"
