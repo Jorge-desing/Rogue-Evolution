@@ -376,7 +376,8 @@ var tests = new (string Name, Action Run)[]
             "PresentCardAsRewardRecordPostfix",
             "AllEntityIdsAllowedAsBlueprintsPostfix",
             "EntityFactorySetupPrespawningPostfix",
-            "EntityFactorySetupAiPrespawningPostfix"
+            "EntityFactorySetupAiPrespawningPostfix",
+            "EntityAttackIsTargetInRangePostfix"
         ];
 
         foreach (string hookName in hookNames)
@@ -8700,9 +8701,14 @@ var tests = new (string Name, Action Run)[]
         var registry = new AiModuleRegistry();
         registry.Register(new SquadFormationAiModule());
         registry.Register(new TacticalSkillActivationAiModule());
+        registry.Register(new CounterBatteryAiModule());
         registry.Register(new WaveEscalationAiModule());
 
-        if (!registry.TryValidate("sample:squad-formation", null, out string diagnostic) || diagnostic != null)
+        if (!registry.TryValidate("sample:counter-battery", null, out string diagnostic) || diagnostic != null)
+        {
+            throw new InvalidOperationException("Counter-battery module failed registry validation: " + diagnostic);
+        }
+        if (!registry.TryValidate("sample:squad-formation", null, out diagnostic) || diagnostic != null)
         {
             throw new InvalidOperationException("Squad-formation module failed registry validation: " + diagnostic);
         }
@@ -8714,6 +8720,157 @@ var tests = new (string Name, Action Run)[]
         {
             throw new InvalidOperationException("Wave-escalation module failed registry validation: " + diagnostic);
         }
+    }),
+    ("counter-battery AI module parses defaults and validates limits", () =>
+    {
+        if (!CounterBatteryParameterParser.TryParse(null, out CounterBatterySettings settings, out string diagnostic) || diagnostic != null)
+        {
+            throw new InvalidOperationException("Counter-battery default parse failed: " + diagnostic);
+        }
+        if (settings.BaseIndex != -1 || settings.ThreatTriggerDistance != 25.0f || settings.MinInterceptorSpeed != 10.0f ||
+            settings.MaxInterceptors != 4 || settings.CooldownSeconds != 8.0f)
+        {
+            throw new InvalidOperationException("Counter-battery default values did not match specification.");
+        }
+
+        var validParams = new[]
+        {
+            new ContentModuleParameter { name = "baseIndex", value = "1" },
+            new ContentModuleParameter { name = "threatTriggerDistance", value = "30" },
+            new ContentModuleParameter { name = "minInterceptorSpeed", value = "12" },
+            new ContentModuleParameter { name = "maxInterceptors", value = "6" },
+            new ContentModuleParameter { name = "cooldownSeconds", value = "5" }
+        };
+        if (!CounterBatteryParameterParser.TryParse(validParams, out settings, out diagnostic) || diagnostic != null)
+        {
+            throw new InvalidOperationException("Counter-battery custom parse failed: " + diagnostic);
+        }
+        if (settings.BaseIndex != 1 || settings.ThreatTriggerDistance != 30f || settings.MinInterceptorSpeed != 12f ||
+            settings.MaxInterceptors != 6 || settings.CooldownSeconds != 5f)
+        {
+            throw new InvalidOperationException("Counter-battery parsed values incorrect.");
+        }
+
+        var invalidDist = new[] { new ContentModuleParameter { name = "threatTriggerDistance", value = "100" } };
+        if (CounterBatteryParameterParser.TryParse(invalidDist, out _, out diagnostic) || diagnostic == null)
+        {
+            throw new InvalidOperationException("Counter-battery should reject threatTriggerDistance > 80.");
+        }
+
+        var invalidSpeed = new[] { new ContentModuleParameter { name = "minInterceptorSpeed", value = "2" } };
+        if (CounterBatteryParameterParser.TryParse(invalidSpeed, out _, out diagnostic) || diagnostic == null)
+        {
+            throw new InvalidOperationException("Counter-battery should reject minInterceptorSpeed < 5.");
+        }
+    }),
+    ("counter-battery AI module dispatches fast interceptors against long-range threat", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        DefaultAiBehaviour.ResetRuntimeState();
+        EntityBalancingStore.Reset();
+        UnityEngine.Time.time = 0f;
+        IRogueCommandAiRuntimeBehaviour? behaviour = null;
+        try
+        {
+            var fastDefender = new EntityController
+            {
+                IsControlledByAi = true,
+                IsUnit = true,
+                IsCombatUnit = true,
+                EntityId = "FastDefender",
+                UniqueEntityId = 501,
+                aiBaseIndex = 0,
+                Position = UnityEngine.Vector3.zero,
+                MoveSpeed = 15f
+            };
+            var slowDefender = new EntityController
+            {
+                IsControlledByAi = true,
+                IsUnit = true,
+                IsCombatUnit = true,
+                EntityId = "SlowDefender",
+                UniqueEntityId = 502,
+                aiBaseIndex = 0,
+                Position = UnityEngine.Vector3.zero,
+                MoveSpeed = 6f
+            };
+            var playerArtillery = new EntityController
+            {
+                IsControlledByPlayer = true,
+                IsUnit = true,
+                UniqueEntityId = 601,
+                Position = new UnityEngine.Vector3(35f, 0f, 0f),
+                WeaponRange = 35f
+            };
+
+            ExistingControllers.Instance.AiUnits().Add(fastDefender);
+            ExistingControllers.Instance.AiUnits().Add(slowDefender);
+            ExistingControllers.Instance.PlayerEntities().Add(playerArtillery);
+
+            behaviour = new CounterBatteryAiModule().CreateBehaviour(new DefaultAiBehaviour(),
+                [
+                    new ContentModuleParameter { name = "threatTriggerDistance", value = "20" },
+                    new ContentModuleParameter { name = "minInterceptorSpeed", value = "10" },
+                    new ContentModuleParameter { name = "maxInterceptors", value = "2" },
+                    new ContentModuleParameter { name = "cooldownSeconds", value = "5" }
+                ]);
+            behaviour.OnInitialized();
+            behaviour.Tick();
+
+            if (fastDefender.ExecuteCommandCallCount == 0 || fastDefender.LastExecutedCommand == null)
+            {
+                throw new InvalidOperationException("Fast defender was not dispatched against artillery threat.");
+            }
+            if (slowDefender.ExecuteCommandCallCount > 0)
+            {
+                throw new InvalidOperationException("Slow defender was dispatched despite not meeting minInterceptorSpeed.");
+            }
+        }
+        finally
+        {
+            behaviour?.OnDestroyed();
+            ExistingControllers.Instance.Reset();
+            DefaultAiBehaviour.ResetRuntimeState();
+        }
+    }),
+    ("unit and building validation checks minAttackRange and active skill extensions", () =>
+    {
+        ContentPackDefinition testPack = ContentPackCopy.DeepClone(nativeSample);
+        ContentUnitDefinition unit = testPack.units[0];
+        unit.minAttackRange = 15.5f;
+        unit.activeSkills = new[]
+        {
+            new ContentActiveSkillDefinition
+            {
+                id = "sample:tactical-emp",
+                skillType = "LocationAoE",
+                targetOrigin = "ChosenLocation",
+                range = 25f,
+                radius = 10f,
+                manaCost = 50f,
+                cooldown = 12f,
+                helpAiToActivate = true,
+                aiActivationTrigger = "EnemiesInRange",
+                aiSkillCooldown = 15f
+            }
+        };
+
+        WithPackage(testPack, (p, root) => ExpectValid(p, root, new EmptySnapshot(), new KnownModuleValidator()));
+
+        ContentPackDefinition invalidMinRange = ContentPackCopy.DeepClone(testPack);
+        invalidMinRange.units[0].minAttackRange = -5f;
+        WithPackage(invalidMinRange, (p, root) => ExpectDiagnostic(p, root, new EmptySnapshot(),
+            new KnownModuleValidator(), "unit.minAttackRange-invalid"));
+
+        ContentPackDefinition invalidOrigin = ContentPackCopy.DeepClone(testPack);
+        invalidOrigin.units[0].activeSkills[0].targetOrigin = "InvalidOrigin";
+        WithPackage(invalidOrigin, (p, root) => ExpectDiagnostic(p, root, new EmptySnapshot(),
+            new KnownModuleValidator(), "active-skill.targetOrigin-invalid"));
+
+        ContentPackDefinition invalidSkillRange = ContentPackCopy.DeepClone(testPack);
+        invalidSkillRange.units[0].activeSkills[0].range = 150f;
+        WithPackage(invalidSkillRange, (p, root) => ExpectDiagnostic(p, root, new EmptySnapshot(),
+            new KnownModuleValidator(), "active-skill.range-invalid"));
     }),
     ("relic validation accepts canonical ChangeableValues and role/tech filters", () =>
     {

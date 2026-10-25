@@ -1811,10 +1811,12 @@ namespace RogueCommandExpansionLoader.Content
                 }
                 ValidateNamespacedId(skill.id, itemPath + ".id", diagnostics);
                 if (String.IsNullOrWhiteSpace(skill.skillType) ||
-                    (skill.skillType != "Position" && skill.skillType != "Target" && skill.skillType != "Self"))
+                    (skill.skillType != "Position" && skill.skillType != "Target" && skill.skillType != "Self" &&
+                     skill.skillType != "Location" && skill.skillType != "LocationAoE" && skill.skillType != "LocationMultiTargets" &&
+                     skill.skillType != "SelfAoE" && skill.skillType != "TargetAoE" && skill.skillType != "Toggle"))
                 {
                     Add(diagnostics, "active-skill.type-invalid", itemPath + ".skillType",
-                        "Active skill type must be Position, Target, or Self.");
+                        "Active skill type must be Position, Target, Self, Location, LocationAoE, SelfAoE, TargetAoE, or Toggle.");
                 }
                 if (!IsFiniteSingle(skill.cooldown) || skill.cooldown < 0 || skill.cooldown > 300)
                 {
@@ -1825,6 +1827,37 @@ namespace RogueCommandExpansionLoader.Content
                 {
                     Add(diagnostics, "active-skill.manaCost-invalid", itemPath + ".manaCost",
                         "Active skill mana cost must be finite and between 0 and 1000.");
+                }
+                if (!string.IsNullOrEmpty(skill.targetOrigin) &&
+                    !string.Equals(skill.targetOrigin, "Self", StringComparison.OrdinalIgnoreCase) &&
+                    !string.Equals(skill.targetOrigin, "ChosenEntity", StringComparison.OrdinalIgnoreCase) &&
+                    !string.Equals(skill.targetOrigin, "ChosenLocation", StringComparison.OrdinalIgnoreCase))
+                {
+                    Add(diagnostics, "active-skill.targetOrigin-invalid", itemPath + ".targetOrigin",
+                        "Active skill targetOrigin must be Self, ChosenEntity, or ChosenLocation.");
+                }
+                if (skill.range.HasValue && (!IsFiniteSingle(skill.range.Value) || skill.range.Value < 0f || skill.range.Value > 100f))
+                {
+                    Add(diagnostics, "active-skill.range-invalid", itemPath + ".range",
+                        "Active skill range must be finite and between 0 and 100.");
+                }
+                if (skill.radius.HasValue && (!IsFiniteSingle(skill.radius.Value) || skill.radius.Value < 0f || skill.radius.Value > 50f))
+                {
+                    Add(diagnostics, "active-skill.radius-invalid", itemPath + ".radius",
+                        "Active skill radius must be finite and between 0 and 50.");
+                }
+                if (skill.aiSkillCooldown.HasValue && (!IsFiniteSingle(skill.aiSkillCooldown.Value) || skill.aiSkillCooldown.Value < 0f || skill.aiSkillCooldown.Value > 300f))
+                {
+                    Add(diagnostics, "active-skill.aiSkillCooldown-invalid", itemPath + ".aiSkillCooldown",
+                        "Active skill aiSkillCooldown must be finite and between 0 and 300.");
+                }
+                if (!string.IsNullOrEmpty(skill.aiActivationTrigger) &&
+                    !string.Equals(skill.aiActivationTrigger, "EnemiesInRange", StringComparison.OrdinalIgnoreCase) &&
+                    !string.Equals(skill.aiActivationTrigger, "LowHealth", StringComparison.OrdinalIgnoreCase) &&
+                    !string.Equals(skill.aiActivationTrigger, "CombatEngaged", StringComparison.OrdinalIgnoreCase))
+                {
+                    Add(diagnostics, "active-skill.aiActivationTrigger-invalid", itemPath + ".aiActivationTrigger",
+                        "Active skill aiActivationTrigger must be EnemiesInRange, LowHealth, or CombatEngaged.");
                 }
                 ValidateActiveSkillEffectValue(skill, itemPath, diagnostics);
             }
@@ -2972,6 +3005,16 @@ namespace RogueCommandExpansionLoader.Content
                 {
                     Add(diagnostics, "unit.rangeToChooseNewTargetAutomatically-invalid", path + ".rangeToChooseNewTargetAutomatically",
                         "rangeToChooseNewTargetAutomatically must be an integer between -1 and 1000.");
+                }
+            }
+
+            if (unit.minAttackRange.HasValue)
+            {
+                float minRange = unit.minAttackRange.Value;
+                if (!IsFiniteSingle(minRange) || minRange < 0f || minRange > 200f)
+                {
+                    Add(diagnostics, "unit.minAttackRange-invalid", path + ".minAttackRange",
+                        "minAttackRange must be a finite float between 0 and 200.");
                 }
             }
 
@@ -4593,6 +4636,16 @@ namespace RogueCommandExpansionLoader.Content
                 {
                     Add(diagnostics, "building.rangeToChooseNewTargetAutomatically-invalid", path + ".rangeToChooseNewTargetAutomatically",
                         "rangeToChooseNewTargetAutomatically must be an integer between -1 and 1000.");
+                }
+            }
+
+            if (building.minAttackRange.HasValue)
+            {
+                float minRange = building.minAttackRange.Value;
+                if (!IsFiniteSingle(minRange) || minRange < 0f || minRange > 200f)
+                {
+                    Add(diagnostics, "building.minAttackRange-invalid", path + ".minAttackRange",
+                        "minAttackRange must be a finite float between 0 and 200.");
                 }
             }
 

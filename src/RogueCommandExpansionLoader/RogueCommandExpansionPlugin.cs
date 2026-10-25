@@ -55,6 +55,7 @@ namespace RogueCommandExpansionLoader
                 modules.Register(new TacticalRegroupAiModule());
                 modules.Register(new SquadFormationAiModule());
                 modules.Register(new TacticalSkillActivationAiModule());
+                modules.Register(new CounterBatteryAiModule());
                 modules.Register(new WaveEscalationAiModule());
 
                 string packsRoot = System.IO.Path.Combine(

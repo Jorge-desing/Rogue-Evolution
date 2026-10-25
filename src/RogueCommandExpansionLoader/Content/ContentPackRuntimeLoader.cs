@@ -43,6 +43,41 @@ namespace RogueCommandExpansionLoader.Content
         private const BindingFlags InstanceFields = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
         private const BindingFlags StaticFields = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static;
 
+        private static readonly Dictionary<string, float> _minAttackRanges =
+            new Dictionary<string, float>(StringComparer.OrdinalIgnoreCase);
+
+        public static bool TryGetMinAttackRange(string entityId, out float minRange)
+        {
+            if (string.IsNullOrEmpty(entityId))
+            {
+                minRange = 0f;
+                return false;
+            }
+            lock (_minAttackRanges)
+            {
+                return _minAttackRanges.TryGetValue(entityId, out minRange);
+            }
+        }
+
+        public static void RegisterMinAttackRange(string entityId, float minRange)
+        {
+            if (!string.IsNullOrEmpty(entityId) && minRange > 0f)
+            {
+                lock (_minAttackRanges)
+                {
+                    _minAttackRanges[entityId] = minRange;
+                }
+            }
+        }
+
+        public static void ClearMinAttackRanges()
+        {
+            lock (_minAttackRanges)
+            {
+                _minAttackRanges.Clear();
+            }
+        }
+
         private readonly object _gate = new object();
         private readonly string _packsRoot;
         private readonly Assembly _gameAssembly;
@@ -84,6 +119,18 @@ namespace RogueCommandExpansionLoader.Content
         private readonly FieldInfo _rangeToChooseNewTargetField;
         private readonly FieldInfo _selectionSoundField;
         private readonly FieldInfo _movementSoundAudioSourceField;
+        private readonly FieldInfo _hasActiveSkillField;
+        private readonly FieldInfo _activeSkillOrProductionField;
+        private readonly FieldInfo _activeSkillTypeField;
+        private readonly FieldInfo _helpAiToActivateSkillField;
+        private readonly FieldInfo _aiSkillCooldownField;
+        private readonly FieldInfo _skillInfoField;
+        private readonly FieldInfo _conditionToActivateSkillField;
+        private readonly FieldInfo _entityIdentifiersField;
+        private readonly Type _skillInfoType;
+        private readonly Type _targetOriginType;
+        private readonly Type _skillActivationConditionType;
+        private readonly Type _entityIdentifierType;
         private readonly FieldInfo _prefabLocationField;
         private readonly FieldInfo _imageLocationField;
         private readonly FieldInfo _inactiveField;
@@ -342,6 +389,20 @@ namespace RogueCommandExpansionLoader.Content
             _rangeToChooseNewTargetField = _entityControllerType.GetField("rangeToChooseNewTargetAutomatically", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
             _selectionSoundField = _entityControllerType.GetField("selectionSound", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
             _movementSoundAudioSourceField = _entityControllerType.GetField("movementSoundAudioSource", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+            _hasActiveSkillField = _entityControllerType.GetField("hasActiveSkill", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+            _activeSkillOrProductionField = _entityControllerType.GetField("activeSkillOrProduction", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+            _activeSkillTypeField = _entityControllerType.GetField("activeSkillType", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+            _helpAiToActivateSkillField = _entityControllerType.GetField("helpAiToActivateSkill", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            _aiSkillCooldownField = _entityControllerType.GetField("aiSkillCooldown", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+            _skillInfoField = _entityControllerType.GetField("_skillInfo", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+            _conditionToActivateSkillField = _entityControllerType.GetField("conditionToActivateSkill", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+            _entityIdentifiersField = _entityControllerType.GetField("entityIdentifiers", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+            _skillInfoType = _gameAssembly.GetType("SkillInfo", false);
+            _targetOriginType = _gameAssembly.GetType("TargetOrigin", false);
+            _skillActivationConditionType = _gameAssembly.GetType("SkillActivationCondition", false);
+            _entityIdentifierType = _gameAssembly.GetType("EntityIdentifier", false);
+            CounterBatteryAiModule.MinAttackRangeResolver = id => TryGetMinAttackRange(id, out float r) ? (float?)r : null;
+            Runtime.RuntimeHooks.MinAttackRangeResolver = id => TryGetMinAttackRange(id, out float r) ? (float?)r : null;
             _prefabLocationField = RequireField(_entityRowType, "prefabLocation", typeof(string));
             _imageLocationField = RequireField(_entityRowType, "imageLocation", typeof(string));
             _inactiveField = RequireField(_entityRowType, "inactive", typeof(bool));
@@ -2336,6 +2397,7 @@ namespace RogueCommandExpansionLoader.Content
         {
             _nativeUnitIds.Clear();
             _nativeFactoryIds.Clear();
+            ClearMinAttackRanges();
             IDictionary index = _entityIndexField.GetValue(null) as IDictionary;
             if (index == null)
             {
@@ -3220,7 +3282,8 @@ namespace RogueCommandExpansionLoader.Content
                             "Unidad " + unit.id + " en '" + packageName + "'");
                         ApplyEntityBehavioralParameters(nativePrefabClone, unit.rotationDegreesPerSecond, unit.collisionRadius,
                             unit.attackWarmUpTime, unit.canAttackWhileMoving, unit.shootAutomaticallyOnEnemiesWithinRange,
-                            unit.defendPositionAggressivelyWhenIdle, unit.rangeToChooseNewTargetAutomatically);
+                            unit.defendPositionAggressivelyWhenIdle, unit.rangeToChooseNewTargetAutomatically, unit.minAttackRange, unit.id);
+                        ApplyEntityActiveSkills(nativePrefabClone, unit.activeSkills, unit.id);
                         AssetBundle audioBundle = !String.IsNullOrWhiteSpace(unit.assetBundleId)
                             ? GetBundle(temporaryBundles, unit.assetBundleId, packageName)
                             : null;
@@ -3277,7 +3340,8 @@ namespace RogueCommandExpansionLoader.Content
                             "Unidad " + unit.id + " en '" + packageName + "'");
                         ApplyEntityBehavioralParameters(customPrefabClone, unit.rotationDegreesPerSecond, unit.collisionRadius,
                             unit.attackWarmUpTime, unit.canAttackWhileMoving, unit.shootAutomaticallyOnEnemiesWithinRange,
-                            unit.defendPositionAggressivelyWhenIdle, unit.rangeToChooseNewTargetAutomatically);
+                            unit.defendPositionAggressivelyWhenIdle, unit.rangeToChooseNewTargetAutomatically, unit.minAttackRange, unit.id);
+                        ApplyEntityActiveSkills(customPrefabClone, unit.activeSkills, unit.id);
                         ApplyEntityAudioBindings(customPrefabClone, bundle, unit.selectionSoundAssetName,
                             unit.engineSoundAssetName, unit.weaponSoundAssetName, unit.id, packageName);
                         EnsureMuzzleFlashHierarchy(customPrefabClone);
@@ -4789,6 +4853,18 @@ namespace RogueCommandExpansionLoader.Content
                 object tagsEnum = Enum.ToObject(_offeredSystemTagsField.FieldType, combinedTags);
                 _offeredSystemTagsField.SetValue(row, tagsEnum);
             }
+            if (unit.activeSkills != null && unit.activeSkills.Length > 0 && unit.activeSkills[0] != null)
+            {
+                ContentActiveSkillDefinition primarySkill = unit.activeSkills[0];
+                if (primarySkill.range.HasValue && _skillRangeField != null)
+                {
+                    _skillRangeField.SetValue(row, primarySkill.range.Value);
+                }
+                if (_skillManaCostField != null)
+                {
+                    _skillManaCostField.SetValue(row, primarySkill.manaCost);
+                }
+            }
         }
 
         private void ApplyStructuredProductionBuildingParameters(
@@ -5147,7 +5223,7 @@ namespace RogueCommandExpansionLoader.Content
                 "Edificio " + building.id + " en '" + packageName + "'");
             ApplyEntityBehavioralParameters(nativePrefabClone, building.rotationDegreesPerSecond, building.collisionRadius,
                 building.attackWarmUpTime, building.canAttackWhileMoving ?? false, building.shootAutomaticallyOnEnemiesWithinRange,
-                building.defendPositionAggressivelyWhenIdle, building.rangeToChooseNewTargetAutomatically);
+                building.defendPositionAggressivelyWhenIdle, building.rangeToChooseNewTargetAutomatically, building.minAttackRange, building.id);
             ApplyEntityAudioBindings(nativePrefabClone, buildingAssetBundle, building.selectionSoundAssetName,
                 building.engineSoundAssetName, building.weaponSoundAssetName, building.id, packageName);
             EnsureMuzzleFlashHierarchy(nativePrefabClone);
@@ -7647,11 +7723,26 @@ namespace RogueCommandExpansionLoader.Content
             bool? canAttackWhileMoving,
             bool? shootAutomaticallyOnEnemiesWithinRange,
             bool? defendPositionAggressivelyWhenIdle,
-            int? rangeToChooseNewTargetAutomatically)
+            int? rangeToChooseNewTargetAutomatically,
+            float? minAttackRange = null,
+            string entityId = null)
         {
             if (prefabClone == null) return;
             Component controller = prefabClone.GetComponent(_entityControllerType);
             if (controller == null) return;
+
+            if (minAttackRange.HasValue && minAttackRange.Value > 0f)
+            {
+                string id = entityId;
+                if (string.IsNullOrEmpty(id) && _entityControllerIdField != null)
+                {
+                    id = _entityControllerIdField.GetValue(controller) as string;
+                }
+                if (!string.IsNullOrEmpty(id))
+                {
+                    RegisterMinAttackRange(id, minAttackRange.Value);
+                }
+            }
 
             if (rotationDegreesPerSecond.HasValue && _rotationDegreesPerSecondField != null)
             {
@@ -7680,6 +7771,176 @@ namespace RogueCommandExpansionLoader.Content
             if (rangeToChooseNewTargetAutomatically.HasValue && _rangeToChooseNewTargetField != null)
             {
                 _rangeToChooseNewTargetField.SetValue(controller, rangeToChooseNewTargetAutomatically.Value);
+            }
+        }
+
+        private void ApplyEntityActiveSkills(
+            GameObject prefabClone,
+            ContentActiveSkillDefinition[] activeSkills,
+            string entityId)
+        {
+            if (prefabClone == null || activeSkills == null || activeSkills.Length == 0) return;
+            Component controller = prefabClone.GetComponent(_entityControllerType);
+            if (controller == null) return;
+
+            ContentActiveSkillDefinition skill = activeSkills[0];
+            if (skill == null) return;
+
+            if (_hasActiveSkillField != null)
+            {
+                _hasActiveSkillField.SetValue(controller, true);
+            }
+
+            if (_activeSkillOrProductionField != null)
+            {
+                Type enumType = _activeSkillOrProductionField.FieldType;
+                if (enumType.IsEnum)
+                {
+                    _activeSkillOrProductionField.SetValue(controller, Enum.ToObject(enumType, 0));
+                }
+            }
+
+            object targetOriginVal = null;
+            if (_targetOriginType != null)
+            {
+                string targetOriginName = skill.targetOrigin;
+                if (string.IsNullOrEmpty(targetOriginName))
+                {
+                    if (string.Equals(skill.skillType, "Target", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(skill.skillType, "TargetAoE", StringComparison.OrdinalIgnoreCase))
+                    {
+                        targetOriginName = "ChosenEntity";
+                    }
+                    else if (string.Equals(skill.skillType, "Position", StringComparison.OrdinalIgnoreCase) ||
+                             string.Equals(skill.skillType, "Location", StringComparison.OrdinalIgnoreCase) ||
+                             string.Equals(skill.skillType, "LocationAoE", StringComparison.OrdinalIgnoreCase) ||
+                             string.Equals(skill.skillType, "LocationMultiTargets", StringComparison.OrdinalIgnoreCase))
+                    {
+                        targetOriginName = "ChosenLocation";
+                    }
+                    else
+                    {
+                        targetOriginName = "Self";
+                    }
+                }
+
+                try
+                {
+                    targetOriginVal = Enum.Parse(_targetOriginType, targetOriginName, true);
+                }
+                catch
+                {
+                    targetOriginVal = Enum.ToObject(_targetOriginType, 0);
+                }
+
+                if (_activeSkillTypeField != null && targetOriginVal != null)
+                {
+                    _activeSkillTypeField.SetValue(controller, targetOriginVal);
+                }
+            }
+
+            if (_skillInfoType != null && _skillInfoField != null && targetOriginVal != null)
+            {
+                try
+                {
+                    ConstructorInfo ctor = _skillInfoType.GetConstructor(new[] { _targetOriginType, typeof(float) });
+                    if (ctor != null)
+                    {
+                        object skillInfoInstance = ctor.Invoke(new object[] { targetOriginVal, skill.manaCost });
+                        _skillInfoField.SetValue(controller, skillInfoInstance);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Log("Could not instantiate SkillInfo for " + entityId + ": " + ex.Message);
+                }
+            }
+
+            bool helpAi = skill.helpAiToActivate ?? true;
+            if (_helpAiToActivateSkillField != null)
+            {
+                _helpAiToActivateSkillField.SetValue(controller, helpAi);
+            }
+
+            float aiCooldown = skill.aiSkillCooldown.HasValue ? skill.aiSkillCooldown.Value : skill.cooldown;
+            if (_aiSkillCooldownField != null)
+            {
+                _aiSkillCooldownField.SetValue(controller, aiCooldown);
+            }
+
+            if (helpAi && _skillActivationConditionType != null && _conditionToActivateSkillField != null)
+            {
+                try
+                {
+                    object condition = Activator.CreateInstance(_skillActivationConditionType);
+                    FieldInfo nameField = _skillActivationConditionType.GetField("entityIdentifierName");
+                    FieldInfo opField = _skillActivationConditionType.GetField("operation");
+                    FieldInfo numField = _skillActivationConditionType.GetField("numberOfEntities");
+
+                    string identName = "EnemiesInRange";
+                    if (nameField != null) nameField.SetValue(condition, identName);
+                    if (opField != null)
+                    {
+                        Type opEnumType = _skillActivationConditionType.GetNestedType("Operation");
+                        if (opEnumType != null)
+                        {
+                            opField.SetValue(condition, Enum.Parse(opEnumType, "Greater"));
+                        }
+                    }
+                    if (numField != null) numField.SetValue(condition, 0);
+
+                    _conditionToActivateSkillField.SetValue(controller, condition);
+
+                    if (_entityIdentifiersField != null && _entityIdentifierType != null)
+                    {
+                        System.Collections.IList idList = _entityIdentifiersField.GetValue(controller) as System.Collections.IList;
+                        if (idList == null)
+                        {
+                            Type listType = typeof(List<>).MakeGenericType(_entityIdentifierType);
+                            idList = Activator.CreateInstance(listType) as System.Collections.IList;
+                            _entityIdentifiersField.SetValue(controller, idList);
+                        }
+
+                        bool hasIdent = false;
+                        if (idList != null)
+                        {
+                            FieldInfo identNameField = _entityIdentifierType.GetField("name");
+                            for (int i = 0; i < idList.Count; i++)
+                            {
+                                object item = idList[i];
+                                if (item != null && identNameField != null &&
+                                    string.Equals(identNameField.GetValue(item) as string, identName, StringComparison.OrdinalIgnoreCase))
+                                {
+                                    hasIdent = true;
+                                    break;
+                                }
+                            }
+
+                            if (!hasIdent)
+                            {
+                                object newIdent = Activator.CreateInstance(_entityIdentifierType);
+                                if (identNameField != null) identNameField.SetValue(newIdent, identName);
+                                FieldInfo radField = _entityIdentifierType.GetField("radius");
+                                if (radField != null && radField.FieldType.IsEnum)
+                                {
+                                    try
+                                    {
+                                        radField.SetValue(newIdent, Enum.Parse(radField.FieldType, "SelfSkillRange"));
+                                    }
+                                    catch
+                                    {
+                                        // Ignore radius parse fallback
+                                    }
+                                }
+                                idList.Add(newIdent);
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Log("Could not configure conditionToActivateSkill for " + entityId + ": " + ex.Message);
+                }
             }
         }
 

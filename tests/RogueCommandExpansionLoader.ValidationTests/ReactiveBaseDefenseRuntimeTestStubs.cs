@@ -30,6 +30,8 @@ public sealed class EntityController
     public int aiBaseIndex { get; set; }
 public float CurrentHealth { get; set; } = 100f;
     public float MaxHealth { get; set; } = 100f;
+    public float MoveSpeed { get; set; } = 10f;
+    public float WeaponRange { get; set; } = 15f;
     public string EntityId { get => entityId; set => entityId = value; }
     public string entityId { get; set; }
     public string name { get => gameObject?.name ?? string.Empty; set { if (gameObject != null) gameObject.name = value; } }

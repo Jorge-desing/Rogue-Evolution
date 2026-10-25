@@ -119,6 +119,10 @@
              Link="Modules/TacticalSkillActivationParameters.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Modules/TacticalSkillActivationAiModule.cs"
              Link="Modules/TacticalSkillActivationAiModule.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Modules/CounterBatteryParameters.cs"
+             Link="Modules/CounterBatteryParameters.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Modules/CounterBatteryAiModule.cs"
+             Link="Modules/CounterBatteryAiModule.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Modules/WaveEscalationParameters.cs"
              Link="Modules/WaveEscalationParameters.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Modules/WaveEscalationAiModule.cs"

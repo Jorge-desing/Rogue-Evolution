@@ -51,6 +51,12 @@ namespace RogueCommandExpansionLoader.Content
         public float cooldown;
         public float manaCost;
         public float effectValue;
+        public string targetOrigin;
+        public float? range;
+        public float? radius;
+        public bool? helpAiToActivate;
+        public string aiActivationTrigger;
+        public float? aiSkillCooldown;
     }
 
     [Serializable]
@@ -300,6 +306,7 @@ namespace RogueCommandExpansionLoader.Content
         public bool? shootAutomaticallyOnEnemiesWithinRange;
         public bool? defendPositionAggressivelyWhenIdle;
         public int? rangeToChooseNewTargetAutomatically;
+        public float? minAttackRange;
         public int? prespawnCount;
         public string selectionSoundAssetName;
         public string engineSoundAssetName;
@@ -593,6 +600,7 @@ namespace RogueCommandExpansionLoader.Content
         public bool? shootAutomaticallyOnEnemiesWithinRange;
         public bool? defendPositionAggressivelyWhenIdle;
         public int? rangeToChooseNewTargetAutomatically;
+        public float? minAttackRange;
         public int? prespawnCount;
         public string selectionSoundAssetName;
         public string engineSoundAssetName;
@@ -979,6 +987,7 @@ namespace RogueCommandExpansionLoader.Content
                 shootAutomaticallyOnEnemiesWithinRange = source.shootAutomaticallyOnEnemiesWithinRange,
                 defendPositionAggressivelyWhenIdle = source.defendPositionAggressivelyWhenIdle,
                 rangeToChooseNewTargetAutomatically = source.rangeToChooseNewTargetAutomatically,
+                minAttackRange = source.minAttackRange,
                 prespawnCount = source.prespawnCount,
                 selectionSoundAssetName = source.selectionSoundAssetName,
                 engineSoundAssetName = source.engineSoundAssetName,
@@ -1040,7 +1049,20 @@ namespace RogueCommandExpansionLoader.Content
 
         private static ContentActiveSkillDefinition CloneActiveSkill(ContentActiveSkillDefinition source)
         {
-            return source == null ? null : new ContentActiveSkillDefinition { id = source.id, skillType = source.skillType, cooldown = source.cooldown, manaCost = source.manaCost, effectValue = source.effectValue };
+            return source == null ? null : new ContentActiveSkillDefinition
+            {
+                id = source.id,
+                skillType = source.skillType,
+                cooldown = source.cooldown,
+                manaCost = source.manaCost,
+                effectValue = source.effectValue,
+                targetOrigin = source.targetOrigin,
+                range = source.range,
+                radius = source.radius,
+                helpAiToActivate = source.helpAiToActivate,
+                aiActivationTrigger = source.aiActivationTrigger,
+                aiSkillCooldown = source.aiSkillCooldown
+            };
         }
 
         private static ContentCombatBoostDefinition CloneCombatBoost(ContentCombatBoostDefinition source)
@@ -1339,6 +1361,7 @@ namespace RogueCommandExpansionLoader.Content
                 shootAutomaticallyOnEnemiesWithinRange = source.shootAutomaticallyOnEnemiesWithinRange,
                 defendPositionAggressivelyWhenIdle = source.defendPositionAggressivelyWhenIdle,
                 rangeToChooseNewTargetAutomatically = source.rangeToChooseNewTargetAutomatically,
+                minAttackRange = source.minAttackRange,
                 prespawnCount = source.prespawnCount,
                 selectionSoundAssetName = source.selectionSoundAssetName,
                 engineSoundAssetName = source.engineSoundAssetName,

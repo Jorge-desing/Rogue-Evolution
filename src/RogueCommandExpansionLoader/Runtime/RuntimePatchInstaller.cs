@@ -209,6 +209,8 @@ namespace RogueCommandExpansionLoader.Runtime
             Type chooseCard = RuntimeReflection.FindUniqueType(gameAssembly, "ChooseCard");
             Type presentCardAsRewardEvent = RuntimeReflection.FindUniqueType(
                 gameAssembly, "PresentCardAsRewardEvent");
+            Type entityAttack = RuntimeReflection.FindUniqueType(gameAssembly, "EntityAttack");
+            Type entityController = RuntimeReflection.FindUniqueType(gameAssembly, "EntityController");
 
             MethodInfo init = RuntimeReflection.FindUniqueMethod(entityStore, "Init",
                 delegate(MethodInfo method) { return method.GetParameters().Length == 0; });
@@ -337,6 +339,13 @@ namespace RogueCommandExpansionLoader.Runtime
             MethodInfo blueprintPoolCandidatesPostfix = Hook("BlueprintPoolBlueprintsInPoolPostfix");
             MethodInfo presentCardAsRewardRecordPostfix = Hook("PresentCardAsRewardRecordPostfix");
             MethodInfo allAllowedBlueprintsPostfix = Hook("AllEntityIdsAllowedAsBlueprintsPostfix");
+            MethodInfo isTargetInRange = RuntimeReflection.FindUniqueMethod(entityAttack, "IsTargetInRange",
+                delegate(MethodInfo method)
+                {
+                    ParameterInfo[] parameters = method.GetParameters();
+                    return parameters.Length == 1 && parameters[0].ParameterType == entityController && method.ReturnType == typeof(bool);
+                });
+            MethodInfo isTargetInRangePostfix = Hook("EntityAttackIsTargetInRangePostfix");
             MethodInfo loadPrefix = typeof(UnityResourcesLoadTypedPatch).GetMethod("Prefix",
                 BindingFlags.Public | BindingFlags.Static);
             if (loadPrefix == null)
@@ -383,6 +392,7 @@ namespace RogueCommandExpansionLoader.Runtime
             plan.Add(new PatchPlan(resourcesLoadUntyped, untypedLoadPrefix, null));
             plan.Add(new PatchPlan(setupPrespawning, null, setupPrespawningPostfix));
             plan.Add(new PatchPlan(setupAiPrespawning, null, setupAiPrespawningPostfix));
+            plan.Add(new PatchPlan(isTargetInRange, null, isTargetInRangePostfix));
             return plan;
         }
 

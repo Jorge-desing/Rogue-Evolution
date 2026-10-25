@@ -900,6 +900,93 @@ namespace RogueCommandExpansionLoader.Runtime
             }
         }
 
+        private static FieldInfo _entityAttackControllerField;
+        private static PropertyInfo _entityControllerIdProperty;
+        private static FieldInfo _entityControllerIdBackingField;
+        private static PropertyInfo _entityControllerPositionProperty;
+
+#pragma warning disable CS0649
+        public static Func<string, float?> MinAttackRangeResolver;
+#pragma warning restore CS0649
+
+        public static void EntityAttackIsTargetInRangePostfix(object __instance, object __0, ref bool __result)
+        {
+            if (!__result || __instance == null || __0 == null)
+            {
+                return;
+            }
+
+            try
+            {
+                if (_entityAttackControllerField == null)
+                {
+                    _entityAttackControllerField = __instance.GetType().GetField("_entityController",
+                        BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+                    if (_entityAttackControllerField == null)
+                    {
+                        return;
+                    }
+                }
+
+                object attackerObj = _entityAttackControllerField.GetValue(__instance);
+                if (attackerObj == null)
+                {
+                    return;
+                }
+
+                if (_entityControllerIdProperty == null && _entityControllerIdBackingField == null)
+                {
+                    Type attackerType = attackerObj.GetType();
+                    _entityControllerIdProperty = attackerType.GetProperty("EntityId", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                    if (_entityControllerIdProperty == null)
+                    {
+                        _entityControllerIdBackingField = attackerType.GetField("entityId", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                    }
+                }
+
+                string entityId = null;
+                if (_entityControllerIdProperty != null)
+                {
+                    entityId = _entityControllerIdProperty.GetValue(attackerObj, null) as string;
+                }
+                else if (_entityControllerIdBackingField != null)
+                {
+                    entityId = _entityControllerIdBackingField.GetValue(attackerObj) as string;
+                }
+
+                if (string.IsNullOrEmpty(entityId))
+                {
+                    return;
+                }
+
+                float? minRange = MinAttackRangeResolver != null ? MinAttackRangeResolver(entityId) : null;
+                if (minRange.HasValue && minRange.Value > 0f)
+                {
+                    if (_entityControllerPositionProperty == null)
+                    {
+                        _entityControllerPositionProperty = attackerObj.GetType().GetProperty("Position",
+                            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                    }
+
+                    if (_entityControllerPositionProperty != null)
+                    {
+                        Vector3 p1 = (Vector3)_entityControllerPositionProperty.GetValue(attackerObj, null);
+                        Vector3 p2 = (Vector3)_entityControllerPositionProperty.GetValue(__0, null);
+                        float dx = p1.x - p2.x;
+                        float dz = p1.z - p2.z;
+                        if ((dx * dx + dz * dz) < (minRange.Value * minRange.Value))
+                        {
+                            __result = false;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _log?.Invoke("[RuntimeHooks] EntityAttackIsTargetInRangePostfix error: " + ex.Message);
+            }
+        }
+
         public static bool TryLoadResource(string resourcePath, out UnityEngine.Object asset)
         {
             asset = null;
@@ -1164,6 +1251,11 @@ namespace RogueCommandExpansionLoader.Runtime
         public static void BlueprintPoolExclusiveBlueprintsPostfix(string __0, HashSet<string> __result)
         {
             RuntimeHooks.BlueprintPoolExclusiveBlueprintsPostfix(__0, __result);
+        }
+
+        public static void EntityAttackIsTargetInRangePostfix(object __instance, object __0, ref bool __result)
+        {
+            RuntimeHooks.EntityAttackIsTargetInRangePostfix(__instance, __0, ref __result);
         }
     }
 
