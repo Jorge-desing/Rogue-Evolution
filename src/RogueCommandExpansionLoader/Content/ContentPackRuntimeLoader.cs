@@ -78,6 +78,46 @@ namespace RogueCommandExpansionLoader.Content
             }
         }
 
+        private static readonly Dictionary<string, List<ContentOnHitStatusEffectDefinition>> _onHitStatusEffects =
+            new Dictionary<string, List<ContentOnHitStatusEffectDefinition>>(StringComparer.Ordinal);
+
+        public static bool TryGetOnHitStatusEffects(string entityId, out List<ContentOnHitStatusEffectDefinition> effects)
+        {
+            if (string.IsNullOrEmpty(entityId))
+            {
+                effects = null;
+                return false;
+            }
+            lock (_onHitStatusEffects)
+            {
+                return _onHitStatusEffects.TryGetValue(entityId, out effects);
+            }
+        }
+
+        public static void RegisterOnHitStatusEffects(string entityId, ContentOnHitStatusEffectDefinition[] effects)
+        {
+            if (!string.IsNullOrEmpty(entityId) && effects != null && effects.Length > 0)
+            {
+                var list = new List<ContentOnHitStatusEffectDefinition>(effects.Length);
+                for (int i = 0; i < effects.Length; i++)
+                {
+                    if (effects[i] != null) list.Add(effects[i]);
+                }
+                lock (_onHitStatusEffects)
+                {
+                    _onHitStatusEffects[entityId] = list;
+                }
+            }
+        }
+
+        public static void ClearOnHitStatusEffects()
+        {
+            lock (_onHitStatusEffects)
+            {
+                _onHitStatusEffects.Clear();
+            }
+        }
+
         private readonly object _gate = new object();
         private readonly string _packsRoot;
         private readonly Assembly _gameAssembly;
@@ -127,6 +167,8 @@ namespace RogueCommandExpansionLoader.Content
         private readonly FieldInfo _skillInfoField;
         private readonly FieldInfo _conditionToActivateSkillField;
         private readonly FieldInfo _entityIdentifiersField;
+        private readonly Type _critModType;
+        private readonly MethodInfo _addCriticalHitChanceBonusMethod;
         private readonly Type _skillInfoType;
         private readonly Type _targetOriginType;
         private readonly Type _skillActivationConditionType;
@@ -403,6 +445,17 @@ namespace RogueCommandExpansionLoader.Content
             _entityIdentifierType = _gameAssembly.GetType("EntityIdentifier", false);
             CounterBatteryAiModule.MinAttackRangeResolver = id => TryGetMinAttackRange(id, out float r) ? (float?)r : null;
             Runtime.RuntimeHooks.MinAttackRangeResolver = id => TryGetMinAttackRange(id, out float r) ? (float?)r : null;
+            Runtime.RuntimeHooks.OnHitStatusEffectsResolver = id => TryGetOnHitStatusEffects(id, out List<ContentOnHitStatusEffectDefinition> fx) ? fx : null;
+            _critModType = _gameAssembly.GetType("CriticalHitChanceModifier", false);
+            if (_critModType != null && _entityControllerType != null)
+            {
+                _addCriticalHitChanceBonusMethod = _entityControllerType.GetMethod(
+                    "AddCriticalHitChanceBonus",
+                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+                    null,
+                    new Type[] { _critModType },
+                    null);
+            }
             _prefabLocationField = RequireField(_entityRowType, "prefabLocation", typeof(string));
             _imageLocationField = RequireField(_entityRowType, "imageLocation", typeof(string));
             _inactiveField = RequireField(_entityRowType, "inactive", typeof(bool));
@@ -3284,6 +3337,7 @@ namespace RogueCommandExpansionLoader.Content
                             unit.attackWarmUpTime, unit.canAttackWhileMoving, unit.shootAutomaticallyOnEnemiesWithinRange,
                             unit.defendPositionAggressivelyWhenIdle, unit.rangeToChooseNewTargetAutomatically, unit.minAttackRange, unit.id);
                         ApplyEntityActiveSkills(nativePrefabClone, unit.activeSkills, unit.id);
+                        ApplyEntityCombatEnhancements(nativePrefabClone, unit.onHitStatusEffects, unit.criticalHitChance, unit.id);
                         AssetBundle audioBundle = !String.IsNullOrWhiteSpace(unit.assetBundleId)
                             ? GetBundle(temporaryBundles, unit.assetBundleId, packageName)
                             : null;
@@ -3342,6 +3396,7 @@ namespace RogueCommandExpansionLoader.Content
                             unit.attackWarmUpTime, unit.canAttackWhileMoving, unit.shootAutomaticallyOnEnemiesWithinRange,
                             unit.defendPositionAggressivelyWhenIdle, unit.rangeToChooseNewTargetAutomatically, unit.minAttackRange, unit.id);
                         ApplyEntityActiveSkills(customPrefabClone, unit.activeSkills, unit.id);
+                        ApplyEntityCombatEnhancements(customPrefabClone, unit.onHitStatusEffects, unit.criticalHitChance, unit.id);
                         ApplyEntityAudioBindings(customPrefabClone, bundle, unit.selectionSoundAssetName,
                             unit.engineSoundAssetName, unit.weaponSoundAssetName, unit.id, packageName);
                         EnsureMuzzleFlashHierarchy(customPrefabClone);
@@ -5248,6 +5303,7 @@ namespace RogueCommandExpansionLoader.Content
                 building.defendPositionAggressivelyWhenIdle, building.rangeToChooseNewTargetAutomatically, building.minAttackRange, building.id);
             ApplyEntityAudioBindings(nativePrefabClone, buildingAssetBundle, building.selectionSoundAssetName,
                 building.engineSoundAssetName, building.weaponSoundAssetName, building.id, packageName);
+            ApplyEntityCombatEnhancements(nativePrefabClone, building.onHitStatusEffects, building.criticalHitChance, building.id);
             EnsureMuzzleFlashHierarchy(nativePrefabClone);
 
             nativePrefabClone.name = "RCL_NativeBuilding_" + building.id.Replace(':', '_');
@@ -7793,6 +7849,46 @@ namespace RogueCommandExpansionLoader.Content
             if (rangeToChooseNewTargetAutomatically.HasValue && _rangeToChooseNewTargetField != null)
             {
                 _rangeToChooseNewTargetField.SetValue(controller, rangeToChooseNewTargetAutomatically.Value);
+            }
+        }
+
+        private void ApplyEntityCombatEnhancements(
+            GameObject prefabClone,
+            ContentOnHitStatusEffectDefinition[] onHitStatusEffects,
+            float? criticalHitChance,
+            string entityId)
+        {
+            if (prefabClone == null) return;
+            Component controller = prefabClone.GetComponent(_entityControllerType);
+            if (controller == null) return;
+
+            string id = entityId;
+            if (string.IsNullOrEmpty(id) && _entityControllerIdField != null)
+            {
+                id = _entityControllerIdField.GetValue(controller) as string;
+            }
+
+            if (!string.IsNullOrEmpty(id) && onHitStatusEffects != null && onHitStatusEffects.Length > 0)
+            {
+                RegisterOnHitStatusEffects(id, onHitStatusEffects);
+            }
+
+            if (criticalHitChance.HasValue && criticalHitChance.Value > 0f &&
+                _critModType != null && _addCriticalHitChanceBonusMethod != null)
+            {
+                try
+                {
+                    object mod = Activator.CreateInstance(_critModType);
+                    FieldInfo additionField = _critModType.GetField("addition", BindingFlags.Instance | BindingFlags.Public);
+                    FieldInfo idField = _critModType.GetField("idToAvoidStacking", BindingFlags.Instance | BindingFlags.Public);
+                    if (additionField != null) additionField.SetValue(mod, criticalHitChance.Value);
+                    if (idField != null) idField.SetValue(mod, "rcl-crit-" + id);
+                    _addCriticalHitChanceBonusMethod.Invoke(controller, new object[] { mod });
+                }
+                catch (Exception ex)
+                {
+                    _log?.Invoke("[ContentPackRuntimeLoader] Could not apply criticalHitChance to " + id + ": " + ex.Message);
+                }
             }
         }
 

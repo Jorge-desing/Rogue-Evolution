@@ -15,6 +15,9 @@ public sealed class EntityController
     public bool CanMoveAndMovementIsEnabled { get; set; }
     public bool IsCombatUnit { get; set; }
     public bool IsEngineer { get; set; }
+    public float HealAmount1 { get; set; } = 0f;
+    public bool canNotBeHealed { get; set; } = false;
+    public void MoveTo(Vector3 destination, bool countsAsMoveCommand = true) { Position = destination; }
     public bool canNotBeAttacked { get; set; }
     public bool canNotBeTargetedByAi { get; set; }
     public bool doNotRegisterGlobally { get; set; }

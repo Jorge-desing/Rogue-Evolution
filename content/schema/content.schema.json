@@ -713,6 +713,25 @@
           "maximum": 1000,
           "description": "Automatic retargeting acquisition radius limit (-1 disables and uses sight radius)."
         },
+        "minAttackRange": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 200.0,
+          "description": "Artillery dead-zone minimum attack range; weapons will not fire inside this distance."
+        },
+        "criticalHitChance": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "Base critical hit chance bonus for precision/sniper units [0.0, 1.0]."
+        },
+        "onHitStatusEffects": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/onHitStatusEffect"
+          },
+          "description": "List of dynamic status effects applied on attack impact."
+        },
         "prespawnCount": {
           "type": "integer",
           "minimum": 0,
@@ -2308,7 +2327,37 @@
         }
       }
     },
-    "activeSkill": {
+        "onHitStatusEffect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "statusEffect",
+        "duration"
+      ],
+      "properties": {
+        "statusEffect": {
+          "type": "string",
+          "enum": [
+            "CombatBoost", "Defender", "SquadEffect", "Turbo", "SlowedDown", "Stun", "OnFire", "Spikes",
+            "CriticallyHitting", "Battered", "Reaper", "Regen", "Rage", "Attacker", "Invincible", "Leaking",
+            "Vampirism", "Robust", "Marked", "Rush", "Solo", "Stealth", "Taunt", "Armored", "AttackDeactivated",
+            "Panic", "Overclocked"
+          ]
+        },
+        "duration": {
+          "type": "number",
+          "minimum": 0.05,
+          "maximum": 300.0
+        },
+        "chance": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "default": 1.0
+        }
+      }
+    },
+"activeSkill": {
       "type": "object",
       "additionalProperties": false,
       "required": [
@@ -3189,6 +3238,25 @@
           "minimum": -1,
           "maximum": 1000,
           "description": "Automatic retargeting acquisition radius limit (-1 disables and uses sight radius)."
+        },
+        "minAttackRange": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 200.0,
+          "description": "Artillery dead-zone minimum attack range; weapons will not fire inside this distance."
+        },
+        "criticalHitChance": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "Base critical hit chance bonus for precision/sniper units [0.0, 1.0]."
+        },
+        "onHitStatusEffects": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/onHitStatusEffect"
+          },
+          "description": "List of dynamic status effects applied on attack impact."
         },
         "prespawnCount": {
           "type": "integer",

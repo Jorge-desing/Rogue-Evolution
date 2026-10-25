@@ -474,6 +474,7 @@ namespace RogueCommandExpansionLoader.Content
                 ValidateAbilities(unit.abilities, itemPath + ".abilities", diagnostics);
                 ValidateAiOverrides(unit.aiOverrides, itemPath + ".aiOverrides", diagnostics);
                 ValidateActiveSkills(unit.activeSkills, itemPath + ".activeSkills", diagnostics);
+                ValidateOnHitStatusEffects(unit.onHitStatusEffects, itemPath + ".onHitStatusEffects", diagnostics);
                 ValidateCombatBoosts(unit.combatBoosts, itemPath + ".combatBoosts", diagnostics);
                 ValidateUnitUpgrades(unit.upgrades, itemPath + ".upgrades", unitIds, registrySnapshot, diagnostics);
                 ValidateUnitExperience(unit.experience, itemPath + ".experience", diagnostics);
@@ -2531,6 +2532,47 @@ namespace RogueCommandExpansionLoader.Content
             }
         }
 
+        private static readonly HashSet<string> ValidStatusEffects = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "CombatBoost", "Defender", "SquadEffect", "Turbo", "SlowedDown", "Stun", "OnFire", "Spikes",
+            "CriticallyHitting", "Battered", "Reaper", "Regen", "Rage", "Attacker", "Invincible", "Leaking",
+            "Vampirism", "Robust", "Marked", "Rush", "Solo", "Stealth", "Taunt", "Armored", "AttackDeactivated",
+            "Panic", "Overclocked"
+        };
+
+        private static void ValidateOnHitStatusEffects(
+            ContentOnHitStatusEffectDefinition[] effects,
+            string path,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (effects == null) return;
+            for (int i = 0; i < effects.Length; i++)
+            {
+                var effect = effects[i];
+                string itemPath = path + "[" + i + "]";
+                if (effect == null)
+                {
+                    Add(diagnostics, "entry.null", itemPath, "On-hit status effect entries cannot be null.");
+                    continue;
+                }
+                if (string.IsNullOrWhiteSpace(effect.statusEffect) || !ValidStatusEffects.Contains(effect.statusEffect))
+                {
+                    Add(diagnostics, "on-hit-status-effect.type-invalid", itemPath + ".statusEffect",
+                        "statusEffect must be a valid StatusEffect flag (e.g. Stun, OnFire, SlowedDown, Battered, Marked, Leaking, AttackDeactivated, Panic).");
+                }
+                if (!IsFiniteSingle(effect.duration) || effect.duration < 0.05f || effect.duration > 300f)
+                {
+                    Add(diagnostics, "on-hit-status-effect.duration-invalid", itemPath + ".duration",
+                        "On-hit status effect duration must be a finite float between 0.05 and 300.");
+                }
+                if (!IsFiniteSingle(effect.chance) || effect.chance < 0f || effect.chance > 1.0f)
+                {
+                    Add(diagnostics, "on-hit-status-effect.chance-invalid", itemPath + ".chance",
+                        "On-hit status effect chance must be a finite float between 0 and 1.");
+                }
+            }
+        }
+
         private static void ValidateUnitProductionQueue(
             ContentUnitProductionQueueDefinition queue,
             string path,
@@ -3015,6 +3057,16 @@ namespace RogueCommandExpansionLoader.Content
                 {
                     Add(diagnostics, "unit.minAttackRange-invalid", path + ".minAttackRange",
                         "minAttackRange must be a finite float between 0 and 200.");
+                }
+            }
+
+            if (unit.criticalHitChance.HasValue)
+            {
+                float crit = unit.criticalHitChance.Value;
+                if (!IsFiniteSingle(crit) || crit < 0f || crit > 1f)
+                {
+                    Add(diagnostics, "unit.criticalHitChance-invalid", path + ".criticalHitChance",
+                        "criticalHitChance must be a finite float between 0 and 1.");
                 }
             }
 
@@ -4448,6 +4500,7 @@ namespace RogueCommandExpansionLoader.Content
                         "A building only declares a bundle when it supplies a card image, visual overlay, or audio assets.");
                 }
 
+                ValidateOnHitStatusEffects(building.onHitStatusEffects, itemPath + ".onHitStatusEffects", diagnostics);
                 ValidateStructuredBuildingParameters(building, itemPath, diagnostics);
                 ValidateBalanceOverrides(building.balanceOverrides, itemPath + ".balanceOverrides",
                     "building", "building", diagnostics, true);
@@ -4646,6 +4699,16 @@ namespace RogueCommandExpansionLoader.Content
                 {
                     Add(diagnostics, "building.minAttackRange-invalid", path + ".minAttackRange",
                         "minAttackRange must be a finite float between 0 and 200.");
+                }
+            }
+
+            if (building.criticalHitChance.HasValue)
+            {
+                float crit = building.criticalHitChance.Value;
+                if (!IsFiniteSingle(crit) || crit < 0f || crit > 1f)
+                {
+                    Add(diagnostics, "building.criticalHitChance-invalid", path + ".criticalHitChance",
+                        "criticalHitChance must be a finite float between 0 and 1.");
                 }
             }
 

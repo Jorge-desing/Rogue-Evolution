@@ -960,9 +960,16 @@ namespace RogueCommandExpansionLoader.Runtime
         private static PropertyInfo _entityControllerIdProperty;
         private static FieldInfo _entityControllerIdBackingField;
         private static PropertyInfo _entityControllerPositionProperty;
+        private static MethodInfo _setActiveStatusEffectMethod;
+        private static Type _statusEffectEnumType;
+        private static Type _durationTypeEnumType;
+        [ThreadStatic]
+        private static System.Random _threadRng;
+        private static System.Random Rng => _threadRng ?? (_threadRng = new System.Random());
 
 #pragma warning disable CS0649
         public static Func<string, float?> MinAttackRangeResolver;
+        public static Func<string, List<RogueCommandExpansionLoader.Content.ContentOnHitStatusEffectDefinition>> OnHitStatusEffectsResolver;
 #pragma warning restore CS0649
 
         public static void EntityAttackIsTargetInRangePostfix(object __instance, object __0, ref bool __result)
@@ -1040,6 +1047,98 @@ namespace RogueCommandExpansionLoader.Runtime
             catch (Exception ex)
             {
                 _log?.Invoke("[RuntimeHooks] EntityAttackIsTargetInRangePostfix error: " + ex.Message);
+            }
+        }
+
+        public static void EntityTakeDamagePostfix(object __instance, float __0, object __1)
+        {
+            if (__instance == null || __1 == null || __0 <= 0f)
+            {
+                return;
+            }
+
+            try
+            {
+                if (_entityControllerIdProperty == null && _entityControllerIdBackingField == null)
+                {
+                    Type attackerType = __1.GetType();
+                    _entityControllerIdProperty = attackerType.GetProperty("EntityId", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                    if (_entityControllerIdProperty == null)
+                    {
+                        _entityControllerIdBackingField = attackerType.GetField("entityId", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                    }
+                }
+
+                string originatorId = null;
+                if (_entityControllerIdProperty != null)
+                {
+                    originatorId = _entityControllerIdProperty.GetValue(__1, null) as string;
+                }
+                else if (_entityControllerIdBackingField != null)
+                {
+                    originatorId = _entityControllerIdBackingField.GetValue(__1) as string;
+                }
+
+                if (string.IsNullOrEmpty(originatorId))
+                {
+                    return;
+                }
+
+                List<RogueCommandExpansionLoader.Content.ContentOnHitStatusEffectDefinition> effects =
+                    OnHitStatusEffectsResolver != null ? OnHitStatusEffectsResolver(originatorId) : null;
+                if (effects == null || effects.Count == 0)
+                {
+                    return;
+                }
+
+                if (_setActiveStatusEffectMethod == null)
+                {
+                    Type ecType = __instance.GetType();
+                    Assembly gameAsm = ecType.Assembly;
+                    _statusEffectEnumType = gameAsm.GetType("StatusEffect");
+                    _durationTypeEnumType = gameAsm.GetType("SetStatusEffect+DurationType") ?? gameAsm.GetType("SetStatusEffect/DurationType");
+                    if (_statusEffectEnumType != null && _durationTypeEnumType != null)
+                    {
+                        _setActiveStatusEffectMethod = ecType.GetMethod("SetActiveStatusEffect",
+                            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+                            null,
+                            new Type[] { _statusEffectEnumType, _durationTypeEnumType, typeof(float) },
+                            null);
+                    }
+                }
+
+                if (_setActiveStatusEffectMethod == null || _statusEffectEnumType == null || _durationTypeEnumType == null)
+                {
+                    return;
+                }
+
+                for (int i = 0; i < effects.Count; i++)
+                {
+                    RogueCommandExpansionLoader.Content.ContentOnHitStatusEffectDefinition effect = effects[i];
+                    if (effect == null || string.IsNullOrEmpty(effect.statusEffect) || effect.duration <= 0f)
+                    {
+                        continue;
+                    }
+
+                    if (effect.chance < 1.0f && (float)Rng.NextDouble() > effect.chance)
+                    {
+                        continue;
+                    }
+
+                    try
+                    {
+                        object parsedEffect = Enum.Parse(_statusEffectEnumType, effect.statusEffect, true);
+                        object durationTypeSeconds = Enum.ToObject(_durationTypeEnumType, 1);
+                        _setActiveStatusEffectMethod.Invoke(__instance, new object[] { parsedEffect, durationTypeSeconds, effect.duration });
+                    }
+                    catch
+                    {
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _log?.Invoke("[RuntimeHooks] EntityTakeDamagePostfix error: " + ex.Message);
             }
         }
 
@@ -1317,6 +1416,11 @@ namespace RogueCommandExpansionLoader.Runtime
         public static void EntityAttackIsTargetInRangePostfix(object __instance, object __0, ref bool __result)
         {
             RuntimeHooks.EntityAttackIsTargetInRangePostfix(__instance, __0, ref __result);
+        }
+
+        public static void EntityTakeDamagePostfix(object __instance, float __0, object __1)
+        {
+            RuntimeHooks.EntityTakeDamagePostfix(__instance, __0, __1);
         }
     }
 

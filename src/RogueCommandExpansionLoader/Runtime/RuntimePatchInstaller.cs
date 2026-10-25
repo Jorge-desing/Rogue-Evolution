@@ -347,6 +347,13 @@ namespace RogueCommandExpansionLoader.Runtime
                     return parameters.Length == 1 && parameters[0].ParameterType == entityController && method.ReturnType == typeof(bool);
                 });
             MethodInfo isTargetInRangePostfix = Hook("EntityAttackIsTargetInRangePostfix");
+            MethodInfo takeDamage = RuntimeReflection.FindUniqueMethod(entityController, "TakeDamage",
+                delegate(MethodInfo method)
+                {
+                    ParameterInfo[] parameters = method.GetParameters();
+                    return parameters.Length == 4 && parameters[0].ParameterType == typeof(float) && parameters[1].ParameterType == entityController;
+                });
+            MethodInfo takeDamagePostfix = Hook("EntityTakeDamagePostfix");
             MethodInfo loadPrefix = typeof(UnityResourcesLoadTypedPatch).GetMethod("Prefix",
                 BindingFlags.Public | BindingFlags.Static);
             if (loadPrefix == null)
@@ -394,6 +401,7 @@ namespace RogueCommandExpansionLoader.Runtime
             plan.Add(new PatchPlan(setupPrespawning, null, setupPrespawningPostfix));
             plan.Add(new PatchPlan(setupAiPrespawning, null, setupAiPrespawningPostfix));
             plan.Add(new PatchPlan(isTargetInRange, null, isTargetInRangePostfix));
+            plan.Add(new PatchPlan(takeDamage, null, takeDamagePostfix));
             return plan;
         }
 

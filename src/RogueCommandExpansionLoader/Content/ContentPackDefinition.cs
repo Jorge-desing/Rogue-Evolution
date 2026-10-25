@@ -69,6 +69,14 @@ namespace RogueCommandExpansionLoader.Content
     }
 
     [Serializable]
+    public sealed class ContentOnHitStatusEffectDefinition
+    {
+        public string statusEffect;
+        public float duration;
+        public float chance = 1.0f;
+    }
+
+    [Serializable]
     public sealed class ContentUnitUpgradeDefinition
     {
         public string targetUnitId;
@@ -307,6 +315,8 @@ namespace RogueCommandExpansionLoader.Content
         public bool? defendPositionAggressivelyWhenIdle;
         public int? rangeToChooseNewTargetAutomatically;
         public float? minAttackRange;
+        public ContentOnHitStatusEffectDefinition[] onHitStatusEffects;
+        public float? criticalHitChance;
         public int? prespawnCount;
         public string selectionSoundAssetName;
         public string engineSoundAssetName;
@@ -601,6 +611,8 @@ namespace RogueCommandExpansionLoader.Content
         public bool? defendPositionAggressivelyWhenIdle;
         public int? rangeToChooseNewTargetAutomatically;
         public float? minAttackRange;
+        public ContentOnHitStatusEffectDefinition[] onHitStatusEffects;
+        public float? criticalHitChance;
         public int? prespawnCount;
         public string selectionSoundAssetName;
         public string engineSoundAssetName;
@@ -988,6 +1000,8 @@ namespace RogueCommandExpansionLoader.Content
                 defendPositionAggressivelyWhenIdle = source.defendPositionAggressivelyWhenIdle,
                 rangeToChooseNewTargetAutomatically = source.rangeToChooseNewTargetAutomatically,
                 minAttackRange = source.minAttackRange,
+                onHitStatusEffects = CloneArray(source.onHitStatusEffects, CloneOnHitStatusEffect),
+                criticalHitChance = source.criticalHitChance,
                 prespawnCount = source.prespawnCount,
                 selectionSoundAssetName = source.selectionSoundAssetName,
                 engineSoundAssetName = source.engineSoundAssetName,
@@ -1068,6 +1082,16 @@ namespace RogueCommandExpansionLoader.Content
         private static ContentCombatBoostDefinition CloneCombatBoost(ContentCombatBoostDefinition source)
         {
             return source == null ? null : new ContentCombatBoostDefinition { id = source.id, statName = source.statName, multiplier = source.multiplier, duration = source.duration };
+        }
+
+        private static ContentOnHitStatusEffectDefinition CloneOnHitStatusEffect(ContentOnHitStatusEffectDefinition source)
+        {
+            return source == null ? null : new ContentOnHitStatusEffectDefinition
+            {
+                statusEffect = source.statusEffect,
+                duration = source.duration,
+                chance = source.chance
+            };
         }
 
         private static ContentUnitUpgradeDefinition CloneUnitUpgrade(ContentUnitUpgradeDefinition source)
@@ -1362,6 +1386,8 @@ namespace RogueCommandExpansionLoader.Content
                 defendPositionAggressivelyWhenIdle = source.defendPositionAggressivelyWhenIdle,
                 rangeToChooseNewTargetAutomatically = source.rangeToChooseNewTargetAutomatically,
                 minAttackRange = source.minAttackRange,
+                onHitStatusEffects = CloneArray(source.onHitStatusEffects, CloneOnHitStatusEffect),
+                criticalHitChance = source.criticalHitChance,
                 prespawnCount = source.prespawnCount,
                 selectionSoundAssetName = source.selectionSoundAssetName,
                 engineSoundAssetName = source.engineSoundAssetName,

@@ -1,4 +1,5 @@
 #nullable enable
+using UnityEngine;
 using System.Collections;
 using System.Reflection;
 using System.Reflection.Emit;
@@ -8850,6 +8851,220 @@ var tests = new (string Name, Action Run)[]
             DefaultAiBehaviour.ResetRuntimeState();
         }
     }),
+    ("tactical AI modules skirmish-kiting and support-repair are registered and validated", () =>
+    {
+        var registry = new AiModuleRegistry();
+        registry.Register(new SkirmishKitingAiModule());
+        registry.Register(new SupportRepairAiModule());
+
+        if (!registry.TryValidate("sample:skirmish-kiting", null, out string diagnostic) || diagnostic != null)
+        {
+            throw new InvalidOperationException("Skirmish-kiting module failed registry validation: " + diagnostic);
+        }
+        if (!registry.TryValidate("sample:support-repair", null, out diagnostic) || diagnostic != null)
+        {
+            throw new InvalidOperationException("Support-repair module failed registry validation: " + diagnostic);
+        }
+    }),
+    ("skirmish kiting AI module parses defaults, custom limits and commands retreat when enemy encroaches", () =>
+    {
+        if (!SkirmishKitingParameterParser.TryParse(null, out SkirmishKitingSettings settings, out string diagnostic) || diagnostic != null)
+        {
+            throw new InvalidOperationException("Skirmish kiting default parse failed: " + diagnostic);
+        }
+        if (settings.RetreatDistanceRatio != 0.70f || settings.PreferredEngagementRatio != 0.90f ||
+            settings.MinKiteSpeed != 8.0f || settings.FleeDistance != 8.0f || settings.MaxKiteTargets != 8)
+        {
+            throw new InvalidOperationException("Skirmish kiting defaults unexpected values.");
+        }
+
+        var invalidParams = new[] { new ContentModuleParameter { name = "retreatDistanceRatio", value = "0.99" }, new ContentModuleParameter { name = "preferredEngagementRatio", value = "0.60" } };
+        if (SkirmishKitingParameterParser.TryParse(invalidParams, out _, out diagnostic) || diagnostic == null)
+        {
+            throw new InvalidOperationException("Skirmish kiting should reject retreatRatio >= preferredRatio.");
+        }
+
+        IRogueCommandAiRuntimeBehaviour? behaviour = null;
+        try
+        {
+            var fastKiteUnit = new EntityController
+            {
+                IsControlledByAi = true,
+                MoveSpeed = 12f,
+                WeaponRange = 20f,
+                Position = new Vector3(10f, 0f, 10f)
+            };
+            var closePlayerEnemy = new EntityController
+            {
+                IsControlledByPlayer = true,
+                Position = new Vector3(12f, 0f, 10f)
+            };
+
+            ExistingControllers.Instance.Reset();
+            ExistingControllers.Instance.AiUnits().Add(fastKiteUnit);
+            ExistingControllers.Instance.PlayerEntities().Add(closePlayerEnemy);
+
+            behaviour = new SkirmishKitingAiModule().CreateBehaviour(new DefaultAiBehaviour(), null);
+            behaviour.OnInitialized();
+            behaviour.Tick();
+
+            if (fastKiteUnit.Position.x >= 10f)
+            {
+                throw new InvalidOperationException("Fast kite unit did not retreat away from encroaching threat: pos=" + fastKiteUnit.Position);
+            }
+        }
+        finally
+        {
+            behaviour?.OnDestroyed();
+            ExistingControllers.Instance.Reset();
+            DefaultAiBehaviour.ResetRuntimeState();
+        }
+    }),
+    ("support repair AI module parses parameters and dispatches repairers to damaged priority friendlies", () =>
+    {
+        if (!SupportRepairParameterParser.TryParse(null, out SupportRepairSettings settings, out string diagnostic) || diagnostic != null)
+        {
+            throw new InvalidOperationException("Support repair default parse failed: " + diagnostic);
+        }
+        if (settings.HealthThresholdRatio != 0.85f || settings.RepairScanRadius != 25.0f ||
+            !settings.PrioritizeHarvestersAndBuildings || settings.MaxAssignedRepairersPerTarget != 2)
+        {
+            throw new InvalidOperationException("Support repair defaults unexpected values.");
+        }
+
+        var invalidThreshold = new[] { new ContentModuleParameter { name = "healthThresholdRatio", value = "1.5" } };
+        if (SupportRepairParameterParser.TryParse(invalidThreshold, out _, out diagnostic) || diagnostic == null)
+        {
+            throw new InvalidOperationException("Support repair should reject healthThresholdRatio > 0.99.");
+        }
+
+        IRogueCommandAiRuntimeBehaviour? behaviour = null;
+        try
+        {
+            var engineer = new EntityController
+            {
+                IsControlledByAi = true,
+                IsEngineer = true,
+                Position = new Vector3(0f, 0f, 0f)
+            };
+            var damagedHarvester = new EntityController
+            {
+                IsControlledByAi = true,
+                Role = UnitRole.Harvester,
+                MaxHealth = 100f,
+                CurrentHealth = 40f,
+                Position = new Vector3(10f, 0f, 0f)
+            };
+            var damagedUnit = new EntityController
+            {
+                IsControlledByAi = true,
+                MaxHealth = 100f,
+                CurrentHealth = 30f,
+                Position = new Vector3(0f, 0f, 15f)
+            };
+
+            ExistingControllers.Instance.Reset();
+            ExistingControllers.Instance.AiUnits().Add(engineer);
+            ExistingControllers.Instance.AiUnits().Add(damagedHarvester);
+            ExistingControllers.Instance.AiUnits().Add(damagedUnit);
+
+            behaviour = new SupportRepairAiModule().CreateBehaviour(new DefaultAiBehaviour(), null);
+            behaviour.OnInitialized();
+            behaviour.Tick();
+
+            if (engineer.Position.x != 10f || engineer.Position.z != 0f)
+            {
+                throw new InvalidOperationException("Engineer did not prioritize damaged harvester: pos=" + engineer.Position);
+            }
+        }
+        finally
+        {
+            behaviour?.OnDestroyed();
+            ExistingControllers.Instance.Reset();
+            DefaultAiBehaviour.ResetRuntimeState();
+        }
+    }),
+    ("unit and building validation checks onHitStatusEffects and criticalHitChance extensions", () =>
+    {
+        ContentPackDefinition testPack = ContentPackCopy.DeepClone(nativeSample);
+        ContentUnitDefinition unit = testPack.units[0];
+        unit.criticalHitChance = 0.25f;
+        unit.onHitStatusEffects = new[]
+        {
+            new ContentOnHitStatusEffectDefinition
+            {
+                statusEffect = "Stun",
+                duration = 2.5f,
+                chance = 0.35f
+            },
+            new ContentOnHitStatusEffectDefinition
+            {
+                statusEffect = "OnFire",
+                duration = 5.0f,
+                chance = 1.0f
+            }
+        };
+
+        testPack.buildings = new[]
+        {
+            new ContentBuildingDefinition
+            {
+                id = "sample-native:turret-test",
+                nativeTemplateId = "MachineGunTurret",
+                cost = 100,
+                buildTime = 5f,
+                combatValue = 10,
+                rarity = "Common",
+                tech = "Tank",
+                criticalHitChance = 0.10f,
+                localizations = new[]
+                {
+                    new ContentUnitLocalizationDefinition
+                    {
+                        language = "en-US",
+                        name = "Test Turret",
+                        description = "Test turret description"
+                    }
+                },
+                onHitStatusEffects = new[]
+                {
+                    new ContentOnHitStatusEffectDefinition
+                    {
+                        statusEffect = "Battered",
+                        duration = 4.0f,
+                        chance = 0.5f
+                    }
+                }
+            }
+        };
+
+        WithPackage(testPack, (p, root) => ExpectValid(p, root, new EmptySnapshot(), new KnownModuleValidator()));
+
+        ContentPackDefinition invalidCrit = ContentPackCopy.DeepClone(testPack);
+        invalidCrit.units[0].criticalHitChance = 1.5f;
+        WithPackage(invalidCrit, (p, root) => ExpectDiagnostic(p, root, new EmptySnapshot(),
+            new KnownModuleValidator(), "unit.criticalHitChance-invalid"));
+
+        ContentPackDefinition invalidBldgCrit = ContentPackCopy.DeepClone(testPack);
+        invalidBldgCrit.buildings[0].criticalHitChance = -0.1f;
+        WithPackage(invalidBldgCrit, (p, root) => ExpectDiagnostic(p, root, new EmptySnapshot(),
+            new KnownModuleValidator(), "building.criticalHitChance-invalid"));
+
+        ContentPackDefinition invalidEffectFlag = ContentPackCopy.DeepClone(testPack);
+        invalidEffectFlag.units[0].onHitStatusEffects[0].statusEffect = "SuperMegaNuke";
+        WithPackage(invalidEffectFlag, (p, root) => ExpectDiagnostic(p, root, new EmptySnapshot(),
+            new KnownModuleValidator(), "on-hit-status-effect.type-invalid"));
+
+        ContentPackDefinition invalidEffectDur = ContentPackCopy.DeepClone(testPack);
+        invalidEffectDur.units[0].onHitStatusEffects[0].duration = 0f;
+        WithPackage(invalidEffectDur, (p, root) => ExpectDiagnostic(p, root, new EmptySnapshot(),
+            new KnownModuleValidator(), "on-hit-status-effect.duration-invalid"));
+
+        ContentPackDefinition invalidEffectChance = ContentPackCopy.DeepClone(testPack);
+        invalidEffectChance.units[0].onHitStatusEffects[0].chance = 2.0f;
+        WithPackage(invalidEffectChance, (p, root) => ExpectDiagnostic(p, root, new EmptySnapshot(),
+            new KnownModuleValidator(), "on-hit-status-effect.chance-invalid"));
+    }),
     ("unit and building validation checks minAttackRange and active skill extensions", () =>
     {
         ContentPackDefinition testPack = ContentPackCopy.DeepClone(nativeSample);
@@ -9776,6 +9991,14 @@ sealed class KnownModuleValidator : IAiModuleValidator
                 if (moduleId == "sample:tactical-regroup")
                 {
                     return TacticalRegroupParameterParser.TryParse(parameters, out _, out diagnostic);
+                }
+                if (moduleId == "sample:skirmish-kiting")
+                {
+                    return SkirmishKitingParameterParser.TryParse(parameters, out _, out diagnostic);
+                }
+                if (moduleId == "sample:support-repair")
+                {
+                    return SupportRepairParameterParser.TryParse(parameters, out _, out diagnostic);
                 }
 
         bool known = moduleId is "sample:scheduled-base-build" or "sample:reactive-base-defense" or "sample:trace-default";
