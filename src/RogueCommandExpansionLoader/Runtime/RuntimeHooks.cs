@@ -143,6 +143,136 @@ namespace RogueCommandExpansionLoader.Runtime
             }
         }
 
+        public static bool EnsureGuaranteedModCardOption(List<string> ids, int? forcedSlot = null)
+        {
+            if (ids == null || ids.Count == 0)
+            {
+                return false;
+            }
+
+            IGuaranteedModCardRewardProvider guaranteedProvider = GetGuaranteedRewardProvider();
+            if (guaranteedProvider == null)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < ids.Count; i++)
+            {
+                if (guaranteedProvider.IsModUnitProduct(ids[i]))
+                {
+                    return false;
+                }
+            }
+
+            string poolId = null;
+            bool isStartingSelection = false;
+            int currentXpLevel = 0;
+            HashSet<string> excluded = new HashSet<string>(ids, StringComparer.Ordinal);
+
+            RuntimeContentMutator mutator;
+            lock (Gate)
+            {
+                mutator = _mutator;
+            }
+
+            if (mutator != null && mutator.GameAssembly != null)
+            {
+                try
+                {
+                    Type gameType = RuntimeReflection.FindUniqueType(mutator.GameAssembly, "Game");
+                    if (gameType != null)
+                    {
+                        FieldInfo startingField = gameType.GetField("AtLeastOneBlueprintHasBeenAddedByPlayer",
+                            BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+                        if (startingField != null)
+                        {
+                            object val = startingField.GetValue(null);
+                            if (val is bool)
+                            {
+                                isStartingSelection = !(bool)val;
+                            }
+                        }
+
+                        PropertyInfo cardsInDeckProp = gameType.GetProperty("CardsInDeck",
+                            BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+                        if (cardsInDeckProp != null)
+                        {
+                            IEnumerable<string> cards = cardsInDeckProp.GetValue(null) as IEnumerable<string>;
+                            if (cards != null)
+                            {
+                                foreach (string card in cards)
+                                {
+                                    if (!string.IsNullOrEmpty(card))
+                                    {
+                                        excluded.Add(card);
+                                    }
+                                }
+                            }
+                        }
+
+                        FieldInfo openCardRewardsField = gameType.GetField("OpenCardRewards",
+                            BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+                        if (openCardRewardsField != null)
+                        {
+                            System.Collections.IList openRewards = openCardRewardsField.GetValue(null) as System.Collections.IList;
+                            if (openRewards != null && openRewards.Count > 0)
+                            {
+                                object firstReward = openRewards[0];
+                                if (firstReward != null)
+                                {
+                                    FieldInfo poolIdField = firstReward.GetType().GetField("blueprintPoolId",
+                                        BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                                    if (poolIdField != null)
+                                    {
+                                        poolId = poolIdField.GetValue(firstReward) as string;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Type metaGameType = RuntimeReflection.FindUniqueType(mutator.GameAssembly, "MetaGame");
+                    if (metaGameType != null)
+                    {
+                        PropertyInfo instanceProp = metaGameType.GetProperty("Instance",
+                            BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+                        object metaInstance = instanceProp != null ? instanceProp.GetValue(null) : null;
+                        if (metaInstance != null)
+                        {
+                            PropertyInfo xpProp = metaGameType.GetProperty("CurrentExperienceLevel",
+                                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                            if (xpProp != null)
+                            {
+                                object xpVal = xpProp.GetValue(metaInstance);
+                                if (xpVal is int)
+                                {
+                                    currentXpLevel = (int)xpVal;
+                                }
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Log("Warning: Could not inspect game state for guaranteed mod card reward: " + ex.Message);
+                }
+            }
+
+            string modProductId;
+            if (guaranteedProvider.TryGetGuaranteedModRewardProduct(
+                poolId, isStartingSelection, currentXpLevel, excluded, out modProductId))
+            {
+                int slot = forcedSlot.HasValue ? Math.Abs(forcedSlot.Value) % ids.Count : _guaranteedRewardRandom.Next(0, ids.Count);
+                string replaced = ids[slot];
+                ids[slot] = modProductId;
+                Log(string.Format("[ExpansionLoader] Guaranteed mod unit card injected into slot {0} (replaced '{1}'): '{2}'",
+                    slot, replaced, modProductId));
+                return true;
+            }
+
+            return false;
+        }
+
         public static void ObserveBlueprintPoolCandidates(
             object pool,
             List<string> candidates,
@@ -1180,6 +1310,16 @@ namespace RogueCommandExpansionLoader.Runtime
             }
         }
 
+        private static readonly System.Random _guaranteedRewardRandom = new System.Random();
+
+        private static IGuaranteedModCardRewardProvider GetGuaranteedRewardProvider()
+        {
+            lock (Gate)
+            {
+                return _provider as IGuaranteedModCardRewardProvider;
+            }
+        }
+
         private static IBlueprintPoolRuntimeProvider GetBlueprintPoolProvider()
         {
             lock (Gate)
@@ -1247,6 +1387,11 @@ namespace RogueCommandExpansionLoader.Runtime
         public static void PresentCardsToChoosePrefix(out object __state)
         {
             __state = RuntimeHooks.BeginBlueprintRewardScope();
+        }
+
+        public static void InstantiateCardsWithDelayPrefix(List<string> __0)
+        {
+            RuntimeHooks.EnsureGuaranteedModCardOption(__0);
         }
 
         public static Exception PresentCardsToChooseFinalizer(Exception __exception, object __state)

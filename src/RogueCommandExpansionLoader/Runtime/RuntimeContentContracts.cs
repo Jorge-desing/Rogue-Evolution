@@ -171,6 +171,21 @@ namespace RogueCommandExpansionLoader.Runtime
     }
 
     /// <summary>
+    /// Optional bridge for guaranteeing that at least one valid mod card appears in card reward screens.
+    /// </summary>
+    public interface IGuaranteedModCardRewardProvider
+    {
+        bool IsModUnitProduct(string productId);
+
+        bool TryGetGuaranteedModRewardProduct(
+            string poolId,
+            bool isStartingSelection,
+            int currentXpLevel,
+            ICollection<string> excludedProductIds,
+            out string modProductId);
+    }
+
+    /// <summary>
     /// Runtime references to objects loaded by the content pipeline. Values are kept
     /// object-typed here so this layer does not bind to Assembly-CSharp at compile time.
     /// </summary>

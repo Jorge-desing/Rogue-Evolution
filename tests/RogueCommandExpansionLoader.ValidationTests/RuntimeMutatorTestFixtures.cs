@@ -245,8 +245,21 @@ public struct EntityInAiDeck
 }
 
 internal sealed class RuntimeMutatorTestProvider : IRuntimeContentProvider, IBlueprintPoolRuntimeProvider,
-    IBlueprintRewardFactoryScopeProvider
+    IBlueprintRewardFactoryScopeProvider, IGuaranteedModCardRewardProvider
 {
+    public HashSet<string> ModProducts { get; } = new(StringComparer.Ordinal);
+    public string GuaranteedModProduct { get; set; }
+    public bool IsModUnitProduct(string productId) => !string.IsNullOrEmpty(productId) && ModProducts.Contains(productId);
+    public bool TryGetGuaranteedModRewardProduct(
+        string poolId,
+        bool isStartingSelection,
+        int currentXpLevel,
+        ICollection<string> excludedProductIds,
+        out string modProductId)
+    {
+        modProductId = GuaranteedModProduct;
+        return !string.IsNullOrEmpty(modProductId);
+    }
     public Dictionary<string, string> PoolLocalizationAliases { get; } = new(StringComparer.OrdinalIgnoreCase);
     public Dictionary<object, string> PoolIds { get; } = new();
     public BlueprintRewardFactoryScope RewardFactoryScope { get; set; }

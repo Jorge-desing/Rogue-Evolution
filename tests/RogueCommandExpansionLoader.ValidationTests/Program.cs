@@ -374,6 +374,7 @@ var tests = new (string Name, Action Run)[]
             "BlueprintPoolExclusiveBlueprintsPostfix",
             "PresentCardsToChoosePrefix",
             "PresentCardsToChooseFinalizer",
+            "InstantiateCardsWithDelayPrefix",
             "BlueprintPoolBlueprintsInPoolPostfix",
             "PresentCardAsRewardRecordPostfix",
             "AllEntityIdsAllowedAsBlueprintsPostfix",
@@ -389,6 +390,15 @@ var tests = new (string Name, Action Run)[]
             {
                 throw new InvalidOperationException($"RuntimePatchInstaller expects missing hook '{hookName}'.");
             }
+        }
+
+        MethodInfo? instantiateCardsHook = typeof(RuntimeHarmonyPatches).GetMethod(
+            "InstantiateCardsWithDelayPrefix", BindingFlags.Public | BindingFlags.Static);
+        ParameterInfo[] instantiateCardsParams = instantiateCardsHook?.GetParameters() ?? Array.Empty<ParameterInfo>();
+        if (instantiateCardsHook == null || instantiateCardsHook.ReturnType != typeof(void) ||
+            instantiateCardsParams.Length != 1 || instantiateCardsParams[0].ParameterType != typeof(List<string>))
+        {
+            throw new InvalidOperationException("InstantiateCardsWithDelayPrefix has an invalid Harmony signature.");
         }
 
         MethodInfo? poolCandidatesHook = typeof(RuntimeHarmonyPatches).GetMethod(
@@ -814,6 +824,47 @@ var tests = new (string Name, Action Run)[]
             !trace.Contains("offeredProducts=[" + stageUnit + "]", StringComparison.Ordinal))
         {
             throw new InvalidOperationException("The trace did not distinguish stage candidates from actual offers: " + trace);
+        }
+    }),
+    ("guaranteed mod card reward replaces non-mod slot and preserves natural rolls", () =>
+    {
+        var mockProvider = new RuntimeMutatorTestProvider
+        {
+            GuaranteedModProduct = "sample:unit-b"
+        };
+        mockProvider.ModProducts.Add("sample:unit-a");
+        mockProvider.ModProducts.Add("sample:unit-b");
+
+        RuntimeHooks.Bind(null!, mockProvider, null!);
+        try
+        {
+            // Case 1: All native cards -> slot replaced with guaranteed mod product
+            var nativeCards = new List<string> { "native:tank", "native:turret", "native:scout" };
+            bool injected = RuntimeHooks.EnsureGuaranteedModCardOption(nativeCards, forcedSlot: 1);
+            if (!injected || nativeCards[1] != "sample:unit-b" || nativeCards[0] != "native:tank" || nativeCards[2] != "native:scout")
+            {
+                throw new InvalidOperationException("Guaranteed mod card was not injected into forced slot 1.");
+            }
+
+            // Case 2: List already contains a mod card -> no modification
+            var mixedCards = new List<string> { "native:tank", "sample:unit-a", "native:scout" };
+            bool injectedMixed = RuntimeHooks.EnsureGuaranteedModCardOption(mixedCards, forcedSlot: 0);
+            if (injectedMixed || mixedCards[0] != "native:tank" || mixedCards[1] != "sample:unit-a")
+            {
+                throw new InvalidOperationException("Guaranteed mod card should not alter list that already has a mod unit.");
+            }
+
+            // Case 3: Empty / null list -> safe return false
+            var emptyCards = new List<string>();
+            bool injectedEmpty = RuntimeHooks.EnsureGuaranteedModCardOption(emptyCards);
+            if (injectedEmpty)
+            {
+                throw new InvalidOperationException("Empty list should not trigger injection.");
+            }
+        }
+        finally
+        {
+            RuntimeHooks.Clear(null!);
         }
     }),
     ("random reward trace output is bounded", () =>

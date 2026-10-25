@@ -300,6 +300,8 @@ namespace RogueCommandExpansionLoader.Runtime
                 blueprintPool, "ExclusiveBlueprints", HasBlueprintPoolExclusiveShape);
             MethodInfo presentCardsToChoose = RuntimeReflection.FindUniqueMethod(
                 chooseCard, "PresentCardsToChoose", HasPresentCardsToChooseShape);
+            MethodInfo instantiateCardsWithDelay = RuntimeReflection.FindUniqueMethod(
+                chooseCard, "InstantiateCardsWithDelay", HasInstantiateCardsWithDelayShape);
             MethodInfo blueprintPoolCandidates = RuntimeReflection.FindUniqueMethod(
                 blueprintPool, "BlueprintsInPool", HasBlueprintPoolCandidatesShape);
             MethodInfo presentCardAsRewardRecord = RuntimeReflection.FindUniqueMethod(
@@ -337,6 +339,7 @@ namespace RogueCommandExpansionLoader.Runtime
             MethodInfo blueprintPoolExclusivePostfix = Hook("BlueprintPoolExclusiveBlueprintsPostfix");
             MethodInfo presentCardsToChoosePrefix = Hook("PresentCardsToChoosePrefix");
             MethodInfo presentCardsToChooseFinalizer = Hook("PresentCardsToChooseFinalizer");
+            MethodInfo instantiateCardsWithDelayPrefix = Hook("InstantiateCardsWithDelayPrefix");
             MethodInfo blueprintPoolCandidatesPostfix = Hook("BlueprintPoolBlueprintsInPoolPostfix");
             MethodInfo presentCardAsRewardRecordPostfix = Hook("PresentCardAsRewardRecordPostfix");
             MethodInfo allAllowedBlueprintsPostfix = Hook("AllEntityIdsAllowedAsBlueprintsPostfix");
@@ -393,6 +396,7 @@ namespace RogueCommandExpansionLoader.Runtime
             plan.Add(new PatchPlan(blueprintPoolExclusive, null, blueprintPoolExclusivePostfix));
             plan.Add(new PatchPlan(presentCardsToChoose, presentCardsToChoosePrefix, null,
                 presentCardsToChooseFinalizer));
+            plan.Add(new PatchPlan(instantiateCardsWithDelay, instantiateCardsWithDelayPrefix, null));
             plan.Add(new PatchPlan(blueprintPoolCandidates, null, blueprintPoolCandidatesPostfix));
             plan.Add(new PatchPlan(presentCardAsRewardRecord, null, presentCardAsRewardRecordPostfix));
             plan.Add(new PatchPlan(allAllowedBlueprints, null, allAllowedBlueprintsPostfix));
@@ -468,6 +472,17 @@ namespace RogueCommandExpansionLoader.Runtime
         {
             return !method.IsStatic && method.ReturnType == typeof(void) &&
                 method.GetParameters().Length == 0;
+        }
+
+        private static bool HasInstantiateCardsWithDelayShape(MethodInfo method)
+        {
+            if (method.IsStatic || method.ReturnType != typeof(System.Collections.IEnumerator))
+            {
+                return false;
+            }
+
+            ParameterInfo[] parameters = method.GetParameters();
+            return parameters.Length == 1 && parameters[0].ParameterType == typeof(List<string>);
         }
 
         private static bool HasBlueprintPoolCandidatesShape(MethodInfo method)

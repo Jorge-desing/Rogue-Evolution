@@ -26,7 +26,7 @@ namespace RogueCommandExpansionLoader.Content
         IRelicLocalizationRuntimeProvider, IStageLandscapeRuntimeProvider,
         IBlueprintPoolRuntimeProvider, IStageFallbackRuntimeProvider,
         IStageOwnedAiPlacementDistanceRuntimeProvider, IBlueprintRewardFactoryScopeProvider,
-        IPrespawnRuntimeProvider
+        IPrespawnRuntimeProvider, IGuaranteedModCardRewardProvider
     {
         private const int MaxManifestBytes = 1024 * 1024;
         private const uint GenericRead = 0x80000000;
@@ -1079,7 +1079,8 @@ namespace RogueCommandExpansionLoader.Content
                 bool isStartingBlueprintSelection =
                     !(bool)_gameAtLeastOneBlueprintAddedByPlayerField.GetValue(null);
                 bool isAllowedAsStartingBlueprint =
-                    (bool)_allowedStartingBlueprintField.GetValue(unit.BalanceRow);
+                    (bool)_allowedStartingBlueprintField.GetValue(unit.BalanceRow) ||
+                    (unit.Definition != null && unit.Definition.neededExperienceLevel <= 0);
                 if (isStartingBlueprintSelection && !isAllowedAsStartingBlueprint)
                 {
                     runOriginal = false;
@@ -1132,7 +1133,8 @@ namespace RogueCommandExpansionLoader.Content
             {
                 if (!unit.IsProductionBuilding && !String.IsNullOrWhiteSpace(unit.ProductionFactoryId))
                 {
-                    if (unit.Definition != null && unit.Definition.isAllowedAsStartingBlueprint &&
+                    if (unit.Definition != null &&
+                        (unit.Definition.isAllowedAsStartingBlueprint || unit.Definition.neededExperienceLevel <= 0) &&
                         _blueprintUnitIds.Contains(unit.ProductionFactoryId))
                     {
                         LoadedUnit factory;
@@ -1147,7 +1149,9 @@ namespace RogueCommandExpansionLoader.Content
                 else if (unit.IsStandaloneBuilding)
                 {
                     object startingVal = _allowedStartingBlueprintField.GetValue(unit.BalanceRow);
-                    if (startingVal is bool && (bool)startingVal)
+                    bool isStarting = (startingVal is bool && (bool)startingVal) ||
+                                      (unit.Definition != null && unit.Definition.neededExperienceLevel <= 0);
+                    if (isStarting)
                     {
                         if (_blueprintUnitIds.Contains(unit.Id) &&
                             (!isDemo || (bool)_allowedForDemoField.GetValue(unit.BalanceRow)))
@@ -1157,6 +1161,146 @@ namespace RogueCommandExpansionLoader.Content
                     }
                 }
             }
+        }
+
+        public bool IsModUnitProduct(string productId)
+        {
+            if (String.IsNullOrEmpty(productId))
+            {
+                return false;
+            }
+
+            lock (_gate)
+            {
+                LoadedUnit unit;
+                if (_units.TryGetValue(productId, out unit))
+                {
+                    return !unit.IsProductionBuilding || unit.IsStandaloneBuilding;
+                }
+
+                if (_blueprintUnitIds.Contains(productId))
+                {
+                    return true;
+                }
+
+                return false;
+            }
+        }
+
+        public bool TryGetGuaranteedModRewardProduct(
+            string poolId,
+            bool isStartingSelection,
+            int currentXpLevel,
+            ICollection<string> excludedProductIds,
+            out string modProductId)
+        {
+            lock (_gate)
+            {
+                modProductId = null;
+                if (_units.Count == 0)
+                {
+                    return false;
+                }
+
+                object balancing = _gameBalancingAssetField != null ? _gameBalancingAssetField.GetValue(null) : null;
+                bool isDemo = balancing != null && _gameIsDemoField != null && (bool)_gameIsDemoField.GetValue(balancing);
+
+                List<LoadedUnit> matchedPoolCandidates = new List<LoadedUnit>();
+                List<LoadedUnit> generalCandidates = new List<LoadedUnit>();
+                List<LoadedUnit> fallbackCandidates = new List<LoadedUnit>();
+
+                foreach (LoadedUnit unit in _units.Values)
+                {
+                    if (unit.IsProductionBuilding && !unit.IsStandaloneBuilding)
+                    {
+                        continue;
+                    }
+
+                    if (isDemo && _allowedForDemoField != null && !(bool)_allowedForDemoField.GetValue(unit.BalanceRow))
+                    {
+                        continue;
+                    }
+
+                    int neededXp = 0;
+                    if (unit.Definition != null && unit.Definition.neededExperienceLevel.HasValue)
+                    {
+                        neededXp = unit.Definition.neededExperienceLevel.Value;
+                    }
+
+                    if (isStartingSelection)
+                    {
+                        bool isStartingEligible = (unit.Definition != null && unit.Definition.isAllowedAsStartingBlueprint) ||
+                                                  neededXp <= 0;
+                        if (!isStartingEligible)
+                        {
+                            continue;
+                        }
+                    }
+                    else
+                    {
+                        if (neededXp > currentXpLevel)
+                        {
+                            continue;
+                        }
+                    }
+
+                    fallbackCandidates.Add(unit);
+
+                    bool isExcluded = excludedProductIds != null &&
+                        (excludedProductIds.Contains(unit.Id) ||
+                         (!String.IsNullOrEmpty(unit.ProductionFactoryId) && excludedProductIds.Contains(unit.ProductionFactoryId)));
+
+                    if (isExcluded)
+                    {
+                        continue;
+                    }
+
+                    generalCandidates.Add(unit);
+
+                    if (!String.IsNullOrEmpty(poolId) && UnitMatchesPoolTheme(unit, poolId))
+                    {
+                        matchedPoolCandidates.Add(unit);
+                    }
+                }
+
+                List<LoadedUnit> selectedList = matchedPoolCandidates.Count > 0
+                    ? matchedPoolCandidates
+                    : (generalCandidates.Count > 0 ? generalCandidates : fallbackCandidates);
+
+                if (selectedList.Count == 0)
+                {
+                    return false;
+                }
+
+                int index = new System.Random().Next(0, selectedList.Count);
+                modProductId = selectedList[index].Id;
+                return true;
+            }
+        }
+
+        private static bool UnitMatchesPoolTheme(LoadedUnit unit, string poolId)
+        {
+            if (unit == null || String.IsNullOrEmpty(poolId) || unit.Definition == null)
+            {
+                return false;
+            }
+
+            string[] roles = unit.Definition.roles;
+            if (roles == null || roles.Length == 0)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < roles.Length; i++)
+            {
+                string role = roles[i];
+                if (!String.IsNullOrEmpty(role) && poolId.IndexOf(role, StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private bool IsNativeInitialStagePool(object pool)
