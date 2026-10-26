@@ -6216,12 +6216,12 @@ namespace RogueCommandExpansionLoader.Content
             string packageName,
             string ownerLabel = "Unidad")
         {
-            Shader litShader = Shader.Find("Universal Render Pipeline/Lit");
             Renderer[] renderers = visualClone.GetComponentsInChildren<Renderer>(true);
             for (int i = 0; i < renderers.Length; i++)
             {
                 Material[] materials = renderers[i].sharedMaterials;
                 bool hasAnyMaterial = false;
+                bool changed = false;
                 if (materials != null && materials.Length > 0)
                 {
                     for (int materialIndex = 0; materialIndex < materials.Length; materialIndex++)
@@ -6230,44 +6230,19 @@ namespace RogueCommandExpansionLoader.Content
                         if (mat != null)
                         {
                             hasAnyMaterial = true;
-                            // Ensure shader is valid, supported, and not an error/fallback shader
-                            if (mat.shader == null || !mat.shader.isSupported ||
-                                mat.shader.name.IndexOf("Error", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                                mat.shader.name.IndexOf("Hidden", StringComparison.OrdinalIgnoreCase) >= 0)
+                            Material rebound = EnsureMaterialSupported(mat, fallbackMaterial);
+                            if (rebound != null && !ReferenceEquals(rebound, mat))
                             {
-                                if (litShader != null && litShader.isSupported)
-                                {
-                                    mat.shader = litShader;
-                                }
-                                else if (fallbackMaterial != null && fallbackMaterial.shader != null && fallbackMaterial.shader.isSupported)
-                                {
-                                    mat.shader = fallbackMaterial.shader;
-                                }
-                            }
-
-                            // Synchronize textures between _BaseMap and _MainTex so textures are never lost
-                            Texture mainTex = null;
-                            if (mat.HasProperty("_BaseMap"))
-                            {
-                                mainTex = mat.GetTexture("_BaseMap");
-                            }
-                            if (mainTex == null && mat.HasProperty("_MainTex"))
-                            {
-                                mainTex = mat.GetTexture("_MainTex");
-                            }
-                            if (mainTex != null)
-                            {
-                                if (mat.HasProperty("_BaseMap") && mat.GetTexture("_BaseMap") == null)
-                                {
-                                    mat.SetTexture("_BaseMap", mainTex);
-                                }
-                                if (mat.HasProperty("_MainTex") && mat.GetTexture("_MainTex") == null)
-                                {
-                                    mat.SetTexture("_MainTex", mainTex);
-                                }
+                                materials[materialIndex] = rebound;
+                                changed = true;
                             }
                         }
                     }
+                }
+
+                if (changed)
+                {
+                    renderers[i].sharedMaterials = materials;
                 }
 
                 if (!hasAnyMaterial)
@@ -6281,6 +6256,261 @@ namespace RogueCommandExpansionLoader.Content
                     renderers[i].sharedMaterial = fallbackMaterial;
                 }
             }
+        }
+
+        private static readonly Dictionary<Material, Material> _reboundMaterials = new Dictionary<Material, Material>();
+        private static readonly Dictionary<string, Shader> _nativeShaderCache = new Dictionary<string, Shader>(StringComparer.Ordinal);
+
+        private static bool IsShaderSupportedAndValid(Shader shader)
+        {
+            if (shader == null || !shader.isSupported)
+            {
+                return false;
+            }
+
+            string name = shader.name ?? String.Empty;
+            if (name.IndexOf("Error", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                name.IndexOf("Hidden", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return false;
+            }
+
+            // "Universal Render Pipeline/Lit" is never available in Rogue Command standalone player
+            if (String.Equals(name, "Universal Render Pipeline/Lit", StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        private static Shader FindNativeShader(string shaderName)
+        {
+            if (String.IsNullOrEmpty(shaderName))
+            {
+                return null;
+            }
+
+            Shader cached;
+            if (_nativeShaderCache.TryGetValue(shaderName, out cached) && cached != null && IsShaderSupportedAndValid(cached))
+            {
+                return cached;
+            }
+
+            Shader direct = Shader.Find(shaderName);
+            if (direct != null && IsShaderSupportedAndValid(direct))
+            {
+                _nativeShaderCache[shaderName] = direct;
+                return direct;
+            }
+
+            Shader[] shaders = Resources.FindObjectsOfTypeAll<Shader>();
+            for (int i = 0; i < shaders.Length; i++)
+            {
+                Shader s = shaders[i];
+                if (s == null) continue;
+                if (String.Equals(s.name, shaderName, StringComparison.Ordinal) && IsShaderSupportedAndValid(s))
+                {
+                    _nativeShaderCache[shaderName] = s;
+                    return s;
+                }
+            }
+
+            return null;
+        }
+
+        private static Material EnsureMaterialSupported(Material source, Material fallbackMaterial)
+        {
+            if (source == null)
+            {
+                return fallbackMaterial;
+            }
+
+            Material existing;
+            if (_reboundMaterials.TryGetValue(source, out existing) && existing != null)
+            {
+                return existing;
+            }
+
+            // If source material already has a valid, supported shader, keep it!
+            if (IsShaderSupportedAndValid(source.shader))
+            {
+                EnsureMaterialKeywords(source);
+                _reboundMaterials[source] = source;
+                return source;
+            }
+
+            // Material shader is missing, broken, or unsupported (e.g. URP/Lit).
+            // Rebind to a supported shader while preserving all textures, colors, and properties!
+            Material result = source;
+            try
+            {
+                string shaderName = source.shader != null ? source.shader.name : String.Empty;
+                Shader targetShader = null;
+
+                if (!String.IsNullOrEmpty(shaderName) &&
+                    shaderName.StartsWith("Universal Render Pipeline/Particles", StringComparison.Ordinal))
+                {
+                    targetShader = FindNativeShader(shaderName) ??
+                                   Shader.Find("Universal Render Pipeline/Particles/Unlit") ??
+                                   Shader.Find("Universal Render Pipeline/Particles/Simple Lit");
+                }
+                else
+                {
+                    // Try supported shaders in priority order:
+                    // 1. RogueCommand/VehiclePBR_VertexWear (if bundle-loaded copy is supported)
+                    // 2. Universal Render Pipeline/Simple Lit (native URP lit shader present in resources.assets)
+                    // 3. Universal Render Pipeline/Unlit
+                    // 4. Native fallback material shader
+                    targetShader = FindNativeShader("RogueCommand/VehiclePBR_VertexWear");
+                    if (targetShader == null || !IsShaderSupportedAndValid(targetShader))
+                    {
+                        targetShader = Shader.Find("Universal Render Pipeline/Simple Lit");
+                    }
+                    if (targetShader == null || !IsShaderSupportedAndValid(targetShader))
+                    {
+                        targetShader = FindNativeShader("Universal Render Pipeline/Simple Lit");
+                    }
+                    if (targetShader == null || !IsShaderSupportedAndValid(targetShader))
+                    {
+                        targetShader = Shader.Find("Universal Render Pipeline/Unlit");
+                    }
+                    if (targetShader == null || !IsShaderSupportedAndValid(targetShader))
+                    {
+                        targetShader = FindNativeShader("Universal Render Pipeline/Unlit");
+                    }
+                    if (targetShader == null && fallbackMaterial != null && IsShaderSupportedAndValid(fallbackMaterial.shader))
+                    {
+                        targetShader = fallbackMaterial.shader;
+                    }
+                }
+
+                if (targetShader != null)
+                {
+                    result = new Material(targetShader) { name = source.name + " (RCL rebound)" };
+                    CopyLitProperties(source, result);
+                }
+            }
+            catch (Exception exception)
+            {
+                UnityEngine.Debug.LogWarning("[ExpansionLoader] No se pudo reasignar shader para el material '" + source.name + "': " +
+                    exception.GetBaseException().Message);
+                result = source;
+            }
+
+            _reboundMaterials[source] = result;
+            return result;
+        }
+
+        private static void EnsureMaterialKeywords(Material mat)
+        {
+            if (mat == null) return;
+
+            Texture albedo = GetTextureIfAny(mat, "_BaseMap", "_MainTex");
+            if (albedo != null)
+            {
+                if (mat.HasProperty("_BaseMap") && mat.GetTexture("_BaseMap") == null) mat.SetTexture("_BaseMap", albedo);
+                if (mat.HasProperty("_MainTex") && mat.GetTexture("_MainTex") == null) mat.SetTexture("_MainTex", albedo);
+            }
+
+            if (mat.HasProperty("_BumpMap") && mat.GetTexture("_BumpMap") != null)
+            {
+                mat.EnableKeyword("_NORMALMAP");
+            }
+
+            if (mat.HasProperty("_MetallicGlossMap") && mat.GetTexture("_MetallicGlossMap") != null)
+            {
+                mat.EnableKeyword("_METALLICSPECGLOSSMAP");
+            }
+
+            if (mat.HasProperty("_EmissionMap") && mat.GetTexture("_EmissionMap") != null)
+            {
+                mat.EnableKeyword("_EMISSION");
+                mat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
+            }
+            else if (mat.HasProperty("_EmissionColor"))
+            {
+                Color ec = mat.GetColor("_EmissionColor");
+                if (ec.maxColorComponent > 0.001f)
+                {
+                    mat.EnableKeyword("_EMISSION");
+                    mat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
+                }
+            }
+
+            mat.enableInstancing = true;
+        }
+
+        private static Texture GetTextureIfAny(Material m, string a, string b = null)
+        {
+            Texture t = null;
+            if (m.HasProperty(a)) t = m.GetTexture(a);
+            if (t == null && b != null && m.HasProperty(b)) t = m.GetTexture(b);
+            return t;
+        }
+
+        private static void CopyLitProperties(Material src, Material dst)
+        {
+            Color baseColor = Color.white;
+            if (src.HasProperty("_BaseColor")) baseColor = src.GetColor("_BaseColor");
+            else if (src.HasProperty("_Color")) baseColor = src.GetColor("_Color");
+
+            Texture albedo = GetTextureIfAny(src, "_BaseMap", "_MainTex");
+            if (albedo != null)
+            {
+                if (dst.HasProperty("_BaseMap")) dst.SetTexture("_BaseMap", albedo);
+                if (dst.HasProperty("_MainTex")) dst.SetTexture("_MainTex", albedo);
+            }
+            if (dst.HasProperty("_BaseColor")) dst.SetColor("_BaseColor", baseColor);
+            if (dst.HasProperty("_Color")) dst.SetColor("_Color", baseColor);
+
+            Texture normal = GetTextureIfAny(src, "_BumpMap");
+            if (normal != null && dst.HasProperty("_BumpMap"))
+            {
+                dst.SetTexture("_BumpMap", normal);
+                dst.EnableKeyword("_NORMALMAP");
+                if (dst.HasProperty("_BumpScale") && src.HasProperty("_BumpScale"))
+                {
+                    dst.SetFloat("_BumpScale", src.GetFloat("_BumpScale"));
+                }
+            }
+
+            Texture metallicGloss = GetTextureIfAny(src, "_MetallicGlossMap");
+            if (metallicGloss != null)
+            {
+                if (dst.HasProperty("_MetallicGlossMap"))
+                {
+                    dst.SetTexture("_MetallicGlossMap", metallicGloss);
+                    dst.EnableKeyword("_METALLICSPECGLOSSMAP");
+                }
+                if (dst.HasProperty("_SpecGlossMap"))
+                {
+                    dst.SetTexture("_SpecGlossMap", metallicGloss);
+                }
+                if (dst.HasProperty("_Smoothness")) dst.SetFloat("_Smoothness", 1f);
+                if (dst.HasProperty("_Metallic")) dst.SetFloat("_Metallic", 1f);
+            }
+            else
+            {
+                if (src.HasProperty("_Metallic") && dst.HasProperty("_Metallic")) dst.SetFloat("_Metallic", src.GetFloat("_Metallic"));
+                if (src.HasProperty("_Smoothness") && dst.HasProperty("_Smoothness")) dst.SetFloat("_Smoothness", src.GetFloat("_Smoothness"));
+                if (src.HasProperty("_Glossiness") && dst.HasProperty("_Smoothness")) dst.SetFloat("_Smoothness", src.GetFloat("_Glossiness"));
+            }
+
+            Texture emission = GetTextureIfAny(src, "_EmissionMap");
+            Color emissionColor = src.HasProperty("_EmissionColor") ? src.GetColor("_EmissionColor") : Color.black;
+            if (emission != null || emissionColor.maxColorComponent > 0.001f)
+            {
+                if (emission != null && dst.HasProperty("_EmissionMap")) dst.SetTexture("_EmissionMap", emission);
+                if (dst.HasProperty("_EmissionColor"))
+                {
+                    dst.SetColor("_EmissionColor", emission != null && emissionColor.maxColorComponent <= 0.001f ? Color.white : emissionColor);
+                }
+                dst.EnableKeyword("_EMISSION");
+                dst.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
+            }
+
+            dst.enableInstancing = true;
         }
 
         private static GameObject InstantiateResourceTemplate(GameObject template, out GameObject holder)

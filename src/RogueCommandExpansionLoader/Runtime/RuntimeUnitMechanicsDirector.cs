@@ -308,7 +308,8 @@ namespace RogueCommandExpansionLoader.Runtime
                     TryGetProfile(originatorId, out profile);
                 }
 
-                if (profile != null && profile.HasOnDamageDealtMechanics && IsEntityAlive(originatorObj))
+                if (profile != null && profile.HasOnDamageDealtMechanics && IsEntityAlive(originatorObj) &&
+                    IsEnemy(originatorObj, targetObj))
                 {
                     // 1. Combat Boosts on hit (visual status effect + exact numeric SpecificValueChange)
                     if (profile.CombatBoosts != null && profile.CombatBoosts.Length > 0)

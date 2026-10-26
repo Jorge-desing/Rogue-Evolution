@@ -190,10 +190,10 @@ Shader "RogueCommand/VehiclePBR_VertexWear"
             ENDHLSL
         }
 
-        UsePass "Universal Render Pipeline/Lit/ShadowCaster"
-        UsePass "Universal Render Pipeline/Lit/DepthOnly"
-        UsePass "Universal Render Pipeline/Lit/DepthNormals"
+        UsePass "Universal Render Pipeline/Simple Lit/ShadowCaster"
+        UsePass "Universal Render Pipeline/Simple Lit/DepthOnly"
+        UsePass "Universal Render Pipeline/Simple Lit/DepthNormals"
     }
 
-    FallBack "Universal Render Pipeline/Lit"
+    FallBack "Universal Render Pipeline/Simple Lit"
 }

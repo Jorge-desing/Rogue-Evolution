@@ -3086,7 +3086,11 @@ namespace RogueCommandExpansion.Authoring
             {
                 shader = Shader.Find(useVertexWearShader
                     ? "Standard"
-                    : "Universal Render Pipeline/Lit");
+                    : "Universal Render Pipeline/Simple Lit");
+                if (shader == null && !useVertexWearShader)
+                {
+                    shader = Shader.Find("Universal Render Pipeline/Lit");
+                }
                 if (useVertexWearShader)
                 {
                     Debug.LogWarning("Shader " + VertexWearShaderName + " is unavailable for " + name +

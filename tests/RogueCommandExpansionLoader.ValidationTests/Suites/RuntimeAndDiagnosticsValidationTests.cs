@@ -1192,6 +1192,23 @@ internal static partial class ValidationTestRunner
             RuntimeUnitMechanicsDirector.RegisterProfile("test:player-killer", new UnitRuntimeMechanicsProfile
             {
                 EntityId = "test:player-killer",
+                Experience = new ContentUnitExperienceDefinition
+                {
+                    experiencePerLevel = 1,
+                    maxLevel = 3,
+                    experienceGainMultiplier = 1.0f,
+                    levelUpBonus = 0.2f
+                },
+                CombatBoosts = new[]
+                {
+                    new ContentCombatBoostDefinition
+                    {
+                        id = "test:friendly-hit-boost",
+                        statName = "MoveSpeed",
+                        multiplier = 1.3f,
+                        duration = 3.0f
+                    }
+                },
                 ExperienceReward = new ContentUnitExperienceRewardDefinition
                 {
                     experienceAmount = 12,
@@ -1204,18 +1221,37 @@ internal static partial class ValidationTestRunner
             {
                 entityId = "test:player-killer",
                 IsControlledByPlayer = true,
-                IsUnit = true
+                IsUnit = true,
+                CurrentHealth = 60f,
+                MaxHealth = 100f,
+                CurrentRank = 0,
+                MaxRank = 3
             };
             var friendlyTarget = new EntityController
             {
                 entityId = "test:friendly-target",
                 IsControlledByPlayer = true,
                 IsUnit = true,
-                CurrentHealth = 0f,
-                DestroyHasBeenStarted = true
+                CurrentHealth = 10f,
+                MaxHealth = 100f
             };
 
+            RuntimeUnitMechanicsDirector.OnEntityDealtDamage(friendlyTarget, 2f, attacker);
+            if (attacker.CurrentRank != 0 || attacker.AppliedSpecificValueChanges.Count != 0 ||
+                attacker.AppliedStatusEffects.Any(e => e.Effect == StatusEffect.Turbo || e.Effect == StatusEffect.CombatBoost))
+            {
+                throw new InvalidOperationException("Friendly hits must not trigger attacker combat boosts or veterancy.");
+            }
+
+            friendlyTarget.CurrentHealth = 0f;
+            friendlyTarget.DestroyHasBeenStarted = true;
             RuntimeUnitMechanicsDirector.OnEntityDealtDamage(friendlyTarget, 10f, attacker);
+
+            if (attacker.CurrentRank != 0 || attacker.AppliedSpecificValueChanges.Count != 0 ||
+                attacker.AppliedStatusEffects.Any(e => e.Effect == StatusEffect.Turbo || e.Effect == StatusEffect.CombatBoost))
+            {
+                throw new InvalidOperationException("Expected no combat boost or veterancy for killing a friendly unit.");
+            }
 
             if (Bank.Deposits.Count != 0)
             {
