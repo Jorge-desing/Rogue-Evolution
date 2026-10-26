@@ -6030,17 +6030,6 @@ namespace RogueCommandExpansionLoader.Content
 
             Material fallbackMaterial = FindNativeVisualMaterial(originalRenderers.ToArray());
 
-            bool isBuilding = !String.IsNullOrEmpty(ownerLabel) &&
-                ownerLabel.IndexOf("Edificio", StringComparison.OrdinalIgnoreCase) >= 0;
-            float nativeHalfExtent = CalculateNativeRenderersHalfExtent(target, originalRenderers);
-            float targetHalfExtent = isBuilding
-                ? (nativeHalfExtent > 0.25f && nativeHalfExtent < 6.0f
-                    ? Mathf.Clamp(nativeHalfExtent, 1.25f, 2.20f)
-                    : 1.60f)
-                : (nativeHalfExtent > 0.15f && nativeHalfExtent < 3.0f
-                    ? Mathf.Clamp(nativeHalfExtent, 0.65f, 1.05f)
-                    : 0.85f);
-
             for (int i = 0; i < originalRenderers.Count; i++)
             {
                 originalRenderers[i].enabled = false;
@@ -6064,91 +6053,23 @@ namespace RogueCommandExpansionLoader.Content
             float invY = Mathf.Abs(targetLossy.y) > 1e-5f ? (1f / targetLossy.y) : 1f;
             float invZ = Mathf.Abs(targetLossy.z) > 1e-5f ? (1f / targetLossy.z) : 1f;
 
-            // Normalize the visual model's half-extent to match the native template's footprint (targetHalfExtent).
-            // This handles both 0.01x centimeter FBX exports and oversized metric models (e.g. wide hexapods,
-            // command vehicles, and heavy walkers) so every unit fits both battlefield spacing and 3D card previews.
-            float visualHalfExtent = CalculateLocalMeshExtent(visualClone);
-            float scaleFactor = (visualHalfExtent > 1e-5f)
-                ? Mathf.Clamp(targetHalfExtent / visualHalfExtent, 0.002f, 250f)
+            // Compensate for Blender FBX 0.01x unit scaling only when the model's visual half-extent
+            // in root space is in centimeter range (0.001m < maxMeshExtent < 0.15m).
+            // Models authored in meters (half-extent >= 0.15m, e.g. 1.0m - 2.8m) or whose child transforms
+            // already have 100x scale retain 1.0x compensation so they never become 100x oversized.
+            float visualExtent = CalculateLocalMeshExtent(visualClone);
+            float authoringCompensation = (visualExtent > 0.001f && visualExtent < 0.15f && (visualExtent * 100f) <= 5.0f)
+                ? 100f
                 : 1f;
 
             visualClone.transform.localScale = new Vector3(
-                invX * scaleFactor,
-                invY * scaleFactor,
-                invZ * scaleFactor
+                invX * authoringCompensation,
+                invY * authoringCompensation,
+                invZ * authoringCompensation
             );
 
             ApplyFallbackVisualMaterial(visualClone, fallbackMaterial, unit, packageName, ownerLabel);
             visualClone.SetActive(true);
-        }
-
-        private static float CalculateNativeRenderersHalfExtent(Transform targetRoot, List<Renderer> renderers)
-        {
-            if (targetRoot == null || renderers == null || renderers.Count == 0)
-            {
-                return 0f;
-            }
-
-            float maxExtent = 0f;
-            for (int i = 0; i < renderers.Count; i++)
-            {
-                Renderer r = renderers[i];
-                if (r == null || r is ParticleSystemRenderer || r is TrailRenderer || r is LineRenderer)
-                {
-                    continue;
-                }
-
-                float relScale = CalculateRelativeMaxScale(r.transform, targetRoot);
-                MeshFilter mf = r.GetComponent<MeshFilter>();
-                if (mf != null && mf.sharedMesh != null)
-                {
-                    Vector3 ext = mf.sharedMesh.bounds.extents;
-                    float scaled = Mathf.Max(ext.x, Mathf.Max(ext.y, ext.z)) * relScale;
-                    maxExtent = Mathf.Max(maxExtent, scaled);
-                }
-                else if (r is SkinnedMeshRenderer smr)
-                {
-                    float boneScale = Mathf.Max(relScale, CalculateMaxBoneScale(smr, targetRoot));
-                    if (smr.sharedMesh != null)
-                    {
-                        Vector3 ext = smr.sharedMesh.bounds.extents;
-                        maxExtent = Mathf.Max(maxExtent, Mathf.Max(ext.x, Mathf.Max(ext.y, ext.z)) * boneScale);
-                    }
-                    Vector3 localExt = smr.localBounds.extents;
-                    maxExtent = Mathf.Max(maxExtent, Mathf.Max(localExt.x, Mathf.Max(localExt.y, localExt.z)) * relScale);
-                }
-            }
-
-            return maxExtent;
-        }
-
-        private static float CalculateMaxBoneScale(SkinnedMeshRenderer skinned, Transform root)
-        {
-            if (skinned == null || root == null)
-            {
-                return 1f;
-            }
-
-            float maxBoneScale = 1f;
-            if (skinned.rootBone != null)
-            {
-                maxBoneScale = Mathf.Max(maxBoneScale, CalculateRelativeMaxScale(skinned.rootBone, root));
-            }
-
-            Transform[] bones = skinned.bones;
-            if (bones != null)
-            {
-                int checkCount = Mathf.Min(bones.Length, 16);
-                for (int i = 0; i < checkCount; i++)
-                {
-                    if (bones[i] != null)
-                    {
-                        maxBoneScale = Mathf.Max(maxBoneScale, CalculateRelativeMaxScale(bones[i], root));
-                    }
-                }
-            }
-
-            return maxBoneScale;
         }
 
         private static float CalculateRelativeMaxScale(Transform child, Transform root)
@@ -6170,36 +6091,7 @@ namespace RogueCommandExpansionLoader.Content
             }
 
             float maxScale = Mathf.Max(scale.x, Mathf.Max(scale.y, scale.z));
-            return maxScale > 1e-5f ? maxScale : 1f;
-        }
-
-        private static Vector3 CalculateRelativePositionInRoot(Transform child, Transform root)
-        {
-            if (child == null || root == null || child == root)
-            {
-                return Vector3.zero;
-            }
-
-            Vector3 pos = Vector3.zero;
-            Transform current = child;
-            while (current != null && current != root)
-            {
-                pos = current.localRotation * pos;
-                Vector3 parentScale = current.parent != null && current.parent != root
-                    ? current.parent.localScale
-                    : Vector3.one;
-                pos += current.localPosition;
-                if (current.parent != null && current.parent != root)
-                {
-                    pos = Vector3.Scale(pos, new Vector3(
-                        Mathf.Abs(parentScale.x),
-                        Mathf.Abs(parentScale.y),
-                        Mathf.Abs(parentScale.z)));
-                }
-                current = current.parent;
-            }
-
-            return pos;
+            return Mathf.Clamp(maxScale > 1e-5f ? maxScale : 1f, 0.01f, 100f);
         }
 
         private static float CalculateLocalMeshExtent(GameObject model)
@@ -6207,6 +6099,7 @@ namespace RogueCommandExpansionLoader.Content
             if (model == null) return 0f;
             float maxExtent = 0f;
             Transform rootTransform = model.transform;
+
             MeshFilter[] filters = model.GetComponentsInChildren<MeshFilter>(true);
             for (int i = 0; i < filters.Length; i++)
             {
@@ -6226,53 +6119,32 @@ namespace RogueCommandExpansionLoader.Content
                         try { mesh.RecalculateBounds(); } catch { }
                         ext = mesh.bounds.extents;
                     }
+
                     float relScale = CalculateRelativeMaxScale(filters[i].transform, rootTransform);
-                    Vector3 relPos = CalculateRelativePositionInRoot(filters[i].transform, rootTransform);
-                    Vector3 centerOffset = Vector3.Scale(mesh.bounds.center, new Vector3(relScale, relScale, relScale)) + relPos;
-                    float scaledExtent = Mathf.Max(
-                        Mathf.Abs(centerOffset.x) + ext.x * relScale,
-                        Mathf.Max(
-                            Mathf.Abs(centerOffset.y) + ext.y * relScale,
-                            Mathf.Abs(centerOffset.z) + ext.z * relScale));
+                    float scaledExtent = Mathf.Max(ext.x, Mathf.Max(ext.y, ext.z)) * relScale;
                     maxExtent = Mathf.Max(maxExtent, scaledExtent);
                 }
             }
+
             SkinnedMeshRenderer[] skinned = model.GetComponentsInChildren<SkinnedMeshRenderer>(true);
             for (int i = 0; i < skinned.Length; i++)
             {
-                if (skinned[i] != null)
+                if (skinned[i] != null && skinned[i].sharedMesh != null)
                 {
-                    float relScale = Mathf.Max(
-                        CalculateRelativeMaxScale(skinned[i].transform, rootTransform),
-                        CalculateMaxBoneScale(skinned[i], rootTransform));
-                    if (skinned[i].sharedMesh != null)
+                    Mesh mesh = skinned[i].sharedMesh;
+                    Vector3 ext = mesh.bounds.extents;
+                    if (ext.sqrMagnitude < 1e-6f)
                     {
-                        Mesh mesh = skinned[i].sharedMesh;
-                        Vector3 ext = mesh.bounds.extents;
-                        if (ext.sqrMagnitude < 1e-6f)
-                        {
-                            try { mesh.RecalculateBounds(); } catch { }
-                            ext = mesh.bounds.extents;
-                        }
-                        float scaledExtent = Mathf.Max(ext.x, Mathf.Max(ext.y, ext.z)) * relScale;
-                        maxExtent = Mathf.Max(maxExtent, scaledExtent);
+                        try { mesh.RecalculateBounds(); } catch { }
+                        ext = mesh.bounds.extents;
                     }
-                    Vector3 localExt = skinned[i].localBounds.extents;
-                    maxExtent = Mathf.Max(maxExtent, Mathf.Max(localExt.x, Mathf.Max(localExt.y, localExt.z)) * relScale);
+
+                    float relScale = CalculateRelativeMaxScale(skinned[i].transform, rootTransform);
+                    float scaledExtent = Mathf.Max(ext.x, Mathf.Max(ext.y, ext.z)) * relScale;
+                    maxExtent = Mathf.Max(maxExtent, scaledExtent);
                 }
             }
-            Transform[] transforms = model.GetComponentsInChildren<Transform>(true);
-            for (int i = 0; i < transforms.Length; i++)
-            {
-                Transform t = transforms[i];
-                if (t != null && t != rootTransform && t.name != null &&
-                    t.name.StartsWith("Socket_", StringComparison.OrdinalIgnoreCase))
-                {
-                    Vector3 relPos = CalculateRelativePositionInRoot(t, rootTransform);
-                    float socketDist = Mathf.Max(Mathf.Abs(relPos.x), Mathf.Max(Mathf.Abs(relPos.y), Mathf.Abs(relPos.z)));
-                    maxExtent = Mathf.Max(maxExtent, socketDist);
-                }
-            }
+
             return maxExtent;
         }
 
