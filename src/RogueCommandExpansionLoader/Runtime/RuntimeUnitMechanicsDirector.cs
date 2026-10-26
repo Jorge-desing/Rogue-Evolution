@@ -15,6 +15,10 @@ namespace RogueCommandExpansionLoader.Runtime
         public string[] BaselineStatusEffects { get; set; }
         public ContentCombatBoostDefinition[] CombatBoosts { get; set; }
         public ContentUnitExperienceDefinition Experience { get; set; }
+        public ContentUnitSynergyDefinition[] Synergies { get; set; }
+        public ContentUnitStealthDefinition Stealth { get; set; }
+        public ContentUnitCommandDefinition Command { get; set; }
+        public ContentUnitExperienceRewardDefinition ExperienceReward { get; set; }
         public float? MinAttackRange { get; set; }
         public float? CriticalHitChance { get; set; }
         public ContentOnHitStatusEffectDefinition[] OnHitStatusEffects { get; set; }
@@ -22,11 +26,15 @@ namespace RogueCommandExpansionLoader.Runtime
         public bool HasRuntimeComponentMechanics =>
             (Healing != null && (Healing.healAmount > 0f || Healing.repairAmount > 0f) && Healing.healRange > 0f) ||
             (Aura != null && Aura.auraRadius > 0f && !string.IsNullOrWhiteSpace(Aura.auraType)) ||
-            (BaselineStatusEffects != null && BaselineStatusEffects.Length > 0);
+            (BaselineStatusEffects != null && BaselineStatusEffects.Length > 0) ||
+            (Synergies != null && Synergies.Length > 0) ||
+            (Stealth != null && Stealth.cloakDuration > 0f && Stealth.stealthLevel > 0f) ||
+            (Command != null && Command.commandRange > 0f);
 
         public bool HasOnDamageDealtMechanics =>
             (CombatBoosts != null && CombatBoosts.Length > 0) ||
-            (Experience != null && Experience.maxLevel > 0);
+            (Experience != null && Experience.maxLevel > 0) ||
+            (ExperienceReward != null && ExperienceReward.experienceAmount > 0);
 
         public bool HasAnyMechanics =>
             HasRuntimeComponentMechanics ||
@@ -38,7 +46,8 @@ namespace RogueCommandExpansionLoader.Runtime
 
     /// <summary>
     /// Executes native runtime mechanics for units declaring <c>healing</c>, <c>aura</c>,
-    /// <c>baselineStatusEffects</c>, <c>combatBoosts</c>, and <c>experience</c> in <c>content.json</c>.
+    /// <c>baselineStatusEffects</c>, <c>combatBoosts</c>, <c>experience</c>, <c>synergies</c>,
+    /// <c>stealth</c>, <c>command</c>, and <c>experienceReward</c> in <c>content.json</c>.
     /// </summary>
     public sealed class RuntimeUnitMechanicsDirector : MonoBehaviour
     {
@@ -54,6 +63,9 @@ namespace RogueCommandExpansionLoader.Runtime
         private static PropertyInfo _uniqueEntityIdProperty;
         private static PropertyInfo _isDestroyedProperty;
         private static PropertyInfo _destroyStartedProperty;
+        private static PropertyInfo _isControlledByPlayerProperty;
+        private static PropertyInfo _isUnitProperty;
+        private static PropertyInfo _isCombatUnitProperty;
         private static PropertyInfo _positionProperty;
         private static PropertyInfo _currentHealthProperty;
         private static PropertyInfo _maxHealthProperty;
@@ -64,14 +76,29 @@ namespace RogueCommandExpansionLoader.Runtime
         private static PropertyInfo _hasShieldProperty;
         private static PropertyInfo _currentRankProperty;
         private static PropertyInfo _maxRankProperty;
+        private static PropertyInfo _timeOfLastDamageProperty;
+        private static PropertyInfo _captainOfThisEntityProperty;
         private static MethodInfo _isEnemyMethod;
         private static MethodInfo _healMethod;
         private static MethodInfo _repairArmorMethod;
         private static MethodInfo _chargeShieldMethod;
         private static MethodInfo _rankUpMethod;
+        private static MethodInfo _setCaptainMethod;
         private static MethodInfo _setActiveStatusEffectMethod;
+        private static MethodInfo _addSpecificValueChangeMethod;
         private static Type _statusEffectEnumType;
         private static Type _durationTypeEnumType;
+        private static Type _changeableValueEnumType;
+        private static Type _specificValueChangeType;
+        private static Type _specificAddTypeEnumType;
+        private static Type _specificValidationTypeEnumType;
+        private static FieldInfo _svcValueToAddField;
+        private static FieldInfo _svcAddField;
+        private static FieldInfo _svcValidationField;
+        private static FieldInfo _svcValidUntilTimestampField;
+        private static FieldInfo _svcOriginatorEntityIdField;
+        private static Type _bankType;
+        private static MethodInfo _bankDepositMethod;
         private static Type _existingControllersType;
         private static PropertyInfo _existingControllersInstanceProp;
         private static MethodInfo _entitiesMethod;
@@ -80,6 +107,9 @@ namespace RogueCommandExpansionLoader.Runtime
         private UnitRuntimeMechanicsProfile _profile;
         private float _nextHealCheckTime;
         private float _nextAuraCheckTime;
+        private float _nextSynergyCheckTime;
+        private float _nextStealthCheckTime;
+        private float _nextCommandCheckTime;
         private bool _baselineApplied;
 
         public static void RegisterProfile(string entityId, UnitRuntimeMechanicsProfile profile)
@@ -175,6 +205,23 @@ namespace RogueCommandExpansionLoader.Runtime
             {
                 parts.Add("Veteranía: Rango " + profile.Experience.maxLevel);
             }
+            if (profile.Synergies != null && profile.Synergies.Length > 0)
+            {
+                parts.Add("Sinergias: " + profile.Synergies.Length);
+            }
+            if (profile.Stealth != null && profile.Stealth.cloakDuration > 0f && profile.Stealth.stealthLevel > 0f)
+            {
+                parts.Add("Sigilo: " + profile.Stealth.cloakDuration.ToString("0.#") + "s");
+            }
+            if (profile.Command != null && profile.Command.commandRange > 0f)
+            {
+                parts.Add("Mando: " + (string.IsNullOrWhiteSpace(profile.Command.commandType) ? "Squad" : profile.Command.commandType) +
+                    " (" + profile.Command.commandRange.ToString("0.#") + "m)");
+            }
+            if (profile.ExperienceReward != null && profile.ExperienceReward.experienceAmount > 0)
+            {
+                parts.Add("Recompensa: +" + profile.ExperienceReward.experienceAmount);
+            }
 
             return parts.Count > 0 ? string.Join(" • ", parts) : null;
         }
@@ -251,109 +298,132 @@ namespace RogueCommandExpansionLoader.Runtime
             try
             {
                 EnsureReflection(originatorObj.GetType());
+                float targetHealth = ReadFloatProperty(_currentHealthProperty, targetObj, 1f);
+                bool targetKilled = targetHealth <= 0f || ReadBoolProperty(_destroyStartedProperty, targetObj);
+
                 string originatorId = ReadEntityId(originatorObj);
-                if (string.IsNullOrWhiteSpace(originatorId))
+                UnitRuntimeMechanicsProfile profile = null;
+                if (!string.IsNullOrWhiteSpace(originatorId))
                 {
-                    return;
+                    TryGetProfile(originatorId, out profile);
                 }
 
-                UnitRuntimeMechanicsProfile profile;
-                if (!TryGetProfile(originatorId, out profile) || profile == null || !profile.HasOnDamageDealtMechanics)
+                if (profile != null && profile.HasOnDamageDealtMechanics && IsEntityAlive(originatorObj))
                 {
-                    return;
-                }
-
-                if (!IsEntityAlive(originatorObj))
-                {
-                    return;
-                }
-
-                // 1. Combat Boosts on hit
-                if (profile.CombatBoosts != null && profile.CombatBoosts.Length > 0)
-                {
-                    for (int i = 0; i < profile.CombatBoosts.Length; i++)
+                    // 1. Combat Boosts on hit (visual status effect + exact numeric SpecificValueChange)
+                    if (profile.CombatBoosts != null && profile.CombatBoosts.Length > 0)
                     {
-                        ContentCombatBoostDefinition boost = profile.CombatBoosts[i];
-                        if (boost == null || boost.duration <= 0f || boost.multiplier <= 0f)
+                        for (int i = 0; i < profile.CombatBoosts.Length; i++)
                         {
-                            continue;
+                            ContentCombatBoostDefinition boost = profile.CombatBoosts[i];
+                            if (boost == null || boost.duration <= 0f || boost.multiplier <= 0f)
+                            {
+                                continue;
+                            }
+
+                            string statusName = "CombatBoost";
+                            if (!string.IsNullOrWhiteSpace(boost.statName))
+                            {
+                                if (boost.statName.IndexOf("Speed", StringComparison.OrdinalIgnoreCase) >= 0 &&
+                                    boost.statName.IndexOf("Move", StringComparison.OrdinalIgnoreCase) >= 0)
+                                {
+                                    statusName = "Turbo";
+                                }
+                                else if (boost.statName.IndexOf("Attack", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                         boost.statName.IndexOf("Cooldown", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                         boost.statName.IndexOf("Rate", StringComparison.OrdinalIgnoreCase) >= 0)
+                                {
+                                    statusName = "Overclocked";
+                                }
+                                else if (boost.statName.IndexOf("Armor", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                         boost.statName.IndexOf("Defense", StringComparison.OrdinalIgnoreCase) >= 0)
+                                {
+                                    statusName = "Robust";
+                                }
+                            }
+
+                            ApplyTimedStatusEffect(originatorObj, statusName, boost.duration);
+                            string boostOriginatorId = "boost:" + (string.IsNullOrWhiteSpace(boost.id) ? i.ToString() : boost.id);
+                            ApplyTimedStatChange(originatorObj, boost.statName, boost.multiplier - 1f, boost.duration, boostOriginatorId);
+                        }
+                    }
+
+                    // 2. Experience & Veterancy RankUp
+                    if (profile.Experience != null && profile.Experience.maxLevel > 0)
+                    {
+                        int xpGain = targetKilled ? 3 : 1;
+                        if (profile.Experience.experienceGainMultiplier > 0f)
+                        {
+                            xpGain = Mathf.Max(1, Mathf.RoundToInt(xpGain * profile.Experience.experienceGainMultiplier));
                         }
 
-                        string statusName = "CombatBoost";
-                        if (!string.IsNullOrWhiteSpace(boost.statName))
+                        int uniqueId = ReadIntProperty(_uniqueEntityIdProperty, originatorObj, originatorObj.GetHashCode());
+                        int threshold = Mathf.Max(1, profile.Experience.experiencePerLevel > 0
+                            ? profile.Experience.experiencePerLevel * 3
+                            : 3);
+
+                        bool shouldPromote = false;
+                        lock (_entityCombatXp)
                         {
-                            if (boost.statName.IndexOf("Speed", StringComparison.OrdinalIgnoreCase) >= 0 &&
-                                boost.statName.IndexOf("Move", StringComparison.OrdinalIgnoreCase) >= 0)
+                            int currentXp;
+                            _entityCombatXp.TryGetValue(uniqueId, out currentXp);
+                            currentXp += xpGain;
+                            if (currentXp >= threshold)
                             {
-                                statusName = "Turbo";
+                                currentXp -= threshold;
+                                shouldPromote = true;
                             }
-                            else if (boost.statName.IndexOf("Attack", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                                     boost.statName.IndexOf("Cooldown", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                                     boost.statName.IndexOf("Rate", StringComparison.OrdinalIgnoreCase) >= 0)
-                            {
-                                statusName = "Overclocked";
-                            }
-                            else if (boost.statName.IndexOf("Armor", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                                     boost.statName.IndexOf("Defense", StringComparison.OrdinalIgnoreCase) >= 0)
-                            {
-                                statusName = "Robust";
-                            }
+                            _entityCombatXp[uniqueId] = currentXp;
                         }
 
-                        ApplyTimedStatusEffect(originatorObj, statusName, boost.duration);
+                        if (shouldPromote)
+                        {
+                            int currentRank = ReadIntProperty(_currentRankProperty, originatorObj, 0);
+                            int maxRank = ReadIntProperty(_maxRankProperty, originatorObj, profile.Experience.maxLevel);
+                            if (currentRank < Mathf.Min(maxRank, profile.Experience.maxLevel) && _rankUpMethod != null)
+                            {
+                                _rankUpMethod.Invoke(originatorObj, new object[] { 1 });
+                            }
+
+                            ApplyUnlimitedStatusEffect(originatorObj, "CombatBoost");
+                            if (profile.Experience.levelUpBonus > 0f)
+                            {
+                                float maxHp = ReadFloatProperty(_maxHealthProperty, originatorObj, 100f);
+                                float bonusHeal = Mathf.Max(5f, maxHp * profile.Experience.levelUpBonus);
+                                InvokeHeal(originatorObj, bonusHeal, originatorObj);
+                                if (ReadBoolProperty(_hasShieldProperty, originatorObj))
+                                {
+                                    InvokeChargeShield(originatorObj, bonusHeal * 0.5f);
+                                }
+                            }
+                        }
+                    }
+
+                    // 3. ExperienceReward on kill (when attacker has ExperienceReward)
+                    if (targetKilled && profile.ExperienceReward != null && profile.ExperienceReward.experienceAmount > 0 &&
+                        ReadBoolProperty(_isControlledByPlayerProperty, originatorObj))
+                    {
+                        float mult = profile.ExperienceReward.bonusMultiplier > 0f ? profile.ExperienceReward.bonusMultiplier : 1f;
+                        float reward = Mathf.Max(1f, (float)Math.Round(profile.ExperienceReward.experienceAmount * mult));
+                        InvokeBankDeposit("Player", reward);
                     }
                 }
 
-                // 2. Experience & Veterancy RankUp
-                if (profile.Experience != null && profile.Experience.maxLevel > 0)
+                // 4. Target bounty reward when killed by a player unit
+                if (targetKilled && ReadBoolProperty(_isControlledByPlayerProperty, originatorObj) &&
+                    IsEnemy(originatorObj, targetObj))
                 {
-                    float targetHealth = ReadFloatProperty(_currentHealthProperty, targetObj, 1f);
-                    bool targetKilled = targetHealth <= 0f || ReadBoolProperty(_destroyStartedProperty, targetObj);
-                    int xpGain = targetKilled ? 3 : 1;
-                    if (profile.Experience.experienceGainMultiplier > 0f)
+                    string targetId = ReadEntityId(targetObj);
+                    UnitRuntimeMechanicsProfile targetProfile;
+                    if (!string.IsNullOrWhiteSpace(targetId) &&
+                        TryGetProfile(targetId, out targetProfile) &&
+                        targetProfile != null &&
+                        targetProfile.ExperienceReward != null &&
+                        targetProfile.ExperienceReward.experienceAmount > 0)
                     {
-                        xpGain = Mathf.Max(1, Mathf.RoundToInt(xpGain * profile.Experience.experienceGainMultiplier));
-                    }
-
-                    int uniqueId = ReadIntProperty(_uniqueEntityIdProperty, originatorObj, originatorObj.GetHashCode());
-                    int threshold = Mathf.Max(1, profile.Experience.experiencePerLevel > 0
-                        ? profile.Experience.experiencePerLevel * 3
-                        : 3);
-
-                    bool shouldPromote = false;
-                    lock (_entityCombatXp)
-                    {
-                        int currentXp;
-                        _entityCombatXp.TryGetValue(uniqueId, out currentXp);
-                        currentXp += xpGain;
-                        if (currentXp >= threshold)
-                        {
-                            currentXp -= threshold;
-                            shouldPromote = true;
-                        }
-                        _entityCombatXp[uniqueId] = currentXp;
-                    }
-
-                    if (shouldPromote)
-                    {
-                        int currentRank = ReadIntProperty(_currentRankProperty, originatorObj, 0);
-                        int maxRank = ReadIntProperty(_maxRankProperty, originatorObj, profile.Experience.maxLevel);
-                        if (currentRank < Mathf.Min(maxRank, profile.Experience.maxLevel) && _rankUpMethod != null)
-                        {
-                            _rankUpMethod.Invoke(originatorObj, new object[] { 1 });
-                        }
-
-                        ApplyUnlimitedStatusEffect(originatorObj, "CombatBoost");
-                        if (profile.Experience.levelUpBonus > 0f)
-                        {
-                            float maxHp = ReadFloatProperty(_maxHealthProperty, originatorObj, 100f);
-                            float bonusHeal = Mathf.Max(5f, maxHp * profile.Experience.levelUpBonus);
-                            InvokeHeal(originatorObj, bonusHeal, originatorObj);
-                            if (ReadBoolProperty(_hasShieldProperty, originatorObj))
-                            {
-                                InvokeChargeShield(originatorObj, bonusHeal * 0.5f);
-                            }
-                        }
+                        float mult = targetProfile.ExperienceReward.bonusMultiplier > 0f ? targetProfile.ExperienceReward.bonusMultiplier : 1f;
+                        float bounty = Mathf.Max(1f, (float)Math.Round(targetProfile.ExperienceReward.experienceAmount * mult));
+                        InvokeBankDeposit("Player", bounty);
                     }
                 }
             }
@@ -369,6 +439,9 @@ namespace RogueCommandExpansionLoader.Runtime
             _profile = profile;
             _nextHealCheckTime = Time.time + 0.5f;
             _nextAuraCheckTime = Time.time + 0.5f;
+            _nextSynergyCheckTime = Time.time + 0.5f;
+            _nextStealthCheckTime = Time.time + 0.5f;
+            _nextCommandCheckTime = Time.time + 0.5f;
             _baselineApplied = true;
         }
 
@@ -413,6 +486,31 @@ namespace RogueCommandExpansionLoader.Runtime
                 {
                     _nextAuraCheckTime = now + 1.0f;
                     ExecuteAuraPulse(_entityController, _profile.Aura);
+                }
+
+                if (_profile.Synergies != null &&
+                    _profile.Synergies.Length > 0 &&
+                    now >= _nextSynergyCheckTime)
+                {
+                    _nextSynergyCheckTime = now + 1.0f;
+                    ExecuteSynergyPulse(_entityController, _profile.Synergies);
+                }
+
+                if (_profile.Stealth != null &&
+                    _profile.Stealth.cloakDuration > 0f &&
+                    _profile.Stealth.stealthLevel > 0f &&
+                    now >= _nextStealthCheckTime)
+                {
+                    _nextStealthCheckTime = now + 1.5f;
+                    ExecuteStealthPulse(_entityController, _profile.Stealth, now);
+                }
+
+                if (_profile.Command != null &&
+                    _profile.Command.commandRange > 0f &&
+                    now >= _nextCommandCheckTime)
+                {
+                    _nextCommandCheckTime = now + 1.0f;
+                    ExecuteCommandPulse(_entityController, _profile.Command);
                 }
             }
             catch
@@ -591,6 +689,345 @@ namespace RogueCommandExpansionLoader.Runtime
             }
         }
 
+        private static void ExecuteSynergyPulse(object self, ContentUnitSynergyDefinition[] synergies)
+        {
+            if (synergies == null || synergies.Length == 0)
+            {
+                return;
+            }
+
+            IEnumerable entities = GetActiveEntities();
+            if (entities == null)
+            {
+                return;
+            }
+
+            Vector3 selfPos = ReadVector3Property(_positionProperty, self);
+            string selfEntityId = ReadEntityId(self) ?? "synergy-unit";
+
+            for (int s = 0; s < synergies.Length; s++)
+            {
+                ContentUnitSynergyDefinition synergy = synergies[s];
+                if (synergy == null || synergy.radius <= 0f || synergy.multiplier <= 0f ||
+                    string.IsNullOrWhiteSpace(synergy.statName) ||
+                    synergy.targetUnitIds == null || synergy.targetUnitIds.Length == 0)
+                {
+                    continue;
+                }
+
+                float worldRadius = synergy.radius <= 25f ? synergy.radius * 10f : synergy.radius;
+                float radiusSq = worldRadius * worldRadius;
+                string originatorTag = "synergy:" + (string.IsNullOrWhiteSpace(synergy.id) ? selfEntityId + ":" + s : synergy.id);
+
+                int buffedCount = 0;
+                foreach (object candidate in entities)
+                {
+                    if (candidate == null || ReferenceEquals(candidate, self) || !IsEntityAlive(candidate) || IsEnemy(self, candidate))
+                    {
+                        continue;
+                    }
+
+                    string candidateId = ReadEntityId(candidate);
+                    if (string.IsNullOrWhiteSpace(candidateId) || !MatchesSynergyTarget(candidateId, synergy.targetUnitIds))
+                    {
+                        continue;
+                    }
+
+                    Vector3 pos = ReadVector3Property(_positionProperty, candidate);
+                    float dx = pos.x - selfPos.x;
+                    float dz = pos.z - selfPos.z;
+                    if ((dx * dx + dz * dz) > radiusSq)
+                    {
+                        continue;
+                    }
+
+                    ApplyTimedStatChange(candidate, synergy.statName, synergy.multiplier - 1f, 2.0f, originatorTag);
+                    ApplyTimedStatusEffect(candidate, "SquadEffect", 1.5f);
+
+                    buffedCount++;
+                    if (buffedCount >= 12)
+                    {
+                        break;
+                    }
+                }
+            }
+        }
+
+        private static bool MatchesSynergyTarget(string candidateId, string[] targetUnitIds)
+        {
+            for (int i = 0; i < targetUnitIds.Length; i++)
+            {
+                string target = targetUnitIds[i];
+                if (string.Equals(target, "*", StringComparison.Ordinal) ||
+                    string.Equals(target, candidateId, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private static void ExecuteStealthPulse(object self, ContentUnitStealthDefinition stealth, float now)
+        {
+            if (stealth == null || stealth.cloakDuration <= 0f || stealth.stealthLevel <= 0f)
+            {
+                return;
+            }
+
+            float lastDamageTime = ReadFloatProperty(_timeOfLastDamageProperty, self, -999f);
+            float combatGraceSeconds = Mathf.Clamp(4.0f - stealth.detectionReduction * 2.0f, 1.5f, 4.0f);
+            if ((now - lastDamageTime) >= combatGraceSeconds)
+            {
+                float duration = Mathf.Clamp(stealth.cloakDuration, 1.5f, 15.0f);
+                ApplyTimedStatusEffect(self, "Stealth", duration);
+            }
+        }
+
+        private static void ExecuteCommandPulse(object self, ContentUnitCommandDefinition command)
+        {
+            if (command == null || command.commandRange <= 0f)
+            {
+                return;
+            }
+
+            IEnumerable entities = GetActiveEntities();
+            if (entities == null)
+            {
+                return;
+            }
+
+            Vector3 selfPos = ReadVector3Property(_positionProperty, self);
+            float worldRange = command.commandRange <= 25f ? command.commandRange * 10f : command.commandRange;
+            float rangeSq = worldRange * worldRange;
+            int maxFollowers = command.maxCommandChain > 0 ? Mathf.Min(command.maxCommandChain, 16) : 4;
+            string selfId = ReadEntityId(self) ?? "commander";
+            string originatorTag = "command:" + selfId;
+
+            int linkedCount = 0;
+            foreach (object candidate in entities)
+            {
+                if (candidate == null || ReferenceEquals(candidate, self) || !IsEntityAlive(candidate) || IsEnemy(self, candidate))
+                {
+                    continue;
+                }
+
+                if (_isUnitProperty != null && !ReadBoolProperty(_isUnitProperty, candidate))
+                {
+                    continue;
+                }
+
+                Vector3 pos = ReadVector3Property(_positionProperty, candidate);
+                float dx = pos.x - selfPos.x;
+                float dz = pos.z - selfPos.z;
+                if ((dx * dx + dz * dz) > rangeSq)
+                {
+                    continue;
+                }
+
+                if (_setCaptainMethod != null)
+                {
+                    try
+                    {
+                        object currentCaptain = _captainOfThisEntityProperty != null
+                            ? _captainOfThisEntityProperty.GetValue(candidate, null)
+                            : null;
+                        if (currentCaptain == null || ReferenceEquals(currentCaptain, self))
+                        {
+                            _setCaptainMethod.Invoke(candidate, new[] { self });
+                        }
+                    }
+                    catch
+                    {
+                    }
+                }
+
+                string cmdType = command.commandType;
+                if (string.Equals(cmdType, "Attack", StringComparison.OrdinalIgnoreCase))
+                {
+                    ApplyTimedStatChange(candidate, "Damage", 0.12f, 2.0f, originatorTag + ":dmg");
+                }
+                else if (string.Equals(cmdType, "Defend", StringComparison.OrdinalIgnoreCase))
+                {
+                    ApplyTimedStatChange(candidate, "ArmorProtection", 0.15f, 2.0f, originatorTag + ":arm");
+                    ApplyTimedStatusEffect(candidate, "Defender", 1.5f);
+                }
+                else if (string.Equals(cmdType, "Move", StringComparison.OrdinalIgnoreCase))
+                {
+                    ApplyTimedStatChange(candidate, "MoveSpeed", 0.15f, 2.0f, originatorTag + ":spd");
+                }
+                else
+                {
+                    ApplyTimedStatChange(candidate, "Damage", 0.10f, 2.0f, originatorTag + ":sup");
+                }
+
+                ApplyTimedStatusEffect(candidate, "SquadEffect", 1.5f);
+                linkedCount++;
+                if (linkedCount >= maxFollowers)
+                {
+                    break;
+                }
+            }
+        }
+
+        public static void ApplyTimedStatChange(
+            object targetObj,
+            string statName,
+            float relativeDelta,
+            float durationSeconds,
+            string originatorId)
+        {
+            if (targetObj == null || string.IsNullOrWhiteSpace(statName) || durationSeconds <= 0f ||
+                Math.Abs(relativeDelta) < 0.0001f)
+            {
+                return;
+            }
+
+            EnsureReflection(targetObj.GetType());
+            if (_addSpecificValueChangeMethod == null || _changeableValueEnumType == null || _specificValueChangeType == null)
+            {
+                return;
+            }
+
+            string enumName = MapStatNameToChangeableValue(statName, ref relativeDelta);
+            if (enumName == null)
+            {
+                return;
+            }
+
+            try
+            {
+                object changeableValue = Enum.Parse(_changeableValueEnumType, enumName, true);
+                object change = Activator.CreateInstance(_specificValueChangeType);
+
+                if (_svcValueToAddField != null)
+                {
+                    _svcValueToAddField.SetValue(change, relativeDelta);
+                }
+                if (_svcAddField != null && _specificAddTypeEnumType != null)
+                {
+                    // AddType.Relative == 1
+                    _svcAddField.SetValue(change, Enum.ToObject(_specificAddTypeEnumType, 1));
+                }
+                if (_svcValidationField != null && _specificValidationTypeEnumType != null)
+                {
+                    // ValidationType.UntilTimestamp == 1
+                    _svcValidationField.SetValue(change, Enum.ToObject(_specificValidationTypeEnumType, 1));
+                }
+                if (_svcValidUntilTimestampField != null)
+                {
+                    _svcValidUntilTimestampField.SetValue(change, Time.time + durationSeconds);
+                }
+                if (_svcOriginatorEntityIdField != null)
+                {
+                    _svcOriginatorEntityIdField.SetValue(change, originatorId ?? "rcl-stat-mod");
+                }
+
+                _addSpecificValueChangeMethod.Invoke(targetObj, new object[] { changeableValue, change, false });
+            }
+            catch
+            {
+            }
+        }
+
+        private static string MapStatNameToChangeableValue(string statName, ref float relativeDelta)
+        {
+            if (string.IsNullOrWhiteSpace(statName))
+            {
+                return null;
+            }
+
+            string trimmed = statName.Trim();
+            if (string.Equals(trimmed, "Damage", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(trimmed, "Damage1", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(trimmed, "AttackDamage", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Damage";
+            }
+            if (string.Equals(trimmed, "AttackSpeed", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(trimmed, "FireRate", StringComparison.OrdinalIgnoreCase))
+            {
+                // Higher AttackSpeed multiplier (e.g. +25% => +0.25) reduces AttackCooldown (-20%)
+                float mult = 1f + relativeDelta;
+                if (mult > 0.1f)
+                {
+                    relativeDelta = (1f / mult) - 1f;
+                }
+                return "AttackCooldown";
+            }
+            if (string.Equals(trimmed, "AttackCooldown", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(trimmed, "Attack1Cooldown", StringComparison.OrdinalIgnoreCase))
+            {
+                return "AttackCooldown";
+            }
+            if (string.Equals(trimmed, "MoveSpeed", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(trimmed, "Speed", StringComparison.OrdinalIgnoreCase))
+            {
+                return "MoveSpeed";
+            }
+            if (string.Equals(trimmed, "WeaponRange", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(trimmed, "Range", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(trimmed, "AttackRange", StringComparison.OrdinalIgnoreCase))
+            {
+                return "WeaponRange";
+            }
+            if (string.Equals(trimmed, "MaxHealth", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(trimmed, "Health", StringComparison.OrdinalIgnoreCase))
+            {
+                return "MaxHealth";
+            }
+            if (string.Equals(trimmed, "MaxArmor", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(trimmed, "Armor", StringComparison.OrdinalIgnoreCase))
+            {
+                return "MaxArmor";
+            }
+            if (string.Equals(trimmed, "ArmorProtection", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(trimmed, "Defense", StringComparison.OrdinalIgnoreCase))
+            {
+                return "ArmorProtection";
+            }
+            if (string.Equals(trimmed, "MaxShield", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(trimmed, "Shield", StringComparison.OrdinalIgnoreCase))
+            {
+                return "MaxShield";
+            }
+            if (string.Equals(trimmed, "HealAmount", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(trimmed, "HealAmount1", StringComparison.OrdinalIgnoreCase))
+            {
+                return "HealAmount";
+            }
+            if (string.Equals(trimmed, "SightRadius", StringComparison.OrdinalIgnoreCase))
+            {
+                return "SightRadius";
+            }
+            if (string.Equals(trimmed, "EffectRadius", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(trimmed, "EffectRadius1", StringComparison.OrdinalIgnoreCase))
+            {
+                return "EffectRadius";
+            }
+            if (string.Equals(trimmed, "SkillRange", StringComparison.OrdinalIgnoreCase))
+            {
+                return "SkillRange";
+            }
+
+            return null;
+        }
+
+        private static void InvokeBankDeposit(string accountName, float amount)
+        {
+            if (_bankDepositMethod == null || string.IsNullOrWhiteSpace(accountName) || amount <= 0f)
+            {
+                return;
+            }
+
+            try
+            {
+                _bankDepositMethod.Invoke(null, new object[] { accountName, amount });
+            }
+            catch
+            {
+            }
+        }
+
         public static void ApplyBaselineStatusEffects(object entityObj, string[] statusEffects)
         {
             if (entityObj == null || statusEffects == null || statusEffects.Length == 0)
@@ -757,6 +1194,9 @@ namespace RogueCommandExpansionLoader.Runtime
             _uniqueEntityIdProperty = entityType.GetProperty("UniqueEntityId", flags);
             _isDestroyedProperty = entityType.GetProperty("IsDestroyed", flags);
             _destroyStartedProperty = entityType.GetProperty("DestroyHasBeenStarted", flags);
+            _isControlledByPlayerProperty = entityType.GetProperty("IsControlledByPlayer", flags);
+            _isUnitProperty = entityType.GetProperty("IsUnit", flags);
+            _isCombatUnitProperty = entityType.GetProperty("IsCombatUnit", flags);
             _positionProperty = entityType.GetProperty("Position", flags);
             _currentHealthProperty = entityType.GetProperty("CurrentHealth", flags);
             _maxHealthProperty = entityType.GetProperty("MaxHealth", flags);
@@ -767,12 +1207,15 @@ namespace RogueCommandExpansionLoader.Runtime
             _hasShieldProperty = entityType.GetProperty("HasShield", flags);
             _currentRankProperty = entityType.GetProperty("CurrentRank", flags);
             _maxRankProperty = entityType.GetProperty("MaxRank", flags);
+            _timeOfLastDamageProperty = entityType.GetProperty("TimeOfLastDamage", flags);
+            _captainOfThisEntityProperty = entityType.GetProperty("CaptainOfThisEntity", flags);
 
             _isEnemyMethod = entityType.GetMethod("IsEnemy", flags, null, new[] { entityType }, null);
             _healMethod = entityType.GetMethod("Heal", flags);
             _repairArmorMethod = entityType.GetMethod("RepairArmor", flags);
             _chargeShieldMethod = entityType.GetMethod("ChargeShield", flags);
             _rankUpMethod = entityType.GetMethod("RankUp", flags, null, new[] { typeof(int) }, null);
+            _setCaptainMethod = entityType.GetMethod("SetCaptain", flags, null, new[] { entityType }, null);
 
             Assembly asm = entityType.Assembly;
             _statusEffectEnumType = asm.GetType("StatusEffect");
@@ -783,6 +1226,42 @@ namespace RogueCommandExpansionLoader.Runtime
                     flags,
                     null,
                     new[] { _statusEffectEnumType, _durationTypeEnumType, typeof(float) },
+                    null);
+            }
+
+            _changeableValueEnumType = entityType.GetNestedType("ChangeableValue", BindingFlags.Public | BindingFlags.NonPublic)
+                ?? asm.GetType("EntityController+ChangeableValue")
+                ?? asm.GetType("EntityController/ChangeableValue");
+            _specificValueChangeType = asm.GetType("SpecificValueChange");
+            if (_specificValueChangeType != null)
+            {
+                _specificAddTypeEnumType = _specificValueChangeType.GetNestedType("AddType", BindingFlags.Public | BindingFlags.NonPublic)
+                    ?? asm.GetType("SpecificValueChange+AddType");
+                _specificValidationTypeEnumType = _specificValueChangeType.GetNestedType("ValidationType", BindingFlags.Public | BindingFlags.NonPublic)
+                    ?? asm.GetType("SpecificValueChange+ValidationType");
+                _svcValueToAddField = _specificValueChangeType.GetField("ValueToAdd", flags);
+                _svcAddField = _specificValueChangeType.GetField("Add", flags);
+                _svcValidationField = _specificValueChangeType.GetField("Validation", flags);
+                _svcValidUntilTimestampField = _specificValueChangeType.GetField("ValidUntilTimestamp", flags);
+                _svcOriginatorEntityIdField = _specificValueChangeType.GetField("OriginatorEntityId", flags);
+
+                if (_changeableValueEnumType != null)
+                {
+                    _addSpecificValueChangeMethod = entityType.GetMethod("AddSpecificValueChange",
+                        flags,
+                        null,
+                        new[] { _changeableValueEnumType, _specificValueChangeType, typeof(bool) },
+                        null);
+                }
+            }
+
+            _bankType = asm.GetType("Bank");
+            if (_bankType != null)
+            {
+                _bankDepositMethod = _bankType.GetMethod("Deposit",
+                    BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic,
+                    null,
+                    new[] { typeof(string), typeof(float) },
                     null);
             }
 

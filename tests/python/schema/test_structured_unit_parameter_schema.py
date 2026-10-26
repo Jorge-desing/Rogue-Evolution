@@ -293,6 +293,17 @@ class StructuredUnitParameterSchemaTests(unittest.TestCase):
                 manifest["units"][0][field] = invalid_val
                 self.assertFalse(self.validator.is_valid(manifest), f"Expected schema to reject {field}={invalid_val}")
 
+    def test_tactical_operations_pack_validates_against_schema_with_runtime_mechanics(self) -> None:
+        tactical_path = ROOT / "content" / "packs" / "tactical-operations" / "content.json"
+        tactical_manifest = json.loads(tactical_path.read_text(encoding="utf-8"))
+        self.assertTrue(self.validator.is_valid(tactical_manifest))
+        units_by_id = {u["id"]: u for u in tactical_manifest["units"]}
+        self.assertIn("stealth", units_by_id["tactical-operations:tidebreaker-skirmisher"])
+        self.assertIn("experienceReward", units_by_id["tactical-operations:tidebreaker-skirmisher"])
+        self.assertIn("synergies", units_by_id["tactical-operations:salvage-hauler"])
+        self.assertIn("command", units_by_id["tactical-operations:bulwark-siege-tank"])
+        self.assertIn("synergies", units_by_id["tactical-operations:field-medic-rover"])
+
 
 if __name__ == "__main__":
     unittest.main()

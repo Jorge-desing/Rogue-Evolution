@@ -1031,11 +1031,153 @@ internal static partial class ValidationTestRunner
             {
                 throw new InvalidOperationException($"Expected veterancy levelUpBonus to heal self above 60 HP, got {self.CurrentHealth}");
             }
+            if (!self.AppliedSpecificValueChanges.Any(c =>
+                    c.Value == EntityController.ChangeableValue.MoveSpeed &&
+                    Math.Abs(c.Change.ValueToAdd - 0.3f) < 0.001f &&
+                    c.Change.Add == SpecificValueChange.AddType.Relative &&
+                    !c.IsStackable))
+            {
+                throw new InvalidOperationException("Expected MoveSpeed combatBoost to apply relative +30% SpecificValueChange.");
+            }
         }
         finally
         {
             RuntimeUnitMechanicsDirector.ClearProfiles();
             ExistingControllers.Instance.Reset();
+            Bank.Reset();
+            UnityEngine.Time.time = 0f;
+        }
+    }),
+    ("runtime unit mechanics director executes synergies, autonomous stealth, command aura, and kill experience rewards", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        RuntimeUnitMechanicsDirector.ClearProfiles();
+        Bank.Reset();
+        UnityEngine.Time.time = 20f;
+
+        try
+        {
+            var profile = new UnitRuntimeMechanicsProfile
+            {
+                EntityId = "test:commander-unit",
+                Synergies = new[]
+                {
+                    new ContentUnitSynergyDefinition
+                    {
+                        id = "test:synergy-armor",
+                        statName = "ArmorProtection",
+                        multiplier = 1.25f,
+                        radius = 4.0f,
+                        targetUnitIds = new[] { "test:escort-ally" }
+                    }
+                },
+                Stealth = new ContentUnitStealthDefinition
+                {
+                    stealthLevel = 2.0f,
+                    cloakDuration = 4.5f,
+                    detectionReduction = 0.5f
+                },
+                Command = new ContentUnitCommandDefinition
+                {
+                    commandRange = 4.0f,
+                    commandType = "Attack",
+                    maxCommandChain = 3
+                },
+                ExperienceReward = new ContentUnitExperienceRewardDefinition
+                {
+                    experienceAmount = 20,
+                    experienceType = "Crystals",
+                    bonusMultiplier = 1.5f
+                }
+            };
+
+            RuntimeUnitMechanicsDirector.RegisterProfile("test:commander-unit", profile);
+            string summary = RuntimeUnitMechanicsDirector.FormatMechanicsSummary("test:commander-unit");
+            if (string.IsNullOrWhiteSpace(summary) ||
+                !summary.Contains("Sinergias: 1", StringComparison.Ordinal) ||
+                !summary.Contains("Sigilo: 4.5s", StringComparison.Ordinal) ||
+                !summary.Contains("Mando: Attack (4m)", StringComparison.Ordinal) ||
+                !summary.Contains("Recompensa: +20", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Unexpected commander mechanics summary: " + summary);
+            }
+
+            var commander = new EntityController
+            {
+                entityId = "test:commander-unit",
+                UniqueEntityId = 301,
+                IsControlledByPlayer = true,
+                IsUnit = true,
+                TimeOfLastDamage = 5f,
+                Position = new UnityEngine.Vector3(0f, 0f, 0f)
+            };
+            var escort = new EntityController
+            {
+                entityId = "test:escort-ally",
+                UniqueEntityId = 302,
+                IsControlledByPlayer = true,
+                IsUnit = true,
+                Position = new UnityEngine.Vector3(12f, 0f, 0f)
+            };
+            var enemy = new EntityController
+            {
+                entityId = "test:target-enemy",
+                UniqueEntityId = 401,
+                IsControlledByAi = true,
+                IsUnit = true,
+                CurrentHealth = 0f,
+                DestroyHasBeenStarted = true,
+                Position = new UnityEngine.Vector3(8f, 0f, 0f)
+            };
+
+            ExistingControllers.Instance.PlayerUnits().Add(commander);
+            ExistingControllers.Instance.PlayerUnits().Add(escort);
+            ExistingControllers.Instance.AiUnits().Add(enemy);
+
+            RuntimeUnitMechanicsDirector.AttachIfApplicable(commander);
+            var director = commander.gameObject.GetComponent<RuntimeUnitMechanicsDirector>();
+            if (director == null)
+            {
+                throw new InvalidOperationException("AttachIfApplicable did not attach RuntimeUnitMechanicsDirector to commander.");
+            }
+
+            UnityEngine.Time.time = 21f;
+            director.TickMechanics();
+
+            if (!commander.AppliedStatusEffects.Any(e => e.Effect == StatusEffect.Stealth && e.DurationType == SetStatusEffect.DurationType.Seconds && Math.Abs(e.Duration - 4.5f) < 0.01f))
+            {
+                throw new InvalidOperationException("Expected out-of-combat commander to activate Stealth status effect.");
+            }
+
+            if (!ReferenceEquals(escort.CaptainOfThisEntity, commander))
+            {
+                throw new InvalidOperationException("Expected Command pulse to bind escort's CaptainOfThisEntity to commander.");
+            }
+            if (!escort.AppliedSpecificValueChanges.Any(c =>
+                    c.Value == EntityController.ChangeableValue.Damage &&
+                    Math.Abs(c.Change.ValueToAdd - 0.12f) < 0.001f))
+            {
+                throw new InvalidOperationException("Expected Attack Command pulse to apply +12% Damage SpecificValueChange to escort.");
+            }
+
+            if (!escort.AppliedSpecificValueChanges.Any(c =>
+                    c.Value == EntityController.ChangeableValue.ArmorProtection &&
+                    Math.Abs(c.Change.ValueToAdd - 0.25f) < 0.001f))
+            {
+                throw new InvalidOperationException("Expected Synergy pulse to apply +25% ArmorProtection SpecificValueChange to escort.");
+            }
+
+            RuntimeUnitMechanicsDirector.OnEntityDealtDamage(enemy, 50f, commander);
+            if (!Bank.Deposits.Any(d => d.Account == "Player" && Math.Abs(d.Amount - 30f) < 0.01f))
+            {
+                throw new InvalidOperationException("Expected ExperienceReward on kill to deposit 30 crystals into Player account.");
+            }
+        }
+        finally
+        {
+            RuntimeUnitMechanicsDirector.ClearProfiles();
+            ExistingControllers.Instance.Reset();
+            Bank.Reset();
             UnityEngine.Time.time = 0f;
         }
     }),

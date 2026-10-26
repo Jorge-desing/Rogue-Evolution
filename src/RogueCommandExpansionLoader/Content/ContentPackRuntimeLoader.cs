@@ -8395,6 +8395,10 @@ namespace RogueCommandExpansionLoader.Content
                 BaselineStatusEffects = unit.baselineStatusEffects,
                 CombatBoosts = unit.combatBoosts,
                 Experience = unit.experience,
+                Synergies = unit.synergies,
+                Stealth = unit.stealth,
+                Command = unit.command,
+                ExperienceReward = unit.experienceReward,
                 MinAttackRange = unit.minAttackRange,
                 CriticalHitChance = unit.criticalHitChance,
                 OnHitStatusEffects = unit.onHitStatusEffects

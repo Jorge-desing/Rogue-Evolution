@@ -19,7 +19,31 @@ public enum StatusEffect
     CombatBoost,
     Hack,
     Smoke,
-    Stun
+    Stun,
+    SquadEffect,
+    Defender
+}
+
+public struct SpecificValueChange
+{
+    public enum AddType
+    {
+        Absolute = 0,
+        Relative = 1
+    }
+
+    public enum ValidationType
+    {
+        UntilFrame = 0,
+        UntilTimestamp = 1
+    }
+
+    public float ValueToAdd;
+    public AddType Add;
+    public ValidationType Validation;
+    public int ValidUntilFrame;
+    public float ValidUntilTimestamp;
+    public string OriginatorEntityId;
 }
 
 public static class SetStatusEffect
@@ -33,9 +57,35 @@ public static class SetStatusEffect
 
 public sealed class EntityController : Component
 {
+    public enum ChangeableValue
+    {
+        CostOfProduct,
+        ProductionDurationOfProduct,
+        MaxHealth,
+        MoveSpeed,
+        SightRadius,
+        Damage,
+        WeaponRange,
+        AttackCooldown,
+        EffectRadius,
+        SkillRange,
+        HealAmount,
+        GainCreditsAmount,
+        MaxShield,
+        MaxMana,
+        SkillManaCost,
+        Duration,
+        MaxRank,
+        MaxArmor,
+        ArmorProtection
+    }
+
     private readonly HashSet<UnitRole> _roles = new();
     private readonly LinkedList<EntityCommand> _commandChain = new();
     public List<(StatusEffect Effect, SetStatusEffect.DurationType DurationType, float Duration)> AppliedStatusEffects { get; } = new();
+    public List<(ChangeableValue Value, SpecificValueChange Change, bool IsStackable)> AppliedSpecificValueChanges { get; } = new();
+
+    public float TimeOfLastDamage { get; set; } = -999f;
 
     public bool IsDestroyed { get; set; }
     public bool DestroyHasBeenStarted { get; set; }
@@ -81,6 +131,16 @@ public sealed class EntityController : Component
     public void SetActiveStatusEffect(StatusEffect effect, SetStatusEffect.DurationType durationType, float duration)
     {
         AppliedStatusEffects.Add((effect, durationType, duration));
+    }
+    public void AddSpecificValueChange(ChangeableValue changeableValue, SpecificValueChange change, bool isStackable = true)
+    {
+        if (!isStackable)
+        {
+            AppliedSpecificValueChanges.RemoveAll(c =>
+                c.Value == changeableValue &&
+                string.Equals(c.Change.OriginatorEntityId, change.OriginatorEntityId, System.StringComparison.Ordinal));
+        }
+        AppliedSpecificValueChanges.Add((changeableValue, change, isStackable));
     }
     public float MoveSpeed { get; set; } = 10f;
     public float WeaponRange { get; set; } = 15f;
@@ -281,7 +341,13 @@ public sealed class WorldGrid
 
 public static class Bank
 {
+    public static List<(string Account, float Amount)> Deposits { get; } = new();
     public static int ActualBalance(string tag) => 1000;
+    public static void Deposit(string accountName, float amount)
+    {
+        Deposits.Add((accountName, amount));
+    }
+    public static void Reset() => Deposits.Clear();
 }
 
 public sealed class ExistingControllers

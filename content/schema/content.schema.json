@@ -746,6 +746,34 @@
         },
         "weaponSoundAssetName": {
           "$ref": "#/$defs/assetName"
+        },
+        "aiModule": {
+          "type": "object",
+          "properties": {
+            "moduleId": {
+              "$ref": "#/$defs/namespacedId"
+            },
+            "parameters": {
+              "oneOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/moduleParameter"
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": [
+                      "string",
+                      "number",
+                      "boolean"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
         }
       },
       "oneOf": [
@@ -1302,6 +1330,10 @@
           "minLength": 1,
           "pattern": "\\S",
           "description": "Relative path to one native factory visual subtree."
+        },
+        "isAllowedAsStartingBlueprint": {
+          "type": "boolean",
+          "description": "Allows this factory to enter the initial stage-0 blueprint offer."
         },
         "balanceOverrides": {
           "type": "array",
@@ -2373,8 +2405,22 @@
           "enum": [
             "Position",
             "Target",
-            "Self"
+            "Self",
+            "Toggle",
+            "Location",
+            "LocationAoE",
+            "LocationMultiTargets",
+            "SelfAoE",
+            "TargetMultiTarget",
+            "TargetAoE",
+            "SelfMultiTarget",
+            "SelfBuff"
           ]
+        },
+        "targetOrigin": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
         },
         "cooldown": {
           "type": "number",
@@ -2388,6 +2434,27 @@
         },
         "effectValue": {
           "type": "number"
+        },
+        "range": {
+          "type": "number",
+          "minimum": 0
+        },
+        "radius": {
+          "type": "number",
+          "minimum": 0
+        },
+        "helpAiToActivate": {
+          "type": "boolean"
+        },
+        "aiActivationTrigger": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "aiSkillCooldown": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 300
         }
       }
     },
