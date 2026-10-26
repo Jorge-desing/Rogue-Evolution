@@ -1181,5 +1181,55 @@ internal static partial class ValidationTestRunner
             UnityEngine.Time.time = 0f;
         }
     }),
+    ("experience reward does not pay for killing a friendly unit", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        RuntimeUnitMechanicsDirector.ClearProfiles();
+        Bank.Reset();
+
+        try
+        {
+            RuntimeUnitMechanicsDirector.RegisterProfile("test:player-killer", new UnitRuntimeMechanicsProfile
+            {
+                EntityId = "test:player-killer",
+                ExperienceReward = new ContentUnitExperienceRewardDefinition
+                {
+                    experienceAmount = 12,
+                    experienceType = "Crystals",
+                    bonusMultiplier = 1.0f
+                }
+            });
+
+            var attacker = new EntityController
+            {
+                entityId = "test:player-killer",
+                IsControlledByPlayer = true,
+                IsUnit = true
+            };
+            var friendlyTarget = new EntityController
+            {
+                entityId = "test:friendly-target",
+                IsControlledByPlayer = true,
+                IsUnit = true,
+                CurrentHealth = 0f,
+                DestroyHasBeenStarted = true
+            };
+
+            RuntimeUnitMechanicsDirector.OnEntityDealtDamage(friendlyTarget, 10f, attacker);
+
+            if (Bank.Deposits.Count != 0)
+            {
+                throw new InvalidOperationException(
+                    "Expected no Player reward for killing a friendly unit, got " + Bank.Deposits.Count + " deposit(s).");
+            }
+        }
+        finally
+        {
+            RuntimeUnitMechanicsDirector.ClearProfiles();
+            ExistingControllers.Instance.Reset();
+            Bank.Reset();
+            UnityEngine.Time.time = 0f;
+        }
+    }),
     };
 }

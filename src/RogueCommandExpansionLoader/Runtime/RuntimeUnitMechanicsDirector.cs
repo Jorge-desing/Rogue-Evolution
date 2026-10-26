@@ -401,7 +401,8 @@ namespace RogueCommandExpansionLoader.Runtime
 
                     // 3. ExperienceReward on kill (when attacker has ExperienceReward)
                     if (targetKilled && profile.ExperienceReward != null && profile.ExperienceReward.experienceAmount > 0 &&
-                        ReadBoolProperty(_isControlledByPlayerProperty, originatorObj))
+                        ReadBoolProperty(_isControlledByPlayerProperty, originatorObj) &&
+                        IsEnemy(originatorObj, targetObj))
                     {
                         float mult = profile.ExperienceReward.bonusMultiplier > 0f ? profile.ExperienceReward.bonusMultiplier : 1f;
                         float reward = Mathf.Max(1f, (float)Math.Round(profile.ExperienceReward.experienceAmount * mult));
