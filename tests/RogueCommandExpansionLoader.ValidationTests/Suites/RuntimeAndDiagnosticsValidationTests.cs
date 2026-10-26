@@ -1236,6 +1236,11 @@ internal static partial class ValidationTestRunner
                 MaxHealth = 100f
             };
 
+            if (attacker.IsEnemy(friendlyTarget))
+            {
+                throw new InvalidOperationException("Fixture reports same-player entities as enemies.");
+            }
+
             RuntimeUnitMechanicsDirector.OnEntityDealtDamage(friendlyTarget, 2f, attacker);
             if (attacker.CurrentRank != 0 || attacker.AppliedSpecificValueChanges.Count != 0 ||
                 attacker.AppliedStatusEffects.Any(e => e.Effect == StatusEffect.Turbo || e.Effect == StatusEffect.CombatBoost))
