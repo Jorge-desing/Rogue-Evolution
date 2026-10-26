@@ -58,6 +58,44 @@ Use this skill when adding or reviewing a unit in this repository. Read `AGENTS.
 - A stage's `unitIds` names produced units. The loader translates those IDs to their own factory IDs for blueprint eligibility and cloned pool scopes; product rows stay ineligible as blueprint rewards. Cloned stage blueprint pools preserve native per-pool filters (`blueprintFilter.IsBlueprintValid`). A pool named in `blueprintPoolEntries` admits only the union of that pool's entries; only pools without entries retain the broader `stage.unitIds` eligibility. Check generic rewards without a pool ID separately because they use the game's global eligibility fallback.
 - Before relying on reflected game methods, recheck the compatibility identity as a whole: Rogue Command version, `Assembly-CSharp.dll` SHA-256, and MVID. `EntityController.InProductionCount` returns `Nullable<int>` (`int?`, token `0x060007df`), while `EntityController.EntityId` is PascalCase (token `0x060007c6`) and AI/production structures use camelCase `entityId`. Unity/bundle authoring must use the pinned Editor version documented in the handoff.
 
+## Factory asset bundle validation and fail-closed registration
+
+- **Explicit bundle-required diagnostic**: When `productionBuilding.cardImageAssetName` or `productionBuilding.visualAssetName` is present, `ContentPackValidation.cs` must emit a dedicated `production-building.asset-bundle-required` diagnostic if `productionBuilding.assetBundleId` is null/whitespace. Relying on `ValidateNamespacedId` alone is insufficient because an empty ID silently produces no bundle-related diagnostic, leaving the pack author without actionable feedback.
+- **Fail-closed factory registration**: In `ContentPackRuntimeLoader.cs`, the unit-product row and the factory row are added to `temporaryUnits` in two consecutive calls. If `CreateProductionBuilding` throws or returns null, the product row remains registered. Wrap the factory creation in try/catch, remove the previously added product row on failure, and rethrow. This prevents partial registration where a product exists in the provider without its factory.
+- **Test coverage**: Add two harness cases in `Program.cs`:
+  1. Factory with asset references but null `assetBundleId` → expect `production-building.asset-bundle-required`.
+  2. Factory with asset references pointing to an undeclared bundle ID → expect `reference.bundle-unresolved`.
+  Run the narrow test first, then the full harness. Do not change unrelated test expectations.
+
+## Asset status and honest reporting
+
+- **Distinguish placeholders from finished assets.** A generated bundle with valid Sprite/GameObject entries is not evidence of HD textures, unique meshes, or correct gameplay. When a unit reuses another unit's model (e.g., SkyguardSAM.fbx for Bulwark), explicitly label it as "reused model — unique authoring pending" in the commit message and validation output. Do not describe a placeholder as a deliverable.
+- **Recommend commands only after verification.** Before presenting a shell command as actionable, confirm that the referenced script exists in the repository and its arguments match the documented interface. If the script or its arguments are unverified, label the command as an illustrative proposal, not a recommended workflow.
+- **Report validation tiers separately.** Offline validation (bundle references, schema checks, Release builds) proves structural correctness only. Authorized in-game verification (Steam-launched match with the QA profile) is required for registration, pool selection, instantiation, and rendering. Never conflate the two in status reports.
+
+## Blender-generated PBR assets and Unity integration
+
+When a unit needs unique geometry and HD PBR textures produced through Blender and integrated into the Unity authoring project, follow the ordered pipeline in `references/blender-unity-pbr.md`. The key rules:
+
+- **Discover the Blender executable once.** Locate the installed binary by checking standard installation directories, then use the verified executable for all subsequent commands. Record the result and proceed; do not repeat the discovery probe after it succeeds. Do not hard-code a machine-specific path as a standing requirement.
+- **Run generators through Blender's embedded Python.** Invoke with `--background --factory-startup --python-exit-code 1 --python <script> -- <arguments>`. Use `tools/generate_unit_model.py` with `--bake-atlas --atlas-resolution 2048 --single-material` for atlas-baked PBR maps. Choose distinct archetypes so each unit has genuinely unique silhouette and material layout.
+- **Preserve the texture-to-geometry pairing.** The single-material atlas output (`Name_Atlas.fbx`) matches the baked texture set; the separate multi-material `Name.fbx` does not automatically align. Inspect exporter outputs before assigning one atlas material.
+- **Import new files through Unity before expecting `.meta` files.** Missing metadata before import is a lifecycle state, not a reason to poll unchanged files.
+- **Persist materials as assets.** Create `.mat` files through `AssetDatabase.CreateAsset` and `SaveAssets`. A transient `new Material` instance is not a completed material deliverable. On reruns, reuse the existing asset path and update properties rather than creating duplicates.
+- **Validate before claiming completion.** Rebuild the affected AssetBundle, run `tools/validate_content_bundle_references.py`, and confirm the bundle contains the prefab with the expected material dependency. File existence and image dimensions verify generation only.
+
+## Asset deliverable requirements for Blender-generated PBR work
+
+- Unique geometry and baked texture maps connected to persisted Unity materials and actual prefabs are required. Vertex colors, reused model placeholders, or generated PNGs alone do not satisfy the request.
+- When a model reuses another unit's FBX (e.g., SkyguardSAM.fbx for Bulwark), explicitly label it as a reused placeholder until unique geometry is authored.
+- After material binding, validate the saved prefab references the material asset (not an in-memory instance) and that shader keywords (`_METALLICSPECGLOSSMAP`, `_NORMALMAP`, `_EMISSION`) are enabled when the corresponding maps are present.
+
+## Loop prevention
+
+- **Advance from evidence instead of repeating probes.** After a check establishes a fact, record the result and perform the next action that changes task state. Repeat a check only after a relevant change or to test a distinct hypothesis; changing an echo label does not constitute a new hypothesis.
+- **Treat a user's loop correction as an immediate workflow reset.** Stop the repeated operation, summarize verified completion versus remaining work briefly, and take one bounded corrective action rather than restarting discovery or merely promising to proceed.
+- **Honor the requested asset deliverable.** For Blender-generated HD PBR work, deliver unique geometry and baked texture maps connected to persisted Unity materials and the actual prefabs; vertex colors, reused model placeholders, or generated PNGs alone do not satisfy the request.
+
 ## Verify honestly
 
 Run the repository's offline validator and Release build when implementation or acceptance criteria call for them. Build the Unity bundle with the repository scaffolder and reopen it in Unity; offline bundle inspection can confirm object names and types. Label these as local validation. Only a Steam-launched match can confirm registration, pool selection, instantiation, and rendering. Use a reversible profile and restore temporary deployment changes after an authorized runtime check.

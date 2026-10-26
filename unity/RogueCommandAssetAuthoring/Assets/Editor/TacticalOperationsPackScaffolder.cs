@@ -274,6 +274,8 @@ namespace RogueCommandExpansion.Authoring
 
         private static string CreateBulwarkSiegeTankVisual()
         {
+            Material pbrMat = CreatePbrMaterial("BulwarkSiegeTank");
+
             GameObject modelAsset = AssetDatabase.LoadAssetAtPath<GameObject>(BulwarkSiegeTankModelPath);
             if (modelAsset == null) throw new FileNotFoundException("Model not found: " + BulwarkSiegeTankModelPath);
 
@@ -282,22 +284,44 @@ namespace RogueCommandExpansion.Authoring
             {
                 GameObject modelInstance = PrefabUtility.InstantiatePrefab(modelAsset) as GameObject;
                 if (modelInstance == null) modelInstance = UnityEngine.Object.Instantiate(modelAsset);
+                if (modelInstance == null) throw new InvalidOperationException("BulwarkSiegeTank model instance is null after instantiation");
                 modelInstance.name = "BulwarkSiegeTankModel";
                 modelInstance.transform.SetParent(root.transform, false);
                 modelInstance.transform.localPosition = Vector3.zero;
                 modelInstance.transform.localRotation = Quaternion.identity;
                 modelInstance.transform.localScale = Vector3.one;
 
-                Material pbrMat = CreatePbrMaterial("BulwarkSiegeTank");
+                if (pbrMat == null) throw new InvalidOperationException("BulwarkSiegeTank PBR material is null");
+
+                Renderer[] __bulwarkRenderers = modelInstance.GetComponentsInChildren<Renderer>(true);
+                bool __bulwarkHasMesh = false;
+                foreach (Renderer __r in __bulwarkRenderers)
+                {
+                    if (__r is MeshRenderer __mr)
+                    {
+                        MeshFilter __mf = __mr.GetComponent<MeshFilter>();
+                        if (__mf != null && __mf.sharedMesh != null) { __bulwarkHasMesh = true; break; }
+                    }
+                    else if (__r is SkinnedMeshRenderer __smr && __smr.sharedMesh != null)
+                    {
+                        __bulwarkHasMesh = true; break;
+                    }
+                }
+                if (!__bulwarkHasMesh) throw new InvalidOperationException("BulwarkSiegeTank model has no mesh-bearing renderers");
+
                 if (pbrMat != null)
                 {
-                    Renderer[] renderers = modelInstance.GetComponentsInChildren<Renderer>(true);
-                    foreach (Renderer r in renderers)
+                    Renderer[] allRenderers = modelInstance.GetComponentsInChildren<Renderer>(true);
+                    foreach (Renderer r in allRenderers)
                     {
-                        int count = r.sharedMaterials != null && r.sharedMaterials.Length > 0 ? r.sharedMaterials.Length : 1;
-                        var mats = new Material[count];
-                        for (int i = 0; i < count; i++) mats[i] = pbrMat;
-                        r.sharedMaterials = mats;
+                        // Only assign PBR material to mesh renderers, preserve VFX/particle materials
+                        if (r is MeshRenderer || r is SkinnedMeshRenderer)
+                        {
+                            int count = r.sharedMaterials != null && r.sharedMaterials.Length > 0 ? r.sharedMaterials.Length : 1;
+                            var mats = new Material[count];
+                            for (int i = 0; i < count; i++) mats[i] = pbrMat;
+                            r.sharedMaterials = mats;
+                        }
                     }
                 }
 
@@ -318,6 +342,8 @@ namespace RogueCommandExpansion.Authoring
 
         private static string CreateArcLanceWalkerVisual()
         {
+            Material pbrMat = CreatePbrMaterial("ArcLanceWalker");
+
             GameObject modelAsset = AssetDatabase.LoadAssetAtPath<GameObject>(ArcLanceWalkerModelPath);
             if (modelAsset == null) throw new FileNotFoundException("Model not found: " + ArcLanceWalkerModelPath);
 
@@ -326,22 +352,44 @@ namespace RogueCommandExpansion.Authoring
             {
                 GameObject modelInstance = PrefabUtility.InstantiatePrefab(modelAsset) as GameObject;
                 if (modelInstance == null) modelInstance = UnityEngine.Object.Instantiate(modelAsset);
+                if (modelInstance == null) throw new InvalidOperationException("ArcLanceWalker model instance is null after instantiation");
                 modelInstance.name = "ArcLanceWalkerModel";
                 modelInstance.transform.SetParent(root.transform, false);
                 modelInstance.transform.localPosition = Vector3.zero;
                 modelInstance.transform.localRotation = Quaternion.identity;
                 modelInstance.transform.localScale = Vector3.one;
 
-                Material pbrMat = CreatePbrMaterial("ArcLanceWalker");
+                if (pbrMat == null) throw new InvalidOperationException("ArcLanceWalker PBR material is null");
+
+                Renderer[] __arcRenderers = modelInstance.GetComponentsInChildren<Renderer>(true);
+                bool __arcHasMesh = false;
+                foreach (Renderer __r in __arcRenderers)
+                {
+                    if (__r is MeshRenderer __mr)
+                    {
+                        MeshFilter __mf = __mr.GetComponent<MeshFilter>();
+                        if (__mf != null && __mf.sharedMesh != null) { __arcHasMesh = true; break; }
+                    }
+                    else if (__r is SkinnedMeshRenderer __smr && __smr.sharedMesh != null)
+                    {
+                        __arcHasMesh = true; break;
+                    }
+                }
+                if (!__arcHasMesh) throw new InvalidOperationException("ArcLanceWalker model has no mesh-bearing renderers");
+
                 if (pbrMat != null)
                 {
-                    Renderer[] renderers = modelInstance.GetComponentsInChildren<Renderer>(true);
-                    foreach (Renderer r in renderers)
+                    Renderer[] allRenderers = modelInstance.GetComponentsInChildren<Renderer>(true);
+                    foreach (Renderer r in allRenderers)
                     {
-                        int count = r.sharedMaterials != null && r.sharedMaterials.Length > 0 ? r.sharedMaterials.Length : 1;
-                        var mats = new Material[count];
-                        for (int i = 0; i < count; i++) mats[i] = pbrMat;
-                        r.sharedMaterials = mats;
+                        // Only assign PBR material to mesh renderers, preserve VFX/particle materials
+                        if (r is MeshRenderer || r is SkinnedMeshRenderer)
+                        {
+                            int count = r.sharedMaterials != null && r.sharedMaterials.Length > 0 ? r.sharedMaterials.Length : 1;
+                            var mats = new Material[count];
+                            for (int i = 0; i < count; i++) mats[i] = pbrMat;
+                            r.sharedMaterials = mats;
+                        }
                     }
                 }
 
@@ -362,6 +410,8 @@ namespace RogueCommandExpansion.Authoring
 
         private static string CreateFieldMedicRoverVisual()
         {
+            Material pbrMat = CreatePbrMaterial("FieldMedicRover");
+
             GameObject modelAsset = AssetDatabase.LoadAssetAtPath<GameObject>(FieldMedicRoverModelPath);
             if (modelAsset == null) throw new FileNotFoundException("Model not found: " + FieldMedicRoverModelPath);
 
@@ -370,22 +420,44 @@ namespace RogueCommandExpansion.Authoring
             {
                 GameObject modelInstance = PrefabUtility.InstantiatePrefab(modelAsset) as GameObject;
                 if (modelInstance == null) modelInstance = UnityEngine.Object.Instantiate(modelAsset);
+                if (modelInstance == null) throw new InvalidOperationException("FieldMedicRover model instance is null after instantiation");
                 modelInstance.name = "FieldMedicRoverModel";
                 modelInstance.transform.SetParent(root.transform, false);
                 modelInstance.transform.localPosition = Vector3.zero;
                 modelInstance.transform.localRotation = Quaternion.identity;
                 modelInstance.transform.localScale = Vector3.one;
 
-                Material pbrMat = CreatePbrMaterial("FieldMedicRover");
+                if (pbrMat == null) throw new InvalidOperationException("FieldMedicRover PBR material is null");
+
+                Renderer[] __medicRenderers = modelInstance.GetComponentsInChildren<Renderer>(true);
+                bool __medicHasMesh = false;
+                foreach (Renderer __r in __medicRenderers)
+                {
+                    if (__r is MeshRenderer __mr)
+                    {
+                        MeshFilter __mf = __mr.GetComponent<MeshFilter>();
+                        if (__mf != null && __mf.sharedMesh != null) { __medicHasMesh = true; break; }
+                    }
+                    else if (__r is SkinnedMeshRenderer __smr && __smr.sharedMesh != null)
+                    {
+                        __medicHasMesh = true; break;
+                    }
+                }
+                if (!__medicHasMesh) throw new InvalidOperationException("FieldMedicRover model has no mesh-bearing renderers");
+
                 if (pbrMat != null)
                 {
-                    Renderer[] renderers = modelInstance.GetComponentsInChildren<Renderer>(true);
-                    foreach (Renderer r in renderers)
+                    Renderer[] allRenderers = modelInstance.GetComponentsInChildren<Renderer>(true);
+                    foreach (Renderer r in allRenderers)
                     {
-                        int count = r.sharedMaterials != null && r.sharedMaterials.Length > 0 ? r.sharedMaterials.Length : 1;
-                        var mats = new Material[count];
-                        for (int i = 0; i < count; i++) mats[i] = pbrMat;
-                        r.sharedMaterials = mats;
+                        // Only assign PBR material to mesh renderers, preserve VFX/particle materials
+                        if (r is MeshRenderer || r is SkinnedMeshRenderer)
+                        {
+                            int count = r.sharedMaterials != null && r.sharedMaterials.Length > 0 ? r.sharedMaterials.Length : 1;
+                            var mats = new Material[count];
+                            for (int i = 0; i < count; i++) mats[i] = pbrMat;
+                            r.sharedMaterials = mats;
+                        }
                     }
                 }
 
