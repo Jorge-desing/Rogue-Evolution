@@ -1068,7 +1068,7 @@ internal static partial class ValidationTestRunner
                         statName = "ArmorProtection",
                         multiplier = 1.25f,
                         radius = 4.0f,
-                        targetUnitIds = new[] { "test:escort-ally" }
+                        targetUnitIds = new[] { "*" }
                     }
                 },
                 Stealth = new ContentUnitStealthDefinition

@@ -85,6 +85,24 @@ internal static partial class ValidationTestRunner
                 "unit-synergy.target-unknown");
         });
     }),
+    ("unit synergy accepts a wildcard target", () =>
+    {
+        WithPackage(sample, (pack, root) =>
+        {
+            pack.units[0].synergies =
+            [
+                new ContentUnitSynergyDefinition
+                {
+                    id = "sample:test-synergy-wildcard",
+                    statName = "damage",
+                    multiplier = 1,
+                    radius = 1,
+                    targetUnitIds = ["*"]
+                }
+            ];
+            ExpectValid(pack, root, new EmptySnapshot(), new KnownModuleValidator());
+        });
+    }),
     ("unit synergy accepts registered native and cross-pack targets", () =>
     {
         WithPackage(sample, (pack, root) =>

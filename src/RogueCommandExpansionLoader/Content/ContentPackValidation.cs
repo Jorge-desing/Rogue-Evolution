@@ -2026,12 +2026,13 @@ namespace RogueCommandExpansionLoader.Content
                 {
                     for (int j = 0; j < synergy.targetUnitIds.Length; j++)
                     {
+                        bool isWildcard = String.Equals(synergy.targetUnitIds[j], "*", StringComparison.Ordinal);
                         if (String.IsNullOrWhiteSpace(synergy.targetUnitIds[j]) ||
-                            (!localUnitIds.Contains(synergy.targetUnitIds[j]) &&
+                            (!isWildcard && !localUnitIds.Contains(synergy.targetUnitIds[j]) &&
                                 (registrySnapshot == null || !registrySnapshot.ContainsUnit(synergy.targetUnitIds[j]))))
                         {
                             Add(diagnostics, "unit-synergy.target-unknown", itemPath + ".targetUnitIds[" + j + "]",
-                                "Synergy target unit must be a declared or native unit ID.");
+                                "Synergy target unit must be '*', a declared unit ID, or a native unit ID.");
                         }
                     }
                 }
