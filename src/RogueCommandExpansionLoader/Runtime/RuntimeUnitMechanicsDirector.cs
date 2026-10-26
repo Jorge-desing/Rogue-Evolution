@@ -22,6 +22,10 @@ namespace RogueCommandExpansionLoader.Runtime
         public float? MinAttackRange { get; set; }
         public float? CriticalHitChance { get; set; }
         public ContentOnHitStatusEffectDefinition[] OnHitStatusEffects { get; set; }
+        public ContentUnitShieldRegenDefinition ShieldRegen { get; set; }
+        public ContentUnitVampiricLeechDefinition VampiricLeech { get; set; }
+        public ContentUnitTauntDefinition Taunt { get; set; }
+        public ContentUnitShieldOverloadNovaDefinition ShieldOverloadNova { get; set; }
 
         public bool HasRuntimeComponentMechanics =>
             (Healing != null && (Healing.healAmount > 0f || Healing.repairAmount > 0f) && Healing.healRange > 0f) ||
@@ -29,12 +33,16 @@ namespace RogueCommandExpansionLoader.Runtime
             (BaselineStatusEffects != null && BaselineStatusEffects.Length > 0) ||
             (Synergies != null && Synergies.Length > 0) ||
             (Stealth != null && Stealth.cloakDuration > 0f && Stealth.stealthLevel > 0f) ||
-            (Command != null && Command.commandRange > 0f);
+            (Command != null && Command.commandRange > 0f) ||
+            (ShieldRegen != null && ShieldRegen.rechargeRate > 0f) ||
+            (Taunt != null && Taunt.tauntRadius > 0f) ||
+            (ShieldOverloadNova != null && ShieldOverloadNova.novaRadius > 0f);
 
         public bool HasOnDamageDealtMechanics =>
             (CombatBoosts != null && CombatBoosts.Length > 0) ||
             (Experience != null && Experience.maxLevel > 0) ||
-            (ExperienceReward != null && ExperienceReward.experienceAmount > 0);
+            (ExperienceReward != null && ExperienceReward.experienceAmount > 0) ||
+            (VampiricLeech != null && VampiricLeech.siphonRatio > 0f);
 
         public bool HasAnyMechanics =>
             HasRuntimeComponentMechanics ||
@@ -84,6 +92,8 @@ namespace RogueCommandExpansionLoader.Runtime
         private static MethodInfo _chargeShieldMethod;
         private static MethodInfo _rankUpMethod;
         private static MethodInfo _setCaptainMethod;
+        private static MethodInfo _attackMethod;
+        private static MethodInfo _takeDamageMethod;
         private static MethodInfo _setActiveStatusEffectMethod;
         private static MethodInfo _addSpecificValueChangeMethod;
         private static Type _statusEffectEnumType;
@@ -110,6 +120,12 @@ namespace RogueCommandExpansionLoader.Runtime
         private float _nextSynergyCheckTime;
         private float _nextStealthCheckTime;
         private float _nextCommandCheckTime;
+        private float _nextShieldRegenCheckTime;
+        private float _lastShieldRegenTime;
+        private float _nextTauntCheckTime;
+        private float _nextNovaAvailableTime;
+        private float _previousShield;
+        private bool _hasInitializedShield;
         private bool _baselineApplied;
 
         public static void RegisterProfile(string entityId, UnitRuntimeMechanicsProfile profile)
@@ -221,6 +237,22 @@ namespace RogueCommandExpansionLoader.Runtime
             if (profile.ExperienceReward != null && profile.ExperienceReward.experienceAmount > 0)
             {
                 parts.Add("Recompensa: +" + profile.ExperienceReward.experienceAmount);
+            }
+            if (profile.ShieldRegen != null && profile.ShieldRegen.rechargeRate > 0f)
+            {
+                parts.Add("Regen Escudo: +" + profile.ShieldRegen.rechargeRate.ToString("0.#") + "/s (" + profile.ShieldRegen.rechargeDelay.ToString("0.#") + "s delay)");
+            }
+            if (profile.VampiricLeech != null && profile.VampiricLeech.siphonRatio > 0f)
+            {
+                parts.Add("Drenaje Vampírico: " + (profile.VampiricLeech.siphonRatio * 100f).ToString("0") + "%");
+            }
+            if (profile.Taunt != null && profile.Taunt.tauntRadius > 0f)
+            {
+                parts.Add("Provocación (Taunt): " + profile.Taunt.tauntRadius.ToString("0.#") + "m");
+            }
+            if (profile.ShieldOverloadNova != null && profile.ShieldOverloadNova.novaRadius > 0f)
+            {
+                parts.Add("Nova EMP: " + profile.ShieldOverloadNova.damage.ToString("0") + " dmg (" + profile.ShieldOverloadNova.novaRadius.ToString("0.#") + "m)");
             }
 
             return parts.Count > 0 ? string.Join(" • ", parts) : null;
@@ -409,9 +441,41 @@ namespace RogueCommandExpansionLoader.Runtime
                         float reward = Mathf.Max(1f, (float)Math.Round(profile.ExperienceReward.experienceAmount * mult));
                         InvokeBankDeposit("Player", reward);
                     }
+
+                    // 4. Vampiric Leech on dealt damage
+                    if (profile.VampiricLeech != null && profile.VampiricLeech.siphonRatio > 0f)
+                    {
+                        float siphon = amount * profile.VampiricLeech.siphonRatio;
+                        if (profile.VampiricLeech.maxSiphonPerHit > 0f && siphon > profile.VampiricLeech.maxSiphonPerHit)
+                        {
+                            siphon = profile.VampiricLeech.maxSiphonPerHit;
+                        }
+
+                        if (siphon > 0.05f)
+                        {
+                            bool restoredShield = false;
+                            if (profile.VampiricLeech.siphonToShield && ReadBoolProperty(_hasShieldProperty, originatorObj))
+                            {
+                                float curShield = ReadFloatProperty(_currentShieldProperty, originatorObj, 0f);
+                                float maxShield = ReadFloatProperty(_maxShieldProperty, originatorObj, 0f);
+                                if (curShield < maxShield - 0.1f)
+                                {
+                                    InvokeChargeShield(originatorObj, siphon);
+                                    restoredShield = true;
+                                }
+                            }
+
+                            if (!restoredShield)
+                            {
+                                InvokeHeal(originatorObj, siphon, originatorObj);
+                            }
+
+                            ApplyTimedStatusEffect(originatorObj, "Vampirism", 0.75f);
+                        }
+                    }
                 }
 
-                // 4. Target bounty reward when killed by a player unit
+                // 5. Target bounty reward when killed by a player unit
                 if (targetKilled && ReadBoolProperty(_isControlledByPlayerProperty, originatorObj) &&
                     IsEnemy(originatorObj, targetObj))
                 {
@@ -444,6 +508,12 @@ namespace RogueCommandExpansionLoader.Runtime
             _nextSynergyCheckTime = Time.time + 0.5f;
             _nextStealthCheckTime = Time.time + 0.5f;
             _nextCommandCheckTime = Time.time + 0.5f;
+            _nextShieldRegenCheckTime = Time.time + 0.5f;
+            _lastShieldRegenTime = Time.time;
+            _nextTauntCheckTime = Time.time + 1.0f;
+            _nextNovaAvailableTime = Time.time;
+            _previousShield = ReadFloatProperty(_currentShieldProperty, entityController, 0f);
+            _hasInitializedShield = true;
             _baselineApplied = true;
         }
 
@@ -513,6 +583,34 @@ namespace RogueCommandExpansionLoader.Runtime
                 {
                     _nextCommandCheckTime = now + 1.0f;
                     ExecuteCommandPulse(_entityController, _profile.Command);
+                }
+
+                if (_profile.ShieldRegen != null &&
+                    _profile.ShieldRegen.rechargeRate > 0f &&
+                    now >= _nextShieldRegenCheckTime)
+                {
+                    _nextShieldRegenCheckTime = now + 0.25f;
+                    ExecuteShieldRegeneration(_entityController, _profile.ShieldRegen, now);
+                }
+
+                if (_profile.Taunt != null &&
+                    _profile.Taunt.tauntRadius > 0f &&
+                    now >= _nextTauntCheckTime)
+                {
+                    _nextTauntCheckTime = now + Mathf.Max(0.5f, _profile.Taunt.pulseInterval);
+                    ExecuteTauntPulse(_entityController, _profile.Taunt);
+                }
+
+                if (_profile.ShieldOverloadNova != null &&
+                    _profile.ShieldOverloadNova.novaRadius > 0f)
+                {
+                    float currentShield = ReadFloatProperty(_currentShieldProperty, _entityController, 0f);
+                    if (_hasInitializedShield && _previousShield > 0.1f && currentShield <= 0.05f && now >= _nextNovaAvailableTime)
+                    {
+                        _nextNovaAvailableTime = now + Mathf.Max(1.0f, _profile.ShieldOverloadNova.cooldown);
+                        ExecuteShieldOverloadNova(_entityController, _profile.ShieldOverloadNova);
+                    }
+                    _previousShield = currentShield;
                 }
             }
             catch
@@ -871,6 +969,139 @@ namespace RogueCommandExpansionLoader.Runtime
             }
         }
 
+        private void ExecuteShieldRegeneration(object self, ContentUnitShieldRegenDefinition regen, float now)
+        {
+            if (regen == null || regen.rechargeRate <= 0f)
+            {
+                return;
+            }
+
+            float dt = Mathf.Clamp(now - _lastShieldRegenTime, 0.05f, 1.0f);
+            _lastShieldRegenTime = now;
+
+            float lastDamageTime = ReadFloatProperty(_timeOfLastDamageProperty, self, -999f);
+            if ((now - lastDamageTime) < regen.rechargeDelay)
+            {
+                return;
+            }
+
+            float curShield = ReadFloatProperty(_currentShieldProperty, self, 0f);
+            float maxShield = ReadFloatProperty(_maxShieldProperty, self, 0f);
+            if (maxShield > 0f && curShield < maxShield - 0.01f)
+            {
+                float needed = maxShield - curShield;
+                float amount = Mathf.Min(regen.rechargeRate * dt, needed);
+                if (curShield <= 0.01f && regen.burstAmount > 0f)
+                {
+                    amount += Mathf.Min(regen.burstAmount, needed - amount);
+                }
+                if (amount > 0f)
+                {
+                    InvokeChargeShield(self, amount);
+                }
+            }
+        }
+
+        private static void ExecuteTauntPulse(object self, ContentUnitTauntDefinition taunt)
+        {
+            if (taunt == null || taunt.tauntRadius <= 0f)
+            {
+                return;
+            }
+
+            IEnumerable entities = GetActiveEntities();
+            if (entities == null)
+            {
+                return;
+            }
+
+            Vector3 selfPos = ReadVector3Property(_positionProperty, self);
+            float worldRadius = taunt.tauntRadius <= 25f ? taunt.tauntRadius * 10f : taunt.tauntRadius;
+            float radiusSq = worldRadius * worldRadius;
+            float duration = taunt.duration > 0f ? taunt.duration : 2.5f;
+            int maxTargets = taunt.maxTargets > 0 ? taunt.maxTargets : 6;
+
+            ApplyTimedStatusEffect(self, "Defender", duration);
+
+            int tauntedCount = 0;
+            foreach (object candidate in entities)
+            {
+                if (candidate == null || !IsEntityAlive(candidate) || !IsEnemy(self, candidate))
+                {
+                    continue;
+                }
+
+                Vector3 pos = ReadVector3Property(_positionProperty, candidate);
+                float dx = pos.x - selfPos.x;
+                float dz = pos.z - selfPos.z;
+                if ((dx * dx + dz * dz) > radiusSq)
+                {
+                    continue;
+                }
+
+                if (_attackMethod != null)
+                {
+                    try
+                    {
+                        _attackMethod.Invoke(candidate, new object[] { self });
+                    }
+                    catch
+                    {
+                    }
+                }
+
+                ApplyTimedStatusEffect(candidate, "Taunt", duration);
+                tauntedCount++;
+                if (tauntedCount >= maxTargets)
+                {
+                    break;
+                }
+            }
+        }
+
+        private static void ExecuteShieldOverloadNova(object self, ContentUnitShieldOverloadNovaDefinition nova)
+        {
+            if (nova == null || nova.novaRadius <= 0f)
+            {
+                return;
+            }
+
+            IEnumerable entities = GetActiveEntities();
+            if (entities == null)
+            {
+                return;
+            }
+
+            Vector3 selfPos = ReadVector3Property(_positionProperty, self);
+            float worldRadius = nova.novaRadius <= 25f ? nova.novaRadius * 10f : nova.novaRadius;
+            float radiusSq = worldRadius * worldRadius;
+            float stunDur = nova.stunDuration > 0f ? nova.stunDuration : 2.0f;
+
+            foreach (object candidate in entities)
+            {
+                if (candidate == null || !IsEntityAlive(candidate) || !IsEnemy(self, candidate))
+                {
+                    continue;
+                }
+
+                Vector3 pos = ReadVector3Property(_positionProperty, candidate);
+                float dx = pos.x - selfPos.x;
+                float dz = pos.z - selfPos.z;
+                if ((dx * dx + dz * dz) > radiusSq)
+                {
+                    continue;
+                }
+
+                ApplyTimedStatusEffect(candidate, "Stun", stunDur);
+                ApplyTimedStatusEffect(candidate, "SlowedDown", stunDur * 1.5f);
+
+                if (nova.damage > 0f)
+                {
+                    InvokeTakeDamage(candidate, nova.damage, self);
+                }
+            }
+        }
+
         public static void ApplyTimedStatChange(
             object targetObj,
             string statName,
@@ -1156,6 +1387,30 @@ namespace RogueCommandExpansionLoader.Runtime
             }
         }
 
+        private static void InvokeTakeDamage(object target, float amount, object originator)
+        {
+            if (_takeDamageMethod == null || target == null || amount <= 0f)
+            {
+                return;
+            }
+
+            try
+            {
+                ParameterInfo[] parameters = _takeDamageMethod.GetParameters();
+                if (parameters.Length == 4)
+                {
+                    _takeDamageMethod.Invoke(target, new object[] { amount, originator, true, false });
+                }
+                else if (parameters.Length == 2)
+                {
+                    _takeDamageMethod.Invoke(target, new object[] { amount, originator });
+                }
+            }
+            catch
+            {
+            }
+        }
+
         private static IEnumerable GetActiveEntities()
         {
             if (_existingControllersInstanceProp == null || _entitiesMethod == null)
@@ -1218,6 +1473,8 @@ namespace RogueCommandExpansionLoader.Runtime
             _chargeShieldMethod = entityType.GetMethod("ChargeShield", flags);
             _rankUpMethod = entityType.GetMethod("RankUp", flags, null, new[] { typeof(int) }, null);
             _setCaptainMethod = entityType.GetMethod("SetCaptain", flags, null, new[] { entityType }, null);
+            _attackMethod = entityType.GetMethod("Attack", flags, null, new[] { entityType }, null);
+            _takeDamageMethod = entityType.GetMethod("TakeDamage", flags);
 
             Assembly asm = entityType.Assembly;
             _statusEffectEnumType = asm.GetType("StatusEffect");

@@ -20,6 +20,8 @@ namespace RogueCommandExpansionLoader.Content
         public ContentStageDefinition[] stages;
         public ContentAiProfileDefinition[] aiProfiles;
         public ContentRelicDefinition[] relics;
+
+        public ContentPackDefinition Clone() => ContentPackCopy.DeepClone(this);
     }
 
     [Serializable]
@@ -252,6 +254,40 @@ namespace RogueCommandExpansionLoader.Content
     }
 
     [Serializable]
+    public sealed class ContentUnitShieldRegenDefinition
+    {
+        public float rechargeDelay;
+        public float rechargeRate;
+        public float burstAmount;
+    }
+
+    [Serializable]
+    public sealed class ContentUnitVampiricLeechDefinition
+    {
+        public float siphonRatio;
+        public bool siphonToShield;
+        public float maxSiphonPerHit;
+    }
+
+    [Serializable]
+    public sealed class ContentUnitTauntDefinition
+    {
+        public float pulseInterval;
+        public float tauntRadius;
+        public float duration;
+        public int maxTargets;
+    }
+
+    [Serializable]
+    public sealed class ContentUnitShieldOverloadNovaDefinition
+    {
+        public float novaRadius;
+        public float damage;
+        public float stunDuration;
+        public float cooldown;
+    }
+
+    [Serializable]
     public sealed class ContentUnitDefinition
     {
         public string id;
@@ -292,6 +328,10 @@ namespace RogueCommandExpansionLoader.Content
         public ContentUnitAuraDefinition aura;
         public ContentUnitResourceGatheringDefinition resourceGathering;
         public ContentUnitAiBehaviorDefinition aiBehavior;
+        public ContentUnitShieldRegenDefinition shieldRegeneration;
+        public ContentUnitVampiricLeechDefinition vampiricLeech;
+        public ContentUnitTauntDefinition tauntPulse;
+        public ContentUnitShieldOverloadNovaDefinition shieldOverloadNova;
         public int? combatValue;
         public int? gridSize;
         public int? maxCapacity;
@@ -1032,6 +1072,10 @@ namespace RogueCommandExpansionLoader.Content
                 aura = CloneUnitAura(source.aura),
                 resourceGathering = CloneUnitResourceGathering(source.resourceGathering),
                 aiBehavior = CloneUnitAiBehavior(source.aiBehavior),
+                shieldRegeneration = CloneShieldRegen(source.shieldRegeneration),
+                vampiricLeech = CloneVampiricLeech(source.vampiricLeech),
+                tauntPulse = CloneTaunt(source.tauntPulse),
+                shieldOverloadNova = CloneShieldOverloadNova(source.shieldOverloadNova),
                 combatValue = source.combatValue,
                 gridSize = source.gridSize,
                 maxCapacity = source.maxCapacity,
@@ -1306,6 +1350,48 @@ namespace RogueCommandExpansionLoader.Content
                 combatUnitCap = source.combatUnitCap,
                 skillActivationCheckInterval = source.skillActivationCheckInterval,
                 aiTag = source.aiTag
+            };
+        }
+
+        private static ContentUnitShieldRegenDefinition CloneShieldRegen(ContentUnitShieldRegenDefinition source)
+        {
+            return source == null ? null : new ContentUnitShieldRegenDefinition
+            {
+                rechargeDelay = source.rechargeDelay,
+                rechargeRate = source.rechargeRate,
+                burstAmount = source.burstAmount
+            };
+        }
+
+        private static ContentUnitVampiricLeechDefinition CloneVampiricLeech(ContentUnitVampiricLeechDefinition source)
+        {
+            return source == null ? null : new ContentUnitVampiricLeechDefinition
+            {
+                siphonRatio = source.siphonRatio,
+                siphonToShield = source.siphonToShield,
+                maxSiphonPerHit = source.maxSiphonPerHit
+            };
+        }
+
+        private static ContentUnitTauntDefinition CloneTaunt(ContentUnitTauntDefinition source)
+        {
+            return source == null ? null : new ContentUnitTauntDefinition
+            {
+                pulseInterval = source.pulseInterval,
+                tauntRadius = source.tauntRadius,
+                duration = source.duration,
+                maxTargets = source.maxTargets
+            };
+        }
+
+        private static ContentUnitShieldOverloadNovaDefinition CloneShieldOverloadNova(ContentUnitShieldOverloadNovaDefinition source)
+        {
+            return source == null ? null : new ContentUnitShieldOverloadNovaDefinition
+            {
+                novaRadius = source.novaRadius,
+                damage = source.damage,
+                stunDuration = source.stunDuration,
+                cooldown = source.cooldown
             };
         }
 

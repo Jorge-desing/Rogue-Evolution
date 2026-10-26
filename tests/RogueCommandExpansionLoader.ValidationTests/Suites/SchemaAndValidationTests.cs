@@ -50,7 +50,11 @@ internal static partial class ValidationTestRunner
             ("experienceReward", "unitExperienceReward", typeof(ContentUnitExperienceRewardDefinition), false),
             ("aura", "unitAura", typeof(ContentUnitAuraDefinition), false),
             ("resourceGathering", "unitResourceGathering", typeof(ContentUnitResourceGatheringDefinition), false),
-            ("aiBehavior", "unitAiBehavior", typeof(ContentUnitAiBehaviorDefinition), false)
+            ("aiBehavior", "unitAiBehavior", typeof(ContentUnitAiBehaviorDefinition), false),
+            ("shieldRegeneration", "unitShieldRegen", typeof(ContentUnitShieldRegenDefinition), false),
+            ("vampiricLeech", "unitVampiricLeech", typeof(ContentUnitVampiricLeechDefinition), false),
+            ("tauntPulse", "unitTauntPulse", typeof(ContentUnitTauntDefinition), false),
+            ("shieldOverloadNova", "unitShieldOverloadNova", typeof(ContentUnitShieldOverloadNovaDefinition), false)
         };
 
         foreach (var entry in subDefinitions)
@@ -838,7 +842,19 @@ internal static partial class ValidationTestRunner
             (pack => pack.units[0].aura = new ContentUnitAuraDefinition { buffAmount = Single.PositiveInfinity }, "unit-aura.buff-invalid"),
             (pack => pack.units[0].resourceGathering = new ContentUnitResourceGatheringDefinition { resourceType = "Credits", gatherRate = Single.NaN }, "unit-gathering.rate-invalid"),
             (pack => pack.units[0].resourceGathering = new ContentUnitResourceGatheringDefinition { resourceType = "Credits", gatherRange = Single.PositiveInfinity }, "unit-gathering.range-invalid"),
-            (pack => pack.units[0].aiBehavior = new ContentUnitAiBehaviorDefinition { skillActivationCheckInterval = Single.NaN }, "unit-ai.interval-invalid")
+            (pack => pack.units[0].aiBehavior = new ContentUnitAiBehaviorDefinition { skillActivationCheckInterval = Single.NaN }, "unit-ai.interval-invalid"),
+            (pack => pack.units[0].shieldRegeneration = new ContentUnitShieldRegenDefinition { rechargeDelay = Single.NaN }, "unit-shield-regen.delay-invalid"),
+            (pack => pack.units[0].shieldRegeneration = new ContentUnitShieldRegenDefinition { rechargeRate = Single.PositiveInfinity }, "unit-shield-regen.rate-invalid"),
+            (pack => pack.units[0].shieldRegeneration = new ContentUnitShieldRegenDefinition { burstAmount = Single.NaN }, "unit-shield-regen.burst-invalid"),
+            (pack => pack.units[0].vampiricLeech = new ContentUnitVampiricLeechDefinition { siphonRatio = Single.NaN }, "unit-vampiric-leech.ratio-invalid"),
+            (pack => pack.units[0].vampiricLeech = new ContentUnitVampiricLeechDefinition { maxSiphonPerHit = Single.PositiveInfinity }, "unit-vampiric-leech.max-invalid"),
+            (pack => pack.units[0].tauntPulse = new ContentUnitTauntDefinition { pulseInterval = Single.NaN }, "unit-taunt.interval-invalid"),
+            (pack => pack.units[0].tauntPulse = new ContentUnitTauntDefinition { tauntRadius = Single.PositiveInfinity }, "unit-taunt.radius-invalid"),
+            (pack => pack.units[0].tauntPulse = new ContentUnitTauntDefinition { duration = Single.NaN }, "unit-taunt.duration-invalid"),
+            (pack => pack.units[0].shieldOverloadNova = new ContentUnitShieldOverloadNovaDefinition { novaRadius = Single.NaN }, "unit-shield-nova.radius-invalid"),
+            (pack => pack.units[0].shieldOverloadNova = new ContentUnitShieldOverloadNovaDefinition { damage = Single.PositiveInfinity }, "unit-shield-nova.damage-invalid"),
+            (pack => pack.units[0].shieldOverloadNova = new ContentUnitShieldOverloadNovaDefinition { stunDuration = Single.NaN }, "unit-shield-nova.stun-invalid"),
+            (pack => pack.units[0].shieldOverloadNova = new ContentUnitShieldOverloadNovaDefinition { cooldown = Single.PositiveInfinity }, "unit-shield-nova.cooldown-invalid")
         };
         var failures = new System.Collections.Generic.List<string>();
         foreach (var testCase in cases)

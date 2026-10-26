@@ -8704,7 +8704,11 @@ namespace RogueCommandExpansionLoader.Content
                 ExperienceReward = unit.experienceReward,
                 MinAttackRange = unit.minAttackRange,
                 CriticalHitChance = unit.criticalHitChance,
-                OnHitStatusEffects = unit.onHitStatusEffects
+                OnHitStatusEffects = unit.onHitStatusEffects,
+                ShieldRegen = unit.shieldRegeneration,
+                VampiricLeech = unit.vampiricLeech,
+                Taunt = unit.tauntPulse,
+                ShieldOverloadNova = unit.shieldOverloadNova
             };
 
             if (profile.HasAnyMechanics)

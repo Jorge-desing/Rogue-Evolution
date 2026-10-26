@@ -370,7 +370,12 @@
                         "tactical-operations:arc-lance-walker"
                     ]
                 }
-            ]
+            ],
+            "shieldRegeneration": {
+                "rechargeDelay": 4.0,
+                "rechargeRate": 1.0,
+                "burstAmount": 1.0
+            }
         },
         {
             "id": "tactical-operations:skyguard-sam",
@@ -702,6 +707,12 @@
                 "commandRange": 4.5,
                 "commandType": "Attack",
                 "maxCommandChain": 4
+            },
+            "tauntPulse": {
+                "pulseInterval": 6.0,
+                "tauntRadius": 4.0,
+                "duration": 2.5,
+                "maxTargets": 4
             }
         },
         {
@@ -871,6 +882,11 @@
                 "maxLevel": 3,
                 "experienceGainMultiplier": 1.0,
                 "levelUpBonus": 0.2
+            },
+            "vampiricLeech": {
+                "siphonRatio": 0.2,
+                "siphonToShield": false,
+                "maxSiphonPerHit": 8.0
             }
         },
         {
@@ -1059,7 +1075,18 @@
                         "tactical-operations:skyguard-sam"
                     ]
                 }
-            ]
+            ],
+            "shieldOverloadNova": {
+                "novaRadius": 4.0,
+                "damage": 25.0,
+                "stunDuration": 2.0,
+                "cooldown": 15.0
+            },
+            "shieldRegeneration": {
+                "rechargeDelay": 5.0,
+                "rechargeRate": 1.5,
+                "burstAmount": 2.0
+            }
         }
     ],
     "stages": [

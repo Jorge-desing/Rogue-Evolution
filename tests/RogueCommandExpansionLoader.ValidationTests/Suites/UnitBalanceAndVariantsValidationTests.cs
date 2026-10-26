@@ -953,5 +953,120 @@ internal static partial class ValidationTestRunner
             unit.firePointCount = null;
         });
     }),
+    ("unit shield regeneration vampiric leech taunt and nova definitions validate bounds and clone safely", () =>
+    {
+        WithPackage(sample, (pack, root) =>
+        {
+            ContentUnitDefinition unit = pack.units[0];
+
+            // 1. Shield Regen bounds
+            unit.shieldRegeneration = new ContentUnitShieldRegenDefinition { rechargeDelay = -1f, rechargeRate = 10f };
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(), "unit-shield-regen.delay-invalid");
+            unit.shieldRegeneration.rechargeDelay = 65f;
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(), "unit-shield-regen.delay-invalid");
+            unit.shieldRegeneration.rechargeDelay = 4.0f;
+
+            unit.shieldRegeneration.rechargeRate = 0f;
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(), "unit-shield-regen.rate-invalid");
+            unit.shieldRegeneration.rechargeRate = 1500f;
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(), "unit-shield-regen.rate-invalid");
+            unit.shieldRegeneration.rechargeRate = 15.0f;
+
+            unit.shieldRegeneration.burstAmount = -5f;
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(), "unit-shield-regen.burst-invalid");
+            unit.shieldRegeneration.burstAmount = 600f;
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(), "unit-shield-regen.burst-invalid");
+            unit.shieldRegeneration.burstAmount = 25f;
+
+            // 2. Vampiric Leech bounds
+            unit.vampiricLeech = new ContentUnitVampiricLeechDefinition { siphonRatio = 0f };
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(), "unit-vampiric-leech.ratio-invalid");
+            unit.vampiricLeech.siphonRatio = 1.2f;
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(), "unit-vampiric-leech.ratio-invalid");
+            unit.vampiricLeech.siphonRatio = 0.25f;
+            unit.vampiricLeech.siphonToShield = true;
+            unit.vampiricLeech.maxSiphonPerHit = 30f;
+
+            // 3. Taunt bounds
+            unit.tauntPulse = new ContentUnitTauntDefinition { pulseInterval = 0.1f, tauntRadius = 15f };
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(), "unit-taunt.interval-invalid");
+            unit.tauntPulse.pulseInterval = 3.0f;
+
+            unit.tauntPulse.tauntRadius = 0.5f;
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(), "unit-taunt.radius-invalid");
+            unit.tauntPulse.tauntRadius = 80f;
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(), "unit-taunt.radius-invalid");
+            unit.tauntPulse.tauntRadius = 15f;
+            unit.tauntPulse.duration = 2.5f;
+            unit.tauntPulse.maxTargets = 8;
+
+            // 4. Shield Overload Nova bounds
+            unit.shieldOverloadNova = new ContentUnitShieldOverloadNovaDefinition { novaRadius = 0.5f };
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(), "unit-shield-nova.radius-invalid");
+            unit.shieldOverloadNova.novaRadius = 12f;
+
+            unit.shieldOverloadNova.stunDuration = 20f;
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(), "unit-shield-nova.stun-invalid");
+            unit.shieldOverloadNova.stunDuration = 2.5f;
+            unit.shieldOverloadNova.damage = 25f;
+            unit.shieldOverloadNova.cooldown = 10f;
+
+            // Deep clone verification
+            ContentPackDefinition clonedPack = ContentPackDefinition.DeepClone(pack);
+            ContentUnitDefinition clonedUnit = clonedPack.units[0];
+            if (clonedUnit.shieldRegeneration == null ||
+                Math.Abs(clonedUnit.shieldRegeneration.rechargeDelay - 4.0f) > 0.001f ||
+                Math.Abs(clonedUnit.shieldRegeneration.rechargeRate - 15.0f) > 0.001f ||
+                Math.Abs(clonedUnit.shieldRegeneration.burstAmount - 25.0f) > 0.001f)
+            {
+                throw new InvalidOperationException("ShieldRegeneration was not deep cloned properly.");
+            }
+            if (clonedUnit.vampiricLeech == null ||
+                Math.Abs(clonedUnit.vampiricLeech.siphonRatio - 0.25f) > 0.001f ||
+                !clonedUnit.vampiricLeech.siphonToShield ||
+                Math.Abs(clonedUnit.vampiricLeech.maxSiphonPerHit - 30.0f) > 0.001f)
+            {
+                throw new InvalidOperationException("VampiricLeech was not deep cloned properly.");
+            }
+            if (clonedUnit.tauntPulse == null ||
+                Math.Abs(clonedUnit.tauntPulse.pulseInterval - 3.0f) > 0.001f ||
+                Math.Abs(clonedUnit.tauntPulse.tauntRadius - 15.0f) > 0.001f ||
+                clonedUnit.tauntPulse.maxTargets != 8)
+            {
+                throw new InvalidOperationException("TauntPulse was not deep cloned properly.");
+            }
+            if (clonedUnit.shieldOverloadNova == null ||
+                Math.Abs(clonedUnit.shieldOverloadNova.novaRadius - 12.0f) > 0.001f ||
+                Math.Abs(clonedUnit.shieldOverloadNova.damage - 25.0f) > 0.001f ||
+                Math.Abs(clonedUnit.shieldOverloadNova.stunDuration - 2.5f) > 0.001f)
+            {
+                throw new InvalidOperationException("ShieldOverloadNova was not deep cloned properly.");
+            }
+
+            // Profile and summary verification
+            var profile = new UnitRuntimeMechanicsProfile
+            {
+                EntityId = unit.id,
+                ShieldRegen = unit.shieldRegeneration,
+                VampiricLeech = unit.vampiricLeech,
+                Taunt = unit.tauntPulse,
+                ShieldOverloadNova = unit.shieldOverloadNova
+            };
+            if (!profile.HasRuntimeComponentMechanics || !profile.HasOnDamageDealtMechanics || !profile.HasAnyMechanics)
+            {
+                throw new InvalidOperationException("Profile does not detect new mechanics.");
+            }
+            RuntimeUnitMechanicsDirector.RegisterProfile(unit.id, profile);
+            string? summary = RuntimeUnitMechanicsDirector.FormatMechanicsSummary(unit.id);
+            if (summary == null ||
+                !summary.Contains("Regen Escudo") ||
+                !summary.Contains("Drenaje Vampírico") ||
+                !summary.Contains("Provocación") ||
+                !summary.Contains("Nova EMP"))
+            {
+                throw new InvalidOperationException("FormatMechanicsSummary does not describe the new mechanics: " + summary);
+            }
+        });
+    }),
     };
 }

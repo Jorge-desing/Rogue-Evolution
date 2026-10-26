@@ -517,6 +517,18 @@
         "aiBehavior": {
           "$ref": "#/$defs/unitAiBehavior"
         },
+        "shieldRegeneration": {
+          "$ref": "#/$defs/unitShieldRegen"
+        },
+        "vampiricLeech": {
+          "$ref": "#/$defs/unitVampiricLeech"
+        },
+        "tauntPulse": {
+          "$ref": "#/$defs/unitTauntPulse"
+        },
+        "shieldOverloadNova": {
+          "$ref": "#/$defs/unitShieldOverloadNova"
+        },
         "copyUpgradesToEntityId": {
           "type": "string",
           "pattern": "^[a-zA-Z0-9_:-]+$",
@@ -2963,6 +2975,85 @@
         },
         "aiTag": {
           "type": "string"
+        }
+      }
+    },
+    "unitShieldRegen": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "rechargeDelay": {
+          "type": "number",
+          "minimum": 0
+        },
+        "rechargeRate": {
+          "type": "number",
+          "minimum": 0
+        },
+        "burstAmount": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "unitVampiricLeech": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "siphonRatio": {
+          "type": "number",
+          "minimum": 0
+        },
+        "siphonToShield": {
+          "type": "boolean"
+        },
+        "maxSiphonPerHit": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "unitTauntPulse": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "pulseInterval": {
+          "type": "number",
+          "minimum": 0
+        },
+        "tauntRadius": {
+          "type": "number",
+          "minimum": 0
+        },
+        "duration": {
+          "type": "number",
+          "minimum": 0
+        },
+        "maxTargets": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "unitShieldOverloadNova": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "novaRadius": {
+          "type": "number",
+          "minimum": 0
+        },
+        "damage": {
+          "type": "number",
+          "minimum": 0
+        },
+        "stunDuration": {
+          "type": "number",
+          "minimum": 0
+        },
+        "cooldown": {
+          "type": "number",
+          "minimum": 0
         }
       }
     },

@@ -496,6 +496,10 @@ namespace RogueCommandExpansionLoader.Content
                 ValidateUnitAura(unit.aura, itemPath + ".aura", diagnostics);
                 ValidateUnitResourceGathering(unit.resourceGathering, itemPath + ".resourceGathering", diagnostics);
                 ValidateUnitAiBehavior(unit.aiBehavior, itemPath + ".aiBehavior", diagnostics);
+                ValidateShieldRegen(unit.shieldRegeneration, itemPath + ".shieldRegeneration", diagnostics);
+                ValidateVampiricLeech(unit.vampiricLeech, itemPath + ".vampiricLeech", diagnostics);
+                ValidateTaunt(unit.tauntPulse, itemPath + ".tauntPulse", diagnostics);
+                ValidateShieldOverloadNova(unit.shieldOverloadNova, itemPath + ".shieldOverloadNova", diagnostics);
                 ValidateUnitBalancingParameters(unit, itemPath, diagnostics);
                 ValidateProductionBuilding(unit.productionBuilding, itemPath + ".productionBuilding",
                                     allIds, productionBuildingIds, bundleIds, registrySnapshot, diagnostics);
@@ -2948,6 +2952,103 @@ namespace RogueCommandExpansionLoader.Content
             {
                 Add(diagnostics, "unit-ai.interval-invalid", path + ".skillActivationCheckInterval",
                     "Skill activation check interval must be finite and non-negative.");
+            }
+        }
+
+        private static void ValidateShieldRegen(
+            ContentUnitShieldRegenDefinition shieldRegen,
+            string path,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (shieldRegen == null) return;
+            if (!IsFiniteSingle(shieldRegen.rechargeDelay) || shieldRegen.rechargeDelay < 0f || shieldRegen.rechargeDelay > 60f)
+            {
+                Add(diagnostics, "unit-shield-regen.delay-invalid", path + ".rechargeDelay",
+                    "Shield recharge delay must be finite and between 0 and 60 seconds.");
+            }
+            if (!IsFiniteSingle(shieldRegen.rechargeRate) || shieldRegen.rechargeRate <= 0f || shieldRegen.rechargeRate > 1000f)
+            {
+                Add(diagnostics, "unit-shield-regen.rate-invalid", path + ".rechargeRate",
+                    "Shield recharge rate must be finite and between 0 and 1000 shield points per second.");
+            }
+            if (!IsFiniteSingle(shieldRegen.burstAmount) || shieldRegen.burstAmount < 0f || shieldRegen.burstAmount > 500f)
+            {
+                Add(diagnostics, "unit-shield-regen.burst-invalid", path + ".burstAmount",
+                    "Shield recharge burst amount must be finite and between 0 and 500.");
+            }
+        }
+
+        private static void ValidateVampiricLeech(
+            ContentUnitVampiricLeechDefinition leech,
+            string path,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (leech == null) return;
+            if (!IsFiniteSingle(leech.siphonRatio) || leech.siphonRatio <= 0f || leech.siphonRatio > 1.0f)
+            {
+                Add(diagnostics, "unit-vampiric-leech.ratio-invalid", path + ".siphonRatio",
+                    "Vampiric leech siphon ratio must be finite and between 0 (exclusive) and 1.0 (100%).");
+            }
+            if (!IsFiniteSingle(leech.maxSiphonPerHit) || leech.maxSiphonPerHit < 0f)
+            {
+                Add(diagnostics, "unit-vampiric-leech.max-invalid", path + ".maxSiphonPerHit",
+                    "Vampiric leech max siphon per hit must be finite and non-negative.");
+            }
+        }
+
+        private static void ValidateTaunt(
+            ContentUnitTauntDefinition taunt,
+            string path,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (taunt == null) return;
+            if (!IsFiniteSingle(taunt.pulseInterval) || taunt.pulseInterval < 0.5f || taunt.pulseInterval > 60f)
+            {
+                Add(diagnostics, "unit-taunt.interval-invalid", path + ".pulseInterval",
+                    "Taunt pulse interval must be finite and between 0.5 and 60 seconds.");
+            }
+            if (!IsFiniteSingle(taunt.tauntRadius) || taunt.tauntRadius < 1.0f || taunt.tauntRadius > 60f)
+            {
+                Add(diagnostics, "unit-taunt.radius-invalid", path + ".tauntRadius",
+                    "Taunt radius must be finite and between 1.0 and 60 meters.");
+            }
+            if (!IsFiniteSingle(taunt.duration) || taunt.duration <= 0f || taunt.duration > 30f)
+            {
+                Add(diagnostics, "unit-taunt.duration-invalid", path + ".duration",
+                    "Taunt duration must be finite and between 0 and 30 seconds.");
+            }
+            if (taunt.maxTargets < 0 || taunt.maxTargets > 32)
+            {
+                Add(diagnostics, "unit-taunt.max-targets-invalid", path + ".maxTargets",
+                    "Taunt max targets must be between 0 and 32.");
+            }
+        }
+
+        private static void ValidateShieldOverloadNova(
+            ContentUnitShieldOverloadNovaDefinition nova,
+            string path,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (nova == null) return;
+            if (!IsFiniteSingle(nova.novaRadius) || nova.novaRadius < 1.0f || nova.novaRadius > 50f)
+            {
+                Add(diagnostics, "unit-shield-nova.radius-invalid", path + ".novaRadius",
+                    "Shield overload nova radius must be finite and between 1.0 and 50 meters.");
+            }
+            if (!IsFiniteSingle(nova.damage) || nova.damage < 0f || nova.damage > 500f)
+            {
+                Add(diagnostics, "unit-shield-nova.damage-invalid", path + ".damage",
+                    "Shield overload nova damage must be finite and between 0 and 500.");
+            }
+            if (!IsFiniteSingle(nova.stunDuration) || nova.stunDuration < 0f || nova.stunDuration > 15f)
+            {
+                Add(diagnostics, "unit-shield-nova.stun-invalid", path + ".stunDuration",
+                    "Shield overload nova stun duration must be finite and between 0 and 15 seconds.");
+            }
+            if (!IsFiniteSingle(nova.cooldown) || nova.cooldown < 1.0f || nova.cooldown > 120f)
+            {
+                Add(diagnostics, "unit-shield-nova.cooldown-invalid", path + ".cooldown",
+                    "Shield overload nova cooldown must be finite and between 1.0 and 120 seconds.");
             }
         }
 
