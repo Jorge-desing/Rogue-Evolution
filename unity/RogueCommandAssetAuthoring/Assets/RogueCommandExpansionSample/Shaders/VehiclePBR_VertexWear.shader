@@ -149,11 +149,18 @@ Shader "RogueCommand/VehiclePBR_VertexWear"
                     surfaceData.smoothness = _Smoothness;
                 #endif
 
-                half ao = saturate(lerp(1.0h, input.vertexColor.r, _AoStrength));
-                half wear = saturate(input.vertexColor.g * _WearStrength);
-                half soot = saturate(input.vertexColor.b * _SootStrength);
+                // If the mesh has no authored vertex colors (Unity supplies all zeros), default to clean unweathered baseline (R=1 cavity AO, G=0 wear, B=0 soot, A=0 team mask)
+                half4 vColor = input.vertexColor;
+                if (dot(vColor, vColor) < 0.0001h)
+                {
+                    vColor = half4(1.0h, 0.0h, 0.0h, 0.0h);
+                }
+
+                half ao = saturate(lerp(1.0h, vColor.r, _AoStrength));
+                half wear = saturate(vColor.g * _WearStrength);
+                half soot = saturate(vColor.b * _SootStrength);
                 surfaceData.albedo = lerp(surfaceData.albedo,
-                    surfaceData.albedo * _TeamColor.rgb, input.vertexColor.a);
+                    surfaceData.albedo * _TeamColor.rgb, vColor.a);
                 surfaceData.albedo *= ao * (1.0h - soot * 0.75h);
                 surfaceData.albedo = lerp(surfaceData.albedo, half3(0.72h, 0.74h, 0.76h), wear * 0.85h);
                 surfaceData.metallic = saturate(surfaceData.metallic + wear * 0.6h);

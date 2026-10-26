@@ -6044,7 +6044,7 @@ namespace RogueCommandExpansionLoader.Content
 
             visualClone.name = "RCL_Visual_" + unit.id.Replace(':', '_');
             visualClone.transform.localPosition = Vector3.zero;
-            visualClone.transform.localRotation = Quaternion.identity;
+            visualClone.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
             visualClone.transform.localScale = Vector3.one;
 
             // Invert parent lossy scale so visualClone does not inherit arbitrary parent bone scales
@@ -6053,19 +6053,52 @@ namespace RogueCommandExpansionLoader.Content
             float invY = Mathf.Abs(targetLossy.y) > 1e-5f ? (1f / targetLossy.y) : 1f;
             float invZ = Mathf.Abs(targetLossy.z) > 1e-5f ? (1f / targetLossy.z) : 1f;
 
-            // Compensate for Blender FBX 0.01x unit scaling only when the model's visual half-extent
-            // in root space is in centimeter range (0.001m < maxMeshExtent < 0.15m).
-            // Models authored in meters (half-extent >= 0.15m, e.g. 1.0m - 2.8m) or whose child transforms
-            // already have 100x scale retain 1.0x compensation so they never become 100x oversized.
+            // Determine target visual half-extent by matching native template combat vehicle footprint
+            float nativeHalfExtent = 0f;
+            for (int i = 0; i < originalRenderers.Count; i++)
+            {
+                if (originalRenderers[i] != null)
+                {
+                    Vector3 ext = originalRenderers[i].bounds.extents;
+                    float m = Mathf.Max(ext.x, Mathf.Max(ext.y, ext.z));
+                    if (m > nativeHalfExtent) nativeHalfExtent = m;
+                }
+            }
+
+            Component col = nativePrefab.GetComponent("BoxCollider") ?? target.GetComponent("BoxCollider");
+            if (col != null)
+            {
+                System.Reflection.PropertyInfo sizeProp = col.GetType().GetProperty("size");
+                if (sizeProp != null)
+                {
+                    Vector3 size = (Vector3)sizeProp.GetValue(col, null);
+                    float m = Mathf.Max(size.x, Mathf.Max(size.y, size.z)) * 0.5f;
+                    if (m > nativeHalfExtent) nativeHalfExtent = m;
+                }
+            }
+
+            nativeHalfExtent = Mathf.Clamp(nativeHalfExtent > 0.5f ? nativeHalfExtent : 3.6f, 2.5f, 4.5f);
+            float targetHalfExtent = nativeHalfExtent * 0.80f;
+
+            // Compensate for Blender FBX 0.01x unit scaling and calibrate visual scale to match
+            // native combat vehicles (approx 6.0m - 7.5m length), ignoring sockets and antenna masts.
             float visualExtent = CalculateLocalMeshExtent(visualClone);
-            float authoringCompensation = (visualExtent > 0.001f && visualExtent < 0.15f && (visualExtent * 100f) <= 5.0f)
-                ? 100f
-                : 1f;
+            float effectiveExtent = (visualExtent > 0.001f && visualExtent < 0.15f)
+                ? (visualExtent * 100f)
+                : visualExtent;
+
+            float autoScale = 1f;
+            if (effectiveExtent > 0.1f)
+            {
+                autoScale = Mathf.Clamp(targetHalfExtent / effectiveExtent, 0.8f, 2.5f);
+            }
+
+            float totalCompensation = ((visualExtent > 0.001f && visualExtent < 0.15f) ? 100f : 1f) * autoScale;
 
             visualClone.transform.localScale = new Vector3(
-                invX * authoringCompensation,
-                invY * authoringCompensation,
-                invZ * authoringCompensation
+                invX * totalCompensation,
+                invY * totalCompensation,
+                invZ * totalCompensation
             );
 
             ApplyFallbackVisualMaterial(visualClone, fallbackMaterial, unit, packageName, ownerLabel);
@@ -6107,7 +6140,9 @@ namespace RogueCommandExpansionLoader.Content
                 {
                     string objName = filters[i].gameObject != null ? filters[i].gameObject.name : String.Empty;
                     if (!String.IsNullOrEmpty(objName) &&
-                        objName.IndexOf("_COLLIDER", StringComparison.OrdinalIgnoreCase) >= 0)
+                        (objName.IndexOf("_COLLIDER", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                         objName.IndexOf("Antenna", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                         objName.StartsWith("Socket_", StringComparison.OrdinalIgnoreCase)))
                     {
                         continue;
                     }
@@ -6131,6 +6166,15 @@ namespace RogueCommandExpansionLoader.Content
             {
                 if (skinned[i] != null && skinned[i].sharedMesh != null)
                 {
+                    string objName = skinned[i].gameObject != null ? skinned[i].gameObject.name : String.Empty;
+                    if (!String.IsNullOrEmpty(objName) &&
+                        (objName.IndexOf("_COLLIDER", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                         objName.IndexOf("Antenna", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                         objName.StartsWith("Socket_", StringComparison.OrdinalIgnoreCase)))
+                    {
+                        continue;
+                    }
+
                     Mesh mesh = skinned[i].sharedMesh;
                     Vector3 ext = mesh.bounds.extents;
                     if (ext.sqrMagnitude < 1e-6f)
@@ -6275,12 +6319,6 @@ namespace RogueCommandExpansionLoader.Content
                 return false;
             }
 
-            // "Universal Render Pipeline/Lit" is never available in Rogue Command standalone player
-            if (String.Equals(name, "Universal Render Pipeline/Lit", StringComparison.Ordinal))
-            {
-                return false;
-            }
-
             return true;
         }
 
@@ -6358,11 +6396,16 @@ namespace RogueCommandExpansionLoader.Content
                 else
                 {
                     // Try supported shaders in priority order:
-                    // 1. RogueCommand/VehiclePBR_VertexWear (if bundle-loaded copy is supported)
-                    // 2. Universal Render Pipeline/Simple Lit (native URP lit shader present in resources.assets)
-                    // 3. Universal Render Pipeline/Unlit
-                    // 4. Native fallback material shader
-                    targetShader = FindNativeShader("RogueCommand/VehiclePBR_VertexWear");
+                    // 1. Universal Render Pipeline/Lit (standard URP lit shader, highest fidelity)
+                    // 2. RogueCommand/VehiclePBR_VertexWear (bundle-loaded PBR shader)
+                    // 3. Universal Render Pipeline/Simple Lit (native URP simple lit shader)
+                    // 4. Universal Render Pipeline/Unlit
+                    // 5. Native fallback material shader
+                    targetShader = FindNativeShader("Universal Render Pipeline/Lit");
+                    if (targetShader == null || !IsShaderSupportedAndValid(targetShader))
+                    {
+                        targetShader = FindNativeShader("RogueCommand/VehiclePBR_VertexWear");
+                    }
                     if (targetShader == null || !IsShaderSupportedAndValid(targetShader))
                     {
                         targetShader = Shader.Find("Universal Render Pipeline/Simple Lit");
