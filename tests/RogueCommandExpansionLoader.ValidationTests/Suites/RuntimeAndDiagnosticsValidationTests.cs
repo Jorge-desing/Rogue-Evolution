@@ -1272,5 +1272,68 @@ internal static partial class ValidationTestRunner
             UnityEngine.Time.time = 0f;
         }
     }),
+    ("on-hit status effects do not affect friendly units", () =>
+    {
+        RuntimeUnitMechanicsDirector.ClearProfiles();
+        RuntimeHooks.OnHitStatusEffectsResolver = entityId => entityId == "test:on-hit-attacker"
+            ? new List<ContentOnHitStatusEffectDefinition>
+            {
+                new() { statusEffect = "Stun", duration = 2f, chance = 1f }
+            }
+            : null;
+
+        try
+        {
+            var attacker = new EntityController
+            {
+                entityId = "test:on-hit-attacker",
+                IsControlledByPlayer = true,
+                IsUnit = true,
+                CurrentHealth = 100f,
+                MaxHealth = 100f
+            };
+            var friendlyTarget = new EntityController
+            {
+                entityId = "test:on-hit-friendly-target",
+                IsControlledByPlayer = true,
+                IsUnit = true,
+                CurrentHealth = 100f,
+                MaxHealth = 100f
+            };
+
+            if (attacker.IsEnemy(friendlyTarget))
+            {
+                throw new InvalidOperationException("Fixture reports same-player entities as enemies.");
+            }
+
+            RuntimeHooks.EntityTakeDamagePostfix(friendlyTarget, 1f, attacker);
+            if (friendlyTarget.AppliedStatusEffects.Any(effect => effect.Effect == StatusEffect.Stun))
+            {
+                throw new InvalidOperationException("On-hit status effects must not affect a friendly target.");
+            }
+
+            var hostileTarget = new EntityController
+            {
+                entityId = "test:on-hit-hostile-target",
+                IsControlledByAi = true,
+                IsUnit = true,
+                CurrentHealth = 100f,
+                MaxHealth = 100f
+            };
+            RuntimeHooks.EntityTakeDamagePostfix(hostileTarget, 1f, attacker);
+            if (!hostileTarget.AppliedStatusEffects.Any(effect =>
+                    effect.Effect == StatusEffect.Stun &&
+                    effect.DurationType == SetStatusEffect.DurationType.Seconds &&
+                    effect.Duration == 2f))
+            {
+                throw new InvalidOperationException("On-hit status effects should still affect a hostile target.");
+            }
+        }
+        finally
+        {
+            RuntimeHooks.OnHitStatusEffectsResolver = null;
+            RuntimeUnitMechanicsDirector.ClearProfiles();
+        }
+    }),
     };
 }

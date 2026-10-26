@@ -1277,7 +1277,8 @@ namespace RogueCommandExpansionLoader.Runtime
                     originatorId = _entityControllerIdBackingField.GetValue(__1) as string;
                 }
 
-                if (string.IsNullOrEmpty(originatorId))
+                if (string.IsNullOrEmpty(originatorId) ||
+                    !RuntimeUnitMechanicsDirector.IsHostileTarget(__1, __instance))
                 {
                     return;
                 }

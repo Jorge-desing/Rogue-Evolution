@@ -1329,6 +1329,24 @@ namespace RogueCommandExpansionLoader.Runtime
             return true;
         }
 
+        internal static bool IsHostileTarget(object attacker, object target)
+        {
+            if (attacker == null || target == null)
+            {
+                return false;
+            }
+
+            try
+            {
+                EnsureReflection(attacker.GetType());
+                return IsEnemy(attacker, target);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         private static bool IsEnemy(object self, object other)
         {
             if (self == null || other == null)
