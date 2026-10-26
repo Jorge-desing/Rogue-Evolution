@@ -24,12 +24,14 @@
                 {
                     "language": "en-US",
                     "name": "Tidebreaker EMP Skirmisher",
-                    "description": "High-speed amphibious hovercraft equipped with pulsed EMP disruptors that stun enemy targets on impact."
+                    "description": "High-speed amphibious hovercraft equipped with pulsed EMP disruptors that stun enemy targets on impact.",
+                    "skillDescription": "Fires an EMP overcharge pulse at the target area, disrupting enemy units."
                 },
                 {
                     "language": "es-XL",
                     "name": "Escaramuzador EMP Tidebreaker",
-                    "description": "Aerodeslizador anfibio de alta velocidad equipado con disruptores EMP que aturden a los objetivos al impactar."
+                    "description": "Aerodeslizador anfibio de alta velocidad equipado con disruptores EMP que aturden a los objetivos al impactar.",
+                    "skillDescription": "Dispara un pulso de sobrecarga EMP en el área objetivo para desestabilizar unidades enemigas."
                 }
             ],
             "balanceOverrides": [
@@ -204,12 +206,14 @@
                 {
                     "language": "en-US",
                     "name": "Salvage Field Repair Hauler",
-                    "description": "Armored logistics crawler outfitted with autonomous nanite repair systems to maintain friendly units and production facilities."
+                    "description": "Armored logistics crawler outfitted with autonomous nanite repair systems to maintain friendly units and production facilities.",
+                    "skillDescription": "Emits a nanite repair pulse that restores nearby allied units and structures."
                 },
                 {
                     "language": "es-XL",
                     "name": "Transporte de reparación en campo Salvage",
-                    "description": "Oruga logística blindada equipada con sistemas nanorrobóticos autónomos para reparar unidades e instalaciones de producción aliadas."
+                    "description": "Oruga logística blindada equipada con sistemas nanorrobóticos autónomos para reparar unidades e instalaciones de producción aliadas.",
+                    "skillDescription": "Emite un pulso nanorrobótico que repara unidades y estructuras aliadas cercanas."
                 }
             ],
             "balanceOverrides": [
@@ -341,7 +345,7 @@
                     }
                 ]
             },
-            "cardModelScalingFactor": 1.0,
+            "cardModelScalingFactor": 0.85,
             "healing": {
                 "healAmount": 12.0,
                 "healRange": 3.5,
@@ -383,12 +387,14 @@
                 {
                     "language": "en-US",
                     "name": "Skyguard Mobile SAM Platform",
-                    "description": "Heavy surface-to-air missile platform with precision targeting and long-range payload delivery, vulnerable to close-range assaults."
+                    "description": "Heavy surface-to-air missile platform with precision targeting and long-range payload delivery, vulnerable to close-range assaults.",
+                    "skillDescription": "Launches a precision missile salvo at the target location."
                 },
                 {
                     "language": "es-XL",
                     "name": "Plataforma SAM móvil Skyguard",
-                    "description": "Plataforma pesada de misiles tierra-aire con puntería de precisión y largo alcance, vulnerable a asaltos a quemarropa."
+                    "description": "Plataforma pesada de misiles tierra-aire con puntería de precisión y largo alcance, vulnerable a asaltos a quemarropa.",
+                    "skillDescription": "Lanza una salva de misiles de precisión sobre la ubicación objetivo."
                 }
             ],
             "balanceOverrides": [
@@ -511,7 +517,7 @@
                     }
                 ]
             },
-            "cardModelScalingFactor": 1.0,
+            "cardModelScalingFactor": 0.85,
             "experience": {
                 "experiencePerLevel": 1,
                 "maxLevel": 3,
@@ -534,12 +540,14 @@
                 {
                     "language": "en-US",
                     "name": "Bulwark Siege Tank",
-                    "description": "Heavily armored siege platform with long-range artillery bombardment capability. Slow but devastating."
+                    "description": "Heavily armored siege platform with long-range artillery bombardment capability. Slow but devastating.",
+                    "skillDescription": "Unleashes a heavy artillery barrage across the target area."
                 },
                 {
                     "language": "es-XL",
                     "name": "Tanque de asedio Bulwark",
-                    "description": "Plataforma de asedio fuertemente blindada con capacidad de bombardeo de artilleria de largo alcance. Lenta pero devastadora."
+                    "description": "Plataforma de asedio fuertemente blindada con capacidad de bombardeo de artilleria de largo alcance. Lenta pero devastadora.",
+                    "skillDescription": "Desata un bombardeo de artillería pesada sobre el área objetivo."
                 }
             ],
             "balanceOverrides": [
@@ -710,12 +718,14 @@
                 {
                     "language": "en-US",
                     "name": "Arc Lance Walker",
-                    "description": "Bipedal mech armed with a high-energy arc lance that chains between targets. Agile and deadly at mid-range."
+                    "description": "Bipedal mech armed with a high-energy arc lance that chains between targets. Agile and deadly at mid-range.",
+                    "skillDescription": "Discharges a high-voltage arc lance strike at the target enemy."
                 },
                 {
                     "language": "es-XL",
                     "name": "Caminante de lanza de arco",
-                    "description": "Meca bipedo armado con una lanza de arco de alta energia que se encadena entre objetivos. Agil y letal a media distancia."
+                    "description": "Meca bipedo armado con una lanza de arco de alta energia que se encadena entre objetivos. Agil y letal a media distancia.",
+                    "skillDescription": "Descarga un impacto de lanza de arco de alto voltaje contra el objetivo enemigo."
                 }
             ],
             "balanceOverrides": [
@@ -846,7 +856,7 @@
                     }
                 ]
             },
-            "cardModelScalingFactor": 1.0,
+            "cardModelScalingFactor": 0.85,
             "combatBoosts": [
                 {
                     "id": "tactical-operations:arc-lance-overclock",
@@ -877,12 +887,14 @@
                 {
                     "language": "en-US",
                     "name": "Field Medic Rover",
-                    "description": "Fast wheeled support vehicle with autonomous nanite healing systems. Repairs allies and suppresses enemies with light weaponry."
+                    "description": "Fast wheeled support vehicle with autonomous nanite healing systems. Repairs allies and suppresses enemies with light weaponry.",
+                    "skillDescription": "Triggers an emergency nanite pulse that heals nearby allied units."
                 },
                 {
                     "language": "es-XL",
                     "name": "Rover medico de campo",
-                    "description": "Vehiculo de apoyo sobre ruedas rapido con sistemas de curacion nanorroboticos autonomos. Repara aliados y suprime enemigos con armamento ligero."
+                    "description": "Vehiculo de apoyo sobre ruedas rapido con sistemas de curacion nanorroboticos autonomos. Repara aliados y suprime enemigos con armamento ligero.",
+                    "skillDescription": "Activa un pulso nanorrobótico de emergencia que repara unidades aliadas cercanas."
                 }
             ],
             "balanceOverrides": [

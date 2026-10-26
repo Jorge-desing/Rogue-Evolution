@@ -193,7 +193,7 @@
         "assetBundleId": "sample-native:assets",
         "cardImageAssetName": "assets/roguecommandexpansionsample/sandlancescoutcard.png"
       },
-      "cardModelScalingFactor": 1.0
+      "cardModelScalingFactor": 0.85
     },
     {
       "id": "sample-native:heavy-artillery",
@@ -375,7 +375,7 @@
         ]
       },
       "isAllowedForAi": true,
-      "cardModelScalingFactor": 1.0
+      "cardModelScalingFactor": 0.85
     },
     {
       "id": "sample-native:assault-walker",
@@ -554,7 +554,7 @@
       "visualAssetName": "assets/roguecommandexpansionsample/ironcladwalkervisual.prefab",
       "visualRootPath": "RoboMarine_Mesh",
       "isAllowedForAi": true,
-      "cardModelScalingFactor": 1.0
+      "cardModelScalingFactor": 0.85
     },
     {
       "id": "sample-native:atlas-crane-mech",
@@ -735,7 +735,7 @@
         "cardImageAssetName": "assets/roguecommandexpansionsample/atlascranemechcard.png"
       },
       "isAllowedForAi": true,
-      "cardModelScalingFactor": 1.0
+      "cardModelScalingFactor": 0.85
     },
     {
       "id": "sample-native:bastion-siege-mech",
@@ -1467,7 +1467,7 @@
         "assetBundleId": "sample-native:assets",
         "cardImageAssetName": "assets/roguecommandexpansionsample/skirmishbikecard.png"
       },
-      "cardModelScalingFactor": 1.0
+      "cardModelScalingFactor": 0.85
     },
     {
       "id": "sample-native:surge-tank",
@@ -1647,7 +1647,7 @@
         "cardImageAssetName": "assets/roguecommandexpansionsample/surgearctankcard.png"
       },
       "isAllowedForAi": true,
-      "cardModelScalingFactor": 1.0
+      "cardModelScalingFactor": 0.85
     }
   ],
   "stages": [
