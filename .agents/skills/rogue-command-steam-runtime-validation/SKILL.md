@@ -18,13 +18,27 @@ Use this skill when an acceptance claim requires observing a loader, unit, stage
 
 ## BepInEx MCP control path
 
-- Resolve the bridge URL and command shape from the installed `BepInExMCP` plugin, not assumptions. Prefer the current `BepInEx/LogOutput.log` listener line; if absent, verify the base URL and routes in `ModdersHelperApp.py`/`bridge_client.py` and match the listening port to the `Rogue Command.exe` process before any read-only probe. Do not infer a bridge target from unrelated local MCP transport ports; this session confirmed the game bridge at `http://127.0.0.1:8080/mcp/`, not `http://localhost:54321/mcp`.
+- Resolve the bridge URL and command shape from the installed `BepInExMCP` plugin, not assumptions. Prefer the current `BepInEx/LogOutput.log` listener line; if absent, verify the base URL and routes in `ModdersHelperApp.py`/`bridge_client.py` and match the listening port to the `Rogue Command.exe` process before any read-only probe. Do not infer a bridge target from unrelated local MCP transport ports; verify the base URL and listening port from `BepInEx/LogOutput.log` or `ModdersHelperApp.py`/`bridge_client.py` before any read-only probe.
 - Commands are path-based (`http://127.0.0.1:8080/mcp/<command>`), with query parameters for filters such as `componentName`. A JSON body with a `method` field is not the protocol for this bridge.
-- Useful commands include `system/ping`, `scene/list_root_gameobjects`, `scene:find_objects_with_component?componentName=...`, `gameobject/inspect_components`, `component/get_details`, `component/get_member`, `component/call_method`, and `mod:inject_class`.
+- Useful commands include `system/ping`, `system/capabilities`, `scene/list_root_gameobjects`, `scene:find_objects_with_component?componentName=...`, `scene/search_gameobjects?name=...&includeInactive=true&limit=...`, `gameobject/inspect_components`, `component/get_details`, `component/get_member`, `component/call_method`, and `mod:inject_class`.
 - `scene:find_objects_with_component` returns the component-bearing objects for the queried type. Save the raw response before filtering; DontDestroyOnLoad templates may not appear in scene-root snapshots or name searches.
-- `scene/search_gameobjects` is limited and noisy; filter its results by exact names and do not treat UI matches as loader evidence.
+- `scene/search_gameobjects` is limited and noisy; filter its results by exact names, scene, and active state, and do not treat UI matches as loader evidence.
+- When resolving a native control, require exact agreement on name, scene, active state, expected component type, and expected member values before invoking any mutating method. A single mismatch is a safety stop.
 - Record the BepInEx log lines that show pack loading and any injected probe. A successful MCP response alone is not evidence that registration occurred.
 - **MCP evidence boundary**: the bridge can enumerate scenes, objects, and components, but it does not replace visual confirmation of card rendering. If vision analysis is rate-limited or the bridge cannot drive the UI to the target scene, record the boundary explicitly and do not claim runtime success from menu navigation alone.
+
+## Reversible deployment manifest
+
+- Before deploying any file into the game installation, write a predeploy manifest under `artifacts/runtime-smoke/<pack>-<YYYYMMDD-HHMMSS>/predeploy-manifest.json`. Each entry records the absolute target path, file size, and SHA-256 hash of the exact bytes that will be overwritten or added.
+- Include the authoritative profile selector path and value, plus a per-file hash manifest for every file in every user profile directory. This makes post-run profile safety a hash comparison, not a best-effort guess.
+- After the run, restore only the entries that the test changed; verify restored hashes match the manifest before continuing. Entries the test did not touch must remain unchanged.
+- Preserve the manifest and any captured log excerpts as evidence; do not delete them during cleanup.
+
+## Game exit and restore sequence
+
+- Verify `Rogue Command.exe` is not running before restoring deployment files or touching profile metadata. A forced termination during native shutdown can leave the installation or profile in an inconsistent state.
+- When closing the game through a native UI control, resolve the exact control first, confirm its label and interactable state, then invoke its click method once. Do not retry the same control if the first call did not exit; inspect the scene/process state instead of blind-retrying.
+- After exit, rerun the predeploy manifest restoration and hash verification. Only after hashes pass should you touch selector files or resume runtime work.
 
 ## Dedicated QA Profile Policy (Profile2 Invariant)
 
@@ -50,6 +64,11 @@ Use this skill when an acceptance claim requires observing a loader, unit, stage
 - Follow the evidence chain in order: plugin loaded; pack discovered and validated; runtime registration reached; target content selected or spawned; intended behavior visible in the match. A successful startup, Harmony hook count, or menu scene proves only the earlier steps it directly records.
 - Capture the relevant game log and in-game observation with enough context to identify the pack, unit/stage/profile, and test session. If the game fails before the target scene or behavior, report the boundary and preserve that failure as unknown runtime behavior; do not attribute it to the mod without a control or direct evidence.
 - After the run, restore the original deployment files and verify their hashes and process state. Preserve user data and evidence artifacts; do not delete profile data created by the game unless the user specifically asks.
+
+## Temporary Unity probe cleanup
+
+- Temporary Unity Editor scripts used to inspect AssetBundle addresses or asset resolution must be removed from the authoring project after verification. Delete both the `.cs` file and its `.meta` file; do not leave probe scripts in `Assets/Editor/`.
+- A probe script that compiles and runs successfully in batchmode is not a permanent authoring artifact. Its only valid outcomes are the observed evidence and cleanup.
 
 ## State the evidence level
 
