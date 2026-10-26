@@ -189,6 +189,12 @@
                 "experienceAmount": 12,
                 "experienceType": "Crystals",
                 "bonusMultiplier": 1.25
+            },
+            "shieldOverloadNova": {
+                "novaRadius": 10.0,
+                "damage": 15.0,
+                "stunDuration": 2.0,
+                "cooldown": 12.0
             }
         },
         {
@@ -709,10 +715,15 @@
                 "maxCommandChain": 4
             },
             "tauntPulse": {
-                "pulseInterval": 6.0,
-                "tauntRadius": 4.0,
-                "duration": 2.5,
-                "maxTargets": 4
+                "pulseInterval": 4.0,
+                "tauntRadius": 18.0,
+                "duration": 3.0,
+                "maxTargets": 6
+            },
+            "shieldRegeneration": {
+                "rechargeDelay": 4.0,
+                "rechargeRate": 12.0,
+                "burstAmount": 20.0
             }
         },
         {
@@ -885,8 +896,8 @@
             },
             "vampiricLeech": {
                 "siphonRatio": 0.2,
-                "siphonToShield": false,
-                "maxSiphonPerHit": 8.0
+                "siphonToShield": true,
+                "maxSiphonPerHit": 25.0
             }
         },
         {

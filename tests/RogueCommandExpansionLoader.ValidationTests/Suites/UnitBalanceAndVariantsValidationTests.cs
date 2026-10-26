@@ -1012,7 +1012,7 @@ internal static partial class ValidationTestRunner
             unit.shieldOverloadNova.cooldown = 10f;
 
             // Deep clone verification
-            ContentPackDefinition clonedPack = ContentPackDefinition.DeepClone(pack);
+            ContentPackDefinition clonedPack = ContentPackCopy.DeepClone(pack);
             ContentUnitDefinition clonedUnit = clonedPack.units[0];
             if (clonedUnit.shieldRegeneration == null ||
                 Math.Abs(clonedUnit.shieldRegeneration.rechargeDelay - 4.0f) > 0.001f ||

@@ -265,3 +265,38 @@ Every added product should explicitly set its card-facing balance values instead
 ## Initial blueprint eligibility in stage pools
 
 The game marks the first card offer while `Game.AtLeastOneBlueprintHasBeenAddedByPlayer` is false. The no-pool candidate path already applies the start-only filter. A product with `isAllowedAsStartingBlueprint: true` may enter the first offer at native stage index 0, even though pack stages are appended later; the loader allows its factory through the current native pool's original filter without changing or replacing the native stage or pool. The loader also applies this flag to custom production-building candidates when the first offer comes from a cloned stage pool. The field is independent of `neededExperienceLevel`, which controls persistent profile XP. Later offers retain the normal stage-pool rules. Native pool candidates continue through the game's filter.
+
+
+## Advanced Runtime Unit Mechanics
+
+Packs can declare advanced, native-grounded runtime mechanics on units (`units[]`) that leverage deep engine reflection into `EntityController` and the `StatusEffect` system:
+
+### 1. Autonomous Regenerative Shield Generator (`shieldRegeneration`)
+- **Schema:**
+  - `rechargeDelay` (number, 0–60s): Delay in seconds out of combat (measured against native `EntityController.TimeOfLastDamage`) before shields begin recharging.
+  - `rechargeRate` (number, 0–1000/s): Shield points restored per second while out of combat.
+  - `burstAmount` (number, 0–500): Optional instant burst of shield restored upon initiation of the recharge cycle.
+- **Runtime behavior:** Invokes native `EntityController.ChargeShield`. Re-activates dormant shield visual GameObjects upon reaching > 0 shield, caps at `MaxShield`, and fires native `Event.OnShieldFullyRecharged` when full.
+
+### 2. Vampiric Nanite Siphon / Life Leech (`vampiricLeech`)
+- **Schema:**
+  - `siphonRatio` (number, 0.0–1.0): Fraction of outgoing damage siphoned back to the attacker.
+  - `siphonToShield` (boolean): When true and the unit's shield is damaged, restores shield first before healing health.
+  - `maxSiphonPerHit` (number, >= 0): Maximum points restored per damage tick to prevent runaway healing.
+- **Runtime behavior:** Triggered during `OnEntityDealtDamage`. Restores shield or health and pulses native `StatusEffect.Vampirism` (`0x10000`) for visual feedback.
+
+### 3. Taunt Aggro Field / Threat Magnet (`tauntPulse`)
+- **Schema:**
+  - `pulseInterval` (number, 0.5–60s): Interval between taunt pulses.
+  - `tauntRadius` (number, 1.0–60m): Radius within which enemies are provoked.
+  - `duration` (number, 0–30s): Duration of the provoked taunt state.
+  - `maxTargets` (integer, 0–32): Maximum enemy combat units forced to retarget per pulse.
+- **Runtime behavior:** Periodically grants `StatusEffect.Defender` to the unit, discovers nearby hostile combat units within `tauntRadius`, forces them to immediately retarget the tank via native `EntityController.Attack(self)`, and applies `StatusEffect.Taunt` (`0x400000`).
+
+### 4. Shield Overload Nova (`shieldOverloadNova`)
+- **Schema:**
+  - `novaRadius` (number, 1.0–50m): Blast radius of the EMP nova.
+  - `damage` (number, 0–500): Damage dealt to surrounding hostile units upon shield collapse.
+  - `stunDuration` (number, 0–15s): Duration of EMP stun and slow applied to surrounding hostiles.
+  - `cooldown` (number, 1–120s): Internal cooldown before another overload nova can trigger.
+- **Runtime behavior:** Monitors shield transitions. When a unit's shield breaks (`> 0` to `<= 0`), emits an EMP shockwave dealing area damage, applying `StatusEffect.Stun` and `StatusEffect.SlowedDown` to surrounding enemies within `novaRadius`.
