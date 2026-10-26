@@ -688,7 +688,7 @@
                     }
                 ]
             },
-            "cardModelScalingFactor": 1.2,
+            "cardModelScalingFactor": 0.9,
             "command": {
                 "commandRange": 4.5,
                 "commandType": "Attack",

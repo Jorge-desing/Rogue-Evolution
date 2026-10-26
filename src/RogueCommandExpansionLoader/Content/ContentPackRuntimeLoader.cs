@@ -3907,6 +3907,34 @@ namespace RogueCommandExpansionLoader.Content
                         pools, stageWorlds, landscape, stagePoolScopes, scopedUnitIds, fallback));
                 }
 
+                // Register stage-scoped blueprint factory eligibility early so AI profile deck validation
+                // can verify that referenced mod units have their production factories enabled in this pack.
+                var packBlueprintFactoryIds = new HashSet<string>(StringComparer.Ordinal);
+                for (int stageIdx = 0; stageIdx < temporaryStages.Count; stageIdx++)
+                {
+                    packBlueprintFactoryIds.UnionWith(StageBlueprintFactoryIds.CollectLoaderFactoryIds(
+                        temporaryStages[stageIdx].Definition,
+                        delegate(string productId)
+                        {
+                            LoadedUnit unit;
+                            if (!TryGetLoadedUnit(productId, temporaryUnits, out unit) || unit.IsProductionBuilding)
+                            {
+                                return null;
+                            }
+                            return String.IsNullOrWhiteSpace(unit.ProductionFactoryId)
+                                ? unit.Id
+                                : unit.ProductionFactoryId;
+                        }));
+                }
+                for (int unitIdx = 0; unitIdx < temporaryUnits.Count; unitIdx++)
+                {
+                    if (temporaryUnits[unitIdx].IsProductionBuilding &&
+                        packBlueprintFactoryIds.Contains(temporaryUnits[unitIdx].Id))
+                    {
+                        _allowedBlueprintField.SetValue(temporaryUnits[unitIdx].BalanceRow, true);
+                    }
+                }
+
                 Dictionary<string, Vector2Int> scopedAiStageRanges = BuildScopedAiStageRanges(
                     temporaryStages, definition.aiProfiles, packageName);
                 for (int i = 0; i < definition.aiProfiles.Length; i++)
@@ -6019,9 +6047,14 @@ namespace RogueCommandExpansionLoader.Content
             float invY = Mathf.Abs(targetLossy.y) > 1e-5f ? (1f / targetLossy.y) : 1f;
             float invZ = Mathf.Abs(targetLossy.z) > 1e-5f ? (1f / targetLossy.z) : 1f;
 
-            // Compensate for Blender FBX 0.01x unit scaling
+            // Compensate for Blender FBX 0.01x unit scaling only when the model's half-extent in root space
+            // is in centimeter range (0.001m < maxMeshExtent < 0.15m) and scaling by 100x stays within a
+            // valid metric vehicle half-extent (<= 4.0m). Metric models (half-extent >= 0.15m, e.g. 0.5m-2.5m)
+            // must retain 1.0x scale so they do not become 100x oversized in world or card UI previews.
             float maxMeshExtent = CalculateLocalMeshExtent(visualClone);
-            float authoringCompensation = (maxMeshExtent > 0.0001f && maxMeshExtent < 0.8f) ? 100f : (maxMeshExtent <= 0.0001f ? 100f : 1f);
+            float authoringCompensation = (maxMeshExtent > 0.001f && maxMeshExtent < 0.15f && (maxMeshExtent * 100f) <= 4.0f)
+                ? 100f
+                : 1f;
 
             visualClone.transform.localScale = new Vector3(
                 invX * authoringCompensation,
@@ -6033,10 +6066,33 @@ namespace RogueCommandExpansionLoader.Content
             visualClone.SetActive(true);
         }
 
+        private static float CalculateRelativeMaxScale(Transform child, Transform root)
+        {
+            if (child == null || root == null)
+            {
+                return 1f;
+            }
+
+            Vector3 scale = Vector3.one;
+            Transform current = child;
+            while (current != null && current != root)
+            {
+                Vector3 local = current.localScale;
+                scale.x *= Mathf.Abs(local.x);
+                scale.y *= Mathf.Abs(local.y);
+                scale.z *= Mathf.Abs(local.z);
+                current = current.parent;
+            }
+
+            float maxScale = Mathf.Max(scale.x, Mathf.Max(scale.y, scale.z));
+            return maxScale > 1e-5f ? maxScale : 1f;
+        }
+
         private static float CalculateLocalMeshExtent(GameObject model)
         {
             if (model == null) return 0f;
             float maxExtent = 0f;
+            Transform rootTransform = model.transform;
             MeshFilter[] filters = model.GetComponentsInChildren<MeshFilter>(true);
             for (int i = 0; i < filters.Length; i++)
             {
@@ -6049,7 +6105,9 @@ namespace RogueCommandExpansionLoader.Content
                         try { mesh.RecalculateBounds(); } catch { }
                         ext = mesh.bounds.extents;
                     }
-                    maxExtent = Mathf.Max(maxExtent, Mathf.Max(ext.x, Mathf.Max(ext.y, ext.z)));
+                    float relScale = CalculateRelativeMaxScale(filters[i].transform, rootTransform);
+                    float scaledExtent = Mathf.Max(ext.x, Mathf.Max(ext.y, ext.z)) * relScale;
+                    maxExtent = Mathf.Max(maxExtent, scaledExtent);
                 }
             }
             SkinnedMeshRenderer[] skinned = model.GetComponentsInChildren<SkinnedMeshRenderer>(true);
@@ -6057,6 +6115,7 @@ namespace RogueCommandExpansionLoader.Content
             {
                 if (skinned[i] != null)
                 {
+                    float relScale = CalculateRelativeMaxScale(skinned[i].transform, rootTransform);
                     if (skinned[i].sharedMesh != null)
                     {
                         Mesh mesh = skinned[i].sharedMesh;
@@ -6066,10 +6125,11 @@ namespace RogueCommandExpansionLoader.Content
                             try { mesh.RecalculateBounds(); } catch { }
                             ext = mesh.bounds.extents;
                         }
-                        maxExtent = Mathf.Max(maxExtent, Mathf.Max(ext.x, Mathf.Max(ext.y, ext.z)));
+                        float scaledExtent = Mathf.Max(ext.x, Mathf.Max(ext.y, ext.z)) * relScale;
+                        maxExtent = Mathf.Max(maxExtent, scaledExtent);
                     }
                     Vector3 localExt = skinned[i].localBounds.extents;
-                    maxExtent = Mathf.Max(maxExtent, Mathf.Max(localExt.x, Mathf.Max(localExt.y, localExt.z)));
+                    maxExtent = Mathf.Max(maxExtent, Mathf.Max(localExt.x, Mathf.Max(localExt.y, localExt.z)) * relScale);
                 }
             }
             return maxExtent;
