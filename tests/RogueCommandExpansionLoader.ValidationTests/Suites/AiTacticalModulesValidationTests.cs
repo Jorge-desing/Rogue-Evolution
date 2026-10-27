@@ -1646,14 +1646,14 @@ internal static partial class ValidationTestRunner
                 Role = UnitRole.Harvester,
                 MaxHealth = 100f,
                 CurrentHealth = 40f,
-                Position = new Vector3(10f, 0f, 0f)
+                Position = new Vector3(20f, 0f, 0f)
             };
             var damagedUnit = new EntityController
             {
                 IsControlledByAi = true,
                 MaxHealth = 100f,
                 CurrentHealth = 30f,
-                Position = new Vector3(0f, 0f, 15f)
+                Position = new Vector3(0f, 0f, 5f)
             };
 
             ExistingControllers.Instance.Reset();
@@ -1665,9 +1665,9 @@ internal static partial class ValidationTestRunner
             behaviour.OnInitialized();
             behaviour.Tick();
 
-            if (engineer.Position.x != 10f || engineer.Position.z != 0f)
+            if (engineer.Position.x != 20f || engineer.Position.z != 0f)
             {
-                throw new InvalidOperationException("Engineer did not prioritize damaged harvester: pos=" + engineer.Position);
+                throw new InvalidOperationException("Engineer did not prioritize the damaged harvester over the nearer damaged unit: pos=" + engineer.Position);
             }
         }
         finally

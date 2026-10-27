@@ -187,10 +187,13 @@ namespace RogueCommandExpansionLoader.Modules
                         }
 
                         float distSq = (target.Position - repPos).sqrMagnitude;
-                        if (distSq <= scanRadiusSq && distSq < bestDistSq)
+                        if (distSq <= scanRadiusSq)
                         {
-                            bestDistSq = distSq;
+                            // The list is already ordered by strategic priority and health ratio.
+                            // Choose the first reachable target instead of letting proximity erase that ordering.
                             bestTarget = target;
+                            bestDistSq = distSq;
+                            break;
                         }
                     }
 
