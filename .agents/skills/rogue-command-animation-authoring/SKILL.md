@@ -1,0 +1,87 @@
+---
+name: rogue-command-animation-authoring
+description: "Author in-place unit animation for Rogue Command."
+metadata:
+  hermes:
+    tags: [Rogue Command, Unity, animation, Animator, locomotion]
+    related_skills: [rogue-command-mech-rigging-authoring, rogue-command-vfx-authoring, rogue-command-3d-model-authoring]
+---
+
+# Rogue Command Animation Authoring
+
+Use this skill for Unity Animator/AnimationClip integration and mechanical animation on Rogue Command vehicles and units. Apply animation principles to RTS camera scale, native movement, and the project's verified runtime hooks; do not copy browser/CSS timing rules literally. For walker gait and armature construction, use [Mech Rigging](../rogue-command-mech-rigging-authoring/SKILL.md). For particle effects, use [VFX Authoring](../rogue-command-vfx-authoring/SKILL.md). For mesh, sockets, and FBX work, use [3D Model Authoring](../rogue-command-3d-model-authoring/SKILL.md).
+
+## When to use
+
+- `Action_Idle`, `Action_Walk`/`Action_Drive`, `Action_FireRecoil`, or `Action_Death` clips.
+- Unity Generic Avatar, AnimatorController, runtime parameters, or transition timing.
+- Turret/radar motion, recoil, antenna wobble, factory doors, and damage-state animation.
+- Reviewing animation readability, timing, and staging from RTS distance.
+
+## Project contracts
+
+- Rogue Command movement is driven by gameplay (`EntityFlockingMovement`), not clip root motion. Walker locomotion must remain in-place: `Bone_Root` has zero position delta through the clip, and the Unity overlay Animator must have root motion disabled.
+- The project builder configures Generic animation and an Avatar from the model, then wires the AnimatorController when the expected clips exist. The standard parameters are `RCL_IsMoving` (Bool), `RCL_Fire` (Trigger), and `RCL_Death` (Trigger).
+- `RuntimeVisualDirector` sets `RCL_IsMoving` from observed entity position changes; it does not drive a speed blend tree. It triggers `RCL_Fire` on detected weapon shots and triggers `RCL_Death` once when the death state is recognized, when those parameters/clips are available.
+- Current builder transitions use 0.12 s for movement-state changes and 0.05 s for Any State fire/death triggers. Fire returns after its exit time; death is not an ordinary looping locomotion transition. Treat these as implementation values, not universal artistic limits.
+- The director's current mechanical feedback is separate from the Animator: radar sweep is configured at 30 RPM (180°/s), turret traverse at 120°/s, recoil is set to 0.22 m on shot with a `Mathf.Lerp` recovery, and the procedural muzzle burst defaults to 0.07 s. Re-read source before relying on these values after a change.
+
+Relevant implementations:
+
+- `src/RogueCommandExpansionLoader/Runtime/Visual/RuntimeVisualDirector.cs`
+- `unity/RogueCommandAssetAuthoring/Assets/Editor/VehiclePrefabBuilder.cs`
+- `unity/RogueCommandAssetAuthoring/Assets/Editor/RogueCommandVisualSampleScaffolder.cs`
+
+## Animation principles adapted to RTS units
+
+Use these as review lenses, not pass/fail formulas:
+
+1. **Squash/stretch, used sparingly:** Reserve deformation for flexible hoses, suspension, recoil dampers, or an intentionally stylized hit; keep hard armor and rigid mechanical plates undeformed.
+2. **Anticipation:** A brief brace, recoil wind-up, leg load, or turret alignment can make an action readable before its main motion.
+3. **Staging:** Keep one prominent moving focal point at a time. Preserve weapon, heading, damage cue, and silhouette readability at RTS zoom.
+4. **Pose-to-pose vs. continuous motion:** Prefer deterministic keyed poses for mechanical action clips and damage states; use continuous updates for truly procedural tracking/sweeps. Keep one owner per transform to avoid Animator/runtime fighting.
+5. **Follow-through and overlap:** Let a barrel mount, hose, sensor, or antenna settle after the main chassis/weapon when that secondary motion is mechanically plausible.
+6. **Slow in and slow out:** Shape starts/stops for mass and control. Do not ease a system that is intended to rotate at constant angular velocity.
+7. **Arcs:** Turrets rotate around their authored pivot, barrels pitch about the correct joint, and recoil follows the weapon axis. Check axis inversion, pivot drift, and clipping.
+8. **Secondary action:** Keep antenna sway, radiator flutter, shell ejection, and debris subordinate to the principal action; disable or reduce them if they obscure combat feedback.
+9. **Timing:** Convey mass and role through acceleration, hold, impact, and recovery. A heavy cannon, autocannon, radar sweep, gait, and death sequence need different durations; browser 300 ms rules do not apply.
+10. **Exaggeration, restrained:** Enlarge a short impact, recoil, or silhouette change only enough to read at game zoom; do not distort armor proportions or imply unsupported gameplay effects.
+11. **Solid form:** Maintain coherent 3D mass, rigid plate weights, mechanically plausible pivots, and consistent scale; inspect both rendered frames and the actual rig hierarchy.
+12. **Appeal and clarity:** Preserve faction palette, unit role, and distinctive silhouette. Animation should make intent obvious without competing motion or visual clutter.
+
+There is no blanket 300 ms limit for game animation. A short muzzle flash, a full gait cycle, and a death sequence have different jobs and durations. Keep transitions only as long as needed for clear state changes and avoid excessive overlap that muddies combat feedback.
+
+## Authoring procedure
+
+1. **Read project context.** Read `AGENTS.md`, `docs/research/AGENT-HANDOFF.md`, `README.md`, `unity/RogueCommandAssetAuthoring/README.md`, and the relevant rigging/model references. Confirm the worktree and preserve unrelated changes.
+2. **Trace the driver.** Search the builder and runtime director for parameter names, clip lookup, transition setup, thresholds, delta-time use, and root-motion settings. Do not invent an Animator parameter or assume every prefab has the director attached.
+3. **Author or edit the source.** Work from the existing `.blend` and deterministic model builder where possible. Keep bone names, pivots, canonical sockets, rigid armor weights, and root transform aligned to the project contract. Put previews/diagnostics in ignored `artifacts/`.
+4. **Validate clips and rig.** Confirm the Generic Avatar is valid, expected clips are present, the root-motion invariant holds, mechanical weights are rigid, looping clips close cleanly, and feet do not penetrate the ground. Use `tools/validate_mech_rigging.py` for its documented structural checks; do not treat it as a full motion-quality or live-controller test.
+5. **Build the prefab/bundle.** Use the Unity authoring builder in `unity/RogueCommandAssetAuthoring/` with Unity 2021.3.45f2. Check `applyRootMotion`, controller parameters, state transitions, clip references, missing scripts, renderer/material links, and canonical socket uniqueness after the build.
+6. **Review animation quality.** Inspect representative frames and loops at close and RTS scales. Check anticipation, contact, silhouette, timing, direction, recovery, and whether animation conflicts with native transform updates. Run the rigging, VFX, and bundle-reference checks relevant to the change.
+7. **Prove runtime claims separately.** A valid clip, prefab, or AssetBundle is local authoring evidence. To claim that motion plays correctly, observe the intended state transition and motion in Rogue Command launched through Steam using the runtime-validation procedure.
+
+## Validation commands
+
+Run from the repository root through `terminal`, using the project Python environment:
+
+```text
+terminal(command="PYTHONPATH=.venv/Lib/site-packages .venv/Scripts/python.exe tools/validate_mech_rigging.py --pack content/packs/sample-native-expansion --json")
+terminal(command="PYTHONPATH=.venv/Lib/site-packages .venv/Scripts/python.exe tools/validate_vfx_assets.py --pack content/packs/sample-native-expansion --json")
+terminal(command="PYTHONPATH=.venv/Lib/site-packages .venv/Scripts/python.exe tools/validate_content_bundle_references.py content/packs/sample-native-expansion")
+```
+
+Inspect `--help` for current options. Use [Steam Runtime Validation](../rogue-command-steam-runtime-validation/SKILL.md) for any in-game acceptance run.
+
+## Pitfalls and evidence limits
+
+- Native visual overlays retain native gameplay hierarchies but do not retarget native animation rigs to a replacement mesh automatically.
+- A serialized Animator/Avatar/controller reference does not prove the model deforms or transitions correctly in the target player.
+- Root-motion-disabled Editor setup does not by itself prove an in-place clip; inspect the clip's root curves and test the animated model.
+- The project validators check limited structural contracts. A passing result does not establish visual quality, stable frame-rate behavior, combat synchronization, or runtime rendering.
+- Keep reflected-signature claims behind the complete game identity check: Rogue Command version, Unity version, `Assembly-CSharp.dll` SHA-256, and MVID.
+- Label results as **static inspection**, **local build/validation**, or **in-game runtime evidence**; never promote one tier into another.
+
+## Completion report
+
+List edited source, clips, controllers, prefabs, and bundles; state tool/engine versions and commands; report observed diagnostics; and separate static, local Unity, and live-game evidence. Identify unverified state transitions or motion behavior explicitly.
