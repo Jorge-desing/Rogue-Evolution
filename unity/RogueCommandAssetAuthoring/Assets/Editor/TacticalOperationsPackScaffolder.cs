@@ -55,6 +55,8 @@ namespace RogueCommandExpansion.Authoring
                                 ConfigureRiggedWalkerModel(BulwarkSiegeTankModelPath);
                                 ConfigureRiggedWalkerModel(FieldMedicRoverModelPath);
                                 ConfigureRiggedWalkerModel(TidebreakerModelPath);
+                ConfigureRiggedWalkerModel(SalvageHaulerModelPath);
+                ConfigureRiggedWalkerModel(SkyguardSAMModelPath);
 
                 // 1. Configure and import card sprites
                 ConfigureCardSprite(TidebreakerCardPath);
@@ -318,6 +320,22 @@ namespace RogueCommandExpansion.Authoring
                 FitBoxCollider(root, modelInstance);
                 VehiclePrefabBuilder.EnsureCanonicalVfxSockets(root, modelInstance);
                 VehiclePrefabBuilder.EnsureCanonicalVfxAndAudioComponents(root);
+                Animator[] importedModelAnimators = modelInstance.GetComponentsInChildren<Animator>(true);
+                for (int i = 0; i < importedModelAnimators.Length; i++)
+                {
+                    if (importedModelAnimators[i] != null)
+                    {
+                        UnityEngine.Object.DestroyImmediate(importedModelAnimators[i]);
+                    }
+                }
+                VehiclePrefabBuilder.SetupAnimatorIfAvailable(
+                    root, modelInstance, modelAsset, "SalvageHauler", preferWalkForMovement: true);
+                Animator salvageAnimator = root.GetComponent<Animator>();
+                if (salvageAnimator != null && salvageAnimator.avatar != null && salvageAnimator.avatar.isValid &&
+                    salvageAnimator.runtimeAnimatorController != null)
+                {
+                    salvageAnimator.applyRootMotion = false;
+                }
 
                 bool success;
                 PrefabUtility.SaveAsPrefabAsset(root, SalvageHaulerPrefabPath, out success);
@@ -352,6 +370,22 @@ namespace RogueCommandExpansion.Authoring
                 FitBoxCollider(root, modelInstance);
                 VehiclePrefabBuilder.EnsureCanonicalVfxSockets(root, modelInstance);
                 VehiclePrefabBuilder.EnsureCanonicalVfxAndAudioComponents(root);
+                Animator[] importedModelAnimators = modelInstance.GetComponentsInChildren<Animator>(true);
+                for (int i = 0; i < importedModelAnimators.Length; i++)
+                {
+                    if (importedModelAnimators[i] != null)
+                    {
+                        UnityEngine.Object.DestroyImmediate(importedModelAnimators[i]);
+                    }
+                }
+                VehiclePrefabBuilder.SetupAnimatorIfAvailable(
+                    root, modelInstance, modelAsset, "SkyguardSAM", preferWalkForMovement: true);
+                Animator skyguardAnimator = root.GetComponent<Animator>();
+                if (skyguardAnimator != null && skyguardAnimator.avatar != null && skyguardAnimator.avatar.isValid &&
+                    skyguardAnimator.runtimeAnimatorController != null)
+                {
+                    skyguardAnimator.applyRootMotion = false;
+                }
 
                 bool success;
                 PrefabUtility.SaveAsPrefabAsset(root, SkyguardSAMPrefabPath, out success);
