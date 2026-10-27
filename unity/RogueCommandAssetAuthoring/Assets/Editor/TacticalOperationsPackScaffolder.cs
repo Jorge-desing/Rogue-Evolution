@@ -12,7 +12,7 @@ namespace RogueCommandExpansion.Authoring
         private const string PrefabsFolder = RootFolder + "/Prefabs";
         private const string MaterialsFolder = RootFolder + "/Materials";
 
-        public const string TidebreakerModelPath = "Assets/RogueCommandExpansionSample/Models/TidebreakerHovercraft_Atlas.fbx";
+        public const string TidebreakerModelPath = "Assets/RogueCommandExpansionSample/Models/TidebreakerHovercraft.fbx";
         public const string SalvageHaulerModelPath = "Assets/RogueCommandExpansionSample/Models/SalvageHauler.fbx";
         public const string SkyguardSAMModelPath = "Assets/RogueCommandExpansionSample/Models/SkyguardSAM.fbx";
         public const string BulwarkSiegeTankModelPath = "Assets/RogueCommandExpansionSample/Models/BulwarkSiegeTank.fbx";
@@ -52,8 +52,9 @@ namespace RogueCommandExpansion.Authoring
                 Directory.CreateDirectory(Path.Combine(Application.dataPath, "TacticalOperations/Materials"));
                 AssetDatabase.Refresh();
                 ConfigureRiggedWalkerModel(ArcLanceWalkerModelPath);
-                ConfigureRiggedWalkerModel(BulwarkSiegeTankModelPath);
-                ConfigureRiggedWalkerModel(FieldMedicRoverModelPath);
+                                ConfigureRiggedWalkerModel(BulwarkSiegeTankModelPath);
+                                ConfigureRiggedWalkerModel(FieldMedicRoverModelPath);
+                                ConfigureRiggedWalkerModel(TidebreakerModelPath);
 
                 // 1. Configure and import card sprites
                 ConfigureCardSprite(TidebreakerCardPath);
@@ -267,6 +268,22 @@ namespace RogueCommandExpansion.Authoring
                 FitBoxCollider(root, modelInstance);
                 VehiclePrefabBuilder.EnsureCanonicalVfxSockets(root, modelInstance);
                 VehiclePrefabBuilder.EnsureCanonicalVfxAndAudioComponents(root);
+                Animator[] importedModelAnimators = modelInstance.GetComponentsInChildren<Animator>(true);
+                for (int i = 0; i < importedModelAnimators.Length; i++)
+                {
+                    if (importedModelAnimators[i] != null)
+                    {
+                        UnityEngine.Object.DestroyImmediate(importedModelAnimators[i]);
+                    }
+                }
+                VehiclePrefabBuilder.SetupAnimatorIfAvailable(
+                    root, modelInstance, modelAsset, "TidebreakerHovercraft", preferWalkForMovement: true);
+                Animator tidebreakerAnimator = root.GetComponent<Animator>();
+                if (tidebreakerAnimator != null && tidebreakerAnimator.avatar != null && tidebreakerAnimator.avatar.isValid &&
+                    tidebreakerAnimator.runtimeAnimatorController != null)
+                {
+                    tidebreakerAnimator.applyRootMotion = false;
+                }
 
                 bool success;
                 PrefabUtility.SaveAsPrefabAsset(root, TidebreakerPrefabPath, out success);
