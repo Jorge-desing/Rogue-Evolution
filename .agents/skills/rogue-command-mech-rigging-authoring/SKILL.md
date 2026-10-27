@@ -74,6 +74,9 @@ Mount empty GameObjects oriented along Unity forward (+Z) and up (+Y):
   - Bake Root Transform Position (Y, XZ) and Rotation into Pose.
 - Run `Tools/Rogue Command/Build AssetBundles` or inspect via `VehiclePrefabBuilder.cs`.
 - Refer to [unity-avatar-and-animator-contracts.md](references/unity-avatar-and-animator-contracts.md) for AnimatorController transition states.
+- When a rigged FBX is the source, point the scaffolder at the rigged FBX, not the static atlas FBX, and configure its importer as `Generic` with `Create From This Model` before prefab generation.
+- A rigged import can carry its own `Animator`. Remove every imported Animator from the model instance before calling `SetupAnimatorIfAvailable`; otherwise the prefab/bundle retains two Animators and the rigging contract fails. The final visual root must contain exactly one configured Animator with a valid Generic avatar and runtime controller.
+- Keep socket creation idempotent: search recursively for existing canonical sockets before creating any new transform; duplicate same-role sockets make `UniqueSocketRoleBinding` ambiguous.
 
 ---
 
