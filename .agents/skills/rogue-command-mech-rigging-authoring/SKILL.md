@@ -78,6 +78,20 @@ Mount empty GameObjects oriented along Unity forward (+Z) and up (+Y):
 - A rigged import can carry its own `Animator`. Remove every imported Animator from the model instance before calling `SetupAnimatorIfAvailable`; otherwise the prefab/bundle retains two Animators and the rigging contract fails. The final visual root must contain exactly one configured Animator with a valid Generic avatar and runtime controller.
 - Keep socket creation idempotent: search recursively for existing canonical sockets before creating any new transform; duplicate same-role sockets make `UniqueSocketRoleBinding` ambiguous.
 
+### Vehicle / Tank Rigging (leg_type = None)
+
+For non-walker vehicles (tanks, rovers, hovercraft) that have a turret but no articulated legs, use `leg_type=None` in `generate_procedural_armature`. This creates a hull-based armature (`Bone_Hull` → `Bone_Pelvis` → `Bone_TurretYaw` → `Bone_TurretPitch` → `Bone_BarrelRecoil`) without leg chains or IK.
+
+- **In-place invariant still applies**: `Bone_Root` must have zero translation. For vehicles, the `Walk` action animates `Bone_Hull`, not `Bone_Root`. Root-motion validation must check that any `Bone_Root` location curves present are all zero (not require exactly 3 curves).
+- **Action clips**: `generate_procedural_action_clips` with `leg_type=None` produces Idle, Walk (hull bob), Drive, FireRecoil, and Death clips. The `Walk` clip animates `Bone_Hull` location/rotation.
+- **Rigid weighting**: The same rigid 1.0-per-mesh rule applies. Meshes containing "Barrel", "Muzzle", "Bore", "Recoil", "Nozzle" bind to `Bone_BarrelRecoil`; "Mantlet", "Cradle", "Howitzer", "TurretPitch" bind to `Bone_TurretPitch`; "Turret", "Bustle", "Visor", "Radar" bind to `Bone_TurretYaw`; everything else binds to `Bone_Hull`.
+- **Socket preservation**: Vehicle sources already have canonical sockets (`Socket_MuzzlePrimary`, `Socket_TurretPivot`, etc.) as empties. Reuse them; do not create duplicates.
+- **Unity scaffolder changes needed**:
+  1. Change model path from `*_Atlas.fbx` to `*.fbx` (rigged).
+  2. Add `ConfigureRiggedWalkerModel(modelPath)` call (reuses the same Generic-avatar importer config).
+  3. In the visual creation method: destroy imported Animators, call `SetupAnimatorIfAvailable`, and disable root motion on the final Animator.
+- **No foot contact sockets** for wheeled/tracked vehicles unless they have articulated legs. The `EnsureCanonicalWalkerSockets` call is walker-specific and should be skipped for vehicles.
+
 ---
 
 ## 3. Auditing & Validation Tool
