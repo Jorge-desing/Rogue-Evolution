@@ -6032,9 +6032,7 @@ namespace RogueCommandExpansionLoader.Content
             bool isBuilding = !String.IsNullOrEmpty(ownerLabel) &&
                 ownerLabel.IndexOf("Edificio", StringComparison.OrdinalIgnoreCase) >= 0;
             float nativeHalfExtent = CalculateRendererHalfExtent(originalRenderers.ToArray());
-            float targetHalfExtent = nativeHalfExtent > 0.05f
-                ? nativeHalfExtent * 0.80f
-                : (isBuilding ? 1.60f : 0.85f);
+            float targetHalfExtent = VisualOverlayScaleCalibration.CalculateTargetHalfExtent(nativeHalfExtent, isBuilding);
 
             for (int i = 0; i < originalRenderers.Count; i++)
             {
@@ -6055,9 +6053,13 @@ namespace RogueCommandExpansionLoader.Content
 
             float visualExtent = CalculateRendererHalfExtent(
                 visualClone.GetComponentsInChildren<Renderer>(true));
-            float scaleFactor = visualExtent > 0.001f
-                ? VisualOverlayScaleCalibration.CalculateUniformScale(visualExtent, targetHalfExtent)
-                : 1f;
+            if (!VisualOverlayScaleCalibration.IsUsableRendererExtent(visualExtent))
+            {
+                throw new InvalidDataException(ownerLabel + " " + unit.id + " en '" + packageName +
+                    "': el overlay visual '" + unit.visualAssetName + "' no contiene bounds de renderers utilizables.");
+            }
+
+            float scaleFactor = VisualOverlayScaleCalibration.CalculateUniformScale(visualExtent, targetHalfExtent);
             visualClone.transform.localScale = Vector3.one * scaleFactor;
 
             ApplyFallbackVisualMaterial(visualClone, fallbackMaterial, unit, packageName, ownerLabel);
@@ -6071,8 +6073,7 @@ namespace RogueCommandExpansionLoader.Content
                 return 0f;
             }
 
-            bool hasBounds = false;
-            Bounds combinedBounds = default(Bounds);
+            var rendererBounds = new List<VisualRendererBounds>();
             for (int i = 0; i < renderers.Length; i++)
             {
                 Renderer renderer = renderers[i];
@@ -6081,33 +6082,26 @@ namespace RogueCommandExpansionLoader.Content
                     continue;
                 }
 
-                string objectName = renderer.gameObject != null ? renderer.gameObject.name : String.Empty;
-                if (!String.IsNullOrEmpty(objectName) &&
-                    (objectName.IndexOf("_COLLIDER", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                     objectName.IndexOf("Antenna", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                     objectName.StartsWith("Socket_", StringComparison.OrdinalIgnoreCase)))
+                var hierarchyNames = new List<string>();
+                Transform hierarchyTransform = renderer.transform;
+                while (hierarchyTransform != null)
+                {
+                    hierarchyNames.Add(hierarchyTransform.name);
+                    hierarchyTransform = hierarchyTransform.parent;
+                }
+
+                if (VisualOverlayScaleCalibration.IsExcludedRendererHierarchy(hierarchyNames))
                 {
                     continue;
                 }
 
-                if (!hasBounds)
-                {
-                    combinedBounds = renderer.bounds;
-                    hasBounds = true;
-                }
-                else
-                {
-                    combinedBounds.Encapsulate(renderer.bounds);
-                }
+                Bounds bounds = renderer.bounds;
+                rendererBounds.Add(new VisualRendererBounds(
+                    bounds.center.x, bounds.center.y, bounds.center.z,
+                    bounds.size.x, bounds.size.y, bounds.size.z));
             }
 
-            if (!hasBounds)
-            {
-                return 0f;
-            }
-
-            Vector3 size = combinedBounds.size;
-            return Mathf.Max(size.x, Mathf.Max(size.y, size.z)) * 0.5f;
+            return VisualOverlayScaleCalibration.CalculateCombinedHalfExtent(rendererBounds);
         }
 
         private static Transform FindUniqueTransformPath(Transform root, string path)

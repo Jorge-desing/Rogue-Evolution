@@ -18,6 +18,23 @@ internal static partial class ValidationTestRunner
     {
     ("visual overlay scale calibration fits both undersized and oversized models", () =>
     {
+        float combinedExtent = VisualOverlayScaleCalibration.CalculateCombinedHalfExtent(new[]
+        {
+            new VisualRendererBounds(0f, 0f, 0f, 2f, 4f, 4f),
+            new VisualRendererBounds(3f, 0f, 0f, 2f, 2f, 2f)
+        });
+        if (Math.Abs(combinedExtent - 2.5f) > 0.001f)
+        {
+            throw new InvalidOperationException("Overlay calibration must aggregate renderer bounds before choosing a uniform extent.");
+        }
+
+        if (Math.Abs(VisualOverlayScaleCalibration.CalculateTargetHalfExtent(5f, false) - 4f) > 0.001f ||
+            Math.Abs(VisualOverlayScaleCalibration.CalculateTargetHalfExtent(0f, false) - 0.85f) > 0.001f ||
+            Math.Abs(VisualOverlayScaleCalibration.CalculateTargetHalfExtent(float.NaN, true) - 1.60f) > 0.001f)
+        {
+            throw new InvalidOperationException("Native, unit-fallback, and building-fallback extents must be selected deterministically.");
+        }
+
         float undersizedScale = VisualOverlayScaleCalibration.CalculateUniformScale(0.25f, 0.85f);
         float oversizedScale = VisualOverlayScaleCalibration.CalculateUniformScale(6.0f, 0.85f);
         float matchingScale = VisualOverlayScaleCalibration.CalculateUniformScale(0.85f, 0.85f);
@@ -29,18 +46,45 @@ internal static partial class ValidationTestRunner
                 "Visual scale must match measured renderer extents without the current 2.5x cap.");
         }
 
-        bool rejectsInvalidExtent = false;
-        try
+        foreach (float invalidExtent in new[] { 0f, 0.001f })
         {
-            VisualOverlayScaleCalibration.CalculateUniformScale(0f, 0.85f);
+            bool rejectsInvalidExtent = false;
+            try
+            {
+                VisualOverlayScaleCalibration.CalculateUniformScale(invalidExtent, 0.85f);
+            }
+            catch (ArgumentOutOfRangeException)
+            {
+                rejectsInvalidExtent = true;
+            }
+
+            if (!rejectsInvalidExtent)
+            {
+                throw new InvalidOperationException("Visual scale calibration must reject zero and degenerate renderer extents.");
+            }
         }
-        catch (ArgumentOutOfRangeException)
+        if (Math.Abs(VisualOverlayScaleCalibration.CalculateUniformScale(0.0011f, 0.85f) - 100f) > 0.001f)
         {
-            rejectsInvalidExtent = true;
+            throw new InvalidOperationException("Visual scale calibration must keep valid tiny extents within its safety clamp.");
         }
-        if (!rejectsInvalidExtent)
+
+        if (VisualOverlayScaleCalibration.IsUsableRendererExtent(0f) ||
+            VisualOverlayScaleCalibration.IsUsableRendererExtent(0.001f) ||
+            VisualOverlayScaleCalibration.IsUsableRendererExtent(float.NaN) ||
+            VisualOverlayScaleCalibration.IsUsableRendererExtent(float.PositiveInfinity) ||
+            !VisualOverlayScaleCalibration.IsUsableRendererExtent(0.0011f))
         {
-            throw new InvalidOperationException("Visual scale calibration must reject non-positive extents.");
+            throw new InvalidOperationException("Renderer extents must reject empty bounds and accept measurable geometry.");
+        }
+
+        if (!VisualOverlayScaleCalibration.IsExcludedRendererObjectName("Armor_COLLIDER_Hull") ||
+            !VisualOverlayScaleCalibration.IsExcludedRendererObjectName("AntennaMast") ||
+            !VisualOverlayScaleCalibration.IsExcludedRendererObjectName("Socket_MuzzlePrimary") ||
+            !VisualOverlayScaleCalibration.IsExcludedRendererHierarchy(new[] { "Vehicle", "Socket_MuzzlePrimary", "Mesh" }) ||
+            VisualOverlayScaleCalibration.IsExcludedRendererObjectName("HullArmor") ||
+            VisualOverlayScaleCalibration.IsExcludedRendererHierarchy(new[] { "Vehicle", "HullArmor" }))
+        {
+            throw new InvalidOperationException("Renderer-bound calibration must exclude helper geometry anywhere in the hierarchy.");
         }
     }),
     ("visual socket discovery accepts canonical IDs and exact legacy suffixes only", () =>
