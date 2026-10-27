@@ -15,7 +15,7 @@ namespace RogueCommandExpansion.Authoring
         public const string TidebreakerModelPath = "Assets/RogueCommandExpansionSample/Models/TidebreakerHovercraft_Atlas.fbx";
         public const string SalvageHaulerModelPath = "Assets/RogueCommandExpansionSample/Models/SalvageHauler.fbx";
         public const string SkyguardSAMModelPath = "Assets/RogueCommandExpansionSample/Models/SkyguardSAM.fbx";
-        public const string BulwarkSiegeTankModelPath = "Assets/RogueCommandExpansionSample/Models/BulwarkSiegeTank_Atlas.fbx";
+        public const string BulwarkSiegeTankModelPath = "Assets/RogueCommandExpansionSample/Models/BulwarkSiegeTank.fbx";
         public const string ArcLanceWalkerModelPath = "Assets/RogueCommandExpansionSample/Models/ArcLanceWalker.fbx";
         public const string FieldMedicRoverModelPath = "Assets/RogueCommandExpansionSample/Models/FieldMedicRover_Atlas.fbx";
 
@@ -52,6 +52,7 @@ namespace RogueCommandExpansion.Authoring
                 Directory.CreateDirectory(Path.Combine(Application.dataPath, "TacticalOperations/Materials"));
                 AssetDatabase.Refresh();
                 ConfigureRiggedWalkerModel(ArcLanceWalkerModelPath);
+                ConfigureRiggedWalkerModel(BulwarkSiegeTankModelPath);
 
                 // 1. Configure and import card sprites
                 ConfigureCardSprite(TidebreakerCardPath);
@@ -401,6 +402,22 @@ namespace RogueCommandExpansion.Authoring
                 FitBoxCollider(root, modelInstance);
                 VehiclePrefabBuilder.EnsureCanonicalVfxSockets(root, modelInstance);
                 VehiclePrefabBuilder.EnsureCanonicalVfxAndAudioComponents(root);
+                Animator[] importedModelAnimators = modelInstance.GetComponentsInChildren<Animator>(true);
+                for (int i = 0; i < importedModelAnimators.Length; i++)
+                {
+                    if (importedModelAnimators[i] != null)
+                    {
+                        UnityEngine.Object.DestroyImmediate(importedModelAnimators[i]);
+                    }
+                }
+                VehiclePrefabBuilder.SetupAnimatorIfAvailable(
+                    root, modelInstance, modelAsset, "BulwarkSiegeTank", preferWalkForMovement: true);
+                Animator bulwarkAnimator = root.GetComponent<Animator>();
+                if (bulwarkAnimator != null && bulwarkAnimator.avatar != null && bulwarkAnimator.avatar.isValid &&
+                    bulwarkAnimator.runtimeAnimatorController != null)
+                {
+                    bulwarkAnimator.applyRootMotion = false;
+                }
 
                 bool success;
                 PrefabUtility.SaveAsPrefabAsset(root, BulwarkSiegeTankPrefabPath, out success);
