@@ -1782,6 +1782,7 @@
       "isPartOfDemo": false,
       "unitIds": [
         "sample-native:scout-tank",
+        "sample-native:skirmish-bike",
         "sample-native:heavy-artillery",
         "sample-native:assault-walker",
         "sample-native:atlas-crane-mech",
