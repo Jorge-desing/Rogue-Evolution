@@ -758,34 +758,6 @@
         },
         "weaponSoundAssetName": {
           "$ref": "#/$defs/assetName"
-        },
-        "aiModule": {
-          "type": "object",
-          "properties": {
-            "moduleId": {
-              "$ref": "#/$defs/namespacedId"
-            },
-            "parameters": {
-              "oneOf": [
-                {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/$defs/moduleParameter"
-                  }
-                },
-                {
-                  "type": "object",
-                  "additionalProperties": {
-                    "type": [
-                      "string",
-                      "number",
-                      "boolean"
-                    ]
-                  }
-                }
-              ]
-            }
-          }
         }
       },
       "oneOf": [

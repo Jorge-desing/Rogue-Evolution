@@ -293,11 +293,39 @@ class StructuredUnitParameterSchemaTests(unittest.TestCase):
                 manifest["units"][0][field] = invalid_val
                 self.assertFalse(self.validator.is_valid(manifest), f"Expected schema to reject {field}={invalid_val}")
 
-    def test_tactical_operations_pack_validates_against_schema_with_runtime_mechanics(self) -> None:
+    def test_unit_level_ai_module_is_rejected(self) -> None:
+        manifest = json.loads(json.dumps(self.sample))
+        manifest["units"][0]["aiModule"] = {
+            "moduleId": "sample:skirmish-kiting",
+            "parameters": {},
+        }
+        self.assertFalse(
+            self.validator.is_valid(manifest),
+            "AI modules are profile-scoped and must not be declared on units",
+        )
+
+    def test_tactical_operations_ai_modules_are_profile_scoped(self) -> None:
         tactical_path = ROOT / "content" / "packs" / "tactical-operations" / "content.json"
         tactical_manifest = json.loads(tactical_path.read_text(encoding="utf-8"))
         self.assertTrue(self.validator.is_valid(tactical_manifest))
         units_by_id = {u["id"]: u for u in tactical_manifest["units"]}
+        self.assertFalse(
+            any("aiModule" in unit for unit in tactical_manifest["units"]),
+            "Per-unit AI declarations are not consumed; modules belong to aiProfiles[].modules",
+        )
+        profile_modules = {
+            module["moduleId"]
+            for profile in tactical_manifest["aiProfiles"]
+            for module in profile.get("modules", [])
+        }
+        self.assertTrue(
+            {
+                "sample:skirmish-kiting",
+                "sample:support-repair",
+                "sample:siege-assault",
+                "sample:focus-fire",
+            }.issubset(profile_modules)
+        )
         self.assertIn("stealth", units_by_id["tactical-operations:tidebreaker-skirmisher"])
         self.assertIn("experienceReward", units_by_id["tactical-operations:tidebreaker-skirmisher"])
         self.assertIn("synergies", units_by_id["tactical-operations:salvage-hauler"])

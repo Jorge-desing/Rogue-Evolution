@@ -110,15 +110,6 @@
                     "chance": 0.35
                 }
             ],
-            "aiModule": {
-                "moduleId": "sample:skirmish-kiting",
-                "parameters": {
-                    "RetreatDistanceRatio": 0.65,
-                    "DangerScanRadius": 10.0,
-                    "StepBackDistance": 4.5,
-                    "RepositionCooldown": 1.2
-                }
-            },
             "activeSkills": [
                 {
                     "id": "tactical-operations:tidebreaker-emp-overcharge",
@@ -290,17 +281,6 @@
             ],
             "customBalance": {
                 "Damage1": 2.5
-            },
-            "aiModule": {
-                "moduleId": "sample:support-repair",
-                "parameters": {
-                    "ScanRadius": 16.0,
-                    "HealthThresholdRatio": 0.85,
-                    "HealScanInterval": 0.5,
-                    "PrioritizeHarvesters": true,
-                    "PrioritizeFactories": true,
-                    "MaxRepairersPerTarget": 2
-                }
             },
             "activeSkills": [
                 {
@@ -649,16 +629,6 @@
                 "experienceGainMultiplier": 1.0,
                 "levelUpBonus": 0.15
             },
-            "aiModule": {
-                "moduleId": "sample:siege-assault",
-                "parameters": {
-                    "baseIndex": 0,
-                    "cooldownSeconds": 30.0,
-                    "minSquadSize": 2,
-                    "targetPriority": "ClosestBuilding",
-                    "minGameTimeSeconds": 30.0
-                }
-            },
             "activeSkills": [
                 {
                     "id": "tactical-operations:bulwark-artillery-barrage",
@@ -819,16 +789,6 @@
             ],
             "customBalance": {
                 "Damage1": 5.0
-            },
-            "aiModule": {
-                "moduleId": "sample:focus-fire",
-                "parameters": {
-                    "baseIndex": 0,
-                    "checkIntervalSeconds": 3.0,
-                    "squadRadius": 18.0,
-                    "minUnitsInSquad": 2,
-                    "priorityMode": "LowestHealth"
-                }
             },
             "activeSkills": [
                 {
@@ -1001,17 +961,6 @@
                     "chance": 0.5
                 }
             ],
-            "aiModule": {
-                "moduleId": "sample:support-repair",
-                "parameters": {
-                    "ScanRadius": 16.0,
-                    "HealthThresholdRatio": 0.85,
-                    "HealScanInterval": 0.5,
-                    "PrioritizeHarvesters": true,
-                    "PrioritizeFactories": true,
-                    "MaxRepairersPerTarget": 2
-                }
-            },
             "activeSkills": [
                 {
                     "id": "tactical-operations:medic-nanite-pulse",
