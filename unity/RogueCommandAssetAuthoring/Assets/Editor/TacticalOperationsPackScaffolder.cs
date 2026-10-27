@@ -17,7 +17,7 @@ namespace RogueCommandExpansion.Authoring
         public const string SkyguardSAMModelPath = "Assets/RogueCommandExpansionSample/Models/SkyguardSAM.fbx";
         public const string BulwarkSiegeTankModelPath = "Assets/RogueCommandExpansionSample/Models/BulwarkSiegeTank.fbx";
         public const string ArcLanceWalkerModelPath = "Assets/RogueCommandExpansionSample/Models/ArcLanceWalker.fbx";
-        public const string FieldMedicRoverModelPath = "Assets/RogueCommandExpansionSample/Models/FieldMedicRover_Atlas.fbx";
+        public const string FieldMedicRoverModelPath = "Assets/RogueCommandExpansionSample/Models/FieldMedicRover.fbx";
 
         public const string TidebreakerCardPath = RootFolder + "/TidebreakerHovercraftCard.png";
         public const string SalvageHaulerCardPath = RootFolder + "/SalvageHaulerCard.png";
@@ -53,6 +53,7 @@ namespace RogueCommandExpansion.Authoring
                 AssetDatabase.Refresh();
                 ConfigureRiggedWalkerModel(ArcLanceWalkerModelPath);
                 ConfigureRiggedWalkerModel(BulwarkSiegeTankModelPath);
+                ConfigureRiggedWalkerModel(FieldMedicRoverModelPath);
 
                 // 1. Configure and import card sprites
                 ConfigureCardSprite(TidebreakerCardPath);
@@ -572,6 +573,22 @@ namespace RogueCommandExpansion.Authoring
                 FitBoxCollider(root, modelInstance);
                 VehiclePrefabBuilder.EnsureCanonicalVfxSockets(root, modelInstance);
                 VehiclePrefabBuilder.EnsureCanonicalVfxAndAudioComponents(root);
+                Animator[] importedModelAnimators = modelInstance.GetComponentsInChildren<Animator>(true);
+                for (int i = 0; i < importedModelAnimators.Length; i++)
+                {
+                    if (importedModelAnimators[i] != null)
+                    {
+                        UnityEngine.Object.DestroyImmediate(importedModelAnimators[i]);
+                    }
+                }
+                VehiclePrefabBuilder.SetupAnimatorIfAvailable(
+                    root, modelInstance, modelAsset, "FieldMedicRover", preferWalkForMovement: true);
+                Animator medicAnimator = root.GetComponent<Animator>();
+                if (medicAnimator != null && medicAnimator.avatar != null && medicAnimator.avatar.isValid &&
+                    medicAnimator.runtimeAnimatorController != null)
+                {
+                    medicAnimator.applyRootMotion = false;
+                }
 
                 bool success;
                 PrefabUtility.SaveAsPrefabAsset(root, FieldMedicRoverPrefabPath, out success);
