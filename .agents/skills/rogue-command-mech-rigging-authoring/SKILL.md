@@ -87,7 +87,7 @@ For non-walker vehicles (tanks, rovers, hovercraft) that have a turret but no ar
 - **Rigid weighting**: The same rigid 1.0-per-mesh rule applies. Meshes containing "Barrel", "Muzzle", "Bore", "Recoil", "Nozzle" bind to `Bone_BarrelRecoil`; "Mantlet", "Cradle", "Howitzer", "TurretPitch" bind to `Bone_TurretPitch`; "Turret", "Bustle", "Visor", "Radar" bind to `Bone_TurretYaw`; everything else binds to `Bone_Hull`.
 - **Socket preservation**: Vehicle sources already have canonical sockets (`Socket_MuzzlePrimary`, `Socket_TurretPivot`, etc.) as empties. Reuse them; do not create duplicates.
 - **Unity scaffolder changes needed**:
-  1. Change model path from `*_Atlas.fbx` to `*.fbx` (rigged).
+  1. Check which model path each unit currently uses — some units in a pack may already point to `*.fbx` (static, pre-rig) while others use `*_Atlas.fbx`. Change all to the rigged `*.fbx`.
   2. Add `ConfigureRiggedWalkerModel(modelPath)` call (reuses the same Generic-avatar importer config).
   3. In the visual creation method: destroy imported Animators, call `SetupAnimatorIfAvailable`, and disable root motion on the final Animator.
 - **No foot contact sockets** for wheeled/tracked vehicles unless they have articulated legs. The `EnsureCanonicalWalkerSockets` call is walker-specific and should be skipped for vehicles.
