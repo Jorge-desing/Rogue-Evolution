@@ -884,7 +884,7 @@ namespace RogueCommandExpansion.Authoring
             return foundMesh;
         }
 
-        private static void EnsureCanonicalWalkerSockets(
+        internal static void EnsureCanonicalWalkerSockets(
             GameObject root,
             GameObject model,
             bool rapidFireMuzzle,

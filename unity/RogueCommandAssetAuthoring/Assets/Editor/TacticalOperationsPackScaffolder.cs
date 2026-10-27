@@ -16,7 +16,7 @@ namespace RogueCommandExpansion.Authoring
         public const string SalvageHaulerModelPath = "Assets/RogueCommandExpansionSample/Models/SalvageHauler.fbx";
         public const string SkyguardSAMModelPath = "Assets/RogueCommandExpansionSample/Models/SkyguardSAM.fbx";
         public const string BulwarkSiegeTankModelPath = "Assets/RogueCommandExpansionSample/Models/BulwarkSiegeTank_Atlas.fbx";
-        public const string ArcLanceWalkerModelPath = "Assets/RogueCommandExpansionSample/Models/ArcLanceWalker_Atlas.fbx";
+        public const string ArcLanceWalkerModelPath = "Assets/RogueCommandExpansionSample/Models/ArcLanceWalker.fbx";
         public const string FieldMedicRoverModelPath = "Assets/RogueCommandExpansionSample/Models/FieldMedicRover_Atlas.fbx";
 
         public const string TidebreakerCardPath = RootFolder + "/TidebreakerHovercraftCard.png";
@@ -51,6 +51,7 @@ namespace RogueCommandExpansion.Authoring
                 Directory.CreateDirectory(Path.Combine(Application.dataPath, "TacticalOperations/Prefabs"));
                 Directory.CreateDirectory(Path.Combine(Application.dataPath, "TacticalOperations/Materials"));
                 AssetDatabase.Refresh();
+                ConfigureRiggedWalkerModel(ArcLanceWalkerModelPath);
 
                 // 1. Configure and import card sprites
                 ConfigureCardSprite(TidebreakerCardPath);
@@ -131,6 +132,78 @@ namespace RogueCommandExpansion.Authoring
             {
                 Debug.LogError("[TacticalOperationsScaffolder] Build failed: " + ex);
                 throw;
+            }
+        }
+
+        private static void ConfigureRiggedWalkerModel(string modelPath)
+        {
+            ModelImporter importer = AssetImporter.GetAtPath(modelPath) as ModelImporter;
+            if (importer == null)
+            {
+                AssetDatabase.ImportAsset(modelPath, ImportAssetOptions.ForceUpdate);
+                importer = AssetImporter.GetAtPath(modelPath) as ModelImporter;
+            }
+            if (importer == null)
+            {
+                throw new InvalidOperationException("Arc Lance Walker source must be a ModelImporter: " + modelPath);
+            }
+
+            bool changed = false;
+            if (importer.animationType != ModelImporterAnimationType.Generic)
+            {
+                importer.animationType = ModelImporterAnimationType.Generic;
+                changed = true;
+            }
+            if (importer.avatarSetup != ModelImporterAvatarSetup.CreateFromThisModel)
+            {
+                importer.avatarSetup = ModelImporterAvatarSetup.CreateFromThisModel;
+                changed = true;
+            }
+            if (!importer.importAnimation)
+            {
+                importer.importAnimation = true;
+                changed = true;
+            }
+            if (importer.optimizeGameObjects)
+            {
+                importer.optimizeGameObjects = false;
+                changed = true;
+            }
+
+            ModelImporterClipAnimation[] clips = importer.clipAnimations;
+            if (clips == null || clips.Length == 0)
+            {
+                clips = importer.defaultClipAnimations;
+            }
+            bool hasClipSettings = false;
+            if (clips != null)
+            {
+                foreach (ModelImporterClipAnimation clip in clips)
+                {
+                    if (clip == null) continue;
+                    bool shouldLoop = clip.name.IndexOf("Idle", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                        clip.name.IndexOf("Walk", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                        clip.name.IndexOf("Drive", StringComparison.OrdinalIgnoreCase) >= 0;
+                    if (clip.loopTime != shouldLoop)
+                    {
+                        clip.loopTime = shouldLoop;
+                        changed = true;
+                    }
+                    if (clip.loopPose != shouldLoop)
+                    {
+                        clip.loopPose = shouldLoop;
+                        changed = true;
+                    }
+                    hasClipSettings = true;
+                }
+            }
+            if (hasClipSettings)
+            {
+                importer.clipAnimations = clips;
+            }
+            if (changed)
+            {
+                importer.SaveAndReimport();
             }
         }
 
@@ -395,7 +468,25 @@ namespace RogueCommandExpansion.Authoring
 
                 FitBoxCollider(root, modelInstance);
                 VehiclePrefabBuilder.EnsureCanonicalVfxSockets(root, modelInstance);
+                RogueCommandVisualSampleScaffolder.EnsureCanonicalWalkerSockets(root, modelInstance, false);
                 VehiclePrefabBuilder.EnsureCanonicalVfxAndAudioComponents(root);
+                Animator[] importedModelAnimators = modelInstance.GetComponentsInChildren<Animator>(true);
+                for (int i = 0; i < importedModelAnimators.Length; i++)
+                {
+                    if (importedModelAnimators[i] != null)
+                    {
+                        UnityEngine.Object.DestroyImmediate(importedModelAnimators[i]);
+                    }
+                }
+                VehiclePrefabBuilder.SetupAnimatorIfAvailable(
+                    root, modelInstance, modelAsset, "ArcLanceWalker", preferWalkForMovement: true);
+                Animator walkerAnimator = root.GetComponent<Animator>();
+                if (walkerAnimator == null || walkerAnimator.avatar == null || !walkerAnimator.avatar.isValid ||
+                    walkerAnimator.runtimeAnimatorController == null)
+                {
+                    throw new InvalidOperationException("ArcLanceWalker rig must produce a valid Generic Avatar and AnimatorController");
+                }
+                walkerAnimator.applyRootMotion = false;
 
                 bool success;
                 PrefabUtility.SaveAsPrefabAsset(root, ArcLanceWalkerPrefabPath, out success);
