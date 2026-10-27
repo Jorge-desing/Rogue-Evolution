@@ -591,6 +591,10 @@ namespace RogueCommandExpansion.Authoring
             ValidateWalkerModelSource(projectRoot, IroncladModelPath, "Ironclad Walker", issues);
             ValidateWalkerModelSource(projectRoot, AtlasCraneMechModelPath, "Atlas Crane Mech", issues);
             ValidateWalkerModelSource(projectRoot, BastionSiegeMechModelPath, "Bastion Siege Mech", issues, true);
+            ValidateWalkerModelSource(projectRoot, ModelPath, "Sandlance Scout", issues);
+            ValidateWalkerModelSource(projectRoot, BikeModelPath, "Skirmish Strike Bike", issues);
+            ValidateWalkerModelSource(projectRoot, ColossusModelPath, "Colossus Siege Platform", issues);
+            ValidateWalkerModelSource(projectRoot, SurgeArcTankModelPath, "Surge Arc Tank", issues);
 
             if (issues.Count > 0)
             {
@@ -1687,188 +1691,35 @@ namespace RogueCommandExpansion.Authoring
 
         private static string CreateSampleVisual()
         {
-            string projectRoot = Directory.GetParent(Application.dataPath).FullName;
-            Directory.CreateDirectory(Path.GetFullPath(Path.Combine(projectRoot, AssetRoot)));
-            AssetDatabase.Refresh();
-
-            GameObject modelAsset = AssetDatabase.LoadAssetAtPath<GameObject>(ModelPath);
-            if (modelAsset == null)
-            {
-                throw new FileNotFoundException("Import the authored Sandlance FBX before building the " +
-                    "sample bundle.", ModelPath);
-            }
-
-            Dictionary<string, Material> materials = CreateScoutMaterials();
-
-            var root = new GameObject("ScoutTankVisual");
-            try
-            {
-                GameObject modelInstance = PrefabUtility.InstantiatePrefab(modelAsset) as GameObject;
-                if (modelInstance == null)
-                {
-                    throw new InvalidOperationException("Unity could not instantiate the authored Sandlance FBX.");
-                }
-
-                modelInstance.name = "SandlanceScoutModel";
-                modelInstance.transform.SetParent(root.transform, false);
-                modelInstance.transform.localPosition = Vector3.zero;
-                modelInstance.transform.localRotation = Quaternion.identity;
-                modelInstance.transform.localScale = Vector3.one;
-                AssignScoutMaterials(modelInstance, materials);
-                VehiclePrefabBuilder.EnsureCanonicalVfxSockets(root, modelInstance);
-
-                bool success;
-                PrefabUtility.SaveAsPrefabAsset(root, PrefabPath, out success);
-                if (!success)
-                {
-                    throw new InvalidOperationException("Unity could not save " + PrefabPath + ".");
-                }
-
-                NormalizeEmptyUnityYamlStrings(Path.GetFullPath(Path.Combine(
-                    Directory.GetParent(Application.dataPath).FullName, PrefabPath)));
-            }
-            finally
-            {
-                UnityEngine.Object.DestroyImmediate(root);
-            }
-
-            AssetImporter importer = AssetImporter.GetAtPath(PrefabPath);
-            if (importer == null)
-            {
-                throw new FileNotFoundException("Unity did not import " + PrefabPath + ".");
-            }
-
-            importer.assetBundleName = BundleName;
-            importer.assetBundleVariant = String.Empty;
-            AssetDatabase.SaveAssets();
-            AssetDatabase.Refresh();
-            NormalizeGeneratedUnityMetaFiles(projectRoot);
-            return PrefabPath;
+            return CreateRiggedWalkerVisual(
+                "SandlanceScout",
+                ModelPath,
+                PrefabPath,
+                CreateScoutMaterials,
+                AssignScoutMaterials,
+                true);
         }
 
         private static string CreateSkirmishBikeVisual()
         {
-            string projectRoot = Directory.GetParent(Application.dataPath).FullName;
-            Directory.CreateDirectory(Path.GetFullPath(Path.Combine(projectRoot, AssetRoot)));
-            AssetDatabase.Refresh();
-
-            GameObject modelAsset = AssetDatabase.LoadAssetAtPath<GameObject>(BikeModelPath);
-            if (modelAsset == null)
-            {
-                throw new FileNotFoundException("Import the authored Skirmish Strike Bike FBX before building the " +
-                    "sample bundle.", BikeModelPath);
-            }
-
-            Dictionary<string, Material> materials = CreateSkirmishBikeMaterials();
-            var root = new GameObject("SkirmishBikeVisual");
-            try
-            {
-                GameObject modelInstance = PrefabUtility.InstantiatePrefab(modelAsset) as GameObject;
-                if (modelInstance == null)
-                {
-                    throw new InvalidOperationException("Unity could not instantiate the authored Skirmish Strike Bike.");
-                }
-
-                modelInstance.name = "SkirmishStrikeBikeModel";
-                modelInstance.transform.SetParent(root.transform, false);
-                modelInstance.transform.localPosition = Vector3.zero;
-                modelInstance.transform.localRotation = Quaternion.identity;
-                modelInstance.transform.localScale = Vector3.one;
-                AssignSkirmishBikeMaterials(modelInstance, materials);
-                VehiclePrefabBuilder.EnsureCanonicalVfxSockets(root, modelInstance);
-
-                bool success;
-                PrefabUtility.SaveAsPrefabAsset(root, BikePrefabPath, out success);
-                if (!success)
-                {
-                    throw new InvalidOperationException("Unity could not save " + BikePrefabPath + ".");
-                }
-
-                NormalizeEmptyUnityYamlStrings(Path.GetFullPath(Path.Combine(
-                    Directory.GetParent(Application.dataPath).FullName, BikePrefabPath)));
-            }
-            finally
-            {
-                UnityEngine.Object.DestroyImmediate(root);
-            }
-
-            AssetImporter importer = AssetImporter.GetAtPath(BikePrefabPath);
-            if (importer == null)
-            {
-                throw new FileNotFoundException("Unity did not import " + BikePrefabPath + ".");
-            }
-
-            importer.assetBundleName = BundleName;
-            importer.assetBundleVariant = String.Empty;
-            AssetDatabase.SaveAssets();
-            AssetDatabase.Refresh();
-            NormalizeGeneratedUnityMetaFiles(projectRoot);
-            return BikePrefabPath;
+            return CreateRiggedWalkerVisual(
+                "SkirmishStrikeBike",
+                BikeModelPath,
+                BikePrefabPath,
+                CreateSkirmishBikeMaterials,
+                AssignSkirmishBikeMaterials,
+                false);
         }
 
         private static string CreateColossusVisual()
         {
-            string projectRoot = Directory.GetParent(Application.dataPath).FullName;
-            Directory.CreateDirectory(Path.GetFullPath(Path.Combine(projectRoot, AssetRoot)));
-            AssetDatabase.Refresh();
-
-            GameObject modelAsset = AssetDatabase.LoadAssetAtPath<GameObject>(ColossusModelPath);
-            if (modelAsset == null)
-            {
-                throw new FileNotFoundException("Import the authored Colossus Siege Platform FBX before building the " +
-                    "sample bundle.", ColossusModelPath);
-            }
-
-            Dictionary<string, Material> materials = CreateColossusMaterials();
-            var root = new GameObject("ColossusSiegeVisual");
-            try
-            {
-                GameObject modelInstance = PrefabUtility.InstantiatePrefab(modelAsset) as GameObject;
-                if (modelInstance == null)
-                {
-                    throw new InvalidOperationException("Unity could not instantiate the authored Colossus Siege Platform.");
-                }
-
-                modelInstance.name = "ColossusSiegePlatformModel";
-                modelInstance.transform.SetParent(root.transform, false);
-                modelInstance.transform.localPosition = Vector3.zero;
-                modelInstance.transform.localRotation = Quaternion.identity;
-                modelInstance.transform.localScale = Vector3.one;
-                AssignColossusMaterials(modelInstance, materials);
-                VehiclePrefabBuilder.EnsureCanonicalVfxSockets(root, modelInstance);
-
-                bool success;
-                PrefabUtility.SaveAsPrefabAsset(root, ColossusPrefabPath, out success);
-                if (!success)
-                {
-                    throw new InvalidOperationException("Unity could not save " + ColossusPrefabPath + ".");
-                }
-
-                string prefabPath = Path.GetFullPath(Path.Combine(projectRoot, ColossusPrefabPath));
-                NormalizeEmptyUnityYamlStrings(prefabPath);
-                string prefabMetadataPath = prefabPath + ".meta";
-                if (File.Exists(prefabMetadataPath))
-                {
-                    NormalizeEmptyUnityYamlStrings(prefabMetadataPath);
-                }
-            }
-            finally
-            {
-                UnityEngine.Object.DestroyImmediate(root);
-            }
-
-            AssetImporter importer = AssetImporter.GetAtPath(ColossusPrefabPath);
-            if (importer == null)
-            {
-                throw new FileNotFoundException("Unity did not import " + ColossusPrefabPath + ".");
-            }
-
-            importer.assetBundleName = BundleName;
-            importer.assetBundleVariant = String.Empty;
-            AssetDatabase.SaveAssets();
-            AssetDatabase.Refresh();
-            NormalizeGeneratedUnityMetaFiles(projectRoot);
-            return ColossusPrefabPath;
+            return CreateRiggedWalkerVisual(
+                "ColossusSiegePlatform",
+                ColossusModelPath,
+                ColossusPrefabPath,
+                CreateColossusMaterials,
+                AssignColossusMaterials,
+                false);
         }
 
         private static string CreateIroncladVisual()
@@ -2014,68 +1865,13 @@ namespace RogueCommandExpansion.Authoring
 
         private static string CreateSurgeArcTankVisual()
         {
-            string projectRoot = Directory.GetParent(Application.dataPath).FullName;
-            Directory.CreateDirectory(Path.GetFullPath(Path.Combine(projectRoot, AssetRoot)));
-            AssetDatabase.Refresh();
-
-            GameObject modelAsset = AssetDatabase.LoadAssetAtPath<GameObject>(SurgeArcTankModelPath);
-            if (modelAsset == null)
-            {
-                throw new FileNotFoundException("Import the authored Surge Arc Tank FBX before building the " +
-                    "sample bundle.", SurgeArcTankModelPath);
-            }
-
-            Dictionary<string, Material> materials = CreateSurgeArcTankMaterials();
-            var root = new GameObject("SurgeArcTankVisual");
-            try
-            {
-                GameObject modelInstance = PrefabUtility.InstantiatePrefab(modelAsset) as GameObject;
-                if (modelInstance == null)
-                {
-                    throw new InvalidOperationException("Unity could not instantiate the authored Surge Arc Tank.");
-                }
-
-                modelInstance.name = "SurgeArcTankModel";
-                modelInstance.transform.SetParent(root.transform, false);
-                modelInstance.transform.localPosition = Vector3.zero;
-                modelInstance.transform.localRotation = Quaternion.identity;
-                modelInstance.transform.localScale = Vector3.one;
-                AssignSurgeArcTankMaterials(modelInstance, materials);
-                VehiclePrefabBuilder.EnsureCanonicalVfxSockets(root, modelInstance);
-
-                bool success;
-                PrefabUtility.SaveAsPrefabAsset(root, SurgeArcTankPrefabPath, out success);
-                if (!success)
-                {
-                    throw new InvalidOperationException("Unity could not save " + SurgeArcTankPrefabPath + ".");
-                }
-
-                string prefabPath = Path.GetFullPath(Path.Combine(projectRoot, SurgeArcTankPrefabPath));
-                NormalizeEmptyUnityYamlStrings(prefabPath);
-                string prefabMetadataPath = prefabPath + ".meta";
-                if (File.Exists(prefabMetadataPath))
-                {
-                    NormalizeEmptyUnityYamlStrings(prefabMetadataPath);
-                }
-            }
-            finally
-            {
-                UnityEngine.Object.DestroyImmediate(root);
-            }
-
-            AssetImporter importer = AssetImporter.GetAtPath(SurgeArcTankPrefabPath);
-            if (importer == null)
-            {
-                throw new FileNotFoundException("Unity did not import " + SurgeArcTankPrefabPath + ".");
-            }
-
-            importer.assetBundleName = BundleName;
-            importer.assetBundleVariant = String.Empty;
-            AssetDatabase.SaveAssets();
-            AssetDatabase.Refresh();
-            NormalizeGeneratedUnityMetaFiles(projectRoot);
-            NormalizeEmptyUnityYamlStrings(Path.GetFullPath(Path.Combine(projectRoot, SurgeArcTankPrefabPath)) + ".meta");
-            return SurgeArcTankPrefabPath;
+            return CreateRiggedWalkerVisual(
+                "SurgeArcTank",
+                SurgeArcTankModelPath,
+                SurgeArcTankPrefabPath,
+                CreateSurgeArcTankMaterials,
+                AssignSurgeArcTankMaterials,
+                false);
         }
 
         private static void ValidateBuiltVisualBundle(string bundlePath)
@@ -2089,12 +1885,18 @@ namespace RogueCommandExpansion.Authoring
             try
             {
                 string[] assetNames = bundle.GetAllAssetNames();
-                ValidateVisualBundleAssets(bundle, assetNames, "scouttankvisual.prefab", "ScoutTankVisual",
-                    "sandlancescoutcard.png", "SandlanceScoutCard", 7, "Sandlance Scout");
-                ValidateVisualBundleAssets(bundle, assetNames, "skirmishbikevisual.prefab", "SkirmishBikeVisual",
-                    "skirmishbikecard.png", "SkirmishBikeCard", 7, "Skirmish Strike Bike");
-                ValidateVisualBundleAssets(bundle, assetNames, "colossussiegevisual.prefab", "ColossusSiegeVisual",
-                    "colossussiegecard.png", "ColossusSiegeCard", 8, "Colossus Siege Platform");
+                ValidateRiggedWalkerBundleAssets(bundle, assetNames,
+                    "scouttankvisual.prefab", "ScoutTankVisual",
+                    "sandlancescoutcard.png", "SandlanceScoutCard", "Sandlance Scout");
+                ValidateRiggedWalkerBundleAssets(bundle, assetNames,
+                    "skirmishbikevisual.prefab", "SkirmishBikeVisual",
+                    "skirmishbikecard.png", "SkirmishBikeCard", "Skirmish Strike Bike");
+                ValidateRiggedWalkerBundleAssets(bundle, assetNames,
+                    "colossussiegevisual.prefab", "ColossusSiegeVisual",
+                    "colossussiegecard.png", "ColossusSiegeCard", "Colossus Siege Platform");
+                ValidateRiggedWalkerBundleAssets(bundle, assetNames,
+                    "surgearctankvisual.prefab", "SurgeArcTankVisual",
+                    "surgearctankcard.png", "SurgeArcTankCard", "Surge Arc Tank");
                 ValidateRiggedWalkerBundleAssets(bundle, assetNames,
                     "ironcladwalkervisual.prefab", "IroncladWalkerVisual",
                     "ironcladwalkercard.png", "IroncladWalkerCard", "Ironclad Walker");
@@ -2104,8 +1906,6 @@ namespace RogueCommandExpansion.Authoring
                 ValidateRiggedWalkerBundleAssets(bundle, assetNames,
                     "bastionsiegemechvisual.prefab", "BastionSiegeMechVisual",
                     "bastionsiegemechcard.png", "BastionSiegeMechCard", "Bastion Siege Mech", true);
-                ValidateVisualBundleAssets(bundle, assetNames, "surgearctankvisual.prefab", "SurgeArcTankVisual",
-                    "surgearctankcard.png", "SurgeArcTankCard", 6, "Surge Arc Tank");
                 ValidateVisualBundleAssets(bundle, assetNames, "arachnidhexapodvisual.prefab",
                     "ArachnidHexapodVisual", null, null, 1, "Arachnid Hexapod");
                 ValidateVisualBundleAssets(bundle, assetNames, "arachnidhexapodfactoryvisual.prefab",
@@ -2791,7 +2591,9 @@ namespace RogueCommandExpansion.Authoring
                 { "gunmetal", CreateOrUpdateMaterial("SurgeArcTankGunmetal", new Color32(18, 22, 28, 255), 0.78f, 0.75f) },
                 { "tread", CreateOrUpdateMaterial("SurgeArcTankTread", new Color32(11, 15, 20, 255), 0.12f, 0.32f) },
                 { "magenta", CreateOrUpdateMaterial("SurgeArcTankWarningMagenta", new Color32(212, 24, 118, 255), 0.20f, 0.70f) },
-                { "arc", CreateOrUpdateMaterial("SurgeArcTankArcCyan", new Color32(0, 240, 255, 255), 0.15f, 0.88f, new Color(0.0f, 0.94f, 1.0f) * 2.2f) }
+                { "arc", CreateOrUpdateMaterial("SurgeArcTankArcCyan", new Color32(0, 240, 255, 255), 0.15f, 0.88f, new Color(0.0f, 0.94f, 1.0f) * 2.2f) },
+                { "wheelHub", CreateOrUpdateMaterial("SurgeArcTankWheelHub", new Color32(18, 22, 28, 255), 0.78f, 0.75f) },
+                { "wheelRim", CreateOrUpdateMaterial("SurgeArcTankWheelRim", new Color32(82, 96, 112, 255), 0.60f, 0.72f) }
             };
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
@@ -2802,14 +2604,14 @@ namespace RogueCommandExpansion.Authoring
             GameObject model,
             IDictionary<string, Material> materials)
         {
-            AssignBatchedMaterials(model, "StrikeBike", materials);
+            AssignBatchedMaterials(model, "SkirmishStrikeBike", materials);
         }
 
         private static void AssignColossusMaterials(
             GameObject model,
             IDictionary<string, Material> materials)
         {
-            AssignBatchedMaterials(model, "Colossus", materials);
+            AssignBatchedMaterials(model, "ColossusSiegePlatform", materials);
         }
 
         private static void AssignIroncladMaterials(
@@ -2931,16 +2733,45 @@ namespace RogueCommandExpansion.Authoring
                 normalizedKey = normalizedKey.Substring(modelMaterialPrefix.Length);
             }
 
+            // Also strip any intermediate unit-name prefix (e.g. "Sandlance_", "Strike_Bike_",
+            // "Colossus_", "SurgeArcTank_") that precedes the material type keyword.
+            string[] intermediatePrefixes = new[]
+            {
+                "Sandlance_", "Strike_Bike_", "Colossus_", "Colossus", "SurgeArcTank_",
+                "IroncladWalker_", "AtlasCraneMech_", "BastionSiegeMech_",
+                "IroncladWalker", "AtlasCraneMech", "BastionSiegeMech"
+            };
+            for (int p = 0; p < intermediatePrefixes.Length; p++)
+            {
+                if (normalizedKey.StartsWith(intermediatePrefixes[p], StringComparison.OrdinalIgnoreCase))
+                {
+                    normalizedKey = normalizedKey.Substring(intermediatePrefixes[p].Length);
+                }
+            }
+
             string alias = null;
             switch (normalizedKey.Replace("_", String.Empty).ToLowerInvariant())
             {
+                case "armor":
                 case "primaryarmor": alias = "armor"; break;
                 case "lightarmor": alias = "lightArmor"; break;
                 case "gunmetal": alias = "gunmetal"; break;
                 case "tread": alias = "tread"; break;
+                case "rubber":
+                case "tire": alias = "rubber"; break;
+                case "arc":
+                case "arccyan": alias = "arc"; break;
+                case "sensor":
+                case "sensorglass":
+                case "sensorcyan": alias = "sensor"; break;
+                case "amber":
+                case "signalamber": alias = "amber"; break;
+                case "wheel":
+                case "wheelmetal": alias = "wheel"; break;
                 case "wheelrim": alias = "wheelRim"; break;
                 case "wheelhub": alias = "wheelHub"; break;
-                case "warning": alias = "warning"; break;
+                case "warning":
+                case "warningorange": alias = "warning"; break;
                 case "emissive": alias = "emissive"; break;
             }
 
@@ -2950,6 +2781,17 @@ namespace RogueCommandExpansion.Authoring
             }
             if (String.Equals(alias, "emissive", StringComparison.Ordinal) &&
                 materials.TryGetValue("sensor", out material) && material != null)
+            {
+                return true;
+            }
+            if (String.Equals(alias, "emissive", StringComparison.Ordinal) &&
+                materials.TryGetValue("arc", out material) && material != null)
+            {
+                return true;
+            }
+
+            if (String.Equals(alias, "warning", StringComparison.Ordinal) &&
+                materials.TryGetValue("magenta", out material) && material != null)
             {
                 return true;
             }
@@ -3156,7 +2998,7 @@ namespace RogueCommandExpansion.Authoring
 
         private static void AssignScoutMaterials(GameObject model, IDictionary<string, Material> materials)
         {
-            AssignBatchedMaterials(model, "Scout", materials);
+            AssignBatchedMaterials(model, "SandlanceScout", materials);
         }
         private static string ResolvePackRoot(string projectRoot)
         {
