@@ -92,6 +92,10 @@ For non-walker vehicles (tanks, rovers, hovercraft) that have a turret but no ar
   3. In the visual creation method: destroy imported Animators, call `SetupAnimatorIfAvailable`, and disable root motion on the final Animator.
 - **No foot contact sockets** for wheeled/tracked vehicles unless they have articulated legs. The `EnsureCanonicalWalkerSockets` call is walker-specific and should be skipped for vehicles.
 
+### Adding animations to an existing armature
+
+When a blend file already has an armature (e.g., from a previous authoring pass) but lacks animation clips, open the existing blend, retrieve the armature by name, and call `generate_procedural_action_clips(armature, prefix=UNIT_NAME, leg_type=...)` to generate the four standard clips. Validate root motion and rigid weights, then export with `include_armature=True, bake_anim=True`. Create a separate build script with a `RiggedModel` suffix (e.g., `Build-ArachnidHexapodRiggedModel.py`) to avoid overwriting the original geometry-creation script. The exported FBX replaces the static one in the Unity project.
+
 ---
 
 ## 3. Auditing & Validation Tool
