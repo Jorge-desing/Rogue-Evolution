@@ -46,6 +46,57 @@ internal static partial class ValidationTestRunner
                 "Visual scale must match measured renderer extents without the current 2.5x cap.");
         }
 
+        // Scale clamp limits.
+        if (Math.Abs(VisualOverlayScaleCalibration.CalculateUniformScale(0.0011f, 100f) - 100f) > 0.001f ||
+            Math.Abs(VisualOverlayScaleCalibration.CalculateUniformScale(100f, 1f) - 0.01f) > 0.001f)
+        {
+            throw new InvalidOperationException("Visual scale calibration must honor its 0.01 and 100 safety limits.");
+        }
+
+        // Invalid target extents (NaN, infinity, zero, negative) must be rejected.
+        foreach (float invalidTarget in new[] { 0f, -1f, float.NaN, float.PositiveInfinity, float.NegativeInfinity })
+        {
+            bool rejected = false;
+            try
+            {
+                VisualOverlayScaleCalibration.CalculateUniformScale(1f, invalidTarget);
+            }
+            catch (ArgumentOutOfRangeException)
+            {
+                rejected = true;
+            }
+            if (!rejected)
+            {
+                throw new InvalidOperationException("Visual scale calibration must reject invalid target extents.");
+            }
+        }
+
+        // Invalid model extents (NaN, infinity, negative) must be rejected.
+        foreach (float invalidModel in new[] { -1f, float.NaN, float.PositiveInfinity, float.NegativeInfinity })
+        {
+            bool rejected = false;
+            try
+            {
+                VisualOverlayScaleCalibration.CalculateUniformScale(invalidModel, 0.85f);
+            }
+            catch (ArgumentOutOfRangeException)
+            {
+                rejected = true;
+            }
+            if (!rejected)
+            {
+                throw new InvalidOperationException("Visual scale calibration must reject invalid model extents.");
+            }
+        }
+
+        // Building vs unit fallback selection.
+        if (Math.Abs(VisualOverlayScaleCalibration.CalculateTargetHalfExtent(0f, true) - 1.60f) > 0.001f ||
+            Math.Abs(VisualOverlayScaleCalibration.CalculateTargetHalfExtent(0f, false) - 0.85f) > 0.001f ||
+            Math.Abs(VisualOverlayScaleCalibration.CalculateTargetHalfExtent(float.NaN, true) - 1.60f) > 0.001f ||
+            Math.Abs(VisualOverlayScaleCalibration.CalculateTargetHalfExtent(float.PositiveInfinity, false) - 0.85f) > 0.001f)
+        {
+            throw new InvalidOperationException("Native, unit-fallback, and building-fallback extents must be selected deterministically.");
+        }
         foreach (float invalidExtent in new[] { 0f, 0.001f })
         {
             bool rejectsInvalidExtent = false;

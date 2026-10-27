@@ -5099,7 +5099,7 @@ namespace RogueCommandExpansionLoader.Content
             if (visualTemplate != null)
             {
                 ApplyVisualOverlay(nativePrefabClone, visualTemplate, localizationDefinition, packageName,
-                    "Edificio de producción", true);
+                    "Edificio de producción", true, true);
             }
 
             EntityController clonedController = nativePrefabClone.GetComponent<EntityController>();
@@ -5710,7 +5710,7 @@ namespace RogueCommandExpansionLoader.Content
             if (visualTemplate != null)
             {
                 ApplyVisualOverlay(nativePrefabClone, visualTemplate, localizationDefinition, packageName,
-                    "Edificio", true);
+                    "Edificio", true, true);
             }
 
             EntityController clonedController = nativePrefabClone.GetComponent<EntityController>();
@@ -6000,7 +6000,8 @@ namespace RogueCommandExpansionLoader.Content
             ContentUnitDefinition unit,
             string packageName,
             string ownerLabel = "Unidad",
-            bool meshRenderersOnly = false)
+            bool meshRenderersOnly = false,
+            bool isBuilding = false)
         {
             Transform target = FindUniqueTransformPath(nativePrefab.transform, unit.visualRootPath);
             if (target == null)
@@ -6029,8 +6030,6 @@ namespace RogueCommandExpansionLoader.Content
             }
 
             Material fallbackMaterial = FindNativeVisualMaterial(originalRenderers.ToArray());
-            bool isBuilding = !String.IsNullOrEmpty(ownerLabel) &&
-                ownerLabel.IndexOf("Edificio", StringComparison.OrdinalIgnoreCase) >= 0;
             float nativeHalfExtent = CalculateRendererHalfExtent(originalRenderers.ToArray());
             float targetHalfExtent = VisualOverlayScaleCalibration.CalculateTargetHalfExtent(nativeHalfExtent, isBuilding);
 
