@@ -264,7 +264,7 @@ bpy.ops.export_scene.fbx(
 
 ## 5. Native Hierarchy & Template Alignment
 
-Rogue Command gameplay components (`EntityController`, weapons, combat physics) live on native prefabs. Mod models are non-destructive visual overlays loaded via `visualRootPath`.
+Rogue Command gameplay components (`EntityController`, weapons, combat physics) live on native prefabs. Mod models are non-destructive visual overlays loaded via `visualRootPath`. The loader calibrates attached visuals from combined native and overlay renderer bounds, excluding collider meshes, antennae, and `Socket_*`; it applies a bounded uniform ratio and uses conservative unit/building fallback extents when native renderer bounds are unavailable. The overlay instance root scale is runtime-controlled, so keep authored offsets and any model-specific scale in descendant transforms rather than relying on the prefab root scale. Do not add a universal Blender-to-Unity `100x` compensation or a narrow scale clamp; verify the actual model against its native renderer bounds.
 
 ### Template Dimension & Hierarchy Matrix
 

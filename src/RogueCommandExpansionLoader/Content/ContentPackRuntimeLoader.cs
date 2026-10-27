@@ -6029,6 +6029,12 @@ namespace RogueCommandExpansionLoader.Content
             }
 
             Material fallbackMaterial = FindNativeVisualMaterial(originalRenderers.ToArray());
+            bool isBuilding = !String.IsNullOrEmpty(ownerLabel) &&
+                ownerLabel.IndexOf("Edificio", StringComparison.OrdinalIgnoreCase) >= 0;
+            float nativeHalfExtent = CalculateRendererHalfExtent(originalRenderers.ToArray());
+            float targetHalfExtent = nativeHalfExtent > 0.05f
+                ? nativeHalfExtent * 0.80f
+                : (isBuilding ? 1.60f : 0.85f);
 
             for (int i = 0; i < originalRenderers.Count; i++)
             {
@@ -6047,149 +6053,61 @@ namespace RogueCommandExpansionLoader.Content
             visualClone.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
             visualClone.transform.localScale = Vector3.one;
 
-            // Invert parent lossy scale so visualClone does not inherit arbitrary parent bone scales
-            Vector3 targetLossy = target.lossyScale;
-            float invX = Mathf.Abs(targetLossy.x) > 1e-5f ? (1f / targetLossy.x) : 1f;
-            float invY = Mathf.Abs(targetLossy.y) > 1e-5f ? (1f / targetLossy.y) : 1f;
-            float invZ = Mathf.Abs(targetLossy.z) > 1e-5f ? (1f / targetLossy.z) : 1f;
-
-            // Determine target visual half-extent by matching native template combat vehicle footprint
-            float nativeHalfExtent = 0f;
-            for (int i = 0; i < originalRenderers.Count; i++)
-            {
-                if (originalRenderers[i] != null)
-                {
-                    Vector3 ext = originalRenderers[i].bounds.extents;
-                    float m = Mathf.Max(ext.x, Mathf.Max(ext.y, ext.z));
-                    if (m > nativeHalfExtent) nativeHalfExtent = m;
-                }
-            }
-
-            Component col = nativePrefab.GetComponent("BoxCollider") ?? target.GetComponent("BoxCollider");
-            if (col != null)
-            {
-                System.Reflection.PropertyInfo sizeProp = col.GetType().GetProperty("size");
-                if (sizeProp != null)
-                {
-                    Vector3 size = (Vector3)sizeProp.GetValue(col, null);
-                    float m = Mathf.Max(size.x, Mathf.Max(size.y, size.z)) * 0.5f;
-                    if (m > nativeHalfExtent) nativeHalfExtent = m;
-                }
-            }
-
-            nativeHalfExtent = Mathf.Clamp(nativeHalfExtent > 0.5f ? nativeHalfExtent : 3.6f, 2.5f, 4.5f);
-            float targetHalfExtent = nativeHalfExtent * 0.80f;
-
-            // Compensate for Blender FBX 0.01x unit scaling and calibrate visual scale to match
-            // native combat vehicles (approx 6.0m - 7.5m length), ignoring sockets and antenna masts.
-            float visualExtent = CalculateLocalMeshExtent(visualClone);
-            float effectiveExtent = (visualExtent > 0.001f && visualExtent < 0.15f)
-                ? (visualExtent * 100f)
-                : visualExtent;
-
-            float autoScale = 1f;
-            if (effectiveExtent > 0.1f)
-            {
-                autoScale = Mathf.Clamp(targetHalfExtent / effectiveExtent, 0.8f, 2.5f);
-            }
-
-            float totalCompensation = ((visualExtent > 0.001f && visualExtent < 0.15f) ? 100f : 1f) * autoScale;
-
-            visualClone.transform.localScale = new Vector3(
-                invX * totalCompensation,
-                invY * totalCompensation,
-                invZ * totalCompensation
-            );
+            float visualExtent = CalculateRendererHalfExtent(
+                visualClone.GetComponentsInChildren<Renderer>(true));
+            float scaleFactor = visualExtent > 0.001f
+                ? VisualOverlayScaleCalibration.CalculateUniformScale(visualExtent, targetHalfExtent)
+                : 1f;
+            visualClone.transform.localScale = Vector3.one * scaleFactor;
 
             ApplyFallbackVisualMaterial(visualClone, fallbackMaterial, unit, packageName, ownerLabel);
             visualClone.SetActive(true);
         }
 
-        private static float CalculateRelativeMaxScale(Transform child, Transform root)
+        private static float CalculateRendererHalfExtent(Renderer[] renderers)
         {
-            if (child == null || root == null)
+            if (renderers == null || renderers.Length == 0)
             {
-                return 1f;
+                return 0f;
             }
 
-            Vector3 scale = Vector3.one;
-            Transform current = child;
-            while (current != null && current != root)
+            bool hasBounds = false;
+            Bounds combinedBounds = default(Bounds);
+            for (int i = 0; i < renderers.Length; i++)
             {
-                Vector3 local = current.localScale;
-                scale.x *= Mathf.Abs(local.x);
-                scale.y *= Mathf.Abs(local.y);
-                scale.z *= Mathf.Abs(local.z);
-                current = current.parent;
-            }
-
-            float maxScale = Mathf.Max(scale.x, Mathf.Max(scale.y, scale.z));
-            return Mathf.Clamp(maxScale > 1e-5f ? maxScale : 1f, 0.01f, 100f);
-        }
-
-        private static float CalculateLocalMeshExtent(GameObject model)
-        {
-            if (model == null) return 0f;
-            float maxExtent = 0f;
-            Transform rootTransform = model.transform;
-
-            MeshFilter[] filters = model.GetComponentsInChildren<MeshFilter>(true);
-            for (int i = 0; i < filters.Length; i++)
-            {
-                if (filters[i] != null && filters[i].sharedMesh != null)
+                Renderer renderer = renderers[i];
+                if (renderer == null || (!(renderer is MeshRenderer) && !(renderer is SkinnedMeshRenderer)))
                 {
-                    string objName = filters[i].gameObject != null ? filters[i].gameObject.name : String.Empty;
-                    if (!String.IsNullOrEmpty(objName) &&
-                        (objName.IndexOf("_COLLIDER", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                         objName.IndexOf("Antenna", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                         objName.StartsWith("Socket_", StringComparison.OrdinalIgnoreCase)))
-                    {
-                        continue;
-                    }
+                    continue;
+                }
 
-                    Mesh mesh = filters[i].sharedMesh;
-                    Vector3 ext = mesh.bounds.extents;
-                    if (ext.sqrMagnitude < 1e-6f)
-                    {
-                        try { mesh.RecalculateBounds(); } catch { }
-                        ext = mesh.bounds.extents;
-                    }
+                string objectName = renderer.gameObject != null ? renderer.gameObject.name : String.Empty;
+                if (!String.IsNullOrEmpty(objectName) &&
+                    (objectName.IndexOf("_COLLIDER", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                     objectName.IndexOf("Antenna", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                     objectName.StartsWith("Socket_", StringComparison.OrdinalIgnoreCase)))
+                {
+                    continue;
+                }
 
-                    float relScale = CalculateRelativeMaxScale(filters[i].transform, rootTransform);
-                    float scaledExtent = Mathf.Max(ext.x, Mathf.Max(ext.y, ext.z)) * relScale;
-                    maxExtent = Mathf.Max(maxExtent, scaledExtent);
+                if (!hasBounds)
+                {
+                    combinedBounds = renderer.bounds;
+                    hasBounds = true;
+                }
+                else
+                {
+                    combinedBounds.Encapsulate(renderer.bounds);
                 }
             }
 
-            SkinnedMeshRenderer[] skinned = model.GetComponentsInChildren<SkinnedMeshRenderer>(true);
-            for (int i = 0; i < skinned.Length; i++)
+            if (!hasBounds)
             {
-                if (skinned[i] != null && skinned[i].sharedMesh != null)
-                {
-                    string objName = skinned[i].gameObject != null ? skinned[i].gameObject.name : String.Empty;
-                    if (!String.IsNullOrEmpty(objName) &&
-                        (objName.IndexOf("_COLLIDER", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                         objName.IndexOf("Antenna", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                         objName.StartsWith("Socket_", StringComparison.OrdinalIgnoreCase)))
-                    {
-                        continue;
-                    }
-
-                    Mesh mesh = skinned[i].sharedMesh;
-                    Vector3 ext = mesh.bounds.extents;
-                    if (ext.sqrMagnitude < 1e-6f)
-                    {
-                        try { mesh.RecalculateBounds(); } catch { }
-                        ext = mesh.bounds.extents;
-                    }
-
-                    float relScale = CalculateRelativeMaxScale(skinned[i].transform, rootTransform);
-                    float scaledExtent = Mathf.Max(ext.x, Mathf.Max(ext.y, ext.z)) * relScale;
-                    maxExtent = Mathf.Max(maxExtent, scaledExtent);
-                }
+                return 0f;
             }
 
-            return maxExtent;
+            Vector3 size = combinedBounds.size;
+            return Mathf.Max(size.x, Mathf.Max(size.y, size.z)) * 0.5f;
         }
 
         private static Transform FindUniqueTransformPath(Transform root, string path)

@@ -11,6 +11,8 @@
   <ItemGroup>
     <Compile Include="../../src/RogueCommandExpansionLoader/Content/ContentPackDefinition.cs"
              Link="Content/ContentPackDefinition.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Content/VisualOverlayScaleCalibration.cs"
+             Link="Content/VisualOverlayScaleCalibration.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Content/UnitLocalizationResolver.cs"
              Link="Content/UnitLocalizationResolver.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Content/EntityControllerIdentity.cs"

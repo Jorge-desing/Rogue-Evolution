@@ -16,6 +16,33 @@ internal static partial class ValidationTestRunner
 {
     internal static IEnumerable<(string Name, Action Run)> GetRuntimeAndDiagnosticsValidationTests() => new (string Name, Action Run)[]
     {
+    ("visual overlay scale calibration fits both undersized and oversized models", () =>
+    {
+        float undersizedScale = VisualOverlayScaleCalibration.CalculateUniformScale(0.25f, 0.85f);
+        float oversizedScale = VisualOverlayScaleCalibration.CalculateUniformScale(6.0f, 0.85f);
+        float matchingScale = VisualOverlayScaleCalibration.CalculateUniformScale(0.85f, 0.85f);
+        if (Math.Abs(undersizedScale - 3.4f) > 0.001f ||
+            Math.Abs(oversizedScale - (0.85f / 6.0f)) > 0.001f ||
+            Math.Abs(matchingScale - 1.0f) > 0.001f)
+        {
+            throw new InvalidOperationException(
+                "Visual scale must match measured renderer extents without the current 2.5x cap.");
+        }
+
+        bool rejectsInvalidExtent = false;
+        try
+        {
+            VisualOverlayScaleCalibration.CalculateUniformScale(0f, 0.85f);
+        }
+        catch (ArgumentOutOfRangeException)
+        {
+            rejectsInvalidExtent = true;
+        }
+        if (!rejectsInvalidExtent)
+        {
+            throw new InvalidOperationException("Visual scale calibration must reject non-positive extents.");
+        }
+    }),
     ("visual socket discovery accepts canonical IDs and exact legacy suffixes only", () =>
     {
         if (!RogueCommandSocketCatalog.TryResolveCanonicalSocketName("Socket_TurretPivot", out string canonical) ||
