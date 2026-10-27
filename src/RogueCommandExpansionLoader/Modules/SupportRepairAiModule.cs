@@ -171,6 +171,14 @@ namespace RogueCommandExpansionLoader.Modules
                 for (int i = 0; i < repairers.Count; i++)
                 {
                     EntityController repairer = repairers[i];
+                    EntityCommand.Command currentCommand = repairer.CurrentPlayerCommandName;
+                    bool isModuleCommand = repairer.CurrentCommandIsTaggedWith(_commandTag);
+                    if (!isModuleCommand && currentCommand != EntityCommand.Command.DoNothing)
+                    {
+                        // Preserve unrelated combat, movement, and player-issued orders.
+                        continue;
+                    }
+
                     Vector3 repPos = repairer.Position;
 
                     EntityController bestTarget = null;
@@ -212,7 +220,7 @@ namespace RogueCommandExpansionLoader.Modules
                                 {
                                     EntityCommand moveCmd = EntityCommand.Move(bestTarget.Position);
                                     moveCmd.tag = _commandTag;
-                                    repairer.ExecuteCommand(moveCmd, EntityController.CommandProcessingType.ExecuteAndDeleteCommandChain);
+                                    repairer.ExecuteCommand(moveCmd, EntityController.CommandProcessingType.ExecuteBeforeCurrentCommand);
                                 }
                             }
                             else

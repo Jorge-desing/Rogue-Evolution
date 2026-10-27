@@ -1677,5 +1677,62 @@ internal static partial class ValidationTestRunner
             DefaultAiBehaviour.ResetRuntimeState();
         }
     }),
+    ("support repair AI preserves unrelated attack commands and queues repair movement", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        IRogueCommandAiRuntimeBehaviour? behaviour = null;
+        try
+        {
+            UnityEngine.Time.time = 10f;
+            var busyRepairer = new EntityController
+            {
+                IsControlledByAi = true,
+                IsEngineer = true,
+                CurrentPlayerCommandName = EntityCommand.Command.Attack,
+                Position = new UnityEngine.Vector3(0f, 0f, 0f)
+            };
+            var idleRepairer = new EntityController
+            {
+                IsControlledByAi = true,
+                IsEngineer = true,
+                CurrentPlayerCommandName = EntityCommand.Command.DoNothing,
+                Position = new UnityEngine.Vector3(1f, 0f, 0f)
+            };
+            var damagedHarvester = new EntityController
+            {
+                IsControlledByAi = true,
+                Role = UnitRole.Harvester,
+                MaxHealth = 100f,
+                CurrentHealth = 40f,
+                Position = new UnityEngine.Vector3(20f, 0f, 0f)
+            };
+
+            ExistingControllers.Instance.AiUnits().Add(busyRepairer);
+            ExistingControllers.Instance.AiUnits().Add(idleRepairer);
+            ExistingControllers.Instance.AiUnits().Add(damagedHarvester);
+
+            behaviour = new SupportRepairAiModule().CreateBehaviour(new DefaultAiBehaviour(), null);
+            behaviour.OnInitialized();
+            behaviour.Tick();
+
+            if (busyRepairer.ExecuteCommandCallCount != 0)
+            {
+                throw new InvalidOperationException("Support repair overwrote an unrelated attack command.");
+            }
+            if (!idleRepairer.LastExecutedCommand.HasValue ||
+                idleRepairer.LastExecutedCommand.Value.command != EntityCommand.Command.Move ||
+                idleRepairer.LastExecutedCommand.Value.destination.x != damagedHarvester.Position.x ||
+                idleRepairer.LastCommandProcessingType != EntityController.CommandProcessingType.ExecuteBeforeCurrentCommand)
+            {
+                throw new InvalidOperationException("Repair movement was not queued ahead of the idle repairer's current order.");
+            }
+        }
+        finally
+        {
+            behaviour?.OnDestroyed();
+            ExistingControllers.Instance.Reset();
+            DefaultAiBehaviour.ResetRuntimeState();
+        }
+    }),
     };
 }
