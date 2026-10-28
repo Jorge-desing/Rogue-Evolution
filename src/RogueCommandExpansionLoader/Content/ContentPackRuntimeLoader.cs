@@ -5994,6 +5994,46 @@ namespace RogueCommandExpansionLoader.Content
             return current != null;
         }
 
+        private static float CalculateVisualYawCorrection(Transform visualRoot)
+        {
+            if (visualRoot == null)
+            {
+                return 0f;
+            }
+
+            Transform muzzle = FindUniqueVisualSocket(visualRoot, "Socket_MuzzlePrimary");
+            Transform rearAnchor = FindUniqueVisualSocket(visualRoot, "Socket_EngineAudio");
+            if (rearAnchor == null)
+            {
+                rearAnchor = FindUniqueVisualSocket(visualRoot, "Socket_DamageSmoke");
+            }
+
+            if (muzzle == null || rearAnchor == null)
+            {
+                return 0f;
+            }
+
+            float muzzleForward = visualRoot.InverseTransformPoint(muzzle.position).z;
+            float rearForward = visualRoot.InverseTransformPoint(rearAnchor.position).z;
+            return VisualOverlayOrientation.CalculateYawCorrectionDegrees(muzzleForward, rearForward);
+        }
+
+        private static Transform FindUniqueVisualSocket(Transform visualRoot, string socketName)
+        {
+            List<Transform> matches = FindTransformsRecursively(visualRoot, transform =>
+            {
+                if (transform == null ||
+                    !Runtime.Visual.RogueCommandSocketCatalog.TryResolveCanonicalSocketName(transform.name, out string canonicalName))
+                {
+                    return false;
+                }
+
+                return String.Equals(canonicalName, socketName, StringComparison.OrdinalIgnoreCase);
+            });
+
+            return matches.Count == 1 ? matches[0] : null;
+        }
+
         private static void ApplyVisualOverlay(
             GameObject nativePrefab,
             GameObject visualTemplate,
@@ -6047,8 +6087,10 @@ namespace RogueCommandExpansionLoader.Content
 
             visualClone.name = "RCL_Visual_" + unit.id.Replace(':', '_');
             visualClone.transform.localPosition = Vector3.zero;
-            visualClone.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
+            visualClone.transform.localRotation = Quaternion.identity;
             visualClone.transform.localScale = Vector3.one;
+            float yawCorrection = CalculateVisualYawCorrection(visualClone.transform);
+            visualClone.transform.localRotation = Quaternion.Euler(0f, yawCorrection, 0f);
 
             float visualExtent = CalculateRendererHalfExtent(
                 visualClone.GetComponentsInChildren<Renderer>(true));

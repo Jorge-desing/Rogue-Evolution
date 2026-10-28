@@ -16,6 +16,18 @@ internal static partial class ValidationTestRunner
 {
     internal static IEnumerable<(string Name, Action Run)> GetRuntimeAndDiagnosticsValidationTests() => new (string Name, Action Run)[]
     {
+    ("visual overlays correct only models authored facing backward", () =>
+    {
+        float backwardCorrection = VisualOverlayOrientation.CalculateYawCorrectionDegrees(-2f, 1f);
+        float forwardCorrection = VisualOverlayOrientation.CalculateYawCorrectionDegrees(2f, -1f);
+        float ambiguousCorrection = VisualOverlayOrientation.CalculateYawCorrectionDegrees(0.01f, 0f);
+        if (Math.Abs(backwardCorrection - 180f) > 0.001f ||
+            Math.Abs(forwardCorrection) > 0.001f ||
+            Math.Abs(ambiguousCorrection) > 0.001f)
+        {
+            throw new InvalidOperationException("Overlay orientation must flip only when its muzzle lies clearly behind the rear anchor.");
+        }
+    }),
     ("visual overlay scale calibration fits both undersized and oversized models", () =>
     {
         float combinedExtent = VisualOverlayScaleCalibration.CalculateCombinedHalfExtent(new[]
