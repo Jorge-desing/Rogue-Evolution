@@ -882,12 +882,12 @@ namespace RogueCommandExpansion.Authoring
             if (controller == null || clips == null || clips.Count == 0 || controller.layers.Length == 0) return;
 
             AnimatorStateMachine stateMachine = controller.layers[0].stateMachine;
-            AnimationClip idleClip = FindAnimationClip(clips, "Idle") ?? clips[0];
+            AnimationClip idleClip = FindAnimationClip(clips, "Action_Idle") ?? FindAnimationClip(clips, "Idle") ?? clips[0];
             AnimationClip driveClip = preferWalkForMovement
-                ? FindAnimationClip(clips, "Walk") ?? FindAnimationClip(clips, "Drive")
-                : FindAnimationClip(clips, "Drive") ?? FindAnimationClip(clips, "Walk");
-            AnimationClip fireClip = FindAnimationClip(clips, "FireRecoil") ?? FindAnimationClip(clips, "Fire");
-            AnimationClip deathClip = FindAnimationClip(clips, "Death");
+                ? (FindAnimationClip(clips, "Action_Walk") ?? FindAnimationClip(clips, "Walk") ?? FindAnimationClip(clips, "Action_Drive") ?? FindAnimationClip(clips, "Drive"))
+                : (FindAnimationClip(clips, "Action_Drive") ?? FindAnimationClip(clips, "Drive") ?? FindAnimationClip(clips, "Action_Walk") ?? FindAnimationClip(clips, "Walk"));
+            AnimationClip fireClip = FindAnimationClip(clips, "Action_FireRecoil") ?? FindAnimationClip(clips, "FireRecoil") ?? FindAnimationClip(clips, "Fire");
+            AnimationClip deathClip = FindAnimationClip(clips, "Action_Death") ?? FindAnimationClip(clips, "Death");
 
             AnimatorState idleState = GetOrCreateAnimationState(stateMachine, idleClip);
             AnimatorState driveState = driveClip != null ? GetOrCreateAnimationState(stateMachine, driveClip) : null;
@@ -918,6 +918,26 @@ namespace RogueCommandExpansion.Authoring
             {
                 EnsureAnyStateTriggerTransition(stateMachine, fireState, "RCL_Fire");
                 EnsureExitTransition(fireState, idleState);
+                if (driveState != null && driveState != fireState && hasMovementParameter)
+                {
+                    bool hasMovingExit = false;
+                    foreach (AnimatorStateTransition existing in fireState.transitions)
+                    {
+                        if (existing.destinationState == driveState && HasTransitionCondition(existing, "RCL_IsMoving", AnimatorConditionMode.If))
+                        {
+                            hasMovingExit = true;
+                            break;
+                        }
+                    }
+                    if (!hasMovingExit)
+                    {
+                        AnimatorStateTransition movingExit = fireState.AddTransition(driveState);
+                        movingExit.hasExitTime = true;
+                        movingExit.exitTime = 1f;
+                        movingExit.duration = 0.05f;
+                        movingExit.AddCondition(AnimatorConditionMode.If, 0f, "RCL_IsMoving");
+                    }
+                }
             }
 
             if (deathState != null && hasDeathParameter)

@@ -1824,6 +1824,10 @@ namespace RogueCommandExpansion.Authoring
                 {
                     configureAdditionalComponents(root);
                 }
+                foreach (Animator importedAnimator in modelInstance.GetComponentsInChildren<Animator>(true))
+                {
+                    UnityEngine.Object.DestroyImmediate(importedAnimator);
+                }
                 VehiclePrefabBuilder.SetupAnimatorIfAvailable(root, modelInstance, modelAsset, unitName, true);
 
                 Animator animator = root.GetComponent<Animator>();
@@ -1916,6 +1920,10 @@ namespace RogueCommandExpansion.Authoring
                 VehiclePrefabBuilder.EnsureCanonicalVfxSockets(root, modelInstance);
                 EnsureCanonicalWalkerSockets(root, modelInstance, false, false);
 
+                foreach (Animator importedAnimator in modelInstance.GetComponentsInChildren<Animator>(true))
+                {
+                    UnityEngine.Object.DestroyImmediate(importedAnimator);
+                }
                 VehiclePrefabBuilder.SetupAnimatorIfAvailable(root, modelInstance, modelAsset, unitName, true);
 
                 Animator animator = root.GetComponent<Animator>();
