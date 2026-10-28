@@ -75,6 +75,9 @@ Inspect `--help` for current options. Use [Steam Runtime Validation](../rogue-co
 
 ## Pitfalls and evidence limits
 
+- **Clip-name ambiguity on rigged imports.** An FBX can import both `Action_Walk` (armature-prefixed, e.g. `IroncladWalker_Armature|IroncladWalker_Action_Walk`) and a plain `Walk` clip. `FindAnimationClip(clips, "Walk")` returns the first name containing "Walk", which may be the wrong (non-deforming or legacy) clip. Prefer `Action_*` names first (`Action_Walk`, `Action_Idle`, `Action_FireRecoil`, `Action_Death`) before falling back to plain names; otherwise Idle→Walk can end up targeting a Death-named or idle clip and the unit appears frozen.
+- **FireRecoil must return to locomotion.** `FireRecoil` exit transitions must include a conditioned return to the movement state (`Action_Walk`/`Action_Drive`) when `RCL_IsMoving` is still true, with `hasExitTime = true`, in addition to the unconditional exit to `Idle`. Otherwise a shot interrupts walking and leaves the unit stuck in a recoil/idle pose.
+- **Duplicate Animator from imported model.** A rigged FBX may carry its own `Animator`. Destroy every imported `Animator` on the model instance before `SetupAnimatorIfAvailable`; otherwise the prefab/bundle keeps two Animators and the rigging contract (exactly one configured Animator on the visual root) fails.
 - Native visual overlays retain native gameplay hierarchies but do not retarget native animation rigs to a replacement mesh automatically.
 - A serialized Animator/Avatar/controller reference does not prove the model deforms or transitions correctly in the target player.
 - Root-motion-disabled Editor setup does not by itself prove an in-place clip; inspect the clip's root curves and test the animated model.
