@@ -702,6 +702,12 @@
       "customBalance": {
         "Damage1": 2.8
       },
+      "healing": {
+        "healAmount": 12.0,
+        "healRange": 3.5,
+        "healRate": 0.8,
+        "repairAmount": 20.0
+      },
       "productionBuilding": {
         "id": "sample-native:atlas-crane-mech-factory",
         "nativeTemplateId": "GatlingWalkerFactory",
@@ -1283,7 +1289,12 @@
           }
         ]
       },
-      "cardModelScalingFactor": 0.9
+      "cardModelScalingFactor": 0.9,
+      "command": {
+        "commandRange": 4.5,
+        "commandType": "Defend",
+        "maxCommandChain": 4
+      }
     },
     {
       "id": "sample-native:skirmish-bike",
@@ -1647,7 +1658,18 @@
         "cardImageAssetName": "assets/roguecommandexpansionsample/surgearctankcard.png"
       },
       "isAllowedForAi": true,
-      "cardModelScalingFactor": 0.85
+      "cardModelScalingFactor": 0.85,
+      "shieldRegeneration": {
+        "rechargeDelay": 4.0,
+        "rechargeRate": 1.5,
+        "burstAmount": 1.0
+      },
+      "shieldOverloadNova": {
+        "novaRadius": 3.5,
+        "damage": 12.0,
+        "stunDuration": 1.5,
+        "cooldown": 15.0
+      }
     }
   ],
   "stages": [
