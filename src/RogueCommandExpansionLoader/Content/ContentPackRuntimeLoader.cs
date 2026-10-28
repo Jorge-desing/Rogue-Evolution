@@ -6019,7 +6019,7 @@ namespace RogueCommandExpansionLoader.Content
             float sepZ = muzzleLocal.z - rearLocal.z;
             float muzzleForward;
             float rearForward;
-            if (Mathf.Abs(sepY) >= Mathf.Abs(sepZ))
+            if (Mathf.Abs(sepY) > Mathf.Abs(sepZ) * 2f)
             {
                 muzzleForward = muzzleLocal.y;
                 rearForward = rearLocal.y;
