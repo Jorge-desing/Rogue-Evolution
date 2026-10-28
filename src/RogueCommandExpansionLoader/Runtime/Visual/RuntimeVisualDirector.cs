@@ -173,7 +173,26 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
 
         private void CacheAnimatorParameters()
         {
-            _animator = GetComponentInChildren<Animator>(true);
+            Animator preferredAnimator = null;
+            Transform[] hierarchyTransforms = GetComponentsInChildren<Transform>(true);
+            for (int animatorIndex = 0; animatorIndex < hierarchyTransforms.Length; animatorIndex++)
+            {
+                Transform candidateTransform = hierarchyTransforms[animatorIndex];
+                if (candidateTransform == null ||
+                    !candidateTransform.name.StartsWith("RCL_Visual_", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                Animator candidateAnimator = candidateTransform.GetComponentInChildren<Animator>(true);
+                if (candidateAnimator != null && candidateAnimator.runtimeAnimatorController != null)
+                {
+                    preferredAnimator = candidateAnimator;
+                    break;
+                }
+            }
+
+            _animator = preferredAnimator != null ? preferredAnimator : GetComponentInChildren<Animator>(true);
             if (_animator == null || _animator.runtimeAnimatorController == null) return;
 
             foreach (AnimatorControllerParameter parameter in _animator.parameters)
