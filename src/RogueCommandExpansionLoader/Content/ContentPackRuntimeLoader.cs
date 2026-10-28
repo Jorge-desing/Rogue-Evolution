@@ -6013,8 +6013,22 @@ namespace RogueCommandExpansionLoader.Content
                 return 0f;
             }
 
-            float muzzleForward = visualRoot.InverseTransformPoint(muzzle.position).z;
-            float rearForward = visualRoot.InverseTransformPoint(rearAnchor.position).z;
+            Vector3 muzzleLocal = visualRoot.InverseTransformPoint(muzzle.position);
+            Vector3 rearLocal = visualRoot.InverseTransformPoint(rearAnchor.position);
+            float sepY = muzzleLocal.y - rearLocal.y;
+            float sepZ = muzzleLocal.z - rearLocal.z;
+            float muzzleForward;
+            float rearForward;
+            if (Mathf.Abs(sepY) >= Mathf.Abs(sepZ))
+            {
+                muzzleForward = muzzleLocal.y;
+                rearForward = rearLocal.y;
+            }
+            else
+            {
+                muzzleForward = muzzleLocal.z;
+                rearForward = rearLocal.z;
+            }
             return VisualOverlayOrientation.CalculateYawCorrectionDegrees(muzzleForward, rearForward);
         }
 
