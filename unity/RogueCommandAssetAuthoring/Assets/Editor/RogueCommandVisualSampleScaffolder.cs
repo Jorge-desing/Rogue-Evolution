@@ -45,10 +45,12 @@ namespace RogueCommandExpansion.Authoring
             AssetRoot + "/VisualOnly/Prefabs/ArachnidHexapodVisual.prefab";
         private const string ArachnidHexapodFactoryVisualPrefabPath =
             AssetRoot + "/VisualOnly/Prefabs/ArachnidHexapodFactoryVisual.prefab";
+        private const string ArachnidHexapodRiggedModelPath = AssetRoot + "/Models/ArachnidHexapod.fbx";
         private const string OverlordCommandHQVisualPrefabPath =
             AssetRoot + "/VisualOnly/Prefabs/OverlordCommandHQVisual.prefab";
         private const string OverlordCommandHQFactoryVisualPrefabPath =
             AssetRoot + "/VisualOnly/Prefabs/OverlordCommandHQFactoryVisual.prefab";
+        private const string OverlordCommandHQRiggedModelPath = AssetRoot + "/Models/OverlordCommandHQ.fbx";
         private const string MaterialRoot = AssetRoot + "/Materials";
         private const string VertexWearShaderName = "RogueCommand/VehiclePBR_VertexWear";
         private const float FactoryNewWearStrength = 0.25f;
@@ -284,6 +286,10 @@ namespace RogueCommandExpansion.Authoring
                 ImportCardSprite(BastionSiegeMechCardSpritePath, true);
                 string surgeArcTankPrefabPath = CreateSurgeArcTankVisual();
                 ImportCardSprite(SurgeArcTankCardSpritePath);
+                string arachnidPrefabPath = CreateRiggedPbrVisual(
+                    "ArachnidHexapod", ArachnidHexapodRiggedModelPath, ArachnidHexapodVisualPrefabPath);
+                string overlordPrefabPath = CreateRiggedPbrVisual(
+                    "OverlordCommandHQ", OverlordCommandHQRiggedModelPath, OverlordCommandHQVisualPrefabPath);
                 ConfigureArachnidOverlordPbrTextureImports();
                 string outputPath = Path.GetFullPath(Path.Combine(projectRoot, BundleOutputPath));
                 Directory.CreateDirectory(outputPath);
@@ -595,6 +601,8 @@ namespace RogueCommandExpansion.Authoring
             ValidateWalkerModelSource(projectRoot, BikeModelPath, "Skirmish Strike Bike", issues);
             ValidateWalkerModelSource(projectRoot, ColossusModelPath, "Colossus Siege Platform", issues);
             ValidateWalkerModelSource(projectRoot, SurgeArcTankModelPath, "Surge Arc Tank", issues);
+            ValidateWalkerModelSource(projectRoot, ArachnidHexapodRiggedModelPath, "Arachnid Hexapod", issues);
+            ValidateWalkerModelSource(projectRoot, OverlordCommandHQRiggedModelPath, "Overlord Command HQ", issues);
 
             if (issues.Count > 0)
             {
@@ -1874,6 +1882,80 @@ namespace RogueCommandExpansion.Authoring
                 false);
         }
 
+        private static string CreateRiggedPbrVisual(
+            string unitName,
+            string modelPath,
+            string prefabPath)
+        {
+            string projectRoot = Directory.GetParent(Application.dataPath).FullName;
+            Directory.CreateDirectory(Path.GetFullPath(Path.Combine(projectRoot, AssetRoot)));
+            AssetDatabase.Refresh();
+
+            GameObject modelAsset = AssetDatabase.LoadAssetAtPath<GameObject>(modelPath);
+            if (modelAsset == null)
+            {
+                throw new FileNotFoundException(
+                    "Import the rigged " + unitName + " FBX before building the sample bundle.", modelPath);
+            }
+
+            var root = new GameObject(unitName + "Visual");
+            try
+            {
+                GameObject modelInstance = PrefabUtility.InstantiatePrefab(modelAsset) as GameObject;
+                if (modelInstance == null)
+                {
+                    throw new InvalidOperationException("Unity could not instantiate the authored " + unitName + ".");
+                }
+
+                modelInstance.name = unitName + "Model";
+                modelInstance.transform.SetParent(root.transform, false);
+                modelInstance.transform.localPosition = Vector3.zero;
+                modelInstance.transform.localRotation = Quaternion.identity;
+                modelInstance.transform.localScale = Vector3.one;
+
+                VehiclePrefabBuilder.EnsureCanonicalVfxSockets(root, modelInstance);
+                EnsureCanonicalWalkerSockets(root, modelInstance, false, false);
+
+                VehiclePrefabBuilder.SetupAnimatorIfAvailable(root, modelInstance, modelAsset, unitName, true);
+
+                Animator animator = root.GetComponent<Animator>();
+                if (animator == null || animator.avatar == null || !animator.avatar.isValid ||
+                    animator.runtimeAnimatorController == null)
+                {
+                    throw new InvalidDataException(unitName +
+                        " prefab must include its valid Generic Avatar and controller.");
+                }
+                animator.applyRootMotion = false;
+
+                bool success;
+                PrefabUtility.SaveAsPrefabAsset(root, prefabPath, out success);
+                if (!success)
+                {
+                    throw new InvalidOperationException("Unity could not save " + prefabPath + ".");
+                }
+
+                NormalizeEmptyUnityYamlStrings(Path.GetFullPath(Path.Combine(
+                    Directory.GetParent(Application.dataPath).FullName, prefabPath)));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(root);
+            }
+
+            AssetImporter importer = AssetImporter.GetAtPath(prefabPath);
+            if (importer == null)
+            {
+                throw new FileNotFoundException("Unity did not import " + prefabPath + ".");
+            }
+
+            importer.assetBundleName = BundleName;
+            importer.assetBundleVariant = String.Empty;
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+            NormalizeGeneratedUnityMetaFiles(projectRoot);
+            return prefabPath;
+        }
+
         private static void ValidateBuiltVisualBundle(string bundlePath)
         {
             AssetBundle bundle = AssetBundle.LoadFromFile(bundlePath);
@@ -1906,20 +1988,16 @@ namespace RogueCommandExpansion.Authoring
                 ValidateRiggedWalkerBundleAssets(bundle, assetNames,
                     "bastionsiegemechvisual.prefab", "BastionSiegeMechVisual",
                     "bastionsiegemechcard.png", "BastionSiegeMechCard", "Bastion Siege Mech", true);
-                ValidateVisualBundleAssets(bundle, assetNames, "arachnidhexapodvisual.prefab",
-                    "ArachnidHexapodVisual", null, null, 1, "Arachnid Hexapod");
                 ValidateVisualBundleAssets(bundle, assetNames, "arachnidhexapodfactoryvisual.prefab",
                     "ArachnidHexapodFactoryVisual", null, null, 1, "Arachnid Hexapod Factory");
-                ValidateVisualBundleAssets(bundle, assetNames, "overlordcommandhqvisual.prefab",
-                    "OverlordCommandHQVisual", null, null, 1, "Overlord Command HQ");
                 ValidateVisualBundleAssets(bundle, assetNames, "overlordcommandhqfactoryvisual.prefab",
                     "OverlordCommandHQFactoryVisual", null, null, 1, "Overlord Command HQ Factory");
-                ValidatePbrVisualBundlePrefab(bundle, assetNames, "arachnidhexapodvisual.prefab",
-                    "ArachnidHexapodVisual", "Arachnid Hexapod");
-                ValidatePbrVisualBundlePrefab(bundle, assetNames, "arachnidhexapodfactoryvisual.prefab",
-                    "ArachnidHexapodFactoryVisual", "Arachnid Hexapod Factory");
-                ValidatePbrVisualBundlePrefab(bundle, assetNames, "overlordcommandhqvisual.prefab",
-                    "OverlordCommandHQVisual", "Overlord Command HQ");
+                ValidateRiggedWalkerBundleAssets(bundle, assetNames,
+                    "arachnidhexapodvisual.prefab", "ArachnidHexapodVisual",
+                    null, null, "Arachnid Hexapod");
+                ValidateRiggedWalkerBundleAssets(bundle, assetNames,
+                    "overlordcommandhqvisual.prefab", "OverlordCommandHQVisual",
+                    null, null, "Overlord Command HQ");
                 ValidatePbrVisualBundlePrefab(bundle, assetNames, "overlordcommandhqfactoryvisual.prefab",
                     "OverlordCommandHQFactoryVisual", "Overlord Command HQ Factory");
             }
@@ -1946,7 +2024,10 @@ namespace RogueCommandExpansion.Authoring
                 throw new InvalidDataException(visualLabel + " prefab could not be loaded by its AssetBundle path.");
             }
 
-            ValidateCardSpriteAsset(bundle, assetNames, cardSuffix, cardName, visualLabel);
+            if (!String.IsNullOrEmpty(cardSuffix) && !String.IsNullOrEmpty(cardName))
+            {
+                ValidateCardSpriteAsset(bundle, assetNames, cardSuffix, cardName, visualLabel);
+            }
 
             SkinnedMeshRenderer[] skinnedRenderers = prefab.GetComponentsInChildren<SkinnedMeshRenderer>(true);
             bool hasBoundSkinnedMesh = false;
@@ -2739,7 +2820,8 @@ namespace RogueCommandExpansion.Authoring
             {
                 "Sandlance_", "Strike_Bike_", "Colossus_", "Colossus", "SurgeArcTank_",
                 "IroncladWalker_", "AtlasCraneMech_", "BastionSiegeMech_",
-                "IroncladWalker", "AtlasCraneMech", "BastionSiegeMech"
+                "IroncladWalker", "AtlasCraneMech", "BastionSiegeMech",
+                "ArachnidHexapod_", "ArachnidHexapod", "OverlordCommandHQ_", "OverlordCommandHQ"
             };
             for (int p = 0; p < intermediatePrefixes.Length; p++)
             {
