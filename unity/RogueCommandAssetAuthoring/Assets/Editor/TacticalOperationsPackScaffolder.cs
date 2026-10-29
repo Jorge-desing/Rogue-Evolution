@@ -781,6 +781,12 @@ namespace RogueCommandExpansion.Authoring
             if (importer.maxTextureSize != 2048) { importer.maxTextureSize = 2048; changed = true; }
             if (!importer.mipmapEnabled) { importer.mipmapEnabled = true; changed = true; }
             if (importer.wrapMode != TextureWrapMode.Clamp) { importer.wrapMode = TextureWrapMode.Clamp; changed = true; }
+            // MetallicGloss packs metallic in RGB and smoothness in A; preserve alpha as input, never as transparency.
+            if (linear)
+            {
+                if (importer.alphaSource != TextureImporterAlphaSource.FromInput) { importer.alphaSource = TextureImporterAlphaSource.FromInput; changed = true; }
+                if (importer.alphaIsTransparency) { importer.alphaIsTransparency = false; changed = true; }
+            }
             if (changed) importer.SaveAndReimport();
         }
 
