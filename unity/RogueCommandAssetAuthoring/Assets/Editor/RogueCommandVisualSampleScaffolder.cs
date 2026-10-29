@@ -822,9 +822,20 @@ namespace RogueCommandExpansion.Authoring
             {
                 for (int i = 0; i < clips.Length; i++)
                 {
+                    string clipName = clips[i] != null ? clips[i].name : string.Empty;
+                    int actionSeparator = clipName.LastIndexOf("Action_", StringComparison.OrdinalIgnoreCase);
+                    string actionToken = actionSeparator >= 0
+                        ? clipName.Substring(actionSeparator + "Action_".Length)
+                        : clipName;
+                    int pipeIndex = actionToken.LastIndexOf('|');
+                    if (pipeIndex >= 0)
+                    {
+                        actionToken = actionToken.Substring(pipeIndex + 1);
+                    }
+                    actionToken = actionToken.Trim();
                     if (clips[i] != null &&
-                        (clips[i].name.IndexOf("Walk", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                         clips[i].name.IndexOf("Drive", StringComparison.OrdinalIgnoreCase) >= 0))
+                        (actionToken.Equals("Walk", StringComparison.OrdinalIgnoreCase) ||
+                         actionToken.Equals("Drive", StringComparison.OrdinalIgnoreCase)))
                     {
                         walkClip = clips[i];
                         break;
