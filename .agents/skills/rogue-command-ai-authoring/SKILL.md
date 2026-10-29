@@ -255,6 +255,14 @@ The loader includes 5 compiled AI modules available for content packs:
    - Parameters: `baseIndex` (0–31), `cooldownSeconds` (10–300s; default 30s), `minSquadSize` (1–12; default 4), `targetPriority` (`ClosestBuilding` [default], `Refinery`, `Hq`), `minGameTimeSeconds` (0–600s; default 30s).
    - Scans known player structures (`PlayerBuildingsKnownToAi`, `PlayerRefineries`, or `EngineeringHq`), gathers available combat troops, and coordinates offensive siege strikes.
 
+### Runtime mechanics profile consumption
+
+- Some module behavior depends on per-unit runtime mechanics (e.g. `aiActivationTrigger` on the first active skill). The trigger lives in content (`unit.activeSkills[0].aiActivationTrigger`) and must be copied by `ContentPackRuntimeLoader` into `UnitRuntimeMechanicsProfile.AiActivationTrigger` when the profile is created; the module then reads it via `RuntimeUnitMechanicsDirector.TryGetProfile(unit.EntityId, out ...)`.
+- Always default to `"EnemiesInRange"` when the profile is missing or the trigger is blank, so existing packs and units without the field behave exactly as before.
+- Only count a non-default trigger as mechanics in `UnitRuntimeMechanicsProfile.HasAnyMechanics` (i.e. `!string.Equals(trigger, "EnemiesInRange", OrdinalIgnoreCase)`); otherwise every unit with an active skill would be flagged as having mechanics and could change load/offer behavior.
+- In tests, initialize the profile directly (`new UnitRuntimeMechanicsProfile { EntityId = ..., AiActivationTrigger = "LowHealth" }`) and `RegisterProfile` it; reflection-based assignment is fragile and fails to compile against partial test views.
+- When a trigger bypasses the usual enemy-in-range gate (e.g. `LowHealth` for self skills), keep the health check (`CurrentHealth / MaxHealth <= 0.5`) before any command dispatch, and only skip the enemy search for `TargetOrigin.Self` skills; non-self skills still require a nearby enemy within `enemyTriggerRadiusCells`.
+
 ### Implementation checklist for a new compiled module
 
 1. Create `Modules/<Name>Parameters.cs` with a parser that rejects unknown, duplicate, and out-of-range values, plus documented defaults.
