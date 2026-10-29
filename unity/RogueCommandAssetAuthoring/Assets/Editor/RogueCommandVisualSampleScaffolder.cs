@@ -680,6 +680,7 @@ namespace RogueCommandExpansion.Authoring
                 {
                     importer.SaveAndReimport();
                 }
+                VehiclePrefabBuilder.ConfigureAnimationClipLooping(modelPath);
 
                 GameObject model = AssetDatabase.LoadAssetAtPath<GameObject>(modelPath);
                 if (model == null)
@@ -1909,6 +1910,11 @@ namespace RogueCommandExpansion.Authoring
                 if (modelInstance == null)
                 {
                     throw new InvalidOperationException("Unity could not instantiate the authored " + unitName + ".");
+                }
+                if (PrefabUtility.IsPartOfPrefabInstance(modelInstance))
+                {
+                    PrefabUtility.UnpackPrefabInstance(modelInstance, PrefabUnpackMode.Completely,
+                        InteractionMode.AutomatedAction);
                 }
 
                 modelInstance.name = unitName + "Model";

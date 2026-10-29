@@ -587,6 +587,8 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             UpdateVtolThrusterVectoring(Time.deltaTime);
         }
 
+        private bool _isMoving;
+
         private void UpdateLocomotionAnimation()
         {
             if (_animator == null || !_hasMovementAnimationParameter || _entity == null) return;
@@ -594,8 +596,9 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             Vector3 currentPosition = _entity.transform.position;
             float deltaTime = Time.deltaTime;
             bool isMoving = _hasLastAnimationPosition && deltaTime > Mathf.Epsilon &&
-                (currentPosition - _lastAnimationPosition).sqrMagnitude > (0.15f * deltaTime) * (0.15f * deltaTime);
+                (currentPosition - _lastAnimationPosition).sqrMagnitude > 0.0001f;
 
+            _isMoving = isMoving;
             _animator.SetBool(MovementAnimationParameter, isMoving);
             _lastAnimationPosition = currentPosition;
             _hasLastAnimationPosition = true;
@@ -867,6 +870,7 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
 
         private void UpdateTurretAiming()
         {
+            if (_isMoving) return;
             if (_socketTurretPivot == null || _isTurretJammed || IsEntityDead()) return;
 
             Transform target = ResolveEntityTarget();

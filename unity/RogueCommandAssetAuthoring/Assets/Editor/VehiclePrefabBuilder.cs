@@ -884,8 +884,8 @@ namespace RogueCommandExpansion.Authoring
             AnimatorStateMachine stateMachine = controller.layers[0].stateMachine;
             AnimationClip idleClip = FindAnimationClip(clips, "Action_Idle") ?? FindAnimationClip(clips, "Idle") ?? clips[0];
             AnimationClip driveClip = preferWalkForMovement
-                ? (FindAnimationClip(clips, "Action_Walk") ?? FindAnimationClip(clips, "Walk") ?? FindAnimationClip(clips, "Action_Drive") ?? FindAnimationClip(clips, "Drive"))
-                : (FindAnimationClip(clips, "Action_Drive") ?? FindAnimationClip(clips, "Drive") ?? FindAnimationClip(clips, "Action_Walk") ?? FindAnimationClip(clips, "Walk"));
+                ? (FindAnimationClip(clips, "Action_Walk") ?? FindAnimationClip(clips, "Action_Drive") ?? FindAnimationClip(clips, "Walk") ?? FindAnimationClip(clips, "Drive"))
+                : (FindAnimationClip(clips, "Action_Drive") ?? FindAnimationClip(clips, "Action_Walk") ?? FindAnimationClip(clips, "Drive") ?? FindAnimationClip(clips, "Walk"));
             AnimationClip fireClip = FindAnimationClip(clips, "Action_FireRecoil") ?? FindAnimationClip(clips, "FireRecoil") ?? FindAnimationClip(clips, "Fire");
             AnimationClip deathClip = FindAnimationClip(clips, "Action_Death") ?? FindAnimationClip(clips, "Death");
 
@@ -910,6 +910,10 @@ namespace RogueCommandExpansion.Authoring
 
             if (hasMovementParameter && driveState != idleState)
             {
+                RemoveStateTransitionsWithConditionExcept(
+                    idleState, "RCL_IsMoving", AnimatorConditionMode.If, driveState);
+                RemoveStateTransitionsWithConditionExcept(
+                    driveState, "RCL_IsMoving", AnimatorConditionMode.IfNot, idleState);
                 EnsureStateTransition(idleState, driveState, "RCL_IsMoving", AnimatorConditionMode.If, 0.12f);
                 EnsureStateTransition(driveState, idleState, "RCL_IsMoving", AnimatorConditionMode.IfNot, 0.12f);
             }
@@ -1009,6 +1013,27 @@ namespace RogueCommandExpansion.Authoring
             transition.hasExitTime = false;
             transition.duration = duration;
             transition.AddCondition(condition, 0f, parameterName);
+        }
+
+        private static void RemoveStateTransitionsWithConditionExcept(
+            AnimatorState source,
+            string parameterName,
+            AnimatorConditionMode condition,
+            AnimatorState destination)
+        {
+            if (source == null) return;
+
+            bool keptExpectedTransition = false;
+            foreach (AnimatorStateTransition existing in source.transitions)
+            {
+                if (!HasTransitionCondition(existing, parameterName, condition)) continue;
+                if (existing.destinationState == destination && !keptExpectedTransition)
+                {
+                    keptExpectedTransition = true;
+                    continue;
+                }
+                source.RemoveTransition(existing);
+            }
         }
 
         private static void EnsureAnyStateTriggerTransition(
@@ -1152,7 +1177,7 @@ namespace RogueCommandExpansion.Authoring
             return false;
         }
 
-        private static void ConfigureAnimationClipLooping(string modelPath)
+        public static void ConfigureAnimationClipLooping(string modelPath)
         {
             ModelImporter importer = AssetImporter.GetAtPath(modelPath) as ModelImporter;
             if (importer == null) return;
@@ -1169,6 +1194,7 @@ namespace RogueCommandExpansion.Authoring
             {
                 if (clip == null) continue;
                 bool shouldLoop = clip.name.IndexOf("Idle", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    clip.name.IndexOf("Walk", StringComparison.OrdinalIgnoreCase) >= 0 ||
                     clip.name.IndexOf("Drive", StringComparison.OrdinalIgnoreCase) >= 0;
                 if (clip.loopTime != shouldLoop)
                 {

@@ -6019,7 +6019,11 @@ namespace RogueCommandExpansionLoader.Content
             float sepZ = muzzleLocal.z - rearLocal.z;
             float muzzleForward;
             float rearForward;
-            if (Mathf.Abs(sepY) > Mathf.Abs(sepZ) * 2f)
+            // Use the dominant forward axis (Y for Blender Y-forward authored models,
+            // Z for Unity Z-forward authored models) instead of requiring Y to be
+            // more than twice Z. This prevents a false 180-degree flip on units
+            // whose authored Y and Z separations are comparable.
+            if (Mathf.Abs(sepY) > Mathf.Abs(sepZ))
             {
                 muzzleForward = muzzleLocal.y;
                 rearForward = rearLocal.y;

@@ -12,7 +12,33 @@ import UnityPy
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 BUNDLE_PATH = REPO_ROOT / "content/packs/sample-native-expansion/bundles/sample-native-expansion.bundle"
-VISUAL_PREFABS = ("ArachnidHexapodVisual", "OverlordCommandHQVisual")
+VISUAL_UNITS = {
+    "ArachnidHexapod": "ArachnidHexapodVisual",
+    "OverlordCommandHQ": "OverlordCommandHQVisual",
+    "AtlasCraneMech": "AtlasCraneMechVisual",
+    "BastionSiegeMech": "BastionSiegeMechVisual",
+    "ColossusSiegePlatform": "ColossusSiegeVisual",
+    "IroncladWalker": "IroncladWalkerVisual",
+    "SandlanceScout": "ScoutTankVisual",
+    "SkirmishStrikeBike": "SkirmishBikeVisual",
+    "SurgeArcTank": "SurgeArcTankVisual",
+}
+VISUAL_PREFABS = tuple(VISUAL_UNITS.values())
+MOVEMENT_ACTIONS = {
+    "ArachnidHexapod": "ArachnidHexapod_Armature|ArachnidHexapod_Action_Walk",
+    "OverlordCommandHQ": "OverlordCommandHQ_Armature|OverlordCommandHQ_Action_Drive",
+    "AtlasCraneMech": "AtlasCraneMech_Armature|AtlasCraneMech_Action_Walk",
+    "BastionSiegeMech": "Walk",
+    "ColossusSiegePlatform": "ColossusSiegePlatform_Armature|ColossusSiegePlatform_Action_Drive",
+    "IroncladWalker": "IroncladWalker_Armature|IroncladWalker_Action_Walk",
+    "SandlanceScout": "SandlanceScout_Armature|SandlanceScout_Action_Drive",
+    "SkirmishStrikeBike": "SkirmishStrikeBike_Armature|SkirmishStrikeBike_Action_Drive",
+    "SurgeArcTank": "SurgeArcTank_Armature|SurgeArcTank_Action_Drive",
+}
+IDLE_ACTIONS = {
+    unit_name: ("Idle" if unit_name == "BastionSiegeMech" else f"{unit_name}_Armature|{unit_name}_Action_Idle")
+    for unit_name in VISUAL_UNITS
+}
 
 
 def _read(pointer: Any) -> Any:
@@ -34,28 +60,6 @@ def _collect_components(root: Any) -> list[str]:
     visit(root)
     return component_types
 
-
-def _movement_transition_destinations(controller_path: Path) -> list[str]:
-    text = controller_path.read_text(encoding="utf-8")
-    states: dict[str, str] = {}
-    movement_destinations: list[str] = []
-    documents = re.split(r"(?=^--- !u!)", text, flags=re.MULTILINE)
-
-    for document in documents:
-        header = re.search(r"^--- !u!(\\d+) &(-?\\d+)", document, flags=re.MULTILINE)
-        if header is None:
-            continue
-        component_type, file_id = header.groups()
-        if component_type == "1102":
-            name = re.search(r"^  m_Name: ?(.*)$", document, flags=re.MULTILINE)
-            if name is not None:
-                states[file_id] = name.group(1).strip()
-        elif component_type == "1101" and "m_ConditionEvent: RCL_IsMoving" in document:
-            destination = re.search(r"^  m_DstState: \\{fileID: (-?\\d+)", document, flags=re.MULTILINE)
-            if destination is not None:
-                movement_destinations.append(destination.group(1))
-
-    return [states.get(file_id, "<missing state>") for file_id in movement_destinations]
 
 
 class SampleNativeVisualRiggingContractTests(unittest.TestCase):
@@ -83,26 +87,66 @@ class SampleNativeVisualRiggingContractTests(unittest.TestCase):
                 )
 
     def test_movement_state_uses_each_rigged_visuals_action_clip(self) -> None:
-        expected_actions = {
-            "ArachnidHexapod": "ArachnidHexapod_Armature|ArachnidHexapod_Action_Walk",
-            "OverlordCommandHQ": "OverlordCommandHQ_Armature|OverlordCommandHQ_Action_Drive",
-        }
         animation_directory = (
             REPO_ROOT
             / "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/Animations"
         )
 
-        for unit_name, expected_action in expected_actions.items():
+        for unit_name, expected_action in MOVEMENT_ACTIONS.items():
             controller_path = animation_directory / f"{unit_name}Controller.controller"
+            expected_idle = IDLE_ACTIONS[unit_name]
+            with self.subTest(unit=unit_name):
+                self.assertEqual(
+                    [expected_action],
+                    _movement_targets_from_action_idle(controller_path, unit_name),
+                    f"{unit_name} movement must enter its rig-bound action, not a generic clip",
+                )
+                self.assertEqual(
+                    [expected_idle],
+                    _movement_return_targets(controller_path, expected_action),
+                    f"{unit_name} rigged movement must return only to its rigged idle action",
+                )
+
+    def test_each_rigged_movement_clip_is_in_the_sample_bundle(self) -> None:
+        bundle_clips = {obj.read().m_Name for obj in self.objects if obj.type.name == "AnimationClip"}
+        for unit_name, expected_action in MOVEMENT_ACTIONS.items():
             with self.subTest(unit=unit_name):
                 self.assertIn(
                     expected_action,
-                    _movement_targets_from_action_idle(controller_path),
-                    f"{unit_name} movement must enter its rig-bound action, not a generic clip",
+                    bundle_clips,
+                    f"{unit_name} movement clip must be imported into the sample bundle",
+                )
+
+    def test_each_visual_fbx_imports_its_locomotion_clips_as_loops(self) -> None:
+        model_directory = (
+            REPO_ROOT / "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/Models"
+        )
+
+        for unit_name in VISUAL_UNITS:
+            importer_meta = model_directory / f"{unit_name}.fbx.meta"
+            with self.subTest(unit=unit_name):
+                self.assertTrue(importer_meta.is_file(), f"{unit_name} FBX importer metadata must exist")
+                text = importer_meta.read_text(encoding="utf-8")
+                clip_section = re.search(
+                    r"(?ms)^    clipAnimations:\n(.*?)(?=^  [A-Za-z]|\Z)", text
+                )
+                self.assertIsNotNone(clip_section, f"{unit_name} must persist explicit clip import settings")
+                clip_blocks = re.split(r"(?=^    - serializedVersion:)", clip_section.group(1), flags=re.MULTILINE)
+                looping_locomotion = [
+                    block
+                    for block in clip_blocks
+                    if re.search(r"(?m)^      name: .*?(?:Idle|Walk|Drive)", block)
+                    and re.search(r"(?m)^      loopTime: 1$", block)
+                ]
+                self.assertTrue(
+                    looping_locomotion,
+                    f"{unit_name} must loop its imported Idle, Walk, or Drive clip",
                 )
 
 
-def _movement_targets_from_action_idle(controller_path: Path) -> list[str]:
+def _parse_animator_controller(
+    controller_path: Path,
+) -> tuple[dict[str, tuple[str, list[str]]], dict[str, tuple[str, list[tuple[str, str]]]]]:
     documents = re.split(r"(?=^--- !u!)", controller_path.read_text(encoding="utf-8"), flags=re.MULTILINE)
     states: dict[str, tuple[str, list[str]]] = {}
     transitions: dict[str, tuple[str, list[tuple[str, str]]]] = {}
@@ -128,14 +172,30 @@ def _movement_targets_from_action_idle(controller_path: Path) -> list[str]:
                 r"(?m)^  - m_ConditionMode: (\d+)\n    m_ConditionEvent: (.*?)\n", document
             )
             transitions[file_id] = (destination.group(1) if destination else "", conditions)
+    return states, transitions
 
+
+def _movement_targets_from_action_idle(controller_path: Path, unit_name: str) -> list[str]:
+    states, transitions = _parse_animator_controller(controller_path)
+    idle_name = IDLE_ACTIONS[unit_name]
+    idle_ids = [file_id for file_id, (name, _) in states.items() if name == idle_name]
     targets: list[str] = []
-    for state_id, (state_name, transition_ids) in states.items():
-        if "Action_Idle" not in state_name:
-            continue
-        for transition_id in transition_ids:
+    for idle_id in idle_ids:
+        for transition_id in states[idle_id][1]:
             destination_id, conditions = transitions.get(transition_id, ("", []))
             if ("1", "RCL_IsMoving") in conditions and destination_id in states:
+                targets.append(states[destination_id][0])
+    return targets
+
+
+def _movement_return_targets(controller_path: Path, movement_state_name: str) -> list[str]:
+    states, transitions = _parse_animator_controller(controller_path)
+    movement_ids = [file_id for file_id, (name, _) in states.items() if name == movement_state_name]
+    targets: list[str] = []
+    for movement_id in movement_ids:
+        for transition_id in states[movement_id][1]:
+            destination_id, conditions = transitions.get(transition_id, ("", []))
+            if ("2", "RCL_IsMoving") in conditions and destination_id in states:
                 targets.append(states[destination_id][0])
     return targets
 
