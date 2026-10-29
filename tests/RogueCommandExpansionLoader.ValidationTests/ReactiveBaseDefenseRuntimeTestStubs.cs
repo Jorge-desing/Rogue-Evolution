@@ -81,6 +81,7 @@ public sealed class EntityController : Component
     }
 
     private readonly HashSet<UnitRole> _roles = new();
+    private readonly HashSet<StatusEffect> _activeStatusEffects = new();
     private readonly LinkedList<EntityCommand> _commandChain = new();
     public List<(StatusEffect Effect, SetStatusEffect.DurationType DurationType, float Duration)> AppliedStatusEffects { get; } = new();
     public List<(ChangeableValue Value, SpecificValueChange Change, bool IsStackable)> AppliedSpecificValueChanges { get; } = new();
@@ -131,6 +132,12 @@ public sealed class EntityController : Component
     public void SetActiveStatusEffect(StatusEffect effect, SetStatusEffect.DurationType durationType, float duration)
     {
         AppliedStatusEffects.Add((effect, durationType, duration));
+        _activeStatusEffects.Add(effect);
+    }
+    public bool HasActiveStatusEffect(StatusEffect effect) => _activeStatusEffects.Contains(effect);
+    public void RemoveStatusEffect(StatusEffect effect)
+    {
+        _activeStatusEffects.Remove(effect);
     }
     public void AddSpecificValueChange(ChangeableValue changeableValue, SpecificValueChange change, bool isStackable = true)
     {

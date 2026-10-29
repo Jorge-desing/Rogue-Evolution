@@ -91,6 +91,8 @@ namespace RogueCommandExpansionLoader.Runtime
         private static PropertyInfo _captainOfThisEntityProperty;
         private static MethodInfo _isEnemyMethod;
         private static MethodInfo _healMethod;
+        private static MethodInfo _removeCaptainMethod;
+        private static readonly Dictionary<int, List<string>> _appliedBaselineEffects = new Dictionary<int, List<string>>();
         private static MethodInfo _repairArmorMethod;
         private static MethodInfo _chargeShieldMethod;
         private static MethodInfo _rankUpMethod;
@@ -261,6 +263,157 @@ namespace RogueCommandExpansionLoader.Runtime
             return parts.Count > 0 ? string.Join(" • ", parts) : null;
         }
 
+        private static int GetCombatExperienceKey(object entityObj)
+        {
+            if (entityObj == null)
+            {
+                return 0;
+            }
+
+            EnsureReflection(entityObj.GetType());
+            int uniqueId = ReadIntProperty(_uniqueEntityIdProperty, entityObj, -1);
+            return uniqueId >= 0 ? uniqueId : entityObj.GetHashCode();
+        }
+
+        private static void RemoveCombatExperience(object entityObj)
+        {
+            if (entityObj == null)
+            {
+                return;
+            }
+
+            try
+            {
+                int uniqueId = GetCombatExperienceKey(entityObj);
+                lock (_entityCombatXp)
+                {
+                    _entityCombatXp.Remove(uniqueId);
+                }
+            }
+            catch
+            {
+                // Lifecycle cleanup must not interfere with native destruction.
+            }
+        }
+
+        public static void OnEntityDestroyed(object entityObj)
+        {
+            RemoveCombatExperience(entityObj);
+        }
+
+        private static void ClearRuntimeMechanics(GameObject rootObject)
+        {
+            if (rootObject == null)
+            {
+                return;
+            }
+
+            RuntimeUnitMechanicsDirector director = rootObject.GetComponent<RuntimeUnitMechanicsDirector>();
+            if (director != null)
+            {
+                director.ClearRuntimeState();
+            }
+        }
+
+        private void ClearRuntimeState()
+        {
+            _entityController = null;
+            _profile = null;
+            _nextHealCheckTime = 0f;
+            _nextAuraCheckTime = 0f;
+            _nextSynergyCheckTime = 0f;
+            _nextStealthCheckTime = 0f;
+            _nextCommandCheckTime = 0f;
+            _nextShieldRegenCheckTime = 0f;
+            _lastShieldRegenTime = 0f;
+            _nextTauntCheckTime = 0f;
+            _nextNovaAvailableTime = 0f;
+            _previousShield = 0f;
+            _hasInitializedShield = false;
+            _baselineApplied = false;
+        }
+
+        private static void RevertBaselineStatusEffects(object entityObj, int key)
+        {
+            List<string> applied;
+            lock (_appliedBaselineEffects)
+            {
+                if (!_appliedBaselineEffects.TryGetValue(key, out applied) || applied == null || applied.Count == 0)
+                {
+                    return;
+                }
+                _appliedBaselineEffects.Remove(key);
+            }
+
+            EnsureReflection(entityObj.GetType());
+            for (int i = 0; i < applied.Count; i++)
+            {
+                string effectName = applied[i];
+                if (string.IsNullOrWhiteSpace(effectName))
+                {
+                    continue;
+                }
+                try
+                {
+                    if (_statusEffectEnumType == null)
+                    {
+                        continue;
+                    }
+                    object parsedEffect = Enum.Parse(_statusEffectEnumType, effectName, true);
+                    if (entityObj.GetType().GetMethod("RemoveStatusEffect") != null)
+                    {
+                        entityObj.GetType().GetMethod("RemoveStatusEffect").Invoke(entityObj, new[] { parsedEffect });
+                    }
+                }
+                catch
+                {
+                    // Best-effort cleanup; never block entity reuse.
+                }
+            }
+        }
+
+        private static void RevertCommandLinks(object entityObj)
+        {
+            if (entityObj == null || _captainOfThisEntityProperty == null)
+            {
+                return;
+            }
+
+            IEnumerable entities = GetActiveEntities();
+            if (entities == null)
+            {
+                return;
+            }
+
+            foreach (object candidate in entities)
+            {
+                if (candidate == null || ReferenceEquals(candidate, entityObj))
+                {
+                    continue;
+                }
+                try
+                {
+                    object currentCaptain = _captainOfThisEntityProperty.GetValue(candidate, null);
+                    if (!ReferenceEquals(currentCaptain, entityObj))
+                    {
+                        continue;
+                    }
+                    if (_removeCaptainMethod != null)
+                    {
+                        _removeCaptainMethod.Invoke(candidate, new[] { entityObj });
+                    }
+                    else
+                    {
+                        _captainOfThisEntityProperty.SetValue(candidate, null, null);
+                    }
+                }
+                catch
+                {
+                    // Best-effort cleanup; never block entity reuse.
+                }
+            }
+        }
+
         public static void AttachIfApplicable(object entityObj)
         {
             if (entityObj == null)
@@ -278,34 +431,36 @@ namespace RogueCommandExpansionLoader.Runtime
                 }
 
                 EnsureReflection(entityObj.GetType());
+                int combatExperienceKey = GetCombatExperienceKey(entityObj);
+                RevertBaselineStatusEffects(entityObj, combatExperienceKey);
+                RevertCommandLinks(entityObj);
+
                 string entityId = ReadEntityId(entityObj);
                 if (string.IsNullOrWhiteSpace(entityId))
                 {
+                    ClearRuntimeMechanics(rootObject);
                     return;
                 }
 
                 UnitRuntimeMechanicsProfile profile;
                 if (!TryGetProfile(entityId, out profile) || profile == null)
                 {
+                    ClearRuntimeMechanics(rootObject);
                     return;
-                }
-
-                int uniqueId = ReadIntProperty(_uniqueEntityIdProperty, entityObj, -1);
-                if (uniqueId >= 0)
-                {
-                    lock (_entityCombatXp)
-                    {
-                        _entityCombatXp.Remove(uniqueId);
-                    }
                 }
 
                 if (profile.BaselineStatusEffects != null && profile.BaselineStatusEffects.Length > 0)
                 {
                     ApplyBaselineStatusEffects(entityObj, profile.BaselineStatusEffects);
+                    lock (_appliedBaselineEffects)
+                    {
+                        _appliedBaselineEffects[combatExperienceKey] = new List<string>(profile.BaselineStatusEffects);
+                    }
                 }
 
                 if (!profile.HasRuntimeComponentMechanics)
                 {
+                    ClearRuntimeMechanics(rootObject);
                     return;
                 }
 
@@ -393,7 +548,7 @@ namespace RogueCommandExpansionLoader.Runtime
                             xpGain = Mathf.Max(1, Mathf.RoundToInt(xpGain * profile.Experience.experienceGainMultiplier));
                         }
 
-                        int uniqueId = ReadIntProperty(_uniqueEntityIdProperty, originatorObj, originatorObj.GetHashCode());
+                        int uniqueId = GetCombatExperienceKey(originatorObj);
                         int threshold = Mathf.Max(1, profile.Experience.experiencePerLevel > 0
                             ? profile.Experience.experiencePerLevel * 3
                             : 3);
@@ -541,6 +696,11 @@ namespace RogueCommandExpansionLoader.Runtime
                 if (!_baselineApplied && _profile.BaselineStatusEffects != null && _profile.BaselineStatusEffects.Length > 0)
                 {
                     ApplyBaselineStatusEffects(_entityController, _profile.BaselineStatusEffects);
+                    int key = GetCombatExperienceKey(_entityController);
+                    lock (_appliedBaselineEffects)
+                    {
+                        _appliedBaselineEffects[key] = new List<string>(_profile.BaselineStatusEffects);
+                    }
                     _baselineApplied = true;
                 }
 
@@ -1476,6 +1636,7 @@ namespace RogueCommandExpansionLoader.Runtime
             _chargeShieldMethod = entityType.GetMethod("ChargeShield", flags);
             _rankUpMethod = entityType.GetMethod("RankUp", flags, null, new[] { typeof(int) }, null);
             _setCaptainMethod = entityType.GetMethod("SetCaptain", flags, null, new[] { entityType }, null);
+            _removeCaptainMethod = entityType.GetMethod("RemoveCaptain", flags, null, new[] { entityType }, null);
             _attackMethod = entityType.GetMethod("Attack", flags, null, new[] { entityType }, null);
             _takeDamageMethod = entityType.GetMethod("TakeDamage", flags);
 

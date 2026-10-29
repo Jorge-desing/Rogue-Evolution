@@ -354,6 +354,14 @@ namespace RogueCommandExpansionLoader.Runtime
                     return parameters.Length == 1 && parameters[0].ParameterType == entityController && method.ReturnType == typeof(bool);
                 });
             MethodInfo isTargetInRangePostfix = Hook("EntityAttackIsTargetInRangePostfix");
+            MethodInfo entityDestroy = RuntimeReflection.FindUniqueMethod(entityController, "Destroy",
+                delegate(MethodInfo method)
+                {
+                    ParameterInfo[] parameters = method.GetParameters();
+                    return method.ReturnType == typeof(void) && parameters.Length == 2 &&
+                        parameters[0].ParameterType == typeof(bool) && parameters[1].ParameterType == entityController;
+                });
+            MethodInfo entityDestroyPostfix = Hook("EntityControllerDestroyPostfix");
             MethodInfo takeDamage = RuntimeReflection.FindUniqueMethod(entityController, "TakeDamage",
                 delegate(MethodInfo method)
                 {
@@ -409,6 +417,7 @@ namespace RogueCommandExpansionLoader.Runtime
             plan.Add(new PatchPlan(setupPrespawning, null, setupPrespawningPostfix));
             plan.Add(new PatchPlan(setupAiPrespawning, null, setupAiPrespawningPostfix));
             plan.Add(new PatchPlan(isTargetInRange, null, isTargetInRangePostfix));
+            plan.Add(new PatchPlan(entityDestroy, null, entityDestroyPostfix));
             plan.Add(new PatchPlan(takeDamage, null, takeDamagePostfix));
             return plan;
         }

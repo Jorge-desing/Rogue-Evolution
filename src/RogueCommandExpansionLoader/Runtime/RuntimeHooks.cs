@@ -1635,6 +1635,11 @@ namespace RogueCommandExpansionLoader.Runtime
             RuntimeHooks.EntityAttackIsTargetInRangePostfix(__instance, __0, ref __result);
         }
 
+        public static void EntityControllerDestroyPostfix(object __instance)
+        {
+            RuntimeUnitMechanicsDirector.OnEntityDestroyed(__instance);
+        }
+
         public static void EntityTakeDamagePostfix(object __instance, float __0, object __1)
         {
             RuntimeHooks.EntityTakeDamagePostfix(__instance, __0, __1);

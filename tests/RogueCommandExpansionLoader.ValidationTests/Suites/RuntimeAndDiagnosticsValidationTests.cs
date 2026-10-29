@@ -263,7 +263,8 @@ internal static partial class ValidationTestRunner
             "AllEntityIdsAllowedAsBlueprintsPostfix",
             "EntityFactorySetupPrespawningPostfix",
             "EntityFactorySetupAiPrespawningPostfix",
-            "EntityAttackIsTargetInRangePostfix"
+            "EntityAttackIsTargetInRangePostfix",
+            "EntityControllerDestroyPostfix"
         ];
 
         foreach (string hookName in hookNames)
@@ -273,6 +274,15 @@ internal static partial class ValidationTestRunner
             {
                 throw new InvalidOperationException($"RuntimePatchInstaller expects missing hook '{hookName}'.");
             }
+        }
+
+        MethodInfo? destroyedEntityHook = typeof(RuntimeHarmonyPatches).GetMethod(
+            "EntityControllerDestroyPostfix", BindingFlags.Public | BindingFlags.Static);
+        ParameterInfo[] destroyedEntityParameters = destroyedEntityHook?.GetParameters() ?? Array.Empty<ParameterInfo>();
+        if (destroyedEntityHook == null || destroyedEntityHook.ReturnType != typeof(void) ||
+            destroyedEntityParameters.Length != 1 || destroyedEntityParameters[0].ParameterType != typeof(object))
+        {
+            throw new InvalidOperationException("EntityControllerDestroyPostfix has an invalid Harmony signature.");
         }
 
         MethodInfo? instantiateCardsHook = typeof(RuntimeHarmonyPatches).GetMethod(
@@ -1011,6 +1021,168 @@ internal static partial class ValidationTestRunner
             throw new InvalidOperationException("Standalone PrespawnQuota does not default factory ID to null.");
         }
     }),
+    ("reused entity clears runtime mechanics when its next profile has no component mechanics", () =>
+    {
+        RuntimeUnitMechanicsDirector.ClearProfiles();
+        UnityEngine.Time.time = 10f;
+
+        try
+        {
+            RuntimeUnitMechanicsDirector.RegisterProfile("test:reuse-source", new UnitRuntimeMechanicsProfile
+            {
+                EntityId = "test:reuse-source",
+                ShieldRegen = new ContentUnitShieldRegenDefinition
+                {
+                    rechargeRate = 10f,
+                    rechargeDelay = 0f
+                }
+            });
+            RuntimeUnitMechanicsDirector.RegisterProfile("test:reuse-descriptive-only", new UnitRuntimeMechanicsProfile
+            {
+                EntityId = "test:reuse-descriptive-only",
+                MinAttackRange = 4f
+            });
+
+            var reused = new EntityController
+            {
+                entityId = "test:reuse-source",
+                UniqueEntityId = 401,
+                HasShield = true,
+                CurrentShield = 0f,
+                MaxShield = 50f
+            };
+
+            RuntimeUnitMechanicsDirector.AttachIfApplicable(reused);
+            RuntimeUnitMechanicsDirector director = reused.gameObject.GetComponent<RuntimeUnitMechanicsDirector>()
+                ?? throw new InvalidOperationException("The source shield-regeneration profile did not attach its director.");
+
+            reused.entityId = "test:reuse-descriptive-only";
+            RuntimeUnitMechanicsDirector.AttachIfApplicable(reused);
+            UnityEngine.Time.time = 11f;
+            director.TickMechanics();
+            if (reused.CurrentShield != 0f)
+            {
+                throw new InvalidOperationException("A reused entity with a descriptive-only profile retained the previous shield-regeneration mechanic.");
+            }
+
+            reused.entityId = "test:reuse-source";
+            RuntimeUnitMechanicsDirector.AttachIfApplicable(reused);
+            reused.entityId = "test:reuse-no-profile";
+            RuntimeUnitMechanicsDirector.AttachIfApplicable(reused);
+            UnityEngine.Time.time = 12f;
+            director.TickMechanics();
+            if (reused.CurrentShield != 0f)
+            {
+                throw new InvalidOperationException("A reused entity without a profile retained the previous shield-regeneration mechanic.");
+            }
+        }
+        finally
+        {
+            RuntimeUnitMechanicsDirector.ClearProfiles();
+            UnityEngine.Time.time = 0f;
+        }
+    }),
+    ("reused entity releases baseline status effects when its next profile has no mechanics", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        RuntimeUnitMechanicsDirector.ClearProfiles();
+
+        try
+        {
+            RuntimeUnitMechanicsDirector.RegisterProfile("test:reuse-baseline", new UnitRuntimeMechanicsProfile
+            {
+                EntityId = "test:reuse-baseline",
+                BaselineStatusEffects = new[] { "Armored" }
+            });
+
+            var reused = new EntityController
+            {
+                entityId = "test:reuse-baseline",
+                UniqueEntityId = 811,
+                IsUnit = true
+            };
+            RuntimeUnitMechanicsDirector.AttachIfApplicable(reused);
+            if (!reused.AppliedStatusEffects.Any(effect => effect.Effect == StatusEffect.Armored && effect.DurationType == SetStatusEffect.DurationType.Unlimited))
+            {
+                throw new InvalidOperationException("The baseline status effect was not initially applied.");
+            }
+
+            reused.entityId = "test:reuse-no-profile";
+            RuntimeUnitMechanicsDirector.AttachIfApplicable(reused);
+
+            if (reused.HasActiveStatusEffect(StatusEffect.Armored))
+            {
+                throw new InvalidOperationException("A baseline status effect from the old profile remained after entity reuse.");
+            }
+        }
+        finally
+        {
+            RuntimeUnitMechanicsDirector.ClearProfiles();
+            ExistingControllers.Instance.Reset();
+        }
+    }),
+    ("reused entity releases command followers when its next profile has no mechanics", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        RuntimeUnitMechanicsDirector.ClearProfiles();
+        UnityEngine.Time.time = 10f;
+
+        try
+        {
+            RuntimeUnitMechanicsDirector.RegisterProfile("test:reuse-commander", new UnitRuntimeMechanicsProfile
+            {
+                EntityId = "test:reuse-commander",
+                Command = new ContentUnitCommandDefinition
+                {
+                    commandType = "Attack",
+                    commandRange = 4f,
+                    maxCommandChain = 4
+                }
+            });
+
+            var reused = new EntityController
+            {
+                entityId = "test:reuse-commander",
+                UniqueEntityId = 812,
+                IsUnit = true,
+                IsControlledByPlayer = true,
+                Position = new UnityEngine.Vector3(0f, 0f, 0f)
+            };
+            var follower = new EntityController
+            {
+                entityId = "test:reuse-follower",
+                UniqueEntityId = 813,
+                IsUnit = true,
+                IsControlledByPlayer = true,
+                Position = new UnityEngine.Vector3(5f, 0f, 0f)
+            };
+            ExistingControllers.Instance.PlayerUnits().Add(reused);
+            ExistingControllers.Instance.PlayerUnits().Add(follower);
+
+            RuntimeUnitMechanicsDirector.AttachIfApplicable(reused);
+            RuntimeUnitMechanicsDirector director = reused.gameObject.GetComponent<RuntimeUnitMechanicsDirector>()
+                ?? throw new InvalidOperationException("The commander profile did not attach its director.");
+            UnityEngine.Time.time = 10.6f;
+            director.TickMechanics();
+            if (!ReferenceEquals(follower.CaptainOfThisEntity, reused))
+            {
+                throw new InvalidOperationException("The command pulse did not attach its eligible follower.");
+            }
+
+            reused.entityId = "test:reuse-no-profile";
+            RuntimeUnitMechanicsDirector.AttachIfApplicable(reused);
+            if (follower.CaptainOfThisEntity != null)
+            {
+                throw new InvalidOperationException("A command follower remained attached to a commander after entity reuse.");
+            }
+        }
+        finally
+        {
+            RuntimeUnitMechanicsDirector.ClearProfiles();
+            ExistingControllers.Instance.Reset();
+            UnityEngine.Time.time = 0f;
+        }
+    }),
     ("runtime unit mechanics director executes baseline status effects, combat boosts, veterancy rank-ups, healing, and auras", () =>
     {
         ExistingControllers.Instance.Reset();
@@ -1313,6 +1485,185 @@ internal static partial class ValidationTestRunner
             ExistingControllers.Instance.Reset();
             Bank.Reset();
             UnityEngine.Time.time = 0f;
+        }
+    }),
+    ("reattaching an active entity preserves its accumulated combat experience", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        RuntimeUnitMechanicsDirector.ClearProfiles();
+
+        try
+        {
+            RuntimeUnitMechanicsDirector.RegisterProfile("test:reattach-xp", new UnitRuntimeMechanicsProfile
+            {
+                EntityId = "test:reattach-xp",
+                Experience = new ContentUnitExperienceDefinition
+                {
+                    experiencePerLevel = 1,
+                    maxLevel = 3,
+                    experienceGainMultiplier = 1f
+                },
+                ShieldRegen = new ContentUnitShieldRegenDefinition
+                {
+                    rechargeRate = 1f,
+                    rechargeDelay = 0f
+                }
+            });
+
+            var attacker = new EntityController
+            {
+                entityId = "test:reattach-xp",
+                UniqueEntityId = 702,
+                IsControlledByPlayer = true,
+                IsUnit = true,
+                CurrentRank = 0,
+                MaxRank = 3
+            };
+            var target = new EntityController
+            {
+                entityId = "test:reattach-target",
+                IsControlledByAi = true,
+                IsUnit = true,
+                CurrentHealth = 100f,
+                MaxHealth = 100f
+            };
+
+            RuntimeUnitMechanicsDirector.OnEntityDealtDamage(target, 1f, attacker);
+            RuntimeUnitMechanicsDirector.OnEntityDealtDamage(target, 1f, attacker);
+            RuntimeUnitMechanicsDirector.AttachIfApplicable(attacker);
+            RuntimeUnitMechanicsDirector.OnEntityDealtDamage(target, 1f, attacker);
+
+            if (attacker.CurrentRank != 1)
+            {
+                throw new InvalidOperationException("Reattaching an active entity discarded its accumulated combat experience.");
+            }
+        }
+        finally
+        {
+            RuntimeUnitMechanicsDirector.ClearProfiles();
+            ExistingControllers.Instance.Reset();
+        }
+    }),
+    ("destroyed entity combat experience is cleared by its lifecycle hook", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        RuntimeUnitMechanicsDirector.ClearProfiles();
+        Bank.Reset();
+
+        try
+        {
+            RuntimeUnitMechanicsDirector.RegisterProfile("test:destroy-cleanup", new UnitRuntimeMechanicsProfile
+            {
+                EntityId = "test:destroy-cleanup",
+                Experience = new ContentUnitExperienceDefinition
+                {
+                    experiencePerLevel = 1,
+                    maxLevel = 3,
+                    experienceGainMultiplier = 1f
+                }
+            });
+
+            var attacker = new EntityController
+            {
+                entityId = "test:destroy-cleanup",
+                UniqueEntityId = 501,
+                IsControlledByPlayer = true,
+                IsUnit = true,
+                CurrentRank = 0,
+                MaxRank = 3
+            };
+            var target = new EntityController
+            {
+                entityId = "test:destroy-target",
+                IsControlledByAi = true,
+                IsUnit = true,
+                CurrentHealth = 100f,
+                MaxHealth = 100f
+            };
+
+            RuntimeUnitMechanicsDirector.OnEntityDealtDamage(target, 1f, attacker);
+            RuntimeUnitMechanicsDirector.OnEntityDealtDamage(target, 1f, attacker);
+
+            MethodInfo destroyHook = typeof(RuntimeHarmonyPatches).GetMethod(
+                "EntityControllerDestroyPostfix", BindingFlags.Public | BindingFlags.Static)
+                ?? throw new InvalidOperationException("EntityController.Destroy cleanup hook is missing.");
+            destroyHook.Invoke(null, new object[] { attacker });
+
+            var replacement = new EntityController
+            {
+                entityId = "test:destroy-cleanup",
+                UniqueEntityId = 501,
+                IsControlledByPlayer = true,
+                IsUnit = true,
+                CurrentRank = 0,
+                MaxRank = 3
+            };
+            RuntimeUnitMechanicsDirector.OnEntityDealtDamage(target, 1f, replacement);
+
+            if (replacement.CurrentRank != 0)
+            {
+                throw new InvalidOperationException("Destroyed entity experience leaked into a later entity instance.");
+            }
+        }
+        finally
+        {
+            RuntimeUnitMechanicsDirector.ClearProfiles();
+            ExistingControllers.Instance.Reset();
+            Bank.Reset();
+        }
+    }),
+    ("destroyed entity combat experience fallback key is cleared", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        RuntimeUnitMechanicsDirector.ClearProfiles();
+        Bank.Reset();
+
+        try
+        {
+            RuntimeUnitMechanicsDirector.RegisterProfile("test:destroy-fallback-cleanup", new UnitRuntimeMechanicsProfile
+            {
+                EntityId = "test:destroy-fallback-cleanup",
+                Experience = new ContentUnitExperienceDefinition
+                {
+                    experiencePerLevel = 1,
+                    maxLevel = 3,
+                    experienceGainMultiplier = 1f
+                }
+            });
+
+            var attacker = new EntityController
+            {
+                entityId = "test:destroy-fallback-cleanup",
+                UniqueEntityId = -1,
+                IsControlledByPlayer = true,
+                IsUnit = true,
+                CurrentRank = 0,
+                MaxRank = 3
+            };
+            var target = new EntityController
+            {
+                entityId = "test:destroy-target",
+                IsControlledByAi = true,
+                IsUnit = true,
+                CurrentHealth = 100f,
+                MaxHealth = 100f
+            };
+
+            RuntimeUnitMechanicsDirector.OnEntityDealtDamage(target, 1f, attacker);
+            RuntimeUnitMechanicsDirector.OnEntityDealtDamage(target, 1f, attacker);
+            RuntimeUnitMechanicsDirector.OnEntityDestroyed(attacker);
+            RuntimeUnitMechanicsDirector.OnEntityDealtDamage(target, 1f, attacker);
+
+            if (attacker.CurrentRank != 0)
+            {
+                throw new InvalidOperationException("Destroyed entity retained combat XP under its fallback identity.");
+            }
+        }
+        finally
+        {
+            RuntimeUnitMechanicsDirector.ClearProfiles();
+            ExistingControllers.Instance.Reset();
+            Bank.Reset();
         }
     }),
     ("experience reward does not pay for killing a friendly unit", () =>
