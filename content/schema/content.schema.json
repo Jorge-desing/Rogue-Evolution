@@ -2395,10 +2395,7 @@
             "LocationAoE",
             "LocationMultiTargets",
             "SelfAoE",
-            "TargetMultiTarget",
-            "TargetAoE",
-            "SelfMultiTarget",
-            "SelfBuff"
+            "TargetAoE"
           ]
         },
         "targetOrigin": {
