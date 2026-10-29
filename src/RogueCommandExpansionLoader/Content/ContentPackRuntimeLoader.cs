@@ -6015,24 +6015,12 @@ namespace RogueCommandExpansionLoader.Content
 
             Vector3 muzzleLocal = visualRoot.InverseTransformPoint(muzzle.position);
             Vector3 rearLocal = visualRoot.InverseTransformPoint(rearAnchor.position);
-            float sepY = muzzleLocal.y - rearLocal.y;
-            float sepZ = muzzleLocal.z - rearLocal.z;
-            float muzzleForward;
-            float rearForward;
-            // Use the dominant forward axis (Y for Blender Y-forward authored models,
-            // Z for Unity Z-forward authored models) instead of requiring Y to be
-            // more than twice Z. This prevents a false 180-degree flip on units
-            // whose authored Y and Z separations are comparable.
-            if (Mathf.Abs(sepY) > Mathf.Abs(sepZ))
-            {
-                muzzleForward = muzzleLocal.y;
-                rearForward = rearLocal.y;
-            }
-            else
-            {
-                muzzleForward = muzzleLocal.z;
-                rearForward = rearLocal.z;
-            }
+            // Yaw correction must only consider the horizontal forward axis (Z in
+            // Unity space). Y is vertical height; comparing it caused false 180
+            // degree flips on units whose muzzle/rear height difference dominated
+            // their horizontal separation (e.g. walkers with a high turret).
+            float muzzleForward = muzzleLocal.z;
+            float rearForward = rearLocal.z;
             return VisualOverlayOrientation.CalculateYawCorrectionDegrees(muzzleForward, rearForward);
         }
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 import unittest
 from pathlib import Path
@@ -74,6 +75,23 @@ class SampleNativeVisualRiggingContractTests(unittest.TestCase):
             if obj.type.name == "GameObject" and obj.read().m_Name in VISUAL_PREFABS
         }
 
+    def test_walker_visual_prefabs_disable_root_motion(self) -> None:
+        prefab_paths = {
+            "ArachnidHexapod": REPO_ROOT
+            / "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/VisualOnly/Prefabs/ArachnidHexapodVisual.prefab",
+            "IroncladWalker": REPO_ROOT
+            / "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/IroncladWalkerVisual.prefab",
+        }
+
+        for unit_name, prefab_path in prefab_paths.items():
+            with self.subTest(unit=unit_name):
+                text = prefab_path.read_text(encoding="utf-8")
+                self.assertRegex(
+                    text,
+                    r"(?m)^  m_ApplyRootMotion: 0$",
+                    f"{unit_name} uses EntityFlockingMovement and must keep its visual Animator in-place",
+                )
+
     def test_rigged_visuals_have_one_animator_for_the_skeletal_hierarchy(self) -> None:
         for prefab_name in VISUAL_PREFABS:
             with self.subTest(prefab=prefab_name):
@@ -117,7 +135,7 @@ class SampleNativeVisualRiggingContractTests(unittest.TestCase):
                     f"{unit_name} movement clip must be imported into the sample bundle",
                 )
 
-    def test_each_visual_fbx_imports_its_locomotion_clips_as_loops(self) -> None:
+    def test_each_visual_fbx_imports_all_locomotion_clips_as_loops(self) -> None:
         model_directory = (
             REPO_ROOT / "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/Models"
         )
@@ -132,15 +150,68 @@ class SampleNativeVisualRiggingContractTests(unittest.TestCase):
                 )
                 self.assertIsNotNone(clip_section, f"{unit_name} must persist explicit clip import settings")
                 clip_blocks = re.split(r"(?=^    - serializedVersion:)", clip_section.group(1), flags=re.MULTILINE)
-                looping_locomotion = [
-                    block
-                    for block in clip_blocks
-                    if re.search(r"(?m)^      name: .*?(?:Idle|Walk|Drive)", block)
-                    and re.search(r"(?m)^      loopTime: 1$", block)
-                ]
+                locomotion_clips = {}
+                for block in clip_blocks:
+                    name_match = re.search(r"(?m)^      name: (.*)$", block)
+                    loop_match = re.search(r"(?m)^      loopTime: ([01])$", block)
+                    if name_match is None or loop_match is None:
+                        continue
+                    clip_name = name_match.group(1)
+                    if clip_name in {"Idle", "Walk", "Drive"} or clip_name.rsplit("|", 1)[-1].endswith(
+                        ("_Action_Idle", "_Action_Walk", "_Action_Drive")
+                    ):
+                        locomotion_clips[clip_name] = loop_match.group(1)
                 self.assertTrue(
-                    looping_locomotion,
-                    f"{unit_name} must loop its imported Idle, Walk, or Drive clip",
+                    locomotion_clips,
+                    f"{unit_name} must persist rig-bound Idle, Walk, or Drive clip import settings",
+                )
+                self.assertTrue(
+                    all(loop_time == "1" for loop_time in locomotion_clips.values()),
+                    f"{unit_name} rig-bound locomotion clips must all loop: {locomotion_clips}",
+                )
+
+    def test_surge_card_preview_scale_fits_selection_card(self) -> None:
+        manifest_path = REPO_ROOT / "content/packs/sample-native-expansion/content.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        surge_tank = next(unit for unit in manifest["units"] if unit["id"] == "sample-native:surge-tank")
+
+        self.assertLessEqual(
+            surge_tank["cardModelScalingFactor"],
+            0.5,
+            "The Surge Arc Tank preview must be scaled down so it does not obscure neighboring selection cards.",
+        )
+
+    def test_imported_fire_and_death_actions_do_not_loop(self) -> None:
+        model_directory = (
+            REPO_ROOT / "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/Models"
+        )
+
+        for unit_name in VISUAL_UNITS:
+            importer_meta = model_directory / f"{unit_name}.fbx.meta"
+            with self.subTest(unit=unit_name):
+                self.assertTrue(importer_meta.is_file(), f"{unit_name} FBX importer metadata must exist")
+                text = importer_meta.read_text(encoding="utf-8")
+                clip_section = re.search(
+                    r"(?ms)^    clipAnimations:\n(.*?)(?=^  [A-Za-z]|\Z)", text
+                )
+                self.assertIsNotNone(clip_section, f"{unit_name} must persist explicit clip import settings")
+                clip_blocks = re.split(r"(?=^    - serializedVersion:)", clip_section.group(1), flags=re.MULTILINE)
+                action_loops = {}
+                for block in clip_blocks:
+                    name_match = re.search(r"(?m)^      name: (.*)$", block)
+                    loop_match = re.search(r"(?m)^      loopTime: ([01])$", block)
+                    if name_match is None or loop_match is None:
+                        continue
+                    clip_name = name_match.group(1)
+                    if re.search(r"(?:Action_)?(?:FireRecoil|Death)$", clip_name):
+                        action_loops[clip_name] = loop_match.group(1)
+                self.assertTrue(
+                    action_loops,
+                    f"{unit_name} must persist rig-bound FireRecoil and Death clip import settings",
+                )
+                self.assertTrue(
+                    all(loop_time == "0" for loop_time in action_loops.values()),
+                    f"{unit_name} fire/death action clips must not loop: {action_loops}",
                 )
 
 

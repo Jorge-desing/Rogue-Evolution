@@ -1658,7 +1658,7 @@
         "cardImageAssetName": "assets/roguecommandexpansionsample/surgearctankcard.png"
       },
       "isAllowedForAi": true,
-      "cardModelScalingFactor": 0.85,
+      "cardModelScalingFactor": 0.5,
       "shieldRegeneration": {
         "rechargeDelay": 4.0,
         "rechargeRate": 1.5,

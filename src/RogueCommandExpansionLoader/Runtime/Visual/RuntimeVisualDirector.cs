@@ -596,7 +596,7 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             Vector3 currentPosition = _entity.transform.position;
             float deltaTime = Time.deltaTime;
             bool isMoving = _hasLastAnimationPosition && deltaTime > Mathf.Epsilon &&
-                (currentPosition - _lastAnimationPosition).sqrMagnitude > 0.0001f;
+                (currentPosition - _lastAnimationPosition).sqrMagnitude > 1e-6f;
 
             _isMoving = isMoving;
             _animator.SetBool(MovementAnimationParameter, isMoving);
