@@ -1246,6 +1246,82 @@ internal static partial class ValidationTestRunner
             throw new InvalidOperationException("Tactical-skill-activation should reject minManaRatio > 1.0.");
         }
     }),
+    ("tactical-skill-activation LowHealth trigger waits for low health and needs no nearby enemy for self skills", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        DefaultAiBehaviour.ResetRuntimeState();
+        EntityBalancingStore.Reset();
+        RuntimeUnitMechanicsDirector.ClearProfiles();
+        UnityEngine.Time.time = 0f;
+        IRogueCommandAiRuntimeBehaviour? behaviour = null;
+        try
+        {
+            var aiCaster = new EntityController
+            {
+                IsControlledByAi = true,
+                IsUnit = true,
+                IsCombatUnit = true,
+                EntityId = "MedicUnit",
+                UniqueEntityId = 401,
+                aiBaseIndex = 0,
+                Position = UnityEngine.Vector3.zero,
+                CurrentHealth = 100f,
+                MaxHealth = 100f,
+                CurrentMana = 100f,
+                SkillInfo = new SkillInfo { targetOrigin = TargetOrigin.Self }
+            };
+            var playerEnemy = new EntityController
+            {
+                IsControlledByPlayer = true,
+                IsUnit = true,
+                UniqueEntityId = 402,
+                Position = new UnityEngine.Vector3(3f, 0f, 0f)
+            };
+            ExistingControllers.Instance.AiUnits().Add(aiCaster);
+            ExistingControllers.Instance.PlayerEntities().Add(playerEnemy);
+
+            var profile = new UnitRuntimeMechanicsProfile
+            {
+                EntityId = "MedicUnit",
+                AiActivationTrigger = "LowHealth"
+            };
+            RuntimeUnitMechanicsDirector.RegisterProfile("MedicUnit", profile);
+
+            behaviour = new TacticalSkillActivationAiModule().CreateBehaviour(new DefaultAiBehaviour(),
+                [
+                    new ContentModuleParameter { name = "enemyTriggerRadiusCells", value = "10" },
+                    new ContentModuleParameter { name = "cooldownSeconds", value = "1" },
+                    new ContentModuleParameter { name = "baseIndex", value = "0" }
+                ]);
+            behaviour.OnInitialized();
+            UnityEngine.Time.time = 1f;
+            behaviour.Tick();
+
+            if (aiCaster.LastExecutedCommand.HasValue)
+            {
+                throw new InvalidOperationException("LowHealth skill fired while caster was at full health.");
+            }
+
+            ExistingControllers.Instance.PlayerEntities().Clear();
+            aiCaster.CurrentHealth = 40f;
+            UnityEngine.Time.time = 2f;
+            behaviour.Tick();
+
+            if (!aiCaster.LastExecutedCommand.HasValue ||
+                aiCaster.LastExecutedCommand.Value.command != EntityCommand.Command.ActiveSkillWithoutTarget)
+            {
+                throw new InvalidOperationException("LowHealth self skill did not fire when wounded without a nearby enemy.");
+            }
+        }
+        finally
+        {
+            behaviour?.OnDestroyed();
+            ExistingControllers.Instance.Reset();
+            DefaultAiBehaviour.ResetRuntimeState();
+            EntityBalancingStore.Reset();
+            RuntimeUnitMechanicsDirector.ClearProfiles();
+        }
+    }),
     ("tactical-skill-activation AI module dispatches active skill when enemy is detected in range", () =>
     {
         ExistingControllers.Instance.Reset();

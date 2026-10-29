@@ -8695,6 +8695,9 @@ namespace RogueCommandExpansionLoader.Content
             var profile = new UnitRuntimeMechanicsProfile
             {
                 EntityId = unit.id,
+                AiActivationTrigger = unit.activeSkills != null && unit.activeSkills.Length > 0 && unit.activeSkills[0] != null
+                    ? unit.activeSkills[0].aiActivationTrigger
+                    : null,
                 Healing = unit.healing,
                 Aura = unit.aura,
                 BaselineStatusEffects = unit.baselineStatusEffects,

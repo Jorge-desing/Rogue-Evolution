@@ -10,6 +10,7 @@ namespace RogueCommandExpansionLoader.Runtime
     public sealed class UnitRuntimeMechanicsProfile
     {
         public string EntityId { get; set; }
+        public string AiActivationTrigger { get; set; }
         public ContentUnitHealingDefinition Healing { get; set; }
         public ContentUnitAuraDefinition Aura { get; set; }
         public string[] BaselineStatusEffects { get; set; }
@@ -47,6 +48,8 @@ namespace RogueCommandExpansionLoader.Runtime
         public bool HasAnyMechanics =>
             HasRuntimeComponentMechanics ||
             HasOnDamageDealtMechanics ||
+            (!string.IsNullOrWhiteSpace(AiActivationTrigger) &&
+                !string.Equals(AiActivationTrigger, "EnemiesInRange", StringComparison.OrdinalIgnoreCase)) ||
             (MinAttackRange.HasValue && MinAttackRange.Value > 0f) ||
             (CriticalHitChance.HasValue && CriticalHitChance.Value > 0f) ||
             (OnHitStatusEffects != null && OnHitStatusEffects.Length > 0);

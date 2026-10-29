@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using RogueCommandExpansionLoader.Content;
 using RogueCommandExpansionLoader.Contracts;
+using RogueCommandExpansionLoader.Runtime;
 using UnityEngine;
 
 namespace RogueCommandExpansionLoader.Modules
@@ -45,6 +46,7 @@ namespace RogueCommandExpansionLoader.Modules
 
         private sealed class TacticalSkillActivationRuntimeBehaviour : IRogueCommandAiRuntimeBehaviour
         {
+            private const float LowHealthActivationThreshold = 0.5f;
             private readonly DefaultAiBehaviour _gameBehaviour;
             private readonly TacticalSkillActivationSettings _settings;
             private float _nextCheckAt;
@@ -95,11 +97,6 @@ namespace RogueCommandExpansionLoader.Modules
                 }
 
                 HashSet<EntityController> playerEntities = ExistingControllers.Instance.PlayerEntities();
-                if (playerEntities == null || playerEntities.Count == 0)
-                {
-                    return;
-                }
-
                 float triggerRadiusSq = _settings.EnemyTriggerRadiusCells * _settings.EnemyTriggerRadiusCells;
 
                 foreach (EntityController unit in aiUnits)
@@ -116,6 +113,20 @@ namespace RogueCommandExpansionLoader.Modules
 
                     SkillInfo skillInfo = unit.SkillInfo;
                     if (skillInfo == null)
+                    {
+                        continue;
+                    }
+
+                    string activationTrigger = "EnemiesInRange";
+                    if (RuntimeUnitMechanicsDirector.TryGetProfile(unit.EntityId, out UnitRuntimeMechanicsProfile mechanicsProfile) &&
+                        mechanicsProfile != null && !string.IsNullOrWhiteSpace(mechanicsProfile.AiActivationTrigger))
+                    {
+                        activationTrigger = mechanicsProfile.AiActivationTrigger;
+                    }
+
+                    bool lowHealthTrigger = string.Equals(activationTrigger, "LowHealth", StringComparison.OrdinalIgnoreCase);
+                    if (lowHealthTrigger && (unit.MaxHealth <= 0f ||
+                        unit.CurrentHealth / unit.MaxHealth > LowHealthActivationThreshold))
                     {
                         continue;
                     }
@@ -144,28 +155,33 @@ namespace RogueCommandExpansionLoader.Modules
                         }
                     }
 
-                    // Find nearest enemy within trigger radius
+                    // Self-targeted LowHealth skills do not need a nearby enemy.
                     EntityController nearestEnemy = null;
-                    float nearestDistSq = float.MaxValue;
-
-                    foreach (EntityController enemy in playerEntities)
+                    if (!lowHealthTrigger || skillInfo.targetOrigin != TargetOrigin.Self)
                     {
-                        if (enemy == null || enemy.DestroyHasBeenStarted || enemy.canNotBeTargetedByAi)
+                        float nearestDistSq = float.MaxValue;
+                        if (playerEntities != null)
+                        {
+                            foreach (EntityController enemy in playerEntities)
+                            {
+                                if (enemy == null || enemy.DestroyHasBeenStarted || enemy.canNotBeTargetedByAi)
+                                {
+                                    continue;
+                                }
+
+                                float distSq = (unit.Position - enemy.Position).sqrMagnitude;
+                                if (distSq <= triggerRadiusSq && distSq < nearestDistSq)
+                                {
+                                    nearestDistSq = distSq;
+                                    nearestEnemy = enemy;
+                                }
+                            }
+                        }
+
+                        if (nearestEnemy == null)
                         {
                             continue;
                         }
-
-                        float distSq = (unit.Position - enemy.Position).sqrMagnitude;
-                        if (distSq <= triggerRadiusSq && distSq < nearestDistSq)
-                        {
-                            nearestDistSq = distSq;
-                            nearestEnemy = enemy;
-                        }
-                    }
-
-                    if (nearestEnemy == null)
-                    {
-                        continue;
                     }
 
                     // Execute appropriate active skill command based on origin
