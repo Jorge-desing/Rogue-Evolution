@@ -186,9 +186,22 @@ namespace RogueCommandExpansion.Authoring
                 foreach (ModelImporterClipAnimation clip in clips)
                 {
                     if (clip == null) continue;
-                    bool shouldLoop = clip.name.IndexOf("Idle", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                        clip.name.IndexOf("Walk", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                        clip.name.IndexOf("Drive", StringComparison.OrdinalIgnoreCase) >= 0;
+                    // Match the action token, not the unit name prefix: a walker named
+                    // "ArcLanceWalker" must not make its FireRecoil/Death clips loop.
+                    string clipName = clip.name;
+                    int actionSeparator = clipName.LastIndexOf("Action_", StringComparison.OrdinalIgnoreCase);
+                    string actionToken = actionSeparator >= 0
+                        ? clipName.Substring(actionSeparator + "Action_".Length)
+                        : clipName;
+                    int pipeIndex = actionToken.LastIndexOf('|');
+                    if (pipeIndex >= 0)
+                    {
+                        actionToken = actionToken.Substring(pipeIndex + 1);
+                    }
+                    actionToken = actionToken.Trim();
+                    bool shouldLoop = actionToken.Equals("Idle", StringComparison.OrdinalIgnoreCase) ||
+                        actionToken.Equals("Walk", StringComparison.OrdinalIgnoreCase) ||
+                        actionToken.Equals("Drive", StringComparison.OrdinalIgnoreCase);
                     if (clip.loopTime != shouldLoop)
                     {
                         clip.loopTime = shouldLoop;
