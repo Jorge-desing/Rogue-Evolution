@@ -10,6 +10,7 @@ and Unity 2021.3.45f2 FBX export.
 from __future__ import annotations
 import json
 import math
+import re
 from pathlib import Path
 from typing import Any, Dict, Sequence, Tuple
 
@@ -8227,6 +8228,13 @@ def assign_rigid_mesh_weights(
         if obj.type != "MESH" or obj.name.endswith(("_COLLIDER", "_ShieldBubble")):
             continue
 
+        # Rigid rebinding must not inherit stale groups/modifiers from authored
+        # or previously generated versions of the same mesh.
+        for vertex_group in list(obj.vertex_groups):
+            obj.vertex_groups.remove(vertex_group)
+        for modifier in [m for m in obj.modifiers if m.type == "ARMATURE"]:
+            obj.modifiers.remove(modifier)
+
         clean_name = obj.name
         if clean_name.startswith(prefix):
             clean_name = clean_name[len(prefix):]
@@ -8247,19 +8255,46 @@ def assign_rigid_mesh_weights(
 
         elif leg_type == "quad":
             tag_found = None
-            for cand, norm in [
-                ("FL", "FL"), ("FR", "FR"), ("RL", "RL"), ("RR", "RR"),
-                ("L_F", "FL"), ("R_F", "FR"), ("L_R", "RL"), ("R_R", "RR"),
-            ]:
-                if cand in clean_name:
-                    tag_found = norm
-                    break
-            if tag_found:
+            # Extract the authored leg tag from "CrawlerLeg_<tag>_" so names such
+            # as "..._FemurBoom" cannot masquerade as a different leg tag.
+            crawler_match = re.search(r"CrawlerLeg_([A-Z](?:_[A-Z])?)_", clean_name)
+            if crawler_match:
+                raw_tag = crawler_match.group(1)
+                tag_found = {
+                    "FL": "FL", "FR": "FR", "RL": "RL", "RR": "RR",
+                    "L_F": "FL", "R_F": "FR", "L_R": "RL", "R_R": "RR",
+                }.get(raw_tag)
+            if tag_found is None:
+                if "_ML" in clean_name or clean_name.endswith("ML"):
+                    tag_found = "ML"
+                elif "_MR" in clean_name or clean_name.endswith("MR"):
+                    tag_found = "MR"
+            if tag_found in ("FL", "FR", "RL", "RR"):
                 if any(k in clean_name for k in ("Foot", "Talon")):
                     target_bone = f"Bone_Foot_{tag_found}"
                 elif any(k in clean_name for k in ("Tibia", "Knee")):
                     target_bone = f"Bone_Shin_{tag_found}"
                 elif any(k in clean_name for k in ("Femur", "Hip")):
+                    target_bone = f"Bone_Thigh_{tag_found}"
+            elif tag_found in ("ML", "MR"):
+                if any(k in clean_name for k in ("Foot", "Talon", "Pad")):
+                    target_bone = f"Bone_Foot_{tag_found}"
+                elif any(k in clean_name for k in ("Tibia", "Knee", "Shin")):
+                    target_bone = f"Bone_Shin_{tag_found}"
+                elif any(k in clean_name for k in ("Thigh", "Femur", "Hip")):
+                    target_bone = f"Bone_Thigh_{tag_found}"
+
+            if target_bone is None and ("HydraulicRam" in clean_name or "HipActuator" in clean_name or "Piston" in clean_name):
+                if tag_found is None:
+                    for cand, norm in [
+                        ("FL", "FL"), ("FR", "FR"), ("RL", "RL"), ("RR", "RR"),
+                        ("LF", "FL"), ("RF", "FR"), ("LR", "RL"), ("RR", "RR"),
+                        ("ML", "ML"), ("MR", "MR"),
+                    ]:
+                        if cand in clean_name:
+                            tag_found = norm
+                            break
+                if tag_found in ("ML", "MR", "FL", "FR", "RL", "RR"):
                     target_bone = f"Bone_Thigh_{tag_found}"
 
             if target_bone is None and any(k in clean_name for k in ("Pelvis", "MechPelvis")):
@@ -8649,6 +8684,13 @@ def generate_procedural_action_clips(
                 set_bone_key(f"Bone_Foot_{tag}", "rotation_euler", f, (math.radians(foot_rot), 0.0, 0.0))
         for tag in ("FR", "RL"):
             for f, (thigh_rot, shin_rot, foot_rot) in quad_gait_diag2.items():
+                set_bone_key(f"Bone_Thigh_{tag}", "rotation_euler", f, (math.radians(thigh_rot), 0.0, 0.0))
+                set_bone_key(f"Bone_Shin_{tag}", "rotation_euler", f, (math.radians(shin_rot), 0.0, 0.0))
+                set_bone_key(f"Bone_Foot_{tag}", "rotation_euler", f, (math.radians(foot_rot), 0.0, 0.0))
+
+        # Middle legs complete the hexapod tripod gait.
+        for tag, gait in (("ML", quad_gait_diag2), ("MR", quad_gait_diag1)):
+            for f, (thigh_rot, shin_rot, foot_rot) in gait.items():
                 set_bone_key(f"Bone_Thigh_{tag}", "rotation_euler", f, (math.radians(thigh_rot), 0.0, 0.0))
                 set_bone_key(f"Bone_Shin_{tag}", "rotation_euler", f, (math.radians(shin_rot), 0.0, 0.0))
                 set_bone_key(f"Bone_Foot_{tag}", "rotation_euler", f, (math.radians(foot_rot), 0.0, 0.0))

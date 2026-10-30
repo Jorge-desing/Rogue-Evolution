@@ -55,6 +55,9 @@ def build_arachnid_hexapod_rigged_model() -> None:
     if armature is None or armature.type != "ARMATURE":
         raise ValueError("Arachnid Hexapod source has no armature")
 
+    # Bind every mesh rigidly to its own leg bone before batching/export.
+    rmk.assign_rigid_mesh_weights(meshes, UNIT_NAME, armature, leg_type="quad")
+
     # Generate animation clips for the existing armature
     actions = rmk.generate_procedural_action_clips(armature, prefix=UNIT_NAME, leg_type="quad")
     _validate_root_motion(armature, actions["Walk"])
