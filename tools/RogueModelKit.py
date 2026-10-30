@@ -5268,7 +5268,7 @@ def export_unity_fbx(
         path_mode="AUTO",
         axis_forward="-Z",
         axis_up="Y",
-        bake_space_transform=False,
+        bake_space_transform=True,
         add_leaf_bones=False,
         use_custom_props=False,
         bake_anim=bake_anim,
