@@ -18,6 +18,7 @@ namespace RogueCommandExpansionLoader
         private ContentPackRuntimeLoader _contentLoader;
         private RuntimeOverlayUi _overlay;
         private RangeDisplayRuntime _rangeDisplay;
+        private LoaderDiagnosticsComponent _diagnostics;
         private bool _sceneDiagnosticsSubscribed;
 
         private void Awake()
@@ -181,10 +182,30 @@ namespace RogueCommandExpansionLoader
                     Config,
                     compatibilityError,
                     message => Logger.LogWarning(message));
+
+                EnsureDiagnosticsComponent(provider);
             }
             catch (Exception exception)
             {
                 Logger.LogWarning("[ExpansionLoader] No se pudo inicializar el inspector: " +
+                    exception.GetType().Name + ": " + exception.Message);
+            }
+        }
+
+        private void EnsureDiagnosticsComponent(IRuntimeContentProvider provider)
+        {
+            try
+            {
+                if (_diagnostics == null)
+                {
+                    _diagnostics = gameObject.AddComponent<LoaderDiagnosticsComponent>();
+                }
+
+                _diagnostics.Initialize(provider, _overlay, _rangeDisplay);
+            }
+            catch (Exception exception)
+            {
+                Logger.LogWarning("[ExpansionLoader] No se pudo adjuntar el componente de diagnóstico: " +
                     exception.GetType().Name + ": " + exception.Message);
             }
         }

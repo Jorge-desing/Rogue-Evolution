@@ -60,6 +60,15 @@ namespace RogueCommandExpansionLoader.Runtime
                 "Raise circles above the unit's position to reduce z-fighting.");
         }
 
+        /// <summary>Live enabled state, readable by an agent without a visual capture.</summary>
+        public bool IsEnabled => _enabled != null && _enabled.Value;
+
+        /// <summary>Currently bound toggle key, readable by an agent without a visual capture.</summary>
+        public string ToggleKey => _toggleKey != null ? _toggleKey.Value.ToString() : "F11";
+
+        /// <summary>Number of entities currently showing range circles, readable by an agent.</summary>
+        public int TrackedEntityCount => _circles.Count;
+
         private void Update()
         {
             if (_enabled == null || _toggleKey == null)

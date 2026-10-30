@@ -84,6 +84,12 @@ namespace RogueCommandExpansionLoader.Runtime
                 "Toggle the loader inspector. Supports a key with optional modifier keys.");
         }
 
+        /// <summary>Live open/closed state, readable by an agent without a visual capture.</summary>
+        public bool IsOpen => _isOpen;
+
+        /// <summary>Currently bound toggle shortcut, readable by an agent without a visual capture.</summary>
+        public string ToggleShortcutText => GetToggleShortcutText();
+
         private void Update()
         {
             if (_provider != null && Time.unscaledTime >= _nextSnapshotRefresh)

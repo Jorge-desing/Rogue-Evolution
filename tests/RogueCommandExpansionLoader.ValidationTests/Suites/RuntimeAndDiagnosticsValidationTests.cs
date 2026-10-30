@@ -125,6 +125,73 @@ internal static partial class ValidationTestRunner
             throw new InvalidOperationException("Color equality must be consistent for the same identifier.");
         }
     }),
+    ("agent diagnostics formatter exposes clean-room and visual utilities as JSON", () =>
+    {
+        var packs = new List<PackDiagnosticReport>
+        {
+            new PackDiagnosticReport(
+                "sample-native:expansion", "sample-native-expansion", true, "Cargado correctamente.",
+                1, 2048L, 5, 3, 3),
+        };
+        var units = new List<UnitDiagnosticReport>
+        {
+            new UnitDiagnosticReport(
+                "sample-native:scout-tank", "sample-native:expansion", "scout.prefab", "scout.png",
+                true, false, true, false, false, null, 0),
+        };
+        var stages = new List<StageDiagnosticReport>
+        {
+            new StageDiagnosticReport("stage-a", "sample-native:expansion", 24, 48,
+                new[] { "sample-native:scout-tank" }, new[] { "default" }),
+        };
+        var aiProfiles = new List<AiProfileDiagnosticReport>
+        {
+            new AiProfileDiagnosticReport("ai-a", "sample-native:expansion", "ai.prefab",
+                new[] { "module-x" }, 1),
+        };
+        var snapshot = new LoaderDiagnosticsSnapshot(
+            "1.0.9", true, true, 1, 0, 2048L,
+            packs, units, stages, aiProfiles,
+            Array.Empty<UnitFactoryDiagnosticReport>(),
+            Array.Empty<StagePoolScopeDiagnosticReport>(),
+            Array.Empty<AiProfileStageRangeDiagnosticReport>(),
+            Array.Empty<UnitEligibilityDiagnosticReport>(),
+            Array.Empty<UnitAssetResolutionDiagnosticReport>(),
+            Array.Empty<UnitLocalizationCoverageDiagnosticReport>(),
+            new[] { "12:00:00 loaded alpha", "12:00:01 loaded alpha" });
+
+        string snapshotJson = AgentDiagnosticsFormatter.SerializeSnapshot(snapshot);
+        if (string.IsNullOrEmpty(snapshotJson) ||
+            !snapshotJson.Contains("\"kind\":\"loaderDiagnostics\"") ||
+            !snapshotJson.Contains("\"sample-native:scout-tank\""))
+        {
+            throw new InvalidOperationException("The snapshot JSON must expose packs, units, and identifiers.");
+        }
+
+        string utilitiesJson = AgentDiagnosticsFormatter.SerializeUtilities(snapshot, null, null);
+        if (!utilitiesJson.Contains("\"kind\":\"utilities\"") ||
+            !utilitiesJson.Contains("\"cleanRoom\"") ||
+            !utilitiesJson.Contains("\"visual\"") ||
+            !utilitiesJson.Contains("\"inspector\"") ||
+            !utilitiesJson.Contains("\"rangeDisplay\""))
+        {
+            throw new InvalidOperationException("The utilities JSON must expose clean-room and visual utility state.");
+        }
+
+        string colorJson = AgentDiagnosticsFormatter.SerializeIdentifierColor("sample-native:scout-tank");
+        if (!colorJson.Contains("\"hex\":\"#") || !colorJson.Contains("\"paletteSize\":16"))
+        {
+            throw new InvalidOperationException("The identifier color JSON must expose a hex color and palette size.");
+        }
+    }),
+    ("agent diagnostics formatter returns an available=false snapshot when provider is null", () =>
+    {
+        string snapshotJson = AgentDiagnosticsFormatter.SerializeSnapshot(null);
+        if (!snapshotJson.Contains("\"available\":false"))
+        {
+            throw new InvalidOperationException("A null snapshot must serialize as available=false, not throw.");
+        }
+    }),
     ("range display resolves selected player radii in world units", () =>
     {
         RangeDisplayEntityState entity = new RangeDisplayEntityState(
