@@ -62,6 +62,18 @@ def build_arachnid_hexapod_rigged_model() -> None:
     actions = rmk.generate_procedural_action_clips(armature, prefix=UNIT_NAME, leg_type="quad")
     _validate_root_motion(armature, actions["Walk"])
 
+    # Keep ONLY the Walk action; remove Idle, Drive, FireRecoil, Death so the
+    # hexapod has no looping idle or extra animations. Only legs move when walking.
+    for name in ("Idle", "Drive", "FireRecoil", "Death"):
+        act = actions.pop(name, None)
+        if act is not None:
+            bpy.data.actions.remove(act)
+    # Remove their NLA tracks too.
+    if armature.animation_data and armature.animation_data.nla_tracks:
+        for track in list(armature.animation_data.nla_tracks):
+            if track.name != "Track_Walk":
+                armature.animation_data.nla_tracks.remove(track)
+
     # Normalize the authored middle-leg (ML/MR) bone orientation so the shins
     # bend downward like the side legs instead of folding into the hull.
     rmk.normalize_arachnid_middle_leg_orientation(armature)
