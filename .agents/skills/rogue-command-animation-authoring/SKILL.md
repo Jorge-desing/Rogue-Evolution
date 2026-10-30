@@ -85,6 +85,19 @@ When the user requests that a unit should only have walking leg animations (no i
 8. **Scope discipline**: When the user says "remove animations from the hexapod", they mean THAT unit only. Do not remove animations from other units or alter shared animation generation functions. The user's frustration signal "Estamos hablando de las patas" means: legs only, don't touch other animations.
 9. **Label the result**: static inspection (Blender/Unity build) vs. in-game runtime evidence. A successful build does not prove the animation plays correctly in-game.
 
+## FBX import settings for rigged models
+
+When a rigged model does not render at all (invisible mesh, zero-extent SMR bounds, or `SetupAnimatorIfAvailable` fails), check the FBX `.meta` file:
+
+- `animationType` must be `3` (Generic), not `2` (Humanoid). A Humanoid avatar on a Generic rig causes the model to not render.
+- `avatarSetup` must be `2` (CreateFromThisModel), not `1` (NoAvatar). Without a valid avatar, `SetupAnimatorIfAvailable` cannot configure the Animator.
+- The build validator (`ValidateWalkerModelSource`) should set these via `ModelImporter`, but the `.meta` file on disk may retain stale values. If the model is invisible after a successful build, manually edit the `.meta` file and rebuild.
+
+## FBX export settings for rigged models
+
+- **`bake_space_transform` must be `False`** for rigged FBX exports. With `True`, Blender bakes the axis conversion (Z-up → Y-up) into vertex/bone transforms, corrupting bind-pose matrices — the SkinnedMeshRenderer reports zero `localBounds` and the mesh collapses in-game. Unity handles axis conversion at import time when this is `False`.
+- **Mesh batching can corrupt vertex weights.** If `batch_and_join_by_material` joins meshes and loses rigid 1.0 weight bindings, export the original unbatched meshes directly: `rmk.export_unity_fbx(FBX_PATH, list(meshes) + [armature], ...)`. Correctness takes priority over draw-call optimization for rigged units.
+
 1. **Read project context.** Read `AGENTS.md`, `docs/research/AGENT-HANDOFF.md`, `README.md`, `unity/RogueCommandAssetAuthoring/README.md`, and the relevant rigging/model references. Confirm the worktree and preserve unrelated changes.
 2. **Trace the driver.** Search the builder and runtime director for parameter names, clip lookup, transition setup, thresholds, delta-time use, and root-motion settings. Do not invent an Animator parameter or assume every prefab has the director attached.
 3. **Author or edit the source.** Work from the existing `.blend` and deterministic model builder where possible. Keep bone names, pivots, canonical sockets, rigid armor weights, and root transform aligned to the project contract. Put previews/diagnostics in ignored `artifacts/`.
