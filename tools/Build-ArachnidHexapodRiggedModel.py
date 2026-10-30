@@ -69,17 +69,10 @@ def build_arachnid_hexapod_rigged_model() -> None:
     bpy.context.view_layer.update()
     bpy.ops.wm.save_as_mainfile(filepath=str(RIGGED_BLEND))
 
-    # Export with armature and animations
-    batched_meshes = rmk.batch_and_join_by_material(
-        meshes,
-        prefix=UNIT_NAME,
-        smooth_by_angle=True,
-        weighted_normals=True,
-        unity_batch_names=True,
-    )
+    # Export with armature and animations (no batching - use original meshes)
     rmk.export_unity_fbx(
         FBX_PATH,
-        list(batched_meshes) + [armature],
+        list(meshes) + [armature],
         include_empties=False,
         include_armature=True,
         bake_anim=True,
