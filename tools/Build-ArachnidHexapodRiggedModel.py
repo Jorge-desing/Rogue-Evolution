@@ -55,38 +55,16 @@ def build_arachnid_hexapod_rigged_model() -> None:
     if armature is None or armature.type != "ARMATURE":
         raise ValueError("Arachnid Hexapod source has no armature")
 
-    # Bind every mesh rigidly to its own leg bone before batching/export.
-    rmk.assign_rigid_mesh_weights(meshes, UNIT_NAME, armature, leg_type="quad")
-
     # Generate animation clips for the existing armature
     actions = rmk.generate_procedural_action_clips(armature, prefix=UNIT_NAME, leg_type="quad")
     _validate_root_motion(armature, actions["Walk"])
 
-    # Keep ONLY the Walk action; remove Idle, FireRecoil, Death so the
-    # hexapod has no looping idle or extra animations. Only legs move when walking.
-    walk_act = actions.get("Walk")
-    for name in ("Idle", "FireRecoil", "Death"):
-        act = actions.pop(name, None)
-        if act is not None and act is not walk_act:
-            bpy.data.actions.remove(act)
-    # "Drive" is an alias of "Walk"; drop the key without removing the action.
-    actions.pop("Drive", None)
-
-    # Strip hull movement from Walk so ONLY legs animate (no body bob/pitch/roll).
-    if walk_act is not None:
-        for fc in list(walk_act.fcurves):
-            if 'Bone_Hull' in fc.data_path:
-                walk_act.fcurves.remove(fc)
-    # Remove their NLA tracks too.
-    if armature.animation_data and armature.animation_data.nla_tracks:
-        for track in list(armature.animation_data.nla_tracks):
-            if track.name != "Track_Walk":
-                armature.animation_data.nla_tracks.remove(track)
-
-    # Normalize the authored middle-leg (ML/MR) bone orientation so the shins
-    # bend downward like the side legs instead of folding into the hull.
-    rmk.normalize_arachnid_middle_leg_orientation(armature)
-    bpy.context.view_layer.update()
+    # Rebuild Walk animation from scratch: strip hull movement so ONLY legs animate.
+    # Remove all Bone_Hull keyframes, then re-generate only leg rotations.
+    walk_act = actions["Walk"]
+    for fc in list(walk_act.fcurves):
+        if 'Bone_Hull' in fc.data_path:
+            walk_act.fcurves.remove(fc)
 
     bpy.context.view_layer.update()
     bpy.ops.wm.save_as_mainfile(filepath=str(RIGGED_BLEND))
