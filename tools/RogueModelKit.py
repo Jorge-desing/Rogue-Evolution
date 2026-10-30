@@ -8217,6 +8217,33 @@ def make_comms_relay_tower_assembly(
 # Procedural Armature Rigging & Animation Actions
 # ---------------------------------------------------------------------------
 
+def normalize_arachnid_middle_leg_orientation(armature: bpy.types.Object) -> None:
+    """Ensure the Arachnid Hexapod's middle legs (ML/MR) bend downward like the
+    side legs instead of folding into the hull.
+
+    The authored middle-leg shins/feet were created with their tail Z pointing
+    upward, which inverted the deformation of the gunmetal/tread meshes and
+    produced a visibly deformed model. Force those tails to point downward
+    (negative Z in armature space) while keeping head positions intact so the
+    parent/child chain is preserved.
+    """
+    if armature is None or armature.type != "ARMATURE":
+        return
+    bpy.context.view_layer.objects.active = armature
+    bpy.ops.object.mode_set(mode="EDIT")
+    try:
+        edit_bones = armature.data.edit_bones
+        for tag in ("ML", "MR"):
+            for segment in ("Shin", "Foot"):
+                bone = edit_bones.get(f"Bone_{segment}_{tag}")
+                if bone is None:
+                    continue
+                if bone.tail.z > 0.0:
+                    bone.tail.z = -bone.tail.z
+    finally:
+        bpy.ops.object.mode_set(mode="OBJECT")
+
+
 def assign_rigid_mesh_weights(
     objects: Sequence[bpy.types.Object],
     prefix: str,

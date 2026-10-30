@@ -62,6 +62,11 @@ def build_arachnid_hexapod_rigged_model() -> None:
     actions = rmk.generate_procedural_action_clips(armature, prefix=UNIT_NAME, leg_type="quad")
     _validate_root_motion(armature, actions["Walk"])
 
+    # Normalize the authored middle-leg (ML/MR) bone orientation so the shins
+    # bend downward like the side legs instead of folding into the hull.
+    rmk.normalize_arachnid_middle_leg_orientation(armature)
+    bpy.context.view_layer.update()
+
     bpy.context.view_layer.update()
     bpy.ops.wm.save_as_mainfile(filepath=str(RIGGED_BLEND))
 
