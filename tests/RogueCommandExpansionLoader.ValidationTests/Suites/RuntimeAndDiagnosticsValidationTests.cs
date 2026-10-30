@@ -16,6 +16,146 @@ internal static partial class ValidationTestRunner
 {
     internal static IEnumerable<(string Name, Action Run)> GetRuntimeAndDiagnosticsValidationTests() => new (string Name, Action Run)[]
     {
+    ("range display resolves selected player radii in world units", () =>
+    {
+        RangeDisplayEntityState entity = new RangeDisplayEntityState(
+            isSelected: true, isPlayerControlled: true, isDestroyed: false,
+            canAttack: true, isMelee: false, weaponRange: 4f,
+            hasActiveSkill: true, skillRangeIsUnlimited: false, skillRange: 6f,
+            effectRadius1: 2f, effectRadius2: 3f, sightRadius: 8f);
+        RangeDisplaySpec[] specs = RangeDisplayPolicy.Resolve(entity, RangeDisplayOptions.Default);
+        RangeDisplaySpec[] disabled = RangeDisplayPolicy.Resolve(entity, RangeDisplayOptions.Default, enabled: false);
+        if (disabled.Length != 0)
+        {
+            throw new InvalidOperationException("Disabled range display must not resolve circles.");
+        }
+        RangeDisplayKind[] expectedKinds =
+        {
+            RangeDisplayKind.Weapon, RangeDisplayKind.Skill,
+            RangeDisplayKind.Effect1, RangeDisplayKind.Effect2
+        };
+        float[] expectedRadii = { 40f, 60f, 20f, 30f };
+        if (specs.Length != expectedKinds.Length)
+        {
+            throw new InvalidOperationException("Range display must resolve each enabled non-sight radius and omit sight by default.");
+        }
+        for (int i = 0; i < specs.Length; i++)
+        {
+            if (specs[i].Kind != expectedKinds[i] || Math.Abs(specs[i].Radius - expectedRadii[i]) > 0.001f)
+            {
+                throw new InvalidOperationException("Range display kinds must be ordered and scaled from cells to world units.");
+            }
+        }
+    }),
+    ("range display rejects ineligible, unlimited, melee, tiny, and duplicate radii", () =>
+    {
+        RangeDisplayEntityState baseEntity = new RangeDisplayEntityState(
+            isSelected: true, isPlayerControlled: true, isDestroyed: false,
+            canAttack: true, isMelee: false, weaponRange: 0.2f,
+            hasActiveSkill: true, skillRangeIsUnlimited: true, skillRange: 10f,
+            effectRadius1: 2f, effectRadius2: 2.02f, sightRadius: 4f);
+        RangeDisplaySpec[] specs = RangeDisplayPolicy.Resolve(baseEntity, new RangeDisplayOptions(
+            showWeapon: true, showSkill: true, showEffects: true, showSight: true));
+        if (specs.Length != 2 || specs[0].Kind != RangeDisplayKind.Effect1 ||
+            specs[1].Kind != RangeDisplayKind.Sight || Math.Abs(specs[1].Radius - 40f) > 0.001f)
+        {
+            throw new InvalidOperationException("Range display must filter tiny weapon, unlimited skill, and coincident radii.");
+        }
+
+        RangeDisplayEntityState[] ineligible =
+        {
+            new RangeDisplayEntityState(false, true, false, true, false, 4f, false, false, 0f, 0f, 0f, 0f),
+            new RangeDisplayEntityState(true, false, false, true, false, 4f, false, false, 0f, 0f, 0f, 0f),
+            new RangeDisplayEntityState(true, true, true, true, false, 4f, false, false, 0f, 0f, 0f, 0f)
+        };
+        for (int i = 0; i < ineligible.Length; i++)
+        {
+            if (RangeDisplayPolicy.Resolve(ineligible[i], RangeDisplayOptions.Default).Length != 0)
+            {
+                throw new InvalidOperationException("Only living, selected, player-controlled entities may receive range circles.");
+            }
+        }
+
+        RangeDisplayEntityState melee = new RangeDisplayEntityState(
+            true, true, false, true, true, 8f, false, false, 0f, 0f, 0f, 0f);
+        if (RangeDisplayPolicy.Resolve(melee, RangeDisplayOptions.Default).Length != 0)
+        {
+            throw new InvalidOperationException("Melee entities must not receive a weapon-range circle.");
+        }
+    }),
+    ("range display selection tracker reports deterministic additions and removals", () =>
+    {
+        var tracker = new RangeDisplaySelectionTracker<int>();
+        RangeDisplaySelectionDelta<int> first = tracker.Update(new[] { 3, 1, 2 });
+        if (!first.Added.SequenceEqual(new[] { 1, 2, 3 }) || first.Removed.Length != 0)
+        {
+            throw new InvalidOperationException("A new selection snapshot must report sorted additions and no removals.");
+        }
+
+        RangeDisplaySelectionDelta<int> second = tracker.Update(new[] { 2, 4 });
+        if (!second.Added.SequenceEqual(new[] { 4 }) || !second.Removed.SequenceEqual(new[] { 1, 3 }))
+        {
+            throw new InvalidOperationException("Selection reconciliation must report only the changed entities in stable order.");
+        }
+
+        RangeDisplaySelectionDelta<int> cleared = tracker.Update(Array.Empty<int>());
+        if (cleared.Added.Length != 0 || !cleared.Removed.SequenceEqual(new[] { 2, 4 }))
+        {
+            throw new InvalidOperationException("Clearing a selection snapshot must release every tracked entity.");
+        }
+    }),
+    ("range display circle geometry closes at the requested radius", () =>
+    {
+        const float radius = 40f;
+        const int segments = 32;
+        const float heightOffset = 0.15f;
+        UnityEngine.Vector3[] points = RangeDisplayGeometry.CreateCirclePoints(radius, segments, heightOffset);
+        if (points.Length != segments + 1)
+        {
+            throw new InvalidOperationException("Circle geometry must include one closing vertex beyond its segment count.");
+        }
+
+        UnityEngine.Vector3 first = points[0];
+        UnityEngine.Vector3 last = points[points.Length - 1];
+        if (Math.Abs(first.x - last.x) > 0.001f || Math.Abs(first.z - last.z) > 0.001f ||
+            Math.Abs(first.y - heightOffset) > 0.001f)
+        {
+            throw new InvalidOperationException("The generated range circle must close and preserve its height offset.");
+        }
+
+        for (int i = 0; i < segments; i++)
+        {
+            float pointRadius = (float)Math.Sqrt(points[i].x * points[i].x + points[i].z * points[i].z);
+            if (Math.Abs(pointRadius - radius) > 0.001f || Math.Abs(points[i].y - heightOffset) > 0.001f)
+            {
+                throw new InvalidOperationException("Every range circle vertex must lie on the requested XZ radius and height.");
+            }
+        }
+
+        foreach (Action invalidGeometry in new Action[]
+        {
+            () => RangeDisplayGeometry.CreateCirclePoints(0f, segments, heightOffset),
+            () => RangeDisplayGeometry.CreateCirclePoints(float.NaN, segments, heightOffset),
+            () => RangeDisplayGeometry.CreateCirclePoints(radius, 2, heightOffset),
+            () => RangeDisplayGeometry.CreateCirclePoints(radius, 257, heightOffset),
+            () => RangeDisplayGeometry.CreateCirclePoints(radius, segments, float.PositiveInfinity)
+        })
+        {
+            bool rejected = false;
+            try
+            {
+                invalidGeometry();
+            }
+            catch (ArgumentOutOfRangeException)
+            {
+                rejected = true;
+            }
+            if (!rejected)
+            {
+                throw new InvalidOperationException("Circle geometry must reject invalid radius, segment, and height inputs.");
+            }
+        }
+    }),
     ("visual overlays correct only models authored facing backward", () =>
     {
         float backwardCorrection = VisualOverlayOrientation.CalculateYawCorrectionDegrees(-2f, 1f);

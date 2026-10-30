@@ -17,6 +17,7 @@ namespace RogueCommandExpansionLoader
 
         private ContentPackRuntimeLoader _contentLoader;
         private RuntimeOverlayUi _overlay;
+        private RangeDisplayRuntime _rangeDisplay;
         private bool _sceneDiagnosticsSubscribed;
 
         private void Awake()
@@ -38,6 +39,7 @@ namespace RogueCommandExpansionLoader
                 SceneManager.activeSceneChanged += OnActiveSceneChanged;
                 _sceneDiagnosticsSubscribed = true;
                 Logger.LogInfo("[ExpansionLoader] Scene transition diagnostics subscribed.");
+                InitializeRangeDisplay();
 
                 var modules = new AiModuleRegistry();
                 modules.Register(new TraceDefaultAiModule());
@@ -96,6 +98,26 @@ namespace RogueCommandExpansionLoader
             }
         }
 
+        private void InitializeRangeDisplay()
+        {
+            try
+            {
+                _rangeDisplay = gameObject.AddComponent<RangeDisplayRuntime>();
+                _rangeDisplay.Initialize(Config, message => Logger.LogWarning(message));
+                Logger.LogInfo("[ExpansionLoader] Range display initialized (disabled by default; toggle key is configurable).");
+            }
+            catch (Exception exception)
+            {
+                if (_rangeDisplay != null)
+                {
+                    UnityEngine.Object.Destroy(_rangeDisplay);
+                    _rangeDisplay = null;
+                }
+                Logger.LogWarning("[ExpansionLoader] Range display is unavailable: " +
+                    exception.GetType().Name + ": " + exception.Message);
+            }
+        }
+
         private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
         {
             Logger.LogInfo("[ExpansionLoader] Scene loaded: '" + scene.name + "' (buildIndex=" +
@@ -110,6 +132,12 @@ namespace RogueCommandExpansionLoader
 
         private void OnDestroy()
         {
+            if (_rangeDisplay != null)
+            {
+                UnityEngine.Object.Destroy(_rangeDisplay);
+                _rangeDisplay = null;
+            }
+
             if (_sceneDiagnosticsSubscribed)
             {
                 SceneManager.sceneLoaded -= OnSceneLoaded;
