@@ -601,7 +601,7 @@ namespace RogueCommandExpansion.Authoring
             ValidateWalkerModelSource(projectRoot, BikeModelPath, "Skirmish Strike Bike", issues);
             ValidateWalkerModelSource(projectRoot, ColossusModelPath, "Colossus Siege Platform", issues);
             ValidateWalkerModelSource(projectRoot, SurgeArcTankModelPath, "Surge Arc Tank", issues);
-            ValidateWalkerModelSource(projectRoot, ArachnidHexapodRiggedModelPath, "Arachnid Hexapod", issues);
+            ValidateWalkerModelSource(projectRoot, ArachnidHexapodRiggedModelPath, "Arachnid Hexapod", issues, false, false);
             ValidateWalkerModelSource(projectRoot, OverlordCommandHQRiggedModelPath, "Overlord Command HQ", issues);
 
             if (issues.Count > 0)
@@ -631,7 +631,8 @@ namespace RogueCommandExpansion.Authoring
             string modelPath,
             string unitName,
             ICollection<string> issues,
-            bool validateBastionRigContract = false)
+            bool validateBastionRigContract = false,
+            bool requireIdleFireDeath = true)
         {
             string absolutePath = Path.GetFullPath(Path.Combine(projectRoot,
                 modelPath.Replace('/', Path.DirectorySeparatorChar)));
@@ -726,16 +727,16 @@ namespace RogueCommandExpansion.Authoring
                 }
 
                 var missingActions = new List<string>();
-                if (!HasAnimationClip(clips, "Idle")) missingActions.Add("Action_Idle");
+                if (requireIdleFireDeath && !HasAnimationClip(clips, "Idle")) missingActions.Add("Action_Idle");
                 if (!HasAnimationClip(clips, "Walk") && !HasAnimationClip(clips, "Drive"))
                 {
                     missingActions.Add("Action_Walk or Action_Drive");
                 }
-                if (!HasAnimationClip(clips, "FireRecoil") && !HasAnimationClip(clips, "Fire"))
+                if (requireIdleFireDeath && !HasAnimationClip(clips, "FireRecoil") && !HasAnimationClip(clips, "Fire"))
                 {
                     missingActions.Add("Action_FireRecoil");
                 }
-                if (!HasAnimationClip(clips, "Death")) missingActions.Add("Action_Death");
+                if (requireIdleFireDeath && !HasAnimationClip(clips, "Death")) missingActions.Add("Action_Death");
 
                 var modelIssues = new List<string>();
                 if (!hasSkinnedMeshWithBones) modelIssues.Add("a SkinnedMeshRenderer with bound bones");
