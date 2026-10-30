@@ -12,6 +12,7 @@ Use this skill when validating or packaging a Rogue Command loader/content chang
 - Parse `content/schema/content.schema.json` and validate each changed `content.json` against Draft 2020-12 schema rules.
 - Run both validation test suites when tests are part of the accepted task:
   - C# loader harness: `dotnet run --project tests/RogueCommandExpansionLoader.ValidationTests -- .` (report a skipped symlink check as skipped, not passed).
+  - The C# harness compiles a **curated `Compile` file list against a minimal `UnityEngine` stub**, not the whole loader. Grep the test csproj `Compile` list before adding a type to a file the harness compiles: a `MonoBehaviour` or any type referencing live Unity authoring/runtime types (`RuntimeOverlayUi`, `RangeDisplayRuntime`, `GUILayout`, `LineRenderer`, ...) fails to compile there. Keep agent-readable/pure logic (JSON formatters, color policies, snapshot DTOs) in a dependency-free file the csproj registers, and keep the Unity-coupled bridge `MonoBehaviour` in a separate file the plugin compiles but the harness does not. A hand-rolled JSON writer beats a Newtonsoft dependency when the formatter must also live in the stub-only test project.
   - Python registry & balance test suite: `python -B -m unittest discover -s tests -v`.
 - **Unit Variant Schema Validation**:
   - `units[].variants` permits up to 8 loadout variants.
@@ -43,6 +44,16 @@ Use this skill when validating or packaging a Rogue Command loader/content chang
 - Temporary Unity Editor probe scripts used to verify AssetBundle addresses or asset resolution are validation aids, not permanent authoring artifacts. Remove both the `.cs` and `.meta` files from `Assets/Editor/` after verification; do not ship them in source control or leave them in the authoring project.
 - In diagnostic trace and telemetry formatting, ensure bounded outputs (e.g. `MaxTraceCharacters = 4096`) place omission/loss counters before unbounded-detail collections (`offeredProducts`, candidates, pools) so tail truncation never hides lost observations.
 - Rebuild the install archive with `tools/Package-Loader.ps1`. Inspect its actual entries: confirm the intended plugin, manifests, bundles, and readmes are present, and that game assemblies, BepInEx, Harmony, PDBs, and Unity editor output are absent.
+
+## Deploy a built package to a local game installation
+
+- Confirm no game process is running before writing into `BepInEx/`.
+- Back up the existing plugin DLL and content directory before overwriting them.
+- Deploy the package by extracting it into the game root, preserving `BepInEx/plugins/...`.
+- The plugin DLL must end at `BepInEx/plugins/RogueCommandExpansionLoader.dll`; do not leave a stale duplicate under `BepInEx/plugins/RogueCommandExpansionLoader/RogueCommandExpansionLoader.dll`.
+- `tools/Package-Loader.ps1` packages only `sample-native-expansion` and `sample-reactive-ai`. Compare its entries with the intended tracked packs; if an intended pack such as `tactical-operations` is omitted, deploy that pack explicitly from the repository and verify its files or hashes.
+- Record profile-file hashes before and after deployment and verify they are unchanged.
+- Deployment verification (ZIP integrity, plugin hash, content files, unchanged profiles) is local installation evidence only. It is not proof of runtime registration, gameplay, or a fix for profile persistence.
 
 ## Protect the repository and runtime
 
