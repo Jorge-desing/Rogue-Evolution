@@ -51,7 +51,39 @@ Use these as review lenses, not pass/fail formulas:
 
 There is no blanket 300 ms limit for game animation. A short muzzle flash, a full gait cycle, and a death sequence have different jobs and durations. Keep transitions only as long as needed for clear state changes and avoid excessive overlap that muddies combat feedback.
 
-## Authoring procedure
+## Stripping non-walk animations from a rigged model
+
+When the user requests that a unit should only have walking leg animations (no idle breathing, fire recoil, or death), the procedure is:
+
+1. **In the Blender build script**, after loading the existing armature from the blend file, delete all actions except the Walk action. **Handle aliases**: if `Drive` is an alias of `Walk` (same action object), pop the key without removing the action, or check object identity before removal to avoid `ReferenceError: StructRNA of type Action has been removed`:
+   ```python
+   walk_act = actions.get("Walk")
+   for name in ("Idle", "FireRecoil", "Death"):
+       act = actions.pop(name, None)
+       if act is not None and act is not walk_act:
+           bpy.data.actions.remove(act)
+   actions.pop("Drive", None)  # alias, do not remove the shared action
+   ```
+2. **Strip hull movement from Walk** so ONLY legs animate. Remove all fcurves whose data_path contains `Bone_Hull`:
+   ```python
+   if walk_act is not None:
+       for fc in list(walk_act.fcurves):
+           if 'Bone_Hull' in fc.data_path:
+               walk_act.fcurves.remove(fc)
+   ```
+3. **Remove NLA tracks** for the deleted actions from the armature:
+   ```python
+   if armature.animation_data:
+       for track in list(armature.animation_data.nla_tracks):
+           if "Walk" not in (track.name or ""):
+               armature.animation_data.nla_tracks.remove(track)
+   ```
+4. **Regenerate the blend and FBX** with `include_armature=True, bake_anim=True, bake_space_transform=True`.
+5. **Update the Unity validator** (`RogueCommandVisualSampleScaffolder.cs`): if the validator requires `Action_Idle`, `Action_FireRecoil`, or `Action_Death` clips, add a `requireIdleFireDeath` parameter (default `true`) and pass `false` for the unit being stripped. The validator's `missingActions` check must be conditional on this flag.
+6. **Rebuild the Unity bundle** and deploy.
+7. **Note**: The AnimatorController may still reference Idle/FireRecoil/Death states, but since those clips no longer exist in the FBX, those states will play the bind pose (static). This is acceptable when the user only wants walking animations. To fully remove those states, edit the `.controller` file manually.
+8. **Scope discipline**: When the user says "remove animations from the hexapod", they mean THAT unit only. Do not remove animations from other units or alter shared animation generation functions. The user's frustration signal "Estamos hablando de las patas" means: legs only, don't touch other animations.
+9. **Label the result**: static inspection (Blender/Unity build) vs. in-game runtime evidence. A successful build does not prove the animation plays correctly in-game.
 
 1. **Read project context.** Read `AGENTS.md`, `docs/research/AGENT-HANDOFF.md`, `README.md`, `unity/RogueCommandAssetAuthoring/README.md`, and the relevant rigging/model references. Confirm the worktree and preserve unrelated changes.
 2. **Trace the driver.** Search the builder and runtime director for parameter names, clip lookup, transition setup, thresholds, delta-time use, and root-motion settings. Do not invent an Animator parameter or assume every prefab has the director attached.
