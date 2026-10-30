@@ -481,6 +481,29 @@ namespace RogueCommandExpansionLoader.Runtime
 
             GUILayout.Space(8);
 
+            LoaderLogBurstSummary latestLog = LoaderLogBurstSummaryPolicy.Create(
+                snapshot == null ? null : snapshot.RecentLogs);
+            if (latestLog != null)
+            {
+                BeginCard("Actividad reciente");
+                GUIStyle latestStyle = _styleLogEntry;
+                if (latestLog.DisplayText.IndexOf("desactivado", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    latestLog.DisplayText.IndexOf("error", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    latestLog.DisplayText.IndexOf("fail", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    latestStyle = _styleLabelError;
+                }
+                else if (latestLog.DisplayText.IndexOf("warning", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                         latestLog.DisplayText.IndexOf("advertencia", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    latestStyle = _styleLabelWarning;
+                }
+
+                GUILayout.Label(latestLog.DisplayText, latestStyle);
+                EndCard();
+                GUILayout.Space(6);
+            }
+
             if (snapshot == null || snapshot.RecentLogs.Count == 0)
             {
                 BeginCard("Registro de Eventos");

@@ -16,6 +16,60 @@ internal static partial class ValidationTestRunner
 {
     internal static IEnumerable<(string Name, Action Run)> GetRuntimeAndDiagnosticsValidationTests() => new (string Name, Action Run)[]
     {
+    ("runtime log burst summary counts only adjacent equal messages", () =>
+    {
+        LoaderLogBurstSummary summary = LoaderLogBurstSummaryPolicy.Create(new[]
+        {
+            "12:00:00 loaded alpha",
+            "12:00:01 loaded alpha",
+            "12:00:02 loaded beta",
+            "12:00:03 loaded alpha"
+        });
+        if (summary == null || summary.Message != "loaded alpha" || summary.RepeatCount != 0)
+        {
+            throw new InvalidOperationException("Only the final consecutive run should be summarized, without merging earlier messages.");
+        }
+
+        LoaderLogBurstSummary repeated = LoaderLogBurstSummaryPolicy.Create(new[]
+        {
+            "12:00:00 loaded alpha",
+            "12:00:01 loaded alpha",
+            "12:00:02 loaded alpha"
+        });
+        if (repeated == null || repeated.Message != "loaded alpha" || repeated.RepeatCount != 2 ||
+            repeated.DisplayText != "loaded alpha (2)")
+        {
+            throw new InvalidOperationException("The summary should display the count of repeated messages after the first entry.");
+        }
+    }),
+    ("runtime log burst summary preserves entries without a valid timestamp", () =>
+    {
+        LoaderLogBurstSummary summary = LoaderLogBurstSummaryPolicy.Create(new[]
+        {
+            "not a timestamp: same",
+            "not a timestamp: same"
+        });
+        if (summary == null || summary.Message != "not a timestamp: same" || summary.RepeatCount != 1)
+        {
+            throw new InvalidOperationException("Non-timestamped messages must remain intact while still being grouped consecutively.");
+        }
+
+        LoaderLogBurstSummary singleRepeat = LoaderLogBurstSummaryPolicy.Create(new[]
+        {
+            "12:00:00 loaded beta",
+            "12:00:01 loaded beta"
+        });
+        if (singleRepeat == null || singleRepeat.RepeatCount != 1 ||
+            singleRepeat.DisplayText != "loaded beta (1)")
+        {
+            throw new InvalidOperationException("The first repeated entry must display a repeat count of one.");
+        }
+
+        if (LoaderLogBurstSummaryPolicy.Create(Array.Empty<string>()) != null)
+        {
+            throw new InvalidOperationException("An empty log should not produce a burst summary.");
+        }
+    }),
     ("range display resolves selected player radii in world units", () =>
     {
         RangeDisplayEntityState entity = new RangeDisplayEntityState(

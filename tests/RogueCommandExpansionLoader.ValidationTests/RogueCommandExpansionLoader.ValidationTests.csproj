@@ -11,6 +11,8 @@
   <ItemGroup>
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RangeDisplayPolicy.cs"
              Link="Runtime/RangeDisplayPolicy.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/LoaderLogBurstSummaryPolicy.cs"
+             Link="Runtime/LoaderLogBurstSummaryPolicy.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Content/ContentPackDefinition.cs"
              Link="Content/ContentPackDefinition.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Content/VisualOverlayScaleCalibration.cs"
