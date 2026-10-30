@@ -15,6 +15,8 @@
              Link="Runtime/LoaderLogBurstSummaryPolicy.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/InspectorTogglePolicy.cs"
              Link="Runtime/InspectorTogglePolicy.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/IdentifierColorPolicy.cs"
+             Link="Runtime/IdentifierColorPolicy.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Content/ContentPackDefinition.cs"
              Link="Content/ContentPackDefinition.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Content/VisualOverlayScaleCalibration.cs"

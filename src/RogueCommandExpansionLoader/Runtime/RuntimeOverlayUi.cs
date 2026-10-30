@@ -348,7 +348,7 @@ namespace RogueCommandExpansionLoader.Runtime
             for (int i = 0; i < snapshot.Packs.Count; i++)
             {
                 PackDiagnosticReport pack = snapshot.Packs[i];
-                BeginCard(pack.PackId + " [" + pack.FolderName + "]");
+                BeginCard(pack.PackId + " [" + pack.FolderName + "]", IdentifierColorPolicy.Resolve(pack.PackId));
 
                 GUILayout.BeginHorizontal();
                 if (pack.IsLoaded)
@@ -673,10 +673,26 @@ namespace RogueCommandExpansionLoader.Runtime
 
         private void BeginCard(string title)
         {
+            BeginCard(title, null);
+        }
+
+        private void BeginCard(string title, UnityEngine.Color? accent)
+        {
             GUILayout.BeginVertical(_styleCard);
             if (!string.IsNullOrEmpty(title))
             {
-                GUILayout.Label(title, _styleCardTitle);
+                if (accent.HasValue)
+                {
+                    Color previous = GUI.color;
+                    GUI.color = accent.Value;
+                    GUILayout.Label(title, _styleCardTitle);
+                    GUI.color = previous;
+                }
+                else
+                {
+                    GUILayout.Label(title, _styleCardTitle);
+                }
+
                 GUILayout.Space(4);
             }
         }

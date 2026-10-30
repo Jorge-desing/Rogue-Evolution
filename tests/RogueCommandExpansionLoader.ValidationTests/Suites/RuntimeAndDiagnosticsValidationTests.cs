@@ -81,6 +81,50 @@ internal static partial class ValidationTestRunner
             throw new InvalidOperationException("Toggle should invert state unless close is pressed, which must leave the inspector closed.");
         }
     }),
+    ("identifier color policy hashes with FNV-1a and maps to a stable palette slot", () =>
+    {
+        if (IdentifierColorPolicy.Hash(string.Empty) != 0x811C9DC5u)
+        {
+            throw new InvalidOperationException("Empty identifier must yield the FNV-1a 32-bit offset basis.");
+        }
+
+        if (IdentifierColorPolicy.Hash("a") != 0xE40C292Cu)
+        {
+            throw new InvalidOperationException("The hash must follow the public FNV-1a 32-bit test vector for 'a'.");
+        }
+
+        if (IdentifierColorPolicy.Hash("foobar") != 0xBF9CF968u)
+        {
+            throw new InvalidOperationException("The hash must follow the public FNV-1a 32-bit test vector for 'foobar'.");
+        }
+
+        int paletteSize = IdentifierColorPolicy.PaletteSize;
+        if (paletteSize <= 0 || (paletteSize & (paletteSize - 1)) != 0)
+        {
+            throw new InvalidOperationException("The palette size must be a positive power of two for even index distribution.");
+        }
+
+        int index = IdentifierColorPolicy.PaletteIndex("sample-native:scout-tank");
+        if (index < 0 || index >= paletteSize)
+        {
+            throw new InvalidOperationException("The palette index must stay within the palette bounds.");
+        }
+    }),
+    ("identifier color policy is deterministic and stable across calls", () =>
+    {
+        string id = "sample-native:expansion";
+        UnityEngine.Color first = IdentifierColorPolicy.Resolve(id);
+        UnityEngine.Color second = IdentifierColorPolicy.Resolve(id);
+        if (first.r != second.r || first.g != second.g || first.b != second.b || first.a != second.a)
+        {
+            throw new InvalidOperationException("The same identifier must always resolve to the same accent color.");
+        }
+
+        if (IdentifierColorPolicy.Resolve(id) != IdentifierColorPolicy.Resolve(id))
+        {
+            throw new InvalidOperationException("Color equality must be consistent for the same identifier.");
+        }
+    }),
     ("range display resolves selected player radii in world units", () =>
     {
         RangeDisplayEntityState entity = new RangeDisplayEntityState(

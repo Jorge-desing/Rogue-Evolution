@@ -63,6 +63,39 @@ namespace UnityEngine
         public static Vector3 operator *(Quaternion q, Vector3 v) => v;
     }
 
+    public struct Color
+    {
+        public float r;
+        public float g;
+        public float b;
+        public float a;
+
+        public Color(float r, float g, float b, float a = 1f)
+        {
+            this.r = r;
+            this.g = g;
+            this.b = b;
+            this.a = a;
+        }
+
+        public static bool operator ==(Color left, Color right) =>
+            left.r == right.r && left.g == right.g && left.b == right.b && left.a == right.a;
+
+        public static bool operator !=(Color left, Color right) => !(left == right);
+
+        public override bool Equals(object obj) => obj is Color other && this == other;
+
+        public override int GetHashCode()
+        {
+            int hash = 17;
+            hash = (hash * 31) + r.GetHashCode();
+            hash = (hash * 31) + g.GetHashCode();
+            hash = (hash * 31) + b.GetHashCode();
+            hash = (hash * 31) + a.GetHashCode();
+            return hash;
+        }
+    }
+
     public class Object
     {
     }
