@@ -81,6 +81,8 @@ When a user reports multiple visual symptoms at once—e.g. “walks backward / 
 - **Wrong facing direction while walking cannot be proven offline.** Static evidence—Blender front axis, FBX `FrontAxis`, prefab transform yaw, generated sockets, or controller/clip inspection—does not establish forward direction during gameplay movement. Treat this as an in-game observation requirement, not a prefab defect, until a live match shows the unit moving opposite to its authored front.
 - **Wrong card image** is usually a manifest/asset mismatch: compare `cardImageAssetName` across units. If one unit is `null` while others reference bundle Sprites, the card fallback is the most likely cause.
 
+- **Deformed model with looping idle and no visible walk can be a rig-weight/coverage defect, not only an Animator defect.** Verify every leg mesh is rigidly bound to its own bone, middle legs are keyed in `Action_Walk`, and the build script actually called `assign_rigid_mesh_weights` before export. A passing `RCL_IsMoving` transition cannot animate bones that were never keyed or were bound to `Bone_Hull`/the wrong leg.
+
 Do not rotate a model or change yaw correction based only on static evidence. Require in-game observation or a confirmed authored-axis mismatch before applying an orientation fix.
 
 ## Pitfalls and evidence limits

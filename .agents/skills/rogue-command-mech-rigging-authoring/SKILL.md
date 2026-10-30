@@ -49,6 +49,15 @@ Reverse engineering of Rogue Command 1.0.9 (e.g. `GatlingWalker` in `resources.a
 - Assign 100% weight ($1.0$) of each armor plate or hydraulic cylinder to exactly one parent bone.
 - Add an `Armature` modifier pointing to the armature object on all skinned meshes.
 
+### Multi-leg (hexapod) rigs
+- Model six leg chains as `FL`/`FR`/`RL`/`RR` plus `ML`/`MR`. Add `Bone_Thigh_ML/MR`, `Bone_Shin_*`, and `Bone_Foot_*`, and bind middle meshes to those bones; do not leave mid armor on `Bone_Hull`.
+- Animate the middle legs in `Action_Walk` as part of a tripod gait (for example, `ML` with `FR`/`RL` and `MR` with `FL`/`RR`). Otherwise the middle legs remain static while the outer legs move.
+- Derive each leg tag from the authored token between `CrawlerLeg_` and the next underscore (`L_F`, `R_R`, etc.). Do not use substring checks for `FL`/`FR`/`RL`/`RR`: names such as `..._FemurBoom` contain `R_F` and misclassify legs.
+
+### Rigid rebinding hygiene
+- Before reassigning weights, remove all existing vertex groups and Armature modifiers from each mesh. Otherwise stale groups persist and the mesh is not rigidly bound to exactly one bone.
+- Call `assign_rigid_mesh_weights(..., leg_type=...)` in the rigged build script before `batch_and_join_by_material` and FBX export. Generating animation clips alone does not repair stale source weights.
+
 ### Step 4: Animate In-Place Locomotion & Actions
 - **Strict In-Place Invariant:** Root bone `Bone_Root` must have zero position delta across the entire clip ($\Delta X = 0, \Delta Y = 0, \Delta Z = 0$). `EntityFlockingMovement` translates the unit in the game grid.
 - Keyframe the 4 standard actions:
