@@ -1,13 +1,13 @@
 using System;
 using System.Collections.Generic;
+using BepInEx.Configuration;
 using UnityEngine;
 
 namespace RogueCommandExpansionLoader.Runtime
 {
     /// <summary>
     /// In-game diagnostic overlay and mod inspector for Rogue Command Expansion Loader.
-    /// Provides an accessible, high-contrast dark UI (accessible via F8 or screen badge)
-    /// to inspect loaded packs, units, stages, AI modules, and runtime logs.
+    /// Provides the high-contrast inspector via configurable Inspector.ToggleKey (F8 by default) or the screen badge, for inspecting loaded packs, units, stages, AI modules, and runtime logs.
     /// </summary>
     public sealed class RuntimeOverlayUi : MonoBehaviour
     {
@@ -19,6 +19,7 @@ namespace RogueCommandExpansionLoader.Runtime
         private RuntimePatchInstallationResult _patchResult;
         private string _compatibilityError;
         private Action<string> _logWarning;
+        private ConfigEntry<KeyboardShortcut> _toggleShortcut;
 
         private bool _isOpen;
         private bool _watermarkVisible = true;
@@ -65,14 +66,22 @@ namespace RogueCommandExpansionLoader.Runtime
             IRuntimeContentProvider provider,
             string pluginVersion,
             RuntimePatchInstallationResult patchResult,
+            ConfigFile config,
             string compatibilityError = null,
             Action<string> logWarning = null)
         {
+            if (config == null)
+            {
+                throw new ArgumentNullException(nameof(config));
+            }
+
             _provider = provider;
             _pluginVersion = pluginVersion ?? "1.19.0";
             _patchResult = patchResult;
             _compatibilityError = compatibilityError;
             _logWarning = logWarning;
+            _toggleShortcut = config.Bind("Inspector", "ToggleKey", new KeyboardShortcut(KeyCode.F8),
+                "Toggle the loader inspector. Supports a key with optional modifier keys.");
         }
 
         private void Update()
@@ -83,15 +92,11 @@ namespace RogueCommandExpansionLoader.Runtime
                 _nextSnapshotRefresh = Time.unscaledTime + 1f;
             }
 
-            if (Input.GetKeyDown(KeyCode.F8) || Input.GetKeyDown(KeyCode.F10))
-            {
-                _isOpen = !_isOpen;
-            }
-
-            if (_isOpen && Input.GetKeyDown(KeyCode.Escape))
-            {
-                _isOpen = false;
-            }
+            bool closePressed = Input.GetKeyDown(KeyCode.Escape);
+            _isOpen = InspectorTogglePolicy.Resolve(
+                _isOpen,
+                _toggleShortcut != null && _toggleShortcut.Value.IsDown(),
+                closePressed);
         }
 
         private void OnGUI()
@@ -146,6 +151,11 @@ namespace RogueCommandExpansionLoader.Runtime
             }
         }
 
+        private string GetToggleShortcutText()
+        {
+            return _toggleShortcut == null ? "F8" : _toggleShortcut.Value.ToString();
+        }
+
         private void DrawWatermark()
         {
             float width = 230f;
@@ -156,7 +166,7 @@ namespace RogueCommandExpansionLoader.Runtime
 
             bool isHealthy = _compatibilityError == null && (_patchResult == null || _patchResult.Success);
             string statusDot = isHealthy ? "[OK]" : "[ERR]";
-            string text = "RCL v" + _pluginVersion + " " + statusDot + " | F8: Inspector";
+            string text = "RCL v" + _pluginVersion + " " + statusDot + " | " + GetToggleShortcutText() + ": Inspector";
 
             Color origColor = GUI.backgroundColor;
             GUI.backgroundColor = isHealthy ? new Color(0.12f, 0.16f, 0.23f, 0.92f) : new Color(0.35f, 0.10f, 0.10f, 0.95f);
@@ -259,7 +269,7 @@ namespace RogueCommandExpansionLoader.Runtime
             Rect footerRect = new Rect(x + 16, y + WindowHeight - 38, WindowWidth - 32, 28);
             GUILayout.BeginArea(footerRect);
             GUILayout.BeginHorizontal();
-            GUILayout.Label("Atajos: F8/F10 para alternar • Esc para cerrar", _styleLabelMuted);
+            GUILayout.Label("Atajos: " + GetToggleShortcutText() + " para alternar • Esc para cerrar", _styleLabelMuted);
             GUILayout.FlexibleSpace();
             if (GUILayout.Button("Cerrar", _styleTabInactive, GUILayout.Width(80), GUILayout.Height(24)))
             {

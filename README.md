@@ -115,9 +115,9 @@ Estos edificios parten de los prefabs de sus fábricas nativas, con identidad, b
 
 El paquete final también adapta la distancia de edificios AI para etapas propias añadidas: en Steam, el índice 12 usó la franja nativa configurada (29 celdas) y dejó de emitir `Unknown stage`. La lista de fallbacks conserva nueve entradas nativas y devuelve un snapshot de 13 para la progresión ampliada.
 
-## Diagnóstico e Inspector en el Juego (F8 / F10)
+## Diagnóstico e Inspector en el Juego (atajo configurable)
 
-El loader incluye un inspector visual integrado accesible mediante **F8** o **F10** (o haciendo clic en la marca de agua superior derecha):
+Una función configurable de BepInEx (`Inspector.ToggleKey`, **F8 inicial**) alterna únicamente la ventana; la marca de agua/badge permanece disponible. La tecla o combinación actual se muestra en el badge y el pie. **F10 ya no es un atajo separado**, pero puede asignarse en esa configuración. Escape cierra el inspector.
 
 - **Marca de agua:** Muestra el estado del loader y versión (`RCL v1.19.0 [OK]`).
 - **6 pestañas interactivas:**

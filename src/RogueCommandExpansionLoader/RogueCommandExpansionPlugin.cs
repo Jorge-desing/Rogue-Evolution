@@ -178,6 +178,7 @@ namespace RogueCommandExpansionLoader
                     provider,
                     PluginVersion,
                     patchResult,
+                    Config,
                     compatibilityError,
                     message => Logger.LogWarning(message));
             }

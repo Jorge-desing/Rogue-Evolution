@@ -70,6 +70,17 @@ internal static partial class ValidationTestRunner
             throw new InvalidOperationException("An empty log should not produce a burst summary.");
         }
     }),
+    ("inspector toggle policy opens, toggles, and gives close precedence", () =>
+    {
+        if (!InspectorTogglePolicy.Resolve(false, true, false) ||
+            InspectorTogglePolicy.Resolve(true, true, false) ||
+            InspectorTogglePolicy.Resolve(true, false, true) ||
+            InspectorTogglePolicy.Resolve(false, true, true) ||
+            InspectorTogglePolicy.Resolve(false, false, false))
+        {
+            throw new InvalidOperationException("Toggle should invert state unless close is pressed, which must leave the inspector closed.");
+        }
+    }),
     ("range display resolves selected player radii in world units", () =>
     {
         RangeDisplayEntityState entity = new RangeDisplayEntityState(
