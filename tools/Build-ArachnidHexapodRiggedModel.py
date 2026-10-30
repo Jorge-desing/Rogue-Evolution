@@ -59,8 +59,7 @@ def build_arachnid_hexapod_rigged_model() -> None:
     actions = rmk.generate_procedural_action_clips(armature, prefix=UNIT_NAME, leg_type="quad")
     _validate_root_motion(armature, actions["Walk"])
 
-    # Rebuild Walk animation from scratch: strip hull movement so ONLY legs animate.
-    # Remove all Bone_Hull keyframes, then re-generate only leg rotations.
+    # Strip hull movement from Walk so ONLY legs animate (no body bob/pitch/roll).
     walk_act = actions["Walk"]
     for fc in list(walk_act.fcurves):
         if 'Bone_Hull' in fc.data_path:
@@ -69,10 +68,17 @@ def build_arachnid_hexapod_rigged_model() -> None:
     bpy.context.view_layer.update()
     bpy.ops.wm.save_as_mainfile(filepath=str(RIGGED_BLEND))
 
-    # Export with armature and animations (no batching - use original meshes)
+    # Export with armature and animations
+    batched_meshes = rmk.batch_and_join_by_material(
+        meshes,
+        prefix=UNIT_NAME,
+        smooth_by_angle=True,
+        weighted_normals=True,
+        unity_batch_names=True,
+    )
     rmk.export_unity_fbx(
         FBX_PATH,
-        list(meshes) + [armature],
+        list(batched_meshes) + [armature],
         include_empties=False,
         include_armature=True,
         bake_anim=True,
