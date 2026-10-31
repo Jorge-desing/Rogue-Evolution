@@ -63,6 +63,7 @@ namespace RogueCommandExpansionLoader
                 modules.Register(new SkirmishKitingAiModule());
                 modules.Register(new SupportRepairAiModule());
                 modules.Register(new WaveEscalationAiModule());
+                modules.Register(new ThreatPrioritizationAiModule());
 
                 string packsRoot = System.IO.Path.Combine(
                     Paths.PluginPath,

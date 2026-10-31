@@ -163,6 +163,10 @@
              Link="Modules/WaveEscalationParameters.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Modules/WaveEscalationAiModule.cs"
              Link="Modules/WaveEscalationAiModule.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Modules/ThreatPrioritizationParameters.cs"
+             Link="Modules/ThreatPrioritizationParameters.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Modules/ThreatPrioritizationAiModule.cs"
+             Link="Modules/ThreatPrioritizationAiModule.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Contracts/IRogueCommandAiModule.cs"
              Link="Contracts/IRogueCommandAiModule.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Modules/AiModuleRegistry.cs"
