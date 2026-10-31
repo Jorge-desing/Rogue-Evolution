@@ -499,6 +499,59 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             res = _call_diagnostics_method(getter, args_list)
             return _tool_response(res)
 
+        elif name == "diagnostics_get_battlefield_census":
+            res = _call_diagnostics_method("GetBattlefieldCensusJson")
+            return _tool_response(res)
+
+        elif name == "diagnostics_get_player_roster":
+            res = _call_diagnostics_method("GetPlayerRosterJson")
+            return _tool_response(res)
+
+        elif name == "diagnostics_get_ai_roster":
+            res = _call_diagnostics_method("GetAiRosterJson")
+            return _tool_response(res)
+
+        elif name == "diagnostics_get_unit_threat_assessment":
+            res = _call_diagnostics_method("GetUnitThreatAssessmentJson")
+            return _tool_response(res)
+
+        elif name == "diagnostics_get_economy_match_census":
+            res = _call_diagnostics_method("GetEconomyMatchCensusJson")
+            return _tool_response(res)
+
+        elif name == "diagnostics_get_combat_status_census":
+            res = _call_diagnostics_method("GetCombatStatusCensusJson")
+            return _tool_response(res)
+
+        elif name == "diagnostics_get_entity_balance":
+            eid = arguments.get("entityId", "")
+            res = _call_diagnostics_method("GetEntityBalanceJson", [eid])
+            return _tool_response(res)
+
+        elif name == "diagnostics_get_runtime_hooks":
+            res = _call_diagnostics_method("GetRuntimeHooksStateJson")
+            return _tool_response(res)
+
+        elif name == "diagnostics_get_registered_profiles":
+            res = _call_diagnostics_method("GetRegisteredProfilesJson")
+            return _tool_response(res)
+
+        elif name == "diagnostics_get_installed_patches":
+            res = _call_diagnostics_method("GetInstalledPatchNamesJson")
+            return _tool_response(res)
+
+        elif name == "diagnostics_get_applied_baseline_effects":
+            res = _call_diagnostics_method("GetAppliedBaselineEffectsJson")
+            return _tool_response(res)
+
+        elif name == "diagnostics_get_combat_xp_entries":
+            res = _call_diagnostics_method("GetCombatXpEntriesJson")
+            return _tool_response(res)
+
+        elif name == "diagnostics_get_ai_modules":
+            res = _call_diagnostics_method("GetAiModulesDiagnosticsJson")
+            return _tool_response(res)
+
         else:
             return _tool_response(f"Unknown tool: {name}", is_error=True)
 

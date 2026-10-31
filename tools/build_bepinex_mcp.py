@@ -768,6 +768,78 @@ TOOL_SPECS = [
             "additionalProperties": False,
         },
     },
+    {
+        "name": "diagnostics_get_battlefield_census",
+        "description": "Queries live battlefield census (counts + per-player-unit rows) from LoaderDiagnosticsComponent.",
+        "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
+    },
+    {
+        "name": "diagnostics_get_player_roster",
+        "description": "Queries live player roster census with base balance params from LoaderDiagnosticsComponent.",
+        "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
+    },
+    {
+        "name": "diagnostics_get_ai_roster",
+        "description": "Queries live AI units/buildings roster with base balance params from LoaderDiagnosticsComponent.",
+        "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
+    },
+    {
+        "name": "diagnostics_get_unit_threat_assessment",
+        "description": "Queries per-unit threat scores (DPS x health ratio) from LoaderDiagnosticsComponent.",
+        "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
+    },
+    {
+        "name": "diagnostics_get_economy_match_census",
+        "description": "Queries match economy, wave, and harvester census from LoaderDiagnosticsComponent.",
+        "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
+    },
+    {
+        "name": "diagnostics_get_combat_status_census",
+        "description": "Queries combat-active status effects census from LoaderDiagnosticsComponent.",
+        "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
+    },
+    {
+        "name": "diagnostics_get_entity_balance",
+        "description": "Queries base balance parameters for one unit by entity id from LoaderDiagnosticsComponent.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "entityId": {"type": "string", "description": "Entity id to look up."},
+            },
+            "required": ["entityId"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "diagnostics_get_runtime_hooks",
+        "description": "Queries installed Harmony hooks and registered combat XP count from LoaderDiagnosticsComponent.",
+        "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
+    },
+    {
+        "name": "diagnostics_get_registered_profiles",
+        "description": "Queries registered AI module profile ids from LoaderDiagnosticsComponent.",
+        "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
+    },
+    {
+        "name": "diagnostics_get_installed_patches",
+        "description": "Queries names of installed Harmony patches from LoaderDiagnosticsComponent.",
+        "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
+    },
+    {
+        "name": "diagnostics_get_applied_baseline_effects",
+        "description": "Queries applied baseline effects count and names from LoaderDiagnosticsComponent.",
+        "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
+    },
+    {
+        "name": "diagnostics_get_combat_xp_entries",
+        "description": "Queries combat XP entries by entity key from LoaderDiagnosticsComponent.",
+        "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
+    },
+    {
+        "name": "diagnostics_get_ai_modules",
+        "description": "Queries registered AI modules diagnostics from LoaderDiagnosticsComponent.",
+        "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
+    },
 ]
 
 
