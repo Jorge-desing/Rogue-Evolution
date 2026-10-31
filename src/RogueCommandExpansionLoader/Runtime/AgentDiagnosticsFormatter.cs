@@ -401,6 +401,29 @@ namespace RogueCommandExpansionLoader.Runtime
         }
 
         /// <summary>
+        /// Serializes aggregated threat-prioritization telemetry collected from all
+        /// active runtime behaviours. Readable by an agent without a visual capture.
+        /// </summary>
+        public static string SerializeThreatPrioritizationCensus(
+            int activeBehaviourCount,
+            int processedAiUnitCount,
+            int processedAlliedUnitCount,
+            int lastRetargetedCount,
+            int totalRetargetCommandCount)
+        {
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "threatPrioritizationCensus",
+                ["activeBehaviourCount"] = activeBehaviourCount < 0 ? 0 : activeBehaviourCount,
+                ["processedAiUnitCount"] = processedAiUnitCount < 0 ? 0 : processedAiUnitCount,
+                ["processedAlliedUnitCount"] = processedAlliedUnitCount < 0 ? 0 : processedAlliedUnitCount,
+                ["lastRetargetedCount"] = lastRetargetedCount < 0 ? 0 : lastRetargetedCount,
+                ["totalRetargetCommandCount"] = totalRetargetCommandCount < 0 ? 0 : totalRetargetCommandCount,
+            };
+            return Serialize(view);
+        }
+
+        /// <summary>
         /// Serializes the live player roster enriched with base balance parameters.
         /// </summary>
         public static string SerializePlayerRoster(PlayerRosterCensus census)

@@ -13,16 +13,47 @@ namespace RogueCommandExpansionLoader.Modules
     {
         public const int CurrentApiVersion = 1;
 
-        public static AiModuleRegistry Active { get; set; }
+        private static AiModuleRegistry _active;
+
+        public static AiModuleRegistry Active
+        {
+            get => _active ??= CreateDefault();
+            set => _active = value;
+        }
 
         public AiModuleRegistry()
         {
-            Active = this;
         }
 
         public static void ResetActive()
         {
-            Active = null;
+            _active = null;
+        }
+
+        public static AiModuleRegistry CreateDefault()
+        {
+            var modules = new AiModuleRegistry();
+            modules.Register(new TraceDefaultAiModule());
+            modules.Register(new ScheduledBaseBuildAiModule());
+            modules.Register(new ReactiveBaseDefenseAiModule());
+            modules.Register(new HarvesterRaiderAiModule());
+            modules.Register(new SiegeAssaultAiModule());
+            modules.Register(new RetreatAndRegroupAiModule());
+            modules.Register(new HarvesterEscortAiModule());
+            modules.Register(new PatrolAndInterceptAiModule());
+            modules.Register(new FactoryReinforcementAiModule());
+            modules.Register(new FlankingStrikeAiModule());
+            modules.Register(new FocusFireAiModule());
+            modules.Register(new ConstructionExpansionAiModule());
+            modules.Register(new TacticalRegroupAiModule());
+            modules.Register(new SquadFormationAiModule());
+            modules.Register(new TacticalSkillActivationAiModule());
+            modules.Register(new CounterBatteryAiModule());
+            modules.Register(new SkirmishKitingAiModule());
+            modules.Register(new SupportRepairAiModule());
+            modules.Register(new WaveEscalationAiModule());
+            modules.Register(new ThreatPrioritizationAiModule());
+            return modules;
         }
 
         public IReadOnlyCollection<string> RegisteredModuleIds

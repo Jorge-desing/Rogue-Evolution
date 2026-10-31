@@ -1420,5 +1420,50 @@ internal static partial class ValidationTestRunner
             throw new InvalidOperationException("Duplicate unit IDs in a pool entry must be rejected.");
         }
     }),
+    ("blueprint reward factory scope correctly identifies stage factories", () =>
+    {
+        var loaderFactories = new[] { "test:factory-a", "test:factory-b" };
+        var stageFactories = new[] { "test:factory-a" };
+        var factoryProducts = new Dictionary<string, string>
+        {
+            ["test:unit-a"] = "test:factory-a",
+            ["test:unit-b"] = "test:factory-b"
+        };
+        var scope = new BlueprintRewardFactoryScope(loaderFactories, stageFactories, factoryProducts, 0, "stage-0");
+
+        if (!scope.IsLoaderFactory("test:factory-a") || !scope.IsStageFactory("test:factory-a"))
+        {
+            throw new InvalidOperationException("Stage factory must be recognized by IsStageFactory.");
+        }
+        if (!scope.IsLoaderFactory("test:factory-b") || scope.IsStageFactory("test:factory-b"))
+        {
+            throw new InvalidOperationException("Loader factory not declared in stage must be rejected by IsStageFactory.");
+        }
+        if (scope.IsStageFactory("nonexistent:factory") || scope.IsStageFactory(null!))
+        {
+            throw new InvalidOperationException("Unknown or null factory must return false for IsStageFactory.");
+        }
+    }),
+    ("blueprint pool scope registry queries unit membership by source pool id", () =>
+    {
+        var registry = new BlueprintPoolScopeRegistry();
+        var poolObj = new object();
+        var units = new HashSet<string> { "sample:unit-1", "sample:unit-2" };
+        var reg = new BlueprintPoolScopeRegistration("scoped_pool_1", "stage-1", poolObj, units, false, "source_pool_a");
+        registry.Register([reg]);
+
+        if (!registry.AllowsModUnitInSourcePool(poolObj, "source_pool_a", "sample:unit-1") ||
+            !registry.AllowsModUnitInSourcePool(poolObj, "source_pool_a", "sample:unit-2"))
+        {
+            throw new InvalidOperationException("Units in source pool must be allowed by AllowsModUnitInSourcePool.");
+        }
+        if (registry.AllowsModUnitInSourcePool(poolObj, "source_pool_a", "sample:unit-3") ||
+            registry.AllowsModUnitInSourcePool(poolObj, "other_source_pool", "sample:unit-1") ||
+            registry.AllowsModUnitInSourcePool(new object(), "source_pool_a", "sample:unit-1") ||
+            registry.AllowsModUnitInSourcePool(null, "source_pool_a", "sample:unit-1"))
+        {
+            throw new InvalidOperationException("Unregistered units, source pools, or pool objects must be rejected.");
+        }
+    }),
     };
 }

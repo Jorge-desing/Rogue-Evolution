@@ -43,27 +43,8 @@ namespace RogueCommandExpansionLoader
                 Logger.LogInfo("[ExpansionLoader] Scene transition diagnostics subscribed.");
                 InitializeRangeDisplay();
 
-                var modules = new AiModuleRegistry();
-                modules.Register(new TraceDefaultAiModule());
-                modules.Register(new ScheduledBaseBuildAiModule());
-                modules.Register(new ReactiveBaseDefenseAiModule());
-                modules.Register(new HarvesterRaiderAiModule());
-                modules.Register(new SiegeAssaultAiModule());
-                modules.Register(new RetreatAndRegroupAiModule());
-                modules.Register(new HarvesterEscortAiModule());
-                modules.Register(new PatrolAndInterceptAiModule());
-                modules.Register(new FactoryReinforcementAiModule());
-                modules.Register(new FlankingStrikeAiModule());
-                modules.Register(new FocusFireAiModule());
-                modules.Register(new ConstructionExpansionAiModule());
-                modules.Register(new TacticalRegroupAiModule());
-                modules.Register(new SquadFormationAiModule());
-                modules.Register(new TacticalSkillActivationAiModule());
-                modules.Register(new CounterBatteryAiModule());
-                modules.Register(new SkirmishKitingAiModule());
-                modules.Register(new SupportRepairAiModule());
-                modules.Register(new WaveEscalationAiModule());
-                modules.Register(new ThreatPrioritizationAiModule());
+                var modules = AiModuleRegistry.CreateDefault();
+                AiModuleRegistry.Active = modules;
 
                 string packsRoot = System.IO.Path.Combine(
                     Paths.PluginPath,

@@ -2699,9 +2699,11 @@ internal static partial class ValidationTestRunner
     }),
     ("runtime ai modules census captures registered modules and serializes cleanly", () =>
     {
+        AiModuleRegistry prevActive = AiModuleRegistry.Active;
         try
         {
-            AiModuleRegistry.ResetActive();
+            var isolated = new AiModuleRegistry();
+            AiModuleRegistry.Active = isolated;
             AiModulesCensus emptyCensus = RuntimeAiModulesCensus.Current();
             if (emptyCensus == null || emptyCensus.RegisteredModuleCount != 0 || emptyCensus.ModuleRows.Count != 0)
             {
@@ -2718,8 +2720,7 @@ internal static partial class ValidationTestRunner
                 }
             }
 
-            var registry = new AiModuleRegistry();
-            registry.Register(new ThreatPrioritizationAiModule());
+            isolated.Register(new ThreatPrioritizationAiModule());
             AiModulesCensus activeCensus = RuntimeAiModulesCensus.Current();
             if (activeCensus.RegisteredModuleCount != 1 || activeCensus.ModuleRows.Count != 1)
             {
@@ -2752,7 +2753,7 @@ internal static partial class ValidationTestRunner
         }
         finally
         {
-            AiModuleRegistry.ResetActive();
+            AiModuleRegistry.Active = prevActive;
         }
     }),
     ("runtime economy census captures match telemetry and degrades safely", () =>
@@ -2913,6 +2914,44 @@ internal static partial class ValidationTestRunner
             {
                 throw new InvalidOperationException("Null system health must serialize safe default primitive values.");
             }
+        }
+    }),
+    ("runtime card change applier availability check handles unreflected state safely", () =>
+    {
+        if (RuntimeCardChangeApplier.IsAvailable(null))
+        {
+            throw new InvalidOperationException("IsAvailable must return false when native assembly/reflection is unavailable.");
+        }
+    }),
+    ("threat-prioritization census serializes telemetry and live registry", () =>
+    {
+        ThreatPrioritizationAiModule.ThreatPrioritizationRuntimeBehaviour.ResetThreatPrioritizationRegistryForTests();
+        string json = AgentDiagnosticsFormatter.SerializeThreatPrioritizationCensus(2, 5, 3, 1, 4);
+        using (var doc = JsonDocument.Parse(json))
+        {
+            if (doc.RootElement.GetProperty("activeBehaviourCount").GetInt32() != 2 ||
+                doc.RootElement.GetProperty("processedAiUnitCount").GetInt32() != 5 ||
+                doc.RootElement.GetProperty("processedAlliedUnitCount").GetInt32() != 3 ||
+                doc.RootElement.GetProperty("lastRetargetedCount").GetInt32() != 1 ||
+                doc.RootElement.GetProperty("totalRetargetCommandCount").GetInt32() != 4)
+            {
+                throw new InvalidOperationException("Threat-prioritization census did not preserve telemetry values.");
+            }
+        }
+
+        string nullSafeJson = AgentDiagnosticsFormatter.SerializeThreatPrioritizationCensus(-1, -2, -3, -4, -5);
+        using (var doc = JsonDocument.Parse(nullSafeJson))
+        {
+            if (doc.RootElement.GetProperty("activeBehaviourCount").GetInt32() != 0 ||
+                doc.RootElement.GetProperty("processedAiUnitCount").GetInt32() != 0)
+            {
+                throw new InvalidOperationException("Threat-prioritization census must clamp negative telemetry to zero.");
+            }
+        }
+
+        if (ThreatPrioritizationAiModule.ThreatPrioritizationRuntimeBehaviour.ActiveBehaviourCount < 0)
+        {
+            throw new InvalidOperationException("Threat-prioritization registry count must be non-negative.");
         }
     }),
     };

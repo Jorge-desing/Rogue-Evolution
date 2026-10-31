@@ -175,6 +175,8 @@
              Link="Modules/ThreatPrioritizationAiModule.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Contracts/IRogueCommandAiModule.cs"
              Link="Contracts/IRogueCommandAiModule.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Modules/TraceDefaultAiModule.cs"
+             Link="Modules/TraceDefaultAiModule.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Modules/AiModuleRegistry.cs"
              Link="Modules/AiModuleRegistry.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Modules/CompositeAiRuntimeBehaviour.cs"

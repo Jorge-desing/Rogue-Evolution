@@ -117,21 +117,5 @@ namespace RogueCommandExpansionLoader.Runtime
                 collectionType.GetGenericArguments()[0] == elementType;
         }
 
-        public static FieldInfo FindInstanceListField(Type ownerType, string name, Type elementType)
-        {
-            FieldInfo field = FindField(ownerType, name, AllFields);
-            if (field.IsStatic || !IsExactList(field.FieldType, elementType))
-            {
-                throw new InvalidOperationException("Field '" + ownerType.FullName + "." + name +
-                    "' is not an instance List<" + elementType.Name + ">.");
-            }
-
-            return field;
-        }
-
-        public static bool IsGameType(Type type, string simpleName)
-        {
-            return type != null && String.Equals(type.Name, simpleName, StringComparison.Ordinal);
-        }
     }
 }

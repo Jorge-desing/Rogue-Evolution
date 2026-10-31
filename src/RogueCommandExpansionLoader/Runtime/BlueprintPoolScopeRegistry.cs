@@ -258,6 +258,17 @@ namespace RogueCommandExpansionLoader.Runtime
             return AllowsModUnitInPool(pool, unitId, false, true, false, true);
         }
 
+        public bool AllowsModUnitInSourcePool(object pool, string sourcePoolId, string unitId)
+        {
+            lock (_gate)
+            {
+                BlueprintPoolScopeRegistration registration;
+                return pool != null &&
+                       _byReference.TryGetValue(pool, out registration) &&
+                       registration.ContainsUnitInSourcePool(sourcePoolId, unitId);
+            }
+        }
+
         /// <summary>
         /// Allows a namespaced unit only in its stage-owned clone and rejects it in demo runs
         /// when its registered balance row is not demo eligible.

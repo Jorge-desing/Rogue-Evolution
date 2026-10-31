@@ -51,11 +51,108 @@ namespace RogueCommandExpansionLoader.Modules
             private int _totalRetargetCommandCount;
             private HashSet<EntityController> _autoControlledAlliedUnits;
 
+            private static readonly object _registryLock = new object();
+            private static readonly List<ThreatPrioritizationRuntimeBehaviour> _activeBehaviours =
+                new List<ThreatPrioritizationRuntimeBehaviour>();
+
             public ThreatPrioritizationRuntimeBehaviour(DefaultAiBehaviour gameBehaviour, ThreatPrioritizationSettings settings)
             {
                 _gameBehaviour = gameBehaviour;
                 _settings = settings;
                 _commandTag = "roguecommand.expansionloader.threat-prioritization." + Guid.NewGuid().ToString("N");
+                lock (_registryLock)
+                {
+                    _activeBehaviours.Add(this);
+                }
+            }
+
+            public static int ActiveBehaviourCount
+            {
+                get { lock (_registryLock) { return _activeBehaviours.Count; } }
+            }
+
+            public static int AggregateLastProcessedAiUnitCount
+            {
+                get
+                {
+                    lock (_registryLock)
+                    {
+                        int sum = 0;
+                        foreach (ThreatPrioritizationRuntimeBehaviour behaviour in _activeBehaviours)
+                        {
+                            if (behaviour != null && !behaviour._stopped)
+                            {
+                                sum += behaviour._lastProcessedAiUnitCount;
+                            }
+                        }
+                        return sum;
+                    }
+                }
+            }
+
+            public static int AggregateLastProcessedAlliedUnitCount
+            {
+                get
+                {
+                    lock (_registryLock)
+                    {
+                        int sum = 0;
+                        foreach (ThreatPrioritizationRuntimeBehaviour behaviour in _activeBehaviours)
+                        {
+                            if (behaviour != null && !behaviour._stopped)
+                            {
+                                sum += behaviour._lastProcessedAlliedUnitCount;
+                            }
+                        }
+                        return sum;
+                    }
+                }
+            }
+
+            public static int AggregateLastRetargetedCount
+            {
+                get
+                {
+                    lock (_registryLock)
+                    {
+                        int sum = 0;
+                        foreach (ThreatPrioritizationRuntimeBehaviour behaviour in _activeBehaviours)
+                        {
+                            if (behaviour != null && !behaviour._stopped)
+                            {
+                                sum += behaviour._lastRetargetedCount;
+                            }
+                        }
+                        return sum;
+                    }
+                }
+            }
+
+            public static int AggregateTotalRetargetCommandCount
+            {
+                get
+                {
+                    lock (_registryLock)
+                    {
+                        int sum = 0;
+                        foreach (ThreatPrioritizationRuntimeBehaviour behaviour in _activeBehaviours)
+                        {
+                            if (behaviour != null && !behaviour._stopped)
+                            {
+                                sum += behaviour._totalRetargetCommandCount;
+                            }
+                        }
+                        return sum;
+                    }
+                }
+            }
+
+            public static void ResetThreatPrioritizationRegistryForTests()
+            {
+                lock (_registryLock)
+                {
+                    _activeBehaviours.Clear();
+                }
             }
 
             public void OnInitialized()
@@ -331,14 +428,13 @@ namespace RogueCommandExpansionLoader.Modules
                 get { return _totalRetargetCommandCount; }
             }
 
-            public void OnDisposed()
-            {
-                _stopped = true;
-            }
-
             public void OnDestroyed()
             {
                 _stopped = true;
+                lock (_registryLock)
+                {
+                    _activeBehaviours.Remove(this);
+                }
             }
         }
     }

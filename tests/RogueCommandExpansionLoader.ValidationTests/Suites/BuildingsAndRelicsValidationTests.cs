@@ -870,5 +870,39 @@ internal static partial class ValidationTestRunner
         WithPackage(missingBundle, (p, root) => ExpectDiagnostic(p, root, new EmptySnapshot(),
             new KnownModuleValidator(), "building.audio-bundle-missing"));
     }),
+    ("production building factory row validation verifies building and factory roles", () =>
+    {
+        var validRow = new EntityBalancingParameters
+        {
+            roles = UnitRole.Building | UnitRole.Factory
+        };
+        if (!BalanceOverrideFlags.TryValidateFactoryRow(validRow, out string? diagnostic) || diagnostic != null)
+        {
+            throw new InvalidOperationException("Valid factory row with Building and Factory roles must pass validation.");
+        }
+
+        var missingFactoryRole = new EntityBalancingParameters
+        {
+            roles = UnitRole.Building
+        };
+        if (BalanceOverrideFlags.TryValidateFactoryRow(missingFactoryRole, out string? missingDiag) ||
+            missingDiag != "A production building must retain both Building and Factory roles.")
+        {
+            throw new InvalidOperationException("Factory row missing Factory role must be rejected.");
+        }
+
+        if (BalanceOverrideFlags.TryValidateFactoryRow(null, out string? nullDiag) ||
+            nullDiag != "A factory row is required.")
+        {
+            throw new InvalidOperationException("Null factory row must be rejected.");
+        }
+
+        var invalidType = new object();
+        if (BalanceOverrideFlags.TryValidateFactoryRow(invalidType, out string? noFieldDiag) ||
+            noFieldDiag != "The factory row has no verified UnitRole field.")
+        {
+            throw new InvalidOperationException("Row without UnitRole field must be rejected.");
+        }
+    }),
     };
 }

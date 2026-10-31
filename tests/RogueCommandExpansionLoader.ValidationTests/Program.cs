@@ -569,6 +569,10 @@ internal static partial class ValidationTestRunner
             {
                 return WaveEscalationParameterParser.TryParse(parameters, out _, out diagnostic);
             }
+            if (moduleId == "sample:threat-prioritization")
+            {
+                return ThreatPrioritizationParameterParser.TryParse(parameters, out _, out diagnostic);
+            }
 
             bool known = moduleId is "sample:scheduled-base-build" or "sample:reactive-base-defense" or "sample:trace-default";
             diagnostic = known ? string.Empty : "Unknown compiled AI module: " + moduleId;

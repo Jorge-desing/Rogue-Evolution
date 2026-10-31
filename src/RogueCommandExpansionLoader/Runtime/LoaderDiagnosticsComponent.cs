@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
 using RogueCommandExpansionLoader.Content;
+using RogueCommandExpansionLoader.Modules;
 using RogueCommandExpansionLoader.Runtime;
 using UnityEngine;
 
@@ -71,6 +72,8 @@ namespace RogueCommandExpansionLoader.Runtime
                 return snapshot != null && snapshot.IsNativeRegistryReady;
             }
         }
+
+        public bool IsNativeCardChangePipelineReady => RuntimeCardChangeApplier.IsAvailable(null);
 
         public int ActivePackCount
         {
@@ -376,6 +379,20 @@ namespace RogueCommandExpansionLoader.Runtime
         {
             return AgentDiagnosticsFormatter.SerializeUnitThreatAssessment(
                 RuntimeUnitThreatAssessment.Current());
+        }
+
+        /// <summary>
+        /// Returns aggregated threat-prioritization telemetry collected from all active
+        /// runtime behaviours as JSON an agent can read without a visual capture.
+        /// </summary>
+        public string GetThreatPrioritizationCensusJson()
+        {
+            return AgentDiagnosticsFormatter.SerializeThreatPrioritizationCensus(
+                ThreatPrioritizationAiModule.ThreatPrioritizationRuntimeBehaviour.ActiveBehaviourCount,
+                ThreatPrioritizationAiModule.ThreatPrioritizationRuntimeBehaviour.AggregateLastProcessedAiUnitCount,
+                ThreatPrioritizationAiModule.ThreatPrioritizationRuntimeBehaviour.AggregateLastProcessedAlliedUnitCount,
+                ThreatPrioritizationAiModule.ThreatPrioritizationRuntimeBehaviour.AggregateLastRetargetedCount,
+                ThreatPrioritizationAiModule.ThreatPrioritizationRuntimeBehaviour.AggregateTotalRetargetCommandCount);
         }
 
         /// <summary>
