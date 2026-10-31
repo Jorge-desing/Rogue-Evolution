@@ -98,6 +98,24 @@ namespace RogueCommandExpansionLoader.Modules
                                 if (ally != null)
                                 {
                                     autoControlledAllies.Add(ally);
+                                    // Real control reassignment (REA-verified setters: set_IsControlledByPlayer(bool), set_IsControlledByAi(bool)).
+                                    try
+                                    {
+                                        System.Reflection.PropertyInfo pPlayer = typeof(EntityController).GetProperty("IsControlledByPlayer");
+                                        if (pPlayer != null && pPlayer.CanWrite)
+                                        {
+                                            pPlayer.SetValue(ally, false, null);
+                                        }
+                                        System.Reflection.PropertyInfo pAi = typeof(EntityController).GetProperty("IsControlledByAi");
+                                        if (pAi != null && pAi.CanWrite)
+                                        {
+                                            pAi.SetValue(ally, true, null);
+                                        }
+                                    }
+                                    catch
+                                    {
+                                        // Guarded: control reassignment must never break the tick.
+                                    }
                                 }
                             }
                         }
