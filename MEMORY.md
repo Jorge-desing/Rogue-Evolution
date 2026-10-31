@@ -267,3 +267,23 @@ This is a compact, durable orientation for agents. For the changing checkout sta
 - Uncommitted working-tree preserved: untracked `.agents/skills/rogue-command-game-research/references/`; nested worktree gitlinks `cargador` (11e9968, dirty) and `task-graph-validation` (d1f9045, dirty); staged Unity prefab reductions and untracked `unity/.../SampleExpansion/` (+meta) remain untouched.
 - Validation: Release plugin build 0 warnings/0 errors; C# harness 392/393 passed (1 skip); Python suite 86/86 passed; `validate_loader_registry.py` passed 4/4 manifests.
 - Profile2 dedicated QA without tutorial; protect saves. Before reflection verify Rogue Command version, Unity `2021.3.45f2`, Assembly-CSharp SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, MVID `db0e9462-128d-4296-9900-de18b4bd0c00`. Root MEMORY.md synced to HEAD 57e19b8.
+
+## Refresh (2026-10-31, HEAD 638bf71)
+
+- Repository: `C:/Users/Alex/Documents/Mod Rogue Command`, loader `1.19.0`, branch `codex/rogue-unit-balance-20261018`. Repository HEAD/upstream/origin `638bf71` (`feat(diagnostics): add terrain grid census, active skill director, vitality adjustments, and status effect controls`). Code baseline remains `0bbede6b7beb68f8f50f4ae89f10e83ecb056c0d`. Implementation baseline remains `e25c6de` (arachnid middle-leg orientation normalizer); remains `d7a3a11b56b58bed6d3f06c47fd40a627c9d1ae3`.
+- New committed scope (commit `638bf71`):
+  - `RuntimeGridCensus.cs`: Clean-room runtime grid telemetry and `GridMetricsCensus` / `GridCellEvaluationResult` DTOs:
+    - `Current()`: Safely extracts `WorldGrid` terrain dimensions (`WorldWidth`, `WorldHeight`), cell counts (`HorizontalCellCount`, `VerticalCellCount`), cell size (`CellSize`), and player/AI start positions.
+    - `EvaluatePosition(x, z)`: Pure diagnostic evaluation checking if a coordinate is within world bounds, computing clamped coordinates, grid cell indices, surface height, and border cell status.
+  - `RuntimeGameplayCommandDirector.cs` additions:
+    - `TryOrderActiveSkill(entityKeyId, targetEntityKeyId, targetX, targetZ)`: Dispatches active tactical skills across Self (`ActiveSkillWithoutTarget`), Target entity (`ActiveSkillOnTarget`), and Ground position (`ActiveSkillAtPosition`) modes.
+    - `TryAdjustEntityVitality(entityKeyId, adjustmentType, amount, ignoreArmor)`: In-game adjustments for `"Heal"`, `"RepairArmor"`, `"ChargeShield"`, and `"Damage"` (with optional armor penetration) to test combat triggers, low-health thresholds, and recovery mechanics.
+    - `TryApplyStatusEffect(entityKeyId, statusEffectName, durationSeconds)`: Dynamically applies status effects (`SlowedDown`, `OnFire`, `Electrified`, `Stun`, `CombatBoost`, etc.) with bounded duration.
+    - `TryClearStatusEffect(entityKeyId, statusEffectName)`: Removes active status effects.
+  - `AgentDiagnosticsFormatter.cs`: Serializers `SerializeActiveSkillOrderResult`, `SerializeVitalityAdjustmentResult`, `SerializeStatusEffectOrderResult`, `SerializeGridMetricsCensus`, and `SerializeGridCellEvaluationResult`. Diagnostic catalog expanded with 6 new endpoints.
+  - `LoaderDiagnosticsComponent.cs`: Exposes `OrderUnitActiveSkillJson`, `AdjustEntityVitalityJson`, `ApplyStatusEffectJson`, `ClearStatusEffectJson`, `GetGridMetricsJson`, and `EvaluateGridPositionJson`.
+  - `tools/build_bepinex_mcp.py` & `tools/bepinex_mcp_server.py`: Added 6 first-class MCP tools (total 85 tools), regenerated schemas in `C:\Users\Alex\.gemini\antigravity\mcp\bepinex_mcp\`.
+  - C# validation harness (`RuntimeAndDiagnosticsValidationTests.cs`): Added 4 new test suites covering active skills across all 3 targeting modes, vitality adjustments with armor absorption and penetration, status effect application/removal, and grid metrics/spatial evaluations. C# harness passes 396/397 (1 Windows symlink skip, 0 failures).
+- Uncommitted working-tree preserved: untracked `.agents/skills/rogue-command-game-research/references/`; nested worktree gitlinks `cargador` (11e9968, dirty) and `task-graph-validation` (d1f9045, dirty) remain untouched.
+- Validation: Release plugin build 0 warnings/0 errors; C# harness 396/397 passed (1 skip); Python suite 86/86 passed; `validate_loader_registry.py` passed 4/4 manifests.
+- Profile2 dedicated QA without tutorial; protect saves. Before reflection verify Rogue Command version, Unity `2021.3.45f2`, Assembly-CSharp SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, MVID `db0e9462-128d-4296-9900-de18b4bd0c00`. Root MEMORY.md synced to HEAD 638bf71.
