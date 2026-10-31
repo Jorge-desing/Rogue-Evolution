@@ -150,6 +150,29 @@ public static class ChangeArmorTranspiler
 6. Patch priority set when multiple plugins target the same method.
 7. Original method not bypassed unless the patch explicitly returns `false` (Prefix) or is a verified transpiler rewrite.
 
+### Optional target resolution (cross-version robustness)
+
+When adding hooks for native methods whose signatures may differ across game versions or whose presence is uncertain (e.g. `EntityController.Die`, `Heal`, `RepairArmor`):
+
+- Resolve the target with a **defensive wrapper** (`TryFindUniqueMethod`) that catches exceptions from `RuntimeReflection.FindUniqueMethod` and returns `null` on miss, instead of letting the miss throw and abort the whole patch plan.
+- Treat the patch wrapper method and the Harmony postfix as **optional**: only register them when both the target `MethodInfo` and the wrapper `MethodInfo` are non-null.
+- Gate the entire optional block behind a `if (target == null || wrapper == null) { return; }` (or skip) so a single missing target leaves every other verified patch intact.
+- Keep the wrapper body a no-op-safe extension point (`try/catch` + log) so a runtime surprise in the hook never propagates to the game.
+- **Do not** promote a missing optional target to a hard failure; only the pinned-identity gate (`GameCompatibility.TryValidate`) is a hard abort.
+
+Pattern:
+
+```csharp
+MethodInfo target = TryFindUniqueMethod(type, "Die", m => m.GetParameters().Length == 0);
+MethodInfo wrapper = target == null ? null : typeof(Hooks).GetMethod("DiePostfix");
+if (target == null || wrapper == null)
+{
+    // optional: skip without disabling the rest of the plan
+    return;
+}
+harmony.Patch(target, postfix: new HarmonyMethod(wrapper));
+```
+
 ## IL2CPP Considerations
 
 - Rogue Command 1.0.9 ships **Mono** (verified: `Assembly-CSharp.dll` in `Managed/`). IL2CPP is not the current backend, but the policy must remain posture-aware.
