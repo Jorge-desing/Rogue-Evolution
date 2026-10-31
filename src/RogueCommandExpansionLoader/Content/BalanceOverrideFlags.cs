@@ -149,36 +149,6 @@ namespace RogueCommandExpansionLoader.Content
             diagnostic = null;
             return true;
         }
-
-        public static bool TryValidateFactoryRow(object row, out string diagnostic)
-        {
-            diagnostic = null;
-            if (row == null)
-            {
-                diagnostic = "A factory row is required.";
-                return false;
-            }
-
-            FieldInfo rolesField = row.GetType().GetField("roles",
-                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-            if (rolesField == null || !rolesField.FieldType.IsEnum || rolesField.FieldType.Name != "UnitRole")
-            {
-                diagnostic = "The factory row has no verified UnitRole field.";
-                return false;
-            }
-
-            object value = rolesField.GetValue(row);
-            if (!(value is Enum roles) ||
-                !roles.HasFlag((Enum)Enum.Parse(rolesField.FieldType, "Building", false)) ||
-                !roles.HasFlag((Enum)Enum.Parse(rolesField.FieldType, "Factory", false)))
-            {
-                diagnostic = "A production building must retain both Building and Factory roles.";
-                return false;
-            }
-
-            return true;
-        }
-
         public static bool TryApply(
             object row,
             FieldInfo field,
