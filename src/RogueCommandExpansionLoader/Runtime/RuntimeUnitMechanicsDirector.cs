@@ -976,6 +976,48 @@ namespace RogueCommandExpansionLoader.Runtime
                         float mult = profile.ExperienceReward.bonusMultiplier > 0f ? profile.ExperienceReward.bonusMultiplier : 1f;
                         float reward = Mathf.Max(1f, (float)Math.Round(profile.ExperienceReward.experienceAmount * mult));
                         InvokeBankDeposit("Player", reward);
+
+                        // Persistent card-change augmentation on bounty kill (native
+                        // data-driven pipeline): the first bounty kill grants a
+                        // permanent Damage1 bonus to the killer. Tracked per unit.
+                        try
+                        {
+                            Assembly bountyAssembly = originatorObj.GetType().Assembly;
+                            int bountyUniqueId = ReadIntProperty(_uniqueEntityIdProperty, originatorObj, -1);
+                            if (bountyUniqueId > 0)
+                            {
+                                string bountyKey = bountyUniqueId.ToString() + "|bounty";
+                                bool alreadyApplied;
+                                lock (_appliedCardChangeBoostKeys)
+                                {
+                                    alreadyApplied = _appliedCardChangeBoostKeys.Contains(bountyKey);
+                                    if (!alreadyApplied)
+                                    {
+                                        _appliedCardChangeBoostKeys.Add(bountyKey);
+                                    }
+                                }
+                                if (!alreadyApplied)
+                                {
+                                    float bountyDamage = Mathf.Max(1f, reward * 0.5f);
+                                    CardChangeRequest bountyRequest = CardChangeRequest.Create(
+                                        "Damage1",
+                                        "Add",
+                                        bountyDamage,
+                                        false,
+                                        false,
+                                        "Friendly",
+                                        false,
+                                        null,
+                                        null,
+                                        "bounty:" + originatorId);
+                                    RuntimeCardChangeApplier.ApplyCardChange(bountyAssembly, bountyUniqueId, bountyRequest);
+                                }
+                            }
+                        }
+                        catch
+                        {
+                            // Guarded: bounty augmentation must never break reward.
+                        }
                     }
 
                     // 4. Vampiric Leech on dealt damage
