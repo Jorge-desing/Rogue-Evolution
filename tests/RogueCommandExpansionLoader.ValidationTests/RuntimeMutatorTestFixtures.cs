@@ -89,13 +89,42 @@ public static class EntityBalancingStore
     public static HashSet<string> BuildingEntityIds = new(StringComparer.Ordinal);
     public static Dictionary<string, UnitRole> RolesOf = new(StringComparer.Ordinal);
     public static Dictionary<string, float> MaxManaOf = new(StringComparer.Ordinal);
+    public static Dictionary<string, int> CostOf = new(StringComparer.Ordinal);
+    public static Dictionary<string, int> MaxHealthOf = new(StringComparer.Ordinal);
+    public static Dictionary<string, int> MaxShieldOf = new(StringComparer.Ordinal);
+    public static Dictionary<string, int> MaxRankOf = new(StringComparer.Ordinal);
+    public static Dictionary<string, float> MaxArmorOf = new(StringComparer.Ordinal);
+    public static Dictionary<string, float> MoveSpeedOf = new(StringComparer.Ordinal);
+    public static Dictionary<string, float> WeaponRangeOf = new(StringComparer.Ordinal);
+    public static Dictionary<string, float> DpsOf = new(StringComparer.Ordinal);
+    public static Dictionary<string, float> Damage1Of = new(StringComparer.Ordinal);
+    public static Dictionary<string, float> Damage2Of = new(StringComparer.Ordinal);
 
     public static bool IsBuilding(string entityId) => BuildingEntityIds.Contains(entityId);
-    public static int Cost(string entityId) => 100;
+    public static int Cost(string entityId, bool includeModified = false) =>
+        CostOf.TryGetValue(entityId, out var c) ? c : 100;
     public static bool HasRole(string entityId, UnitRole role) =>
         RolesOf.TryGetValue(entityId, out var r) ? (r & role) == role : false;
-    public static float MaxMana(string entityId) =>
+    public static float MaxMana(string entityId, bool includeModified = false) =>
         MaxManaOf.TryGetValue(entityId, out var m) ? m : 100f;
+    public static int MaxHealth(string entityId, bool includeModified = false) =>
+        MaxHealthOf.TryGetValue(entityId, out var v) ? v : 100;
+    public static int MaxShield(string entityId, bool includeModified = false) =>
+        MaxShieldOf.TryGetValue(entityId, out var v) ? v : 0;
+    public static int MaxRank(string entityId, bool includeModified = false) =>
+        MaxRankOf.TryGetValue(entityId, out var v) ? v : 1;
+    public static float MaxArmor(string entityId, bool includeModified = false) =>
+        MaxArmorOf.TryGetValue(entityId, out var v) ? v : 0f;
+    public static float MoveSpeed(string entityId, bool includeModified = false) =>
+        MoveSpeedOf.TryGetValue(entityId, out var v) ? v : 1f;
+    public static float WeaponRange(string entityId, bool includeModified = false) =>
+        WeaponRangeOf.TryGetValue(entityId, out var v) ? v : 0f;
+    public static float Dps(string entityId) =>
+        DpsOf.TryGetValue(entityId, out var v) ? v : 0f;
+    public static float Damage1(string entityId, bool includeModified = false) =>
+        Damage1Of.TryGetValue(entityId, out var v) ? v : 0f;
+    public static float Damage2(string entityId, bool includeModified = false) =>
+        Damage2Of.TryGetValue(entityId, out var v) ? v : 0f;
 
     public static void InvalidateCache(string entityId)
     {
@@ -114,6 +143,16 @@ public static class EntityBalancingStore
         BuildingEntityIds.Clear();
         RolesOf.Clear();
         MaxManaOf.Clear();
+        CostOf = new Dictionary<string, int>(StringComparer.Ordinal);
+        MaxHealthOf = new Dictionary<string, int>(StringComparer.Ordinal);
+        MaxShieldOf = new Dictionary<string, int>(StringComparer.Ordinal);
+        MaxRankOf = new Dictionary<string, int>(StringComparer.Ordinal);
+        MaxArmorOf = new Dictionary<string, float>(StringComparer.Ordinal);
+        MoveSpeedOf = new Dictionary<string, float>(StringComparer.Ordinal);
+        WeaponRangeOf = new Dictionary<string, float>(StringComparer.Ordinal);
+        DpsOf = new Dictionary<string, float>(StringComparer.Ordinal);
+        Damage1Of = new Dictionary<string, float>(StringComparer.Ordinal);
+        Damage2Of = new Dictionary<string, float>(StringComparer.Ordinal);
     }
 }
 

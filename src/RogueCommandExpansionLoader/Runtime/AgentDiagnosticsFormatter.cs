@@ -344,6 +344,33 @@ namespace RogueCommandExpansionLoader.Runtime
             return Serialize(view);
         }
 
+        /// <summary>
+        /// Serializes one unit's base balance parameters (read from the game's own
+        /// EntityBalancingStore) into a flat, agent-readable JSON object. Filters nothing but an
+        /// empty entity id, and preserves the field order below so tail truncation never hides the
+        /// core survivability numbers behind cosmetic ones.
+        /// </summary>
+        public static string SerializeEntityBalanceLookup(EntityBalanceRow row)
+        {
+            var view = new Dictionary<string, object>
+            {
+                ["entityId"] = row.EntityId ?? string.Empty,
+                ["isBuilding"] = row.IsBuilding,
+                ["cost"] = row.Cost,
+                ["maxHealth"] = row.MaxHealth,
+                ["maxArmor"] = row.MaxArmor,
+                ["maxShield"] = row.MaxShield,
+                ["maxMana"] = row.MaxMana,
+                ["maxRank"] = row.MaxRank,
+                ["moveSpeed"] = row.MoveSpeed,
+                ["weaponRange"] = row.WeaponRange,
+                ["dps"] = row.Dps,
+                ["damage1"] = row.Damage1,
+                ["damage2"] = row.Damage2,
+            };
+            return Serialize(view);
+        }
+
         private static List<Dictionary<string, object>> BuildPackRows(IReadOnlyList<PackDiagnosticReport> packs)
         {
             var rows = new List<Dictionary<string, object>>();

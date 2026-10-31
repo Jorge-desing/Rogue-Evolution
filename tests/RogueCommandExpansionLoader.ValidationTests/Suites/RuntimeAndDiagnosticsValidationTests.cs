@@ -220,6 +220,84 @@ internal static partial class ValidationTestRunner
             throw new InvalidOperationException("SerializeBattlefieldCensus must emit an empty census for null input.");
         }
     }),
+    ("entity balance lookup serializer emits base params", () =>
+    {
+        var row = new EntityBalanceRow("unit:alpha", false, 150, 200, 25f, 40, 120f, 3, 1.5f, 4f, 7.5f, 12f, 6f);
+        string json = AgentDiagnosticsFormatter.SerializeEntityBalanceLookup(row);
+        if (!json.Contains("\"entityId\":\"unit:alpha\"") ||
+            !json.Contains("\"isBuilding\":false") ||
+            !json.Contains("\"cost\":150") ||
+            !json.Contains("\"maxHealth\":200") ||
+            !json.Contains("\"maxArmor\":25") ||
+            !json.Contains("\"maxShield\":40") ||
+            !json.Contains("\"maxMana\":120") ||
+            !json.Contains("\"maxRank\":3") ||
+            !json.Contains("\"moveSpeed\":1.5") ||
+            !json.Contains("\"weaponRange\":4") ||
+            !json.Contains("\"dps\":7.5") ||
+            !json.Contains("\"damage1\":12") ||
+            !json.Contains("\"damage2\":6"))
+        {
+            throw new InvalidOperationException("SerializeEntityBalanceLookup must report the base balance parameters in field order.");
+        }
+
+        string empty = AgentDiagnosticsFormatter.SerializeEntityBalanceLookup(default(EntityBalanceRow));
+        if (!empty.Contains("\"entityId\":\"\"") || !empty.Contains("\"cost\":0") || !empty.Contains("\"dps\":0"))
+        {
+            throw new InvalidOperationException("SerializeEntityBalanceLookup must emit neutral defaults for an empty row.");
+        }
+    }),
+    ("runtime entity balance lookup reads base params from EntityBalancingStore", () =>
+    {
+        EntityBalancingStore.Reset();
+        try
+        {
+            EntityBalancingStore.CostOf["unit:alpha"] = 150;
+            EntityBalancingStore.MaxHealthOf["unit:alpha"] = 200;
+            EntityBalancingStore.MaxArmorOf["unit:alpha"] = 25f;
+            EntityBalancingStore.MaxShieldOf["unit:alpha"] = 40;
+            EntityBalancingStore.MaxManaOf["unit:alpha"] = 120f;
+            EntityBalancingStore.MaxRankOf["unit:alpha"] = 3;
+            EntityBalancingStore.MoveSpeedOf["unit:alpha"] = 1.5f;
+            EntityBalancingStore.WeaponRangeOf["unit:alpha"] = 4f;
+            EntityBalancingStore.DpsOf["unit:alpha"] = 7.5f;
+            EntityBalancingStore.Damage1Of["unit:alpha"] = 12f;
+            EntityBalancingStore.Damage2Of["unit:alpha"] = 6f;
+            EntityBalancingStore.BuildingEntityIds.Add("building:hq");
+
+            EntityBalanceRow alpha = RuntimeEntityBalanceLookup.Current("unit:alpha");
+            if (alpha.EntityId != "unit:alpha" || alpha.Cost != 150 || alpha.MaxHealth != 200 ||
+                alpha.MaxArmor != 25f || alpha.MaxShield != 40 || alpha.MaxMana != 120f ||
+                alpha.MaxRank != 3 || alpha.MoveSpeed != 1.5f || alpha.WeaponRange != 4f ||
+                alpha.Dps != 7.5f || alpha.Damage1 != 12f || alpha.Damage2 != 6f || alpha.IsBuilding)
+            {
+                throw new InvalidOperationException("RuntimeEntityBalanceLookup must read base params from EntityBalancingStore.");
+            }
+
+            EntityBalanceRow building = RuntimeEntityBalanceLookup.Current("building:hq");
+            if (!building.IsBuilding)
+            {
+                throw new InvalidOperationException("RuntimeEntityBalanceLookup must report IsBuilding from EntityBalancingStore.");
+            }
+
+            EntityBalanceRow unknown = RuntimeEntityBalanceLookup.Current("unit:unknown");
+            if (unknown.EntityId != "unit:unknown" || unknown.Cost != 100 || unknown.MaxHealth != 100 ||
+                unknown.MaxRank != 1 || unknown.IsBuilding)
+            {
+                throw new InvalidOperationException("RuntimeEntityBalanceLookup must return store defaults for an unknown entity id.");
+            }
+
+            EntityBalanceRow blank = RuntimeEntityBalanceLookup.Current("  ");
+            if (!string.IsNullOrEmpty(blank.EntityId))
+            {
+                throw new InvalidOperationException("RuntimeEntityBalanceLookup must return an empty row for a blank entity id.");
+            }
+        }
+        finally
+        {
+            EntityBalancingStore.Reset();
+        }
+    }),
     ("runtime battlefield census collects from the existing controllers registry", () =>
     {
         ExistingControllers.Instance.Reset();

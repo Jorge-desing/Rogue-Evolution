@@ -21,6 +21,8 @@
              Link="Runtime/AgentDiagnosticsFormatter.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeBattlefieldCensus.cs"
              Link="Runtime/RuntimeBattlefieldCensus.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeEntityBalanceLookup.cs"
+             Link="Runtime/RuntimeEntityBalanceLookup.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Content/ContentPackDefinition.cs"
              Link="Content/ContentPackDefinition.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Content/VisualOverlayScaleCalibration.cs"
