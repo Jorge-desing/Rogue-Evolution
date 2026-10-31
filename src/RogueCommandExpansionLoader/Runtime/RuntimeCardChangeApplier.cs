@@ -82,7 +82,6 @@ namespace RogueCommandExpansionLoader.Runtime
             {
                 return;
             }
-            _reflectionResolved = true;
 
             try
             {
@@ -173,6 +172,7 @@ namespace RogueCommandExpansionLoader.Runtime
                         }
                     }
                 }
+                _reflectionResolved = true;
             }
             catch
             {
