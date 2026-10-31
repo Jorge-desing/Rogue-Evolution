@@ -280,6 +280,11 @@ Pitfalls:
 - Tag every issued command and skip units already tagged with the same tag; otherwise a timer-gated scan can repeatedly stack orders on the same units.
 - Use `ExistingControllers` as the source of truth for AI units, harvesters, and player units; do not cache entity lists across ticks.
 - Keep scan intervals and target counts bounded and fail closed on missing native fields or incompatible types.
+- Do not mutate `IsControlledByPlayer`/`IsControlledByAi` to track module ownership; those flags define hostility and are consumed by other modules and `IsEnemy`. Track ownership in module state or command tags instead.
+- Filter AI target candidates with `unit.IsEnemy(candidate)` and re-check hostility on the current target before applying hysteresis; never assume player-side entities are hostile after control-flag changes.
+- Require both `IsCombatUnit` and `CanAttackAndIsAttackEnabled` for AI combat-unit eligibility; avoid inverted `!A && !B` conditions.
+- Consume retarget/command budgets before native dispatch so exceptions cannot bypass caps.
+- When adding a target field to the test `EntityCommand` stub, update every factory that carries a target (`Attack`, `AttackMoveOnTarget`, `ActiveSkillOnTarget`, etc.) consistently.
 
 ### Integration with Existing AI Authoring
 
