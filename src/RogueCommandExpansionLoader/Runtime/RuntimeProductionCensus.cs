@@ -110,12 +110,25 @@ namespace RogueCommandExpansionLoader.Runtime
 
                 try
                 {
+                    HashSet<EntityController> allPlayerBuildings = existing.PlayerBuildings();
+                    if (allPlayerBuildings != null)
+                    {
+                        candidateEntities.AddRange(allPlayerBuildings);
+                    }
+                }
+                catch
+                {
+                    // Degrade gracefully
+                }
+
+                try
+                {
                     HashSet<EntityController> playerUnits = existing.PlayerUnits();
                     if (playerUnits != null)
                     {
                         foreach (EntityController entity in playerUnits)
                         {
-                            if (entity != null && (entity.InProductionCount != null || entity.IsBuilding))
+                            if (entity != null && (entity.IsFactory || entity.IsBuilding))
                             {
                                 candidateEntities.Add(entity);
                             }
@@ -161,7 +174,7 @@ namespace RogueCommandExpansionLoader.Runtime
                         continue;
                     }
 
-                    bool isFactory = entity.InProductionCount != null;
+                    bool isFactory = entity.IsFactory || (entity.InProductionCount != null);
                     if (!isFactory)
                     {
                         continue;
@@ -269,6 +282,8 @@ namespace RogueCommandExpansionLoader.Runtime
                 {
                     HashSet<EntityController> playerBuildings = existing.PlayerBuildingsKnownToAi();
                     if (playerBuildings != null) candidates.AddRange(playerBuildings);
+                    HashSet<EntityController> allPlayerBuildings = existing.PlayerBuildings();
+                    if (allPlayerBuildings != null) candidates.AddRange(allPlayerBuildings);
                     HashSet<EntityController> playerUnits = existing.PlayerUnits();
                     if (playerUnits != null) candidates.AddRange(playerUnits);
                 }

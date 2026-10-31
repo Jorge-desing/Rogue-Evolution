@@ -377,6 +377,7 @@ public sealed class ExistingControllers
     private readonly HashSet<EntityController> _harvesters = new();
     private readonly HashSet<EntityController> _playerRefineries = new();
     private readonly HashSet<EntityController> _playerBuildingsKnownToAi = new();
+    private readonly HashSet<EntityController> _playerBuildings = new();
     public EntityController EngineeringHqEntity { get; set; }
 
     public HashSet<EntityController> PlayerUnits() => _playerUnits;
@@ -386,6 +387,7 @@ public sealed class ExistingControllers
     public HashSet<EntityController> Harvesters => _harvesters;
     public HashSet<EntityController> PlayerRefineries() => _playerRefineries;
     public HashSet<EntityController> PlayerBuildingsKnownToAi() => _playerBuildingsKnownToAi;
+    public HashSet<EntityController> PlayerBuildings() => _playerBuildings;
     public EntityController EngineeringHq() => EngineeringHqEntity;
     public HashSet<EntityController> AiBuildings()
     {
@@ -405,6 +407,7 @@ public sealed class ExistingControllers
         _harvesters.Clear();
         _playerRefineries.Clear();
         _playerBuildingsKnownToAi.Clear();
+        _playerBuildings.Clear();
         EngineeringHqEntity = null;
         ThrowOnAiBuildings = false;
     }

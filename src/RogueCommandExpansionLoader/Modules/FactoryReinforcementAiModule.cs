@@ -102,7 +102,7 @@ namespace RogueCommandExpansionLoader.Modules
 
                 foreach (EntityController factory in buildings)
                 {
-                    if (factory == null || factory.DestroyHasBeenStarted || factory.InProductionCount == null || !factory.IsControlledByAi)
+                    if (factory == null || factory.DestroyHasBeenStarted || !factory.IsFactory || !factory.IsControlledByAi)
                     {
                         continue;
                     }
