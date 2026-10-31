@@ -921,6 +921,50 @@ namespace RogueCommandExpansionLoader.Runtime
                                     InvokeChargeShield(originatorObj, bonusHeal * 0.5f);
                                 }
                             }
+
+                            // Persistent card-change augmentation on promotion (native data-driven
+                            // pipeline): the first time a unit reaches a new rank, also grant a
+                            // permanent MaxHealth bonus so the veterancy edge survives. Tracked
+                            // per (unit, rank) to avoid stacking.
+                            try
+                            {
+                                Assembly rankAssembly = originatorObj.GetType().Assembly;
+                                int rankUniqueId = GetCombatExperienceKey(originatorObj);
+                                if (rankUniqueId > 0)
+                                {
+                                    string rankKey = rankUniqueId.ToString() + "|rankup|" + currentRank.ToString();
+                                    bool alreadyApplied;
+                                    lock (_appliedCardChangeBoostKeys)
+                                    {
+                                        alreadyApplied = _appliedCardChangeBoostKeys.Contains(rankKey);
+                                        if (!alreadyApplied)
+                                        {
+                                            _appliedCardChangeBoostKeys.Add(rankKey);
+                                        }
+                                    }
+                                    if (!alreadyApplied)
+                                    {
+                                        float maxHp = ReadFloatProperty(_maxHealthProperty, originatorObj, 100f);
+                                        float rankBonus = profile.Experience.levelUpBonus > 0f ? profile.Experience.levelUpBonus : 0.1f;
+                                        CardChangeRequest rankRequest = CardChangeRequest.Create(
+                                            "MaxHealth",
+                                            "Add",
+                                            Mathf.Max(1f, maxHp * rankBonus * 0.5f),
+                                            false,
+                                            false,
+                                            "Friendly",
+                                            true,
+                                            null,
+                                            null,
+                                            "rankup:" + originatorId);
+                                        RuntimeCardChangeApplier.ApplyCardChange(rankAssembly, rankUniqueId, rankRequest);
+                                    }
+                                }
+                            }
+                            catch
+                            {
+                                // Guarded: rank-up augmentation must never break promotion.
+                            }
                         }
                     }
 
