@@ -840,6 +840,67 @@ TOOL_SPECS = [
         "description": "Queries registered AI modules diagnostics from LoaderDiagnosticsComponent.",
         "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
     },
+    {
+        "name": "diagnostics_get_run_progression",
+        "description": "Queries live match run progression, current stage, ascension/heat level, active relics, and offered blueprint reward pools directly from LoaderDiagnosticsComponent.",
+        "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
+    },
+    {
+        "name": "diagnostics_grant_credits",
+        "description": "Grants economy credits to the player bank balance in-game via LoaderDiagnosticsComponent / RuntimeGameplayCommandDirector.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "amount": {"type": "integer", "description": "Amount of credits to deposit into player bank (e.g. 500)."},
+                "accountName": {"type": "string", "description": "Bank account name (default 'Player')."},
+            },
+            "required": ["amount"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "diagnostics_apply_card_change",
+        "description": "Applies a data-driven card change / stat modifier to an entity in-game via LoaderDiagnosticsComponent and the native EntityBalancingStore pipeline.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "valueToChange": {"type": "string", "description": "Attribute to modify (e.g. 'MaxHealth', 'MoveSpeed', 'Damage1', 'WeaponRange')."},
+                "operation": {"type": "string", "description": "Operation: 'Add' or 'Multiply' (default 'Add')."},
+                "value": {"type": "number", "description": "Numeric delta to apply."},
+                "side": {"type": "string", "description": "Target side: 'Friendly' or 'Enemy' (default 'Friendly')."},
+                "targetEntityId": {"type": "string", "description": "Specific entity ID or name to target (optional)."},
+            },
+            "required": ["valueToChange", "value"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "diagnostics_order_unit_move",
+        "description": "Dispatches an in-game move command to a living unit by entity key ID via LoaderDiagnosticsComponent / RuntimeGameplayCommandDirector.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "entityKeyId": {"type": "string", "description": "Entity ID or name of the unit to command."},
+                "destinationX": {"type": "number", "description": "World X coordinate."},
+                "destinationZ": {"type": "number", "description": "World Z coordinate."},
+            },
+            "required": ["entityKeyId", "destinationX", "destinationZ"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "diagnostics_order_unit_attack",
+        "description": "Dispatches an in-game attack command on a target entity via LoaderDiagnosticsComponent / RuntimeGameplayCommandDirector.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "entityKeyId": {"type": "string", "description": "Attacker unit entity ID or name."},
+                "targetEntityKeyId": {"type": "string", "description": "Target entity ID or name to attack."},
+            },
+            "required": ["entityKeyId", "targetEntityKeyId"],
+            "additionalProperties": False,
+        },
+    },
 ]
 
 

@@ -735,6 +735,114 @@ namespace RogueCommandExpansionLoader.Runtime
         }
 
         /// <summary>
+        /// Serializes live match run progression, ascension/heat scaling, active relics,
+        /// and offered blueprint reward pools. Omission counters are serialized before detail collections.
+        /// </summary>
+        public static string SerializeRunProgressionCensus(RunProgressionCensus census)
+        {
+            var relicList = new List<string>();
+            if (census != null && census.ActiveRelicIds != null)
+            {
+                foreach (string id in census.ActiveRelicIds)
+                {
+                    if (!string.IsNullOrEmpty(id))
+                    {
+                        relicList.Add(id);
+                    }
+                }
+            }
+
+            var blueprintList = new List<string>();
+            if (census != null && census.OfferedBlueprintPoolIds != null)
+            {
+                foreach (string id in census.OfferedBlueprintPoolIds)
+                {
+                    if (!string.IsNullOrEmpty(id))
+                    {
+                        blueprintList.Add(id);
+                    }
+                }
+            }
+
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "runProgressionCensus",
+                ["omittedRelicCount"] = census != null ? census.OmittedRelicCount : 0,
+                ["omittedBlueprintCount"] = census != null ? census.OmittedBlueprintCount : 0,
+                ["activeSceneName"] = census != null ? census.ActiveSceneName : string.Empty,
+                ["currentLevel"] = census != null ? census.CurrentLevel : 0,
+                ["currentStage"] = census != null ? census.CurrentStage : 0,
+                ["isLastLevel"] = census != null && census.IsLastLevel,
+                ["isFirstLevel"] = census != null && census.IsFirstLevel,
+                ["ascensionLevel"] = census != null ? census.AscensionLevel : 0,
+                ["heatLevel"] = census != null ? census.HeatLevel : 0,
+                ["ascensionAndHeatString"] = census != null ? census.AscensionAndHeatString : string.Empty,
+                ["progressionMode"] = census != null ? census.ProgressionMode : string.Empty,
+                ["totalRelicCount"] = census != null ? census.TotalRelicCount : 0,
+                ["totalBlueprintRewardCount"] = census != null ? census.TotalBlueprintRewardCount : 0,
+                ["cardsInDeckCount"] = census != null ? census.CardsInDeckCount : 0,
+                ["relicCount"] = relicList.Count,
+                ["activeRelicIds"] = relicList,
+                ["offeredBlueprintRewardCount"] = blueprintList.Count,
+                ["offeredBlueprintPoolIds"] = blueprintList,
+            };
+            return Serialize(view);
+        }
+
+        /// <summary>
+        /// Serializes the result of an in-game credit grant command.
+        /// </summary>
+        public static string SerializeCreditGrantResult(CreditGrantResult result)
+        {
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "creditGrantResult",
+                ["success"] = result.Success,
+                ["accountName"] = result.AccountName ?? string.Empty,
+                ["amountGranted"] = result.AmountGranted,
+                ["currentBalance"] = result.CurrentBalance,
+                ["message"] = result.Message ?? string.Empty,
+            };
+            return Serialize(view);
+        }
+
+        /// <summary>
+        /// Serializes the result of a data-driven card change application on an in-game entity.
+        /// </summary>
+        public static string SerializeCardChangeApplyResult(CardChangeApplyResult result)
+        {
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "cardChangeApplyResult",
+                ["success"] = result.Success,
+                ["targetEntityKeyId"] = result.TargetEntityKeyId ?? string.Empty,
+                ["valueToChange"] = result.ValueToChange ?? string.Empty,
+                ["operation"] = result.Operation ?? string.Empty,
+                ["value"] = result.Value,
+                ["message"] = result.Message ?? string.Empty,
+            };
+            return Serialize(view);
+        }
+
+        /// <summary>
+        /// Serializes the result of an in-game tactical unit command (move, attack, etc.).
+        /// </summary>
+        public static string SerializeUnitCommandResult(UnitCommandResult result)
+        {
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "unitCommandResult",
+                ["success"] = result.Success,
+                ["entityKeyId"] = result.EntityKeyId ?? string.Empty,
+                ["commandType"] = result.CommandType ?? string.Empty,
+                ["targetX"] = result.TargetX,
+                ["targetZ"] = result.TargetZ,
+                ["message"] = result.Message ?? string.Empty,
+            };
+            return Serialize(view);
+        }
+
+        /// <summary>
         /// Unified health and status telemetry synthesizing loader state, content registries,
         /// compiled AI modules, match economy, and combat telemetry into a single agent-readable JSON.
         /// </summary>
@@ -1114,6 +1222,11 @@ namespace RogueCommandExpansionLoader.Runtime
                 new Dictionary<string, object> { ["name"] = "GetProductionCensusJson", ["description"] = "Live factory production queue metrics and active producing counts." },
                 new Dictionary<string, object> { ["name"] = "GetBaseIntegrityCensusJson", ["description"] = "Player command HQ and enemy base structure integrity telemetry." },
                 new Dictionary<string, object> { ["name"] = "OrderFactoryProduceJson", ["description"] = "Trigger in-game unit production order on a player factory." },
+                new Dictionary<string, object> { ["name"] = "GetRunProgressionCensusJson", ["description"] = "Run progression parameters, active relics, offered blueprints, and scene telemetry." },
+                new Dictionary<string, object> { ["name"] = "GrantPlayerCreditsJson", ["description"] = "Grant economy credits to player bank balance." },
+                new Dictionary<string, object> { ["name"] = "ApplyInGameCardChangeJson", ["description"] = "Apply a data-driven card change to an entity via native EntityBalancingStore." },
+                new Dictionary<string, object> { ["name"] = "OrderUnitMoveJson", ["description"] = "Dispatch an in-game move command to a unit by entity key id." },
+                new Dictionary<string, object> { ["name"] = "OrderUnitAttackJson", ["description"] = "Dispatch an in-game attack command on a target entity." },
                 new Dictionary<string, object> { ["name"] = "GetSystemHealthJson", ["description"] = "Unified system health across subsystems." },
                 new Dictionary<string, object> { ["name"] = "GetDiagnosticCatalogJson", ["description"] = "Catalog of available diagnostic getters." },
             };

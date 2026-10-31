@@ -293,12 +293,21 @@ public static class Game
     public static bool AtLeastOneBlueprintHasBeenAddedByPlayer = true;
     public static List<string> CardsInDeck { get; set; } = new();
     public static List<OpenReward> OpenCardRewards = new();
+    public static List<string> Relics { get; set; } = new();
+    public static int CurrentLevel { get; set; } = 1;
+    public static bool IsLastLevel { get; set; } = false;
+    public static bool IsFirstLevelOrGameHasBeenResetted { get; set; } = false;
+    public static object StageMap { get; set; }
+    public static string CurrentLevelProgressionMode { get; set; } = "Default";
 }
 
 public sealed class MetaGame
 {
     public static MetaGame Instance { get; set; } = new();
     public int CurrentExperienceLevel { get; set; }
+    public int CurrentAscensionLevel { get; set; }
+    public int CurrentHeat { get; set; }
+    public string CurrentAscensionAndHeatLevelString { get; set; } = "Ascension 0";
 }
 
 namespace Shapes2D

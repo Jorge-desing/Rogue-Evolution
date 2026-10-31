@@ -204,3 +204,17 @@ namespace UnityEngine
         public static string unityVersion { get; set; } = "2021.3.45f2";
     }
 }
+
+namespace UnityEngine.SceneManagement
+{
+    public struct Scene
+    {
+        public string name { get; set; }
+    }
+
+    public static class SceneManager
+    {
+        public static string ActiveSceneName { get; set; } = "MainDesertScene";
+        public static Scene GetActiveScene() => new Scene { name = ActiveSceneName };
+    }
+}

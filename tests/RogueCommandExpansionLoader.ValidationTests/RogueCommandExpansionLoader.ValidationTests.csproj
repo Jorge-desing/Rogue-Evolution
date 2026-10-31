@@ -41,6 +41,10 @@
              Link="Runtime/RuntimeProductionCensus.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeBaseIntegrityCensus.cs"
              Link="Runtime/RuntimeBaseIntegrityCensus.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeRunProgressionCensus.cs"
+             Link="Runtime/RuntimeRunProgressionCensus.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeGameplayCommandDirector.cs"
+             Link="Runtime/RuntimeGameplayCommandDirector.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Content/ContentPackDefinition.cs"
              Link="Content/ContentPackDefinition.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Content/VisualOverlayScaleCalibration.cs"

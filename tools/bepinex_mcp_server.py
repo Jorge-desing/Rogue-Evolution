@@ -485,6 +485,41 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             res = _call_diagnostics_method("OrderFactoryProduceJson", [f_key, instant, for_free])
             return _tool_response(res)
 
+        elif name == "diagnostics_get_run_progression":
+            res = _call_diagnostics_method("GetRunProgressionCensusJson")
+            return _tool_response(res)
+
+        elif name == "diagnostics_grant_credits":
+            amount = int(arguments.get("amount", 0))
+            account = str(arguments.get("accountName", "Player"))
+            res = _call_diagnostics_method("GrantPlayerCreditsJson", [amount, account])
+            return _tool_response(res)
+
+        elif name == "diagnostics_apply_card_change":
+            val_to_change = str(arguments.get("valueToChange", ""))
+            op = str(arguments.get("operation", "Add"))
+            val = float(arguments.get("value", 0.0))
+            side = str(arguments.get("side", "Friendly"))
+            target_id = arguments.get("targetEntityId")
+            args = [val_to_change, op, val, side]
+            if target_id is not None:
+                args.append(str(target_id))
+            res = _call_diagnostics_method("ApplyInGameCardChangeJson", args)
+            return _tool_response(res)
+
+        elif name == "diagnostics_order_unit_move":
+            e_key = str(arguments.get("entityKeyId", ""))
+            x = float(arguments.get("destinationX", 0.0))
+            z = float(arguments.get("destinationZ", 0.0))
+            res = _call_diagnostics_method("OrderUnitMoveJson", [e_key, x, z])
+            return _tool_response(res)
+
+        elif name == "diagnostics_order_unit_attack":
+            e_key = str(arguments.get("entityKeyId", ""))
+            t_key = str(arguments.get("targetEntityKeyId", ""))
+            res = _call_diagnostics_method("OrderUnitAttackJson", [e_key, t_key])
+            return _tool_response(res)
+
         elif name == "diagnostics_get_match_summary":
             res = _call_diagnostics_method("GetMatchSummaryJson")
             return _tool_response(res)

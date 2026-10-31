@@ -498,6 +498,55 @@ namespace RogueCommandExpansionLoader.Runtime
         }
 
         /// <summary>
+        /// Pure JSON telemetry of run progression, ascension/heat scaling, active relics,
+        /// and offered blueprint reward pools.
+        /// </summary>
+        public string GetRunProgressionCensusJson()
+        {
+            return AgentDiagnosticsFormatter.SerializeRunProgressionCensus(
+                RuntimeRunProgressionCensus.Current());
+        }
+
+        /// <summary>
+        /// Grants economy credits to a bank account (default: "Player") for live testing
+        /// and balance calibration without GUI interaction.
+        /// </summary>
+        public string GrantPlayerCreditsJson(int amount, string accountName = "Player")
+        {
+            return AgentDiagnosticsFormatter.SerializeCreditGrantResult(
+                RuntimeGameplayCommandDirector.TryGrantCredits(amount, accountName));
+        }
+
+        /// <summary>
+        /// Dispatches a data-driven card change to an entity in-game via the native
+        /// EntityBalancingStore pipeline for dynamic balance testing.
+        /// </summary>
+        public string ApplyInGameCardChangeJson(string valueToChange, string operation, float value, string side = "Friendly", string targetEntityId = null)
+        {
+            var req = CardChangeRequest.Create(valueToChange, operation, value, false, false, side);
+            return AgentDiagnosticsFormatter.SerializeCardChangeApplyResult(
+                RuntimeGameplayCommandDirector.TryApplyCardChange(req, targetEntityId));
+        }
+
+        /// <summary>
+        /// Dispatches a movement command to a living unit by entity key ID.
+        /// </summary>
+        public string OrderUnitMoveJson(string entityKeyId, float destinationX, float destinationZ)
+        {
+            return AgentDiagnosticsFormatter.SerializeUnitCommandResult(
+                RuntimeGameplayCommandDirector.TryOrderUnitMove(entityKeyId, destinationX, destinationZ));
+        }
+
+        /// <summary>
+        /// Dispatches an attack command on a target entity by key ID.
+        /// </summary>
+        public string OrderUnitAttackJson(string entityKeyId, string targetEntityKeyId)
+        {
+            return AgentDiagnosticsFormatter.SerializeUnitCommandResult(
+                RuntimeGameplayCommandDirector.TryOrderUnitAttack(entityKeyId, targetEntityKeyId));
+        }
+
+        /// <summary>
         /// Returns a unified system health and diagnostics overview as JSON.
         /// Synthesizes loader registry readiness, content counts, AI modules,
         /// economy parameters, and active combat telemetry.

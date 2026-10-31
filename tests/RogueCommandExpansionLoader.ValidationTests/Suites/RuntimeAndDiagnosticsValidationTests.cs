@@ -3238,5 +3238,260 @@ internal static partial class ValidationTestRunner
             }
         }
     }),
+    ("run progression census collects scene, stage, ascension/heat, relics and rewards with loss counters first", () =>
+    {
+        try
+        {
+            UnityEngine.SceneManagement.SceneManager.ActiveSceneName = "Desert_Combat_01";
+            Game.CurrentLevel = 3;
+            Game.IsLastLevel = false;
+            Game.IsFirstLevelOrGameHasBeenResetted = false;
+            Game.CardsInDeck = new List<string> { "card_1", "card_2", "card_3" };
+
+            MetaGame.Instance.CurrentAscensionLevel = 2;
+            MetaGame.Instance.CurrentHeat = 5;
+            MetaGame.Instance.CurrentAscensionAndHeatLevelString = "Ascension 2 Heat 5";
+
+            var testRelics = new List<string>();
+            for (int i = 1; i <= 40; i++)
+            {
+                testRelics.Add("relic_item_" + i);
+            }
+            Game.Relics = testRelics;
+
+            var testRewards = new List<OpenReward>();
+            for (int i = 1; i <= 35; i++)
+            {
+                testRewards.Add(new OpenReward { blueprintPoolId = "pool_reward_" + i });
+            }
+            Game.OpenCardRewards = testRewards;
+
+            RunProgressionCensus census = RuntimeRunProgressionCensus.Current();
+
+            if (census.ActiveSceneName != "Desert_Combat_01" ||
+                census.CurrentLevel != 3 ||
+                census.IsLastLevel ||
+                census.IsFirstLevel ||
+                census.AscensionLevel != 2 ||
+                census.HeatLevel != 5 ||
+                census.AscensionAndHeatString != "Ascension 2 Heat 5" ||
+                census.CardsInDeckCount != 3)
+            {
+                throw new InvalidOperationException("RunProgressionCensus failed to capture core stage/meta progression parameters.");
+            }
+
+            if (census.TotalRelicCount != 40 || census.ActiveRelicIds.Count != 32 || census.OmittedRelicCount != 8)
+            {
+                throw new InvalidOperationException("RunProgressionCensus must cap relics at 32 and track 8 omitted relics.");
+            }
+
+            if (census.TotalBlueprintRewardCount != 35 || census.OfferedBlueprintPoolIds.Count != 32 || census.OmittedBlueprintCount != 3)
+            {
+                throw new InvalidOperationException("RunProgressionCensus must cap blueprint pools at 32 and track 3 omitted blueprints.");
+            }
+
+            string json = AgentDiagnosticsFormatter.SerializeRunProgressionCensus(census);
+            using (var doc = JsonDocument.Parse(json))
+            {
+                JsonElement root = doc.RootElement;
+                if (root.GetProperty("kind").GetString() != "runProgressionCensus" ||
+                    root.GetProperty("omittedRelicCount").GetInt32() != 8 ||
+                    root.GetProperty("omittedBlueprintCount").GetInt32() != 3 ||
+                    root.GetProperty("activeSceneName").GetString() != "Desert_Combat_01" ||
+                    root.GetProperty("currentLevel").GetInt32() != 3 ||
+                    root.GetProperty("ascensionLevel").GetInt32() != 2 ||
+                    root.GetProperty("heatLevel").GetInt32() != 5 ||
+                    root.GetProperty("relicCount").GetInt32() != 32 ||
+                    root.GetProperty("offeredBlueprintRewardCount").GetInt32() != 32)
+                {
+                    throw new InvalidOperationException("SerializeRunProgressionCensus JSON property mismatch.");
+                }
+
+                int omittedRelicIdx = json.IndexOf("\"omittedRelicCount\"");
+                int activeRelicsIdx = json.IndexOf("\"activeRelicIds\"");
+                int omittedBpIdx = json.IndexOf("\"omittedBlueprintCount\"");
+                int offeredBpIdx = json.IndexOf("\"offeredBlueprintPoolIds\"");
+
+                if (omittedRelicIdx < 0 || activeRelicsIdx < 0 || omittedRelicIdx >= activeRelicsIdx ||
+                    omittedBpIdx < 0 || offeredBpIdx < 0 || omittedBpIdx >= offeredBpIdx)
+                {
+                    throw new InvalidOperationException("Loss/omission counters must strictly precede collections in JSON output.");
+                }
+            }
+        }
+        finally
+        {
+            Game.Relics.Clear();
+            Game.OpenCardRewards.Clear();
+            Game.CardsInDeck.Clear();
+            UnityEngine.SceneManagement.SceneManager.ActiveSceneName = string.Empty;
+        }
+    }),
+    ("gameplay command director grants credits with bounded limits and updates balance", () =>
+    {
+        try
+        {
+            Bank.Reset();
+
+            CreditGrantResult grantSuccess = RuntimeGameplayCommandDirector.TryGrantCredits(750, "Player");
+            if (!grantSuccess.Success || grantSuccess.AmountGranted != 750 || grantSuccess.AccountName != "Player")
+            {
+                throw new InvalidOperationException("Valid credit grant of 750 credits must succeed.");
+            }
+
+            CreditGrantResult grantZero = RuntimeGameplayCommandDirector.TryGrantCredits(0, "Player");
+            if (grantZero.Success || grantZero.AmountGranted != 0)
+            {
+                throw new InvalidOperationException("Credit grant of 0 credits must fail.");
+            }
+
+            CreditGrantResult grantNegative = RuntimeGameplayCommandDirector.TryGrantCredits(-100, "Player");
+            if (grantNegative.Success || grantNegative.AmountGranted != 0)
+            {
+                throw new InvalidOperationException("Negative credit grant must fail.");
+            }
+
+            CreditGrantResult grantExcessive = RuntimeGameplayCommandDirector.TryGrantCredits(1000000, "Player");
+            if (grantExcessive.Success || grantExcessive.AmountGranted != 0)
+            {
+                throw new InvalidOperationException("Credit grant exceeding 500,000 cap must fail.");
+            }
+
+            string json = AgentDiagnosticsFormatter.SerializeCreditGrantResult(grantSuccess);
+            using (var doc = JsonDocument.Parse(json))
+            {
+                if (!doc.RootElement.GetProperty("success").GetBoolean() ||
+                    doc.RootElement.GetProperty("accountName").GetString() != "Player" ||
+                    doc.RootElement.GetProperty("amountGranted").GetInt32() != 750)
+                {
+                    throw new InvalidOperationException("SerializeCreditGrantResult JSON property mismatch.");
+                }
+            }
+        }
+        finally
+        {
+            Bank.Reset();
+        }
+    }),
+    ("gameplay command director dispatches unit move and attack commands and validates targets", () =>
+    {
+        try
+        {
+            ExistingControllers.Instance.Reset();
+
+            var playerUnit = new EntityController
+            {
+                name = "player_strike_tank",
+                EntityId = "unit:strike-tank-01",
+                IsControlledByPlayer = true,
+                IsUnit = true,
+                CurrentHealth = 250f,
+                MaxHealth = 250f,
+                Position = new Vector3(10f, 0f, 10f)
+            };
+            ExistingControllers.Instance.PlayerUnits().Add(playerUnit);
+
+            var enemyUnit = new EntityController
+            {
+                name = "enemy_raider",
+                EntityId = "unit:enemy-raider-01",
+                IsControlledByAi = true,
+                IsUnit = true,
+                CurrentHealth = 120f,
+                MaxHealth = 120f,
+                Position = new Vector3(60f, 0f, 80f)
+            };
+            ExistingControllers.Instance.AiUnits().Add(enemyUnit);
+
+            // Test Unit Move Command
+            UnitCommandResult moveRes = RuntimeGameplayCommandDirector.TryOrderUnitMove("unit:strike-tank-01", 35f, 45f);
+            if (!moveRes.Success || moveRes.CommandType != "Move" || moveRes.TargetX != 35f || moveRes.TargetZ != 45f)
+            {
+                throw new InvalidOperationException("TryOrderUnitMove must succeed for existing player unit.");
+            }
+
+            if (!playerUnit.LastExecutedCommand.HasValue ||
+                playerUnit.LastExecutedCommand.Value.command != EntityCommand.Command.Move ||
+                playerUnit.LastExecutedCommand.Value.destination.x != 35f ||
+                playerUnit.LastExecutedCommand.Value.destination.z != 45f)
+            {
+                throw new InvalidOperationException("Player unit must have received EntityCommand.Move with destination (35, 45).");
+            }
+
+            // Test Unit Move on non-existent unit
+            UnitCommandResult moveMissing = RuntimeGameplayCommandDirector.TryOrderUnitMove("unit:non-existent", 0f, 0f);
+            if (moveMissing.Success)
+            {
+                throw new InvalidOperationException("TryOrderUnitMove must fail for missing entity.");
+            }
+
+            // Test Unit Attack Command
+            UnitCommandResult attackRes = RuntimeGameplayCommandDirector.TryOrderUnitAttack("unit:strike-tank-01", "unit:enemy-raider-01");
+            if (!attackRes.Success || attackRes.CommandType != "AttackMoveOnTarget" ||
+                attackRes.TargetX != 60f || attackRes.TargetZ != 80f)
+            {
+                throw new InvalidOperationException("TryOrderUnitAttack must succeed for existing attacker and target.");
+            }
+
+            if (!playerUnit.LastExecutedCommand.HasValue ||
+                playerUnit.LastExecutedCommand.Value.command != EntityCommand.Command.AttackMoveOnTarget ||
+                playerUnit.LastExecutedCommand.Value.target != enemyUnit)
+            {
+                throw new InvalidOperationException("Player unit must have received EntityCommand.AttackMoveOnTarget with target enemyUnit.");
+            }
+
+            // Test Unit Attack with missing target
+            UnitCommandResult attackMissingTarget = RuntimeGameplayCommandDirector.TryOrderUnitAttack("unit:strike-tank-01", "unit:missing-target");
+            if (attackMissingTarget.Success)
+            {
+                throw new InvalidOperationException("TryOrderUnitAttack must fail for missing target.");
+            }
+
+            // Verify serialization
+            string moveJson = AgentDiagnosticsFormatter.SerializeUnitCommandResult(moveRes);
+            using (var doc = JsonDocument.Parse(moveJson))
+            {
+                if (!doc.RootElement.GetProperty("success").GetBoolean() ||
+                    doc.RootElement.GetProperty("commandType").GetString() != "Move" ||
+                    doc.RootElement.GetProperty("targetX").GetSingle() != 35f)
+                {
+                    throw new InvalidOperationException("SerializeUnitCommandResult JSON mismatch.");
+                }
+            }
+        }
+        finally
+        {
+            ExistingControllers.Instance.Reset();
+        }
+    }),
+    ("diagnostic catalog contains run progression, credit grant, card change, and unit command endpoints", () =>
+    {
+        string json = AgentDiagnosticsFormatter.SerializeDiagnosticCatalog();
+        using (var doc = JsonDocument.Parse(json))
+        {
+            var names = new HashSet<string>();
+            foreach (JsonElement item in doc.RootElement.GetProperty("diagnostics").EnumerateArray())
+            {
+                names.Add(item.GetProperty("name").GetString());
+            }
+
+            string[] required =
+            {
+                "GetRunProgressionCensusJson",
+                "GrantPlayerCreditsJson",
+                "ApplyInGameCardChangeJson",
+                "OrderUnitMoveJson",
+                "OrderUnitAttackJson"
+            };
+
+            foreach (string req in required)
+            {
+                if (!names.Contains(req))
+                {
+                    throw new InvalidOperationException("Diagnostic catalog must include " + req + ".");
+                }
+            }
+        }
+    }),
     };
 }
