@@ -36,7 +36,19 @@ Goal: let an external agent (BepInEx MCP bridge) read loader state in real time 
 - Use `using UnityEngine;` in addition to `using UnityEngine.SceneManagement;` when calling `new GameObject(...)`.
 - After deploying, verify live readability: `scene:find_objects_with_component?componentName=LoaderDiagnosticsComponent` must return the object; `component/get_details` and `component/call_method` must return real values.
 
-### Manual JSON writer rules
+### Extending the bridge with a new utility
+
+When adding a new clean-room or visual utility to the live bridge, follow this three-part pattern so it stays testable and agent-readable:
+
+1. **Pure formatter serializer** in `AgentDiagnosticsFormatter` (dependency-free, primitive DTOs only): add a `SerializeX(...)` method returning JSON, plus a `BuildX()` helper if it feeds `SerializeUtilities`. Verify it compiles in the test harness (no Unity types).
+2. **Bridge surface** in `LoaderDiagnosticsComponent`: expose a read-only getter (for `component/get_details`) and/or a `GetXJson(...)` method (for `component/call_method`) that delegates to the formatter. Keep the MonoBehaviour thin — no logic beyond null-safe delegation.
+3. **Test** in `RuntimeAndDiagnosticsValidationTests.cs`: assert the serializer output contains the expected keys/values (e.g. `"valid":true`, `"pointCount":33`).
+
+Rules:
+- Every new utility must be readable by an agent without a visual capture: either a getter or a JSON method (prefer both).
+- Primitive DTOs only (`string`, `int`, `bool`, `float`); `UnityEngine.Color`/`Vector3` never cross the formatter boundary.
+- Place omission/loss counters before unbounded-detail collections in bounded reports so tail truncation cannot hide them.
+- Rebuild plugin + test project and run the harness after each batch; the patch tool's fuzzy matching has repeatedly broken adjacent declarations.
 
 - No Newtonsoft.Json. Write a minimal serializer that emits `{"key":value}` with proper escaping for strings, numbers, booleans, and null.
 - Keep DTOs as primitive-only structs/classes so they compile in both the plugin (Unity) and the test harness (stub).

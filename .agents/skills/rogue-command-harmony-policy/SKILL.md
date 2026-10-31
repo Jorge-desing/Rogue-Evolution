@@ -150,6 +150,13 @@ public static class ChangeArmorTranspiler
 6. Patch priority set when multiple plugins target the same method.
 7. Original method not bypassed unless the patch explicitly returns `false` (Prefix) or is a verified transpiler rewrite.
 
+### C# editing safety (patch tool)
+
+- When inserting new members with a find-and-replace patch immediately **before** a method or property declaration, anchor the match on the **entire declaration line plus its opening brace and first statement**, not on a trailing snippet that the fuzzy matcher can extend into the next declaration. The matcher has repeatedly consumed the following method signature, leaving an orphaned `{`/`return` and a broken file.
+- After every patch batch, run `dotnet build` (plugin + test project) before the next edit; a structurally broken file still reports the previous error count as 0 only if it was not recompiled. Treat "0 errors" as proof only when the file you just edited was part of the build.
+- If a patch leaves an orphaned brace or signature, do not attempt a third blind patch on the same region; rewrite the enclosing method with `write_file` (or restore from git) and re-apply cleanly.
+- A patch that already applied will fail on a re-issue: re-sending the identical `old_string` returns "Could not find a match" (the text is already gone) and the error's "Did you mean one of these sections" hint shows the NEW, already-applied content. When the tool also flags "byte-identical to an earlier call" or "Nth consecutive identical call," the edit is done — confirm with `read_file` and move on; never loop retries on the same arguments.
+
 ### Optional target resolution (cross-version robustness)
 
 When adding hooks for native methods whose signatures may differ across game versions or whose presence is uncertain (e.g. `EntityController.Die`, `Heal`, `RepairArmor`):
@@ -172,6 +179,12 @@ if (target == null || wrapper == null)
 }
 harmony.Patch(target, postfix: new HarmonyMethod(wrapper));
 ```
+
+### `Harmony.Patch()` return value (counting installed hooks)
+
+- `harmony.Patch(original, prefix, postfix, transpiler, finalizer, ...)` returns a `MethodInfo` (the patched original), **not** a `bool`. A `null` return means the patch was not applied.
+- To count or list installed hooks, assign the result and check non-null: `MethodInfo patched = harmony.Patch(...); if (patched != null) { names.Add(...); count++; }`. Writing `if (harmony.Patch(...))` is `CS0029` (cannot implicitly convert `MethodInfo` to `bool`) — it will not compile, so a hook-count getter that relies on it silently fails at build time rather than reporting a wrong count at runtime.
+- Reset the count and name list in the same teardown that clears the `Harmony` instance; re-install accumulates into a fresh zeroed list, never into the previous run's.
 
 ## IL2CPP Considerations
 
