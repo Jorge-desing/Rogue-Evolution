@@ -436,8 +436,63 @@ namespace RogueCommandExpansionLoader.Runtime
         /// </summary>
         public static void OnEntityHealed(object entityObj, float amount)
         {
-            // Extension point: healing aura sync / on-heal status effects.
-            // Intentionally a safe no-op until verified against the live game assembly.
+            if (entityObj == null || amount <= 0f)
+            {
+                return;
+            }
+
+            try
+            {
+                string entityId = ReadEntityId(entityObj);
+                if (string.IsNullOrWhiteSpace(entityId))
+                {
+                    return;
+                }
+                UnitRuntimeMechanicsProfile profile;
+                if (!TryGetProfile(entityId, out profile) || profile == null)
+                {
+                    return;
+                }
+
+                int uniqueId = ReadIntProperty(_uniqueEntityIdProperty, entityObj, -1);
+                if (uniqueId <= 0)
+                {
+                    return;
+                }
+
+                string healKey = uniqueId.ToString() + "|heal";
+                bool alreadyApplied;
+                lock (_appliedCardChangeBoostKeys)
+                {
+                    alreadyApplied = _appliedCardChangeBoostKeys.Contains(healKey);
+                    if (!alreadyApplied)
+                    {
+                        _appliedCardChangeBoostKeys.Add(healKey);
+                    }
+                }
+                if (alreadyApplied)
+                {
+                    return;
+                }
+
+                Assembly assembly = entityObj.GetType().Assembly;
+                CardChangeRequest request = CardChangeRequest.Create(
+                    "MaxHealth",
+                    "Add",
+                    amount * 0.1f,
+                    false,
+                    false,
+                    "Friendly",
+                    true,
+                    null,
+                    null,
+                    "heal:" + entityId);
+                RuntimeCardChangeApplier.ApplyCardChange(assembly, uniqueId, request);
+            }
+            catch
+            {
+                // Guarded: healing augmentation must never break native healing.
+            }
         }
 
         /// <summary>
@@ -446,8 +501,63 @@ namespace RogueCommandExpansionLoader.Runtime
         /// </summary>
         public static void OnEntityRepairedArmor(object entityObj, float amount)
         {
-            // Extension point: repair-aura sync / on-repair status effects.
-            // Intentionally a safe no-op until verified against the live game assembly.
+            if (entityObj == null || amount <= 0f)
+            {
+                return;
+            }
+
+            try
+            {
+                string entityId = ReadEntityId(entityObj);
+                if (string.IsNullOrWhiteSpace(entityId))
+                {
+                    return;
+                }
+                UnitRuntimeMechanicsProfile profile;
+                if (!TryGetProfile(entityId, out profile) || profile == null)
+                {
+                    return;
+                }
+
+                int uniqueId = ReadIntProperty(_uniqueEntityIdProperty, entityObj, -1);
+                if (uniqueId <= 0)
+                {
+                    return;
+                }
+
+                string repairKey = uniqueId.ToString() + "|repair";
+                bool alreadyApplied;
+                lock (_appliedCardChangeBoostKeys)
+                {
+                    alreadyApplied = _appliedCardChangeBoostKeys.Contains(repairKey);
+                    if (!alreadyApplied)
+                    {
+                        _appliedCardChangeBoostKeys.Add(repairKey);
+                    }
+                }
+                if (alreadyApplied)
+                {
+                    return;
+                }
+
+                Assembly assembly = entityObj.GetType().Assembly;
+                CardChangeRequest request = CardChangeRequest.Create(
+                    "MaxArmor",
+                    "Add",
+                    amount * 0.1f,
+                    false,
+                    false,
+                    "Friendly",
+                    true,
+                    null,
+                    null,
+                    "repair:" + entityId);
+                RuntimeCardChangeApplier.ApplyCardChange(assembly, uniqueId, request);
+            }
+            catch
+            {
+                // Guarded: repair augmentation must never break native repair.
+            }
         }
 
         private static void ClearRuntimeMechanicsByObject(object entityObj)
