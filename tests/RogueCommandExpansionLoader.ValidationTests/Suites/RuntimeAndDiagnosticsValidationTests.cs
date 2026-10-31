@@ -81,6 +81,34 @@ internal static partial class ValidationTestRunner
             throw new InvalidOperationException("Toggle should invert state unless close is pressed, which must leave the inspector closed.");
         }
     }),
+    ("inspector toggle state serializes resolved open flag", () =>
+    {
+        string json = AgentDiagnosticsFormatter.SerializeInspectorToggleState(false, true, false);
+        if (!json.Contains("\"resolvedOpen\":true"))
+        {
+            throw new InvalidOperationException("SerializeInspectorToggleState must report resolvedOpen=true for a toggle press.");
+        }
+
+        string closedJson = AgentDiagnosticsFormatter.SerializeInspectorToggleState(true, false, true);
+        if (!closedJson.Contains("\"resolvedOpen\":false"))
+        {
+            throw new InvalidOperationException("SerializeInspectorToggleState must report resolvedOpen=false when close is pressed.");
+        }
+    }),
+    ("range circle point count serializes validity and count", () =>
+    {
+        string validJson = AgentDiagnosticsFormatter.SerializeRangeCirclePointCount(32);
+        if (!validJson.Contains("\"valid\":true") || !validJson.Contains("\"pointCount\":33"))
+        {
+            throw new InvalidOperationException("SerializeRangeCirclePointCount must report valid=true and pointCount=segments+1.");
+        }
+
+        string invalidJson = AgentDiagnosticsFormatter.SerializeRangeCirclePointCount(2);
+        if (!invalidJson.Contains("\"valid\":false") || !invalidJson.Contains("\"pointCount\":0"))
+        {
+            throw new InvalidOperationException("SerializeRangeCirclePointCount must report valid=false and pointCount=0 for out-of-range segments.");
+        }
+    }),
     ("identifier color policy hashes with FNV-1a and maps to a stable palette slot", () =>
     {
         if (IdentifierColorPolicy.Hash(string.Empty) != 0x811C9DC5u)

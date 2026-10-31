@@ -191,6 +191,73 @@ namespace RogueCommandExpansionLoader.Runtime
             return AgentDiagnosticsFormatter.SerializeIdentifierColor(identifier);
         }
 
+        /// <summary>
+        /// Returns the number of registered unit runtime mechanics profiles.
+        /// </summary>
+        public int RegisteredUnitMechanicsProfileCount => RuntimeUnitMechanicsDirector.RegisteredProfileCount;
+
+        /// <summary>
+        /// Returns a compact textual summary of the runtime mechanics registered
+        /// for a unit, or an empty string when none are registered.
+        /// </summary>
+        public string GetUnitMechanicsSummary(string entityId)
+        {
+            string summary = RuntimeUnitMechanicsDirector.FormatMechanicsSummary(entityId);
+            return summary ?? string.Empty;
+        }
+
+        /// <summary>
+        /// Resolves the inspector open state from toggle/close input.
+        /// </summary>
+        public bool ResolveInspectorOpenState(bool isOpen, bool togglePressed, bool closePressed)
+        {
+            return InspectorTogglePolicy.Resolve(isOpen, togglePressed, closePressed);
+        }
+
+        /// <summary>
+        /// Returns the inspector toggle resolution as JSON. Readable by an agent
+        /// without a visual capture.
+        /// </summary>
+        public string GetInspectorToggleStateJson(bool isOpen, bool togglePressed, bool closePressed)
+        {
+            return AgentDiagnosticsFormatter.SerializeInspectorToggleState(isOpen, togglePressed, closePressed);
+        }
+
+        /// <summary>
+        /// Minimum segment count accepted by the range circle geometry builder.
+        /// </summary>
+        public int RangeDisplayGeometryMinimumSegments => 8;
+
+        /// <summary>
+        /// Maximum segment count accepted by the range circle geometry builder.
+        /// </summary>
+        public int RangeDisplayGeometryMaximumSegments => 256;
+
+        /// <summary>
+        /// Returns the number of points produced for a range circle with the given
+        /// segment count (segments + 1), or 0 when the count is out of range.
+        /// </summary>
+        public int GetRangeCirclePointCount(int segments)
+        {
+            const int minimumSegments = 8;
+            const int maximumSegments = 256;
+            if (segments < minimumSegments || segments > maximumSegments)
+            {
+                return 0;
+            }
+
+            return segments + 1;
+        }
+
+        /// <summary>
+        /// Returns the range circle point count as JSON. Readable by an agent
+        /// without a visual capture.
+        /// </summary>
+        public string GetRangeCirclePointCountJson(int segments)
+        {
+            return AgentDiagnosticsFormatter.SerializeRangeCirclePointCount(segments);
+        }
+
         private LoaderDiagnosticsSnapshot SafeSnapshot()
         {
             if (_provider == null)

@@ -133,6 +133,17 @@ namespace RogueCommandExpansionLoader.Runtime
         private bool _hasInitializedShield;
         private bool _baselineApplied;
 
+        public static int RegisteredProfileCount
+        {
+            get
+            {
+                lock (_profiles)
+                {
+                    return _profiles.Count;
+                }
+            }
+        }
+
         public static void RegisterProfile(string entityId, UnitRuntimeMechanicsProfile profile)
         {
             if (string.IsNullOrWhiteSpace(entityId) || profile == null || !profile.HasAnyMechanics)

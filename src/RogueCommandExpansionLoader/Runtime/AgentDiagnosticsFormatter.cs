@@ -153,6 +153,36 @@ namespace RogueCommandExpansionLoader.Runtime
             return Serialize(view);
         }
 
+        public static string SerializeInspectorToggleState(bool isOpen, bool togglePressed, bool closePressed)
+        {
+            bool resolved = InspectorTogglePolicy.Resolve(isOpen, togglePressed, closePressed);
+            var view = new Dictionary<string, object>
+            {
+                ["isOpen"] = isOpen,
+                ["togglePressed"] = togglePressed,
+                ["closePressed"] = closePressed,
+                ["resolvedOpen"] = resolved,
+            };
+            return Serialize(view);
+        }
+
+        public static string SerializeRangeCirclePointCount(int segments)
+        {
+            const int minimumSegments = 8;
+            const int maximumSegments = 256;
+            bool valid = segments >= minimumSegments && segments <= maximumSegments;
+            int pointCount = valid ? segments + 1 : 0;
+            var view = new Dictionary<string, object>
+            {
+                ["segments"] = segments,
+                ["minimumSegments"] = minimumSegments,
+                ["maximumSegments"] = maximumSegments,
+                ["valid"] = valid,
+                ["pointCount"] = pointCount,
+            };
+            return Serialize(view);
+        }
+
         public static string SerializeIdentifierColor(string identifier)
         {
             string id = identifier ?? string.Empty;
@@ -300,6 +330,21 @@ namespace RogueCommandExpansionLoader.Runtime
                 ["inspectorTogglePolicy"] = new Dictionary<string, object>
                 {
                     ["description"] = "Resolves the inspector open state from toggle/close input.",
+                    ["sample"] = new Dictionary<string, object>
+                    {
+                        ["isOpen"] = false,
+                        ["togglePressed"] = true,
+                        ["closePressed"] = false,
+                        ["resolvedOpen"] = InspectorTogglePolicy.Resolve(false, true, false),
+                    },
+                },
+                ["rangeDisplayGeometry"] = new Dictionary<string, object>
+                {
+                    ["description"] = "Builds world-space circle points for range guides.",
+                    ["minimumSegments"] = 8,
+                    ["maximumSegments"] = 256,
+                    ["sampleSegments"] = 32,
+                    ["samplePointCount"] = 33,
                 },
                 ["rangeDisplayPolicy"] = new Dictionary<string, object>
                 {
