@@ -1089,6 +1089,198 @@ namespace RogueCommandExpansionLoader.Runtime
         /// Unified health and status telemetry synthesizing loader state, content registries,
         /// compiled AI modules, match economy, and combat telemetry into a single agent-readable JSON.
         /// </summary>
+        /// <summary>
+        /// Serializes native AI Director state, attack wave progress, and command queue counts.
+        /// </summary>
+        public static string SerializeAiDirectorCensus(AiDirectorCensus census)
+        {
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "aiDirectorCensus",
+                ["isAiDirectorAvailable"] = census != null && census.IsAiDirectorAvailable,
+                ["currentAttackWaveNumber"] = census != null ? census.CurrentAttackWaveNumber : 0,
+                ["tickDuration"] = census != null ? census.TickDuration : 0f,
+                ["showAiTags"] = census != null && census.ShowAiTags,
+                ["showCurrentCommands"] = census != null && census.ShowCurrentCommands,
+                ["attackCommandCount"] = census != null ? census.AttackCommandCount : 0,
+                ["defendCommandCount"] = census != null ? census.DefendCommandCount : 0,
+                ["scoutCommandCount"] = census != null ? census.ScoutCommandCount : 0,
+                ["buildCommandCount"] = census != null ? census.BuildCommandCount : 0,
+                ["produceCommandCount"] = census != null ? census.ProduceCommandCount : 0,
+                ["otherCommandCount"] = census != null ? census.OtherCommandCount : 0,
+                ["constructionQueueSummary"] = census != null ? (census.ConstructionQueueSummary ?? string.Empty) : string.Empty,
+            };
+            return Serialize(view);
+        }
+
+        /// <summary>
+        /// Serializes the result of an AI Director command.
+        /// </summary>
+        public static string SerializeAiDirectorCommandResult(AiDirectorCommandResult result)
+        {
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "aiDirectorCommandResult",
+                ["success"] = result.Success,
+                ["commandType"] = result.CommandType ?? string.Empty,
+                ["waveNumber"] = result.WaveNumber,
+                ["message"] = result.Message ?? string.Empty,
+            };
+            return Serialize(view);
+        }
+
+        /// <summary>
+        /// Serializes camera viewport, world position, and zoom settings.
+        /// </summary>
+        public static string SerializeCameraCensus(CameraCensus census)
+        {
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "cameraCensus",
+                ["isCameraAvailable"] = census != null && census.IsCameraAvailable,
+                ["positionX"] = census != null ? census.PositionX : 0f,
+                ["positionY"] = census != null ? census.PositionY : 0f,
+                ["positionZ"] = census != null ? census.PositionZ : 0f,
+                ["fieldOfView"] = census != null ? census.FieldOfView : 0f,
+                ["minFov"] = census != null ? census.MinFov : 0f,
+                ["maxFov"] = census != null ? census.MaxFov : 0f,
+                ["defaultFov"] = census != null ? census.DefaultFov : 0f,
+                ["isOrthographic"] = census != null && census.IsOrthographic,
+                ["orthographicSize"] = census != null ? census.OrthographicSize : 0f,
+            };
+            return Serialize(view);
+        }
+
+        /// <summary>
+        /// Serializes the result of a camera command.
+        /// </summary>
+        public static string SerializeCameraCommandResult(CameraCommandResult result)
+        {
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "cameraCommandResult",
+                ["success"] = result.Success,
+                ["commandType"] = result.CommandType ?? string.Empty,
+                ["targetX"] = result.TargetX,
+                ["targetZ"] = result.TargetZ,
+                ["fieldOfView"] = result.FieldOfView,
+                ["message"] = result.Message ?? string.Empty,
+            };
+            return Serialize(view);
+        }
+
+        /// <summary>
+        /// Serializes active harvesters, crystal payloads, and mining states across the battlefield.
+        /// Loss/omission counters are serialized before detail collections.
+        /// </summary>
+        public static string SerializeHarvesterCensus(HarvesterCensus census)
+        {
+            var rows = new List<Dictionary<string, object>>();
+            if (census != null && census.HarvesterRows != null)
+            {
+                foreach (HarvesterDiagnosticRow row in census.HarvesterRows)
+                {
+                    rows.Add(new Dictionary<string, object>
+                    {
+                        ["entityKeyId"] = row.EntityKeyId ?? string.Empty,
+                        ["isPlayerControlled"] = row.IsPlayerControlled,
+                        ["currentLoad"] = row.CurrentLoad,
+                        ["maxLoad"] = row.MaxLoad,
+                        ["loadFraction"] = row.LoadFraction,
+                        ["currentState"] = row.CurrentState ?? string.Empty,
+                        ["positionX"] = row.PositionX,
+                        ["positionZ"] = row.PositionZ,
+                    });
+                }
+            }
+
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "harvesterCensus",
+                ["omittedHarvesterCount"] = census != null ? census.OmittedHarvesterCount : 0,
+                ["totalHarvesterCount"] = census != null ? census.TotalHarvesterCount : 0,
+                ["playerHarvesterCount"] = census != null ? census.PlayerHarvesterCount : 0,
+                ["aiHarvesterCount"] = census != null ? census.AiHarvesterCount : 0,
+                ["idleHarvesterCount"] = census != null ? census.IdleHarvesterCount : 0,
+                ["totalCrystalsCarried"] = census != null ? census.TotalCrystalsCarried : 0f,
+                ["trackedHarvesterRowCount"] = rows.Count,
+                ["harvesterRows"] = rows,
+            };
+            return Serialize(view);
+        }
+
+        /// <summary>
+        /// Serializes the result of a harvester command.
+        /// </summary>
+        public static string SerializeHarvesterCommandResult(HarvesterCommandResult result)
+        {
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "harvesterCommandResult",
+                ["success"] = result.Success,
+                ["harvesterKeyId"] = result.HarvesterKeyId ?? string.Empty,
+                ["commandType"] = result.CommandType ?? string.Empty,
+                ["message"] = result.Message ?? string.Empty,
+            };
+            return Serialize(view);
+        }
+
+        /// <summary>
+        /// Serializes audio mixer volume slider levels.
+        /// </summary>
+        public static string SerializeAudioCensus(AudioCensus census)
+        {
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "audioCensus",
+                ["isAudioAvailable"] = census != null && census.IsAudioAvailable,
+                ["masterVolumeSlider"] = census != null ? census.MasterVolumeSlider : 0f,
+                ["musicVolumeSlider"] = census != null ? census.MusicVolumeSlider : 0f,
+                ["gameplayVolumeSlider"] = census != null ? census.GameplayVolumeSlider : 0f,
+                ["uiVolumeSlider"] = census != null ? census.UiVolumeSlider : 0f,
+            };
+            return Serialize(view);
+        }
+
+        /// <summary>
+        /// Serializes the result of an audio volume adjustment command.
+        /// </summary>
+        public static string SerializeAudioCommandResult(AudioCommandResult result)
+        {
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "audioCommandResult",
+                ["success"] = result.Success,
+                ["channel"] = result.Channel ?? string.Empty,
+                ["volumeSlider"] = result.VolumeSlider,
+                ["message"] = result.Message ?? string.Empty,
+            };
+            return Serialize(view);
+        }
+
+        /// <summary>
+        /// Serializes registered tech upgrades, research branches, and relics from balancing stores.
+        /// Omission counters precede detail collections.
+        /// </summary>
+        public static string SerializeTechCatalogCensus(TechCatalogCensus census)
+        {
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "techCatalogCensus",
+                ["omittedUpgradeCount"] = census != null ? census.OmittedUpgradeCount : 0,
+                ["omittedResearchCount"] = census != null ? census.OmittedResearchCount : 0,
+                ["omittedRelicCount"] = census != null ? census.OmittedRelicCount : 0,
+                ["isTechCatalogReady"] = census != null && census.IsTechCatalogReady,
+                ["totalUpgrades"] = census != null ? census.TotalUpgrades : 0,
+                ["totalResearch"] = census != null ? census.TotalResearch : 0,
+                ["totalRelics"] = census != null ? census.TotalRelics : 0,
+                ["upgradeIds"] = census != null && census.UpgradeIds != null ? census.UpgradeIds : (object)Array.Empty<string>(),
+                ["researchIds"] = census != null && census.ResearchIds != null ? census.ResearchIds : (object)Array.Empty<string>(),
+                ["relicIds"] = census != null && census.RelicIds != null ? census.RelicIds : (object)Array.Empty<string>(),
+            };
+            return Serialize(view);
+        }
+
         public static string SerializeSystemHealth(
             LoaderDiagnosticsSnapshot snapshot,
             AiModulesCensus aiCensus,
@@ -1494,6 +1686,20 @@ namespace RogueCommandExpansionLoader.Runtime
                 new Dictionary<string, object> { ["name"] = "GetGameTimeScaleJson", ["description"] = "Query current match time scale." },
                 new Dictionary<string, object> { ["name"] = "TriggerMatchEndJson", ["description"] = "Trigger match victory or defeat." },
                 new Dictionary<string, object> { ["name"] = "SpawnEntityJson", ["description"] = "Spawn a unit or building entity at coordinates." },
+                new Dictionary<string, object> { ["name"] = "GetAiDirectorCensusJson", ["description"] = "Telemetry of native AI Director, attack wave progress, and command queues." },
+                new Dictionary<string, object> { ["name"] = "SetAttackWaveNumberJson", ["description"] = "Set current AI attack wave number." },
+                new Dictionary<string, object> { ["name"] = "IncrementAttackWaveJson", ["description"] = "Increment AI attack wave number by 1." },
+                new Dictionary<string, object> { ["name"] = "ToggleAiDebugVisualsJson", ["description"] = "Toggle or set AI debug visual tags and tactical commands." },
+                new Dictionary<string, object> { ["name"] = "GetCameraCensusJson", ["description"] = "Telemetry of camera viewport, ground coordinates, and FOV." },
+                new Dictionary<string, object> { ["name"] = "MoveCameraJson", ["description"] = "Move camera to ground coordinates (X, Z)." },
+                new Dictionary<string, object> { ["name"] = "FocusCameraOnEntityJson", ["description"] = "Center camera on entity by key ID." },
+                new Dictionary<string, object> { ["name"] = "SetCameraZoomJson", ["description"] = "Set camera FOV / zoom level." },
+                new Dictionary<string, object> { ["name"] = "GetHarvesterCensusJson", ["description"] = "Telemetry of active harvesters, crystal payloads, and states." },
+                new Dictionary<string, object> { ["name"] = "OrderHarvesterHarvestJson", ["description"] = "Order harvester to harvest nearest crystal." },
+                new Dictionary<string, object> { ["name"] = "OrderHarvesterReturnJson", ["description"] = "Order harvester to return to refinery." },
+                new Dictionary<string, object> { ["name"] = "GetAudioCensusJson", ["description"] = "Telemetry of audio mixer volume slider levels." },
+                new Dictionary<string, object> { ["name"] = "SetAudioVolumeJson", ["description"] = "Set volume slider level for Master, Music, Gameplay, UI." },
+                new Dictionary<string, object> { ["name"] = "GetTechCatalogJson", ["description"] = "Catalog of registered upgrades, research branches, and relics." },
                 new Dictionary<string, object> { ["name"] = "GetDiagnosticCatalogJson", ["description"] = "Catalog of available diagnostic getters." },
             };
 

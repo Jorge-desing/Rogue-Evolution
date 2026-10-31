@@ -317,3 +317,25 @@ This is a compact, durable orientation for agents. For the changing checkout sta
 - Uncommitted working-tree changes (preserved; do not stage, reset, clean, or overwrite): modified `src/RogueCommandExpansionLoader/Runtime/AgentDiagnosticsFormatter.cs`, `LoaderDiagnosticsComponent.cs`, `RuntimeGameplayCommandDirector.cs`, test stubs/csxproj/fixtures, `tools/bepinex_mcp_server.py`, and `tools/build_bepinex_mcp.py`; untracked `RuntimeAiDirectorCensus.cs`, `RuntimeAudioCensus.cs`, `RuntimeCameraCensus.cs`, `RuntimeHarvesterCensus.cs`, `RuntimeTechCatalogCensus.cs`, and `.agents/skills/rogue-command-game-research/references/`. Nested worktree gitlinks `cargador` (11e9968, dirty) and `task-graph-validation` (d1f9045, dirty), staged Unity prefab reductions, and untracked `unity/.../SampleExpansion/` (+meta) remain.
 - Validation (freshly rerun 2026-10-31): Release plugin build 0 warnings/0 errors; C# harness 400/401 (1 Windows symlink-privilege skip, 0 failures); Python unittest 86/86; bundle references 25/0; native visual preflight 9/0; `git diff --check` reports LF/CRLF warnings and one trailing-whitespace warning in `RuntimeGameplayCommandDirector.cs:1440`. Live Steam confirms diagnostics bridge (`ActivePackCount=3`, `RegisteredUnitCount=30`, `ProviderReady=True`) and expanded utilities; no fresh Unity/current-HEAD Steam gameplay proof beyond bridge; last deployment 2026-10-25. Natural offer→selection→placement→production/render/stat and tactical AI unverified.
 - QA/reflection safety: Profile2 dedicated QA without tutorial; never ask, inspect, infer, gate, bypass, or switch profiles for tutorial. Check current selector/save safety and preserve saves. Before reflection verify Rogue Command version, Unity `2021.3.45f2`, Assembly-CSharp SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, MVID `db0e9462-128d-4296-9900-de18b4bd0c00`. Agent memories (codex, antigravity) and mem0 synced to HEAD 6acfa3f.
+
+
+## Refresh (2026-10-31, AI Director, Camera, Harvester, Audio, Tech Catalog)
+
+- Repository: `C:/Users/Alex/Documents/Mod Rogue Command`, loader `1.19.0`, branch `codex/rogue-unit-balance-20261018`.
+- New implementation scope:
+  - `RuntimeAiDirectorCensus.cs`: Clean-room AI director telemetry (`AiDirectorCensus` DTO) querying `AiBehaviourManager` (current attack wave number, active command counts for attack, defend, scout, build, produce, other, queue summary, tick duration, debug visual flags).
+  - `RuntimeCameraCensus.cs`: Clean-room camera viewport telemetry (`CameraCensus` DTO) querying `Camera.main` and `CameraZoom` (viewport ground coordinates min/max X/Z, center X/Z, FOV, orthographic state).
+  - `RuntimeHarvesterCensus.cs`: Clean-room harvester telemetry (`HarvesterCensus` and `HarvesterDiagnosticRow` DTOs capped at 32 rows, omission counters first) querying `ExistingControllers.Instance.Harvesters` and `Harvest` components (load, capacity, fraction, mining state, entity key).
+  - `RuntimeAudioCensus.cs`: Clean-room audio mixer telemetry (`AudioCensus` DTO) querying `AudioMixer` via `AudioMixerHelper` (Master, Music, Gameplay, UI slider levels).
+  - `RuntimeTechCatalogCensus.cs`: Clean-room catalog of research, upgrades, and relics (`TechCatalogCensus` DTO capped at 64 per collection, omission counters first) querying `UpgradeBalancingStore`, `ResearchBalancingStore`, and `RelicBalancingStore`.
+  - `RuntimeGameplayCommandDirector.cs` additions:
+    - AI Director: `TrySetAttackWaveNumber`, `TryIncrementAttackWave`, `TryToggleAiDebugVisuals`.
+    - Camera: `TryMoveCamera`, `TryFocusCameraOnEntity`, `TrySetCameraZoom`.
+    - Harvester: `TryOrderHarvesterHarvest`, `TryOrderHarvesterReturn` (with candidate search in `FindEntityByKey` enriched with `existing.Harvesters`).
+    - Audio: `TrySetAudioVolume` (clamped in [0, 1] for Master, Music, Gameplay, UI).
+  - `AgentDiagnosticsFormatter.cs`: Serializers for all 5 censuses and 4 command result DTOs; catalog expanded with 14 new diagnostic endpoints.
+  - `LoaderDiagnosticsComponent.cs`: Added 14 new MonoBehaviour bridge methods returning formatted JSON strings.
+  - `tools/build_bepinex_mcp.py` & `tools/bepinex_mcp_server.py`: Added 14 first-class BepInEx MCP tools (total 128 tools generated in `C:\Users\Alex\.gemini\antigravity\mcp\bepinex_mcp\`).
+  - Validation test harness (`RuntimeAndDiagnosticsValidationTests.cs`): Added 5 comprehensive test suites covering all 5 new subsystems.
+- Validation: Release plugin build 0 warnings/0 errors (`artifacts/plugin/RogueCommandExpansionLoader.dll`); C# harness 405/406 passed (1 Windows symlink skip, 0 failures); Python suite 86/86 passed; `validate_loader_registry.py` passed 4/4 manifests; `git diff --check` clean.
+- Uncommitted working-tree preserved: untracked `.agents/skills/rogue-command-game-research/references/`; nested worktree gitlinks `cargador` (11e9968, dirty) and `task-graph-validation` (d1f9045, dirty) remain untouched.

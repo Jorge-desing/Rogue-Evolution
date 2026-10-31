@@ -231,14 +231,48 @@ public sealed class AiBehaviour
     public float detectionRange = 10.0f;
 }
 
-public sealed class AiBehaviourManager
+public class AiBehaviourManager : UnityEngine.MonoBehaviour
 {
+    private static AiBehaviourManager _instance;
+    public static AiBehaviourManager Instance => _instance ??= new AiBehaviourManager();
+
     public AiBehaviour activeBehaviour;
     public static readonly Priority_Queue.SimplePriorityQueue<string> ConstructionQueue = new();
-    public static int CurrentAttackWaveNumber { get; set; }
+    public static int CurrentAttackWaveNumber { get; set; } = 3;
+    public float tickDuration = 0.5f;
+    public bool showAiTags = false;
+    public bool showCurrentCommands = false;
+
+    public System.Collections.Generic.List<object> attackCommands = new System.Collections.Generic.List<object> { new object() };
+    public System.Collections.Generic.List<object> defendCommands = new System.Collections.Generic.List<object>();
+    public System.Collections.Generic.List<object> scoutCommands = new System.Collections.Generic.List<object>();
+    public System.Collections.Generic.List<object> buildCommands = new System.Collections.Generic.List<object>();
+    public System.Collections.Generic.List<object> produceCommands = new System.Collections.Generic.List<object>();
+    public System.Collections.Generic.List<object> otherCommands = new System.Collections.Generic.List<object>();
+
+    public AiBehaviourManager()
+    {
+        _instance = this;
+    }
+
     public static void IncrementAttackWaveNumber_Static()
     {
         CurrentAttackWaveNumber++;
+    }
+
+    public static void ToggleShowAiTags_Static()
+    {
+        Instance.showAiTags = !Instance.showAiTags;
+    }
+
+    public static void ToggleCurrentCommands_Static()
+    {
+        Instance.showCurrentCommands = !Instance.showCurrentCommands;
+    }
+
+    public static string ConstructionQueueToString_Static()
+    {
+        return "Factory_Assault x1, Turret_Heavy x2";
     }
 }
 

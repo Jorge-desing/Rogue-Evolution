@@ -1424,26 +1424,26 @@ internal static partial class ValidationTestRunner
         var mutationManager = new RuntimeMutationManager(msg => { });
 
         // Null target
-        if (mutationManager.MutateField(null!, "someField", 1.0f)) 
+        if (mutationManager.MutateField(null!, "someField", 1.0f))
             throw new InvalidOperationException("Mutation should fail for null target.");
 
         // Non-existent field
         var target = new object();
-        if (mutationManager.MutateField(target, "NonExistentField", 1.0f)) 
+        if (mutationManager.MutateField(target, "NonExistentField", 1.0f))
             throw new InvalidOperationException("Mutation should fail for non-existent field.");
 
         // Wrong type
         var buff = new EntityValueModifier { value = 1.0f };
-        if (mutationManager.MutateField(buff, "value", "not a float")) 
+        if (mutationManager.MutateField(buff, "value", "not a float"))
             throw new InvalidOperationException("Mutation should fail for type mismatch.");
 
         // AI Behaviour: null manager
-        if (mutationManager.MutateActiveAiBehaviour(null!, "tickRate", 0.5f)) 
+        if (mutationManager.MutateActiveAiBehaviour(null!, "tickRate", 0.5f))
             throw new InvalidOperationException("AI mutation should fail for null manager.");
 
         // AI Behaviour: null activeBehaviour
         var manager = new AiBehaviourManager { activeBehaviour = null! };
-        if (mutationManager.MutateActiveAiBehaviour(manager, "tickRate", 0.5f)) 
+        if (mutationManager.MutateActiveAiBehaviour(manager, "tickRate", 0.5f))
             throw new InvalidOperationException("AI mutation should fail for null activeBehaviour.");
     }),
     ("production building visual-source compatibility is explicit and independent", () =>
@@ -4064,6 +4064,260 @@ internal static partial class ValidationTestRunner
                 !names.Contains("SpawnEntityJson"))
             {
                 throw new InvalidOperationException("Diagnostic catalog should include newly exposed getters.");
+            }
+        }
+    }),
+("runtime ai director census and command director observe and manipulate attack waves and debug visuals", () =>
+    {
+        AiDirectorCensus census = RuntimeAiDirectorCensus.Current();
+        if (!census.IsAiDirectorAvailable || census.CurrentAttackWaveNumber < 0)
+        {
+            throw new InvalidOperationException("RuntimeAiDirectorCensus.Current should report available AI director.");
+        }
+
+        // Set wave number
+        AiDirectorCommandResult setRes = RuntimeGameplayCommandDirector.TrySetAttackWaveNumber(7);
+        if (!setRes.Success || setRes.WaveNumber != 7)
+        {
+            throw new InvalidOperationException("TrySetAttackWaveNumber(7) should update wave number to 7.");
+        }
+
+        census = RuntimeAiDirectorCensus.Current();
+        if (census.CurrentAttackWaveNumber != 7)
+        {
+            throw new InvalidOperationException("CurrentAttackWaveNumber should be 7.");
+        }
+
+        // Increment wave
+        AiDirectorCommandResult incRes = RuntimeGameplayCommandDirector.TryIncrementAttackWave();
+        if (!incRes.Success || incRes.WaveNumber != 8)
+        {
+            throw new InvalidOperationException("TryIncrementAttackWave should increment wave to 8.");
+        }
+
+        // Toggle debug visuals
+        AiDirectorCommandResult visRes = RuntimeGameplayCommandDirector.TryToggleAiDebugVisuals(true, true);
+        if (!visRes.Success)
+        {
+            throw new InvalidOperationException("TryToggleAiDebugVisuals should succeed.");
+        }
+
+        census = RuntimeAiDirectorCensus.Current();
+        if (!census.ShowAiTags || !census.ShowCurrentCommands)
+        {
+            throw new InvalidOperationException("ShowAiTags and ShowCurrentCommands should be true.");
+        }
+
+        // Serialization check
+        string json = AgentDiagnosticsFormatter.SerializeAiDirectorCensus(census);
+        using (var doc = JsonDocument.Parse(json))
+        {
+            if (!doc.RootElement.GetProperty("isAiDirectorAvailable").GetBoolean() ||
+                doc.RootElement.GetProperty("currentAttackWaveNumber").GetInt32() != 8 ||
+                !doc.RootElement.GetProperty("showAiTags").GetBoolean())
+            {
+                throw new InvalidOperationException("SerializeAiDirectorCensus JSON mismatch.");
+            }
+        }
+    }),
+    ("runtime camera census and director move focus and zoom camera viewport without GUI", () =>
+    {
+        CameraCensus census = RuntimeCameraCensus.Current();
+        if (!census.IsCameraAvailable)
+        {
+            throw new InvalidOperationException("RuntimeCameraCensus.Current should report available camera.");
+        }
+
+        // Move camera
+        CameraCommandResult moveRes = RuntimeGameplayCommandDirector.TryMoveCamera(120f, 180f);
+        if (!moveRes.Success || moveRes.TargetX != 120f || moveRes.TargetZ != 180f)
+        {
+            throw new InvalidOperationException("TryMoveCamera should report moved target coords.");
+        }
+
+        // Set camera zoom
+        CameraCommandResult zoomRes = RuntimeGameplayCommandDirector.TrySetCameraZoom(55f);
+        if (!zoomRes.Success || zoomRes.FieldOfView != 55f)
+        {
+            throw new InvalidOperationException("TrySetCameraZoom should update camera FOV to 55f.");
+        }
+
+        // Focus camera on entity
+        var scout = new EntityController { EntityId = "scout_rover", tag = "Player", CurrentHealth = 100f, MaxHealth = 100f };
+        scout.gameObject.name = "scout_rover";
+        scout.transform.position = new Vector3(40f, 0f, 60f);
+        ExistingControllers.Instance.PlayerUnits().Add(scout);
+
+        try
+        {
+            CameraCommandResult focusRes = RuntimeGameplayCommandDirector.TryFocusCameraOnEntity("scout_rover");
+            if (!focusRes.Success || focusRes.TargetX != 40f || focusRes.TargetZ != 60f)
+            {
+                throw new InvalidOperationException("TryFocusCameraOnEntity should succeed focusing scout_rover.");
+            }
+        }
+        finally
+        {
+            ExistingControllers.Instance.Reset();
+        }
+
+        // Serialization check
+        string json = AgentDiagnosticsFormatter.SerializeCameraCensus(census);
+        using (var doc = JsonDocument.Parse(json))
+        {
+            if (!doc.RootElement.GetProperty("isCameraAvailable").GetBoolean())
+            {
+                throw new InvalidOperationException("SerializeCameraCensus JSON mismatch.");
+            }
+        }
+    }),
+    ("runtime harvester census and director track crystal payloads and dispatch mining orders", () =>
+    {
+        try
+        {
+            ExistingControllers.Instance.Reset();
+            Harvest.ClaimCalled = false;
+            Harvest.RefineryCalled = false;
+
+            var harvester = new EntityController { EntityId = "harvester_mining_1", tag = "Player", CurrentHealth = 120f, MaxHealth = 120f };
+            harvester.gameObject.name = "harvester_mining_1";
+            var harvestComp = harvester.gameObject.AddComponent<Harvest>();
+            harvestComp._currentLoad = 40f;
+            harvestComp.MaxValue = 100;
+            harvestComp._loadFraction = 0.4f;
+
+            ExistingControllers.Instance.Harvesters.Add(harvester);
+
+            HarvesterCensus census = RuntimeHarvesterCensus.Current();
+            if (census.TotalHarvesterCount != 1 || census.PlayerHarvesterCount != 1 || census.TotalCrystalsCarried != 40f)
+            {
+                throw new InvalidOperationException("RuntimeHarvesterCensus should report 1 player harvester with 40 crystals carried.");
+            }
+
+            if (census.HarvesterRows.Count != 1 || census.HarvesterRows[0].EntityKeyId != "harvester_mining_1")
+            {
+                throw new InvalidOperationException("HarvesterRows should include harvester_mining_1.");
+            }
+
+            // Command harvest
+            HarvesterCommandResult claimRes = RuntimeGameplayCommandDirector.TryOrderHarvesterHarvest("harvester_mining_1");
+            if (!claimRes.Success || !Harvest.ClaimCalled)
+            {
+                throw new InvalidOperationException("TryOrderHarvesterHarvest should invoke ClaimClosestCrystalAndMoveToIt.");
+            }
+
+            // Command return to refinery
+            HarvesterCommandResult refRes = RuntimeGameplayCommandDirector.TryOrderHarvesterReturn("harvester_mining_1");
+            if (!refRes.Success || !Harvest.RefineryCalled)
+            {
+                throw new InvalidOperationException("TryOrderHarvesterReturn should invoke MoveToClosestRefinery.");
+            }
+
+            // Serialization check
+            string json = AgentDiagnosticsFormatter.SerializeHarvesterCensus(census);
+            using (var doc = JsonDocument.Parse(json))
+            {
+                if (doc.RootElement.GetProperty("totalHarvesterCount").GetInt32() != 1 ||
+                    doc.RootElement.GetProperty("totalCrystalsCarried").GetSingle() != 40f ||
+                    doc.RootElement.GetProperty("omittedHarvesterCount").GetInt32() != 0)
+                {
+                    throw new InvalidOperationException("SerializeHarvesterCensus JSON mismatch.");
+                }
+            }
+        }
+        finally
+        {
+            ExistingControllers.Instance.Reset();
+            Harvest.ClaimCalled = false;
+            Harvest.RefineryCalled = false;
+        }
+    }),
+    ("runtime audio census and volume director query and adjust audio mixer sliders", () =>
+    {
+        AudioCensus census = RuntimeAudioCensus.Current();
+        if (!census.IsAudioAvailable)
+        {
+            throw new InvalidOperationException("RuntimeAudioCensus.Current should report available audio.");
+        }
+
+        // Set master volume
+        AudioCommandResult masterRes = RuntimeGameplayCommandDirector.TrySetAudioVolume("Master", 0.55f);
+        if (!masterRes.Success || masterRes.VolumeSlider != 0.55f || AudioMixerHelper.MasterSlider != 0.55f)
+        {
+            throw new InvalidOperationException("TrySetAudioVolume(Master, 0.55) should update Master slider to 0.55.");
+        }
+
+        // Set music volume
+        AudioCommandResult musicRes = RuntimeGameplayCommandDirector.TrySetAudioVolume("Music", 0.35f);
+        if (!musicRes.Success || musicRes.VolumeSlider != 0.35f || AudioMixerHelper.MusicSlider != 0.35f)
+        {
+            throw new InvalidOperationException("TrySetAudioVolume(Music, 0.35) should update Music slider to 0.35.");
+        }
+
+        // Serialization check
+        string json = AgentDiagnosticsFormatter.SerializeAudioCensus(census);
+        using (var doc = JsonDocument.Parse(json))
+        {
+            if (!doc.RootElement.GetProperty("isAudioAvailable").GetBoolean())
+            {
+                throw new InvalidOperationException("SerializeAudioCensus JSON mismatch.");
+            }
+        }
+    }),
+    ("runtime tech catalog census queries registered upgrades research branches and relics", () =>
+    {
+        TechCatalogCensus census = RuntimeTechCatalogCensus.Current();
+        if (!census.IsTechCatalogReady || census.TotalUpgrades < 3 || census.TotalResearch < 2 || census.TotalRelics < 3)
+        {
+            throw new InvalidOperationException("RuntimeTechCatalogCensus should report registered tech items.");
+        }
+
+        if (!census.UpgradeIds.Contains("Upgrade_HullReinforcement") ||
+            !census.ResearchIds.Contains("Research_AdvancedRobotics") ||
+            !census.RelicIds.Contains("Relic_FoundryCounterweight"))
+        {
+            throw new InvalidOperationException("Tech catalog should contain expected sample IDs.");
+        }
+
+        // Serialization check
+        string json = AgentDiagnosticsFormatter.SerializeTechCatalogCensus(census);
+        using (var doc = JsonDocument.Parse(json))
+        {
+            if (!doc.RootElement.GetProperty("isTechCatalogReady").GetBoolean() ||
+                doc.RootElement.GetProperty("totalUpgrades").GetInt32() < 3 ||
+                doc.RootElement.GetProperty("omittedUpgradeCount").GetInt32() != 0)
+            {
+                throw new InvalidOperationException("SerializeTechCatalogCensus JSON mismatch.");
+            }
+        }
+
+        // Verify Diagnostic Catalog includes newest endpoints
+        string catalogJson = AgentDiagnosticsFormatter.SerializeDiagnosticCatalog();
+        using (var doc = JsonDocument.Parse(catalogJson))
+        {
+            var items = doc.RootElement.GetProperty("diagnostics");
+            var names = new HashSet<string>();
+            foreach (var item in items.EnumerateArray())
+            {
+                names.Add(item.GetProperty("name").GetString()!);
+            }
+
+            if (!names.Contains("GetAiDirectorCensusJson") ||
+                !names.Contains("SetAttackWaveNumberJson") ||
+                !names.Contains("IncrementAttackWaveJson") ||
+                !names.Contains("ToggleAiDebugVisualsJson") ||
+                !names.Contains("GetCameraCensusJson") ||
+                !names.Contains("MoveCameraJson") ||
+                !names.Contains("FocusCameraOnEntityJson") ||
+                !names.Contains("SetCameraZoomJson") ||
+                !names.Contains("GetHarvesterCensusJson") ||
+                !names.Contains("OrderHarvesterHarvestJson") ||
+                !names.Contains("OrderHarvesterReturnJson") ||
+                !names.Contains("GetAudioCensusJson") ||
+                !names.Contains("SetAudioVolumeJson") ||
+                !names.Contains("GetTechCatalogJson"))
+            {
+                throw new InvalidOperationException("Diagnostic catalog should include all newly exposed endpoints.");
             }
         }
     }),

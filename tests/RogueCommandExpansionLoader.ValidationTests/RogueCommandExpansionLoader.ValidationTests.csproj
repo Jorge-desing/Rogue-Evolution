@@ -53,6 +53,16 @@
              Link="Runtime/RuntimeFogCensus.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeEntityCatalogCensus.cs"
              Link="Runtime/RuntimeEntityCatalogCensus.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeAiDirectorCensus.cs"
+             Link="Runtime/RuntimeAiDirectorCensus.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeCameraCensus.cs"
+             Link="Runtime/RuntimeCameraCensus.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeHarvesterCensus.cs"
+             Link="Runtime/RuntimeHarvesterCensus.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeAudioCensus.cs"
+             Link="Runtime/RuntimeAudioCensus.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeTechCatalogCensus.cs"
+             Link="Runtime/RuntimeTechCatalogCensus.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Content/ContentPackDefinition.cs"
              Link="Content/ContentPackDefinition.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Content/VisualOverlayScaleCalibration.cs"

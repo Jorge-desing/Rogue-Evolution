@@ -808,6 +808,132 @@ namespace RogueCommandExpansionLoader.Runtime
         /// Synthesizes loader registry readiness, content counts, AI modules,
         /// economy parameters, and active combat telemetry.
         /// </summary>
+        /// <summary>
+        /// Returns native AI Director state, attack wave progress, and command queue counts as JSON.
+        /// </summary>
+        public string GetAiDirectorCensusJson()
+        {
+            return AgentDiagnosticsFormatter.SerializeAiDirectorCensus(
+                RuntimeAiDirectorCensus.Current());
+        }
+
+        /// <summary>
+        /// Sets the current AI attack wave number.
+        /// </summary>
+        public string SetAttackWaveNumberJson(int waveNumber)
+        {
+            return AgentDiagnosticsFormatter.SerializeAiDirectorCommandResult(
+                RuntimeGameplayCommandDirector.TrySetAttackWaveNumber(waveNumber));
+        }
+
+        /// <summary>
+        /// Increments the AI attack wave number by 1.
+        /// </summary>
+        public string IncrementAttackWaveJson()
+        {
+            return AgentDiagnosticsFormatter.SerializeAiDirectorCommandResult(
+                RuntimeGameplayCommandDirector.TryIncrementAttackWave());
+        }
+
+        /// <summary>
+        /// Toggles or sets AI debug visual tags and tactical commands on screen.
+        /// </summary>
+        public string ToggleAiDebugVisualsJson(bool showTags, bool showCommands)
+        {
+            return AgentDiagnosticsFormatter.SerializeAiDirectorCommandResult(
+                RuntimeGameplayCommandDirector.TryToggleAiDebugVisuals(showTags, showCommands));
+        }
+
+        /// <summary>
+        /// Returns camera viewport metrics, position, and FOV as JSON.
+        /// </summary>
+        public string GetCameraCensusJson()
+        {
+            return AgentDiagnosticsFormatter.SerializeCameraCensus(
+                RuntimeCameraCensus.Current());
+        }
+
+        /// <summary>
+        /// Moves the main camera to target ground coordinates (X, Z).
+        /// </summary>
+        public string MoveCameraJson(float targetX, float targetZ)
+        {
+            return AgentDiagnosticsFormatter.SerializeCameraCommandResult(
+                RuntimeGameplayCommandDirector.TryMoveCamera(targetX, targetZ));
+        }
+
+        /// <summary>
+        /// Centers the camera on an entity by key ID.
+        /// </summary>
+        public string FocusCameraOnEntityJson(string entityKeyId)
+        {
+            return AgentDiagnosticsFormatter.SerializeCameraCommandResult(
+                RuntimeGameplayCommandDirector.TryFocusCameraOnEntity(entityKeyId));
+        }
+
+        /// <summary>
+        /// Sets camera FOV / zoom level.
+        /// </summary>
+        public string SetCameraZoomJson(float fov)
+        {
+            return AgentDiagnosticsFormatter.SerializeCameraCommandResult(
+                RuntimeGameplayCommandDirector.TrySetCameraZoom(fov));
+        }
+
+        /// <summary>
+        /// Returns active harvesters, crystal payloads, and states as JSON.
+        /// </summary>
+        public string GetHarvesterCensusJson()
+        {
+            return AgentDiagnosticsFormatter.SerializeHarvesterCensus(
+                RuntimeHarvesterCensus.Current());
+        }
+
+        /// <summary>
+        /// Orders a harvester unit to harvest nearest crystal.
+        /// </summary>
+        public string OrderHarvesterHarvestJson(string harvesterKeyId)
+        {
+            return AgentDiagnosticsFormatter.SerializeHarvesterCommandResult(
+                RuntimeGameplayCommandDirector.TryOrderHarvesterHarvest(harvesterKeyId));
+        }
+
+        /// <summary>
+        /// Orders a harvester unit to return cargo to closest refinery.
+        /// </summary>
+        public string OrderHarvesterReturnJson(string harvesterKeyId)
+        {
+            return AgentDiagnosticsFormatter.SerializeHarvesterCommandResult(
+                RuntimeGameplayCommandDirector.TryOrderHarvesterReturn(harvesterKeyId));
+        }
+
+        /// <summary>
+        /// Returns audio mixer volume slider levels as JSON.
+        /// </summary>
+        public string GetAudioCensusJson()
+        {
+            return AgentDiagnosticsFormatter.SerializeAudioCensus(
+                RuntimeAudioCensus.Current());
+        }
+
+        /// <summary>
+        /// Sets volume slider level for an audio channel (Master, Music, Gameplay, UI).
+        /// </summary>
+        public string SetAudioVolumeJson(string channel, float sliderValue)
+        {
+            return AgentDiagnosticsFormatter.SerializeAudioCommandResult(
+                RuntimeGameplayCommandDirector.TrySetAudioVolume(channel, sliderValue));
+        }
+
+        /// <summary>
+        /// Returns registered tech upgrades, research branches, and relics as JSON.
+        /// </summary>
+        public string GetTechCatalogJson()
+        {
+            return AgentDiagnosticsFormatter.SerializeTechCatalogCensus(
+                RuntimeTechCatalogCensus.Current());
+        }
+
         public string GetSystemHealthJson()
         {
             return AgentDiagnosticsFormatter.SerializeSystemHealth(

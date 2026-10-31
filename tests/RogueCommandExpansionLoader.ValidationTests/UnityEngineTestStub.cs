@@ -96,6 +96,20 @@ namespace UnityEngine
         }
     }
 
+    public class Camera : Component
+    {
+        private static Camera _main;
+        public static Camera main
+        {
+            get => _main ??= new Camera();
+            set => _main = value;
+        }
+
+        public float fieldOfView { get; set; } = 45f;
+        public bool orthographic { get; set; } = false;
+        public float orthographicSize { get; set; } = 10f;
+    }
+
     public class Object
     {
         public static T FindObjectOfType<T>() where T : class => null;
@@ -126,6 +140,7 @@ namespace UnityEngine
         public GameObject gameObject { get; set; } = new();
         public Transform transform { get; set; } = new();
         public string tag { get => gameObject?.tag ?? ""; set { if (gameObject != null) gameObject.tag = value; } }
+        public T GetComponent<T>() where T : Component => gameObject?.GetComponent<T>();
     }
 
     public class MonoBehaviour : Component
@@ -219,5 +234,14 @@ namespace UnityEngine.SceneManagement
     {
         public static string ActiveSceneName { get; set; } = "MainDesertScene";
         public static Scene GetActiveScene() => new Scene { name = ActiveSceneName };
+    }
+}
+
+namespace UnityEngine.Audio
+{
+    public class AudioMixer : Object
+    {
+        public bool SetFloat(string name, float value) => true;
+        public bool GetFloat(string name, out float value) { value = 0f; return true; }
     }
 }

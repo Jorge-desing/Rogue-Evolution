@@ -714,6 +714,73 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             res = _call_diagnostics_method("TriggerMatchEndJson", [win])
             return _tool_response(res)
 
+        elif name == "diagnostics_get_ai_director_census":
+            res = _call_diagnostics_method("GetAiDirectorCensusJson")
+            return _tool_response(res)
+
+        elif name == "diagnostics_set_attack_wave_number":
+            wave = int(arguments.get("waveNumber", 0))
+            res = _call_diagnostics_method("SetAttackWaveNumberJson", [wave])
+            return _tool_response(res)
+
+        elif name == "diagnostics_increment_attack_wave":
+            res = _call_diagnostics_method("IncrementAttackWaveJson")
+            return _tool_response(res)
+
+        elif name == "diagnostics_toggle_ai_debug_visuals":
+            tags = bool(arguments.get("showTags", True))
+            cmds = bool(arguments.get("showCommands", True))
+            res = _call_diagnostics_method("ToggleAiDebugVisualsJson", [tags, cmds])
+            return _tool_response(res)
+
+        elif name == "diagnostics_get_camera_census":
+            res = _call_diagnostics_method("GetCameraCensusJson")
+            return _tool_response(res)
+
+        elif name == "diagnostics_move_camera":
+            x = float(arguments.get("targetX", 0.0))
+            z = float(arguments.get("targetZ", 0.0))
+            res = _call_diagnostics_method("MoveCameraJson", [x, z])
+            return _tool_response(res)
+
+        elif name == "diagnostics_focus_camera_on_entity":
+            key_id = str(arguments.get("entityKeyId", ""))
+            res = _call_diagnostics_method("FocusCameraOnEntityJson", [key_id])
+            return _tool_response(res)
+
+        elif name == "diagnostics_set_camera_zoom":
+            fov = float(arguments.get("fieldOfView", 45.0))
+            res = _call_diagnostics_method("SetCameraZoomJson", [fov])
+            return _tool_response(res)
+
+        elif name == "diagnostics_get_harvester_census":
+            res = _call_diagnostics_method("GetHarvesterCensusJson")
+            return _tool_response(res)
+
+        elif name == "diagnostics_order_harvester_harvest":
+            key_id = str(arguments.get("harvesterKeyId", ""))
+            res = _call_diagnostics_method("OrderHarvesterHarvestJson", [key_id])
+            return _tool_response(res)
+
+        elif name == "diagnostics_order_harvester_return":
+            key_id = str(arguments.get("harvesterKeyId", ""))
+            res = _call_diagnostics_method("OrderHarvesterReturnJson", [key_id])
+            return _tool_response(res)
+
+        elif name == "diagnostics_get_audio_census":
+            res = _call_diagnostics_method("GetAudioCensusJson")
+            return _tool_response(res)
+
+        elif name == "diagnostics_set_audio_volume":
+            channel = str(arguments.get("channel", "Master"))
+            volume = float(arguments.get("volumeSlider", 1.0))
+            res = _call_diagnostics_method("SetAudioVolumeJson", [channel, volume])
+            return _tool_response(res)
+
+        elif name == "diagnostics_get_tech_catalog":
+            res = _call_diagnostics_method("GetTechCatalogJson")
+            return _tool_response(res)
+
         elif name == "diagnostics_runtime_scalars":
             scalars = {}
             scalar_calls = [

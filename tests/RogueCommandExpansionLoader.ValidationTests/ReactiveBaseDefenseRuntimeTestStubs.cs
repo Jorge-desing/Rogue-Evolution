@@ -555,6 +555,7 @@ public class UpdateFogOfWar : MonoBehaviour
 public class FinishLevel : MonoBehaviour
 {
     private static FinishLevel _instance;
+    public UnityEngine.Audio.AudioMixer audioMixer = new UnityEngine.Audio.AudioMixer();
     public static FinishLevel Instance => _instance ??= new FinishLevel();
 
     private static bool _isFinishing;
@@ -628,4 +629,92 @@ public static class Tags
     public const string Neutral = "Neutral";
     public static bool IsPlayer(string tag) => string.Equals(tag, Player, StringComparison.OrdinalIgnoreCase);
     public static bool IsAi(string tag) => string.Equals(tag, Ai, StringComparison.OrdinalIgnoreCase);
+}
+
+public class CameraZoom : MonoBehaviour
+{
+    public float minFov = 20f;
+    public float maxFov = 80f;
+    public float defaultFov = 45f;
+    public float zoomSpeed = 5f;
+}
+
+public class Harvest : Component
+{
+    public float _currentLoad = 25f;
+    public float _loadFraction = 0.25f;
+    public int MaxValue = 100;
+    public string _currentState = "Mining";
+
+    public static bool ClaimCalled { get; set; }
+    public static bool RefineryCalled { get; set; }
+
+    public void ClaimClosestCrystalAndMoveToIt()
+    {
+        ClaimCalled = true;
+    }
+
+    public void MoveToClosestRefinery()
+    {
+        RefineryCalled = true;
+    }
+
+    public void Stop() { }
+    public void Pause() { }
+    public void Resume() { }
+}
+
+
+
+public static class AudioMixerHelper
+{
+    public static float MasterSlider { get; set; } = 0.8f;
+    public static float MusicSlider { get; set; } = 0.6f;
+    public static float GameplaySlider { get; set; } = 0.9f;
+    public static float UiSlider { get; set; } = 0.7f;
+
+    public static void SetMasterVolume(float v, UnityEngine.Audio.AudioMixer m) => MasterSlider = v;
+    public static void SetMusicVolume(float v, UnityEngine.Audio.AudioMixer m) => MusicSlider = v;
+    public static void SetGameplayVolume(float v, UnityEngine.Audio.AudioMixer m) => GameplaySlider = v;
+    public static void SetUiSelectionSoundsVolume(float v, UnityEngine.Audio.AudioMixer m) => UiSlider = v;
+
+    public static float GetMasterSliderValue(UnityEngine.Audio.AudioMixer m) => MasterSlider;
+    public static float GetMusicSliderValue(UnityEngine.Audio.AudioMixer m) => MusicSlider;
+    public static float GetGameplaySliderValue(UnityEngine.Audio.AudioMixer m) => GameplaySlider;
+    public static float GetUiSelectionSoundsSliderValue(UnityEngine.Audio.AudioMixer m) => UiSlider;
+}
+
+public static class UpgradeBalancingStore
+{
+    public static System.Collections.Generic.List<string> Upgrades = new System.Collections.Generic.List<string>
+    {
+        "Upgrade_HullReinforcement",
+        "Upgrade_KineticPenetrator",
+        "Upgrade_ShieldOvercharge"
+    };
+
+    public static System.Collections.Generic.List<string> AllUpgradeIds() => Upgrades;
+}
+
+public static class ResearchBalancingStore
+{
+    public static System.Collections.Generic.List<string> Research = new System.Collections.Generic.List<string>
+    {
+        "Research_AdvancedRobotics",
+        "Research_NanoFabrication"
+    };
+
+    public static System.Collections.Generic.List<string> AllResearchIds() => Research;
+}
+
+public static class RelicBalancingStore
+{
+    public static System.Collections.Generic.List<string> Relics = new System.Collections.Generic.List<string>
+    {
+        "Relic_FoundryCounterweight",
+        "Relic_OverclockMatrix",
+        "Relic_ReactiveCore"
+    };
+
+    public static System.Collections.Generic.List<string> AllRelicIds() => Relics;
 }
