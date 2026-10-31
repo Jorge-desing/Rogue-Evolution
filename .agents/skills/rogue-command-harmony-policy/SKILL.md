@@ -194,6 +194,7 @@ Label every finding and every claim with exactly one tier. Do not promote static
 
 ## Reference Documentation
 
+- [Clean-room utility recreation and live agent-readable diagnostics](references/clean-room-live-diagnostics.md) — FNV-1a color policy, manual JSON writer, primitive DTOs, MCP bridge discovery via scene GameObject, and deployment verification workflow.
 - `docs/research/BASELINE.md` — compatibility baseline.
 - `docs/research/AGENT-HANDOFF.md` — agent handoff and verified commands.
 - `docs/research/STEAM-RUNTIME-CONTROL.md` — Steam/BepInEx runtime, profile isolation, and reversible deployment.
