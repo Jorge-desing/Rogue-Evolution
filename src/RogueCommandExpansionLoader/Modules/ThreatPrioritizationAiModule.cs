@@ -43,6 +43,7 @@ namespace RogueCommandExpansionLoader.Modules
             private float _nextCheckAt;
             private bool _stopped;
             private int _lastProcessedAiUnitCount;
+            private int _lastProcessedAlliedUnitCount;
 
             public ThreatPrioritizationRuntimeBehaviour(DefaultAiBehaviour gameBehaviour, ThreatPrioritizationSettings settings)
             {
@@ -74,6 +75,7 @@ namespace RogueCommandExpansionLoader.Modules
                 try
                 {
                     int aiUnitCount = 0;
+                    int alliedUnitCount = 0;
                     ExistingControllers existing = ExistingControllers.Instance;
                     if (existing != null)
                     {
@@ -82,8 +84,14 @@ namespace RogueCommandExpansionLoader.Modules
                         {
                             aiUnitCount = aiUnits.Count;
                         }
+                        System.Collections.Generic.HashSet<EntityController> playerUnits = existing.PlayerUnits();
+                        if (playerUnits != null)
+                        {
+                            alliedUnitCount = playerUnits.Count;
+                        }
                     }
                     _lastProcessedAiUnitCount = aiUnitCount;
+                    _lastProcessedAlliedUnitCount = alliedUnitCount;
                 }
                 catch
                 {
@@ -94,6 +102,11 @@ namespace RogueCommandExpansionLoader.Modules
             public int LastProcessedAiUnitCount
             {
                 get { return _lastProcessedAiUnitCount; }
+            }
+
+            public int LastProcessedAlliedUnitCount
+            {
+                get { return _lastProcessedAlliedUnitCount; }
             }
 
             public void OnDisposed()
