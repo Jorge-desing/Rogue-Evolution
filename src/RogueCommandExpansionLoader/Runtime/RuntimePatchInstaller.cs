@@ -369,6 +369,32 @@ namespace RogueCommandExpansionLoader.Runtime
                     return parameters.Length == 4 && parameters[0].ParameterType == typeof(float) && parameters[1].ParameterType == entityController;
                 });
             MethodInfo takeDamagePostfix = Hook("EntityTakeDamagePostfix");
+
+            // Optional gameplay hooks: resolved defensively so a missing target never
+            // disables the rest of the patch plan. These extend gameplay (death,
+            // healing, armor repair) without breaking installation on builds where
+            // the native method shape differs.
+            MethodInfo entityDie = TryFindUniqueMethod(entityController, "Die",
+                delegate(MethodInfo method)
+                {
+                    ParameterInfo[] parameters = method.GetParameters();
+                    return method.ReturnType == typeof(void) && parameters.Length <= 2;
+                });
+            MethodInfo entityDiePostfix = entityDie == null ? null : Hook("EntityControllerDiePostfix");
+            MethodInfo entityHeal = TryFindUniqueMethod(entityController, "Heal",
+                delegate(MethodInfo method)
+                {
+                    ParameterInfo[] parameters = method.GetParameters();
+                    return parameters.Length >= 1 && parameters[0].ParameterType == typeof(float);
+                });
+            MethodInfo entityHealPostfix = entityHeal == null ? null : Hook("EntityControllerHealPostfix");
+            MethodInfo entityRepairArmor = TryFindUniqueMethod(entityController, "RepairArmor",
+                delegate(MethodInfo method)
+                {
+                    ParameterInfo[] parameters = method.GetParameters();
+                    return parameters.Length >= 1 && parameters[0].ParameterType == typeof(float);
+                });
+            MethodInfo entityRepairArmorPostfix = entityRepairArmor == null ? null : Hook("EntityControllerRepairArmorPostfix");
             MethodInfo loadPrefix = typeof(UnityResourcesLoadTypedPatch).GetMethod("Prefix",
                 BindingFlags.Public | BindingFlags.Static);
             if (loadPrefix == null)
@@ -419,6 +445,22 @@ namespace RogueCommandExpansionLoader.Runtime
             plan.Add(new PatchPlan(isTargetInRange, null, isTargetInRangePostfix));
             plan.Add(new PatchPlan(entityDestroy, null, entityDestroyPostfix));
             plan.Add(new PatchPlan(takeDamage, null, takeDamagePostfix));
+
+            // Optional gameplay hooks (resolved defensively): death, healing, and armor
+            // repair. These are additive and never disable the rest of the plan when
+            // the native method shape differs.
+            if (entityDie != null && entityDiePostfix != null)
+            {
+                plan.Add(new PatchPlan(entityDie, null, entityDiePostfix));
+            }
+            if (entityHeal != null && entityHealPostfix != null)
+            {
+                plan.Add(new PatchPlan(entityHeal, null, entityHealPostfix));
+            }
+            if (entityRepairArmor != null && entityRepairArmorPostfix != null)
+            {
+                plan.Add(new PatchPlan(entityRepairArmor, null, entityRepairArmorPostfix));
+            }
             return plan;
         }
 
@@ -648,6 +690,23 @@ namespace RogueCommandExpansionLoader.Runtime
             catch
             {
                 // Logging failures do not affect installation.
+            }
+        }
+
+        private static MethodInfo TryFindUniqueMethod(Type type, string name, Func<MethodInfo, bool> shapePredicate)
+        {
+            if (type == null || string.IsNullOrEmpty(name) || shapePredicate == null)
+            {
+                return null;
+            }
+
+            try
+            {
+                return RuntimeReflection.FindUniqueMethod(type, name, shapePredicate);
+            }
+            catch
+            {
+                return null;
             }
         }
 

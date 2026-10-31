@@ -1343,6 +1343,57 @@ namespace RogueCommandExpansionLoader.Runtime
             }
         }
 
+        public static void EntityControllerDiePostfix(object __instance)
+        {
+            if (__instance == null)
+            {
+                return;
+            }
+
+            try
+            {
+                RuntimeUnitMechanicsDirector.OnEntityDied(__instance);
+            }
+            catch (Exception exception)
+            {
+                Log("EntityControllerDiePostfix failed safely: " + exception.Message);
+            }
+        }
+
+        public static void EntityControllerHealPostfix(object __instance, float __0)
+        {
+            if (__instance == null)
+            {
+                return;
+            }
+
+            try
+            {
+                RuntimeUnitMechanicsDirector.OnEntityHealed(__instance, __0);
+            }
+            catch (Exception exception)
+            {
+                Log("EntityControllerHealPostfix failed safely: " + exception.Message);
+            }
+        }
+
+        public static void EntityControllerRepairArmorPostfix(object __instance, float __0)
+        {
+            if (__instance == null)
+            {
+                return;
+            }
+
+            try
+            {
+                RuntimeUnitMechanicsDirector.OnEntityRepairedArmor(__instance, __0);
+            }
+            catch (Exception exception)
+            {
+                Log("EntityControllerRepairArmorPostfix failed safely: " + exception.Message);
+            }
+        }
+
         public static bool TryLoadResource(string resourcePath, out UnityEngine.Object asset)
         {
             asset = null;
@@ -1635,9 +1686,24 @@ namespace RogueCommandExpansionLoader.Runtime
             RuntimeHooks.EntityAttackIsTargetInRangePostfix(__instance, __0, ref __result);
         }
 
+        public static void EntityControllerDiePostfix(object __instance)
+        {
+            RuntimeHooks.EntityControllerDiePostfix(__instance);
+        }
+
+        public static void EntityControllerHealPostfix(object __instance, float __0)
+        {
+            RuntimeHooks.EntityControllerHealPostfix(__instance, __0);
+        }
+
         public static void EntityControllerDestroyPostfix(object __instance)
         {
             RuntimeUnitMechanicsDirector.OnEntityDestroyed(__instance);
+        }
+
+        public static void EntityControllerRepairArmorPostfix(object __instance, float __0)
+        {
+            RuntimeHooks.EntityControllerRepairArmorPostfix(__instance, __0);
         }
 
         public static void EntityTakeDamagePostfix(object __instance, float __0, object __1)

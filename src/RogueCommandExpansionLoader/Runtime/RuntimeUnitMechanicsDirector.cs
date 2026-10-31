@@ -301,6 +301,77 @@ namespace RogueCommandExpansionLoader.Runtime
             RemoveCombatExperience(entityObj);
         }
 
+        /// <summary>
+        /// Invoked when an entity dies (Harmony postfix on EntityController.Die).
+        /// Cleans up runtime mechanics state and combat experience tracking so
+        /// a dying unit does not retain stale buffs/auras or reward duplicates.
+        /// </summary>
+        public static void OnEntityDied(object entityObj)
+        {
+            try
+            {
+                RemoveCombatExperience(entityObj);
+                ClearRuntimeMechanicsByObject(entityObj);
+            }
+            catch
+            {
+                // Death cleanup must never interfere with native destruction.
+            }
+        }
+
+        /// <summary>
+        /// Invoked when an entity is healed (Harmony postfix on EntityController.Heal).
+        /// Extension point for healing-aura synchronization and on-heal status effects.
+        /// </summary>
+        public static void OnEntityHealed(object entityObj, float amount)
+        {
+            // Extension point: healing aura sync / on-heal status effects.
+            // Intentionally a safe no-op until verified against the live game assembly.
+        }
+
+        /// <summary>
+        /// Invoked when an entity's armor is repaired (Harmony postfix on
+        /// EntityController.RepairArmor). Extension point for repair-aura sync.
+        /// </summary>
+        public static void OnEntityRepairedArmor(object entityObj, float amount)
+        {
+            // Extension point: repair-aura sync / on-repair status effects.
+            // Intentionally a safe no-op until verified against the live game assembly.
+        }
+
+        private static void ClearRuntimeMechanicsByObject(object entityObj)
+        {
+            if (entityObj == null)
+            {
+                return;
+            }
+
+            try
+            {
+                Type entityType = entityObj.GetType();
+                PropertyInfo gameObjectProperty = entityType.GetProperty("gameObject",
+                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                if (gameObjectProperty != null)
+                {
+                    GameObject gameObject = gameObjectProperty.GetValue(entityObj, null) as GameObject;
+                    ClearRuntimeMechanics(gameObject);
+                    return;
+                }
+
+                FieldInfo gameObjectField = entityType.GetField("gameObject",
+                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                if (gameObjectField != null)
+                {
+                    GameObject gameObject = gameObjectField.GetValue(entityObj) as GameObject;
+                    ClearRuntimeMechanics(gameObject);
+                }
+            }
+            catch
+            {
+                // Best-effort cleanup; never throw from a death hook.
+            }
+        }
+
         private static void ClearRuntimeMechanics(GameObject rootObject)
         {
             if (rootObject == null)

@@ -702,7 +702,10 @@ internal static partial class ValidationTestRunner
             "EntityFactorySetupPrespawningPostfix",
             "EntityFactorySetupAiPrespawningPostfix",
             "EntityAttackIsTargetInRangePostfix",
-            "EntityControllerDestroyPostfix"
+            "EntityControllerDestroyPostfix",
+            "EntityControllerDiePostfix",
+            "EntityControllerHealPostfix",
+            "EntityControllerRepairArmorPostfix"
         ];
 
         foreach (string hookName in hookNames)
