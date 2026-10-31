@@ -345,6 +345,60 @@ namespace RogueCommandExpansionLoader.Runtime
         }
 
         /// <summary>
+        /// Serializes the live AI roster (units + buildings) enriched with base balance
+        /// parameters, as read from the verified ExistingControllers registry plus the
+        /// game's own EntityBalancingStore. Readable by an agent without a visual capture.
+        /// </summary>
+        public static string SerializeAiRoster(AiRosterCensus census)
+        {
+            var unitRows = new List<Dictionary<string, object>>();
+            var buildingRows = new List<Dictionary<string, object>>();
+            if (census != null)
+            {
+                if (census.AiUnitRows != null)
+                {
+                    foreach (AiRosterRow row in census.AiUnitRows)
+                    {
+                        unitRows.Add(BuildAiRosterRow(row));
+                    }
+                }
+                if (census.AiBuildingRows != null)
+                {
+                    foreach (AiRosterRow row in census.AiBuildingRows)
+                    {
+                        buildingRows.Add(BuildAiRosterRow(row));
+                    }
+                }
+            }
+
+            var view = new Dictionary<string, object>
+            {
+                ["aiUnitCount"] = census != null ? census.AiUnitCount : 0,
+                ["aiBuildingCount"] = census != null ? census.AiBuildingCount : 0,
+                ["aiUnitRowCount"] = unitRows.Count,
+                ["aiUnitRows"] = unitRows,
+                ["aiBuildingRowCount"] = buildingRows.Count,
+                ["aiBuildingRows"] = buildingRows,
+            };
+            return Serialize(view);
+        }
+
+        private static Dictionary<string, object> BuildAiRosterRow(AiRosterRow row)
+        {
+            return new Dictionary<string, object>
+            {
+                ["entityKeyId"] = row.EntityKeyId ?? string.Empty,
+                ["isBuilding"] = row.IsBuilding,
+                ["cost"] = row.Cost,
+                ["maxHealth"] = row.MaxHealth,
+                ["moveSpeed"] = row.MoveSpeed,
+                ["dps"] = row.Dps,
+                ["damage1"] = row.Damage1,
+                ["weaponRange"] = row.WeaponRange,
+            };
+        }
+
+        /// <summary>
         /// Serializes one unit's base balance parameters (read from the game's own
         /// EntityBalancingStore) into a flat, agent-readable JSON object. Filters nothing but an
         /// empty entity id, and preserves the field order below so tail truncation never hides the

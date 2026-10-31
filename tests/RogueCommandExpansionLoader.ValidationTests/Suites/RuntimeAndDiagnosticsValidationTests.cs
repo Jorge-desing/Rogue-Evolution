@@ -358,6 +358,78 @@ internal static partial class ValidationTestRunner
             ExistingControllers.Instance.Reset();
         }
     }),
+    ("ai roster census serializer emits counts and rows", () =>
+    {
+        var rows = new[]
+        {
+            new AiRosterRow("unit:ai-1", false, 100, 80, 5f, 10f, 12f, 6f),
+            new AiRosterRow("building:ai-hq", true, 300, 200, 0f, 0f, 0f, 0f),
+        };
+        var census = new AiRosterCensus(1, 1, new[] { rows[0] }, new[] { rows[1] });
+        string json = AgentDiagnosticsFormatter.SerializeAiRoster(census);
+        if (!json.Contains("\"aiUnitCount\":1") ||
+            !json.Contains("\"aiBuildingCount\":1") ||
+            !json.Contains("\"aiUnitRowCount\":1") ||
+            !json.Contains("\"aiBuildingRowCount\":1") ||
+            !json.Contains("\"entityKeyId\":\"unit:ai-1\"") ||
+            !json.Contains("\"dps\":10") ||
+            !json.Contains("\"entityKeyId\":\"building:ai-hq\""))
+        {
+            throw new InvalidOperationException("SerializeAiRoster must report counts and rows.");
+        }
+
+        string empty = AgentDiagnosticsFormatter.SerializeAiRoster(null);
+        if (!empty.Contains("\"aiUnitCount\":0") || !empty.Contains("\"aiUnitRows\":[]") ||
+            !empty.Contains("\"aiBuildingRows\":[]"))
+        {
+            throw new InvalidOperationException("SerializeAiRoster must emit empty arrays for null input.");
+        }
+    }),
+    ("runtime ai roster census collects from the existing controllers registry", () =>
+    {
+        EntityBalancingStore.Reset();
+        ExistingControllers.Instance.Reset();
+        try
+        {
+            EntityBalancingStore.CostOf["unit:ai-1"] = 100;
+            EntityBalancingStore.MaxHealthOf["unit:ai-1"] = 80;
+            EntityBalancingStore.MoveSpeedOf["unit:ai-1"] = 5f;
+            EntityBalancingStore.DpsOf["unit:ai-1"] = 10f;
+            EntityBalancingStore.Damage1Of["unit:ai-1"] = 12f;
+            EntityBalancingStore.WeaponRangeOf["unit:ai-1"] = 6f;
+
+            ExistingControllers.Instance.AiUnits().Add(new EntityController
+            {
+                entityId = "unit:ai-1",
+                IsControlledByAi = true,
+            });
+            ExistingControllers.Instance.AiBuildings().Add(new EntityController
+            {
+                entityId = "building:ai-hq",
+                IsBuilding = true,
+                IsControlledByAi = true,
+            });
+
+            AiRosterCensus census = RuntimeAiRosterCensus.Current();
+            if (census.AiUnitCount != 1 || census.AiBuildingCount != 1 ||
+                census.AiUnitRows.Count != 1 || census.AiBuildingRows.Count != 1 ||
+                census.AiUnitRows[0].EntityKeyId != "unit:ai-1" ||
+                census.AiUnitRows[0].Cost != 100 ||
+                census.AiUnitRows[0].MaxHealth != 80 ||
+                census.AiUnitRows[0].MoveSpeed != 5f ||
+                census.AiUnitRows[0].Dps != 10f ||
+                census.AiBuildingRows[0].EntityKeyId != "building:ai-hq" ||
+                !census.AiBuildingRows[0].IsBuilding)
+            {
+                throw new InvalidOperationException("RuntimeAiRosterCensus must aggregate live AI units and buildings with balance.");
+            }
+        }
+        finally
+        {
+            ExistingControllers.Instance.Reset();
+            EntityBalancingStore.Reset();
+        }
+    }),
     ("identifier color policy hashes with FNV-1a and maps to a stable palette slot", () =>
     {
         if (IdentifierColorPolicy.Hash(string.Empty) != 0x811C9DC5u)

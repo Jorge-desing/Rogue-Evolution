@@ -23,6 +23,8 @@
              Link="Runtime/RuntimeBattlefieldCensus.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeEntityBalanceLookup.cs"
              Link="Runtime/RuntimeEntityBalanceLookup.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeAiRosterCensus.cs"
+             Link="Runtime/RuntimeAiRosterCensus.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Content/ContentPackDefinition.cs"
              Link="Content/ContentPackDefinition.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Content/VisualOverlayScaleCalibration.cs"
