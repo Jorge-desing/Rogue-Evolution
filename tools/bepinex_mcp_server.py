@@ -480,7 +480,7 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             f_key = arguments.get("factoryKeyId", "")
             instant = bool(arguments.get("instant", False))
             for_free = bool(arguments.get("forFree", True))
-            res = _call_diagnostics_method("OrderFactoryProduceJson", [f_key, instant, forFree])
+            res = _call_diagnostics_method("OrderFactoryProduceJson", [f_key, instant, for_free])
             return _tool_response(res)
 
         elif name == "diagnostics_get_match_summary":
