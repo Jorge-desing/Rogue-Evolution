@@ -17,6 +17,8 @@ Se recrearon tres conductas en slices separados: el resumen de mensajes consecut
 
 Las tres tienen validación local mediante build y harness (349/350 chequeos, 1 omitido por privilegio de enlace simbólico en Windows); eso no prueba la visualización dentro del juego. La aceptación visual de las tres utilidades sigue pendiente de un runtime Steam controlado.
 
+El bridge de diagnóstico live se amplió con utilidades visuales adicionales legibles por un agente sin capturas: `RangeDisplayPolicy.RangeColor(kind)` (colores por tipo de rango, política pura), getters públicos de configuración en `RangeDisplayRuntime` (qué rangos se muestran, grosor, segmentos, altura) y de estado en `RuntimeOverlayUi` (pestaña activa, watermark, GUI desactivada/fallida, filtro de logs, versión, compatibilidad, resultado del patch), `IdentifierColorPolicy.PaletteColorAt(index)` (paleta completa), y dos métodos del bridge —`GetRangeColorsJson` y `GetIdentifierPaletteJson`— más campos extendidos en `GetUtilitiesJson`. Verificado en vivo con el puente MCP: `GetRangeColorsJson`, `GetIdentifierPaletteJson` y los 13 getters nuevos devuelven JSON/valores reales. Los colores de `RangeColor` son valores independientemente autorados (weapon 0.95/0.18/0.12, skill 0.12/0.48/0.95, effect1 0.98/0.48/0.08, effect2 0.96/0.72/0.18, sight 0.72/0.76/0.82), distintos de la paleta de referencia de RCM-RangeDisplay (1.00/0.25/0.20, 0.25/0.65/1.00, 1.00/0.60/0.10, 1.00/0.80/0.30, 0.80/0.80/0.80), sin reutilizar código ni paleta del original.
+
 ## Fuentes conductuales observadas
 
 - Checkout local de RCM-Manager, `RCMManager.UpdateTitle`/`LogToUI`, commit `e2fb9e468049574c8f9e622ccac936b2da17e569`; checkout conservado fuera del repo bajo Hermes scratch. Sin código o assets del checkout incluidos.

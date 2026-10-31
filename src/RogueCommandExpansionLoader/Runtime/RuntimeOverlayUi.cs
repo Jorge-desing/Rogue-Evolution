@@ -90,6 +90,33 @@ namespace RogueCommandExpansionLoader.Runtime
         /// <summary>Currently bound toggle shortcut, readable by an agent without a visual capture.</summary>
         public string ToggleShortcutText => GetToggleShortcutText();
 
+        /// <summary>Currently selected inspector tab, readable by an agent without a visual capture.</summary>
+        public int SelectedTab => _selectedTab;
+
+        /// <summary>Whether the corner watermark is drawn, readable by an agent without a visual capture.</summary>
+        public bool WatermarkVisible => _watermarkVisible;
+
+        /// <summary>Whether the GUI was disabled after a rendering exception, readable by an agent.</summary>
+        public bool IsGuiDisabled => _guiDisabled;
+
+        /// <summary>Whether the GUI failure has already been reported to the log, readable by an agent.</summary>
+        public bool IsGuiFailureReported => _guiFailureReported;
+
+        /// <summary>Active log filter text, readable by an agent without a visual capture.</summary>
+        public string LogFilter => _logFilter ?? string.Empty;
+
+        /// <summary>Reported plugin version, readable by an agent without a visual capture.</summary>
+        public string PluginVersion => _pluginVersion ?? string.Empty;
+
+        /// <summary>Compatibility error text, empty when the loader is compatible, readable by an agent.</summary>
+        public string CompatibilityError => _compatibilityError ?? string.Empty;
+
+        /// <summary>Whether the runtime patch install succeeded, readable by an agent without a visual capture.</summary>
+        public bool IsPatchResultSuccess => _patchResult != null && _patchResult.Success;
+
+        /// <summary>Runtime patch installation message, readable by an agent without a visual capture.</summary>
+        public string PatchResultMessage => _patchResult != null ? _patchResult.Message : string.Empty;
+
         private void Update()
         {
             if (_provider != null && Time.unscaledTime >= _nextSnapshotRefresh)

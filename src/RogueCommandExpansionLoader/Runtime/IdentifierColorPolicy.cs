@@ -30,6 +30,20 @@ namespace RogueCommandExpansionLoader.Runtime
         public static int PaletteSize => Palette.Length;
 
         /// <summary>
+        /// The accent color at a palette index, readable by an agent without a visual capture.
+        /// Throws when the index is outside the palette.
+        /// </summary>
+        public static UnityEngine.Color PaletteColorAt(int index)
+        {
+            if (index < 0 || index >= Palette.Length)
+            {
+                throw new System.ArgumentOutOfRangeException(nameof(index));
+            }
+
+            return Palette[index];
+        }
+
+        /// <summary>
         /// FNV-1a 32-bit hash of the identifier's UTF-8 bytes. Pure and total.
         /// </summary>
         public static uint Hash(string identifier)

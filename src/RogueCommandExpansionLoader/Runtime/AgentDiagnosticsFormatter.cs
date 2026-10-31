@@ -12,33 +12,88 @@ namespace RogueCommandExpansionLoader.Runtime
     /// <summary>Primitive view of the inspector overlay state, decoupled from Unity types.</summary>
     public sealed class OverlayStateView
     {
-        public OverlayStateView(bool ready, bool isOpen, string toggleShortcut)
+        public OverlayStateView(
+            bool ready,
+            bool isOpen,
+            string toggleShortcut,
+            int selectedTab,
+            bool watermarkVisible,
+            bool isGuiDisabled,
+            bool isGuiFailureReported,
+            string logFilter,
+            string pluginVersion,
+            string compatibilityError,
+            bool isPatchResultSuccess,
+            string patchResultMessage)
         {
             Ready = ready;
             IsOpen = isOpen;
             ToggleShortcut = toggleShortcut ?? string.Empty;
+            SelectedTab = selectedTab;
+            WatermarkVisible = watermarkVisible;
+            IsGuiDisabled = isGuiDisabled;
+            IsGuiFailureReported = isGuiFailureReported;
+            LogFilter = logFilter ?? string.Empty;
+            PluginVersion = pluginVersion ?? string.Empty;
+            CompatibilityError = compatibilityError ?? string.Empty;
+            IsPatchResultSuccess = isPatchResultSuccess;
+            PatchResultMessage = patchResultMessage ?? string.Empty;
         }
 
         public bool Ready { get; }
         public bool IsOpen { get; }
         public string ToggleShortcut { get; }
+        public int SelectedTab { get; }
+        public bool WatermarkVisible { get; }
+        public bool IsGuiDisabled { get; }
+        public bool IsGuiFailureReported { get; }
+        public string LogFilter { get; }
+        public string PluginVersion { get; }
+        public string CompatibilityError { get; }
+        public bool IsPatchResultSuccess { get; }
+        public string PatchResultMessage { get; }
     }
 
     /// <summary>Primitive view of the range display state, decoupled from Unity types.</summary>
     public sealed class RangeStateView
     {
-        public RangeStateView(bool ready, bool enabled, string toggleKey, int trackedEntities)
+        public RangeStateView(
+            bool ready,
+            bool enabled,
+            string toggleKey,
+            int trackedEntities,
+            bool showWeaponRange,
+            bool showSkillRange,
+            bool showEffectRadius,
+            bool showSightRange,
+            float lineWidth,
+            int segments,
+            float heightOffset)
         {
             Ready = ready;
             IsEnabled = enabled;
             ToggleKey = toggleKey ?? string.Empty;
             TrackedEntities = trackedEntities;
+            ShowWeaponRange = showWeaponRange;
+            ShowSkillRange = showSkillRange;
+            ShowEffectRadius = showEffectRadius;
+            ShowSightRange = showSightRange;
+            LineWidth = lineWidth;
+            Segments = segments;
+            HeightOffset = heightOffset;
         }
 
         public bool Ready { get; }
         public bool IsEnabled { get; }
         public string ToggleKey { get; }
         public int TrackedEntities { get; }
+        public bool ShowWeaponRange { get; }
+        public bool ShowSkillRange { get; }
+        public bool ShowEffectRadius { get; }
+        public bool ShowSightRange { get; }
+        public float LineWidth { get; }
+        public int Segments { get; }
+        public float HeightOffset { get; }
     }
 
     /// <summary>
@@ -311,6 +366,15 @@ namespace RogueCommandExpansionLoader.Runtime
                     ["ready"] = overlayState != null && overlayState.Ready,
                     ["isOpen"] = overlayState != null && overlayState.IsOpen,
                     ["toggleShortcut"] = overlayState != null ? overlayState.ToggleShortcut : string.Empty,
+                    ["selectedTab"] = overlayState != null ? overlayState.SelectedTab : -1,
+                    ["watermarkVisible"] = overlayState != null && overlayState.WatermarkVisible,
+                    ["guiDisabled"] = overlayState != null && overlayState.IsGuiDisabled,
+                    ["guiFailureReported"] = overlayState != null && overlayState.IsGuiFailureReported,
+                    ["logFilter"] = overlayState != null ? overlayState.LogFilter : string.Empty,
+                    ["pluginVersion"] = overlayState != null ? overlayState.PluginVersion : string.Empty,
+                    ["compatibilityError"] = overlayState != null ? overlayState.CompatibilityError : string.Empty,
+                    ["patchResultSuccess"] = overlayState != null && overlayState.IsPatchResultSuccess,
+                    ["patchResultMessage"] = overlayState != null ? overlayState.PatchResultMessage : string.Empty,
                 },
                 ["rangeDisplay"] = new Dictionary<string, object>
                 {
@@ -319,8 +383,64 @@ namespace RogueCommandExpansionLoader.Runtime
                     ["enabled"] = rangeState != null && rangeState.IsEnabled,
                     ["toggleKey"] = rangeState != null ? rangeState.ToggleKey : string.Empty,
                     ["trackedEntities"] = rangeState != null ? rangeState.TrackedEntities : 0,
+                    ["showWeaponRange"] = rangeState != null && rangeState.ShowWeaponRange,
+                    ["showSkillRange"] = rangeState != null && rangeState.ShowSkillRange,
+                    ["showEffectRadius"] = rangeState != null && rangeState.ShowEffectRadius,
+                    ["showSightRange"] = rangeState != null && rangeState.ShowSightRange,
+                    ["lineWidth"] = rangeState != null ? rangeState.LineWidth : 0f,
+                    ["segments"] = rangeState != null ? rangeState.Segments : 0,
+                    ["heightOffset"] = rangeState != null ? rangeState.HeightOffset : 0f,
                 },
+                ["rangeColors"] = BuildRangeColors(),
+                ["identifierPalette"] = BuildIdentifierPalette(),
             };
+        }
+
+        private static Dictionary<string, object> BuildRangeColors()
+        {
+            return new Dictionary<string, object>
+            {
+                ["description"] = "Per-kind range guide colors (world-space circles).",
+                ["weapon"] = ToHex(RangeDisplayPolicy.RangeColor(RangeDisplayKind.Weapon)),
+                ["skill"] = ToHex(RangeDisplayPolicy.RangeColor(RangeDisplayKind.Skill)),
+                ["effect1"] = ToHex(RangeDisplayPolicy.RangeColor(RangeDisplayKind.Effect1)),
+                ["effect2"] = ToHex(RangeDisplayPolicy.RangeColor(RangeDisplayKind.Effect2)),
+                ["sight"] = ToHex(RangeDisplayPolicy.RangeColor(RangeDisplayKind.Sight)),
+            };
+        }
+
+        private static Dictionary<string, object> BuildIdentifierPalette()
+        {
+            var colors = new List<string>();
+            for (int i = 0; i < IdentifierColorPolicy.PaletteSize; i++)
+            {
+                colors.Add(ToHex(IdentifierColorPolicy.PaletteColorAt(i)));
+            }
+
+            return new Dictionary<string, object>
+            {
+                ["description"] = "Deterministic FNV-1a accent palette, indexed by identifier hash.",
+                ["paletteSize"] = IdentifierColorPolicy.PaletteSize,
+                ["colors"] = colors,
+            };
+        }
+
+        /// <summary>
+        /// Serializes the per-kind range guide colors as JSON. Readable by an agent
+        /// without a visual capture.
+        /// </summary>
+        public static string SerializeRangeColors()
+        {
+            return Serialize(BuildRangeColors());
+        }
+
+        /// <summary>
+        /// Serializes the full deterministic accent palette as JSON. Readable by an
+        /// agent without a visual capture.
+        /// </summary>
+        public static string SerializeIdentifierPalette()
+        {
+            return Serialize(BuildIdentifierPalette());
         }
 
         private static string ToHex(UnityEngine.Color color)

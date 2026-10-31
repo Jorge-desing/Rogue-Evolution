@@ -184,6 +184,128 @@ internal static partial class ValidationTestRunner
             throw new InvalidOperationException("The identifier color JSON must expose a hex color and palette size.");
         }
     }),
+    ("range display policy exposes authored per-kind colors", () =>
+    {
+        UnityEngine.Color weapon = RangeDisplayPolicy.RangeColor(RangeDisplayKind.Weapon);
+        UnityEngine.Color skill = RangeDisplayPolicy.RangeColor(RangeDisplayKind.Skill);
+        UnityEngine.Color effect1 = RangeDisplayPolicy.RangeColor(RangeDisplayKind.Effect1);
+        UnityEngine.Color effect2 = RangeDisplayPolicy.RangeColor(RangeDisplayKind.Effect2);
+        UnityEngine.Color sight = RangeDisplayPolicy.RangeColor(RangeDisplayKind.Sight);
+
+        if (Math.Abs(weapon.r - 0.95f) > 0.001f || Math.Abs(weapon.g - 0.18f) > 0.001f ||
+            Math.Abs(weapon.b - 0.12f) > 0.001f || Math.Abs(weapon.a - 0.82f) > 0.001f)
+        {
+            throw new InvalidOperationException("The weapon range color must match the authored red value.");
+        }
+
+        if (Math.Abs(skill.r - 0.12f) > 0.001f || Math.Abs(skill.g - 0.48f) > 0.001f ||
+            Math.Abs(skill.b - 0.95f) > 0.001f || Math.Abs(skill.a - 0.82f) > 0.001f)
+        {
+            throw new InvalidOperationException("The skill range color must match the authored blue value.");
+        }
+
+        if (Math.Abs(effect1.r - 0.98f) > 0.001f || Math.Abs(effect1.g - 0.48f) > 0.001f ||
+            Math.Abs(effect1.b - 0.08f) > 0.001f || Math.Abs(effect1.a - 0.82f) > 0.001f)
+        {
+            throw new InvalidOperationException("The effect1 range color must match the authored orange value.");
+        }
+
+        if (Math.Abs(effect2.r - 0.96f) > 0.001f || Math.Abs(effect2.g - 0.72f) > 0.001f ||
+            Math.Abs(effect2.b - 0.18f) > 0.001f || Math.Abs(effect2.a - 0.82f) > 0.001f)
+        {
+            throw new InvalidOperationException("The effect2 range color must match the authored gold value.");
+        }
+
+        if (Math.Abs(sight.r - 0.72f) > 0.001f || Math.Abs(sight.g - 0.76f) > 0.001f ||
+            Math.Abs(sight.b - 0.82f) > 0.001f || Math.Abs(sight.a - 0.62f) > 0.001f)
+        {
+            throw new InvalidOperationException("The sight range color must fall back to the authored neutral value.");
+        }
+    }),
+    ("identifier color policy exposes the full palette by index", () =>
+    {
+        if (IdentifierColorPolicy.PaletteSize != 16)
+        {
+            throw new InvalidOperationException("The authored palette must expose 16 entries.");
+        }
+
+        UnityEngine.Color first = IdentifierColorPolicy.PaletteColorAt(0);
+        UnityEngine.Color firstAgain = IdentifierColorPolicy.PaletteColorAt(0);
+        if (first != firstAgain)
+        {
+            throw new InvalidOperationException("Palette lookups must be deterministic.");
+        }
+
+        for (int i = 0; i < IdentifierColorPolicy.PaletteSize; i++)
+        {
+            IdentifierColorPolicy.PaletteColorAt(i);
+        }
+
+        bool threwLow = false;
+        bool threwHigh = false;
+        try
+        {
+            IdentifierColorPolicy.PaletteColorAt(-1);
+        }
+        catch (System.ArgumentOutOfRangeException)
+        {
+            threwLow = true;
+        }
+
+        try
+        {
+            IdentifierColorPolicy.PaletteColorAt(IdentifierColorPolicy.PaletteSize);
+        }
+        catch (System.ArgumentOutOfRangeException)
+        {
+            threwHigh = true;
+        }
+
+        if (!threwLow || !threwHigh)
+        {
+            throw new InvalidOperationException("Palette lookups must reject out-of-range indices.");
+        }
+    }),
+    ("agent diagnostics formatter exposes range colors and the full palette as JSON", () =>
+    {
+        string rangeColorsJson = AgentDiagnosticsFormatter.SerializeRangeColors();
+        if (!rangeColorsJson.Contains("\"kind\":\"rangeColors\"") ||
+            !rangeColorsJson.Contains("\"weapon\":\"#") ||
+            !rangeColorsJson.Contains("\"skill\":\"#") ||
+            !rangeColorsJson.Contains("\"effect1\":\"#") ||
+            !rangeColorsJson.Contains("\"effect2\":\"#") ||
+            !rangeColorsJson.Contains("\"sight\":\"#"))
+        {
+            throw new InvalidOperationException("The range colors JSON must expose a hex color per range kind.");
+        }
+
+        string paletteJson = AgentDiagnosticsFormatter.SerializeIdentifierPalette();
+        if (!paletteJson.Contains("\"kind\":\"identifierPalette\"") ||
+            !paletteJson.Contains("\"paletteSize\":16") ||
+            !paletteJson.Contains("\"colors\":["))
+        {
+            throw new InvalidOperationException("The palette JSON must expose the palette size and the color list.");
+        }
+
+        var overlayState = new OverlayStateView(
+            true, false, "F8", 2, true, false, false, "alpha", "1.19.0", string.Empty, true, "ok");
+        var rangeState = new RangeStateView(
+            true, true, "F11", 3, true, false, true, false, 0.08f, 64, 0.15f);
+        string utilitiesJson = AgentDiagnosticsFormatter.SerializeUtilities(null, overlayState, rangeState);
+        if (!utilitiesJson.Contains("\"rangeColors\"") ||
+            !utilitiesJson.Contains("\"identifierPalette\"") ||
+            !utilitiesJson.Contains("\"selectedTab\":2") ||
+            !utilitiesJson.Contains("\"guiDisabled\":false") ||
+            !utilitiesJson.Contains("\"showWeaponRange\":true") ||
+            !utilitiesJson.Contains("\"lineWidth\":0.08") ||
+            !utilitiesJson.Contains("\"segments\":64") ||
+            !utilitiesJson.Contains("\"heightOffset\":0.15") ||
+            !utilitiesJson.Contains("\"pluginVersion\":\"1.19.0\"") ||
+            !utilitiesJson.Contains("\"patchResultSuccess\":true"))
+        {
+            throw new InvalidOperationException("The utilities JSON must expose the extended overlay and range display fields.");
+        }
+    }),
     ("agent diagnostics formatter returns an available=false snapshot when provider is null", () =>
     {
         string snapshotJson = AgentDiagnosticsFormatter.SerializeSnapshot(null);

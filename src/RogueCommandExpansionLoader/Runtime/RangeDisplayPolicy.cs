@@ -1,4 +1,5 @@
 using System;
+using UnityEngine;
 
 namespace RogueCommandExpansionLoader.Runtime
 {
@@ -231,6 +232,26 @@ namespace RogueCommandExpansionLoader.Runtime
         private static bool IsFinite(float value)
         {
             return !float.IsNaN(value) && !float.IsInfinity(value);
+        }
+
+        // Authored per-kind colors for the world-space range guides. Kept here (rather than inside the
+        // MonoBehaviour) so the color contract is a pure, unit-testable policy the live diagnostics
+        // bridge can read without instantiating the range display at runtime.
+        public static Color RangeColor(RangeDisplayKind kind)
+        {
+            switch (kind)
+            {
+                case RangeDisplayKind.Weapon:
+                    return new Color(0.95f, 0.18f, 0.12f, 0.82f);
+                case RangeDisplayKind.Skill:
+                    return new Color(0.12f, 0.48f, 0.95f, 0.82f);
+                case RangeDisplayKind.Effect1:
+                    return new Color(0.98f, 0.48f, 0.08f, 0.82f);
+                case RangeDisplayKind.Effect2:
+                    return new Color(0.96f, 0.72f, 0.18f, 0.82f);
+                default:
+                    return new Color(0.72f, 0.76f, 0.82f, 0.62f);
+            }
         }
     }
 }

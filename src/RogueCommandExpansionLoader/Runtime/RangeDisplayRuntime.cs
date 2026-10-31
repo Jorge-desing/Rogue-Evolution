@@ -69,6 +69,27 @@ namespace RogueCommandExpansionLoader.Runtime
         /// <summary>Number of entities currently showing range circles, readable by an agent.</summary>
         public int TrackedEntityCount => _circles.Count;
 
+        /// <summary>Whether weapon ranges are drawn, readable by an agent without a visual capture.</summary>
+        public bool ShowWeaponRange => _showWeapon != null && _showWeapon.Value;
+
+        /// <summary>Whether skill ranges are drawn, readable by an agent without a visual capture.</summary>
+        public bool ShowSkillRange => _showSkill != null && _showSkill.Value;
+
+        /// <summary>Whether effect radii are drawn, readable by an agent without a visual capture.</summary>
+        public bool ShowEffectRadius => _showEffects != null && _showEffects.Value;
+
+        /// <summary>Whether sight radii are drawn, readable by an agent without a visual capture.</summary>
+        public bool ShowSightRange => _showSight != null && _showSight.Value;
+
+        /// <summary>World-space line width, readable by an agent without a visual capture.</summary>
+        public float LineWidth => _lineWidth != null ? _lineWidth.Value : 0.08f;
+
+        /// <summary>Circle tessellation segment count (clamped), readable by an agent.</summary>
+        public int Segments => _segments != null ? Mathf.Clamp(_segments.Value, 8, 128) : DefaultSegments;
+
+        /// <summary>Circle height offset above the unit, readable by an agent without a visual capture.</summary>
+        public float HeightOffset => _heightOffset != null ? _heightOffset.Value : 0.15f;
+
         private void Update()
         {
             if (_enabled == null || _toggleKey == null)
@@ -372,19 +393,7 @@ namespace RogueCommandExpansionLoader.Runtime
 
         private static Color GetColor(RangeDisplayKind kind)
         {
-            switch (kind)
-            {
-                case RangeDisplayKind.Weapon:
-                    return new Color(0.95f, 0.18f, 0.12f, 0.82f);
-                case RangeDisplayKind.Skill:
-                    return new Color(0.12f, 0.48f, 0.95f, 0.82f);
-                case RangeDisplayKind.Effect1:
-                    return new Color(0.98f, 0.48f, 0.08f, 0.82f);
-                case RangeDisplayKind.Effect2:
-                    return new Color(0.96f, 0.72f, 0.18f, 0.82f);
-                default:
-                    return new Color(0.72f, 0.76f, 0.82f, 0.62f);
-            }
+            return RangeDisplayPolicy.RangeColor(kind);
         }
 
         private sealed class EntityCircles

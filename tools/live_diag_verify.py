@@ -135,6 +135,12 @@ if obj_id is not None:
     # call GetUtilitiesJson
     res = call("component/call_method", {"id": obj_id, "componentName": "LoaderDiagnosticsComponent", "methodName": "GetUtilitiesJson", "args": "[]"}, timeout=15)
     log("GET_UTILITIES_JSON: " + res[:4000])
+    # NEW: call GetRangeColorsJson
+    res_rc = call("component/call_method", {"id": obj_id, "componentName": "LoaderDiagnosticsComponent", "methodName": "GetRangeColorsJson", "args": "[]"}, timeout=10)
+    log("GET_RANGE_COLORS_JSON: " + res_rc[:1200])
+    # NEW: call GetIdentifierPaletteJson
+    res_ip = call("component/call_method", {"id": obj_id, "componentName": "LoaderDiagnosticsComponent", "methodName": "GetIdentifierPaletteJson", "args": "[]"}, timeout=10)
+    log("GET_IDENTIFIER_PALETTE_JSON: " + res_ip[:1600])
     # call GetDiagnosticsJson
     res2 = call("component/call_method", {"id": obj_id, "componentName": "LoaderDiagnosticsComponent", "methodName": "GetDiagnosticsJson", "args": "[]"}, timeout=15)
     log("GET_DIAGNOSTICS_JSON: " + res2[:2000])
@@ -142,7 +148,11 @@ if obj_id is not None:
     res3 = call("component/call_method", {"id": obj_id, "componentName": "LoaderDiagnosticsComponent", "methodName": "ResolveIdentifierColor", "args": '["arachnid-hexapod"]'}, timeout=10)
     log("RESOLVE_COLOR: " + res3[:500])
     # read public members via get_member
-    for m in ("OverlayOpen", "RangeDisplayEnabled", "RangeDisplayTrackedEntities", "ActivePackCount", "RegisteredUnitCount", "ProviderReady"):
+    for m in ("OverlayOpen", "RangeDisplayEnabled", "RangeDisplayTrackedEntities", "ActivePackCount", "RegisteredUnitCount", "ProviderReady",
+              # NEW overlay/range getters
+              "OverlaySelectedTab", "OverlayWatermarkVisible", "OverlayGuiDisabled", "OverlayPluginVersion", "OverlayPatchResultSuccess",
+              "RangeDisplayShowWeapon", "RangeDisplayShowSkill", "RangeDisplayShowEffect", "RangeDisplayShowSight",
+              "RangeDisplayLineWidth", "RangeDisplaySegments", "RangeDisplayHeightOffset"):
         gm = call("component/get_member", {"id": obj_id, "componentName": "LoaderDiagnosticsComponent", "memberName": m}, timeout=10)
         log(f"MEMBER {m}: " + gm[:300])
 else:

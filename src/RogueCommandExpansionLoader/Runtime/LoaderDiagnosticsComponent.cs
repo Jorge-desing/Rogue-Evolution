@@ -44,6 +44,23 @@ namespace RogueCommandExpansionLoader.Runtime
         public bool RangeDisplayEnabled => _rangeDisplay != null && _rangeDisplay.IsEnabled;
         public string RangeDisplayToggleKey => _rangeDisplay != null ? _rangeDisplay.ToggleKey : string.Empty;
         public int RangeDisplayTrackedEntities => _rangeDisplay != null ? _rangeDisplay.TrackedEntityCount : 0;
+        public bool RangeDisplayShowWeapon => _rangeDisplay != null && _rangeDisplay.ShowWeaponRange;
+        public bool RangeDisplayShowSkill => _rangeDisplay != null && _rangeDisplay.ShowSkillRange;
+        public bool RangeDisplayShowEffect => _rangeDisplay != null && _rangeDisplay.ShowEffectRadius;
+        public bool RangeDisplayShowSight => _rangeDisplay != null && _rangeDisplay.ShowSightRange;
+        public float RangeDisplayLineWidth => _rangeDisplay != null ? _rangeDisplay.LineWidth : 0f;
+        public int RangeDisplaySegments => _rangeDisplay != null ? _rangeDisplay.Segments : 0;
+        public float RangeDisplayHeightOffset => _rangeDisplay != null ? _rangeDisplay.HeightOffset : 0f;
+
+        public int OverlaySelectedTab => _overlay != null ? _overlay.SelectedTab : -1;
+        public bool OverlayWatermarkVisible => _overlay != null && _overlay.WatermarkVisible;
+        public bool OverlayGuiDisabled => _overlay != null && _overlay.IsGuiDisabled;
+        public bool OverlayGuiFailureReported => _overlay != null && _overlay.IsGuiFailureReported;
+        public string OverlayLogFilter => _overlay != null ? _overlay.LogFilter : string.Empty;
+        public string OverlayPluginVersion => _overlay != null ? _overlay.PluginVersion : string.Empty;
+        public string OverlayCompatibilityError => _overlay != null ? _overlay.CompatibilityError : string.Empty;
+        public bool OverlayPatchResultSuccess => _overlay != null && _overlay.IsPatchResultSuccess;
+        public string OverlayPatchResultMessage => _overlay != null ? _overlay.PatchResultMessage : string.Empty;
 
         public string TargetGameVersion => _provider != null ? _provider.TargetGameVersion : string.Empty;
         public bool IsNativeRegistryReady
@@ -121,14 +138,48 @@ namespace RogueCommandExpansionLoader.Runtime
             var overlayState = new OverlayStateView(
                 _overlay != null,
                 _overlay != null && _overlay.IsOpen,
-                _overlay != null ? _overlay.ToggleShortcutText : string.Empty);
+                _overlay != null ? _overlay.ToggleShortcutText : string.Empty,
+                _overlay != null ? _overlay.SelectedTab : -1,
+                _overlay != null && _overlay.WatermarkVisible,
+                _overlay != null && _overlay.IsGuiDisabled,
+                _overlay != null && _overlay.IsGuiFailureReported,
+                _overlay != null ? _overlay.LogFilter : string.Empty,
+                _overlay != null ? _overlay.PluginVersion : string.Empty,
+                _overlay != null ? _overlay.CompatibilityError : string.Empty,
+                _overlay != null && _overlay.IsPatchResultSuccess,
+                _overlay != null ? _overlay.PatchResultMessage : string.Empty);
             var rangeState = new RangeStateView(
                 _rangeDisplay != null,
                 _rangeDisplay != null && _rangeDisplay.IsEnabled,
                 _rangeDisplay != null ? _rangeDisplay.ToggleKey : string.Empty,
-                _rangeDisplay != null ? _rangeDisplay.TrackedEntityCount : 0);
+                _rangeDisplay != null ? _rangeDisplay.TrackedEntityCount : 0,
+                _rangeDisplay != null && _rangeDisplay.ShowWeaponRange,
+                _rangeDisplay != null && _rangeDisplay.ShowSkillRange,
+                _rangeDisplay != null && _rangeDisplay.ShowEffectRadius,
+                _rangeDisplay != null && _rangeDisplay.ShowSightRange,
+                _rangeDisplay != null ? _rangeDisplay.LineWidth : 0f,
+                _rangeDisplay != null ? _rangeDisplay.Segments : 0,
+                _rangeDisplay != null ? _rangeDisplay.HeightOffset : 0f);
 
             return AgentDiagnosticsFormatter.SerializeUtilities(SafeSnapshot(), overlayState, rangeState);
+        }
+
+        /// <summary>
+        /// Returns the per-kind range guide colors as JSON. Readable by an agent
+        /// without a visual capture.
+        /// </summary>
+        public string GetRangeColorsJson()
+        {
+            return AgentDiagnosticsFormatter.SerializeRangeColors();
+        }
+
+        /// <summary>
+        /// Returns the full deterministic accent palette as JSON. Readable by an
+        /// agent without a visual capture.
+        /// </summary>
+        public string GetIdentifierPaletteJson()
+        {
+            return AgentDiagnosticsFormatter.SerializeIdentifierPalette();
         }
 
         /// <summary>
