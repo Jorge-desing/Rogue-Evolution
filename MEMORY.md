@@ -339,3 +339,15 @@ This is a compact, durable orientation for agents. For the changing checkout sta
   - Validation test harness (`RuntimeAndDiagnosticsValidationTests.cs`): Added 5 comprehensive test suites covering all 5 new subsystems.
 - Validation: Release plugin build 0 warnings/0 errors (`artifacts/plugin/RogueCommandExpansionLoader.dll`); C# harness 405/406 passed (1 Windows symlink skip, 0 failures); Python suite 86/86 passed; `validate_loader_registry.py` passed 4/4 manifests; `git diff --check` clean.
 - Uncommitted working-tree preserved: untracked `.agents/skills/rogue-command-game-research/references/`; nested worktree gitlinks `cargador` (11e9968, dirty) and `task-graph-validation` (d1f9045, dirty) remain untouched.
+
+## Refresh (2026-10-31, Clean-Room Diagnostics Skill & MCP Integration)
+
+- Repository: `C:/Users/Alex/Documents/Mod Rogue Command`, loader `1.19.0`, branch `codex/rogue-unit-balance-20261018`.
+- New documentation & skill integration scope:
+  - Created `.agents/skills/rogue-command-clean-room-diagnostics/SKILL.md`: First-class skill providing comprehensive guidance on clean-room telemetry invariants (primitive DTOs, manual JSON writer, loss counters first, fail-closed reflection), all 128 BepInEx MCP tools, high-performance aggregators (`diagnostics_runtime_snapshot` and `diagnostics_runtime_scalars`), 18 diagnostic censuses, tactical gameplay command director (`RuntimeGameplayCommandDirector`), scene GameObject discovery, query parameter protocols, batching, and test harness rules.
+  - Updated `.agents/skills/rogue-command-harmony-policy/references/clean-room-live-diagnostics.md`: Enriched reference covering the 128-tool MCP bridge, composite and scalar aggregators, censuses, command director, and reflection safety rules.
+  - Updated `C:\Users\Alex\.gemini\antigravity\mcp\bepinex_mcp\instructions.md`: Synchronized MCP instructions file documenting all 128 tools, aggregators, commands, reflection, and operational guidelines.
+  - Updated `.agents/skills/rogue-command-game-research/references/live-diagnostics-bridge.md`: Synchronized bridge placement, reflection pitfalls, and aggregator guidance.
+  - Updated `.agents/skills/rogue-command-harmony-policy/SKILL.md`: Added `rogue-command-clean-room-diagnostics` to `related_skills` and references.
+- Validation: Release plugin build 0 warnings/0 errors (`artifacts/plugin/RogueCommandExpansionLoader.dll`); C# harness 405/406 passed (1 Windows symlink skip, 0 failures); Python suite 86/86 passed; `validate_loader_registry.py` passed 4/4 manifests; `git diff --check` clean.
+- Uncommitted working-tree preserved: untracked `.agents/skills/rogue-command-game-research/references/`; nested worktree gitlinks `cargador` (11e9968, dirty) and `task-graph-validation` (d1f9045, dirty) remain untouched.

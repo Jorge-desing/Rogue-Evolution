@@ -7,7 +7,7 @@ author: Hermes Agent
 metadata:
   hermes:
     tags: [Rogue Command, Unity, Mono, BepInEx, Harmony, IL2CPP, patching, SHA256, MVID, assembly verification]
-    related_skills: [rogue-command-reverse-engineering, rogue-command-game-research, rogue-command-steam-runtime-validation, rogue-command-pack-validation, rogue-command-unit-authoring]
+    related_skills: [rogue-command-clean-room-diagnostics, rogue-command-reverse-engineering, rogue-command-game-research, rogue-command-steam-runtime-validation, rogue-command-pack-validation, rogue-command-unit-authoring]
 ---
 
 # Rogue Command Harmony Policy
@@ -230,7 +230,8 @@ Label every finding and every claim with exactly one tier. Do not promote static
 
 ## Reference Documentation
 
-- [Clean-room utility recreation and live agent-readable diagnostics](references/clean-room-live-diagnostics.md) — FNV-1a color policy, manual JSON writer, primitive DTOs, MCP bridge discovery via scene GameObject, and deployment verification workflow.
+- [Clean-room utility recreation and live agent-readable diagnostics](references/clean-room-live-diagnostics.md) — FNV-1a color policy, manual JSON writer, primitive DTOs, MCP bridge discovery via scene GameObject, 128-tool BepInEx MCP suite, command director, runtime censuses, aggregators, and deployment verification workflow.
+- [Rogue Command Clean-Room Diagnostics Skill](../rogue-command-clean-room-diagnostics/SKILL.md) — Authoritative skill for clean-room telemetry, gameplay command director, and BepInEx MCP integration.
 - `docs/research/BASELINE.md` — compatibility baseline.
 - `docs/research/AGENT-HANDOFF.md` — agent handoff and verified commands.
 - `docs/research/STEAM-RUNTIME-CONTROL.md` — Steam/BepInEx runtime, profile isolation, and reversible deployment.
