@@ -3516,7 +3516,17 @@ namespace RogueCommandExpansionLoader.Runtime
 
                 MethodInfo m = typeof(Harvest).GetMethod("ClaimClosestCrystalAndMoveToIt", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
 
-                m?.Invoke(harvest, null);
+                if (m == null)
+
+                {
+
+                    return new HarvesterCommandResult(false, harvesterKeyId, "Harvest",
+
+                        "Harvest.ClaimClosestCrystalAndMoveToIt not found.");
+
+                }
+
+                m.Invoke(harvest, null);
 
                 return new HarvesterCommandResult(true, harvesterKeyId, "Harvest",
 
@@ -3600,7 +3610,17 @@ namespace RogueCommandExpansionLoader.Runtime
 
                 MethodInfo m = typeof(Harvest).GetMethod("MoveToClosestRefinery", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
 
-                m?.Invoke(harvest, null);
+                if (m == null)
+
+                {
+
+                    return new HarvesterCommandResult(false, harvesterKeyId, "ReturnToRefinery",
+
+                        "Harvest.MoveToClosestRefinery not found.");
+
+                }
+
+                m.Invoke(harvest, null);
 
                 return new HarvesterCommandResult(true, harvesterKeyId, "ReturnToRefinery",
 
