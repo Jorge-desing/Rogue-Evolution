@@ -289,27 +289,23 @@ This is a compact, durable orientation for agents. For the changing checkout sta
 - Profile2 dedicated QA without tutorial; protect saves. Before reflection verify Rogue Command version, Unity `2021.3.45f2`, Assembly-CSharp SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, MVID `db0e9462-128d-4296-9900-de18b4bd0c00`. Root MEMORY.md synced to HEAD 638bf71.
 
 
-## Refresh (2026-10-31, working tree beyond HEAD 638bf71)
+## Refresh (2026-10-31, HEAD 49b85b5)
 
-- Repository: `C:/Users/Alex/Documents/Mod Rogue Command`, loader `1.19.0`, branch `codex/rogue-unit-balance-20261018`. Committed HEAD/upstream/origin remain `638bf71` (`feat(diagnostics): add terrain grid census, active skill director, vitality adjustments, and status effect controls`); commit `bb86659` synced root MEMORY.md to that HEAD. Code baseline remains `0bbede6b7beb68f8f50f4ae89f10e83ecb056c0d`. Implementation baseline remains `e25c6de` (arachnid middle-leg orientation normalizer); remains `d7a3a11b56b58bed6d3f06c47fd40a627c9d1ae3`.
-- Uncommitted working-tree changes (preserve; do not stage, reset, clean, or overwrite):
-  - Modified: `src/RogueCommandExpansionLoader/Runtime/RuntimeGameplayCommandDirector.cs` (expanded with selection/control-group, vitality adjustment, status-effect, and active-skill command directors and DTOs).
-  - Untracked: `src/RogueCommandExpansionLoader/Runtime/RuntimeEntityCatalogCensus.cs`, `RuntimeFogCensus.cs`, `RuntimeSelectionCensus.cs` (clean-room census DTOs/collectors for entity catalog, fog-of-war state, and player selection).
-  - Nested worktree gitlinks `cargador` (11e9968, dirty) and `task-graph-validation` (d1f9045, dirty) remain dirty and preserved.
-  - Staged Unity prefab reductions and untracked `unity/.../SampleExpansion/` (+meta) remain.
-- Build status at this working tree: Release plugin build currently FAILS with 8 errors in `RuntimeGameplayCommandDirector.cs` (direct calls to non-public `PlayerUnitController`/`EntityController` members such as `DeselectAllUnits`, `AddToSelection`, `Select`, and `Health`); the test project fails with 4 errors (missing `PlayerUnitController` in that compilation context). These in-progress changes need reflection-based access before they can compile. Do not claim build/test success at this tree. Validation counts from the last successful committed state remain 396/397 plugin harness (1 Windows symlink skip) and 86/86 Python at HEAD 638bf71.
-- Profile2 dedicated QA without tutorial; protect saves. Before reflection verify Rogue Command version, Unity `2021.3.45f2`, Assembly-CSharp SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, MVID `db0e9462-128d-4296-9900-de18b4bd0c00`.
-- Root MEMORY.md, codex memory, antigravity memory, and mem0 synced to this working-tree state.
-
-
-## Refresh (2026-10-31, working tree at HEAD 6b6b60b)
-
-- Repository: `C:/Users/Alex/Documents/Mod Rogue Command`, loader `1.19.0`, branch `codex/rogue-unit-balance-20261018`. Committed HEAD/upstream/origin now `6b6b60b51db09d9d2e80d2dd1424ddf7e214d435` (`docs(memory): sync root MEMORY.md to working tree beyond HEAD 638bf71`), on top of `8837717` (`feat(mcp): expose remaining diagnostic utilities as first-class tools`) and `bb86659` (`docs(memory): sync root MEMORY.md to HEAD 638bf71`). Code baseline remains `0bbede6b7beb68f8f50f4ae89f10e83ecb056c0d`. Implementation baseline remains `e25c6de` (arachnid middle-leg orientation normalizer); remains `d7a3a11b56b58bed6d3f06c47fd40a627c9d1ae3`.
-- Expanded uncommitted working-tree changes (preserve; do not stage, reset, clean, or overwrite):
-  - Modified: `src/RogueCommandExpansionLoader/Runtime/AgentDiagnosticsFormatter.cs` (added `SerializeSelectionCensus`, `SerializeFogStateCensus`, and `SerializeEntityCatalogCensus` serializers), `RuntimeGameplayCommandDirector.cs` (selection/vitality/status/active-skill command directors).
-  - Untracked: `RuntimeEntityCatalogCensus.cs`, `RuntimeFogCensus.cs`, `RuntimeSelectionCensus.cs` (clean-room census DTOs/collectors), plus `tools/patch_component.py` (in-progress helper that injects selection/fog/entity-catalog getters into `LoaderDiagnosticsComponent`).
-  - Nested worktree gitlinks `cargador` (11e9968, dirty) and `task-graph-validation` (d1f9045, dirty) remain dirty and preserved.
-  - Staged Unity prefab reductions and untracked `unity/.../SampleExpansion/` (+meta) remain.
-- Build status at this working tree: Release plugin build still FAILS with 8 errors in `RuntimeGameplayCommandDirector.cs` (direct calls to non-public `PlayerUnitController`/`EntityController` members such as `DeselectAllUnits`, `AddToSelection`, `Select`, and `Health`); the test project fails with 4 errors (missing `PlayerUnitController` in that compilation context). These in-progress changes need reflection-based access before they can compile. Do not claim build/test success at this tree. Last successful committed validation remains 396/397 plugin harness (1 Windows symlink skip) and Python 86/86 at HEAD 638bf71.
-- Profile2 dedicated QA without tutorial; protect saves. Before reflection verify Rogue Command version, Unity `2021.3.45f2`, Assembly-CSharp SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, MVID `db0e9462-128d-4296-9900-de18b4bd0c00`.
-- Root MEMORY.md, codex memory, antigravity memory, and mem0 synced to this working-tree state.
+- Repository: `C:/Users/Alex/Documents/Mod Rogue Command`, loader `1.19.0`, branch `codex/rogue-unit-balance-20261018`. Repository HEAD/upstream/origin `49b85b5` (`feat(diagnostics): add selection census, tactical stances, fog controls, timescale, match director, and entity spawner`). Code baseline remains `0bbede6b7beb68f8f50f4ae89f10e83ecb056c0d`. Implementation baseline remains `e25c6de` (arachnid middle-leg orientation normalizer); remains `d7a3a11b56b58bed6d3f06c47fd40a627c9d1ae3`.
+- New committed scope (commit `49b85b5`):
+  - `RuntimeSelectionCensus.cs`: Clean-room player selection and control group telemetry (`SelectionCensus` DTO). Inspects `PlayerUnitController`, extracting active unit selections, selected AI targets, active skills, and 10 control group counts with loss counters first (`OmittedSelectedCount`).
+  - `RuntimeFogCensus.cs`: Clean-room Fog of War status and update interval telemetry (`FogStateCensus` DTO). Safely inspects `UpdateFogOfWar`.
+  - `RuntimeEntityCatalogCensus.cs`: Bounded census of registered units, buildings, and factories (`EntityCatalogCensus` DTO) from `EntityBalancingStore` with loss counters first (`OmittedUnitCount`, `OmittedBuildingCount`, `OmittedFactoryCount`).
+  - `RuntimeGameplayCommandDirector.cs` additions:
+    - Selection controls: `TrySelectEntities(keys, additive)`, `TryDeselectAll()`, `TrySelectCategory(category)` ("CombatUnits", "Harvesters", "IdleHarvesters", "SkillBuildings", "Factories"), `TryAssignControlGroup(0-9)`, and `TrySelectControlGroup(0-9)`.
+    - Tactical stances: `TryOrderStop(entityKeyId)`, `TryOrderHoldPosition(entityKeyId)`, `TryOrderAttackMove(entityKeyId, targetX, targetZ)`.
+    - Fog of War controls: `TrySetFogOfWar(disableFog)` and `TryRevealFogOfWar()`.
+    - Match and time controls: `TrySetGameTimeScale(timeScale)`, `GetGameTimeScale()`, and `TryTriggerMatchEnd(win)`.
+    - Entity spawner: `TrySpawnEntity(entityId, side, targetX, targetZ, customName)`.
+  - `AgentDiagnosticsFormatter.cs`: Added serializers `SerializeSelectionCensus`, `SerializeFogStateCensus`, `SerializeEntityCatalogCensus`, `SerializeSelectionCommandResult`, `SerializeFogCommandResult`, `SerializeGameSpeedCommandResult`, `SerializeMatchControlResult`, `SerializeEntitySpawnResult`, and expanded `SerializeDiagnosticCatalog()`.
+  - `LoaderDiagnosticsComponent.cs`: Exposed in-game bridge methods for all 17 new telemetry and command endpoints.
+  - `tools/build_bepinex_mcp.py` & `tools/bepinex_mcp_server.py`: Generated schemas and dispatch handlers for all 112 tools in `C:\Users\Alex\.gemini\antigravity\mcp\bepinex_mcp\`.
+  - Validation test harness (`RuntimeAndDiagnosticsValidationTests.cs`): Added 4 comprehensive test suites covering selection, control groups, tactical orders, fog toggling, match control, timescale adjustments, entity spawning, and catalog queries.
+- Uncommitted working-tree preserved: untracked `.agents/skills/rogue-command-game-research/references/`; nested worktree gitlinks `cargador` (11e9968, dirty) and `task-graph-validation` (d1f9045, dirty) remain untouched.
+- Validation: Release plugin build 0 warnings/0 errors (`artifacts/plugin/RogueCommandExpansionLoader.dll`); C# harness 400/401 passed (1 Windows symlink skip, 0 failures); Python suite 86/86 passed; `validate_loader_registry.py` passed 4/4 manifests; whitespace check clean.
+- Profile2 dedicated QA without tutorial; protect saves. Before reflection verify Rogue Command version, Unity `2021.3.45f2`, Assembly-CSharp SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, MVID `db0e9462-128d-4296-9900-de18b4bd0c00`. Root MEMORY.md synced to HEAD 49b85b5.
