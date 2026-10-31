@@ -2670,6 +2670,16 @@ namespace RogueCommandExpansionLoader.Content
             }
         }
 
+        public void ShutdownBundles()
+        {
+            _bundleRegistry.UnloadAll(true);
+        }
+
+        public bool TryGetBundle(string bundleId, out AssetBundle bundle)
+        {
+            return _bundleRegistry.TryGetBundle(bundleId, out bundle);
+        }
+
         private void RemoveAiBehaviourBindingIfCurrentLocked(
             DefaultAiBehaviour behaviour,
             BoundAiRuntimeBehaviour expected)

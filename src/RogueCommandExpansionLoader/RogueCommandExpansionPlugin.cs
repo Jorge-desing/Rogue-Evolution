@@ -168,6 +168,7 @@ namespace RogueCommandExpansionLoader
                 }
 
                 _contentLoader.ShutdownRuntimeBehaviours();
+                _contentLoader.ShutdownBundles();
             }
         }
 
