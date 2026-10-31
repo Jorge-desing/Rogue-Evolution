@@ -287,3 +287,16 @@ This is a compact, durable orientation for agents. For the changing checkout sta
 - Uncommitted working-tree preserved: untracked `.agents/skills/rogue-command-game-research/references/`; nested worktree gitlinks `cargador` (11e9968, dirty) and `task-graph-validation` (d1f9045, dirty) remain untouched.
 - Validation: Release plugin build 0 warnings/0 errors; C# harness 396/397 passed (1 skip); Python suite 86/86 passed; `validate_loader_registry.py` passed 4/4 manifests.
 - Profile2 dedicated QA without tutorial; protect saves. Before reflection verify Rogue Command version, Unity `2021.3.45f2`, Assembly-CSharp SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, MVID `db0e9462-128d-4296-9900-de18b4bd0c00`. Root MEMORY.md synced to HEAD 638bf71.
+
+
+## Refresh (2026-10-31, working tree beyond HEAD 638bf71)
+
+- Repository: `C:/Users/Alex/Documents/Mod Rogue Command`, loader `1.19.0`, branch `codex/rogue-unit-balance-20261018`. Committed HEAD/upstream/origin remain `638bf71` (`feat(diagnostics): add terrain grid census, active skill director, vitality adjustments, and status effect controls`); commit `bb86659` synced root MEMORY.md to that HEAD. Code baseline remains `0bbede6b7beb68f8f50f4ae89f10e83ecb056c0d`. Implementation baseline remains `e25c6de` (arachnid middle-leg orientation normalizer); remains `d7a3a11b56b58bed6d3f06c47fd40a627c9d1ae3`.
+- Uncommitted working-tree changes (preserve; do not stage, reset, clean, or overwrite):
+  - Modified: `src/RogueCommandExpansionLoader/Runtime/RuntimeGameplayCommandDirector.cs` (expanded with selection/control-group, vitality adjustment, status-effect, and active-skill command directors and DTOs).
+  - Untracked: `src/RogueCommandExpansionLoader/Runtime/RuntimeEntityCatalogCensus.cs`, `RuntimeFogCensus.cs`, `RuntimeSelectionCensus.cs` (clean-room census DTOs/collectors for entity catalog, fog-of-war state, and player selection).
+  - Nested worktree gitlinks `cargador` (11e9968, dirty) and `task-graph-validation` (d1f9045, dirty) remain dirty and preserved.
+  - Staged Unity prefab reductions and untracked `unity/.../SampleExpansion/` (+meta) remain.
+- Build status at this working tree: Release plugin build currently FAILS with 8 errors in `RuntimeGameplayCommandDirector.cs` (direct calls to non-public `PlayerUnitController`/`EntityController` members such as `DeselectAllUnits`, `AddToSelection`, `Select`, and `Health`); the test project fails with 4 errors (missing `PlayerUnitController` in that compilation context). These in-progress changes need reflection-based access before they can compile. Do not claim build/test success at this tree. Validation counts from the last successful committed state remain 396/397 plugin harness (1 Windows symlink skip) and 86/86 Python at HEAD 638bf71.
+- Profile2 dedicated QA without tutorial; protect saves. Before reflection verify Rogue Command version, Unity `2021.3.45f2`, Assembly-CSharp SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, MVID `db0e9462-128d-4296-9900-de18b4bd0c00`.
+- Root MEMORY.md, codex memory, antigravity memory, and mem0 synced to this working-tree state.
