@@ -235,7 +235,7 @@ Pitfalls:
 
 ### Registered AI Modules
 
-The loader includes 5 compiled AI modules available for content packs:
+The loader includes 6 compiled AI modules available for content packs:
 
 1. **`sample:scheduled-base-build`**:
    - Uses `DefaultAiBehaviour.CreateBuilding_Static` to construct a building already present in the active native deck.
@@ -254,6 +254,10 @@ The loader includes 5 compiled AI modules available for content packs:
    - Coordinates multi-unit assault waves against player fortifications and infrastructure.
    - Parameters: `baseIndex` (0–31), `cooldownSeconds` (10–300s; default 30s), `minSquadSize` (1–12; default 4), `targetPriority` (`ClosestBuilding` [default], `Refinery`, `Hq`), `minGameTimeSeconds` (0–600s; default 30s).
    - Scans known player structures (`PlayerBuildingsKnownToAi`, `PlayerRefineries`, or `EngineeringHq`), gathers available combat troops, and coordinates offensive siege strikes.
+6. **`sample:threat-prioritization`**:
+   - Scores hostile player units and retargets AI combat units with hysteresis and a per-tick command budget.
+   - Parameters: `baseIndex` (-1–31; default -1), `checkIntervalSeconds` (0.5–30s; default 3s), `priorityMode` (`HighestThreat` [default], `LowestHealth`, `HighestDps`; normalized to canonical casing), `engagementRadius` (5–120; default 35), `retargetThreshold` (1.0–3.0; default 1.25), `maxRetargetsPerTick` (1–32; default 8).
+   - Filters candidates with `unit.IsEnemy(candidate)` and re-checks hostility on the current target before hysteresis; consumes the retarget budget before native dispatch.
 
 ### Runtime mechanics profile consumption
 

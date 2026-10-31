@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """
-BepInEx MCP Server bridge for Antigravity.
+BepInEx MCP Server bridge for Antigravity & Rogue Command.
 Connects standard Model Context Protocol (JSON-RPC over stdio) to BepInEx MCP HTTP server (http://127.0.0.1:8080/mcp/).
+Supports full scene hierarchy, reflection, dynamic Harmony patching, batching, watchers, mod profiles,
+and first-class clean-room diagnostics with automatic GameObject resolution for LoaderDiagnosticsComponent.
 """
 
 from __future__ import annotations
@@ -12,296 +14,111 @@ import sys
 import urllib.error
 import urllib.parse
 import urllib.request
+from pathlib import Path
 from typing import Any
 
 PROTOCOL_VERSION = "2024-11-05"
 SERVER_NAME = "bepinex_mcp"
-SERVER_VERSION = "1.0.0"
+SERVER_VERSION = "1.2.0"
 BASE_URL = os.environ.get("BEPINEX_MCP_URL", "http://127.0.0.1:8080/mcp/")
 
-TOOLS = [
-    {
-        "name": "system_ping",
-        "description": "Ping BepInEx MCP server to check if the game is alive and responding.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {},
-            "additionalProperties": False,
-        },
-    },
-    {
-        "name": "system_capabilities",
-        "description": "Get BepInEx MCP server capabilities, Unity version, runtime, and architecture.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {},
-            "additionalProperties": False,
-        },
-    },
-    {
-        "name": "system_paths",
-        "description": "Get game root directory and Assembly-CSharp.dll path.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {},
-            "additionalProperties": False,
-        },
-    },
-    {
-        "name": "scene_list_root_gameobjects",
-        "description": "List root GameObjects (name and instance ID) in the active scene.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {},
-            "additionalProperties": False,
-        },
-    },
-    {
-        "name": "scene_search_gameobjects",
-        "description": "Search GameObjects across loaded scenes by name, component, tag, or scene.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "name": {"type": "string", "description": "GameObject name filter substring."},
-                "componentName": {"type": "string", "description": "Component type name filter."},
-                "tag": {"type": "string", "description": "Tag filter."},
-                "scene": {"type": "string", "description": "Scene name filter."},
-                "includeInactive": {"type": "boolean", "description": "Whether to include inactive GameObjects (default true)."},
-                "limit": {"type": "integer", "description": "Maximum objects to return (default 100)."},
-            },
-            "additionalProperties": False,
-        },
-    },
-    {
-        "name": "scene_hierarchy_snapshot",
-        "description": "Get a hierarchy tree snapshot of GameObjects and their components starting from root or a specific GameObject ID.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "id": {"type": "integer", "description": "Root GameObject instance ID (optional, omit for scene root)."},
-                "depth": {"type": "integer", "description": "Maximum tree depth to traverse (default 3, max 16)."},
-                "maxNodes": {"type": "integer", "description": "Maximum total nodes to collect (default 500)."},
-            },
-            "additionalProperties": False,
-        },
-    },
-    {
-        "name": "scene_resolve_selector",
-        "description": "Resolve a GameObject or Component reference using a selector path/name/component.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "path": {"type": "string", "description": "Transform hierarchy path (e.g. 'Canvas/Panel/Button')."},
-                "name": {"type": "string", "description": "GameObject name."},
-                "component": {"type": "string", "description": "Component type name."},
-                "scene": {"type": "string", "description": "Scene name."},
-            },
-            "additionalProperties": False,
-        },
-    },
-    {
-        "name": "gameobject_list_children",
-        "description": "List direct child GameObjects for a parent GameObject ID.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "id": {"type": "integer", "description": "Parent GameObject instance ID."},
-            },
-            "required": ["id"],
-            "additionalProperties": False,
-        },
-    },
-    {
-        "name": "gameobject_inspect_components",
-        "description": "List all component types attached to a GameObject ID.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "id": {"type": "integer", "description": "GameObject instance ID."},
-            },
-            "required": ["id"],
-            "additionalProperties": False,
-        },
-    },
-    {
-        "name": "component_get_details",
-        "description": "Get all fields and properties of a component on a GameObject.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "id": {"type": "integer", "description": "GameObject instance ID."},
-                "componentName": {"type": "string", "description": "Component type name."},
-            },
-            "required": ["id", "componentName"],
-            "additionalProperties": False,
-        },
-    },
-    {
-        "name": "component_get_member",
-        "description": "Read a single field or property value on a component.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "id": {"type": "integer", "description": "GameObject instance ID."},
-                "componentName": {"type": "string", "description": "Component type name."},
-                "memberName": {"type": "string", "description": "Field or property name."},
-            },
-            "required": ["id", "componentName", "memberName"],
-            "additionalProperties": False,
-        },
-    },
-    {
-        "name": "component_set_value",
-        "description": "Set a field or property value on a component (supports string, int, float, bool, Vector3 '(x,y,z)').",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "id": {"type": "integer", "description": "GameObject instance ID."},
-                "componentName": {"type": "string", "description": "Component type name."},
-                "memberName": {"type": "string", "description": "Field or property name to set."},
-                "value": {"type": "string", "description": "Serialized value string."},
-            },
-            "required": ["id", "componentName", "memberName", "value"],
-            "additionalProperties": False,
-        },
-    },
-    {
-        "name": "component_call_method",
-        "description": "Invoke a method on a component with JSON arguments.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "id": {"type": "integer", "description": "GameObject instance ID."},
-                "componentName": {"type": "string", "description": "Component type name."},
-                "methodName": {"type": "string", "description": "Method name to invoke."},
-                "args": {"type": "string", "description": "JSON array string of arguments (e.g. '[\"val\", 123]')."},
-            },
-            "required": ["id", "componentName", "methodName"],
-            "additionalProperties": False,
-        },
-    },
-    {
-        "name": "component_list_methods",
-        "description": "List all methods available on a component.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "id": {"type": "integer", "description": "GameObject instance ID."},
-                "componentName": {"type": "string", "description": "Component type name."},
-            },
-            "required": ["id", "componentName"],
-            "additionalProperties": False,
-        },
-    },
-    {
-        "name": "scene_find_objects_with_component",
-        "description": "Find all GameObjects in loaded scenes that have a component of the specified type.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "componentName": {"type": "string", "description": "Component type name (e.g. 'Balancing', 'EntityController')."},
-            },
-            "required": ["componentName"],
-            "additionalProperties": False,
-        },
-    },
-    {
-        "name": "type_search",
-        "description": "Search loaded C# / Mono types across all AppDomain assemblies.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "query": {"type": "string", "description": "Type name substring to search."},
-                "offset": {"type": "integer", "description": "Pagination offset (default 0)."},
-                "limit": {"type": "integer", "description": "Pagination limit (default 100)."},
-            },
-            "additionalProperties": False,
-        },
-    },
-    {
-        "name": "type_describe",
-        "description": "Get detailed reflection metadata (fields, properties, methods) for a C# type.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "typeName": {"type": "string", "description": "Full or short type name."},
-                "offset": {"type": "integer", "description": "Pagination offset (default 0)."},
-                "limit": {"type": "integer", "description": "Pagination limit (default 200)."},
-            },
-            "required": ["typeName"],
-            "additionalProperties": False,
-        },
-    },
-    {
-        "name": "mod_patch_method",
-        "description": "Apply a live Harmony patch to a C# method at runtime.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "targetClass": {"type": "string", "description": "Target class name."},
-                "targetMethod": {"type": "string", "description": "Target method name."},
-                "patchType": {"type": "string", "enum": ["prefix", "postfix", "transpiler", "finalizer"], "description": "Patch type."},
-                "patchCode": {"type": "string", "description": "C# method body/code for the patch."},
-                "parameterTypes": {"type": "string", "description": "Comma-separated parameter type names for method overload disambiguation."},
-                "registrationId": {"type": "string", "description": "Optional custom tracking ID."},
-            },
-            "required": ["targetClass", "targetMethod", "patchCode"],
-            "additionalProperties": False,
-        },
-    },
-    {
-        "name": "mod_inject_class",
-        "description": "Compile and dynamically inject C# code into Unity at runtime, optionally attaching to a GameObject.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "classCode": {"type": "string", "description": "Complete C# class code to compile and inject."},
-                "attachToGameObjectId": {"type": "string", "description": "Optional GameObject ID to attach the compiled MonoBehaviour component to."},
-            },
-            "required": ["classCode"],
-            "additionalProperties": False,
-        },
-    },
-    {
-        "name": "mod_list_patches",
-        "description": "List all active dynamic Harmony patches applied through MCP.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {},
-            "additionalProperties": False,
-        },
-    },
-    {
-        "name": "mod_remove_patch",
-        "description": "Unpatch a dynamic Harmony patch by registration ID.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "registrationId": {"type": "string", "description": "Registration ID of the patch to remove."},
-            },
-            "required": ["registrationId"],
-            "additionalProperties": False,
-        },
-    },
-    {
-        "name": "raw_mcp_request",
-        "description": "Send a raw HTTP GET or POST request to the BepInEx MCP server.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "endpoint": {"type": "string", "description": "Endpoint relative to /mcp/ (e.g. 'system/ping', 'scene/list_root_gameobjects')."},
-                "method": {"type": "string", "enum": ["GET", "POST"], "description": "HTTP method (default GET)."},
-                "queryParams": {"type": "object", "description": "Key-value dictionary of query parameters."},
-                "bodyJson": {"type": "string", "description": "JSON string body for POST requests."},
-            },
-            "required": ["endpoint"],
-            "additionalProperties": False,
-        },
-    },
-]
+# Try importing profiles from upstream BepInExMCP if available
+_profile_store = None
+try:
+    _mcp_pkg_dir = os.path.join(os.path.dirname(__file__), "..", ".tools", "BepInExMCP", "mcp")
+    if os.path.isdir(_mcp_pkg_dir):
+        sys.path.insert(0, os.path.abspath(_mcp_pkg_dir))
+        from profiles import ProfileStore, default_profiles_dir
+        _profile_store = ProfileStore(default_profiles_dir())
+except Exception:
+    pass
+
+# Fallback profile store if upstream package directory is not present
+if _profile_store is None:
+    class _SimpleProfileStore:
+        def __init__(self, root: Path):
+            self.root = root
+            self.root.mkdir(parents=True, exist_ok=True)
+            self._active_file = self.root / "_active.json"
+
+        def _get_active(self) -> set[str]:
+            if self._active_file.is_file():
+                try:
+                    return set(json.loads(self._active_file.read_text(encoding="utf-8")))
+                except Exception:
+                    pass
+            return set()
+
+        def _save_active(self, active: set[str]):
+            self._active_file.write_text(json.dumps(sorted(list(active))), encoding="utf-8")
+
+        def list(self) -> list[dict[str, Any]]:
+            active = self._get_active()
+            res = []
+            for p in self.root.glob("*.json"):
+                if p.name == "_active.json":
+                    continue
+                try:
+                    data = json.loads(p.read_text(encoding="utf-8"))
+                    res.append({
+                        "name": p.stem,
+                        "active": p.stem in active,
+                        "autoApply": bool(data.get("autoApply", False)),
+                        "operationCount": len(data.get("operations", [])),
+                    })
+                except Exception:
+                    res.append({"name": p.stem, "active": p.stem in active, "error": "Invalid JSON"})
+            return res
+
+        def get(self, name: str) -> dict[str, Any]:
+            p = self.root / f"{name}.json"
+            if not p.is_file():
+                raise FileNotFoundError(f"Profile '{name}' does not exist.")
+            return json.loads(p.read_text(encoding="utf-8"))
+
+        def save(self, name: str, data: dict[str, Any]):
+            p = self.root / f"{name}.json"
+            p.write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+        def delete(self, name: str):
+            p = self.root / f"{name}.json"
+            if p.is_file():
+                p.unlink()
+            active = self._get_active()
+            if name in active:
+                active.remove(name)
+                self._save_active(active)
+
+        def set_active(self, name: str, is_active: bool) -> list[str]:
+            active = self._get_active()
+            if is_active:
+                active.add(name)
+            else:
+                active.discard(name)
+            self._save_active(active)
+            return sorted(list(active))
+
+    _fallback_dir = Path(os.environ.get("LOCALAPPDATA", os.path.expanduser("~"))) / "unity-mcp-translator" / "profiles"
+    _profile_store = _SimpleProfileStore(_fallback_dir)
+
+# Import TOOL_SPECS from build_bepinex_mcp to maintain a single source of truth
+try:
+    from build_bepinex_mcp import TOOL_SPECS
+    TOOLS = [
+        {
+            "name": spec["name"],
+            "description": spec["description"],
+            "inputSchema": spec["parameters"],
+        }
+        for spec in TOOL_SPECS
+    ]
+except Exception:
+    TOOLS = []
+
+_DIAGNOSTICS_GO_ID: int | None = None
 
 
-def _call_http(endpoint: str, method: str = "GET", params: dict[str, Any] | None = None, body_str: str | None = None, timeout: float = 10.0) -> str:
+def _call_http(endpoint: str, method: str = "GET", params: dict[str, Any] | None = None, body_str: str | None = None, timeout: float = 12.0) -> str:
     url = BASE_URL.rstrip("/") + "/" + endpoint.lstrip("/")
     if params:
         filtered = {k: str(v) for k, v in params.items() if v is not None}
@@ -310,7 +127,7 @@ def _call_http(endpoint: str, method: str = "GET", params: dict[str, Any] | None
 
     data = body_str.encode("utf-8") if body_str else None
     req = urllib.request.Request(url, data=data, method=method)
-    req.add_header("User-Agent", "Antigravity-BepInEx-MCP-Bridge/1.0")
+    req.add_header("User-Agent", "Antigravity-BepInEx-MCP-Bridge/1.2")
     if data:
         req.add_header("Content-Type", "application/json")
 
@@ -334,52 +151,136 @@ def _tool_response(text: str, is_error: bool = False) -> dict[str, Any]:
     }
 
 
+def _get_diagnostics_go_id() -> int:
+    global _DIAGNOSTICS_GO_ID
+    if _DIAGNOSTICS_GO_ID is not None:
+        return _DIAGNOSTICS_GO_ID
+
+    raw = _call_http("scene:find_objects_with_component", params={"componentName": "LoaderDiagnosticsComponent"})
+    try:
+        data = json.loads(raw)
+        if isinstance(data, list) and len(data) > 0 and "id" in data[0]:
+            _DIAGNOSTICS_GO_ID = int(data[0]["id"])
+            return _DIAGNOSTICS_GO_ID
+        elif isinstance(data, dict) and "id" in data:
+            _DIAGNOSTICS_GO_ID = int(data["id"])
+            return _DIAGNOSTICS_GO_ID
+    except Exception:
+        pass
+
+    raise RuntimeError(
+        "Could not find a GameObject with LoaderDiagnosticsComponent in the running game. "
+        "Ensure Rogue Command is running with the RogueCommandExpansionLoader plugin active."
+    )
+
+
+def _call_diagnostics_method(method_name: str, args: list | None = None) -> str:
+    global _DIAGNOSTICS_GO_ID
+    args_json = json.dumps(args or [])
+    try:
+        go_id = _get_diagnostics_go_id()
+        raw = _call_http("component/call_method", params={
+            "id": go_id,
+            "componentName": "LoaderDiagnosticsComponent",
+            "methodName": method_name,
+            "args": args_json,
+        })
+        # If cached go_id became stale, retry once after discovery
+        if "Missing or invalid 'id'" in raw or "not found" in raw.lower():
+            _DIAGNOSTICS_GO_ID = None
+            go_id = _get_diagnostics_go_id()
+            raw = _call_http("component/call_method", params={
+                "id": go_id,
+                "componentName": "LoaderDiagnosticsComponent",
+                "methodName": method_name,
+                "args": args_json,
+            })
+
+        # Unwrap ReturnValue if present
+        try:
+            resp_obj = json.loads(raw)
+            if isinstance(resp_obj, dict) and "message" in resp_obj:
+                msg = resp_obj["message"]
+                idx = msg.find("ReturnValue: ")
+                if idx >= 0:
+                    ret_str = msg[idx + len("ReturnValue: "):].strip()
+                    try:
+                        parsed_ret = json.loads(ret_str)
+                        return json.dumps(parsed_ret, indent=2)
+                    except Exception:
+                        return ret_str
+        except Exception:
+            pass
+
+        return raw
+    except Exception as exc:
+        _DIAGNOSTICS_GO_ID = None
+        return json.dumps({"error": f"Failed calling diagnostics method '{method_name}': {exc}"})
+
+
 def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
     try:
-        if name == "system_ping":
+        # ---- Core Bridge & System ----
+        if name in ("system_ping", "ping_unity_bridge"):
             res = _call_http("system/ping")
             return _tool_response(res)
 
-        elif name == "system_capabilities":
+        elif name in ("system_capabilities", "get_runtime_capabilities"):
             res = _call_http("system/capabilities")
             return _tool_response(res)
 
-        elif name == "system_paths":
+        elif name in ("system_paths", "get_game_paths"):
             res = _call_http("system/paths")
             return _tool_response(res)
 
-        elif name == "scene_list_root_gameobjects":
+        # ---- Hierarchy & GameObjects ----
+        elif name in ("scene_list_root_gameobjects", "list_root_gameobjects"):
             res = _call_http("scene/list_root_gameobjects")
             return _tool_response(res)
 
-        elif name == "scene_search_gameobjects":
+        elif name in ("scene_search_gameobjects", "search_gameobjects"):
             res = _call_http("scene/search_gameobjects", params=arguments)
             return _tool_response(res)
 
-        elif name == "scene_hierarchy_snapshot":
+        elif name in ("scene_hierarchy_snapshot", "get_hierarchy_snapshot"):
             res = _call_http("scene/hierarchy_snapshot", params=arguments)
             return _tool_response(res)
 
-        elif name == "scene_resolve_selector":
-            res = _call_http("scene/resolve_selector", params=arguments)
+        elif name in ("scene_resolve_selector", "resolve_gameobject_selector"):
+            selector_str = arguments.get("selector_json")
+            if selector_str:
+                try:
+                    parsed_sel = json.loads(selector_str)
+                    res = _call_http("scene/resolve_selector", params=parsed_sel)
+                except Exception:
+                    res = _call_http("scene/resolve_selector", params=arguments)
+            else:
+                res = _call_http("scene/resolve_selector", params=arguments)
             return _tool_response(res)
 
-        elif name == "gameobject_list_children":
+        elif name in ("gameobject_list_children", "list_children"):
             res = _call_http("gameobject/list_children", params={"id": arguments.get("id")})
             return _tool_response(res)
 
-        elif name == "gameobject_inspect_components":
+        elif name in ("gameobject_inspect_components", "inspect_components"):
             res = _call_http("gameobject/inspect_components", params={"id": arguments.get("id")})
             return _tool_response(res)
 
-        elif name == "component_get_details":
+        elif name in ("scene_find_objects_with_component", "find_objects_with_component"):
+            res = _call_http("scene:find_objects_with_component", params={
+                "componentName": arguments.get("componentName"),
+            })
+            return _tool_response(res)
+
+        # ---- Components & Reflection ----
+        elif name in ("component_get_details", "get_component_details"):
             res = _call_http("component/get_details", params={
                 "id": arguments.get("id"),
                 "componentName": arguments.get("componentName"),
             })
             return _tool_response(res)
 
-        elif name == "component_get_member":
+        elif name in ("component_get_member", "get_component_member"):
             res = _call_http("component/get_member", params={
                 "id": arguments.get("id"),
                 "componentName": arguments.get("componentName"),
@@ -387,45 +288,58 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             })
             return _tool_response(res)
 
-        elif name == "component_set_value":
+        elif name in ("component_set_value", "set_component_value"):
             res = _call_http("component/set_value", params={
                 "id": arguments.get("id"),
                 "componentName": arguments.get("componentName"),
                 "memberName": arguments.get("memberName"),
-                "value": arguments.get("value"),
+                "value": str(arguments.get("value", "")),
             })
             return _tool_response(res)
 
-        elif name == "component_call_method":
+        elif name in ("component_call_method", "call_component_method"):
+            args_val = arguments.get("args") or arguments.get("args_json") or "[]"
+            if isinstance(args_val, (list, dict)):
+                args_val = json.dumps(args_val)
             res = _call_http("component/call_method", params={
                 "id": arguments.get("id"),
-                "componentName": arguments.get("componentName"),
-                "methodName": arguments.get("methodName"),
-                "args": arguments.get("args", "[]"),
+                "componentName": arguments.get("componentName") or arguments.get("comp"),
+                "methodName": arguments.get("methodName") or arguments.get("method"),
+                "args": args_val,
             })
+            # Unwrap ReturnValue if present
+            try:
+                resp_obj = json.loads(res)
+                if isinstance(resp_obj, dict) and "message" in resp_obj:
+                    msg = resp_obj["message"]
+                    idx = msg.find("ReturnValue: ")
+                    if idx >= 0:
+                        ret_str = msg[idx + len("ReturnValue: "):].strip()
+                        try:
+                            parsed_ret = json.loads(ret_str)
+                            return _tool_response(json.dumps(parsed_ret, indent=2))
+                        except Exception:
+                            return _tool_response(ret_str)
+            except Exception:
+                pass
             return _tool_response(res)
 
-        elif name == "component_list_methods":
+        elif name in ("component_list_methods", "list_component_methods"):
             res = _call_http("component/list_methods", params={
                 "id": arguments.get("id"),
                 "componentName": arguments.get("componentName"),
             })
             return _tool_response(res)
 
-        elif name == "scene_find_objects_with_component":
-            res = _call_http("scene:find_objects_with_component", params={
-                "componentName": arguments.get("componentName"),
-            })
-            return _tool_response(res)
-
-        elif name == "type_search":
+        elif name in ("type_search", "search_runtime_types"):
             res = _call_http("type/search", params=arguments)
             return _tool_response(res)
 
-        elif name == "type_describe":
+        elif name in ("type_describe", "describe_runtime_type"):
             res = _call_http("type/describe", params=arguments)
             return _tool_response(res)
 
+        # ---- Live Patching & Code Injection ----
         elif name == "mod_patch_method":
             res = _call_http("mod:patch_method", params=arguments)
             return _tool_response(res)
@@ -438,12 +352,71 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             res = _call_http("mod:inject_class", method="POST", body_str=payload)
             return _tool_response(res)
 
-        elif name == "mod_list_patches":
+        elif name in ("mod_list_patches", "list_mod_patches"):
             res = _call_http("mod:list_patches")
             return _tool_response(res)
 
-        elif name == "mod_remove_patch":
+        elif name in ("mod_remove_patch", "remove_mod_patch"):
             res = _call_http("mod:remove_patch", params=arguments)
+            return _tool_response(res)
+
+        elif name == "mod_subscribe_to_method":
+            res = _call_http("mod:subscribe_to_method", params={
+                "id": arguments.get("id"),
+                "componentName": arguments.get("componentName"),
+                "methodName": arguments.get("methodName"),
+                "registrationId": arguments.get("registrationId", ""),
+            })
+            return _tool_response(res)
+
+        # ---- Batching, Watchers & Network ----
+        elif name == "run_bridge_batch":
+            ops = arguments.get("operations")
+            if ops is None and "operations_json" in arguments:
+                try:
+                    ops = json.loads(arguments["operations_json"])
+                except Exception:
+                    ops = []
+            if not isinstance(ops, list):
+                ops = []
+            stop_on_error = bool(arguments.get("stopOnError", False))
+            payload = json.dumps({"operations": ops, "stopOnError": stop_on_error})
+            res = _call_http("batch", method="POST", body_str=payload)
+            return _tool_response(res)
+
+        elif name == "watch_component_member":
+            sel = arguments.get("selector")
+            if sel is None and "selector_json" in arguments:
+                try:
+                    sel = json.loads(arguments["selector_json"])
+                except Exception:
+                    sel = {}
+            res = _call_http("watch/member", params={
+                "selector": json.dumps(sel) if isinstance(sel, dict) else str(sel or "{}"),
+                "componentName": arguments.get("componentName"),
+                "memberName": arguments.get("memberName"),
+                "intervalMs": arguments.get("intervalMs", 500),
+                "registrationId": arguments.get("registrationId", ""),
+            })
+            return _tool_response(res)
+
+        elif name == "watch_active_scene":
+            res = _call_http("watch/scene", params={
+                "intervalMs": arguments.get("intervalMs", 500),
+                "registrationId": arguments.get("registrationId", ""),
+            })
+            return _tool_response(res)
+
+        elif name == "list_watchers":
+            res = _call_http("watch/list")
+            return _tool_response(res)
+
+        elif name == "remove_watcher":
+            res = _call_http("watch/remove", params={"registrationId": arguments.get("registrationId")})
+            return _tool_response(res)
+
+        elif name == "get_network_diagnostics":
+            res = _call_http("network/diagnostics", params={"id": arguments.get("id")})
             return _tool_response(res)
 
         elif name == "raw_mcp_request":
@@ -452,6 +425,76 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             qparams = arguments.get("queryParams")
             body = arguments.get("bodyJson")
             res = _call_http(endpoint, method=method, params=qparams, body_str=body)
+            return _tool_response(res)
+
+        # ---- Mod Profiles ----
+        elif name == "save_mod_profile":
+            pname = arguments.get("name", "").strip()
+            pdata = arguments.get("profile_json")
+            if isinstance(pdata, str):
+                try:
+                    pdata = json.loads(pdata)
+                except Exception as exc:
+                    return _tool_response(f"Invalid profile_json: {exc}", is_error=True)
+            _profile_store.save(pname, pdata)
+            return _tool_response(json.dumps({"status": "ok", "saved": pname}))
+
+        elif name == "get_mod_profile":
+            pname = arguments.get("name", "").strip()
+            pdata = _profile_store.get(pname)
+            return _tool_response(json.dumps(pdata, indent=2))
+
+        elif name == "list_mod_profiles":
+            plist = _profile_store.list()
+            return _tool_response(json.dumps(plist, indent=2))
+
+        elif name == "delete_mod_profile":
+            pname = arguments.get("name", "").strip()
+            _profile_store.delete(pname)
+            return _tool_response(json.dumps({"status": "ok", "deleted": pname}))
+
+        elif name == "activate_mod_profile":
+            pname = arguments.get("name", "").strip()
+            act = bool(arguments.get("active", True))
+            actives = _profile_store.set_active(pname, act)
+            return _tool_response(json.dumps({"status": "ok", "activeProfiles": actives}))
+
+        # ---- Clean-Room Loader Diagnostics ----
+        elif name == "diagnostics_get_system_health":
+            res = _call_diagnostics_method("GetSystemHealthJson")
+            return _tool_response(res)
+
+        elif name == "diagnostics_get_threat_prioritization":
+            res = _call_diagnostics_method("GetThreatPrioritizationCensusJson")
+            return _tool_response(res)
+
+        elif name == "diagnostics_get_production_census":
+            res = _call_diagnostics_method("GetProductionCensusJson")
+            return _tool_response(res)
+
+        elif name == "diagnostics_get_base_integrity":
+            res = _call_diagnostics_method("GetBaseIntegrityCensusJson")
+            return _tool_response(res)
+
+        elif name == "diagnostics_order_production":
+            f_key = arguments.get("factoryKeyId", "")
+            instant = bool(arguments.get("instant", False))
+            for_free = bool(arguments.get("forFree", True))
+            res = _call_diagnostics_method("OrderFactoryProduceJson", [f_key, instant, forFree])
+            return _tool_response(res)
+
+        elif name == "diagnostics_get_match_summary":
+            res = _call_diagnostics_method("GetMatchSummaryJson")
+            return _tool_response(res)
+
+        elif name == "diagnostics_get_catalog":
+            res = _call_diagnostics_method("GetDiagnosticCatalogJson")
+            return _tool_response(res)
+
+        elif name == "diagnostics_call_getter":
+            getter = arguments.get("getterName", "").strip()
+            args_list = arguments.get("args") or []
+            res = _call_diagnostics_method(getter, args_list)
             return _tool_response(res)
 
         else:

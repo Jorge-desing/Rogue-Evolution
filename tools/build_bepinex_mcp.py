@@ -1,0 +1,791 @@
+#!/usr/bin/env python3
+"""
+Builder and synchronizer for BepInEx MCP tools and Antigravity tool schemas.
+Updates tools/bepinex_mcp_server.py and generates tool JSON schemas in
+C:/Users/Alex/.gemini/antigravity/mcp/bepinex_mcp/.
+"""
+
+import json
+import os
+from pathlib import Path
+
+MCP_DIR = Path(r"C:\Users\Alex\.gemini\antigravity\mcp\bepinex_mcp")
+
+# All tools with name, description, parameters schema, and handler key
+TOOL_SPECS = [
+    # ---- Core Bridge & System ----
+    {
+        "name": "system_ping",
+        "description": "Ping BepInEx MCP server to check if the game is alive and responding.",
+        "parameters": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "ping_unity_bridge",
+        "description": "Alias for system_ping: check bridge health without touching game state.",
+        "parameters": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "system_capabilities",
+        "description": "Get BepInEx MCP server capabilities, Unity version, runtime, and architecture.",
+        "parameters": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "get_runtime_capabilities",
+        "description": "Alias for system_capabilities: report connected runtime, versions, architecture, and patch types.",
+        "parameters": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "system_paths",
+        "description": "Get game root directory and Assembly-CSharp.dll path on disk.",
+        "parameters": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "get_game_paths",
+        "description": "Alias for system_paths: retrieve absolute paths to game directory and main Assembly-CSharp.dll.",
+        "parameters": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": False,
+        },
+    },
+
+    # ---- Hierarchy & GameObjects ----
+    {
+        "name": "scene_list_root_gameobjects",
+        "description": "List root GameObjects (name and instance ID) in the active scene.",
+        "parameters": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "list_root_gameobjects",
+        "description": "Alias for scene_list_root_gameobjects: list all root GameObjects in the active scene.",
+        "parameters": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "scene_search_gameobjects",
+        "description": "Search GameObjects across loaded scenes by name, component, tag, or scene.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string", "description": "GameObject name filter substring."},
+                "componentName": {"type": "string", "description": "Component type name filter."},
+                "tag": {"type": "string", "description": "Tag filter."},
+                "scene": {"type": "string", "description": "Scene name filter."},
+                "includeInactive": {"type": "boolean", "description": "Include inactive GameObjects (default true)."},
+                "limit": {"type": "integer", "description": "Maximum objects to return (default 100)."},
+            },
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "search_gameobjects",
+        "description": "Alias for scene_search_gameobjects: search loaded GameObjects by name, component, or tag.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string", "description": "GameObject name filter substring."},
+                "componentName": {"type": "string", "description": "Component type name filter."},
+                "tag": {"type": "string", "description": "Tag filter."},
+                "scene": {"type": "string", "description": "Scene name filter."},
+                "includeInactive": {"type": "boolean", "description": "Include inactive GameObjects (default true)."},
+                "limit": {"type": "integer", "description": "Maximum objects to return (default 100)."},
+            },
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "scene_hierarchy_snapshot",
+        "description": "Get a hierarchy tree snapshot of GameObjects and their components starting from root or specific ID.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "id": {"type": "integer", "description": "Root GameObject instance ID (optional)."},
+                "depth": {"type": "integer", "description": "Maximum tree depth to traverse (default 3, max 16)."},
+                "maxNodes": {"type": "integer", "description": "Maximum total nodes to collect (default 500)."},
+            },
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "get_hierarchy_snapshot",
+        "description": "Alias for scene_hierarchy_snapshot: snapshot tree of GameObjects and components.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "id": {"type": "integer", "description": "Root GameObject instance ID (optional)."},
+                "depth": {"type": "integer", "description": "Maximum tree depth to traverse (default 3, max 16)."},
+                "maxNodes": {"type": "integer", "description": "Maximum total nodes to collect (default 500)."},
+            },
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "scene_resolve_selector",
+        "description": "Resolve a GameObject or Component reference using a stable selector path/name/component.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "path": {"type": "string", "description": "Transform hierarchy path (e.g. 'Canvas/Panel/Button')."},
+                "name": {"type": "string", "description": "GameObject name."},
+                "component": {"type": "string", "description": "Component type name."},
+                "scene": {"type": "string", "description": "Scene name."},
+            },
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "resolve_gameobject_selector",
+        "description": "Alias for scene_resolve_selector: resolve a stable scene/path/component selector to current ID.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "path": {"type": "string", "description": "Transform hierarchy path."},
+                "name": {"type": "string", "description": "GameObject name."},
+                "component": {"type": "string", "description": "Component type name."},
+                "scene": {"type": "string", "description": "Scene name."},
+                "selector_json": {"type": "string", "description": "JSON object string of selector."},
+            },
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "gameobject_list_children",
+        "description": "List direct child GameObjects for a parent GameObject ID.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "id": {"type": "integer", "description": "Parent GameObject instance ID."},
+            },
+            "required": ["id"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "list_children",
+        "description": "Alias for gameobject_list_children: list immediate children of a GameObject.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "id": {"type": "integer", "description": "Parent GameObject instance ID."},
+            },
+            "required": ["id"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "gameobject_inspect_components",
+        "description": "List all component types attached to a GameObject ID.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "id": {"type": "integer", "description": "GameObject instance ID."},
+            },
+            "required": ["id"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "inspect_components",
+        "description": "Alias for gameobject_inspect_components: list all component names on a GameObject.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "id": {"type": "integer", "description": "GameObject instance ID."},
+            },
+            "required": ["id"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "scene_find_objects_with_component",
+        "description": "Find all GameObjects in loaded scenes that have a component of the specified type.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "componentName": {"type": "string", "description": "Component type name (e.g. 'LoaderDiagnosticsComponent')."},
+            },
+            "required": ["componentName"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "find_objects_with_component",
+        "description": "Alias for scene_find_objects_with_component: search for all GameObjects with a specific component.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "componentName": {"type": "string", "description": "Component type name."},
+            },
+            "required": ["componentName"],
+            "additionalProperties": False,
+        },
+    },
+
+    # ---- Components & Reflection ----
+    {
+        "name": "component_get_details",
+        "description": "Get all fields and properties of a component on a GameObject.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "id": {"type": "integer", "description": "GameObject instance ID."},
+                "componentName": {"type": "string", "description": "Component type name."},
+            },
+            "required": ["id", "componentName"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "get_component_details",
+        "description": "Alias for component_get_details: inspect all fields/properties from a component.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "id": {"type": "integer", "description": "GameObject instance ID."},
+                "componentName": {"type": "string", "description": "Component type name."},
+            },
+            "required": ["id", "componentName"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "component_get_member",
+        "description": "Read a single field or property value on a component.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "id": {"type": "integer", "description": "GameObject instance ID."},
+                "componentName": {"type": "string", "description": "Component type name."},
+                "memberName": {"type": "string", "description": "Field or property name."},
+            },
+            "required": ["id", "componentName", "memberName"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "get_component_member",
+        "description": "Alias for component_get_member: read a single field or property value on a component.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "id": {"type": "integer", "description": "GameObject instance ID."},
+                "componentName": {"type": "string", "description": "Component type name."},
+                "memberName": {"type": "string", "description": "Field or property name."},
+            },
+            "required": ["id", "componentName", "memberName"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "component_set_value",
+        "description": "Set a field or property value on a component (supports string, int, float, bool, Vector3 '(x,y,z)').",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "id": {"type": "integer", "description": "GameObject instance ID."},
+                "componentName": {"type": "string", "description": "Component type name."},
+                "memberName": {"type": "string", "description": "Field or property name to set."},
+                "value": {"type": "string", "description": "Serialized value string."},
+            },
+            "required": ["id", "componentName", "memberName", "value"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "set_component_value",
+        "description": "Alias for component_set_value: set a field or property value on a component.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "id": {"type": "integer", "description": "GameObject instance ID."},
+                "componentName": {"type": "string", "description": "Component type name."},
+                "memberName": {"type": "string", "description": "Field or property name to set."},
+                "value": {"type": "string", "description": "Serialized value string."},
+            },
+            "required": ["id", "componentName", "memberName", "value"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "component_call_method",
+        "description": "Invoke a method on a component with JSON arguments.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "id": {"type": "integer", "description": "GameObject instance ID."},
+                "componentName": {"type": "string", "description": "Component type name."},
+                "methodName": {"type": "string", "description": "Method name to invoke."},
+                "args": {"type": "string", "description": "JSON array string of arguments (e.g. '[\"val\", 123]')."},
+            },
+            "required": ["id", "componentName", "methodName"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "call_component_method",
+        "description": "Alias for component_call_method: invoke a method on a component with JSON arguments.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "id": {"type": "integer", "description": "GameObject instance ID."},
+                "componentName": {"type": "string", "description": "Component type name."},
+                "methodName": {"type": "string", "description": "Method name to invoke."},
+                "args": {"type": "string", "description": "JSON array string of arguments (e.g. '[\"val\", 123]')."},
+            },
+            "required": ["id", "componentName", "methodName"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "component_list_methods",
+        "description": "List all methods available on a component.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "id": {"type": "integer", "description": "GameObject instance ID."},
+                "componentName": {"type": "string", "description": "Component type name."},
+            },
+            "required": ["id", "componentName"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "list_component_methods",
+        "description": "Alias for component_list_methods: list all methods on a specific component.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "id": {"type": "integer", "description": "GameObject instance ID."},
+                "componentName": {"type": "string", "description": "Component type name."},
+            },
+            "required": ["id", "componentName"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "type_search",
+        "description": "Search loaded C# / Mono types across all AppDomain assemblies.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "Type name substring to search."},
+                "offset": {"type": "integer", "description": "Pagination offset (default 0)."},
+                "limit": {"type": "integer", "description": "Pagination limit (default 100)."},
+            },
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "search_runtime_types",
+        "description": "Alias for type_search: search loaded types across assemblies.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "Type name substring to search."},
+                "offset": {"type": "integer", "description": "Pagination offset (default 0)."},
+                "limit": {"type": "integer", "description": "Pagination limit (default 100)."},
+            },
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "type_describe",
+        "description": "Get detailed reflection metadata (fields, properties, methods) for a C# type.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "typeName": {"type": "string", "description": "Full or short type name."},
+                "offset": {"type": "integer", "description": "Pagination offset (default 0)."},
+                "limit": {"type": "integer", "description": "Pagination limit (default 200)."},
+            },
+            "required": ["typeName"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "describe_runtime_type",
+        "description": "Alias for type_describe: get detailed reflection metadata for a C# type.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "typeName": {"type": "string", "description": "Full or short type name."},
+                "offset": {"type": "integer", "description": "Pagination offset (default 0)."},
+                "limit": {"type": "integer", "description": "Pagination limit (default 200)."},
+            },
+            "required": ["typeName"],
+            "additionalProperties": False,
+        },
+    },
+
+    # ---- Live Patching & Code Injection ----
+    {
+        "name": "mod_patch_method",
+        "description": "Apply a live Harmony patch to a C# method at runtime.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "targetClass": {"type": "string", "description": "Target class name."},
+                "targetMethod": {"type": "string", "description": "Target method name."},
+                "patchType": {"type": "string", "enum": ["prefix", "postfix", "transpiler", "finalizer"], "description": "Patch type."},
+                "patchCode": {"type": "string", "description": "C# method body/code for the DynamicPatcher class."},
+                "parameterTypes": {"type": "string", "description": "Comma-separated parameter type names for overload disambiguation."},
+                "registrationId": {"type": "string", "description": "Optional custom tracking ID."},
+            },
+            "required": ["targetClass", "targetMethod", "patchCode"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "mod_inject_class",
+        "description": "Compile and dynamically inject C# code into Unity at runtime, optionally attaching to a GameObject.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "classCode": {"type": "string", "description": "Complete C# class code to compile and inject."},
+                "attachToGameObjectId": {"type": "string", "description": "Optional GameObject ID to attach the MonoBehaviour component to."},
+            },
+            "required": ["classCode"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "mod_list_patches",
+        "description": "List all active dynamic Harmony patches applied through MCP.",
+        "parameters": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "list_mod_patches",
+        "description": "Alias for mod_list_patches: list Harmony subscriptions and dynamic patches with lifecycle IDs.",
+        "parameters": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "mod_remove_patch",
+        "description": "Unpatch a dynamic Harmony patch by registration ID.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "registrationId": {"type": "string", "description": "Registration ID of the patch to remove."},
+            },
+            "required": ["registrationId"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "remove_mod_patch",
+        "description": "Alias for mod_remove_patch: unpatch one subscription or dynamic patch by lifecycle ID.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "registrationId": {"type": "string", "description": "Registration ID of the patch to remove."},
+            },
+            "required": ["registrationId"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "mod_subscribe_to_method",
+        "description": "Subscribe to method invocations via Harmony to deliver live events.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "id": {"type": "integer", "description": "GameObject instance ID."},
+                "componentName": {"type": "string", "description": "Component type name."},
+                "methodName": {"type": "string", "description": "Method name to subscribe to."},
+                "registrationId": {"type": "string", "description": "Optional registration ID."},
+            },
+            "required": ["id", "componentName", "methodName"],
+            "additionalProperties": False,
+        },
+    },
+
+    # ---- Batching, Watchers & Network ----
+    {
+        "name": "run_bridge_batch",
+        "description": "Execute an ordered list of operations (set_value, call_method, etc.) in a single atomic round-trip.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "operations": {"type": "array", "description": "Array of operation objects with command, params, etc."},
+                "operations_json": {"type": "string", "description": "JSON string of operations array if passed as string."},
+                "stopOnError": {"type": "boolean", "description": "Whether to halt execution on first failure (default false)."},
+            },
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "watch_component_member",
+        "description": "Register a watcher on a component member that monitors changes at a periodic interval.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "selector": {"type": "object", "description": "Stable selector object."},
+                "selector_json": {"type": "string", "description": "JSON string of selector."},
+                "componentName": {"type": "string", "description": "Component type name."},
+                "memberName": {"type": "string", "description": "Member field/property name."},
+                "intervalMs": {"type": "integer", "description": "Polling interval in milliseconds (default 500)."},
+                "registrationId": {"type": "string", "description": "Optional custom registration ID."},
+            },
+            "required": ["componentName", "memberName"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "watch_active_scene",
+        "description": "Create a watcher that emits notification when the active Unity scene changes.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "intervalMs": {"type": "integer", "description": "Polling interval in ms (default 500)."},
+                "registrationId": {"type": "string", "description": "Optional registration ID."},
+            },
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "list_watchers",
+        "description": "List all active member and scene watchers.",
+        "parameters": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "remove_watcher",
+        "description": "Remove an active watcher by registration ID.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "registrationId": {"type": "string", "description": "Watcher registration ID to remove."},
+            },
+            "required": ["registrationId"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "get_network_diagnostics",
+        "description": "Read common ownership, authority, and network state without network writes.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "id": {"type": "integer", "description": "GameObject instance ID."},
+            },
+            "required": ["id"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "raw_mcp_request",
+        "description": "Send a raw HTTP GET or POST request to the BepInEx MCP server.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "endpoint": {"type": "string", "description": "Endpoint relative to /mcp/ (e.g. 'system/ping')."},
+                "method": {"type": "string", "enum": ["GET", "POST"], "description": "HTTP method (default GET)."},
+                "queryParams": {"type": "object", "description": "Key-value dictionary of query parameters."},
+                "bodyJson": {"type": "string", "description": "JSON string body for POST requests."},
+            },
+            "required": ["endpoint"],
+            "additionalProperties": False,
+        },
+    },
+
+    # ---- Mod Profiles ----
+    {
+        "name": "save_mod_profile",
+        "description": "Validates and saves a version-1 persistent mod profile to disk.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string", "description": "Profile name (letters, digits, dots, underscores, dashes)."},
+                "profile_json": {"type": "string", "description": "JSON string or object containing profile definition."},
+            },
+            "required": ["name", "profile_json"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "get_mod_profile",
+        "description": "Returns one saved mod profile by name.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string", "description": "Profile name."},
+            },
+            "required": ["name"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "list_mod_profiles",
+        "description": "Lists all saved mod profile names, auto-apply state, and operation counts.",
+        "parameters": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "delete_mod_profile",
+        "description": "Deletes one saved mod profile and deactivates it.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string", "description": "Profile name to delete."},
+            },
+            "required": ["name"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "activate_mod_profile",
+        "description": "Opts a mod profile into or out of automatic scene application.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string", "description": "Profile name."},
+                "active": {"type": "boolean", "description": "Whether profile is active (default true)."},
+            },
+            "required": ["name"],
+            "additionalProperties": False,
+        },
+    },
+
+    # ---- Rogue Command Clean-Room Diagnostics ----
+    {
+        "name": "diagnostics_get_system_health",
+        "description": "Queries unified live system health across active packs, units, AI modules, economy, combat status, and threat telemetry directly from LoaderDiagnosticsComponent.",
+        "parameters": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "diagnostics_get_threat_prioritization",
+        "description": "Queries aggregated threat-prioritization AI telemetry (active behaviours, processed AI/allied units, retarget counts) directly from LoaderDiagnosticsComponent.",
+        "parameters": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "diagnostics_get_production_census",
+        "description": "Queries live factory production queues, units actively producing, and per-factory status directly from LoaderDiagnosticsComponent.",
+        "parameters": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "diagnostics_get_base_integrity",
+        "description": "Queries player command HQ and enemy base structural integrity directly from LoaderDiagnosticsComponent.",
+        "parameters": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "diagnostics_order_production",
+        "description": "Triggers an in-game unit production order on a player factory directly via LoaderDiagnosticsComponent / RuntimeGameplayProductionDirector.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "factoryKeyId": {"type": "string", "description": "Entity ID or unique ID of the target player factory."},
+                "instant": {"type": "boolean", "description": "Produce unit instantly without waiting build time (default false)."},
+                "forFree": {"type": "boolean", "description": "Produce unit without deducting player credits (default true)."},
+            },
+            "required": ["factoryKeyId"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "diagnostics_get_match_summary",
+        "description": "Queries unified match summary combining battlefield roster, economy status, and AI combat status directly from LoaderDiagnosticsComponent.",
+        "parameters": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "diagnostics_get_catalog",
+        "description": "Retrieves the full catalog of all 18+ agent-readable diagnostic getters available on LoaderDiagnosticsComponent.",
+        "parameters": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "diagnostics_call_getter",
+        "description": "Invokes any diagnostic getter method on LoaderDiagnosticsComponent by name (e.g. 'GetPlayerRosterJson', 'GetAiRosterJson', 'GetCombatStatusCensusJson', 'GetEconomyMatchCensusJson', 'GetRangeColorsJson', 'GetIdentifierPaletteJson', etc.) with automatic GameObject resolution.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "getterName": {"type": "string", "description": "Exact getter method name on LoaderDiagnosticsComponent."},
+                "args": {"type": "array", "description": "Optional list of positional arguments (default empty)."},
+            },
+            "required": ["getterName"],
+            "additionalProperties": False,
+        },
+    },
+]
+
+
+def generate_mcp_schema_files():
+    MCP_DIR.mkdir(parents=True, exist_ok=True)
+    count = 0
+    for spec in TOOL_SPECS:
+        name = spec["name"]
+        file_path = MCP_DIR / f"{name}.json"
+        schema_content = {
+            "name": name,
+            "description": spec["description"],
+            "parameters": spec["parameters"],
+        }
+        file_path.write_text(json.dumps(schema_content, indent=2), encoding="utf-8")
+        count += 1
+    print(f"Generated {count} tool schemas in {MCP_DIR}")
+
+
+if __name__ == "__main__":
+    generate_mcp_schema_files()
