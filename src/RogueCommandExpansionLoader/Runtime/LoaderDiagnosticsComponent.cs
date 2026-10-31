@@ -396,6 +396,15 @@ namespace RogueCommandExpansionLoader.Runtime
         }
 
         /// <summary>
+        /// Returns a catalog of available diagnostic getters as JSON an agent can read
+        /// without a visual capture.
+        /// </summary>
+        public string GetDiagnosticCatalogJson()
+        {
+            return AgentDiagnosticsFormatter.SerializeDiagnosticCatalog();
+        }
+
+        /// <summary>
         /// Returns one unit's base balance parameters (cost, max health/armor/shield/mana/rank,
         /// move speed, weapon range, dps, damage) as read from the game's own EntityBalancingStore,
         /// as JSON an agent can read without a visual capture. Pass the unit's entity id.

@@ -965,6 +965,38 @@ namespace RogueCommandExpansionLoader.Runtime
             return Serialize(BuildIdentifierPalette());
         }
 
+        public static string SerializeDiagnosticCatalog()
+        {
+            var diagnostics = new List<Dictionary<string, object>>
+            {
+                new Dictionary<string, object> { ["name"] = "GetRuntimeHooksStateJson", ["description"] = "Installed Harmony hooks and registered combat XP count." },
+                new Dictionary<string, object> { ["name"] = "GetInstalledPatchNamesJson", ["description"] = "Names of installed Harmony patches." },
+                new Dictionary<string, object> { ["name"] = "GetRegisteredProfilesJson", ["description"] = "Registered AI module profile ids." },
+                new Dictionary<string, object> { ["name"] = "GetAppliedBaselineEffectsJson", ["description"] = "Applied baseline effects count and names." },
+                new Dictionary<string, object> { ["name"] = "GetCombatXpEntriesJson", ["description"] = "Combat XP entries by entity key." },
+                new Dictionary<string, object> { ["name"] = "GetBattlefieldCensusJson", ["description"] = "Live battlefield census counts and player unit rows." },
+                new Dictionary<string, object> { ["name"] = "GetEntityBalanceJson", ["description"] = "Base balance parameters for one unit by entity id." },
+                new Dictionary<string, object> { ["name"] = "GetCardChangeRequestJson", ["description"] = "Serialized mod-authored card change request." },
+                new Dictionary<string, object> { ["name"] = "GetAiRosterJson", ["description"] = "Live AI units and buildings with base balance params." },
+                new Dictionary<string, object> { ["name"] = "GetPlayerRosterJson", ["description"] = "Live player units with base balance params." },
+                new Dictionary<string, object> { ["name"] = "GetThreatPrioritizationCensusJson", ["description"] = "Aggregated threat-prioritization telemetry." },
+                new Dictionary<string, object> { ["name"] = "GetUnitThreatAssessmentJson", ["description"] = "Per-unit threat score (DPS x health ratio)." },
+                new Dictionary<string, object> { ["name"] = "GetMatchSummaryJson", ["description"] = "Unified match summary across battlefield and AI roster." },
+                new Dictionary<string, object> { ["name"] = "GetEconomyMatchCensusJson", ["description"] = "Match economy, wave, and harvester census." },
+                new Dictionary<string, object> { ["name"] = "GetCombatStatusCensusJson", ["description"] = "Combat-active status effects census." },
+                new Dictionary<string, object> { ["name"] = "GetSystemHealthJson", ["description"] = "Unified system health across subsystems." },
+                new Dictionary<string, object> { ["name"] = "GetDiagnosticCatalogJson", ["description"] = "Catalog of available diagnostic getters." },
+            };
+
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "diagnosticCatalog",
+                ["diagnosticCount"] = diagnostics.Count,
+                ["diagnostics"] = diagnostics,
+            };
+            return Serialize(view);
+        }
+
         private static string ToHex(UnityEngine.Color color)
         {
             int r = Clamp255(color.r);

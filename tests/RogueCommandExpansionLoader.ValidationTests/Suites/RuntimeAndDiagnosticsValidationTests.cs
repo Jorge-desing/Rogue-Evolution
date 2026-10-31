@@ -2954,5 +2954,31 @@ internal static partial class ValidationTestRunner
             throw new InvalidOperationException("Threat-prioritization registry count must be non-negative.");
         }
     }),
+    ("diagnostic catalog lists available agent getters", () =>
+    {
+        string json = AgentDiagnosticsFormatter.SerializeDiagnosticCatalog();
+        using (var doc = JsonDocument.Parse(json))
+        {
+            if (doc.RootElement.GetProperty("kind").GetString() != "diagnosticCatalog" ||
+                doc.RootElement.GetProperty("diagnosticCount").GetInt32() <= 0)
+            {
+                throw new InvalidOperationException("Diagnostic catalog must report a non-empty count.");
+            }
+
+            bool found = false;
+            foreach (JsonElement item in doc.RootElement.GetProperty("diagnostics").EnumerateArray())
+            {
+                if (item.GetProperty("name").GetString() == "GetThreatPrioritizationCensusJson")
+                {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found)
+            {
+                throw new InvalidOperationException("Diagnostic catalog must include threat-prioritization census getter.");
+            }
+        }
+    }),
     };
 }
