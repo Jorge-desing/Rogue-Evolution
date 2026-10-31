@@ -103,6 +103,8 @@ if _profile_store is None:
 
 # Import TOOL_SPECS from build_bepinex_mcp to maintain a single source of truth
 try:
+    import sys as _sys
+    _sys.path.insert(0, str(Path(__file__).resolve().parent))
     from build_bepinex_mcp import TOOL_SPECS
     TOOLS = [
         {
