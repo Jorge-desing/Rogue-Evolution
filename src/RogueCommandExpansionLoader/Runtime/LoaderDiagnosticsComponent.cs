@@ -132,6 +132,18 @@ namespace RogueCommandExpansionLoader.Runtime
 
         public int LiveUnitsWithStatusEffectsCount => RuntimeCombatStatusCensus.Current().UnitsWithActiveStatusEffectsCount;
 
+        public int LiveTotalFactoryCount => RuntimeProductionCensus.Current().TotalFactoryCount;
+
+        public int LiveActiveProducingFactoryCount => RuntimeProductionCensus.Current().ActiveProducingCount;
+
+        public int LiveQueuedUnitCount => RuntimeProductionCensus.Current().TotalQueuedUnitsCount;
+
+        public bool LiveHasPlayerHq => RuntimeBaseIntegrityCensus.Current().HasPlayerHq;
+
+        public float LivePlayerHqHealthRatio => RuntimeBaseIntegrityCensus.Current().PlayerHqHealthRatio;
+
+        public float LiveAiStructureHealthRatio => RuntimeBaseIntegrityCensus.Current().AverageAiStructureHealthRatio;
+
         // ---- Methods callable via component/call_method ----
 
         /// <summary>
@@ -453,6 +465,36 @@ namespace RogueCommandExpansionLoader.Runtime
         {
             return AgentDiagnosticsFormatter.SerializeCombatStatusCensus(
                 RuntimeCombatStatusCensus.Current());
+        }
+
+        /// <summary>
+        /// Returns the live factory production census (production queues, active producing counts,
+        /// and living factory health) as JSON.
+        /// </summary>
+        public string GetProductionCensusJson()
+        {
+            return AgentDiagnosticsFormatter.SerializeProductionCensus(
+                RuntimeProductionCensus.Current());
+        }
+
+        /// <summary>
+        /// Returns the live base integrity census (player command HQ and enemy base structures
+        /// survivability metrics) as JSON.
+        /// </summary>
+        public string GetBaseIntegrityCensusJson()
+        {
+            return AgentDiagnosticsFormatter.SerializeBaseIntegrityCensus(
+                RuntimeBaseIntegrityCensus.Current());
+        }
+
+        /// <summary>
+        /// Commands an in-game factory to produce a unit, supporting live automated testing
+        /// and validation without requiring manual GUI interactions.
+        /// </summary>
+        public string OrderFactoryProduceJson(string factoryKeyId, bool instant = false, bool forFree = true)
+        {
+            return AgentDiagnosticsFormatter.SerializeProductionOrderResult(
+                RuntimeGameplayProductionDirector.TryOrderProduction(factoryKeyId, instant, forFree));
         }
 
         /// <summary>

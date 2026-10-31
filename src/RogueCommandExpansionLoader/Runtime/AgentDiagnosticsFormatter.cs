@@ -644,6 +644,97 @@ namespace RogueCommandExpansionLoader.Runtime
         }
 
         /// <summary>
+        /// Serializes factory production queue metrics and living factory status across
+        /// player and AI battlefield entities. Omission counters are serialized before detail collections.
+        /// </summary>
+        public static string SerializeProductionCensus(ProductionCensus census)
+        {
+            var rows = new List<Dictionary<string, object>>();
+            if (census != null && census.FactoryRows != null)
+            {
+                foreach (ProductionFactoryDiagnosticRow row in census.FactoryRows)
+                {
+                    rows.Add(new Dictionary<string, object>
+                    {
+                        ["entityKeyId"] = row.EntityKeyId ?? string.Empty,
+                        ["isControlledByPlayer"] = row.IsControlledByPlayer,
+                        ["inProductionCount"] = row.InProductionCount,
+                        ["isProducing"] = row.IsProducing,
+                        ["currentHealth"] = row.CurrentHealth,
+                        ["maxHealth"] = row.MaxHealth,
+                        ["healthRatio"] = row.HealthRatio,
+                    });
+                }
+            }
+
+            var view = new Dictionary<string, object>
+            {
+                ["omittedFactoryCount"] = census != null ? census.OmittedFactoryCount : 0,
+                ["totalFactoryCount"] = census != null ? census.TotalFactoryCount : 0,
+                ["activeProducingCount"] = census != null ? census.ActiveProducingCount : 0,
+                ["totalQueuedUnitsCount"] = census != null ? census.TotalQueuedUnitsCount : 0,
+                ["playerFactoryCount"] = census != null ? census.PlayerFactoryCount : 0,
+                ["aiFactoryCount"] = census != null ? census.AiFactoryCount : 0,
+                ["factoryRowCount"] = rows.Count,
+                ["factoryRows"] = rows,
+            };
+            return Serialize(view);
+        }
+
+        /// <summary>
+        /// Serializes player command HQ and enemy base building survivability metrics.
+        /// Omission counters are serialized before detail collections.
+        /// </summary>
+        public static string SerializeBaseIntegrityCensus(BaseIntegrityCensus census)
+        {
+            var rows = new List<Dictionary<string, object>>();
+            if (census != null && census.StructureRows != null)
+            {
+                foreach (BaseStructureDiagnosticRow row in census.StructureRows)
+                {
+                    rows.Add(new Dictionary<string, object>
+                    {
+                        ["entityKeyId"] = row.EntityKeyId ?? string.Empty,
+                        ["isControlledByPlayer"] = row.IsControlledByPlayer,
+                        ["currentHealth"] = row.CurrentHealth,
+                        ["maxHealth"] = row.MaxHealth,
+                        ["healthRatio"] = row.HealthRatio,
+                        ["isEngineeringHq"] = row.IsEngineeringHq,
+                    });
+                }
+            }
+
+            var view = new Dictionary<string, object>
+            {
+                ["omittedStructureCount"] = census != null ? census.OmittedStructureCount : 0,
+                ["hasPlayerHq"] = census != null && census.HasPlayerHq,
+                ["playerHqHealth"] = census != null ? census.PlayerHqHealth : 0f,
+                ["playerHqMaxHealth"] = census != null ? census.PlayerHqMaxHealth : 0f,
+                ["playerHqHealthRatio"] = census != null ? census.PlayerHqHealthRatio : 0f,
+                ["livingAiBuildingCount"] = census != null ? census.LivingAiBuildingCount : 0,
+                ["averageAiStructureHealthRatio"] = census != null ? census.AverageAiStructureHealthRatio : 0f,
+                ["structureRowCount"] = rows.Count,
+                ["structureRows"] = rows,
+            };
+            return Serialize(view);
+        }
+
+        /// <summary>
+        /// Serializes the result of an in-game factory production command triggered via MCP/diagnostics.
+        /// </summary>
+        public static string SerializeProductionOrderResult(ProductionOrderResult result)
+        {
+            var view = new Dictionary<string, object>
+            {
+                ["success"] = result.Success,
+                ["factoryKeyId"] = result.FactoryKeyId ?? string.Empty,
+                ["inProductionCount"] = result.InProductionCount,
+                ["message"] = result.Message ?? string.Empty,
+            };
+            return Serialize(view);
+        }
+
+        /// <summary>
         /// Unified health and status telemetry synthesizing loader state, content registries,
         /// compiled AI modules, match economy, and combat telemetry into a single agent-readable JSON.
         /// </summary>
@@ -994,6 +1085,9 @@ namespace RogueCommandExpansionLoader.Runtime
                 new Dictionary<string, object> { ["name"] = "GetMatchSummaryJson", ["description"] = "Unified match summary across battlefield and AI roster." },
                 new Dictionary<string, object> { ["name"] = "GetEconomyMatchCensusJson", ["description"] = "Match economy, wave, and harvester census." },
                 new Dictionary<string, object> { ["name"] = "GetCombatStatusCensusJson", ["description"] = "Combat-active status effects census." },
+                new Dictionary<string, object> { ["name"] = "GetProductionCensusJson", ["description"] = "Live factory production queue metrics and active producing counts." },
+                new Dictionary<string, object> { ["name"] = "GetBaseIntegrityCensusJson", ["description"] = "Player command HQ and enemy base structure integrity telemetry." },
+                new Dictionary<string, object> { ["name"] = "OrderFactoryProduceJson", ["description"] = "Trigger in-game unit production order on a player factory." },
                 new Dictionary<string, object> { ["name"] = "GetSystemHealthJson", ["description"] = "Unified system health across subsystems." },
                 new Dictionary<string, object> { ["name"] = "GetDiagnosticCatalogJson", ["description"] = "Catalog of available diagnostic getters." },
             };

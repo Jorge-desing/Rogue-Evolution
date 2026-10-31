@@ -2980,5 +2980,263 @@ internal static partial class ValidationTestRunner
             }
         }
     }),
+    ("production census serializes factory queue telemetry with omission bounds first", () =>
+    {
+        var rows = new List<ProductionFactoryDiagnosticRow>
+        {
+            new ProductionFactoryDiagnosticRow("factory:player-heavy", true, 2, true, 450f, 500f, 0.9f),
+            new ProductionFactoryDiagnosticRow("factory:ai-barracks", false, 0, false, 300f, 300f, 1.0f)
+        };
+        var census = new ProductionCensus(0, 2, 1, 2, 1, 1, rows);
+        string json = AgentDiagnosticsFormatter.SerializeProductionCensus(census);
+
+        int omittedIndex = json.IndexOf("omittedFactoryCount");
+        int rowsIndex = json.IndexOf("factoryRows");
+        if (omittedIndex < 0 || rowsIndex < 0 || omittedIndex > rowsIndex)
+        {
+            throw new InvalidOperationException("Omission counter must be serialized before detail collection in production census.");
+        }
+
+        using (var doc = JsonDocument.Parse(json))
+        {
+            if (doc.RootElement.GetProperty("omittedFactoryCount").GetInt32() != 0 ||
+                doc.RootElement.GetProperty("totalFactoryCount").GetInt32() != 2 ||
+                doc.RootElement.GetProperty("activeProducingCount").GetInt32() != 1 ||
+                doc.RootElement.GetProperty("totalQueuedUnitsCount").GetInt32() != 2 ||
+                doc.RootElement.GetProperty("playerFactoryCount").GetInt32() != 1 ||
+                doc.RootElement.GetProperty("aiFactoryCount").GetInt32() != 1 ||
+                doc.RootElement.GetProperty("factoryRowCount").GetInt32() != 2)
+            {
+                throw new InvalidOperationException("Production census did not preserve factory telemetry metrics.");
+            }
+
+            JsonElement first = doc.RootElement.GetProperty("factoryRows")[0];
+            if (first.GetProperty("entityKeyId").GetString() != "factory:player-heavy" ||
+                !first.GetProperty("isControlledByPlayer").GetBoolean() ||
+                first.GetProperty("inProductionCount").GetInt32() != 2 ||
+                !first.GetProperty("isProducing").GetBoolean())
+            {
+                throw new InvalidOperationException("Production census did not serialize factory row correctly.");
+            }
+        }
+
+        string nullJson = AgentDiagnosticsFormatter.SerializeProductionCensus(null);
+        using (var doc = JsonDocument.Parse(nullJson))
+        {
+            if (doc.RootElement.GetProperty("omittedFactoryCount").GetInt32() != 0 ||
+                doc.RootElement.GetProperty("totalFactoryCount").GetInt32() != 0 ||
+                doc.RootElement.GetProperty("factoryRowCount").GetInt32() != 0)
+            {
+                throw new InvalidOperationException("Null production census must serialize default values.");
+            }
+        }
+    }),
+    ("base integrity census serializes HQ and AI structure telemetry with omission bounds first", () =>
+    {
+        var rows = new List<BaseStructureDiagnosticRow>
+        {
+            new BaseStructureDiagnosticRow("building:player-hq", true, 900f, 1000f, 0.9f, true),
+            new BaseStructureDiagnosticRow("building:ai-defense", false, 200f, 400f, 0.5f, false)
+        };
+        var census = new BaseIntegrityCensus(0, true, 900f, 1000f, 0.9f, 1, 0.5f, rows);
+        string json = AgentDiagnosticsFormatter.SerializeBaseIntegrityCensus(census);
+
+        int omittedIndex = json.IndexOf("omittedStructureCount");
+        int rowsIndex = json.IndexOf("structureRows");
+        if (omittedIndex < 0 || rowsIndex < 0 || omittedIndex > rowsIndex)
+        {
+            throw new InvalidOperationException("Omission counter must be serialized before detail collection in base integrity census.");
+        }
+
+        using (var doc = JsonDocument.Parse(json))
+        {
+            if (doc.RootElement.GetProperty("omittedStructureCount").GetInt32() != 0 ||
+                !doc.RootElement.GetProperty("hasPlayerHq").GetBoolean() ||
+                Math.Abs(doc.RootElement.GetProperty("playerHqHealthRatio").GetSingle() - 0.9f) > 0.001f ||
+                doc.RootElement.GetProperty("livingAiBuildingCount").GetInt32() != 1 ||
+                Math.Abs(doc.RootElement.GetProperty("averageAiStructureHealthRatio").GetSingle() - 0.5f) > 0.001f ||
+                doc.RootElement.GetProperty("structureRowCount").GetInt32() != 2)
+            {
+                throw new InvalidOperationException("Base integrity census did not preserve structure metrics.");
+            }
+        }
+
+        string nullJson = AgentDiagnosticsFormatter.SerializeBaseIntegrityCensus(null);
+        using (var doc = JsonDocument.Parse(nullJson))
+        {
+            if (doc.RootElement.GetProperty("hasPlayerHq").GetBoolean() ||
+                doc.RootElement.GetProperty("livingAiBuildingCount").GetInt32() != 0)
+            {
+                throw new InvalidOperationException("Null base integrity census must serialize default values.");
+            }
+        }
+    }),
+    ("runtime production census queries living factories from existing controllers", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        try
+        {
+            var pFactory = new EntityController
+            {
+                entityId = "building:player-factory",
+                IsFactory = true,
+                IsBuilding = true,
+                IsControlledByPlayer = true,
+                CurrentHealth = 400f,
+                MaxHealth = 500f,
+                InProductionCount = 1
+            };
+            var aiBuilding = new EntityController
+            {
+                entityId = "building:ai-turret-factory",
+                IsFactory = true,
+                IsBuilding = true,
+                IsControlledByPlayer = false,
+                CurrentHealth = 250f,
+                MaxHealth = 250f,
+                InProductionCount = 0
+            };
+            ExistingControllers.Instance.PlayerBuildingsKnownToAi().Add(pFactory);
+            ExistingControllers.Instance.AiBuildings().Add(aiBuilding);
+
+            ProductionCensus census = RuntimeProductionCensus.Current();
+            if (census.TotalFactoryCount != 2 ||
+                census.PlayerFactoryCount != 1 ||
+                census.AiFactoryCount != 1 ||
+                census.ActiveProducingCount != 1 ||
+                census.TotalQueuedUnitsCount != 1 ||
+                census.FactoryRows.Count != 2)
+            {
+                throw new InvalidOperationException($"RuntimeProductionCensus did not collect expected factory stats. Total={census.TotalFactoryCount}, Active={census.ActiveProducingCount}");
+            }
+        }
+        finally
+        {
+            ExistingControllers.Instance.Reset();
+        }
+    }),
+    ("runtime base integrity census collects HQ and living AI buildings", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        try
+        {
+            var hq = new EntityController
+            {
+                entityId = "building:engineering-hq",
+                IsBuilding = true,
+                IsControlledByPlayer = true,
+                CurrentHealth = 800f,
+                MaxHealth = 1000f
+            };
+            var aiTurret = new EntityController
+            {
+                entityId = "building:ai-turret",
+                IsBuilding = true,
+                IsControlledByPlayer = false,
+                CurrentHealth = 100f,
+                MaxHealth = 200f
+            };
+            ExistingControllers.Instance.EngineeringHqEntity = hq;
+            ExistingControllers.Instance.AiBuildings().Add(aiTurret);
+
+            BaseIntegrityCensus census = RuntimeBaseIntegrityCensus.Current();
+            if (!census.HasPlayerHq ||
+                Math.Abs(census.PlayerHqHealthRatio - 0.8f) > 0.001f ||
+                census.LivingAiBuildingCount != 1 ||
+                Math.Abs(census.AverageAiStructureHealthRatio - 0.5f) > 0.001f ||
+                census.StructureRows.Count != 2)
+            {
+                throw new InvalidOperationException($"RuntimeBaseIntegrityCensus did not collect expected HQ/AI structure metrics. HasHQ={census.HasPlayerHq}, AiBuildings={census.LivingAiBuildingCount}");
+            }
+        }
+        finally
+        {
+            ExistingControllers.Instance.Reset();
+        }
+    }),
+    ("runtime gameplay production director orders production on player factory and validates constraints", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        try
+        {
+            ProductionOrderResult emptyRes = RuntimeGameplayProductionDirector.TryOrderProduction("");
+            if (emptyRes.Success)
+            {
+                throw new InvalidOperationException("Production order on empty factory ID must fail.");
+            }
+
+            ProductionOrderResult notFoundRes = RuntimeGameplayProductionDirector.TryOrderProduction("building:ghost-factory");
+            if (notFoundRes.Success)
+            {
+                throw new InvalidOperationException("Production order on nonexistent factory must fail.");
+            }
+
+            var aiFactory = new EntityController
+            {
+                entityId = "building:ai-factory-1",
+                IsFactory = true,
+                IsBuilding = true,
+                IsControlledByPlayer = false,
+                InProductionCount = 0
+            };
+            ExistingControllers.Instance.PlayerUnits().Add(aiFactory);
+
+            ProductionOrderResult aiRes = RuntimeGameplayProductionDirector.TryOrderProduction("building:ai-factory-1");
+            if (aiRes.Success)
+            {
+                throw new InvalidOperationException("Production order on non-player factory must fail.");
+            }
+
+            var playerFactory = new EntityController
+            {
+                entityId = "building:player-factory-1",
+                IsFactory = true,
+                IsBuilding = true,
+                IsControlledByPlayer = true,
+                InProductionCount = 3
+            };
+            ExistingControllers.Instance.PlayerBuildingsKnownToAi().Add(playerFactory);
+
+            ProductionOrderResult successRes = RuntimeGameplayProductionDirector.TryOrderProduction("building:player-factory-1", instant: false, forFree: true);
+            if (!successRes.Success || successRes.FactoryKeyId != "building:player-factory-1" || successRes.InProductionCount != 3)
+            {
+                throw new InvalidOperationException("Production order on player factory must succeed.");
+            }
+
+            string resultJson = AgentDiagnosticsFormatter.SerializeProductionOrderResult(successRes);
+            using (var doc = JsonDocument.Parse(resultJson))
+            {
+                if (!doc.RootElement.GetProperty("success").GetBoolean() ||
+                    doc.RootElement.GetProperty("factoryKeyId").GetString() != "building:player-factory-1" ||
+                    doc.RootElement.GetProperty("inProductionCount").GetInt32() != 3)
+                {
+                    throw new InvalidOperationException("ProductionOrderResult serialization mismatch.");
+                }
+            }
+        }
+        finally
+        {
+            ExistingControllers.Instance.Reset();
+        }
+    }),
+    ("diagnostic catalog contains new production and base integrity endpoints", () =>
+    {
+        string json = AgentDiagnosticsFormatter.SerializeDiagnosticCatalog();
+        using (var doc = JsonDocument.Parse(json))
+        {
+            var names = new HashSet<string>();
+            foreach (JsonElement item in doc.RootElement.GetProperty("diagnostics").EnumerateArray())
+            {
+                names.Add(item.GetProperty("name").GetString()!);
+            }
+
+            if (!names.Contains("GetProductionCensusJson") ||
+                !names.Contains("GetBaseIntegrityCensusJson") ||
+                !names.Contains("OrderFactoryProduceJson"))
+            {
+                throw new InvalidOperationException("Diagnostic catalog must include GetProductionCensusJson, GetBaseIntegrityCensusJson, and OrderFactoryProduceJson.");
+            }
+        }
+    }),
     };
 }
