@@ -3712,7 +3712,7 @@ namespace RogueCommandExpansionLoader.Runtime
 
                 MethodInfo m = helperType.GetMethod(methodName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static,
 
-                    null, new[] { typeof(float), typeof(UnityEngine.Audio.AudioMixer) }, null);
+                    null, new[] { typeof(UnityEngine.Audio.AudioMixer), typeof(float) }, null);
 
 
 
@@ -3720,7 +3720,7 @@ namespace RogueCommandExpansionLoader.Runtime
 
                 {
 
-                    m.Invoke(null, new object[] { clamped, mixer });
+                    m.Invoke(null, new object[] { mixer, clamped });
 
                     return new AudioCommandResult(true, ch, clamped,
 

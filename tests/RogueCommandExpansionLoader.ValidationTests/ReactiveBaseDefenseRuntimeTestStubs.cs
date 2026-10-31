@@ -673,10 +673,10 @@ public static class AudioMixerHelper
     public static float GameplaySlider { get; set; } = 0.9f;
     public static float UiSlider { get; set; } = 0.7f;
 
-    public static void SetMasterVolume(float v, UnityEngine.Audio.AudioMixer m) => MasterSlider = v;
-    public static void SetMusicVolume(float v, UnityEngine.Audio.AudioMixer m) => MusicSlider = v;
-    public static void SetGameplayVolume(float v, UnityEngine.Audio.AudioMixer m) => GameplaySlider = v;
-    public static void SetUiSelectionSoundsVolume(float v, UnityEngine.Audio.AudioMixer m) => UiSlider = v;
+    public static void SetMasterVolume(UnityEngine.Audio.AudioMixer m, float v) => MasterSlider = v;
+    public static void SetMusicVolume(UnityEngine.Audio.AudioMixer m, float v) => MusicSlider = v;
+    public static void SetGameplayVolume(UnityEngine.Audio.AudioMixer m, float v) => GameplaySlider = v;
+    public static void SetUiSelectionSoundsVolume(UnityEngine.Audio.AudioMixer m, float v) => UiSlider = v;
 
     public static float GetMasterSliderValue(UnityEngine.Audio.AudioMixer m) => MasterSlider;
     public static float GetMusicSliderValue(UnityEngine.Audio.AudioMixer m) => MusicSlider;
