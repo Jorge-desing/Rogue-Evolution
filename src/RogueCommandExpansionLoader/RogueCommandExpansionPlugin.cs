@@ -4,6 +4,7 @@ using RogueCommandExpansionLoader.Compatibility;
 using RogueCommandExpansionLoader.Content;
 using RogueCommandExpansionLoader.Modules;
 using RogueCommandExpansionLoader.Runtime;
+using UnityEngine;
 using UnityEngine.SceneManagement;
 
 namespace RogueCommandExpansionLoader
@@ -123,6 +124,14 @@ namespace RogueCommandExpansionLoader
         {
             Logger.LogInfo("[ExpansionLoader] Scene loaded: '" + scene.name + "' (buildIndex=" +
                 scene.buildIndex + ", mode=" + mode + ").");
+
+            // Recreate the live diagnostics bridge in the new scene so the MCP bridge
+            // can discover it (it lives in a normal scene, not DontDestroyOnLoad).
+            if (_contentLoader != null)
+            {
+                _diagnostics = null;
+                EnsureDiagnosticsComponent(_contentLoader);
+            }
         }
 
         private void OnActiveSceneChanged(Scene previous, Scene next)
@@ -198,13 +207,20 @@ namespace RogueCommandExpansionLoader
             {
                 if (_diagnostics == null)
                 {
-                    _diagnostics = gameObject.AddComponent<LoaderDiagnosticsComponent>();
+                    var host = new GameObject("LoaderDiagnostics");
+                    _diagnostics = host.AddComponent<LoaderDiagnosticsComponent>();
                 }
 
                 _diagnostics.Initialize(provider, _overlay, _rangeDisplay);
             }
             catch (Exception exception)
             {
+                if (_diagnostics != null)
+                {
+                    UnityEngine.Object.Destroy(_diagnostics.gameObject);
+                    _diagnostics = null;
+                }
+
                 Logger.LogWarning("[ExpansionLoader] No se pudo adjuntar el componente de diagnóstico: " +
                     exception.GetType().Name + ": " + exception.Message);
             }
