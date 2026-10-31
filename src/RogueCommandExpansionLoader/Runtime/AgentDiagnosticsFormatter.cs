@@ -747,7 +747,20 @@ namespace RogueCommandExpansionLoader.Runtime
             int threatProcessedAiUnitCount = 0,
             int threatProcessedAlliedUnitCount = 0,
             int threatLastRetargetedCount = 0,
-            int threatTotalRetargetCommandCount = 0)
+            int threatTotalRetargetCommandCount = 0,
+            int battlefieldEntityCount = 0,
+            int livePlayerUnitCount = 0,
+            int liveAiUnitCount = 0,
+            int liveAiBuildingCount = 0,
+            int liveHarvesterCount = 0,
+            int totalFactoryCount = 0,
+            int activeProducingFactoryCount = 0,
+            int queuedUnitCount = 0,
+            bool hasPlayerHq = false,
+            float playerHqHealthRatio = 0f,
+            float aiStructureHealthRatio = 0f,
+            int aiRosterUnitCount = 0,
+            int aiRosterBuildingCount = 0)
         {
             var view = new Dictionary<string, object>
             {
@@ -768,6 +781,19 @@ namespace RogueCommandExpansionLoader.Runtime
                 ["threatProcessedAlliedUnitCount"] = threatProcessedAlliedUnitCount < 0 ? 0 : threatProcessedAlliedUnitCount,
                 ["threatLastRetargetedCount"] = threatLastRetargetedCount < 0 ? 0 : threatLastRetargetedCount,
                 ["threatTotalRetargetCommandCount"] = threatTotalRetargetCommandCount < 0 ? 0 : threatTotalRetargetCommandCount,
+                ["battlefieldEntityCount"] = battlefieldEntityCount < 0 ? 0 : battlefieldEntityCount,
+                ["livePlayerUnitCount"] = livePlayerUnitCount < 0 ? 0 : livePlayerUnitCount,
+                ["liveAiUnitCount"] = liveAiUnitCount < 0 ? 0 : liveAiUnitCount,
+                ["liveAiBuildingCount"] = liveAiBuildingCount < 0 ? 0 : liveAiBuildingCount,
+                ["liveHarvesterCount"] = liveHarvesterCount < 0 ? 0 : liveHarvesterCount,
+                ["totalFactoryCount"] = totalFactoryCount < 0 ? 0 : totalFactoryCount,
+                ["activeProducingFactoryCount"] = activeProducingFactoryCount < 0 ? 0 : activeProducingFactoryCount,
+                ["queuedUnitCount"] = queuedUnitCount < 0 ? 0 : queuedUnitCount,
+                ["hasPlayerHq"] = hasPlayerHq,
+                ["playerHqHealthRatio"] = playerHqHealthRatio < 0f ? 0f : (playerHqHealthRatio > 1f ? 1f : playerHqHealthRatio),
+                ["aiStructureHealthRatio"] = aiStructureHealthRatio < 0f ? 0f : (aiStructureHealthRatio > 1f ? 1f : aiStructureHealthRatio),
+                ["aiRosterUnitCount"] = aiRosterUnitCount < 0 ? 0 : aiRosterUnitCount,
+                ["aiRosterBuildingCount"] = aiRosterBuildingCount < 0 ? 0 : aiRosterBuildingCount,
                 ["recentLogCount"] = snapshot != null && snapshot.RecentLogs != null ? snapshot.RecentLogs.Count : 0,
             };
             return Serialize(view);

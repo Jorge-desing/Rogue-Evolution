@@ -513,7 +513,20 @@ namespace RogueCommandExpansionLoader.Runtime
                 ThreatPrioritizationAiModule.ThreatPrioritizationRuntimeBehaviour.AggregateLastProcessedAiUnitCount,
                 ThreatPrioritizationAiModule.ThreatPrioritizationRuntimeBehaviour.AggregateLastProcessedAlliedUnitCount,
                 ThreatPrioritizationAiModule.ThreatPrioritizationRuntimeBehaviour.AggregateLastRetargetedCount,
-                ThreatPrioritizationAiModule.ThreatPrioritizationRuntimeBehaviour.AggregateTotalRetargetCommandCount);
+                ThreatPrioritizationAiModule.ThreatPrioritizationRuntimeBehaviour.AggregateTotalRetargetCommandCount,
+                RuntimeBattlefieldCensus.Current().BattlefieldEntityCount,
+                RuntimeBattlefieldCensus.Current().PlayerUnitCount,
+                RuntimeBattlefieldCensus.Current().AiUnitCount,
+                RuntimeBattlefieldCensus.Current().AiBuildingCount,
+                RuntimeBattlefieldCensus.Current().HarvesterCount,
+                RuntimeProductionCensus.Current().TotalFactoryCount,
+                RuntimeProductionCensus.Current().ActiveProducingCount,
+                RuntimeProductionCensus.Current().TotalQueuedUnitsCount,
+                RuntimeBaseIntegrityCensus.Current().HasPlayerHq,
+                RuntimeBaseIntegrityCensus.Current().PlayerHqHealthRatio,
+                RuntimeBaseIntegrityCensus.Current().AverageAiStructureHealthRatio,
+                RuntimeAiRosterCensus.Current().AiUnitCount,
+                RuntimeAiRosterCensus.Current().AiBuildingCount);
         }
 
         private LoaderDiagnosticsSnapshot SafeSnapshot()
