@@ -236,6 +236,77 @@ namespace RogueCommandExpansionLoader.Runtime
             return Serialize(view);
         }
 
+        public static string SerializeRegisteredProfiles(IReadOnlyList<string> profileIds)
+        {
+            var ids = new List<string>();
+            if (profileIds != null)
+            {
+                for (int i = 0; i < profileIds.Count; i++)
+                {
+                    string id = profileIds[i];
+                    if (!string.IsNullOrEmpty(id))
+                    {
+                        ids.Add(id);
+                    }
+                }
+            }
+
+            var view = new Dictionary<string, object>
+            {
+                ["registeredProfileCount"] = ids.Count,
+                ["registeredProfileIds"] = ids,
+            };
+            return Serialize(view);
+        }
+
+        public static string SerializeAppliedBaselineEffects(int entryCount, IReadOnlyList<string> effectNames)
+        {
+            var names = new List<string>();
+            if (effectNames != null)
+            {
+                for (int i = 0; i < effectNames.Count; i++)
+                {
+                    string name = effectNames[i];
+                    if (!string.IsNullOrEmpty(name))
+                    {
+                        names.Add(name);
+                    }
+                }
+            }
+
+            var view = new Dictionary<string, object>
+            {
+                ["appliedBaselineEffectEntryCount"] = entryCount,
+                ["appliedBaselineEffectNames"] = names,
+            };
+            return Serialize(view);
+        }
+
+        public static string SerializeCombatXpEntries(
+            IReadOnlyList<RuntimeUnitMechanicsDirector.CombatXpEntry> entries)
+        {
+            var rows = new List<Dictionary<string, object>>();
+            if (entries != null)
+            {
+                for (int i = 0; i < entries.Count; i++)
+                {
+                    RuntimeUnitMechanicsDirector.CombatXpEntry entry = entries[i];
+                    rows.Add(new Dictionary<string, object>
+                    {
+                        ["entityKeyId"] = entry.EntityKeyId,
+                        ["experience"] = entry.Experience,
+                    });
+                }
+            }
+
+            var view = new Dictionary<string, object>
+            {
+                ["combatXpEntryCount"] = rows.Count,
+                ["combatXpEntries"] = rows,
+            };
+            return Serialize(view);
+        }
+
         private static List<Dictionary<string, object>> BuildPackRows(IReadOnlyList<PackDiagnosticReport> packs)
         {
             var rows = new List<Dictionary<string, object>>();
@@ -484,6 +555,7 @@ namespace RogueCommandExpansionLoader.Runtime
         {
             return new Dictionary<string, object>
             {
+                ["kind"] = "rangeColors",
                 ["description"] = "Per-kind range guide colors (world-space circles).",
                 ["weapon"] = ToHex(RangeDisplayPolicy.RangeColor(RangeDisplayKind.Weapon)),
                 ["skill"] = ToHex(RangeDisplayPolicy.RangeColor(RangeDisplayKind.Skill)),
@@ -503,6 +575,7 @@ namespace RogueCommandExpansionLoader.Runtime
 
             return new Dictionary<string, object>
             {
+                ["kind"] = "identifierPalette",
                 ["description"] = "Deterministic FNV-1a accent palette, indexed by identifier hash.",
                 ["paletteSize"] = IdentifierColorPolicy.PaletteSize,
                 ["colors"] = colors,

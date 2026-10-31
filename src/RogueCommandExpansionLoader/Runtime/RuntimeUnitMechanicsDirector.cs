@@ -155,6 +155,92 @@ namespace RogueCommandExpansionLoader.Runtime
             }
         }
 
+        public readonly struct CombatXpEntry
+        {
+            public CombatXpEntry(int entityKeyId, int experience)
+            {
+                EntityKeyId = entityKeyId;
+                Experience = experience;
+            }
+
+            public int EntityKeyId { get; }
+            public int Experience { get; }
+        }
+
+        public static IReadOnlyList<string> RegisteredProfileIds
+        {
+            get
+            {
+                lock (_profiles)
+                {
+                    var ids = new List<string>(_profiles.Keys);
+                    ids.Sort(StringComparer.Ordinal);
+                    return ids;
+                }
+            }
+        }
+
+        public static int AppliedBaselineEffectsCount
+        {
+            get
+            {
+                lock (_appliedBaselineEffects)
+                {
+                    return _appliedBaselineEffects.Count;
+                }
+            }
+        }
+
+        public static IReadOnlyList<string> AppliedBaselineEffectNames
+        {
+            get
+            {
+                var names = new SortedSet<string>(StringComparer.Ordinal);
+                lock (_appliedBaselineEffects)
+                {
+                    foreach (List<string> list in _appliedBaselineEffects.Values)
+                    {
+                        if (list == null)
+                        {
+                            continue;
+                        }
+
+                        for (int i = 0; i < list.Count; i++)
+                        {
+                            string name = list[i];
+                            if (!string.IsNullOrWhiteSpace(name))
+                            {
+                                names.Add(name);
+                            }
+                        }
+                    }
+                }
+
+                return new List<string>(names);
+            }
+        }
+
+        public static IReadOnlyList<CombatXpEntry> CombatXpEntries
+        {
+            get
+            {
+                lock (_entityCombatXp)
+                {
+                    var entries = new List<CombatXpEntry>(_entityCombatXp.Count);
+                    foreach (KeyValuePair<int, int> pair in _entityCombatXp)
+                    {
+                        entries.Add(new CombatXpEntry(pair.Key, pair.Value));
+                    }
+
+                    entries.Sort(delegate(CombatXpEntry a, CombatXpEntry b)
+                    {
+                        return b.Experience.CompareTo(a.Experience);
+                    });
+                    return entries;
+                }
+            }
+        }
+
         public static void RegisterProfile(string entityId, UnitRuntimeMechanicsProfile profile)
         {
             if (string.IsNullOrWhiteSpace(entityId) || profile == null || !profile.HasAnyMechanics)

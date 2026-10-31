@@ -281,6 +281,25 @@ namespace RogueCommandExpansionLoader.Runtime
                 RuntimePatchInstaller.InstalledPatchNames);
         }
 
+        public string GetRegisteredProfilesJson()
+        {
+            return AgentDiagnosticsFormatter.SerializeRegisteredProfiles(
+                RuntimeUnitMechanicsDirector.RegisteredProfileIds);
+        }
+
+        public string GetAppliedBaselineEffectsJson()
+        {
+            return AgentDiagnosticsFormatter.SerializeAppliedBaselineEffects(
+                RuntimeUnitMechanicsDirector.AppliedBaselineEffectsCount,
+                RuntimeUnitMechanicsDirector.AppliedBaselineEffectNames);
+        }
+
+        public string GetCombatXpEntriesJson()
+        {
+            return AgentDiagnosticsFormatter.SerializeCombatXpEntries(
+                RuntimeUnitMechanicsDirector.CombatXpEntries);
+        }
+
         private LoaderDiagnosticsSnapshot SafeSnapshot()
         {
             if (_provider == null)

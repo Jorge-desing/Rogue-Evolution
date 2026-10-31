@@ -141,6 +141,57 @@ internal static partial class ValidationTestRunner
             throw new InvalidOperationException("SerializeInstalledPatchNames must emit an empty list and count 0 for null input.");
         }
     }),
+    ("registered profiles serializes ids with their count", () =>
+    {
+        string json = AgentDiagnosticsFormatter.SerializeRegisteredProfiles(new[] { "zebra", "alpha" });
+        if (!json.Contains("\"registeredProfileCount\":2") ||
+            !json.Contains("\"registeredProfileIds\":[\"zebra\",\"alpha\"]"))
+        {
+            throw new InvalidOperationException("SerializeRegisteredProfiles must preserve id order and report the count.");
+        }
+
+        string dropped = AgentDiagnosticsFormatter.SerializeRegisteredProfiles(new[] { "", null, "solo" });
+        if (!dropped.Contains("\"registeredProfileCount\":1") || !dropped.Contains("\"registeredProfileIds\":[\"solo\"]"))
+        {
+            throw new InvalidOperationException("SerializeRegisteredProfiles must drop null/empty ids and report the surviving count.");
+        }
+    }),
+    ("applied baseline effects serializes the entry count and names", () =>
+    {
+        string json = AgentDiagnosticsFormatter.SerializeAppliedBaselineEffects(3, new[] { "Burning", "Chilled", "Burning" });
+        if (!json.Contains("\"appliedBaselineEffectEntryCount\":3") ||
+            !json.Contains("\"appliedBaselineEffectNames\":[\"Burning\",\"Chilled\",\"Burning\"]"))
+        {
+            throw new InvalidOperationException("SerializeAppliedBaselineEffects must preserve names and report the entry count.");
+        }
+
+        string none = AgentDiagnosticsFormatter.SerializeAppliedBaselineEffects(0, null);
+        if (!none.Contains("\"appliedBaselineEffectEntryCount\":0") || !none.Contains("\"appliedBaselineEffectNames\":[]"))
+        {
+            throw new InvalidOperationException("SerializeAppliedBaselineEffects must emit an empty name list for a null input.");
+        }
+    }),
+    ("combat xp entries serializes entity keys and experience", () =>
+    {
+        var entries = new[]
+        {
+            new RuntimeUnitMechanicsDirector.CombatXpEntry(201, 12),
+            new RuntimeUnitMechanicsDirector.CombatXpEntry(105, 4),
+        };
+        string json = AgentDiagnosticsFormatter.SerializeCombatXpEntries(entries);
+        if (!json.Contains("\"combatXpEntryCount\":2") ||
+            !json.Contains("\"entityKeyId\":201") || !json.Contains("\"experience\":12") ||
+            !json.Contains("\"entityKeyId\":105") || !json.Contains("\"experience\":4"))
+        {
+            throw new InvalidOperationException("SerializeCombatXpEntries must report each entity key id and its experience.");
+        }
+
+        string empty = AgentDiagnosticsFormatter.SerializeCombatXpEntries(null);
+        if (!empty.Contains("\"combatXpEntryCount\":0") || !empty.Contains("\"combatXpEntries\":[]"))
+        {
+            throw new InvalidOperationException("SerializeCombatXpEntries must emit an empty list and count 0 for null input.");
+        }
+    }),
     ("identifier color policy hashes with FNV-1a and maps to a stable palette slot", () =>
     {
         if (IdentifierColorPolicy.Hash(string.Empty) != 0x811C9DC5u)
