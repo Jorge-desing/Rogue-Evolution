@@ -438,6 +438,34 @@ namespace RogueCommandExpansionLoader.Runtime
         }
 
         /// <summary>
+        /// Builds a mod-authored card-change request from primitive parameters and
+        /// returns it as JSON, so an agent can preview the request without a visual capture.
+        /// </summary>
+        public string GetCardChangeRequestJsonFromParams(
+            string valueToChange,
+            string operation = "Add",
+            float value = 0f,
+            string side = "Friendly",
+            bool multiplyValueWithCurrentHeatLevel = false,
+            bool multiplyValueWithMetaProgressionMultiplier = false,
+            bool changeableValueHasToBeGreaterZero = false,
+            string sourceId = "rcl-card-change")
+        {
+            var request = CardChangeRequest.Create(
+                valueToChange,
+                operation,
+                value,
+                multiplyValueWithCurrentHeatLevel,
+                multiplyValueWithMetaProgressionMultiplier,
+                side,
+                changeableValueHasToBeGreaterZero,
+                null,
+                null,
+                sourceId);
+            return AgentDiagnosticsFormatter.SerializeCardChangeRequest(request);
+        }
+
+        /// <summary>
         /// Returns the snapshot of registered compiled AI modules as JSON.
         /// Readable by an agent without a visual capture.
         /// </summary>
