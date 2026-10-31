@@ -377,6 +377,16 @@ namespace RogueCommandExpansionLoader.Runtime
                 RuntimeEntityBalanceLookup.Current(entityId));
         }
 
+        /// <summary>
+        /// Serializes one mod-authored card-change request (the data-driven input to
+        /// the game's native EntityBalancingStore.AddInGameCardChange pipeline) into
+        /// JSON an agent can read without a visual capture.
+        /// </summary>
+        public string GetCardChangeRequestJson(CardChangeRequest request)
+        {
+            return AgentDiagnosticsFormatter.SerializeCardChangeRequest(request);
+        }
+
         private LoaderDiagnosticsSnapshot SafeSnapshot()
         {
             if (_provider == null)

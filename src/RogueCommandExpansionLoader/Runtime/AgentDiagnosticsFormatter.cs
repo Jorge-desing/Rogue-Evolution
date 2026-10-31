@@ -516,6 +516,30 @@ namespace RogueCommandExpansionLoader.Runtime
             return Serialize(view);
         }
 
+        /// <summary>
+        /// Serializes one mod-authored card-change request (the data-driven input to
+        /// <see cref="RuntimeCardChangeApplier"/>) into a flat, agent-readable JSON
+        /// object. Preserves field order so tail truncation never hides the core
+        /// survivability delta behind cosmetic filters.
+        /// </summary>
+        public static string SerializeCardChangeRequest(CardChangeRequest request)
+        {
+            var view = new Dictionary<string, object>
+            {
+                ["valueToChange"] = request.ValueToChange ?? string.Empty,
+                ["operation"] = request.Operation ?? string.Empty,
+                ["value"] = request.Value,
+                ["multiplyValueWithCurrentHeatLevel"] = request.MultiplyValueWithCurrentHeatLevel,
+                ["multiplyValueWithMetaProgressionMultiplier"] = request.MultiplyValueWithMetaProgressionMultiplier,
+                ["side"] = request.Side ?? string.Empty,
+                ["changeableValueHasToBeGreaterZero"] = request.ChangeableValueHasToBeGreaterZero,
+                ["onlyForTheseEntityIdsCount"] = request.OnlyForTheseEntityIds == null ? 0 : request.OnlyForTheseEntityIds.Length,
+                ["entityIdsNotAllowedCount"] = request.EntityIdsNotAllowed == null ? 0 : request.EntityIdsNotAllowed.Length,
+                ["sourceId"] = request.SourceId ?? string.Empty,
+            };
+            return Serialize(view);
+        }
+
         private static List<Dictionary<string, object>> BuildPackRows(IReadOnlyList<PackDiagnosticReport> packs)
         {
             var rows = new List<Dictionary<string, object>>();

@@ -247,6 +247,32 @@ internal static partial class ValidationTestRunner
             throw new InvalidOperationException("SerializeEntityBalanceLookup must emit neutral defaults for an empty row.");
         }
     }),
+    ("card change request serializer emits request fields", () =>
+    {
+        var request = CardChangeRequest.Create(
+            "MaxHealth", "Add", 25f, true, false, "Friendly", false,
+            new[] { "unit:alpha" }, new[] { "unit:beta" }, "rcl-test");
+        string json = AgentDiagnosticsFormatter.SerializeCardChangeRequest(request);
+        if (!json.Contains("\"valueToChange\":\"MaxHealth\"") ||
+            !json.Contains("\"operation\":\"Add\"") ||
+            !json.Contains("\"value\":25") ||
+            !json.Contains("\"multiplyValueWithCurrentHeatLevel\":true") ||
+            !json.Contains("\"multiplyValueWithMetaProgressionMultiplier\":false") ||
+            !json.Contains("\"side\":\"Friendly\"") ||
+            !json.Contains("\"changeableValueHasToBeGreaterZero\":false") ||
+            !json.Contains("\"onlyForTheseEntityIdsCount\":1") ||
+            !json.Contains("\"entityIdsNotAllowedCount\":1") ||
+            !json.Contains("\"sourceId\":\"rcl-test\""))
+        {
+            throw new InvalidOperationException("SerializeCardChangeRequest must report the request fields in field order.");
+        }
+
+        string empty = AgentDiagnosticsFormatter.SerializeCardChangeRequest(default(CardChangeRequest));
+        if (!empty.Contains("\"valueToChange\":\"\"") || !empty.Contains("\"value\":0") || !empty.Contains("\"sourceId\":\"\""))
+        {
+            throw new InvalidOperationException("SerializeCardChangeRequest must emit neutral defaults for an empty request.");
+        }
+    }),
     ("runtime entity balance lookup reads base params from EntityBalancingStore", () =>
     {
         EntityBalancingStore.Reset();
