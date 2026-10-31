@@ -1917,6 +1917,10 @@
               "value": "4"
             }
           ]
+        },
+        {
+          "moduleId": "sample:threat-prioritization",
+          "parameters": []
         }
       ],
       "productionBuildingEntries": [
@@ -1984,6 +1988,10 @@
               "value": "5"
             }
           ]
+        },
+        {
+          "moduleId": "sample:threat-prioritization",
+          "parameters": []
         }
       ],
       "productionBuildingEntries": [
@@ -2108,6 +2116,10 @@
               "value": "25"
             }
           ]
+        },
+        {
+          "moduleId": "sample:threat-prioritization",
+          "parameters": []
         }
       ],
       "productionBuildingEntries": [

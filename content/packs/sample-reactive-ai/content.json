@@ -66,6 +66,10 @@
             { "name": "defenseRadiusCells", "value": "12" },
             { "name": "maxResponders", "value": "2" }
           ]
+        },
+        {
+          "moduleId": "sample:threat-prioritization",
+          "parameters": []
         }
       ]
     }

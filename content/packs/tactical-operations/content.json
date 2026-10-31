@@ -1380,6 +1380,10 @@
                             "value": "30.0"
                         }
                     ]
+                },
+                {
+                    "moduleId": "sample:threat-prioritization",
+                    "parameters": []
                 }
             ]
         }
