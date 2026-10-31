@@ -569,6 +569,51 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             res = _call_diagnostics_method("GetDiagnosticCatalogJson")
             return _tool_response(res)
 
+        elif name == "diagnostics_get_diagnostics":
+            res = _call_diagnostics_method("GetDiagnosticsJson")
+            return _tool_response(res)
+
+        elif name == "diagnostics_get_utilities":
+            res = _call_diagnostics_method("GetUtilitiesJson")
+            return _tool_response(res)
+
+        elif name == "diagnostics_get_range_colors":
+            res = _call_diagnostics_method("GetRangeColorsJson")
+            return _tool_response(res)
+
+        elif name == "diagnostics_get_identifier_palette":
+            res = _call_diagnostics_method("GetIdentifierPaletteJson")
+            return _tool_response(res)
+
+        elif name == "diagnostics_get_range_circle_point_count":
+            segments = int(arguments.get("segments", 8))
+            res = _call_diagnostics_method("GetRangeCirclePointCountJson", [segments])
+            return _tool_response(res)
+
+        elif name == "diagnostics_get_inspector_toggle_state":
+            is_open = bool(arguments.get("isOpen", False))
+            toggle_pressed = bool(arguments.get("togglePressed", False))
+            close_pressed = bool(arguments.get("closePressed", False))
+            res = _call_diagnostics_method("GetInspectorToggleStateJson", [is_open, toggle_pressed, close_pressed])
+            return _tool_response(res)
+
+        elif name == "diagnostics_resolve_identifier_color":
+            identifier = str(arguments.get("identifier", ""))
+            res = _call_diagnostics_method("ResolveIdentifierColor", [identifier])
+            return _tool_response(res)
+
+        elif name == "diagnostics_get_unit_mechanics_summary":
+            entity_id = str(arguments.get("entityId", ""))
+            res = _call_diagnostics_method("GetUnitMechanicsSummary", [entity_id])
+            return _tool_response(res)
+
+        elif name == "diagnostics_resolve_inspector_open_state":
+            is_open = bool(arguments.get("isOpen", False))
+            toggle_pressed = bool(arguments.get("togglePressed", False))
+            close_pressed = bool(arguments.get("closePressed", False))
+            res = _call_diagnostics_method("ResolveInspectorOpenState", [is_open, toggle_pressed, close_pressed])
+            return _tool_response(res)
+
         elif name == "diagnostics_call_getter":
             getter = arguments.get("getterName", "").strip()
             args_list = arguments.get("args") or []

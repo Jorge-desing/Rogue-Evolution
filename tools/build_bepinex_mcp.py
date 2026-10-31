@@ -980,8 +980,91 @@ TOOL_SPECS = [
             "additionalProperties": False,
         },
     },
+    {
+        "name": "diagnostics_get_diagnostics",
+        "description": "Queries the full loader diagnostics snapshot JSON from LoaderDiagnosticsComponent.",
+        "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
+    },
+    {
+        "name": "diagnostics_get_utilities",
+        "description": "Queries clean-room and visual utility state JSON from LoaderDiagnosticsComponent.",
+        "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
+    },
+    {
+        "name": "diagnostics_get_range_colors",
+        "description": "Queries per-kind range guide colors JSON from LoaderDiagnosticsComponent.",
+        "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
+    },
+    {
+        "name": "diagnostics_get_identifier_palette",
+        "description": "Queries the deterministic identifier accent palette JSON from LoaderDiagnosticsComponent.",
+        "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
+    },
+    {
+        "name": "diagnostics_get_range_circle_point_count",
+        "description": "Queries range circle point count JSON for the given segment count from LoaderDiagnosticsComponent.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "segments": {"type": "integer", "description": "Segment count (8..256)."},
+            },
+            "required": ["segments"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "diagnostics_get_inspector_toggle_state",
+        "description": "Queries inspector toggle resolution JSON from LoaderDiagnosticsComponent.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "isOpen": {"type": "boolean", "description": "Current open state."},
+                "togglePressed": {"type": "boolean", "description": "Toggle pressed this frame."},
+                "closePressed": {"type": "boolean", "description": "Close pressed this frame."},
+            },
+            "required": ["isOpen", "togglePressed", "closePressed"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "diagnostics_resolve_identifier_color",
+        "description": "Resolves the stable accent color JSON for an identifier from LoaderDiagnosticsComponent.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "identifier": {"type": "string", "description": "Identifier to resolve."},
+            },
+            "required": ["identifier"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "diagnostics_get_unit_mechanics_summary",
+        "description": "Queries a compact runtime mechanics summary for a unit from LoaderDiagnosticsComponent.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "entityId": {"type": "string", "description": "Unit entity ID."},
+            },
+            "required": ["entityId"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "diagnostics_resolve_inspector_open_state",
+        "description": "Resolves the inspector open state (boolean) from toggle/close input via LoaderDiagnosticsComponent.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "isOpen": {"type": "boolean", "description": "Current open state."},
+                "togglePressed": {"type": "boolean", "description": "Toggle pressed this frame."},
+                "closePressed": {"type": "boolean", "description": "Close pressed this frame."},
+            },
+            "required": ["isOpen", "togglePressed", "closePressed"],
+            "additionalProperties": False,
+        },
+    },
 ]
-
 
 def generate_mcp_schema_files():
     MCP_DIR.mkdir(parents=True, exist_ok=True)
