@@ -115,7 +115,7 @@ namespace RogueCommandExpansionLoader.Runtime
                     {
                         foreach (EntityController entity in playerUnits)
                         {
-                            if (entity != null && (entity.IsFactory || entity.IsBuilding))
+                            if (entity != null && (entity.InProductionCount != null || entity.IsBuilding))
                             {
                                 candidateEntities.Add(entity);
                             }
@@ -161,7 +161,7 @@ namespace RogueCommandExpansionLoader.Runtime
                         continue;
                     }
 
-                    bool isFactory = entity.IsFactory || (entity.InProductionCount != null);
+                    bool isFactory = entity.InProductionCount != null;
                     if (!isFactory)
                     {
                         continue;
