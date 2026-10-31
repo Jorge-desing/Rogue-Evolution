@@ -466,7 +466,12 @@ namespace RogueCommandExpansionLoader.Runtime
                 SafeSnapshot(),
                 RuntimeAiModulesCensus.Current(),
                 RuntimeEconomyCensus.Current(),
-                RuntimeCombatStatusCensus.Current());
+                RuntimeCombatStatusCensus.Current(),
+                ThreatPrioritizationAiModule.ThreatPrioritizationRuntimeBehaviour.ActiveBehaviourCount,
+                ThreatPrioritizationAiModule.ThreatPrioritizationRuntimeBehaviour.AggregateLastProcessedAiUnitCount,
+                ThreatPrioritizationAiModule.ThreatPrioritizationRuntimeBehaviour.AggregateLastProcessedAlliedUnitCount,
+                ThreatPrioritizationAiModule.ThreatPrioritizationRuntimeBehaviour.AggregateLastRetargetedCount,
+                ThreatPrioritizationAiModule.ThreatPrioritizationRuntimeBehaviour.AggregateTotalRetargetCommandCount);
         }
 
         private LoaderDiagnosticsSnapshot SafeSnapshot()

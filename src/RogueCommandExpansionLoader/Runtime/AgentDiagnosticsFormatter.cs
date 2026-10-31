@@ -651,7 +651,12 @@ namespace RogueCommandExpansionLoader.Runtime
             LoaderDiagnosticsSnapshot snapshot,
             AiModulesCensus aiCensus,
             EconomyCensus economyCensus,
-            CombatStatusCensus combatCensus)
+            CombatStatusCensus combatCensus,
+            int threatActiveBehaviourCount = 0,
+            int threatProcessedAiUnitCount = 0,
+            int threatProcessedAlliedUnitCount = 0,
+            int threatLastRetargetedCount = 0,
+            int threatTotalRetargetCommandCount = 0)
         {
             var view = new Dictionary<string, object>
             {
@@ -667,6 +672,11 @@ namespace RogueCommandExpansionLoader.Runtime
                 ["omittedCombatUnitCount"] = combatCensus != null ? combatCensus.OmittedUnitCount : 0,
                 ["totalCombatActiveUnitCount"] = combatCensus != null ? combatCensus.TotalCombatActiveUnitCount : 0,
                 ["unitsWithActiveStatusEffectsCount"] = combatCensus != null ? combatCensus.UnitsWithActiveStatusEffectsCount : 0,
+                ["threatActiveBehaviourCount"] = threatActiveBehaviourCount < 0 ? 0 : threatActiveBehaviourCount,
+                ["threatProcessedAiUnitCount"] = threatProcessedAiUnitCount < 0 ? 0 : threatProcessedAiUnitCount,
+                ["threatProcessedAlliedUnitCount"] = threatProcessedAlliedUnitCount < 0 ? 0 : threatProcessedAlliedUnitCount,
+                ["threatLastRetargetedCount"] = threatLastRetargetedCount < 0 ? 0 : threatLastRetargetedCount,
+                ["threatTotalRetargetCommandCount"] = threatTotalRetargetCommandCount < 0 ? 0 : threatTotalRetargetCommandCount,
                 ["recentLogCount"] = snapshot != null && snapshot.RecentLogs != null ? snapshot.RecentLogs.Count : 0,
             };
             return Serialize(view);
