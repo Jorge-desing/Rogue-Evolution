@@ -300,6 +300,31 @@ namespace RogueCommandExpansionLoader.Runtime
                 RuntimeUnitMechanicsDirector.CombatXpEntries);
         }
 
+        /// <summary>
+        /// Number of live entities on the battlefield (player units + AI units +
+        /// AI buildings), read through the verified ExistingControllers registry.
+        /// </summary>
+        public int LiveBattlefieldEntityCount => RuntimeBattlefieldCensus.Current().BattlefieldEntityCount;
+
+        public int LivePlayerUnitCount => RuntimeBattlefieldCensus.Current().PlayerUnitCount;
+
+        public int LiveAiUnitCount => RuntimeBattlefieldCensus.Current().AiUnitCount;
+
+        public int LiveAiBuildingCount => RuntimeBattlefieldCensus.Current().AiBuildingCount;
+
+        public int LiveHarvesterCount => RuntimeBattlefieldCensus.Current().HarvesterCount;
+
+        /// <summary>
+        /// Returns the live battlefield census (counts plus per-player-unit
+        /// health/armor/shield/rank state) as JSON. Readable by an agent without
+        /// a visual capture.
+        /// </summary>
+        public string GetBattlefieldCensusJson()
+        {
+            return AgentDiagnosticsFormatter.SerializeBattlefieldCensus(
+                RuntimeBattlefieldCensus.Current());
+        }
+
         private LoaderDiagnosticsSnapshot SafeSnapshot()
         {
             if (_provider == null)

@@ -192,6 +192,94 @@ internal static partial class ValidationTestRunner
             throw new InvalidOperationException("SerializeCombatXpEntries must emit an empty list and count 0 for null input.");
         }
     }),
+    ("battlefield census serializer emits counts and rows", () =>
+    {
+        var rows = new[]
+        {
+            new BattlefieldUnitRow("unit:alpha", false, 60f, 100f, 20f, 30f, 2, false, true, true),
+            new BattlefieldUnitRow("unit:beta", true, 0f, 50f, 0f, 0f, 0, true, false, false),
+        };
+        var census = new BattlefieldCensus(5, 2, 1, 1, 1, rows);
+        string json = AgentDiagnosticsFormatter.SerializeBattlefieldCensus(census);
+        if (!json.Contains("\"battlefieldEntityCount\":5") ||
+            !json.Contains("\"playerUnitCount\":2") ||
+            !json.Contains("\"aiUnitCount\":1") ||
+            !json.Contains("\"aiBuildingCount\":1") ||
+            !json.Contains("\"harvesterCount\":1") ||
+            !json.Contains("\"playerUnitRowCount\":2") ||
+            !json.Contains("\"entityKeyId\":\"unit:alpha\"") ||
+            !json.Contains("\"healthRatio\":0.6") ||
+            !json.Contains("\"isAlive\":false"))
+        {
+            throw new InvalidOperationException("SerializeBattlefieldCensus must report counts, rows, and per-unit health/armor/shield/rank state.");
+        }
+
+        string empty = AgentDiagnosticsFormatter.SerializeBattlefieldCensus(null);
+        if (!empty.Contains("\"battlefieldEntityCount\":0") || !empty.Contains("\"playerUnitRows\":[]"))
+        {
+            throw new InvalidOperationException("SerializeBattlefieldCensus must emit an empty census for null input.");
+        }
+    }),
+    ("runtime battlefield census collects from the existing controllers registry", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        try
+        {
+            ExistingControllers.Instance.PlayerUnits().Add(new EntityController
+            {
+                entityId = "unit:player-1",
+                CurrentHealth = 80f,
+                MaxHealth = 100f,
+                CurrentArmor = 10f,
+                CurrentShield = 5f,
+                CurrentRank = 1,
+                IsBuilding = false,
+                IsControlledByPlayer = true,
+                IsControlledByAi = false,
+            });
+            ExistingControllers.Instance.AiUnits().Add(new EntityController
+            {
+                entityId = "unit:ai-1",
+                CurrentHealth = 40f,
+                MaxHealth = 40f,
+                IsControlledByAi = true,
+            });
+            ExistingControllers.Instance.AiBuildings().Add(new EntityController
+            {
+                entityId = "building:ai-hq",
+                IsBuilding = true,
+                IsControlledByAi = true,
+            });
+            ExistingControllers.Instance.Harvesters.Add(new EntityController
+            {
+                entityId = "unit:harvester-1",
+                CurrentHealth = 30f,
+                MaxHealth = 30f,
+                IsControlledByPlayer = true,
+            });
+
+            BattlefieldCensus census = RuntimeBattlefieldCensus.Current();
+            if (census.BattlefieldEntityCount != 3 ||
+                census.PlayerUnitCount != 1 ||
+                census.AiUnitCount != 1 ||
+                census.AiBuildingCount != 1 ||
+                census.HarvesterCount != 1 ||
+                census.PlayerUnitRows.Count != 1 ||
+                census.PlayerUnitRows[0].EntityKeyId != "unit:player-1" ||
+                census.PlayerUnitRows[0].CurrentHealth != 80f ||
+                census.PlayerUnitRows[0].HealthRatio != 0.8f ||
+                census.PlayerUnitRows[0].CurrentArmor != 10f ||
+                census.PlayerUnitRows[0].CurrentShield != 5f ||
+                census.PlayerUnitRows[0].CurrentRank != 1)
+            {
+                throw new InvalidOperationException("RuntimeBattlefieldCensus must aggregate live player, AI, building, and harvester state from the registry.");
+            }
+        }
+        finally
+        {
+            ExistingControllers.Instance.Reset();
+        }
+    }),
     ("identifier color policy hashes with FNV-1a and maps to a stable palette slot", () =>
     {
         if (IdentifierColorPolicy.Hash(string.Empty) != 0x811C9DC5u)

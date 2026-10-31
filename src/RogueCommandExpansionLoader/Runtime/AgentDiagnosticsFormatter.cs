@@ -307,6 +307,43 @@ namespace RogueCommandExpansionLoader.Runtime
             return Serialize(view);
         }
 
+        public static string SerializeBattlefieldCensus(BattlefieldCensus census)
+        {
+            var rows = new List<Dictionary<string, object>>();
+            if (census != null && census.PlayerUnitRows != null)
+            {
+                foreach (BattlefieldUnitRow row in census.PlayerUnitRows)
+                {
+                    rows.Add(new Dictionary<string, object>
+                    {
+                        ["entityKeyId"] = row.EntityKeyId ?? string.Empty,
+                        ["isBuilding"] = row.IsBuilding,
+                        ["currentHealth"] = row.CurrentHealth,
+                        ["maxHealth"] = row.MaxHealth,
+                        ["healthRatio"] = row.HealthRatio,
+                        ["currentArmor"] = row.CurrentArmor,
+                        ["currentShield"] = row.CurrentShield,
+                        ["currentRank"] = row.CurrentRank,
+                        ["isControlledByAi"] = row.IsControlledByAi,
+                        ["isControlledByPlayer"] = row.IsControlledByPlayer,
+                        ["isAlive"] = row.IsAlive,
+                    });
+                }
+            }
+
+            var view = new Dictionary<string, object>
+            {
+                ["battlefieldEntityCount"] = census != null ? census.BattlefieldEntityCount : 0,
+                ["playerUnitCount"] = census != null ? census.PlayerUnitCount : 0,
+                ["aiUnitCount"] = census != null ? census.AiUnitCount : 0,
+                ["aiBuildingCount"] = census != null ? census.AiBuildingCount : 0,
+                ["harvesterCount"] = census != null ? census.HarvesterCount : 0,
+                ["playerUnitRowCount"] = rows.Count,
+                ["playerUnitRows"] = rows,
+            };
+            return Serialize(view);
+        }
+
         private static List<Dictionary<string, object>> BuildPackRows(IReadOnlyList<PackDiagnosticReport> packs)
         {
             var rows = new List<Dictionary<string, object>>();
