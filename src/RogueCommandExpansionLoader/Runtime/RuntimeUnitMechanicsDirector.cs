@@ -68,6 +68,9 @@ namespace RogueCommandExpansionLoader.Runtime
         private static readonly Dictionary<int, int> _entityCombatXp =
             new Dictionary<int, int>();
 
+        private static readonly HashSet<string> _appliedCardChangeBoostKeys =
+            new HashSet<string>(StringComparer.Ordinal);
+
         private static bool _reflectionResolved;
         private static PropertyInfo _entityIdProperty;
         private static FieldInfo _entityIdField;
@@ -715,6 +718,48 @@ namespace RogueCommandExpansionLoader.Runtime
                             ApplyTimedStatusEffect(originatorObj, statusName, boost.duration);
                             string boostOriginatorId = "boost:" + (string.IsNullOrWhiteSpace(boost.id) ? i.ToString() : boost.id);
                             ApplyTimedStatChange(originatorObj, boost.statName, boost.multiplier - 1f, boost.duration, boostOriginatorId);
+
+                            // Permanent card-change augmentation (native data-driven pipeline):
+                            // the first time a given combat boost triggers for a unit, also apply
+                            // it as a persistent card change so the unit keeps the edge after the
+                            // timed effect expires. Tracked per (unit, boost) to avoid stacking.
+                            try
+                            {
+                               int originatorUniqueId = ReadIntProperty(_uniqueEntityIdProperty, originatorObj, -1);
+                               if (originatorUniqueId > 0)
+                               {
+                                   string boostKey = originatorUniqueId.ToString() + "|" + (string.IsNullOrWhiteSpace(boost.id) ? i.ToString() : boost.id);
+                                   bool alreadyApplied;
+                                   lock (_appliedCardChangeBoostKeys)
+                                   {
+                                       alreadyApplied = _appliedCardChangeBoostKeys.Contains(boostKey);
+                                       if (!alreadyApplied)
+                                       {
+                                           _appliedCardChangeBoostKeys.Add(boostKey);
+                                       }
+                                   }
+                                   if (!alreadyApplied)
+                                   {
+                                       Assembly boostAssembly = originatorObj.GetType().Assembly;
+                                       CardChangeRequest cardRequest = CardChangeRequest.Create(
+                                           boost.statName,
+                                           "Add",
+                                           boost.multiplier - 1f,
+                                           true,
+                                           false,
+                                           "Friendly",
+                                           false,
+                                           null,
+                                           null,
+                                           boostOriginatorId);
+                                       RuntimeCardChangeApplier.ApplyCardChange(boostAssembly, originatorUniqueId, cardRequest);
+                                   }
+                               }
+                            }
+                            catch
+                            {
+                               // Guarded: card-change augmentation must never break the boost.
+                            }
                         }
                     }
 
