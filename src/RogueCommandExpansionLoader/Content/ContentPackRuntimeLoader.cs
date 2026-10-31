@@ -4759,6 +4759,25 @@ namespace RogueCommandExpansionLoader.Content
                         : unit.ProductionFactoryId;
                 });
         }
+
+        private void AddLoadedFactoryId(
+            string unitId,
+            List<LoadedUnit> currentPackUnits,
+            HashSet<string> result,
+            string stageId)
+        {
+            LoadedUnit unit;
+            if (!TryGetLoadedUnit(unitId, currentPackUnits, out unit) || unit.IsProductionBuilding)
+            {
+                throw new InvalidDataException("La etapa " + stageId +
+                    " referencia una unidad no cargada para su pool de blueprints: " + unitId);
+            }
+
+            result.Add(String.IsNullOrWhiteSpace(unit.ProductionFactoryId)
+                ? unit.Id
+                : unit.ProductionFactoryId);
+        }
+
         private bool TryGetLoadedUnit(string unitId, List<LoadedUnit> temporaryUnits, out LoadedUnit unit)
         {
             if (temporaryUnits != null)
@@ -4797,6 +4816,93 @@ namespace RogueCommandExpansionLoader.Content
 
             return result;
         }
+
+        private List<object> CloneStageBlueprintPools(
+            UnityEngine.Object stageParameters,
+            string packId,
+            ContentStageDefinition stage,
+            string packageName,
+            List<object> validatedPools,
+            HashSet<string> scopedUnitIds,
+            List<LoadedUnit> currentPackUnits,
+            HashSet<string> reservedPoolIds,
+            List<ScriptableObject> temporaryClones,
+            List<BlueprintPoolScopeRegistration> registrations)
+        {
+            ScriptableObject sourceList = _stageParametersBlueprintPoolListField.GetValue(stageParameters)
+                as ScriptableObject;
+            if (sourceList == null || sourceList.GetType() != _blueprintPoolListType)
+            {
+                throw new InvalidDataException("Etapa " + stage.id + " en '" + packageName +
+                    "' no tiene una BlueprintPoolList clonable.");
+            }
+
+            ScriptableObject clonedList = UnityEngine.Object.Instantiate(sourceList);
+            if (clonedList == null || clonedList.GetType() != _blueprintPoolListType)
+            {
+                throw new InvalidDataException("No se pudo clonar la lista de BlueprintPool de " + stage.id + ".");
+            }
+
+            temporaryClones.Add(clonedList);
+            clonedList.name = "RCL_BlueprintPoolList_" + stage.id.Replace(':', '_');
+            clonedList.hideFlags = HideFlags.HideAndDontSave;
+            IList clonedPools = _blueprintPoolsField.GetValue(clonedList) as IList;
+            if (clonedPools == null || clonedPools.Count != validatedPools.Count)
+            {
+                throw new InvalidDataException("La lista de BlueprintPool clonada para " + stage.id +
+                    " cambió de forma inesperada.");
+            }
+
+            var sourcePoolIds = new HashSet<string>(StringComparer.Ordinal);
+            for (int poolIndex = 0; poolIndex < validatedPools.Count; poolIndex++)
+            {
+                sourcePoolIds.Add(_blueprintPoolIdField.GetValue(validatedPools[poolIndex]) as string);
+            }
+            Dictionary<string, HashSet<string>> unitsByPool = GetStagePoolUnitIds(
+                stage, scopedUnitIds, currentPackUnits, sourcePoolIds);
+            var result = new List<object>(clonedPools.Count);
+            for (int i = 0; i < clonedPools.Count; i++)
+            {
+                UnityEngine.Object sourcePool = clonedPools[i] as UnityEngine.Object;
+                if (sourcePool == null || sourcePool.GetType() != _blueprintPoolType)
+                {
+                    throw new InvalidDataException("La lista clonada de la etapa " + stage.id +
+                        " contiene un BlueprintPool inválido.");
+                }
+
+                UnityEngine.Object clonedPool = UnityEngine.Object.Instantiate(sourcePool);
+                if (clonedPool == null || clonedPool.GetType() != _blueprintPoolType)
+                {
+                    throw new InvalidDataException("No se pudo clonar un BlueprintPool de la etapa " + stage.id + ".");
+                }
+
+                var poolClone = (ScriptableObject)clonedPool;
+                temporaryClones.Add(poolClone);
+                string originalPoolId = _blueprintPoolIdField.GetValue(sourcePool) as string;
+                HashSet<string> poolUnitIds;
+                if (!unitsByPool.TryGetValue(originalPoolId, out poolUnitIds))
+                {
+                    poolUnitIds = new HashSet<string>(StringComparer.Ordinal);
+                }
+                string scopedPoolId = CreateScopedBlueprintPoolId(
+                    packId, stage.id, originalPoolId, reservedPoolIds);
+                poolClone.name = "RCL_BlueprintPool_" + scopedPoolId.Substring("RCL_POOL_".Length, 16);
+                poolClone.hideFlags = HideFlags.HideAndDontSave;
+                _blueprintPoolIdField.SetValue(poolClone, scopedPoolId);
+                clonedPools[i] = poolClone;
+
+                bool exclusive = (bool)_blueprintPoolExclusiveField.GetValue(poolClone);
+                var registration = new BlueprintPoolScopeRegistration(
+                    scopedPoolId, stage.id, poolClone, poolUnitIds, exclusive, originalPoolId);
+                if (exclusive) registration.SetEligibleExclusiveUnitIds(poolUnitIds);
+                registrations.Add(registration);
+                result.Add(poolClone);
+            }
+
+            _stageParametersBlueprintPoolListField.SetValue(stageParameters, clonedList);
+            return result;
+        }
+
         private string CreateScopedBlueprintPoolId(
             string packId,
             string stageId,

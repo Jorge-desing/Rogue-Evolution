@@ -108,6 +108,18 @@ namespace RogueCommandExpansionLoader.Content
                 return bundle;
             }
         }
+
+        /// <summary>
+        /// Retrieves a loaded AssetBundle by its ID.
+        /// </summary>
+        public bool TryGetBundle(string bundleId, out AssetBundle bundle)
+        {
+            lock (_lock)
+            {
+                return _bundles.TryGetValue(bundleId, out bundle);
+            }
+        }
+
         /// <summary>
         /// Removes a specific bundle from the registry without unloading it. The owner decides
         /// when to unload it and dispose any associated stream.
@@ -123,6 +135,24 @@ namespace RogueCommandExpansionLoader.Content
                 }
 
                 return _bundles.Remove(bundleId);
+            }
+        }
+
+        /// <summary>
+        /// Unloads all registered bundles.
+        /// </summary>
+        public void UnloadAll(bool unloadAllLoadedObjects)
+        {
+            lock (_lock)
+            {
+                foreach (var bundle in _bundles.Values)
+                {
+                    if (bundle != null)
+                    {
+                        bundle.Unload(unloadAllLoadedObjects);
+                    }
+                }
+                _bundles.Clear();
             }
         }
     }
