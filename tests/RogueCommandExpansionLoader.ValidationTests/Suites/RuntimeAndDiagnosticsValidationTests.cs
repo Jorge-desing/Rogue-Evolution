@@ -3803,5 +3803,269 @@ internal static partial class ValidationTestRunner
             }
         }
     }),
+    ("runtime selection census and tactical command director manage unit selection and stance orders", () =>
+    {
+        try
+        {
+            ExistingControllers.Instance.Reset();
+            PlayerUnitController.Instance.DeselectAllUnits();
+
+            var unit1 = new EntityController { EntityId = "unit_alpha", tag = "Player", CurrentHealth = 100f, MaxHealth = 100f };
+            unit1.gameObject.name = "unit_alpha";
+            var unit2 = new EntityController { EntityId = "unit_beta", tag = "Player", CurrentHealth = 100f, MaxHealth = 100f };
+            unit2.gameObject.name = "unit_beta";
+            var harvester = new EntityController { EntityId = "harvester_1", tag = "Player", CurrentHealth = 80f, MaxHealth = 80f };
+            harvester.gameObject.name = "harvester_1";
+
+            ExistingControllers.Instance.PlayerUnits().Add(unit1);
+            ExistingControllers.Instance.PlayerUnits().Add(unit2);
+            ExistingControllers.Instance.Harvesters.Add(harvester);
+
+            // Select units by keys
+            SelectionCommandResult selectRes = RuntimeGameplayCommandDirector.TrySelectEntities(new[] { "unit_alpha", "unit_beta" });
+            if (!selectRes.Success || selectRes.EntitiesSelectedCount != 2)
+            {
+                throw new InvalidOperationException("TrySelectEntities should select 2 entities.");
+            }
+
+            SelectionCensus census = RuntimeSelectionCensus.Current();
+            if (!census.IsSelectionReady || census.SelectedCount != 2 || census.SelectedEntityKeys.Count != 2)
+            {
+                throw new InvalidOperationException("RuntimeSelectionCensus.Current should report 2 selected units.");
+            }
+
+            // Assign Control Group 1
+            SelectionCommandResult assignGroupRes = RuntimeGameplayCommandDirector.TryAssignControlGroup(1);
+            if (!assignGroupRes.Success || assignGroupRes.EntitiesSelectedCount != 2)
+            {
+                throw new InvalidOperationException("TryAssignControlGroup should bind 2 units to group 1.");
+            }
+
+            census = RuntimeSelectionCensus.Current();
+            if (census.ControlGroupCounts[1] != 2)
+            {
+                throw new InvalidOperationException("ControlGroupCounts[1] should report 2 units.");
+            }
+
+            // Deselect all
+            SelectionCommandResult deselectRes = RuntimeGameplayCommandDirector.TryDeselectAll();
+            if (!deselectRes.Success)
+            {
+                throw new InvalidOperationException("TryDeselectAll should succeed.");
+            }
+
+            census = RuntimeSelectionCensus.Current();
+            if (census.SelectedCount != 0)
+            {
+                throw new InvalidOperationException("Selection count should be 0 after DeselectAll.");
+            }
+
+            // Select Control Group 1
+            SelectionCommandResult recallGroupRes = RuntimeGameplayCommandDirector.TrySelectControlGroup(1);
+            if (!recallGroupRes.Success || recallGroupRes.EntitiesSelectedCount != 2)
+            {
+                throw new InvalidOperationException("TrySelectControlGroup should recall 2 units.");
+            }
+
+            census = RuntimeSelectionCensus.Current();
+
+            // Select Category Harvesters
+            SelectionCommandResult catRes = RuntimeGameplayCommandDirector.TrySelectCategory("Harvesters");
+            if (!catRes.Success)
+            {
+                throw new InvalidOperationException("TrySelectCategory Harvesters should succeed.");
+            }
+
+            // Orders Stop & Hold Position
+            UnitCommandResult stopRes = RuntimeGameplayCommandDirector.TryOrderStop("unit_alpha");
+            if (!stopRes.Success || stopRes.CommandType != "Stop")
+            {
+                throw new InvalidOperationException("TryOrderStop should succeed.");
+            }
+
+            UnitCommandResult holdRes = RuntimeGameplayCommandDirector.TryOrderHoldPosition();
+            if (!holdRes.Success || holdRes.CommandType != "HoldPosition")
+            {
+                throw new InvalidOperationException("TryOrderHoldPosition should succeed.");
+            }
+
+            UnitCommandResult attackMoveRes = RuntimeGameplayCommandDirector.TryOrderAttackMove("unit_alpha", 50f, 60f);
+            if (!attackMoveRes.Success || attackMoveRes.TargetX != 50f || attackMoveRes.TargetZ != 60f)
+            {
+                throw new InvalidOperationException("TryOrderAttackMove should succeed with target coords (50, 60).");
+            }
+
+            // Serialization check
+            string json = AgentDiagnosticsFormatter.SerializeSelectionCensus(census);
+            using (var doc = JsonDocument.Parse(json))
+            {
+                if (!doc.RootElement.GetProperty("isSelectionReady").GetBoolean() ||
+                    doc.RootElement.GetProperty("selectedCount").GetInt32() != 2 ||
+                    doc.RootElement.GetProperty("controlGroupCounts")[1].GetInt32() != 2)
+                {
+                    throw new InvalidOperationException("SerializeSelectionCensus JSON mismatch.");
+                }
+            }
+        }
+        finally
+        {
+            ExistingControllers.Instance.Reset();
+            PlayerUnitController.Instance.DeselectAllUnits();
+        }
+    }),
+    ("runtime fog census and fog command director safely toggle and reveal fog of war", () =>
+    {
+        FogStateCensus state = RuntimeFogCensus.Current();
+        if (!state.IsAvailable || !state.IsActive || state.IsDisabled)
+        {
+            throw new InvalidOperationException("RuntimeFogCensus.Current should report available and active Fog of War.");
+        }
+
+        // Disable Fog of War
+        FogCommandResult disableRes = RuntimeGameplayCommandDirector.TrySetFogOfWar(true);
+        if (!disableRes.Success || !disableRes.IsDisabled || !UpdateFogOfWar.RevealedStaticCalled)
+        {
+            throw new InvalidOperationException("TrySetFogOfWar(true) should disable fog and call Reveal_Static.");
+        }
+
+        state = RuntimeFogCensus.Current();
+        if (!state.IsDisabled || state.IsActive)
+        {
+            throw new InvalidOperationException("RuntimeFogCensus should report fog disabled.");
+        }
+
+        // Reveal Fog of War
+        FogCommandResult revealRes = RuntimeGameplayCommandDirector.TryRevealFogOfWar();
+        if (!revealRes.Success)
+        {
+            throw new InvalidOperationException("TryRevealFogOfWar should succeed.");
+        }
+
+        // Re-enable Fog of War
+        RuntimeGameplayCommandDirector.TrySetFogOfWar(false);
+
+        // Serialization check
+        string json = AgentDiagnosticsFormatter.SerializeFogStateCensus(state);
+        using (var doc = JsonDocument.Parse(json))
+        {
+            if (!doc.RootElement.GetProperty("isAvailable").GetBoolean() ||
+                !doc.RootElement.GetProperty("isDisabled").GetBoolean())
+            {
+                throw new InvalidOperationException("SerializeFogStateCensus JSON mismatch.");
+            }
+        }
+    }),
+    ("runtime game speed match control and entity spawning directors execute commands without GUI", () =>
+    {
+        try
+        {
+            // Game Speed
+            GameSpeedCommandResult speedRes = RuntimeGameplayCommandDirector.TrySetGameTimeScale(2.5f);
+            if (!speedRes.Success || speedRes.CurrentTimeScale != 2.5f || RuntimeGameplayCommandDirector.GetGameTimeScale() != 2.5f)
+            {
+                throw new InvalidOperationException("TrySetGameTimeScale should update Time.timeScale to 2.5f.");
+            }
+
+            RuntimeGameplayCommandDirector.TrySetGameTimeScale(1.0f);
+
+            // Match Control
+            FinishLevel.Reset();
+            MatchControlResult winRes = RuntimeGameplayCommandDirector.TryTriggerMatchEnd(true);
+            if (!winRes.Success || winRes.Outcome != "Win" || !FinishLevel.WonCalled)
+            {
+                throw new InvalidOperationException("TryTriggerMatchEnd(true) should invoke victory sequence.");
+            }
+
+            FinishLevel.Reset();
+
+            // Entity Spawning
+            EntitySpawnResult spawnRes = RuntimeGameplayCommandDirector.TrySpawnEntity("SampleScout", "Player", 45f, 55f, "SpawnedScout");
+            if (!spawnRes.Success || spawnRes.EntityId != "SampleScout" || spawnRes.Side != "Player" ||
+                spawnRes.SpawnedX != 45f || spawnRes.SpawnedZ != 55f || spawnRes.Health != 100f)
+            {
+                throw new InvalidOperationException("TrySpawnEntity should spawn SampleScout at (45, 55) with 100 health.");
+            }
+
+            // Serialization checks
+            string speedJson = AgentDiagnosticsFormatter.SerializeGameSpeedCommandResult(speedRes);
+            using (var doc = JsonDocument.Parse(speedJson))
+            {
+                if (!doc.RootElement.GetProperty("success").GetBoolean() ||
+                    doc.RootElement.GetProperty("currentTimeScale").GetSingle() != 2.5f)
+                {
+                    throw new InvalidOperationException("SerializeGameSpeedCommandResult JSON mismatch.");
+                }
+            }
+
+            string spawnJson = AgentDiagnosticsFormatter.SerializeEntitySpawnResult(spawnRes);
+            using (var doc = JsonDocument.Parse(spawnJson))
+            {
+                if (!doc.RootElement.GetProperty("success").GetBoolean() ||
+                    doc.RootElement.GetProperty("entityId").GetString() != "SampleScout" ||
+                    doc.RootElement.GetProperty("side").GetString() != "Player")
+                {
+                    throw new InvalidOperationException("SerializeEntitySpawnResult JSON mismatch.");
+                }
+            }
+        }
+        finally
+        {
+            FinishLevel.Reset();
+        }
+    }),
+    ("runtime entity catalog census queries registered balancing units buildings and factories", () =>
+    {
+        EntityBalancingStore.RolesOf["Unit_Prowler"] = UnitRole.Unit;
+        EntityBalancingStore.RolesOf["Unit_Striker"] = UnitRole.Scout;
+        EntityBalancingStore.BuildingEntityIds.Add("Building_Turret");
+        EntityBalancingStore.BuildingEntityIds.Add("Building_Radar");
+        EntityBalancingStore.FactoryEntityIdOf["Factory_Vehicles"] = "Building_Factory";
+
+        EntityCatalogCensus catalog = RuntimeEntityCatalogCensus.Current();
+        if (!catalog.IsCatalogReady || catalog.TotalUnits < 2 || catalog.TotalBuildings < 2 || catalog.TotalFactories < 1)
+        {
+            throw new InvalidOperationException("RuntimeEntityCatalogCensus should report registered units, buildings, and factories.");
+        }
+
+        if (!catalog.UnitIds.Contains("Unit_Prowler") || !catalog.BuildingIds.Contains("Building_Turret"))
+        {
+            throw new InvalidOperationException("EntityCatalogCensus should contain Unit_Prowler and Building_Turret.");
+        }
+
+        // Serialization check
+        string json = AgentDiagnosticsFormatter.SerializeEntityCatalogCensus(catalog);
+        using (var doc = JsonDocument.Parse(json))
+        {
+            if (!doc.RootElement.GetProperty("isCatalogReady").GetBoolean() ||
+                doc.RootElement.GetProperty("totalUnits").GetInt32() < 2 ||
+                doc.RootElement.GetProperty("totalBuildings").GetInt32() < 2)
+            {
+                throw new InvalidOperationException("SerializeEntityCatalogCensus JSON mismatch.");
+            }
+        }
+
+        // Verify Diagnostic Catalog includes new getters
+        string catalogJson = AgentDiagnosticsFormatter.SerializeDiagnosticCatalog();
+        using (var doc = JsonDocument.Parse(catalogJson))
+        {
+            var items = doc.RootElement.GetProperty("diagnostics");
+            var names = new HashSet<string>();
+            foreach (var item in items.EnumerateArray())
+            {
+                names.Add(item.GetProperty("name").GetString()!);
+            }
+
+            if (!names.Contains("GetSelectionCensusJson") ||
+                !names.Contains("GetFogStateJson") ||
+                !names.Contains("GetEntityCatalogJson") ||
+                !names.Contains("SelectUnitsJson") ||
+                !names.Contains("DeselectAllUnitsJson") ||
+                !names.Contains("SetGameTimeScaleJson") ||
+                !names.Contains("SpawnEntityJson"))
+            {
+                throw new InvalidOperationException("Diagnostic catalog should include newly exposed getters.");
+            }
+        }
+    }),
     };
 }

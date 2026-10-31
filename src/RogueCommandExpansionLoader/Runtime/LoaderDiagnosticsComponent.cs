@@ -636,6 +636,174 @@ namespace RogueCommandExpansionLoader.Runtime
         }
 
         /// <summary>
+        /// Returns player selection census and control group assignments as JSON.
+        /// </summary>
+        public string GetSelectionCensusJson()
+        {
+            return AgentDiagnosticsFormatter.SerializeSelectionCensus(
+                RuntimeSelectionCensus.Current());
+        }
+
+        /// <summary>
+        /// Returns Fog of War runtime status and update settings as JSON.
+        /// </summary>
+        public string GetFogStateJson()
+        {
+            return AgentDiagnosticsFormatter.SerializeFogStateCensus(
+                RuntimeFogCensus.Current());
+        }
+
+        /// <summary>
+        /// Returns all registered unit, building, and factory entity IDs as JSON.
+        /// </summary>
+        public string GetEntityCatalogJson()
+        {
+            return AgentDiagnosticsFormatter.SerializeEntityCatalogCensus(
+                RuntimeEntityCatalogCensus.Current());
+        }
+
+        /// <summary>
+        /// Selects units by comma-separated entity key IDs or names.
+        /// </summary>
+        public string SelectUnitsJson(string entityKeysCsv, bool additive = false)
+        {
+            var keys = new List<string>();
+            if (!string.IsNullOrWhiteSpace(entityKeysCsv))
+            {
+                string[] parts = entityKeysCsv.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries);
+                for (int i = 0; i < parts.Length; i++)
+                {
+                    string trimmed = parts[i].Trim();
+                    if (!string.IsNullOrEmpty(trimmed))
+                    {
+                        keys.Add(trimmed);
+                    }
+                }
+            }
+
+            return AgentDiagnosticsFormatter.SerializeSelectionCommandResult(
+                RuntimeGameplayCommandDirector.TrySelectEntities(keys, additive));
+        }
+
+        /// <summary>
+        /// Deselects all currently selected units.
+        /// </summary>
+        public string DeselectAllUnitsJson()
+        {
+            return AgentDiagnosticsFormatter.SerializeSelectionCommandResult(
+                RuntimeGameplayCommandDirector.TryDeselectAll());
+        }
+
+        /// <summary>
+        /// Selects all units belonging to a specific category (CombatUnits, Harvesters, IdleHarvesters, SkillBuildings, Factories).
+        /// </summary>
+        public string SelectCategoryJson(string category)
+        {
+            return AgentDiagnosticsFormatter.SerializeSelectionCommandResult(
+                RuntimeGameplayCommandDirector.TrySelectCategory(category));
+        }
+
+        /// <summary>
+        /// Orders Stop on a unit or all selected units.
+        /// </summary>
+        public string OrderUnitStopJson(string entityKeyId = null)
+        {
+            return AgentDiagnosticsFormatter.SerializeUnitCommandResult(
+                RuntimeGameplayCommandDirector.TryOrderStop(entityKeyId));
+        }
+
+        /// <summary>
+        /// Orders Hold Position on a unit or all selected units.
+        /// </summary>
+        public string OrderUnitHoldPositionJson(string entityKeyId = null)
+        {
+            return AgentDiagnosticsFormatter.SerializeUnitCommandResult(
+                RuntimeGameplayCommandDirector.TryOrderHoldPosition(entityKeyId));
+        }
+
+        /// <summary>
+        /// Orders AttackMove toward target coordinates.
+        /// </summary>
+        public string OrderUnitAttackMoveJson(string entityKeyId, float targetX, float targetZ)
+        {
+            return AgentDiagnosticsFormatter.SerializeUnitCommandResult(
+                RuntimeGameplayCommandDirector.TryOrderAttackMove(entityKeyId, targetX, targetZ));
+        }
+
+        /// <summary>
+        /// Assigns selected units to a control group index (0-9).
+        /// </summary>
+        public string AssignControlGroupJson(int groupNumber)
+        {
+            return AgentDiagnosticsFormatter.SerializeSelectionCommandResult(
+                RuntimeGameplayCommandDirector.TryAssignControlGroup(groupNumber));
+        }
+
+        /// <summary>
+        /// Selects units assigned to a control group index (0-9).
+        /// </summary>
+        public string SelectControlGroupJson(int groupNumber)
+        {
+            return AgentDiagnosticsFormatter.SerializeSelectionCommandResult(
+                RuntimeGameplayCommandDirector.TrySelectControlGroup(groupNumber));
+        }
+
+        /// <summary>
+        /// Enables or disables Fog of War and reveals the map if disabled.
+        /// </summary>
+        public string SetFogOfWarJson(bool disableFog)
+        {
+            return AgentDiagnosticsFormatter.SerializeFogCommandResult(
+                RuntimeGameplayCommandDirector.TrySetFogOfWar(disableFog));
+        }
+
+        /// <summary>
+        /// Triggers full-map Fog of War reveal.
+        /// </summary>
+        public string RevealFogOfWarJson()
+        {
+            return AgentDiagnosticsFormatter.SerializeFogCommandResult(
+                RuntimeGameplayCommandDirector.TryRevealFogOfWar());
+        }
+
+        /// <summary>
+        /// Sets match time scale (0.0 = pause, 1.0 = normal, up to 10.0 = fast forward).
+        /// </summary>
+        public string SetGameTimeScaleJson(float timeScale)
+        {
+            return AgentDiagnosticsFormatter.SerializeGameSpeedCommandResult(
+                RuntimeGameplayCommandDirector.TrySetGameTimeScale(timeScale));
+        }
+
+        /// <summary>
+        /// Returns current match time scale.
+        /// </summary>
+        public string GetGameTimeScaleJson()
+        {
+            float scale = RuntimeGameplayCommandDirector.GetGameTimeScale();
+            return AgentDiagnosticsFormatter.SerializeGameSpeedCommandResult(
+                new GameSpeedCommandResult(true, scale, scale, "Current time scale queried."));
+        }
+
+        /// <summary>
+        /// Triggers match victory or defeat sequence.
+        /// </summary>
+        public string TriggerMatchEndJson(bool win)
+        {
+            return AgentDiagnosticsFormatter.SerializeMatchControlResult(
+                RuntimeGameplayCommandDirector.TryTriggerMatchEnd(win));
+        }
+
+        /// <summary>
+        /// Dynamically spawns a unit or building entity at coordinates.
+        /// </summary>
+        public string SpawnEntityJson(string entityId, string side, float targetX, float targetZ, string customName = "")
+        {
+            return AgentDiagnosticsFormatter.SerializeEntitySpawnResult(
+                RuntimeGameplayCommandDirector.TrySpawnEntity(entityId, side, targetX, targetZ, customName));
+        }
+
+        /// <summary>
         /// Returns a unified system health and diagnostics overview as JSON.
         /// Synthesizes loader registry readiness, content counts, AI modules,
         /// economy parameters, and active combat telemetry.

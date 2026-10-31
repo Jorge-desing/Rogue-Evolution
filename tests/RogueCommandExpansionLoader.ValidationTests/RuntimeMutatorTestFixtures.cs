@@ -100,6 +100,15 @@ public static class EntityBalancingStore
     public static Dictionary<string, float> Damage1Of = new(StringComparer.Ordinal);
     public static Dictionary<string, float> Damage2Of = new(StringComparer.Ordinal);
 
+    public static List<string> AllEntityIdsOfUnits() => new(RolesOf.Keys);
+    public static List<string> AllEntityIdsOfBuildings() => new(BuildingEntityIds);
+    public static List<string> AllEntityIdsOfFactories() => new(FactoryEntityIdOf.Values);
+    public static List<string> AllEntityIds()
+    {
+        var set = new HashSet<string>(RolesOf.Keys, StringComparer.Ordinal);
+        set.UnionWith(BuildingEntityIds);
+        return new List<string>(set);
+    }
     public static bool IsBuilding(string entityId) => BuildingEntityIds.Contains(entityId);
     public static int Cost(string entityId, bool includeModified = false) =>
         CostOf.TryGetValue(entityId, out var c) ? c : 100;

@@ -152,6 +152,112 @@ namespace RogueCommandExpansionLoader.Runtime
     }
 
     /// <summary>
+    /// Pure diagnostic DTO returned when executing selection or control group operations.
+    /// Decoupled from Unity types.
+    /// </summary>
+    public readonly struct SelectionCommandResult
+    {
+        public SelectionCommandResult(bool success, string commandType, int entitiesSelectedCount, string message)
+        {
+            Success = success;
+            CommandType = commandType ?? string.Empty;
+            EntitiesSelectedCount = entitiesSelectedCount;
+            Message = message ?? string.Empty;
+        }
+
+        public bool Success { get; }
+        public string CommandType { get; }
+        public int EntitiesSelectedCount { get; }
+        public string Message { get; }
+    }
+
+    /// <summary>
+    /// Pure diagnostic DTO returned when toggling or revealing Fog of War.
+    /// Decoupled from Unity types.
+    /// </summary>
+    public readonly struct FogCommandResult
+    {
+        public FogCommandResult(bool success, bool isDisabled, string message)
+        {
+            Success = success;
+            IsDisabled = isDisabled;
+            Message = message ?? string.Empty;
+        }
+
+        public bool Success { get; }
+        public bool IsDisabled { get; }
+        public string Message { get; }
+    }
+
+    /// <summary>
+    /// Pure diagnostic DTO returned when modifying or querying match time scale.
+    /// Decoupled from Unity types.
+    /// </summary>
+    public readonly struct GameSpeedCommandResult
+    {
+        public GameSpeedCommandResult(bool success, float previousTimeScale, float currentTimeScale, string message)
+        {
+            Success = success;
+            PreviousTimeScale = previousTimeScale;
+            CurrentTimeScale = currentTimeScale;
+            Message = message ?? string.Empty;
+        }
+
+        public bool Success { get; }
+        public float PreviousTimeScale { get; }
+        public float CurrentTimeScale { get; }
+        public string Message { get; }
+    }
+
+    /// <summary>
+    /// Pure diagnostic DTO returned when commanding match victory or defeat.
+    /// Decoupled from Unity types.
+    /// </summary>
+    public readonly struct MatchControlResult
+    {
+        public MatchControlResult(bool success, string outcome, string message)
+        {
+            Success = success;
+            Outcome = outcome ?? string.Empty;
+            Message = message ?? string.Empty;
+        }
+
+        public bool Success { get; }
+        public string Outcome { get; }
+        public string Message { get; }
+    }
+
+    /// <summary>
+    /// Pure diagnostic DTO returned when dynamically spawning an entity on the grid.
+    /// Decoupled from Unity types.
+    /// </summary>
+    public readonly struct EntitySpawnResult
+    {
+        public EntitySpawnResult(bool success, string entityKeyId, string entityId, string side, float spawnedX, float spawnedY, float spawnedZ, float health, string message)
+        {
+            Success = success;
+            EntityKeyId = entityKeyId ?? string.Empty;
+            EntityId = entityId ?? string.Empty;
+            Side = side ?? string.Empty;
+            SpawnedX = spawnedX;
+            SpawnedY = spawnedY;
+            SpawnedZ = spawnedZ;
+            Health = health;
+            Message = message ?? string.Empty;
+        }
+
+        public bool Success { get; }
+        public string EntityKeyId { get; }
+        public string EntityId { get; }
+        public string Side { get; }
+        public float SpawnedX { get; }
+        public float SpawnedY { get; }
+        public float SpawnedZ { get; }
+        public float Health { get; }
+        public string Message { get; }
+    }
+
+    /// <summary>
     /// Safe in-game gameplay and diagnostic command director allowing authorized automated agents
     /// and clean-room testing harnesses to inspect and command match systems without GUI interaction.
     /// </summary>
@@ -702,6 +808,550 @@ namespace RogueCommandExpansionLoader.Runtime
             }
 
             return null;
+        }
+
+        private static readonly MethodInfo SelectGameObjectMethod = typeof(PlayerUnitController).GetMethod("Select", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance, null, new[] { typeof(GameObject) }, null);
+        private static readonly MethodInfo AddToSelectionMethod = typeof(PlayerUnitController).GetMethod("AddToSelection", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance, null, new[] { typeof(GameObject) }, null);
+        private static readonly MethodInfo DeselectAllUnitsMethod = typeof(PlayerUnitController).GetMethod("DeselectAllUnits", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance, null, Type.EmptyTypes, null);
+
+        private static void InternalSelect(PlayerUnitController puc, GameObject go)
+        {
+            if (puc == null || go == null) return;
+            try
+            {
+                SelectGameObjectMethod?.Invoke(puc, new object[] { go });
+            }
+            catch { }
+        }
+
+        private static void InternalAddToSelection(PlayerUnitController puc, GameObject go)
+        {
+            if (puc == null || go == null) return;
+            try
+            {
+                if (AddToSelectionMethod != null)
+                {
+                    AddToSelectionMethod.Invoke(puc, new object[] { go });
+                }
+                else
+                {
+                    InternalSelect(puc, go);
+                }
+            }
+            catch { }
+        }
+
+        private static void InternalDeselectAll(PlayerUnitController puc)
+        {
+            try
+            {
+                PlayerUnitController.DeselectAll_Static();
+            }
+            catch
+            {
+                try
+                {
+                    if (puc != null && DeselectAllUnitsMethod != null)
+                    {
+                        DeselectAllUnitsMethod.Invoke(puc, null);
+                    }
+                }
+                catch { }
+            }
+        }
+
+        /// <summary>
+        /// Selects units by entity key IDs (or names).
+        /// </summary>
+        public static SelectionCommandResult TrySelectEntities(IReadOnlyList<string> entityKeyIds, bool additive = false)
+        {
+            if (entityKeyIds == null || entityKeyIds.Count == 0)
+            {
+                return new SelectionCommandResult(false, "SelectEntities", 0, "No entity keys provided.");
+            }
+
+            try
+            {
+                PlayerUnitController puc = ResolvePlayerUnitController();
+                if (puc == null)
+                {
+                    return new SelectionCommandResult(false, "SelectEntities", 0, "PlayerUnitController instance is not available.");
+                }
+
+                ExistingControllers existing = ExistingControllers.Instance;
+                if (existing == null)
+                {
+                    return new SelectionCommandResult(false, "SelectEntities", 0, "ExistingControllers instance is not available.");
+                }
+
+                if (!additive)
+                {
+                    InternalDeselectAll(puc);
+                }
+
+                int selectedCount = 0;
+                foreach (string key in entityKeyIds)
+                {
+                    if (string.IsNullOrWhiteSpace(key)) continue;
+                    EntityController ec = FindEntityByKey(existing, key.Trim());
+                    if (ec != null && ec.gameObject != null)
+                    {
+                        InternalAddToSelection(puc, ec.gameObject);
+                        selectedCount++;
+                    }
+                }
+
+                return new SelectionCommandResult(selectedCount > 0, "SelectEntities", selectedCount,
+                    "Selected " + selectedCount + " of " + entityKeyIds.Count + " requested entities.");
+            }
+            catch (Exception ex)
+            {
+                return new SelectionCommandResult(false, "SelectEntities", 0, "Error selecting entities: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Deselects all currently selected units.
+        /// </summary>
+        public static SelectionCommandResult TryDeselectAll()
+        {
+            try
+            {
+                PlayerUnitController puc = ResolvePlayerUnitController();
+                InternalDeselectAll(puc);
+                return new SelectionCommandResult(true, "DeselectAll", 0, "Deselected all units.");
+            }
+            catch (Exception ex)
+            {
+                return new SelectionCommandResult(false, "DeselectAll", 0, "Error deselecting: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Selects all units belonging to a specific category (CombatUnits, Harvesters, IdleHarvesters, SkillBuildings, Factories).
+        /// </summary>
+        public static SelectionCommandResult TrySelectCategory(string category)
+        {
+            if (string.IsNullOrWhiteSpace(category))
+            {
+                return new SelectionCommandResult(false, "SelectCategory", 0, "Category name is empty.");
+            }
+
+            try
+            {
+                PlayerUnitController puc = ResolvePlayerUnitController();
+                if (puc == null)
+                {
+                    return new SelectionCommandResult(false, "SelectCategory", 0, "PlayerUnitController instance is not available.");
+                }
+
+                string cat = category.Trim();
+                if (string.Equals(cat, "CombatUnits", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(cat, "Combat", StringComparison.OrdinalIgnoreCase))
+                {
+                    puc.SelectAllCombatUnits();
+                }
+                else if (string.Equals(cat, "Harvesters", StringComparison.OrdinalIgnoreCase))
+                {
+                    puc.SelectAllHarvesters();
+                }
+                else if (string.Equals(cat, "IdleHarvesters", StringComparison.OrdinalIgnoreCase))
+                {
+                    puc.SelectIdleHarvesters();
+                }
+                else if (string.Equals(cat, "SkillBuildings", StringComparison.OrdinalIgnoreCase))
+                {
+                    puc.SelectSkillBuildings();
+                }
+                else if (string.Equals(cat, "Factories", StringComparison.OrdinalIgnoreCase))
+                {
+                    puc.SelectAllFactories();
+                }
+                else
+                {
+                    return new SelectionCommandResult(false, "SelectCategory", 0,
+                        "Unknown category '" + category + "'. Allowed: CombatUnits, Harvesters, IdleHarvesters, SkillBuildings, Factories.");
+                }
+
+                SelectionCensus census = RuntimeSelectionCensus.Current();
+                return new SelectionCommandResult(true, "SelectCategory:" + cat, census.SelectedCount,
+                    "Category '" + cat + "' selected (" + census.SelectedCount + " entities).");
+            }
+            catch (Exception ex)
+            {
+                return new SelectionCommandResult(false, "SelectCategory", 0, "Error selecting category: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Orders Stop on a unit or all currently selected units.
+        /// </summary>
+        public static UnitCommandResult TryOrderStop(string entityKeyId = null)
+        {
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(entityKeyId))
+                {
+                    ExistingControllers existing = ExistingControllers.Instance;
+                    if (existing != null)
+                    {
+                        EntityController entity = FindEntityByKey(existing, entityKeyId);
+                        if (entity != null)
+                        {
+                            PlayerUnitController puc = ResolvePlayerUnitController();
+                            if (puc != null && entity.gameObject != null)
+                            {
+                                InternalSelect(puc, entity.gameObject);
+                            }
+
+                            PlayerUnitController.Stop_Static();
+                            Vector3 pos = entity.transform != null ? entity.transform.position : Vector3.zero;
+                            return new UnitCommandResult(true, entityKeyId, "Stop", pos.x, pos.z,
+                                "Order Stop dispatched to entity '" + entityKeyId + "'.");
+                        }
+                    }
+
+                    return new UnitCommandResult(false, entityKeyId, "Stop", 0f, 0f,
+                        "Entity '" + entityKeyId + "' not found.");
+                }
+
+                PlayerUnitController.Stop_Static();
+                return new UnitCommandResult(true, "SelectedUnits", "Stop", 0f, 0f,
+                    "Order Stop dispatched to all selected units.");
+            }
+            catch (Exception ex)
+            {
+                return new UnitCommandResult(false, entityKeyId ?? "SelectedUnits", "Stop", 0f, 0f,
+                    "Error ordering Stop: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Orders Hold Position on a unit or all currently selected units.
+        /// </summary>
+        public static UnitCommandResult TryOrderHoldPosition(string entityKeyId = null)
+        {
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(entityKeyId))
+                {
+                    ExistingControllers existing = ExistingControllers.Instance;
+                    if (existing != null)
+                    {
+                        EntityController entity = FindEntityByKey(existing, entityKeyId);
+                        if (entity != null)
+                        {
+                            PlayerUnitController puc = ResolvePlayerUnitController();
+                            if (puc != null && entity.gameObject != null)
+                            {
+                                InternalSelect(puc, entity.gameObject);
+                            }
+
+                            PlayerUnitController.HoldPosition_Static();
+                            Vector3 pos = entity.transform != null ? entity.transform.position : Vector3.zero;
+                            return new UnitCommandResult(true, entityKeyId, "HoldPosition", pos.x, pos.z,
+                                "Order HoldPosition dispatched to entity '" + entityKeyId + "'.");
+                        }
+                    }
+
+                    return new UnitCommandResult(false, entityKeyId, "HoldPosition", 0f, 0f,
+                        "Entity '" + entityKeyId + "' not found.");
+                }
+
+                PlayerUnitController.HoldPosition_Static();
+                return new UnitCommandResult(true, "SelectedUnits", "HoldPosition", 0f, 0f,
+                    "Order HoldPosition dispatched to all selected units.");
+            }
+            catch (Exception ex)
+            {
+                return new UnitCommandResult(false, entityKeyId ?? "SelectedUnits", "HoldPosition", 0f, 0f,
+                    "Error ordering HoldPosition: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Orders AttackMove toward target coordinates.
+        /// </summary>
+        public static UnitCommandResult TryOrderAttackMove(string entityKeyId, float targetX, float targetZ)
+        {
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(entityKeyId))
+                {
+                    ExistingControllers existing = ExistingControllers.Instance;
+                    if (existing != null)
+                    {
+                        EntityController entity = FindEntityByKey(existing, entityKeyId);
+                        if (entity != null && entity.gameObject != null)
+                        {
+                            PlayerUnitController puc = ResolvePlayerUnitController();
+                            if (puc != null)
+                            {
+                                InternalSelect(puc, entity.gameObject);
+                            }
+                        }
+                    }
+                }
+
+                PlayerUnitController.AttackMove_Static(new Vector3(targetX, 0f, targetZ));
+                return new UnitCommandResult(true, entityKeyId ?? "SelectedUnits", "AttackMove", targetX, targetZ,
+                    "Order AttackMove to (" + targetX + ", " + targetZ + ") dispatched.");
+            }
+            catch (Exception ex)
+            {
+                return new UnitCommandResult(false, entityKeyId ?? "SelectedUnits", "AttackMove", targetX, targetZ,
+                    "Error ordering AttackMove: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Binds the currently selected entities to a control group index (0-9).
+        /// </summary>
+        public static SelectionCommandResult TryAssignControlGroup(int groupNumber)
+        {
+            if (groupNumber < 0 || groupNumber > 9)
+            {
+                return new SelectionCommandResult(false, "AssignControlGroup", 0, "Control group index must be between 0 and 9.");
+            }
+
+            try
+            {
+                bool assigned = PlayerUnitController.SetControlGroup_Static(groupNumber);
+                SelectionCensus census = RuntimeSelectionCensus.Current();
+                int count = (census.ControlGroupCounts != null && groupNumber < census.ControlGroupCounts.Count)
+                    ? census.ControlGroupCounts[groupNumber]
+                    : 0;
+
+                return new SelectionCommandResult(assigned, "AssignControlGroup", count,
+                    "Assigned " + count + " selected entities to Control Group " + groupNumber + ".");
+            }
+            catch (Exception ex)
+            {
+                return new SelectionCommandResult(false, "AssignControlGroup", 0,
+                    "Error assigning control group: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Selects the entities assigned to a control group index (0-9).
+        /// </summary>
+        public static SelectionCommandResult TrySelectControlGroup(int groupNumber)
+        {
+            if (groupNumber < 0 || groupNumber > 9)
+            {
+                return new SelectionCommandResult(false, "SelectControlGroup", 0, "Control group index must be between 0 and 9.");
+            }
+
+            try
+            {
+                PlayerUnitController.SelectControlGroup_Static(groupNumber);
+                SelectionCensus census = RuntimeSelectionCensus.Current();
+                int count = (census.ControlGroupCounts != null && groupNumber < census.ControlGroupCounts.Count)
+                    ? census.ControlGroupCounts[groupNumber]
+                    : 0;
+
+                return new SelectionCommandResult(true, "SelectControlGroup", count,
+                    "Selected Control Group " + groupNumber + " (" + count + " entities).");
+            }
+            catch (Exception ex)
+            {
+                return new SelectionCommandResult(false, "SelectControlGroup", 0,
+                    "Error selecting control group: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Sets Fog of War status (disabled or active) and reveals the map if disabled.
+        /// </summary>
+        public static FogCommandResult TrySetFogOfWar(bool disableFog)
+        {
+            try
+            {
+                Type type = typeof(UpdateFogOfWar);
+                FieldInfo instanceField = type.GetField("_instance", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
+                object instance = instanceField?.GetValue(null) ?? UnityEngine.Object.FindObjectOfType<UpdateFogOfWar>();
+
+                if (instance != null)
+                {
+                    FieldInfo disableField = type.GetField("disableFogOfWar", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                    disableField?.SetValue(instance, disableFog);
+                }
+
+                if (disableFog)
+                {
+                    UpdateFogOfWar.Reveal_Static();
+                }
+
+                return new FogCommandResult(true, disableFog,
+                    disableFog ? "Fog of War disabled and revealed." : "Fog of War enabled.");
+            }
+            catch (Exception ex)
+            {
+                return new FogCommandResult(false, disableFog, "Error setting Fog of War: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Triggers full-map Fog of War reveal.
+        /// </summary>
+        public static FogCommandResult TryRevealFogOfWar()
+        {
+            try
+            {
+                UpdateFogOfWar.Reveal_Static();
+                return new FogCommandResult(true, false, "Fog of War revealed across world map.");
+            }
+            catch (Exception ex)
+            {
+                return new FogCommandResult(false, false, "Error revealing Fog of War: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Adjusts match time scale (0.0 = pause, 1.0 = normal, up to 10.0 = fast-forward).
+        /// </summary>
+        public static GameSpeedCommandResult TrySetGameTimeScale(float timeScale)
+        {
+            try
+            {
+                float prev = Time.timeScale;
+                float clamped = Mathf.Clamp(timeScale, 0f, 10f);
+                Time.timeScale = clamped;
+                return new GameSpeedCommandResult(true, prev, clamped,
+                    "Game time scale set to " + clamped + "x (previous: " + prev + "x).");
+            }
+            catch (Exception ex)
+            {
+                return new GameSpeedCommandResult(false, 1f, 1f, "Error setting time scale: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Returns the current match time scale.
+        /// </summary>
+        public static float GetGameTimeScale()
+        {
+            try
+            {
+                return Time.timeScale;
+            }
+            catch
+            {
+                return 1f;
+            }
+        }
+
+        /// <summary>
+        /// Triggers match victory or defeat sequence cleanly.
+        /// </summary>
+        public static MatchControlResult TryTriggerMatchEnd(bool win)
+        {
+            try
+            {
+                bool isFinishing = false;
+                try
+                {
+                    isFinishing = FinishLevel.IsFinishing_Static();
+                }
+                catch { }
+
+                if (isFinishing)
+                {
+                    return new MatchControlResult(false, win ? "Win" : "Lose", "Match is already finishing.");
+                }
+
+                if (win)
+                {
+                    FinishLevel.Win_Static(Vector3.zero, null);
+                    return new MatchControlResult(true, "Win", "Victory sequence triggered successfully.");
+                }
+                else
+                {
+                    FinishLevel.Lose_Static(Vector3.zero);
+                    return new MatchControlResult(true, "Lose", "Defeat sequence triggered successfully.");
+                }
+            }
+            catch (Exception ex)
+            {
+                return new MatchControlResult(false, win ? "Win" : "Lose", "Error triggering match end: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Dynamically spawns a unit or building entity at the specified world coordinates.
+        /// </summary>
+        public static EntitySpawnResult TrySpawnEntity(string entityId, string side, float targetX, float targetZ, string customName = "")
+        {
+            if (string.IsNullOrWhiteSpace(entityId))
+            {
+                return new EntitySpawnResult(false, string.Empty, string.Empty, string.Empty, targetX, 0f, targetZ, 0f, "Entity ID cannot be empty.");
+            }
+
+            try
+            {
+                string tag = string.Equals(side, "Ai", StringComparison.OrdinalIgnoreCase) ? "Ai" : "Player";
+                Vector3 position = new Vector3(targetX, 0f, targetZ);
+
+                try
+                {
+                    WorldGrid grid = WorldGrid.Instance;
+                    if (grid != null)
+                    {
+                        position = grid.ClampToWorld(position);
+                    }
+                }
+                catch { }
+
+                string name = string.IsNullOrWhiteSpace(customName) ? entityId + "_AgentSpawn" : customName.Trim();
+
+                EntityController entity = EntityFactory.InstantiateEntity(
+                    entityId.Trim(),
+                    position,
+                    null,
+                    tag,
+                    name,
+                    null,
+                    UnitRole.None,
+                    false,
+                    "AgentRuntimeSpawn");
+
+                if (entity == null)
+                {
+                    return new EntitySpawnResult(false, string.Empty, entityId, tag, position.x, position.y, position.z, 0f,
+                        "EntityFactory returned null for '" + entityId + "'.");
+                }
+
+                string keyId = entity.EntityId ?? entity.name ?? entityId;
+                float health = entity.CurrentHealth;
+
+                return new EntitySpawnResult(true, keyId, entityId, tag, position.x, position.y, position.z, health,
+                    "Spawned " + tag + " entity '" + entityId + "' at (" + position.x + ", " + position.z + ").");
+            }
+            catch (Exception ex)
+            {
+                return new EntitySpawnResult(false, string.Empty, entityId, side ?? string.Empty, targetX, 0f, targetZ, 0f,
+                    "Error spawning entity: " + ex.Message);
+            }
+        }
+
+        private static PlayerUnitController ResolvePlayerUnitController()
+        {
+            try
+            {
+                Type type = typeof(PlayerUnitController);
+                FieldInfo instanceField = type.GetField("_instance", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
+                object instance = instanceField?.GetValue(null);
+                if (instance is PlayerUnitController puc)
+                {
+                    return puc;
+                }
+
+                return UnityEngine.Object.FindObjectOfType<PlayerUnitController>();
+            }
+            catch
+            {
+                return null;
+            }
         }
     }
 }

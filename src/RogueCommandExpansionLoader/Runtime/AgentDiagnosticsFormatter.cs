@@ -941,6 +941,151 @@ namespace RogueCommandExpansionLoader.Runtime
         }
 
         /// <summary>
+        /// Serializes player selection census and control group assignments.
+        /// </summary>
+        public static string SerializeSelectionCensus(SelectionCensus census)
+        {
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "selectionCensus",
+                ["omittedSelectedCount"] = census != null ? census.OmittedSelectedCount : 0,
+                ["isSelectionReady"] = census != null && census.IsSelectionReady,
+                ["selectedCount"] = census != null ? census.SelectedCount : 0,
+                ["hasSelectedAiEntity"] = census != null && census.HasSelectedAiEntity,
+                ["selectedAiEntityKey"] = census != null ? (census.SelectedAiEntityKey ?? string.Empty) : string.Empty,
+                ["onlyBuildingsSelected"] = census != null && census.OnlyBuildingsSelected,
+                ["onlyEntitiesThatCannotAttackSelected"] = census != null && census.OnlyEntitiesThatCannotAttackSelected,
+                ["activeSkillSelectedCount"] = census != null ? census.ActiveSkillSelectedCount : 0,
+                ["selectedEntityKeys"] = census != null && census.SelectedEntityKeys != null ? census.SelectedEntityKeys : (object)Array.Empty<string>(),
+                ["selectedEntityIds"] = census != null && census.SelectedEntityIds != null ? census.SelectedEntityIds : (object)Array.Empty<string>(),
+                ["controlGroupCounts"] = census != null && census.ControlGroupCounts != null ? census.ControlGroupCounts : (object)Array.Empty<int>(),
+            };
+            return Serialize(view);
+        }
+
+        /// <summary>
+        /// Serializes Fog of War runtime status and update settings.
+        /// </summary>
+        public static string SerializeFogStateCensus(FogStateCensus census)
+        {
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "fogStateCensus",
+                ["isAvailable"] = census != null && census.IsAvailable,
+                ["isActive"] = census != null && census.IsActive,
+                ["isDisabled"] = census != null && census.IsDisabled,
+                ["updateIntervalSeconds"] = census != null ? census.UpdateIntervalSeconds : 0f,
+                ["hasBlendTexture"] = census != null && census.HasBlendTexture,
+            };
+            return Serialize(view);
+        }
+
+        /// <summary>
+        /// Serializes all registered unit, building, and factory entity IDs from the game balancing store.
+        /// </summary>
+        public static string SerializeEntityCatalogCensus(EntityCatalogCensus census)
+        {
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "entityCatalogCensus",
+                ["omittedUnitCount"] = census != null ? census.OmittedUnitCount : 0,
+                ["omittedBuildingCount"] = census != null ? census.OmittedBuildingCount : 0,
+                ["omittedFactoryCount"] = census != null ? census.OmittedFactoryCount : 0,
+                ["isCatalogReady"] = census != null && census.IsCatalogReady,
+                ["totalUnits"] = census != null ? census.TotalUnits : 0,
+                ["totalBuildings"] = census != null ? census.TotalBuildings : 0,
+                ["totalFactories"] = census != null ? census.TotalFactories : 0,
+                ["unitIds"] = census != null && census.UnitIds != null ? census.UnitIds : (object)Array.Empty<string>(),
+                ["buildingIds"] = census != null && census.BuildingIds != null ? census.BuildingIds : (object)Array.Empty<string>(),
+                ["factoryIds"] = census != null && census.FactoryIds != null ? census.FactoryIds : (object)Array.Empty<string>(),
+            };
+            return Serialize(view);
+        }
+
+        /// <summary>
+        /// Serializes the result of a selection command.
+        /// </summary>
+        public static string SerializeSelectionCommandResult(SelectionCommandResult result)
+        {
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "selectionCommandResult",
+                ["success"] = result.Success,
+                ["commandType"] = result.CommandType ?? string.Empty,
+                ["entitiesSelectedCount"] = result.EntitiesSelectedCount,
+                ["message"] = result.Message ?? string.Empty,
+            };
+            return Serialize(view);
+        }
+
+        /// <summary>
+        /// Serializes the result of a Fog of War toggle or reveal command.
+        /// </summary>
+        public static string SerializeFogCommandResult(FogCommandResult result)
+        {
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "fogCommandResult",
+                ["success"] = result.Success,
+                ["isDisabled"] = result.IsDisabled,
+                ["message"] = result.Message ?? string.Empty,
+            };
+            return Serialize(view);
+        }
+
+        /// <summary>
+        /// Serializes the result of adjusting match time scale.
+        /// </summary>
+        public static string SerializeGameSpeedCommandResult(GameSpeedCommandResult result)
+        {
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "gameSpeedCommandResult",
+                ["success"] = result.Success,
+                ["previousTimeScale"] = result.PreviousTimeScale,
+                ["currentTimeScale"] = result.CurrentTimeScale,
+                ["message"] = result.Message ?? string.Empty,
+            };
+            return Serialize(view);
+        }
+
+        /// <summary>
+        /// Serializes the result of triggering match victory or defeat.
+        /// </summary>
+        public static string SerializeMatchControlResult(MatchControlResult result)
+        {
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "matchControlResult",
+                ["success"] = result.Success,
+                ["outcome"] = result.Outcome ?? string.Empty,
+                ["message"] = result.Message ?? string.Empty,
+            };
+            return Serialize(view);
+        }
+
+        /// <summary>
+        /// Serializes the result of dynamically spawning an entity on the grid.
+        /// </summary>
+        public static string SerializeEntitySpawnResult(EntitySpawnResult result)
+        {
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "entitySpawnResult",
+                ["success"] = result.Success,
+                ["entityKeyId"] = result.EntityKeyId ?? string.Empty,
+                ["entityId"] = result.EntityId ?? string.Empty,
+                ["side"] = result.Side ?? string.Empty,
+                ["spawnedX"] = result.SpawnedX,
+                ["spawnedY"] = result.SpawnedY,
+                ["spawnedZ"] = result.SpawnedZ,
+                ["health"] = result.Health,
+                ["message"] = result.Message ?? string.Empty,
+            };
+            return Serialize(view);
+        }
+
+        /// <summary>
         /// Unified health and status telemetry synthesizing loader state, content registries,
         /// compiled AI modules, match economy, and combat telemetry into a single agent-readable JSON.
         /// </summary>
@@ -1332,6 +1477,23 @@ namespace RogueCommandExpansionLoader.Runtime
                 new Dictionary<string, object> { ["name"] = "GetGridMetricsJson", ["description"] = "Telemetry of terrain dimensions, cell counts, and start cells." },
                 new Dictionary<string, object> { ["name"] = "EvaluateGridPositionJson", ["description"] = "Evaluate an (X, Z) coordinate against the battlefield grid bounds." },
                 new Dictionary<string, object> { ["name"] = "GetSystemHealthJson", ["description"] = "Unified system health across subsystems." },
+                new Dictionary<string, object> { ["name"] = "GetSelectionCensusJson", ["description"] = "Telemetry of active player selection and control group assignments." },
+                new Dictionary<string, object> { ["name"] = "GetFogStateJson", ["description"] = "Telemetry of Fog of War state and update intervals." },
+                new Dictionary<string, object> { ["name"] = "GetEntityCatalogJson", ["description"] = "Catalog of registered units, buildings, and factories." },
+                new Dictionary<string, object> { ["name"] = "SelectUnitsJson", ["description"] = "Select in-game units by entity key IDs." },
+                new Dictionary<string, object> { ["name"] = "DeselectAllUnitsJson", ["description"] = "Deselect all currently selected units." },
+                new Dictionary<string, object> { ["name"] = "SelectCategoryJson", ["description"] = "Select units by category (CombatUnits, Harvesters, IdleHarvesters, SkillBuildings, Factories)." },
+                new Dictionary<string, object> { ["name"] = "OrderUnitStopJson", ["description"] = "Order Stop on a unit or all selected units." },
+                new Dictionary<string, object> { ["name"] = "OrderUnitHoldPositionJson", ["description"] = "Order Hold Position on a unit or all selected units." },
+                new Dictionary<string, object> { ["name"] = "OrderUnitAttackMoveJson", ["description"] = "Order AttackMove toward coordinates." },
+                new Dictionary<string, object> { ["name"] = "AssignControlGroupJson", ["description"] = "Assign selected units to control group (0-9)." },
+                new Dictionary<string, object> { ["name"] = "SelectControlGroupJson", ["description"] = "Select units assigned to control group (0-9)." },
+                new Dictionary<string, object> { ["name"] = "SetFogOfWarJson", ["description"] = "Enable or disable Fog of War." },
+                new Dictionary<string, object> { ["name"] = "RevealFogOfWarJson", ["description"] = "Reveal Fog of War across the entire map." },
+                new Dictionary<string, object> { ["name"] = "SetGameTimeScaleJson", ["description"] = "Adjust match time scale (speed/pause)." },
+                new Dictionary<string, object> { ["name"] = "GetGameTimeScaleJson", ["description"] = "Query current match time scale." },
+                new Dictionary<string, object> { ["name"] = "TriggerMatchEndJson", ["description"] = "Trigger match victory or defeat." },
+                new Dictionary<string, object> { ["name"] = "SpawnEntityJson", ["description"] = "Spawn a unit or building entity at coordinates." },
                 new Dictionary<string, object> { ["name"] = "GetDiagnosticCatalogJson", ["description"] = "Catalog of available diagnostic getters." },
             };
 

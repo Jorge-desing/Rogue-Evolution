@@ -47,6 +47,12 @@
              Link="Runtime/RuntimeGameplayCommandDirector.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeGridCensus.cs"
              Link="Runtime/RuntimeGridCensus.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeSelectionCensus.cs"
+             Link="Runtime/RuntimeSelectionCensus.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeFogCensus.cs"
+             Link="Runtime/RuntimeFogCensus.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeEntityCatalogCensus.cs"
+             Link="Runtime/RuntimeEntityCatalogCensus.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Content/ContentPackDefinition.cs"
              Link="Content/ContentPackDefinition.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Content/VisualOverlayScaleCalibration.cs"

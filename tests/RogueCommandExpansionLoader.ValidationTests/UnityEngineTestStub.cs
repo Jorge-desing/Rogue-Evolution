@@ -98,6 +98,7 @@ namespace UnityEngine
 
     public class Object
     {
+        public static T FindObjectOfType<T>() where T : class => null;
     }
 
     public class Sprite : Object
@@ -124,6 +125,7 @@ namespace UnityEngine
     {
         public GameObject gameObject { get; set; } = new();
         public Transform transform { get; set; } = new();
+        public string tag { get => gameObject?.tag ?? ""; set { if (gameObject != null) gameObject.tag = value; } }
     }
 
     public class MonoBehaviour : Component
@@ -186,6 +188,7 @@ namespace UnityEngine
     public static class Time
     {
         public static float time { get; set; }
+        public static float timeScale { get; set; } = 1.0f;
     }
 
     public static class Debug

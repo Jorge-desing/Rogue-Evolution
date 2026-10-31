@@ -432,3 +432,200 @@ public sealed class ExistingControllers
         ThrowOnAiBuildings = false;
     }
 }
+
+public class PlayerUnitController : MonoBehaviour
+{
+    private static PlayerUnitController _instance = new PlayerUnitController();
+    public static PlayerUnitController Instance => _instance ??= new PlayerUnitController();
+
+    private readonly HashSet<GameObject> _selectedGameObjects = new();
+    private EntityController _selectedAiEntityController;
+    public EntityController SelectedAiEntityController => _selectedAiEntityController;
+    private readonly List<EntityController> _selectedEntitiesWithActiveSkill = new();
+    private readonly HashSet<GameObject>[] _controlGroups = new HashSet<GameObject>[10];
+
+    public bool OnlyBuildingsSelected { get; set; }
+    public bool OnlyEntitiesThatCannotAttackSelected { get; set; }
+
+    public PlayerUnitController()
+    {
+        for (int i = 0; i < 10; i++)
+        {
+            _controlGroups[i] = new HashSet<GameObject>();
+        }
+        _instance = this;
+    }
+
+    public void Select(GameObject go)
+    {
+        _selectedGameObjects.Clear();
+        if (go != null) _selectedGameObjects.Add(go);
+    }
+
+    public void AddToSelection(GameObject go)
+    {
+        if (go != null) _selectedGameObjects.Add(go);
+    }
+
+    public void Deselect(GameObject go, bool flag)
+    {
+        if (go != null) _selectedGameObjects.Remove(go);
+    }
+
+    public void DeselectAllUnits()
+    {
+        _selectedGameObjects.Clear();
+        _selectedAiEntityController = null;
+        _selectedEntitiesWithActiveSkill.Clear();
+    }
+
+    public static void DeselectAll_Static() => Instance.DeselectAllUnits();
+
+    public void SelectAllCombatUnits()
+    {
+        DeselectAllUnits();
+        foreach (var u in ExistingControllers.Instance.PlayerUnits())
+        {
+            if (u.gameObject != null) _selectedGameObjects.Add(u.gameObject);
+        }
+    }
+
+    public void SelectAllHarvesters()
+    {
+        DeselectAllUnits();
+        foreach (var h in ExistingControllers.Instance.Harvesters)
+        {
+            if (h.gameObject != null) _selectedGameObjects.Add(h.gameObject);
+        }
+    }
+
+    public void SelectIdleHarvesters() => SelectAllHarvesters();
+    public void SelectSkillBuildings() => DeselectAllUnits();
+    public void SelectAllFactories() => DeselectAllUnits();
+
+    public static bool SetControlGroup_Static(int number)
+    {
+        if (number < 0 || number >= 10) return false;
+        Instance._controlGroups[number].Clear();
+        foreach (var go in Instance._selectedGameObjects)
+        {
+            Instance._controlGroups[number].Add(go);
+        }
+        return true;
+    }
+
+    public static void SelectControlGroup_Static(int number)
+    {
+        if (number < 0 || number >= 10) return;
+        Instance.DeselectAllUnits();
+        foreach (var go in Instance._controlGroups[number])
+        {
+            Instance._selectedGameObjects.Add(go);
+        }
+    }
+
+    public static void Stop_Static() { }
+    public static void HoldPosition_Static() { }
+    public static void AttackMove_Static(Vector3 pos) { }
+    public static bool IsAnyEntitySelected_Static() => Instance._selectedGameObjects.Count > 0;
+    public static bool IsSelected_Static(string id) => false;
+}
+
+public class UpdateFogOfWar : MonoBehaviour
+{
+    private static UpdateFogOfWar _instance = new UpdateFogOfWar();
+    public static UpdateFogOfWar Instance => _instance ??= new UpdateFogOfWar();
+
+    public bool disableFogOfWar;
+    public float updateIntervalInSeconds = 0.5f;
+    private object _blendAmountTexture = new object();
+
+    public UpdateFogOfWar()
+    {
+        _instance = this;
+    }
+
+    public static bool RevealedStaticCalled { get; set; }
+    public static void Reveal_Static()
+    {
+        RevealedStaticCalled = true;
+    }
+}
+
+public class FinishLevel : MonoBehaviour
+{
+    private static FinishLevel _instance;
+    public static FinishLevel Instance => _instance ??= new FinishLevel();
+
+    private static bool _isFinishing;
+    public static bool WonCalled { get; set; }
+    public static bool LostCalled { get; set; }
+
+    public FinishLevel()
+    {
+        _instance = this;
+    }
+
+    public static bool IsFinishing_Static() => _isFinishing;
+    public static void Win_Static(Vector3 pos, AiBehaviour beatenAi)
+    {
+        WonCalled = true;
+        _isFinishing = true;
+    }
+
+    public static void Lose_Static(Vector3 pos)
+    {
+        LostCalled = true;
+        _isFinishing = true;
+    }
+
+    public void Win() => Win_Static(Vector3.zero, null);
+    public void Lose() => Lose_Static(Vector3.zero);
+    public static void Reset()
+    {
+        _isFinishing = false;
+        WonCalled = false;
+        LostCalled = false;
+    }
+}
+
+public static class EntityFactory
+{
+    public static Func<string, Vector3, EntityController, string, string, Transform, UnitRole, bool, string, EntityController> CustomInstantiate { get; set; }
+
+    public static EntityController InstantiateEntity(
+        string entityId,
+        Vector3 position,
+        EntityController originEntity,
+        string tag = "",
+        string name = "",
+        Transform parentTransform = null,
+        UnitRole additionalRoles = UnitRole.None,
+        bool hasBeenCalledFromAbove = false,
+        string instantiationInfo = "")
+    {
+        if (CustomInstantiate != null)
+        {
+            return CustomInstantiate(entityId, position, originEntity, tag, name, parentTransform, additionalRoles, hasBeenCalledFromAbove, instantiationInfo);
+        }
+
+        var ec = new EntityController
+        {
+            EntityId = string.IsNullOrEmpty(name) ? entityId : name,
+            CurrentHealth = 100f,
+            MaxHealth = 100f,
+            tag = string.IsNullOrEmpty(tag) ? "Player" : tag
+        };
+        ec.transform.position = position;
+        return ec;
+    }
+}
+
+public static class Tags
+{
+    public const string Player = "Player";
+    public const string Ai = "Ai";
+    public const string Neutral = "Neutral";
+    public static bool IsPlayer(string tag) => string.Equals(tag, Player, StringComparison.OrdinalIgnoreCase);
+    public static bool IsAi(string tag) => string.Equals(tag, Ai, StringComparison.OrdinalIgnoreCase);
+}
