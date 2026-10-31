@@ -1426,6 +1426,50 @@ internal static partial class ValidationTestRunner
             throw new InvalidOperationException("Wave-escalation should reject maxWaves > 100.");
         }
     }),
+    ("threat-prioritization AI module parses defaults and validates limits", () =>
+    {
+        if (!ThreatPrioritizationParameterParser.TryParse(null, out ThreatPrioritizationSettings settings, out string diagnostic) || diagnostic != null)
+        {
+            throw new InvalidOperationException("Threat-prioritization default parse failed: " + diagnostic);
+        }
+        if (settings.BaseIndex != -1 || settings.CheckIntervalSeconds != 3f || settings.PriorityMode != "HighestThreat")
+        {
+            throw new InvalidOperationException("Threat-prioritization default values did not match specification.");
+        }
+
+        var validParams = new[]
+        {
+            new ContentModuleParameter { name = "baseIndex", value = "2" },
+            new ContentModuleParameter { name = "checkIntervalSeconds", value = "5" },
+            new ContentModuleParameter { name = "priorityMode", value = "LowestHealth" }
+        };
+        if (!ThreatPrioritizationParameterParser.TryParse(validParams, out settings, out diagnostic) || diagnostic != null)
+        {
+            throw new InvalidOperationException("Threat-prioritization custom parse failed: " + diagnostic);
+        }
+        if (settings.BaseIndex != 2 || settings.CheckIntervalSeconds != 5f || settings.PriorityMode != "LowestHealth")
+        {
+            throw new InvalidOperationException("Threat-prioritization parsed values incorrect.");
+        }
+
+        var invalidInterval = new[]
+        {
+            new ContentModuleParameter { name = "checkIntervalSeconds", value = "0.1" }
+        };
+        if (ThreatPrioritizationParameterParser.TryParse(invalidInterval, out _, out diagnostic) || diagnostic == null)
+        {
+            throw new InvalidOperationException("Threat-prioritization should reject checkIntervalSeconds < 0.5.");
+        }
+
+        var invalidMode = new[]
+        {
+            new ContentModuleParameter { name = "priorityMode", value = "Invalid" }
+        };
+        if (ThreatPrioritizationParameterParser.TryParse(invalidMode, out _, out diagnostic) || diagnostic == null)
+        {
+            throw new InvalidOperationException("Threat-prioritization should reject invalid priorityMode.");
+        }
+    }),
     ("wave-escalation AI module increments attack wave counter and orders assault", () =>
     {
         ExistingControllers.Instance.Reset();
