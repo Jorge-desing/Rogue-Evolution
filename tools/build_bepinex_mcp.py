@@ -1101,6 +1101,7 @@ TOOL_SPECS = [
     {"name": "diagnostics_spawn_entity", "description": "Spawns an entity via LoaderDiagnosticsComponent.", "parameters": {"type": "object", "properties": {"entityId": {"type": "string", "description": "Entity ID."}, "side": {"type": "string", "description": "Side (Friendly/Enemy)."}, "targetX": {"type": "number", "description": "X."}, "targetZ": {"type": "number", "description": "Z."}, "customName": {"type": "string", "description": "Custom name (optional)."}}, "required": ["entityId", "side", "targetX", "targetZ"], "additionalProperties": False}},
     {"name": "diagnostics_trigger_match_end", "description": "Triggers match end via LoaderDiagnosticsComponent.", "parameters": {"type": "object", "properties": {"win": {"type": "boolean", "description": "Win flag."}}, "required": ["win"], "additionalProperties": False}},
     {"name": "diagnostics_runtime_snapshot", "description": "Aggregates multiple live runtime diagnostics into a single JSON payload for agents.", "parameters": {"type": "object", "properties": {}, "additionalProperties": False}},
+    {"name": "diagnostics_runtime_scalars", "description": "Aggregates scalar runtime counters (live counts, profile count, range geometry bounds, point count) into JSON.", "parameters": {"type": "object", "properties": {}, "additionalProperties": False}},
 ]
 
 def generate_mcp_schema_files():

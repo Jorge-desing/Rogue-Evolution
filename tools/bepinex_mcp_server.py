@@ -714,6 +714,26 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             res = _call_diagnostics_method("TriggerMatchEndJson", [win])
             return _tool_response(res)
 
+        elif name == "diagnostics_runtime_scalars":
+            scalars = {}
+            scalar_calls = [
+                ("LiveBattlefieldEntityCount", []),
+                ("LivePlayerUnitCount", []),
+                ("LiveAiUnitCount", []),
+                ("LiveAiBuildingCount", []),
+                ("LiveHarvesterCount", []),
+                ("RegisteredUnitMechanicsProfileCount", []),
+                ("RangeDisplayGeometryMinimumSegments", []),
+                ("RangeDisplayGeometryMaximumSegments", []),
+                ("GetRangeCirclePointCount", [8]),
+            ]
+            for method, args in scalar_calls:
+                try:
+                    scalars[method] = _call_diagnostics_method(method, args)
+                except Exception as exc:
+                    scalars[method] = {"error": str(exc)}
+            return _tool_response(json.dumps(scalars, indent=2))
+
         elif name == "diagnostics_runtime_snapshot":
             snapshot = {}
             getters = [
