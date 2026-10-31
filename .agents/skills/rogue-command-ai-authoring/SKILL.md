@@ -284,6 +284,7 @@ Pitfalls:
 - Filter AI target candidates with `unit.IsEnemy(candidate)` and re-check hostility on the current target before applying hysteresis; never assume player-side entities are hostile after control-flag changes.
 - Require both `IsCombatUnit` and `CanAttackAndIsAttackEnabled` for AI combat-unit eligibility; avoid inverted `!A && !B` conditions.
 - Consume retarget/command budgets before native dispatch so exceptions cannot bypass caps.
+- AI profiles allow at most 8 modules. When adding a standard module such as `sample:threat-prioritization` to every profile, append it as the last module and verify each profile stays within the limit; profiles already at 8 must have a module removed or consolidated first.
 - When adding a target field to the test `EntityCommand` stub, update every factory that carries a target (`Attack`, `AttackMoveOnTarget`, `ActiveSkillOnTarget`, etc.) consistently.
 
 ### Integration with Existing AI Authoring
