@@ -324,6 +324,7 @@ class StructuredUnitParameterSchemaTests(unittest.TestCase):
                 "sample:support-repair",
                 "sample:siege-assault",
                 "sample:focus-fire",
+                "sample:threat-prioritization",
             }.issubset(profile_modules)
         )
         self.assertIn("stealth", units_by_id["tactical-operations:tidebreaker-skirmisher"])
@@ -331,6 +332,29 @@ class StructuredUnitParameterSchemaTests(unittest.TestCase):
         self.assertIn("synergies", units_by_id["tactical-operations:salvage-hauler"])
         self.assertIn("command", units_by_id["tactical-operations:bulwark-siege-tank"])
         self.assertIn("synergies", units_by_id["tactical-operations:field-medic-rover"])
+
+    def test_shipped_ai_profiles_contain_threat_prioritization(self) -> None:
+        packs = [
+            "sample-expansion",
+            "sample-native-expansion",
+            "sample-reactive-ai",
+            "tactical-operations",
+        ]
+        for pack_name in packs:
+            pack_path = ROOT / "content" / "packs" / pack_name / "content.json"
+            pack_manifest = json.loads(pack_path.read_text(encoding="utf-8"))
+            for profile in pack_manifest.get("aiProfiles", []):
+                modules = [m["moduleId"] for m in profile.get("modules", [])]
+                self.assertIn(
+                    "sample:threat-prioritization",
+                    modules,
+                    f"Profile '{profile.get('id')}' in pack '{pack_name}' must declare sample:threat-prioritization",
+                )
+                self.assertLessEqual(
+                    len(modules),
+                    8,
+                    f"Profile '{profile.get('id')}' in pack '{pack_name}' exceeded maximum 8 AI modules",
+                )
 
 
 if __name__ == "__main__":

@@ -87,14 +87,23 @@ namespace RogueCommandExpansionLoader.Modules
                 }
                 else if (string.Equals(name, "priorityMode", StringComparison.OrdinalIgnoreCase))
                 {
-                    if (!string.Equals(value, "HighestThreat", StringComparison.OrdinalIgnoreCase) &&
-                        !string.Equals(value, "LowestHealth", StringComparison.OrdinalIgnoreCase) &&
-                        !string.Equals(value, "HighestDps", StringComparison.OrdinalIgnoreCase))
+                    if (string.Equals(value, "HighestThreat", StringComparison.OrdinalIgnoreCase))
+                    {
+                        settings.PriorityMode = "HighestThreat";
+                    }
+                    else if (string.Equals(value, "LowestHealth", StringComparison.OrdinalIgnoreCase))
+                    {
+                        settings.PriorityMode = "LowestHealth";
+                    }
+                    else if (string.Equals(value, "HighestDps", StringComparison.OrdinalIgnoreCase))
+                    {
+                        settings.PriorityMode = "HighestDps";
+                    }
+                    else
                     {
                         diagnostic = "priorityMode must be HighestThreat, LowestHealth, or HighestDps.";
                         return false;
                     }
-                    settings.PriorityMode = value;
                 }
                 else if (string.Equals(name, "engagementRadius", StringComparison.OrdinalIgnoreCase))
                 {

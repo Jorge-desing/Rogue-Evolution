@@ -1488,6 +1488,76 @@ internal static partial class ValidationTestRunner
         {
             throw new InvalidOperationException("Threat-prioritization should reject duplicate parameters.");
         }
+
+        var dpsParams = new[]
+        {
+            new ContentModuleParameter { name = "priorityMode", value = "HighestDps" },
+            new ContentModuleParameter { name = "retargetThreshold", value = "1.5" },
+            new ContentModuleParameter { name = "maxRetargetsPerTick", value = "16" },
+            new ContentModuleParameter { name = "engagementRadius", value = "50" }
+        };
+        if (!ThreatPrioritizationParameterParser.TryParse(dpsParams, out settings, out diagnostic) || diagnostic != null)
+        {
+            throw new InvalidOperationException("Threat-prioritization custom HighestDps parse failed: " + diagnostic);
+        }
+        if (settings.PriorityMode != "HighestDps" || settings.RetargetThreshold != 1.5f || settings.MaxRetargetsPerTick != 16 || settings.EngagementRadius != 50f)
+        {
+            throw new InvalidOperationException("Threat-prioritization HighestDps parsed values incorrect.");
+        }
+
+        var invalidIntervalUpper = new[] { new ContentModuleParameter { name = "checkIntervalSeconds", value = "35" } };
+        if (ThreatPrioritizationParameterParser.TryParse(invalidIntervalUpper, out _, out diagnostic) || diagnostic == null)
+        {
+            throw new InvalidOperationException("Threat-prioritization should reject checkIntervalSeconds > 30.");
+        }
+
+        var invalidRadiusUpper = new[] { new ContentModuleParameter { name = "engagementRadius", value = "150" } };
+        if (ThreatPrioritizationParameterParser.TryParse(invalidRadiusUpper, out _, out diagnostic) || diagnostic == null)
+        {
+            throw new InvalidOperationException("Threat-prioritization should reject engagementRadius > 120.");
+        }
+
+        var invalidThresholdLower = new[] { new ContentModuleParameter { name = "retargetThreshold", value = "0.8" } };
+        if (ThreatPrioritizationParameterParser.TryParse(invalidThresholdLower, out _, out diagnostic) || diagnostic == null)
+        {
+            throw new InvalidOperationException("Threat-prioritization should reject retargetThreshold < 1.0.");
+        }
+
+        var invalidThresholdUpper = new[] { new ContentModuleParameter { name = "retargetThreshold", value = "3.5" } };
+        if (ThreatPrioritizationParameterParser.TryParse(invalidThresholdUpper, out _, out diagnostic) || diagnostic == null)
+        {
+            throw new InvalidOperationException("Threat-prioritization should reject retargetThreshold > 3.0.");
+        }
+
+        var invalidBudgetLower = new[] { new ContentModuleParameter { name = "maxRetargetsPerTick", value = "0" } };
+        if (ThreatPrioritizationParameterParser.TryParse(invalidBudgetLower, out _, out diagnostic) || diagnostic == null)
+        {
+            throw new InvalidOperationException("Threat-prioritization should reject maxRetargetsPerTick < 1.");
+        }
+
+        var invalidBudgetUpper = new[] { new ContentModuleParameter { name = "maxRetargetsPerTick", value = "40" } };
+        if (ThreatPrioritizationParameterParser.TryParse(invalidBudgetUpper, out _, out diagnostic) || diagnostic == null)
+        {
+            throw new InvalidOperationException("Threat-prioritization should reject maxRetargetsPerTick > 32.");
+        }
+
+        var invalidBaseLower = new[] { new ContentModuleParameter { name = "baseIndex", value = "-2" } };
+        if (ThreatPrioritizationParameterParser.TryParse(invalidBaseLower, out _, out diagnostic) || diagnostic == null)
+        {
+            throw new InvalidOperationException("Threat-prioritization should reject baseIndex < -1.");
+        }
+
+        var invalidBaseUpper = new[] { new ContentModuleParameter { name = "baseIndex", value = "35" } };
+        if (ThreatPrioritizationParameterParser.TryParse(invalidBaseUpper, out _, out diagnostic) || diagnostic == null)
+        {
+            throw new InvalidOperationException("Threat-prioritization should reject baseIndex > 31.");
+        }
+
+        var invalidUnknown = new[] { new ContentModuleParameter { name = "unknownParam", value = "foo" } };
+        if (ThreatPrioritizationParameterParser.TryParse(invalidUnknown, out _, out diagnostic) || diagnostic == null)
+        {
+            throw new InvalidOperationException("Threat-prioritization should reject unknown parameters.");
+        }
     }),
     ("threat-prioritization AI module prioritizes high-threat and finisher targets dynamically", () =>
     {
@@ -1619,6 +1689,168 @@ internal static partial class ValidationTestRunner
             if (aiOtherBase.ExecuteCommandCallCount > 0)
             {
                 throw new InvalidOperationException("Unit belonging to base 2 was retargeted by base 0 module.");
+            }
+
+            // Scenario 4: HighestDps mode prioritizes lethal glass cannon over bullet sponge
+            ExistingControllers.Instance.Reset();
+            var aiDpsAttacker = new EntityController
+            {
+                IsControlledByAi = true,
+                IsUnit = true,
+                IsCombatUnit = true,
+                CanAttackAndIsAttackEnabled = true,
+                CanMoveAndMovementIsEnabled = true,
+                UniqueEntityId = 503,
+                aiBaseIndex = 0,
+                Position = UnityEngine.Vector3.zero
+            };
+            ExistingControllers.Instance.AiUnits().Add(aiDpsAttacker);
+
+            var playerGlassCannon = new EntityController
+            {
+                IsControlledByPlayer = true,
+                IsUnit = true,
+                IsCombatUnit = true,
+                UniqueEntityId = 701,
+                Position = new UnityEngine.Vector3(10f, 0f, 0f),
+                CurrentHealth = 40f,
+                MaxHealth = 40f,
+                Damage1 = 90f,
+                Attack1Cooldown = 1f
+            };
+            var playerBulletSponge = new EntityController
+            {
+                IsControlledByPlayer = true,
+                IsUnit = true,
+                IsCombatUnit = true,
+                UniqueEntityId = 702,
+                Position = new UnityEngine.Vector3(6f, 0f, 0f),
+                CurrentHealth = 800f,
+                MaxHealth = 800f,
+                Damage1 = 4f,
+                Attack1Cooldown = 2f
+            };
+            ExistingControllers.Instance.PlayerEntities().Add(playerGlassCannon);
+            ExistingControllers.Instance.PlayerEntities().Add(playerBulletSponge);
+
+            var dpsModule = new ThreatPrioritizationAiModule();
+            var dpsBehaviour = dpsModule.CreateBehaviour(new DefaultAiBehaviour(),
+            [
+                new ContentModuleParameter { name = "priorityMode", value = "HighestDps" },
+                new ContentModuleParameter { name = "checkIntervalSeconds", value = "1" },
+                new ContentModuleParameter { name = "engagementRadius", value = "40" }
+            ]);
+            dpsBehaviour.OnInitialized();
+            dpsBehaviour.Tick();
+
+            if (aiDpsAttacker.CurrentAttackTarget != playerGlassCannon)
+            {
+                throw new InvalidOperationException("AI attacker did not prioritize high-DPS glass cannon in HighestDps mode.");
+            }
+
+            // Scenario 5: Hysteresis prevents target flapping when candidate does not beat current by threshold
+            var playerMarginalThreat = new EntityController
+            {
+                IsControlledByPlayer = true,
+                IsUnit = true,
+                IsCombatUnit = true,
+                UniqueEntityId = 703,
+                Position = new UnityEngine.Vector3(10f, 0f, 0f),
+                CurrentHealth = 40f,
+                MaxHealth = 40f,
+                Damage1 = 95f,
+                Attack1Cooldown = 1f
+            };
+            ExistingControllers.Instance.PlayerEntities().Add(playerMarginalThreat);
+
+            int commandsBeforeHysteresis = aiDpsAttacker.ExecuteCommandCallCount;
+            UnityEngine.Time.time += 2f;
+            dpsBehaviour.Tick();
+
+            if (aiDpsAttacker.CurrentAttackTarget != playerGlassCannon || aiDpsAttacker.ExecuteCommandCallCount != commandsBeforeHysteresis)
+            {
+                throw new InvalidOperationException("Hysteresis failed: target flapped when new threat was within retargetThreshold margin.");
+            }
+
+            // When an overwhelming threat appears (> 1.25x), retargeting triggers
+            var playerExtremeThreat = new EntityController
+            {
+                IsControlledByPlayer = true,
+                IsUnit = true,
+                IsCombatUnit = true,
+                UniqueEntityId = 704,
+                Position = new UnityEngine.Vector3(10f, 0f, 0f),
+                CurrentHealth = 40f,
+                MaxHealth = 40f,
+                Damage1 = 200f,
+                Attack1Cooldown = 1f
+            };
+            ExistingControllers.Instance.PlayerEntities().Add(playerExtremeThreat);
+
+            UnityEngine.Time.time += 2f;
+            dpsBehaviour.Tick();
+
+            if (aiDpsAttacker.CurrentAttackTarget != playerExtremeThreat)
+            {
+                throw new InvalidOperationException("Retargeting failed to switch when new threat exceeded retargetThreshold.");
+            }
+
+            // Scenario 6: maxRetargetsPerTick budget caps commands per tick
+            ExistingControllers.Instance.Reset();
+            var ai1 = new EntityController { IsControlledByAi = true, IsUnit = true, IsCombatUnit = true, CanAttackAndIsAttackEnabled = true, UniqueEntityId = 801, Position = UnityEngine.Vector3.zero };
+            var ai2 = new EntityController { IsControlledByAi = true, IsUnit = true, IsCombatUnit = true, CanAttackAndIsAttackEnabled = true, UniqueEntityId = 802, Position = UnityEngine.Vector3.zero };
+            var ai3 = new EntityController { IsControlledByAi = true, IsUnit = true, IsCombatUnit = true, CanAttackAndIsAttackEnabled = true, UniqueEntityId = 803, Position = UnityEngine.Vector3.zero };
+            ExistingControllers.Instance.AiUnits().Add(ai1);
+            ExistingControllers.Instance.AiUnits().Add(ai2);
+            ExistingControllers.Instance.AiUnits().Add(ai3);
+            ExistingControllers.Instance.PlayerEntities().Add(playerExtremeThreat);
+
+            var budgetModule = new ThreatPrioritizationAiModule();
+            var budgetBehaviour = budgetModule.CreateBehaviour(new DefaultAiBehaviour(),
+            [
+                new ContentModuleParameter { name = "maxRetargetsPerTick", value = "2" },
+                new ContentModuleParameter { name = "checkIntervalSeconds", value = "1" }
+            ]);
+            budgetBehaviour.OnInitialized();
+            budgetBehaviour.Tick();
+
+            var budgetRuntime = (ThreatPrioritizationAiModule.ThreatPrioritizationRuntimeBehaviour)budgetBehaviour;
+            if (budgetRuntime.LastRetargetedCount != 2)
+            {
+                throw new InvalidOperationException("maxRetargetsPerTick budget was not respected; expected 2 retargets but got " + budgetRuntime.LastRetargetedCount);
+            }
+
+            // Scenario 7: Out-of-range candidate is ignored
+            ExistingControllers.Instance.Reset();
+            var aiRanger = new EntityController { IsControlledByAi = true, IsUnit = true, IsCombatUnit = true, CanAttackAndIsAttackEnabled = true, UniqueEntityId = 901, Position = UnityEngine.Vector3.zero };
+            ExistingControllers.Instance.AiUnits().Add(aiRanger);
+
+            var playerFarAway = new EntityController
+            {
+                IsControlledByPlayer = true,
+                IsUnit = true,
+                IsCombatUnit = true,
+                UniqueEntityId = 902,
+                Position = new UnityEngine.Vector3(100f, 0f, 0f),
+                CurrentHealth = 10f,
+                MaxHealth = 10f,
+                Damage1 = 500f,
+                Attack1Cooldown = 1f
+            };
+            ExistingControllers.Instance.PlayerEntities().Add(playerFarAway);
+
+            var rangeModule = new ThreatPrioritizationAiModule();
+            var rangeBehaviour = rangeModule.CreateBehaviour(new DefaultAiBehaviour(),
+            [
+                new ContentModuleParameter { name = "engagementRadius", value = "35" },
+                new ContentModuleParameter { name = "checkIntervalSeconds", value = "1" }
+            ]);
+            rangeBehaviour.OnInitialized();
+            rangeBehaviour.Tick();
+
+            if (aiRanger.ExecuteCommandCallCount > 0)
+            {
+                throw new InvalidOperationException("AI attacker targeted an enemy candidate located outside engagement radius.");
             }
         }
         finally
