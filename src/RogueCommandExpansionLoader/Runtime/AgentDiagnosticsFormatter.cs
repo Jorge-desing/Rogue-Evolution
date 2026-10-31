@@ -345,6 +345,33 @@ namespace RogueCommandExpansionLoader.Runtime
         }
 
         /// <summary>
+        /// Serializes a compact live match summary combining the battlefield census,
+        /// the AI roster, and the runtime hook state. Readable by an agent without a
+        /// visual capture.
+        /// </summary>
+        public static string SerializeMatchSummary(
+            BattlefieldCensus battlefield,
+            AiRosterCensus aiRoster,
+            bool hooksInstalled,
+            int installedHookCount)
+        {
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "matchSummary",
+                ["hooksInstalled"] = hooksInstalled,
+                ["installedHookCount"] = installedHookCount,
+                ["battlefieldEntityCount"] = battlefield != null ? battlefield.BattlefieldEntityCount : 0,
+                ["playerUnitCount"] = battlefield != null ? battlefield.PlayerUnitCount : 0,
+                ["aiUnitCount"] = battlefield != null ? battlefield.AiUnitCount : 0,
+                ["aiBuildingCount"] = battlefield != null ? battlefield.AiBuildingCount : 0,
+                ["harvesterCount"] = battlefield != null ? battlefield.HarvesterCount : 0,
+                ["aiRosterUnitCount"] = aiRoster != null ? aiRoster.AiUnitCount : 0,
+                ["aiRosterBuildingCount"] = aiRoster != null ? aiRoster.AiBuildingCount : 0,
+            };
+            return Serialize(view);
+        }
+
+        /// <summary>
         /// Serializes the live AI roster (units + buildings) enriched with base balance
         /// parameters, as read from the verified ExistingControllers registry plus the
         /// game's own EntityBalancingStore. Readable by an agent without a visual capture.

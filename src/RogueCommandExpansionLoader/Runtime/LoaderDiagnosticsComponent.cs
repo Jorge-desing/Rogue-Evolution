@@ -337,6 +337,18 @@ namespace RogueCommandExpansionLoader.Runtime
         }
 
         /// <summary>
+        /// Returns a compact live match summary (battlefield + AI roster + hooks) as JSON.
+        /// </summary>
+        public string GetMatchSummaryJson()
+        {
+            return AgentDiagnosticsFormatter.SerializeMatchSummary(
+                RuntimeBattlefieldCensus.Current(),
+                RuntimeAiRosterCensus.Current(),
+                RuntimePatchInstaller.IsHooksInstalled,
+                RuntimePatchInstaller.InstalledHookCount);
+        }
+
+        /// <summary>
         /// Returns one unit's base balance parameters (cost, max health/armor/shield/mana/rank,
         /// move speed, weapon range, dps, damage) as read from the game's own EntityBalancingStore,
         /// as JSON an agent can read without a visual capture. Pass the unit's entity id.
