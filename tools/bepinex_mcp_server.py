@@ -714,6 +714,32 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             res = _call_diagnostics_method("TriggerMatchEndJson", [win])
             return _tool_response(res)
 
+        elif name == "diagnostics_runtime_snapshot":
+            snapshot = {}
+            getters = [
+                "GetSystemHealthJson",
+                "GetBattlefieldCensusJson",
+                "GetPlayerRosterJson",
+                "GetAiRosterJson",
+                "GetRunProgressionCensusJson",
+                "GetCombatStatusCensusJson",
+                "GetProductionCensusJson",
+                "GetEconomyMatchCensusJson",
+                "GetBaseIntegrityCensusJson",
+                "GetThreatPrioritizationCensusJson",
+                "GetUnitThreatAssessmentJson",
+            ]
+            for getter in getters:
+                try:
+                    raw = _call_diagnostics_method(getter)
+                    try:
+                        snapshot[getter] = json.loads(raw)
+                    except Exception:
+                        snapshot[getter] = raw
+                except Exception as exc:
+                    snapshot[getter] = {"error": str(exc)}
+            return _tool_response(json.dumps(snapshot, indent=2))
+
         elif name == "diagnostics_call_getter":
             getter = arguments.get("getterName", "").strip()
             args_list = arguments.get("args") or []
