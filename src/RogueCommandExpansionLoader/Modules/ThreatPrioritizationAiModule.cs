@@ -44,6 +44,7 @@ namespace RogueCommandExpansionLoader.Modules
             private bool _stopped;
             private int _lastProcessedAiUnitCount;
             private int _lastProcessedAlliedUnitCount;
+            private System.Collections.Generic.HashSet<EntityController> _autoControlledAlliedUnits;
 
             public ThreatPrioritizationRuntimeBehaviour(DefaultAiBehaviour gameBehaviour, ThreatPrioritizationSettings settings)
             {
@@ -76,6 +77,7 @@ namespace RogueCommandExpansionLoader.Modules
                 {
                     int aiUnitCount = 0;
                     int alliedUnitCount = 0;
+                    System.Collections.Generic.HashSet<EntityController> autoControlledAllies = new System.Collections.Generic.HashSet<EntityController>();
                     ExistingControllers existing = ExistingControllers.Instance;
                     if (existing != null)
                     {
@@ -88,10 +90,21 @@ namespace RogueCommandExpansionLoader.Modules
                         if (playerUnits != null)
                         {
                             alliedUnitCount = playerUnits.Count;
+                            // Specialized for allied units: mark them as auto-controlled by this module
+                            // so the player does not need to micromanage them. Actual control
+                            // reassignment is deferred to a REA-verified follow-up.
+                            foreach (EntityController ally in playerUnits)
+                            {
+                                if (ally != null)
+                                {
+                                    autoControlledAllies.Add(ally);
+                                }
+                            }
                         }
                     }
                     _lastProcessedAiUnitCount = aiUnitCount;
                     _lastProcessedAlliedUnitCount = alliedUnitCount;
+                    _autoControlledAlliedUnits = autoControlledAllies;
                 }
                 catch
                 {
@@ -107,6 +120,11 @@ namespace RogueCommandExpansionLoader.Modules
             public int LastProcessedAlliedUnitCount
             {
                 get { return _lastProcessedAlliedUnitCount; }
+            }
+
+            public int AutoControlledAlliedUnitCount
+            {
+                get { return _autoControlledAlliedUnits != null ? _autoControlledAlliedUnits.Count : 0; }
             }
 
             public void OnDisposed()
