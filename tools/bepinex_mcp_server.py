@@ -614,6 +614,106 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             res = _call_diagnostics_method("ResolveInspectorOpenState", [is_open, toggle_pressed, close_pressed])
             return _tool_response(res)
 
+        elif name == "diagnostics_get_card_change_request":
+            value_to_change = str(arguments.get("valueToChange", ""))
+            operation = str(arguments.get("operation", "Add"))
+            value = float(arguments.get("value", 0.0))
+            side = str(arguments.get("side", "Friendly"))
+            mult_heat = bool(arguments.get("multiplyValueWithCurrentHeatLevel", False))
+            mult_meta = bool(arguments.get("multiplyValueWithMetaProgressionMultiplier", False))
+            greater_zero = bool(arguments.get("changeableValueHasToBeGreaterZero", False))
+            source_id = str(arguments.get("sourceId", "rcl-card-change"))
+            res = _call_diagnostics_method("GetCardChangeRequestJsonFromParams", [value_to_change, operation, value, side, mult_heat, mult_meta, greater_zero, source_id])
+            return _tool_response(res)
+
+        elif name == "diagnostics_assign_control_group":
+            group_number = int(arguments.get("groupNumber", 0))
+            res = _call_diagnostics_method("AssignControlGroupJson", [group_number])
+            return _tool_response(res)
+
+        elif name == "diagnostics_deselect_all_units":
+            res = _call_diagnostics_method("DeselectAllUnitsJson")
+            return _tool_response(res)
+
+        elif name == "diagnostics_get_entity_catalog":
+            res = _call_diagnostics_method("GetEntityCatalogJson")
+            return _tool_response(res)
+
+        elif name == "diagnostics_get_fog_state":
+            res = _call_diagnostics_method("GetFogStateJson")
+            return _tool_response(res)
+
+        elif name == "diagnostics_get_game_time_scale":
+            res = _call_diagnostics_method("GetGameTimeScaleJson")
+            return _tool_response(res)
+
+        elif name == "diagnostics_get_selection_census":
+            res = _call_diagnostics_method("GetSelectionCensusJson")
+            return _tool_response(res)
+
+        elif name == "diagnostics_order_unit_attack_move":
+            e_key = str(arguments.get("entityKeyId", ""))
+            x = float(arguments.get("targetX", 0.0))
+            z = float(arguments.get("targetZ", 0.0))
+            res = _call_diagnostics_method("OrderUnitAttackMoveJson", [e_key, x, z])
+            return _tool_response(res)
+
+        elif name == "diagnostics_order_unit_hold_position":
+            e_key = arguments.get("entityKeyId")
+            args = [str(e_key)] if e_key is not None else []
+            res = _call_diagnostics_method("OrderUnitHoldPositionJson", args)
+            return _tool_response(res)
+
+        elif name == "diagnostics_order_unit_stop":
+            e_key = arguments.get("entityKeyId")
+            args = [str(e_key)] if e_key is not None else []
+            res = _call_diagnostics_method("OrderUnitStopJson", args)
+            return _tool_response(res)
+
+        elif name == "diagnostics_reveal_fog_of_war":
+            res = _call_diagnostics_method("RevealFogOfWarJson")
+            return _tool_response(res)
+
+        elif name == "diagnostics_select_category":
+            category = str(arguments.get("category", ""))
+            res = _call_diagnostics_method("SelectCategoryJson", [category])
+            return _tool_response(res)
+
+        elif name == "diagnostics_select_control_group":
+            group_number = int(arguments.get("groupNumber", 0))
+            res = _call_diagnostics_method("SelectControlGroupJson", [group_number])
+            return _tool_response(res)
+
+        elif name == "diagnostics_select_units":
+            csv = str(arguments.get("entityKeysCsv", ""))
+            additive = bool(arguments.get("additive", False))
+            res = _call_diagnostics_method("SelectUnitsJson", [csv, additive])
+            return _tool_response(res)
+
+        elif name == "diagnostics_set_fog_of_war":
+            disable_fog = bool(arguments.get("disableFog", False))
+            res = _call_diagnostics_method("SetFogOfWarJson", [disable_fog])
+            return _tool_response(res)
+
+        elif name == "diagnostics_set_game_time_scale":
+            time_scale = float(arguments.get("timeScale", 1.0))
+            res = _call_diagnostics_method("SetGameTimeScaleJson", [time_scale])
+            return _tool_response(res)
+
+        elif name == "diagnostics_spawn_entity":
+            entity_id = str(arguments.get("entityId", ""))
+            side = str(arguments.get("side", "Friendly"))
+            x = float(arguments.get("targetX", 0.0))
+            z = float(arguments.get("targetZ", 0.0))
+            custom_name = str(arguments.get("customName", ""))
+            res = _call_diagnostics_method("SpawnEntityJson", [entity_id, side, x, z, custom_name])
+            return _tool_response(res)
+
+        elif name == "diagnostics_trigger_match_end":
+            win = bool(arguments.get("win", True))
+            res = _call_diagnostics_method("TriggerMatchEndJson", [win])
+            return _tool_response(res)
+
         elif name == "diagnostics_call_getter":
             getter = arguments.get("getterName", "").strip()
             args_list = arguments.get("args") or []
