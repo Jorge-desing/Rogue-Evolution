@@ -430,6 +430,67 @@ internal static partial class ValidationTestRunner
             EntityBalancingStore.Reset();
         }
     }),
+    ("player roster census serializer emits counts and rows", () =>
+    {
+        var rows = new[]
+        {
+            new PlayerRosterRow("unit:player-1", false, 80f, 100f, 0.8f, 150, 5f, 10f, 12f, 6f),
+        };
+        var census = new PlayerRosterCensus(1, rows);
+        string json = AgentDiagnosticsFormatter.SerializePlayerRoster(census);
+        if (!json.Contains("\"playerUnitCount\":1") ||
+            !json.Contains("\"playerUnitRowCount\":1") ||
+            !json.Contains("\"entityKeyId\":\"unit:player-1\"") ||
+            !json.Contains("\"healthRatio\":0.8") ||
+            !json.Contains("\"cost\":150"))
+        {
+            throw new InvalidOperationException("SerializePlayerRoster must report counts and rows.");
+        }
+
+        string empty = AgentDiagnosticsFormatter.SerializePlayerRoster(null);
+        if (!empty.Contains("\"playerUnitCount\":0") || !empty.Contains("\"playerUnitRows\":[]"))
+        {
+            throw new InvalidOperationException("SerializePlayerRoster must emit empty arrays for null input.");
+        }
+    }),
+    ("runtime player roster census collects from the battlefield census and balance store", () =>
+    {
+        EntityBalancingStore.Reset();
+        ExistingControllers.Instance.Reset();
+        try
+        {
+            EntityBalancingStore.CostOf["unit:player-1"] = 150;
+            EntityBalancingStore.MaxHealthOf["unit:player-1"] = 100;
+            EntityBalancingStore.MoveSpeedOf["unit:player-1"] = 5f;
+            EntityBalancingStore.DpsOf["unit:player-1"] = 10f;
+            EntityBalancingStore.Damage1Of["unit:player-1"] = 12f;
+            EntityBalancingStore.WeaponRangeOf["unit:player-1"] = 6f;
+
+            ExistingControllers.Instance.PlayerUnits().Add(new EntityController
+            {
+                entityId = "unit:player-1",
+                CurrentHealth = 80f,
+                MaxHealth = 100f,
+                IsControlledByPlayer = true,
+            });
+
+            PlayerRosterCensus census = RuntimePlayerRosterCensus.Current();
+            if (census.PlayerUnitCount != 1 || census.PlayerUnitRows.Count != 1 ||
+                census.PlayerUnitRows[0].EntityKeyId != "unit:player-1" ||
+                census.PlayerUnitRows[0].Cost != 150 ||
+                census.PlayerUnitRows[0].MaxHealth != 100 ||
+                census.PlayerUnitRows[0].CurrentHealth != 80f ||
+                census.PlayerUnitRows[0].HealthRatio != 0.8f)
+            {
+                throw new InvalidOperationException("RuntimePlayerRosterCensus must aggregate live player units with balance.");
+            }
+        }
+        finally
+        {
+            ExistingControllers.Instance.Reset();
+            EntityBalancingStore.Reset();
+        }
+    }),
     ("identifier color policy hashes with FNV-1a and maps to a stable palette slot", () =>
     {
         if (IdentifierColorPolicy.Hash(string.Empty) != 0x811C9DC5u)
