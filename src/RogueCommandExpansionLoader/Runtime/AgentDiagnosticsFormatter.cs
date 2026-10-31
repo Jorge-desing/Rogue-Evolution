@@ -372,6 +372,41 @@ namespace RogueCommandExpansionLoader.Runtime
         }
 
         /// <summary>
+        /// Serializes the live player roster enriched with base balance parameters.
+        /// </summary>
+        public static string SerializePlayerRoster(PlayerRosterCensus census)
+        {
+            var rows = new List<Dictionary<string, object>>();
+            if (census != null && census.PlayerUnitRows != null)
+            {
+                foreach (PlayerRosterRow row in census.PlayerUnitRows)
+                {
+                    rows.Add(new Dictionary<string, object>
+                    {
+                        ["entityKeyId"] = row.EntityKeyId ?? string.Empty,
+                        ["isBuilding"] = row.IsBuilding,
+                        ["currentHealth"] = row.CurrentHealth,
+                        ["maxHealth"] = row.MaxHealth,
+                        ["healthRatio"] = row.HealthRatio,
+                        ["cost"] = row.Cost,
+                        ["moveSpeed"] = row.MoveSpeed,
+                        ["dps"] = row.Dps,
+                        ["damage1"] = row.Damage1,
+                        ["weaponRange"] = row.WeaponRange,
+                    });
+                }
+            }
+
+            var view = new Dictionary<string, object>
+            {
+                ["playerUnitCount"] = census != null ? census.PlayerUnitCount : 0,
+                ["playerUnitRowCount"] = rows.Count,
+                ["playerUnitRows"] = rows,
+            };
+            return Serialize(view);
+        }
+
+        /// <summary>
         /// Serializes the live AI roster (units + buildings) enriched with base balance
         /// parameters, as read from the verified ExistingControllers registry plus the
         /// game's own EntityBalancingStore. Readable by an agent without a visual capture.

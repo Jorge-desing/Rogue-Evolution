@@ -25,6 +25,8 @@
              Link="Runtime/RuntimeEntityBalanceLookup.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeAiRosterCensus.cs"
              Link="Runtime/RuntimeAiRosterCensus.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimePlayerRosterCensus.cs"
+             Link="Runtime/RuntimePlayerRosterCensus.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Content/ContentPackDefinition.cs"
              Link="Content/ContentPackDefinition.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Content/VisualOverlayScaleCalibration.cs"
