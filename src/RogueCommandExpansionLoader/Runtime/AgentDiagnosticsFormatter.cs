@@ -372,6 +372,35 @@ namespace RogueCommandExpansionLoader.Runtime
         }
 
         /// <summary>
+        /// Serializes a live unit threat assessment (per-unit health ratio, base DPS,
+        /// and combined threat score). Readable by an agent without a visual capture.
+        /// </summary>
+        public static string SerializeUnitThreatAssessment(UnitThreatAssessment assessment)
+        {
+            var rows = new List<Dictionary<string, object>>();
+            if (assessment != null && assessment.Rows != null)
+            {
+                foreach (UnitThreatRow row in assessment.Rows)
+                {
+                    rows.Add(new Dictionary<string, object>
+                    {
+                        ["entityKeyId"] = row.EntityKeyId ?? string.Empty,
+                        ["healthRatio"] = row.HealthRatio,
+                        ["baseDps"] = row.BaseDps,
+                        ["threatScore"] = row.ThreatScore,
+                    });
+                }
+            }
+
+            var view = new Dictionary<string, object>
+            {
+                ["unitThreatCount"] = rows.Count,
+                ["unitThreatRows"] = rows,
+            };
+            return Serialize(view);
+        }
+
+        /// <summary>
         /// Serializes the live player roster enriched with base balance parameters.
         /// </summary>
         public static string SerializePlayerRoster(PlayerRosterCensus census)
