@@ -1007,6 +1007,48 @@ namespace RogueCommandExpansionLoader.Runtime
                             }
 
                             ApplyTimedStatusEffect(originatorObj, "Vampirism", 0.75f);
+
+                            // Persistent card-change augmentation on siphon (native data-driven
+                            // pipeline): the first time a unit siphons, grant a permanent
+                            // Damage1 bonus so the leech edge survives. Tracked per unit.
+                            try
+                            {
+                                Assembly leechAssembly = originatorObj.GetType().Assembly;
+                                int leechUniqueId = ReadIntProperty(_uniqueEntityIdProperty, originatorObj, -1);
+                                if (leechUniqueId > 0)
+                                {
+                                    string leechKey = leechUniqueId.ToString() + "|leech";
+                                    bool alreadyApplied;
+                                    lock (_appliedCardChangeBoostKeys)
+                                    {
+                                        alreadyApplied = _appliedCardChangeBoostKeys.Contains(leechKey);
+                                        if (!alreadyApplied)
+                                        {
+                                            _appliedCardChangeBoostKeys.Add(leechKey);
+                                        }
+                                    }
+                                    if (!alreadyApplied)
+                                    {
+                                        float leechDamage = Mathf.Max(0.5f, amount * profile.VampiricLeech.siphonRatio * 0.5f);
+                                        CardChangeRequest leechRequest = CardChangeRequest.Create(
+                                            "Damage1",
+                                            "Add",
+                                            leechDamage,
+                                            false,
+                                            false,
+                                            "Friendly",
+                                            false,
+                                            null,
+                                            null,
+                                            "leech:" + originatorId);
+                                        RuntimeCardChangeApplier.ApplyCardChange(leechAssembly, leechUniqueId, leechRequest);
+                                    }
+                                }
+                            }
+                            catch
+                            {
+                                // Guarded: leech augmentation must never break siphon.
+                            }
                         }
                     }
                 }
