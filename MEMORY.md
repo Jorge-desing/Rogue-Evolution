@@ -169,3 +169,19 @@ This is a compact, durable orientation for agents. For the changing checkout sta
   - `LoaderDiagnosticsComponent`: Exposes new public members (`RegisteredAiModuleCount`, `LivePlayerCredits`, `LiveAiCredits`, `LiveAttackWaveNumber`, `LiveCombatActiveUnitCount`, `LiveUnitsWithStatusEffectsCount`) and MCP callable methods (`GetAiModulesDiagnosticsJson()`, `GetEconomyMatchCensusJson()`, `GetCombatStatusCensusJson()`, `GetSystemHealthJson()`).
   - Unit tests: 4 new validation tests in `RuntimeAndDiagnosticsValidationTests.cs` asserting correct counts, loss bounds, JSON structure, and graceful degradation on nulls. C# harness passes 376/377 (1 Windows symlink skip, 0 failures); Python tests 85/85 pass; Release plugin build compiles with 0 warnings and 0 errors.
 - Uncommitted working-tree preserved: untracked `.agents/skills/rogue-command-game-research/references/`; nested worktree gitlinks `cargador` (11e9968, dirty) and `task-graph-validation` (d1f9045, dirty).
+
+## Refresh (2026-10-31, HEAD ff0ce12)
+
+- Repository HEAD/upstream/origin now `ff0ce12` (`refactor(loader): purge dead obsolete helpers and wire up unreferenced loader utilities`), after `406e258` and `9207d1e`. Code baseline remains `0bbede6b7beb68f8f50f4ae89f10e83ecb056c0d`; branch `codex/rogue-unit-balance-20261018`, loader `1.19.0`.
+- Dead code discarded / purged:
+  - `ContentPackRuntimeLoader.cs`: Purged uncalled obsolete helpers `IsNativeInitialStagePool` (pre-universal blueprint scoping artifact), `AddLoadedFactoryId`, `CloneStageBlueprintPools` (superseded by inlined stage pool cloning at line 3840), and unused static `ContainsString`.
+  - `ThreatPrioritizationAiModule.cs`: Removed dead redundant `OnDisposed()` (`OnDestroyed()` already satisfies `IRogueCommandAiRuntimeBehaviour`).
+  - `RuntimeReflection.cs`: Removed uncalled legacy `FindInstanceListField` and duplicate `IsGameType` (`HasSimpleName` retained).
+- Unreferenced utilities implemented, wired up, and tested:
+  - `BalanceOverrideFlags.TryValidateFactoryRow`: Validates `Building` + `Factory` roles on factory balance rows; covered with unit tests in `BuildingsAndRelicsValidationTests.cs`.
+  - `BlueprintPoolScopeRegistry.AllowsModUnitInSourcePool`: Implemented and wired to `BlueprintPoolScopeRegistration.ContainsUnitInSourcePool`; covered in `StagesAndBlueprintsValidationTests.cs`.
+  - `BlueprintRewardFactoryScope.IsStageFactory`: Verified and covered with unit tests in `StagesAndBlueprintsValidationTests.cs`.
+  - `RuntimeCardChangeApplier.IsAvailable`: Wired to `LoaderDiagnosticsComponent.IsNativeCardChangePipelineReady` property and verified in `RuntimeAndDiagnosticsValidationTests.cs`.
+  - `ThreatPrioritizationAiModule.ThreatPrioritizationRuntimeBehaviour`: Added behaviour tracking registry (`ActiveBehaviourCount`, aggregates for processed AI/allied units and retarget counts) wired to `LoaderDiagnosticsComponent.GetThreatPrioritizationCensusJson()`.
+  - `AiModuleRegistry`: Consolidated all 20 compiled AI module registrations into static factory `AiModuleRegistry.CreateDefault()`, simplifying `RogueCommandExpansionPlugin.cs` initialization and protecting tests with thread-safe lazy active instance.
+- Validation: Release plugin build 0 warnings/0 errors; C# validation harness passes 381/382 (1 Windows symlink-privilege skip, 0 failures); Python test suite passes 85/85. Uncommitted worktrees preserved.
