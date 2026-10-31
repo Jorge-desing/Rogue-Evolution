@@ -520,6 +520,47 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             res = _call_diagnostics_method("OrderUnitAttackJson", [e_key, t_key])
             return _tool_response(res)
 
+        elif name == "diagnostics_order_active_skill":
+            e_key = str(arguments.get("entityKeyId", ""))
+            t_key = arguments.get("targetEntityKeyId")
+            tx = arguments.get("targetX")
+            tz = arguments.get("targetZ")
+            has_pos = tx is not None and tz is not None
+            args = [e_key, str(t_key) if t_key is not None else "", float(tx or 0.0), float(tz or 0.0), bool(has_pos)]
+            res = _call_diagnostics_method("OrderUnitActiveSkillJson", args)
+            return _tool_response(res)
+
+        elif name == "diagnostics_adjust_vitality":
+            e_key = str(arguments.get("entityKeyId", ""))
+            adj_type = str(arguments.get("adjustmentType", "Heal"))
+            amount = float(arguments.get("amount", 0.0))
+            ignore_armor = bool(arguments.get("ignoreArmor", False))
+            res = _call_diagnostics_method("AdjustEntityVitalityJson", [e_key, adj_type, amount, ignore_armor])
+            return _tool_response(res)
+
+        elif name == "diagnostics_apply_status_effect":
+            e_key = str(arguments.get("entityKeyId", ""))
+            effect_name = str(arguments.get("statusEffectName", ""))
+            duration = float(arguments.get("durationSeconds", 10.0))
+            res = _call_diagnostics_method("ApplyStatusEffectJson", [e_key, effect_name, duration])
+            return _tool_response(res)
+
+        elif name == "diagnostics_clear_status_effect":
+            e_key = str(arguments.get("entityKeyId", ""))
+            effect_name = str(arguments.get("statusEffectName", ""))
+            res = _call_diagnostics_method("ClearStatusEffectJson", [e_key, effect_name])
+            return _tool_response(res)
+
+        elif name == "diagnostics_get_grid_metrics":
+            res = _call_diagnostics_method("GetGridMetricsJson")
+            return _tool_response(res)
+
+        elif name == "diagnostics_evaluate_grid_position":
+            x = float(arguments.get("x", 0.0))
+            z = float(arguments.get("z", 0.0))
+            res = _call_diagnostics_method("EvaluateGridPositionJson", [x, z])
+            return _tool_response(res)
+
         elif name == "diagnostics_get_match_summary":
             res = _call_diagnostics_method("GetMatchSummaryJson")
             return _tool_response(res)

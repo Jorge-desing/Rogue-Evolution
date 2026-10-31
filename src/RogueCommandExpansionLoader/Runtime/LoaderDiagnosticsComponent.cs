@@ -547,6 +547,67 @@ namespace RogueCommandExpansionLoader.Runtime
         }
 
         /// <summary>
+        /// Dispatches an active tactical skill command on a unit (Self, on Target, or at Position).
+        /// </summary>
+        public string OrderUnitActiveSkillJson(
+            string entityKeyId,
+            string targetEntityKeyId = null,
+            float targetX = 0f,
+            float targetZ = 0f,
+            bool hasTargetPosition = false)
+        {
+            float? tx = hasTargetPosition ? (float?)targetX : null;
+            float? tz = hasTargetPosition ? (float?)targetZ : null;
+            return AgentDiagnosticsFormatter.SerializeActiveSkillOrderResult(
+                RuntimeGameplayCommandDirector.TryOrderActiveSkill(entityKeyId, targetEntityKeyId, tx, tz));
+        }
+
+        /// <summary>
+        /// Safely adjusts health, armor, shield, or damage on an entity for testing and calibration.
+        /// </summary>
+        public string AdjustEntityVitalityJson(string entityKeyId, string adjustmentType, float amount, bool ignoreArmor = false)
+        {
+            return AgentDiagnosticsFormatter.SerializeVitalityAdjustmentResult(
+                RuntimeGameplayCommandDirector.TryAdjustEntityVitality(entityKeyId, adjustmentType, amount, ignoreArmor));
+        }
+
+        /// <summary>
+        /// Applies a status effect (e.g. Emp, Burn, SlowedDown, Stun) to an entity for testing.
+        /// </summary>
+        public string ApplyStatusEffectJson(string entityKeyId, string statusEffectName, float durationSeconds = 10f)
+        {
+            return AgentDiagnosticsFormatter.SerializeStatusEffectOrderResult(
+                RuntimeGameplayCommandDirector.TryApplyStatusEffect(entityKeyId, statusEffectName, durationSeconds));
+        }
+
+        /// <summary>
+        /// Clears an active status effect from an entity.
+        /// </summary>
+        public string ClearStatusEffectJson(string entityKeyId, string statusEffectName)
+        {
+            return AgentDiagnosticsFormatter.SerializeStatusEffectOrderResult(
+                RuntimeGameplayCommandDirector.TryClearStatusEffect(entityKeyId, statusEffectName));
+        }
+
+        /// <summary>
+        /// Pure JSON telemetry of match terrain dimensions, cell counts, and start cells.
+        /// </summary>
+        public string GetGridMetricsJson()
+        {
+            return AgentDiagnosticsFormatter.SerializeGridMetricsCensus(
+                RuntimeGridCensus.Current());
+        }
+
+        /// <summary>
+        /// Evaluates an (X, Z) coordinate against the battlefield grid bounds.
+        /// </summary>
+        public string EvaluateGridPositionJson(float x, float z)
+        {
+            return AgentDiagnosticsFormatter.SerializeGridCellEvaluationResult(
+                RuntimeGridCensus.EvaluatePosition(x, z));
+        }
+
+        /// <summary>
         /// Returns a unified system health and diagnostics overview as JSON.
         /// Synthesizes loader registry readiness, content counts, AI modules,
         /// economy parameters, and active combat telemetry.

@@ -124,9 +124,20 @@ public sealed class EntityController : Component
     public float MaxShield { get; set; } = 0f;
     public int CurrentRank { get; set; } = 0;
     public int MaxRank { get; set; } = 3;
-    public void Heal(float amount, EntityController originator) { CurrentHealth = System.Math.Min(CurrentHealth + amount, MaxHealth); }
-    public void RepairArmor(float amount, EntityController originator, bool doNotFire = false) { CurrentArmor = System.Math.Min(CurrentArmor + amount, MaxArmor); }
+    public void Heal(float amount, EntityController originator = null, bool doNotFireOnHasHealed = false, bool doNotFireOnBeingHealed = false) { CurrentHealth = System.Math.Min(CurrentHealth + amount, MaxHealth); }
+    public void RepairArmor(float amount, EntityController originator = null, bool doNotFire = false) { CurrentArmor = System.Math.Min(CurrentArmor + amount, MaxArmor); }
     public void ChargeShield(float amount, bool displayDeltaInBar = true) { CurrentShield = System.Math.Min(CurrentShield + amount, MaxShield); }
+    public void TakeDamage(float amount, EntityController originator = null, bool doNotFireOnHasDealtDamage = false, bool ignoreArmor = false)
+    {
+        float damageRemaining = amount;
+        if (!ignoreArmor && CurrentArmor > 0f)
+        {
+            float armorAbsorbed = System.Math.Min(CurrentArmor, damageRemaining);
+            CurrentArmor -= armorAbsorbed;
+            damageRemaining -= armorAbsorbed;
+        }
+        CurrentHealth = System.Math.Max(0f, CurrentHealth - damageRemaining);
+    }
     public void RankUp(int amount) { CurrentRank = System.Math.Min(CurrentRank + amount, MaxRank); }
     public bool IsEnemy(EntityController other) => other != null && (IsControlledByPlayer != other.IsControlledByPlayer || IsControlledByAi != other.IsControlledByAi);
     public void SetActiveStatusEffect(StatusEffect effect, SetStatusEffect.DurationType durationType, float duration)
@@ -351,8 +362,17 @@ public class SkillInfo
 public sealed class WorldGrid
 {
     public static WorldGrid Instance { get; set; } = new();
-    public Vector3 ClampToWorld(Vector3 position) => position;
-    public bool IsWithinWorld(Vector3 position) => true;
+    public float WorldWidth = 200f;
+    public float WorldHeight = 200f;
+    public int HorizontalCellCount = 100;
+    public int VerticalCellCount = 100;
+    public float CellSize = 2f;
+    public Vector2Int PlayerStartCell { get; set; } = new(10, 10);
+    public Vector2Int AiStartCell { get; set; } = new(90, 90);
+    public Vector3 ClampToWorld(Vector3 position) => new(Mathf.Clamp(position.x, 0f, WorldWidth), position.y, Mathf.Clamp(position.z, 0f, WorldHeight));
+    public bool IsWithinWorld(Vector3 position) => position.x >= 0f && position.z >= 0f && position.x <= WorldWidth && position.z <= WorldHeight;
+    public bool IsBorderCell(Vector2Int cell) => cell.x <= 0 || cell.y <= 0 || cell.x >= HorizontalCellCount - 1 || cell.y >= VerticalCellCount - 1;
+    public float Height(Vector2Int cell) => 0f;
 }
 
 public static class Bank

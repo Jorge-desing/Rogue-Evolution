@@ -3472,7 +3472,7 @@ internal static partial class ValidationTestRunner
             var names = new HashSet<string>();
             foreach (JsonElement item in doc.RootElement.GetProperty("diagnostics").EnumerateArray())
             {
-                names.Add(item.GetProperty("name").GetString());
+                names.Add(item.GetProperty("name").GetString()!);
             }
 
             string[] required =
@@ -3481,7 +3481,13 @@ internal static partial class ValidationTestRunner
                 "GrantPlayerCreditsJson",
                 "ApplyInGameCardChangeJson",
                 "OrderUnitMoveJson",
-                "OrderUnitAttackJson"
+                "OrderUnitAttackJson",
+                "OrderUnitActiveSkillJson",
+                "AdjustEntityVitalityJson",
+                "ApplyStatusEffectJson",
+                "ClearStatusEffectJson",
+                "GetGridMetricsJson",
+                "EvaluateGridPositionJson"
             };
 
             foreach (string req in required)
@@ -3490,6 +3496,310 @@ internal static partial class ValidationTestRunner
                 {
                     throw new InvalidOperationException("Diagnostic catalog must include " + req + ".");
                 }
+            }
+        }
+    }),
+    ("gameplay command director dispatches active skill commands across Self, Target, and Position modes", () =>
+    {
+        try
+        {
+            ExistingControllers.Instance.Reset();
+
+            var caster = new EntityController
+            {
+                name = "test_arc_caster",
+                EntityId = "unit:arc-caster-01",
+                IsControlledByPlayer = true,
+                IsUnit = true,
+                Position = new Vector3(15f, 0f, 20f)
+            };
+            ExistingControllers.Instance.PlayerUnits().Add(caster);
+
+            var enemyTarget = new EntityController
+            {
+                name = "test_enemy_mech",
+                EntityId = "unit:enemy-mech-01",
+                IsControlledByAi = true,
+                IsUnit = true,
+                Position = new Vector3(40f, 0f, 60f)
+            };
+            ExistingControllers.Instance.AiUnits().Add(enemyTarget);
+
+            // Self-targeted active skill
+            ActiveSkillOrderResult selfRes = RuntimeGameplayCommandDirector.TryOrderActiveSkill("unit:arc-caster-01");
+            if (!selfRes.Success || selfRes.SkillTargetMode != "Self" || selfRes.TargetX != 15f || selfRes.TargetZ != 20f)
+            {
+                throw new InvalidOperationException("Self-targeted skill command must succeed.");
+            }
+            if (!caster.LastExecutedCommand.HasValue ||
+                caster.LastExecutedCommand.Value.command != EntityCommand.Command.ActiveSkillWithoutTarget)
+            {
+                throw new InvalidOperationException("Caster must receive ActiveSkillWithoutTarget command.");
+            }
+
+            // Target-entity active skill
+            ActiveSkillOrderResult targetRes = RuntimeGameplayCommandDirector.TryOrderActiveSkill("unit:arc-caster-01", targetEntityKeyId: "unit:enemy-mech-01");
+            if (!targetRes.Success || targetRes.SkillTargetMode != "Target" || targetRes.TargetX != 40f || targetRes.TargetZ != 60f)
+            {
+                throw new InvalidOperationException("Entity-targeted skill command must succeed.");
+            }
+            if (!caster.LastExecutedCommand.HasValue ||
+                caster.LastExecutedCommand.Value.command != EntityCommand.Command.ActiveSkillOnTarget ||
+                caster.LastExecutedCommand.Value.target != enemyTarget)
+            {
+                throw new InvalidOperationException("Caster must receive ActiveSkillOnTarget command with target.");
+            }
+
+            // Ground position active skill
+            ActiveSkillOrderResult posRes = RuntimeGameplayCommandDirector.TryOrderActiveSkill("unit:arc-caster-01", targetX: 75f, targetZ: 85f);
+            if (!posRes.Success || posRes.SkillTargetMode != "Position" || posRes.TargetX != 75f || posRes.TargetZ != 85f)
+            {
+                throw new InvalidOperationException("Position-targeted skill command must succeed.");
+            }
+            if (!caster.LastExecutedCommand.HasValue ||
+                caster.LastExecutedCommand.Value.command != EntityCommand.Command.ActiveSkillAtPosition ||
+                caster.LastExecutedCommand.Value.destination.x != 75f ||
+                caster.LastExecutedCommand.Value.destination.z != 85f)
+            {
+                throw new InvalidOperationException("Caster must receive ActiveSkillAtPosition command with coords.");
+            }
+
+            // Failure handling
+            ActiveSkillOrderResult missingCaster = RuntimeGameplayCommandDirector.TryOrderActiveSkill("unit:missing-caster");
+            if (missingCaster.Success)
+            {
+                throw new InvalidOperationException("Skill command must fail when caster is missing.");
+            }
+
+            ActiveSkillOrderResult missingTarget = RuntimeGameplayCommandDirector.TryOrderActiveSkill("unit:arc-caster-01", targetEntityKeyId: "unit:missing-target");
+            if (missingTarget.Success)
+            {
+                throw new InvalidOperationException("Skill command must fail when target entity is missing.");
+            }
+
+            // Serialization
+            string json = AgentDiagnosticsFormatter.SerializeActiveSkillOrderResult(posRes);
+            using (var doc = JsonDocument.Parse(json))
+            {
+                if (!doc.RootElement.GetProperty("success").GetBoolean() ||
+                    doc.RootElement.GetProperty("skillTargetMode").GetString() != "Position" ||
+                    doc.RootElement.GetProperty("targetX").GetSingle() != 75f)
+                {
+                    throw new InvalidOperationException("SerializeActiveSkillOrderResult JSON mismatch.");
+                }
+            }
+        }
+        finally
+        {
+            ExistingControllers.Instance.Reset();
+        }
+    }),
+    ("gameplay command director adjusts vitality: Heal, RepairArmor, ChargeShield, Damage", () =>
+    {
+        try
+        {
+            ExistingControllers.Instance.Reset();
+
+            var unit = new EntityController
+            {
+                name = "test_vitality_unit",
+                EntityId = "unit:vitality-01",
+                IsControlledByPlayer = true,
+                IsUnit = true,
+                CurrentHealth = 100f,
+                MaxHealth = 200f,
+                CurrentArmor = 50f,
+                MaxArmor = 100f,
+                CurrentShield = 20f,
+                MaxShield = 100f
+            };
+            ExistingControllers.Instance.PlayerUnits().Add(unit);
+
+            // Heal
+            VitalityAdjustmentResult healRes = RuntimeGameplayCommandDirector.TryAdjustEntityVitality("unit:vitality-01", "Heal", 40f);
+            if (!healRes.Success || healRes.NewHealth != 140f)
+            {
+                throw new InvalidOperationException("Heal adjustment must succeed and increase health to 140.");
+            }
+
+            // RepairArmor
+            VitalityAdjustmentResult repairRes = RuntimeGameplayCommandDirector.TryAdjustEntityVitality("unit:vitality-01", "RepairArmor", 30f);
+            if (!repairRes.Success || repairRes.NewArmor != 80f)
+            {
+                throw new InvalidOperationException("RepairArmor adjustment must succeed and increase armor to 80.");
+            }
+
+            // ChargeShield
+            VitalityAdjustmentResult shieldRes = RuntimeGameplayCommandDirector.TryAdjustEntityVitality("unit:vitality-01", "ChargeShield", 50f);
+            if (!shieldRes.Success || shieldRes.NewShield != 70f)
+            {
+                throw new InvalidOperationException("ChargeShield adjustment must succeed and increase shield to 70.");
+            }
+
+            // Damage with Armor Absorption (60 damage: armor drops from 80 to 20, health untouched at 140)
+            VitalityAdjustmentResult damageRes = RuntimeGameplayCommandDirector.TryAdjustEntityVitality("unit:vitality-01", "Damage", 60f, ignoreArmor: false);
+            if (!damageRes.Success || damageRes.NewArmor != 20f || damageRes.NewHealth != 140f)
+            {
+                throw new InvalidOperationException("Damage adjustment must reduce armor first before health.");
+            }
+
+            // Damage Bypassing Armor (50 damage: armor remains 20, health drops from 140 to 90)
+            VitalityAdjustmentResult directDmgRes = RuntimeGameplayCommandDirector.TryAdjustEntityVitality("unit:vitality-01", "Damage", 50f, ignoreArmor: true);
+            if (!directDmgRes.Success || directDmgRes.NewHealth != 90f || directDmgRes.NewArmor != 20f)
+            {
+                throw new InvalidOperationException("Armor-bypassing damage must directly reduce health.");
+            }
+
+            // Negative amount validation
+            VitalityAdjustmentResult negativeRes = RuntimeGameplayCommandDirector.TryAdjustEntityVitality("unit:vitality-01", "Heal", -20f);
+            if (negativeRes.Success)
+            {
+                throw new InvalidOperationException("Negative vitality adjustment must fail.");
+            }
+
+            // Invalid type validation
+            VitalityAdjustmentResult invalidTypeRes = RuntimeGameplayCommandDirector.TryAdjustEntityVitality("unit:vitality-01", "Explode", 50f);
+            if (invalidTypeRes.Success)
+            {
+                throw new InvalidOperationException("Unsupported adjustment type must fail.");
+            }
+
+            // Serialization
+            string json = AgentDiagnosticsFormatter.SerializeVitalityAdjustmentResult(healRes);
+            using (var doc = JsonDocument.Parse(json))
+            {
+                if (!doc.RootElement.GetProperty("success").GetBoolean() ||
+                    doc.RootElement.GetProperty("adjustmentType").GetString() != "Heal" ||
+                    doc.RootElement.GetProperty("amountApplied").GetSingle() != 40f ||
+                    doc.RootElement.GetProperty("newHealth").GetSingle() != 140f)
+                {
+                    throw new InvalidOperationException("SerializeVitalityAdjustmentResult JSON mismatch.");
+                }
+            }
+        }
+        finally
+        {
+            ExistingControllers.Instance.Reset();
+        }
+    }),
+    ("gameplay command director applies and clears status effects on units", () =>
+    {
+        try
+        {
+            ExistingControllers.Instance.Reset();
+
+            var unit = new EntityController
+            {
+                name = "test_status_unit",
+                EntityId = "unit:status-01",
+                IsControlledByPlayer = true,
+                IsUnit = true
+            };
+            ExistingControllers.Instance.PlayerUnits().Add(unit);
+
+            // Apply OnFire
+            StatusEffectOrderResult fireRes = RuntimeGameplayCommandDirector.TryApplyStatusEffect("unit:status-01", "OnFire", 15f);
+            if (!fireRes.Success || !fireRes.IsApplied || fireRes.DurationSeconds != 15f || !unit.HasActiveStatusEffect(StatusEffect.OnFire))
+            {
+                throw new InvalidOperationException("ApplyStatusEffect for OnFire must succeed.");
+            }
+
+            // Apply Stun
+            StatusEffectOrderResult stunRes = RuntimeGameplayCommandDirector.TryApplyStatusEffect("unit:status-01", "Stun", 5f);
+            if (!stunRes.Success || !unit.HasActiveStatusEffect(StatusEffect.Stun))
+            {
+                throw new InvalidOperationException("ApplyStatusEffect for Stun must succeed.");
+            }
+
+            // Clear OnFire
+            StatusEffectOrderResult clearFireRes = RuntimeGameplayCommandDirector.TryClearStatusEffect("unit:status-01", "OnFire");
+            if (!clearFireRes.Success || clearFireRes.IsApplied || unit.HasActiveStatusEffect(StatusEffect.OnFire))
+            {
+                throw new InvalidOperationException("ClearStatusEffect for OnFire must succeed.");
+            }
+            if (!unit.HasActiveStatusEffect(StatusEffect.Stun))
+            {
+                throw new InvalidOperationException("Stun effect must remain active after clearing OnFire.");
+            }
+
+            // Unknown status effect name
+            StatusEffectOrderResult unknownRes = RuntimeGameplayCommandDirector.TryApplyStatusEffect("unit:status-01", "NonExistentEffect");
+            if (unknownRes.Success)
+            {
+                throw new InvalidOperationException("ApplyStatusEffect must fail for unknown effect name.");
+            }
+
+            // Missing entity
+            StatusEffectOrderResult missingRes = RuntimeGameplayCommandDirector.TryApplyStatusEffect("unit:missing", "OnFire");
+            if (missingRes.Success)
+            {
+                throw new InvalidOperationException("ApplyStatusEffect must fail for missing entity.");
+            }
+
+            // Serialization
+            string json = AgentDiagnosticsFormatter.SerializeStatusEffectOrderResult(fireRes);
+            using (var doc = JsonDocument.Parse(json))
+            {
+                if (!doc.RootElement.GetProperty("success").GetBoolean() ||
+                    doc.RootElement.GetProperty("statusEffectName").GetString() != "OnFire" ||
+                    doc.RootElement.GetProperty("durationSeconds").GetSingle() != 15f ||
+                    !doc.RootElement.GetProperty("isApplied").GetBoolean())
+                {
+                    throw new InvalidOperationException("SerializeStatusEffectOrderResult JSON mismatch.");
+                }
+            }
+        }
+        finally
+        {
+            ExistingControllers.Instance.Reset();
+        }
+    }),
+    ("runtime grid census extracts map bounds and evaluates coordinates against world grid", () =>
+    {
+        GridMetricsCensus metrics = RuntimeGridCensus.Current();
+        if (!metrics.IsGridReady || metrics.WorldWidth != 200f || metrics.WorldHeight != 200f ||
+            metrics.HorizontalCellCount != 100 || metrics.VerticalCellCount != 100 || metrics.CellSize != 2f ||
+            metrics.PlayerStartX != 10 || metrics.PlayerStartY != 10 ||
+            metrics.AiStartX != 90 || metrics.AiStartY != 90)
+        {
+            throw new InvalidOperationException("RuntimeGridCensus.Current must extract accurate world dimensions and start cells.");
+        }
+
+        // Evaluate In-Bounds Position
+        GridCellEvaluationResult inBounds = RuntimeGridCensus.EvaluatePosition(50f, 60f);
+        if (!inBounds.IsWithinWorld || inBounds.ClampedX != 50f || inBounds.ClampedZ != 60f ||
+            inBounds.CellX != 25 || inBounds.CellY != 30)
+        {
+            throw new InvalidOperationException("EvaluatePosition for in-bounds coordinates (50, 60) must succeed with cell (25, 30).");
+        }
+
+        // Evaluate Out-of-Bounds Position
+        GridCellEvaluationResult outBounds = RuntimeGridCensus.EvaluatePosition(250f, -10f);
+        if (outBounds.IsWithinWorld || outBounds.ClampedX != 200f || outBounds.ClampedZ != 0f)
+        {
+            throw new InvalidOperationException("EvaluatePosition for out-of-bounds coordinates must clamp to grid edge.");
+        }
+
+        // Serialization
+        string metricsJson = AgentDiagnosticsFormatter.SerializeGridMetricsCensus(metrics);
+        using (var doc = JsonDocument.Parse(metricsJson))
+        {
+            if (!doc.RootElement.GetProperty("isGridReady").GetBoolean() ||
+                doc.RootElement.GetProperty("worldWidth").GetSingle() != 200f ||
+                doc.RootElement.GetProperty("playerStartX").GetInt32() != 10)
+            {
+                throw new InvalidOperationException("SerializeGridMetricsCensus JSON mismatch.");
+            }
+        }
+
+        string evalJson = AgentDiagnosticsFormatter.SerializeGridCellEvaluationResult(inBounds);
+        using (var doc = JsonDocument.Parse(evalJson))
+        {
+            if (!doc.RootElement.GetProperty("isWithinWorld").GetBoolean() ||
+                doc.RootElement.GetProperty("cellX").GetInt32() != 25 ||
+                doc.RootElement.GetProperty("cellY").GetInt32() != 30)
+            {
+                throw new InvalidOperationException("SerializeGridCellEvaluationResult JSON mismatch.");
             }
         }
     }),

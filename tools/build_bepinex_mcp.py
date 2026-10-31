@@ -901,6 +901,85 @@ TOOL_SPECS = [
             "additionalProperties": False,
         },
     },
+    {
+        "name": "diagnostics_order_active_skill",
+        "description": "Dispatches an active tactical skill command on a unit (Self, on Target, or at Position) via LoaderDiagnosticsComponent / RuntimeGameplayCommandDirector.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "entityKeyId": {"type": "string", "description": "Caster unit entity ID or name."},
+                "targetEntityKeyId": {"type": "string", "description": "Target entity ID or name for targeted skills (optional)."},
+                "targetX": {"type": "number", "description": "World X coordinate for ground-targeted skills (optional)."},
+                "targetZ": {"type": "number", "description": "World Z coordinate for ground-targeted skills (optional)."},
+            },
+            "required": ["entityKeyId"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "diagnostics_adjust_vitality",
+        "description": "Safely adjusts health, armor, shield, or inflicts damage on an entity for testing and balance calibration via LoaderDiagnosticsComponent / RuntimeGameplayCommandDirector.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "entityKeyId": {"type": "string", "description": "Target entity ID or name."},
+                "adjustmentType": {
+                    "type": "string",
+                    "enum": ["Heal", "RepairArmor", "ChargeShield", "Damage"],
+                    "description": "Type of vitality adjustment: Heal, RepairArmor, ChargeShield, or Damage."
+                },
+                "amount": {"type": "number", "description": "Numeric delta amount to apply."},
+                "ignoreArmor": {"type": "boolean", "description": "Whether damage should bypass armor (default false)."},
+            },
+            "required": ["entityKeyId", "adjustmentType", "amount"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "diagnostics_apply_status_effect",
+        "description": "Applies a status effect (e.g. Emp, Burn, SlowedDown, Stun) to an entity via LoaderDiagnosticsComponent / RuntimeGameplayCommandDirector.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "entityKeyId": {"type": "string", "description": "Target entity ID or name."},
+                "statusEffectName": {"type": "string", "description": "Status effect enum name (e.g. 'SlowedDown', 'OnFire', 'Stun', 'Armored', 'CombatBoost')."},
+                "durationSeconds": {"type": "number", "description": "Duration in seconds (default 10s)."},
+            },
+            "required": ["entityKeyId", "statusEffectName"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "diagnostics_clear_status_effect",
+        "description": "Clears an active status effect from an entity via LoaderDiagnosticsComponent / RuntimeGameplayCommandDirector.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "entityKeyId": {"type": "string", "description": "Target entity ID or name."},
+                "statusEffectName": {"type": "string", "description": "Status effect enum name to clear."},
+            },
+            "required": ["entityKeyId", "statusEffectName"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "diagnostics_get_grid_metrics",
+        "description": "Queries match terrain dimensions, cell counts, cell size, and player/AI start cells directly from LoaderDiagnosticsComponent / RuntimeGridCensus.",
+        "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
+    },
+    {
+        "name": "diagnostics_evaluate_grid_position",
+        "description": "Evaluates an (X, Z) coordinate against the battlefield grid bounds, returning clamped coords, cell index, height, and border status via LoaderDiagnosticsComponent / RuntimeGridCensus.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "x": {"type": "number", "description": "World X coordinate."},
+                "z": {"type": "number", "description": "World Z coordinate."},
+            },
+            "required": ["x", "z"],
+            "additionalProperties": False,
+        },
+    },
 ]
 
 

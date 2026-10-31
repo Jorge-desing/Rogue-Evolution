@@ -843,6 +843,104 @@ namespace RogueCommandExpansionLoader.Runtime
         }
 
         /// <summary>
+        /// Serializes the result of an active skill command dispatched on a unit.
+        /// </summary>
+        public static string SerializeActiveSkillOrderResult(ActiveSkillOrderResult result)
+        {
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "activeSkillOrderResult",
+                ["success"] = result.Success,
+                ["entityKeyId"] = result.EntityKeyId ?? string.Empty,
+                ["skillTargetMode"] = result.SkillTargetMode ?? string.Empty,
+                ["targetX"] = result.TargetX,
+                ["targetZ"] = result.TargetZ,
+                ["message"] = result.Message ?? string.Empty,
+            };
+            return Serialize(view);
+        }
+
+        /// <summary>
+        /// Serializes the result of an in-game entity vitality adjustment (Heal, RepairArmor, ChargeShield, Damage).
+        /// </summary>
+        public static string SerializeVitalityAdjustmentResult(VitalityAdjustmentResult result)
+        {
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "vitalityAdjustmentResult",
+                ["success"] = result.Success,
+                ["entityKeyId"] = result.EntityKeyId ?? string.Empty,
+                ["adjustmentType"] = result.AdjustmentType ?? string.Empty,
+                ["amountApplied"] = result.AmountApplied,
+                ["newHealth"] = result.NewHealth,
+                ["newArmor"] = result.NewArmor,
+                ["newShield"] = result.NewShield,
+                ["message"] = result.Message ?? string.Empty,
+            };
+            return Serialize(view);
+        }
+
+        /// <summary>
+        /// Serializes the result of applying or clearing a status effect on an entity.
+        /// </summary>
+        public static string SerializeStatusEffectOrderResult(StatusEffectOrderResult result)
+        {
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "statusEffectOrderResult",
+                ["success"] = result.Success,
+                ["entityKeyId"] = result.EntityKeyId ?? string.Empty,
+                ["statusEffectName"] = result.StatusEffectName ?? string.Empty,
+                ["durationSeconds"] = result.DurationSeconds,
+                ["isApplied"] = result.IsApplied,
+                ["message"] = result.Message ?? string.Empty,
+            };
+            return Serialize(view);
+        }
+
+        /// <summary>
+        /// Serializes match terrain, map bounds, and world grid layout metrics.
+        /// </summary>
+        public static string SerializeGridMetricsCensus(GridMetricsCensus census)
+        {
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "gridMetricsCensus",
+                ["isGridReady"] = census != null && census.IsGridReady,
+                ["worldWidth"] = census != null ? census.WorldWidth : 0f,
+                ["worldHeight"] = census != null ? census.WorldHeight : 0f,
+                ["horizontalCellCount"] = census != null ? census.HorizontalCellCount : 0,
+                ["verticalCellCount"] = census != null ? census.VerticalCellCount : 0,
+                ["cellSize"] = census != null ? census.CellSize : 0f,
+                ["playerStartX"] = census != null ? census.PlayerStartX : 0,
+                ["playerStartY"] = census != null ? census.PlayerStartY : 0,
+                ["aiStartX"] = census != null ? census.AiStartX : 0,
+                ["aiStartY"] = census != null ? census.AiStartY : 0,
+            };
+            return Serialize(view);
+        }
+
+        /// <summary>
+        /// Serializes the evaluation of an (X, Z) coordinate against the battlefield grid.
+        /// </summary>
+        public static string SerializeGridCellEvaluationResult(GridCellEvaluationResult result)
+        {
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "gridCellEvaluationResult",
+                ["isWithinWorld"] = result.IsWithinWorld,
+                ["clampedX"] = result.ClampedX,
+                ["clampedZ"] = result.ClampedZ,
+                ["cellX"] = result.CellX,
+                ["cellY"] = result.CellY,
+                ["surfaceHeight"] = result.SurfaceHeight,
+                ["isBorderCell"] = result.IsBorderCell,
+                ["message"] = result.Message ?? string.Empty,
+            };
+            return Serialize(view);
+        }
+
+        /// <summary>
         /// Unified health and status telemetry synthesizing loader state, content registries,
         /// compiled AI modules, match economy, and combat telemetry into a single agent-readable JSON.
         /// </summary>
@@ -1227,6 +1325,12 @@ namespace RogueCommandExpansionLoader.Runtime
                 new Dictionary<string, object> { ["name"] = "ApplyInGameCardChangeJson", ["description"] = "Apply a data-driven card change to an entity via native EntityBalancingStore." },
                 new Dictionary<string, object> { ["name"] = "OrderUnitMoveJson", ["description"] = "Dispatch an in-game move command to a unit by entity key id." },
                 new Dictionary<string, object> { ["name"] = "OrderUnitAttackJson", ["description"] = "Dispatch an in-game attack command on a target entity." },
+                new Dictionary<string, object> { ["name"] = "OrderUnitActiveSkillJson", ["description"] = "Dispatch an active tactical skill command on a unit (Self, Target, or Position)." },
+                new Dictionary<string, object> { ["name"] = "AdjustEntityVitalityJson", ["description"] = "Safely adjust health, armor, shield, or damage on an entity for testing." },
+                new Dictionary<string, object> { ["name"] = "ApplyStatusEffectJson", ["description"] = "Apply a status effect (e.g. Emp, Burn, SlowedDown, Stun) to an entity." },
+                new Dictionary<string, object> { ["name"] = "ClearStatusEffectJson", ["description"] = "Clear an active status effect from an entity." },
+                new Dictionary<string, object> { ["name"] = "GetGridMetricsJson", ["description"] = "Telemetry of terrain dimensions, cell counts, and start cells." },
+                new Dictionary<string, object> { ["name"] = "EvaluateGridPositionJson", ["description"] = "Evaluate an (X, Z) coordinate against the battlefield grid bounds." },
                 new Dictionary<string, object> { ["name"] = "GetSystemHealthJson", ["description"] = "Unified system health across subsystems." },
                 new Dictionary<string, object> { ["name"] = "GetDiagnosticCatalogJson", ["description"] = "Catalog of available diagnostic getters." },
             };

@@ -76,6 +76,82 @@ namespace RogueCommandExpansionLoader.Runtime
     }
 
     /// <summary>
+    /// Pure diagnostic DTO returned when triggering a unit active skill.
+    /// Decoupled from Unity types.
+    /// </summary>
+    public readonly struct ActiveSkillOrderResult
+    {
+        public ActiveSkillOrderResult(bool success, string entityKeyId, string skillTargetMode, float targetX, float targetZ, string message)
+        {
+            Success = success;
+            EntityKeyId = entityKeyId ?? string.Empty;
+            SkillTargetMode = skillTargetMode ?? string.Empty;
+            TargetX = targetX;
+            TargetZ = targetZ;
+            Message = message ?? string.Empty;
+        }
+
+        public bool Success { get; }
+        public string EntityKeyId { get; }
+        public string SkillTargetMode { get; }
+        public float TargetX { get; }
+        public float TargetZ { get; }
+        public string Message { get; }
+    }
+
+    /// <summary>
+    /// Pure diagnostic DTO returned when applying health, armor, shield, or damage adjustments to an entity.
+    /// Decoupled from Unity types.
+    /// </summary>
+    public readonly struct VitalityAdjustmentResult
+    {
+        public VitalityAdjustmentResult(bool success, string entityKeyId, string adjustmentType, float amountApplied, float newHealth, float newArmor, float newShield, string message)
+        {
+            Success = success;
+            EntityKeyId = entityKeyId ?? string.Empty;
+            AdjustmentType = adjustmentType ?? string.Empty;
+            AmountApplied = amountApplied;
+            NewHealth = newHealth;
+            NewArmor = newArmor;
+            NewShield = newShield;
+            Message = message ?? string.Empty;
+        }
+
+        public bool Success { get; }
+        public string EntityKeyId { get; }
+        public string AdjustmentType { get; }
+        public float AmountApplied { get; }
+        public float NewHealth { get; }
+        public float NewArmor { get; }
+        public float NewShield { get; }
+        public string Message { get; }
+    }
+
+    /// <summary>
+    /// Pure diagnostic DTO returned when applying or clearing status effects on an entity.
+    /// Decoupled from Unity types.
+    /// </summary>
+    public readonly struct StatusEffectOrderResult
+    {
+        public StatusEffectOrderResult(bool success, string entityKeyId, string statusEffectName, float durationSeconds, bool isApplied, string message)
+        {
+            Success = success;
+            EntityKeyId = entityKeyId ?? string.Empty;
+            StatusEffectName = statusEffectName ?? string.Empty;
+            DurationSeconds = durationSeconds;
+            IsApplied = isApplied;
+            Message = message ?? string.Empty;
+        }
+
+        public bool Success { get; }
+        public string EntityKeyId { get; }
+        public string StatusEffectName { get; }
+        public float DurationSeconds { get; }
+        public bool IsApplied { get; }
+        public string Message { get; }
+    }
+
+    /// <summary>
     /// Safe in-game gameplay and diagnostic command director allowing authorized automated agents
     /// and clean-room testing harnesses to inspect and command match systems without GUI interaction.
     /// </summary>
@@ -288,6 +364,265 @@ namespace RogueCommandExpansionLoader.Runtime
             {
                 return new UnitCommandResult(false, entityKeyId, "AttackMoveOnTarget", 0f, 0f,
                     "Error executing unit attack: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Dispatches an active tactical skill command on a unit (Self, on Target, or at Position).
+        /// </summary>
+        public static ActiveSkillOrderResult TryOrderActiveSkill(
+            string entityKeyId,
+            string targetEntityKeyId = null,
+            float? targetX = null,
+            float? targetZ = null)
+        {
+            if (string.IsNullOrWhiteSpace(entityKeyId))
+            {
+                return new ActiveSkillOrderResult(false, string.Empty, "None", 0f, 0f,
+                    "Entity key ID cannot be empty.");
+            }
+
+            try
+            {
+                ExistingControllers existing = ExistingControllers.Instance;
+                if (existing == null)
+                {
+                    return new ActiveSkillOrderResult(false, entityKeyId, "None", 0f, 0f,
+                        "ExistingControllers instance is not available.");
+                }
+
+                EntityController caster = FindEntityByKey(existing, entityKeyId);
+                if (caster == null)
+                {
+                    return new ActiveSkillOrderResult(false, entityKeyId, "None", 0f, 0f,
+                        "Caster unit '" + entityKeyId + "' not found or destroyed.");
+                }
+
+                EntityCommand skillCmd;
+                string mode;
+                float tx = 0f;
+                float tz = 0f;
+
+                if (!string.IsNullOrWhiteSpace(targetEntityKeyId))
+                {
+                    EntityController target = FindEntityByKey(existing, targetEntityKeyId);
+                    if (target == null)
+                    {
+                        return new ActiveSkillOrderResult(false, entityKeyId, "Target", 0f, 0f,
+                            "Skill target entity '" + targetEntityKeyId + "' not found or destroyed.");
+                    }
+
+                    skillCmd = EntityCommand.ActiveSkillOnTarget(target);
+                    mode = "Target";
+                    tx = target.Position.x;
+                    tz = target.Position.z;
+                }
+                else if (targetX.HasValue && targetZ.HasValue)
+                {
+                    Vector3 pos = new Vector3(targetX.Value, 0f, targetZ.Value);
+                    skillCmd = EntityCommand.ActiveSkillAtPosition(pos);
+                    mode = "Position";
+                    tx = targetX.Value;
+                    tz = targetZ.Value;
+                }
+                else
+                {
+                    skillCmd = EntityCommand.ActiveSkillWithoutTarget();
+                    mode = "Self";
+                    tx = caster.Position.x;
+                    tz = caster.Position.z;
+                }
+
+                skillCmd.tag = "rcl-command-director";
+                caster.ExecuteCommand(skillCmd, EntityController.CommandProcessingType.ExecuteBeforeCurrentCommand);
+
+                return new ActiveSkillOrderResult(true, entityKeyId, mode, tx, tz,
+                    "Active skill command (" + mode + ") dispatched successfully.");
+            }
+            catch (Exception ex)
+            {
+                return new ActiveSkillOrderResult(false, entityKeyId, "Error", 0f, 0f,
+                    "Error executing active skill: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Safely adjusts health, armor, shield, or damage on an entity for testing and calibration.
+        /// </summary>
+        public static VitalityAdjustmentResult TryAdjustEntityVitality(
+            string entityKeyId,
+            string adjustmentType,
+            float amount,
+            bool ignoreArmor = false)
+        {
+            if (string.IsNullOrWhiteSpace(entityKeyId))
+            {
+                return new VitalityAdjustmentResult(false, string.Empty, adjustmentType, 0f, 0f, 0f, 0f,
+                    "Entity key ID cannot be empty.");
+            }
+
+            if (amount <= 0f || float.IsNaN(amount) || float.IsInfinity(amount))
+            {
+                return new VitalityAdjustmentResult(false, entityKeyId, adjustmentType, 0f, 0f, 0f, 0f,
+                    "Adjustment amount must be positive and finite.");
+            }
+
+            try
+            {
+                ExistingControllers existing = ExistingControllers.Instance;
+                if (existing == null)
+                {
+                    return new VitalityAdjustmentResult(false, entityKeyId, adjustmentType, 0f, 0f, 0f, 0f,
+                        "ExistingControllers instance is not available.");
+                }
+
+                EntityController entity = FindEntityByKey(existing, entityKeyId);
+                if (entity == null)
+                {
+                    return new VitalityAdjustmentResult(false, entityKeyId, adjustmentType, 0f, 0f, 0f, 0f,
+                        "Entity '" + entityKeyId + "' not found or destroyed.");
+                }
+
+                string type = (adjustmentType ?? string.Empty).Trim();
+
+                if (string.Equals(type, "Heal", StringComparison.OrdinalIgnoreCase))
+                {
+                    entity.Heal(amount, null, false, false);
+                }
+                else if (string.Equals(type, "RepairArmor", StringComparison.OrdinalIgnoreCase))
+                {
+                    entity.RepairArmor(amount, null, false);
+                }
+                else if (string.Equals(type, "ChargeShield", StringComparison.OrdinalIgnoreCase))
+                {
+                    entity.ChargeShield(amount, true);
+                }
+                else if (string.Equals(type, "Damage", StringComparison.OrdinalIgnoreCase))
+                {
+                    entity.TakeDamage(amount, null, false, ignoreArmor);
+                }
+                else
+                {
+                    return new VitalityAdjustmentResult(false, entityKeyId, type, 0f, entity.CurrentHealth, entity.CurrentArmor, entity.CurrentShield,
+                        "Unsupported adjustment type '" + type + "'. Supported: Heal, RepairArmor, ChargeShield, Damage.");
+                }
+
+                return new VitalityAdjustmentResult(true, entityKeyId, type, amount,
+                    entity.CurrentHealth, entity.CurrentArmor, entity.CurrentShield,
+                    "Vitality adjustment (" + type + ") of " + amount + " applied successfully.");
+            }
+            catch (Exception ex)
+            {
+                return new VitalityAdjustmentResult(false, entityKeyId, adjustmentType, 0f, 0f, 0f, 0f,
+                    "Error adjusting entity vitality: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Applies a status effect (e.g. Emp, Burn, SlowedDown, Stun) to an entity.
+        /// </summary>
+        public static StatusEffectOrderResult TryApplyStatusEffect(
+            string entityKeyId,
+            string statusEffectName,
+            float durationSeconds = 10f)
+        {
+            if (string.IsNullOrWhiteSpace(entityKeyId))
+            {
+                return new StatusEffectOrderResult(false, string.Empty, statusEffectName, 0f, false,
+                    "Entity key ID cannot be empty.");
+            }
+
+            if (string.IsNullOrWhiteSpace(statusEffectName))
+            {
+                return new StatusEffectOrderResult(false, entityKeyId, string.Empty, 0f, false,
+                    "Status effect name cannot be empty.");
+            }
+
+            try
+            {
+                ExistingControllers existing = ExistingControllers.Instance;
+                if (existing == null)
+                {
+                    return new StatusEffectOrderResult(false, entityKeyId, statusEffectName, 0f, false,
+                        "ExistingControllers instance is not available.");
+                }
+
+                EntityController entity = FindEntityByKey(existing, entityKeyId);
+                if (entity == null)
+                {
+                    return new StatusEffectOrderResult(false, entityKeyId, statusEffectName, 0f, false,
+                        "Entity '" + entityKeyId + "' not found or destroyed.");
+                }
+
+                if (!Enum.TryParse<StatusEffect>(statusEffectName, true, out StatusEffect effect))
+                {
+                    return new StatusEffectOrderResult(false, entityKeyId, statusEffectName, 0f, false,
+                        "Unknown status effect name '" + statusEffectName + "'.");
+                }
+
+                float duration = Mathf.Clamp(durationSeconds, 0.5f, 300f);
+                entity.SetActiveStatusEffect(effect, SetStatusEffect.DurationType.Seconds, duration);
+
+                return new StatusEffectOrderResult(true, entityKeyId, effect.ToString(), duration, true,
+                    "Status effect '" + effect + "' applied for " + duration + "s.");
+            }
+            catch (Exception ex)
+            {
+                return new StatusEffectOrderResult(false, entityKeyId, statusEffectName, 0f, false,
+                    "Error applying status effect: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Clears an active status effect from an entity.
+        /// </summary>
+        public static StatusEffectOrderResult TryClearStatusEffect(
+            string entityKeyId,
+            string statusEffectName)
+        {
+            if (string.IsNullOrWhiteSpace(entityKeyId))
+            {
+                return new StatusEffectOrderResult(false, string.Empty, statusEffectName, 0f, false,
+                    "Entity key ID cannot be empty.");
+            }
+
+            if (string.IsNullOrWhiteSpace(statusEffectName))
+            {
+                return new StatusEffectOrderResult(false, entityKeyId, string.Empty, 0f, false,
+                    "Status effect name cannot be empty.");
+            }
+
+            try
+            {
+                ExistingControllers existing = ExistingControllers.Instance;
+                if (existing == null)
+                {
+                    return new StatusEffectOrderResult(false, entityKeyId, statusEffectName, 0f, false,
+                        "ExistingControllers instance is not available.");
+                }
+
+                EntityController entity = FindEntityByKey(existing, entityKeyId);
+                if (entity == null)
+                {
+                    return new StatusEffectOrderResult(false, entityKeyId, statusEffectName, 0f, false,
+                        "Entity '" + entityKeyId + "' not found or destroyed.");
+                }
+
+                if (!Enum.TryParse<StatusEffect>(statusEffectName, true, out StatusEffect effect))
+                {
+                    return new StatusEffectOrderResult(false, entityKeyId, statusEffectName, 0f, false,
+                        "Unknown status effect name '" + statusEffectName + "'.");
+                }
+
+                entity.RemoveStatusEffect(effect);
+
+                return new StatusEffectOrderResult(true, entityKeyId, effect.ToString(), 0f, false,
+                    "Status effect '" + effect + "' removed successfully.");
+            }
+            catch (Exception ex)
+            {
+                return new StatusEffectOrderResult(false, entityKeyId, statusEffectName, 0f, false,
+                    "Error clearing status effect: " + ex.Message);
             }
         }
 
