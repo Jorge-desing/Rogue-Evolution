@@ -13,6 +13,28 @@ namespace RogueCommandExpansionLoader.Modules
     {
         public const int CurrentApiVersion = 1;
 
+        public static AiModuleRegistry Active { get; set; }
+
+        public AiModuleRegistry()
+        {
+            Active = this;
+        }
+
+        public static void ResetActive()
+        {
+            Active = null;
+        }
+
+        public IReadOnlyCollection<string> RegisteredModuleIds
+        {
+            get { return modules.Keys; }
+        }
+
+        public IReadOnlyCollection<IRogueCommandAiModule> RegisteredModules
+        {
+            get { return modules.Values; }
+        }
+
         private readonly Dictionary<string, IRogueCommandAiModule> modules =
             new Dictionary<string, IRogueCommandAiModule>(StringComparer.Ordinal);
 

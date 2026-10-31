@@ -2697,5 +2697,223 @@ internal static partial class ValidationTestRunner
             RuntimeUnitMechanicsDirector.ClearProfiles();
         }
     }),
+    ("runtime ai modules census captures registered modules and serializes cleanly", () =>
+    {
+        try
+        {
+            AiModuleRegistry.ResetActive();
+            AiModulesCensus emptyCensus = RuntimeAiModulesCensus.Current();
+            if (emptyCensus == null || emptyCensus.RegisteredModuleCount != 0 || emptyCensus.ModuleRows.Count != 0)
+            {
+                throw new InvalidOperationException("Initial AI modules census must be empty.");
+            }
+
+            string emptyJson = AgentDiagnosticsFormatter.SerializeAiModulesCensus(emptyCensus);
+            using (var doc = JsonDocument.Parse(emptyJson))
+            {
+                if (doc.RootElement.GetProperty("registeredModuleCount").GetInt32() != 0 ||
+                    doc.RootElement.GetProperty("moduleRowCount").GetInt32() != 0)
+                {
+                    throw new InvalidOperationException("Serialized empty AI modules census must report 0 counts.");
+                }
+            }
+
+            var registry = new AiModuleRegistry();
+            registry.Register(new ThreatPrioritizationAiModule());
+            AiModulesCensus activeCensus = RuntimeAiModulesCensus.Current();
+            if (activeCensus.RegisteredModuleCount != 1 || activeCensus.ModuleRows.Count != 1)
+            {
+                throw new InvalidOperationException("AI modules census must report registered threat-prioritization module.");
+            }
+
+            if (activeCensus.ModuleRows[0].ModuleId != "sample:threat-prioritization" ||
+                !activeCensus.ModuleRows[0].IsRegistered)
+            {
+                throw new InvalidOperationException("AI module row did not capture correct module ID or registration state.");
+            }
+
+            string activeJson = AgentDiagnosticsFormatter.SerializeAiModulesCensus(activeCensus);
+            using (var doc = JsonDocument.Parse(activeJson))
+            {
+                if (doc.RootElement.GetProperty("registeredModuleCount").GetInt32() != 1 ||
+                    doc.RootElement.GetProperty("moduleRowCount").GetInt32() != 1)
+                {
+                    throw new InvalidOperationException("Serialized active census must reflect 1 registered module.");
+                }
+
+                JsonElement rows = doc.RootElement.GetProperty("moduleRows");
+                if (rows.GetArrayLength() != 1 ||
+                    rows[0].GetProperty("moduleId").GetString() != "sample:threat-prioritization" ||
+                    !rows[0].GetProperty("isRegistered").GetBoolean())
+                {
+                    throw new InvalidOperationException("Serialized moduleRows array does not match registered module properties.");
+                }
+            }
+        }
+        finally
+        {
+            AiModuleRegistry.ResetActive();
+        }
+    }),
+    ("runtime economy census captures match telemetry and degrades safely", () =>
+    {
+        EconomyCensus custom = new EconomyCensus(250, 400, 5, 120.5f, 3);
+        if (custom.PlayerCredits != 250 || custom.AiCredits != 400 || custom.AttackWaveNumber != 5 ||
+            Math.Abs(custom.ElapsedGameTimeSeconds - 120.5f) > 0.001f || custom.HarvesterCount != 3)
+        {
+            throw new InvalidOperationException("EconomyCensus constructor did not assign values accurately.");
+        }
+
+        string json = AgentDiagnosticsFormatter.SerializeEconomyCensus(custom);
+        using (var doc = JsonDocument.Parse(json))
+        {
+            if (doc.RootElement.GetProperty("playerCredits").GetInt32() != 250 ||
+                doc.RootElement.GetProperty("aiCredits").GetInt32() != 400 ||
+                doc.RootElement.GetProperty("attackWaveNumber").GetInt32() != 5 ||
+                Math.Abs(doc.RootElement.GetProperty("elapsedGameTimeSeconds").GetSingle() - 120.5f) > 0.001f ||
+                doc.RootElement.GetProperty("harvesterCount").GetInt32() != 3)
+            {
+                throw new InvalidOperationException("Serialized EconomyCensus JSON properties do not match expected values.");
+            }
+        }
+
+        string nullJson = AgentDiagnosticsFormatter.SerializeEconomyCensus(null);
+        using (var doc = JsonDocument.Parse(nullJson))
+        {
+            if (doc.RootElement.GetProperty("playerCredits").GetInt32() != 0 ||
+                doc.RootElement.GetProperty("aiCredits").GetInt32() != 0 ||
+                doc.RootElement.GetProperty("attackWaveNumber").GetInt32() != 0 ||
+                doc.RootElement.GetProperty("elapsedGameTimeSeconds").GetSingle() != 0f ||
+                doc.RootElement.GetProperty("harvesterCount").GetInt32() != 0)
+            {
+                throw new InvalidOperationException("Serialized null EconomyCensus must fall back gracefully to zeroed primitives.");
+            }
+        }
+
+        EconomyCensus live = RuntimeEconomyCensus.Current();
+        if (live == null)
+        {
+            throw new InvalidOperationException("RuntimeEconomyCensus.Current() must never return null.");
+        }
+    }),
+    ("runtime combat status census serializes loss bounds and tracking details", () =>
+    {
+        var rows = new List<CombatEntityStatusRow>
+        {
+            new CombatEntityStatusRow("test:unit-1", true, 10.0f, true, 2),
+            new CombatEntityStatusRow("test:unit-2", false, 12.5f, false, 0),
+        };
+        CombatStatusCensus census = new CombatStatusCensus(1, 3, 1, rows.AsReadOnly());
+
+        if (census.OmittedUnitCount != 1 || census.TotalCombatActiveUnitCount != 3 ||
+            census.UnitsWithActiveStatusEffectsCount != 1 || census.CombatActiveUnits.Count != 2)
+        {
+            throw new InvalidOperationException("CombatStatusCensus failed to retain field values.");
+        }
+
+        string json = AgentDiagnosticsFormatter.SerializeCombatStatusCensus(census);
+        using (var doc = JsonDocument.Parse(json))
+        {
+            if (doc.RootElement.GetProperty("omittedUnitCount").GetInt32() != 1 ||
+                doc.RootElement.GetProperty("totalCombatActiveUnitCount").GetInt32() != 3 ||
+                doc.RootElement.GetProperty("unitsWithActiveStatusEffectsCount").GetInt32() != 1 ||
+                doc.RootElement.GetProperty("trackedUnitRowCount").GetInt32() != 2)
+            {
+                throw new InvalidOperationException("Serialized CombatStatusCensus counts do not match expected bounds.");
+            }
+
+            JsonElement units = doc.RootElement.GetProperty("combatActiveUnits");
+            if (units.GetArrayLength() != 2 ||
+                units[0].GetProperty("entityKeyId").GetString() != "test:unit-1" ||
+                !units[0].GetProperty("isControlledByPlayer").GetBoolean() ||
+                units[0].GetProperty("activeStatusEffectsCount").GetInt32() != 2)
+            {
+                throw new InvalidOperationException("Serialized combat active units array does not match row elements.");
+            }
+        }
+
+        string nullJson = AgentDiagnosticsFormatter.SerializeCombatStatusCensus(null);
+        using (var doc = JsonDocument.Parse(nullJson))
+        {
+            if (doc.RootElement.GetProperty("omittedUnitCount").GetInt32() != 0 ||
+                doc.RootElement.GetProperty("totalCombatActiveUnitCount").GetInt32() != 0 ||
+                doc.RootElement.GetProperty("unitsWithActiveStatusEffectsCount").GetInt32() != 0 ||
+                doc.RootElement.GetProperty("trackedUnitRowCount").GetInt32() != 0)
+            {
+                throw new InvalidOperationException("Null CombatStatusCensus must serialize with zero counts.");
+            }
+        }
+
+        CombatStatusCensus live = RuntimeCombatStatusCensus.Current();
+        if (live == null)
+        {
+            throw new InvalidOperationException("RuntimeCombatStatusCensus.Current() must never return null.");
+        }
+    }),
+    ("runtime unified system health synthesizes subsystems cleanly", () =>
+    {
+        var dummySnapshot = new LoaderDiagnosticsSnapshot(
+            "1.0.9", true, true, 2, 0, 2048L,
+            Array.Empty<PackDiagnosticReport>(),
+            new List<UnitDiagnosticReport>
+            {
+                new UnitDiagnosticReport("sample:unit-a", "sample_pack", "prefab", "img", true)
+            }.AsReadOnly(),
+            Array.Empty<StageDiagnosticReport>(),
+            Array.Empty<AiProfileDiagnosticReport>(),
+            Array.Empty<UnitFactoryDiagnosticReport>(),
+            Array.Empty<StagePoolScopeDiagnosticReport>(),
+            Array.Empty<AiProfileStageRangeDiagnosticReport>(),
+            new List<string> { "log1", "log2" }.AsReadOnly());
+
+        var aiCensus = new AiModulesCensus(2, new List<AiModuleDiagnosticRow>
+        {
+            new AiModuleDiagnosticRow("sample:threat-prioritization", 1, true),
+            new AiModuleDiagnosticRow("sample:skirmish-kiting", 1, true),
+        }.AsReadOnly());
+
+        var economyCensus = new EconomyCensus(500, 750, 4, 300f, 6);
+        var combatCensus = new CombatStatusCensus(0, 5, 2, Array.Empty<CombatEntityStatusRow>());
+
+        string json = AgentDiagnosticsFormatter.SerializeSystemHealth(
+            dummySnapshot,
+            aiCensus,
+            economyCensus,
+            combatCensus);
+
+        using (var doc = JsonDocument.Parse(json))
+        {
+            if (!doc.RootElement.GetProperty("isNativeRegistryReady").GetBoolean() ||
+                doc.RootElement.GetProperty("activePackCount").GetInt32() != 2 ||
+                doc.RootElement.GetProperty("failedPackCount").GetInt32() != 0 ||
+                doc.RootElement.GetProperty("registeredUnitCount").GetInt32() != 1 ||
+                doc.RootElement.GetProperty("registeredAiModuleCount").GetInt32() != 2 ||
+                doc.RootElement.GetProperty("playerCredits").GetInt32() != 500 ||
+                doc.RootElement.GetProperty("aiCredits").GetInt32() != 750 ||
+                doc.RootElement.GetProperty("attackWaveNumber").GetInt32() != 4 ||
+                Math.Abs(doc.RootElement.GetProperty("elapsedGameTimeSeconds").GetSingle() - 300f) > 0.001f ||
+                doc.RootElement.GetProperty("omittedCombatUnitCount").GetInt32() != 0 ||
+                doc.RootElement.GetProperty("totalCombatActiveUnitCount").GetInt32() != 5 ||
+                doc.RootElement.GetProperty("unitsWithActiveStatusEffectsCount").GetInt32() != 2 ||
+                doc.RootElement.GetProperty("recentLogCount").GetInt32() != 2)
+            {
+                throw new InvalidOperationException("Unified system health serialization did not preserve subsystem values.");
+            }
+        }
+
+        string nullHealthJson = AgentDiagnosticsFormatter.SerializeSystemHealth(null, null, null, null);
+        using (var doc = JsonDocument.Parse(nullHealthJson))
+        {
+            if (doc.RootElement.GetProperty("isNativeRegistryReady").GetBoolean() ||
+                doc.RootElement.GetProperty("activePackCount").GetInt32() != 0 ||
+                doc.RootElement.GetProperty("registeredUnitCount").GetInt32() != 0 ||
+                doc.RootElement.GetProperty("registeredAiModuleCount").GetInt32() != 0 ||
+                doc.RootElement.GetProperty("playerCredits").GetInt32() != 0 ||
+                doc.RootElement.GetProperty("totalCombatActiveUnitCount").GetInt32() != 0)
+            {
+                throw new InvalidOperationException("Null system health must serialize safe default primitive values.");
+            }
+        }
+    }),
     };
 }

@@ -540,6 +540,115 @@ namespace RogueCommandExpansionLoader.Runtime
             return Serialize(view);
         }
 
+        /// <summary>
+        /// Serializes the snapshot of compiled AI modules registered in the active registry
+        /// into an agent-readable JSON object without visual captures.
+        /// </summary>
+        public static string SerializeAiModulesCensus(AiModulesCensus census)
+        {
+            var rows = new List<Dictionary<string, object>>();
+            if (census != null && census.ModuleRows != null)
+            {
+                foreach (AiModuleDiagnosticRow row in census.ModuleRows)
+                {
+                    rows.Add(new Dictionary<string, object>
+                    {
+                        ["moduleId"] = row.ModuleId ?? string.Empty,
+                        ["apiVersion"] = row.ApiVersion,
+                        ["isRegistered"] = row.IsRegistered,
+                    });
+                }
+            }
+
+            var view = new Dictionary<string, object>
+            {
+                ["registeredModuleCount"] = census != null ? census.RegisteredModuleCount : 0,
+                ["moduleRowCount"] = rows.Count,
+                ["moduleRows"] = rows,
+            };
+            return Serialize(view);
+        }
+
+        /// <summary>
+        /// Serializes live match economy parameters (player and AI crystal balances,
+        /// attack wave number, elapsed game time, harvester count) into an agent-readable JSON object.
+        /// </summary>
+        public static string SerializeEconomyCensus(EconomyCensus census)
+        {
+            var view = new Dictionary<string, object>
+            {
+                ["playerCredits"] = census != null ? census.PlayerCredits : 0,
+                ["aiCredits"] = census != null ? census.AiCredits : 0,
+                ["attackWaveNumber"] = census != null ? census.AttackWaveNumber : 0,
+                ["elapsedGameTimeSeconds"] = census != null ? census.ElapsedGameTimeSeconds : 0f,
+                ["harvesterCount"] = census != null ? census.HarvesterCount : 0,
+            };
+            return Serialize(view);
+        }
+
+        /// <summary>
+        /// Serializes combat engagement telemetry (units taking recent damage, active target locks,
+        /// and active status effects). Omission counters are serialized before detail collections
+        /// to ensure bounded trace limits never hide dropped items.
+        /// </summary>
+        public static string SerializeCombatStatusCensus(CombatStatusCensus census)
+        {
+            var rows = new List<Dictionary<string, object>>();
+            if (census != null && census.CombatActiveUnits != null)
+            {
+                foreach (CombatEntityStatusRow row in census.CombatActiveUnits)
+                {
+                    rows.Add(new Dictionary<string, object>
+                    {
+                        ["entityKeyId"] = row.EntityKeyId ?? string.Empty,
+                        ["isControlledByPlayer"] = row.IsControlledByPlayer,
+                        ["timeOfLastDamage"] = row.TimeOfLastDamage,
+                        ["isUnderRecentAttack"] = row.IsUnderRecentAttack,
+                        ["activeStatusEffectsCount"] = row.ActiveStatusEffectsCount,
+                    });
+                }
+            }
+
+            var view = new Dictionary<string, object>
+            {
+                ["omittedUnitCount"] = census != null ? census.OmittedUnitCount : 0,
+                ["totalCombatActiveUnitCount"] = census != null ? census.TotalCombatActiveUnitCount : 0,
+                ["unitsWithActiveStatusEffectsCount"] = census != null ? census.UnitsWithActiveStatusEffectsCount : 0,
+                ["trackedUnitRowCount"] = rows.Count,
+                ["combatActiveUnits"] = rows,
+            };
+            return Serialize(view);
+        }
+
+        /// <summary>
+        /// Unified health and status telemetry synthesizing loader state, content registries,
+        /// compiled AI modules, match economy, and combat telemetry into a single agent-readable JSON.
+        /// </summary>
+        public static string SerializeSystemHealth(
+            LoaderDiagnosticsSnapshot snapshot,
+            AiModulesCensus aiCensus,
+            EconomyCensus economyCensus,
+            CombatStatusCensus combatCensus)
+        {
+            var view = new Dictionary<string, object>
+            {
+                ["isNativeRegistryReady"] = snapshot != null && snapshot.IsNativeRegistryReady,
+                ["activePackCount"] = snapshot != null ? snapshot.ActivePackCount : 0,
+                ["failedPackCount"] = snapshot != null ? snapshot.FailedPackCount : 0,
+                ["registeredUnitCount"] = snapshot != null && snapshot.Units != null ? snapshot.Units.Count : 0,
+                ["registeredAiModuleCount"] = aiCensus != null ? aiCensus.RegisteredModuleCount : 0,
+                ["playerCredits"] = economyCensus != null ? economyCensus.PlayerCredits : 0,
+                ["aiCredits"] = economyCensus != null ? economyCensus.AiCredits : 0,
+                ["attackWaveNumber"] = economyCensus != null ? economyCensus.AttackWaveNumber : 0,
+                ["elapsedGameTimeSeconds"] = economyCensus != null ? economyCensus.ElapsedGameTimeSeconds : 0f,
+                ["omittedCombatUnitCount"] = combatCensus != null ? combatCensus.OmittedUnitCount : 0,
+                ["totalCombatActiveUnitCount"] = combatCensus != null ? combatCensus.TotalCombatActiveUnitCount : 0,
+                ["unitsWithActiveStatusEffectsCount"] = combatCensus != null ? combatCensus.UnitsWithActiveStatusEffectsCount : 0,
+                ["recentLogCount"] = snapshot != null && snapshot.RecentLogs != null ? snapshot.RecentLogs.Count : 0,
+            };
+            return Serialize(view);
+        }
+
         private static List<Dictionary<string, object>> BuildPackRows(IReadOnlyList<PackDiagnosticReport> packs)
         {
             var rows = new List<Dictionary<string, object>>();

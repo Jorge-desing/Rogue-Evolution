@@ -117,6 +117,18 @@ namespace RogueCommandExpansionLoader.Runtime
             }
         }
 
+        public int RegisteredAiModuleCount => RuntimeAiModulesCensus.Current().RegisteredModuleCount;
+
+        public int LivePlayerCredits => RuntimeEconomyCensus.Current().PlayerCredits;
+
+        public int LiveAiCredits => RuntimeEconomyCensus.Current().AiCredits;
+
+        public int LiveAttackWaveNumber => RuntimeEconomyCensus.Current().AttackWaveNumber;
+
+        public int LiveCombatActiveUnitCount => RuntimeCombatStatusCensus.Current().TotalCombatActiveUnitCount;
+
+        public int LiveUnitsWithStatusEffectsCount => RuntimeCombatStatusCensus.Current().UnitsWithActiveStatusEffectsCount;
+
         // ---- Methods callable via component/call_method ----
 
         /// <summary>
@@ -385,6 +397,50 @@ namespace RogueCommandExpansionLoader.Runtime
         public string GetCardChangeRequestJson(CardChangeRequest request)
         {
             return AgentDiagnosticsFormatter.SerializeCardChangeRequest(request);
+        }
+
+        /// <summary>
+        /// Returns the snapshot of registered compiled AI modules as JSON.
+        /// Readable by an agent without a visual capture.
+        /// </summary>
+        public string GetAiModulesDiagnosticsJson()
+        {
+            return AgentDiagnosticsFormatter.SerializeAiModulesCensus(
+                RuntimeAiModulesCensus.Current());
+        }
+
+        /// <summary>
+        /// Returns the live match economy census (player/AI crystal balances,
+        /// wave number, elapsed game time, harvester count) as JSON.
+        /// </summary>
+        public string GetEconomyMatchCensusJson()
+        {
+            return AgentDiagnosticsFormatter.SerializeEconomyCensus(
+                RuntimeEconomyCensus.Current());
+        }
+
+        /// <summary>
+        /// Returns the live combat status census (active combatants, status effects,
+        /// and loss/omission counts) as JSON.
+        /// </summary>
+        public string GetCombatStatusCensusJson()
+        {
+            return AgentDiagnosticsFormatter.SerializeCombatStatusCensus(
+                RuntimeCombatStatusCensus.Current());
+        }
+
+        /// <summary>
+        /// Returns a unified system health and diagnostics overview as JSON.
+        /// Synthesizes loader registry readiness, content counts, AI modules,
+        /// economy parameters, and active combat telemetry.
+        /// </summary>
+        public string GetSystemHealthJson()
+        {
+            return AgentDiagnosticsFormatter.SerializeSystemHealth(
+                SafeSnapshot(),
+                RuntimeAiModulesCensus.Current(),
+                RuntimeEconomyCensus.Current(),
+                RuntimeCombatStatusCensus.Current());
         }
 
         private LoaderDiagnosticsSnapshot SafeSnapshot()

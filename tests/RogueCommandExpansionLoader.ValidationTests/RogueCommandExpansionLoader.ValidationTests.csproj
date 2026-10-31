@@ -31,6 +31,12 @@
              Link="Runtime/RuntimePlayerRosterCensus.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeUnitThreatAssessment.cs"
              Link="Runtime/RuntimeUnitThreatAssessment.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeAiModulesCensus.cs"
+             Link="Runtime/RuntimeAiModulesCensus.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeEconomyCensus.cs"
+             Link="Runtime/RuntimeEconomyCensus.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeCombatStatusCensus.cs"
+             Link="Runtime/RuntimeCombatStatusCensus.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Content/ContentPackDefinition.cs"
              Link="Content/ContentPackDefinition.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Content/VisualOverlayScaleCalibration.cs"
