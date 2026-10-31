@@ -109,6 +109,38 @@ internal static partial class ValidationTestRunner
             throw new InvalidOperationException("SerializeRangeCirclePointCount must report valid=false and pointCount=0 for out-of-range segments.");
         }
     }),
+    ("runtime hooks state serializes installed flags, owner id and xp count", () =>
+    {
+        string json = AgentDiagnosticsFormatter.SerializeRuntimeHooksState(true, 42, "RogueCommand.ExpansionLoader.Runtime", 7);
+        if (!json.Contains("\"hooksInstalled\":true") || !json.Contains("\"installedHookCount\":42") ||
+            !json.Contains("\"harmonyOwnerId\":\"RogueCommand.ExpansionLoader.Runtime\"") ||
+            !json.Contains("\"registeredCombatXpCount\":7"))
+        {
+            throw new InvalidOperationException("SerializeRuntimeHooksState must report the installed flags, owner id and combat xp count.");
+        }
+
+        string nullOwner = AgentDiagnosticsFormatter.SerializeRuntimeHooksState(false, 0, null, 0);
+        if (!nullOwner.Contains("\"harmonyOwnerId\":\"\""))
+        {
+            throw new InvalidOperationException("SerializeRuntimeHooksState must emit an empty owner id string when null.");
+        }
+    }),
+    ("installed patch names serializes a de-duplicated name list with its count", () =>
+    {
+        string json = AgentDiagnosticsFormatter.SerializeInstalledPatchNames(new[] { "EntityControllerDiePostfix", "", null, "EntityTakeDamagePostfix" });
+        if (!json.Contains("\"installedPatchCount\":2") ||
+            !json.Contains("\"EntityControllerDiePostfix\"") ||
+            !json.Contains("\"EntityTakeDamagePostfix\""))
+        {
+            throw new InvalidOperationException("SerializeInstalledPatchNames must drop null/empty entries and report the surviving count.");
+        }
+
+        string empty = AgentDiagnosticsFormatter.SerializeInstalledPatchNames(null);
+        if (!empty.Contains("\"installedPatchCount\":0") || !empty.Contains("\"installedPatchNames\":[]"))
+        {
+            throw new InvalidOperationException("SerializeInstalledPatchNames must emit an empty list and count 0 for null input.");
+        }
+    }),
     ("identifier color policy hashes with FNV-1a and maps to a stable palette slot", () =>
     {
         if (IdentifierColorPolicy.Hash(string.Empty) != 0x811C9DC5u)

@@ -233,6 +233,8 @@ namespace RogueCommandExpansionLoader.Runtime
         /// </summary>
         public int RangeDisplayGeometryMaximumSegments => 256;
 
+        public string RuntimeHarmonyOwnerId => RuntimePatchInstaller.HarmonyOwnerId;
+
         /// <summary>
         /// Returns the number of points produced for a range circle with the given
         /// segment count (segments + 1), or 0 when the count is out of range.
@@ -256,6 +258,27 @@ namespace RogueCommandExpansionLoader.Runtime
         public string GetRangeCirclePointCountJson(int segments)
         {
             return AgentDiagnosticsFormatter.SerializeRangeCirclePointCount(segments);
+        }
+
+        public bool IsRuntimeHooksInstalled => RuntimePatchInstaller.IsHooksInstalled;
+
+        public int RuntimeInstalledHookCount => RuntimePatchInstaller.InstalledHookCount;
+
+        public int RegisteredRuntimeCombatXpCount => RuntimeUnitMechanicsDirector.RegisteredCombatXpCount;
+
+        public string GetRuntimeHooksStateJson()
+        {
+            return AgentDiagnosticsFormatter.SerializeRuntimeHooksState(
+                RuntimePatchInstaller.IsHooksInstalled,
+                RuntimePatchInstaller.InstalledHookCount,
+                RuntimePatchInstaller.HarmonyOwnerId,
+                RuntimeUnitMechanicsDirector.RegisteredCombatXpCount);
+        }
+
+        public string GetInstalledPatchNamesJson()
+        {
+            return AgentDiagnosticsFormatter.SerializeInstalledPatchNames(
+                RuntimePatchInstaller.InstalledPatchNames);
         }
 
         private LoaderDiagnosticsSnapshot SafeSnapshot()

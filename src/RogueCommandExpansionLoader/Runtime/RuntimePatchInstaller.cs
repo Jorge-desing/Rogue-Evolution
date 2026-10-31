@@ -21,6 +21,8 @@ namespace RogueCommandExpansionLoader.Runtime
         private static RuntimeContentMutator _mutator;
         private static Assembly _gameAssembly;
         private static bool _cleanupPending;
+        private static int _installedPatchCount;
+        private static List<string> _installedPatchNames;
 
         public static RuntimePatchInstallationResult Install(
             string gameRoot,
@@ -100,19 +102,26 @@ namespace RogueCommandExpansionLoader.Runtime
                         RuntimeUnitMechanicsDirector.AttachIfApplicable(entityObj);
                     };
                     harmony = new Harmony(HarmonyOwnerId);
+                    var installedNames = new List<string>();
                     for (int i = 0; i < patches.Count; i++)
                     {
                         PatchPlan patch = patches[i];
                         HarmonyMethod prefix = patch.Prefix == null ? null : new HarmonyMethod(patch.Prefix);
                         HarmonyMethod postfix = patch.Postfix == null ? null : new HarmonyMethod(patch.Postfix);
                         HarmonyMethod finalizer = patch.Finalizer == null ? null : new HarmonyMethod(patch.Finalizer);
-                        harmony.Patch(patch.Target, prefix, postfix, null, finalizer, null);
+                        MethodInfo patched = harmony.Patch(patch.Target, prefix, postfix, null, finalizer, null);
+                        if (patched != null)
+                        {
+                            installedNames.Add(DescribePatch(patch));
+                        }
                     }
 
                     _harmony = harmony;
                     _provider = provider;
                     _mutator = mutator;
                     _gameAssembly = gameAssembly;
+                    _installedPatchNames = installedNames;
+                    _installedPatchCount = installedNames.Count;
                     Log(logger, "Installed " + patches.Count + " verified Harmony hooks for Rogue Command " +
                         RuntimeBuildGuard.ExpectedGameVersion + ".");
                     return new RuntimePatchInstallationResult(true, false,
@@ -662,10 +671,37 @@ namespace RogueCommandExpansionLoader.Runtime
             return method;
         }
 
+        private static string DescribePatch(PatchPlan patch)
+        {
+            if (patch.Postfix != null)
+            {
+                return patch.Postfix.Name;
+            }
+
+            if (patch.Prefix != null)
+            {
+                return patch.Prefix.Name;
+            }
+
+            if (patch.Finalizer != null)
+            {
+                return patch.Finalizer.Name;
+            }
+
+            return "patch";
+        }
+
         private static RuntimePatchInstallationResult Failed(string message)
         {
             return new RuntimePatchInstallationResult(false, false, message);
         }
+
+        public static bool IsHooksInstalled => _harmony != null;
+
+        public static int InstalledHookCount => _installedPatchCount;
+
+        public static IReadOnlyList<string> InstalledPatchNames =>
+            _installedPatchNames ?? (IReadOnlyList<string>)Array.Empty<string>();
 
         private static void ClearInstallationState()
         {
@@ -674,6 +710,8 @@ namespace RogueCommandExpansionLoader.Runtime
             _mutator = null;
             _gameAssembly = null;
             _cleanupPending = false;
+            _installedPatchCount = 0;
+            _installedPatchNames = null;
         }
 
         private static void Log(Action<string> logger, string message)

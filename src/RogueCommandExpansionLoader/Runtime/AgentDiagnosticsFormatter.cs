@@ -197,6 +197,45 @@ namespace RogueCommandExpansionLoader.Runtime
             return Serialize(view);
         }
 
+        public static string SerializeRuntimeHooksState(
+            bool hooksInstalled,
+            int installedHookCount,
+            string harmonyOwnerId,
+            int registeredCombatXpCount)
+        {
+            var view = new Dictionary<string, object>
+            {
+                ["hooksInstalled"] = hooksInstalled,
+                ["installedHookCount"] = installedHookCount,
+                ["harmonyOwnerId"] = harmonyOwnerId ?? string.Empty,
+                ["registeredCombatXpCount"] = registeredCombatXpCount,
+            };
+            return Serialize(view);
+        }
+
+        public static string SerializeInstalledPatchNames(IReadOnlyList<string> patchNames)
+        {
+            var names = new List<string>();
+            if (patchNames != null)
+            {
+                for (int i = 0; i < patchNames.Count; i++)
+                {
+                    string name = patchNames[i];
+                    if (!string.IsNullOrEmpty(name))
+                    {
+                        names.Add(name);
+                    }
+                }
+            }
+
+            var view = new Dictionary<string, object>
+            {
+                ["installedPatchCount"] = names.Count,
+                ["installedPatchNames"] = names,
+            };
+            return Serialize(view);
+        }
+
         private static List<Dictionary<string, object>> BuildPackRows(IReadOnlyList<PackDiagnosticReport> packs)
         {
             var rows = new List<Dictionary<string, object>>();

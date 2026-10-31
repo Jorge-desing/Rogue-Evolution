@@ -144,6 +144,17 @@ namespace RogueCommandExpansionLoader.Runtime
             }
         }
 
+        public static int RegisteredCombatXpCount
+        {
+            get
+            {
+                lock (_entityCombatXp)
+                {
+                    return _entityCombatXp.Count;
+                }
+            }
+        }
+
         public static void RegisterProfile(string entityId, UnitRuntimeMechanicsProfile profile)
         {
             if (string.IsNullOrWhiteSpace(entityId) || profile == null || !profile.HasAnyMechanics)
