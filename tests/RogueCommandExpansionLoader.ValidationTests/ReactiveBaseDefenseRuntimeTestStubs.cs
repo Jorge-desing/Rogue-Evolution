@@ -329,7 +329,7 @@ public struct EntityCommand
         new() { command = Command.ActiveSkillWithoutTarget };
 
     public static EntityCommand ActiveSkillOnTarget(EntityController target) =>
-        new() { command = Command.ActiveSkillOnTarget };
+        new() { command = Command.ActiveSkillOnTarget, target = target };
 
     public static EntityCommand ActiveSkillAtPosition(Vector3 position) =>
         new() { command = Command.ActiveSkillAtPosition, destination = position };

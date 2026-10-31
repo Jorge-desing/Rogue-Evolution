@@ -93,7 +93,10 @@ namespace RogueCommandExpansionLoader.Modules
                     int alliedUnitCount = playerUnits != null ? playerUnits.Count : 0;
                     _lastProcessedAlliedUnitCount = alliedUnitCount;
 
-                    // Preserve allied unit auto-control tracking and REA-verified control reflection
+                    // Track allied units observed by this module for diagnostics only.
+                    // Do not mutate faction/control identity here: player (enemy) units must
+                    // remain IsControlledByPlayer=true so other modules and IsEnemy checks
+                    // keep treating them as hostile targets.
                     HashSet<EntityController> autoControlledAllies = new HashSet<EntityController>();
                     if (playerUnits != null && playerUnits.Count > 0)
                     {
@@ -102,23 +105,6 @@ namespace RogueCommandExpansionLoader.Modules
                             if (ally != null)
                             {
                                 autoControlledAllies.Add(ally);
-                                try
-                                {
-                                    System.Reflection.PropertyInfo pPlayer = typeof(EntityController).GetProperty("IsControlledByPlayer");
-                                    if (pPlayer != null && pPlayer.CanWrite)
-                                    {
-                                        pPlayer.SetValue(ally, false, null);
-                                    }
-                                    System.Reflection.PropertyInfo pAi = typeof(EntityController).GetProperty("IsControlledByAi");
-                                    if (pAi != null && pAi.CanWrite)
-                                    {
-                                        pAi.SetValue(ally, true, null);
-                                    }
-                                }
-                                catch
-                                {
-                                    // Guarded: reflection reassignment must never break the tick
-                                }
                             }
                         }
                     }
@@ -156,7 +142,7 @@ namespace RogueCommandExpansionLoader.Modules
                             continue;
                         }
 
-                        if (!unit.CanAttackAndIsAttackEnabled && !unit.IsCombatUnit)
+                        if (!unit.IsCombatUnit || !unit.CanAttackAndIsAttackEnabled)
                         {
                             continue;
                         }
@@ -171,6 +157,11 @@ namespace RogueCommandExpansionLoader.Modules
                                 candidate.DestroyHasBeenStarted ||
                                 candidate.canNotBeAttacked ||
                                 candidate.canNotBeTargetedByAi)
+                            {
+                                continue;
+                            }
+
+                            if (!unit.IsEnemy(candidate))
                             {
                                 continue;
                             }
@@ -200,7 +191,8 @@ namespace RogueCommandExpansionLoader.Modules
                             !currentTarget.IsDestroyed &&
                             !currentTarget.DestroyHasBeenStarted &&
                             !currentTarget.canNotBeAttacked &&
-                            !currentTarget.canNotBeTargetedByAi;
+                            !currentTarget.canNotBeTargetedByAi &&
+                            unit.IsEnemy(currentTarget);
 
                         if (hasValidCurrentTarget)
                         {
@@ -231,12 +223,12 @@ namespace RogueCommandExpansionLoader.Modules
                             EntityCommand.Role.ThisCommandWantsPathToBeCleared);
                         attackCmd.tag = _commandTag;
 
+                        retargetBudget--;
                         try
                         {
                             unit.ExecuteCommand(attackCmd, EntityController.CommandProcessingType.ExecuteBeforeCurrentCommand);
                             _lastRetargetedCount++;
                             _totalRetargetCommandCount++;
-                            retargetBudget--;
                         }
                         catch (Exception ex)
                         {
