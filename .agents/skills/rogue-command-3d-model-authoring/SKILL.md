@@ -260,6 +260,8 @@ bpy.ops.export_scene.fbx(
 
 *See tested geometric algorithms and recipes in [blender-procedural-techniques.md](references/blender-procedural-techniques.md).*
 
+**Important**: `bake_space_transform=False` is required for rigged FBX exports. With `True`, Blender bakes the axis conversion (Z-up → Y-up) into vertex/bone transforms, which corrupts bind-pose matrices for skinned meshes — the SkinnedMeshRenderer reports zero `localBounds` (Extents 0,0,0) and the mesh collapses in-game. With `False`, Unity handles axis conversion at import time, preserving correct bind poses. This was verified via runtime inspection: `True` → degenerate bounds; `False` → correct bounds. This is especially critical for hexapods and other non-standard rigs.
+
 ---
 
 ## 5. Native Hierarchy & Template Alignment
