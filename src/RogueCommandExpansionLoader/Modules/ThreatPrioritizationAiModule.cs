@@ -42,6 +42,7 @@ namespace RogueCommandExpansionLoader.Modules
             private readonly ThreatPrioritizationSettings _settings;
             private float _nextCheckAt;
             private bool _stopped;
+            private int _lastProcessedAiUnitCount;
 
             public ThreatPrioritizationRuntimeBehaviour(DefaultAiBehaviour gameBehaviour, ThreatPrioritizationSettings settings)
             {
@@ -66,10 +67,33 @@ namespace RogueCommandExpansionLoader.Modules
                     return;
                 }
                 _nextCheckAt = now + _settings.CheckIntervalSeconds;
-                // Threat prioritization is intentionally non-destructive: it only
-                // re-evaluates target focus on the configured cadence. Detailed
-                // target reassignment is deferred to a follow-up that has live
-                // EntityController target inspection.
+
+                // Safe, non-destructive cadence: count live AI units so the module
+                // is observable and ready for target reassignment in a follow-up
+                // that has REA-verified EntityController target members.
+                try
+                {
+                    int aiUnitCount = 0;
+                    ExistingControllers existing = ExistingControllers.Instance;
+                    if (existing != null)
+                    {
+                        System.Collections.Generic.HashSet<EntityController> aiUnits = existing.AiUnits();
+                        if (aiUnits != null)
+                        {
+                            aiUnitCount = aiUnits.Count;
+                        }
+                    }
+                    _lastProcessedAiUnitCount = aiUnitCount;
+                }
+                catch
+                {
+                    // Guarded: diagnostics must never break the tick.
+                }
+            }
+
+            public int LastProcessedAiUnitCount
+            {
+                get { return _lastProcessedAiUnitCount; }
             }
 
             public void OnDisposed()
