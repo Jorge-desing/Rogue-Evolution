@@ -1432,7 +1432,7 @@ internal static partial class ValidationTestRunner
         {
             throw new InvalidOperationException("Threat-prioritization default parse failed: " + diagnostic);
         }
-        if (settings.BaseIndex != -1 || settings.CheckIntervalSeconds != 3f || settings.PriorityMode != "HighestThreat")
+        if (settings.BaseIndex != -1 || settings.CheckIntervalSeconds != 3f || settings.PriorityMode != "HighestThreat" || settings.EngagementRadius != 35f || settings.RetargetThreshold != 1.25f || settings.MaxRetargetsPerTick != 8)
         {
             throw new InvalidOperationException("Threat-prioritization default values did not match specification.");
         }
@@ -1468,6 +1468,164 @@ internal static partial class ValidationTestRunner
         if (ThreatPrioritizationParameterParser.TryParse(invalidMode, out _, out diagnostic) || diagnostic == null)
         {
             throw new InvalidOperationException("Threat-prioritization should reject invalid priorityMode.");
+        }
+
+        var invalidRadius = new[]
+        {
+            new ContentModuleParameter { name = "engagementRadius", value = "2" }
+        };
+        if (ThreatPrioritizationParameterParser.TryParse(invalidRadius, out _, out diagnostic) || diagnostic == null)
+        {
+            throw new InvalidOperationException("Threat-prioritization should reject engagementRadius < 5.");
+        }
+
+        var invalidDuplicate = new[]
+        {
+            new ContentModuleParameter { name = "priorityMode", value = "HighestThreat" },
+            new ContentModuleParameter { name = "priorityMode", value = "LowestHealth" }
+        };
+        if (ThreatPrioritizationParameterParser.TryParse(invalidDuplicate, out _, out diagnostic) || diagnostic == null)
+        {
+            throw new InvalidOperationException("Threat-prioritization should reject duplicate parameters.");
+        }
+    }),
+    ("threat-prioritization AI module prioritizes high-threat and finisher targets dynamically", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        DefaultAiBehaviour.ResetRuntimeState();
+        UnityEngine.Time.time = 0f;
+        IRogueCommandAiRuntimeBehaviour? behaviour = null;
+        try
+        {
+            // Scenario 1: HighestThreat mode prioritizes lethal sniper over chaff
+            var aiAttacker = new EntityController
+            {
+                IsControlledByAi = true,
+                IsUnit = true,
+                IsCombatUnit = true,
+                CanAttackAndIsAttackEnabled = true,
+                CanMoveAndMovementIsEnabled = true,
+                UniqueEntityId = 501,
+                aiBaseIndex = 0,
+                Position = UnityEngine.Vector3.zero
+            };
+            var playerChaff = new EntityController
+            {
+                IsControlledByPlayer = true,
+                IsUnit = true,
+                IsCombatUnit = true,
+                UniqueEntityId = 601,
+                Position = new UnityEngine.Vector3(5f, 0f, 0f),
+                CurrentHealth = 100f,
+                MaxHealth = 100f,
+                Damage1 = 2f,
+                Attack1Cooldown = 2f
+            };
+            var playerSniper = new EntityController
+            {
+                IsControlledByPlayer = true,
+                IsUnit = true,
+                IsCombatUnit = true,
+                UniqueEntityId = 602,
+                Position = new UnityEngine.Vector3(15f, 0f, 0f),
+                CurrentHealth = 60f,
+                MaxHealth = 60f,
+                Damage1 = 45f,
+                Attack1Cooldown = 1f,
+                Role = UnitRole.Sniper
+            };
+
+            ExistingControllers.Instance.AiUnits().Add(aiAttacker);
+            ExistingControllers.Instance.PlayerEntities().Add(playerChaff);
+            ExistingControllers.Instance.PlayerEntities().Add(playerSniper);
+
+            var module = new ThreatPrioritizationAiModule();
+            behaviour = module.CreateBehaviour(new DefaultAiBehaviour(),
+            [
+                new ContentModuleParameter { name = "priorityMode", value = "HighestThreat" },
+                new ContentModuleParameter { name = "checkIntervalSeconds", value = "1" },
+                new ContentModuleParameter { name = "engagementRadius", value = "40" }
+            ]);
+            behaviour.OnInitialized();
+            behaviour.Tick();
+
+            if (aiAttacker.ExecuteCommandCallCount == 0 || !aiAttacker.LastExecutedCommand.HasValue)
+            {
+                throw new InvalidOperationException("AI attacker was not commanded to attack prioritized threat.");
+            }
+            if (aiAttacker.CurrentAttackTarget != playerSniper)
+            {
+                throw new InvalidOperationException("AI attacker did not prioritize player sniper over chaff in HighestThreat mode.");
+            }
+
+            var runtime = (ThreatPrioritizationAiModule.ThreatPrioritizationRuntimeBehaviour)behaviour;
+            if (runtime.LastProcessedAiUnitCount != 1 || runtime.LastRetargetedCount != 1)
+            {
+                throw new InvalidOperationException("Runtime behaviour metrics mismatch after HighestThreat tick.");
+            }
+
+            // Scenario 2: LowestHealth finisher mode prioritizes low health finisher
+            var playerWounded = new EntityController
+            {
+                IsControlledByPlayer = true,
+                IsUnit = true,
+                IsCombatUnit = true,
+                UniqueEntityId = 603,
+                Position = new UnityEngine.Vector3(8f, 0f, 0f),
+                CurrentHealth = 10f,
+                MaxHealth = 100f,
+                Damage1 = 5f,
+                Attack1Cooldown = 1f
+            };
+            ExistingControllers.Instance.PlayerEntities().Add(playerWounded);
+
+            var finisherModule = new ThreatPrioritizationAiModule();
+            var finisherBehaviour = finisherModule.CreateBehaviour(new DefaultAiBehaviour(),
+            [
+                new ContentModuleParameter { name = "priorityMode", value = "LowestHealth" },
+                new ContentModuleParameter { name = "checkIntervalSeconds", value = "1" },
+                new ContentModuleParameter { name = "engagementRadius", value = "40" }
+            ]);
+            finisherBehaviour.OnInitialized();
+            finisherBehaviour.Tick();
+
+            if (aiAttacker.CurrentAttackTarget != playerWounded)
+            {
+                throw new InvalidOperationException("AI attacker did not prioritize wounded enemy in LowestHealth mode.");
+            }
+
+            // Scenario 3: BaseIndex filtering
+            var aiOtherBase = new EntityController
+            {
+                IsControlledByAi = true,
+                IsUnit = true,
+                IsCombatUnit = true,
+                CanAttackAndIsAttackEnabled = true,
+                UniqueEntityId = 502,
+                aiBaseIndex = 2,
+                Position = UnityEngine.Vector3.zero
+            };
+            ExistingControllers.Instance.AiUnits().Add(aiOtherBase);
+
+            var baseSpecificModule = new ThreatPrioritizationAiModule();
+            var baseSpecificBehaviour = baseSpecificModule.CreateBehaviour(new DefaultAiBehaviour(),
+            [
+                new ContentModuleParameter { name = "baseIndex", value = "0" },
+                new ContentModuleParameter { name = "checkIntervalSeconds", value = "1" }
+            ]);
+            baseSpecificBehaviour.OnInitialized();
+            baseSpecificBehaviour.Tick();
+
+            if (aiOtherBase.ExecuteCommandCallCount > 0)
+            {
+                throw new InvalidOperationException("Unit belonging to base 2 was retargeted by base 0 module.");
+            }
+        }
+        finally
+        {
+            behaviour?.OnDestroyed();
+            ExistingControllers.Instance.Reset();
+            DefaultAiBehaviour.ResetRuntimeState();
         }
     }),
     ("wave-escalation AI module increments attack wave counter and orders assault", () =>
@@ -1534,6 +1692,7 @@ internal static partial class ValidationTestRunner
         registry.Register(new TacticalSkillActivationAiModule());
         registry.Register(new CounterBatteryAiModule());
         registry.Register(new WaveEscalationAiModule());
+        registry.Register(new ThreatPrioritizationAiModule());
 
         if (!registry.TryValidate("sample:counter-battery", null, out string diagnostic) || diagnostic != null)
         {
@@ -1550,6 +1709,10 @@ internal static partial class ValidationTestRunner
         if (!registry.TryValidate("sample:wave-escalation", null, out diagnostic) || diagnostic != null)
         {
             throw new InvalidOperationException("Wave-escalation module failed registry validation: " + diagnostic);
+        }
+        if (!registry.TryValidate("sample:threat-prioritization", null, out diagnostic) || diagnostic != null)
+        {
+            throw new InvalidOperationException("Threat-prioritization module failed registry validation: " + diagnostic);
         }
     }),
     ("counter-battery AI module parses defaults and validates limits", () =>

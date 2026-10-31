@@ -1,6 +1,8 @@
 using System;
+using System.Collections.Generic;
 using RogueCommandExpansionLoader.Content;
 using RogueCommandExpansionLoader.Contracts;
+using UnityEngine;
 
 namespace RogueCommandExpansionLoader.Modules
 {
@@ -36,25 +38,29 @@ namespace RogueCommandExpansionLoader.Modules
             return new ThreatPrioritizationRuntimeBehaviour(gameBehaviour, settings);
         }
 
-        private sealed class ThreatPrioritizationRuntimeBehaviour : IRogueCommandAiRuntimeBehaviour
+        internal sealed class ThreatPrioritizationRuntimeBehaviour : IRogueCommandAiRuntimeBehaviour
         {
             private readonly DefaultAiBehaviour _gameBehaviour;
             private readonly ThreatPrioritizationSettings _settings;
+            private readonly string _commandTag;
             private float _nextCheckAt;
             private bool _stopped;
             private int _lastProcessedAiUnitCount;
             private int _lastProcessedAlliedUnitCount;
-            private System.Collections.Generic.HashSet<EntityController> _autoControlledAlliedUnits;
+            private int _lastRetargetedCount;
+            private int _totalRetargetCommandCount;
+            private HashSet<EntityController> _autoControlledAlliedUnits;
 
             public ThreatPrioritizationRuntimeBehaviour(DefaultAiBehaviour gameBehaviour, ThreatPrioritizationSettings settings)
             {
                 _gameBehaviour = gameBehaviour;
                 _settings = settings;
+                _commandTag = "roguecommand.expansionloader.threat-prioritization." + Guid.NewGuid().ToString("N");
             }
 
             public void OnInitialized()
             {
-                _nextCheckAt = UnityEngine.Time.time + _settings.CheckIntervalSeconds;
+                _nextCheckAt = 0f;
             }
 
             public void Tick()
@@ -63,71 +69,249 @@ namespace RogueCommandExpansionLoader.Modules
                 {
                     return;
                 }
-                float now = UnityEngine.Time.time;
+                float now = Time.time;
                 if (now < _nextCheckAt)
                 {
                     return;
                 }
                 _nextCheckAt = now + _settings.CheckIntervalSeconds;
+                _lastRetargetedCount = 0;
 
-                // Safe, non-destructive cadence: count live AI units so the module
-                // is observable and ready for target reassignment in a follow-up
-                // that has REA-verified EntityController target members.
                 try
                 {
-                    int aiUnitCount = 0;
-                    int alliedUnitCount = 0;
-                    System.Collections.Generic.HashSet<EntityController> autoControlledAllies = new System.Collections.Generic.HashSet<EntityController>();
                     ExistingControllers existing = ExistingControllers.Instance;
-                    if (existing != null)
+                    if (existing == null)
                     {
-                        System.Collections.Generic.HashSet<EntityController> aiUnits = existing.AiUnits();
-                        if (aiUnits != null)
+                        return;
+                    }
+
+                    HashSet<EntityController> aiUnits = existing.AiUnits();
+                    int aiUnitCount = aiUnits != null ? aiUnits.Count : 0;
+                    _lastProcessedAiUnitCount = aiUnitCount;
+
+                    HashSet<EntityController> playerUnits = existing.PlayerUnits();
+                    int alliedUnitCount = playerUnits != null ? playerUnits.Count : 0;
+                    _lastProcessedAlliedUnitCount = alliedUnitCount;
+
+                    // Preserve allied unit auto-control tracking and REA-verified control reflection
+                    HashSet<EntityController> autoControlledAllies = new HashSet<EntityController>();
+                    if (playerUnits != null && playerUnits.Count > 0)
+                    {
+                        foreach (EntityController ally in playerUnits)
                         {
-                            aiUnitCount = aiUnits.Count;
-                        }
-                        System.Collections.Generic.HashSet<EntityController> playerUnits = existing.PlayerUnits();
-                        if (playerUnits != null)
-                        {
-                            alliedUnitCount = playerUnits.Count;
-                            // Specialized for allied units: mark them as auto-controlled by this module
-                            // so the player does not need to micromanage them. Actual control
-                            // reassignment is deferred to a REA-verified follow-up.
-                            foreach (EntityController ally in playerUnits)
+                            if (ally != null)
                             {
-                                if (ally != null)
+                                autoControlledAllies.Add(ally);
+                                try
                                 {
-                                    autoControlledAllies.Add(ally);
-                                    // Real control reassignment (REA-verified setters: set_IsControlledByPlayer(bool), set_IsControlledByAi(bool)).
-                                    try
+                                    System.Reflection.PropertyInfo pPlayer = typeof(EntityController).GetProperty("IsControlledByPlayer");
+                                    if (pPlayer != null && pPlayer.CanWrite)
                                     {
-                                        System.Reflection.PropertyInfo pPlayer = typeof(EntityController).GetProperty("IsControlledByPlayer");
-                                        if (pPlayer != null && pPlayer.CanWrite)
-                                        {
-                                            pPlayer.SetValue(ally, false, null);
-                                        }
-                                        System.Reflection.PropertyInfo pAi = typeof(EntityController).GetProperty("IsControlledByAi");
-                                        if (pAi != null && pAi.CanWrite)
-                                        {
-                                            pAi.SetValue(ally, true, null);
-                                        }
+                                        pPlayer.SetValue(ally, false, null);
                                     }
-                                    catch
+                                    System.Reflection.PropertyInfo pAi = typeof(EntityController).GetProperty("IsControlledByAi");
+                                    if (pAi != null && pAi.CanWrite)
                                     {
-                                        // Guarded: control reassignment must never break the tick.
+                                        pAi.SetValue(ally, true, null);
                                     }
+                                }
+                                catch
+                                {
+                                    // Guarded: reflection reassignment must never break the tick
                                 }
                             }
                         }
                     }
-                    _lastProcessedAiUnitCount = aiUnitCount;
-                    _lastProcessedAlliedUnitCount = alliedUnitCount;
                     _autoControlledAlliedUnits = autoControlledAllies;
+
+                    // Evaluate and retarget AI combat units
+                    if (aiUnits == null || aiUnits.Count == 0)
+                    {
+                        return;
+                    }
+
+                    HashSet<EntityController> playerEntities = existing.PlayerEntities() ?? playerUnits;
+                    if (playerEntities == null || playerEntities.Count == 0)
+                    {
+                        return;
+                    }
+
+                    float engagementRadiusSq = _settings.EngagementRadius * _settings.EngagementRadius;
+                    int retargetBudget = _settings.MaxRetargetsPerTick;
+
+                    foreach (EntityController unit in aiUnits)
+                    {
+                        if (retargetBudget <= 0)
+                        {
+                            break;
+                        }
+
+                        if (unit == null || unit.IsDestroyed || unit.DestroyHasBeenStarted)
+                        {
+                            continue;
+                        }
+
+                        if (_settings.BaseIndex >= 0 && unit.aiBaseIndex != _settings.BaseIndex)
+                        {
+                            continue;
+                        }
+
+                        if (!unit.CanAttackAndIsAttackEnabled && !unit.IsCombatUnit)
+                        {
+                            continue;
+                        }
+
+                        EntityController bestCandidate = null;
+                        float bestScore = Single.NegativeInfinity;
+
+                        foreach (EntityController candidate in playerEntities)
+                        {
+                            if (candidate == null ||
+                                candidate.IsDestroyed ||
+                                candidate.DestroyHasBeenStarted ||
+                                candidate.canNotBeAttacked ||
+                                candidate.canNotBeTargetedByAi)
+                            {
+                                continue;
+                            }
+
+                            float distSq = (candidate.Position - unit.Position).sqrMagnitude;
+                            if (distSq > engagementRadiusSq)
+                            {
+                                continue;
+                            }
+
+                            float score = ComputeThreatScore(candidate, unit, distSq, _settings.PriorityMode);
+                            if (score > bestScore)
+                            {
+                                bestScore = score;
+                                bestCandidate = candidate;
+                            }
+                        }
+
+                        if (bestCandidate == null)
+                        {
+                            continue;
+                        }
+
+                        // Hysteresis: compare against current target
+                        EntityController currentTarget = unit.CurrentAttackTarget;
+                        bool hasValidCurrentTarget = currentTarget != null &&
+                            !currentTarget.IsDestroyed &&
+                            !currentTarget.DestroyHasBeenStarted &&
+                            !currentTarget.canNotBeAttacked &&
+                            !currentTarget.canNotBeTargetedByAi;
+
+                        if (hasValidCurrentTarget)
+                        {
+                            if (currentTarget == bestCandidate)
+                            {
+                                continue; // Already attacking best candidate
+                            }
+
+                            float curDistSq = (currentTarget.Position - unit.Position).sqrMagnitude;
+                            if (curDistSq <= engagementRadiusSq * 1.44f)
+                            {
+                                float currentScore = ComputeThreatScore(currentTarget, unit, curDistSq, _settings.PriorityMode);
+                                // Require best candidate to beat current target by retarget threshold
+                                if (bestScore <= currentScore * _settings.RetargetThreshold)
+                                {
+                                    continue;
+                                }
+                            }
+                        }
+
+                        if (unit.CurrentCommandIsTaggedWith(_commandTag) && unit.CurrentAttackTarget == bestCandidate)
+                        {
+                            continue;
+                        }
+
+                        EntityCommand attackCmd = EntityCommand.AttackMoveOnTarget(
+                            bestCandidate,
+                            EntityCommand.Role.ThisCommandWantsPathToBeCleared);
+                        attackCmd.tag = _commandTag;
+
+                        try
+                        {
+                            unit.ExecuteCommand(attackCmd, EntityController.CommandProcessingType.ExecuteBeforeCurrentCommand);
+                            _lastRetargetedCount++;
+                            _totalRetargetCommandCount++;
+                            retargetBudget--;
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.LogWarning("[ThreatPrioritization] Failed to execute attack on " + unit.name + ": " + ex.Message);
+                        }
+                    }
                 }
                 catch
                 {
-                    // Guarded: diagnostics must never break the tick.
+                    // Guarded: diagnostics and retargeting must never break the tick.
                 }
+            }
+
+            internal static float ComputeThreatScore(
+                EntityController candidate,
+                EntityController friendlyUnit,
+                float distSq,
+                string priorityMode)
+            {
+                float health = Mathf.Max(0.1f, candidate.CurrentHealth);
+                float maxHealth = Mathf.Max(1f, candidate.MaxHealth);
+                float healthFraction = Mathf.Clamp(health / maxHealth, 0f, 1f);
+
+                float dps = 0f;
+                try
+                {
+                    if (candidate.Attack1Cooldown > 0.01f && candidate.Damage1 > 0f)
+                    {
+                        dps += candidate.Damage1 / candidate.Attack1Cooldown;
+                    }
+                    if (candidate.Attack2Cooldown > 0.01f && candidate.Damage2 > 0f)
+                    {
+                        dps += candidate.Damage2 / candidate.Attack2Cooldown;
+                    }
+                }
+                catch
+                {
+                    // Fallback
+                }
+                if (dps <= 0f)
+                {
+                    dps = candidate.IsCombatUnit ? 15f : 3f;
+                }
+
+                float roleBonus = 0f;
+                if (candidate.HasRole(UnitRole.MassDestruction)) roleBonus += 45f;
+                if (candidate.HasRole(UnitRole.Sniper)) roleBonus += 35f;
+                if (candidate.HasRole(UnitRole.Turret)) roleBonus += 30f;
+                if (candidate.HasRole(UnitRole.FrontalAttacker)) roleBonus += 25f;
+                if (candidate.HasRole(UnitRole.Melee)) roleBonus += 20f;
+                if (candidate.HasRole(UnitRole.Tank)) roleBonus += 10f;
+
+                float rankBonus = candidate.CurrentRank * 10f;
+                float distPenalty = distSq * 0.03f;
+
+                if (string.Equals(priorityMode, "LowestHealth", StringComparison.OrdinalIgnoreCase))
+                {
+                    // Finisher priority: rewards missing HP percentage and low absolute HP
+                    return ((1f - healthFraction) * 120f) + (500f / Mathf.Max(10f, health)) + (candidate.IsCombatUnit ? 25f : 0f) - distPenalty;
+                }
+                else if (string.Equals(priorityMode, "HighestDps", StringComparison.OrdinalIgnoreCase))
+                {
+                    // Pure damage dealer priority: eliminate highest DPS threats first
+                    return (dps * 5f) + (roleBonus * 0.5f) + rankBonus - distPenalty;
+                }
+                else
+                {
+                    // HighestThreat default: composite threat combining DPS, high-impact roles, rank, and health
+                    return (dps * 3f) + roleBonus + rankBonus + (candidate.MaxHealth * 0.1f) - distPenalty;
+                }
+            }
+
+            public string CommandTag
+            {
+                get { return _commandTag; }
             }
 
             public int LastProcessedAiUnitCount
@@ -143,6 +327,16 @@ namespace RogueCommandExpansionLoader.Modules
             public int AutoControlledAlliedUnitCount
             {
                 get { return _autoControlledAlliedUnits != null ? _autoControlledAlliedUnits.Count : 0; }
+            }
+
+            public int LastRetargetedCount
+            {
+                get { return _lastRetargetedCount; }
+            }
+
+            public int TotalRetargetCommandCount
+            {
+                get { return _totalRetargetCommandCount; }
             }
 
             public void OnDisposed()

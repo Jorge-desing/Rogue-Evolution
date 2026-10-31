@@ -151,6 +151,10 @@ public sealed class EntityController : Component
     }
     public float MoveSpeed { get; set; } = 10f;
     public float WeaponRange { get; set; } = 15f;
+    public float Damage1 { get; set; } = 10f;
+    public float Damage2 { get; set; } = 0f;
+    public float Attack1Cooldown { get; set; } = 1f;
+    public float Attack2Cooldown { get; set; } = 1f;
     public string EntityId { get => entityId; set => entityId = value; }
     public string entityId { get; set; }
     public string name { get => gameObject?.name ?? string.Empty; set { if (gameObject != null) gameObject.name = value; } }
@@ -202,6 +206,10 @@ public sealed class EntityController : Component
         ExecuteCommandCallCount++;
         LastCommandProcessingType = processingType;
         CurrentCommandTag = command.tag;
+        if (command.target != null)
+        {
+            CurrentAttackTarget = command.target;
+        }
         if (command.command == EntityCommand.Command.Move)
         {
             MoveTo(command.destination);
@@ -256,6 +264,7 @@ public struct EntityCommand
     public Role role;
     public Command command;
     public int intValue;
+    public EntityController target;
 
     public enum Command
     {
@@ -308,10 +317,10 @@ public struct EntityCommand
         new() { command = Command.Stop };
 
     public static EntityCommand Attack(EntityController target) =>
-        new() { command = Command.Attack };
+        new() { command = Command.Attack, target = target };
 
     public static EntityCommand AttackMoveOnTarget(EntityController target, Role role) =>
-        new() { command = Command.AttackMoveOnTarget, role = role };
+        new() { command = Command.AttackMoveOnTarget, role = role, target = target };
 
     public static EntityCommand Move(Vector3 destination, Vector2Int? clickPositionCell = null, Role role = Role.None) =>
         new() { command = Command.Move, destination = destination, role = role };
