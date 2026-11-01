@@ -5367,7 +5367,7 @@ internal static partial class ValidationTestRunner
         ExistingControllers.Instance.PlayerUnits().Add(unitA);
 
         // Apply Swift
-        UnitAffixResult swift = RuntimeGameplayCommandDirector.TryApplyUnitAffix("951", "Swift");
+        UnitAffixResult swift = RuntimeGameplayCommandDirector.TryApplyUnitAffix("unit:affix_alpha", "Swift");
         if (!swift.Success || swift.ActiveAffixCount != 1 || swift.Affix != "Swift")
         {
             throw new InvalidOperationException("TryApplyUnitAffix Swift should succeed with 1 active affix.");
@@ -5413,14 +5413,14 @@ internal static partial class ValidationTestRunner
         }
 
         // Remove Swift
-        UnitAffixResult remSwift = RuntimeGameplayCommandDirector.TryRemoveUnitAffix("951", "Swift");
+        UnitAffixResult remSwift = RuntimeGameplayCommandDirector.TryRemoveUnitAffix("unit:affix_alpha", "Swift");
         if (!remSwift.Success || remSwift.ActiveAffixCount != 2)
         {
             throw new InvalidOperationException("TryRemoveUnitAffix Swift should leave 2 active affixes.");
         }
 
         // Remove All
-        UnitAffixResult remAll = RuntimeGameplayCommandDirector.TryRemoveUnitAffix("951", "All");
+        UnitAffixResult remAll = RuntimeGameplayCommandDirector.TryRemoveUnitAffix("unit:affix_alpha", "All");
         if (!remAll.Success || remAll.ActiveAffixCount != 0)
         {
             throw new InvalidOperationException("TryRemoveUnitAffix All should clear all affixes.");

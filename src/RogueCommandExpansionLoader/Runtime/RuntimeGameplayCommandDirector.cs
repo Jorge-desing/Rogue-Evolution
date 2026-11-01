@@ -5587,6 +5587,19 @@ namespace RogueCommandExpansionLoader.Runtime
             bool removeAll = string.Equals(normalized, "All", StringComparison.OrdinalIgnoreCase);
 
             string key = entityKeyId.Trim();
+            try
+            {
+                EntityController unit = FindEntityByKey(ExistingControllers.Instance, key);
+                if (unit != null)
+                {
+                    key = unit.UniqueEntityId.ToString();
+                }
+            }
+            catch
+            {
+                // Keep the supplied key so numeric runtime keys can still be removed fail-closed.
+            }
+
             int activeCount = 0;
             bool found = false;
 
