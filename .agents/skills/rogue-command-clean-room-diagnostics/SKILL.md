@@ -112,6 +112,17 @@ When pulsing or renewing a dynamic command aura, track which follower links were
 - Clear links only when the captain's aura is explicitly cleared or the aura state is removed.
 
 Pitfall: Renewing an aura without tracking ownership either (a) leaves stale links from the expired aura attached to the captain, or (b) releases native links that the game depends on. Always distinguish created links from pre-existing ones before releasing.
+
+### Command Director Fail-Closed Rules
+
+- `TryOrderAttackMove` must resolve and validate the requested entity before calling native `AttackMove_Static`; a missing key must fail instead of commanding the previously selected unit.
+- Hostility guards must be written as `unit.IsEnemy == null || !unit.IsEnemy(target)`; the inverted `unit.IsEnemy != null && !unit.IsEnemy(target)` form skips hostility when the delegate is null.
+- Candidate filters that invoke `source.IsEnemy(candidate)` or `attacker.IsEnemy(target)` must check `== null` first; otherwise a null delegate throws and can abort the whole sweep or assault.
+- Clamp floating-point distances, radii, durations, and magnitudes with `Mathf.Clamp` and preserve the clamped `float`; do not truncate through `int`.
+- Validate every float coordinate, radius, magnitude, and duration for `NaN`/infinity before reflection or command dispatch, returning `success: false`.
+- Compute `omitted*Count` from requested versus dispatched/selected counts, not from already-filtered candidate counts.
+### Environmental Hazards
+
 - `diagnostics_order_spawn_hazard_zone`: Spawns a battlefield environmental hazard zone (`hazardType` `"Firestorm"`/`"AcidPool"`/`"EmpField"`/`"CryoMist"`/`"NaniteField"`, `x`, `z`, `radius`, `durationSeconds`, `tickDamage`) with trigger collider and amortized tick rate (>= 0.5s).
 - `diagnostics_order_clear_hazard_zones`: Clears all active hazard zones and colliders.
 
