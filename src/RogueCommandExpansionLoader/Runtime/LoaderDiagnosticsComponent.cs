@@ -464,7 +464,7 @@ namespace RogueCommandExpansionLoader.Runtime
             float value = 0f,
             string side = "Friendly",
             bool multiplyValueWithCurrentHeatLevel = false,
-            bool multiplyValueWithMetaProgressionMultiplier = false,
+            string multiplyValueWithMetaProgressionMultiplier = null,
             bool changeableValueHasToBeGreaterZero = false,
             string sourceId = "rcl-card-change")
         {
@@ -568,7 +568,7 @@ namespace RogueCommandExpansionLoader.Runtime
         /// </summary>
         public string ApplyInGameCardChangeJson(string valueToChange, string operation, float value, string side = "Friendly", string targetEntityId = null)
         {
-            var req = CardChangeRequest.Create(valueToChange, operation, value, false, false, side);
+            var req = CardChangeRequest.Create(valueToChange, operation, value, false, null, side);
             return AgentDiagnosticsFormatter.SerializeCardChangeApplyResult(
                 RuntimeGameplayCommandDirector.TryApplyCardChange(req, targetEntityId));
         }
