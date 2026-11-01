@@ -18,7 +18,7 @@ namespace RogueCommandExpansionLoader.Runtime
         public string Operation { get; set; }
         public float Value { get; set; }
         public bool MultiplyValueWithCurrentHeatLevel { get; set; }
-        public bool MultiplyValueWithMetaProgressionMultiplier { get; set; }
+        public string MultiplyValueWithMetaProgressionMultiplier { get; set; }
         public string Side { get; set; }
         public bool ChangeableValueHasToBeGreaterZero { get; set; }
         public string[] OnlyForTheseEntityIds { get; set; }
@@ -30,7 +30,7 @@ namespace RogueCommandExpansionLoader.Runtime
             string operation,
             float value,
             bool multiplyValueWithCurrentHeatLevel = false,
-            bool multiplyValueWithMetaProgressionMultiplier = false,
+            string multiplyValueWithMetaProgressionMultiplier = null,
             string side = "Friendly",
             bool changeableValueHasToBeGreaterZero = false,
             string[] onlyForTheseEntityIds = null,
@@ -43,7 +43,7 @@ namespace RogueCommandExpansionLoader.Runtime
                 Operation = string.IsNullOrWhiteSpace(operation) ? "Add" : operation,
                 Value = value,
                 MultiplyValueWithCurrentHeatLevel = multiplyValueWithCurrentHeatLevel,
-                MultiplyValueWithMetaProgressionMultiplier = multiplyValueWithMetaProgressionMultiplier,
+                MultiplyValueWithMetaProgressionMultiplier = multiplyValueWithMetaProgressionMultiplier ?? string.Empty,
                 Side = string.IsNullOrWhiteSpace(side) ? "Friendly" : side,
                 ChangeableValueHasToBeGreaterZero = changeableValueHasToBeGreaterZero,
                 OnlyForTheseEntityIds = onlyForTheseEntityIds ?? new string[0],

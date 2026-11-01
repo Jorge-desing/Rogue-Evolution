@@ -328,14 +328,14 @@ internal static partial class ValidationTestRunner
     ("card change request serializer emits request fields", () =>
     {
         var request = CardChangeRequest.Create(
-            "MaxHealth", "Add", 25f, true, false, "Friendly", false,
+            "MaxHealth", "Add", 25f, true, null, "Friendly", false,
             new[] { "unit:alpha" }, new[] { "unit:beta" }, "rcl-test");
         string json = AgentDiagnosticsFormatter.SerializeCardChangeRequest(request);
         if (!json.Contains("\"valueToChange\":\"MaxHealth\"") ||
             !json.Contains("\"operation\":\"Add\"") ||
             !json.Contains("\"value\":25") ||
             !json.Contains("\"multiplyValueWithCurrentHeatLevel\":true") ||
-            !json.Contains("\"multiplyValueWithMetaProgressionMultiplier\":false") ||
+            !json.Contains("\"multiplyValueWithMetaProgressionMultiplier\":\"\"") ||
             !json.Contains("\"side\":\"Friendly\"") ||
             !json.Contains("\"changeableValueHasToBeGreaterZero\":false") ||
             !json.Contains("\"onlyForTheseEntityIdsCount\":1") ||
