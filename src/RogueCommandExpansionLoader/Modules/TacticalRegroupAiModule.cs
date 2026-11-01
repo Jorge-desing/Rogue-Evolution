@@ -101,7 +101,8 @@ namespace RogueCommandExpansionLoader.Modules
 
                 foreach (EntityController unit in aiUnits)
                 {
-                    if (unit == null || unit.IsDestroyed || unit.DestroyHasBeenStarted)
+                    if (unit == null || unit.IsDestroyed || unit.DestroyHasBeenStarted ||
+                        !unit.IsControlledByAi || !unit.IsUnit || !unit.IsCombatUnit)
                     {
                         continue;
                     }
@@ -111,7 +112,7 @@ namespace RogueCommandExpansionLoader.Modules
                         continue;
                     }
 
-                    if (!unit.CanMoveAndMovementIsEnabled)
+                    if (!unit.CanAttackAndIsAttackEnabled || !unit.CanMoveAndMovementIsEnabled)
                     {
                         continue;
                     }
@@ -207,7 +208,8 @@ namespace RogueCommandExpansionLoader.Modules
                 {
                     foreach (EntityController b in buildings)
                     {
-                        if (b != null && !b.IsDestroyed && !b.DestroyHasBeenStarted)
+                        if (b != null && !b.IsDestroyed && !b.DestroyHasBeenStarted &&
+                            b.IsControlledByAi && b.IsBuilding)
                         {
                             if (baseIndex < 0 || b.aiBaseIndex == baseIndex)
                             {

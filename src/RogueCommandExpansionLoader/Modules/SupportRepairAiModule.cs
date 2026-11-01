@@ -97,7 +97,8 @@ namespace RogueCommandExpansionLoader.Modules
                 foreach (EntityController unit in aiUnits)
                 {
                     if (unit == null || unit.IsDestroyed || unit.DestroyHasBeenStarted ||
-                        unit.IsBuilding || !unit.IsControlledByAi || unit.canNotBeAttacked)
+                        !unit.IsControlledByAi || !unit.IsUnit ||
+                        unit.IsBuilding || !unit.CanMoveAndMovementIsEnabled || unit.canNotBeAttacked)
                     {
                         continue;
                     }
@@ -267,7 +268,8 @@ namespace RogueCommandExpansionLoader.Modules
             private bool IsEligibleRepairTarget(EntityController candidate)
             {
                 if (candidate == null || candidate.IsDestroyed || candidate.DestroyHasBeenStarted ||
-                    !candidate.IsControlledByAi || candidate.canNotBeHealed || candidate.MaxHealth <= 0.001f)
+                    !candidate.IsControlledByAi || (!candidate.IsUnit && !candidate.IsBuilding) ||
+                    candidate.canNotBeHealed || candidate.MaxHealth <= 0.001f)
                 {
                     return false;
                 }

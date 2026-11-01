@@ -164,6 +164,7 @@ namespace RogueCommandExpansionLoader.Modules
                             enemy.DestroyHasBeenStarted ||
                             !enemy.IsControlledByPlayer ||
                             !enemy.IsUnit ||
+                            !enemy.IsCombatUnit ||
                             enemy.canNotBeAttacked ||
                             enemy.canNotBeTargetedByAi ||
                             enemy.doNotRegisterGlobally)
@@ -201,6 +202,7 @@ namespace RogueCommandExpansionLoader.Modules
                         unit.DestroyHasBeenStarted ||
                         !unit.IsControlledByAi ||
                         !unit.IsUnit ||
+                        !unit.IsCombatUnit ||
                         unit.aiBaseIndex != _settings.BaseIndex ||
                         !unit.CanAttackAndIsAttackEnabled ||
                         !unit.CanMoveAndMovementIsEnabled ||

@@ -162,7 +162,7 @@ namespace RogueCommandExpansionLoader.Modules
                 foreach (EntityController playerUnit in playerUnits)
                 {
                     if (playerUnit == null || playerUnit.IsDestroyed || playerUnit.DestroyHasBeenStarted ||
-                        !playerUnit.IsControlledByPlayer || !playerUnit.IsUnit ||
+                        !playerUnit.IsControlledByPlayer || !playerUnit.IsUnit || !playerUnit.IsCombatUnit ||
                         !playerUnit.CanAttackAndIsAttackEnabled ||
                         playerUnit.canNotBeAttacked || playerUnit.canNotBeTargetedByAi ||
                         playerUnit.doNotRegisterGlobally)
@@ -216,7 +216,7 @@ namespace RogueCommandExpansionLoader.Modules
 
                 foreach (EntityController unit in aiUnits)
                 {
-                    if (unit == null || unit.IsDestroyed || unit.DestroyHasBeenStarted || !unit.IsUnit ||
+                    if (unit == null || unit.IsDestroyed || unit.DestroyHasBeenStarted || !unit.IsUnit || !unit.IsCombatUnit ||
                         !unit.IsControlledByAi || unit.aiBaseIndex != _settings.BaseIndex)
                     {
                         continue;

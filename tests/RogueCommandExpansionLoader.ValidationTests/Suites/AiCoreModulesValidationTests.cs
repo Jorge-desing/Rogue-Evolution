@@ -951,6 +951,7 @@ internal static partial class ValidationTestRunner
         {
             IsControlledByAi = true,
             IsUnit = true,
+            IsCombatUnit = true,
             CanAttackAndIsAttackEnabled = true,
             CanMoveAndMovementIsEnabled = true,
             aiBaseIndex = 0,
@@ -960,6 +961,7 @@ internal static partial class ValidationTestRunner
         {
             IsControlledByAi = true,
             IsUnit = true,
+            IsCombatUnit = true,
             CanAttackAndIsAttackEnabled = true,
             CanMoveAndMovementIsEnabled = true,
             aiBaseIndex = 0,
@@ -1179,6 +1181,7 @@ internal static partial class ValidationTestRunner
         {
             IsControlledByPlayer = true,
             IsUnit = true,
+            IsCombatUnit = true,
             CanAttackAndIsAttackEnabled = true,
             IsTargetInRange = false,
             CurrentAttackTarget = target,
@@ -1268,6 +1271,7 @@ internal static partial class ValidationTestRunner
             {
                 IsControlledByPlayer = true,
                 IsUnit = true,
+                IsCombatUnit = true,
                 CanAttackAndIsAttackEnabled = true,
                 CurrentAttackTarget = harvester,
                 CurrentCell = new UnityEngine.Vector2Int(11, 10),
@@ -1323,6 +1327,7 @@ internal static partial class ValidationTestRunner
         {
             IsControlledByPlayer = true,
             IsUnit = true,
+            IsCombatUnit = true,
             CanAttackAndIsAttackEnabled = true,
             IsTargetInRange = false,
             CurrentAttackTarget = target,
@@ -1401,7 +1406,7 @@ internal static partial class ValidationTestRunner
         {
             var attacker = new EntityController
             {
-                IsControlledByPlayer = true, IsUnit = true, CanAttackAndIsAttackEnabled = true,
+                IsControlledByPlayer = true, IsUnit = true, IsCombatUnit = true, CanAttackAndIsAttackEnabled = true,
                 CurrentAttackTarget = target, CurrentCell = new UnityEngine.Vector2Int(11, 10),
                 Position = target == harvester
                     ? new UnityEngine.Vector3(44f, 0f, 44f)
@@ -1452,6 +1457,7 @@ internal static partial class ValidationTestRunner
                 {
                     IsControlledByPlayer = true,
                     IsUnit = true,
+                    IsCombatUnit = true,
                     CanAttackAndIsAttackEnabled = true,
                     CurrentAttackTarget = protectedTarget,
                     CurrentCell = new UnityEngine.Vector2Int(11, 10),

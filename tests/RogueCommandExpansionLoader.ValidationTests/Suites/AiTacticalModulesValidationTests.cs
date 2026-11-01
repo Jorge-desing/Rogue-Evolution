@@ -762,6 +762,7 @@ internal static partial class ValidationTestRunner
                 IsControlledByPlayer = true,
                 IsUnit = true,
                 IsCombatUnit = true,
+                CanAttackAndIsAttackEnabled = true,
                 Position = new UnityEngine.Vector3(2f, 0f, 0f),
                 UniqueEntityId = 703
             };
@@ -1917,6 +1918,7 @@ internal static partial class ValidationTestRunner
                 IsControlledByPlayer = true,
                 IsUnit = true,
                 IsCombatUnit = true,
+                CanAttackAndIsAttackEnabled = true,
                 UniqueEntityId = 601,
                 Position = new UnityEngine.Vector3(5f, 0f, 0f),
                 CurrentHealth = 100f,
@@ -1929,6 +1931,7 @@ internal static partial class ValidationTestRunner
                 IsControlledByPlayer = true,
                 IsUnit = true,
                 IsCombatUnit = true,
+                CanAttackAndIsAttackEnabled = true,
                 UniqueEntityId = 602,
                 Position = new UnityEngine.Vector3(15f, 0f, 0f),
                 CurrentHealth = 60f,
@@ -1973,6 +1976,7 @@ internal static partial class ValidationTestRunner
                 IsControlledByPlayer = true,
                 IsUnit = true,
                 IsCombatUnit = true,
+                CanAttackAndIsAttackEnabled = true,
                 UniqueEntityId = 603,
                 Position = new UnityEngine.Vector3(8f, 0f, 0f),
                 CurrentHealth = 10f,
@@ -2044,6 +2048,7 @@ internal static partial class ValidationTestRunner
                 IsControlledByPlayer = true,
                 IsUnit = true,
                 IsCombatUnit = true,
+                CanAttackAndIsAttackEnabled = true,
                 UniqueEntityId = 701,
                 Position = new UnityEngine.Vector3(10f, 0f, 0f),
                 CurrentHealth = 40f,
@@ -2056,6 +2061,7 @@ internal static partial class ValidationTestRunner
                 IsControlledByPlayer = true,
                 IsUnit = true,
                 IsCombatUnit = true,
+                CanAttackAndIsAttackEnabled = true,
                 UniqueEntityId = 702,
                 Position = new UnityEngine.Vector3(6f, 0f, 0f),
                 CurrentHealth = 800f,
@@ -2087,6 +2093,7 @@ internal static partial class ValidationTestRunner
                 IsControlledByPlayer = true,
                 IsUnit = true,
                 IsCombatUnit = true,
+                CanAttackAndIsAttackEnabled = true,
                 UniqueEntityId = 703,
                 Position = new UnityEngine.Vector3(10f, 0f, 0f),
                 CurrentHealth = 40f,
@@ -2111,6 +2118,7 @@ internal static partial class ValidationTestRunner
                 IsControlledByPlayer = true,
                 IsUnit = true,
                 IsCombatUnit = true,
+                CanAttackAndIsAttackEnabled = true,
                 UniqueEntityId = 704,
                 Position = new UnityEngine.Vector3(10f, 0f, 0f),
                 CurrentHealth = 40f,
@@ -2163,6 +2171,7 @@ internal static partial class ValidationTestRunner
                 IsControlledByPlayer = true,
                 IsUnit = true,
                 IsCombatUnit = true,
+                CanAttackAndIsAttackEnabled = true,
                 UniqueEntityId = 902,
                 Position = new UnityEngine.Vector3(100f, 0f, 0f),
                 CurrentHealth = 10f,
@@ -2241,6 +2250,7 @@ internal static partial class ValidationTestRunner
                 IsControlledByPlayer = true,
                 IsUnit = true,
                 IsCombatUnit = true,
+                CanAttackAndIsAttackEnabled = true,
                 UniqueEntityId = 9601,
                 Position = new UnityEngine.Vector3(45f, 0f, 0f),
                 CurrentHealth = 40f,
@@ -2296,6 +2306,7 @@ internal static partial class ValidationTestRunner
                 IsControlledByPlayer = true,
                 IsUnit = true,
                 IsCombatUnit = true,
+                CanAttackAndIsAttackEnabled = true,
                 UniqueEntityId = 9602,
                 Position = new UnityEngine.Vector3(5f, 0f, 0f),
                 CurrentHealth = 30f,
@@ -2557,6 +2568,8 @@ internal static partial class ValidationTestRunner
             {
                 IsControlledByPlayer = true,
                 IsUnit = true,
+                IsCombatUnit = true,
+                CanAttackAndIsAttackEnabled = true,
                 UniqueEntityId = 601,
                 Position = new UnityEngine.Vector3(35f, 0f, 0f),
                 WeaponRange = 35f
@@ -2742,6 +2755,10 @@ internal static partial class ValidationTestRunner
             var fastKiteUnit = new EntityController
             {
                 IsControlledByAi = true,
+                IsUnit = true,
+                IsCombatUnit = true,
+                CanAttackAndIsAttackEnabled = true,
+                CanMoveAndMovementIsEnabled = true,
                 MoveSpeed = 12f,
                 WeaponRange = 20f,
                 Position = new Vector3(10f, 0f, 10f)
@@ -2749,6 +2766,9 @@ internal static partial class ValidationTestRunner
             var closePlayerEnemy = new EntityController
             {
                 IsControlledByPlayer = true,
+                IsUnit = true,
+                IsCombatUnit = true,
+                CanAttackAndIsAttackEnabled = true,
                 Position = new Vector3(12f, 0f, 10f)
             };
 
@@ -2796,12 +2816,15 @@ internal static partial class ValidationTestRunner
             var engineer = new EntityController
             {
                 IsControlledByAi = true,
+                IsUnit = true,
                 IsEngineer = true,
+                CanMoveAndMovementIsEnabled = true,
                 Position = new Vector3(0f, 0f, 0f)
             };
             var damagedHarvester = new EntityController
             {
                 IsControlledByAi = true,
+                IsUnit = true,
                 Role = UnitRole.Harvester,
                 MaxHealth = 100f,
                 CurrentHealth = 40f,
@@ -2810,6 +2833,7 @@ internal static partial class ValidationTestRunner
             var damagedUnit = new EntityController
             {
                 IsControlledByAi = true,
+                IsUnit = true,
                 MaxHealth = 100f,
                 CurrentHealth = 30f,
                 Position = new Vector3(0f, 0f, 5f)
@@ -2846,20 +2870,25 @@ internal static partial class ValidationTestRunner
             var busyRepairer = new EntityController
             {
                 IsControlledByAi = true,
+                IsUnit = true,
                 IsEngineer = true,
+                CanMoveAndMovementIsEnabled = true,
                 CurrentPlayerCommandName = EntityCommand.Command.Attack,
                 Position = new UnityEngine.Vector3(0f, 0f, 0f)
             };
             var idleRepairer = new EntityController
             {
                 IsControlledByAi = true,
+                IsUnit = true,
                 IsEngineer = true,
+                CanMoveAndMovementIsEnabled = true,
                 CurrentPlayerCommandName = EntityCommand.Command.DoNothing,
                 Position = new UnityEngine.Vector3(1f, 0f, 0f)
             };
             var damagedHarvester = new EntityController
             {
                 IsControlledByAi = true,
+                IsUnit = true,
                 Role = UnitRole.Harvester,
                 MaxHealth = 100f,
                 CurrentHealth = 40f,

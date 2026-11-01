@@ -161,7 +161,8 @@ namespace RogueCommandExpansionLoader.Modules
                         candidate.IsDestroyed ||
                         candidate.DestroyHasBeenStarted ||
                         !candidate.IsControlledByPlayer ||
-                        candidate.canNotBeAttacked ||
+                        !candidate.IsUnit ||
+                        !candidate.IsCombatUnit ||
                         candidate.canNotBeTargetedByAi ||
                         candidate.doNotRegisterGlobally)
                     {

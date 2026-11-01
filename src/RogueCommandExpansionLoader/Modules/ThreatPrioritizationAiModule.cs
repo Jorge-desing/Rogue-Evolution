@@ -228,7 +228,8 @@ namespace RogueCommandExpansionLoader.Modules
                             break;
                         }
 
-                        if (unit == null || unit.IsDestroyed || unit.DestroyHasBeenStarted)
+                        if (unit == null || unit.IsDestroyed || unit.DestroyHasBeenStarted ||
+                            !unit.IsControlledByAi || !unit.IsUnit)
                         {
                             continue;
                         }
@@ -261,13 +262,17 @@ namespace RogueCommandExpansionLoader.Modules
                             if (candidate == null ||
                                 candidate.IsDestroyed ||
                                 candidate.DestroyHasBeenStarted ||
+                                !candidate.IsControlledByPlayer ||
+                                !candidate.IsUnit ||
+                                !candidate.IsCombatUnit ||
+                                !candidate.CanAttackAndIsAttackEnabled ||
                                 candidate.canNotBeAttacked ||
                                 candidate.canNotBeTargetedByAi)
                             {
                                 continue;
                             }
 
-                            if (!unit.IsEnemy(candidate))
+                            if (unit.IsEnemy == null || !unit.IsEnemy(candidate))
                             {
                                 continue;
                             }
@@ -298,7 +303,7 @@ namespace RogueCommandExpansionLoader.Modules
                             !currentTarget.DestroyHasBeenStarted &&
                             !currentTarget.canNotBeAttacked &&
                             !currentTarget.canNotBeTargetedByAi &&
-                            unit.IsEnemy(currentTarget);
+                            unit.IsEnemy != null && unit.IsEnemy(currentTarget);
 
                         if (hasValidCurrentTarget)
                         {

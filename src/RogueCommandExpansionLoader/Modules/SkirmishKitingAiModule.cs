@@ -103,7 +103,9 @@ namespace RogueCommandExpansionLoader.Modules
                 foreach (EntityController unit in aiUnits)
                 {
                     if (unit == null || unit.IsDestroyed || unit.DestroyHasBeenStarted ||
-                        unit.IsBuilding || !unit.IsControlledByAi || unit.canNotBeAttacked)
+                        !unit.IsControlledByAi || !unit.IsUnit || !unit.IsCombatUnit ||
+                        !unit.CanAttackAndIsAttackEnabled || !unit.CanMoveAndMovementIsEnabled ||
+                        unit.IsBuilding || unit.canNotBeAttacked)
                     {
                         continue;
                     }
@@ -131,6 +133,8 @@ namespace RogueCommandExpansionLoader.Modules
                     foreach (EntityController threat in playerEntities)
                     {
                         if (threat == null || threat.IsDestroyed || threat.DestroyHasBeenStarted ||
+                            !threat.IsControlledByPlayer || !threat.IsUnit || !threat.IsCombatUnit ||
+                            !threat.CanAttackAndIsAttackEnabled ||
                             threat.canNotBeAttacked || threat.canNotBeTargetedByAi)
                         {
                             continue;
