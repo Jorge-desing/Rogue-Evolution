@@ -4656,5 +4656,59 @@ internal static partial class ValidationTestRunner
             RuntimeAgentCoordinator.ResetForTests();
         }
     }),
+    ("runtime mechanics cleans up applied boost keys and enforces veterancy rank bounds", () =>
+    {
+        RuntimeUnitMechanicsDirector.ClearProfiles();
+        try
+        {
+            var unit = new EntityController
+            {
+                entityId = "test:veterancy-cap-unit",
+                UniqueEntityId = 987,
+                IsControlledByPlayer = true,
+                IsUnit = true,
+                CurrentHealth = 100f,
+                MaxHealth = 100f,
+                CurrentRank = 3,
+                MaxRank = 3
+            };
+
+            var profile = new UnitRuntimeMechanicsProfile
+            {
+                Experience = new ContentUnitExperienceDefinition
+                {
+                    experiencePerLevel = 2,
+                    maxLevel = 3,
+                    experienceGainMultiplier = 1f,
+                    levelUpBonus = 0.1f
+                }
+            };
+            RuntimeUnitMechanicsDirector.RegisterProfile("test:veterancy-cap-unit", profile);
+
+            var enemy = new EntityController
+            {
+                entityId = "test:hostile-target",
+                UniqueEntityId = 988,
+                IsControlledByAi = true,
+                IsUnit = true,
+                CurrentHealth = 50f,
+                MaxHealth = 50f
+            };
+
+            RuntimeUnitMechanicsDirector.OnEntityDealtDamage(enemy, 10f, unit);
+
+            if (unit.CurrentRank != 3)
+            {
+                throw new InvalidOperationException($"Rank should remain at max (3), was: {unit.CurrentRank}");
+            }
+
+            RuntimeUnitMechanicsDirector.OnEntityDied(unit);
+            RuntimeUnitMechanicsDirector.ClearProfiles();
+        }
+        finally
+        {
+            RuntimeUnitMechanicsDirector.ClearProfiles();
+        }
+    }),
     };
 }

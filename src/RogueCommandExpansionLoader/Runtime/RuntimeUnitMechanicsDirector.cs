@@ -301,6 +301,11 @@ namespace RogueCommandExpansionLoader.Runtime
             {
                 _activeDynamicCommandAuras.Clear();
             }
+
+            lock (_appliedCardChangeBoostKeys)
+            {
+                _appliedCardChangeBoostKeys.Clear();
+            }
         }
 
         public static int GetCombatXpForEntity(object entityObj)
@@ -814,9 +819,36 @@ namespace RogueCommandExpansionLoader.Runtime
             }
         }
 
+        private static void RemoveAppliedCardChangeBoostKeys(object entityObj)
+        {
+            if (entityObj == null)
+            {
+                return;
+            }
+
+            try
+            {
+                EnsureReflection(entityObj.GetType());
+                int uniqueId = ReadIntProperty(_uniqueEntityIdProperty, entityObj, -1);
+                if (uniqueId > 0)
+                {
+                    string prefix = uniqueId.ToString() + "|";
+                    lock (_appliedCardChangeBoostKeys)
+                    {
+                        _appliedCardChangeBoostKeys.RemoveWhere(k => k.StartsWith(prefix, StringComparison.Ordinal));
+                    }
+                }
+            }
+            catch
+            {
+                // Key cleanup must not interfere with native destruction.
+            }
+        }
+
         public static void OnEntityDestroyed(object entityObj)
         {
             RemoveCombatExperience(entityObj);
+            RemoveAppliedCardChangeBoostKeys(entityObj);
         }
 
         /// <summary>
@@ -829,6 +861,7 @@ namespace RogueCommandExpansionLoader.Runtime
             try
             {
                 RemoveCombatExperience(entityObj);
+                RemoveAppliedCardChangeBoostKeys(entityObj);
                 ClearRuntimeMechanicsByObject(entityObj);
             }
             catch
@@ -1294,25 +1327,30 @@ namespace RogueCommandExpansionLoader.Runtime
                             ? profile.Experience.experiencePerLevel * 3
                             : 3);
 
+                        int currentRank = ReadIntProperty(_currentRankProperty, originatorObj, 0);
+                        int maxRank = ReadIntProperty(_maxRankProperty, originatorObj, profile.Experience.maxLevel);
+                        int maxAllowedRank = Mathf.Min(maxRank, profile.Experience.maxLevel);
+
                         bool shouldPromote = false;
-                        lock (_entityCombatXp)
+                        if (currentRank < maxAllowedRank)
                         {
-                            int currentXp;
-                            _entityCombatXp.TryGetValue(uniqueId, out currentXp);
-                            currentXp += xpGain;
-                            if (currentXp >= threshold)
+                            lock (_entityCombatXp)
                             {
-                                currentXp -= threshold;
-                                shouldPromote = true;
+                                int currentXp;
+                                _entityCombatXp.TryGetValue(uniqueId, out currentXp);
+                                currentXp += xpGain;
+                                if (currentXp >= threshold)
+                                {
+                                    currentXp -= threshold;
+                                    shouldPromote = true;
+                                }
+                                _entityCombatXp[uniqueId] = currentXp;
                             }
-                            _entityCombatXp[uniqueId] = currentXp;
                         }
 
                         if (shouldPromote)
                         {
-                            int currentRank = ReadIntProperty(_currentRankProperty, originatorObj, 0);
-                            int maxRank = ReadIntProperty(_maxRankProperty, originatorObj, profile.Experience.maxLevel);
-                            if (currentRank < Mathf.Min(maxRank, profile.Experience.maxLevel) && _rankUpMethod != null)
+                            if (_rankUpMethod != null)
                             {
                                 _rankUpMethod.Invoke(originatorObj, new object[] { 1 });
                             }
@@ -1336,10 +1374,10 @@ namespace RogueCommandExpansionLoader.Runtime
                             try
                             {
                                 Assembly rankAssembly = originatorObj.GetType().Assembly;
-                                int rankUniqueId = GetCombatExperienceKey(originatorObj);
+                                int rankUniqueId = ReadIntProperty(_uniqueEntityIdProperty, originatorObj, -1);
                                 if (rankUniqueId > 0)
                                 {
-                                    string rankKey = rankUniqueId.ToString() + "|rankup|" + currentRank.ToString();
+                                    string rankKey = rankUniqueId.ToString() + "|rankup|" + (currentRank + 1).ToString();
                                     bool alreadyApplied;
                                     lock (_appliedCardChangeBoostKeys)
                                     {
