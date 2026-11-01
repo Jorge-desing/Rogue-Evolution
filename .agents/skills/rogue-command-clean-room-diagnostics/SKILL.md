@@ -121,6 +121,13 @@ Pitfall: Renewing an aura without tracking ownership either (a) leaves stale lin
 - Clamp floating-point distances, radii, durations, and magnitudes with `Mathf.Clamp` and preserve the clamped `float`; do not truncate through `int`.
 - Validate every float coordinate, radius, magnitude, and duration for `NaN`/infinity before reflection or command dispatch, returning `success: false`.
 - Compute `omitted*Count` from requested versus dispatched/selected counts, not from already-filtered candidate counts.
+### AssetBundle Registry
+
+- `GlobalBundleRegistry.LoadBundleAsync(string, string)` must validate `bundleId` and `path` before locking.
+- On a race where another caller registers the same `bundleId`, unload the duplicate bundle with `Unload(false)` before returning the existing instance; otherwise the path overload leaks an AssetBundle.
+- Keep the stream and path overloads behaviorally aligned for duplicate handling.
+- Treat `UnloadAll` as terminal for all returned bundle handles; do not use a handle after it has been unloaded.
+
 ### Environmental Hazards
 
 - `diagnostics_order_spawn_hazard_zone`: Spawns a battlefield environmental hazard zone (`hazardType` `"Firestorm"`/`"AcidPool"`/`"EmpField"`/`"CryoMist"`/`"NaniteField"`, `x`, `z`, `radius`, `durationSeconds`, `tickDamage`) with trigger collider and amortized tick rate (>= 0.5s).
