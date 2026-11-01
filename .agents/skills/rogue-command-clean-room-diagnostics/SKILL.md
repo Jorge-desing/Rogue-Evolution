@@ -223,3 +223,25 @@ When adding any new telemetry or command endpoint:
 - **Dedicated QA Profile**: Always perform live testing on `Profile2` (the user's designated dedicated QA profile without a tutorial). Never touch user profile saves or bypass tutorial flags on active user profiles.
 - **Preserve Unrelated Changes**: Never use `git add -A`. Stage only task-owned files explicitly.
 - **Label Evidence Accurately**: Local build and test harness passes are local validation; in-game live MCP responses are runtime evidence.
+- **Installed vs. Local DLL Hash**: Before attributing runtime behavior to a source change, compare `BepInEx/plugins/RogueCommandExpansionLoader.dll` SHA-256 against the local build artifact. A mismatch means the running game exercises stale code; deploy the updated DLL or abort the runtime step.
+- **Time Scale Is Not Pause**: `currentTimeScale == 0.1` is slow motion, not a confirmed pause. Reversible mutation smokes must require `currentTimeScale == 0` (and ideally a stable scaled clock across two reads) before issuing orders.
+- **Profile Checkpoint Scope**: The Profile2 checkpoint covers `currentProfile.txt` plus `Profile1`, `Profile2`, `Profile4`, and `Profile5` (16 files). `Profile3` is not in the checkpoint. Compare the full file set, not just Profile2, after runtime work.
+
+---
+
+## 8. Diagnostics Host Scene Placement (Lifecycle)
+
+The MCP bridge's `LoaderDiagnosticsComponent` is intentionally **scene-local** (never `DontDestroyOnLoad`) and recreated per scene. On **additive** scene loads, Unity fires `sceneLoaded` **before** `activeSceneChanged`, so `new GameObject("LoaderDiagnostics")` lands in the still-active previous scene and is destroyed when that scene unloads. `OnActiveSceneChanged` must therefore also (re)create or relocate the host.
+
+Pattern:
+- `EnsureDiagnosticsComponent(provider, targetScene)` accepts the target `Scene`; create the host there, and if `new GameObject` lands elsewhere, `SceneManager.MoveGameObjectToScene` it before adding the component. Abort (and destroy the transient host) if the move fails.
+- Keep the existing `_diagnostics == null` guard and null-reset for idempotency; also reinitialize when the host's scene differs from the target.
+- `ShouldEnsureOnSceneLoaded(hasHost, loadedSceneName, isSingleLoad, hostAlreadyInLoadedScene)`: on an additive load with an existing host, only re-ensure when the loaded scene is `Game` (or the host's own scene); unrelated additive scenes must not displace the host.
+- Guard `provider == null` and `!scene.IsValid() || !scene.isLoaded` before touching Unity objects.
+
+Pitfalls:
+- A successful MCP response or a single isolated `find_objects_with_component` hit does **not** prove the host survived a scene transition. Recheck after the transition and after the previous scene unloads.
+- The installed plugin DLL hash can differ from the local build. Before attributing runtime behavior to a source change, compare `BepInEx/plugins/RogueCommandExpansionLoader.dll` SHA-256 against the local build artifact; a mismatch means the runtime exercises stale code.
+- Test the ordering with a stub where the active scene differs from the loaded scene; a stub that always returns the same active scene hides the additive-load bug.
+- **Tool naming**: the Python MCP server exposes `find_objects_with_component` (no `scene:` prefix) and `scene:find_objects_with_component` (HTTP route). Use the unprefixed name when calling via the Python server; the short component name works because it resolves via `FindType`.
+- **`mod_inject_class` parameter**: pass the full C# source as `classCode` (not `code`). The class must compile standalone. A minimal MonoBehaviour with `Application.Quit()` in `Awake` is the reliable close pattern when no UI button is available.
