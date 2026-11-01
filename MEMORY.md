@@ -339,6 +339,8 @@ This is a compact, durable orientation for agents. For the changing checkout sta
   - Validation test harness (`RuntimeAndDiagnosticsValidationTests.cs`): Added 5 comprehensive test suites covering all 5 new subsystems.
 - Validation: Release plugin build 0 warnings/0 errors (`artifacts/plugin/RogueCommandExpansionLoader.dll`); C# harness 405/406 passed (1 Windows symlink skip, 0 failures); Python suite 86/86 passed; `validate_loader_registry.py` passed 4/4 manifests; `git diff --check` clean.
 - Uncommitted working-tree preserved: untracked `.agents/skills/rogue-command-game-research/references/`; nested worktree gitlinks `cargador` (11e9968, dirty) and `task-graph-validation` (d1f9045, dirty) remain untouched.
+- QA/reflection safety: Profile2 is dedicated QA without a tutorial; never ask, inspect, infer, gate, bypass, or switch profiles for tutorial. Check current selector/save safety and preserve saves. Before reflection, verify Rogue Command version, Unity `2021.3.45f2`, Assembly-CSharp SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, and MVID `db0e9462-128d-4296-9900-de18b4bd0c00`.
+- Agent memories (codex, antigravity) and mem0 synced to HEAD 98219f3.
 
 ## Refresh (2026-10-31, Clean-Room Diagnostics Skill & MCP Integration)
 
@@ -351,3 +353,5 @@ This is a compact, durable orientation for agents. For the changing checkout sta
   - Updated `.agents/skills/rogue-command-harmony-policy/SKILL.md`: Added `rogue-command-clean-room-diagnostics` to `related_skills` and references.
 - Validation: Release plugin build 0 warnings/0 errors (`artifacts/plugin/RogueCommandExpansionLoader.dll`); C# harness 405/406 passed (1 Windows symlink skip, 0 failures); Python suite 86/86 passed; `validate_loader_registry.py` passed 4/4 manifests; `git diff --check` clean.
 - Uncommitted working-tree preserved: untracked `.agents/skills/rogue-command-game-research/references/`; nested worktree gitlinks `cargador` (11e9968, dirty) and `task-graph-validation` (d1f9045, dirty) remain untouched.
+- QA/reflection safety: Profile2 is dedicated QA without a tutorial; never ask, inspect, infer, gate, bypass, or switch profiles for tutorial. Check current selector/save safety and preserve saves. Before reflection, verify Rogue Command version, Unity `2021.3.45f2`, Assembly-CSharp SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, and MVID `db0e9462-128d-4296-9900-de18b4bd0c00`.
+- Agent memories (codex, antigravity) and mem0 synced to HEAD 98219f3.
