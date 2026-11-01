@@ -176,6 +176,126 @@ def _get_diagnostics_go_id() -> int:
     )
 
 
+def _extract_bridge_return_value(raw: str) -> str | None:
+    marker = "ReturnValue: "
+    try:
+        response = json.loads(raw)
+        message = response.get("message") if isinstance(response, dict) else None
+        if isinstance(message, str) and marker in message:
+            return message.split(marker, 1)[1].strip()
+    except Exception:
+        pass
+
+    marker_index = raw.find(marker)
+    if marker_index < 0:
+        return None
+
+    start = marker_index + len(marker)
+    while start < len(raw) and raw[start].isspace():
+        start += 1
+    if start >= len(raw):
+        return None
+
+    if raw[start] in "{[":
+        stack = [raw[start]]
+        in_string = False
+        escaped = False
+        for index in range(start + 1, len(raw)):
+            char = raw[index]
+            if in_string:
+                if escaped:
+                    escaped = False
+                elif char == "\\":
+                    escaped = True
+                elif char == '"':
+                    in_string = False
+                continue
+            if char == '"':
+                in_string = True
+            elif char in "[{":
+                stack.append(char)
+            elif char in "]}":
+                if not stack:
+                    return None
+                opening = stack.pop()
+                if (opening, char) not in (("[", "]"), ("{", "}")):
+                    return None
+                if not stack:
+                    return raw[start:index + 1]
+        return None
+
+    if raw[start] == '"':
+        escaped = False
+        for index in range(start + 1, len(raw)):
+            char = raw[index]
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                return raw[start:index + 1]
+        return None
+
+    end = start
+    while end < len(raw) and raw[end] not in '"}':
+        end += 1
+    value = raw[start:end].strip()
+    return value or None
+
+
+def _parse_component_member(raw: str) -> Any:
+    try:
+        member = json.loads(raw)
+    except Exception as exc:
+        return {"error": f"Invalid component member response: {exc}"}
+    if not isinstance(member, dict) or "value" not in member:
+        return member if isinstance(member, dict) else {"error": "Component member response has no value."}
+
+    value = member["value"]
+    clr_type = member.get("type")
+    if not isinstance(value, str):
+        return value
+    try:
+        if clr_type in ("System.Byte", "System.Int16", "System.Int32", "System.Int64", "System.UInt16", "System.UInt32", "System.UInt64"):
+            return int(value)
+        if clr_type in ("System.Single", "System.Double", "System.Decimal"):
+            return float(value)
+        if clr_type == "System.Boolean" and value.lower() in ("true", "false"):
+            return value.lower() == "true"
+        return value
+    except (TypeError, ValueError):
+        return {"error": f"Could not parse {clr_type or 'component'} value: {value}"}
+
+
+def _call_diagnostics_member(member_name: str) -> Any:
+    global _DIAGNOSTICS_GO_ID
+    for attempt in range(2):
+        try:
+            go_id = _get_diagnostics_go_id()
+            raw = _call_http("component/get_member", params={
+                "id": go_id,
+                "componentName": "LoaderDiagnosticsComponent",
+                "memberName": member_name,
+            })
+            try:
+                response = json.loads(raw)
+            except Exception:
+                response = None
+            if isinstance(response, dict) and "error" in response:
+                error = str(response["error"])
+                if attempt == 0 and any(token in error.lower() for token in ("not found", "invalid 'id'", "gameobject")):
+                    _DIAGNOSTICS_GO_ID = None
+                    continue
+                return {"error": error}
+            return _parse_component_member(raw)
+        except Exception as exc:
+            if attempt == 0:
+                _DIAGNOSTICS_GO_ID = None
+                continue
+            return {"error": f"Failed reading diagnostics member '{member_name}': {exc}"}
+    return {"error": f"Failed reading diagnostics member '{member_name}'."}
+
+
 def _call_diagnostics_method(method_name: str, args: list | None = None) -> str:
     global _DIAGNOSTICS_GO_ID
     args_json = json.dumps(args or [])
@@ -188,7 +308,7 @@ def _call_diagnostics_method(method_name: str, args: list | None = None) -> str:
             "args": args_json,
         })
         # If cached go_id became stale, retry once after discovery
-        if "Missing or invalid 'id'" in raw or "not found" in raw.lower():
+        if "Missing or invalid 'id'" in raw or "not found" in raw.lower() or "GameObject" in raw:
             _DIAGNOSTICS_GO_ID = None
             go_id = _get_diagnostics_go_id()
             raw = _call_http("component/call_method", params={
@@ -198,22 +318,12 @@ def _call_diagnostics_method(method_name: str, args: list | None = None) -> str:
                 "args": args_json,
             })
 
-        # Unwrap ReturnValue if present
-        try:
-            resp_obj = json.loads(raw)
-            if isinstance(resp_obj, dict) and "message" in resp_obj:
-                msg = resp_obj["message"]
-                idx = msg.find("ReturnValue: ")
-                if idx >= 0:
-                    ret_str = msg[idx + len("ReturnValue: "):].strip()
-                    try:
-                        parsed_ret = json.loads(ret_str)
-                        return json.dumps(parsed_ret, indent=2)
-                    except Exception:
-                        return ret_str
-        except Exception:
-            pass
-
+        return_value = _extract_bridge_return_value(raw)
+        if return_value is not None:
+            try:
+                return json.dumps(json.loads(return_value), indent=2)
+            except Exception:
+                return return_value
         return raw
     except Exception as exc:
         _DIAGNOSTICS_GO_ID = None
@@ -783,22 +893,26 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
 
         elif name == "diagnostics_runtime_scalars":
             scalars = {}
-            scalar_calls = [
-                ("LiveBattlefieldEntityCount", []),
-                ("LivePlayerUnitCount", []),
-                ("LiveAiUnitCount", []),
-                ("LiveAiBuildingCount", []),
-                ("LiveHarvesterCount", []),
-                ("RegisteredUnitMechanicsProfileCount", []),
-                ("RangeDisplayGeometryMinimumSegments", []),
-                ("RangeDisplayGeometryMaximumSegments", []),
-                ("GetRangeCirclePointCount", [8]),
-            ]
-            for method, args in scalar_calls:
+            for member_name in [
+                "LiveBattlefieldEntityCount",
+                "LivePlayerUnitCount",
+                "LiveAiUnitCount",
+                "LiveAiBuildingCount",
+                "LiveHarvesterCount",
+                "RegisteredUnitMechanicsProfileCount",
+                "RangeDisplayGeometryMinimumSegments",
+                "RangeDisplayGeometryMaximumSegments",
+            ]:
+                scalars[member_name] = _call_diagnostics_member(member_name)
+
+            try:
+                raw_point_count = _call_diagnostics_method("GetRangeCirclePointCount", [8])
                 try:
-                    scalars[method] = _call_diagnostics_method(method, args)
-                except Exception as exc:
-                    scalars[method] = {"error": str(exc)}
+                    scalars["RangeDisplayCirclePointCount"] = json.loads(raw_point_count)
+                except Exception:
+                    scalars["RangeDisplayCirclePointCount"] = raw_point_count
+            except Exception as exc:
+                scalars["RangeDisplayCirclePointCount"] = {"error": str(exc)}
             return _tool_response(json.dumps(scalars, indent=2))
 
         elif name == "diagnostics_runtime_snapshot":
