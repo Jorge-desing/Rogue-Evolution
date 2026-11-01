@@ -4411,7 +4411,8 @@ internal static partial class ValidationTestRunner
                 !names.Contains("OrderSpawnHazardZoneJson") ||
                 !names.Contains("OrderClearHazardZonesJson") ||
                 !names.Contains("OrderUnitTacticalPulseJson") ||
-                !names.Contains("OrderDirectorThreatSweepJson"))
+                !names.Contains("OrderDirectorThreatSweepJson") ||
+                !names.Contains("OrderCoordinatedAssaultJson"))
             {
                 throw new InvalidOperationException("Diagnostic catalog should include all newly exposed endpoints.");
             }
@@ -4738,6 +4739,78 @@ internal static partial class ValidationTestRunner
                     durationDoc.RootElement.GetProperty("success").GetBoolean())
                 {
                     throw new InvalidOperationException("Non-finite threat sweep results must serialize as valid JSON null values.");
+                }
+            }
+        }
+        finally
+        {
+            ExistingControllers.Instance.Reset();
+        }
+    }),
+    ("runtime director coordinated assault dispatches only hostile combat attackers", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        try
+        {
+            var target = new EntityController
+            {
+                entityId = "unit:assault-target",
+                UniqueEntityId = 831,
+                IsControlledByAi = true,
+                IsUnit = true,
+                IsCombatUnit = true,
+                Position = new Vector3(12f, 0f, 8f)
+            };
+            var attacker = new EntityController
+            {
+                entityId = "unit:assault-attacker",
+                UniqueEntityId = 832,
+                IsControlledByPlayer = true,
+                IsUnit = true,
+                IsCombatUnit = true,
+                Position = new Vector3(4f, 0f, 8f)
+            };
+            var friendlyAttacker = new EntityController
+            {
+                entityId = "unit:assault-friendly",
+                UniqueEntityId = 833,
+                IsControlledByAi = true,
+                IsUnit = true,
+                IsCombatUnit = true,
+                Position = new Vector3(6f, 0f, 8f)
+            };
+            ExistingControllers.Instance.PlayerUnits().Add(attacker);
+            ExistingControllers.Instance.AiUnits().Add(target);
+            ExistingControllers.Instance.AiUnits().Add(friendlyAttacker);
+
+            CoordinatedAssaultResult result = RuntimeGameplayCommandDirector.TryExecuteCoordinatedAssault(
+                "831",
+                new[] { "unit:assault-attacker", "unit:assault-friendly", "unit:missing", "unit:assault-attacker" },
+                3);
+            if (!result.Success || result.TargetEntityKeyId != "unit:assault-target" ||
+                result.RequestedAttackerCount != 4 || result.DispatchedAttackerCount != 1 ||
+                result.OmittedAttackerCount != 3 || result.DispatchedAttackerEntityKeyIds.Count != 1 ||
+                result.DispatchedAttackerEntityKeyIds[0] != "unit:assault-attacker" ||
+                attacker.LastExecutedCommand?.command != EntityCommand.Command.AttackMoveOnTarget ||
+                attacker.LastExecutedCommand?.target != target ||
+                attacker.CurrentCommandTag != "rcl-coordinated-assault" ||
+                friendlyAttacker.LastExecutedCommand.HasValue)
+            {
+                throw new InvalidOperationException("Coordinated assault must dispatch only hostile combat attackers and reject friendly or missing targets.");
+            }
+
+            string json = AgentDiagnosticsFormatter.SerializeCoordinatedAssaultResult(result);
+            using (var doc = JsonDocument.Parse(json))
+            {
+                int omissionIndex = json.IndexOf("\"omittedAttackerCount\"", StringComparison.Ordinal);
+                int detailIndex = json.IndexOf("\"dispatchedAttackerEntityKeyIds\"", StringComparison.Ordinal);
+                if (doc.RootElement.GetProperty("kind").GetString() != "coordinatedAssaultResult" ||
+                    doc.RootElement.GetProperty("dispatchedAttackerCount").GetInt32() != 1 ||
+                    doc.RootElement.GetProperty("omittedAttackerCount").GetInt32() != 3 ||
+                    doc.RootElement.GetProperty("dispatchedAttackerEntityKeyIds").GetArrayLength() != 1 ||
+                    omissionIndex < 0 || detailIndex < 0 || omissionIndex > detailIndex)
+                {
+                    throw new InvalidOperationException("SerializeCoordinatedAssaultResult JSON format error.");
                 }
             }
         }

@@ -853,6 +853,15 @@ namespace RogueCommandExpansionLoader.Runtime
 
 
         /// <summary>
+        /// Coordinates a bounded attack against one hostile target.
+        /// </summary>
+        public string OrderCoordinatedAssaultJson(string targetEntityKeyId, IReadOnlyList<string> attackerEntityKeyIds, int maxAttackers)
+        {
+            return AgentDiagnosticsFormatter.SerializeCoordinatedAssaultResult(
+                RuntimeGameplayCommandDirector.TryExecuteCoordinatedAssault(targetEntityKeyId, attackerEntityKeyIds, maxAttackers));
+        }
+
+        /// <summary>
         /// Queries the unit elite affixes census across living units.
         /// </summary>
         public string GetUnitAffixCensusJson()

@@ -654,6 +654,18 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
                 [source_key, sweep_type, radius, duration, max_targets],
             )
             return _tool_response(res)
+        elif name == "diagnostics_order_coordinated_assault":
+            target_key = str(arguments.get("targetEntityKeyId", ""))
+            attacker_keys = arguments.get("attackerEntityKeyIds", [])
+            if not isinstance(attacker_keys, list):
+                attacker_keys = []
+            attacker_keys = [str(value) for value in attacker_keys]
+            max_attackers = int(arguments.get("maxAttackers", 8))
+            res = _call_diagnostics_method(
+                "OrderCoordinatedAssaultJson",
+                [target_key, attacker_keys, max_attackers],
+            )
+            return _tool_response(res)
         elif name == "diagnostics_order_active_skill":
             e_key = str(arguments.get("entityKeyId", ""))
             t_key = arguments.get("targetEntityKeyId")

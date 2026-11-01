@@ -935,6 +935,24 @@ TOOL_SPECS = [
         },
     },
     {
+        "name": "diagnostics_order_coordinated_assault",
+        "description": "Coordinates a bounded attack against one hostile target using only eligible hostile combat attackers via LoaderDiagnosticsComponent / RuntimeGameplayCommandDirector.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "targetEntityKeyId": {"type": "string", "description": "Target entity ID or name."},
+                "attackerEntityKeyIds": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Ordered attacker entity IDs or names."
+                },
+                "maxAttackers": {"type": "integer", "description": "Maximum dispatched attackers (1 to 16)."},
+            },
+            "required": ["targetEntityKeyId", "attackerEntityKeyIds", "maxAttackers"],
+            "additionalProperties": False,
+        },
+    },
+    {
         "name": "diagnostics_order_active_skill",
         "description": "Dispatches an active tactical skill command on a unit (Self, on Target, or at Position) via LoaderDiagnosticsComponent / RuntimeGameplayCommandDirector.",
         "parameters": {

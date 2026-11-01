@@ -415,6 +415,45 @@ namespace RogueCommandExpansionLoader.Runtime
 
 
     /// <summary>
+    /// Pure diagnostic DTO returned when coordinating bounded attacks against one hostile target.
+    /// </summary>
+    public readonly struct CoordinatedAssaultResult
+    {
+        public CoordinatedAssaultResult(
+            bool success,
+            string targetEntityKeyId,
+            int requestedAttackerCount,
+            int dispatchedAttackerCount,
+            int omittedAttackerCount,
+            IReadOnlyList<string> dispatchedAttackerEntityKeyIds,
+            float targetX,
+            float targetZ,
+            string message)
+        {
+            Success = success;
+            TargetEntityKeyId = targetEntityKeyId ?? string.Empty;
+            RequestedAttackerCount = requestedAttackerCount;
+            DispatchedAttackerCount = dispatchedAttackerCount;
+            OmittedAttackerCount = omittedAttackerCount;
+            DispatchedAttackerEntityKeyIds = dispatchedAttackerEntityKeyIds ?? new List<string>().AsReadOnly();
+            TargetX = targetX;
+            TargetZ = targetZ;
+            Message = message ?? string.Empty;
+        }
+
+        public bool Success { get; }
+        public string TargetEntityKeyId { get; }
+        public int RequestedAttackerCount { get; }
+        public int DispatchedAttackerCount { get; }
+        public int OmittedAttackerCount { get; }
+        public IReadOnlyList<string> DispatchedAttackerEntityKeyIds { get; }
+        public float TargetX { get; }
+        public float TargetZ { get; }
+        public string Message { get; }
+    }
+
+
+    /// <summary>
     /// Pure diagnostic DTO returned when executing selection or control group operations.
     /// Decoupled from Unity types.
     /// </summary>
@@ -1613,16 +1652,16 @@ namespace RogueCommandExpansionLoader.Runtime
                 EntityController target = FindEntityByKey(existing, targetEntityKeyId);
 
                 if (target == null)
-
                 {
-
                     return new UnitCommandResult(false, entityKeyId, "AttackMoveOnTarget", 0f, 0f,
-
                         "Target entity '" + targetEntityKeyId + "' not found or destroyed.");
-
                 }
 
-
+                if (attacker.IsEnemy != null && !attacker.IsEnemy(target))
+                {
+                    return new UnitCommandResult(false, entityKeyId, "AttackMoveOnTarget", 0f, 0f,
+                        "Target entity '" + targetEntityKeyId + "' is not hostile to attacker '" + entityKeyId + "'.");
+                }
 
                 EntityCommand attackCmd = EntityCommand.AttackMoveOnTarget(
 
@@ -2413,6 +2452,110 @@ namespace RogueCommandExpansionLoader.Runtime
                 return new ThreatSweepResult(false, sourceEntityKeyId, normalizedSweep, statusEffectName,
                     clampedRadius, clampedDuration, 0, 0, emptyTargets,
                     "Error executing director threat sweep: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Coordinates a bounded attack against one hostile target.
+        /// Friendly, non-combat, missing, and destroyed attackers are rejected fail-closed.
+        /// </summary>
+        public static CoordinatedAssaultResult TryExecuteCoordinatedAssault(
+            string targetEntityKeyId,
+            IReadOnlyList<string> attackerEntityKeyIds,
+            int maxAttackers)
+        {
+            IReadOnlyList<string> emptyAttackers = new List<string>().AsReadOnly();
+            int requestedCount = attackerEntityKeyIds != null ? attackerEntityKeyIds.Count : 0;
+            int clampedMaxAttackers = Mathf.Clamp(maxAttackers, 1, 16);
+            string normalizedTargetKey = string.IsNullOrWhiteSpace(targetEntityKeyId)
+                ? string.Empty
+                : targetEntityKeyId.Trim();
+
+            if (string.IsNullOrEmpty(normalizedTargetKey))
+            {
+                return new CoordinatedAssaultResult(false, string.Empty, requestedCount, 0, requestedCount,
+                    emptyAttackers, 0f, 0f, "Target entity key ID cannot be empty.");
+            }
+
+            if (requestedCount == 0)
+            {
+                return new CoordinatedAssaultResult(false, normalizedTargetKey, 0, 0, 0,
+                    emptyAttackers, 0f, 0f, "At least one attacker entity key ID is required.");
+            }
+
+            try
+            {
+                ExistingControllers existing = ExistingControllers.Instance;
+                if (existing == null)
+                {
+                    return new CoordinatedAssaultResult(false, normalizedTargetKey, requestedCount, 0, requestedCount,
+                        emptyAttackers, 0f, 0f, "ExistingControllers instance is not available.");
+                }
+
+                EntityController target = FindEntityByKey(existing, normalizedTargetKey);
+                if (target == null || target.gameObject == null || target.IsDestroyed || target.DestroyHasBeenStarted)
+                {
+                    return new CoordinatedAssaultResult(false, normalizedTargetKey, requestedCount, 0, requestedCount,
+                        emptyAttackers, 0f, 0f, "Target entity '" + targetEntityKeyId + "' not found or destroyed.");
+                }
+
+                Vector3 targetPosition = target.Position;
+                int consideredCount = Math.Min(requestedCount, clampedMaxAttackers);
+                var dispatched = new List<string>(consideredCount);
+                for (int i = 0; i < consideredCount; i++)
+                {
+                    string attackerKey = attackerEntityKeyIds[i];
+                    if (string.IsNullOrWhiteSpace(attackerKey))
+                    {
+                        continue;
+                    }
+
+                    try
+                    {
+                        EntityController attacker = FindEntityByKey(existing, attackerKey.Trim());
+                        if (attacker == null || attacker.gameObject == null || attacker.IsDestroyed ||
+                            attacker.DestroyHasBeenStarted || !attacker.IsUnit || !attacker.IsCombatUnit ||
+                            ReferenceEquals(attacker, target) || !attacker.IsEnemy(target))
+                        {
+                            continue;
+                        }
+
+                        EntityCommand attackCommand = EntityCommand.AttackMoveOnTarget(
+                            target, EntityCommand.Role.ThisCommandWantsPathToBeCleared);
+                        attackCommand.tag = "rcl-coordinated-assault";
+                        attacker.ExecuteCommand(
+                            attackCommand,
+                            EntityController.CommandProcessingType.ExecuteBeforeCurrentCommand);
+
+                        string dispatchedKey = ResolveEntityIdString(attacker);
+                        if (string.IsNullOrWhiteSpace(dispatchedKey))
+                        {
+                            dispatchedKey = attacker.name;
+                        }
+
+                        dispatched.Add(string.IsNullOrWhiteSpace(dispatchedKey)
+                            ? attackerKey.Trim()
+                            : dispatchedKey);
+                    }
+                    catch
+                    {
+                        // One incompatible attacker must not abort the bounded assault.
+                    }
+                }
+
+                int omittedCount = Math.Max(0, requestedCount - dispatched.Count);
+                bool success = dispatched.Count > 0;
+                string message = success
+                    ? "Coordinated assault dispatched " + dispatched.Count + " attacker(s) against '" +
+                      normalizedTargetKey + "'."
+                    : "Coordinated assault found no eligible hostile combat attackers.";
+                return new CoordinatedAssaultResult(success, normalizedTargetKey, requestedCount,
+                    dispatched.Count, omittedCount, dispatched.AsReadOnly(), targetPosition.x, targetPosition.z, message);
+            }
+            catch (Exception ex)
+            {
+                return new CoordinatedAssaultResult(false, normalizedTargetKey, requestedCount, 0, requestedCount,
+                    emptyAttackers, 0f, 0f, "Error executing coordinated assault: " + ex.Message);
             }
         }
 
