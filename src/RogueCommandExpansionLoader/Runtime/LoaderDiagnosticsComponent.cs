@@ -748,6 +748,97 @@ namespace RogueCommandExpansionLoader.Runtime
         }
 
         /// <summary>
+        /// Dispatches a native patrol route to a unit by entity key ID and parallel X/Z waypoints.
+        /// </summary>
+        public string OrderUnitPatrolJson(string entityKeyId, IReadOnlyList<float> waypointX, IReadOnlyList<float> waypointZ)
+        {
+            return AgentDiagnosticsFormatter.SerializeUnitPatrolResult(
+                RuntimeGameplayCommandDirector.TryOrderUnitPatrol(entityKeyId, waypointX, waypointZ));
+        }
+
+        /// <summary>
+        /// Dispatches a single command type (Move, Stop, HoldPosition, AttackMove) to a group of units.
+        /// </summary>
+        public string OrderGroupCommandJson(IReadOnlyList<string> entityKeyIds, string commandType, float targetX, float targetZ)
+        {
+            return AgentDiagnosticsFormatter.SerializeGroupCommandResult(
+                RuntimeGameplayCommandDirector.TryOrderGroupCommand(entityKeyIds, commandType, targetX, targetZ));
+        }
+
+        /// <summary>
+        /// Dispatches a tactical formation movement to multiple units.
+        /// Supported formations: Line, Wedge, Column, Box, Surround.
+        /// </summary>
+        public string OrderFormationMoveJson(IReadOnlyList<string> entityKeyIds, string formationType, float targetX, float targetZ, float spacing)
+        {
+            return AgentDiagnosticsFormatter.SerializeFormationOrderResult(
+                RuntimeGameplayCommandDirector.TryOrderFormationMove(entityKeyIds, formationType, targetX, targetZ, spacing));
+        }
+
+        /// <summary>
+        /// Assigns a tactical combat stance to a unit (Standard, Aggressive, Defensive, HoldFire, Kiting).
+        /// </summary>
+        public string OrderUnitTacticalStanceJson(string entityKeyId, string stanceName)
+        {
+            return AgentDiagnosticsFormatter.SerializeUnitTacticalStanceResult(
+                RuntimeGameplayCommandDirector.TrySetUnitTacticalStance(entityKeyId, stanceName));
+        }
+
+        /// <summary>
+        /// Assigns a tactical combat stance to a group of units (Standard, Aggressive, Defensive, HoldFire, Kiting).
+        /// </summary>
+        public string OrderGroupTacticalStanceJson(IReadOnlyList<string> entityKeyIds, string stanceName)
+        {
+            return AgentDiagnosticsFormatter.SerializeUnitTacticalStanceResult(
+                RuntimeGameplayCommandDirector.TrySetGroupTacticalStance(entityKeyIds, stanceName));
+        }
+
+        /// <summary>
+        /// Queries the tactical combat stance census across living units.
+        /// </summary>
+        public string GetTacticalStanceCensusJson()
+        {
+            return AgentDiagnosticsFormatter.SerializeTacticalStanceCensus(
+                RuntimeGameplayCommandDirector.GetTacticalStanceCensus(32));
+        }
+
+        /// <summary>
+        /// Applies an elite affix/trait to a unit (Swift, Juggernaut, Overcharged, Vampiric, Bulwark, Volatile).
+        /// </summary>
+        public string OrderApplyUnitAffixJson(string entityKeyId, string affixName)
+        {
+            return AgentDiagnosticsFormatter.SerializeUnitAffixResult(
+                RuntimeGameplayCommandDirector.TryApplyUnitAffix(entityKeyId, affixName));
+        }
+
+        /// <summary>
+        /// Removes an active elite affix from a unit (or "All" to clear).
+        /// </summary>
+        public string OrderRemoveUnitAffixJson(string entityKeyId, string affixName)
+        {
+            return AgentDiagnosticsFormatter.SerializeUnitAffixResult(
+                RuntimeGameplayCommandDirector.TryRemoveUnitAffix(entityKeyId, affixName));
+        }
+
+        /// <summary>
+        /// Queries the unit elite affixes census across living units.
+        /// </summary>
+        public string GetUnitAffixCensusJson()
+        {
+            return AgentDiagnosticsFormatter.SerializeUnitAffixCensus(
+                RuntimeGameplayCommandDirector.GetUnitAffixCensus(32));
+        }
+
+        /// <summary>
+        /// Manually triggers and coordinates an AI assault wave with elevated aggression.
+        /// </summary>
+        public string OrderDispatchAiAssaultWaveJson(int waveNumber, float aggressionBoost, int targetBaseIndex)
+        {
+            return AgentDiagnosticsFormatter.SerializeAiWaveDispatchResult(
+                RuntimeGameplayCommandDirector.TryDispatchAiAssaultWave(waveNumber, aggressionBoost, targetBaseIndex));
+        }
+
+        /// <summary>
         /// Assigns selected units to a control group index (0-9).
         /// </summary>
         public string AssignControlGroupJson(int groupNumber)

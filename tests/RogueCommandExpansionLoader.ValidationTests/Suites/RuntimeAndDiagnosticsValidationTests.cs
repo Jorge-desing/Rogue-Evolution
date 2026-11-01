@@ -4992,5 +4992,425 @@ internal static partial class ValidationTestRunner
             RuntimeGameplayCommandDirector.ClearAiDoctrineAndDeckEntries();
         }
     }),
+    ("runtime unit patrol seeds native waypoints and issues a tagged patrol command", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        RuntimeGameplayCommandDirector.ClearUnitLoadouts();
+        var unit = new EntityController
+        {
+            entityId = "unit:patrol_test",
+            UniqueEntityId = 911,
+            IsControlledByPlayer = true,
+            IsUnit = true,
+        };
+        ExistingControllers.Instance.PlayerUnits().Add(unit);
+
+        UnitPatrolResult emptyRoute = RuntimeGameplayCommandDirector.TryOrderUnitPatrol("911", new float[0], new float[0]);
+        if (emptyRoute.Success)
+        {
+            throw new InvalidOperationException("TryOrderUnitPatrol with no waypoints must return false.");
+        }
+
+        UnitPatrolResult mismatched = RuntimeGameplayCommandDirector.TryOrderUnitPatrol("911", new[] { 1f, 2f }, new[] { 3f });
+        if (mismatched.Success)
+        {
+            throw new InvalidOperationException("TryOrderUnitPatrol with mismatched waypoint lengths must return false.");
+        }
+
+        UnitPatrolResult ok = RuntimeGameplayCommandDirector.TryOrderUnitPatrol("911", new[] { 10f, 20f, 30f }, new[] { 40f, 50f, 60f });
+        if (!ok.Success || ok.WaypointCount != 3 || ok.EntityKeyId != "911")
+        {
+            throw new InvalidOperationException("TryOrderUnitPatrol should seed 3 waypoints and dispatch a patrol command.");
+        }
+
+        if (unit.PatrolPositions == null || unit.PatrolPositions.Count != 3)
+        {
+            throw new InvalidOperationException("The native patrol route should contain exactly 3 seeded positions.");
+        }
+
+        if (!unit.CurrentCommandIsTaggedWith("rcl-command-director") || unit.LastExecutedCommand == null ||
+            unit.LastExecutedCommand.Value.command != EntityCommand.Command.Patrol)
+        {
+            throw new InvalidOperationException("The dispatched command must be a tagged EntityCommand.Patrol.");
+        }
+
+        string json = AgentDiagnosticsFormatter.SerializeUnitPatrolResult(ok);
+        using (var doc = JsonDocument.Parse(json))
+        {
+            if (!doc.RootElement.TryGetProperty("kind", out var kindProp) || kindProp.GetString() != "unitPatrolResult")
+            {
+                throw new InvalidOperationException("SerializeUnitPatrolResult kind must be 'unitPatrolResult'.");
+            }
+            if (!doc.RootElement.TryGetProperty("waypointCount", out var wp) || wp.GetInt32() != 3)
+            {
+                throw new InvalidOperationException("SerializeUnitPatrolResult waypointCount must be 3.");
+            }
+        }
+    }),
+    ("runtime group command fans a single command type to every targeted unit", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        RuntimeGameplayCommandDirector.ClearUnitLoadouts();
+        var unitA = new EntityController
+        {
+            entityId = "unit:group_alpha",
+            UniqueEntityId = 921,
+            IsControlledByPlayer = true,
+            IsUnit = true,
+        };
+        var unitB = new EntityController
+        {
+            entityId = "unit:group_beta",
+            UniqueEntityId = 922,
+            IsControlledByPlayer = true,
+            IsUnit = true,
+        };
+        ExistingControllers.Instance.PlayerUnits().Add(unitA);
+        ExistingControllers.Instance.PlayerUnits().Add(unitB);
+
+        GroupCommandResult unsupported = RuntimeGameplayCommandDirector.TryOrderGroupCommand(
+            new[] { "921", "922" }, "Barrage", 0f, 0f);
+        if (unsupported.Success)
+        {
+            throw new InvalidOperationException("TryOrderGroupCommand with an unsupported command type must return false.");
+        }
+
+        GroupCommandResult empty = RuntimeGameplayCommandDirector.TryOrderGroupCommand(
+            new[] { "does_not_exist" }, "Stop", 0f, 0f);
+        if (empty.Success || empty.DispatchedCount != 0 || empty.TargetedCount != 1)
+        {
+            throw new InvalidOperationException("TryOrderGroupCommand should target 1 unit and dispatch to 0 when none exist.");
+        }
+
+        GroupCommandResult stop = RuntimeGameplayCommandDirector.TryOrderGroupCommand(
+            new[] { "921", "922" }, "Stop", 0f, 0f);
+        if (!stop.Success || stop.TargetedCount != 2 || stop.DispatchedCount != 2)
+        {
+            throw new InvalidOperationException("TryOrderGroupCommand Stop should dispatch to both targeted units.");
+        }
+
+        GroupCommandResult move = RuntimeGameplayCommandDirector.TryOrderGroupCommand(
+            new[] { "921", "922" }, "Move", 15f, 25f);
+        if (!move.Success || move.DispatchedCount != 2)
+        {
+            throw new InvalidOperationException("TryOrderGroupCommand Move should dispatch to both targeted units.");
+        }
+
+        string json = AgentDiagnosticsFormatter.SerializeGroupCommandResult(stop);
+        using (var doc = JsonDocument.Parse(json))
+        {
+            if (!doc.RootElement.TryGetProperty("kind", out var kindProp) || kindProp.GetString() != "groupCommandResult")
+            {
+                throw new InvalidOperationException("SerializeGroupCommandResult kind must be 'groupCommandResult'.");
+            }
+            if (!doc.RootElement.TryGetProperty("dispatchedCount", out var dc) || dc.GetInt32() != 2)
+            {
+                throw new InvalidOperationException("SerializeGroupCommandResult dispatchedCount must be 2.");
+            }
+        }
+    }),
+    ("runtime formation move dispatches calculated offset positions for Line, Wedge, and Box formations", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        RuntimeGameplayCommandDirector.ClearUnitLoadouts();
+        var unitA = new EntityController
+        {
+            entityId = "unit:form_alpha",
+            UniqueEntityId = 931,
+            IsControlledByPlayer = true,
+            IsUnit = true,
+        };
+        var unitB = new EntityController
+        {
+            entityId = "unit:form_beta",
+            UniqueEntityId = 932,
+            IsControlledByPlayer = true,
+            IsUnit = true,
+        };
+        var unitC = new EntityController
+        {
+            entityId = "unit:form_gamma",
+            UniqueEntityId = 933,
+            IsControlledByPlayer = true,
+            IsUnit = true,
+        };
+        ExistingControllers.Instance.PlayerUnits().Add(unitA);
+        ExistingControllers.Instance.PlayerUnits().Add(unitB);
+        ExistingControllers.Instance.PlayerUnits().Add(unitC);
+
+        // Empty keys
+        FormationOrderResult empty = RuntimeGameplayCommandDirector.TryOrderFormationMove(
+            new string[0], "Line", 50f, 50f, 4f);
+        if (empty.Success || empty.TargetedCount != 0)
+        {
+            throw new InvalidOperationException("TryOrderFormationMove with empty keys must fail.");
+        }
+
+        // Line formation
+        FormationOrderResult line = RuntimeGameplayCommandDirector.TryOrderFormationMove(
+            new[] { "931", "932", "933" }, "Line", 50f, 50f, 4f);
+        if (!line.Success || line.TargetedCount != 3 || line.DispatchedCount != 3)
+        {
+            throw new InvalidOperationException("TryOrderFormationMove Line must dispatch to all 3 units.");
+        }
+
+        // Wedge formation
+        FormationOrderResult wedge = RuntimeGameplayCommandDirector.TryOrderFormationMove(
+            new[] { "931", "932", "933" }, "Wedge", 100f, 100f, 5f);
+        if (!wedge.Success || wedge.DispatchedCount != 3)
+        {
+            throw new InvalidOperationException("TryOrderFormationMove Wedge must dispatch to all 3 units.");
+        }
+
+        // Box formation
+        FormationOrderResult box = RuntimeGameplayCommandDirector.TryOrderFormationMove(
+            new[] { "931", "932", "933" }, "Box", 0f, 0f, 3f);
+        if (!box.Success || box.DispatchedCount != 3)
+        {
+            throw new InvalidOperationException("TryOrderFormationMove Box must dispatch to all 3 units.");
+        }
+
+        // Serialization
+        string json = AgentDiagnosticsFormatter.SerializeFormationOrderResult(line);
+        using (var doc = JsonDocument.Parse(json))
+        {
+            if (!doc.RootElement.TryGetProperty("kind", out var kindProp) || kindProp.GetString() != "formationOrderResult")
+            {
+                throw new InvalidOperationException("SerializeFormationOrderResult kind must be 'formationOrderResult'.");
+            }
+            if (!doc.RootElement.TryGetProperty("formationType", out var fProp) || fProp.GetString() != "Line")
+            {
+                throw new InvalidOperationException("SerializeFormationOrderResult formationType must be 'Line'.");
+            }
+            if (!doc.RootElement.TryGetProperty("dispatchedCount", out var dc) || dc.GetInt32() != 3)
+            {
+                throw new InvalidOperationException("SerializeFormationOrderResult dispatchedCount must be 3.");
+            }
+        }
+    }),
+    ("runtime tactical combat stances assigns stance modes and serializes tactical stance census with omission first", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        RuntimeGameplayCommandDirector.ClearTacticalStancesAndAffixes();
+        var unitA = new EntityController
+        {
+            entityId = "unit:stance_alpha",
+            UniqueEntityId = 941,
+            IsControlledByPlayer = true,
+            IsUnit = true,
+            MoveSpeed = 5.0f,
+            WeaponRange = 10.0f,
+        };
+        var unitB = new EntityController
+        {
+            entityId = "unit:stance_beta",
+            UniqueEntityId = 942,
+            IsControlledByPlayer = false,
+            IsUnit = true,
+            MoveSpeed = 4.0f,
+            WeaponRange = 12.0f,
+        };
+        ExistingControllers.Instance.PlayerUnits().Add(unitA);
+        ExistingControllers.Instance.AiUnits().Add(unitB);
+
+        // Assign Aggressive to unit A
+        UnitTacticalStanceResult resA = RuntimeGameplayCommandDirector.TrySetUnitTacticalStance("941", "Aggressive");
+        if (!resA.Success || resA.Stance != "Aggressive" || resA.AffectedUnitCount != 1)
+        {
+            throw new InvalidOperationException("TrySetUnitTacticalStance should assign Aggressive to unit 941.");
+        }
+
+        // Assign Kiting to unit B
+        UnitTacticalStanceResult resB = RuntimeGameplayCommandDirector.TrySetUnitTacticalStance("942", "Kiting");
+        if (!resB.Success || resB.Stance != "Kiting")
+        {
+            throw new InvalidOperationException("TrySetUnitTacticalStance should assign Kiting to unit 942.");
+        }
+
+        // Invalid stance
+        UnitTacticalStanceResult invalid = RuntimeGameplayCommandDirector.TrySetUnitTacticalStance("941", "Berserk");
+        if (invalid.Success)
+        {
+            throw new InvalidOperationException("TrySetUnitTacticalStance with unsupported stance must fail.");
+        }
+
+        // Query Census
+        TacticalStanceCensus census = RuntimeGameplayCommandDirector.GetTacticalStanceCensus(32);
+        if (census.TotalTrackedUnits != 2 || census.AggressiveCount != 1 || census.KitingCount != 1)
+        {
+            throw new InvalidOperationException("TacticalStanceCensus should track 2 units (1 Aggressive, 1 Kiting).");
+        }
+
+        // Serialize census
+        string json = AgentDiagnosticsFormatter.SerializeTacticalStanceCensus(census);
+        using (var doc = JsonDocument.Parse(json))
+        {
+            if (!doc.RootElement.TryGetProperty("kind", out var kindProp) || kindProp.GetString() != "tacticalStanceCensus")
+            {
+                throw new InvalidOperationException("SerializeTacticalStanceCensus kind must be 'tacticalStanceCensus'.");
+            }
+            if (!doc.RootElement.TryGetProperty("omittedUnitCount", out var om) || om.GetInt32() != 0)
+            {
+                throw new InvalidOperationException("SerializeTacticalStanceCensus omittedUnitCount must be 0.");
+            }
+            if (!doc.RootElement.TryGetProperty("aggressiveCount", out var agg) || agg.GetInt32() != 1)
+            {
+                throw new InvalidOperationException("SerializeTacticalStanceCensus aggressiveCount must be 1.");
+            }
+            if (!doc.RootElement.TryGetProperty("stanceRows", out var rows) || rows.GetArrayLength() != 2)
+            {
+                throw new InvalidOperationException("SerializeTacticalStanceCensus stanceRows must have 2 elements.");
+            }
+        }
+
+        // Group stance assignment
+        UnitTacticalStanceResult groupRes = RuntimeGameplayCommandDirector.TrySetGroupTacticalStance(
+            new[] { "941", "942" }, "Defensive");
+        if (!groupRes.Success || groupRes.AffectedUnitCount != 2)
+        {
+            throw new InvalidOperationException("TrySetGroupTacticalStance should assign Defensive to both units.");
+        }
+    }),
+    ("runtime unit elite affixes applies and removes traits and serializes unit affix census with omission first", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        RuntimeGameplayCommandDirector.ClearTacticalStancesAndAffixes();
+        var unitA = new EntityController
+        {
+            entityId = "unit:affix_alpha",
+            UniqueEntityId = 951,
+            IsControlledByPlayer = true,
+            IsUnit = true,
+            CurrentHealth = 50f,
+            MaxHealth = 100f,
+            CurrentShield = 0f,
+            MaxShield = 2f,
+        };
+        ExistingControllers.Instance.PlayerUnits().Add(unitA);
+
+        // Apply Swift
+        UnitAffixResult swift = RuntimeGameplayCommandDirector.TryApplyUnitAffix("951", "Swift");
+        if (!swift.Success || swift.ActiveAffixCount != 1 || swift.Affix != "Swift")
+        {
+            throw new InvalidOperationException("TryApplyUnitAffix Swift should succeed with 1 active affix.");
+        }
+
+        // Apply Bulwark (charges shield)
+        UnitAffixResult bulwark = RuntimeGameplayCommandDirector.TryApplyUnitAffix("951", "Bulwark");
+        if (!bulwark.Success || bulwark.ActiveAffixCount != 2 || unitA.CurrentShield < 1f)
+        {
+            throw new InvalidOperationException("TryApplyUnitAffix Bulwark should charge shield and report 2 active affixes.");
+        }
+
+        // Apply Juggernaut (heals)
+        UnitAffixResult jugg = RuntimeGameplayCommandDirector.TryApplyUnitAffix("951", "Juggernaut");
+        if (!jugg.Success || jugg.ActiveAffixCount != 3 || unitA.CurrentHealth <= 50f)
+        {
+            throw new InvalidOperationException("TryApplyUnitAffix Juggernaut should heal and report 3 active affixes.");
+        }
+
+        // Query Census
+        UnitAffixCensus census = RuntimeGameplayCommandDirector.GetUnitAffixCensus(32);
+        if (census.TotalTrackedUnits != 1 || census.TotalActiveAffixes != 3)
+        {
+            throw new InvalidOperationException("UnitAffixCensus should report 1 unit and 3 total active affixes.");
+        }
+
+        // Serialize census
+        string json = AgentDiagnosticsFormatter.SerializeUnitAffixCensus(census);
+        using (var doc = JsonDocument.Parse(json))
+        {
+            if (!doc.RootElement.TryGetProperty("kind", out var kindProp) || kindProp.GetString() != "unitAffixCensus")
+            {
+                throw new InvalidOperationException("SerializeUnitAffixCensus kind must be 'unitAffixCensus'.");
+            }
+            if (!doc.RootElement.TryGetProperty("omittedUnitCount", out var om) || om.GetInt32() != 0)
+            {
+                throw new InvalidOperationException("SerializeUnitAffixCensus omittedUnitCount must be 0.");
+            }
+            if (!doc.RootElement.TryGetProperty("totalActiveAffixes", out var ta) || ta.GetInt32() != 3)
+            {
+                throw new InvalidOperationException("SerializeUnitAffixCensus totalActiveAffixes must be 3.");
+            }
+        }
+
+        // Remove Swift
+        UnitAffixResult remSwift = RuntimeGameplayCommandDirector.TryRemoveUnitAffix("951", "Swift");
+        if (!remSwift.Success || remSwift.ActiveAffixCount != 2)
+        {
+            throw new InvalidOperationException("TryRemoveUnitAffix Swift should leave 2 active affixes.");
+        }
+
+        // Remove All
+        UnitAffixResult remAll = RuntimeGameplayCommandDirector.TryRemoveUnitAffix("951", "All");
+        if (!remAll.Success || remAll.ActiveAffixCount != 0)
+        {
+            throw new InvalidOperationException("TryRemoveUnitAffix All should clear all affixes.");
+        }
+    }),
+    ("runtime AI assault wave coordinates attack wave escalation and dispatches orders to living AI combat units", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        RuntimeGameplayCommandDirector.ClearAiDoctrineAndDeckEntries();
+        var hq = new EntityController
+        {
+            entityId = "building:player_hq",
+            UniqueEntityId = 101,
+            IsControlledByPlayer = true,
+            IsBuilding = true,
+            Position = new UnityEngine.Vector3(100f, 0f, 100f),
+        };
+        ExistingControllers.Instance.EngineeringHqEntity = hq;
+
+        var aiTank1 = new EntityController
+        {
+            entityId = "unit:ai_assault_tank_1",
+            UniqueEntityId = 961,
+            IsControlledByAi = true,
+            IsControlledByPlayer = false,
+            IsUnit = true,
+            IsCombatUnit = true,
+            CanAttackAndIsAttackEnabled = true,
+            Position = new UnityEngine.Vector3(0f, 0f, 0f),
+        };
+        var aiTank2 = new EntityController
+        {
+            entityId = "unit:ai_assault_tank_2",
+            UniqueEntityId = 962,
+            IsControlledByAi = true,
+            IsControlledByPlayer = false,
+            IsUnit = true,
+            IsCombatUnit = true,
+            CanAttackAndIsAttackEnabled = true,
+            Position = new UnityEngine.Vector3(5f, 0f, 5f),
+        };
+        ExistingControllers.Instance.AiUnits().Add(aiTank1);
+        ExistingControllers.Instance.AiUnits().Add(aiTank2);
+
+        // Dispatch assault wave 4 with aggression boost 2.0
+        AiWaveDispatchResult res = RuntimeGameplayCommandDirector.TryDispatchAiAssaultWave(4, 2.0f, 0);
+        if (!res.Success || res.WaveNumber != 4 || res.DispatchedUnitCount != 2)
+        {
+            throw new InvalidOperationException("TryDispatchAiAssaultWave should dispatch wave 4 to both living AI units.");
+        }
+
+        // Serialization
+        string json = AgentDiagnosticsFormatter.SerializeAiWaveDispatchResult(res);
+        using (var doc = JsonDocument.Parse(json))
+        {
+            if (!doc.RootElement.TryGetProperty("kind", out var kindProp) || kindProp.GetString() != "aiWaveDispatchResult")
+            {
+                throw new InvalidOperationException("SerializeAiWaveDispatchResult kind must be 'aiWaveDispatchResult'.");
+            }
+            if (!doc.RootElement.TryGetProperty("waveNumber", out var wn) || wn.GetInt32() != 4)
+            {
+                throw new InvalidOperationException("SerializeAiWaveDispatchResult waveNumber must be 4.");
+            }
+            if (!doc.RootElement.TryGetProperty("dispatchedUnitCount", out var dc) || dc.GetInt32() != 2)
+            {
+                throw new InvalidOperationException("SerializeAiWaveDispatchResult dispatchedUnitCount must be 2.");
+            }
+        }
+    }),
     };
 }

@@ -857,6 +857,254 @@ namespace RogueCommandExpansionLoader.Runtime
         public string Message { get; }
     }
 
+    /// <summary>
+    /// Pure diagnostic DTO returned when dispatching a native patrol route to a unit.
+    /// Decoupled from Unity types.
+    /// </summary>
+    public readonly struct UnitPatrolResult
+    {
+        public UnitPatrolResult(bool success, string entityKeyId, int waypointCount, string message)
+        {
+            Success = success;
+            EntityKeyId = entityKeyId ?? string.Empty;
+            WaypointCount = waypointCount;
+            Message = message ?? string.Empty;
+        }
+
+        public bool Success { get; }
+        public string EntityKeyId { get; }
+        public int WaypointCount { get; }
+        public string Message { get; }
+    }
+
+    /// <summary>
+    /// Pure diagnostic DTO returned when dispatching a single command type to a group of units.
+    /// Decoupled from Unity types.
+    /// </summary>
+    public readonly struct GroupCommandResult
+    {
+        public GroupCommandResult(bool success, string commandType, int targetedCount, int dispatchedCount, string message)
+        {
+            Success = success;
+            CommandType = commandType ?? string.Empty;
+            TargetedCount = targetedCount;
+            DispatchedCount = dispatchedCount;
+            Message = message ?? string.Empty;
+        }
+
+        public bool Success { get; }
+        public string CommandType { get; }
+        public int TargetedCount { get; }
+        public int DispatchedCount { get; }
+        public string Message { get; }
+    }
+
+    /// <summary>
+    /// Pure diagnostic DTO returned when dispatching a tactical formation movement to multiple units.
+    /// Decoupled from Unity types.
+    /// </summary>
+    public readonly struct FormationOrderResult
+    {
+        public FormationOrderResult(bool success, string formationType, int targetedCount, int dispatchedCount, float targetX, float targetZ, float spacing, string message)
+        {
+            Success = success;
+            FormationType = formationType ?? string.Empty;
+            TargetedCount = targetedCount;
+            DispatchedCount = dispatchedCount;
+            TargetX = targetX;
+            TargetZ = targetZ;
+            Spacing = spacing;
+            Message = message ?? string.Empty;
+        }
+
+        public bool Success { get; }
+        public string FormationType { get; }
+        public int TargetedCount { get; }
+        public int DispatchedCount { get; }
+        public float TargetX { get; }
+        public float TargetZ { get; }
+        public float Spacing { get; }
+        public string Message { get; }
+    }
+
+    /// <summary>
+    /// Pure diagnostic row for a unit's active tactical combat stance.
+    /// Decoupled from Unity types.
+    /// </summary>
+    public readonly struct TacticalStanceDiagnosticRow
+    {
+        public TacticalStanceDiagnosticRow(string entityKeyId, string entityId, string stance, bool isControlledByPlayer, float moveSpeed, float weaponRange)
+        {
+            EntityKeyId = entityKeyId ?? string.Empty;
+            EntityId = entityId ?? string.Empty;
+            Stance = stance ?? string.Empty;
+            IsControlledByPlayer = isControlledByPlayer;
+            MoveSpeed = moveSpeed;
+            WeaponRange = weaponRange;
+        }
+
+        public string EntityKeyId { get; }
+        public string EntityId { get; }
+        public string Stance { get; }
+        public bool IsControlledByPlayer { get; }
+        public float MoveSpeed { get; }
+        public float WeaponRange { get; }
+    }
+
+    /// <summary>
+    /// Pure diagnostic DTO returned when applying or updating a unit's tactical combat stance.
+    /// Decoupled from Unity types.
+    /// </summary>
+    public readonly struct UnitTacticalStanceResult
+    {
+        public UnitTacticalStanceResult(bool success, string entityKeyId, string stance, int affectedUnitCount, string message)
+        {
+            Success = success;
+            EntityKeyId = entityKeyId ?? string.Empty;
+            Stance = stance ?? string.Empty;
+            AffectedUnitCount = affectedUnitCount;
+            Message = message ?? string.Empty;
+        }
+
+        public bool Success { get; }
+        public string EntityKeyId { get; }
+        public string Stance { get; }
+        public int AffectedUnitCount { get; }
+        public string Message { get; }
+    }
+
+    /// <summary>
+    /// Census of tactical combat stances across living units.
+    /// Decoupled from Unity types.
+    /// </summary>
+    public sealed class TacticalStanceCensus
+    {
+        public int OmittedUnitCount { get; }
+        public int TotalTrackedUnits { get; }
+        public int AggressiveCount { get; }
+        public int DefensiveCount { get; }
+        public int KitingCount { get; }
+        public int HoldFireCount { get; }
+        public int StandardCount { get; }
+        public IReadOnlyList<TacticalStanceDiagnosticRow> StanceRows { get; }
+
+        public TacticalStanceCensus(
+            int omittedUnitCount,
+            int totalTrackedUnits,
+            int aggressiveCount,
+            int defensiveCount,
+            int kitingCount,
+            int holdFireCount,
+            int standardCount,
+            IReadOnlyList<TacticalStanceDiagnosticRow> stanceRows)
+        {
+            OmittedUnitCount = omittedUnitCount;
+            TotalTrackedUnits = totalTrackedUnits;
+            AggressiveCount = aggressiveCount;
+            DefensiveCount = defensiveCount;
+            KitingCount = kitingCount;
+            HoldFireCount = holdFireCount;
+            StandardCount = standardCount;
+            StanceRows = stanceRows ?? new List<TacticalStanceDiagnosticRow>().AsReadOnly();
+        }
+
+        public static TacticalStanceCensus Empty { get; } =
+            new TacticalStanceCensus(0, 0, 0, 0, 0, 0, 0, new List<TacticalStanceDiagnosticRow>().AsReadOnly());
+    }
+
+    /// <summary>
+    /// Pure diagnostic row for a unit's active elite affixes and traits.
+    /// Decoupled from Unity types.
+    /// </summary>
+    public readonly struct UnitAffixDiagnosticRow
+    {
+        public UnitAffixDiagnosticRow(string entityKeyId, string entityId, bool isControlledByPlayer, IReadOnlyList<string> affixes)
+        {
+            EntityKeyId = entityKeyId ?? string.Empty;
+            EntityId = entityId ?? string.Empty;
+            IsControlledByPlayer = isControlledByPlayer;
+            Affixes = affixes ?? new List<string>().AsReadOnly();
+        }
+
+        public string EntityKeyId { get; }
+        public string EntityId { get; }
+        public bool IsControlledByPlayer { get; }
+        public IReadOnlyList<string> Affixes { get; }
+    }
+
+    /// <summary>
+    /// Pure diagnostic DTO returned when adding or removing an elite affix on a unit.
+    /// Decoupled from Unity types.
+    /// </summary>
+    public readonly struct UnitAffixResult
+    {
+        public UnitAffixResult(bool success, string entityKeyId, string affix, string action, int activeAffixCount, string message)
+        {
+            Success = success;
+            EntityKeyId = entityKeyId ?? string.Empty;
+            Affix = affix ?? string.Empty;
+            Action = action ?? string.Empty;
+            ActiveAffixCount = activeAffixCount;
+            Message = message ?? string.Empty;
+        }
+
+        public bool Success { get; }
+        public string EntityKeyId { get; }
+        public string Affix { get; }
+        public string Action { get; }
+        public int ActiveAffixCount { get; }
+        public string Message { get; }
+    }
+
+    /// <summary>
+    /// Census of active elite affixes and traits applied to living units.
+    /// Decoupled from Unity types.
+    /// </summary>
+    public sealed class UnitAffixCensus
+    {
+        public int OmittedUnitCount { get; }
+        public int TotalTrackedUnits { get; }
+        public int TotalActiveAffixes { get; }
+        public IReadOnlyList<UnitAffixDiagnosticRow> AffixRows { get; }
+
+        public UnitAffixCensus(
+            int omittedUnitCount,
+            int totalTrackedUnits,
+            int totalActiveAffixes,
+            IReadOnlyList<UnitAffixDiagnosticRow> affixRows)
+        {
+            OmittedUnitCount = omittedUnitCount;
+            TotalTrackedUnits = totalTrackedUnits;
+            TotalActiveAffixes = totalActiveAffixes;
+            AffixRows = affixRows ?? new List<UnitAffixDiagnosticRow>().AsReadOnly();
+        }
+
+        public static UnitAffixCensus Empty { get; } =
+            new UnitAffixCensus(0, 0, 0, new List<UnitAffixDiagnosticRow>().AsReadOnly());
+    }
+
+    /// <summary>
+    /// Pure diagnostic DTO returned when manually triggering an AI assault wave.
+    /// Decoupled from Unity types.
+    /// </summary>
+    public readonly struct AiWaveDispatchResult
+    {
+        public AiWaveDispatchResult(bool success, int waveNumber, float aggressionBoost, int dispatchedUnitCount, string message)
+        {
+            Success = success;
+            WaveNumber = waveNumber;
+            AggressionBoost = aggressionBoost;
+            DispatchedUnitCount = dispatchedUnitCount;
+            Message = message ?? string.Empty;
+        }
+
+        public bool Success { get; }
+        public int WaveNumber { get; }
+        public float AggressionBoost { get; }
+        public int DispatchedUnitCount { get; }
+        public string Message { get; }
+    }
+
     public static class RuntimeGameplayCommandDirector
 
     {
@@ -869,6 +1117,8 @@ namespace RogueCommandExpansionLoader.Runtime
         private static string _activeAiDoctrine = "Standard";
         private static float _aiAggressionMultiplier = 1.0f;
         private static readonly List<AiDeckEntryDiagnosticRow> _injectedAiDeckEntries = new List<AiDeckEntryDiagnosticRow>();
+        private static readonly Dictionary<string, string> _activeTacticalStances = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        private static readonly Dictionary<string, List<string>> _activeUnitAffixes = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
 
         private static string ResolveEntityIdString(EntityController unit)
         {
@@ -4806,6 +5056,706 @@ namespace RogueCommandExpansionLoader.Runtime
             lock (_injectedAiDeckEntries)
             {
                 _injectedAiDeckEntries.Clear();
+            }
+        }
+
+        /// <summary>
+        /// Dispatches a native patrol route to a living unit. Clears the unit's existing native
+        /// patrol positions, seeds them with the supplied waypoints, and issues a tagged
+        /// <c>EntityCommand.Patrol(0)</c>. Uses the verified game identity (Assembly-CSharp.dll
+        /// SHA-256 d2da384d...): <c>EntityController.ClearPatrolPositions</c>
+        /// (0x06000888), <c>AddPatrolPosition(Vector3)</c> (0x06000889),
+        /// <c>ArePatrolPositionsEmpty</c> (0x0600088a), and <c>EntityCommand.Patrol(int)</c>
+        /// (0x06000697). Waypoints are supplied as parallel X/Z lists; the Y axis is resolved by
+        /// the native pathing. Fails closed when the route is empty or seeding does not stick.
+        /// </summary>
+        public static UnitPatrolResult TryOrderUnitPatrol(string entityKeyId, IReadOnlyList<float> waypointX, IReadOnlyList<float> waypointZ)
+        {
+            if (string.IsNullOrWhiteSpace(entityKeyId))
+            {
+                return new UnitPatrolResult(false, entityKeyId, 0, "Entity key ID cannot be empty.");
+            }
+
+            if (waypointX == null || waypointZ == null || waypointX.Count != waypointZ.Count || waypointX.Count < 1)
+            {
+                return new UnitPatrolResult(false, entityKeyId, 0,
+                    "Patrol requires at least one waypoint with matching X and Z coordinates.");
+            }
+
+            try
+            {
+                ExistingControllers existing = ExistingControllers.Instance;
+                if (existing == null)
+                {
+                    return new UnitPatrolResult(false, entityKeyId, 0, "ExistingControllers instance is not available.");
+                }
+
+                EntityController unit = FindEntityByKey(existing, entityKeyId.Trim());
+                if (unit == null)
+                {
+                    return new UnitPatrolResult(false, entityKeyId, 0, "Unit '" + entityKeyId + "' not found or destroyed.");
+                }
+
+                unit.ClearPatrolPositions();
+                for (int i = 0; i < waypointX.Count; i++)
+                {
+                    unit.AddPatrolPosition(new Vector3(waypointX[i], 0f, waypointZ[i]));
+                }
+
+                if (unit.ArePatrolPositionsEmpty())
+                {
+                    return new UnitPatrolResult(false, entityKeyId, 0,
+                        "Native patrol positions were not seeded for unit '" + entityKeyId + "'.");
+                }
+
+                EntityCommand patrolCommand = EntityCommand.Patrol(0);
+                patrolCommand.tag = "rcl-command-director";
+                unit.ExecuteCommand(patrolCommand, EntityController.CommandProcessingType.ExecuteBeforeCurrentCommand);
+
+                return new UnitPatrolResult(true, entityKeyId, waypointX.Count,
+                    "Patrol route dispatched for unit '" + entityKeyId + "' with " + waypointX.Count + " waypoint(s).");
+            }
+            catch (Exception ex)
+            {
+                return new UnitPatrolResult(false, entityKeyId, 0, "Error dispatching unit patrol: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Dispatches a single command type to every living unit in the provided key list.
+        /// Supported command types: "Move", "Stop", "HoldPosition", "AttackMove". Each member is
+        /// routed through the already-verified single-unit dispatch methods so the group command
+        /// reuses the same fail-closed reflection and error handling. The result reports how many
+        /// targeted units accepted the order versus how many were requested.
+        /// </summary>
+        public static GroupCommandResult TryOrderGroupCommand(IReadOnlyList<string> entityKeyIds, string commandType, float targetX, float targetZ)
+        {
+            if (entityKeyIds == null || entityKeyIds.Count == 0)
+            {
+                return new GroupCommandResult(false, string.Empty, 0, 0, "No entity keys provided for the group command.");
+            }
+
+            string normalized = string.IsNullOrWhiteSpace(commandType) ? string.Empty : commandType.Trim();
+            bool isMove = string.Equals(normalized, "Move", StringComparison.OrdinalIgnoreCase);
+            bool isStop = string.Equals(normalized, "Stop", StringComparison.OrdinalIgnoreCase);
+            bool isHold = string.Equals(normalized, "HoldPosition", StringComparison.OrdinalIgnoreCase);
+            bool isAttackMove = string.Equals(normalized, "AttackMove", StringComparison.OrdinalIgnoreCase);
+
+            if (!isMove && !isStop && !isHold && !isAttackMove)
+            {
+                return new GroupCommandResult(false, normalized, 0, 0,
+                    "Unsupported group command type '" + normalized + "'. Supported: Move, Stop, HoldPosition, AttackMove.");
+            }
+
+            int targetedCount = 0;
+            int dispatchedCount = 0;
+            string lastFailure = string.Empty;
+
+            for (int i = 0; i < entityKeyIds.Count; i++)
+            {
+                string key = entityKeyIds[i];
+                if (string.IsNullOrWhiteSpace(key))
+                {
+                    continue;
+                }
+
+                targetedCount++;
+                UnitCommandResult memberResult = isMove
+                    ? TryOrderUnitMove(key.Trim(), targetX, targetZ)
+                    : isStop
+                        ? TryOrderStop(key.Trim())
+                        : isHold
+                            ? TryOrderHoldPosition(key.Trim())
+                            : TryOrderAttackMove(key.Trim(), targetX, targetZ);
+
+                if (memberResult.Success)
+                {
+                    dispatchedCount++;
+                }
+                else
+                {
+                    lastFailure = "Unit '" + key.Trim() + "': " + memberResult.Message;
+                }
+            }
+
+            bool success = dispatchedCount > 0;
+            string message;
+            if (targetedCount == 0)
+            {
+                message = "Group command skipped: no valid entity keys were provided.";
+            }
+            else if (success && dispatchedCount == targetedCount)
+            {
+                message = "Group '" + normalized + "' dispatched to all " + dispatchedCount + " targeted unit(s).";
+            }
+            else if (success)
+            {
+                message = "Group '" + normalized + "' dispatched to " + dispatchedCount + " of " + targetedCount +
+                          " targeted unit(s). Last failure: " + lastFailure;
+            }
+            else
+            {
+                message = "Group '" + normalized + "' failed for all " + targetedCount + " targeted unit(s). Last failure: " + lastFailure;
+            }
+
+            return new GroupCommandResult(success, normalized, targetedCount, dispatchedCount, message);
+        }
+
+        /// <summary>
+        /// Dispatches a tactical formation movement to multiple units.
+        /// Supported formations: Line, Wedge, Column, Box, Surround.
+        /// Spacing is in meters (default 4.0, clamped 1.5 to 25.0).
+        /// </summary>
+        public static FormationOrderResult TryOrderFormationMove(
+            IReadOnlyList<string> entityKeyIds,
+            string formationType,
+            float targetX,
+            float targetZ,
+            float spacing)
+        {
+            if (entityKeyIds == null || entityKeyIds.Count == 0)
+            {
+                return new FormationOrderResult(false, formationType ?? "Line", 0, 0, targetX, targetZ, spacing, "No entity keys provided for formation move.");
+            }
+
+            string normalized = string.IsNullOrWhiteSpace(formationType) ? "Line" : formationType.Trim();
+            bool isLine = string.Equals(normalized, "Line", StringComparison.OrdinalIgnoreCase);
+            bool isWedge = string.Equals(normalized, "Wedge", StringComparison.OrdinalIgnoreCase);
+            bool isColumn = string.Equals(normalized, "Column", StringComparison.OrdinalIgnoreCase);
+            bool isBox = string.Equals(normalized, "Box", StringComparison.OrdinalIgnoreCase);
+            bool isSurround = string.Equals(normalized, "Surround", StringComparison.OrdinalIgnoreCase);
+
+            if (!isLine && !isWedge && !isColumn && !isBox && !isSurround)
+            {
+                normalized = "Line";
+                isLine = true;
+            }
+
+            float effSpacing = Mathf.Clamp(spacing > 0.01f ? spacing : 4.0f, 1.5f, 25.0f);
+            int n = entityKeyIds.Count;
+            int targetedCount = 0;
+            int dispatchedCount = 0;
+            string lastError = string.Empty;
+
+            for (int i = 0; i < n; i++)
+            {
+                string key = entityKeyIds[i];
+                if (string.IsNullOrWhiteSpace(key)) continue;
+
+                targetedCount++;
+                float offX = 0f;
+                float offZ = 0f;
+
+                if (isLine)
+                {
+                    offX = (i - (n - 1) / 2.0f) * effSpacing;
+                    offZ = 0f;
+                }
+                else if (isColumn)
+                {
+                    offX = 0f;
+                    offZ = -(i - (n - 1) / 2.0f) * effSpacing;
+                }
+                else if (isWedge)
+                {
+                    if (i == 0)
+                    {
+                        offX = 0f;
+                        offZ = 0f;
+                    }
+                    else
+                    {
+                        int rank = (i + 1) / 2;
+                        float side = (i % 2 == 1) ? -1.0f : 1.0f;
+                        offX = side * rank * effSpacing;
+                        offZ = -rank * effSpacing;
+                    }
+                }
+                else if (isBox)
+                {
+                    if (n == 1)
+                    {
+                        offX = 0f;
+                        offZ = 0f;
+                    }
+                    else
+                    {
+                        int cols = (int)Math.Ceiling(Math.Sqrt(n));
+                        int rows = (int)Math.Ceiling((double)n / cols);
+                        int c = i % cols;
+                        int r = i / cols;
+                        offX = (c - (cols - 1) / 2.0f) * effSpacing;
+                        offZ = -(r - (rows - 1) / 2.0f) * effSpacing;
+                    }
+                }
+                else if (isSurround)
+                {
+                    float theta = (float)(2.0 * Math.PI * i / n);
+                    float radius = Math.Max(effSpacing, (float)(effSpacing * n / (2.0 * Math.PI)));
+                    offX = radius * (float)Math.Cos(theta);
+                    offZ = radius * (float)Math.Sin(theta);
+                }
+
+                float posX = targetX + offX;
+                float posZ = targetZ + offZ;
+
+                UnitCommandResult res = TryOrderUnitMove(key.Trim(), posX, posZ);
+                if (res.Success)
+                {
+                    dispatchedCount++;
+                }
+                else
+                {
+                    lastError = "Unit '" + key.Trim() + "': " + res.Message;
+                }
+            }
+
+            bool success = dispatchedCount > 0;
+            string msg;
+            if (targetedCount == 0)
+            {
+                msg = "Formation move skipped: no valid entity keys provided.";
+            }
+            else if (success && dispatchedCount == targetedCount)
+            {
+                msg = "Dispatched " + normalized + " formation move to all " + dispatchedCount + " unit(s) at (" + targetX + ", " + targetZ + ").";
+            }
+            else if (success)
+            {
+                msg = "Dispatched " + normalized + " formation move to " + dispatchedCount + " of " + targetedCount + " unit(s). Last error: " + lastError;
+            }
+            else
+            {
+                msg = "Failed formation move for all " + targetedCount + " unit(s). Last error: " + lastError;
+            }
+
+            return new FormationOrderResult(success, normalized, targetedCount, dispatchedCount, targetX, targetZ, effSpacing, msg);
+        }
+
+        /// <summary>
+        /// Assigns a tactical combat stance to a unit.
+        /// Supported stances: Standard, Aggressive, Defensive, HoldFire, Kiting.
+        /// </summary>
+        public static UnitTacticalStanceResult TrySetUnitTacticalStance(string entityKeyId, string stanceName)
+        {
+            if (string.IsNullOrWhiteSpace(entityKeyId))
+            {
+                return new UnitTacticalStanceResult(false, string.Empty, stanceName ?? "Standard", 0, "Entity key ID cannot be empty.");
+            }
+
+            string normalized = string.IsNullOrWhiteSpace(stanceName) ? "Standard" : stanceName.Trim();
+            bool isStandard = string.Equals(normalized, "Standard", StringComparison.OrdinalIgnoreCase);
+            bool isAggressive = string.Equals(normalized, "Aggressive", StringComparison.OrdinalIgnoreCase);
+            bool isDefensive = string.Equals(normalized, "Defensive", StringComparison.OrdinalIgnoreCase);
+            bool isHoldFire = string.Equals(normalized, "HoldFire", StringComparison.OrdinalIgnoreCase);
+            bool isKiting = string.Equals(normalized, "Kiting", StringComparison.OrdinalIgnoreCase);
+
+            if (!isStandard && !isAggressive && !isDefensive && !isHoldFire && !isKiting)
+            {
+                return new UnitTacticalStanceResult(false, entityKeyId, normalized, 0,
+                    "Unsupported tactical stance '" + normalized + "'. Supported: Standard, Aggressive, Defensive, HoldFire, Kiting.");
+            }
+
+            try
+            {
+                ExistingControllers existing = ExistingControllers.Instance;
+                if (existing == null)
+                {
+                    return new UnitTacticalStanceResult(false, entityKeyId, normalized, 0, "ExistingControllers not ready.");
+                }
+
+                EntityController unit = FindEntityByKey(existing, entityKeyId.Trim());
+                if (unit == null)
+                {
+                    return new UnitTacticalStanceResult(false, entityKeyId, normalized, 0, "Unit '" + entityKeyId + "' not found or destroyed.");
+                }
+
+                string key = unit.UniqueEntityId.ToString();
+                lock (_activeTacticalStances)
+                {
+                    _activeTacticalStances[key] = normalized;
+                }
+
+                if (isHoldFire)
+                {
+                    TryOrderStop(key);
+                }
+
+                return new UnitTacticalStanceResult(true, key, normalized, 1,
+                    "Tactical stance '" + normalized + "' assigned to unit '" + key + "'.");
+            }
+            catch (Exception ex)
+            {
+                return new UnitTacticalStanceResult(false, entityKeyId, normalized, 0, "Error setting tactical stance: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Assigns a tactical combat stance to a group of units.
+        /// </summary>
+        public static UnitTacticalStanceResult TrySetGroupTacticalStance(IReadOnlyList<string> entityKeyIds, string stanceName)
+        {
+            if (entityKeyIds == null || entityKeyIds.Count == 0)
+            {
+                return new UnitTacticalStanceResult(false, string.Empty, stanceName ?? "Standard", 0, "No entity keys provided.");
+            }
+
+            int applied = 0;
+            string lastErr = string.Empty;
+            for (int i = 0; i < entityKeyIds.Count; i++)
+            {
+                string key = entityKeyIds[i];
+                if (string.IsNullOrWhiteSpace(key)) continue;
+                UnitTacticalStanceResult res = TrySetUnitTacticalStance(key.Trim(), stanceName);
+                if (res.Success) applied++;
+                else lastErr = res.Message;
+            }
+
+            bool success = applied > 0;
+            string msg = success
+                ? "Assigned stance '" + stanceName + "' to " + applied + " unit(s)."
+                : "Failed assigning stance to group: " + lastErr;
+            return new UnitTacticalStanceResult(success, "Group", stanceName, applied, msg);
+        }
+
+        /// <summary>
+        /// Queries the tactical combat stance census across living units.
+        /// Omission counters precede detail collections.
+        /// </summary>
+        public static TacticalStanceCensus GetTacticalStanceCensus(int maxTrackedUnits = 32)
+        {
+            var rows = new List<TacticalStanceDiagnosticRow>();
+            int totalCount = 0;
+            int omittedCount = 0;
+            int aggCount = 0;
+            int defCount = 0;
+            int kiteCount = 0;
+            int holdCount = 0;
+            int stdCount = 0;
+
+            try
+            {
+                ExistingControllers existing = ExistingControllers.Instance;
+                if (existing != null)
+                {
+                    var units = new List<EntityController>();
+                    if (existing.PlayerUnits() != null) units.AddRange(existing.PlayerUnits());
+                    if (existing.AiUnits() != null) units.AddRange(existing.AiUnits());
+
+                    for (int i = 0; i < units.Count; i++)
+                    {
+                        EntityController unit = units[i];
+                        if (unit == null || unit.IsDestroyed || unit.DestroyHasBeenStarted) continue;
+
+                        totalCount++;
+                        string key = unit.UniqueEntityId.ToString();
+                        string stance;
+                        lock (_activeTacticalStances)
+                        {
+                            if (!_activeTacticalStances.TryGetValue(key, out stance) || string.IsNullOrEmpty(stance))
+                            {
+                                stance = "Standard";
+                            }
+                        }
+
+                        if (string.Equals(stance, "Aggressive", StringComparison.OrdinalIgnoreCase)) aggCount++;
+                        else if (string.Equals(stance, "Defensive", StringComparison.OrdinalIgnoreCase)) defCount++;
+                        else if (string.Equals(stance, "Kiting", StringComparison.OrdinalIgnoreCase)) kiteCount++;
+                        else if (string.Equals(stance, "HoldFire", StringComparison.OrdinalIgnoreCase)) holdCount++;
+                        else stdCount++;
+
+                        if (rows.Count < maxTrackedUnits)
+                        {
+                            rows.Add(new TacticalStanceDiagnosticRow(
+                                key,
+                                ResolveEntityIdString(unit),
+                                stance,
+                                unit.IsControlledByPlayer,
+                                unit.MoveSpeed,
+                                unit.WeaponRange));
+                        }
+                    }
+                }
+            }
+            catch { }
+
+            omittedCount = Math.Max(0, totalCount - rows.Count);
+            return new TacticalStanceCensus(
+                omittedCount, totalCount, aggCount, defCount, kiteCount, holdCount, stdCount, rows.AsReadOnly());
+        }
+
+        /// <summary>
+        /// Applies an elite affix/trait to a unit.
+        /// Supported affixes: Swift, Juggernaut, Overcharged, Vampiric, Bulwark, Volatile.
+        /// </summary>
+        public static UnitAffixResult TryApplyUnitAffix(string entityKeyId, string affixName)
+        {
+            if (string.IsNullOrWhiteSpace(entityKeyId))
+            {
+                return new UnitAffixResult(false, string.Empty, affixName ?? string.Empty, "Apply", 0, "Entity key ID cannot be empty.");
+            }
+            if (string.IsNullOrWhiteSpace(affixName))
+            {
+                return new UnitAffixResult(false, entityKeyId, string.Empty, "Apply", 0, "Affix name cannot be empty.");
+            }
+
+            string normalized = affixName.Trim();
+            bool isSwift = string.Equals(normalized, "Swift", StringComparison.OrdinalIgnoreCase);
+            bool isJuggernaut = string.Equals(normalized, "Juggernaut", StringComparison.OrdinalIgnoreCase);
+            bool isOvercharged = string.Equals(normalized, "Overcharged", StringComparison.OrdinalIgnoreCase);
+            bool isVampiric = string.Equals(normalized, "Vampiric", StringComparison.OrdinalIgnoreCase);
+            bool isBulwark = string.Equals(normalized, "Bulwark", StringComparison.OrdinalIgnoreCase);
+            bool isVolatile = string.Equals(normalized, "Volatile", StringComparison.OrdinalIgnoreCase);
+
+            if (!isSwift && !isJuggernaut && !isOvercharged && !isVampiric && !isBulwark && !isVolatile)
+            {
+                return new UnitAffixResult(false, entityKeyId, normalized, "Apply", 0,
+                    "Unsupported unit affix '" + normalized + "'. Supported: Swift, Juggernaut, Overcharged, Vampiric, Bulwark, Volatile.");
+            }
+
+            try
+            {
+                ExistingControllers existing = ExistingControllers.Instance;
+                if (existing == null)
+                {
+                    return new UnitAffixResult(false, entityKeyId, normalized, "Apply", 0, "ExistingControllers not ready.");
+                }
+
+                EntityController unit = FindEntityByKey(existing, entityKeyId.Trim());
+                if (unit == null)
+                {
+                    return new UnitAffixResult(false, entityKeyId, normalized, "Apply", 0, "Unit '" + entityKeyId + "' not found or destroyed.");
+                }
+
+                string key = unit.UniqueEntityId.ToString();
+                int activeCount = 0;
+                lock (_activeUnitAffixes)
+                {
+                    List<string> affixes;
+                    if (!_activeUnitAffixes.TryGetValue(key, out affixes))
+                    {
+                        affixes = new List<string>();
+                        _activeUnitAffixes[key] = affixes;
+                    }
+
+                    bool exists = false;
+                    for (int i = 0; i < affixes.Count; i++)
+                    {
+                        if (string.Equals(affixes[i], normalized, StringComparison.OrdinalIgnoreCase))
+                        {
+                            exists = true;
+                            break;
+                        }
+                    }
+                    if (!exists)
+                    {
+                        affixes.Add(normalized);
+                    }
+                    activeCount = affixes.Count;
+                }
+
+                // Apply mechanics fail-closed
+                if (isBulwark)
+                {
+                    unit.ChargeShield(2f, true);
+                }
+                else if (isJuggernaut)
+                {
+                    unit.Heal(25f, null, false, false);
+                }
+
+                return new UnitAffixResult(true, key, normalized, "Apply", activeCount,
+                    "Affix '" + normalized + "' applied to unit '" + key + "'. Active affixes: " + activeCount + ".");
+            }
+            catch (Exception ex)
+            {
+                return new UnitAffixResult(false, entityKeyId, normalized, "Apply", 0, "Error applying unit affix: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Removes an active elite affix from a unit (or 'All' to clear all affixes).
+        /// </summary>
+        public static UnitAffixResult TryRemoveUnitAffix(string entityKeyId, string affixName)
+        {
+            if (string.IsNullOrWhiteSpace(entityKeyId))
+            {
+                return new UnitAffixResult(false, string.Empty, affixName ?? string.Empty, "Remove", 0, "Entity key ID cannot be empty.");
+            }
+
+            string normalized = string.IsNullOrWhiteSpace(affixName) ? "All" : affixName.Trim();
+            bool removeAll = string.Equals(normalized, "All", StringComparison.OrdinalIgnoreCase);
+
+            string key = entityKeyId.Trim();
+            int activeCount = 0;
+            bool found = false;
+
+            lock (_activeUnitAffixes)
+            {
+                List<string> affixes;
+                if (_activeUnitAffixes.TryGetValue(key, out affixes) && affixes != null)
+                {
+                    if (removeAll)
+                    {
+                        affixes.Clear();
+                        found = true;
+                    }
+                    else
+                    {
+                        for (int i = affixes.Count - 1; i >= 0; i--)
+                        {
+                            if (string.Equals(affixes[i], normalized, StringComparison.OrdinalIgnoreCase))
+                            {
+                                affixes.RemoveAt(i);
+                                found = true;
+                            }
+                        }
+                    }
+                    activeCount = affixes.Count;
+                }
+            }
+
+            if (!found)
+            {
+                return new UnitAffixResult(false, key, normalized, "Remove", activeCount,
+                    "Affix '" + normalized + "' was not active on unit '" + key + "'.");
+            }
+
+            return new UnitAffixResult(true, key, normalized, "Remove", activeCount,
+                "Removed affix '" + normalized + "' from unit '" + key + "'. Remaining affixes: " + activeCount + ".");
+        }
+
+        /// <summary>
+        /// Queries the unit elite affixes census across living units.
+        /// Omission counters precede detail collections.
+        /// </summary>
+        public static UnitAffixCensus GetUnitAffixCensus(int maxTrackedUnits = 32)
+        {
+            var rows = new List<UnitAffixDiagnosticRow>();
+            int totalTrackedUnits = 0;
+            int omittedCount = 0;
+            int totalActiveAffixes = 0;
+
+            try
+            {
+                ExistingControllers existing = ExistingControllers.Instance;
+                if (existing != null)
+                {
+                    var units = new List<EntityController>();
+                    if (existing.PlayerUnits() != null) units.AddRange(existing.PlayerUnits());
+                    if (existing.AiUnits() != null) units.AddRange(existing.AiUnits());
+
+                    for (int i = 0; i < units.Count; i++)
+                    {
+                        EntityController unit = units[i];
+                        if (unit == null || unit.IsDestroyed || unit.DestroyHasBeenStarted) continue;
+
+                        string key = unit.UniqueEntityId.ToString();
+                        List<string> affixes = null;
+                        lock (_activeUnitAffixes)
+                        {
+                            List<string> stored;
+                            if (_activeUnitAffixes.TryGetValue(key, out stored) && stored != null && stored.Count > 0)
+                            {
+                                affixes = new List<string>(stored);
+                            }
+                        }
+
+                        if (affixes != null && affixes.Count > 0)
+                        {
+                            totalTrackedUnits++;
+                            totalActiveAffixes += affixes.Count;
+                            if (rows.Count < maxTrackedUnits)
+                            {
+                                rows.Add(new UnitAffixDiagnosticRow(
+                                    key,
+                                    ResolveEntityIdString(unit),
+                                    unit.IsControlledByPlayer,
+                                    affixes.AsReadOnly()));
+                            }
+                        }
+                    }
+                }
+            }
+            catch { }
+
+            omittedCount = Math.Max(0, totalTrackedUnits - rows.Count);
+            return new UnitAffixCensus(omittedCount, totalTrackedUnits, totalActiveAffixes, rows.AsReadOnly());
+        }
+
+        /// <summary>
+        /// Manually triggers and coordinates an AI assault wave with elevated aggression.
+        /// Advances the attack wave counter and orders living AI combat units to attack-move towards player HQ.
+        /// </summary>
+        public static AiWaveDispatchResult TryDispatchAiAssaultWave(int waveNumber, float aggressionBoost, int targetBaseIndex = 0)
+        {
+            int wave = waveNumber > 0 ? waveNumber : 1;
+            float effBoost = Mathf.Clamp(aggressionBoost > 0.1f ? aggressionBoost : 1.5f, 1.0f, 3.0f);
+
+            try
+            {
+                // 1. Advance wave counter in AI Director
+                TrySetAttackWaveNumber(wave);
+
+                // 2. Adjust aggression in AI Doctrine
+                TrySetAiDoctrine("Assault", effBoost);
+
+                // 3. Command AI combat units to attack-move towards player HQ / center ground
+                ExistingControllers existing = ExistingControllers.Instance;
+                int dispatchedCount = 0;
+
+                if (existing != null && existing.AiUnits() != null)
+                {
+                    float targetX = 0f;
+                    float targetZ = 0f;
+
+                    // Attempt to target player HQ if available
+                    EntityController hq = existing.EngineeringHq();
+                    if (hq != null && !hq.IsDestroyed)
+                    {
+                        targetX = hq.Position.x;
+                        targetZ = hq.Position.z;
+                    }
+
+                    foreach (EntityController aiUnit in existing.AiUnits())
+                    {
+                        if (aiUnit == null || aiUnit.IsDestroyed || aiUnit.DestroyHasBeenStarted) continue;
+                        if (!aiUnit.IsCombatUnit && !aiUnit.CanAttackAndIsAttackEnabled) continue;
+
+                        string key = aiUnit.UniqueEntityId.ToString();
+                        UnitCommandResult cmd = TryOrderAttackMove(key, targetX, targetZ);
+                        if (cmd.Success)
+                        {
+                            dispatchedCount++;
+                        }
+                    }
+                }
+
+                return new AiWaveDispatchResult(
+                    true,
+                    wave,
+                    effBoost,
+                    dispatchedCount,
+                    "AI Assault Wave " + wave + " dispatched to " + dispatchedCount + " unit(s) with aggression boost " + effBoost.ToString("0.0#", System.Globalization.CultureInfo.InvariantCulture) + ".");
+            }
+            catch (Exception ex)
+            {
+                return new AiWaveDispatchResult(false, wave, effBoost, 0, "Error dispatching AI assault wave: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Clears active tactical stances and unit affixes (used for test teardown and match transitions).
+        /// </summary>
+        public static void ClearTacticalStancesAndAffixes()
+        {
+            lock (_activeTacticalStances)
+            {
+                _activeTacticalStances.Clear();
+            }
+            lock (_activeUnitAffixes)
+            {
+                _activeUnitAffixes.Clear();
             }
         }
 

@@ -768,6 +768,69 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             res = _call_diagnostics_method("OrderUnitAttackMoveJson", [e_key, x, z])
             return _tool_response(res)
 
+        elif name == "diagnostics_order_unit_patrol":
+            e_key = str(arguments.get("entityKeyId", ""))
+            wx = arguments.get("waypointX") or []
+            wz = arguments.get("waypointZ") or []
+            res = _call_diagnostics_method("OrderUnitPatrolJson", [e_key, [float(v) for v in wx], [float(v) for v in wz]])
+            return _tool_response(res)
+
+        elif name == "diagnostics_order_group_command":
+            keys = arguments.get("entityKeyIds") or []
+            cmd_type = str(arguments.get("commandType", ""))
+            x = float(arguments.get("targetX", 0.0))
+            z = float(arguments.get("targetZ", 0.0))
+            res = _call_diagnostics_method("OrderGroupCommandJson", [[str(k) for k in keys], cmd_type, x, z])
+            return _tool_response(res)
+
+        elif name == "diagnostics_order_formation_move":
+            keys = arguments.get("entityKeyIds") or []
+            f_type = str(arguments.get("formationType", "Line"))
+            x = float(arguments.get("targetX", 0.0))
+            z = float(arguments.get("targetZ", 0.0))
+            spacing = float(arguments.get("spacing", 4.0))
+            res = _call_diagnostics_method("OrderFormationMoveJson", [[str(k) for k in keys], f_type, x, z, spacing])
+            return _tool_response(res)
+
+        elif name == "diagnostics_order_unit_tactical_stance":
+            e_key = str(arguments.get("entityKeyId", ""))
+            s_name = str(arguments.get("stanceName", "Standard"))
+            res = _call_diagnostics_method("OrderUnitTacticalStanceJson", [e_key, s_name])
+            return _tool_response(res)
+
+        elif name == "diagnostics_order_group_tactical_stance":
+            keys = arguments.get("entityKeyIds") or []
+            s_name = str(arguments.get("stanceName", "Standard"))
+            res = _call_diagnostics_method("OrderGroupTacticalStanceJson", [[str(k) for k in keys], s_name])
+            return _tool_response(res)
+
+        elif name == "diagnostics_get_tactical_stance_census":
+            res = _call_diagnostics_method("GetTacticalStanceCensusJson")
+            return _tool_response(res)
+
+        elif name == "diagnostics_order_apply_unit_affix":
+            e_key = str(arguments.get("entityKeyId", ""))
+            a_name = str(arguments.get("affixName", ""))
+            res = _call_diagnostics_method("OrderApplyUnitAffixJson", [e_key, a_name])
+            return _tool_response(res)
+
+        elif name == "diagnostics_order_remove_unit_affix":
+            e_key = str(arguments.get("entityKeyId", ""))
+            a_name = str(arguments.get("affixName", "All"))
+            res = _call_diagnostics_method("OrderRemoveUnitAffixJson", [e_key, a_name])
+            return _tool_response(res)
+
+        elif name == "diagnostics_get_unit_affix_census":
+            res = _call_diagnostics_method("GetUnitAffixCensusJson")
+            return _tool_response(res)
+
+        elif name == "diagnostics_order_dispatch_ai_assault_wave":
+            wave = int(arguments.get("waveNumber", 1))
+            boost = float(arguments.get("aggressionBoost", 1.5))
+            base_idx = int(arguments.get("targetBaseIndex", 0))
+            res = _call_diagnostics_method("OrderDispatchAiAssaultWaveJson", [wave, boost, base_idx])
+            return _tool_response(res)
+
         elif name == "diagnostics_order_unit_hold_position":
             e_key = arguments.get("entityKeyId")
             args = [str(e_key)] if e_key is not None else []

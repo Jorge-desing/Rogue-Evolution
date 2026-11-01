@@ -843,6 +843,183 @@ namespace RogueCommandExpansionLoader.Runtime
         }
 
         /// <summary>
+        /// Serializes the result of a native patrol route dispatched to a unit.
+        /// </summary>
+        public static string SerializeUnitPatrolResult(UnitPatrolResult result)
+        {
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "unitPatrolResult",
+                ["success"] = result.Success,
+                ["entityKeyId"] = result.EntityKeyId ?? string.Empty,
+                ["waypointCount"] = result.WaypointCount,
+                ["message"] = result.Message ?? string.Empty,
+            };
+            return Serialize(view);
+        }
+
+        /// <summary>
+        /// Serializes the result of a group command dispatched to multiple units.
+        /// </summary>
+        public static string SerializeGroupCommandResult(GroupCommandResult result)
+        {
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "groupCommandResult",
+                ["success"] = result.Success,
+                ["commandType"] = result.CommandType ?? string.Empty,
+                ["targetedCount"] = result.TargetedCount,
+                ["dispatchedCount"] = result.DispatchedCount,
+                ["message"] = result.Message ?? string.Empty,
+            };
+            return Serialize(view);
+        }
+
+        /// <summary>
+        /// Serializes the result of a tactical formation movement dispatched to multiple units.
+        /// </summary>
+        public static string SerializeFormationOrderResult(FormationOrderResult result)
+        {
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "formationOrderResult",
+                ["success"] = result.Success,
+                ["formationType"] = result.FormationType ?? string.Empty,
+                ["targetedCount"] = result.TargetedCount,
+                ["dispatchedCount"] = result.DispatchedCount,
+                ["targetX"] = result.TargetX,
+                ["targetZ"] = result.TargetZ,
+                ["spacing"] = result.Spacing,
+                ["message"] = result.Message ?? string.Empty,
+            };
+            return Serialize(view);
+        }
+
+        /// <summary>
+        /// Serializes the result of assigning a tactical stance to a unit or group.
+        /// </summary>
+        public static string SerializeUnitTacticalStanceResult(UnitTacticalStanceResult result)
+        {
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "unitTacticalStanceResult",
+                ["success"] = result.Success,
+                ["entityKeyId"] = result.EntityKeyId ?? string.Empty,
+                ["stance"] = result.Stance ?? string.Empty,
+                ["affectedUnitCount"] = result.AffectedUnitCount,
+                ["message"] = result.Message ?? string.Empty,
+            };
+            return Serialize(view);
+        }
+
+        /// <summary>
+        /// Serializes unit tactical combat stances across living units.
+        /// Omission counters precede detail collections.
+        /// </summary>
+        public static string SerializeTacticalStanceCensus(TacticalStanceCensus census)
+        {
+            var rows = new List<Dictionary<string, object>>();
+            if (census != null && census.StanceRows != null)
+            {
+                for (int i = 0; i < census.StanceRows.Count; i++)
+                {
+                    TacticalStanceDiagnosticRow row = census.StanceRows[i];
+                    rows.Add(new Dictionary<string, object>
+                    {
+                        ["entityKeyId"] = row.EntityKeyId ?? string.Empty,
+                        ["entityId"] = row.EntityId ?? string.Empty,
+                        ["stance"] = row.Stance ?? string.Empty,
+                        ["isControlledByPlayer"] = row.IsControlledByPlayer,
+                        ["moveSpeed"] = row.MoveSpeed,
+                        ["weaponRange"] = row.WeaponRange,
+                    });
+                }
+            }
+
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "tacticalStanceCensus",
+                ["omittedUnitCount"] = census != null ? census.OmittedUnitCount : 0,
+                ["totalTrackedUnits"] = census != null ? census.TotalTrackedUnits : 0,
+                ["aggressiveCount"] = census != null ? census.AggressiveCount : 0,
+                ["defensiveCount"] = census != null ? census.DefensiveCount : 0,
+                ["kitingCount"] = census != null ? census.KitingCount : 0,
+                ["holdFireCount"] = census != null ? census.HoldFireCount : 0,
+                ["standardCount"] = census != null ? census.StandardCount : 0,
+                ["stanceRows"] = rows,
+            };
+            return Serialize(view);
+        }
+
+        /// <summary>
+        /// Serializes the result of adding or removing an elite affix on a unit.
+        /// </summary>
+        public static string SerializeUnitAffixResult(UnitAffixResult result)
+        {
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "unitAffixResult",
+                ["success"] = result.Success,
+                ["entityKeyId"] = result.EntityKeyId ?? string.Empty,
+                ["affix"] = result.Affix ?? string.Empty,
+                ["action"] = result.Action ?? string.Empty,
+                ["activeAffixCount"] = result.ActiveAffixCount,
+                ["message"] = result.Message ?? string.Empty,
+            };
+            return Serialize(view);
+        }
+
+        /// <summary>
+        /// Serializes active elite affixes and traits applied to living units.
+        /// Omission counters precede detail collections.
+        /// </summary>
+        public static string SerializeUnitAffixCensus(UnitAffixCensus census)
+        {
+            var rows = new List<Dictionary<string, object>>();
+            if (census != null && census.AffixRows != null)
+            {
+                for (int i = 0; i < census.AffixRows.Count; i++)
+                {
+                    UnitAffixDiagnosticRow row = census.AffixRows[i];
+                    rows.Add(new Dictionary<string, object>
+                    {
+                        ["entityKeyId"] = row.EntityKeyId ?? string.Empty,
+                        ["entityId"] = row.EntityId ?? string.Empty,
+                        ["isControlledByPlayer"] = row.IsControlledByPlayer,
+                        ["affixes"] = row.Affixes != null ? row.Affixes : (object)Array.Empty<string>(),
+                    });
+                }
+            }
+
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "unitAffixCensus",
+                ["omittedUnitCount"] = census != null ? census.OmittedUnitCount : 0,
+                ["totalTrackedUnits"] = census != null ? census.TotalTrackedUnits : 0,
+                ["totalActiveAffixes"] = census != null ? census.TotalActiveAffixes : 0,
+                ["affixRows"] = rows,
+            };
+            return Serialize(view);
+        }
+
+        /// <summary>
+        /// Serializes the result of dispatching an AI assault wave.
+        /// </summary>
+        public static string SerializeAiWaveDispatchResult(AiWaveDispatchResult result)
+        {
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "aiWaveDispatchResult",
+                ["success"] = result.Success,
+                ["waveNumber"] = result.WaveNumber,
+                ["aggressionBoost"] = result.AggressionBoost,
+                ["dispatchedUnitCount"] = result.DispatchedUnitCount,
+                ["message"] = result.Message ?? string.Empty,
+            };
+            return Serialize(view);
+        }
+
+        /// <summary>
         /// Serializes the result of an active skill command dispatched on a unit.
         /// </summary>
         public static string SerializeActiveSkillOrderResult(ActiveSkillOrderResult result)

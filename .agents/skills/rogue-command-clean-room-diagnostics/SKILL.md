@@ -1,7 +1,7 @@
 ---
 name: rogue-command-clean-room-diagnostics
 description: "Clean-room in-game telemetry, diagnostic censuses, runtime gameplay command director, and BepInEx MCP bridge integration for Rogue Command (v1.0.9 / Unity 2021.3.45f2, Mono x64). [Diagnósticos runtime clean-room, censos de telemetría, director de comandos de gameplay y puente BepInEx MCP para Rogue Command]"
-version: 1.3.0
+version: 1.4.0
 license: MIT
 author: Hermes Agent
 metadata:
@@ -65,6 +65,8 @@ All censuses query live game singletons through fail-closed reflection and forma
 - **Environmental Hazard Zones** (`diagnostics_get_hazard_census`): Active battlefield hazard zones (Firestorm, AcidPool, EmpField, CryoMist, NaniteField), trigger metrics, and damage per tick.
 - **Unit Loadouts & Pre-Spawn Pools** (`diagnostics_get_unit_loadout_census`): Live unit loadout assignments, active combat variant IDs, unit stat profiles (Damage, Range, Speed, Cooldown), and EntityFactory anti-hitch pre-spawn pool quotas and warmed instances.
 - **AI Tactical Doctrine & Deck Reinforcement** (`diagnostics_get_ai_doctrine_census`): Active AI combat doctrine, aggression scaling multiplier, and live deck unit quotas (`countAtStart`, `maxLiving`) per AI base.
+- **Tactical Combat Stances** (`diagnostics_get_tactical_stance_census`): Active combat stances (`Standard`, `Aggressive`, `Defensive`, `HoldFire`, `Kiting`), movement speeds, and weapon ranges across living units.
+- **Unit Elite Affixes & Traits** (`diagnostics_get_unit_affix_census`): Active elite modifiers (`Swift`, `Juggernaut`, `Overcharged`, `Vampiric`, `Bulwark`, `Volatile`) applied to living units.
 - **Multi-Agent Coordination** (`diagnostics_get_agent_coordination`): Active agent sessions, heartbeats, and advisory locks held on entities or camera.
 
 ---
@@ -79,6 +81,14 @@ The `RuntimeGameplayCommandDirector` class dispatches safe in-game actions for a
 - `diagnostics_order_unit_stop`: Halts the entity's active order (`entityKeyId`).
 - `diagnostics_order_unit_hold_position`: Commands the unit to hold position and engage targets in range (`entityKeyId`).
 - `diagnostics_order_unit_attack_move`: Orders an attack-move toward coordinates (`entityKeyId`, `targetX`, `targetZ`).
+- `diagnostics_order_unit_patrol`: Dispatches a native patrol route with parallel X/Z waypoints (`entityKeyId`, `waypointX`, `waypointZ`).
+- `diagnostics_order_group_command`: Dispatches a command (`Move`, `Stop`, `HoldPosition`, `AttackMove`) across multiple units (`entityKeyIds`, `commandType`, `targetX`, `targetZ`).
+- `diagnostics_order_formation_move`: Dispatches a synchronized formation movement (`Line`, `Wedge`, `Column`, `Box`, `Surround`) to multiple units (`entityKeyIds`, `formationType`, `targetX`, `targetZ`, `spacing`).
+- `diagnostics_order_unit_tactical_stance`: Assigns a tactical combat stance (`Standard`, `Aggressive`, `Defensive`, `HoldFire`, `Kiting`) to a unit (`entityKeyId`, `stanceName`).
+- `diagnostics_order_group_tactical_stance`: Assigns a tactical combat stance across multiple units (`entityKeyIds`, `stanceName`).
+- `diagnostics_order_apply_unit_affix`: Grants an elite trait/modifier (`Swift`, `Juggernaut`, `Overcharged`, `Vampiric`, `Bulwark`, `Volatile`) to a unit (`entityKeyId`, `affixName`).
+- `diagnostics_order_remove_unit_affix`: Removes an active elite trait from a unit or clears all (`entityKeyId`, `affixName`).
+- `diagnostics_order_dispatch_ai_assault_wave`: Manually triggers and coordinates an AI assault wave with elevated aggression (`waveNumber`, `aggressionBoost`, `targetBaseIndex`).
 
 ### Active Skills, Status Effects & Vitality Adjustments
 - `diagnostics_order_unit_active_skill`: Fires tactical active skills (`entityKeyId`, `targetingMode` `"Self"`/`"TargetUnit"`/`"TargetPosition"`, `targetUnitKeyId`, `targetX`, `targetZ`).
@@ -146,7 +156,7 @@ The BepInEx MCP server is built with universal cross-agent compatibility support
 
 ### 5.1 Hermes Integration (Native Plugin & Skills)
 Hermes agents can communicate with the bridge using three distinct channels:
-1. **Hermes Plugin (`bepinex-mcp`)**: Installed at `C:\Users\Alex\AppData\Local\hermes\plugins\bepinex-mcp/` and enabled in `C:\Users\Alex\AppData\Local\hermes\config.yaml` (`plugins.enabled: [bepinex-mcp]`). All 148 tools are discovered as native MCP tools.
+1. **Hermes Plugin (`bepinex-mcp`)**: Installed at `C:\Users\Alex\AppData\Local\hermes\plugins\bepinex-mcp/` and enabled in `C:\Users\Alex\AppData\Local\hermes\config.yaml` (`plugins.enabled: [bepinex-mcp]`). All 158 tools are discovered as native MCP tools.
 2. **Hermes Skill Catalog**: Registered under `C:\Users\Alex\AppData\Local\hermes\skills\rogue-command\rogue-command-clean-room-diagnostics/`.
 3. **Hermes Direct CLI Execution**: When running in a shell or terminal without an active MCP connection:
    ```bash
@@ -156,7 +166,7 @@ Hermes agents can communicate with the bridge using three distinct channels:
    ```
 
 ### 5.2 Antigravity & Google Gemini CLI
-- Fully registered under `bepinex_mcp` with 148 generated schemas in `C:\Users\Alex\.gemini\antigravity\mcp\bepinex_mcp/`.
+- Fully registered under `bepinex_mcp` with 158 generated schemas in `C:\Users\Alex\.gemini\antigravity\mcp\bepinex_mcp/`.
 - Call eagerly or lazily using `call_mcp_tool(ServerName="bepinex_mcp", ToolName="...", Arguments={...})`.
 
 ### 5.3 Anthropic Claude Desktop

@@ -73,6 +73,15 @@ SIMULATED_CUSTOM_BALANCE_FIELDS: Dict[str, str] = {
     "EffectRadius1": "effect_radius1",
 }
 
+# REA-verified combat model constants (mechanics confirmed via decompiled
+# EntityController.TakeDamage / LandsCriticalHit / ChargeShield).
+# Numeric DEFAULTS are MODEL ASSUMPTIONS, NOT values extracted from
+# Assembly-CSharp.dll (protected/non-standard layout prevents clean extraction).
+CRITICAL_HIT_MULTIPLIER_DEFAULT: float = 2.0
+SHIELD_RECHARGE_PER_SECOND_DEFAULT: float = 1.0
+SHIELD_RECHARGE_COOLDOWN_DEFAULT: float = 3.0
+MANA_RECHARGE_PER_SECOND_DEFAULT: float = 1.0
+
 
 def _reject_json_constant(value: str) -> None:
     raise ValueError(f"Invalid non-finite JSON number: {value}")
@@ -221,6 +230,15 @@ class UnitProfile:
     attack_type: str = "Unknown"  # AttackType metadata; not currently used by the damage model.
     is_suicide: bool = False
     tags: List[str] = field(default_factory=list)
+    # REA-verified combat model extensions (mechanics confirmed via decompiled
+    # EntityController; numeric defaults are MODEL ASSUMPTIONS, not verified
+    # game values -- see module-level constants).
+    crit_chance: float = 0.0  # Probability of a critical hit per volley (0.0-1.0)
+    crit_multiplier: float = CRITICAL_HIT_MULTIPLIER_DEFAULT  # Critical damage multiplier
+    shield_recharge_per_second: float = SHIELD_RECHARGE_PER_SECOND_DEFAULT  # Shield charges regenerated per second
+    shield_recharge_cooldown: float = SHIELD_RECHARGE_COOLDOWN_DEFAULT  # Seconds before shield recharge starts
+    mana_recharge_per_second: float = MANA_RECHARGE_PER_SECOND_DEFAULT  # Mana regenerated per second (ability DPS)
+    ignore_armor: bool = False  # If True, attacks bypass defender armor (DealDamage.ignoreArmor)
 
     @property
     def is_suicide_unit(self) -> bool:
@@ -253,25 +271,42 @@ class UnitProfile:
         return val
 
     def effective_dps_against(self, defender_armor: float) -> float:
-        """DPS after flat armor subtraction with min 0.1 floor."""
+        """DPS after flat armor subtraction with min 0.1 floor.
+
+        Incorporates REA-verified critical hit expected-value multiplier:
+        E[dmg] = base_dmg * (1 + crit_chance * (crit_multiplier - 1)).
+        If ignore_armor is set, armor subtraction is bypassed (DealDamage.ignoreArmor).
+        """
+        effective_armor = 0.0 if self.ignore_armor else defender_armor
+        crit_factor = 1.0 + self.crit_chance * (self.crit_multiplier - 1.0)
         if self.is_suicide_unit:
-            return max(0.1, self.damage1 - defender_armor)
+            return max(0.1, (self.damage1 - effective_armor)) * crit_factor
         val = 0.0
         if self.attack_cooldown > 0.0:
-            dmg1 = max(0.1, self.damage1 - defender_armor)
+            dmg1 = max(0.1, self.damage1 - effective_armor)
             val += (dmg1 * self.fire_point_count) / self.attack_cooldown
         if self.damage2 > 0.0 and self.attack2_cooldown > 0.0:
-            dmg2 = max(0.1, self.damage2 - defender_armor)
+            dmg2 = max(0.1, self.damage2 - effective_armor)
             val += dmg2 / self.attack2_cooldown
-        return val
+        return val * crit_factor
 
-    def effective_health_against(self, attacker_damage: float) -> float:
-        """Effective Health Pool (EHP) accounting for discrete shield charges and flat armor."""
+    def effective_health_against(self, attacker_damage: float, combat_duration: float = 0.0) -> float:
+        """Effective Health Pool (EHP) accounting for discrete shield charges, flat armor,
+        and REA-verified shield recharge (ShieldRechargePerSecond after ShieldRechargeCooldown).
+
+        If combat_duration > 0, models shield regen over the combat duration:
+        regenerated_shields = shield_recharge_per_second * max(0, combat_duration - shield_recharge_cooldown).
+        """
         shield_absorbed_damage = self.max_shield * attacker_damage
         effective_damage = max(0.1, attacker_damage - self.armor_protection)
         mitigation_ratio = attacker_damage / effective_damage if attacker_damage > 0 else 1.0
         armor_ehp = self.max_health * mitigation_ratio
-        return shield_absorbed_damage + armor_ehp
+        ehp = shield_absorbed_damage + armor_ehp
+        if combat_duration > 0.0 and self.shield_recharge_per_second > 0.0:
+            regen_window = max(0.0, combat_duration - self.shield_recharge_cooldown)
+            regen_shields = self.shield_recharge_per_second * regen_window
+            ehp += regen_shields * attacker_damage
+        return ehp
 
     @property
     def cost_efficiency_index(self) -> float:
@@ -332,15 +367,18 @@ class CombatSimulator:
         self.max_simulation_time = max_simulation_time
 
     @staticmethod
-    def calculate_hit_damage(raw_damage: float, defender_armor: float, defender_shields: float) -> Tuple[float, float, float]:
+    def calculate_hit_damage(raw_damage: float, defender_armor: float, defender_shields: float, ignore_armor: bool = False) -> Tuple[float, float, float]:
         """Calculates exact damage resolution according to REA-verified Rogue Command mechanics.
 
         Returns: (applied_hp_damage, absorbed_by_armor, absorbed_by_shields)
+
+        If ignore_armor is True, armor subtraction is bypassed (DealDamage.ignoreArmor).
         """
         if defender_shields > 0:
             return 0.0, 0.0, raw_damage
 
-        effective_damage = max(0.1, raw_damage - defender_armor)
+        effective_armor = 0.0 if ignore_armor else defender_armor
+        effective_damage = max(0.1, raw_damage - effective_armor)
         absorbed_armor = max(0.0, raw_damage - effective_damage)
         return effective_damage, absorbed_armor, 0.0
 
@@ -351,12 +389,14 @@ class CombatSimulator:
         defender_armor: float,
         defender_shields: float,
         defender_hp: Optional[float] = None,
+        ignore_armor: bool = False,
     ) -> Tuple[float, float, float, float, int]:
         """Applies one discrete projectile hit per firepoint in a primary attack volley.
 
         Each projectile independently consumes one shield charge before later projectiles
         in the same volley can damage HP. If a target HP total is supplied, stop when it
         would be destroyed rather than counting unused projectiles as shots fired.
+        If ignore_armor is True, armor subtraction is bypassed (DealDamage.ignoreArmor).
         """
         hp_damage = 0.0
         armor_absorbed = 0.0
@@ -368,7 +408,7 @@ class CombatSimulator:
             if defender_hp is not None and hp_damage >= defender_hp:
                 break
             hit_damage, armor_hit, shield_hit = self.calculate_hit_damage(
-                raw_damage, defender_armor, remaining_shields
+                raw_damage, defender_armor, remaining_shields, ignore_armor
             )
             shots_fired += 1
             hp_damage += hit_damage
@@ -394,6 +434,10 @@ class CombatSimulator:
         hp_b = unit_b.max_health
         shields_a = unit_a.max_shield
         shields_b = unit_b.max_shield
+
+        # REA-verified shield recharge tracking: seconds since last damage
+        shield_regen_timer_a = unit_a.shield_recharge_cooldown
+        shield_regen_timer_b = unit_b.shield_recharge_cooldown
 
         cd_a = random.uniform(0.0, unit_a.attack_cooldown * 0.2) if (jitter_initiative and unit_a.attack_cooldown > 0) else 0.0
         cd_b = random.uniform(0.0, unit_b.attack_cooldown * 0.2) if (jitter_initiative and unit_b.attack_cooldown > 0) else 0.0
@@ -443,6 +487,14 @@ class CombatSimulator:
             cd_a -= self.time_step
             cd_b -= self.time_step
 
+            # REA-verified shield recharge: regenerate shields after cooldown
+            shield_regen_timer_a = max(0.0, shield_regen_timer_a - self.time_step)
+            shield_regen_timer_b = max(0.0, shield_regen_timer_b - self.time_step)
+            if shield_regen_timer_a <= 0.0 and unit_a.shield_recharge_per_second > 0.0 and shields_a < unit_a.max_shield:
+                shields_a = min(unit_a.max_shield, shields_a + unit_a.shield_recharge_per_second * self.time_step)
+            if shield_regen_timer_b <= 0.0 and unit_b.shield_recharge_per_second > 0.0 and shields_b < unit_b.max_shield:
+                shields_b = min(unit_b.max_shield, shields_b + unit_b.shield_recharge_per_second * self.time_step)
+
             a_in_range = current_distance <= unit_a.effective_range
             b_in_range = current_distance <= unit_b.effective_range
 
@@ -474,12 +526,16 @@ class CombatSimulator:
                     unit_b.armor_protection,
                     shields_b,
                     hp_b,
+                    ignore_armor=unit_a.ignore_armor,
                 )
                 shots_a += fired_projectiles
                 hp_b -= hp_loss
                 dmg_dealt_a += hp_loss
                 armor_absorbed_b += arm_abs
                 shield_absorbed_b += sh_abs
+                # Reset defender's shield recharge timer on any damage
+                if hp_loss > 0.0 or sh_abs > 0.0:
+                    shield_regen_timer_b = unit_b.shield_recharge_cooldown
 
                 if unit_a.is_suicide_unit:
                     hp_a = 0.0
@@ -494,12 +550,16 @@ class CombatSimulator:
                     unit_a.armor_protection,
                     shields_a,
                     hp_a,
+                    ignore_armor=unit_b.ignore_armor,
                 )
                 shots_b += fired_projectiles
                 hp_a -= hp_loss
                 dmg_dealt_b += hp_loss
                 armor_absorbed_a += arm_abs
                 shield_absorbed_a += sh_abs
+                # Reset defender's shield recharge timer on any damage
+                if hp_loss > 0.0 or sh_abs > 0.0:
+                    shield_regen_timer_a = unit_a.shield_recharge_cooldown
 
                 if unit_b.is_suicide_unit:
                     hp_b = 0.0
