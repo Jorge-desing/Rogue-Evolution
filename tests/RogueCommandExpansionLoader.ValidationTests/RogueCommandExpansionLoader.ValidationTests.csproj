@@ -209,6 +209,8 @@
              Link="Modules/ThreatPrioritizationParameters.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Modules/ThreatPrioritizationAiModule.cs"
              Link="Modules/ThreatPrioritizationAiModule.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Modules/ThreatPrioritizationRoleProfile.cs"
+             Link="Modules/ThreatPrioritizationRoleProfile.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Contracts/IRogueCommandAiModule.cs"
              Link="Contracts/IRogueCommandAiModule.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Modules/TraceDefaultAiModule.cs"

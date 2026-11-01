@@ -1860,6 +1860,137 @@ internal static partial class ValidationTestRunner
             DefaultAiBehaviour.ResetRuntimeState();
         }
     }),
+    ("threat-prioritization role profile specializes targeting by allied unit class", () =>
+    {
+        var sniperProfile = ThreatPrioritizationRoleProfile.Resolve(new EntityController { Role = UnitRole.Sniper }.Role);
+        var meleeProfile = ThreatPrioritizationRoleProfile.Resolve(new EntityController { Role = UnitRole.Melee }.Role);
+        var supporterProfile = ThreatPrioritizationRoleProfile.Resolve(new EntityController { Role = UnitRole.Supporter }.Role);
+        var genericProfile = ThreatPrioritizationRoleProfile.Resolve(new EntityController { Role = UnitRole.None }.Role);
+
+        if (sniperProfile.EngagementRangeMultiplier <= 1.0f || sniperProfile.DistanceWeight >= 1.0f)
+            throw new InvalidOperationException("Sniper profile must extend range and reduce distance penalty.");
+        if (meleeProfile.EngagementRangeMultiplier >= 1.0f || meleeProfile.DistanceWeight <= 1.0f)
+            throw new InvalidOperationException("Melee profile must close range and increase distance penalty.");
+        if (supporterProfile.EngagesCombat)
+            throw new InvalidOperationException("Supporter profile must not engage combat targets.");
+        if (!genericProfile.EngagesCombat || genericProfile.EngagementRangeMultiplier != 1.0f || genericProfile.DistanceWeight != 1.0f)
+            throw new InvalidOperationException("Generic allied unit must keep default targeting behavior.");
+
+        if (!ThreatPrioritizationRoleProfile.ResolveFor(new EntityController { Role = UnitRole.Sniper }).Equals(sniperProfile))
+            throw new InvalidOperationException("ResolveFor diverged from Resolve for Sniper.");
+        if (!ThreatPrioritizationRoleProfile.ResolveFor(null).Equals(genericProfile))
+            throw new InvalidOperationException("ResolveFor(null) must degrade to default.");
+    }),
+    ("threat-prioritization sniper allied unit engages target beyond default engagement radius", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        DefaultAiBehaviour.ResetRuntimeState();
+        UnityEngine.Time.time = 0f;
+        IRogueCommandAiRuntimeBehaviour? behaviour = null;
+        try
+        {
+            var sniperAttacker = new EntityController
+            {
+                IsControlledByAi = true,
+                IsUnit = true,
+                IsCombatUnit = true,
+                CanAttackAndIsAttackEnabled = true,
+                CanMoveAndMovementIsEnabled = true,
+                UniqueEntityId = 9501,
+                aiBaseIndex = 0,
+                Role = UnitRole.Sniper,
+                Position = UnityEngine.Vector3.zero
+            };
+            ExistingControllers.Instance.AiUnits().Add(sniperAttacker);
+
+            var distantEnemy = new EntityController
+            {
+                IsControlledByPlayer = true,
+                IsUnit = true,
+                IsCombatUnit = true,
+                UniqueEntityId = 9601,
+                Position = new UnityEngine.Vector3(45f, 0f, 0f),
+                CurrentHealth = 40f,
+                MaxHealth = 40f,
+                Damage1 = 30f,
+                Attack1Cooldown = 1f
+            };
+            ExistingControllers.Instance.PlayerEntities().Add(distantEnemy);
+
+            var module = new ThreatPrioritizationAiModule();
+            behaviour = module.CreateBehaviour(new DefaultAiBehaviour(),
+            [
+                new ContentModuleParameter { name = "engagementRadius", value = "35" },
+                new ContentModuleParameter { name = "checkIntervalSeconds", value = "1" }
+            ]);
+            behaviour.OnInitialized();
+            behaviour.Tick();
+
+            if (sniperAttacker.ExecuteCommandCallCount == 0 || sniperAttacker.CurrentAttackTarget != distantEnemy)
+                throw new InvalidOperationException("Sniper allied unit failed to engage a target within its extended (1.4x) engagement radius.");
+        }
+        finally
+        {
+            behaviour?.OnDestroyed();
+            ExistingControllers.Instance.Reset();
+            DefaultAiBehaviour.ResetRuntimeState();
+        }
+    }),
+    ("threat-prioritization supporter allied unit is never retargeted onto enemies", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        DefaultAiBehaviour.ResetRuntimeState();
+        UnityEngine.Time.time = 0f;
+        IRogueCommandAiRuntimeBehaviour? behaviour = null;
+        try
+        {
+            var supporter = new EntityController
+            {
+                IsControlledByAi = true,
+                IsUnit = true,
+                IsCombatUnit = true,
+                CanAttackAndIsAttackEnabled = true,
+                CanMoveAndMovementIsEnabled = true,
+                UniqueEntityId = 9502,
+                aiBaseIndex = 0,
+                Role = UnitRole.Supporter,
+                Position = UnityEngine.Vector3.zero
+            };
+            ExistingControllers.Instance.AiUnits().Add(supporter);
+
+            var nearbyEnemy = new EntityController
+            {
+                IsControlledByPlayer = true,
+                IsUnit = true,
+                IsCombatUnit = true,
+                UniqueEntityId = 9602,
+                Position = new UnityEngine.Vector3(5f, 0f, 0f),
+                CurrentHealth = 30f,
+                MaxHealth = 30f,
+                Damage1 = 10f,
+                Attack1Cooldown = 1f
+            };
+            ExistingControllers.Instance.PlayerEntities().Add(nearbyEnemy);
+
+            var module = new ThreatPrioritizationAiModule();
+            behaviour = module.CreateBehaviour(new DefaultAiBehaviour(),
+            [
+                new ContentModuleParameter { name = "engagementRadius", value = "35" },
+                new ContentModuleParameter { name = "checkIntervalSeconds", value = "1" }
+            ]);
+            behaviour.OnInitialized();
+            behaviour.Tick();
+
+            if (supporter.ExecuteCommandCallCount > 0)
+                throw new InvalidOperationException("Supporter allied unit was retargeted onto an enemy despite not engaging combat.");
+        }
+        finally
+        {
+            behaviour?.OnDestroyed();
+            ExistingControllers.Instance.Reset();
+            DefaultAiBehaviour.ResetRuntimeState();
+        }
+    }),
     ("wave-escalation AI module increments attack wave counter and orders assault", () =>
     {
         ExistingControllers.Instance.Reset();

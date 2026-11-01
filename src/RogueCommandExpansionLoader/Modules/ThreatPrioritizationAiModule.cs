@@ -219,7 +219,6 @@ namespace RogueCommandExpansionLoader.Modules
                         return;
                     }
 
-                    float engagementRadiusSq = _settings.EngagementRadius * _settings.EngagementRadius;
                     int retargetBudget = _settings.MaxRetargetsPerTick;
 
                     foreach (EntityController unit in aiUnits)
@@ -243,6 +242,16 @@ namespace RogueCommandExpansionLoader.Modules
                         {
                             continue;
                         }
+
+                        // Specialize targeting per allied unit role: engagement envelope, distance
+                        // weighting, and whether the unit even takes combat targets this tick.
+                        ThreatPrioritizationRoleProfile roleProfile = ThreatPrioritizationRoleProfile.ResolveFor(unit);
+                        if (!roleProfile.EngagesCombat)
+                        {
+                            continue;
+                        }
+                        float unitEngagementRadius = _settings.EngagementRadius * roleProfile.EngagementRangeMultiplier;
+                        float engagementRadiusSq = unitEngagementRadius * unitEngagementRadius;
 
                         EntityController bestCandidate = null;
                         float bestScore = Single.NegativeInfinity;
@@ -269,7 +278,7 @@ namespace RogueCommandExpansionLoader.Modules
                                 continue;
                             }
 
-                            float score = ComputeThreatScore(candidate, unit, distSq, _settings.PriorityMode);
+                            float score = ComputeThreatScore(candidate, distSq, _settings.PriorityMode, roleProfile.DistanceWeight);
                             if (score > bestScore)
                             {
                                 bestScore = score;
@@ -301,7 +310,7 @@ namespace RogueCommandExpansionLoader.Modules
                             float curDistSq = (currentTarget.Position - unit.Position).sqrMagnitude;
                             if (curDistSq <= engagementRadiusSq * 1.44f)
                             {
-                                float currentScore = ComputeThreatScore(currentTarget, unit, curDistSq, _settings.PriorityMode);
+                                float currentScore = ComputeThreatScore(currentTarget, curDistSq, _settings.PriorityMode, roleProfile.DistanceWeight);
                                 // Require best candidate to beat current target by retarget threshold
                                 if (bestScore <= currentScore * _settings.RetargetThreshold)
                                 {
@@ -341,9 +350,9 @@ namespace RogueCommandExpansionLoader.Modules
 
             internal static float ComputeThreatScore(
                 EntityController candidate,
-                EntityController friendlyUnit,
                 float distSq,
-                string priorityMode)
+                string priorityMode,
+                float distanceWeight)
             {
                 float health = Mathf.Max(0.1f, candidate.CurrentHealth);
                 float maxHealth = Mathf.Max(1f, candidate.MaxHealth);
@@ -379,7 +388,7 @@ namespace RogueCommandExpansionLoader.Modules
                 if (candidate.HasRole(UnitRole.Tank)) roleBonus += 10f;
 
                 float rankBonus = candidate.CurrentRank * 10f;
-                float distPenalty = distSq * 0.03f;
+                float distPenalty = distSq * 0.03f * Mathf.Max(0f, distanceWeight);
 
                 if (string.Equals(priorityMode, "LowestHealth", StringComparison.OrdinalIgnoreCase))
                 {
