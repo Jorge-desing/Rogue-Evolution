@@ -254,13 +254,51 @@ class MechRigValidator:
                     )
 
                     found_names: Set[str] = set()
-                    self._collect_child_names(data, found_names)
+                    component_types: Set[str] = set()
+                    animator_components: List[Any] = []
+                    self._collect_child_names(
+                        data,
+                        found_names,
+                        component_types,
+                        animator_components,
+                    )
                     lower_names = {n.lower() for n in found_names}
 
                     has_bone_prefix = any(n.startswith("bone_") for n in lower_names)
                     has_armature_kw = any("armature" in n for n in lower_names)
                     audit.has_armature = has_bone_prefix or has_armature_kw
                     audit.has_hierarchical_legs = any(k in lower_names for k in ("legs", "leftleg", "rightleg"))
+                    audit.has_animator = "Animator" in component_types
+
+                    for animator in animator_components:
+                        controller_ref = getattr(animator, "m_Controller", None)
+                        try:
+                            controller = controller_ref.read() if controller_ref is not None else None
+                        except Exception:
+                            controller = None
+                        if controller is None:
+                            continue
+
+                        for clip_ref in getattr(controller, "m_AnimationClips", []) or []:
+                            try:
+                                clip = clip_ref.read() if hasattr(clip_ref, "read") else clip_ref
+                                clip_name = str(getattr(clip, "m_Name", "") or "")
+                            except Exception:
+                                clip_name = ""
+                            if clip_name and clip_name not in audit.animation_clips:
+                                audit.animation_clips.append(clip_name)
+
+                        for _, parameter_name in getattr(controller, "m_TOS", []) or []:
+                            if any(parameter_name.lower() == expected for expected, _ in EXPECTED_ANIMATOR_PARAMS):
+                                if parameter_name not in audit.animator_parameters:
+                                    audit.animator_parameters.append(parameter_name)
+
+                    expected_parameters = [name for name, _ in EXPECTED_ANIMATOR_PARAMS]
+                    audit.missing_parameters = [
+                        expected
+                        for expected in expected_parameters
+                        if expected not in {parameter.lower() for parameter in audit.animator_parameters}
+                    ]
 
                     if audit.has_armature:
                         audit.rig_type = "skeletal_armature"
@@ -268,6 +306,23 @@ class MechRigValidator:
                         audit.rig_type = "hierarchical_transform"
                     else:
                         audit.rig_type = "static_unrigged"
+
+                    if audit.rig_type == "skeletal_armature":
+                        if not audit.has_animator:
+                            audit.score -= 15
+                            audit.flags.append(
+                                "ANIMATOR_MISSING: Skeletal armature requires Animator component."
+                            )
+                        if audit.missing_parameters:
+                            audit.score -= 5
+                            audit.flags.append(
+                                "ANIMATOR_PARAMETERS_MISSING: " + ", ".join(audit.missing_parameters)
+                            )
+                        if not audit.animation_clips:
+                            audit.score -= 15
+                            audit.flags.append(
+                                "ANIMATION_CLIPS_MISSING: Skeletal armature has no clips referenced by its controller."
+                            )
 
                     if audit.rig_type == "static_unrigged" and "walker" in name.lower():
                         audit.score -= 40
@@ -312,21 +367,40 @@ class MechRigValidator:
                 continue
         return True
 
-    def _collect_child_names(self, go_data: Any, names_set: Set[str]) -> None:
-        """Recursively collects GameObject child names."""
+    def _collect_child_names(
+        self,
+        go_data: Any,
+        names_set: Set[str],
+        component_types: Set[str] | None = None,
+        animator_components: List[Any] | None = None,
+    ) -> None:
+        """Collect child names and component metadata recursively from a bundle GameObject."""
+        if component_types is None:
+            component_types = set()
+        if animator_components is None:
+            animator_components = []
         try:
             names_set.add(getattr(go_data, "m_Name", ""))
             for component_pair in getattr(go_data, "m_Component", []):
                 try:
                     component_ptr = getattr(component_pair, "component", component_pair)
                     c = component_ptr.read() if hasattr(component_ptr, "read") else component_ptr
-                    if type(c).__name__ == "Transform":
+                    component_type = type(c).__name__
+                    component_types.add(component_type)
+                    if component_type == "Animator":
+                        animator_components.append(c)
+                    if component_type == "Transform":
                         for ch_ptr in getattr(c, "m_Children", []):
                             ch = ch_ptr.read() if hasattr(ch_ptr, "read") else ch_ptr
                             go_ptr = getattr(ch, "m_GameObject", None)
                             if go_ptr:
-                                go_data = go_ptr.read() if hasattr(go_ptr, "read") else go_ptr
-                                self._collect_child_names(go_data, names_set)
+                                child_data = go_ptr.read() if hasattr(go_ptr, "read") else go_ptr
+                                self._collect_child_names(
+                                    child_data,
+                                    names_set,
+                                    component_types,
+                                    animator_components,
+                                )
                 except Exception:
                     pass
         except Exception:

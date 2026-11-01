@@ -888,21 +888,24 @@ namespace RogueCommandExpansion.Authoring
             GameObject root,
             GameObject model,
             bool rapidFireMuzzle,
-            bool quadrupedCrawler = false)
+            bool quadrupedCrawler = false,
+            bool requireFootContactSockets = true)
         {
-            string[] footContactNames = quadrupedCrawler
-                ? new[]
-                {
-                    "Socket_FootContact_FL",
-                    "Socket_FootContact_FR",
-                    "Socket_FootContact_RL",
-                    "Socket_FootContact_RR"
-                }
-                : new[]
-                {
-                    "Socket_FootContact_L",
-                    "Socket_FootContact_R"
-                };
+            string[] footContactNames = !requireFootContactSockets
+                ? new string[0]
+                : quadrupedCrawler
+                    ? new[]
+                    {
+                        "Socket_FootContact_FL",
+                        "Socket_FootContact_FR",
+                        "Socket_FootContact_RL",
+                        "Socket_FootContact_RR"
+                    }
+                    : new[]
+                    {
+                        "Socket_FootContact_L",
+                        "Socket_FootContact_R"
+                    };
             string[] uniqueSocketNames =
             {
                 "Socket_MuzzlePrimary",
@@ -925,7 +928,7 @@ namespace RogueCommandExpansion.Authoring
             Bounds modelBounds = GetModelBoundsInRootSpace(root, model);
             float footHalfWidth = Mathf.Max(modelBounds.size.x * 0.22f, 0.12f);
             Transform[] footContacts = new Transform[footContactNames.Length];
-            if (quadrupedCrawler)
+            if (requireFootContactSockets && quadrupedCrawler)
             {
                 // Crawler contact points are part of the authored model contract. Do not synthesize
                 // generic L/R contacts, which lose the independent front/rear track anchors.
@@ -934,7 +937,7 @@ namespace RogueCommandExpansion.Authoring
                     footContacts[i] = GetUniqueNamedTransform(root, footContactNames[i], true);
                 }
             }
-            else
+            else if (requireFootContactSockets)
             {
                 Vector3 leftFootFallback = new Vector3(
                     modelBounds.center.x - footHalfWidth, 0.0f, modelBounds.center.z);
@@ -971,27 +974,31 @@ namespace RogueCommandExpansion.Authoring
                 throw new InvalidDataException("FirePoint_0 and FirePoint_1 must be distinct on " + root.name + ".");
             }
 
-            ValidateCanonicalWalkerSockets(root, root.name, quadrupedCrawler);
+            ValidateCanonicalWalkerSockets(
+                root, root.name, quadrupedCrawler, requireFootContactSockets);
         }
 
         private static void ValidateCanonicalWalkerSockets(
             GameObject root,
             string unitName,
-            bool quadrupedCrawler = false)
+            bool quadrupedCrawler = false,
+            bool requireFootContactSockets = true)
         {
-            string[] footContactNames = quadrupedCrawler
-                ? new[]
-                {
-                    "Socket_FootContact_FL",
-                    "Socket_FootContact_FR",
-                    "Socket_FootContact_RL",
-                    "Socket_FootContact_RR"
-                }
-                : new[]
-                {
-                    "Socket_FootContact_L",
-                    "Socket_FootContact_R"
-                };
+            string[] footContactNames = !requireFootContactSockets
+                ? new string[0]
+                : quadrupedCrawler
+                    ? new[]
+                    {
+                        "Socket_FootContact_FL",
+                        "Socket_FootContact_FR",
+                        "Socket_FootContact_RL",
+                        "Socket_FootContact_RR"
+                    }
+                    : new[]
+                    {
+                        "Socket_FootContact_L",
+                        "Socket_FootContact_R"
+                    };
             string[] requiredSocketNames =
             {
                 "Socket_MuzzlePrimary",
@@ -1716,6 +1723,8 @@ namespace RogueCommandExpansion.Authoring
                 modelInstance.transform.localScale = Vector3.one;
                 AssignScoutMaterials(modelInstance, materials);
                 VehiclePrefabBuilder.EnsureCanonicalVfxSockets(root, modelInstance);
+                EnsureCanonicalWalkerSockets(root, modelInstance, false, false, false);
+                SetupRiggedAnimatorOrThrow(root, modelInstance, modelAsset, "SandlanceScout", true);
 
                 bool success;
                 PrefabUtility.SaveAsPrefabAsset(root, PrefabPath, out success);
@@ -1776,6 +1785,8 @@ namespace RogueCommandExpansion.Authoring
                 modelInstance.transform.localScale = Vector3.one;
                 AssignSkirmishBikeMaterials(modelInstance, materials);
                 VehiclePrefabBuilder.EnsureCanonicalVfxSockets(root, modelInstance);
+                EnsureCanonicalWalkerSockets(root, modelInstance, false, false, false);
+                SetupRiggedAnimatorOrThrow(root, modelInstance, modelAsset, "SkirmishStrikeBike", true);
 
                 bool success;
                 PrefabUtility.SaveAsPrefabAsset(root, BikePrefabPath, out success);
@@ -1836,6 +1847,8 @@ namespace RogueCommandExpansion.Authoring
                 modelInstance.transform.localScale = Vector3.one;
                 AssignColossusMaterials(modelInstance, materials);
                 VehiclePrefabBuilder.EnsureCanonicalVfxSockets(root, modelInstance);
+                EnsureCanonicalWalkerSockets(root, modelInstance, false, false, false);
+                SetupRiggedAnimatorOrThrow(root, modelInstance, modelAsset, "ColossusSiegePlatform", true);
 
                 bool success;
                 PrefabUtility.SaveAsPrefabAsset(root, ColossusPrefabPath, out success);
@@ -1921,6 +1934,35 @@ namespace RogueCommandExpansion.Authoring
                 quadrupedCrawler: true);
         }
 
+        private static void SetupRiggedAnimatorOrThrow(
+            GameObject root,
+            GameObject modelInstance,
+            GameObject modelAsset,
+            string unitName,
+            bool preferWalkForMovement)
+        {
+            Animator[] importedAnimators = modelInstance.GetComponentsInChildren<Animator>(true);
+            for (int i = 0; i < importedAnimators.Length; i++)
+            {
+                if (importedAnimators[i] != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(importedAnimators[i]);
+                }
+            }
+
+            VehiclePrefabBuilder.SetupAnimatorIfAvailable(
+                root, modelInstance, modelAsset, unitName, preferWalkForMovement);
+            Animator animator = root.GetComponent<Animator>();
+            if (animator == null || animator.avatar == null || !animator.avatar.isValid ||
+                animator.runtimeAnimatorController == null)
+            {
+                throw new InvalidDataException(
+                    unitName + " must import a valid Generic Avatar and the RCL animation controller.");
+            }
+
+            animator.applyRootMotion = false;
+        }
+
         private static string CreateRiggedWalkerVisual(
             string unitName,
             string modelPath,
@@ -1965,17 +2007,7 @@ namespace RogueCommandExpansion.Authoring
                 {
                     configureAdditionalComponents(root);
                 }
-                VehiclePrefabBuilder.SetupAnimatorIfAvailable(root, modelInstance, modelAsset, unitName, true);
-
-                Animator animator = root.GetComponent<Animator>();
-                if (animator == null || animator.avatar == null || !animator.avatar.isValid ||
-                    animator.runtimeAnimatorController == null)
-                {
-                    throw new InvalidDataException(
-                        unitName + " must import a valid Generic Avatar and the RCL animation controller.");
-                }
-
-                animator.applyRootMotion = false;
+                SetupRiggedAnimatorOrThrow(root, modelInstance, modelAsset, unitName, true);
 
                 bool success;
                 PrefabUtility.SaveAsPrefabAsset(root, prefabPath, out success);
@@ -2042,6 +2074,8 @@ namespace RogueCommandExpansion.Authoring
                 modelInstance.transform.localScale = Vector3.one;
                 AssignSurgeArcTankMaterials(modelInstance, materials);
                 VehiclePrefabBuilder.EnsureCanonicalVfxSockets(root, modelInstance);
+                EnsureCanonicalWalkerSockets(root, modelInstance, false, false, false);
+                SetupRiggedAnimatorOrThrow(root, modelInstance, modelAsset, "SurgeArcTank", true);
 
                 bool success;
                 PrefabUtility.SaveAsPrefabAsset(root, SurgeArcTankPrefabPath, out success);
@@ -2089,12 +2123,18 @@ namespace RogueCommandExpansion.Authoring
             try
             {
                 string[] assetNames = bundle.GetAllAssetNames();
-                ValidateVisualBundleAssets(bundle, assetNames, "scouttankvisual.prefab", "ScoutTankVisual",
-                    "sandlancescoutcard.png", "SandlanceScoutCard", 0, "Sandlance Scout");
-                ValidateVisualBundleAssets(bundle, assetNames, "skirmishbikevisual.prefab", "SkirmishBikeVisual",
-                    "skirmishbikecard.png", "SkirmishBikeCard", 0, "Skirmish Strike Bike");
-                ValidateVisualBundleAssets(bundle, assetNames, "colossussiegevisual.prefab", "ColossusSiegeVisual",
-                    "colossussiegecard.png", "ColossusSiegeCard", 0, "Colossus Siege Platform");
+                ValidateRiggedWalkerBundleAssets(bundle, assetNames,
+                    "scouttankvisual.prefab", "ScoutTankVisual",
+                    "sandlancescoutcard.png", "SandlanceScoutCard", "Sandlance Scout",
+                    requireFootContactSockets: false);
+                ValidateRiggedWalkerBundleAssets(bundle, assetNames,
+                    "skirmishbikevisual.prefab", "SkirmishBikeVisual",
+                    "skirmishbikecard.png", "SkirmishBikeCard", "Skirmish Strike Bike",
+                    requireFootContactSockets: false);
+                ValidateRiggedWalkerBundleAssets(bundle, assetNames,
+                    "colossussiegevisual.prefab", "ColossusSiegeVisual",
+                    "colossussiegecard.png", "ColossusSiegeCard", "Colossus Siege Platform",
+                    requireFootContactSockets: false);
                 ValidateRiggedWalkerBundleAssets(bundle, assetNames,
                     "ironcladwalkervisual.prefab", "IroncladWalkerVisual",
                     "ironcladwalkercard.png", "IroncladWalkerCard", "Ironclad Walker");
@@ -2104,8 +2144,10 @@ namespace RogueCommandExpansion.Authoring
                 ValidateRiggedWalkerBundleAssets(bundle, assetNames,
                     "bastionsiegemechvisual.prefab", "BastionSiegeMechVisual",
                     "bastionsiegemechcard.png", "BastionSiegeMechCard", "Bastion Siege Mech", true);
-                ValidateVisualBundleAssets(bundle, assetNames, "surgearctankvisual.prefab", "SurgeArcTankVisual",
-                    "surgearctankcard.png", "SurgeArcTankCard", 0, "Surge Arc Tank");
+                ValidateRiggedWalkerBundleAssets(bundle, assetNames,
+                    "surgearctankvisual.prefab", "SurgeArcTankVisual",
+                    "surgearctankcard.png", "SurgeArcTankCard", "Surge Arc Tank",
+                    requireFootContactSockets: false);
                 ValidateVisualBundleAssets(bundle, assetNames, "arachnidhexapodvisual.prefab",
                     "ArachnidHexapodVisual", null, null, 0, "Arachnid Hexapod");
                 ValidateVisualBundleAssets(bundle, assetNames, "arachnidhexapodfactoryvisual.prefab",
@@ -2139,7 +2181,8 @@ namespace RogueCommandExpansion.Authoring
             string cardSuffix,
             string cardName,
             string visualLabel,
-            bool validateBastionIntegration = false)
+            bool validateBastionIntegration = false,
+            bool requireFootContactSockets = true)
         {
             string prefabAssetPath = FindUniqueAssetPath(assetNames, prefabSuffix, visualLabel + " prefab");
             GameObject prefab = bundle.LoadAsset<GameObject>(prefabAssetPath);
@@ -2207,7 +2250,8 @@ namespace RogueCommandExpansion.Authoring
                 }
             }
 
-            ValidateCanonicalWalkerSockets(prefab, visualLabel, validateBastionIntegration);
+            ValidateCanonicalWalkerSockets(
+                prefab, visualLabel, validateBastionIntegration, requireFootContactSockets);
             if (validateBastionIntegration)
             {
                 ValidateBastionBundleIntegration(prefab);
@@ -3102,10 +3146,12 @@ namespace RogueCommandExpansion.Authoring
                 normalized = Regex.Replace(normalized, @"(?m)[ \t]+(?=\r?$)", String.Empty);
             }
 
+            string optionalCarriageReturn = new string((char)13, 1);
             normalized = Regex.Replace(normalized,
                 @"(?m)^([ \t]*(?:value|userData|assetBundleName|assetBundleVariant|motionNodeName|" +
                 @"rigImportErrors|rigImportWarnings|animationImportErrors|animationImportWarnings|" +
-                @"animationRetargetingWarnings|rootMotionBoneName):)[ \t]*(\r?)$",
+                @"animationRetargetingWarnings|rootMotionBoneName|m_WarningMessage):)[ \t]*(" +
+                optionalCarriageReturn + @")?$",
                 "$1 \"\"$2");
             if (!String.Equals(contents, normalized, StringComparison.Ordinal))
             {
