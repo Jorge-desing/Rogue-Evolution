@@ -1441,6 +1441,69 @@ namespace RogueCommandExpansionLoader.Runtime
             return Serialize(view);
         }
 
+        public static string SerializeAgentCoordinationCensus(AgentCoordinationSnapshot snapshot)
+        {
+            var sessions = new List<Dictionary<string, object>>();
+            if (snapshot != null && snapshot.ActiveSessions != null)
+            {
+                for (int i = 0; i < snapshot.ActiveSessions.Count; i++)
+                {
+                    AgentSessionRecord s = snapshot.ActiveSessions[i];
+                    sessions.Add(new Dictionary<string, object>
+                    {
+                        ["agentId"] = s.AgentId ?? string.Empty,
+                        ["agentRole"] = s.AgentRole ?? string.Empty,
+                        ["notes"] = s.Notes ?? string.Empty,
+                        ["registeredAtSeconds"] = s.RegisteredAtSeconds,
+                        ["lastPingSeconds"] = s.LastPingSeconds,
+                        ["pingCount"] = s.PingCount,
+                    });
+                }
+            }
+
+            var locks = new List<Dictionary<string, object>>();
+            if (snapshot != null && snapshot.ActiveLocks != null)
+            {
+                for (int i = 0; i < snapshot.ActiveLocks.Count; i++)
+                {
+                    AgentAdvisoryLock l = snapshot.ActiveLocks[i];
+                    locks.Add(new Dictionary<string, object>
+                    {
+                        ["resourceKey"] = l.ResourceKey ?? string.Empty,
+                        ["ownerAgentId"] = l.OwnerAgentId ?? string.Empty,
+                        ["acquiredAtSeconds"] = l.AcquiredAtSeconds,
+                        ["expiresAtSeconds"] = l.ExpiresAtSeconds,
+                        ["remainingSeconds"] = l.RemainingSeconds,
+                    });
+                }
+            }
+
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "agentCoordinationCensus",
+                ["omittedSessionCount"] = snapshot != null ? snapshot.OmittedSessionCount : 0,
+                ["omittedLockCount"] = snapshot != null ? snapshot.OmittedLockCount : 0,
+                ["activeSessionCount"] = sessions.Count,
+                ["activeLockCount"] = locks.Count,
+                ["sessions"] = sessions,
+                ["locks"] = locks,
+            };
+            return Serialize(view);
+        }
+
+        public static string SerializeAgentOperationResult(bool success, string agentId, string action, string message)
+        {
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "agentOperationResult",
+                ["success"] = success,
+                ["agentId"] = agentId ?? string.Empty,
+                ["action"] = action ?? string.Empty,
+                ["message"] = message ?? string.Empty,
+            };
+            return Serialize(view);
+        }
+
         public static string SerializeSystemHealth(
             LoaderDiagnosticsSnapshot snapshot,
             AiModulesCensus aiCensus,
@@ -1869,6 +1932,11 @@ namespace RogueCommandExpansionLoader.Runtime
                 new Dictionary<string, object> { ["name"] = "GetHazardCensusJson", ["description"] = "Live battlefield environmental hazard zones and trigger collider metrics." },
                 new Dictionary<string, object> { ["name"] = "OrderSpawnHazardZoneJson", ["description"] = "Spawn a battlefield environmental hazard zone." },
                 new Dictionary<string, object> { ["name"] = "OrderClearHazardZonesJson", ["description"] = "Clear all active battlefield environmental hazard zones." },
+                new Dictionary<string, object> { ["name"] = "GetAgentCoordinationCensusJson", ["description"] = "Multi-agent coordination census: active agent sessions, heartbeats, and advisory locks." },
+                new Dictionary<string, object> { ["name"] = "RegisterAgentSessionJson", ["description"] = "Register or refresh an agent session with role and notes." },
+                new Dictionary<string, object> { ["name"] = "PingAgentJson", ["description"] = "Send an agent heartbeat ping to the game runtime." },
+                new Dictionary<string, object> { ["name"] = "AcquireAgentLockJson", ["description"] = "Acquire or renew an advisory lock on a game resource." },
+                new Dictionary<string, object> { ["name"] = "ReleaseAgentLockJson", ["description"] = "Release an advisory lock on a game resource." },
                 new Dictionary<string, object> { ["name"] = "GetDiagnosticCatalogJson", ["description"] = "Catalog of available diagnostic getters." },
             };
 

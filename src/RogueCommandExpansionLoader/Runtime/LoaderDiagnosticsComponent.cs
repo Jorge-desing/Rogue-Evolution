@@ -89,6 +89,8 @@ namespace RogueCommandExpansionLoader.Runtime
         public int ActiveHazardZoneCount => RuntimeHazardManager.ActiveZoneCount;
         public int ActiveCommandAuraCount => RuntimeCommandAuraCensus.Current().TotalActiveAurasCount;
         public int TrackedVeterancyUnitCount => RuntimeVeterancyCensus.Current().TotalVeterancyUnitsCount;
+        public int RegisteredAgentSessionCount => RuntimeAgentCoordinator.RegisteredSessionCount;
+        public int ActiveAgentLockCount => RuntimeAgentCoordinator.ActiveLockCount;
 
         public int ActivePackCount
         {
@@ -1028,6 +1030,53 @@ namespace RogueCommandExpansionLoader.Runtime
         {
             return AgentDiagnosticsFormatter.SerializeHazardCommandResult(
                 RuntimeGameplayCommandDirector.TryClearHazardZones());
+        }
+
+        public string GetAgentCoordinationCensusJson()
+        {
+            return AgentDiagnosticsFormatter.SerializeAgentCoordinationCensus(
+                RuntimeAgentCoordinator.GetSnapshot(Time.time));
+        }
+
+        public string RegisterAgentSessionJson(string agentId, string agentRole, string notes)
+        {
+            bool success = RuntimeAgentCoordinator.TryRegisterSession(
+                agentId,
+                agentRole,
+                notes,
+                Time.time,
+                out string message);
+            return AgentDiagnosticsFormatter.SerializeAgentOperationResult(success, agentId, "RegisterSession", message);
+        }
+
+        public string PingAgentJson(string agentId, string message)
+        {
+            bool success = RuntimeAgentCoordinator.TryPing(
+                agentId,
+                message,
+                Time.time,
+                out string reply);
+            return AgentDiagnosticsFormatter.SerializeAgentOperationResult(success, agentId, "Ping", reply);
+        }
+
+        public string AcquireAgentLockJson(string agentId, string resourceKey, float durationSeconds)
+        {
+            bool success = RuntimeAgentCoordinator.TryAcquireLock(
+                agentId,
+                resourceKey,
+                durationSeconds,
+                Time.time,
+                out string message);
+            return AgentDiagnosticsFormatter.SerializeAgentOperationResult(success, agentId, "AcquireLock", message);
+        }
+
+        public string ReleaseAgentLockJson(string agentId, string resourceKey)
+        {
+            bool success = RuntimeAgentCoordinator.TryReleaseLock(
+                agentId,
+                resourceKey,
+                out string message);
+            return AgentDiagnosticsFormatter.SerializeAgentOperationResult(success, agentId, "ReleaseLock", message);
         }
 
         public string GetSystemHealthJson()

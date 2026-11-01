@@ -1707,8 +1707,7 @@
         "experienceAmount": 2,
         "experienceType": "Combat",
         "bonusMultiplier": 1
-      },
-      "vampiricLeech": null
+      }
     },
     {
       "id": "sample-native:surge-tank",

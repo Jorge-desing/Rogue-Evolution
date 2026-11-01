@@ -1,18 +1,18 @@
 ---
 name: rogue-command-clean-room-diagnostics
 description: "Clean-room in-game telemetry, diagnostic censuses, runtime gameplay command director, and BepInEx MCP bridge integration for Rogue Command (v1.0.9 / Unity 2021.3.45f2, Mono x64). [Diagnósticos runtime clean-room, censos de telemetría, director de comandos de gameplay y puente BepInEx MCP para Rogue Command]"
-version: 1.0.0
+version: 1.3.0
 license: MIT
 author: Hermes Agent
 metadata:
   hermes:
-    tags: [Rogue Command, clean-room, diagnostics, telemetry, BepInEx, MCP, aggregators, gameplay commands, censuses]
+    tags: [Rogue Command, clean-room, diagnostics, telemetry, BepInEx, MCP, aggregators, gameplay commands, censuses, multi-agent, hermes-plugin]
     related_skills: [rogue-command-harmony-policy, rogue-command-game-research, rogue-command-reverse-engineering, rogue-command-steam-runtime-validation]
 ---
 
-# Rogue Command Clean-Room Diagnostics & MCP Integration
+# Rogue Command Clean-Room Diagnostics & Multi-Agent MCP Integration
 
-Use this skill when reading in-game state, building runtime telemetry censuses, dispatching tactical gameplay commands, or communicating with Rogue Command via the BepInEx MCP HTTP bridge (`http://127.0.0.1:8080/mcp/`) without visual captures or GUI dependencies.
+Use this skill when reading in-game state, building runtime telemetry censuses, dispatching tactical gameplay commands, or coordinating multiple autonomous agents (Hermes, Antigravity, Claude, Cursor, VS Code/Windsurf, Codex) communicating with Rogue Command via the BepInEx MCP bridge without visual captures or GUI dependencies.
 
 ---
 
@@ -23,7 +23,7 @@ Every diagnostic utility, census DTO, and runtime command MUST follow these rule
 1. **Independent Authoring**: Never copy or decompile proprietary structures, closed palettes, or external mod code. Use open standards (FNV-1a) and independently calibrated data.
 2. **Zero External JSON Libraries in Runtime**: Do NOT use `Newtonsoft.Json`, `System.Text.Json`, or third-party serializers in the game loader runtime (`src/RogueCommandExpansionLoader/`). Handcraft manual, string-escaped JSON writers in `AgentDiagnosticsFormatter.cs`.
 3. **Decoupled Primitive DTOs**: DTOs and command result structs must contain only primitive CLR types (`string`, `int`, `long`, `float`, `double`, `bool`, `IReadOnlyList<T>`). Never expose `UnityEngine.Color`, `Vector3`, `GameObject`, or `Component` across the DTO interface so that tests run cleanly against minimal stubs.
-4. **Omission & Loss Counters First**: In bounded diagnostic collections (rosters, censuses, catalogs), place loss/omission counters (`omittedCount`, `lossFraction`) at the beginning of the serialized JSON and DTO. This prevents tail truncation from hiding data loss.
+4. **Omission & Loss Counters First**: In bounded diagnostic collections (rosters, censuses, catalogs, agent sessions), place loss/omission counters (`omittedCount`, `lossFraction`, `omittedSessionCount`, `omittedLockCount`) at the beginning of the serialized JSON and DTO. This prevents tail truncation from hiding data loss.
 5. **Fail-Closed Reflection**: When reflecting game assembly members (`AiBehaviourManager`, `Harvest`, `UpdateFogOfWar`, `AudioMixerHelper`), wrap calls in null guards and try-catch blocks. Return explicit failure DTOs (`success: false`) instead of throwing unhandled exceptions.
 
 ---
@@ -36,6 +36,7 @@ When monitoring match progression or running autonomous agent loops, avoid issui
 |---|---|---|
 | `diagnostics_runtime_snapshot` | Composite JSON | Combines `BattlefieldCensus`, `RunProgressionCensus`, `SystemHealth`, and `MatchSummary` into a single payload. Ideal for match setup, tick ticks, and end-of-turn audits. |
 | `diagnostics_runtime_scalars` | Flat key-value JSON | Emits high-density numeric telemetry (`LiveBattlefieldEntityCount`, `LivePlayerUnitCount`, `LiveAiUnitCount`, `LiveAiBuildingCount`, `LiveHarvesterCount`, `RegisteredUnitMechanicsProfileCount`, `RangeDisplayGeometryMinimumSegments`, `RangeDisplayGeometryMaximumSegments`, `RangeDisplayCirclePointCount`). Ideal for high-frequency pacing monitors. |
+| `diagnostics_get_agent_coordination` | Composite JSON | Emits multi-agent coordination telemetry (`activeSessionCount`, `activeLockCount`, `sessions[]`, `locks[]`). Ideal for checking whether other agents are holding locks before commanding units. |
 
 ---
 
@@ -62,6 +63,7 @@ All censuses query live game singletons through fail-closed reflection and forma
 - **Veterancy & Combat XP** (`diagnostics_get_veterancy_census`): Live combat XP points, rank tiers (0 to 5), and calculated stat bonuses across living units.
 - **Command Auras** (`diagnostics_get_command_aura_census`): Active captain command auras, subordinate linkage counts, and aura remaining durations.
 - **Environmental Hazard Zones** (`diagnostics_get_hazard_census`): Active battlefield hazard zones (Firestorm, AcidPool, EmpField, CryoMist, NaniteField), trigger metrics, and damage per tick.
+- **Multi-Agent Coordination** (`diagnostics_get_agent_coordination`): Active agent sessions, heartbeats, and advisory locks held on entities or camera.
 
 ---
 
@@ -78,7 +80,7 @@ The `RuntimeGameplayCommandDirector` class dispatches safe in-game actions for a
 
 ### Active Skills, Status Effects & Vitality Adjustments
 - `diagnostics_order_unit_active_skill`: Fires tactical active skills (`entityKeyId`, `targetingMode` `"Self"`/`"TargetUnit"`/`"TargetPosition"`, `targetUnitKeyId`, `targetX`, `targetZ`).
-- `diagnostics_apply_status_effect`: Applies effects like `SlowedDown`, `OnFire`, `Electrified`, `Stun`, `CombatBoost` (`entityKeyId`, `statusEffectName`, `durationSeconds`).
+- `diagnostics_apply_status_effect`: Applies effects like `SlowedDown`, `OnFire`, `Stun`, `CombatBoost` (`entityKeyId`, `statusEffectName`, `durationSeconds`).
 - `diagnostics_clear_status_effect`: Clears active status effects (`entityKeyId`, `statusEffectName`).
 - `diagnostics_adjust_entity_vitality`: Modifies health, armor, or shields directly (`entityKeyId`, `adjustmentType` `"Heal"`/`"RepairArmor"`/`"ChargeShield"`/`"Damage"`, `amount`, `ignoreArmor`).
 
@@ -89,6 +91,12 @@ The `RuntimeGameplayCommandDirector` class dispatches safe in-game actions for a
 - `diagnostics_order_clear_command_aura_links`: Clears command aura links for a captain entity (`captainKeyId`).
 - `diagnostics_order_spawn_hazard_zone`: Spawns a battlefield environmental hazard zone (`hazardType` `"Firestorm"`/`"AcidPool"`/`"EmpField"`/`"CryoMist"`/`"NaniteField"`, `x`, `z`, `radius`, `durationSeconds`, `tickDamage`) with trigger collider and amortized tick rate (>= 0.5s).
 - `diagnostics_order_clear_hazard_zones`: Clears all active hazard zones and colliders.
+
+### Multi-Agent Coordination & Advisory Locks
+- `diagnostics_register_agent_session`: Registers or updates an agent session in runtime (`agentId`, `agentRole`, `notes`).
+- `diagnostics_ping_agent`: Heartbeat ping to verify bridge health and update agent activity timestamp (`agentId`, `message`).
+- `diagnostics_acquire_agent_lock`: Acquires or renews an advisory lock on a resource (`agentId`, `resourceKey`, `durationSeconds`). Fails if already locked by a different agent until expired.
+- `diagnostics_release_agent_lock`: Explicitly releases an advisory lock before TTL expiry (`agentId`, `resourceKey`).
 
 ### Selection & Control Groups
 - `diagnostics_select_units`: Selects entities by CSV or key list (`entityKeysCsv`, `additive`).
@@ -112,26 +120,51 @@ The `RuntimeGameplayCommandDirector` class dispatches safe in-game actions for a
 
 ---
 
-## 5. BepInEx MCP Server Integration
+## 5. Multi-Agent & Cross-Platform Integration
 
-The BepInEx MCP server is built and synchronized via:
-- `tools/build_bepinex_mcp.py`: Central registry of tool specs; outputs tool schemas to `C:\Users\Alex\.gemini\antigravity\mcp\bepinex_mcp\`.
-- `tools/bepinex_mcp_server.py`: Fast MCP JSON-RPC server implementing all 137 tools, batch execution, watchers, and mod profiles.
+The BepInEx MCP server is built with universal cross-agent compatibility supporting stdio newline-delimited JSON and Content-Length HTTP-style framing.
 
-### Bridge Discovery via Active Scene GameObject
-- **The DontDestroyOnLoad Pitfall**: The BepInEx MCP bridge filters out objects whose `scene.name` is null. Components on `DontDestroyOnLoad` GameObjects are therefore invisible to `scene_find_objects_with_component`.
-- **Solution**: Always instantiate `LoaderDiagnosticsComponent` on a regular GameObject in the active loaded scene (`SceneManager.sceneLoaded`). The component can hold references to persistent singletons on the plugin root.
+### 5.1 Hermes Integration (Native Plugin & Skills)
+Hermes agents can communicate with the bridge using three distinct channels:
+1. **Hermes Plugin (`bepinex-mcp`)**: Installed at `C:\Users\Alex\AppData\Local\hermes\plugins\bepinex-mcp/` and enabled in `C:\Users\Alex\AppData\Local\hermes\config.yaml` (`plugins.enabled: [bepinex-mcp]`). All 142 tools are discovered as native MCP tools.
+2. **Hermes Skill Catalog**: Registered under `C:\Users\Alex\AppData\Local\hermes\skills\rogue-command\rogue-command-clean-room-diagnostics/`.
+3. **Hermes Direct CLI Execution**: When running in a shell or terminal without an active MCP connection:
+   ```bash
+   python tools/bepinex_mcp_server.py --call diagnostics_runtime_snapshot
+   python tools/bepinex_mcp_server.py --call diagnostics_ping_agent --args '{"agentId":"hermes-tactician","message":"alive"}'
+   python tools/bepinex_mcp_server.py --call diagnostics_acquire_agent_lock --args '{"agentId":"hermes-tactician","resourceKey":"unit:scout_1","durationSeconds":30.0}'
+   ```
 
-### Query Parameter Protocol & Argument Marshaling
-Calls to `call_component_method` or MCP tools pass arguments formatted as JSON arrays or URI query parameters. Types are marshaled culture-invariantly (`CultureInfo.InvariantCulture`):
-```text
-POST /mcp/call_method?componentName=LoaderDiagnosticsComponent&methodName=OrderUnitMoveJson&args=["unit_scout_1",15.0,22.5]
-```
+### 5.2 Antigravity & Google Gemini CLI
+- Fully registered under `bepinex_mcp` with 142 generated schemas in `C:\Users\Alex\.gemini\antigravity\mcp\bepinex_mcp/`.
+- Call eagerly or lazily using `call_mcp_tool(ServerName="bepinex_mcp", ToolName="...", Arguments={...})`.
 
-### Batching & Profiles
-- `diagnostics_batch_read`: Executes an array of diagnostic getter calls in a single IPC cycle.
-- `diagnostics_batch_execute`: Runs multiple command director operations sequentially and atomically.
-- `save_mod_profile` / `activate_mod_profile`: Persists and applies diagnostic configurations.
+### 5.3 Anthropic Claude Desktop
+- Configuration snippet located at `artifacts/mcp-configs/claude_desktop_config.json`:
+  ```json
+  {
+    "mcpServers": {
+      "bepinex_mcp": {
+        "command": "python",
+        "args": ["C:/Users/Alex/Documents/Mod Rogue Command/tools/bepinex_mcp_server.py"],
+        "env": {
+          "BEPINEX_MCP_URL": "http://127.0.0.1:8080/mcp/"
+        }
+      }
+    }
+  }
+  ```
+
+### 5.4 Cursor IDE & VS Code / Windsurf
+- Cursor configuration generated at `.cursor/mcp.json` and `artifacts/mcp-configs/cursor_mcp.json`.
+- VS Code / Windsurf configuration generated at `.vscode/mcp.json` and `artifacts/mcp-configs/vscode_mcp.json`.
+
+### 5.5 Multi-Agent Advisory Locking Protocol
+When two or more autonomous agents collaborate on the same match (e.g. Hermes managing strategic economy and base construction while Antigravity controls micro-combat):
+1. **Session Announcement**: Call `diagnostics_register_agent_session` with your `agentId` and `agentRole`.
+2. **Resource Reservation**: Before sending move/attack orders to a unit or adjusting the camera, call `diagnostics_acquire_agent_lock(agentId, "unit:<keyId>", durationSeconds=30)`.
+3. **Lock Check**: If the lock call returns `success: false`, check `diagnostics_get_agent_coordination` to coordinate with the owning agent.
+4. **Order Execution & Release**: Perform tactical micro and immediately call `diagnostics_release_agent_lock`.
 
 ---
 
@@ -141,13 +174,17 @@ When adding any new telemetry or command endpoint:
 
 1. **Pure Formatter / DTO** (`AgentDiagnosticsFormatter.cs`):
    - Declare the pure struct/class DTO with primitive fields.
-   - Implement manual JSON serialization emitting a `"kind"` discriminator.
+   - Implement manual JSON serialization emitting a `"kind"` discriminator and placing loss/omission counters strictly first.
 2. **Bridge Method** (`LoaderDiagnosticsComponent.cs`):
    - Add a public MonoBehaviour method returning a JSON string.
    - Perform null-safe delegation to the DTO collector or `RuntimeGameplayCommandDirector`.
 3. **Validation Unit Test** (`RuntimeAndDiagnosticsValidationTests.cs`):
    - Add a test verifying JSON schema structure, values, and fail-closed error handling.
    - Re-run the validation test harness (`dotnet run --project tests/... -c Release`).
+4. **MCP Tool Registration**:
+   - Add tool spec to `tools/build_bepinex_mcp.py` and handler in `tools/bepinex_mcp_server.py`.
+   - Run `python tools/build_bepinex_mcp.py` to regenerate all schemas.
+   - Run `python tools/bepinex_mcp_server.py --generate-configs` to keep agent manifests in sync.
 
 ---
 

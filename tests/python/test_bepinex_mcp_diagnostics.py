@@ -136,6 +136,56 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
         self.assertTrue(all(isinstance(value, dict) for value in snapshot.values()))
         self.assertTrue(all(value == expected for value in snapshot.values()))
 
+    def test_agent_coordination_and_locking_tools(self) -> None:
+        calls: list[tuple[str, list[object]]] = []
+
+        def fake_http(endpoint: str, params: dict[str, object] | None = None, **_: object) -> str:
+            params = params or {}
+            method = str(params.get("methodName", ""))
+            raw_args = json.loads(str(params.get("args", "[]")))
+            calls.append((method, raw_args))
+            return json.dumps({
+                "status": "ok",
+                "message": f"Called '{method}' with {len(raw_args)} args. ReturnValue: {json.dumps({'kind': 'agentOperationResult', 'success': True})}"
+            })
+
+        with (
+            mock.patch.object(SERVER, "_DIAGNOSTICS_GO_ID", 73),
+            mock.patch.object(SERVER, "_call_http", side_effect=fake_http),
+        ):
+            resp1 = SERVER.execute_tool("diagnostics_register_agent_session", {"agentId": "hermes-1", "agentRole": "Coordinator"})
+            self.assertFalse(resp1["isError"])
+
+            resp2 = SERVER.execute_tool("diagnostics_ping_agent", {"agentId": "hermes-1", "message": "ping"})
+            self.assertFalse(resp2["isError"])
+
+            resp3 = SERVER.execute_tool("diagnostics_acquire_agent_lock", {"agentId": "hermes-1", "resourceKey": "unit:command_tank", "durationSeconds": 25.0})
+            self.assertFalse(resp3["isError"])
+
+            resp4 = SERVER.execute_tool("diagnostics_release_agent_lock", {"agentId": "hermes-1", "resourceKey": "unit:command_tank"})
+            self.assertFalse(resp4["isError"])
+
+            resp5 = SERVER.execute_tool("diagnostics_get_agent_coordination", {})
+            self.assertFalse(resp5["isError"])
+
+        self.assertEqual(5, len(calls))
+        self.assertEqual("RegisterAgentSessionJson", calls[0][0])
+        self.assertEqual(["hermes-1", "Coordinator", ""], calls[0][1])
+        self.assertEqual("PingAgentJson", calls[1][0])
+        self.assertEqual(["hermes-1", "ping"], calls[1][1])
+        self.assertEqual("AcquireAgentLockJson", calls[2][0])
+        self.assertEqual(["hermes-1", "unit:command_tank", 25.0], calls[2][1])
+        self.assertEqual("ReleaseAgentLockJson", calls[3][0])
+        self.assertEqual(["hermes-1", "unit:command_tank"], calls[3][1])
+        self.assertEqual("GetAgentCoordinationCensusJson", calls[4][0])
+
+    def test_generate_agent_configs(self) -> None:
+        configs = SERVER.generate_agent_configs()
+        self.assertIn("claude", configs)
+        self.assertIn("cursor", configs)
+        self.assertIn("vscode", configs)
+        self.assertIn("hermes", configs)
+
 
 if __name__ == "__main__":
     unittest.main()

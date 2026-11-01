@@ -71,6 +71,8 @@
              Link="Runtime/RuntimeHazardCensus.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeHazardManager.cs"
              Link="Runtime/RuntimeHazardManager.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeAgentCoordinator.cs"
+             Link="Runtime/RuntimeAgentCoordinator.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Content/ContentPackDefinition.cs"
              Link="Content/ContentPackDefinition.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Content/VisualOverlayScaleCalibration.cs"

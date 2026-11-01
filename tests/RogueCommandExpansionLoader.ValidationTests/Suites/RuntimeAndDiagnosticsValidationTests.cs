@@ -4562,5 +4562,99 @@ internal static partial class ValidationTestRunner
             RuntimeHazardManager.ClearAll();
         }
     }),
+    ("runtime agent coordinator manages sessions, pings, advisory locks, and clean-room serialization", () =>
+    {
+        RuntimeAgentCoordinator.ResetForTests();
+        UnityEngine.Time.time = 50f;
+
+        try
+        {
+            // Register Hermes session
+            bool regHermes = RuntimeAgentCoordinator.TryRegisterSession(
+                "agent:hermes", "Coordinator", "Primary test agent", 50f, out string regMsg);
+            if (!regHermes || RuntimeAgentCoordinator.RegisteredSessionCount != 1)
+            {
+                throw new InvalidOperationException($"Register Hermes agent failed: {regMsg}");
+            }
+
+            // Ping from Hermes
+            bool pingHermes = RuntimeAgentCoordinator.TryPing("agent:hermes", "Heartbeat 1", 51f, out string pingReply);
+            if (!pingHermes || !pingReply.Contains("Pong"))
+            {
+                throw new InvalidOperationException($"Ping Hermes failed: {pingReply}");
+            }
+
+            // Acquire advisory lock
+            bool lock1 = RuntimeAgentCoordinator.TryAcquireLock("agent:hermes", "unit:command_tank", 15f, 51f, out string lockMsg1);
+            if (!lock1 || RuntimeAgentCoordinator.ActiveLockCount != 1)
+            {
+                throw new InvalidOperationException($"Acquire lock 1 failed: {lockMsg1}");
+            }
+
+            // Second agent fails to lock same resource
+            bool lockConflict = RuntimeAgentCoordinator.TryAcquireLock("agent:antigravity", "unit:command_tank", 10f, 52f, out string lockMsg2);
+            if (lockConflict)
+            {
+                throw new InvalidOperationException("Agent antigravity should not acquire locked resource.");
+            }
+
+            // Ping from antigravity auto-registers
+            bool pingAg = RuntimeAgentCoordinator.TryPing("agent:antigravity", "Hello runtime", 52f, out string pingReply2);
+            if (!pingAg || RuntimeAgentCoordinator.RegisteredSessionCount != 2)
+            {
+                throw new InvalidOperationException("Ping should auto-register second agent.");
+            }
+
+            // Antigravity locks different resource
+            bool lock2 = RuntimeAgentCoordinator.TryAcquireLock("agent:antigravity", "camera:tactical", 20f, 52f, out string lockMsg3);
+            if (!lock2 || RuntimeAgentCoordinator.ActiveLockCount != 2)
+            {
+                throw new InvalidOperationException($"Acquire lock 2 failed: {lockMsg3}");
+            }
+
+            // Snapshot check
+            AgentCoordinationSnapshot snapshot = RuntimeAgentCoordinator.GetSnapshot(53f);
+            if (snapshot.OmittedSessionCount != 0 || snapshot.OmittedLockCount != 0 ||
+                snapshot.ActiveSessions.Count != 2 || snapshot.ActiveLocks.Count != 2)
+            {
+                throw new InvalidOperationException("Snapshot counts mismatch.");
+            }
+
+            // Clean-room JSON serialization
+            string json = AgentDiagnosticsFormatter.SerializeAgentCoordinationCensus(snapshot);
+            using (var doc = JsonDocument.Parse(json))
+            {
+                if (!doc.RootElement.TryGetProperty("kind", out var kindProp) ||
+                    kindProp.GetString() != "agentCoordinationCensus" ||
+                    !doc.RootElement.TryGetProperty("omittedSessionCount", out var omittedSess) ||
+                    omittedSess.GetInt32() != 0 ||
+                    !doc.RootElement.TryGetProperty("sessions", out var sessArr) ||
+                    sessArr.GetArrayLength() != 2 ||
+                    !doc.RootElement.TryGetProperty("locks", out var locksArr) ||
+                    locksArr.GetArrayLength() != 2)
+                {
+                    throw new InvalidOperationException($"SerializeAgentCoordinationCensus JSON format error: {json}");
+                }
+            }
+
+            // Release lock by Hermes
+            bool rel1 = RuntimeAgentCoordinator.TryReleaseLock("agent:hermes", "unit:command_tank", out string relMsg);
+            if (!rel1 || RuntimeAgentCoordinator.ActiveLockCount != 1)
+            {
+                throw new InvalidOperationException($"Release lock failed: {relMsg}");
+            }
+
+            // Antigravity can now acquire unit:command_tank
+            bool lockTakeover = RuntimeAgentCoordinator.TryAcquireLock("agent:antigravity", "unit:command_tank", 10f, 54f, out string takeMsg);
+            if (!lockTakeover || RuntimeAgentCoordinator.ActiveLockCount != 2)
+            {
+                throw new InvalidOperationException($"Takeover lock failed: {takeMsg}");
+            }
+        }
+        finally
+        {
+            RuntimeAgentCoordinator.ResetForTests();
+        }
+    }),
     };
 }

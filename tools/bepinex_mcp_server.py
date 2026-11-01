@@ -938,6 +938,36 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             res = _call_diagnostics_method("OrderClearHazardZonesJson")
             return _tool_response(res)
 
+        elif name == "diagnostics_get_agent_coordination":
+            res = _call_diagnostics_method("GetAgentCoordinationCensusJson")
+            return _tool_response(res)
+
+        elif name == "diagnostics_register_agent_session":
+            agent_id = str(arguments.get("agentId", ""))
+            agent_role = str(arguments.get("agentRole", "Agent"))
+            notes = str(arguments.get("notes", ""))
+            res = _call_diagnostics_method("RegisterAgentSessionJson", [agent_id, agent_role, notes])
+            return _tool_response(res)
+
+        elif name == "diagnostics_ping_agent":
+            agent_id = str(arguments.get("agentId", ""))
+            message = str(arguments.get("message", ""))
+            res = _call_diagnostics_method("PingAgentJson", [agent_id, message])
+            return _tool_response(res)
+
+        elif name == "diagnostics_acquire_agent_lock":
+            agent_id = str(arguments.get("agentId", ""))
+            resource_key = str(arguments.get("resourceKey", ""))
+            duration_seconds = float(arguments.get("durationSeconds", 30.0))
+            res = _call_diagnostics_method("AcquireAgentLockJson", [agent_id, resource_key, duration_seconds])
+            return _tool_response(res)
+
+        elif name == "diagnostics_release_agent_lock":
+            agent_id = str(arguments.get("agentId", ""))
+            resource_key = str(arguments.get("resourceKey", ""))
+            res = _call_diagnostics_method("ReleaseAgentLockJson", [agent_id, resource_key])
+            return _tool_response(res)
+
         elif name == "diagnostics_get_tech_catalog":
             res = _call_diagnostics_method("GetTechCatalogJson")
             return _tool_response(res)
@@ -1106,13 +1136,195 @@ def handle_request(message: dict[str, Any]) -> dict[str, Any] | None:
     }
 
 
-def main() -> int:
-    for raw_line in sys.stdin:
-        line = raw_line.strip()
-        if not line:
-            continue
+def generate_agent_configs(repo_root: Path | None = None) -> dict[str, str]:
+    if repo_root is None:
+        repo_root = Path(__file__).resolve().parent.parent
+    server_py = (repo_root / "tools" / "bepinex_mcp_server.py").as_posix()
+    configs_dir = repo_root / "artifacts" / "mcp-configs"
+    configs_dir.mkdir(parents=True, exist_ok=True)
+
+    # 1. Claude Desktop config snippet
+    claude_config = {
+        "mcpServers": {
+            "bepinex_mcp": {
+                "command": "python",
+                "args": [server_py],
+                "env": {
+                    "BEPINEX_MCP_URL": BASE_URL
+                }
+            }
+        }
+    }
+    claude_path = configs_dir / "claude_desktop_config.json"
+    claude_path.write_text(json.dumps(claude_config, indent=2), encoding="utf-8")
+
+    # 2. Cursor config snippet (.cursor/mcp.json)
+    cursor_config = {
+        "mcpServers": {
+            "bepinex_mcp": {
+                "command": "python",
+                "args": [server_py],
+                "env": {
+                    "BEPINEX_MCP_URL": BASE_URL
+                }
+            }
+        }
+    }
+    cursor_path = configs_dir / "cursor_mcp.json"
+    cursor_path.write_text(json.dumps(cursor_config, indent=2), encoding="utf-8")
+    repo_cursor_dir = repo_root / ".cursor"
+    repo_cursor_dir.mkdir(parents=True, exist_ok=True)
+    (repo_cursor_dir / "mcp.json").write_text(json.dumps(cursor_config, indent=2), encoding="utf-8")
+
+    # 3. VS Code / Windsurf config snippet (.vscode/mcp.json)
+    vscode_config = {
+        "mcpServers": {
+            "bepinex_mcp": {
+                "command": "python",
+                "args": ["${workspaceFolder}/tools/bepinex_mcp_server.py"],
+                "env": {
+                    "BEPINEX_MCP_URL": BASE_URL
+                }
+            }
+        }
+    }
+    vscode_path = configs_dir / "vscode_mcp.json"
+    vscode_path.write_text(json.dumps(vscode_config, indent=2), encoding="utf-8")
+    repo_vscode_dir = repo_root / ".vscode"
+    repo_vscode_dir.mkdir(parents=True, exist_ok=True)
+    (repo_vscode_dir / "mcp.json").write_text(json.dumps(vscode_config, indent=2), encoding="utf-8")
+
+    # 4. Hermes Plugin & MCP Manifests
+    hermes_plugin = {
+        "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+        "name": "bepinex-mcp",
+        "version": SERVER_VERSION,
+        "description": "BepInEx MCP server bridge for Rogue Command runtime diagnostics, telemetry censuses, multi-agent coordination, and tactical gameplay commands.",
+        "author": {
+            "name": "Hermes Agent",
+            "url": "https://github.com/Jorge-desing/Rogue-Evolution"
+        },
+        "license": "MIT",
+        "keywords": [
+            "rogue-command",
+            "bepinex",
+            "diagnostics",
+            "telemetry",
+            "clean-room",
+            "multi-agent",
+            "mcp"
+        ]
+    }
+    hermes_mcp = {
+        "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+        "mcpServers": {
+            "bepinex_mcp": {
+                "type": "stdio",
+                "command": "python",
+                "args": [server_py],
+                "env": {
+                    "BEPINEX_MCP_URL": BASE_URL
+                }
+            }
+        }
+    }
+    (configs_dir / "hermes_plugin.json").write_text(json.dumps(hermes_plugin, indent=2), encoding="utf-8")
+    (configs_dir / "hermes_mcp.json").write_text(json.dumps(hermes_mcp, indent=2), encoding="utf-8")
+
+    # Sync to Hermes home if available
+    hermes_plugins_dir = Path(os.environ.get("LOCALAPPDATA", "")) / "hermes" / "plugins" / "bepinex-mcp"
+    if hermes_plugins_dir.parent.is_dir():
+        hermes_plugins_dir.mkdir(parents=True, exist_ok=True)
+        (hermes_plugins_dir / "plugin.json").write_text(json.dumps(hermes_plugin, indent=2), encoding="utf-8")
+        (hermes_plugins_dir / "mcp.json").write_text(json.dumps(hermes_mcp, indent=2), encoding="utf-8")
+
+    return {
+        "claude": str(claude_path),
+        "cursor": str(cursor_path),
+        "vscode": str(vscode_path),
+        "hermes": str(hermes_plugins_dir) if hermes_plugins_dir.parent.is_dir() else "hermes_configs_in_artifacts",
+    }
+
+
+def _read_framed_message() -> dict[str, Any] | None:
+    first_line = sys.stdin.readline()
+    if not first_line:
+        return None
+    line = first_line.strip()
+    if not line:
+        return _read_framed_message()
+
+    if line.lower().startswith("content-length:"):
         try:
-            message = json.loads(line)
+            length = int(line.split(":", 1)[1].strip())
+            while True:
+                sep = sys.stdin.readline()
+                if sep in ("\r\n", "\n", ""):
+                    break
+            body = sys.stdin.read(length)
+            return json.loads(body)
+        except Exception as exc:
+            raise ValueError(f"Failed to read Content-Length framed message: {exc}")
+
+    return json.loads(line)
+
+
+def main() -> int:
+    import argparse
+    parser = argparse.ArgumentParser(description="BepInEx MCP Server bridge for Rogue Command & multi-agent environments.")
+    parser.add_argument("--call", type=str, help="Directly execute an MCP tool by name and print JSON result.")
+    parser.add_argument("--args", type=str, default="{}", help="JSON arguments dictionary for --call.")
+    parser.add_argument("--list-tools", action="store_true", help="Print available tools and descriptions.")
+    parser.add_argument("--ping", action="store_true", help="Ping game bridge and exit.")
+    parser.add_argument("--generate-configs", action="store_true", help="Generate MCP configuration snippets for Hermes, Claude, Cursor, and VS Code.")
+    parser.add_argument("--url", type=str, help="Override BEPINEX_MCP_URL (e.g. http://127.0.0.1:8080/mcp/).")
+
+    # In stdio mode when invoked without arguments, skip arg parsing if stdin is piped
+    if len(sys.argv) > 1:
+        args = parser.parse_args()
+        global BASE_URL
+        if args.url:
+            BASE_URL = args.url
+
+        if args.generate_configs:
+            res = generate_agent_configs()
+            print("Generated agent configurations:")
+            for k, v in res.items():
+                print(f"  {k}: {v}")
+            return 0
+
+        if args.ping:
+            res = execute_tool("system_ping", {})
+            print(json.dumps(res, indent=2))
+            return 0 if not res.get("isError") else 1
+
+        if args.list_tools:
+            print(f"Total available tools: {len(TOOLS)}")
+            for t in TOOLS:
+                print(f"  - {t['name']}: {t['description']}")
+            return 0
+
+        if args.call:
+            try:
+                parsed_args = json.loads(args.args)
+            except Exception as e:
+                print(f"Error parsing --args JSON: {e}", file=sys.stderr)
+                return 1
+            res = execute_tool(args.call, parsed_args)
+            content = res.get("content", [{}])[0].get("text", "")
+            try:
+                formatted = json.dumps(json.loads(content), indent=2)
+                print(formatted)
+            except Exception:
+                print(content)
+            return 0 if not res.get("isError") else 1
+
+    # Standard MCP JSON-RPC loop over stdio
+    while True:
+        try:
+            message = _read_framed_message()
+            if message is None:
+                break
             response = handle_request(message)
         except json.JSONDecodeError:
             response = {
