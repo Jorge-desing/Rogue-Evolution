@@ -4690,6 +4690,62 @@ internal static partial class ValidationTestRunner
             ExistingControllers.Instance.Reset();
         }
     }),
+    ("runtime director threat sweep rejects non-finite bounds and keeps JSON valid", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        try
+        {
+            var source = new EntityController
+            {
+                entityId = "unit:sweep-finite-source",
+                UniqueEntityId = 824,
+                IsControlledByPlayer = true,
+                IsUnit = true,
+                IsCombatUnit = true,
+                Position = new Vector3(0f, 0f, 0f)
+            };
+            var enemy = new EntityController
+            {
+                entityId = "unit:sweep-finite-enemy",
+                UniqueEntityId = 825,
+                IsControlledByAi = true,
+                IsUnit = true,
+                IsCombatUnit = true,
+                Position = new Vector3(2f, 0f, 0f)
+            };
+            ExistingControllers.Instance.PlayerUnits().Add(source);
+            ExistingControllers.Instance.AiUnits().Add(enemy);
+
+            ThreatSweepResult invalidRadius = RuntimeGameplayCommandDirector.TryExecuteThreatSweep(
+                "824", "Mark", float.NaN, 5f, 2);
+            ThreatSweepResult invalidDuration = RuntimeGameplayCommandDirector.TryExecuteThreatSweep(
+                "824", "Suppress", 5f, float.PositiveInfinity, 2);
+            if (invalidRadius.Success || invalidDuration.Success ||
+                invalidRadius.AffectedEntityCount != 0 || invalidDuration.AffectedEntityCount != 0 ||
+                !invalidRadius.Message.Contains("finite") || !invalidDuration.Message.Contains("finite") ||
+                enemy.HasActiveStatusEffect(StatusEffect.Marked) ||
+                enemy.HasActiveStatusEffect(StatusEffect.SlowedDown))
+            {
+                throw new InvalidOperationException("Threat sweep must reject non-finite bounds without affecting targets.");
+            }
+
+            using (var radiusDoc = JsonDocument.Parse(AgentDiagnosticsFormatter.SerializeThreatSweepResult(invalidRadius)))
+            using (var durationDoc = JsonDocument.Parse(AgentDiagnosticsFormatter.SerializeThreatSweepResult(invalidDuration)))
+            {
+                if (radiusDoc.RootElement.GetProperty("radius").ValueKind != JsonValueKind.Null ||
+                    durationDoc.RootElement.GetProperty("durationSeconds").ValueKind != JsonValueKind.Null ||
+                    radiusDoc.RootElement.GetProperty("success").GetBoolean() ||
+                    durationDoc.RootElement.GetProperty("success").GetBoolean())
+                {
+                    throw new InvalidOperationException("Non-finite threat sweep results must serialize as valid JSON null values.");
+                }
+            }
+        }
+        finally
+        {
+            ExistingControllers.Instance.Reset();
+        }
+    }),
     ("runtime tactical pulse rally and repair affect only nearby allied units", () =>
     {
         ExistingControllers.Instance.Reset();

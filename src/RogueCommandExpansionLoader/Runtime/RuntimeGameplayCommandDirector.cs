@@ -2320,6 +2320,14 @@ namespace RogueCommandExpansionLoader.Runtime
                     "Unknown sweep type '" + sweepType + "'. Allowed: Mark, Suppress.");
             }
 
+            if (float.IsNaN(radius) || float.IsInfinity(radius) ||
+                float.IsNaN(durationSeconds) || float.IsInfinity(durationSeconds))
+            {
+                return new ThreatSweepResult(false, sourceEntityKeyId, normalizedSweep, statusEffectName,
+                    radius, durationSeconds, 0, 0, emptyTargets,
+                    "Threat sweep radius and duration must be finite.");
+            }
+
             float clampedRadius = Mathf.Clamp(radius, 3.0f, 50.0f);
             float clampedDuration = Mathf.Clamp(durationSeconds, 0.5f, 30.0f);
             int clampedMaxTargets = Mathf.Clamp(maxTargets, 1, 16);
