@@ -407,7 +407,7 @@
       "isAllowedForAi": true,
       "cardModelScalingFactor": 0.85,
       "healing": {
-        "healAmount": 4.0,
+        "healAmount": 2.0,
         "healRange": 6,
         "healRate": 2,
         "repairAmount": 2.0
@@ -416,7 +416,7 @@
         {
           "id": "rcm:boost",
           "statName": "Damage1",
-          "multiplier": 1.08,
+          "multiplier": 1.06,
           "duration": 25
         }
       ],
@@ -424,7 +424,7 @@
         "experiencePerLevel": 10,
         "maxLevel": 5,
         "experienceGainMultiplier": 1,
-        "levelUpBonus": 0.08
+        "levelUpBonus": 0.06
       },
       "experienceReward": {
         "experienceAmount": 5,
@@ -432,7 +432,7 @@
         "bonusMultiplier": 1
       },
       "vampiricLeech": {
-        "siphonRatio": 0.07,
+        "siphonRatio": 0.03,
         "siphonToShield": false,
         "maxSiphonPerHit": 10
       }
@@ -616,7 +616,7 @@
       "isAllowedForAi": true,
       "cardModelScalingFactor": 0.85,
       "healing": {
-        "healAmount": 4.0,
+        "healAmount": 4.8,
         "healRange": 6,
         "healRate": 2,
         "repairAmount": 2.0
@@ -625,7 +625,7 @@
         {
           "id": "rcm:boost",
           "statName": "Damage1",
-          "multiplier": 1.08,
+          "multiplier": 1.06,
           "duration": 25
         }
       ],
@@ -633,7 +633,7 @@
         "experiencePerLevel": 10,
         "maxLevel": 5,
         "experienceGainMultiplier": 1,
-        "levelUpBonus": 0.08
+        "levelUpBonus": 0.06
       },
       "experienceReward": {
         "experienceAmount": 5,
@@ -641,7 +641,7 @@
         "bonusMultiplier": 1
       },
       "vampiricLeech": {
-        "siphonRatio": 0.07,
+        "siphonRatio": 0.078,
         "siphonToShield": false,
         "maxSiphonPerHit": 10
       }
@@ -844,7 +844,7 @@
         "experiencePerLevel": 10,
         "maxLevel": 5,
         "experienceGainMultiplier": 1,
-        "levelUpBonus": 0.08
+        "levelUpBonus": 0.06
       },
       "experienceReward": {
         "experienceAmount": 5,
@@ -852,7 +852,7 @@
         "bonusMultiplier": 1
       },
       "vampiricLeech": {
-        "siphonRatio": 0.07,
+        "siphonRatio": 0.06,
         "siphonToShield": false,
         "maxSiphonPerHit": 10
       }
@@ -1037,7 +1037,7 @@
       "isAllowedForAi": true,
       "cardModelScalingFactor": 0.85,
       "healing": {
-        "healAmount": 4.0,
+        "healAmount": 4.8,
         "healRange": 6,
         "healRate": 2,
         "repairAmount": 2.0
@@ -1046,7 +1046,7 @@
         {
           "id": "rcm:boost",
           "statName": "Damage1",
-          "multiplier": 1.08,
+          "multiplier": 1.06,
           "duration": 25
         }
       ],
@@ -1054,7 +1054,7 @@
         "experiencePerLevel": 10,
         "maxLevel": 5,
         "experienceGainMultiplier": 1,
-        "levelUpBonus": 0.08
+        "levelUpBonus": 0.06
       },
       "experienceReward": {
         "experienceAmount": 5,
@@ -1062,7 +1062,7 @@
         "bonusMultiplier": 1
       },
       "vampiricLeech": {
-        "siphonRatio": 0.07,
+        "siphonRatio": 0.078,
         "siphonToShield": false,
         "maxSiphonPerHit": 10
       }
@@ -1251,7 +1251,7 @@
       },
       "cardModelScalingFactor": 0.85,
       "healing": {
-        "healAmount": 4.0,
+        "healAmount": 4.8,
         "healRange": 6,
         "healRate": 2,
         "repairAmount": 2.0
@@ -1260,7 +1260,7 @@
         {
           "id": "rcm:boost",
           "statName": "Damage1",
-          "multiplier": 1.08,
+          "multiplier": 1.06,
           "duration": 25
         }
       ],
@@ -1268,7 +1268,7 @@
         "experiencePerLevel": 10,
         "maxLevel": 5,
         "experienceGainMultiplier": 1,
-        "levelUpBonus": 0.08
+        "levelUpBonus": 0.06
       },
       "experienceReward": {
         "experienceAmount": 5,
@@ -1276,7 +1276,7 @@
         "bonusMultiplier": 1
       },
       "vampiricLeech": {
-        "siphonRatio": 0.07,
+        "siphonRatio": 0.078,
         "siphonToShield": false,
         "maxSiphonPerHit": 10
       }
@@ -1487,7 +1487,7 @@
         "experiencePerLevel": 10,
         "maxLevel": 4,
         "experienceGainMultiplier": 1,
-        "levelUpBonus": 0.06
+        "levelUpBonus": 0.05
       },
       "experienceReward": {
         "experienceAmount": 4,
@@ -1901,7 +1901,7 @@
         "cooldown": 15.0
       },
       "healing": {
-        "healAmount": 3.0,
+        "healAmount": 3.5999999999999996,
         "healRange": 6,
         "healRate": 2,
         "repairAmount": 1.5
@@ -1910,7 +1910,7 @@
         {
           "id": "rcm:boost",
           "statName": "Damage1",
-          "multiplier": 1.06,
+          "multiplier": 1.05,
           "duration": 25
         }
       ],
@@ -1918,7 +1918,7 @@
         "experiencePerLevel": 10,
         "maxLevel": 4,
         "experienceGainMultiplier": 1,
-        "levelUpBonus": 0.06
+        "levelUpBonus": 0.05
       },
       "experienceReward": {
         "experienceAmount": 4,
@@ -1926,7 +1926,7 @@
         "bonusMultiplier": 1
       },
       "vampiricLeech": {
-        "siphonRatio": 0.05,
+        "siphonRatio": 0.065,
         "siphonToShield": false,
         "maxSiphonPerHit": 10
       }
