@@ -73,6 +73,7 @@ namespace RogueCommandExpansionLoader.Runtime
 
         private sealed class DynamicCommandAuraState
         {
+            public object CaptainObj;
             public string CaptainKeyId;
             public string CaptainEntityId;
             public bool IsControlledByPlayer;
@@ -80,6 +81,7 @@ namespace RogueCommandExpansionLoader.Runtime
             public float Radius;
             public float EndTime;
             public int LinkedFollowerCount;
+            public readonly List<object> CreatedFollowerLinks = new List<object>();
         }
 
         private static readonly Dictionary<string, DynamicCommandAuraState> _activeDynamicCommandAuras =
@@ -299,6 +301,10 @@ namespace RogueCommandExpansionLoader.Runtime
 
             lock (_activeDynamicCommandAuras)
             {
+                foreach (DynamicCommandAuraState state in _activeDynamicCommandAuras.Values)
+                {
+                    ReleaseCommandAuraFollowerLinks(state);
+                }
                 _activeDynamicCommandAuras.Clear();
             }
 
@@ -498,6 +504,7 @@ namespace RogueCommandExpansionLoader.Runtime
             string captainEntityId = ReadEntityId(captainObj) ?? "captain";
             string captainKeyId = ReadIntProperty(_uniqueEntityIdProperty, captainObj, -1).ToString();
             bool isPlayer = ReadBoolProperty(_isControlledByPlayerProperty, captainObj);
+            var createdLinks = new List<object>();
 
             IEnumerable entities = GetActiveEntities();
             if (entities != null)
@@ -527,9 +534,14 @@ namespace RogueCommandExpansionLoader.Runtime
                         try
                         {
                             object curCap = _captainOfThisEntityProperty != null ? _captainOfThisEntityProperty.GetValue(candidate, null) : null;
-                            if (curCap == null || ReferenceEquals(curCap, captainObj))
+                            if (curCap == null)
                             {
                                 _setCaptainMethod.Invoke(candidate, new[] { captainObj });
+                                createdLinks.Add(candidate);
+                            }
+                            else if (ReferenceEquals(curCap, captainObj))
+                            {
+                                // Already linked to this captain
                             }
                         }
                         catch
@@ -576,8 +588,14 @@ namespace RogueCommandExpansionLoader.Runtime
 
             lock (_activeDynamicCommandAuras)
             {
-                _activeDynamicCommandAuras[captainKeyId] = new DynamicCommandAuraState
+                if (_activeDynamicCommandAuras.TryGetValue(captainKeyId, out DynamicCommandAuraState existing))
                 {
+                    ReleaseCommandAuraFollowerLinks(existing);
+                }
+
+                var state = new DynamicCommandAuraState
+                {
+                    CaptainObj = captainObj,
                     CaptainKeyId = captainKeyId,
                     CaptainEntityId = captainEntityId,
                     IsControlledByPlayer = isPlayer,
@@ -586,9 +604,52 @@ namespace RogueCommandExpansionLoader.Runtime
                     EndTime = now + clampedDuration,
                     LinkedFollowerCount = linkedFollowersCount
                 };
+                state.CreatedFollowerLinks.AddRange(createdLinks);
+                _activeDynamicCommandAuras[captainKeyId] = state;
             }
 
             return true;
+        }
+
+        private static void ReleaseCommandAuraFollowerLinks(DynamicCommandAuraState state)
+        {
+            if (state == null || state.CreatedFollowerLinks == null || state.CreatedFollowerLinks.Count == 0)
+            {
+                return;
+            }
+
+            for (int i = 0; i < state.CreatedFollowerLinks.Count; i++)
+            {
+                object follower = state.CreatedFollowerLinks[i];
+                if (follower == null)
+                {
+                    continue;
+                }
+
+                try
+                {
+                    if (_captainOfThisEntityProperty != null)
+                    {
+                        object curCap = _captainOfThisEntityProperty.GetValue(follower, null);
+                        if (ReferenceEquals(curCap, state.CaptainObj))
+                        {
+                            if (_removeCaptainMethod != null)
+                            {
+                                _removeCaptainMethod.Invoke(follower, new[] { state.CaptainObj });
+                            }
+                            else
+                            {
+                                _captainOfThisEntityProperty.SetValue(follower, null, null);
+                            }
+                        }
+                    }
+                }
+                catch
+                {
+                }
+            }
+
+            state.CreatedFollowerLinks.Clear();
         }
 
         public static bool TryClearDynamicCommandAura(object captainObj, out int clearedFollowersCount)
@@ -601,6 +662,16 @@ namespace RogueCommandExpansionLoader.Runtime
 
             EnsureReflection(captainObj.GetType());
             string captainKeyId = ReadIntProperty(_uniqueEntityIdProperty, captainObj, -1).ToString();
+
+            lock (_activeDynamicCommandAuras)
+            {
+                if (_activeDynamicCommandAuras.TryGetValue(captainKeyId, out DynamicCommandAuraState state))
+                {
+                    clearedFollowersCount = state.CreatedFollowerLinks.Count;
+                    ReleaseCommandAuraFollowerLinks(state);
+                    _activeDynamicCommandAuras.Remove(captainKeyId);
+                }
+            }
 
             IEnumerable entities = GetActiveEntities();
             if (entities != null && _captainOfThisEntityProperty != null)
@@ -634,11 +705,6 @@ namespace RogueCommandExpansionLoader.Runtime
                 }
             }
 
-            lock (_activeDynamicCommandAuras)
-            {
-                _activeDynamicCommandAuras.Remove(captainKeyId);
-            }
-
             return true;
         }
 
@@ -656,18 +722,20 @@ namespace RogueCommandExpansionLoader.Runtime
             var list = new List<CommandAuraDiagnosticRow>();
             lock (_activeDynamicCommandAuras)
             {
-                var keysToRemove = new List<string>();
+                var expiredAuras = new List<DynamicCommandAuraState>();
                 foreach (KeyValuePair<string, DynamicCommandAuraState> pair in _activeDynamicCommandAuras)
                 {
                     if (now >= pair.Value.EndTime)
                     {
-                        keysToRemove.Add(pair.Key);
+                        expiredAuras.Add(pair.Value);
                     }
                 }
 
-                for (int i = 0; i < keysToRemove.Count; i++)
+                for (int i = 0; i < expiredAuras.Count; i++)
                 {
-                    _activeDynamicCommandAuras.Remove(keysToRemove[i]);
+                    DynamicCommandAuraState expired = expiredAuras[i];
+                    ReleaseCommandAuraFollowerLinks(expired);
+                    _activeDynamicCommandAuras.Remove(expired.CaptainKeyId);
                 }
 
                 int total = _activeDynamicCommandAuras.Count;

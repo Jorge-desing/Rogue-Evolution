@@ -4468,7 +4468,76 @@ internal static partial class ValidationTestRunner
             RuntimeUnitMechanicsDirector.ClearProfiles();
         }
     }),
+    ("runtime command aura expiry removes only the follower links it created", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        RuntimeUnitMechanicsDirector.ClearProfiles();
+        UnityEngine.Time.time = 20f;
+        try
+        {
+            var captain = new EntityController
+            {
+                entityId = "test:aura-expiry-captain",
+                UniqueEntityId = 761,
+                IsControlledByPlayer = true,
+                IsUnit = true,
+                Position = new Vector3(0f, 0f, 0f)
+            };
+            var follower = new EntityController
+            {
+                entityId = "test:aura-expiry-follower",
+                UniqueEntityId = 762,
+                IsControlledByPlayer = true,
+                IsUnit = true,
+                Position = new Vector3(1f, 0f, 0f)
+            };
+            var existingCaptain = new EntityController
+            {
+                entityId = "test:native-captain",
+                UniqueEntityId = 763,
+                IsControlledByPlayer = true,
+                IsUnit = true,
+                Position = new Vector3(2f, 0f, 0f)
+            };
+            var existingFollower = new EntityController
+            {
+                entityId = "test:native-follower",
+                UniqueEntityId = 764,
+                IsControlledByPlayer = true,
+                IsUnit = true,
+                Position = new Vector3(3f, 0f, 0f),
+                CaptainOfThisEntity = existingCaptain
+            };
+            ExistingControllers.Instance.PlayerUnits().Add(captain);
+            ExistingControllers.Instance.PlayerUnits().Add(follower);
+            ExistingControllers.Instance.PlayerUnits().Add(existingCaptain);
+            ExistingControllers.Instance.PlayerUnits().Add(existingFollower);
+
+            CommandAuraResult pulse = RuntimeGameplayCommandDirector.TryDispatchCommandAuraPulse(
+                "761", "Inspire", 10f, 1f);
+            if (!pulse.Success || !ReferenceEquals(follower.CaptainOfThisEntity, captain) ||
+                !ReferenceEquals(existingFollower.CaptainOfThisEntity, existingCaptain))
+            {
+                throw new InvalidOperationException("The initial command aura should link the nearby follower.");
+            }
+
+            UnityEngine.Time.time = 22f;
+            CommandAuraCensus expired = RuntimeCommandAuraCensus.Current();
+            if (follower.CaptainOfThisEntity != null || expired.TotalActiveAurasCount != 0 ||
+                !ReferenceEquals(existingFollower.CaptainOfThisEntity, existingCaptain))
+            {
+                throw new InvalidOperationException("An expired command aura should release only links it created and leave no active census row.");
+            }
+        }
+        finally
+        {
+            ExistingControllers.Instance.Reset();
+            RuntimeUnitMechanicsDirector.ClearProfiles();
+            UnityEngine.Time.time = 0f;
+        }
+    }),
     ("runtime battlefield environmental hazard zones enforce trigger colliders and amortized tick rates", () =>
+
     {
         try
         {
@@ -4700,6 +4769,10 @@ internal static partial class ValidationTestRunner
             if (unit.CurrentRank != 3)
             {
                 throw new InvalidOperationException($"Rank should remain at max (3), was: {unit.CurrentRank}");
+            }
+            if (RuntimeUnitMechanicsDirector.GetCombatXpForEntity(unit) != 0)
+            {
+                throw new InvalidOperationException("A unit at its veterancy cap must not accumulate unusable combat XP.");
             }
 
             RuntimeUnitMechanicsDirector.OnEntityDied(unit);
