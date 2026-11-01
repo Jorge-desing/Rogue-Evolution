@@ -1176,6 +1176,8 @@ namespace RogueCommandExpansionLoader.Runtime
 
 
         private static readonly Dictionary<string, string> _activeUnitVariants = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        private static readonly Dictionary<string, HashSet<string>> _activeUnitLoadoutStats =
+            new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
         private static readonly Dictionary<string, int> _prespawnPoolQuotas = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         private static readonly Dictionary<string, int> _prespawnPoolWarmed = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         private static readonly object _doctrineLock = new object();
@@ -4931,58 +4933,106 @@ namespace RogueCommandExpansionLoader.Runtime
                     return new UnitLoadoutResult(false, entityKeyId, loadoutId, "Entity '" + entityKeyId + "' not found or destroyed.");
                 }
 
+                string key = entityKeyId.Trim();
                 string sanitized = string.IsNullOrWhiteSpace(loadoutId) ? "Standard" : loadoutId.Trim();
-                string tag = "loadout:" + sanitized;
+                var changes = new Dictionary<string, float>(StringComparer.OrdinalIgnoreCase);
 
                 if (string.Equals(sanitized, "AP", StringComparison.OrdinalIgnoreCase) ||
                     string.Equals(sanitized, "ArmorPiercing", StringComparison.OrdinalIgnoreCase))
                 {
-                    RuntimeUnitMechanicsDirector.ApplyTimedStatChange(unit, "Damage", 0.30f, 3600f, tag + ":dmg");
-                    RuntimeUnitMechanicsDirector.ApplyTimedStatChange(unit, "AttackCooldown", 0.20f, 3600f, tag + ":cd");
+                    sanitized = "AP";
+                    changes["Damage"] = 0.30f;
+                    changes["AttackCooldown"] = 0.20f;
                 }
                 else if (string.Equals(sanitized, "HE", StringComparison.OrdinalIgnoreCase) ||
                          string.Equals(sanitized, "HighExplosive", StringComparison.OrdinalIgnoreCase))
                 {
-                    RuntimeUnitMechanicsDirector.ApplyTimedStatChange(unit, "Damage", 0.15f, 3600f, tag + ":dmg");
-                    RuntimeUnitMechanicsDirector.ApplyTimedStatChange(unit, "EffectRadius", 0.40f, 3600f, tag + ":rad");
+                    sanitized = "HE";
+                    changes["Damage"] = 0.15f;
+                    changes["EffectRadius"] = 0.40f;
                 }
                 else if (string.Equals(sanitized, "Speed", StringComparison.OrdinalIgnoreCase) ||
                          string.Equals(sanitized, "Scout", StringComparison.OrdinalIgnoreCase))
                 {
-                    RuntimeUnitMechanicsDirector.ApplyTimedStatChange(unit, "MoveSpeed", 0.25f, 3600f, tag + ":spd");
-                    RuntimeUnitMechanicsDirector.ApplyTimedStatChange(unit, "WeaponRange", 0.15f, 3600f, tag + ":rng");
+                    sanitized = "Speed";
+                    changes["MoveSpeed"] = 0.25f;
+                    changes["WeaponRange"] = 0.15f;
                 }
                 else if (string.Equals(sanitized, "Siege", StringComparison.OrdinalIgnoreCase))
                 {
-                    RuntimeUnitMechanicsDirector.ApplyTimedStatChange(unit, "WeaponRange", 0.35f, 3600f, tag + ":rng");
-                    RuntimeUnitMechanicsDirector.ApplyTimedStatChange(unit, "MoveSpeed", -0.30f, 3600f, tag + ":spd");
-                    RuntimeUnitMechanicsDirector.ApplyTimedStatChange(unit, "Damage", 0.20f, 3600f, tag + ":dmg");
+                    sanitized = "Siege";
+                    changes["WeaponRange"] = 0.35f;
+                    changes["MoveSpeed"] = -0.30f;
+                    changes["Damage"] = 0.20f;
                 }
                 else if (string.Equals(sanitized, "Reinforced", StringComparison.OrdinalIgnoreCase) ||
                          string.Equals(sanitized, "Assault", StringComparison.OrdinalIgnoreCase))
                 {
-                    RuntimeUnitMechanicsDirector.ApplyTimedStatChange(unit, "MaxHealth", 0.30f, 3600f, tag + ":hp");
-                    RuntimeUnitMechanicsDirector.ApplyTimedStatChange(unit, "ArmorProtection", 0.25f, 3600f, tag + ":arm");
-                    RuntimeUnitMechanicsDirector.ApplyTimedStatChange(unit, "MoveSpeed", -0.10f, 3600f, tag + ":spd");
+                    sanitized = "Reinforced";
+                    changes["MaxHealth"] = 0.30f;
+                    changes["ArmorProtection"] = 0.25f;
+                    changes["MoveSpeed"] = -0.10f;
+                }
+                else if (string.Equals(sanitized, "Standard", StringComparison.OrdinalIgnoreCase))
+                {
+                    sanitized = "Standard";
                 }
                 else
                 {
-                    return new UnitLoadoutResult(false, entityKeyId.Trim(), sanitized,
+                    return new UnitLoadoutResult(false, key, sanitized,
                         "Unrecognized loadout '" + sanitized + "'.");
+                }
+
+                var previousStats = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                lock (_activeUnitVariants)
+                {
+                    HashSet<string> registeredStats;
+                    if (_activeUnitLoadoutStats.TryGetValue(key, out registeredStats) && registeredStats != null)
+                    {
+                        previousStats.UnionWith(registeredStats);
+                    }
+                }
+
+                foreach (string previousStat in previousStats)
+                {
+                    RuntimeUnitMechanicsDirector.ApplyTimedStatChange(
+                        unit,
+                        previousStat,
+                        0f,
+                        3600f,
+                        UnitLoadoutOriginator(key, previousStat),
+                        true);
+                }
+
+                foreach (KeyValuePair<string, float> change in changes)
+                {
+                    RuntimeUnitMechanicsDirector.ApplyTimedStatChange(
+                        unit,
+                        change.Key,
+                        change.Value,
+                        3600f,
+                        UnitLoadoutOriginator(key, change.Key),
+                        true);
                 }
 
                 lock (_activeUnitVariants)
                 {
-                    _activeUnitVariants[entityKeyId.Trim()] = sanitized;
+                    _activeUnitVariants[key] = sanitized;
+                    _activeUnitLoadoutStats[key] = new HashSet<string>(changes.Keys, StringComparer.OrdinalIgnoreCase);
                 }
 
-                return new UnitLoadoutResult(true, entityKeyId.Trim(), sanitized,
+                return new UnitLoadoutResult(true, key, sanitized,
                     "Applied loadout '" + sanitized + "' to unit '" + entityKeyId + "'.");
             }
             catch (Exception ex)
             {
                 return new UnitLoadoutResult(false, entityKeyId, loadoutId, "Error applying unit loadout: " + ex.Message);
             }
+        }
+
+        private static string UnitLoadoutOriginator(string entityKeyId, string statName)
+        {
+            return "rcl:unit-loadout:" + entityKeyId + ":" + statName;
         }
 
         public static PrespawnWarmResult TryWarmPrespawnPool(string entityId, int count)
@@ -5205,6 +5255,7 @@ namespace RogueCommandExpansionLoader.Runtime
             lock (_activeUnitVariants)
             {
                 _activeUnitVariants.Clear();
+                _activeUnitLoadoutStats.Clear();
             }
             lock (_prespawnPoolQuotas)
             {

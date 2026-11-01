@@ -2564,10 +2564,11 @@ namespace RogueCommandExpansionLoader.Runtime
             string statName,
             float relativeDelta,
             float durationSeconds,
-            string originatorId)
+            string originatorId,
+            bool replaceExisting = false)
         {
             if (targetObj == null || string.IsNullOrWhiteSpace(statName) || durationSeconds <= 0f ||
-                Math.Abs(relativeDelta) < 0.0001f)
+                (!replaceExisting && Math.Abs(relativeDelta) < 0.0001f))
             {
                 return;
             }

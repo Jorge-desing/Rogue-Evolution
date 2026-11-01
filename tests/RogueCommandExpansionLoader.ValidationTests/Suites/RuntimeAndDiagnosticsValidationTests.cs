@@ -5107,6 +5107,77 @@ internal static partial class ValidationTestRunner
             RuntimeGameplayCommandDirector.ClearUnitLoadouts();
         }
     }),
+    ("runtime unit loadout switching replaces stale modifiers and accepts Standard reset", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        RuntimeGameplayCommandDirector.ClearUnitLoadouts();
+        try
+        {
+            var unit = new EntityController
+            {
+                entityId = "sample-native:loadout-switch-test",
+                UniqueEntityId = 882,
+                IsControlledByPlayer = true,
+                IsUnit = true,
+                MoveSpeed = 10f,
+                WeaponRange = 15f,
+                Damage1 = 10f,
+                Attack1Cooldown = 1f
+            };
+            ExistingControllers.Instance.PlayerUnits().Add(unit);
+
+            UnitLoadoutResult ap = RuntimeGameplayCommandDirector.TryApplyUnitLoadout("882", "AP");
+            if (!ap.Success)
+            {
+                throw new InvalidOperationException("AP loadout should apply before testing replacement.");
+            }
+
+            UnitLoadoutResult he = RuntimeGameplayCommandDirector.TryApplyUnitLoadout("882", "HE");
+            if (!he.Success)
+            {
+                throw new InvalidOperationException("HE loadout should replace the previous AP loadout.");
+            }
+
+            var changesAfterHe = unit.AppliedSpecificValueChanges;
+            int damageChanges = changesAfterHe.Count(c => c.Value == EntityController.ChangeableValue.Damage);
+            int cooldownChanges = changesAfterHe.Count(c => c.Value == EntityController.ChangeableValue.AttackCooldown);
+            int radiusChanges = changesAfterHe.Count(c => c.Value == EntityController.ChangeableValue.EffectRadius);
+            if (damageChanges != 1 || cooldownChanges != 1 || radiusChanges != 1)
+            {
+                throw new InvalidOperationException("Switching loadouts must leave one replacement entry per affected stat, not stale AP and HE entries.");
+            }
+
+            var cooldown = changesAfterHe.Single(c => c.Value == EntityController.ChangeableValue.AttackCooldown);
+            if (Math.Abs(cooldown.Change.ValueToAdd) > 0.0001f)
+            {
+                throw new InvalidOperationException("The AP-only cooldown modifier must be neutralized when switching to HE.");
+            }
+
+            UnitLoadoutResult standard = RuntimeGameplayCommandDirector.TryApplyUnitLoadout("882", "Standard");
+            if (!standard.Success || !string.Equals(standard.LoadoutId, "Standard", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException("Standard must be an explicit loadout that resets the active variant.");
+            }
+
+            foreach (var change in unit.AppliedSpecificValueChanges)
+            {
+                if (Math.Abs(change.Change.ValueToAdd) > 0.0001f)
+                {
+                    throw new InvalidOperationException("Standard loadout must neutralize every prior runtime modifier.");
+                }
+            }
+
+            if (RuntimeGameplayCommandDirector.GetActiveUnitVariant("882") != "Standard")
+            {
+                throw new InvalidOperationException("The loadout census state must report Standard after reset.");
+            }
+        }
+        finally
+        {
+            ExistingControllers.Instance.Reset();
+            RuntimeGameplayCommandDirector.ClearUnitLoadouts();
+        }
+    }),
     ("runtime AI doctrine coordinator and deck reinforcement dynamically modulate doctrine and base quotas", () =>
     {
         RuntimeGameplayCommandDirector.ClearAiDoctrineAndDeckEntries();
