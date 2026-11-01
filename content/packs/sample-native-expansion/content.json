@@ -205,7 +205,7 @@
           "id": "rcm:boost",
           "statName": "Damage1",
           "multiplier": 1.03,
-          "duration": 25
+          "duration": 15.0
         }
       ],
       "experience": {
@@ -416,8 +416,8 @@
         {
           "id": "rcm:boost",
           "statName": "Damage1",
-          "multiplier": 1.06,
-          "duration": 25
+          "multiplier": 1.04,
+          "duration": 21.0
         }
       ],
       "experience": {
@@ -427,7 +427,7 @@
         "levelUpBonus": 0.06
       },
       "experienceReward": {
-        "experienceAmount": 5,
+        "experienceAmount": 3,
         "experienceType": "Combat",
         "bonusMultiplier": 1
       },
@@ -626,17 +626,17 @@
           "id": "rcm:boost",
           "statName": "Damage1",
           "multiplier": 1.06,
-          "duration": 25
+          "duration": 33.0
         }
       ],
       "experience": {
         "experiencePerLevel": 10,
         "maxLevel": 5,
         "experienceGainMultiplier": 1,
-        "levelUpBonus": 0.06
+        "levelUpBonus": 0.066
       },
       "experienceReward": {
-        "experienceAmount": 5,
+        "experienceAmount": 3,
         "experienceType": "Combat",
         "bonusMultiplier": 1
       },
@@ -837,22 +837,22 @@
           "id": "rcm:boost",
           "statName": "Damage1",
           "multiplier": 1.04,
-          "duration": 25
+          "duration": 39.0
         }
       ],
       "experience": {
         "experiencePerLevel": 10,
         "maxLevel": 5,
         "experienceGainMultiplier": 1,
-        "levelUpBonus": 0.06
+        "levelUpBonus": 0.048
       },
       "experienceReward": {
-        "experienceAmount": 5,
+        "experienceAmount": 4,
         "experienceType": "Combat",
         "bonusMultiplier": 1
       },
       "vampiricLeech": {
-        "siphonRatio": 0.06,
+        "siphonRatio": 0.03,
         "siphonToShield": false,
         "maxSiphonPerHit": 10
       }
@@ -1047,17 +1047,17 @@
           "id": "rcm:boost",
           "statName": "Damage1",
           "multiplier": 1.06,
-          "duration": 25
+          "duration": 33.0
         }
       ],
       "experience": {
         "experiencePerLevel": 10,
         "maxLevel": 5,
         "experienceGainMultiplier": 1,
-        "levelUpBonus": 0.06
+        "levelUpBonus": 0.066
       },
       "experienceReward": {
-        "experienceAmount": 5,
+        "experienceAmount": 3,
         "experienceType": "Combat",
         "bonusMultiplier": 1
       },
@@ -1261,17 +1261,17 @@
           "id": "rcm:boost",
           "statName": "Damage1",
           "multiplier": 1.06,
-          "duration": 25
+          "duration": 33.0
         }
       ],
       "experience": {
         "experiencePerLevel": 10,
         "maxLevel": 5,
         "experienceGainMultiplier": 1,
-        "levelUpBonus": 0.06
+        "levelUpBonus": 0.066
       },
       "experienceReward": {
-        "experienceAmount": 5,
+        "experienceAmount": 3,
         "experienceType": "Combat",
         "bonusMultiplier": 1
       },
@@ -1480,22 +1480,22 @@
           "id": "rcm:boost",
           "statName": "Damage1",
           "multiplier": 1.04,
-          "duration": 25
+          "duration": 26.0
         }
       ],
       "experience": {
         "experiencePerLevel": 10,
         "maxLevel": 4,
         "experienceGainMultiplier": 1,
-        "levelUpBonus": 0.05
+        "levelUpBonus": 0.04
       },
       "experienceReward": {
-        "experienceAmount": 4,
+        "experienceAmount": 3,
         "experienceType": "Combat",
         "bonusMultiplier": 1
       },
       "vampiricLeech": {
-        "siphonRatio": 0.05,
+        "siphonRatio": 0.025,
         "siphonToShield": false,
         "maxSiphonPerHit": 10
       }
@@ -1694,7 +1694,7 @@
           "id": "rcm:boost",
           "statName": "Damage1",
           "multiplier": 1.03,
-          "duration": 25
+          "duration": 15.0
         }
       ],
       "experience": {
@@ -1707,7 +1707,8 @@
         "experienceAmount": 2,
         "experienceType": "Combat",
         "bonusMultiplier": 1
-      }
+      },
+      "vampiricLeech": null
     },
     {
       "id": "sample-native:surge-tank",
@@ -1900,7 +1901,7 @@
         "cooldown": 15.0
       },
       "healing": {
-        "healAmount": 3.5999999999999996,
+        "healAmount": 3.6,
         "healRange": 6,
         "healRate": 2,
         "repairAmount": 1.5
@@ -1910,17 +1911,17 @@
           "id": "rcm:boost",
           "statName": "Damage1",
           "multiplier": 1.05,
-          "duration": 25
+          "duration": 22.0
         }
       ],
       "experience": {
         "experiencePerLevel": 10,
         "maxLevel": 4,
         "experienceGainMultiplier": 1,
-        "levelUpBonus": 0.05
+        "levelUpBonus": 0.055
       },
       "experienceReward": {
-        "experienceAmount": 4,
+        "experienceAmount": 2,
         "experienceType": "Combat",
         "bonusMultiplier": 1
       },
