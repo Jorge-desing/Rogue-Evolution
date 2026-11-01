@@ -1037,6 +1037,26 @@ namespace RogueCommandExpansionLoader.Runtime
         }
 
         /// <summary>
+        /// Serializes an evasive retreat result.
+        /// </summary>
+        public static string SerializeRetreatResult(RetreatResult result)
+        {
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "retreatResult",
+                ["success"] = result.Success,
+                ["entityKeyId"] = result.EntityKeyId ?? string.Empty,
+                ["threatX"] = result.ThreatX,
+                ["threatZ"] = result.ThreatZ,
+                ["retreatX"] = result.RetreatX,
+                ["retreatZ"] = result.RetreatZ,
+                ["distance"] = result.Distance,
+                ["message"] = result.Message ?? string.Empty,
+            };
+            return Serialize(view);
+        }
+
+        /// <summary>
         /// Serializes active elite affixes and traits applied to living units.
         /// Omission counters precede detail collections.
         /// </summary>
@@ -2272,6 +2292,7 @@ namespace RogueCommandExpansionLoader.Runtime
                 new Dictionary<string, object> { ["name"] = "OrderUnitTacticalPulseJson", ["description"] = "Execute a bounded Shockwave, Rally, or Repair pulse around a unit." },
                 new Dictionary<string, object> { ["name"] = "OrderDirectorThreatSweepJson", ["description"] = "Apply a bounded Mark or Suppress sweep to nearby hostile combat units." },
 new Dictionary<string, object> { ["name"] = "OrderCoordinatedAssaultJson", ["description"] = "Coordinate a bounded attack against one hostile target using only eligible hostile combat attackers." },
+new Dictionary<string, object> { ["name"] = "OrderRetreatJson", ["description"] = "Order an evasive retreat away from a threat position." },
                 new Dictionary<string, object> { ["name"] = "OrderUnitActiveSkillJson", ["description"] = "Dispatch an active tactical skill command on a unit (Self, Target, or Position)." },
                 new Dictionary<string, object> { ["name"] = "AdjustEntityVitalityJson", ["description"] = "Safely adjust health, armor, shield, or damage on an entity for testing." },
                 new Dictionary<string, object> { ["name"] = "ApplyStatusEffectJson", ["description"] = "Apply a status effect (e.g. Emp, Burn, SlowedDown, Stun) to an entity." },

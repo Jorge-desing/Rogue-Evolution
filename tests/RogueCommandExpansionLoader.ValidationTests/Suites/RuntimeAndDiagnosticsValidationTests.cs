@@ -4412,7 +4412,8 @@ internal static partial class ValidationTestRunner
                 !names.Contains("OrderClearHazardZonesJson") ||
                 !names.Contains("OrderUnitTacticalPulseJson") ||
                 !names.Contains("OrderDirectorThreatSweepJson") ||
-                !names.Contains("OrderCoordinatedAssaultJson"))
+                !names.Contains("OrderCoordinatedAssaultJson") ||
+                !names.Contains("OrderRetreatJson"))
             {
                 throw new InvalidOperationException("Diagnostic catalog should include all newly exposed endpoints.");
             }
@@ -4784,7 +4785,7 @@ internal static partial class ValidationTestRunner
             ExistingControllers.Instance.AiUnits().Add(friendlyAttacker);
 
             CoordinatedAssaultResult result = RuntimeGameplayCommandDirector.TryExecuteCoordinatedAssault(
-                "831",
+                "unit:assault-target",
                 new[] { "unit:assault-attacker", "unit:assault-friendly", "unit:missing", "unit:assault-attacker" },
                 3);
             if (!result.Success || result.TargetEntityKeyId != "unit:assault-target" ||
@@ -4811,6 +4812,56 @@ internal static partial class ValidationTestRunner
                     omissionIndex < 0 || detailIndex < 0 || omissionIndex > detailIndex)
                 {
                     throw new InvalidOperationException("SerializeCoordinatedAssaultResult JSON format error.");
+                }
+            }
+        }
+        finally
+        {
+            ExistingControllers.Instance.Reset();
+        }
+    }),
+    ("runtime director retreat moves unit away from threat and rejects non-finite bounds", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        try
+        {
+            var unit = new EntityController
+            {
+                entityId = "unit:retreat-unit",
+                UniqueEntityId = 841,
+                IsControlledByPlayer = true,
+                IsUnit = true,
+                Position = new Vector3(10f, 0f, 10f)
+            };
+            var originalPosition = unit.Position;
+            ExistingControllers.Instance.PlayerUnits().Add(unit);
+
+            RetreatResult invalid = RuntimeGameplayCommandDirector.TryOrderRetreat(
+                "unit:retreat-unit", float.NaN, 5f, 8f);
+            if (invalid.Success || !invalid.Message.Contains("finite"))
+            {
+                throw new InvalidOperationException("Retreat must reject non-finite threat coordinates.");
+            }
+
+            RetreatResult result = RuntimeGameplayCommandDirector.TryOrderRetreat(
+                "unit:retreat-unit", 0f, 0f, 8f);
+            if (!result.Success || result.EntityKeyId != "unit:retreat-unit" ||
+                result.RetreatX <= originalPosition.x || result.RetreatZ <= originalPosition.z ||
+                result.Distance < 3f || result.Distance > 50f ||
+                unit.LastExecutedCommand?.command != EntityCommand.Command.Move ||
+                unit.CurrentCommandTag != "rcl-retreat")
+            {
+                throw new InvalidOperationException("Retreat must move the unit away from the threat.");
+            }
+
+            string json = AgentDiagnosticsFormatter.SerializeRetreatResult(result);
+            using (var doc = JsonDocument.Parse(json))
+            {
+                if (doc.RootElement.GetProperty("kind").GetString() != "retreatResult" ||
+                    doc.RootElement.GetProperty("success").GetBoolean() != true ||
+                    doc.RootElement.GetProperty("distance").GetSingle() != result.Distance)
+                {
+                    throw new InvalidOperationException("SerializeRetreatResult JSON format error.");
                 }
             }
         }

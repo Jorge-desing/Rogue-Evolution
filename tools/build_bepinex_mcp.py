@@ -953,6 +953,21 @@ TOOL_SPECS = [
         },
     },
     {
+        "name": "diagnostics_order_retreat",
+        "description": "Orders an evasive retreat away from a threat position via LoaderDiagnosticsComponent / RuntimeGameplayCommandDirector.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "entityKeyId": {"type": "string", "description": "Unit entity ID or name."},
+                "threatX": {"type": "number", "description": "Threat world X coordinate."},
+                "threatZ": {"type": "number", "description": "Threat world Z coordinate."},
+                "distance": {"type": "number", "description": "Retreat distance (3 to 50)."},
+            },
+            "required": ["entityKeyId", "threatX", "threatZ", "distance"],
+            "additionalProperties": False,
+        },
+    },
+    {
         "name": "diagnostics_order_active_skill",
         "description": "Dispatches an active tactical skill command on a unit (Self, on Target, or at Position) via LoaderDiagnosticsComponent / RuntimeGameplayCommandDirector.",
         "parameters": {

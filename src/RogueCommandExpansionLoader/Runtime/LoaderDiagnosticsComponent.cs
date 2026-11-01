@@ -862,6 +862,15 @@ namespace RogueCommandExpansionLoader.Runtime
         }
 
         /// <summary>
+        /// Orders an evasive retreat away from a threat position.
+        /// </summary>
+        public string OrderRetreatJson(string entityKeyId, float threatX, float threatZ, float distance)
+        {
+            return AgentDiagnosticsFormatter.SerializeRetreatResult(
+                RuntimeGameplayCommandDirector.TryOrderRetreat(entityKeyId, threatX, threatZ, distance));
+        }
+
+        /// <summary>
         /// Queries the unit elite affixes census across living units.
         /// </summary>
         public string GetUnitAffixCensusJson()

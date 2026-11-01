@@ -666,6 +666,16 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
                 [target_key, attacker_keys, max_attackers],
             )
             return _tool_response(res)
+        elif name == "diagnostics_order_retreat":
+            e_key = str(arguments.get("entityKeyId", ""))
+            tx = float(arguments.get("threatX", 0.0))
+            tz = float(arguments.get("threatZ", 0.0))
+            dist = float(arguments.get("distance", 8.0))
+            res = _call_diagnostics_method(
+                "OrderRetreatJson",
+                [e_key, tx, tz, dist],
+            )
+            return _tool_response(res)
         elif name == "diagnostics_order_active_skill":
             e_key = str(arguments.get("entityKeyId", ""))
             t_key = arguments.get("targetEntityKeyId")

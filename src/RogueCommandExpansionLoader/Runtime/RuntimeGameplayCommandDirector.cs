@@ -454,6 +454,43 @@ namespace RogueCommandExpansionLoader.Runtime
 
 
     /// <summary>
+    /// Pure diagnostic DTO returned when ordering an evasive retreat away from a threat.
+    /// Decoupled from Unity types.
+    /// </summary>
+    public readonly struct RetreatResult
+    {
+        public RetreatResult(
+            bool success,
+            string entityKeyId,
+            float threatX,
+            float threatZ,
+            float retreatX,
+            float retreatZ,
+            float distance,
+            string message)
+        {
+            Success = success;
+            EntityKeyId = entityKeyId ?? string.Empty;
+            ThreatX = threatX;
+            ThreatZ = threatZ;
+            RetreatX = retreatX;
+            RetreatZ = retreatZ;
+            Distance = distance;
+            Message = message ?? string.Empty;
+        }
+
+        public bool Success { get; }
+        public string EntityKeyId { get; }
+        public float ThreatX { get; }
+        public float ThreatZ { get; }
+        public float RetreatX { get; }
+        public float RetreatZ { get; }
+        public float Distance { get; }
+        public string Message { get; }
+    }
+
+
+    /// <summary>
     /// Pure diagnostic DTO returned when executing selection or control group operations.
     /// Decoupled from Unity types.
     /// </summary>
@@ -1502,6 +1539,79 @@ namespace RogueCommandExpansionLoader.Runtime
         /// Dispatches a movement command to a living unit by entity key ID.
 
         /// </summary>
+
+        /// <summary>
+        /// Orders an evasive retreat away from a threat position.
+        /// The retreat distance is bounded and validated for finite inputs.
+        /// </summary>
+        public static RetreatResult TryOrderRetreat(string entityKeyId, float threatX, float threatZ, float distance)
+        {
+            if (string.IsNullOrWhiteSpace(entityKeyId))
+            {
+                return new RetreatResult(false, string.Empty, threatX, threatZ, 0f, 0f, distance,
+                    "Entity key ID cannot be empty.");
+            }
+
+            if (float.IsNaN(threatX) || float.IsInfinity(threatX) ||
+                float.IsNaN(threatZ) || float.IsInfinity(threatZ) ||
+                float.IsNaN(distance) || float.IsInfinity(distance))
+            {
+                return new RetreatResult(false, entityKeyId, threatX, threatZ, 0f, 0f, distance,
+                    "Retreat threat coordinates and distance must be finite.");
+            }
+
+            int clampedDistance = (int)Mathf.Clamp(distance, 3f, 50f);
+            float retreatDistance = clampedDistance;
+
+            try
+            {
+                ExistingControllers existing = ExistingControllers.Instance;
+                if (existing == null)
+                {
+                    return new RetreatResult(false, entityKeyId, threatX, threatZ, 0f, 0f, retreatDistance,
+                        "ExistingControllers instance is not available.");
+                }
+
+                EntityController unit = FindEntityByKey(existing, entityKeyId);
+                if (unit == null || unit.IsDestroyed || unit.DestroyHasBeenStarted || !unit.IsUnit)
+                {
+                    return new RetreatResult(false, entityKeyId, threatX, threatZ, 0f, 0f, retreatDistance,
+                        "Unit '" + entityKeyId + "' not found or destroyed.");
+                }
+
+                Vector3 pos = unit.Position;
+                float dx = pos.x - threatX;
+                float dz = pos.z - threatZ;
+                float len = (float)Math.Sqrt(dx * dx + dz * dz);
+                float dirX;
+                float dirZ;
+                if (len <= 0.0001f)
+                {
+                    dirX = 0f;
+                    dirZ = 1f;
+                }
+                else
+                {
+                    dirX = dx / len;
+                    dirZ = dz / len;
+                }
+
+                float retreatX = pos.x + dirX * retreatDistance;
+                float retreatZ = pos.z + dirZ * retreatDistance;
+
+                EntityCommand moveCmd = EntityCommand.Move(new Vector3(retreatX, 0f, retreatZ));
+                moveCmd.tag = "rcl-retreat";
+                unit.ExecuteCommand(moveCmd, EntityController.CommandProcessingType.ExecuteBeforeCurrentCommand);
+
+                return new RetreatResult(true, entityKeyId, threatX, threatZ, retreatX, retreatZ, retreatDistance,
+                    "Retreat command dispatched away from threat.");
+            }
+            catch (Exception ex)
+            {
+                return new RetreatResult(false, entityKeyId, threatX, threatZ, 0f, 0f, retreatDistance,
+                    "Error executing retreat: " + ex.Message);
+            }
+        }
 
         public static UnitCommandResult TryOrderUnitMove(string entityKeyId, float destinationX, float destinationZ)
 
