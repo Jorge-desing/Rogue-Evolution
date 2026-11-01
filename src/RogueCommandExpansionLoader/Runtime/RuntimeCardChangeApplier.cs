@@ -221,7 +221,11 @@ namespace RogueCommandExpansionLoader.Runtime
                 SetField(cardChange, "changeableValueHasToBeGreaterZero", request.ChangeableValueHasToBeGreaterZero);
                 if (_changeSideType != null)
                 {
-                    SetEnumField(cardChange, "side", _changeSideType, request.Side);
+                    object sideValue = ResolveCardChangeSide(request.Side);
+                    if (sideValue != null)
+                    {
+                        SetField(cardChange, "side", sideValue);
+                    }
                 }
                 if (request.OnlyForTheseEntityIds != null && request.OnlyForTheseEntityIds.Length > 0)
                 {
@@ -290,6 +294,49 @@ namespace RogueCommandExpansionLoader.Runtime
             {
             }
             return -1;
+        }
+
+        private static object ResolveCardChangeSide(string side)
+        {
+            if (_changeSideType == null || ! _changeSideType.IsEnum)
+            {
+                return null;
+            }
+
+            string normalized = string.IsNullOrWhiteSpace(side) ? "Friendly" : side.Trim();
+            string nativeName;
+            if (string.Equals(normalized, "Friendly", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(normalized, "Player", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(normalized, "Allies", StringComparison.OrdinalIgnoreCase))
+            {
+                nativeName = "False";
+            }
+            else if (string.Equals(normalized, "Enemy", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(normalized, "AI", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(normalized, "Hostile", StringComparison.OrdinalIgnoreCase))
+            {
+                nativeName = "True";
+            }
+            else if (string.Equals(normalized, "All", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(normalized, "Any", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(normalized, "Irrelevant", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(normalized, "Neutral", StringComparison.OrdinalIgnoreCase))
+            {
+                nativeName = "Irrelevant";
+            }
+            else
+            {
+                nativeName = normalized;
+            }
+
+            try
+            {
+                return Enum.Parse(_changeSideType, nativeName, true);
+            }
+            catch
+            {
+                return null;
+            }
         }
 
         private static void SetField(object target, string name, object value)
