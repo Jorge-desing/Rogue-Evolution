@@ -81,6 +81,7 @@ The `RuntimeGameplayCommandDirector` class dispatches safe in-game actions for a
 - `diagnostics_order_unit_stop`: Halts the entity's active order (`entityKeyId`).
 - `diagnostics_order_unit_hold_position`: Commands the unit to hold position and engage targets in range (`entityKeyId`).
 - `diagnostics_order_unit_attack_move`: Orders an attack-move toward coordinates (`entityKeyId`, `targetX`, `targetZ`).
+- `diagnostics_order_coordinated_assault`: Coordinates a bounded attack against one hostile target using only eligible hostile combat attackers (`targetEntityKeyId`, `attackerEntityKeyIds`, `maxAttackers`).
 - `diagnostics_order_unit_patrol`: Dispatches a native patrol route with parallel X/Z waypoints (`entityKeyId`, `waypointX`, `waypointZ`).
 - `diagnostics_order_group_command`: Dispatches a command (`Move`, `Stop`, `HoldPosition`, `AttackMove`) across multiple units (`entityKeyIds`, `commandType`, `targetX`, `targetZ`).
 - `diagnostics_order_formation_move`: Dispatches a synchronized formation movement (`Line`, `Wedge`, `Column`, `Box`, `Surround`) to multiple units (`entityKeyIds`, `formationType`, `targetX`, `targetZ`, `spacing`).
@@ -213,6 +214,7 @@ When adding any new telemetry or command endpoint:
 1. **Pure Formatter / DTO** (`AgentDiagnosticsFormatter.cs`):
    - Declare the pure struct/class DTO with primitive fields.
    - Implement manual JSON serialization emitting a `"kind"` discriminator and placing loss/omission counters strictly first.
+   - For numeric fields, store the raw `float`/`double` in the view dictionary. `Serialize` -> `WriteValue` already routes `float`/`double` through `WriteFiniteNumber(StringBuilder, ...)`, which emits `null` for `NaN`/infinity and preserves finite precision. Do **not** call `WriteFiniteNumber(value)` as a dictionary value: it returns `void` and will not compile, and pre-converting loses the finite-formatting path.
 2. **Bridge Method** (`LoaderDiagnosticsComponent.cs`):
    - Add a public MonoBehaviour method returning a JSON string.
    - Perform null-safe delegation to the DTO collector or `RuntimeGameplayCommandDirector`.
