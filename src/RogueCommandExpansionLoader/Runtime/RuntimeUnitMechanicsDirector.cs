@@ -505,6 +505,14 @@ namespace RogueCommandExpansionLoader.Runtime
             string captainKeyId = ReadIntProperty(_uniqueEntityIdProperty, captainObj, -1).ToString();
             bool isPlayer = ReadBoolProperty(_isControlledByPlayerProperty, captainObj);
             var createdLinks = new List<object>();
+            var previouslyCreatedLinks = new List<object>();
+            lock (_activeDynamicCommandAuras)
+            {
+                if (_activeDynamicCommandAuras.TryGetValue(captainKeyId, out DynamicCommandAuraState existing))
+                {
+                    previouslyCreatedLinks.AddRange(existing.CreatedFollowerLinks);
+                }
+            }
 
             IEnumerable entities = GetActiveEntities();
             if (entities != null)
@@ -539,9 +547,9 @@ namespace RogueCommandExpansionLoader.Runtime
                                 _setCaptainMethod.Invoke(candidate, new[] { captainObj });
                                 createdLinks.Add(candidate);
                             }
-                            else if (ReferenceEquals(curCap, captainObj))
+                            else if (ReferenceEquals(curCap, captainObj) && ContainsReference(previouslyCreatedLinks, candidate))
                             {
-                                // Already linked to this captain
+                                createdLinks.Add(candidate);
                             }
                         }
                         catch
@@ -609,6 +617,24 @@ namespace RogueCommandExpansionLoader.Runtime
             }
 
             return true;
+        }
+
+        private static bool ContainsReference(List<object> items, object target)
+        {
+            if (items == null || target == null)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < items.Count; i++)
+            {
+                if (ReferenceEquals(items[i], target))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static void ReleaseCommandAuraFollowerLinks(DynamicCommandAuraState state)

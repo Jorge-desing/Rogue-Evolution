@@ -4521,7 +4521,15 @@ internal static partial class ValidationTestRunner
                 throw new InvalidOperationException("The initial command aura should link the nearby follower.");
             }
 
-            UnityEngine.Time.time = 22f;
+            UnityEngine.Time.time = 20.5f;
+            CommandAuraResult renewed = RuntimeGameplayCommandDirector.TryDispatchCommandAuraPulse(
+                "761", "Inspire", 10f, 3f);
+            if (!renewed.Success || !ReferenceEquals(follower.CaptainOfThisEntity, captain))
+            {
+                throw new InvalidOperationException("Renewing a command aura should preserve follower links owned by the prior pulse.");
+            }
+
+            UnityEngine.Time.time = 24f;
             CommandAuraCensus expired = RuntimeCommandAuraCensus.Current();
             if (follower.CaptainOfThisEntity != null || expired.TotalActiveAurasCount != 0 ||
                 !ReferenceEquals(existingFollower.CaptainOfThisEntity, existingCaptain))
