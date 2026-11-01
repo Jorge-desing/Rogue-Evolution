@@ -235,17 +235,16 @@ Pitfalls:
 
 ### Registered AI Modules
 
-The loader includes 6 compiled AI modules available for content packs:
+The loader includes 20 compiled AI modules registered in `AiModuleRegistry.CreateDefault()` (available for content packs, with a per-profile limit of up to 8 modules):
 
-1. **`sample:scheduled-base-build`**:
+1. **`sample:trace-default`**:
+   - Diagnostic trace module monitoring native AI lifecycle events and logging execution milestones.
+2. **`sample:scheduled-base-build`**:
    - Uses `DefaultAiBehaviour.CreateBuilding_Static` to construct a building already present in the active native deck.
    - Parameters: `entityId` (namespaced string), `intervalSeconds` (finite 1–300s), `cooldownSeconds` (finite 0–300s), `maxAttempts` (integer 1–100), `maxSuccessfulBuilds` (integer 1–100).
-2. **`sample:reactive-base-defense`**:
+3. **`sample:reactive-base-defense`**:
    - Intercepts player units attacking AI structures and inserts attack-move counterattacks before selected defenders' current commands.
    - Parameters: `baseIndex` (0–31), `cooldownSeconds` (1–60s), `defenseRadiusCells` (1–64; default 12), `maxResponders` (1–4; default 2), `protectedTargetType` (`Buildings` [default], `Harvesters`, `BuildingsAndHarvesters`).
-3. **`sample:patrol-and-intercept`**:
-   - Manages tactical perimeter patrol and interception. `AttackMove` remains the default mode.
-   - Opt-in native Patrol route motion requires `CurrentPlayerCommandName == DoNothing` AND verified empty private `_commandChain` queue (`LinkedList<EntityCommand>`), failing closed otherwise to preserve queued orders.
 4. **`sample:harvester-raider`**:
    - Actively hunts player crystal gatherers to disrupt enemy economy.
    - Parameters: `baseIndex` (0–31), `scanIntervalSeconds` (2–120s; default 10s), `cooldownSeconds` (5–300s; default 25s), `raidSquadSize` (1–8; default 3), `minGameTimeSeconds` (0–600s; default 15s).
@@ -256,8 +255,56 @@ The loader includes 6 compiled AI modules available for content packs:
    - Scans known player structures (`PlayerBuildingsKnownToAi`, `PlayerRefineries`, or `EngineeringHq`), gathers available combat troops, and coordinates offensive siege strikes.
 6. **`sample:threat-prioritization`**:
    - Scores hostile player units and retargets AI combat units with hysteresis and a per-tick command budget.
-   - Parameters: `baseIndex` (-1–31; default -1), `checkIntervalSeconds` (0.5–30s; default 3s), `priorityMode` (`HighestThreat` [default], `LowestHealth`, `HighestDps`; normalized to canonical casing), `engagementRadius` (5–120; default 35), `retargetThreshold` (1.0–3.0; default 1.25), `maxRetargetsPerTick` (1–32; default 8).
-   - Filters candidates with `unit.IsEnemy(candidate)` and re-checks hostility on the current target before hysteresis; consumes the retarget budget before native dispatch.
+   - Parameters: `baseIndex` (-1–31; default -1), `checkIntervalSeconds` (0.5–30s; default 3s), `priorityMode` (`HighestThreat` [default], `LowestHealth`, `HighestDps`; normalized to canonical PascalCase), `engagementRadius` (5–120; default 35), `retargetThreshold` (1.0–3.0; default 1.25), `maxRetargetsPerTick` (1–32; default 8).
+   - Filters candidates with `unit.IsEnemy(candidate)` and re-checks hostility on the current target before hysteresis; consumes the retarget budget before native dispatch via `EntityCommand.AttackMoveOnTarget` with `ExecuteBeforeCurrentCommand`.
+7. **`sample:skirmish-kiting`**:
+   - Tactical harassment module that activates for fast, long-range units (`MoveSpeed >= MinKiteSpeed`, `WeaponRange >= 5.0`).
+   - Parameters: `baseIndex` (-1–31; default -1), `checkIntervalSeconds` (0.2–10s; default 1.0s), `minKiteSpeed` (5.0–30.0; default 10.0), `retreatDistanceRatio` (0.2–0.9; default 0.6), `kiteCooldownSeconds` (0.5–30s; default 2.0s).
+   - Monitors encroaching hostiles and commands retreat moves opposite the threat vector when enemies enter the retreat distance ratio of weapon range.
+8. **`sample:support-repair`**:
+   - Autonomous logistics and field repair module directing dedicated support units to damaged friendlies.
+   - Parameters: `baseIndex` (-1–31; default -1), `scanIntervalSeconds` (0.5–30s; default 2.0s), `repairRadiusCells` (5–60; default 25), `targetPriority` (`HarvestersFirst` [default], `FactoriesFirst`, `LowestHealthRatio`), `maxRepairersPerTarget` (1–4; default 2).
+   - Scans damaged allies, prioritizes Harvesters and production factories, and queues repair moves.
+9. **`sample:counter-battery`**:
+   - Dispatches fast, mobile interceptors against long-range player artillery and siege weapons.
+   - Parameters: `baseIndex` (-1–31; default -1), `scanIntervalSeconds` (1.0–30s; default 3.0s), `artilleryRangeThreshold` (10.0–50.0; default 18.0), `interceptSquadSize` (1–6; default 2).
+   - Pinpoints hostile units exceeding the range threshold and assigns high-speed units to neutralize them.
+10. **`sample:wave-escalation`**:
+    - Periodically increments the AI attack wave counter and coordinates timed offensive pushes.
+    - Parameters: `baseIndex` (-1–31; default -1), `escalationIntervalSeconds` (30–600s; default 120s), `maxWaveNumber` (1–50; default 10), `orderAssaultOnWave` (true/false; default true).
+    - Interfaces with `AiBehaviourManager.CurrentAttackWaveNumber` to escalate match pressure.
+11. **`sample:squad-formation`**:
+    - Binds follower combat units to an anchor captain unit with designated geometric offsets.
+    - Parameters: `baseIndex` (-1–31; default -1), `formationType` (`Wedge` [default], `Line`, `Column`), `spacingCells` (1–10; default 2), `maxFollowers` (1–8; default 4).
+    - Automatically unbinds followers when captain is destroyed.
+12. **`sample:tactical-skill-activation`**:
+    - Triggers entity active tactical skills when enemy units are detected in range or upon health drops.
+    - Parameters: `baseIndex` (-1–31; default -1), `checkIntervalSeconds` (0.5–10s; default 1.5s), `enemyTriggerRadiusCells` (2–40; default 15).
+    - Evaluates `UnitRuntimeMechanicsProfile.AiActivationTrigger` (`EnemiesInRange` vs `LowHealth`); triggers self-buffs or target-directed skills accordingly.
+13. **`sample:focus-fire`**:
+    - Coordinates multiple allied combatants to concentrate fire on single high-priority targets.
+    - Parameters: `baseIndex` (-1–31; default -1), `evalIntervalSeconds` (0.5–15s; default 2.0s), `selectionMode` (`LowestHealth` [default], `HighestThreat`, `HighestDps`).
+14. **`sample:construction-expansion`**:
+    - Manages dynamic AI base expansion and defensive perimeter construction.
+    - Parameters: `baseIndex` (0–31), `expansionIntervalSeconds` (10–300s; default 45s), `maxExpansions` (1–10; default 3).
+15. **`sample:tactical-regroup`**:
+    - Pulls combatants back to a safe rally point when squad casualties exceed a configurable threshold.
+    - Parameters: `baseIndex` (-1–31; default -1), `healthRatioThreshold` (0.1–0.7; default 0.35), `regroupRadiusCells` (5–50; default 15).
+16. **`sample:factory-reinforcement`**:
+    - Automatically routes newly produced factory units directly to bolster active front-line combat squads.
+    - Parameters: `baseIndex` (0–31), `rallyDistanceThreshold` (5.0–100.0; default 25.0).
+17. **`sample:flanking-strike`**:
+    - Coordinates secondary assault groups to navigate around primary battle lines and strike flanks or rear infrastructure.
+    - Parameters: `baseIndex` (0–31), `flankAngleDegrees` (30–90; default 60), `squadSize` (2–6; default 3).
+18. **`sample:retreat-and-regroup`**:
+    - Pulls severely damaged units back to base repair zones.
+    - Parameters: `baseIndex` (0–31), `retreatHealthRatio` (0.1–0.5; default 0.25), `cooldownSeconds` (5–120s; default 20s).
+19. **`sample:harvester-escort`**:
+    - Assigns dedicated combat escorts to shadow and protect friendly harvesters during resource collection runs.
+    - Parameters: `baseIndex` (0–31), `escortsPerHarvester` (1–3; default 1), `leashDistance` (3.0–20.0; default 8.0).
+20. **`sample:patrol-and-intercept`**:
+    - Manages tactical perimeter patrol and interception. `AttackMove` remains the default mode.
+    - Opt-in native Patrol route motion requires `CurrentPlayerCommandName == DoNothing` AND verified empty private `_commandChain` queue (`LinkedList<EntityCommand>`), failing closed otherwise to preserve queued orders.
 
 ### Runtime mechanics profile consumption
 

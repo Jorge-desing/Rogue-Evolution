@@ -34,6 +34,17 @@ Read `AGENTS.md`, `references/changeable-values-spec.md`, `references/lanchester
 - **Custom Units Without Native Templates**: Custom units do not require a `nativeTemplateId`. As verified by `test_custom_unit_without_native_template_id_loads`, the simulator parses and benchmarks standalone custom units using their authored manifest stats.
 - **Attack delivery model limit**: In this simulator, `UnitProfile.attack_type` is descriptive metadata only; the game uses `AttackType` to select delivery and targeting behavior. Primary attacks model `firePointCount` as one same-tick projectile hit per firepoint, including shield-charge consumption per hit; `damage1` is per projectile and cooldown is per volley. Nominal DPS/CEI also includes `damage2` and `attack2Cooldown` when supplied, but timed duel and squad events execute only primary volleys; secondary delivery is not simulated. The model does not reproduce firepoint stagger, beam ticks, exact target ordering, or actual AoE victim counts. It reports `Unknown` when the input has no verified `AttackType`; do not treat `Continuous` as a game enum or as proof that damage is continuous.
 - **Squad geometry limit**: `--squad` assigns each unit an independent scalar distance, adds initial approach scatter, and moves each toward its own weapon range. It does not track pairwise positions, collision, formation, obstacles, line of sight, flanking, or retreat behavior; every firing unit can choose the lowest-HP surviving opponent regardless of that target's distance. Squad results are comparative estimates, and an infinite-kiting flag from the duel model remains a warning about range/speed matchups.
+- **Tactical Combat Mechanics (`RuntimeUnitMechanicsDirector`)**:
+  - *Autonomous Shield Regeneration*: Units with defined shield capacity regenerate charges over time outside combat hits (`shieldRegenPerSecond`, `shieldCapacity`).
+  - *Vampiric Life Leech*: Restores health based on dealt combat damage (`vampiricLifeLeechRatio`); strictly safeguarded against boosting from friendly fire.
+  - *Taunt Pulse*: Forces nearby enemies within `tauntRadius` to focus fire on the taunting unit for `tauntDurationSeconds`.
+  - *Shield Overload EMP*: Emits an area EMP blast (`shieldOverloadEmpRadius`, `shieldOverloadEmpDamage`) upon shield depletion.
+- **Precision Critical Strike Specialization**:
+  - Attribute `criticalHitChance` ($0.0 \le p \le 1.0$) mapped through `EntityController.AddCriticalHitChanceBonus` for high-variance spike damage.
+- **Artillery Minimum Attack Range Dead-Zone**:
+  - Attribute `minAttackRange` ($0 \le r \le 200\text{m}$) enforced via `EntityAttack.IsTargetInRange` postfix hook to prevent siege artillery from firing at point-blank enemies.
+- **Dynamic On-Hit Status Effects**:
+  - Support for `onHitStatusEffects[]` declaring status applications (Stun, SlowedDown, OnFire, Electrified, CombatBoost) with bounded duration and trigger chance.
 
 ---
 

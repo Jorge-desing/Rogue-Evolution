@@ -27,21 +27,23 @@ For Unity particle authoring, read `AGENTS.md`, `docs/research/AGENT-HANDOFF.md`
 
 ## 2. Core Technical Rules & Native Hooks
 
-1. **Automatic Muzzle Flash Hook (`ShootProjectile`)**:
+1. **Automatic Muzzle Flash Hook & BFS Safeguard (`ShootProjectile`)**:
    - The native engine iterates `firePointsTransform` children at startup.
    - If a child has sub-children, it automatically caches `child.GetChild(0).GetComponent<ParticleSystem>()` and calls `.Play()` upon firing.
-   - **Rule**: Place your muzzle flash `ParticleSystem` as **child index 0** under each individual firepoint transform. Set `playOnAwake = false` and `looping = false`. No custom C# code is needed.
+   - **Rule**: Place your muzzle flash `ParticleSystem` as **child index 0** (`FirePoint_0`) under `Socket_MuzzlePrimary`. Set `playOnAwake = false` and `looping = false`.
+   - **Loader Safeguard (`EnsureMuzzleFlashHierarchy`)**: If an imported model lacks child particle emitters under a declared firepoint, `ContentPackRuntimeLoader` executes a recursive BFS to discover or synthesize a lightweight particle emitter on `FirePoint_0`, preventing unhandled `NullReferenceException` crashes during native `ShootProjectile.Init()`.
 
 2. **Damage Smoke & Fire Anchors (`RuntimeVisualDirector`)**:
    - The loader visual director attaches smoke when `HealthRatio <= 0.50f` and fire when `HealthRatio <= 0.25f`.
    - Provide explicit transform sockets named `Socket_DamageSmoke` (e.g. over the engine exhaust deck) and `Socket_DamageFire` (near fuel tanks/turret ring).
    - A missing socket may make the fallback mount at the entity root. It only applies if `RuntimeVisualDirector` attaches to that entity; do not imply every native/custom prefab receives the modded effect. Authored emitters bind only when the socket role is unique and exactly one descendant `ParticleSystem` exists.
 
-3. **URP Shader Compatibility**:
+3. **URP Shader Compatibility & Runtime Fallback**:
    - Rogue Command runs on the Universal Render Pipeline.
    - Use `Universal Render Pipeline/Particles/Unlit` (or `Simple Lit`). Built-in pipeline shaders (`Particles/Standard Surface`, `Standard`) will render pink/broken.
    - Enable GPU instancing only when the chosen shader and renderer support it. The flag makes a renderer eligible; it does not prove batching or fewer draw calls.
    - A distributable bundle must include its required shader/material dependencies; do not assume the game's built-in shader assets satisfy a modded bundle.
+   - **Runtime Fallback (`ApplyFallbackVisualMaterial`)**: In-game fallback handler automatically inspects imported materials and replaces null or unsupported shaders with native `Shader Graphs/EntityColorShader` or `Universal Render Pipeline/Lit` to prevent pink material artifacts.
 
 4. **Performance Safeguards**:
    - Treat 250 max particles per vehicle as a local authoring ceiling, not an engine-enforced limit; the reference recipes suggest roughly 15 per muzzle flash, 40 damage smoke, and 30 damage fire.

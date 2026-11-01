@@ -36,6 +36,15 @@ Use this skill when validating or packaging a Rogue Command loader/content chang
 - **Registry Hardening**:
   - Rejects duplicate unit, factory, and pool IDs both intra-pack and cross-pack.
   - Excludes ambiguous cross-pack mappings and safely reports invalid UTF-8 manifests without crashing.
+- **Global Blueprint Reward Injection & Stage Factory Scope**:
+  - `AllEntityIdsAllowedAsBlueprintsPostfix` injects eligible modded factories into stage reward pools via `IGlobalBlueprintCandidateProvider`. Modded unit factories should declare `Common` rarity to ensure natural reward card offers.
+  - `BlueprintRewardFactoryScope.IsStageFactory` accurately identifies stage factories, preventing reward pool contamination.
+- **Standalone Building Definitions (`ContentBuildingDefinition` / `buildings[]`)**:
+  - First-class standalone buildings follow schema DTO, null-safe deep cloning, and range validation without requiring unit production bindings.
+- **Pre-Spawning Anti-Hitch Pool Quotas (`ApplyModPrespawnQuotas`)**:
+  - Warm pre-allocation of modded unit entity pools in `RuntimeHooks.cs` prevents GC hitches and micro-stutters during heavy combat spawns.
+- **Prefab and AssetBundle Manifest Parity**:
+  - Every unit and building declared in `content.json` must exist inside the compiled `.bundle`. Mismatches cause silent runtime instantiation failures.
 - Schema enum and C# allowlist must agree: if `content.schema.json` advertises an `activeSkill.skillType` (or other enum) that `ContentPackValidation.cs` rejects (or the runtime does not handle), content authors can pass schema validation but fail at load. When adding or renaming a skill type, update both the schema enum and the C# allowlist in the same change, and confirm the runtime actually dispatches the new type. Conversely, when a type is in the schema but unsupported at runtime, remove it from the schema enum rather than widening the allowlist without runtime support.
 - Schema and offline harness validation do not prove that a `blueprintPoolEntries` pool ID exists in the native stage template. A missing native pool disables the whole pack during runtime registration, so verify pool IDs with generated stage references or a live BepInEx MCP registration probe before delivery.
 - Native stage templates differ in available pools: `StageParameters_Pools_Level1SimpleRoleChoiceWithPriceLimit` supports `BP_CheaperVehicles`, `BP_CheaperRobos`, and `BP_CheaperMechs`, while the tested `StageParameters_Pools_Level3` template supports only `BP_CheaperMechs`. Treat any pool ID as invalid until a runtime registration probe or generated stage reference confirms it.

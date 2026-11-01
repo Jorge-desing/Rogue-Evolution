@@ -42,6 +42,16 @@ Read `AGENTS.md`, `references/native-audio-integration-points.md`, `references/u
    - `minDistance = 3.0m`, `maxDistance = 60.0m – 80.0m` (matches the tactical camera height and screen radius).
    - `dopplerLevel = 0.0` (critical in RTS: non-zero doppler warbles when the player rapidly pans the camera).
 
+5. **Canonical Sockets for 3D Audio Placement**:
+   - `Socket_WeaponAudio`: Positioned at the primary weapon muzzle to anchor `ShootProjectile.shotSoundAudioSource`.
+   - `Socket_EngineAudio`: Positioned over the engine exhaust deck midpoint to drive `EntityFlockingMovement._movementSoundAudioSource`.
+
+6. **Audio Mixer Telemetry & Runtime Volume Control**:
+   - Clean-room `RuntimeAudioCensus` inspects the game's `AudioMixer` via `AudioMixerHelper`.
+   - Decompiled signature order: `AudioMixerHelper.Set*Volume(AudioMixer mixer, float sliderValue)` (mixer first, float second).
+   - Sliders operate in normalized range $[0.0, 1.0]$ across `Master`, `Music`, `Gameplay`, and `UI` (`UISelectionSounds`).
+   - Accessible over BepInEx MCP via `diagnostics_get_audio_census` and `diagnostics_set_audio_volume`.
+
 ---
 
 ## 3. Audio Validation Tool

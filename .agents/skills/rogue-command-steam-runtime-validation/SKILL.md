@@ -1,6 +1,10 @@
 ---
 name: rogue-command-steam-runtime-validation
 description: "Verify Rogue Command loader or content behavior in a live match launched through Steam, using reversible deployment and explicit evidence boundaries."
+metadata:
+  hermes:
+    tags: [Rogue Command, Steam, runtime validation, BepInEx, MCP, QA Profile2]
+    related_skills: [rogue-command-clean-room-diagnostics, rogue-command-harmony-policy, rogue-command-pack-validation]
 ---
 
 # Rogue Command Steam Runtime Validation
@@ -33,6 +37,11 @@ Use this skill when an acceptance claim requires observing a loader, unit, stage
 - When resolving a native control, require exact agreement on name, scene, active state, expected component type, and expected member values before invoking any mutating method. A single mismatch is a safety stop.
 - Record the BepInEx log lines that show pack loading and any injected probe. A successful MCP response alone is not evidence that registration occurred.
 - **MCP evidence boundary**: the bridge can enumerate scenes, objects, and components, but it does not replace visual confirmation of card rendering. If vision analysis is rate-limited or the bridge cannot drive the UI to the target scene, record the boundary explicitly and do not claim runtime success from menu navigation alone.
+- **First-Class MCP Tool Suite & Aggregators**: Rather than constructing manual `component/call_method` HTTP queries, prefer using the first-class tools exposed by `tools/bepinex_mcp_server.py` and documented in `rogue-command-clean-room-diagnostics`:
+  - `diagnostics_runtime_snapshot`: Consolidated JSON snapshot combining battlefield, run progression, system health, and match summary in one call.
+  - `diagnostics_runtime_scalars`: Fast scalar metrics for live polling loops.
+  - 18 diagnostic censuses (`AiDirector`, `Camera`, `Harvester`, `Audio`, `TechCatalog`, `Selection`, `Fog`, `Grid`, `Battlefield`, `PlayerRoster`, `AiRoster`, etc.).
+  - 20+ in-game command director tools for tactical orders, active skills, vitality adjustments, harvester commands, and AI wave manipulation.
 
 ## Reversible deployment manifest
 
