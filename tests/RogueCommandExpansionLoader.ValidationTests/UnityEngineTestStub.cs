@@ -113,6 +113,7 @@ namespace UnityEngine
     public class Object
     {
         public static T FindObjectOfType<T>() where T : class => null;
+        public static void Destroy(Object obj) { }
     }
 
     public class Sprite : Object
@@ -147,12 +148,23 @@ namespace UnityEngine
     {
     }
 
+    public class Collider : Component
+    {
+        public bool isTrigger { get; set; }
+    }
+
+    public class SphereCollider : Collider
+    {
+        public float radius { get; set; }
+    }
+
     public sealed class GameObject : Object
     {
         private readonly System.Collections.Generic.List<Component> _components = new();
         public string name { get; set; } = string.Empty;
         public string tag { get; set; } = "Enemy";
         public bool activeInHierarchy { get; set; } = true;
+        public Transform transform { get; set; } = new();
 
         public GameObject(string name = "")
         {
@@ -186,6 +198,8 @@ namespace UnityEngine
     public static class Mathf
     {
         public static float Clamp(float value, float min, float max) =>
+            value < min ? min : (value > max ? max : value);
+        public static int Clamp(int value, int min, int max) =>
             value < min ? min : (value > max ? max : value);
 
         public static int Max(int a, int b) => a > b ? a : b;

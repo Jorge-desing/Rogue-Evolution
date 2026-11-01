@@ -692,6 +692,84 @@ namespace RogueCommandExpansionLoader.Runtime
 
 
 
+    /// <summary>
+    /// Pure diagnostic DTO returned when adjusting or granting entity combat veterancy / XP.
+    /// Decoupled from Unity types.
+    /// </summary>
+    public readonly struct VeterancyCommandResult
+    {
+        public VeterancyCommandResult(bool success, string entityKeyId, int currentRank, int currentXp, string message)
+        {
+            Success = success;
+            EntityKeyId = entityKeyId ?? string.Empty;
+            CurrentRank = currentRank;
+            CurrentXp = currentXp;
+            Message = message ?? string.Empty;
+        }
+
+        public bool Success { get; }
+        public string EntityKeyId { get; }
+        public int CurrentRank { get; }
+        public int CurrentXp { get; }
+        public string Message { get; }
+    }
+
+    /// <summary>
+    /// Pure diagnostic DTO returned when dispatching a dynamic command aura or captain link pulse.
+    /// Decoupled from Unity types.
+    /// </summary>
+    public readonly struct CommandAuraResult
+    {
+        public CommandAuraResult(bool success, string captainKeyId, string auraType, int linkedFollowersCount, float radius, float durationSeconds, string message)
+        {
+            Success = success;
+            CaptainKeyId = captainKeyId ?? string.Empty;
+            AuraType = auraType ?? string.Empty;
+            LinkedFollowersCount = linkedFollowersCount;
+            Radius = radius;
+            DurationSeconds = durationSeconds;
+            Message = message ?? string.Empty;
+        }
+
+        public bool Success { get; }
+        public string CaptainKeyId { get; }
+        public string AuraType { get; }
+        public int LinkedFollowersCount { get; }
+        public float Radius { get; }
+        public float DurationSeconds { get; }
+        public string Message { get; }
+    }
+
+    /// <summary>
+    /// Pure diagnostic DTO returned when spawning or clearing battlefield environmental hazard zones.
+    /// Decoupled from Unity types.
+    /// </summary>
+    public readonly struct HazardCommandResult
+    {
+        public HazardCommandResult(bool success, string zoneId, string hazardType, float centerX, float centerZ, float radius, float durationSeconds, float tickDamage, string message)
+        {
+            Success = success;
+            ZoneId = zoneId ?? string.Empty;
+            HazardType = hazardType ?? string.Empty;
+            CenterX = centerX;
+            CenterZ = centerZ;
+            Radius = radius;
+            DurationSeconds = durationSeconds;
+            TickDamage = tickDamage;
+            Message = message ?? string.Empty;
+        }
+
+        public bool Success { get; }
+        public string ZoneId { get; }
+        public string HazardType { get; }
+        public float CenterX { get; }
+        public float CenterZ { get; }
+        public float Radius { get; }
+        public float DurationSeconds { get; }
+        public float TickDamage { get; }
+        public string Message { get; }
+    }
+
     public static class RuntimeGameplayCommandDirector
 
     {
@@ -1712,11 +1790,15 @@ namespace RogueCommandExpansionLoader.Runtime
 
                 string name = entity.name ?? string.Empty;
 
+                string uniqueId = entity.UniqueEntityId > 0 ? entity.UniqueEntityId.ToString() : string.Empty;
+
 
 
                 if (string.Equals(id, key, StringComparison.OrdinalIgnoreCase) ||
 
-                    string.Equals(name, key, StringComparison.OrdinalIgnoreCase))
+                    string.Equals(name, key, StringComparison.OrdinalIgnoreCase) ||
+
+                    (!string.IsNullOrEmpty(uniqueId) && string.Equals(uniqueId, key, StringComparison.OrdinalIgnoreCase)))
 
                 {
 
@@ -3746,6 +3828,290 @@ namespace RogueCommandExpansionLoader.Runtime
 
 
 
-    }
 
+
+        /// <summary>
+        /// Grants combat experience (XP) to a unit, advancing veterancy ranks when thresholds are met.
+        /// </summary>
+        public static VeterancyCommandResult TryGrantEntityCombatXp(string entityKeyId, int xpAmount)
+        {
+            if (string.IsNullOrWhiteSpace(entityKeyId) || xpAmount <= 0)
+            {
+                return new VeterancyCommandResult(false, entityKeyId, 0, 0,
+                    "Invalid entity key or XP amount must be positive.");
+            }
+
+            try
+            {
+                ExistingControllers existing = ExistingControllers.Instance;
+                if (existing == null)
+                {
+                    return new VeterancyCommandResult(false, entityKeyId, 0, 0,
+                        "ExistingControllers instance is not available.");
+                }
+
+                EntityController unit = FindEntityByKey(existing, entityKeyId.Trim());
+                if (unit == null || unit.gameObject == null)
+                {
+                    return new VeterancyCommandResult(false, entityKeyId, 0, 0,
+                        "Entity '" + entityKeyId + "' not found or destroyed.");
+                }
+
+                int resultingXp, resultingRank;
+                bool success = RuntimeUnitMechanicsDirector.TryGrantCombatXp(unit, xpAmount, out resultingXp, out resultingRank);
+                if (success)
+                {
+                    return new VeterancyCommandResult(true, entityKeyId, resultingRank, resultingXp,
+                        "Granted " + xpAmount + " combat XP to unit '" + entityKeyId + "' (Rank: " + resultingRank + ", XP: " + resultingXp + ").");
+                }
+
+                return new VeterancyCommandResult(false, entityKeyId, 0, 0,
+                    "Failed granting combat XP to unit '" + entityKeyId + "'.");
+            }
+            catch (Exception ex)
+            {
+                return new VeterancyCommandResult(false, entityKeyId, 0, 0,
+                    "Error granting combat XP: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Sets a unit's veterancy rank level directly, invoking rankup bonuses.
+        /// </summary>
+        public static VeterancyCommandResult TrySetEntityVeterancyLevel(string entityKeyId, int targetLevel)
+        {
+            if (string.IsNullOrWhiteSpace(entityKeyId) || targetLevel < 0)
+            {
+                return new VeterancyCommandResult(false, entityKeyId, 0, 0,
+                    "Invalid entity key or target level must be non-negative.");
+            }
+
+            try
+            {
+                ExistingControllers existing = ExistingControllers.Instance;
+                if (existing == null)
+                {
+                    return new VeterancyCommandResult(false, entityKeyId, 0, 0,
+                        "ExistingControllers instance is not available.");
+                }
+
+                EntityController unit = FindEntityByKey(existing, entityKeyId.Trim());
+                if (unit == null || unit.gameObject == null)
+                {
+                    return new VeterancyCommandResult(false, entityKeyId, 0, 0,
+                        "Entity '" + entityKeyId + "' not found or destroyed.");
+                }
+
+                int resultingRank;
+                bool success = RuntimeUnitMechanicsDirector.TrySetUnitVeterancyRank(unit, targetLevel, out resultingRank);
+                int currentXp = RuntimeUnitMechanicsDirector.GetCombatXpForEntity(unit);
+                if (success)
+                {
+                    return new VeterancyCommandResult(true, entityKeyId, resultingRank, currentXp,
+                        "Set veterancy level of unit '" + entityKeyId + "' to Rank " + resultingRank + ".");
+                }
+
+                return new VeterancyCommandResult(false, entityKeyId, 0, 0,
+                    "Failed setting veterancy level of unit '" + entityKeyId + "'.");
+            }
+            catch (Exception ex)
+            {
+                return new VeterancyCommandResult(false, entityKeyId, 0, 0,
+                    "Error setting veterancy level: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Dispatches a dynamic command aura pulse around a captain entity, linking squad subordinates and applying tactical aura buffs.
+        /// </summary>
+        public static CommandAuraResult TryDispatchCommandAuraPulse(string captainKeyId, string auraType, float radius, float durationSeconds)
+        {
+            if (string.IsNullOrWhiteSpace(captainKeyId))
+            {
+                return new CommandAuraResult(false, captainKeyId, auraType, 0, radius, durationSeconds,
+                    "Captain entity key must not be empty.");
+            }
+
+            try
+            {
+                ExistingControllers existing = ExistingControllers.Instance;
+                if (existing == null)
+                {
+                    return new CommandAuraResult(false, captainKeyId, auraType, 0, radius, durationSeconds,
+                        "ExistingControllers instance is not available.");
+                }
+
+                EntityController captain = FindEntityByKey(existing, captainKeyId.Trim());
+                if (captain == null || captain.gameObject == null)
+                {
+                    return new CommandAuraResult(false, captainKeyId, auraType, 0, radius, durationSeconds,
+                        "Captain entity '" + captainKeyId + "' not found or destroyed.");
+                }
+
+                int linkedCount;
+                bool success = RuntimeUnitMechanicsDirector.TryDispatchDynamicCommandAura(
+                    captain, auraType, radius, durationSeconds, out linkedCount);
+
+                float clampedRadius = Mathf.Clamp(radius, 3.0f, 50.0f);
+                float clampedDuration = Mathf.Clamp(durationSeconds, 1.0f, 60.0f);
+                string aura = string.IsNullOrWhiteSpace(auraType) ? "Inspire" : auraType.Trim();
+
+                if (success)
+                {
+                    return new CommandAuraResult(true, captainKeyId, aura, linkedCount, clampedRadius, clampedDuration,
+                        "Dispatched " + aura + " command aura pulse from captain '" + captainKeyId + "' linking " + linkedCount + " squad units.");
+                }
+
+                return new CommandAuraResult(false, captainKeyId, aura, 0, clampedRadius, clampedDuration,
+                    "Failed dispatching command aura from captain '" + captainKeyId + "'.");
+            }
+            catch (Exception ex)
+            {
+                return new CommandAuraResult(false, captainKeyId, auraType, 0, radius, durationSeconds,
+                    "Error dispatching command aura: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Clears command aura links and subordinate captain bonds for a captain entity.
+        /// </summary>
+        public static CommandAuraResult TryClearCommandAuraLinks(string captainKeyId)
+        {
+            if (string.IsNullOrWhiteSpace(captainKeyId))
+            {
+                return new CommandAuraResult(false, captainKeyId, "", 0, 0f, 0f,
+                    "Captain entity key must not be empty.");
+            }
+
+            try
+            {
+                ExistingControllers existing = ExistingControllers.Instance;
+                if (existing == null)
+                {
+                    return new CommandAuraResult(false, captainKeyId, "", 0, 0f, 0f,
+                        "ExistingControllers instance is not available.");
+                }
+
+                EntityController captain = FindEntityByKey(existing, captainKeyId.Trim());
+                if (captain == null || captain.gameObject == null)
+                {
+                    return new CommandAuraResult(false, captainKeyId, "", 0, 0f, 0f,
+                        "Captain entity '" + captainKeyId + "' not found or destroyed.");
+                }
+
+                int clearedCount;
+                bool success = RuntimeUnitMechanicsDirector.TryClearDynamicCommandAura(captain, out clearedCount);
+                if (success)
+                {
+                    return new CommandAuraResult(true, captainKeyId, "", clearedCount, 0f, 0f,
+                        "Cleared command aura links for captain '" + captainKeyId + "' (" + clearedCount + " followers unlinked).");
+                }
+
+                return new CommandAuraResult(false, captainKeyId, "", 0, 0f, 0f,
+                    "Failed clearing command aura links for captain '" + captainKeyId + "'.");
+            }
+            catch (Exception ex)
+            {
+                return new CommandAuraResult(false, captainKeyId, "", 0, 0f, 0f,
+                    "Error clearing command aura links: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Spawns a battlefield environmental hazard zone (Firestorm, AcidPool, EmpField, CryoMist, NaniteField).
+        /// Enforces trigger collider and amortized tick rate (>= 0.5s).
+        /// </summary>
+        public static HazardCommandResult TrySpawnHazardZone(
+            string hazardType,
+            float x,
+            float z,
+            float radius,
+            float durationSeconds,
+            float tickDamage)
+        {
+            try
+            {
+                string zoneId;
+                bool success = RuntimeHazardManager.TrySpawnHazardZone(
+                    hazardType, x, z, radius, durationSeconds, tickDamage, out zoneId);
+
+                float clampedRadius = Mathf.Clamp(radius, RuntimeHazardManager.MinimumRadius, RuntimeHazardManager.MaximumRadius);
+                float clampedDuration = Mathf.Clamp(durationSeconds, RuntimeHazardManager.MinimumDuration, RuntimeHazardManager.MaximumDuration);
+                float clampedDamage = Mathf.Max(0f, tickDamage);
+                string sanitizedType = string.IsNullOrWhiteSpace(hazardType) ? "Firestorm" : hazardType.Trim();
+
+                if (success)
+                {
+                    return new HazardCommandResult(
+                        true,
+                        zoneId,
+                        sanitizedType,
+                        x,
+                        z,
+                        clampedRadius,
+                        clampedDuration,
+                        clampedDamage,
+                        "Spawned hazard zone '" + zoneId + "' (" + sanitizedType + ") at (" + x + ", " + z + ") with radius " + clampedRadius + "m.");
+                }
+
+                return new HazardCommandResult(
+                    false,
+                    "",
+                    sanitizedType,
+                    x,
+                    z,
+                    clampedRadius,
+                    clampedDuration,
+                    clampedDamage,
+                    "Failed spawning hazard zone.");
+            }
+            catch (Exception ex)
+            {
+                return new HazardCommandResult(
+                    false,
+                    "",
+                    hazardType ?? "Firestorm",
+                    x,
+                    z,
+                    radius,
+                    durationSeconds,
+                    tickDamage,
+                    "Error spawning hazard zone: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Clears all active battlefield environmental hazard zones and their trigger colliders.
+        /// </summary>
+        public static HazardCommandResult TryClearHazardZones()
+        {
+            try
+            {
+                int cleared = RuntimeHazardManager.ClearAll();
+                return new HazardCommandResult(
+                    true,
+                    "",
+                    "All",
+                    0f,
+                    0f,
+                    0f,
+                    0f,
+                    0f,
+                    "Cleared " + cleared + " active hazard zones.");
+            }
+            catch (Exception ex)
+            {
+                return new HazardCommandResult(
+                    false,
+                    "",
+                    "All",
+                    0f,
+                    0f,
+                    0f,
+                    0f,
+                    0f,
+                    "Error clearing hazard zones: " + ex.Message);
+            }
+        }
+    }
 }

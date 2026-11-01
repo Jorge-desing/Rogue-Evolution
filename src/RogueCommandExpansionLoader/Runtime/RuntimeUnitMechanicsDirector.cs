@@ -71,6 +71,20 @@ namespace RogueCommandExpansionLoader.Runtime
         private static readonly HashSet<string> _appliedCardChangeBoostKeys =
             new HashSet<string>(StringComparer.Ordinal);
 
+        private sealed class DynamicCommandAuraState
+        {
+            public string CaptainKeyId;
+            public string CaptainEntityId;
+            public bool IsControlledByPlayer;
+            public string AuraType;
+            public float Radius;
+            public float EndTime;
+            public int LinkedFollowerCount;
+        }
+
+        private static readonly Dictionary<string, DynamicCommandAuraState> _activeDynamicCommandAuras =
+            new Dictionary<string, DynamicCommandAuraState>(StringComparer.Ordinal);
+
         private static bool _reflectionResolved;
         private static PropertyInfo _entityIdProperty;
         private static FieldInfo _entityIdField;
@@ -282,6 +296,399 @@ namespace RogueCommandExpansionLoader.Runtime
             {
                 _entityCombatXp.Clear();
             }
+
+            lock (_activeDynamicCommandAuras)
+            {
+                _activeDynamicCommandAuras.Clear();
+            }
+        }
+
+        public static int GetCombatXpForEntity(object entityObj)
+        {
+            if (entityObj == null)
+            {
+                return 0;
+            }
+
+            int uniqueId = GetCombatExperienceKey(entityObj);
+            lock (_entityCombatXp)
+            {
+                int xp;
+                _entityCombatXp.TryGetValue(uniqueId, out xp);
+                return xp;
+            }
+        }
+
+        public static bool TryGrantCombatXp(object entityObj, int xpAmount, out int resultingXp, out int resultingRank)
+        {
+            resultingXp = 0;
+            resultingRank = 0;
+            if (entityObj == null || xpAmount <= 0)
+            {
+                return false;
+            }
+
+            EnsureReflection(entityObj.GetType());
+            int uniqueId = GetCombatExperienceKey(entityObj);
+            int currentRank = ReadIntProperty(_currentRankProperty, entityObj, 0);
+            int maxRank = ReadIntProperty(_maxRankProperty, entityObj, 3);
+            int threshold = 3;
+
+            string entityId = ReadEntityId(entityObj);
+            UnitRuntimeMechanicsProfile profile;
+            if (TryGetProfile(entityId, out profile) && profile != null && profile.Experience != null)
+            {
+                if (profile.Experience.experiencePerLevel > 0)
+                {
+                    threshold = profile.Experience.experiencePerLevel * 3;
+                }
+                if (profile.Experience.maxLevel > 0)
+                {
+                    maxRank = profile.Experience.maxLevel;
+                }
+            }
+
+            int currentXp;
+            int levelsToPromote = 0;
+            lock (_entityCombatXp)
+            {
+                _entityCombatXp.TryGetValue(uniqueId, out currentXp);
+                currentXp += xpAmount;
+                while (currentXp >= threshold && (currentRank + levelsToPromote) < maxRank)
+                {
+                    currentXp -= threshold;
+                    levelsToPromote++;
+                }
+                _entityCombatXp[uniqueId] = currentXp;
+            }
+
+            if (levelsToPromote > 0)
+            {
+                if (_rankUpMethod != null)
+                {
+                    try
+                    {
+                        _rankUpMethod.Invoke(entityObj, new object[] { levelsToPromote });
+                    }
+                    catch
+                    {
+                    }
+                }
+
+                ApplyUnlimitedStatusEffect(entityObj, "CombatBoost");
+                float maxHp = ReadFloatProperty(_maxHealthProperty, entityObj, 100f);
+                InvokeHeal(entityObj, Mathf.Max(5f, maxHp * 0.10f * levelsToPromote), entityObj);
+            }
+
+            resultingXp = currentXp;
+            resultingRank = ReadIntProperty(_currentRankProperty, entityObj, currentRank + levelsToPromote);
+            return true;
+        }
+
+        public static bool TrySetUnitVeterancyRank(object entityObj, int targetRank, out int resultingRank)
+        {
+            resultingRank = 0;
+            if (entityObj == null)
+            {
+                return false;
+            }
+
+            EnsureReflection(entityObj.GetType());
+            int currentRank = ReadIntProperty(_currentRankProperty, entityObj, 0);
+            int maxRank = ReadIntProperty(_maxRankProperty, entityObj, 3);
+            int clampedTarget = (int)Mathf.Clamp((float)targetRank, 0f, (float)maxRank);
+
+            if (clampedTarget > currentRank)
+            {
+                int diff = clampedTarget - currentRank;
+                if (_rankUpMethod != null)
+                {
+                    try
+                    {
+                        _rankUpMethod.Invoke(entityObj, new object[] { diff });
+                    }
+                    catch
+                    {
+                    }
+                }
+
+                ApplyUnlimitedStatusEffect(entityObj, "CombatBoost");
+                float maxHp = ReadFloatProperty(_maxHealthProperty, entityObj, 100f);
+                InvokeHeal(entityObj, Mathf.Max(5f, maxHp * 0.10f * diff), entityObj);
+            }
+
+            resultingRank = ReadIntProperty(_currentRankProperty, entityObj, clampedTarget);
+            return true;
+        }
+
+        public static void GetUnitVeterancyStats(
+            object entityObj,
+            out int currentRank,
+            out int maxRank,
+            out int combatXp,
+            out int xpToNextRank,
+            out float hpBonusMult,
+            out float dmgBonusMult)
+        {
+            if (entityObj == null)
+            {
+                currentRank = 0;
+                maxRank = 0;
+                combatXp = 0;
+                xpToNextRank = 0;
+                hpBonusMult = 1.0f;
+                dmgBonusMult = 1.0f;
+                return;
+            }
+
+            EnsureReflection(entityObj.GetType());
+            currentRank = ReadIntProperty(_currentRankProperty, entityObj, 0);
+            maxRank = ReadIntProperty(_maxRankProperty, entityObj, 3);
+            int uniqueId = GetCombatExperienceKey(entityObj);
+            lock (_entityCombatXp)
+            {
+                _entityCombatXp.TryGetValue(uniqueId, out combatXp);
+            }
+
+            int threshold = 3;
+            string entityId = ReadEntityId(entityObj);
+            UnitRuntimeMechanicsProfile profile;
+            if (TryGetProfile(entityId, out profile) && profile != null && profile.Experience != null)
+            {
+                if (profile.Experience.experiencePerLevel > 0)
+                {
+                    threshold = profile.Experience.experiencePerLevel * 3;
+                }
+                if (profile.Experience.maxLevel > 0)
+                {
+                    maxRank = profile.Experience.maxLevel;
+                }
+            }
+
+            xpToNextRank = currentRank >= maxRank ? 0 : Mathf.Max(0, threshold - combatXp);
+            hpBonusMult = 1.0f + (currentRank * 0.10f);
+            dmgBonusMult = 1.0f + (currentRank * 0.10f);
+        }
+
+        public static bool TryDispatchDynamicCommandAura(
+            object captainObj,
+            string auraType,
+            float radius,
+            float durationSeconds,
+            out int linkedFollowersCount)
+        {
+            linkedFollowersCount = 0;
+            if (captainObj == null)
+            {
+                return false;
+            }
+
+            EnsureReflection(captainObj.GetType());
+            float clampedRadius = Mathf.Clamp(radius, 3.0f, 50.0f);
+            float clampedDuration = Mathf.Clamp(durationSeconds, 1.0f, 60.0f);
+            string sanitizedAura = string.IsNullOrWhiteSpace(auraType) ? "Inspire" : auraType.Trim();
+
+            Vector3 selfPos = ReadVector3Property(_positionProperty, captainObj);
+            float rangeSq = clampedRadius * clampedRadius;
+            string captainEntityId = ReadEntityId(captainObj) ?? "captain";
+            string captainKeyId = ReadIntProperty(_uniqueEntityIdProperty, captainObj, -1).ToString();
+            bool isPlayer = ReadBoolProperty(_isControlledByPlayerProperty, captainObj);
+
+            IEnumerable entities = GetActiveEntities();
+            if (entities != null)
+            {
+                foreach (object candidate in entities)
+                {
+                    if (candidate == null || ReferenceEquals(candidate, captainObj) || !IsEntityAlive(candidate) || IsEnemy(captainObj, candidate))
+                    {
+                        continue;
+                    }
+
+                    if (_isUnitProperty != null && !ReadBoolProperty(_isUnitProperty, candidate))
+                    {
+                        continue;
+                    }
+
+                    Vector3 pos = ReadVector3Property(_positionProperty, candidate);
+                    float dx = pos.x - selfPos.x;
+                    float dz = pos.z - selfPos.z;
+                    if ((dx * dx + dz * dz) > rangeSq)
+                    {
+                        continue;
+                    }
+
+                    if (_setCaptainMethod != null)
+                    {
+                        try
+                        {
+                            object curCap = _captainOfThisEntityProperty != null ? _captainOfThisEntityProperty.GetValue(candidate, null) : null;
+                            if (curCap == null || ReferenceEquals(curCap, captainObj))
+                            {
+                                _setCaptainMethod.Invoke(candidate, new[] { captainObj });
+                            }
+                        }
+                        catch
+                        {
+                        }
+                    }
+
+                    string tag = "cmd_aura:" + captainKeyId;
+                    if (string.Equals(sanitizedAura, "Aegis", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(sanitizedAura, "Defend", StringComparison.OrdinalIgnoreCase))
+                    {
+                        ApplyTimedStatChange(candidate, "ArmorProtection", 0.20f, clampedDuration, tag + ":arm");
+                        ApplyTimedStatusEffect(candidate, "Defender", clampedDuration);
+                    }
+                    else if (string.Equals(sanitizedAura, "Swiftness", StringComparison.OrdinalIgnoreCase) ||
+                             string.Equals(sanitizedAura, "Move", StringComparison.OrdinalIgnoreCase))
+                    {
+                        ApplyTimedStatChange(candidate, "MoveSpeed", 0.20f, clampedDuration, tag + ":spd");
+                        ApplyTimedStatusEffect(candidate, "Turbo", clampedDuration);
+                    }
+                    else
+                    {
+                        // Inspire / Attack
+                        ApplyTimedStatChange(candidate, "Damage", 0.15f, clampedDuration, tag + ":dmg");
+                        ApplyTimedStatusEffect(candidate, "SquadEffect", clampedDuration);
+                    }
+
+                    linkedFollowersCount++;
+                    if (linkedFollowersCount >= 16)
+                    {
+                        break;
+                    }
+                }
+            }
+
+            float now = 0f;
+            try
+            {
+                now = Time.time;
+            }
+            catch
+            {
+            }
+
+            lock (_activeDynamicCommandAuras)
+            {
+                _activeDynamicCommandAuras[captainKeyId] = new DynamicCommandAuraState
+                {
+                    CaptainKeyId = captainKeyId,
+                    CaptainEntityId = captainEntityId,
+                    IsControlledByPlayer = isPlayer,
+                    AuraType = sanitizedAura,
+                    Radius = clampedRadius,
+                    EndTime = now + clampedDuration,
+                    LinkedFollowerCount = linkedFollowersCount
+                };
+            }
+
+            return true;
+        }
+
+        public static bool TryClearDynamicCommandAura(object captainObj, out int clearedFollowersCount)
+        {
+            clearedFollowersCount = 0;
+            if (captainObj == null)
+            {
+                return false;
+            }
+
+            EnsureReflection(captainObj.GetType());
+            string captainKeyId = ReadIntProperty(_uniqueEntityIdProperty, captainObj, -1).ToString();
+
+            IEnumerable entities = GetActiveEntities();
+            if (entities != null && _captainOfThisEntityProperty != null)
+            {
+                foreach (object candidate in entities)
+                {
+                    if (candidate == null || ReferenceEquals(candidate, captainObj))
+                    {
+                        continue;
+                    }
+
+                    try
+                    {
+                        object curCap = _captainOfThisEntityProperty.GetValue(candidate, null);
+                        if (ReferenceEquals(curCap, captainObj))
+                        {
+                            if (_removeCaptainMethod != null)
+                            {
+                                _removeCaptainMethod.Invoke(candidate, new[] { captainObj });
+                            }
+                            else
+                            {
+                                _captainOfThisEntityProperty.SetValue(candidate, null, null);
+                            }
+                            clearedFollowersCount++;
+                        }
+                    }
+                    catch
+                    {
+                    }
+                }
+            }
+
+            lock (_activeDynamicCommandAuras)
+            {
+                _activeDynamicCommandAuras.Remove(captainKeyId);
+            }
+
+            return true;
+        }
+
+        public static IReadOnlyList<CommandAuraDiagnosticRow> GetActiveCommandAuras(int maxRows, out int omittedCount)
+        {
+            float now = 0f;
+            try
+            {
+                now = Time.time;
+            }
+            catch
+            {
+            }
+
+            var list = new List<CommandAuraDiagnosticRow>();
+            lock (_activeDynamicCommandAuras)
+            {
+                var keysToRemove = new List<string>();
+                foreach (KeyValuePair<string, DynamicCommandAuraState> pair in _activeDynamicCommandAuras)
+                {
+                    if (now >= pair.Value.EndTime)
+                    {
+                        keysToRemove.Add(pair.Key);
+                    }
+                }
+
+                for (int i = 0; i < keysToRemove.Count; i++)
+                {
+                    _activeDynamicCommandAuras.Remove(keysToRemove[i]);
+                }
+
+                int total = _activeDynamicCommandAuras.Count;
+                int toTake = Math.Min(total, maxRows);
+                omittedCount = Math.Max(0, total - toTake);
+                int taken = 0;
+                foreach (KeyValuePair<string, DynamicCommandAuraState> pair in _activeDynamicCommandAuras)
+                {
+                    if (taken++ >= toTake)
+                    {
+                        break;
+                    }
+
+                    DynamicCommandAuraState state = pair.Value;
+                    list.Add(new CommandAuraDiagnosticRow(
+                        state.CaptainKeyId,
+                        state.CaptainEntityId,
+                        state.IsControlledByPlayer,
+                        state.LinkedFollowerCount,
+                        state.Radius,
+                        state.AuraType,
+                        Mathf.Max(0f, state.EndTime - now)));
+                }
+            }
+
+            return list.AsReadOnly();
         }
 
         public static string FormatMechanicsSummary(string entityId)

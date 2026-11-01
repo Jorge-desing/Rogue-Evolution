@@ -1281,6 +1281,166 @@ namespace RogueCommandExpansionLoader.Runtime
             return Serialize(view);
         }
 
+        /// <summary>
+        /// Serializes unit veterancy, combat XP, rank tiers, and stat multipliers.
+        /// Omission counters precede detail collections.
+        /// </summary>
+        public static string SerializeVeterancyCensus(VeterancyCensus census)
+        {
+            var rows = new List<Dictionary<string, object>>();
+            if (census != null && census.Units != null)
+            {
+                for (int i = 0; i < census.Units.Count; i++)
+                {
+                    UnitVeterancyDiagnosticRow row = census.Units[i];
+                    rows.Add(new Dictionary<string, object>
+                    {
+                        ["entityKeyId"] = row.EntityKeyId ?? string.Empty,
+                        ["entityId"] = row.EntityId ?? string.Empty,
+                        ["isControlledByPlayer"] = row.IsControlledByPlayer,
+                        ["currentRank"] = row.CurrentRank,
+                        ["maxRank"] = row.MaxRank,
+                        ["combatXp"] = row.CombatXp,
+                        ["xpToNextRank"] = row.XpToNextRank,
+                        ["healthBonusMultiplier"] = row.HealthBonusMultiplier,
+                        ["damageBonusMultiplier"] = row.DamageBonusMultiplier,
+                    });
+                }
+            }
+
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "veterancyCensus",
+                ["omittedUnitCount"] = census != null ? census.OmittedUnitCount : 0,
+                ["totalVeterancyUnitsCount"] = census != null ? census.TotalVeterancyUnitsCount : 0,
+                ["totalLivingUnitsCount"] = census != null ? census.TotalLivingUnitsCount : 0,
+                ["veteranRankUnitsCount"] = census != null ? census.VeteranRankUnitsCount : 0,
+                ["units"] = rows,
+            };
+            return Serialize(view);
+        }
+
+        public static string SerializeVeterancyCommandResult(VeterancyCommandResult result)
+        {
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "veterancyCommandResult",
+                ["success"] = result.Success,
+                ["entityKeyId"] = result.EntityKeyId ?? string.Empty,
+                ["currentRank"] = result.CurrentRank,
+                ["currentXp"] = result.CurrentXp,
+                ["message"] = result.Message ?? string.Empty,
+            };
+            return Serialize(view);
+        }
+
+        /// <summary>
+        /// Serializes active captain command auras and subordinate links.
+        /// Omission counters precede detail collections.
+        /// </summary>
+        public static string SerializeCommandAuraCensus(CommandAuraCensus census)
+        {
+            var rows = new List<Dictionary<string, object>>();
+            if (census != null && census.Auras != null)
+            {
+                for (int i = 0; i < census.Auras.Count; i++)
+                {
+                    CommandAuraDiagnosticRow row = census.Auras[i];
+                    rows.Add(new Dictionary<string, object>
+                    {
+                        ["captainEntityKeyId"] = row.CaptainEntityKeyId ?? string.Empty,
+                        ["captainEntityId"] = row.CaptainEntityId ?? string.Empty,
+                        ["isControlledByPlayer"] = row.IsControlledByPlayer,
+                        ["linkedFollowerCount"] = row.LinkedFollowerCount,
+                        ["commandRadius"] = row.CommandRadius,
+                        ["activeAuraType"] = row.ActiveAuraType ?? string.Empty,
+                        ["remainingDurationSeconds"] = row.RemainingDurationSeconds,
+                    });
+                }
+            }
+
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "commandAuraCensus",
+                ["omittedAuraCount"] = census != null ? census.OmittedAuraCount : 0,
+                ["totalActiveAurasCount"] = census != null ? census.TotalActiveAurasCount : 0,
+                ["totalLinkedFollowersCount"] = census != null ? census.TotalLinkedFollowersCount : 0,
+                ["auras"] = rows,
+            };
+            return Serialize(view);
+        }
+
+        public static string SerializeCommandAuraResult(CommandAuraResult result)
+        {
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "commandAuraResult",
+                ["success"] = result.Success,
+                ["captainKeyId"] = result.CaptainKeyId ?? string.Empty,
+                ["auraType"] = result.AuraType ?? string.Empty,
+                ["linkedFollowersCount"] = result.LinkedFollowersCount,
+                ["radius"] = result.Radius,
+                ["durationSeconds"] = result.DurationSeconds,
+                ["message"] = result.Message ?? string.Empty,
+            };
+            return Serialize(view);
+        }
+
+        /// <summary>
+        /// Serializes battlefield environmental hazard zones and trigger metrics.
+        /// Omission counters precede detail collections.
+        /// </summary>
+        public static string SerializeHazardCensus(HazardZoneCensus census)
+        {
+            var rows = new List<Dictionary<string, object>>();
+            if (census != null && census.ActiveZones != null)
+            {
+                for (int i = 0; i < census.ActiveZones.Count; i++)
+                {
+                    HazardZoneDiagnosticRow row = census.ActiveZones[i];
+                    rows.Add(new Dictionary<string, object>
+                    {
+                        ["zoneId"] = row.ZoneId ?? string.Empty,
+                        ["hazardType"] = row.HazardType ?? string.Empty,
+                        ["centerX"] = row.CenterX,
+                        ["centerZ"] = row.CenterZ,
+                        ["radius"] = row.Radius,
+                        ["tickDamage"] = row.TickDamage,
+                        ["tickIntervalSeconds"] = row.TickIntervalSeconds,
+                        ["remainingDurationSeconds"] = row.RemainingDurationSeconds,
+                        ["affectedEntitiesLastTick"] = row.AffectedEntitiesLastTick,
+                    });
+                }
+            }
+
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "hazardZoneCensus",
+                ["omittedZoneCount"] = census != null ? census.OmittedZoneCount : 0,
+                ["totalActiveZonesCount"] = census != null ? census.TotalActiveZonesCount : 0,
+                ["activeZones"] = rows,
+            };
+            return Serialize(view);
+        }
+
+        public static string SerializeHazardCommandResult(HazardCommandResult result)
+        {
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "hazardCommandResult",
+                ["success"] = result.Success,
+                ["zoneId"] = result.ZoneId ?? string.Empty,
+                ["hazardType"] = result.HazardType ?? string.Empty,
+                ["centerX"] = result.CenterX,
+                ["centerZ"] = result.CenterZ,
+                ["radius"] = result.Radius,
+                ["durationSeconds"] = result.DurationSeconds,
+                ["tickDamage"] = result.TickDamage,
+                ["message"] = result.Message ?? string.Empty,
+            };
+            return Serialize(view);
+        }
+
         public static string SerializeSystemHealth(
             LoaderDiagnosticsSnapshot snapshot,
             AiModulesCensus aiCensus,
@@ -1700,6 +1860,15 @@ namespace RogueCommandExpansionLoader.Runtime
                 new Dictionary<string, object> { ["name"] = "GetAudioCensusJson", ["description"] = "Telemetry of audio mixer volume slider levels." },
                 new Dictionary<string, object> { ["name"] = "SetAudioVolumeJson", ["description"] = "Set volume slider level for Master, Music, Gameplay, UI." },
                 new Dictionary<string, object> { ["name"] = "GetTechCatalogJson", ["description"] = "Catalog of registered upgrades, research branches, and relics." },
+                                new Dictionary<string, object> { ["name"] = "GetVeterancyCensusJson", ["description"] = "Live combat XP, rank tiers, and veterancy bonus multipliers." },
+                new Dictionary<string, object> { ["name"] = "OrderGrantCombatXpJson", ["description"] = "Grant combat experience (XP) to a unit." },
+                new Dictionary<string, object> { ["name"] = "OrderSetVeterancyLevelJson", ["description"] = "Set veterancy level of a unit directly." },
+                new Dictionary<string, object> { ["name"] = "GetCommandAuraCensusJson", ["description"] = "Live captain command auras and linked follower chains." },
+                new Dictionary<string, object> { ["name"] = "OrderCommandAuraPulseJson", ["description"] = "Dispatch dynamic command aura pulse from a captain entity." },
+                new Dictionary<string, object> { ["name"] = "OrderClearCommandAuraLinksJson", ["description"] = "Clear command aura links for a captain entity." },
+                new Dictionary<string, object> { ["name"] = "GetHazardCensusJson", ["description"] = "Live battlefield environmental hazard zones and trigger collider metrics." },
+                new Dictionary<string, object> { ["name"] = "OrderSpawnHazardZoneJson", ["description"] = "Spawn a battlefield environmental hazard zone." },
+                new Dictionary<string, object> { ["name"] = "OrderClearHazardZonesJson", ["description"] = "Clear all active battlefield environmental hazard zones." },
                 new Dictionary<string, object> { ["name"] = "GetDiagnosticCatalogJson", ["description"] = "Catalog of available diagnostic getters." },
             };
 

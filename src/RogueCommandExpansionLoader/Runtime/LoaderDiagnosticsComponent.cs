@@ -33,6 +33,17 @@ namespace RogueCommandExpansionLoader.Runtime
             _rangeDisplay = rangeDisplay;
         }
 
+        private void Update()
+        {
+            try
+            {
+                RuntimeHazardManager.UpdateTick(Time.time);
+            }
+            catch
+            {
+            }
+        }
+
         // ---- Public members readable via component/get_details (no arguments) ----
 
         public bool ProviderReady => _provider != null;
@@ -74,6 +85,10 @@ namespace RogueCommandExpansionLoader.Runtime
         }
 
         public bool IsNativeCardChangePipelineReady => RuntimeCardChangeApplier.IsAvailable(null);
+
+        public int ActiveHazardZoneCount => RuntimeHazardManager.ActiveZoneCount;
+        public int ActiveCommandAuraCount => RuntimeCommandAuraCensus.Current().TotalActiveAurasCount;
+        public int TrackedVeterancyUnitCount => RuntimeVeterancyCensus.Current().TotalVeterancyUnitsCount;
 
         public int ActivePackCount
         {
@@ -932,6 +947,87 @@ namespace RogueCommandExpansionLoader.Runtime
         {
             return AgentDiagnosticsFormatter.SerializeTechCatalogCensus(
                 RuntimeTechCatalogCensus.Current());
+        }
+
+        /// <summary>
+        /// Returns live combat XP, rank tiers, and veterancy bonus multipliers as JSON.
+        /// </summary>
+        public string GetVeterancyCensusJson()
+        {
+            return AgentDiagnosticsFormatter.SerializeVeterancyCensus(
+                RuntimeVeterancyCensus.Current());
+        }
+
+        /// <summary>
+        /// Grants combat XP to a unit by entity key id.
+        /// </summary>
+        public string OrderGrantCombatXpJson(string entityKeyId, int xpAmount)
+        {
+            return AgentDiagnosticsFormatter.SerializeVeterancyCommandResult(
+                RuntimeGameplayCommandDirector.TryGrantEntityCombatXp(entityKeyId, xpAmount));
+        }
+
+        /// <summary>
+        /// Sets a unit's veterancy level directly by entity key id.
+        /// </summary>
+        public string OrderSetVeterancyLevelJson(string entityKeyId, int targetLevel)
+        {
+            return AgentDiagnosticsFormatter.SerializeVeterancyCommandResult(
+                RuntimeGameplayCommandDirector.TrySetEntityVeterancyLevel(entityKeyId, targetLevel));
+        }
+
+        /// <summary>
+        /// Returns active captain command auras and linked follower chains as JSON.
+        /// </summary>
+        public string GetCommandAuraCensusJson()
+        {
+            return AgentDiagnosticsFormatter.SerializeCommandAuraCensus(
+                RuntimeCommandAuraCensus.Current());
+        }
+
+        /// <summary>
+        /// Dispatches a dynamic command aura pulse from a captain entity.
+        /// </summary>
+        public string OrderCommandAuraPulseJson(string captainKeyId, string auraType, float radius, float durationSeconds)
+        {
+            return AgentDiagnosticsFormatter.SerializeCommandAuraResult(
+                RuntimeGameplayCommandDirector.TryDispatchCommandAuraPulse(captainKeyId, auraType, radius, durationSeconds));
+        }
+
+        /// <summary>
+        /// Clears command aura links for a captain entity.
+        /// </summary>
+        public string OrderClearCommandAuraLinksJson(string captainKeyId)
+        {
+            return AgentDiagnosticsFormatter.SerializeCommandAuraResult(
+                RuntimeGameplayCommandDirector.TryClearCommandAuraLinks(captainKeyId));
+        }
+
+        /// <summary>
+        /// Returns active battlefield environmental hazard zones and trigger metrics as JSON.
+        /// </summary>
+        public string GetHazardCensusJson()
+        {
+            return AgentDiagnosticsFormatter.SerializeHazardCensus(
+                RuntimeHazardCensus.Current());
+        }
+
+        /// <summary>
+        /// Spawns a battlefield environmental hazard zone.
+        /// </summary>
+        public string OrderSpawnHazardZoneJson(string hazardType, float x, float z, float radius, float durationSeconds, float tickDamage)
+        {
+            return AgentDiagnosticsFormatter.SerializeHazardCommandResult(
+                RuntimeGameplayCommandDirector.TrySpawnHazardZone(hazardType, x, z, radius, durationSeconds, tickDamage));
+        }
+
+        /// <summary>
+        /// Clears all active battlefield environmental hazard zones.
+        /// </summary>
+        public string OrderClearHazardZonesJson()
+        {
+            return AgentDiagnosticsFormatter.SerializeHazardCommandResult(
+                RuntimeGameplayCommandDirector.TryClearHazardZones());
         }
 
         public string GetSystemHealthJson()

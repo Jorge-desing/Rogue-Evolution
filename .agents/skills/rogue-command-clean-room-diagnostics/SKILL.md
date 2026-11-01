@@ -59,6 +59,9 @@ All censuses query live game singletons through fail-closed reflection and forma
 - **Harvester Telemetry** (`diagnostics_get_harvester_census`): Harvester counts, crystal loads, load fractions, mining states (Mining, Returning, Idle).
 - **Audio Mixer** (`diagnostics_get_audio_census`): Volume slider levels (0.0 to 1.0) and dB attenuation for Master, Music, Gameplay, and UI.
 - **Catalogs** (`diagnostics_get_tech_catalog`, `diagnostics_get_entity_catalog`): Upgrades, research branches, relics, units, buildings, and factories registered in balancing stores.
+- **Veterancy & Combat XP** (`diagnostics_get_veterancy_census`): Live combat XP points, rank tiers (0 to 5), and calculated stat bonuses across living units.
+- **Command Auras** (`diagnostics_get_command_aura_census`): Active captain command auras, subordinate linkage counts, and aura remaining durations.
+- **Environmental Hazard Zones** (`diagnostics_get_hazard_census`): Active battlefield hazard zones (Firestorm, AcidPool, EmpField, CryoMist, NaniteField), trigger metrics, and damage per tick.
 
 ---
 
@@ -78,6 +81,14 @@ The `RuntimeGameplayCommandDirector` class dispatches safe in-game actions for a
 - `diagnostics_apply_status_effect`: Applies effects like `SlowedDown`, `OnFire`, `Electrified`, `Stun`, `CombatBoost` (`entityKeyId`, `statusEffectName`, `durationSeconds`).
 - `diagnostics_clear_status_effect`: Clears active status effects (`entityKeyId`, `statusEffectName`).
 - `diagnostics_adjust_entity_vitality`: Modifies health, armor, or shields directly (`entityKeyId`, `adjustmentType` `"Heal"`/`"RepairArmor"`/`"ChargeShield"`/`"Damage"`, `amount`, `ignoreArmor`).
+
+### Veterancy, Command Auras & Environmental Hazards
+- `diagnostics_order_grant_combat_xp`: Grants combat experience (XP) to a unit, promoting rank when thresholds are met (`entityKeyId`, `xpAmount`).
+- `diagnostics_order_set_veterancy_level`: Sets a unit's veterancy level directly (`entityKeyId`, `targetLevel`).
+- `diagnostics_order_command_aura_pulse`: Dispatches a dynamic command aura pulse linking nearby squad units (`captainKeyId`, `auraType` `"Inspire"`/`"Aegis"`/`"Swiftness"`, `radius`, `durationSeconds`).
+- `diagnostics_order_clear_command_aura_links`: Clears command aura links for a captain entity (`captainKeyId`).
+- `diagnostics_order_spawn_hazard_zone`: Spawns a battlefield environmental hazard zone (`hazardType` `"Firestorm"`/`"AcidPool"`/`"EmpField"`/`"CryoMist"`/`"NaniteField"`, `x`, `z`, `radius`, `durationSeconds`, `tickDamage`) with trigger collider and amortized tick rate (>= 0.5s).
+- `diagnostics_order_clear_hazard_zones`: Clears all active hazard zones and colliders.
 
 ### Selection & Control Groups
 - `diagnostics_select_units`: Selects entities by CSV or key list (`entityKeysCsv`, `additive`).
@@ -105,7 +116,7 @@ The `RuntimeGameplayCommandDirector` class dispatches safe in-game actions for a
 
 The BepInEx MCP server is built and synchronized via:
 - `tools/build_bepinex_mcp.py`: Central registry of tool specs; outputs tool schemas to `C:\Users\Alex\.gemini\antigravity\mcp\bepinex_mcp\`.
-- `tools/bepinex_mcp_server.py`: Fast MCP JSON-RPC server implementing all 128 tools, batch execution, watchers, and mod profiles.
+- `tools/bepinex_mcp_server.py`: Fast MCP JSON-RPC server implementing all 137 tools, batch execution, watchers, and mod profiles.
 
 ### Bridge Discovery via Active Scene GameObject
 - **The DontDestroyOnLoad Pitfall**: The BepInEx MCP bridge filters out objects whose `scene.name` is null. Components on `DontDestroyOnLoad` GameObjects are therefore invisible to `scene_find_objects_with_component`.

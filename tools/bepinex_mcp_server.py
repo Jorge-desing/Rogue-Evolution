@@ -887,6 +887,57 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             res = _call_diagnostics_method("SetAudioVolumeJson", [channel, volume])
             return _tool_response(res)
 
+        elif name == "diagnostics_get_veterancy_census":
+            res = _call_diagnostics_method("GetVeterancyCensusJson")
+            return _tool_response(res)
+
+        elif name == "diagnostics_order_grant_combat_xp":
+            entity_key_id = arguments.get("entityKeyId")
+            xp_amount = arguments.get("xpAmount")
+            res = _call_diagnostics_method("OrderGrantCombatXpJson", [entity_key_id, xp_amount])
+            return _tool_response(res)
+
+        elif name == "diagnostics_order_set_veterancy_level":
+            entity_key_id = arguments.get("entityKeyId")
+            target_level = arguments.get("targetLevel")
+            res = _call_diagnostics_method("OrderSetVeterancyLevelJson", [entity_key_id, target_level])
+            return _tool_response(res)
+
+        elif name == "diagnostics_get_command_aura_census":
+            res = _call_diagnostics_method("GetCommandAuraCensusJson")
+            return _tool_response(res)
+
+        elif name == "diagnostics_order_command_aura_pulse":
+            captain_key_id = arguments.get("captainKeyId")
+            aura_type = arguments.get("auraType")
+            radius = arguments.get("radius")
+            duration_seconds = arguments.get("durationSeconds")
+            res = _call_diagnostics_method("OrderCommandAuraPulseJson", [captain_key_id, aura_type, radius, duration_seconds])
+            return _tool_response(res)
+
+        elif name == "diagnostics_order_clear_command_aura_links":
+            captain_key_id = arguments.get("captainKeyId")
+            res = _call_diagnostics_method("OrderClearCommandAuraLinksJson", [captain_key_id])
+            return _tool_response(res)
+
+        elif name == "diagnostics_get_hazard_census":
+            res = _call_diagnostics_method("GetHazardCensusJson")
+            return _tool_response(res)
+
+        elif name == "diagnostics_order_spawn_hazard_zone":
+            hazard_type = arguments.get("hazardType")
+            x = arguments.get("x")
+            z = arguments.get("z")
+            radius = arguments.get("radius")
+            duration_seconds = arguments.get("durationSeconds")
+            tick_damage = arguments.get("tickDamage")
+            res = _call_diagnostics_method("OrderSpawnHazardZoneJson", [hazard_type, x, z, radius, duration_seconds, tick_damage])
+            return _tool_response(res)
+
+        elif name == "diagnostics_order_clear_hazard_zones":
+            res = _call_diagnostics_method("OrderClearHazardZonesJson")
+            return _tool_response(res)
+
         elif name == "diagnostics_get_tech_catalog":
             res = _call_diagnostics_method("GetTechCatalogJson")
             return _tool_response(res)

@@ -4315,10 +4315,251 @@ internal static partial class ValidationTestRunner
                 !names.Contains("OrderHarvesterReturnJson") ||
                 !names.Contains("GetAudioCensusJson") ||
                 !names.Contains("SetAudioVolumeJson") ||
-                !names.Contains("GetTechCatalogJson"))
+                !names.Contains("GetTechCatalogJson") ||
+                !names.Contains("GetVeterancyCensusJson") ||
+                !names.Contains("OrderGrantCombatXpJson") ||
+                !names.Contains("OrderSetVeterancyLevelJson") ||
+                !names.Contains("GetCommandAuraCensusJson") ||
+                !names.Contains("OrderCommandAuraPulseJson") ||
+                !names.Contains("OrderClearCommandAuraLinksJson") ||
+                !names.Contains("GetHazardCensusJson") ||
+                !names.Contains("OrderSpawnHazardZoneJson") ||
+                !names.Contains("OrderClearHazardZonesJson"))
             {
                 throw new InvalidOperationException("Diagnostic catalog should include all newly exposed endpoints.");
             }
+        }
+    }),
+    ("runtime veterancy census and director track XP, promote ranks, and format JSON", () =>
+    {
+        try
+        {
+            var pUnit = new EntityController
+            {
+                entityId = "unit:hero_mech",
+                UniqueEntityId = 555,
+                IsControlledByPlayer = true,
+                IsUnit = true,
+                MaxRank = 5,
+                CurrentRank = 1,
+            };
+            ExistingControllers.Instance.PlayerUnits().Add(pUnit);
+
+            VeterancyCensus census = RuntimeVeterancyCensus.Current();
+            if (census == null || census.OmittedUnitCount != 0 || census.TotalVeterancyUnitsCount < 1)
+            {
+                throw new InvalidOperationException("RuntimeVeterancyCensus should report registered unit with rank > 0.");
+            }
+
+            // Grant XP command
+            VeterancyCommandResult xpRes = RuntimeGameplayCommandDirector.TryGrantEntityCombatXp("555", 3);
+            if (!xpRes.Success || xpRes.CurrentRank < 1)
+            {
+                throw new InvalidOperationException("TryGrantEntityCombatXp should grant XP successfully.");
+            }
+
+            // Set Rank command
+            VeterancyCommandResult rankRes = RuntimeGameplayCommandDirector.TrySetEntityVeterancyLevel("555", 3);
+            if (!rankRes.Success || rankRes.CurrentRank != 3)
+            {
+                throw new InvalidOperationException("TrySetEntityVeterancyLevel should advance unit to Rank 3.");
+            }
+
+            // Serialization checks
+            string censusJson = AgentDiagnosticsFormatter.SerializeVeterancyCensus(census);
+            using (var doc = JsonDocument.Parse(censusJson))
+            {
+                if (!doc.RootElement.TryGetProperty("omittedUnitCount", out var omittedProp) ||
+                    omittedProp.GetInt32() != 0 ||
+                    !doc.RootElement.TryGetProperty("units", out var unitsProp) ||
+                    unitsProp.GetArrayLength() < 1)
+                {
+                    throw new InvalidOperationException("SerializeVeterancyCensus JSON format error.");
+                }
+            }
+
+            string cmdJson = AgentDiagnosticsFormatter.SerializeVeterancyCommandResult(rankRes);
+            using (var doc = JsonDocument.Parse(cmdJson))
+            {
+                if (!doc.RootElement.GetProperty("success").GetBoolean() ||
+                    doc.RootElement.GetProperty("currentRank").GetInt32() != 3)
+                {
+                    throw new InvalidOperationException("SerializeVeterancyCommandResult JSON format error.");
+                }
+            }
+        }
+        finally
+        {
+            ExistingControllers.Instance.Reset();
+            RuntimeUnitMechanicsDirector.ClearProfiles();
+        }
+    }),
+    ("runtime command aura census and director manage captain linkage and squad pulses", () =>
+    {
+        try
+        {
+            var captain = new EntityController
+            {
+                entityId = "unit:squad_captain",
+                UniqueEntityId = 601,
+                IsControlledByPlayer = true,
+                IsUnit = true,
+                Position = new Vector3(10f, 0f, 10f),
+            };
+            var follower = new EntityController
+            {
+                entityId = "unit:squad_grunt",
+                UniqueEntityId = 602,
+                IsControlledByPlayer = true,
+                IsUnit = true,
+                Position = new Vector3(12f, 0f, 11f),
+            };
+            ExistingControllers.Instance.PlayerUnits().Add(captain);
+            ExistingControllers.Instance.PlayerUnits().Add(follower);
+
+            // Dispatch command aura pulse
+            CommandAuraResult pulseRes = RuntimeGameplayCommandDirector.TryDispatchCommandAuraPulse(
+                "601", "Inspire", 15.0f, 30.0f);
+            if (!pulseRes.Success || pulseRes.LinkedFollowersCount < 1 || follower.CaptainOfThisEntity != captain)
+            {
+                throw new InvalidOperationException("TryDispatchCommandAuraPulse should link nearby follower to captain.");
+            }
+
+            // Query census
+            CommandAuraCensus census = RuntimeCommandAuraCensus.Current();
+            if (census == null || census.OmittedAuraCount != 0 || census.TotalActiveAurasCount < 1 || census.TotalLinkedFollowersCount < 1)
+            {
+                throw new InvalidOperationException("RuntimeCommandAuraCensus should report active aura and linked follower.");
+            }
+
+            // Clear links
+            CommandAuraResult clearRes = RuntimeGameplayCommandDirector.TryClearCommandAuraLinks("601");
+            if (!clearRes.Success || clearRes.LinkedFollowersCount < 1 || follower.CaptainOfThisEntity != null)
+            {
+                throw new InvalidOperationException("TryClearCommandAuraLinks should remove captain link from follower.");
+            }
+
+            // Serialization checks
+            string censusJson = AgentDiagnosticsFormatter.SerializeCommandAuraCensus(census);
+            using (var doc = JsonDocument.Parse(censusJson))
+            {
+                if (!doc.RootElement.TryGetProperty("omittedAuraCount", out var omittedProp) ||
+                    omittedProp.GetInt32() != 0 ||
+                    !doc.RootElement.TryGetProperty("auras", out var aurasProp) ||
+                    aurasProp.GetArrayLength() < 1)
+                {
+                    throw new InvalidOperationException("SerializeCommandAuraCensus JSON format error.");
+                }
+            }
+
+            string cmdJson = AgentDiagnosticsFormatter.SerializeCommandAuraResult(pulseRes);
+            using (var doc = JsonDocument.Parse(cmdJson))
+            {
+                if (!doc.RootElement.GetProperty("success").GetBoolean() ||
+                    doc.RootElement.GetProperty("auraType").GetString() != "Inspire")
+                {
+                    throw new InvalidOperationException("SerializeCommandAuraResult JSON format error.");
+                }
+            }
+        }
+        finally
+        {
+            ExistingControllers.Instance.Reset();
+            RuntimeUnitMechanicsDirector.ClearProfiles();
+        }
+    }),
+    ("runtime battlefield environmental hazard zones enforce trigger colliders and amortized tick rates", () =>
+    {
+        try
+        {
+            var enemy = new EntityController
+            {
+                entityId = "unit:enemy_tank",
+                UniqueEntityId = 701,
+                IsControlledByPlayer = false,
+                IsControlledByAi = true,
+                IsUnit = true,
+                Position = new Vector3(20f, 0f, 20f),
+                CurrentHealth = 100f,
+                MaxHealth = 100f,
+            };
+            var ally = new EntityController
+            {
+                entityId = "unit:ally_tank",
+                UniqueEntityId = 702,
+                IsControlledByPlayer = true,
+                IsUnit = true,
+                Position = new Vector3(21f, 0f, 20f),
+                CurrentHealth = 50f,
+                MaxHealth = 100f,
+                CurrentArmor = 10f,
+                MaxArmor = 50f,
+            };
+            ExistingControllers.Instance.AiUnits().Add(enemy);
+            ExistingControllers.Instance.PlayerUnits().Add(ally);
+
+            // Spawn firestorm
+            HazardCommandResult fireRes = RuntimeGameplayCommandDirector.TrySpawnHazardZone(
+                "Firestorm", 20f, 20f, 10f, 15f, 20f);
+            if (!fireRes.Success || string.IsNullOrEmpty(fireRes.ZoneId))
+            {
+                throw new InvalidOperationException("TrySpawnHazardZone should succeed and assign zone ID.");
+            }
+
+            // Tick firestorm -> enemy should take damage and catch fire
+            RuntimeHazardManager.UpdateTick(Time.time + 0.6f);
+            if (enemy.CurrentHealth >= 100f || !enemy.HasActiveStatusEffect(StatusEffect.OnFire))
+            {
+                throw new InvalidOperationException("Firestorm hazard tick should deal damage and apply OnFire status.");
+            }
+
+            // Spawn NaniteField
+            HazardCommandResult nanoRes = RuntimeGameplayCommandDirector.TrySpawnHazardZone(
+                "NaniteField", 20f, 20f, 10f, 15f, 15f);
+            if (!nanoRes.Success)
+            {
+                throw new InvalidOperationException("Spawn NaniteField should succeed.");
+            }
+
+            // Tick nanite -> ally should heal
+            float allyHpBefore = ally.CurrentHealth;
+            RuntimeHazardManager.UpdateTick(Time.time + 1.2f);
+            if (ally.CurrentHealth <= allyHpBefore)
+            {
+                throw new InvalidOperationException("NaniteField hazard tick should heal damaged friendly units.");
+            }
+
+            // Census check
+            HazardZoneCensus census = RuntimeHazardCensus.Current();
+            if (census == null || census.OmittedZoneCount != 0 || census.TotalActiveZonesCount < 2)
+            {
+                throw new InvalidOperationException("RuntimeHazardCensus should report 2 active hazard zones.");
+            }
+
+            // Serialization checks
+            string censusJson = AgentDiagnosticsFormatter.SerializeHazardCensus(census);
+            using (var doc = JsonDocument.Parse(censusJson))
+            {
+                if (!doc.RootElement.TryGetProperty("omittedZoneCount", out var omittedProp) ||
+                    omittedProp.GetInt32() != 0 ||
+                    !doc.RootElement.TryGetProperty("activeZones", out var zonesProp) ||
+                    zonesProp.GetArrayLength() < 2)
+                {
+                    throw new InvalidOperationException("SerializeHazardCensus JSON format error.");
+                }
+            }
+
+            // Clear hazards
+            HazardCommandResult clearRes = RuntimeGameplayCommandDirector.TryClearHazardZones();
+            if (!clearRes.Success || RuntimeHazardManager.ActiveZoneCount != 0)
+            {
+                throw new InvalidOperationException("TryClearHazardZones should remove all active hazard zones.");
+            }
+        }
+        finally
+        {
+            ExistingControllers.Instance.Reset();
+            RuntimeHazardManager.ClearAll();
         }
     }),
     };

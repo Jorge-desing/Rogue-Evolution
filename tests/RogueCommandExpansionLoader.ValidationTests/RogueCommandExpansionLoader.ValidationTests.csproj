@@ -63,6 +63,14 @@
              Link="Runtime/RuntimeAudioCensus.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeTechCatalogCensus.cs"
              Link="Runtime/RuntimeTechCatalogCensus.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeVeterancyCensus.cs"
+             Link="Runtime/RuntimeVeterancyCensus.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeCommandAuraCensus.cs"
+             Link="Runtime/RuntimeCommandAuraCensus.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeHazardCensus.cs"
+             Link="Runtime/RuntimeHazardCensus.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeHazardManager.cs"
+             Link="Runtime/RuntimeHazardManager.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Content/ContentPackDefinition.cs"
              Link="Content/ContentPackDefinition.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Content/VisualOverlayScaleCalibration.cs"
