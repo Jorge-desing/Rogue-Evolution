@@ -770,9 +770,121 @@ namespace RogueCommandExpansionLoader.Runtime
         public string Message { get; }
     }
 
+
+    /// <summary>
+    /// Pure diagnostic DTO returned when applying or switching a unit loadout / variant.
+    /// Decoupled from Unity types.
+    /// </summary>
+    public readonly struct UnitLoadoutResult
+    {
+        public UnitLoadoutResult(bool success, string entityKeyId, string loadoutId, string message)
+        {
+            Success = success;
+            EntityKeyId = entityKeyId ?? string.Empty;
+            LoadoutId = loadoutId ?? string.Empty;
+            Message = message ?? string.Empty;
+        }
+
+        public bool Success { get; }
+        public string EntityKeyId { get; }
+        public string LoadoutId { get; }
+        public string Message { get; }
+    }
+
+    /// <summary>
+    /// Pure diagnostic DTO returned when manually warming an EntityFactory pre-spawn pool.
+    /// Decoupled from Unity types.
+    /// </summary>
+    public readonly struct PrespawnWarmResult
+    {
+        public PrespawnWarmResult(bool success, string entityId, int requestedCount, int warmedCount, string message)
+        {
+            Success = success;
+            EntityId = entityId ?? string.Empty;
+            RequestedCount = requestedCount;
+            WarmedCount = warmedCount;
+            Message = message ?? string.Empty;
+        }
+
+        public bool Success { get; }
+        public string EntityId { get; }
+        public int RequestedCount { get; }
+        public int WarmedCount { get; }
+        public string Message { get; }
+    }
+
+    /// <summary>
+    /// Pure diagnostic DTO returned when setting an AI tactical doctrine and aggression scaling.
+    /// Decoupled from Unity types.
+    /// </summary>
+    public readonly struct AiDoctrineResult
+    {
+        public AiDoctrineResult(bool success, string doctrineName, float aggressionMultiplier, string message)
+        {
+            Success = success;
+            DoctrineName = doctrineName ?? string.Empty;
+            AggressionMultiplier = aggressionMultiplier;
+            Message = message ?? string.Empty;
+        }
+
+        public bool Success { get; }
+        public string DoctrineName { get; }
+        public float AggressionMultiplier { get; }
+        public string Message { get; }
+    }
+
+    /// <summary>
+    /// Pure diagnostic DTO returned when injecting a unit into an AI base deck.
+    /// Decoupled from Unity types.
+    /// </summary>
+    public readonly struct AiDeckInjectionResult
+    {
+        public AiDeckInjectionResult(bool success, int baseIndex, string unitId, int countAtStart, int maxLiving, string message)
+        {
+            Success = success;
+            BaseIndex = baseIndex;
+            UnitId = unitId ?? string.Empty;
+            CountAtStart = countAtStart;
+            MaxLiving = maxLiving;
+            Message = message ?? string.Empty;
+        }
+
+        public bool Success { get; }
+        public int BaseIndex { get; }
+        public string UnitId { get; }
+        public int CountAtStart { get; }
+        public int MaxLiving { get; }
+        public string Message { get; }
+    }
+
     public static class RuntimeGameplayCommandDirector
 
     {
+
+
+        private static readonly Dictionary<string, string> _activeUnitVariants = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        private static readonly Dictionary<string, int> _prespawnPoolQuotas = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        private static readonly Dictionary<string, int> _prespawnPoolWarmed = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        private static readonly object _doctrineLock = new object();
+        private static string _activeAiDoctrine = "Standard";
+        private static float _aiAggressionMultiplier = 1.0f;
+        private static readonly List<AiDeckEntryDiagnosticRow> _injectedAiDeckEntries = new List<AiDeckEntryDiagnosticRow>();
+
+        private static string ResolveEntityIdString(EntityController unit)
+        {
+            if (unit == null) return string.Empty;
+            PropertyInfo prop = unit.GetType().GetProperty("EntityId") ?? unit.GetType().GetProperty("entityId");
+            if (prop != null)
+            {
+                return prop.GetValue(unit, null) as string ?? string.Empty;
+            }
+            FieldInfo field = unit.GetType().GetField("entityId") ?? unit.GetType().GetField("EntityId");
+            if (field != null)
+            {
+                return field.GetValue(unit) as string ?? string.Empty;
+            }
+            return string.Empty;
+        }
 
         private const int MaxCreditGrant = 500000;
 
@@ -4113,5 +4225,566 @@ namespace RogueCommandExpansionLoader.Runtime
                     "Error clearing hazard zones: " + ex.Message);
             }
         }
-    }
+
+        public static string GetActiveUnitVariant(string keyId)
+        {
+            if (string.IsNullOrWhiteSpace(keyId)) return string.Empty;
+            lock (_activeUnitVariants)
+            {
+                string variant;
+                return _activeUnitVariants.TryGetValue(keyId.Trim(), out variant) ? variant : string.Empty;
+            }
+        }
+
+        public static IReadOnlyList<UnitLoadoutDiagnosticRow> GetActiveUnitLoadoutRows(
+            int maxRows, out int omittedCount, out int totalCount)
+        {
+            var rows = new List<UnitLoadoutDiagnosticRow>();
+            totalCount = 0;
+            omittedCount = 0;
+
+            try
+            {
+                ExistingControllers existing = ExistingControllers.Instance;
+                if (existing != null)
+                {
+                    var units = new List<EntityController>();
+                    if (existing.PlayerUnits() != null) units.AddRange(existing.PlayerUnits());
+                    if (existing.AiUnits() != null) units.AddRange(existing.AiUnits());
+
+                    for (int i = 0; i < units.Count; i++)
+                    {
+                        EntityController unit = units[i];
+                        if (unit == null || unit.IsDestroyed) continue;
+
+                        totalCount++;
+                        if (rows.Count < maxRows)
+                        {
+                            string keyId = unit.UniqueEntityId.ToString();
+                            string variantId;
+                            lock (_activeUnitVariants)
+                            {
+                                _activeUnitVariants.TryGetValue(keyId, out variantId);
+                            }
+                            string loadoutName = string.IsNullOrEmpty(variantId) ? "Standard" : variantId;
+
+                            rows.Add(new UnitLoadoutDiagnosticRow(
+                                keyId,
+                                ResolveEntityIdString(unit),
+                                variantId ?? string.Empty,
+                                loadoutName,
+                                unit.IsControlledByPlayer,
+                                unit.MoveSpeed,
+                                unit.WeaponRange,
+                                unit.Damage1,
+                                unit.Attack1Cooldown));
+                        }
+                    }
+                }
+            }
+            catch { }
+
+            omittedCount = Math.Max(0, totalCount - rows.Count);
+            return rows.AsReadOnly();
+        }
+
+        public static IReadOnlyList<PrespawnPoolDiagnosticRow> GetPrespawnPoolRows(
+            int maxRows, out int omittedCount, out int totalCount)
+        {
+            var rows = new List<PrespawnPoolDiagnosticRow>();
+            totalCount = 0;
+            omittedCount = 0;
+
+            try
+            {
+                lock (_prespawnPoolQuotas)
+                {
+                    foreach (KeyValuePair<string, int> kv in _prespawnPoolQuotas)
+                    {
+                        totalCount++;
+                        if (rows.Count < maxRows)
+                        {
+                            int warmed = 0;
+                            _prespawnPoolWarmed.TryGetValue(kv.Key, out warmed);
+                            bool isBuilding = kv.Key.IndexOf("factory", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                              kv.Key.IndexOf("building", StringComparison.OrdinalIgnoreCase) >= 0;
+                            rows.Add(new PrespawnPoolDiagnosticRow(kv.Key, kv.Value, warmed, isBuilding));
+                        }
+                    }
+                }
+
+                Type entityFactory = Type.GetType("EntityFactory, Assembly-CSharp");
+                if (entityFactory != null)
+                {
+                    FieldInfo toPrespawnField = entityFactory.GetField("toPrespawn", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
+                    FieldInfo prespawnedField = entityFactory.GetField("prespawned", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
+
+                    System.Collections.IDictionary toPrespawn = toPrespawnField?.GetValue(null) as System.Collections.IDictionary;
+                    System.Collections.IDictionary prespawned = prespawnedField?.GetValue(null) as System.Collections.IDictionary;
+
+                    if (toPrespawn != null)
+                    {
+                        foreach (System.Collections.DictionaryEntry de in toPrespawn)
+                        {
+                            string entityId = de.Key as string;
+                            if (string.IsNullOrEmpty(entityId)) continue;
+
+                            bool alreadyPresent = false;
+                            for (int r = 0; r < rows.Count; r++)
+                            {
+                                if (string.Equals(rows[r].EntityId, entityId, StringComparison.OrdinalIgnoreCase))
+                                {
+                                    alreadyPresent = true;
+                                    break;
+                                }
+                            }
+
+                            if (!alreadyPresent)
+                            {
+                                totalCount++;
+                                if (rows.Count < maxRows)
+                                {
+                                    int quota = 0;
+                                    try { quota = Convert.ToInt32(de.Value); } catch { }
+                                    int warmed = 0;
+                                    if (prespawned != null && prespawned.Contains(entityId))
+                                    {
+                                        System.Collections.ICollection stack = prespawned[entityId] as System.Collections.ICollection;
+                                        warmed = stack != null ? stack.Count : 0;
+                                    }
+                                    bool isBuilding = entityId.IndexOf("factory", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                                      entityId.IndexOf("building", StringComparison.OrdinalIgnoreCase) >= 0;
+                                    rows.Add(new PrespawnPoolDiagnosticRow(entityId, quota, warmed, isBuilding));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            catch { }
+
+            omittedCount = Math.Max(0, totalCount - rows.Count);
+            return rows.AsReadOnly();
+        }
+
+        public static string GetActiveAiDoctrine()
+        {
+            lock (_doctrineLock)
+            {
+                return _activeAiDoctrine;
+            }
+        }
+
+        public static float GetAiAggressionMultiplier()
+        {
+            lock (_doctrineLock)
+            {
+                return _aiAggressionMultiplier;
+            }
+        }
+
+        public static IReadOnlyList<AiDeckEntryDiagnosticRow> GetAiDeckEntries(
+            int maxEntries, out int omittedCount, out int totalCount, out int profileCount)
+        {
+            var rows = new List<AiDeckEntryDiagnosticRow>();
+            totalCount = 0;
+            omittedCount = 0;
+            profileCount = 1;
+
+            try
+            {
+                lock (_injectedAiDeckEntries)
+                {
+                    for (int i = 0; i < _injectedAiDeckEntries.Count; i++)
+                    {
+                        totalCount++;
+                        if (rows.Count < maxEntries)
+                        {
+                            rows.Add(_injectedAiDeckEntries[i]);
+                        }
+                    }
+                }
+
+                object manager = ResolveAiDirectorManager();
+                if (manager != null)
+                {
+                    Type mgrType = manager.GetType();
+                    FieldInfo activeBField = mgrType.GetField("activeBehaviour", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+                        ?? mgrType.GetField("_activeBehaviour", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                    object activeBehaviour = activeBField?.GetValue(manager);
+                    if (activeBehaviour != null)
+                    {
+                        FieldInfo aiBasesField = activeBehaviour.GetType().GetField("aiBases", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                        System.Collections.IList bases = aiBasesField?.GetValue(activeBehaviour) as System.Collections.IList;
+                        if (bases != null)
+                        {
+                            profileCount = Math.Max(1, bases.Count);
+                            for (int b = 0; b < bases.Count; b++)
+                            {
+                                object aiBase = bases[b];
+                                if (aiBase == null) continue;
+
+                                FieldInfo deckField = aiBase.GetType().GetField("entitiesInAiDeck", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                                System.Collections.IList deck = deckField?.GetValue(aiBase) as System.Collections.IList;
+                                if (deck != null)
+                                {
+                                    for (int d = 0; d < deck.Count; d++)
+                                    {
+                                        object entry = deck[d];
+                                        if (entry == null) continue;
+
+                                        Type entryType = entry.GetType();
+                                        string uId = entryType.GetField("entityId", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)?.GetValue(entry) as string;
+                                        int atStart = 0;
+                                        int maxL = 0;
+                                        int curL = 0;
+
+                                        FieldInfo casF = entryType.GetField("countAtStart", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                                        if (casF != null) atStart = Convert.ToInt32(casF.GetValue(entry));
+
+                                        FieldInfo mlF = entryType.GetField("maxLiving", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                                        if (mlF != null) maxL = Convert.ToInt32(mlF.GetValue(entry));
+
+                                        FieldInfo clF = entryType.GetField("currentlyLiving", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                                        if (clF != null) curL = Convert.ToInt32(clF.GetValue(entry));
+
+                                        bool alreadyInRows = false;
+                                        for (int r = 0; r < rows.Count; r++)
+                                        {
+                                            if (rows[r].BaseIndex == b && string.Equals(rows[r].UnitId, uId, StringComparison.OrdinalIgnoreCase))
+                                            {
+                                                alreadyInRows = true;
+                                                break;
+                                            }
+                                        }
+
+                                        if (!alreadyInRows)
+                                        {
+                                            totalCount++;
+                                            if (rows.Count < maxEntries)
+                                            {
+                                                rows.Add(new AiDeckEntryDiagnosticRow(b, uId, atStart, maxL, curL));
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            catch { }
+
+            omittedCount = Math.Max(0, totalCount - rows.Count);
+            return rows.AsReadOnly();
+        }
+
+        private static object ResolveAiDirectorManager()
+        {
+            try
+            {
+                Type type = typeof(AiBehaviourManager);
+                FieldInfo instanceF = type.GetField("_instance", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
+                return instanceF?.GetValue(null) ?? UnityEngine.Object.FindObjectOfType<AiBehaviourManager>();
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        public static UnitLoadoutResult TryApplyUnitLoadout(string entityKeyId, string loadoutId)
+        {
+            if (string.IsNullOrWhiteSpace(entityKeyId))
+            {
+                return new UnitLoadoutResult(false, entityKeyId, loadoutId, "Entity key ID must not be empty.");
+            }
+
+            try
+            {
+                ExistingControllers existing = ExistingControllers.Instance;
+                if (existing == null)
+                {
+                    return new UnitLoadoutResult(false, entityKeyId, loadoutId, "ExistingControllers instance is not available.");
+                }
+
+                EntityController unit = FindEntityByKey(existing, entityKeyId.Trim());
+                if (unit == null || unit.gameObject == null || unit.IsDestroyed)
+                {
+                    return new UnitLoadoutResult(false, entityKeyId, loadoutId, "Entity '" + entityKeyId + "' not found or destroyed.");
+                }
+
+                string sanitized = string.IsNullOrWhiteSpace(loadoutId) ? "Standard" : loadoutId.Trim();
+                string tag = "loadout:" + sanitized;
+
+                if (string.Equals(sanitized, "AP", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(sanitized, "ArmorPiercing", StringComparison.OrdinalIgnoreCase))
+                {
+                    RuntimeUnitMechanicsDirector.ApplyTimedStatChange(unit, "Damage", 0.30f, 3600f, tag + ":dmg");
+                    RuntimeUnitMechanicsDirector.ApplyTimedStatChange(unit, "AttackCooldown", 0.20f, 3600f, tag + ":cd");
+                }
+                else if (string.Equals(sanitized, "HE", StringComparison.OrdinalIgnoreCase) ||
+                         string.Equals(sanitized, "HighExplosive", StringComparison.OrdinalIgnoreCase))
+                {
+                    RuntimeUnitMechanicsDirector.ApplyTimedStatChange(unit, "Damage", 0.15f, 3600f, tag + ":dmg");
+                    RuntimeUnitMechanicsDirector.ApplyTimedStatChange(unit, "EffectRadius", 0.40f, 3600f, tag + ":rad");
+                }
+                else if (string.Equals(sanitized, "Speed", StringComparison.OrdinalIgnoreCase) ||
+                         string.Equals(sanitized, "Scout", StringComparison.OrdinalIgnoreCase))
+                {
+                    RuntimeUnitMechanicsDirector.ApplyTimedStatChange(unit, "MoveSpeed", 0.25f, 3600f, tag + ":spd");
+                    RuntimeUnitMechanicsDirector.ApplyTimedStatChange(unit, "WeaponRange", 0.15f, 3600f, tag + ":rng");
+                }
+                else if (string.Equals(sanitized, "Siege", StringComparison.OrdinalIgnoreCase))
+                {
+                    RuntimeUnitMechanicsDirector.ApplyTimedStatChange(unit, "WeaponRange", 0.35f, 3600f, tag + ":rng");
+                    RuntimeUnitMechanicsDirector.ApplyTimedStatChange(unit, "MoveSpeed", -0.30f, 3600f, tag + ":spd");
+                    RuntimeUnitMechanicsDirector.ApplyTimedStatChange(unit, "Damage", 0.20f, 3600f, tag + ":dmg");
+                }
+                else if (string.Equals(sanitized, "Reinforced", StringComparison.OrdinalIgnoreCase) ||
+                         string.Equals(sanitized, "Assault", StringComparison.OrdinalIgnoreCase))
+                {
+                    RuntimeUnitMechanicsDirector.ApplyTimedStatChange(unit, "MaxHealth", 0.30f, 3600f, tag + ":hp");
+                    RuntimeUnitMechanicsDirector.ApplyTimedStatChange(unit, "ArmorProtection", 0.25f, 3600f, tag + ":arm");
+                    RuntimeUnitMechanicsDirector.ApplyTimedStatChange(unit, "MoveSpeed", -0.10f, 3600f, tag + ":spd");
+                }
+
+                lock (_activeUnitVariants)
+                {
+                    _activeUnitVariants[entityKeyId.Trim()] = sanitized;
+                }
+
+                return new UnitLoadoutResult(true, entityKeyId.Trim(), sanitized,
+                    "Applied loadout '" + sanitized + "' to unit '" + entityKeyId + "'.");
+            }
+            catch (Exception ex)
+            {
+                return new UnitLoadoutResult(false, entityKeyId, loadoutId, "Error applying unit loadout: " + ex.Message);
+            }
+        }
+
+        public static PrespawnWarmResult TryWarmPrespawnPool(string entityId, int count)
+        {
+            if (string.IsNullOrWhiteSpace(entityId))
+            {
+                return new PrespawnWarmResult(false, entityId, count, 0, "Entity ID must not be empty.");
+            }
+
+            int clampedCount = Mathf.Clamp(count, 1, 50);
+            string sanitizedId = entityId.Trim();
+
+            try
+            {
+                int warmedCount = clampedCount;
+
+                Type entityFactory = Type.GetType("EntityFactory, Assembly-CSharp");
+                if (entityFactory != null)
+                {
+                    MethodInfo prespawnM = entityFactory.GetMethod("PrespawnEntity",
+                        BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static,
+                        null, new[] { typeof(string), typeof(int) }, null);
+                    if (prespawnM != null)
+                    {
+                        try
+                        {
+                            object res = prespawnM.Invoke(null, new object[] { sanitizedId, clampedCount });
+                            if (res is bool success && !success)
+                            {
+                                warmedCount = 0;
+                            }
+                        }
+                        catch { }
+                    }
+                }
+
+                lock (_prespawnPoolQuotas)
+                {
+                    int currentQuota = 0;
+                    _prespawnPoolQuotas.TryGetValue(sanitizedId, out currentQuota);
+                    _prespawnPoolQuotas[sanitizedId] = Math.Max(currentQuota, clampedCount);
+
+                    int currentWarmed = 0;
+                    _prespawnPoolWarmed.TryGetValue(sanitizedId, out currentWarmed);
+                    _prespawnPoolWarmed[sanitizedId] = currentWarmed + warmedCount;
+                }
+
+                return new PrespawnWarmResult(true, sanitizedId, clampedCount, warmedCount,
+                    "Warmed pre-spawn pool for entity '" + sanitizedId + "' with " + warmedCount + " instances.");
+            }
+            catch (Exception ex)
+            {
+                return new PrespawnWarmResult(false, sanitizedId, clampedCount, 0, "Error warming pre-spawn pool: " + ex.Message);
+            }
+        }
+
+        public static AiDoctrineResult TrySetAiDoctrine(string doctrineName, float aggressionMultiplier)
+        {
+            if (string.IsNullOrWhiteSpace(doctrineName))
+            {
+                return new AiDoctrineResult(false, doctrineName, aggressionMultiplier, "Doctrine name must not be empty.");
+            }
+
+            string sanitized = doctrineName.Trim();
+            float clampedMultiplier = Mathf.Clamp(aggressionMultiplier, 0.1f, 5.0f);
+
+            lock (_doctrineLock)
+            {
+                _activeAiDoctrine = sanitized;
+                _aiAggressionMultiplier = clampedMultiplier;
+            }
+
+            try
+            {
+                object manager = ResolveAiDirectorManager();
+                if (manager != null)
+                {
+                    Type mgrType = manager.GetType();
+                    FieldInfo tickField = mgrType.GetField("tickDuration", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                    if (tickField != null && clampedMultiplier > 0f)
+                    {
+                        float baseTick = 1.0f;
+                        tickField.SetValue(manager, Math.Max(0.2f, baseTick / clampedMultiplier));
+                    }
+                }
+            }
+            catch { }
+
+            return new AiDoctrineResult(true, sanitized, clampedMultiplier,
+                "Configured active AI doctrine '" + sanitized + "' with aggression multiplier " + clampedMultiplier.ToString("0.0#", System.Globalization.CultureInfo.InvariantCulture) + ".");
+        }
+
+        public static AiDeckInjectionResult TryInjectAiDeckUnit(int baseIndex, string unitId, int countAtStart, int maxLiving)
+        {
+            if (baseIndex < 0)
+            {
+                return new AiDeckInjectionResult(false, baseIndex, unitId, countAtStart, maxLiving, "Base index must be non-negative.");
+            }
+            if (string.IsNullOrWhiteSpace(unitId))
+            {
+                return new AiDeckInjectionResult(false, baseIndex, unitId, countAtStart, maxLiving, "Unit ID must not be empty.");
+            }
+
+            string sanitizedId = unitId.Trim();
+            int clampedStart = Mathf.Clamp(countAtStart, 0, 50);
+            int clampedMax = Mathf.Clamp(maxLiving, 1, 50);
+
+            try
+            {
+                bool injectedIntoGame = false;
+                object manager = ResolveAiDirectorManager();
+                if (manager != null)
+                {
+                    Type mgrType = manager.GetType();
+                    FieldInfo activeBField = mgrType.GetField("activeBehaviour", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+                        ?? mgrType.GetField("_activeBehaviour", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                    object activeBehaviour = activeBField?.GetValue(manager);
+                    if (activeBehaviour != null)
+                    {
+                        FieldInfo aiBasesField = activeBehaviour.GetType().GetField("aiBases", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                        System.Collections.IList bases = aiBasesField?.GetValue(activeBehaviour) as System.Collections.IList;
+                        if (bases != null && baseIndex < bases.Count)
+                        {
+                            object aiBase = bases[baseIndex];
+                            if (aiBase != null)
+                            {
+                                FieldInfo deckField = aiBase.GetType().GetField("entitiesInAiDeck", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                                System.Collections.IList deck = deckField?.GetValue(aiBase) as System.Collections.IList;
+                                if (deck != null)
+                                {
+                                    Type deckEntryType = deckField.FieldType.IsGenericType ? deckField.FieldType.GetGenericArguments()[0] : null;
+                                    if (deckEntryType != null)
+                                    {
+                                        object existingEntry = null;
+                                        for (int i = 0; i < deck.Count; i++)
+                                        {
+                                            object entry = deck[i];
+                                            if (entry != null)
+                                            {
+                                                string existingId = entry.GetType().GetField("entityId", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)?.GetValue(entry) as string;
+                                                if (string.Equals(existingId, sanitizedId, StringComparison.OrdinalIgnoreCase))
+                                                {
+                                                    existingEntry = entry;
+                                                    break;
+                                                }
+                                            }
+                                        }
+
+                                        if (existingEntry != null)
+                                        {
+                                            existingEntry.GetType().GetField("countAtStart", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)?.SetValue(existingEntry, clampedStart);
+                                            existingEntry.GetType().GetField("maxLiving", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)?.SetValue(existingEntry, clampedMax);
+                                        }
+                                        else
+                                        {
+                                            object newEntry = Activator.CreateInstance(deckEntryType);
+                                            newEntry.GetType().GetField("entityId", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)?.SetValue(newEntry, sanitizedId);
+                                            newEntry.GetType().GetField("countAtStart", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)?.SetValue(newEntry, clampedStart);
+                                            newEntry.GetType().GetField("maxLiving", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)?.SetValue(newEntry, clampedMax);
+                                            deck.Add(newEntry);
+                                        }
+                                        injectedIntoGame = true;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                lock (_injectedAiDeckEntries)
+                {
+                    bool replaced = false;
+                    for (int i = 0; i < _injectedAiDeckEntries.Count; i++)
+                    {
+                        if (_injectedAiDeckEntries[i].BaseIndex == baseIndex &&
+                            string.Equals(_injectedAiDeckEntries[i].UnitId, sanitizedId, StringComparison.OrdinalIgnoreCase))
+                        {
+                            _injectedAiDeckEntries[i] = new AiDeckEntryDiagnosticRow(baseIndex, sanitizedId, clampedStart, clampedMax, 0);
+                            replaced = true;
+                            break;
+                        }
+                    }
+
+                    if (!replaced)
+                    {
+                        _injectedAiDeckEntries.Add(new AiDeckEntryDiagnosticRow(baseIndex, sanitizedId, clampedStart, clampedMax, 0));
+                    }
+                }
+
+                string status = injectedIntoGame ? "injected into live AI Behaviour deck" : "recorded in runtime deck registry";
+                return new AiDeckInjectionResult(true, baseIndex, sanitizedId, clampedStart, clampedMax,
+                    "Unit '" + sanitizedId + "' " + status + " for base " + baseIndex + " (countAtStart: " + clampedStart + ", maxLiving: " + clampedMax + ").");
+            }
+            catch (Exception ex)
+            {
+                return new AiDeckInjectionResult(false, baseIndex, sanitizedId, clampedStart, clampedMax, "Error injecting AI deck unit: " + ex.Message);
+            }
+        }
+
+        public static void ClearUnitLoadouts()
+        {
+            lock (_activeUnitVariants)
+            {
+                _activeUnitVariants.Clear();
+            }
+            lock (_prespawnPoolQuotas)
+            {
+                _prespawnPoolQuotas.Clear();
+                _prespawnPoolWarmed.Clear();
+            }
+        }
+
+        public static void ClearAiDoctrineAndDeckEntries()
+        {
+            lock (_doctrineLock)
+            {
+                _activeAiDoctrine = "Standard";
+                _aiAggressionMultiplier = 1.0f;
+            }
+            lock (_injectedAiDeckEntries)
+            {
+                _injectedAiDeckEntries.Clear();
+            }
+        }
+
+}
 }

@@ -1441,6 +1441,146 @@ namespace RogueCommandExpansionLoader.Runtime
             return Serialize(view);
         }
 
+
+        public static string SerializeUnitLoadoutAndPoolCensus(UnitLoadoutAndPoolCensus census)
+        {
+            var unitRows = new List<Dictionary<string, object>>();
+            if (census != null && census.UnitRows != null)
+            {
+                for (int i = 0; i < census.UnitRows.Count; i++)
+                {
+                    UnitLoadoutDiagnosticRow row = census.UnitRows[i];
+                    unitRows.Add(new Dictionary<string, object>
+                    {
+                        ["unitKeyId"] = row.UnitKeyId ?? string.Empty,
+                        ["entityId"] = row.EntityId ?? string.Empty,
+                        ["activeVariantId"] = row.ActiveVariantId ?? string.Empty,
+                        ["loadoutName"] = row.LoadoutName ?? string.Empty,
+                        ["isPlayerControlled"] = row.IsPlayerControlled,
+                        ["moveSpeed"] = row.MoveSpeed,
+                        ["weaponRange"] = row.WeaponRange,
+                        ["damage"] = row.Damage,
+                        ["attackCooldown"] = row.AttackCooldown,
+                    });
+                }
+            }
+
+            var poolRows = new List<Dictionary<string, object>>();
+            if (census != null && census.PoolRows != null)
+            {
+                for (int i = 0; i < census.PoolRows.Count; i++)
+                {
+                    PrespawnPoolDiagnosticRow row = census.PoolRows[i];
+                    poolRows.Add(new Dictionary<string, object>
+                    {
+                        ["entityId"] = row.EntityId ?? string.Empty,
+                        ["targetQuota"] = row.TargetQuota,
+                        ["prespawnedCount"] = row.PrespawnedCount,
+                        ["isBuilding"] = row.IsBuilding,
+                    });
+                }
+            }
+
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "unitLoadoutAndPoolCensus",
+                ["omittedUnitCount"] = census != null ? census.OmittedUnitCount : 0,
+                ["totalTrackedUnits"] = census != null ? census.TotalTrackedUnits : 0,
+                ["omittedPoolCount"] = census != null ? census.OmittedPoolCount : 0,
+                ["totalPoolCount"] = census != null ? census.TotalPoolCount : 0,
+                ["units"] = unitRows,
+                ["pools"] = poolRows,
+            };
+            return Serialize(view);
+        }
+
+        public static string SerializeUnitLoadoutResult(UnitLoadoutResult result)
+        {
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "unitLoadoutResult",
+                ["success"] = result.Success,
+                ["entityKeyId"] = result.EntityKeyId ?? string.Empty,
+                ["loadoutId"] = result.LoadoutId ?? string.Empty,
+                ["message"] = result.Message ?? string.Empty,
+            };
+            return Serialize(view);
+        }
+
+        public static string SerializePrespawnWarmResult(PrespawnWarmResult result)
+        {
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "prespawnWarmResult",
+                ["success"] = result.Success,
+                ["entityId"] = result.EntityId ?? string.Empty,
+                ["requestedCount"] = result.RequestedCount,
+                ["warmedCount"] = result.WarmedCount,
+                ["message"] = result.Message ?? string.Empty,
+            };
+            return Serialize(view);
+        }
+
+        public static string SerializeAiDoctrineAndDeckCensus(AiDoctrineAndDeckCensus census)
+        {
+            var deckRows = new List<Dictionary<string, object>>();
+            if (census != null && census.DeckEntries != null)
+            {
+                for (int i = 0; i < census.DeckEntries.Count; i++)
+                {
+                    AiDeckEntryDiagnosticRow row = census.DeckEntries[i];
+                    deckRows.Add(new Dictionary<string, object>
+                    {
+                        ["baseIndex"] = row.BaseIndex,
+                        ["unitId"] = row.UnitId ?? string.Empty,
+                        ["countAtStart"] = row.CountAtStart,
+                        ["maxLiving"] = row.MaxLiving,
+                        ["currentLivingCount"] = row.CurrentLivingCount,
+                    });
+                }
+            }
+
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "aiDoctrineAndDeckCensus",
+                ["omittedDeckEntryCount"] = census != null ? census.OmittedDeckEntryCount : 0,
+                ["totalDeckEntries"] = census != null ? census.TotalDeckEntries : 0,
+                ["activeDoctrine"] = census != null ? census.ActiveDoctrine : "Standard",
+                ["aggressionMultiplier"] = census != null ? census.AggressionMultiplier : 1.0f,
+                ["profileCount"] = census != null ? census.ProfileCount : 0,
+                ["deckEntries"] = deckRows,
+            };
+            return Serialize(view);
+        }
+
+        public static string SerializeAiDoctrineResult(AiDoctrineResult result)
+        {
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "aiDoctrineResult",
+                ["success"] = result.Success,
+                ["doctrineName"] = result.DoctrineName ?? string.Empty,
+                ["aggressionMultiplier"] = result.AggressionMultiplier,
+                ["message"] = result.Message ?? string.Empty,
+            };
+            return Serialize(view);
+        }
+
+        public static string SerializeAiDeckInjectionResult(AiDeckInjectionResult result)
+        {
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "aiDeckInjectionResult",
+                ["success"] = result.Success,
+                ["baseIndex"] = result.BaseIndex,
+                ["unitId"] = result.UnitId ?? string.Empty,
+                ["countAtStart"] = result.CountAtStart,
+                ["maxLiving"] = result.MaxLiving,
+                ["message"] = result.Message ?? string.Empty,
+            };
+            return Serialize(view);
+        }
+
         public static string SerializeAgentCoordinationCensus(AgentCoordinationSnapshot snapshot)
         {
             var sessions = new List<Dictionary<string, object>>();

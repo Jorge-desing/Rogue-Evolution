@@ -938,6 +938,40 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             res = _call_diagnostics_method("OrderClearHazardZonesJson")
             return _tool_response(res)
 
+        elif name == "diagnostics_get_unit_loadout_census":
+            res = _call_diagnostics_method("GetUnitLoadoutCensusJson", [])
+            return _tool_response(res)
+
+        elif name == "diagnostics_order_apply_unit_loadout":
+            entity_key_id = arguments.get("entityKeyId")
+            loadout_id = arguments.get("loadoutId")
+            res = _call_diagnostics_method("OrderApplyUnitLoadoutJson", [entity_key_id, loadout_id])
+            return _tool_response(res)
+
+        elif name == "diagnostics_order_warm_prespawn_pool":
+            entity_id = arguments.get("entityId")
+            count = arguments.get("count")
+            res = _call_diagnostics_method("OrderWarmPrespawnPoolJson", [entity_id, count])
+            return _tool_response(res)
+
+        elif name == "diagnostics_get_ai_doctrine_census":
+            res = _call_diagnostics_method("GetAiDoctrineCensusJson", [])
+            return _tool_response(res)
+
+        elif name == "diagnostics_order_set_ai_doctrine":
+            doctrine_name = arguments.get("doctrineName")
+            aggression_multiplier = arguments.get("aggressionMultiplier")
+            res = _call_diagnostics_method("OrderSetAiDoctrineJson", [doctrine_name, aggression_multiplier])
+            return _tool_response(res)
+
+        elif name == "diagnostics_order_inject_ai_deck_unit":
+            base_index = arguments.get("baseIndex")
+            unit_id = arguments.get("unitId")
+            count_at_start = arguments.get("countAtStart")
+            max_living = arguments.get("maxLiving")
+            res = _call_diagnostics_method("OrderInjectAiDeckUnitJson", [base_index, unit_id, count_at_start, max_living])
+            return _tool_response(res)
+
         elif name == "diagnostics_get_agent_coordination":
             res = _call_diagnostics_method("GetAgentCoordinationCensusJson")
             return _tool_response(res)

@@ -37,18 +37,18 @@ class TacticalOperationsCalibrationTests(unittest.TestCase):
             },
             "tactical-operations:skyguard-sam": {
                 "cost": 320.0, "max_health": 140.0, "move_speed": 8.5,
-                "damage1": 24.0, "dps": 17.1428571429,
+                "damage1": 22.0, "dps": 15.7142857143,
             },
             "tactical-operations:bulwark-siege-tank": {
-                "cost": 360.0, "max_health": 160.0, "armor_protection": 2.0,
-                "damage1": 40.0, "attack_cooldown": 4.5, "weapon_range": 14.0,
-                "effect_radius1": 1.2, "dps": 17.7777777778,
-                "cost_efficiency_index": 14.9652228823,
+                "cost": 360.0, "max_health": 160.0, "armor_protection": 1.0,
+                "damage1": 32.0, "attack_cooldown": 4.5, "weapon_range": 14.0,
+                "effect_radius1": 1.2, "dps": 14.2222222222,
+                "cost_efficiency_index": 12.8569925142,
             },
             "tactical-operations:arc-lance-walker": {
                 "cost": 420.0, "max_health": 400.0, "max_shield": 0.0,
-                "move_speed": 11.0, "damage1": 5.0, "dps": 6.25,
-                "cost_efficiency_index": 11.0433209521,
+                "move_speed": 11.0, "damage1": 7.0, "dps": 8.75,
+                "cost_efficiency_index": 13.0332576900,
             },
             "tactical-operations:field-medic-rover": {
                 "cost": 240.0, "production_duration": 90.0, "max_health": 100.0,

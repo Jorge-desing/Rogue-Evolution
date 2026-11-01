@@ -4791,5 +4791,200 @@ internal static partial class ValidationTestRunner
             RuntimeUnitMechanicsDirector.ClearProfiles();
         }
     }),
+    ("runtime unit loadouts and prespawn pool warming apply dynamic combat variants and pool quotas", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        RuntimeGameplayCommandDirector.ClearUnitLoadouts();
+        try
+        {
+            // Empty census check
+            UnitLoadoutAndPoolCensus emptyCensus = RuntimeUnitLoadoutCensus.Current();
+            if (emptyCensus == null || emptyCensus.TotalTrackedUnits != 0 || emptyCensus.TotalPoolCount != 0)
+            {
+                throw new InvalidOperationException("Initial unit loadout and pool census should be empty.");
+            }
+
+            // Spawn test unit
+            var unit = new EntityController
+            {
+                entityId = "unit:combat_skirmisher",
+                UniqueEntityId = 881,
+                IsControlledByPlayer = true,
+                IsUnit = true,
+                Damage1 = 10f,
+                WeaponRange = 10f,
+                MoveSpeed = 10f,
+                Attack1Cooldown = 1.0f
+            };
+            ExistingControllers.Instance.PlayerUnits().Add(unit);
+
+            // Apply AP loadout
+            UnitLoadoutResult apResult = RuntimeGameplayCommandDirector.TryApplyUnitLoadout("881", "AP");
+            if (!apResult.Success || !string.Equals(apResult.LoadoutId, "AP", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException("TryApplyUnitLoadout should succeed and return AP loadout.");
+            }
+
+            // Warm pre-spawn pool
+            PrespawnWarmResult warmResult = RuntimeGameplayCommandDirector.TryWarmPrespawnPool("sample-native:sandlance-scout", 5);
+            if (!warmResult.Success || warmResult.RequestedCount != 5 || warmResult.WarmedCount != 5)
+            {
+                throw new InvalidOperationException("TryWarmPrespawnPool should succeed and report warmed counts.");
+            }
+
+            // Census populated check
+            UnitLoadoutAndPoolCensus populated = RuntimeUnitLoadoutCensus.Current();
+            if (populated == null || populated.TotalTrackedUnits < 1 || populated.TotalPoolCount < 1)
+            {
+                throw new InvalidOperationException("Populated census should report living units and pre-spawn pools.");
+            }
+            if (populated.OmittedUnitCount != 0 || populated.OmittedPoolCount != 0)
+            {
+                throw new InvalidOperationException("Small pool/unit lists should have 0 omitted counts.");
+            }
+
+            // Serialization check
+            string json = AgentDiagnosticsFormatter.SerializeUnitLoadoutAndPoolCensus(populated);
+            using (var doc = JsonDocument.Parse(json))
+            {
+                if (!doc.RootElement.TryGetProperty("kind", out var kindProp) || kindProp.GetString() != "unitLoadoutAndPoolCensus")
+                {
+                    throw new InvalidOperationException("SerializeUnitLoadoutAndPoolCensus kind must be 'unitLoadoutAndPoolCensus'.");
+                }
+                if (!doc.RootElement.TryGetProperty("omittedUnitCount", out var oUnit) || oUnit.GetInt32() != 0)
+                {
+                    throw new InvalidOperationException("SerializeUnitLoadoutAndPoolCensus omittedUnitCount must be 0.");
+                }
+                if (!doc.RootElement.TryGetProperty("omittedPoolCount", out var oPool) || oPool.GetInt32() != 0)
+                {
+                    throw new InvalidOperationException("SerializeUnitLoadoutAndPoolCensus omittedPoolCount must be 0.");
+                }
+                if (!doc.RootElement.TryGetProperty("units", out var unitsArray) || unitsArray.GetArrayLength() < 1)
+                {
+                    throw new InvalidOperationException("SerializeUnitLoadoutAndPoolCensus units array must not be empty.");
+                }
+                if (!doc.RootElement.TryGetProperty("pools", out var poolsArray) || poolsArray.GetArrayLength() < 1)
+                {
+                    throw new InvalidOperationException("SerializeUnitLoadoutAndPoolCensus pools array must not be empty.");
+                }
+            }
+
+            // Fail-closed checks
+            UnitLoadoutResult missingUnit = RuntimeGameplayCommandDirector.TryApplyUnitLoadout("nonexistent_999", "AP");
+            if (missingUnit.Success)
+            {
+                throw new InvalidOperationException("TryApplyUnitLoadout on missing unit must return false.");
+            }
+
+            PrespawnWarmResult emptyPool = RuntimeGameplayCommandDirector.TryWarmPrespawnPool("", 5);
+            if (emptyPool.Success)
+            {
+                throw new InvalidOperationException("TryWarmPrespawnPool on empty entityId must return false.");
+            }
+        }
+        finally
+        {
+            ExistingControllers.Instance.Reset();
+            RuntimeGameplayCommandDirector.ClearUnitLoadouts();
+        }
+    }),
+    ("runtime AI doctrine coordinator and deck reinforcement dynamically modulate doctrine and base quotas", () =>
+    {
+        RuntimeGameplayCommandDirector.ClearAiDoctrineAndDeckEntries();
+        try
+        {
+            // Initial state check
+            AiDoctrineAndDeckCensus initialCensus = RuntimeAiDoctrineCensus.Current();
+            if (initialCensus == null || initialCensus.ActiveDoctrine != "Standard" || initialCensus.AggressionMultiplier != 1.0f)
+            {
+                throw new InvalidOperationException("Initial AI doctrine census should be Standard with 1.0 aggression multiplier.");
+            }
+
+            // Set doctrine to Assault
+            AiDoctrineResult doctrineRes = RuntimeGameplayCommandDirector.TrySetAiDoctrine("Assault", 2.5f);
+            if (!doctrineRes.Success || doctrineRes.DoctrineName != "Assault" || doctrineRes.AggressionMultiplier != 2.5f)
+            {
+                throw new InvalidOperationException("TrySetAiDoctrine should succeed and set Assault doctrine.");
+            }
+
+            // Inject AI deck unit
+            AiDeckInjectionResult injectRes = RuntimeGameplayCommandDirector.TryInjectAiDeckUnit(
+                0, "sample-native:heavy-artillery", 2, 4);
+            if (!injectRes.Success || injectRes.BaseIndex != 0 || injectRes.UnitId != "sample-native:heavy-artillery" ||
+                injectRes.CountAtStart != 2 || injectRes.MaxLiving != 4)
+            {
+                throw new InvalidOperationException("TryInjectAiDeckUnit should succeed and report parameters.");
+            }
+
+            // Census populated check
+            AiDoctrineAndDeckCensus populated = RuntimeAiDoctrineCensus.Current();
+            if (populated == null || populated.ActiveDoctrine != "Assault" || populated.AggressionMultiplier != 2.5f ||
+                populated.TotalDeckEntries < 1)
+            {
+                throw new InvalidOperationException("Populated AI doctrine census should reflect Assault and injected deck entries.");
+            }
+            if (populated.OmittedDeckEntryCount != 0)
+            {
+                throw new InvalidOperationException("Omitted deck entry count must be 0 for small collections.");
+            }
+
+            // Serialization checks
+            string censusJson = AgentDiagnosticsFormatter.SerializeAiDoctrineAndDeckCensus(populated);
+            using (var doc = JsonDocument.Parse(censusJson))
+            {
+                if (!doc.RootElement.TryGetProperty("kind", out var kindProp) || kindProp.GetString() != "aiDoctrineAndDeckCensus")
+                {
+                    throw new InvalidOperationException("SerializeAiDoctrineAndDeckCensus kind must be 'aiDoctrineAndDeckCensus'.");
+                }
+                if (!doc.RootElement.TryGetProperty("omittedDeckEntryCount", out var oDeck) || oDeck.GetInt32() != 0)
+                {
+                    throw new InvalidOperationException("SerializeAiDoctrineAndDeckCensus omittedDeckEntryCount must be 0.");
+                }
+                if (!doc.RootElement.TryGetProperty("activeDoctrine", out var actDoc) || actDoc.GetString() != "Assault")
+                {
+                    throw new InvalidOperationException("SerializeAiDoctrineAndDeckCensus activeDoctrine must be 'Assault'.");
+                }
+                if (!doc.RootElement.TryGetProperty("deckEntries", out var deckArray) || deckArray.GetArrayLength() < 1)
+                {
+                    throw new InvalidOperationException("SerializeAiDoctrineAndDeckCensus deckEntries must not be empty.");
+                }
+            }
+
+            string doctrineJson = AgentDiagnosticsFormatter.SerializeAiDoctrineResult(doctrineRes);
+            using (var doc = JsonDocument.Parse(doctrineJson))
+            {
+                if (!doc.RootElement.TryGetProperty("kind", out var kindProp) || kindProp.GetString() != "aiDoctrineResult")
+                {
+                    throw new InvalidOperationException("SerializeAiDoctrineResult kind must be 'aiDoctrineResult'.");
+                }
+            }
+
+            string injectJson = AgentDiagnosticsFormatter.SerializeAiDeckInjectionResult(injectRes);
+            using (var doc = JsonDocument.Parse(injectJson))
+            {
+                if (!doc.RootElement.TryGetProperty("kind", out var kindProp) || kindProp.GetString() != "aiDeckInjectionResult")
+                {
+                    throw new InvalidOperationException("SerializeAiDeckInjectionResult kind must be 'aiDeckInjectionResult'.");
+                }
+            }
+
+            // Fail-closed checks
+            AiDoctrineResult invalidDoc = RuntimeGameplayCommandDirector.TrySetAiDoctrine("", 1.0f);
+            if (invalidDoc.Success)
+            {
+                throw new InvalidOperationException("TrySetAiDoctrine with empty doctrine name must return false.");
+            }
+
+            AiDeckInjectionResult invalidInject = RuntimeGameplayCommandDirector.TryInjectAiDeckUnit(-1, "unit", 1, 1);
+            if (invalidInject.Success)
+            {
+                throw new InvalidOperationException("TryInjectAiDeckUnit with negative base index must return false.");
+            }
+        }
+        finally
+        {
+            RuntimeGameplayCommandDirector.ClearAiDoctrineAndDeckEntries();
+        }
+    }),
     };
 }

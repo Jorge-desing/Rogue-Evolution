@@ -598,7 +598,7 @@ namespace RogueCommandExpansionLoader.Runtime
             {
                 if (_activeDynamicCommandAuras.TryGetValue(captainKeyId, out DynamicCommandAuraState existing))
                 {
-                    ReleaseCommandAuraFollowerLinks(existing);
+                    ReleaseCommandAuraFollowerLinks(existing, createdLinks);
                 }
 
                 var state = new DynamicCommandAuraState
@@ -637,7 +637,7 @@ namespace RogueCommandExpansionLoader.Runtime
             return false;
         }
 
-        private static void ReleaseCommandAuraFollowerLinks(DynamicCommandAuraState state)
+        private static void ReleaseCommandAuraFollowerLinks(DynamicCommandAuraState state, List<object> preservedLinks = null)
         {
             if (state == null || state.CreatedFollowerLinks == null || state.CreatedFollowerLinks.Count == 0)
             {
@@ -648,6 +648,11 @@ namespace RogueCommandExpansionLoader.Runtime
             {
                 object follower = state.CreatedFollowerLinks[i];
                 if (follower == null)
+                {
+                    continue;
+                }
+
+                if (preservedLinks != null && ContainsReference(preservedLinks, follower))
                 {
                     continue;
                 }

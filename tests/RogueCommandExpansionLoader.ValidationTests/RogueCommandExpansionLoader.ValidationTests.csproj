@@ -71,6 +71,10 @@
              Link="Runtime/RuntimeHazardCensus.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeHazardManager.cs"
              Link="Runtime/RuntimeHazardManager.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeUnitLoadoutCensus.cs"
+             Link="Runtime/RuntimeUnitLoadoutCensus.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeAiDoctrineCensus.cs"
+             Link="Runtime/RuntimeAiDoctrineCensus.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeAgentCoordinator.cs"
              Link="Runtime/RuntimeAgentCoordinator.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Content/ContentPackDefinition.cs"

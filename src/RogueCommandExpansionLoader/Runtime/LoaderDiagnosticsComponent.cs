@@ -1032,6 +1032,61 @@ namespace RogueCommandExpansionLoader.Runtime
                 RuntimeGameplayCommandDirector.TryClearHazardZones());
         }
 
+
+        /// <summary>
+        /// Collects diagnostic census of active unit loadouts and EntityFactory pre-spawn pools.
+        /// </summary>
+        public string GetUnitLoadoutCensusJson()
+        {
+            return AgentDiagnosticsFormatter.SerializeUnitLoadoutAndPoolCensus(
+                RuntimeUnitLoadoutCensus.Current());
+        }
+
+        /// <summary>
+        /// Dispatches a unit loadout / variant change to a living unit.
+        /// </summary>
+        public string OrderApplyUnitLoadoutJson(string entityKeyId, string loadoutId)
+        {
+            return AgentDiagnosticsFormatter.SerializeUnitLoadoutResult(
+                RuntimeGameplayCommandDirector.TryApplyUnitLoadout(entityKeyId, loadoutId));
+        }
+
+        /// <summary>
+        /// Manually warms an EntityFactory pre-spawn pool.
+        /// </summary>
+        public string OrderWarmPrespawnPoolJson(string entityId, int count)
+        {
+            return AgentDiagnosticsFormatter.SerializePrespawnWarmResult(
+                RuntimeGameplayCommandDirector.TryWarmPrespawnPool(entityId, count));
+        }
+
+        /// <summary>
+        /// Collects diagnostic census of active AI tactical doctrine and base deck entries.
+        /// </summary>
+        public string GetAiDoctrineCensusJson()
+        {
+            return AgentDiagnosticsFormatter.SerializeAiDoctrineAndDeckCensus(
+                RuntimeAiDoctrineCensus.Current());
+        }
+
+        /// <summary>
+        /// Sets the active AI tactical doctrine and aggression scaling multiplier.
+        /// </summary>
+        public string OrderSetAiDoctrineJson(string doctrineName, float aggressionMultiplier)
+        {
+            return AgentDiagnosticsFormatter.SerializeAiDoctrineResult(
+                RuntimeGameplayCommandDirector.TrySetAiDoctrine(doctrineName, aggressionMultiplier));
+        }
+
+        /// <summary>
+        /// Injects or updates a unit entry in an AI base deck.
+        /// </summary>
+        public string OrderInjectAiDeckUnitJson(int baseIndex, string unitId, int countAtStart, int maxLiving)
+        {
+            return AgentDiagnosticsFormatter.SerializeAiDeckInjectionResult(
+                RuntimeGameplayCommandDirector.TryInjectAiDeckUnit(baseIndex, unitId, countAtStart, maxLiving));
+        }
+
         public string GetAgentCoordinationCensusJson()
         {
             return AgentDiagnosticsFormatter.SerializeAgentCoordinationCensus(

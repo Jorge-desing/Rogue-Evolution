@@ -277,7 +277,7 @@
         },
         {
           "name": "attackCooldown",
-          "value": "4.5"
+          "value": "4.0"
         },
         {
           "name": "effectRadius1",
@@ -682,7 +682,7 @@
         },
         {
           "name": "maxHealth",
-          "value": "320"
+          "value": "420"
         },
         {
           "name": "moveSpeed",

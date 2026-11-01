@@ -63,6 +63,8 @@ All censuses query live game singletons through fail-closed reflection and forma
 - **Veterancy & Combat XP** (`diagnostics_get_veterancy_census`): Live combat XP points, rank tiers (0 to 5), and calculated stat bonuses across living units.
 - **Command Auras** (`diagnostics_get_command_aura_census`): Active captain command auras, subordinate linkage counts, and aura remaining durations.
 - **Environmental Hazard Zones** (`diagnostics_get_hazard_census`): Active battlefield hazard zones (Firestorm, AcidPool, EmpField, CryoMist, NaniteField), trigger metrics, and damage per tick.
+- **Unit Loadouts & Pre-Spawn Pools** (`diagnostics_get_unit_loadout_census`): Live unit loadout assignments, active combat variant IDs, unit stat profiles (Damage, Range, Speed, Cooldown), and EntityFactory anti-hitch pre-spawn pool quotas and warmed instances.
+- **AI Tactical Doctrine & Deck Reinforcement** (`diagnostics_get_ai_doctrine_census`): Active AI combat doctrine, aggression scaling multiplier, and live deck unit quotas (`countAtStart`, `maxLiving`) per AI base.
 - **Multi-Agent Coordination** (`diagnostics_get_agent_coordination`): Active agent sessions, heartbeats, and advisory locks held on entities or camera.
 
 ---
@@ -89,8 +91,26 @@ The `RuntimeGameplayCommandDirector` class dispatches safe in-game actions for a
 - `diagnostics_order_set_veterancy_level`: Sets a unit's veterancy level directly (`entityKeyId`, `targetLevel`).
 - `diagnostics_order_command_aura_pulse`: Dispatches a dynamic command aura pulse linking nearby squad units (`captainKeyId`, `auraType` `"Inspire"`/`"Aegis"`/`"Swiftness"`, `radius`, `durationSeconds`).
 - `diagnostics_order_clear_command_aura_links`: Clears command aura links for a captain entity (`captainKeyId`).
+
+### Command Aura Renewal & Link Ownership
+
+When pulsing or renewing a dynamic command aura, track which follower links were **created by that specific aura** (e.g. a `CreatedFollowerLinks` collection per aura state). On expiry or replacement:
+- Release **only** the links created by the expiring aura.
+- Preserve pre-existing native links (e.g. from `AddCaptain`, hierarchy, or prior native auras) that were not created by this mod's aura.
+- Do **not** blindly clear all links for the captain — that clobbers legitimate native relationships and breaks native telemetry.
+- Clear links only when the captain's aura is explicitly cleared or the aura state is removed.
+
+Pitfall: Renewing an aura without tracking ownership either (a) leaves stale links from the expired aura attached to the captain, or (b) releases native links that the game depends on. Always distinguish created links from pre-existing ones before releasing.
 - `diagnostics_order_spawn_hazard_zone`: Spawns a battlefield environmental hazard zone (`hazardType` `"Firestorm"`/`"AcidPool"`/`"EmpField"`/`"CryoMist"`/`"NaniteField"`, `x`, `z`, `radius`, `durationSeconds`, `tickDamage`) with trigger collider and amortized tick rate (>= 0.5s).
 - `diagnostics_order_clear_hazard_zones`: Clears all active hazard zones and colliders.
+
+### Dynamic Unit Loadouts & Anti-Hitch Pre-Spawn Pools
+- `diagnostics_order_apply_unit_loadout`: Switches or applies a unit loadout/variant (`entityKeyId`, `loadoutId` `"AP"`/`"HE"`/`"Speed"`/`"Siege"`/`"Reinforced"`/`"Standard"`). Applies stat adjustments (Damage, Range, Cooldown, Speed, Armor) via the native stat modification pipeline and records active variant state.
+- `diagnostics_order_warm_prespawn_pool`: Manually warms an EntityFactory pre-spawn pool (`entityId`, `count` 1 to 50), pre-allocating instances to eliminate runtime hitching during mass production.
+
+### AI Tactical Doctrine & Deck Reinforcement
+- `diagnostics_order_set_ai_doctrine`: Configures the active AI tactical doctrine (`doctrineName` `"Standard"`/`"Assault"`/`"Siege"`/`"Kiting"`/`"Fortify"`, `aggressionMultiplier` 0.1 to 5.0). Modulates AI update cadence, retarget intervals, and wave aggressiveness.
+- `diagnostics_order_inject_ai_deck_unit`: Dynamically reinforces an AI base deck with production quotas (`baseIndex`, `unitId`, `countAtStart`, `maxLiving`), escalating AI capabilities during matches.
 
 ### Multi-Agent Coordination & Advisory Locks
 - `diagnostics_register_agent_session`: Registers or updates an agent session in runtime (`agentId`, `agentRole`, `notes`).
@@ -126,7 +146,7 @@ The BepInEx MCP server is built with universal cross-agent compatibility support
 
 ### 5.1 Hermes Integration (Native Plugin & Skills)
 Hermes agents can communicate with the bridge using three distinct channels:
-1. **Hermes Plugin (`bepinex-mcp`)**: Installed at `C:\Users\Alex\AppData\Local\hermes\plugins\bepinex-mcp/` and enabled in `C:\Users\Alex\AppData\Local\hermes\config.yaml` (`plugins.enabled: [bepinex-mcp]`). All 142 tools are discovered as native MCP tools.
+1. **Hermes Plugin (`bepinex-mcp`)**: Installed at `C:\Users\Alex\AppData\Local\hermes\plugins\bepinex-mcp/` and enabled in `C:\Users\Alex\AppData\Local\hermes\config.yaml` (`plugins.enabled: [bepinex-mcp]`). All 148 tools are discovered as native MCP tools.
 2. **Hermes Skill Catalog**: Registered under `C:\Users\Alex\AppData\Local\hermes\skills\rogue-command\rogue-command-clean-room-diagnostics/`.
 3. **Hermes Direct CLI Execution**: When running in a shell or terminal without an active MCP connection:
    ```bash
@@ -136,7 +156,7 @@ Hermes agents can communicate with the bridge using three distinct channels:
    ```
 
 ### 5.2 Antigravity & Google Gemini CLI
-- Fully registered under `bepinex_mcp` with 142 generated schemas in `C:\Users\Alex\.gemini\antigravity\mcp\bepinex_mcp/`.
+- Fully registered under `bepinex_mcp` with 148 generated schemas in `C:\Users\Alex\.gemini\antigravity\mcp\bepinex_mcp/`.
 - Call eagerly or lazily using `call_mcp_tool(ServerName="bepinex_mcp", ToolName="...", Arguments={...})`.
 
 ### 5.3 Anthropic Claude Desktop
