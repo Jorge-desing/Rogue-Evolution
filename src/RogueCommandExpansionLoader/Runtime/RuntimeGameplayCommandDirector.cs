@@ -2935,39 +2935,57 @@ namespace RogueCommandExpansionLoader.Runtime
 
         {
 
+            if (string.IsNullOrWhiteSpace(entityKeyId))
+
+            {
+
+                return new UnitCommandResult(false, string.Empty, "AttackMove", targetX, targetZ,
+
+                    "Entity key ID cannot be empty.");
+
+            }
+
+
+
             try
 
             {
 
-                if (!string.IsNullOrWhiteSpace(entityKeyId))
+                ExistingControllers existing = ExistingControllers.Instance;
+
+                if (existing == null)
 
                 {
 
-                    ExistingControllers existing = ExistingControllers.Instance;
+                    return new UnitCommandResult(false, entityKeyId, "AttackMove", targetX, targetZ,
 
-                    if (existing != null)
+                        "ExistingControllers instance is not available.");
 
-                    {
+                }
 
-                        EntityController entity = FindEntityByKey(existing, entityKeyId);
 
-                        if (entity != null && entity.gameObject != null)
 
-                        {
+                EntityController entity = FindEntityByKey(existing, entityKeyId.Trim());
 
-                            PlayerUnitController puc = ResolvePlayerUnitController();
+                if (entity == null || entity.gameObject == null)
 
-                            if (puc != null)
+                {
 
-                            {
+                    return new UnitCommandResult(false, entityKeyId, "AttackMove", targetX, targetZ,
 
-                                InternalSelect(puc, entity.gameObject);
+                        "Entity '" + entityKeyId + "' not found or destroyed.");
 
-                            }
+                }
 
-                        }
 
-                    }
+
+                PlayerUnitController puc = ResolvePlayerUnitController();
+
+                if (puc != null)
+
+                {
+
+                    InternalSelect(puc, entity.gameObject);
 
                 }
 
@@ -2975,7 +2993,7 @@ namespace RogueCommandExpansionLoader.Runtime
 
                 PlayerUnitController.AttackMove_Static(new Vector3(targetX, 0f, targetZ));
 
-                return new UnitCommandResult(true, entityKeyId ?? "SelectedUnits", "AttackMove", targetX, targetZ,
+                return new UnitCommandResult(true, entityKeyId, "AttackMove", targetX, targetZ,
 
                     "Order AttackMove to (" + targetX + ", " + targetZ + ") dispatched.");
 
@@ -2985,7 +3003,7 @@ namespace RogueCommandExpansionLoader.Runtime
 
             {
 
-                return new UnitCommandResult(false, entityKeyId ?? "SelectedUnits", "AttackMove", targetX, targetZ,
+                return new UnitCommandResult(false, entityKeyId, "AttackMove", targetX, targetZ,
 
                     "Error ordering AttackMove: " + ex.Message);
 

@@ -3525,6 +3525,13 @@ internal static partial class ValidationTestRunner
                 throw new InvalidOperationException("TryOrderUnitAttack must fail for missing target.");
             }
 
+            // AttackMove must not fall back to the previously selected unit when its key is missing.
+            UnitCommandResult attackMoveMissingUnit = RuntimeGameplayCommandDirector.TryOrderAttackMove("unit:non-existent", 25f, 35f);
+            if (attackMoveMissingUnit.Success)
+            {
+                throw new InvalidOperationException("TryOrderAttackMove must fail for a missing entity instead of commanding stale selection.");
+            }
+
             // Verify serialization
             string moveJson = AgentDiagnosticsFormatter.SerializeUnitCommandResult(moveRes);
             using (var doc = JsonDocument.Parse(moveJson))
