@@ -4827,9 +4827,15 @@ internal static partial class ValidationTestRunner
 
             // Warm pre-spawn pool
             PrespawnWarmResult warmResult = RuntimeGameplayCommandDirector.TryWarmPrespawnPool("sample-native:sandlance-scout", 5);
-            if (!warmResult.Success || warmResult.RequestedCount != 5 || warmResult.WarmedCount != 5)
+            if (!warmResult.Success || warmResult.RequestedCount != 5)
             {
-                throw new InvalidOperationException("TryWarmPrespawnPool should succeed and report warmed counts.");
+                throw new InvalidOperationException("TryWarmPrespawnPool should record the quota and report success.");
+            }
+            // Offline, the game assembly is absent, so no instances are actually prespawned;
+            // the warmed count must be reported honestly as 0 rather than optimistically as the request.
+            if (warmResult.WarmedCount != 0)
+            {
+                throw new InvalidOperationException("TryWarmPrespawnPool must report warmed counts honestly (0 when the game assembly is unavailable).");
             }
 
             // Census populated check

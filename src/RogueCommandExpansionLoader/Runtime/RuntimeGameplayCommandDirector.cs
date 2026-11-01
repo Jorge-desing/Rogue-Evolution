@@ -4548,6 +4548,11 @@ namespace RogueCommandExpansionLoader.Runtime
                     RuntimeUnitMechanicsDirector.ApplyTimedStatChange(unit, "ArmorProtection", 0.25f, 3600f, tag + ":arm");
                     RuntimeUnitMechanicsDirector.ApplyTimedStatChange(unit, "MoveSpeed", -0.10f, 3600f, tag + ":spd");
                 }
+                else
+                {
+                    return new UnitLoadoutResult(false, entityKeyId.Trim(), sanitized,
+                        "Unrecognized loadout '" + sanitized + "'.");
+                }
 
                 lock (_activeUnitVariants)
                 {
@@ -4575,7 +4580,8 @@ namespace RogueCommandExpansionLoader.Runtime
 
             try
             {
-                int warmedCount = clampedCount;
+                int actualWarmed = 0;
+                bool prespawnResolved = false;
 
                 Type entityFactory = Type.GetType("EntityFactory, Assembly-CSharp");
                 if (entityFactory != null)
@@ -4585,18 +4591,21 @@ namespace RogueCommandExpansionLoader.Runtime
                         null, new[] { typeof(string), typeof(int) }, null);
                     if (prespawnM != null)
                     {
+                        prespawnResolved = true;
                         try
                         {
                             object res = prespawnM.Invoke(null, new object[] { sanitizedId, clampedCount });
-                            if (res is bool success && !success)
+                            if (res is bool success)
                             {
-                                warmedCount = 0;
+                                actualWarmed = success ? clampedCount : 0;
                             }
                         }
                         catch { }
                     }
                 }
 
+                // Record the desired quota locally regardless of live prespawn availability, so the
+                // diagnostic census reflects the requested target even when the game assembly is absent.
                 lock (_prespawnPoolQuotas)
                 {
                     int currentQuota = 0;
@@ -4605,11 +4614,25 @@ namespace RogueCommandExpansionLoader.Runtime
 
                     int currentWarmed = 0;
                     _prespawnPoolWarmed.TryGetValue(sanitizedId, out currentWarmed);
-                    _prespawnPoolWarmed[sanitizedId] = currentWarmed + warmedCount;
+                    _prespawnPoolWarmed[sanitizedId] = Math.Max(currentWarmed, actualWarmed);
                 }
 
-                return new PrespawnWarmResult(true, sanitizedId, clampedCount, warmedCount,
-                    "Warmed pre-spawn pool for entity '" + sanitizedId + "' with " + warmedCount + " instances.");
+                string message;
+                if (!prespawnResolved)
+                {
+                    message = "Recorded warm intent for entity '" + sanitizedId + "' (target " + clampedCount +
+                              "); live prespawn is unavailable in this environment (0 instances warmed).";
+                }
+                else if (actualWarmed > 0)
+                {
+                    message = "Warmed pre-spawn pool for entity '" + sanitizedId + "' with " + actualWarmed + " instances.";
+                }
+                else
+                {
+                    message = "Prespawn for entity '" + sanitizedId + "' was rejected (0 instances warmed).";
+                }
+
+                return new PrespawnWarmResult(true, sanitizedId, clampedCount, actualWarmed, message);
             }
             catch (Exception ex)
             {
