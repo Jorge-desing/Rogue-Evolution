@@ -45,7 +45,7 @@ When monitoring match progression or running autonomous agent loops, avoid issui
 All censuses query live game singletons through fail-closed reflection and format primitive DTOs:
 
 - **System Health** (`diagnostics_get_system_health`): Readiness of native registry, active content packs, registered units and AI modules, player and AI credit balances.
-- **Threat Prioritization** (`diagnostics_get_threat_prioritization`): Active threat-prioritization behaviors, evaluated enemy units, friendly targets, and dynamic retargeting counters.
+- **Threat Prioritization** (`diagnostics_get_threat_prioritization`): Active threat-prioritization behaviors, evaluated enemy units, friendly targets, and dynamic retargeting counters. Each tick also censuses AI units (`AiUnits()`) and allied player units (`PlayerUnits()`), exposing `AutoControlledAlliedUnitCount` / `_lastProcessedAiUnitCount` for diagnostics only; it does **not** mutate control/faction identity (allied units stay `IsControlledByPlayer=true`). An earlier reflection-based control-flag reassignment was reverted in `5b88d65`.
 - **Production Queues** (`diagnostics_get_production_census`): Living factories, active production queues, build durations, and progress ratios.
 - **Base Integrity** (`diagnostics_get_base_integrity`): Engineering HQ existence, player HQ health ratio, enemy structure count, and average structure health.
 - **Battlefield Census** (`diagnostics_get_battlefield_census`): Living units, tactical roles, positions, and current health ratios.
