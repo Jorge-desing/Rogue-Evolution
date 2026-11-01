@@ -1560,8 +1560,7 @@ namespace RogueCommandExpansionLoader.Runtime
                     "Retreat threat coordinates and distance must be finite.");
             }
 
-            int clampedDistance = (int)Mathf.Clamp(distance, 3f, 50f);
-            float retreatDistance = clampedDistance;
+            float retreatDistance = Mathf.Clamp(distance, 3f, 50f);
 
             try
             {
@@ -1624,6 +1623,20 @@ namespace RogueCommandExpansionLoader.Runtime
                 return new UnitCommandResult(false, string.Empty, "Move", destinationX, destinationZ,
 
                     "Entity key ID cannot be empty.");
+
+            }
+
+
+
+            if (float.IsNaN(destinationX) || float.IsInfinity(destinationX) ||
+
+                float.IsNaN(destinationZ) || float.IsInfinity(destinationZ))
+
+            {
+
+                return new UnitCommandResult(false, string.Empty, "Move", destinationX, destinationZ,
+
+                    "Move destination coordinates must be finite.");
 
             }
 
@@ -1767,7 +1780,7 @@ namespace RogueCommandExpansionLoader.Runtime
                         "Target entity '" + targetEntityKeyId + "' not found or destroyed.");
                 }
 
-                if (attacker.IsEnemy != null && !attacker.IsEnemy(target))
+                if (attacker.IsEnemy == null || !attacker.IsEnemy(target))
                 {
                     return new UnitCommandResult(false, entityKeyId, "AttackMoveOnTarget", 0f, 0f,
                         "Target entity '" + targetEntityKeyId + "' is not hostile to attacker '" + entityKeyId + "'.");
@@ -2364,6 +2377,22 @@ namespace RogueCommandExpansionLoader.Runtime
             }
 
 
+
+            if (float.IsNaN(radius) || float.IsInfinity(radius) ||
+
+                float.IsNaN(magnitude) || float.IsInfinity(magnitude) ||
+
+                float.IsNaN(durationSeconds) || float.IsInfinity(durationSeconds))
+
+            {
+
+                return new TacticalPulseResult(false, entityKeyId, pulseType, 0, 0f, 0f, 0,
+
+                    "Tactical pulse radius, magnitude, and duration must be finite.");
+
+            }
+
+
             try
 
             {
@@ -2625,7 +2654,7 @@ namespace RogueCommandExpansionLoader.Runtime
                         EntityController attacker = FindEntityByKey(existing, attackerKey.Trim());
                         if (attacker == null || attacker.gameObject == null || attacker.IsDestroyed ||
                             attacker.DestroyHasBeenStarted || !attacker.IsUnit || !attacker.IsCombatUnit ||
-                            ReferenceEquals(attacker, target) || !attacker.IsEnemy(target))
+                            ReferenceEquals(attacker, target) || attacker.IsEnemy == null || !attacker.IsEnemy(target))
                         {
                             continue;
                         }
@@ -2686,7 +2715,7 @@ namespace RogueCommandExpansionLoader.Runtime
             {
                 if (candidate == null || ReferenceEquals(candidate, source) || candidate.gameObject == null ||
                     candidate.IsDestroyed || candidate.DestroyHasBeenStarted || !candidate.IsUnit ||
-                    !candidate.IsCombatUnit || !source.IsEnemy(candidate) || !seen.Add(candidate))
+                    !candidate.IsCombatUnit || source.IsEnemy == null || !source.IsEnemy(candidate) || !seen.Add(candidate))
                 {
                     continue;
                 }
@@ -3403,6 +3432,20 @@ namespace RogueCommandExpansionLoader.Runtime
                 return new UnitCommandResult(false, string.Empty, "AttackMove", targetX, targetZ,
 
                     "Entity key ID cannot be empty.");
+
+            }
+
+
+
+            if (float.IsNaN(targetX) || float.IsInfinity(targetX) ||
+
+                float.IsNaN(targetZ) || float.IsInfinity(targetZ))
+
+            {
+
+                return new UnitCommandResult(false, string.Empty, "AttackMove", targetX, targetZ,
+
+                    "AttackMove target coordinates must be finite.");
 
             }
 
