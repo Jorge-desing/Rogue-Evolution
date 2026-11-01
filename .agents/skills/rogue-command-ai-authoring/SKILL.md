@@ -233,6 +233,18 @@ Pitfalls:
 - Bound time, attempts, target count, and repeated work.
 - Static evidence only: in-game runtime proof required for acceptance.
 
+### Role-profile specialization (pure, offline-testable)
+
+When a module's behavior should vary by the allied unit's role (e.g. sniper vs melee vs support), do NOT mutate control/hostility flags or branch on unit identity inside the tick. Instead:
+
+1. Create a pure `readonly struct` (no Unity/game types) in a separate file (e.g. `ThreatPrioritizationRoleProfile.cs`) with behavioral knobs (engagement-range multiplier, distance weight, combat-engagement gate, ...) as get-only fields and named static instances (`Default`, `Sniper`, `Melee`, `Supporter`, ...).
+2. Provide two resolvers that must agree: `Resolve(UnitRole role)` (pure, bitwise on role flags; testable without an `EntityController`) and `ResolveFor(EntityController unit)` (uses `unit.HasRole(...)` so multi-role units classify consistently; degrades to `Default` on null).
+3. In the module tick, resolve the profile per allied unit, gate on `EngagesCombat`, and scale the engagement radius / scoring penalties by the profile's knobs. Default/generic units keep the historical behavior so existing packs are unaffected.
+4. Add the new `.cs` file as a `<Compile Include>` in the test project (the loader csproj globs implicitly) — otherwise the harness cannot see the type.
+5. Test both resolvers agree (`ResolveFor(unit).Equals(Resolve(unit.Role))`) and test behavioral boundaries: a role with extended range engages a target beyond the base radius but within the scaled radius; a non-combat role never engages even with a nearby enemy.
+
+Pitfall: keep the resolver pure and free of Unity types so it compiles in the harness without game assemblies; pass only primitive knobs (floats/bools) into scoring functions rather than the whole profile to keep signatures stable.
+
 ### Registered AI Modules
 
 The loader includes 20 compiled AI modules registered in `AiModuleRegistry.CreateDefault()` (available for content packs, with a per-profile limit of up to 8 modules):
