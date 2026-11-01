@@ -107,12 +107,13 @@ namespace RogueCommandExpansionLoader
             Logger.LogInfo("[ExpansionLoader] Scene loaded: '" + scene.name + "' (buildIndex=" +
                 scene.buildIndex + ", mode=" + mode + ").");
 
-            // Recreate the live diagnostics bridge in the new scene so the MCP bridge
-            // can discover it (it lives in a normal scene, not DontDestroyOnLoad).
-            if (_contentLoader != null)
+            if (_contentLoader != null && RuntimeDiagnosticsScenePlacement.ShouldEnsureOnSceneLoaded(
+                _diagnostics != null,
+                scene.name,
+                mode == LoadSceneMode.Single,
+                _diagnostics != null && _diagnostics.gameObject.scene.handle == scene.handle))
             {
-                _diagnostics = null;
-                EnsureDiagnosticsComponent(_contentLoader);
+                EnsureDiagnosticsComponent(_contentLoader, scene);
             }
         }
 
@@ -175,7 +176,7 @@ namespace RogueCommandExpansionLoader
                     compatibilityError,
                     message => Logger.LogWarning(message));
 
-                EnsureDiagnosticsComponent(provider);
+                EnsureDiagnosticsComponent(provider, SceneManager.GetActiveScene());
             }
             catch (Exception exception)
             {
@@ -184,14 +185,41 @@ namespace RogueCommandExpansionLoader
             }
         }
 
-        private void EnsureDiagnosticsComponent(IRuntimeContentProvider provider)
+        private void EnsureDiagnosticsComponent(IRuntimeContentProvider provider, Scene scene)
         {
             try
             {
+                if (provider == null || !scene.IsValid() || !scene.isLoaded)
+                {
+                    return;
+                }
+
                 if (_diagnostics == null)
                 {
                     var host = new GameObject("LoaderDiagnostics");
+                    if (host.scene.handle != scene.handle &&
+                        !RuntimeDiagnosticsScenePlacement.TryMoveHostToScene(host, scene))
+                    {
+                        Logger.LogWarning("[ExpansionLoader] Diagnostics host could not be moved into loaded scene '" + scene.name + "'.");
+                        UnityEngine.Object.Destroy(host);
+                        return;
+                    }
+
                     _diagnostics = host.AddComponent<LoaderDiagnosticsComponent>();
+                }
+                else
+                {
+                    if (_diagnostics.gameObject.scene.handle != scene.handle &&
+                        !RuntimeDiagnosticsScenePlacement.TryMoveHostToScene(_diagnostics.gameObject, scene))
+                    {
+                        Logger.LogWarning("[ExpansionLoader] Existing diagnostics host could not be moved into loaded scene '" + scene.name + "'.");
+                        return;
+                    }
+
+                    if (_diagnostics.gameObject.scene.handle != scene.handle)
+                    {
+                        return;
+                    }
                 }
 
                 _diagnostics.Initialize(provider, _overlay, _rangeDisplay);

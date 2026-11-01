@@ -16,6 +16,84 @@ internal static partial class ValidationTestRunner
 {
     internal static IEnumerable<(string Name, Action Run)> GetRuntimeAndDiagnosticsValidationTests() => new (string Name, Action Run)[]
     {
+    ("diagnostics host follows the loaded additive scene", () =>
+    {
+        string previousSceneName = UnityEngine.SceneManagement.SceneManager.ActiveSceneName;
+        int previousSceneHandle = UnityEngine.SceneManagement.SceneManager.ActiveSceneHandle;
+        try
+        {
+            UnityEngine.SceneManagement.SceneManager.ActiveSceneName = "IntermissionScreen";
+            UnityEngine.SceneManagement.SceneManager.ActiveSceneHandle = 1;
+            var host = new GameObject("LoaderDiagnostics");
+            var gameScene = new UnityEngine.SceneManagement.Scene { name = "Game", isLoaded = true, handle = 2 };
+
+            if (!RuntimeDiagnosticsScenePlacement.TryMoveHostToScene(host, gameScene) ||
+                host.scene.name != "Game" || !host.scene.isLoaded)
+            {
+                throw new InvalidOperationException("The diagnostics host must be moved to the scene that was loaded, not left in the previous active scene.");
+            }
+
+            if (!RuntimeDiagnosticsScenePlacement.TryMoveHostToScene(host, gameScene))
+            {
+                throw new InvalidOperationException("Moving the diagnostics host to its current scene should be idempotent.");
+            }
+        }
+        finally
+        {
+            UnityEngine.SceneManagement.SceneManager.ActiveSceneName = previousSceneName;
+            UnityEngine.SceneManagement.SceneManager.ActiveSceneHandle = previousSceneHandle;
+        }
+    }),
+        ("diagnostics host ignores unrelated additive scenes once registered", () =>
+        {
+            if (RuntimeDiagnosticsScenePlacement.ShouldEnsureOnSceneLoaded(true, "AudioOverlay", false, false))
+            {
+                throw new InvalidOperationException("Loading an unrelated additive scene must not move an existing diagnostics host out of Game.");
+            }
+
+            if (!RuntimeDiagnosticsScenePlacement.ShouldEnsureOnSceneLoaded(true, "Game", false, false))
+            {
+                throw new InvalidOperationException("Loading Game must rebind an existing diagnostics host to the gameplay scene.");
+            }
+
+            if (!RuntimeDiagnosticsScenePlacement.ShouldEnsureOnSceneLoaded(false, "MainMenu", false, false))
+            {
+                throw new InvalidOperationException("A scene load should recreate a diagnostics host that no longer exists.");
+            }
+
+            if (!RuntimeDiagnosticsScenePlacement.ShouldEnsureOnSceneLoaded(true, "MainMenu", true, false))
+            {
+                throw new InvalidOperationException("A single-scene transition should rebind the host to the replacement scene.");
+            }
+
+            if (!RuntimeDiagnosticsScenePlacement.ShouldEnsureOnSceneLoaded(true, "Game", false, true))
+            {
+                throw new InvalidOperationException("The active diagnostics host should be reinitialized when its scene is reloaded.");
+            }
+        }),
+        ("diagnostics host rejects an unloaded target scene", () =>
+    {
+        string previousSceneName = UnityEngine.SceneManagement.SceneManager.ActiveSceneName;
+        int previousSceneHandle = UnityEngine.SceneManagement.SceneManager.ActiveSceneHandle;
+        try
+        {
+            UnityEngine.SceneManagement.SceneManager.ActiveSceneName = "IntermissionScreen";
+            UnityEngine.SceneManagement.SceneManager.ActiveSceneHandle = 1;
+            var host = new GameObject("LoaderDiagnostics");
+            var unloadedScene = new UnityEngine.SceneManagement.Scene { name = "Game", isLoaded = false, handle = 2 };
+
+            if (RuntimeDiagnosticsScenePlacement.TryMoveHostToScene(host, unloadedScene) ||
+                host.scene.name != "IntermissionScreen")
+            {
+                throw new InvalidOperationException("An unloaded target scene must not detach the diagnostics host from its current scene.");
+            }
+        }
+        finally
+        {
+            UnityEngine.SceneManagement.SceneManager.ActiveSceneName = previousSceneName;
+            UnityEngine.SceneManagement.SceneManager.ActiveSceneHandle = previousSceneHandle;
+        }
+    }),
     ("runtime log burst summary counts only adjacent equal messages", () =>
     {
         LoaderLogBurstSummary summary = LoaderLogBurstSummaryPolicy.Create(new[]

@@ -165,10 +165,12 @@ namespace UnityEngine
         public string tag { get; set; } = "Enemy";
         public bool activeInHierarchy { get; set; } = true;
         public Transform transform { get; set; } = new();
+        public UnityEngine.SceneManagement.Scene scene { get; set; }
 
         public GameObject(string name = "")
         {
             this.name = name;
+            scene = UnityEngine.SceneManagement.SceneManager.GetActiveScene();
         }
 
         public T GetComponent<T>() where T : Component
@@ -242,12 +244,25 @@ namespace UnityEngine.SceneManagement
     public struct Scene
     {
         public string name { get; set; }
+        public bool isLoaded { get; set; }
+        public int handle { get; set; }
+
+        public Scene(string name, bool isLoaded, int handle)
+        {
+            this.name = name;
+            this.isLoaded = isLoaded;
+            this.handle = handle;
+        }
+
+        public bool IsValid() => !string.IsNullOrEmpty(name);
     }
 
     public static class SceneManager
     {
         public static string ActiveSceneName { get; set; } = "MainDesertScene";
-        public static Scene GetActiveScene() => new Scene { name = ActiveSceneName };
+        public static int ActiveSceneHandle { get; set; } = 1;
+        public static Scene GetActiveScene() => new Scene { name = ActiveSceneName, isLoaded = true, handle = ActiveSceneHandle };
+        public static void MoveGameObjectToScene(GameObject gameObject, Scene scene) => gameObject.scene = scene;
     }
 }
 
