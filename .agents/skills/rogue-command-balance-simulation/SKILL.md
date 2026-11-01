@@ -45,6 +45,7 @@ Read `AGENTS.md`, `references/changeable-values-spec.md`, `references/lanchester
   - Attribute `minAttackRange` ($0 \le r \le 200\text{m}$) enforced via `EntityAttack.IsTargetInRange` postfix hook to prevent siege artillery from firing at point-blank enemies.
 - **Dynamic On-Hit Status Effects**:
   - Support for `onHitStatusEffects[]` declaring status applications (Stun, SlowedDown, OnFire, Electrified, CombatBoost) with bounded duration and trigger chance.
+- **Runtime mechanics are NOT modeled by this simulator**: `healing`, `combatBoosts`, `experience` (rank-up), `vampiricLeech`, and `experienceReward` (bounty) are persistent card-change augmentations applied by `RuntimeUnitMechanicsDirector` via `RuntimeCardChangeApplier`. The simulator's CEI/TTK/DPS reflect base stats only. When authoring these, scale by cost tier and role, enforce schema bounds (`siphonRatio` ∈ (0,1], `experienceAmount` integer, `levelUpBonus` ≤ ~0.1), and validate the pack; do not expect the simulator to reflect their impact.
 
 ---
 
