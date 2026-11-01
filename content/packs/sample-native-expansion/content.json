@@ -59,7 +59,7 @@
         },
         {
           "name": "weaponRange",
-          "value": "3.5"
+          "value": "5.5"
         },
         {
           "name": "attackCooldown",
@@ -261,7 +261,7 @@
         },
         {
           "name": "maxHealth",
-          "value": "160"
+          "value": "110"
         },
         {
           "name": "moveSpeed",
@@ -277,7 +277,7 @@
         },
         {
           "name": "attackCooldown",
-          "value": "4.0"
+          "value": "4.5"
         },
         {
           "name": "effectRadius1",
@@ -285,7 +285,7 @@
         },
         {
           "name": "armorProtection",
-          "value": "2"
+          "value": "1"
         },
         {
           "name": "rarity",
@@ -469,7 +469,7 @@
         },
         {
           "name": "maxHealth",
-          "value": "420"
+          "value": "370"
         },
         {
           "name": "moveSpeed",
@@ -682,7 +682,7 @@
         },
         {
           "name": "maxHealth",
-          "value": "420"
+          "value": "320"
         },
         {
           "name": "moveSpeed",
@@ -790,7 +790,7 @@
         }
       ],
       "customBalance": {
-        "Damage1": 2.8
+        "Damage1": 1.8
       },
       "healing": {
         "healAmount": 6.0,
@@ -1763,7 +1763,7 @@
         },
         {
           "name": "armorProtection",
-          "value": "2"
+          "value": "1"
         },
         {
           "name": "rarity",

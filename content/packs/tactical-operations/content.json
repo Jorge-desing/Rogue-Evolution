@@ -61,7 +61,7 @@
                 },
                 {
                     "name": "weaponRange",
-                    "value": "3.8"
+                    "value": "5.5"
                 },
                 {
                     "name": "attackCooldown",
@@ -266,7 +266,7 @@
                 },
                 {
                     "name": "maxArmor",
-                    "value": "15"
+                    "value": "0"
                 },
                 {
                     "name": "armorProtection",
@@ -441,7 +441,7 @@
                 },
                 {
                     "name": "maxArmor",
-                    "value": "5"
+                    "value": "0"
                 },
                 {
                     "name": "armorProtection",
@@ -449,7 +449,7 @@
                 }
             ],
             "customBalance": {
-                "Damage1": 24.0
+                "Damage1": 22.0
             },
             "criticalHitChance": 0.3,
             "minAttackRange": 4.5,
@@ -594,15 +594,15 @@
                 },
                 {
                     "name": "maxArmor",
-                    "value": "25"
+                    "value": "0"
                 },
                 {
                     "name": "armorProtection",
-                    "value": "2"
+                    "value": "1"
                 }
             ],
             "customBalance": {
-                "Damage1": 40.0,
+                "Damage1": 32.0,
                 "EffectRadius1": 1.2
             },
             "minAttackRange": 5.0,
@@ -769,15 +769,15 @@
                 },
                 {
                     "name": "maxArmor",
-                    "value": "8"
+                    "value": "0"
                 },
                 {
                     "name": "armorProtection",
-                    "value": "2"
+                    "value": "1"
                 }
             ],
             "customBalance": {
-                "Damage1": 5.0
+                "Damage1": 7.0
             },
             "activeSkills": [
                 {
@@ -933,7 +933,7 @@
                 },
                 {
                     "name": "maxArmor",
-                    "value": "5"
+                    "value": "0"
                 },
                 {
                     "name": "armorProtection",
