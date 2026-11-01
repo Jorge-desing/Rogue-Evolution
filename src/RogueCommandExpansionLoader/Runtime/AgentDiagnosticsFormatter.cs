@@ -2381,6 +2381,17 @@ namespace RogueCommandExpansionLoader.Runtime
             }
         }
 
+        private static void WriteFiniteNumber(StringBuilder builder, float value)
+        {
+            if (float.IsNaN(value) || float.IsInfinity(value))
+            {
+                builder.Append("null");
+                return;
+            }
+
+            builder.Append(value.ToString("R", CultureInfo.InvariantCulture));
+        }
+
         private static void WriteFiniteNumber(StringBuilder builder, double value)
         {
             if (double.IsNaN(value) || double.IsInfinity(value))
