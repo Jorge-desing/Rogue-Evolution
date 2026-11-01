@@ -970,6 +970,26 @@ namespace RogueCommandExpansionLoader.Runtime
         }
 
         /// <summary>
+        /// Serializes the result of a bounded tactical pulse around a unit.
+        /// </summary>
+        public static string SerializeTacticalPulseResult(TacticalPulseResult result)
+        {
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "tacticalPulseResult",
+                ["success"] = result.Success,
+                ["entityKeyId"] = result.EntityKeyId ?? string.Empty,
+                ["pulseType"] = result.PulseType ?? string.Empty,
+                ["affectedEntityCount"] = result.AffectedEntityCount,
+                ["damageApplied"] = result.DamageApplied,
+                ["healingApplied"] = result.HealingApplied,
+                ["statusEffectApplicationCount"] = result.StatusEffectApplicationCount,
+                ["message"] = result.Message ?? string.Empty,
+            };
+            return Serialize(view);
+        }
+
+        /// <summary>
         /// Serializes active elite affixes and traits applied to living units.
         /// Omission counters precede detail collections.
         /// </summary>
@@ -2202,6 +2222,7 @@ namespace RogueCommandExpansionLoader.Runtime
                 new Dictionary<string, object> { ["name"] = "ApplyInGameCardChangeJson", ["description"] = "Apply a data-driven card change to an entity via native EntityBalancingStore." },
                 new Dictionary<string, object> { ["name"] = "OrderUnitMoveJson", ["description"] = "Dispatch an in-game move command to a unit by entity key id." },
                 new Dictionary<string, object> { ["name"] = "OrderUnitAttackJson", ["description"] = "Dispatch an in-game attack command on a target entity." },
+                new Dictionary<string, object> { ["name"] = "OrderUnitTacticalPulseJson", ["description"] = "Execute a bounded Shockwave, Rally, or Repair pulse around a unit." },
                 new Dictionary<string, object> { ["name"] = "OrderUnitActiveSkillJson", ["description"] = "Dispatch an active tactical skill command on a unit (Self, Target, or Position)." },
                 new Dictionary<string, object> { ["name"] = "AdjustEntityVitalityJson", ["description"] = "Safely adjust health, armor, shield, or damage on an entity for testing." },
                 new Dictionary<string, object> { ["name"] = "ApplyStatusEffectJson", ["description"] = "Apply a status effect (e.g. Emp, Burn, SlowedDown, Stun) to an entity." },

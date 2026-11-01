@@ -821,6 +821,22 @@ namespace RogueCommandExpansionLoader.Runtime
         }
 
         /// <summary>
+        /// Executes a bounded tactical pulse around a living unit (Shockwave, Rally, or Repair).
+        /// </summary>
+        public string OrderUnitTacticalPulseJson(
+            string entityKeyId,
+            string pulseType,
+            float radius,
+            float magnitude,
+            float durationSeconds,
+            int maxTargets)
+        {
+            return AgentDiagnosticsFormatter.SerializeTacticalPulseResult(
+                RuntimeGameplayCommandDirector.TryExecuteTacticalPulse(
+                    entityKeyId, pulseType, radius, magnitude, durationSeconds, maxTargets));
+        }
+
+        /// <summary>
         /// Queries the unit elite affixes census across living units.
         /// </summary>
         public string GetUnitAffixCensusJson()

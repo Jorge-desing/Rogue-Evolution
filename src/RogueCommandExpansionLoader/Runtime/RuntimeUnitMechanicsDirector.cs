@@ -58,7 +58,8 @@ namespace RogueCommandExpansionLoader.Runtime
     /// <summary>
     /// Executes native runtime mechanics for units declaring <c>healing</c>, <c>aura</c>,
     /// <c>baselineStatusEffects</c>, <c>combatBoosts</c>, <c>experience</c>, <c>synergies</c>,
-    /// <c>stealth</c>, <c>command</c>, and <c>experienceReward</c> in <c>content.json</c>.
+    /// <c>stealth</c>, <c>command</c>, and <c>experienceReward</c> in <c>content.json</c>,
+    /// plus bounded tactical pulses dispatched by the runtime command director.
     /// </summary>
     public sealed class RuntimeUnitMechanicsDirector : MonoBehaviour
     {
@@ -2137,6 +2138,293 @@ namespace RogueCommandExpansionLoader.Runtime
                 }
             }
         }
+
+        /// <summary>
+
+        /// Executes a bounded tactical pulse using native status, healing, shield, and damage paths.
+
+        /// </summary>
+
+        public static bool TryExecuteTacticalPulse(
+
+            object sourceObj,
+
+            string pulseType,
+
+            float radius,
+
+            float magnitude,
+
+            float durationSeconds,
+
+            int maxTargets,
+
+            out string normalizedPulseType,
+
+            out int affectedEntityCount,
+
+            out float damageApplied,
+
+            out float healingApplied,
+
+            out int statusEffectApplicationCount,
+
+            out string message)
+
+        {
+
+            normalizedPulseType = string.IsNullOrWhiteSpace(pulseType) ? "Shockwave" : pulseType.Trim();
+
+            affectedEntityCount = 0;
+
+            damageApplied = 0f;
+
+            healingApplied = 0f;
+
+            statusEffectApplicationCount = 0;
+
+            message = string.Empty;
+
+            if (sourceObj == null)
+
+            {
+
+                message = "Pulse source is not available.";
+
+                return false;
+
+            }
+
+
+            if (string.Equals(normalizedPulseType, "Shock", StringComparison.OrdinalIgnoreCase) ||
+
+                string.Equals(normalizedPulseType, "Emp", StringComparison.OrdinalIgnoreCase))
+
+            {
+
+                normalizedPulseType = "Shockwave";
+
+            }
+
+            else if (string.Equals(normalizedPulseType, "Inspire", StringComparison.OrdinalIgnoreCase))
+
+            {
+
+                normalizedPulseType = "Rally";
+
+            }
+
+
+            if (!string.Equals(normalizedPulseType, "Shockwave", StringComparison.OrdinalIgnoreCase) &&
+
+                !string.Equals(normalizedPulseType, "Rally", StringComparison.OrdinalIgnoreCase) &&
+
+                !string.Equals(normalizedPulseType, "Repair", StringComparison.OrdinalIgnoreCase))
+
+            {
+
+                message = "Unknown tactical pulse type '" + normalizedPulseType + "'.";
+
+                return false;
+
+            }
+
+
+            EnsureReflection(sourceObj.GetType());
+
+            float clampedRadius = Mathf.Clamp(radius, 3f, 50f);
+
+            float clampedMagnitude = Mathf.Clamp(magnitude, 0f, 1000f);
+
+            float clampedDuration = Mathf.Clamp(durationSeconds, 0.5f, 30f);
+
+            int clampedMaxTargets = Mathf.Clamp(maxTargets, 1, 16);
+
+            IEnumerable entities = GetActiveEntities();
+
+            if (entities == null)
+
+            {
+
+                message = "Active entity registry is not available.";
+
+                return false;
+
+            }
+
+
+            Vector3 sourcePosition = ReadVector3Property(_positionProperty, sourceObj);
+
+            float radiusSquared = clampedRadius * clampedRadius;
+
+            foreach (object candidate in entities)
+
+            {
+
+                if (candidate == null || ReferenceEquals(candidate, sourceObj) || !IsEntityAlive(candidate))
+
+                {
+
+                    continue;
+
+                }
+
+
+                if (_isUnitProperty != null && !ReadBoolProperty(_isUnitProperty, candidate))
+
+                {
+
+                    continue;
+
+                }
+
+
+                bool enemy = IsEnemy(sourceObj, candidate);
+
+                bool shockwave = string.Equals(normalizedPulseType, "Shockwave", StringComparison.OrdinalIgnoreCase);
+
+                if (shockwave != enemy)
+
+                {
+
+                    continue;
+
+                }
+
+
+                Vector3 candidatePosition = ReadVector3Property(_positionProperty, candidate);
+
+                float dx = candidatePosition.x - sourcePosition.x;
+
+                float dz = candidatePosition.z - sourcePosition.z;
+
+                if ((dx * dx + dz * dz) > radiusSquared)
+
+                {
+
+                    continue;
+
+                }
+
+
+                if (shockwave)
+
+                {
+
+                    ApplyTimedStatusEffect(candidate, "Stun", clampedDuration);
+
+                    ApplyTimedStatusEffect(candidate, "SlowedDown", clampedDuration * 1.5f);
+
+                    statusEffectApplicationCount += 2;
+
+                    if (clampedMagnitude > 0f)
+
+                    {
+
+                        InvokeTakeDamage(candidate, clampedMagnitude, sourceObj);
+
+                        damageApplied += clampedMagnitude;
+
+                    }
+
+                }
+
+                else if (string.Equals(normalizedPulseType, "Rally", StringComparison.OrdinalIgnoreCase))
+
+                {
+
+                    ApplyTimedStatusEffect(candidate, "CombatBoost", clampedDuration);
+
+                    ApplyTimedStatusEffect(candidate, "Turbo", clampedDuration);
+
+                    ApplyTimedStatChange(candidate, "Damage", 0.10f, clampedDuration, "tactical-pulse:rally");
+
+                    ApplyTimedStatChange(candidate, "MoveSpeed", 0.10f, clampedDuration, "tactical-pulse:rally");
+
+                    statusEffectApplicationCount += 2;
+
+                    if (clampedMagnitude > 0f)
+
+                    {
+
+                        InvokeHeal(candidate, clampedMagnitude, sourceObj);
+
+                        healingApplied += clampedMagnitude;
+
+                    }
+
+                }
+
+                else
+
+                {
+
+                    ApplyTimedStatusEffect(candidate, "Robust", clampedDuration);
+
+                    statusEffectApplicationCount++;
+
+                    float currentHealth = ReadFloatProperty(_currentHealthProperty, candidate, 0f);
+
+                    float maxHealth = ReadFloatProperty(_maxHealthProperty, candidate, 0f);
+
+                    if (clampedMagnitude > 0f && maxHealth > currentHealth)
+
+                    {
+
+                        float amount = Mathf.Min(clampedMagnitude, maxHealth - currentHealth);
+
+                        InvokeHeal(candidate, amount, sourceObj);
+
+                        healingApplied += amount;
+
+                    }
+
+                    if (ReadBoolProperty(_hasShieldProperty, candidate))
+
+                    {
+
+                        float currentShield = ReadFloatProperty(_currentShieldProperty, candidate, 0f);
+
+                        float maxShield = ReadFloatProperty(_maxShieldProperty, candidate, 0f);
+
+                        if (clampedMagnitude > 0f && maxShield > currentShield)
+
+                        {
+
+                            float amount = Mathf.Min(clampedMagnitude, maxShield - currentShield);
+
+                            InvokeChargeShield(candidate, amount);
+
+                            healingApplied += amount;
+
+                        }
+
+                    }
+
+                }
+
+
+                affectedEntityCount++;
+
+                if (affectedEntityCount >= clampedMaxTargets)
+
+                {
+
+                    break;
+
+                }
+
+            }
+
+
+            message = "Tactical pulse '" + normalizedPulseType + "' affected " + affectedEntityCount +
+
+                " unit(s).";
+
+            return true;
+
+        }
+
 
         private void ExecuteShieldRegeneration(object self, ContentUnitShieldRegenDefinition regen, float now)
         {

@@ -630,6 +630,19 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             res = _call_diagnostics_method("OrderUnitAttackJson", [e_key, t_key])
             return _tool_response(res)
 
+        elif name == "diagnostics_order_unit_tactical_pulse":
+            e_key = str(arguments.get("entityKeyId", ""))
+            pulse_type = str(arguments.get("pulseType", "Shockwave"))
+            radius = float(arguments.get("radius", 12.0))
+            magnitude = float(arguments.get("magnitude", 0.0))
+            duration = float(arguments.get("durationSeconds", 2.0))
+            max_targets = int(arguments.get("maxTargets", 8))
+            res = _call_diagnostics_method(
+                "OrderUnitTacticalPulseJson",
+                [e_key, pulse_type, radius, magnitude, duration, max_targets],
+            )
+            return _tool_response(res)
+
         elif name == "diagnostics_order_active_skill":
             e_key = str(arguments.get("entityKeyId", ""))
             t_key = arguments.get("targetEntityKeyId")

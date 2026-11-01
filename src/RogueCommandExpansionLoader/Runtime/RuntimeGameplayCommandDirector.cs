@@ -306,11 +306,76 @@ namespace RogueCommandExpansionLoader.Runtime
 
     /// <summary>
 
+    /// Pure diagnostic DTO returned when executing a bounded tactical pulse around a unit.
+
+    /// </summary>
+
+    public readonly struct TacticalPulseResult
+
+    {
+
+        public TacticalPulseResult(
+
+            bool success,
+
+            string entityKeyId,
+
+            string pulseType,
+
+            int affectedEntityCount,
+
+            float damageApplied,
+
+            float healingApplied,
+
+            int statusEffectApplicationCount,
+
+            string message)
+
+        {
+
+            Success = success;
+
+            EntityKeyId = entityKeyId ?? string.Empty;
+
+            PulseType = pulseType ?? string.Empty;
+
+            AffectedEntityCount = affectedEntityCount;
+
+            DamageApplied = damageApplied;
+
+            HealingApplied = healingApplied;
+
+            StatusEffectApplicationCount = statusEffectApplicationCount;
+
+            Message = message ?? string.Empty;
+
+        }
+
+        public bool Success { get; }
+
+        public string EntityKeyId { get; }
+
+        public string PulseType { get; }
+
+        public int AffectedEntityCount { get; }
+
+        public float DamageApplied { get; }
+
+        public float HealingApplied { get; }
+
+        public int StatusEffectApplicationCount { get; }
+
+        public string Message { get; }
+
+    }
+
+
+    /// <summary>
+
     /// Pure diagnostic DTO returned when executing selection or control group operations.
 
     /// Decoupled from Unity types.
-
-    /// </summary>
 
     public readonly struct SelectionCommandResult
 
@@ -2072,6 +2137,108 @@ namespace RogueCommandExpansionLoader.Runtime
 
         }
 
+
+
+        /// <summary>
+
+        /// Executes a bounded tactical pulse (Shockwave, Rally, or Repair) around a living unit.
+
+        /// </summary>
+
+        public static TacticalPulseResult TryExecuteTacticalPulse(
+
+            string entityKeyId,
+
+            string pulseType,
+
+            float radius,
+
+            float magnitude,
+
+            float durationSeconds,
+
+            int maxTargets)
+
+        {
+
+            if (string.IsNullOrWhiteSpace(entityKeyId))
+
+            {
+
+                return new TacticalPulseResult(false, string.Empty, pulseType, 0, 0f, 0f, 0,
+
+                    "Entity key ID cannot be empty.");
+
+            }
+
+
+            try
+
+            {
+
+                ExistingControllers existing = ExistingControllers.Instance;
+
+                if (existing == null)
+
+                {
+
+                    return new TacticalPulseResult(false, entityKeyId, pulseType, 0, 0f, 0f, 0,
+
+                        "ExistingControllers instance is not available.");
+
+                }
+
+
+                EntityController unit = FindEntityByKey(existing, entityKeyId.Trim());
+
+                if (unit == null)
+
+                {
+
+                    return new TacticalPulseResult(false, entityKeyId, pulseType, 0, 0f, 0f, 0,
+
+                        "Entity '" + entityKeyId + "' not found or destroyed.");
+
+                }
+
+
+                string normalizedPulseType;
+
+                int affectedEntityCount;
+
+                float damageApplied;
+
+                float healingApplied;
+
+                int statusEffectApplicationCount;
+
+                string message;
+
+                bool success = RuntimeUnitMechanicsDirector.TryExecuteTacticalPulse(
+
+                    unit, pulseType, radius, magnitude, durationSeconds, maxTargets,
+
+                    out normalizedPulseType, out affectedEntityCount, out damageApplied,
+
+                    out healingApplied, out statusEffectApplicationCount, out message);
+
+                return new TacticalPulseResult(success, entityKeyId, normalizedPulseType, affectedEntityCount,
+
+                    damageApplied, healingApplied, statusEffectApplicationCount, message);
+
+            }
+
+            catch (Exception ex)
+
+            {
+
+                return new TacticalPulseResult(false, entityKeyId, pulseType, 0, 0f, 0f, 0,
+
+                    "Error executing tactical pulse: " + ex.Message);
+
+            }
+
+        }
 
 
         private static EntityController FindEntityByKey(ExistingControllers existing, string key)

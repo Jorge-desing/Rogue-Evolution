@@ -4402,7 +4402,8 @@ internal static partial class ValidationTestRunner
                 !names.Contains("OrderClearCommandAuraLinksJson") ||
                 !names.Contains("GetHazardCensusJson") ||
                 !names.Contains("OrderSpawnHazardZoneJson") ||
-                !names.Contains("OrderClearHazardZonesJson"))
+                !names.Contains("OrderClearHazardZonesJson") ||
+                !names.Contains("OrderUnitTacticalPulseJson"))
             {
                 throw new InvalidOperationException("Diagnostic catalog should include all newly exposed endpoints.");
             }
@@ -4538,6 +4539,140 @@ internal static partial class ValidationTestRunner
                 {
                     throw new InvalidOperationException("SerializeCommandAuraResult JSON format error.");
                 }
+            }
+        }
+        finally
+        {
+            ExistingControllers.Instance.Reset();
+            RuntimeUnitMechanicsDirector.ClearProfiles();
+        }
+    }),
+    ("runtime tactical pulse shockwave damages and stuns nearby enemy units", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        RuntimeUnitMechanicsDirector.ClearProfiles();
+        try
+        {
+            var caster = new EntityController
+            {
+                entityId = "unit:pulse-caster",
+                UniqueEntityId = 801,
+                IsControlledByPlayer = true,
+                IsUnit = true,
+                IsCombatUnit = true,
+                Position = new Vector3(0f, 0f, 0f)
+            };
+            var enemy = new EntityController
+            {
+                entityId = "unit:pulse-enemy",
+                UniqueEntityId = 802,
+                IsControlledByAi = true,
+                IsUnit = true,
+                IsCombatUnit = true,
+                CurrentHealth = 100f,
+                MaxHealth = 100f,
+                Position = new Vector3(4f, 0f, 0f)
+            };
+            var farEnemy = new EntityController
+            {
+                entityId = "unit:pulse-far-enemy",
+                UniqueEntityId = 803,
+                IsControlledByAi = true,
+                IsUnit = true,
+                IsCombatUnit = true,
+                CurrentHealth = 100f,
+                MaxHealth = 100f,
+                Position = new Vector3(100f, 0f, 0f)
+            };
+            ExistingControllers.Instance.PlayerUnits().Add(caster);
+            ExistingControllers.Instance.AiUnits().Add(enemy);
+            ExistingControllers.Instance.AiUnits().Add(farEnemy);
+
+            TacticalPulseResult result = RuntimeGameplayCommandDirector.TryExecuteTacticalPulse(
+                "801", "Shockwave", 10f, 12f, 2f, 4);
+            if (!result.Success || result.PulseType != "Shockwave" || result.AffectedEntityCount != 1 ||
+                result.DamageApplied != 12f || result.StatusEffectApplicationCount < 2 ||
+                enemy.CurrentHealth != 88f || farEnemy.CurrentHealth != 100f ||
+                !enemy.HasActiveStatusEffect(StatusEffect.Stun) ||
+                !enemy.HasActiveStatusEffect(StatusEffect.SlowedDown))
+            {
+                throw new InvalidOperationException("Tactical Shockwave should affect only the nearby enemy with bounded damage and crowd-control effects.");
+            }
+
+            string json = AgentDiagnosticsFormatter.SerializeTacticalPulseResult(result);
+            using (var doc = JsonDocument.Parse(json))
+            {
+                if (doc.RootElement.GetProperty("kind").GetString() != "tacticalPulseResult" ||
+                    !doc.RootElement.GetProperty("success").GetBoolean() ||
+                    doc.RootElement.GetProperty("affectedEntityCount").GetInt32() != 1 ||
+                    doc.RootElement.GetProperty("statusEffectApplicationCount").GetInt32() < 2)
+                {
+                    throw new InvalidOperationException("SerializeTacticalPulseResult JSON format error.");
+                }
+            }
+        }
+        finally
+        {
+            ExistingControllers.Instance.Reset();
+            RuntimeUnitMechanicsDirector.ClearProfiles();
+        }
+    }),
+    ("runtime tactical pulse rally and repair affect only nearby allied units", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        RuntimeUnitMechanicsDirector.ClearProfiles();
+        try
+        {
+            var source = new EntityController
+            {
+                entityId = "unit:pulse-support",
+                UniqueEntityId = 811,
+                IsControlledByPlayer = true,
+                IsUnit = true,
+                Position = new Vector3(0f, 0f, 0f)
+            };
+            var ally = new EntityController
+            {
+                entityId = "unit:pulse-ally",
+                UniqueEntityId = 812,
+                IsControlledByPlayer = true,
+                IsUnit = true,
+                CurrentHealth = 50f,
+                MaxHealth = 100f,
+                Position = new Vector3(3f, 0f, 0f)
+            };
+            var enemy = new EntityController
+            {
+                entityId = "unit:pulse-enemy-rally",
+                UniqueEntityId = 813,
+                IsControlledByAi = true,
+                IsUnit = true,
+                CurrentHealth = 100f,
+                MaxHealth = 100f,
+                Position = new Vector3(3f, 0f, 0f)
+            };
+            ExistingControllers.Instance.PlayerUnits().Add(source);
+            ExistingControllers.Instance.PlayerUnits().Add(ally);
+            ExistingControllers.Instance.AiUnits().Add(enemy);
+
+            TacticalPulseResult rally = RuntimeGameplayCommandDirector.TryExecuteTacticalPulse(
+                "811", "Rally", 10f, 20f, 3f, 4);
+            if (!rally.Success || rally.AffectedEntityCount != 1 || rally.HealingApplied != 20f ||
+                ally.CurrentHealth != 70f || enemy.CurrentHealth != 100f ||
+                !ally.HasActiveStatusEffect(StatusEffect.CombatBoost) ||
+                !ally.HasActiveStatusEffect(StatusEffect.Turbo))
+            {
+                throw new InvalidOperationException("Tactical Rally should heal and buff only the nearby allied unit.");
+            }
+
+            ally.CurrentHealth = 40f;
+            TacticalPulseResult repair = RuntimeGameplayCommandDirector.TryExecuteTacticalPulse(
+                "811", "Repair", 10f, 15f, 3f, 4);
+            if (!repair.Success || repair.AffectedEntityCount != 1 || repair.HealingApplied != 15f ||
+                ally.CurrentHealth != 55f || enemy.CurrentHealth != 100f ||
+                !ally.HasActiveStatusEffect(StatusEffect.Robust))
+            {
+                throw new InvalidOperationException("Tactical Repair should restore only the nearby allied unit and apply Robust.");
             }
         }
         finally
