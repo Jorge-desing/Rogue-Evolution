@@ -193,7 +193,37 @@
         "assetBundleId": "sample-native:assets",
         "cardImageAssetName": "assets/roguecommandexpansionsample/sandlancescoutcard.png"
       },
-      "cardModelScalingFactor": 0.85
+      "cardModelScalingFactor": 0.85,
+      "healing": {
+        "healAmount": 5,
+        "healRange": 6,
+        "healRate": 2,
+        "repairAmount": 2
+      },
+      "combatBoosts": [
+        {
+          "id": "rcm:boost",
+          "statName": "Damage1",
+          "multiplier": 1.1,
+          "duration": 30
+        }
+      ],
+      "experience": {
+        "experiencePerLevel": 10,
+        "maxLevel": 5,
+        "experienceGainMultiplier": 1,
+        "levelUpBonus": 0.1
+      },
+      "experienceReward": {
+        "experienceAmount": 5,
+        "experienceType": "Combat",
+        "bonusMultiplier": 1
+      },
+      "vampiricLeech": {
+        "siphonRatio": 0.1,
+        "siphonToShield": false,
+        "maxSiphonPerHit": 10
+      }
     },
     {
       "id": "sample-native:heavy-artillery",
@@ -375,7 +405,37 @@
         ]
       },
       "isAllowedForAi": true,
-      "cardModelScalingFactor": 0.85
+      "cardModelScalingFactor": 0.85,
+      "healing": {
+        "healAmount": 5,
+        "healRange": 6,
+        "healRate": 2,
+        "repairAmount": 2
+      },
+      "combatBoosts": [
+        {
+          "id": "rcm:boost",
+          "statName": "Damage1",
+          "multiplier": 1.1,
+          "duration": 30
+        }
+      ],
+      "experience": {
+        "experiencePerLevel": 10,
+        "maxLevel": 5,
+        "experienceGainMultiplier": 1,
+        "levelUpBonus": 0.1
+      },
+      "experienceReward": {
+        "experienceAmount": 5,
+        "experienceType": "Combat",
+        "bonusMultiplier": 1
+      },
+      "vampiricLeech": {
+        "siphonRatio": 0.1,
+        "siphonToShield": false,
+        "maxSiphonPerHit": 10
+      }
     },
     {
       "id": "sample-native:assault-walker",
@@ -554,7 +614,37 @@
       "visualAssetName": "assets/roguecommandexpansionsample/ironcladwalkervisual.prefab",
       "visualRootPath": "RoboMarine_Mesh",
       "isAllowedForAi": true,
-      "cardModelScalingFactor": 0.85
+      "cardModelScalingFactor": 0.85,
+      "healing": {
+        "healAmount": 5,
+        "healRange": 6,
+        "healRate": 2,
+        "repairAmount": 2
+      },
+      "combatBoosts": [
+        {
+          "id": "rcm:boost",
+          "statName": "Damage1",
+          "multiplier": 1.1,
+          "duration": 30
+        }
+      ],
+      "experience": {
+        "experiencePerLevel": 10,
+        "maxLevel": 5,
+        "experienceGainMultiplier": 1,
+        "levelUpBonus": 0.1
+      },
+      "experienceReward": {
+        "experienceAmount": 5,
+        "experienceType": "Combat",
+        "bonusMultiplier": 1
+      },
+      "vampiricLeech": {
+        "siphonRatio": 0.1,
+        "siphonToShield": false,
+        "maxSiphonPerHit": 10
+      }
     },
     {
       "id": "sample-native:atlas-crane-mech",
@@ -703,10 +793,10 @@
         "Damage1": 2.8
       },
       "healing": {
-        "healAmount": 12.0,
-        "healRange": 3.5,
-        "healRate": 0.8,
-        "repairAmount": 20.0
+        "healAmount": 5,
+        "healRange": 6,
+        "healRate": 2,
+        "repairAmount": 2
       },
       "productionBuilding": {
         "id": "sample-native:atlas-crane-mech-factory",
@@ -741,7 +831,31 @@
         "cardImageAssetName": "assets/roguecommandexpansionsample/atlascranemechcard.png"
       },
       "isAllowedForAi": true,
-      "cardModelScalingFactor": 0.85
+      "cardModelScalingFactor": 0.85,
+      "combatBoosts": [
+        {
+          "id": "rcm:boost",
+          "statName": "Damage1",
+          "multiplier": 1.1,
+          "duration": 30
+        }
+      ],
+      "experience": {
+        "experiencePerLevel": 10,
+        "maxLevel": 5,
+        "experienceGainMultiplier": 1,
+        "levelUpBonus": 0.1
+      },
+      "experienceReward": {
+        "experienceAmount": 5,
+        "experienceType": "Combat",
+        "bonusMultiplier": 1
+      },
+      "vampiricLeech": {
+        "siphonRatio": 0.1,
+        "siphonToShield": false,
+        "maxSiphonPerHit": 10
+      }
     },
     {
       "id": "sample-native:bastion-siege-mech",
@@ -921,7 +1035,37 @@
         "cardImageAssetName": "assets/roguecommandexpansionsample/bastionsiegemechcard.png"
       },
       "isAllowedForAi": true,
-      "cardModelScalingFactor": 0.85
+      "cardModelScalingFactor": 0.85,
+      "healing": {
+        "healAmount": 5,
+        "healRange": 6,
+        "healRate": 2,
+        "repairAmount": 2
+      },
+      "combatBoosts": [
+        {
+          "id": "rcm:boost",
+          "statName": "Damage1",
+          "multiplier": 1.1,
+          "duration": 30
+        }
+      ],
+      "experience": {
+        "experiencePerLevel": 10,
+        "maxLevel": 5,
+        "experienceGainMultiplier": 1,
+        "levelUpBonus": 0.1
+      },
+      "experienceReward": {
+        "experienceAmount": 5,
+        "experienceType": "Combat",
+        "bonusMultiplier": 1
+      },
+      "vampiricLeech": {
+        "siphonRatio": 0.1,
+        "siphonToShield": false,
+        "maxSiphonPerHit": 10
+      }
     },
     {
       "id": "sample-native:arachnid-hexapod",
@@ -1105,7 +1249,37 @@
           }
         ]
       },
-      "cardModelScalingFactor": 0.85
+      "cardModelScalingFactor": 0.85,
+      "healing": {
+        "healAmount": 5,
+        "healRange": 6,
+        "healRate": 2,
+        "repairAmount": 2
+      },
+      "combatBoosts": [
+        {
+          "id": "rcm:boost",
+          "statName": "Damage1",
+          "multiplier": 1.1,
+          "duration": 30
+        }
+      ],
+      "experience": {
+        "experiencePerLevel": 10,
+        "maxLevel": 5,
+        "experienceGainMultiplier": 1,
+        "levelUpBonus": 0.1
+      },
+      "experienceReward": {
+        "experienceAmount": 5,
+        "experienceType": "Combat",
+        "bonusMultiplier": 1
+      },
+      "vampiricLeech": {
+        "siphonRatio": 0.1,
+        "siphonToShield": false,
+        "maxSiphonPerHit": 10
+      }
     },
     {
       "id": "sample-native:overlord-command-hq",
@@ -1294,6 +1468,36 @@
         "commandRange": 4.5,
         "commandType": "Defend",
         "maxCommandChain": 4
+      },
+      "healing": {
+        "healAmount": 5,
+        "healRange": 6,
+        "healRate": 2,
+        "repairAmount": 2
+      },
+      "combatBoosts": [
+        {
+          "id": "rcm:boost",
+          "statName": "Damage1",
+          "multiplier": 1.1,
+          "duration": 30
+        }
+      ],
+      "experience": {
+        "experiencePerLevel": 10,
+        "maxLevel": 5,
+        "experienceGainMultiplier": 1,
+        "levelUpBonus": 0.1
+      },
+      "experienceReward": {
+        "experienceAmount": 5,
+        "experienceType": "Combat",
+        "bonusMultiplier": 1
+      },
+      "vampiricLeech": {
+        "siphonRatio": 0.1,
+        "siphonToShield": false,
+        "maxSiphonPerHit": 10
       }
     },
     {
@@ -1478,7 +1682,37 @@
         "assetBundleId": "sample-native:assets",
         "cardImageAssetName": "assets/roguecommandexpansionsample/skirmishbikecard.png"
       },
-      "cardModelScalingFactor": 0.85
+      "cardModelScalingFactor": 0.85,
+      "healing": {
+        "healAmount": 5,
+        "healRange": 6,
+        "healRate": 2,
+        "repairAmount": 2
+      },
+      "combatBoosts": [
+        {
+          "id": "rcm:boost",
+          "statName": "Damage1",
+          "multiplier": 1.1,
+          "duration": 30
+        }
+      ],
+      "experience": {
+        "experiencePerLevel": 10,
+        "maxLevel": 5,
+        "experienceGainMultiplier": 1,
+        "levelUpBonus": 0.1
+      },
+      "experienceReward": {
+        "experienceAmount": 5,
+        "experienceType": "Combat",
+        "bonusMultiplier": 1
+      },
+      "vampiricLeech": {
+        "siphonRatio": 0.1,
+        "siphonToShield": false,
+        "maxSiphonPerHit": 10
+      }
     },
     {
       "id": "sample-native:surge-tank",
@@ -1669,6 +1903,36 @@
         "damage": 12.0,
         "stunDuration": 1.5,
         "cooldown": 15.0
+      },
+      "healing": {
+        "healAmount": 5,
+        "healRange": 6,
+        "healRate": 2,
+        "repairAmount": 2
+      },
+      "combatBoosts": [
+        {
+          "id": "rcm:boost",
+          "statName": "Damage1",
+          "multiplier": 1.1,
+          "duration": 30
+        }
+      ],
+      "experience": {
+        "experiencePerLevel": 10,
+        "maxLevel": 5,
+        "experienceGainMultiplier": 1,
+        "levelUpBonus": 0.1
+      },
+      "experienceReward": {
+        "experienceAmount": 5,
+        "experienceType": "Combat",
+        "bonusMultiplier": 1
+      },
+      "vampiricLeech": {
+        "siphonRatio": 0.1,
+        "siphonToShield": false,
+        "maxSiphonPerHit": 10
       }
     }
   ],
