@@ -610,6 +610,71 @@ internal static partial class ValidationTestRunner
             }
         }
     }),
+    ("flanking-strike ignores non-combat AI units even when attack and movement are enabled", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        DefaultAiBehaviour.ResetRuntimeState();
+        UnityEngine.Time.time = 0f;
+        IRogueCommandAiRuntimeBehaviour? behaviour = null;
+        try
+        {
+            var target = new EntityController
+            {
+                IsControlledByPlayer = true,
+                IsBuilding = true,
+                CurrentHealth = 100f,
+                MaxHealth = 100f,
+                Position = new UnityEngine.Vector3(10f, 0f, 0f),
+                UniqueEntityId = 731
+            };
+            var supportA = new EntityController
+            {
+                IsControlledByAi = true,
+                IsUnit = true,
+                IsCombatUnit = false,
+                CanAttackAndIsAttackEnabled = true,
+                CanMoveAndMovementIsEnabled = true,
+                aiBaseIndex = 0,
+                Position = UnityEngine.Vector3.zero,
+                UniqueEntityId = 732
+            };
+            var supportB = new EntityController
+            {
+                IsControlledByAi = true,
+                IsUnit = true,
+                IsCombatUnit = false,
+                CanAttackAndIsAttackEnabled = true,
+                CanMoveAndMovementIsEnabled = true,
+                aiBaseIndex = 0,
+                Position = new UnityEngine.Vector3(1f, 0f, 0f),
+                UniqueEntityId = 733
+            };
+            ExistingControllers.Instance.PlayerBuildingsKnownToAi().Add(target);
+            ExistingControllers.Instance.AiUnits().Add(supportA);
+            ExistingControllers.Instance.AiUnits().Add(supportB);
+
+            behaviour = new FlankingStrikeAiModule().CreateBehaviour(new DefaultAiBehaviour(),
+                [
+                    new ContentModuleParameter { name = "baseIndex", value = "0" },
+                    new ContentModuleParameter { name = "squadSize", value = "2" },
+                    new ContentModuleParameter { name = "minGameTimeSeconds", value = "0" },
+                    new ContentModuleParameter { name = "targetPreference", value = "Refinery" }
+                ]);
+            behaviour.OnInitialized();
+            behaviour.Tick();
+
+            if (supportA.ExecuteCommandCallCount != 0 || supportB.ExecuteCommandCallCount != 0)
+            {
+                throw new InvalidOperationException("Flanking strike dispatched non-combat AI units.");
+            }
+        }
+        finally
+        {
+            behaviour?.OnDestroyed();
+            ExistingControllers.Instance.Reset();
+            DefaultAiBehaviour.ResetRuntimeState();
+        }
+    }),
     ("new AI modules factory-reinforcement and flanking-strike are registered and validate parameters", () =>
     {
         var registry = new AiModuleRegistry();
@@ -662,6 +727,123 @@ internal static partial class ValidationTestRunner
         if (FocusFireParameterParser.TryParse(invalidParams, out _, out diagnostic) || diagnostic == null)
         {
             throw new InvalidOperationException("Focus-fire should reject invalid priorityMode.");
+        }
+    }),
+    ("focus-fire ignores non-combat AI units even when attack and movement are enabled", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        DefaultAiBehaviour.ResetRuntimeState();
+        UnityEngine.Time.time = 0f;
+        IRogueCommandAiRuntimeBehaviour? behaviour = null;
+        try
+        {
+            var supportA = new EntityController
+            {
+                IsControlledByAi = true,
+                IsUnit = true,
+                IsCombatUnit = false,
+                CanAttackAndIsAttackEnabled = true,
+                CanMoveAndMovementIsEnabled = true,
+                Position = UnityEngine.Vector3.zero,
+                UniqueEntityId = 701
+            };
+            var supportB = new EntityController
+            {
+                IsControlledByAi = true,
+                IsUnit = true,
+                IsCombatUnit = false,
+                CanAttackAndIsAttackEnabled = true,
+                CanMoveAndMovementIsEnabled = true,
+                Position = new UnityEngine.Vector3(1f, 0f, 0f),
+                UniqueEntityId = 702
+            };
+            var playerTarget = new EntityController
+            {
+                IsControlledByPlayer = true,
+                IsUnit = true,
+                IsCombatUnit = true,
+                Position = new UnityEngine.Vector3(2f, 0f, 0f),
+                UniqueEntityId = 703
+            };
+            ExistingControllers.Instance.AiUnits().Add(supportA);
+            ExistingControllers.Instance.AiUnits().Add(supportB);
+            ExistingControllers.Instance.PlayerEntities().Add(playerTarget);
+
+            behaviour = new FocusFireAiModule().CreateBehaviour(new DefaultAiBehaviour(),
+                [new ContentModuleParameter { name = "checkIntervalSeconds", value = "1" }]);
+            behaviour.OnInitialized();
+            UnityEngine.Time.time = 1f;
+            behaviour.Tick();
+
+            if (supportA.ExecuteCommandCallCount != 0 || supportB.ExecuteCommandCallCount != 0)
+            {
+                throw new InvalidOperationException("Focus-fire dispatched non-combat AI units.");
+            }
+        }
+        finally
+        {
+            behaviour?.OnDestroyed();
+            ExistingControllers.Instance.Reset();
+            DefaultAiBehaviour.ResetRuntimeState();
+        }
+    }),
+    ("focus-fire rejects a non-hostile candidate from the player entity registry", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        DefaultAiBehaviour.ResetRuntimeState();
+        UnityEngine.Time.time = 0f;
+        IRogueCommandAiRuntimeBehaviour? behaviour = null;
+        try
+        {
+            var aiA = new EntityController
+            {
+                IsControlledByAi = true,
+                IsUnit = true,
+                IsCombatUnit = true,
+                CanAttackAndIsAttackEnabled = true,
+                CanMoveAndMovementIsEnabled = true,
+                Position = UnityEngine.Vector3.zero,
+                UniqueEntityId = 711
+            };
+            var aiB = new EntityController
+            {
+                IsControlledByAi = true,
+                IsUnit = true,
+                IsCombatUnit = true,
+                CanAttackAndIsAttackEnabled = true,
+                CanMoveAndMovementIsEnabled = true,
+                Position = new UnityEngine.Vector3(1f, 0f, 0f),
+                UniqueEntityId = 712
+            };
+            var nonHostileCandidate = new EntityController
+            {
+                IsControlledByAi = true,
+                IsControlledByPlayer = false,
+                IsUnit = true,
+                IsCombatUnit = true,
+                Position = new UnityEngine.Vector3(2f, 0f, 0f),
+                UniqueEntityId = 713
+            };
+            ExistingControllers.Instance.AiUnits().Add(aiA);
+            ExistingControllers.Instance.AiUnits().Add(aiB);
+            ExistingControllers.Instance.PlayerEntities().Add(nonHostileCandidate);
+
+            behaviour = new FocusFireAiModule().CreateBehaviour(new DefaultAiBehaviour(),
+                [new ContentModuleParameter { name = "checkIntervalSeconds", value = "1" }]);
+            behaviour.OnInitialized();
+            UnityEngine.Time.time = 1f;
+            behaviour.Tick();
+
+            if (aiA.ExecuteCommandCallCount != 0 || aiB.ExecuteCommandCallCount != 0)
+            {
+                throw new InvalidOperationException("Focus-fire targeted a non-hostile entity.");
+            }
+        }
+        finally
+        {
+            behaviour?.OnDestroyed();
+            ExistingControllers.Instance.Reset();
+            DefaultAiBehaviour.ResetRuntimeState();
         }
     }),
     ("construction-expansion AI module parses defaults and validates limits", () =>
@@ -1201,6 +1383,98 @@ internal static partial class ValidationTestRunner
             EntityBalancingStore.Reset();
         }
     }),
+    ("squad-formation preserves native captain links when the module is destroyed", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        DefaultAiBehaviour.ResetRuntimeState();
+        EntityBalancingStore.Reset();
+        UnityEngine.Time.time = 0f;
+        IRogueCommandAiRuntimeBehaviour? behaviour = null;
+        try
+        {
+            EntityBalancingStore.RolesOf["ModuleCaptain"] = UnitRole.Tank;
+            EntityBalancingStore.RolesOf["NativeCaptain"] = UnitRole.Unit;
+            EntityBalancingStore.RolesOf["ModuleFollower"] = UnitRole.Unit;
+            EntityBalancingStore.RolesOf["NativeFollower"] = UnitRole.Unit;
+
+            var moduleCaptain = new EntityController
+            {
+                IsControlledByAi = true,
+                IsUnit = true,
+                IsCombatUnit = true,
+                EntityId = "ModuleCaptain",
+                UniqueEntityId = 121,
+                aiBaseIndex = 0,
+                Position = UnityEngine.Vector3.zero
+            };
+            var moduleFollower = new EntityController
+            {
+                IsControlledByAi = true,
+                IsUnit = true,
+                IsCombatUnit = true,
+                EntityId = "ModuleFollower",
+                UniqueEntityId = 122,
+                aiBaseIndex = 0,
+                Position = new UnityEngine.Vector3(2f, 0f, 0f)
+            };
+            var nativeCaptain = new EntityController
+            {
+                IsControlledByAi = true,
+                IsUnit = true,
+                IsCombatUnit = true,
+                EntityId = "NativeCaptain",
+                UniqueEntityId = 123,
+                aiBaseIndex = 0,
+                Position = new UnityEngine.Vector3(100f, 0f, 0f)
+            };
+            var nativeFollower = new EntityController
+            {
+                IsControlledByAi = true,
+                IsUnit = true,
+                IsCombatUnit = true,
+                EntityId = "NativeFollower",
+                UniqueEntityId = 124,
+                aiBaseIndex = 0,
+                Position = new UnityEngine.Vector3(100f, 0f, 1f),
+                CaptainOfThisEntity = nativeCaptain
+            };
+
+            ExistingControllers.Instance.AiUnits().Add(moduleCaptain);
+            ExistingControllers.Instance.AiUnits().Add(moduleFollower);
+            ExistingControllers.Instance.AiUnits().Add(nativeCaptain);
+            ExistingControllers.Instance.AiUnits().Add(nativeFollower);
+
+            behaviour = new SquadFormationAiModule().CreateBehaviour(new DefaultAiBehaviour(),
+                [
+                    new ContentModuleParameter { name = "anchorRole", value = "Tank" },
+                    new ContentModuleParameter { name = "baseIndex", value = "0" },
+                    new ContentModuleParameter { name = "cooldownSeconds", value = "1" },
+                    new ContentModuleParameter { name = "formationRadiusCells", value = "10" }
+                ]);
+            behaviour.OnInitialized();
+            UnityEngine.Time.time = 1f;
+            behaviour.Tick();
+
+            if (moduleFollower.CaptainOfThisEntity != moduleCaptain ||
+                nativeFollower.CaptainOfThisEntity != nativeCaptain)
+            {
+                throw new InvalidOperationException("Squad formation setup did not establish both captain relationships.");
+            }
+
+            behaviour.OnDestroyed();
+            if (moduleFollower.CaptainOfThisEntity != null || nativeFollower.CaptainOfThisEntity != nativeCaptain)
+            {
+                throw new InvalidOperationException("Squad formation cleanup removed a native captain relationship.");
+            }
+        }
+        finally
+        {
+            behaviour?.OnDestroyed();
+            ExistingControllers.Instance.Reset();
+            DefaultAiBehaviour.ResetRuntimeState();
+            EntityBalancingStore.Reset();
+        }
+    }),
     ("tactical-skill-activation AI module parses defaults and validates limits", () =>
     {
         if (!TacticalSkillActivationParameterParser.TryParse(null, out TacticalSkillActivationSettings settings, out string diagnostic) || diagnostic != null)
@@ -1311,6 +1585,65 @@ internal static partial class ValidationTestRunner
                 aiCaster.LastExecutedCommand.Value.command != EntityCommand.Command.ActiveSkillWithoutTarget)
             {
                 throw new InvalidOperationException("LowHealth self skill did not fire when wounded without a nearby enemy.");
+            }
+        }
+        finally
+        {
+            behaviour?.OnDestroyed();
+            ExistingControllers.Instance.Reset();
+            DefaultAiBehaviour.ResetRuntimeState();
+            EntityBalancingStore.Reset();
+            RuntimeUnitMechanicsDirector.ClearProfiles();
+        }
+    }),
+    ("tactical-skill-activation ignores a non-hostile entry in the player registry", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        DefaultAiBehaviour.ResetRuntimeState();
+        EntityBalancingStore.Reset();
+        RuntimeUnitMechanicsDirector.ClearProfiles();
+        UnityEngine.Time.time = 0f;
+        IRogueCommandAiRuntimeBehaviour? behaviour = null;
+        try
+        {
+            var caster = new EntityController
+            {
+                IsControlledByAi = true,
+                IsUnit = true,
+                IsCombatUnit = true,
+                UniqueEntityId = 451,
+                EntityId = "ai:skill-caster",
+                aiBaseIndex = 0,
+                Position = UnityEngine.Vector3.zero,
+                CurrentMana = 100f,
+                SkillInfo = new SkillInfo { targetOrigin = TargetOrigin.ChosenEntity }
+            };
+            var nonHostile = new EntityController
+            {
+                IsControlledByAi = true,
+                IsUnit = true,
+                IsCombatUnit = true,
+                UniqueEntityId = 452,
+                EntityId = "ai:non-hostile",
+                Position = new UnityEngine.Vector3(2f, 0f, 0f)
+            };
+            ExistingControllers.Instance.AiUnits().Add(caster);
+            ExistingControllers.Instance.PlayerEntities().Add(nonHostile);
+
+            behaviour = new TacticalSkillActivationAiModule().CreateBehaviour(
+                new DefaultAiBehaviour(),
+                [
+                    new ContentModuleParameter { name = "enemyTriggerRadiusCells", value = "10" },
+                    new ContentModuleParameter { name = "cooldownSeconds", value = "1" },
+                    new ContentModuleParameter { name = "baseIndex", value = "0" }
+                ]);
+            behaviour.OnInitialized();
+            UnityEngine.Time.time = 1f;
+            behaviour.Tick();
+
+            if (caster.ExecuteCommandCallCount != 0)
+            {
+                throw new InvalidOperationException("Tactical skill activation targeted a non-hostile entity.");
             }
         }
         finally
@@ -1991,6 +2324,71 @@ internal static partial class ValidationTestRunner
             DefaultAiBehaviour.ResetRuntimeState();
         }
     }),
+    ("wave-escalation ignores non-combat AI units during assault dispatch", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        DefaultAiBehaviour.ResetRuntimeState();
+        AiBehaviourManager.CurrentAttackWaveNumber = 0;
+        UnityEngine.Time.time = 0f;
+        IRogueCommandAiRuntimeBehaviour? behaviour = null;
+        try
+        {
+            var hq = new EntityController
+            {
+                IsControlledByPlayer = true,
+                IsBuilding = true,
+                EntityId = "EngineeringHq",
+                Position = new UnityEngine.Vector3(20f, 0f, 0f)
+            };
+            var supportA = new EntityController
+            {
+                IsControlledByAi = true,
+                IsUnit = true,
+                IsCombatUnit = false,
+                CanAttackAndIsAttackEnabled = true,
+                CanMoveAndMovementIsEnabled = true,
+                aiBaseIndex = 0,
+                Position = UnityEngine.Vector3.zero,
+                UniqueEntityId = 741
+            };
+            var supportB = new EntityController
+            {
+                IsControlledByAi = true,
+                IsUnit = true,
+                IsCombatUnit = false,
+                CanAttackAndIsAttackEnabled = true,
+                CanMoveAndMovementIsEnabled = true,
+                aiBaseIndex = 0,
+                Position = new UnityEngine.Vector3(1f, 0f, 0f),
+                UniqueEntityId = 742
+            };
+            ExistingControllers.Instance.EngineeringHqEntity = hq;
+            ExistingControllers.Instance.AiUnits().Add(supportA);
+            ExistingControllers.Instance.AiUnits().Add(supportB);
+
+            behaviour = new WaveEscalationAiModule().CreateBehaviour(new DefaultAiBehaviour(),
+                [
+                    new ContentModuleParameter { name = "waveIntervalSeconds", value = "10" },
+                    new ContentModuleParameter { name = "maxWaves", value = "1" },
+                    new ContentModuleParameter { name = "baseIndex", value = "0" }
+                ]);
+            behaviour.OnInitialized();
+            UnityEngine.Time.time = 10f;
+            behaviour.Tick();
+
+            if (supportA.ExecuteCommandCallCount != 0 || supportB.ExecuteCommandCallCount != 0)
+            {
+                throw new InvalidOperationException("Wave escalation dispatched non-combat AI units.");
+            }
+        }
+        finally
+        {
+            behaviour?.OnDestroyed();
+            ExistingControllers.Instance.Reset();
+            DefaultAiBehaviour.ResetRuntimeState();
+            AiBehaviourManager.CurrentAttackWaveNumber = 0;
+        }
+    }),
     ("wave-escalation AI module increments attack wave counter and orders assault", () =>
     {
         ExistingControllers.Instance.Reset();
@@ -2014,6 +2412,8 @@ internal static partial class ValidationTestRunner
                 IsControlledByAi = true,
                 IsUnit = true,
                 IsCombatUnit = true,
+                CanAttackAndIsAttackEnabled = true,
+                CanMoveAndMovementIsEnabled = true,
                 UniqueEntityId = 501,
                 aiBaseIndex = 0,
                 Position = UnityEngine.Vector3.zero
@@ -2134,6 +2534,8 @@ internal static partial class ValidationTestRunner
                 IsControlledByAi = true,
                 IsUnit = true,
                 IsCombatUnit = true,
+                CanAttackAndIsAttackEnabled = true,
+                CanMoveAndMovementIsEnabled = true,
                 EntityId = "FastDefender",
                 UniqueEntityId = 501,
                 aiBaseIndex = 0,
@@ -2186,6 +2588,117 @@ internal static partial class ValidationTestRunner
         finally
         {
             behaviour?.OnDestroyed();
+            ExistingControllers.Instance.Reset();
+            DefaultAiBehaviour.ResetRuntimeState();
+        }
+    }),
+    ("counter-battery ignores non-combat AI units even when they are fast", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        DefaultAiBehaviour.ResetRuntimeState();
+        UnityEngine.Time.time = 0f;
+        IRogueCommandAiRuntimeBehaviour? behaviour = null;
+        try
+        {
+            var nonCombatInterceptor = new EntityController
+            {
+                IsControlledByAi = true,
+                IsUnit = true,
+                IsCombatUnit = false,
+                CanAttackAndIsAttackEnabled = true,
+                CanMoveAndMovementIsEnabled = true,
+                EntityId = "FastSupport",
+                UniqueEntityId = 511,
+                aiBaseIndex = 0,
+                Position = UnityEngine.Vector3.zero,
+                MoveSpeed = 20f
+            };
+            var playerArtillery = new EntityController
+            {
+                IsControlledByPlayer = true,
+                IsUnit = true,
+                EntityId = "PlayerArtillery",
+                UniqueEntityId = 611,
+                Position = new UnityEngine.Vector3(35f, 0f, 0f),
+                WeaponRange = 35f
+            };
+            ExistingControllers.Instance.AiUnits().Add(nonCombatInterceptor);
+            ExistingControllers.Instance.PlayerEntities().Add(playerArtillery);
+
+            behaviour = new CounterBatteryAiModule().CreateBehaviour(new DefaultAiBehaviour(),
+                [
+                    new ContentModuleParameter { name = "threatTriggerDistance", value = "20" },
+                    new ContentModuleParameter { name = "minInterceptorSpeed", value = "10" },
+                    new ContentModuleParameter { name = "maxInterceptors", value = "1" }
+                ]);
+            behaviour.OnInitialized();
+            behaviour.Tick();
+
+            if (nonCombatInterceptor.ExecuteCommandCallCount != 0)
+            {
+                throw new InvalidOperationException("Counter-battery dispatched a non-combat AI unit.");
+            }
+        }
+        finally
+        {
+            behaviour?.OnDestroyed();
+            ExistingControllers.Instance.Reset();
+            DefaultAiBehaviour.ResetRuntimeState();
+        }
+    }),
+    ("counter-battery ignores a short min-attack-range hint below the threat threshold", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        DefaultAiBehaviour.ResetRuntimeState();
+        UnityEngine.Time.time = 0f;
+        CounterBatteryAiModule.MinAttackRangeResolver = _ => 4.5f;
+        IRogueCommandAiRuntimeBehaviour? behaviour = null;
+        try
+        {
+            var fastDefender = new EntityController
+            {
+                IsControlledByAi = true,
+                IsUnit = true,
+                IsCombatUnit = true,
+                CanAttackAndIsAttackEnabled = true,
+                CanMoveAndMovementIsEnabled = true,
+                EntityId = "FastDefender",
+                UniqueEntityId = 521,
+                aiBaseIndex = 0,
+                Position = UnityEngine.Vector3.zero,
+                MoveSpeed = 15f
+            };
+            var playerUnit = new EntityController
+            {
+                IsControlledByPlayer = true,
+                IsUnit = true,
+                EntityId = "PlayerUnit",
+                UniqueEntityId = 621,
+                Position = new UnityEngine.Vector3(35f, 0f, 0f),
+                WeaponRange = 15f
+            };
+            ExistingControllers.Instance.AiUnits().Add(fastDefender);
+            ExistingControllers.Instance.PlayerEntities().Add(playerUnit);
+
+            behaviour = new CounterBatteryAiModule().CreateBehaviour(new DefaultAiBehaviour(),
+                [
+                    new ContentModuleParameter { name = "threatTriggerDistance", value = "20" },
+                    new ContentModuleParameter { name = "minInterceptorSpeed", value = "10" },
+                    new ContentModuleParameter { name = "maxInterceptors", value = "1" }
+                ]);
+            behaviour.OnInitialized();
+            behaviour.Tick();
+
+            if (fastDefender.ExecuteCommandCallCount != 0)
+            {
+                throw new InvalidOperationException(
+                    "Counter-battery treated a short minAttackRange dead-zone as long-range artillery.");
+            }
+        }
+        finally
+        {
+            behaviour?.OnDestroyed();
+            CounterBatteryAiModule.MinAttackRangeResolver = null;
             ExistingControllers.Instance.Reset();
             DefaultAiBehaviour.ResetRuntimeState();
         }

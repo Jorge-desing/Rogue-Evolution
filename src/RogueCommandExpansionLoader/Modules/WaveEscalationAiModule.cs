@@ -138,7 +138,10 @@ namespace RogueCommandExpansionLoader.Modules
 
                 foreach (EntityController unit in aiUnits)
                 {
-                    if (unit == null || unit.DestroyHasBeenStarted || unit.IsBuilding)
+                    if (unit == null || unit.IsDestroyed || unit.DestroyHasBeenStarted ||
+                        !unit.IsControlledByAi || !unit.IsUnit || !unit.IsCombatUnit ||
+                        !unit.CanAttackAndIsAttackEnabled || !unit.CanMoveAndMovementIsEnabled ||
+                        unit.IsBuilding)
                     {
                         continue;
                     }

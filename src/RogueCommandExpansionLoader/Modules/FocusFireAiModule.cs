@@ -113,7 +113,7 @@ namespace RogueCommandExpansionLoader.Modules
                         continue;
                     }
 
-                    if (!unit.CanAttackAndIsAttackEnabled || !unit.CanMoveAndMovementIsEnabled)
+                    if (!unit.IsCombatUnit || !unit.CanAttackAndIsAttackEnabled || !unit.CanMoveAndMovementIsEnabled)
                     {
                         continue;
                     }
@@ -139,7 +139,8 @@ namespace RogueCommandExpansionLoader.Modules
                     }
 
                     Vector3 squadCenter = ComputeSquadCenter(squad);
-                    EntityController priorityTarget = SelectPriorityTarget(squadCenter, playerEntities, _settings);
+                    EntityController priorityTarget = SelectPriorityTarget(
+                        squadCenter, playerEntities, _settings, squad[0]);
 
                     if (priorityTarget == null || priorityTarget.IsDestroyed || priorityTarget.DestroyHasBeenStarted)
                     {
@@ -219,10 +220,23 @@ namespace RogueCommandExpansionLoader.Modules
                 return sum / squad.Count;
             }
 
+            private static bool IsHostile(EntityController source, EntityController candidate)
+            {
+                try
+                {
+                    return source != null && candidate != null && source.IsEnemy(candidate);
+                }
+                catch
+                {
+                    return false;
+                }
+            }
+
             private static EntityController SelectPriorityTarget(
                 Vector3 squadCenter,
                 HashSet<EntityController> candidates,
-                FocusFireSettings settings)
+                FocusFireSettings settings,
+                EntityController sourceUnit)
             {
                 EntityController bestCandidate = null;
                 float bestScore = Single.NegativeInfinity;
@@ -231,7 +245,8 @@ namespace RogueCommandExpansionLoader.Modules
                 foreach (EntityController candidate in candidates)
                 {
                     if (candidate == null || candidate.IsDestroyed || candidate.DestroyHasBeenStarted ||
-                        candidate.canNotBeAttacked || candidate.canNotBeTargetedByAi)
+                        candidate.canNotBeAttacked || candidate.canNotBeTargetedByAi ||
+                        !IsHostile(sourceUnit, candidate))
                     {
                         continue;
                     }

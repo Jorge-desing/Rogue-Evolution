@@ -83,6 +83,18 @@ namespace RogueCommandExpansionLoader.Modules
                 _stopped = true;
             }
 
+            private static bool IsHostile(EntityController source, EntityController candidate)
+            {
+                try
+                {
+                    return source != null && candidate != null && source.IsEnemy(candidate);
+                }
+                catch
+                {
+                    return false;
+                }
+            }
+
             private void TriggerTacticalSkills()
             {
                 if (ExistingControllers.Instance == null)
@@ -101,7 +113,8 @@ namespace RogueCommandExpansionLoader.Modules
 
                 foreach (EntityController unit in aiUnits)
                 {
-                    if (unit == null || unit.DestroyHasBeenStarted)
+                    if (unit == null || unit.IsDestroyed || unit.DestroyHasBeenStarted ||
+                        !unit.IsControlledByAi || !unit.IsUnit)
                     {
                         continue;
                     }
@@ -164,7 +177,8 @@ namespace RogueCommandExpansionLoader.Modules
                         {
                             foreach (EntityController enemy in playerEntities)
                             {
-                                if (enemy == null || enemy.DestroyHasBeenStarted || enemy.canNotBeTargetedByAi)
+                                if (enemy == null || enemy.DestroyHasBeenStarted || enemy.canNotBeTargetedByAi ||
+                                    !IsHostile(unit, enemy))
                                 {
                                     continue;
                                 }

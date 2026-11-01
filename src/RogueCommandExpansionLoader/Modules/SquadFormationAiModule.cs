@@ -46,6 +46,8 @@ namespace RogueCommandExpansionLoader.Modules
         {
             private readonly DefaultAiBehaviour _gameBehaviour;
             private readonly SquadFormationSettings _settings;
+            private readonly Dictionary<EntityController, EntityController> _moduleCaptainLinks =
+                new Dictionary<EntityController, EntityController>();
             private float _nextCheckAt;
             private bool _stopped;
 
@@ -78,7 +80,7 @@ namespace RogueCommandExpansionLoader.Modules
             public void OnDestroyed()
             {
                 _stopped = true;
-                ReleaseAllCaptains();
+                ReleaseModuleCaptainLinks();
             }
 
             private void UpdateSquadFormations()
@@ -123,14 +125,27 @@ namespace RogueCommandExpansionLoader.Modules
                         // Check existing captain validity
                         if (unit.CaptainOfThisEntity != null)
                         {
-                            if (unit.CaptainOfThisEntity.DestroyHasBeenStarted)
+                            EntityController currentCaptain = unit.CaptainOfThisEntity;
+                            EntityController ownedCaptain;
+                            bool ownedByModule = _moduleCaptainLinks.TryGetValue(unit, out ownedCaptain);
+                            if (ownedByModule && !ReferenceEquals(ownedCaptain, currentCaptain))
                             {
-                                unit.RemoveCaptain(unit.CaptainOfThisEntity);
-                                unassignedFollowers.Add(unit);
+                                _moduleCaptainLinks.Remove(unit);
+                                ownedByModule = false;
+                            }
+
+                            if (currentCaptain.DestroyHasBeenStarted)
+                            {
+                                if (ownedByModule)
+                                {
+                                    unit.RemoveCaptain(currentCaptain);
+                                    _moduleCaptainLinks.Remove(unit);
+                                    unassignedFollowers.Add(unit);
+                                }
                             }
                             else
                             {
-                                int captainId = unit.CaptainOfThisEntity.UniqueEntityId;
+                                int captainId = currentCaptain.UniqueEntityId;
                                 int count;
                                 followerCounts.TryGetValue(captainId, out count);
                                 followerCounts[captainId] = count + 1;
@@ -138,6 +153,7 @@ namespace RogueCommandExpansionLoader.Modules
                         }
                         else
                         {
+                            _moduleCaptainLinks.Remove(unit);
                             unassignedFollowers.Add(unit);
                         }
                     }
@@ -177,9 +193,25 @@ namespace RogueCommandExpansionLoader.Modules
                     if (bestCaptain != null)
                     {
                         follower.SetCaptain(bestCaptain);
+                        _moduleCaptainLinks[follower] = bestCaptain;
                         followerCounts[bestCaptain.UniqueEntityId]++;
                     }
                 }
+            }
+
+            private void ReleaseModuleCaptainLinks()
+            {
+                foreach (KeyValuePair<EntityController, EntityController> link in _moduleCaptainLinks)
+                {
+                    EntityController follower = link.Key;
+                    EntityController captain = link.Value;
+                    if (follower != null && ReferenceEquals(follower.CaptainOfThisEntity, captain))
+                    {
+                        follower.RemoveCaptain(captain);
+                    }
+                }
+
+                _moduleCaptainLinks.Clear();
             }
 
             private void ReleaseAllCaptains()

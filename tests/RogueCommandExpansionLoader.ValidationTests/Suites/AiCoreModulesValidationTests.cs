@@ -810,6 +810,7 @@ internal static partial class ValidationTestRunner
         {
             IsControlledByAi = true,
             IsUnit = true,
+            IsCombatUnit = true,
             CanAttackAndIsAttackEnabled = true,
             CanMoveAndMovementIsEnabled = true,
             aiBaseIndex = 0,
@@ -872,6 +873,57 @@ internal static partial class ValidationTestRunner
                 raider.LastExecutedCommand?.intent != "Harvester raid strike")
             {
                 throw new InvalidOperationException("The raider did not become eligible after its raid command ended.");
+            }
+        }
+        finally
+        {
+            behaviour.OnDestroyed();
+            ExistingControllers.Instance.Reset();
+            DefaultAiBehaviour.ResetRuntimeState();
+        }
+    }),
+    ("harvester-raider excludes non-combat AI units from the raid squad", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        DefaultAiBehaviour.ResetRuntimeState();
+        UnityEngine.Time.time = 15f;
+
+        var target = new EntityController
+        {
+            IsControlledByPlayer = true,
+            IsUnit = true,
+            Position = new UnityEngine.Vector3(8f, 0f, 0f)
+        };
+        var nonCombatRaider = new EntityController
+        {
+            IsControlledByAi = true,
+            IsUnit = true,
+            IsCombatUnit = false,
+            CanAttackAndIsAttackEnabled = true,
+            CanMoveAndMovementIsEnabled = true,
+            aiBaseIndex = 0,
+            UniqueEntityId = 503,
+            Position = new UnityEngine.Vector3(5f, 0f, 0f)
+        };
+        ExistingControllers.Instance.Harvesters.Add(target);
+        ExistingControllers.Instance.AiUnits().Add(nonCombatRaider);
+
+        IRogueCommandAiRuntimeBehaviour behaviour = new HarvesterRaiderAiModule().CreateBehaviour(
+            new DefaultAiBehaviour { transform = new UnityEngine.Transform { position = UnityEngine.Vector3.zero } },
+            [
+                new ContentModuleParameter { name = "baseIndex", value = "0" },
+                new ContentModuleParameter { name = "scanIntervalSeconds", value = "2" },
+                new ContentModuleParameter { name = "cooldownSeconds", value = "5" },
+                new ContentModuleParameter { name = "raidSquadSize", value = "1" },
+                new ContentModuleParameter { name = "minGameTimeSeconds", value = "15" }
+            ]);
+        behaviour.OnInitialized();
+        try
+        {
+            behaviour.Tick();
+            if (nonCombatRaider.ExecuteCommandCallCount != 0)
+            {
+                throw new InvalidOperationException("Harvester raider dispatched a non-combat AI unit.");
             }
         }
         finally

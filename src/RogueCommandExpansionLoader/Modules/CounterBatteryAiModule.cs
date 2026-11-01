@@ -172,7 +172,7 @@ namespace RogueCommandExpansionLoader.Modules
                     if (MinAttackRangeResolver != null)
                     {
                         float? minR = MinAttackRangeResolver(candidate.EntityId);
-                        if (minR.HasValue && minR.Value > 0f)
+                        if (minR.HasValue && minR.Value >= _settings.ThreatTriggerDistance)
                         {
                             isArtillery = true;
                         }
@@ -226,6 +226,10 @@ namespace RogueCommandExpansionLoader.Modules
                         unit.DestroyHasBeenStarted ||
                         unit.IsBuilding ||
                         !unit.IsControlledByAi ||
+                        !unit.IsUnit ||
+                        !unit.IsCombatUnit ||
+                        !unit.CanAttackAndIsAttackEnabled ||
+                        !unit.CanMoveAndMovementIsEnabled ||
                         unit.canNotBeAttacked)
                     {
                         continue;
