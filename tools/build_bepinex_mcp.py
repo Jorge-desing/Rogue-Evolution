@@ -919,6 +919,22 @@ TOOL_SPECS = [
         },
     },
     {
+        "name": "diagnostics_order_director_threat_sweep",
+        "description": "Applies a bounded Mark or Suppress sweep to nearby hostile combat units via LoaderDiagnosticsComponent / RuntimeGameplayCommandDirector.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "sourceEntityKeyId": {"type": "string", "description": "Source unit entity ID or name."},
+                "sweepType": {"type": "string", "enum": ["Mark", "Suppress"], "description": "Sweep mode."},
+                "radius": {"type": "number", "description": "Sweep radius in world meters (3.0 to 50.0)."},
+                "durationSeconds": {"type": "number", "description": "Status duration in seconds (0.5 to 30.0)."},
+                "maxTargets": {"type": "integer", "description": "Maximum hostile combat units affected (1 to 16)."},
+            },
+            "required": ["sourceEntityKeyId", "sweepType", "radius", "durationSeconds", "maxTargets"],
+            "additionalProperties": False,
+        },
+    },
+    {
         "name": "diagnostics_order_active_skill",
         "description": "Dispatches an active tactical skill command on a unit (Self, on Target, or at Position) via LoaderDiagnosticsComponent / RuntimeGameplayCommandDirector.",
         "parameters": {
@@ -1108,6 +1124,7 @@ TOOL_SPECS = [
     {"name": "diagnostics_get_selection_census", "description": "Queries selection census JSON via LoaderDiagnosticsComponent.", "parameters": {"type": "object", "properties": {}, "additionalProperties": False}},
     {"name": "diagnostics_order_unit_attack_move", "description": "Dispatches an attack-move command to a unit via LoaderDiagnosticsComponent.", "parameters": {"type": "object", "properties": {"entityKeyId": {"type": "string", "description": "Unit entity ID."}, "targetX": {"type": "number", "description": "Target X."}, "targetZ": {"type": "number", "description": "Target Z."}}, "required": ["entityKeyId", "targetX", "targetZ"], "additionalProperties": False}},
     {"name": "diagnostics_order_unit_tactical_pulse", "description": "Executes a bounded Shockwave, Rally, or Repair pulse around a unit via LoaderDiagnosticsComponent.", "parameters": {"type": "object", "properties": {"entityKeyId": {"type": "string", "description": "Source unit entity ID."}, "pulseType": {"type": "string", "enum": ["Shockwave", "Rally", "Repair"], "description": "Pulse mode."}, "radius": {"type": "number", "description": "Radius in meters (3.0 to 50.0)."}, "magnitude": {"type": "number", "description": "Damage/heal/repair magnitude."}, "durationSeconds": {"type": "number", "description": "Status duration (0.5 to 30.0 seconds)."}, "maxTargets": {"type": "integer", "description": "Maximum affected units (1 to 16)."}}, "required": ["entityKeyId", "pulseType", "radius", "magnitude", "durationSeconds", "maxTargets"], "additionalProperties": False}},
+    {"name": "diagnostics_order_director_threat_sweep", "description": "Applies a bounded Mark or Suppress sweep to nearby hostile combat units via LoaderDiagnosticsComponent.", "parameters": {"type": "object", "properties": {"sourceEntityKeyId": {"type": "string", "description": "Source unit entity ID."}, "sweepType": {"type": "string", "enum": ["Mark", "Suppress"], "description": "Sweep mode."}, "radius": {"type": "number", "description": "Radius in meters (3.0 to 50.0)."}, "durationSeconds": {"type": "number", "description": "Status duration (0.5 to 30.0 seconds)."}, "maxTargets": {"type": "integer", "description": "Maximum hostile combat units (1 to 16)."}}, "required": ["sourceEntityKeyId", "sweepType", "radius", "durationSeconds", "maxTargets"], "additionalProperties": False}},
     {"name": "diagnostics_order_unit_patrol", "description": "Dispatches a native patrol route to a unit via LoaderDiagnosticsComponent. Waypoints are parallel X/Z arrays.", "parameters": {"type": "object", "properties": {"entityKeyId": {"type": "string", "description": "Unit entity ID."}, "waypointX": {"type": "array", "items": {"type": "number"}, "description": "Waypoint X coordinates."}, "waypointZ": {"type": "array", "items": {"type": "number"}, "description": "Waypoint Z coordinates."}}, "required": ["entityKeyId", "waypointX", "waypointZ"], "additionalProperties": False}},
     {"name": "diagnostics_order_group_command", "description": "Dispatches a single command type (Move, Stop, HoldPosition, AttackMove) to a group of units via LoaderDiagnosticsComponent.", "parameters": {"type": "object", "properties": {"entityKeyIds": {"type": "array", "items": {"type": "string"}, "description": "Unit entity IDs to command."}, "commandType": {"type": "string", "description": "Command type: Move, Stop, HoldPosition, or AttackMove."}, "targetX": {"type": "number", "description": "Target X (for Move/AttackMove)."}, "targetZ": {"type": "number", "description": "Target Z (for Move/AttackMove)."}}, "required": ["entityKeyIds", "commandType"], "additionalProperties": False}},
     {"name": "diagnostics_order_formation_move", "description": "Dispatches a tactical formation movement to multiple units via LoaderDiagnosticsComponent. Formations: Line, Wedge, Column, Box, Surround.", "parameters": {"type": "object", "properties": {"entityKeyIds": {"type": "array", "items": {"type": "string"}, "description": "Unit entity IDs to command."}, "formationType": {"type": "string", "description": "Formation type: Line, Wedge, Column, Box, or Surround."}, "targetX": {"type": "number", "description": "Target center X coordinate."}, "targetZ": {"type": "number", "description": "Target center Z coordinate."}, "spacing": {"type": "number", "description": "Spacing between units in meters (default 4.0, range 1.5 to 25.0)."}}, "required": ["entityKeyIds", "formationType", "targetX", "targetZ"], "additionalProperties": False}},

@@ -837,6 +837,22 @@ namespace RogueCommandExpansionLoader.Runtime
         }
 
         /// <summary>
+        /// Executes a bounded director threat sweep around a living unit (Mark or Suppress).
+        /// </summary>
+        public string OrderDirectorThreatSweepJson(
+            string sourceEntityKeyId,
+            string sweepType,
+            float radius,
+            float durationSeconds,
+            int maxTargets)
+        {
+            return AgentDiagnosticsFormatter.SerializeThreatSweepResult(
+                RuntimeGameplayCommandDirector.TryExecuteThreatSweep(
+                    sourceEntityKeyId, sweepType, radius, durationSeconds, maxTargets));
+        }
+
+
+        /// <summary>
         /// Queries the unit elite affixes census across living units.
         /// </summary>
         public string GetUnitAffixCensusJson()

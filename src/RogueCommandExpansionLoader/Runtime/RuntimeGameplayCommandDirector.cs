@@ -372,11 +372,52 @@ namespace RogueCommandExpansionLoader.Runtime
 
 
     /// <summary>
+    /// Pure diagnostic DTO returned when a director sweeps hostile units around a source.
+    /// </summary>
+    public readonly struct ThreatSweepResult
+    {
+        public ThreatSweepResult(
+            bool success,
+            string sourceEntityKeyId,
+            string sweepType,
+            string statusEffectName,
+            float radius,
+            float durationSeconds,
+            int affectedEntityCount,
+            int omittedTargetCount,
+            IReadOnlyList<string> targetEntityKeyIds,
+            string message)
+        {
+            Success = success;
+            SourceEntityKeyId = sourceEntityKeyId ?? string.Empty;
+            SweepType = sweepType ?? string.Empty;
+            StatusEffectName = statusEffectName ?? string.Empty;
+            Radius = radius;
+            DurationSeconds = durationSeconds;
+            AffectedEntityCount = affectedEntityCount;
+            OmittedTargetCount = omittedTargetCount;
+            TargetEntityKeyIds = targetEntityKeyIds ?? new List<string>().AsReadOnly();
+            Message = message ?? string.Empty;
+        }
 
+        public bool Success { get; }
+        public string SourceEntityKeyId { get; }
+        public string SweepType { get; }
+        public string StatusEffectName { get; }
+        public float Radius { get; }
+        public float DurationSeconds { get; }
+        public int AffectedEntityCount { get; }
+        public int OmittedTargetCount { get; }
+        public IReadOnlyList<string> TargetEntityKeyIds { get; }
+        public string Message { get; }
+    }
+
+
+
+    /// <summary>
     /// Pure diagnostic DTO returned when executing selection or control group operations.
-
     /// Decoupled from Unity types.
-
+    /// </summary>
     public readonly struct SelectionCommandResult
 
     {
@@ -2240,6 +2281,165 @@ namespace RogueCommandExpansionLoader.Runtime
 
             }
 
+        }
+
+
+        /// <summary>
+        /// Applies a bounded director sweep to nearby hostile combat units.
+        /// Mark applies Marked; Suppress applies SlowedDown.
+        /// </summary>
+        public static ThreatSweepResult TryExecuteThreatSweep(
+            string sourceEntityKeyId,
+            string sweepType,
+            float radius,
+            float durationSeconds,
+            int maxTargets)
+        {
+            IReadOnlyList<string> emptyTargets = new List<string>().AsReadOnly();
+            if (string.IsNullOrWhiteSpace(sourceEntityKeyId))
+            {
+                return new ThreatSweepResult(false, string.Empty, sweepType, string.Empty,
+                    radius, durationSeconds, 0, 0, emptyTargets,
+                    "Source entity key ID cannot be empty.");
+            }
+
+            string normalizedSweep = string.IsNullOrWhiteSpace(sweepType) ? string.Empty : sweepType.Trim();
+            string statusEffectName;
+            if (string.Equals(normalizedSweep, "Mark", StringComparison.OrdinalIgnoreCase))
+            {
+                statusEffectName = "Marked";
+            }
+            else if (string.Equals(normalizedSweep, "Suppress", StringComparison.OrdinalIgnoreCase))
+            {
+                statusEffectName = "SlowedDown";
+            }
+            else
+            {
+                return new ThreatSweepResult(false, sourceEntityKeyId, normalizedSweep, string.Empty,
+                    radius, durationSeconds, 0, 0, emptyTargets,
+                    "Unknown sweep type '" + sweepType + "'. Allowed: Mark, Suppress.");
+            }
+
+            float clampedRadius = Mathf.Clamp(radius, 3.0f, 50.0f);
+            float clampedDuration = Mathf.Clamp(durationSeconds, 0.5f, 30.0f);
+            int clampedMaxTargets = Mathf.Clamp(maxTargets, 1, 16);
+
+            try
+            {
+                ExistingControllers existing = ExistingControllers.Instance;
+                if (existing == null)
+                {
+                    return new ThreatSweepResult(false, sourceEntityKeyId, normalizedSweep, statusEffectName,
+                        clampedRadius, clampedDuration, 0, 0, emptyTargets,
+                        "ExistingControllers instance is not available.");
+                }
+
+                EntityController source = FindEntityByKey(existing, sourceEntityKeyId.Trim());
+                if (source == null || source.gameObject == null)
+                {
+                    return new ThreatSweepResult(false, sourceEntityKeyId, normalizedSweep, statusEffectName,
+                        clampedRadius, clampedDuration, 0, 0, emptyTargets,
+                        "Source entity '" + sourceEntityKeyId + "' not found or destroyed.");
+                }
+
+                if (!Enum.TryParse<StatusEffect>(statusEffectName, true, out StatusEffect effect))
+                {
+                    return new ThreatSweepResult(false, sourceEntityKeyId, normalizedSweep, statusEffectName,
+                        clampedRadius, clampedDuration, 0, 0, emptyTargets,
+                        "Status effect '" + statusEffectName + "' is unavailable in this game build.");
+                }
+
+                Vector3 sourcePosition = source.Position;
+                float radiusSquared = clampedRadius * clampedRadius;
+                var candidates = new List<EntityController>();
+                var seen = new HashSet<EntityController>();
+                AddThreatSweepCandidates(existing.PlayerUnits(), source, sourcePosition, radiusSquared, seen, candidates);
+                AddThreatSweepCandidates(existing.AiUnits(), source, sourcePosition, radiusSquared, seen, candidates);
+                AddThreatSweepCandidates(existing.Harvesters, source, sourcePosition, radiusSquared, seen, candidates);
+                candidates.Sort(delegate(EntityController left, EntityController right)
+                {
+                    float leftDistance = (left.Position - sourcePosition).sqrMagnitude;
+                    float rightDistance = (right.Position - sourcePosition).sqrMagnitude;
+                    int distanceComparison = leftDistance.CompareTo(rightDistance);
+                    return distanceComparison != 0
+                        ? distanceComparison
+                        : left.UniqueEntityId.CompareTo(right.UniqueEntityId);
+                });
+
+                int selectedCount = Math.Min(clampedMaxTargets, candidates.Count);
+                int affectedCount = 0;
+                var targetIds = new List<string>(selectedCount);
+                for (int i = 0; i < selectedCount; i++)
+                {
+                    EntityController target = candidates[i];
+                    try
+                    {
+                        target.SetActiveStatusEffect(effect, SetStatusEffect.DurationType.Seconds, clampedDuration);
+                        string targetId = ResolveEntityIdString(target);
+                        if (string.IsNullOrWhiteSpace(targetId))
+                        {
+                            targetId = target.name;
+                        }
+
+                        targetIds.Add(targetId ?? string.Empty);
+                        affectedCount++;
+                    }
+                    catch
+                    {
+                        // One incompatible target must not abort the bounded sweep.
+                    }
+                }
+
+                int omittedCount = Math.Max(0, candidates.Count - selectedCount);
+                bool success = affectedCount > 0;
+                string message = success
+                    ? "Director " + normalizedSweep + " sweep applied " + statusEffectName +
+                      " to " + affectedCount + " hostile unit(s)."
+                    : "Director " + normalizedSweep + " sweep found no eligible hostile units.";
+                return new ThreatSweepResult(success, sourceEntityKeyId, normalizedSweep, statusEffectName,
+                    clampedRadius, clampedDuration, affectedCount, omittedCount,
+                    targetIds.AsReadOnly(), message);
+            }
+            catch (Exception ex)
+            {
+                return new ThreatSweepResult(false, sourceEntityKeyId, normalizedSweep, statusEffectName,
+                    clampedRadius, clampedDuration, 0, 0, emptyTargets,
+                    "Error executing director threat sweep: " + ex.Message);
+            }
+        }
+
+        private static void AddThreatSweepCandidates(
+            IEnumerable<EntityController> values,
+            EntityController source,
+            Vector3 sourcePosition,
+            float radiusSquared,
+            HashSet<EntityController> seen,
+            List<EntityController> candidates)
+        {
+            if (values == null)
+            {
+                return;
+            }
+
+            foreach (EntityController candidate in values)
+            {
+                if (candidate == null || ReferenceEquals(candidate, source) || candidate.gameObject == null ||
+                    candidate.IsDestroyed || candidate.DestroyHasBeenStarted || !candidate.IsUnit ||
+                    !candidate.IsCombatUnit || !source.IsEnemy(candidate) || !seen.Add(candidate))
+                {
+                    continue;
+                }
+
+                Vector3 delta = candidate.Position - sourcePosition;
+                if (delta.sqrMagnitude <= radiusSquared)
+                {
+                    candidates.Add(candidate);
+                }
+                else
+                {
+                    seen.Remove(candidate);
+                }
+            }
         }
 
 

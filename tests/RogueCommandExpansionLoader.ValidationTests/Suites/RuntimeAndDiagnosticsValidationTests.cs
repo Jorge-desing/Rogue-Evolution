@@ -4410,7 +4410,8 @@ internal static partial class ValidationTestRunner
                 !names.Contains("GetHazardCensusJson") ||
                 !names.Contains("OrderSpawnHazardZoneJson") ||
                 !names.Contains("OrderClearHazardZonesJson") ||
-                !names.Contains("OrderUnitTacticalPulseJson"))
+                !names.Contains("OrderUnitTacticalPulseJson") ||
+                !names.Contains("OrderDirectorThreatSweepJson"))
             {
                 throw new InvalidOperationException("Diagnostic catalog should include all newly exposed endpoints.");
             }
@@ -4622,6 +4623,71 @@ internal static partial class ValidationTestRunner
         {
             ExistingControllers.Instance.Reset();
             RuntimeUnitMechanicsDirector.ClearProfiles();
+        }
+    }),
+    ("runtime director threat sweep marks only nearby hostile units", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        try
+        {
+            var source = new EntityController
+            {
+                entityId = "unit:sweep-source",
+                UniqueEntityId = 821,
+                IsControlledByPlayer = true,
+                IsUnit = true,
+                IsCombatUnit = true,
+                Position = new Vector3(0f, 0f, 0f)
+            };
+            var enemy = new EntityController
+            {
+                entityId = "unit:sweep-enemy",
+                UniqueEntityId = 822,
+                IsControlledByAi = true,
+                IsUnit = true,
+                IsCombatUnit = true,
+                Position = new Vector3(4f, 0f, 0f)
+            };
+            var farEnemy = new EntityController
+            {
+                entityId = "unit:sweep-far-enemy",
+                UniqueEntityId = 823,
+                IsControlledByAi = true,
+                IsUnit = true,
+                IsCombatUnit = true,
+                Position = new Vector3(100f, 0f, 0f)
+            };
+            ExistingControllers.Instance.PlayerUnits().Add(source);
+            ExistingControllers.Instance.AiUnits().Add(enemy);
+            ExistingControllers.Instance.AiUnits().Add(farEnemy);
+
+            ThreatSweepResult result = RuntimeGameplayCommandDirector.TryExecuteThreatSweep(
+                "821", "Mark", 10f, 4f, 4);
+            if (!result.Success || result.SweepType != "Mark" || result.StatusEffectName != "Marked" ||
+                result.AffectedEntityCount != 1 || result.TargetEntityKeyIds.Count != 1 ||
+                result.TargetEntityKeyIds[0] != "unit:sweep-enemy" ||
+                !enemy.HasActiveStatusEffect(StatusEffect.Marked) ||
+                farEnemy.HasActiveStatusEffect(StatusEffect.Marked) ||
+                source.HasActiveStatusEffect(StatusEffect.Marked))
+            {
+                throw new InvalidOperationException("Threat sweep should mark only the nearby hostile unit.");
+            }
+
+            string json = AgentDiagnosticsFormatter.SerializeThreatSweepResult(result);
+            using (var doc = JsonDocument.Parse(json))
+            {
+                if (doc.RootElement.GetProperty("kind").GetString() != "directorThreatSweepResult" ||
+                    !doc.RootElement.GetProperty("success").GetBoolean() ||
+                    doc.RootElement.GetProperty("affectedEntityCount").GetInt32() != 1 ||
+                    doc.RootElement.GetProperty("targetEntityKeyIds").GetArrayLength() != 1)
+                {
+                    throw new InvalidOperationException("SerializeThreatSweepResult JSON format error.");
+                }
+            }
+        }
+        finally
+        {
+            ExistingControllers.Instance.Reset();
         }
     }),
     ("runtime tactical pulse rally and repair affect only nearby allied units", () =>

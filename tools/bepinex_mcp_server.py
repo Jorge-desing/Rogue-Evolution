@@ -643,6 +643,17 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             )
             return _tool_response(res)
 
+        elif name == "diagnostics_order_director_threat_sweep":
+            source_key = str(arguments.get("sourceEntityKeyId", ""))
+            sweep_type = str(arguments.get("sweepType", "Mark"))
+            radius = float(arguments.get("radius", 12.0))
+            duration = float(arguments.get("durationSeconds", 4.0))
+            max_targets = int(arguments.get("maxTargets", 8))
+            res = _call_diagnostics_method(
+                "OrderDirectorThreatSweepJson",
+                [source_key, sweep_type, radius, duration, max_targets],
+            )
+            return _tool_response(res)
         elif name == "diagnostics_order_active_skill":
             e_key = str(arguments.get("entityKeyId", ""))
             t_key = arguments.get("targetEntityKeyId")

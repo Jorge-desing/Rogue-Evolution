@@ -990,6 +990,30 @@ namespace RogueCommandExpansionLoader.Runtime
         }
 
         /// <summary>
+        /// Serializes a bounded director threat sweep result with omission counters before target details.
+        /// </summary>
+        public static string SerializeThreatSweepResult(ThreatSweepResult result)
+        {
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "directorThreatSweepResult",
+                ["success"] = result.Success,
+                ["omittedTargetCount"] = result.OmittedTargetCount,
+                ["sourceEntityKeyId"] = result.SourceEntityKeyId ?? string.Empty,
+                ["sweepType"] = result.SweepType ?? string.Empty,
+                ["statusEffectName"] = result.StatusEffectName ?? string.Empty,
+                ["radius"] = result.Radius,
+                ["durationSeconds"] = result.DurationSeconds,
+                ["affectedEntityCount"] = result.AffectedEntityCount,
+                ["targetEntityKeyIds"] = result.TargetEntityKeyIds != null
+                    ? result.TargetEntityKeyIds
+                    : (object)Array.Empty<string>(),
+                ["message"] = result.Message ?? string.Empty,
+            };
+            return Serialize(view);
+        }
+
+        /// <summary>
         /// Serializes active elite affixes and traits applied to living units.
         /// Omission counters precede detail collections.
         /// </summary>
@@ -2223,6 +2247,7 @@ namespace RogueCommandExpansionLoader.Runtime
                 new Dictionary<string, object> { ["name"] = "OrderUnitMoveJson", ["description"] = "Dispatch an in-game move command to a unit by entity key id." },
                 new Dictionary<string, object> { ["name"] = "OrderUnitAttackJson", ["description"] = "Dispatch an in-game attack command on a target entity." },
                 new Dictionary<string, object> { ["name"] = "OrderUnitTacticalPulseJson", ["description"] = "Execute a bounded Shockwave, Rally, or Repair pulse around a unit." },
+                new Dictionary<string, object> { ["name"] = "OrderDirectorThreatSweepJson", ["description"] = "Apply a bounded Mark or Suppress sweep to nearby hostile combat units." },
                 new Dictionary<string, object> { ["name"] = "OrderUnitActiveSkillJson", ["description"] = "Dispatch an active tactical skill command on a unit (Self, Target, or Position)." },
                 new Dictionary<string, object> { ["name"] = "AdjustEntityVitalityJson", ["description"] = "Safely adjust health, armor, shield, or damage on an entity for testing." },
                 new Dictionary<string, object> { ["name"] = "ApplyStatusEffectJson", ["description"] = "Apply a status effect (e.g. Emp, Burn, SlowedDown, Stun) to an entity." },
