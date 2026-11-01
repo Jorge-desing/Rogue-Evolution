@@ -2369,10 +2369,27 @@ namespace RogueCommandExpansionLoader.Runtime
                 case IEnumerable sequence when !(value is string):
                     WriteArray(builder, sequence);
                     break;
+                case float single:
+                    WriteFiniteNumber(builder, single);
+                    break;
+                case double number:
+                    WriteFiniteNumber(builder, number);
+                    break;
                 default:
                     builder.Append(Convert.ToString(value, CultureInfo.InvariantCulture));
                     break;
             }
+        }
+
+        private static void WriteFiniteNumber(StringBuilder builder, double value)
+        {
+            if (double.IsNaN(value) || double.IsInfinity(value))
+            {
+                builder.Append("null");
+                return;
+            }
+
+            builder.Append(value.ToString("R", CultureInfo.InvariantCulture));
         }
 
         private static void WriteObject(StringBuilder builder, Dictionary<string, object> map)
