@@ -24,3 +24,15 @@ For runtime questions, launch through Steam as the user requires. Protect saves 
 ## Decompile managed types when source is insufficient
 
 When the loader source does not expose the exact initialization path or member layout, use `tools/Decompile-ManagedType.ps1` with ILSpy to produce offline decompiled C# for the native type under investigation. Read the decompiled file directly; decompilation is static evidence and does not prove runtime behavior, but it often reveals the exact call order, fallback paths, and string messages that drive card/menu rendering.
+
+## Live diagnostics bridge
+
+For extending the loader's `LoaderDiagnosticsComponent` with agent-readable censuses, getters, or command director methods, follow the patterns in [references/live-diagnostics-bridge.md](references/live-diagnostics-bridge.md). Key invariants:
+- The diagnostics `MonoBehaviour` is **scene-local** (never `DontDestroyOnLoad`); the MCP bridge filters out objects whose `scene.name` is null. Recreate it per scene via `SceneManager.sceneLoaded` and also handle additive loads (see the clean-room diagnostics skill, section 8).
+- Pure policy/DTO logic lives in testable formatters; bridge methods delegate and return JSON strings.
+- A process exit code 0 from the MCP server or Python wrapper is **not** functional success — inspect the JSON payload and verify the observable effect (see `rogue-command-clean-room-diagnostics` and `rogue-command-steam-runtime-validation`).
+
+## References
+
+- [Live diagnostics bridge](references/live-diagnostics-bridge.md) — extending `LoaderDiagnosticsComponent` with censuses, getters, and command director methods.
+- `docs/research/AGENT-HANDOFF.md`, `docs/research/BASELINE.md`, `docs/research/ASSET-CATALOG.md`.

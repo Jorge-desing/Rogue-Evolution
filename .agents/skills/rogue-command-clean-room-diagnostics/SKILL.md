@@ -200,6 +200,14 @@ When two or more autonomous agents collaborate on the same match (e.g. Hermes ma
 
 ## 6. Extending Clean-Room Diagnostics (The Three-Part Pattern)
 
+### Test harness execution
+
+- Build both projects first: `dotnet build src/RogueCommandExpansionLoader/RogueCommandExpansionLoader.csproj -c Release --no-incremental --artifacts-path artifacts/dotnet-build` and `dotnet build tests/RogueCommandExpansionLoader.ValidationTests/RogueCommandExpansionLoader.ValidationTests.csproj -c Release --no-incremental --artifacts-path artifacts/dotnet-build`.
+- Run the full harness: `dotnet exec artifacts/dotnet-build/bin/RogueCommandExpansionLoader.ValidationTests/release/RogueCommandExpansionLoader.ValidationTests.dll "C:/Users/Alex/Documents/Mod Rogue Command"` (pass the repo root as the single argument).
+- Run a single suite: append `--suite <SuiteName>` (e.g., `--suite RuntimeAndDiagnostics`). The suite name must be passed after the repo root, not before it; passing it as a positional argument before the root causes a manifest-not-found error.
+- The harness reports `N/M validation checks passed; K skipped.` The skip is typically a Windows symlink-privilege test and is not a failure.
+- For TDD regression detection: temporarily mutate the source, rebuild, run only the new test with `--suite`, confirm it fails with the expected message, then restore the source and verify SHA-256 matches the pre-mutation hash.
+
 When adding any new telemetry or command endpoint:
 
 1. **Pure Formatter / DTO** (`AgentDiagnosticsFormatter.cs`):
@@ -245,3 +253,25 @@ Pitfalls:
 - Test the ordering with a stub where the active scene differs from the loaded scene; a stub that always returns the same active scene hides the additive-load bug.
 - **Tool naming**: the Python MCP server exposes `find_objects_with_component` (no `scene:` prefix) and `scene:find_objects_with_component` (HTTP route). Use the unprefixed name when calling via the Python server; the short component name works because it resolves via `FindType`.
 - **`mod_inject_class` parameter**: pass the full C# source as `classCode` (not `code`). The class must compile standalone. A minimal MonoBehaviour with `Application.Quit()` in `Awake` is the reliable close pattern when no UI button is available.
+
+### 8.1 MCP exit code 0 is not functional success
+
+The BepInEx MCP server and the Python wrapper return process exit code 0 even when the JSON payload contains `{"error": ...}` or `{"status": "error"}`. Always inspect the payload content and, when possible, verify the observable effect (component present in scene, census populated, order applied and restored). A ping returning `{"status": "ok"}` only proves the bridge is alive, not that diagnostics or commands work.
+
+### 8.2 TDD regression-detection via temporary mutation
+
+When adding a regression test for a lifecycle or ordering bug, temporarily mutate the source to reintroduce the bug (e.g., change `return host.scene.handle == targetScene.handle;` to `return false;`), rebuild, run only the new test, and confirm it **fails** with the expected message. Then restore the source (verify SHA-256 matches the pre-mutation hash) and rebuild. This proves the test detects the regression rather than passing vacuously. Document the expected failure message in the test or skill so future maintainers know what a regression looks like.
+
+### 8.3 Full DLL deploy-test-restore cycle
+
+When runtime evidence requires a code change that is not yet deployed:
+
+1. **Predeploy manifest**: Record target path, size, and SHA-256 of the installed DLL; back up the installed DLL.
+2. **Deploy**: Copy the local build over the installed DLL; verify hashes match.
+3. **Launch**: Start the game through Steam (never the exe directly). Wait for bridge ping.
+4. **Verify component in Game scene**: Call `find_objects_with_component` after the Game scene loads. A result of 1 (not 0) confirms the host survived the transition.
+5. **Test diagnostics**: Call `diagnostics_get_system_health` or the specific census. A populated response confirms the bridge works in-game.
+6. **Restore**: Close the game (via `mod_inject_class` with `Application.Quit()` if no UI close is available). Restore the original DLL from backup. Verify restored hash matches the manifest.
+7. **Profile check**: Verify the profile selector and file hashes against the checkpoint. `metaSavegame.dat` changes are expected; flag only other changes.
+
+Pitfall: The installed DLL hash can differ from the local build even after a successful build. Always compare before attributing runtime behavior to a source change.

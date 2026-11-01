@@ -72,6 +72,17 @@ The `um sprite`, `um render3d`, and `um scan` commands from the universal-modder
 
 ## Pack and Asset Validation
 
+### Python tooling and test loading
+
+- Run `./tools/run_python_checks.sh` from the repository root for the supported Python verification path. It selects the project `.venv`, clears inherited `PYTHONPATH` so Hermes' cp314 packages cannot shadow cp312 wheels, runs `tests/python`, then checks bundle references, the loader registry, and whitespace. Do not substitute a system interpreter or install dependencies globally.
+- Tests in `tests/python/` load scripts from `tools/` through `load_tool_module()` in `tests/python/helpers.py`; do not use direct `from tools.X import Y` imports because `tools/` is not a Python package.
+- With UnityPy 1.25.4, bundle dependencies are stored on the serialized `AssetBundle` object's `m_Dependencies`; `env.file.dependencies` is not a `BundleFile` API.
+- `tools/audit_unity_bundle.py <bundle> [--output report.json]` reports serialized object counts, shader/texture metadata, bundle size, and declared dependencies. It is offline inventory only; it does not prove Unity import, resource selection, rendering, or gameplay.
+- `tools/validate_content_pack.py <pack-dir>` is a quick manifest/path/duplicate-ID preflight. It uses an embedded simplified schema, not the authoritative `content/schema/content.schema.json`; although `--schema` appears in its CLI help, the current implementation does not consume that argument. Do not rely on it for full schema or loader-contract validation; use the repository schema checks, `tools/validate_loader_registry.py`, and the C# harness as appropriate.
+- `tools/profile_hash_audit.py <profile-dir> <manifest.json>` compares one profile directory with `profileFiles` entries and reports added, missing, and changed files. It is read-only; keep checkpoint manifests and reports under ignored `artifacts/`, include all profile files in the checkpoint, and do not commit or publish profile data or hashes.
+- `tools/extract_game_strings.py <binary> [--min-length N] [--output strings.txt]` extracts printable ASCII and zero-paired UTF-16LE strings. Treat output as a search aid, not decompilation or semantic/runtime evidence; keep generated reports under ignored `artifacts/`.
+- Keep the project dependency set in `requirements.txt` and use the checked-in runner to select the interpreter. Do not install packages into Hermes or another global Python environment to repair project tests.
+
 Run these commands from the repository root via `terminal` with the project virtual environment; explicit `PYTHONPATH` prevents globally visible Hermes packages from shadowing local dependencies. Use `--help` for exact current options.
 
 ```text
