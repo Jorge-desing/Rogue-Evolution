@@ -3778,6 +3778,25 @@ internal static partial class ValidationTestRunner
                 throw new InvalidOperationException("Skill command must fail when target entity is missing.");
             }
 
+            // Mismatched and non-finite coordinate validation
+            ActiveSkillOrderResult partialX = RuntimeGameplayCommandDirector.TryOrderActiveSkill("unit:arc-caster-01", targetX: 75f);
+            if (partialX.Success || !partialX.Message.Contains("Both targetX and targetZ"))
+            {
+                throw new InvalidOperationException("Skill command must fail when targetZ is omitted for positioned skill.");
+            }
+
+            ActiveSkillOrderResult partialZ = RuntimeGameplayCommandDirector.TryOrderActiveSkill("unit:arc-caster-01", targetZ: 85f);
+            if (partialZ.Success || !partialZ.Message.Contains("Both targetX and targetZ"))
+            {
+                throw new InvalidOperationException("Skill command must fail when targetX is omitted for positioned skill.");
+            }
+
+            ActiveSkillOrderResult nanCoord = RuntimeGameplayCommandDirector.TryOrderActiveSkill("unit:arc-caster-01", targetX: float.NaN, targetZ: 85f);
+            if (nanCoord.Success || !nanCoord.Message.Contains("finite"))
+            {
+                throw new InvalidOperationException("Skill command must fail when coordinates are non-finite.");
+            }
+
             // Serialization
             string json = AgentDiagnosticsFormatter.SerializeActiveSkillOrderResult(posRes);
             using (var doc = JsonDocument.Parse(json))
@@ -6008,6 +6027,21 @@ internal static partial class ValidationTestRunner
             throw new InvalidOperationException("TryOrderFormationMove Box must dispatch to all 3 units.");
         }
 
+        // Non-finite coordinate and spacing validation
+        FormationOrderResult nanCoord = RuntimeGameplayCommandDirector.TryOrderFormationMove(
+            new[] { "931", "932", "933" }, "Line", float.NaN, 50f, 4f);
+        if (nanCoord.Success || !nanCoord.Message.Contains("finite"))
+        {
+            throw new InvalidOperationException("TryOrderFormationMove must fail with non-finite targetX.");
+        }
+
+        FormationOrderResult infSpacing = RuntimeGameplayCommandDirector.TryOrderFormationMove(
+            new[] { "931", "932", "933" }, "Line", 50f, 50f, float.PositiveInfinity);
+        if (infSpacing.Success || !infSpacing.Message.Contains("finite"))
+        {
+            throw new InvalidOperationException("TryOrderFormationMove must fail with non-finite spacing.");
+        }
+
         // Serialization
         string json = AgentDiagnosticsFormatter.SerializeFormationOrderResult(line);
         using (var doc = JsonDocument.Parse(json))
@@ -7667,7 +7701,90 @@ internal static partial class ValidationTestRunner
             throw new InvalidOperationException("RemoveStatusEffect did not clear AppliedStatusEffects entry in test stub.");
         }
     }),
+    ("FindRuntimeVisualDirector locates director on root and child hierarchy", () =>
+    {
+        var rootUnit = new EntityController { entityId = "test:child-vd-unit" };
+        var rootGo = new GameObject("Root");
+        rootUnit.gameObject = rootGo;
+
+        if (RuntimeGameplayCommandDirector.FindRuntimeVisualDirector(rootUnit) != null)
+        {
+            throw new InvalidOperationException("FindRuntimeVisualDirector should return null when no director is attached.");
+        }
+
+        var childGo = new GameObject("Child_Visual");
+        childGo.transform.parent = rootGo.transform;
+        var rvd = childGo.AddComponent<RuntimeVisualDirector>();
+
+        var found = RuntimeGameplayCommandDirector.FindRuntimeVisualDirector(rootUnit);
+        if (found == null)
+        {
+            throw new InvalidOperationException("FindRuntimeVisualDirector failed to locate child-attached RuntimeVisualDirector.");
+        }
+    }),
+    ("RuntimeCardChangeApplier SetField converts collections and numeric types", () =>
+    {
+        var dummy = new TestCardChangeTarget();
+        MethodInfo? setFieldMethod = typeof(RuntimeCardChangeApplier).GetMethod("SetField", BindingFlags.NonPublic | BindingFlags.Static);
+        if (setFieldMethod == null)
+        {
+            throw new InvalidOperationException("SetField method not found via reflection.");
+        }
+
+        // Test array to List<string>
+        setFieldMethod.Invoke(null, new object[] { dummy, "ListField", new string[] { "unit:a", "unit:b" } });
+        if (dummy.ListField == null || dummy.ListField.Count != 2 || dummy.ListField[0] != "unit:a")
+        {
+            throw new InvalidOperationException("SetField failed to convert array to List<string>.");
+        }
+
+        // Test List<string> to string[]
+        setFieldMethod.Invoke(null, new object[] { dummy, "ArrayField", new List<string> { "unit:c", "unit:d" } });
+        if (dummy.ArrayField == null || dummy.ArrayField.Length != 2 || dummy.ArrayField[1] != "unit:d")
+        {
+            throw new InvalidOperationException("SetField failed to convert List<string> to string[].");
+        }
+
+        // Test int to float conversion
+        setFieldMethod.Invoke(null, new object[] { dummy, "FloatField", 42 });
+        if (Math.Abs(dummy.FloatField - 42f) > 0.001f)
+        {
+            throw new InvalidOperationException("SetField failed to convert int to float.");
+        }
+    }),
+    ("SetTacticalStanceVisual modulates stance state on Aggressive and Defensive", () =>
+    {
+        var go = new GameObject("TestStanceDirector");
+        var rvd = go.AddComponent<RuntimeVisualDirector>();
+
+        rvd.SetTacticalStanceVisual("Defensive");
+        if (rvd.ActiveTacticalStanceVisual != "Defensive")
+        {
+            throw new InvalidOperationException("SetTacticalStanceVisual did not transition to Defensive.");
+        }
+
+        rvd.SetTacticalStanceVisual("Aggressive");
+        if (rvd.ActiveTacticalStanceVisual != "Aggressive")
+        {
+            throw new InvalidOperationException("SetTacticalStanceVisual did not transition to Aggressive.");
+        }
+
+        rvd.SetTacticalStanceVisual("Standard");
+        if (rvd.ActiveTacticalStanceVisual != "Standard")
+        {
+            throw new InvalidOperationException("SetTacticalStanceVisual did not transition to Standard.");
+        }
+    }),
     };
+
+    private sealed class TestCardChangeTarget
+    {
+#pragma warning disable CS0649, CS8618
+        public List<string>? ListField;
+        public string[]? ArrayField;
+        public float FloatField;
+#pragma warning restore CS0649, CS8618
+    }
 
     private sealed class TestEntityAttackStub
     {

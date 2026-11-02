@@ -352,7 +352,25 @@ namespace RogueCommandExpansionLoader.Runtime
             }
             if (value != null && !field.FieldType.IsInstanceOfType(value))
             {
-                return;
+                if (field.FieldType == typeof(List<string>) && value is IEnumerable<string> strEnum)
+                {
+                    value = new List<string>(strEnum);
+                }
+                else if (field.FieldType == typeof(string[]) && value is IEnumerable<string> strEnumArr)
+                {
+                    value = strEnumArr is string[] arr ? arr : new List<string>(strEnumArr).ToArray();
+                }
+                else
+                {
+                    try
+                    {
+                        value = Convert.ChangeType(value, field.FieldType);
+                    }
+                    catch
+                    {
+                        return;
+                    }
+                }
             }
             try
             {

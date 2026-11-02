@@ -1936,9 +1936,33 @@ namespace RogueCommandExpansionLoader.Runtime
 
                 }
 
-                else if (targetX.HasValue && targetZ.HasValue)
+                else if (targetX.HasValue || targetZ.HasValue)
 
                 {
+
+                    if (!targetX.HasValue || !targetZ.HasValue)
+
+                    {
+
+                        return new ActiveSkillOrderResult(false, entityKeyId, "Position", 0f, 0f,
+
+                            "Both targetX and targetZ coordinates must be provided for a positioned skill.");
+
+                    }
+
+                    if (float.IsNaN(targetX.Value) || float.IsInfinity(targetX.Value) ||
+
+                        float.IsNaN(targetZ.Value) || float.IsInfinity(targetZ.Value))
+
+                    {
+
+                        return new ActiveSkillOrderResult(false, entityKeyId, "Position", 0f, 0f,
+
+                            "Active skill target coordinates must be finite.");
+
+                    }
+
+
 
                     Vector3 pos = new Vector3(targetX.Value, 0f, targetZ.Value);
 
@@ -6300,6 +6324,14 @@ namespace RogueCommandExpansionLoader.Runtime
                 isLine = true;
             }
 
+            if (float.IsNaN(targetX) || float.IsInfinity(targetX) ||
+                float.IsNaN(targetZ) || float.IsInfinity(targetZ) ||
+                float.IsNaN(spacing) || float.IsInfinity(spacing))
+            {
+                return new FormationOrderResult(false, normalized, 0, 0, targetX, targetZ, spacing,
+                    "Formation target coordinates and spacing must be finite.");
+            }
+
             float effSpacing = Mathf.Clamp(spacing > 0.01f ? spacing : 4.0f, 1.5f, 25.0f);
             int n = entityKeyIds.Count;
             int targetedCount = 0;
@@ -7542,14 +7574,9 @@ namespace RogueCommandExpansionLoader.Runtime
                     {
                         if (units[i] != null && !units[i].IsDestroyed)
                         {
-                            Component[] comps = units[i].GetComponents<Component>();
-                            for (int c = 0; c < comps.Length; c++)
+                            if (FindRuntimeVisualDirector(units[i]) != null)
                             {
-                                if (comps[c] != null && comps[c].GetType().Name == "RuntimeVisualDirector")
-                                {
-                                    count++;
-                                    break;
-                                }
+                                count++;
                             }
                         }
                     }
@@ -7574,15 +7601,11 @@ namespace RogueCommandExpansionLoader.Runtime
                     {
                         if (units[i] != null && !units[i].IsDestroyed)
                         {
-                            Component[] comps = units[i].GetComponents<Component>();
-                            for (int c = 0; c < comps.Length; c++)
+                            Component vd = FindRuntimeVisualDirector(units[i]);
+                            if (vd != null)
                             {
-                                if (comps[c] != null && comps[c].GetType().Name == "RuntimeVisualDirector")
-                                {
-                                    PropertyInfo p = comps[c].GetType().GetProperty("IsTurretJammed");
-                                    if (p != null && (bool)p.GetValue(comps[c], null)) count++;
-                                    break;
-                                }
+                                PropertyInfo p = vd.GetType().GetProperty("IsTurretJammed");
+                                if (p != null && (bool)p.GetValue(vd, null)) count++;
                             }
                         }
                     }
@@ -7709,21 +7732,17 @@ namespace RogueCommandExpansionLoader.Runtime
                             float recoil = 0f;
                             float door = 0f;
 
-                            Component[] comps = unit.GetComponents<Component>();
-                            for (int c = 0; c < comps.Length; c++)
+                            Component vd = FindRuntimeVisualDirector(unit);
+                            if (vd != null)
                             {
-                                if (comps[c] != null && comps[c].GetType().Name == "RuntimeVisualDirector")
-                                {
-                                    hasVd = true;
-                                    Type vt = comps[c].GetType();
-                                    PropertyInfo pj = vt.GetProperty("IsTurretJammed");
-                                    if (pj != null) isJammed = (bool)pj.GetValue(comps[c], null);
-                                    PropertyInfo pr = vt.GetProperty("CurrentRecoilOffset");
-                                    if (pr != null) recoil = (float)pr.GetValue(comps[c], null);
-                                    PropertyInfo pd = vt.GetProperty("DoorOpenProgress");
-                                    if (pd != null) door = (float)pd.GetValue(comps[c], null);
-                                    break;
-                                }
+                                hasVd = true;
+                                Type vt = vd.GetType();
+                                PropertyInfo pj = vt.GetProperty("IsTurretJammed");
+                                if (pj != null) isJammed = (bool)pj.GetValue(vd, null);
+                                PropertyInfo pr = vt.GetProperty("CurrentRecoilOffset");
+                                if (pr != null) recoil = (float)pr.GetValue(vd, null);
+                                PropertyInfo pd = vt.GetProperty("DoorOpenProgress");
+                                if (pd != null) door = (float)pd.GetValue(vd, null);
                             }
 
                             rows.Add(new UnitMechanicsCensusRow
@@ -7768,6 +7787,40 @@ namespace RogueCommandExpansionLoader.Runtime
             };
         }
 
+        public static Component FindRuntimeVisualDirector(EntityController unit)
+        {
+            if (unit == null || unit.gameObject == null)
+            {
+                return null;
+            }
+
+            try
+            {
+                Component[] comps = unit.GetComponents<Component>();
+                for (int i = 0; i < comps.Length; i++)
+                {
+                    if (comps[i] != null && comps[i].GetType().Name == "RuntimeVisualDirector")
+                    {
+                        return comps[i];
+                    }
+                }
+
+                Component[] childComps = unit.gameObject.GetComponentsInChildren<Component>(true);
+                for (int i = 0; i < childComps.Length; i++)
+                {
+                    if (childComps[i] != null && childComps[i].GetType().Name == "RuntimeVisualDirector")
+                    {
+                        return childComps[i];
+                    }
+                }
+            }
+            catch
+            {
+            }
+
+            return null;
+        }
+
         public static VisualFeedbackResult TryOrderUnitVisualFeedback(string entityKeyId, string feedbackType, float magnitude = 0.22f)
         {
             if (string.IsNullOrWhiteSpace(entityKeyId))
@@ -7793,16 +7846,7 @@ namespace RogueCommandExpansionLoader.Runtime
                     return new VisualFeedbackResult { Success = false, EntityKeyId = entityKeyId, FeedbackType = feedbackType, Message = "Entity not found or destroyed: " + entityKeyId };
                 }
 
-                Component visualDirector = null;
-                Component[] comps = unit.GetComponents<Component>();
-                for (int i = 0; i < comps.Length; i++)
-                {
-                    if (comps[i] != null && comps[i].GetType().Name == "RuntimeVisualDirector")
-                    {
-                        visualDirector = comps[i];
-                        break;
-                    }
-                }
+                Component visualDirector = FindRuntimeVisualDirector(unit);
 
                 if (visualDirector == null)
                 {
@@ -7901,16 +7945,7 @@ namespace RogueCommandExpansionLoader.Runtime
                     return new VisualFeedbackResult { Success = false, EntityKeyId = entityKeyId, FeedbackType = "Attachment", Message = "Entity not found or destroyed: " + entityKeyId };
                 }
 
-                Component visualDirector = null;
-                Component[] comps = unit.GetComponents<Component>();
-                for (int i = 0; i < comps.Length; i++)
-                {
-                    if (comps[i] != null && comps[i].GetType().Name == "RuntimeVisualDirector")
-                    {
-                        visualDirector = comps[i];
-                        break;
-                    }
-                }
+                Component visualDirector = FindRuntimeVisualDirector(unit);
 
                 if (visualDirector == null)
                 {

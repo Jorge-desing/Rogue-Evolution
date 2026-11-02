@@ -1036,20 +1036,39 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
         public void SetTacticalStanceVisual(string stance)
         {
             if (string.IsNullOrEmpty(stance)) return;
-            bool wasDefensive = string.Equals(_activeTacticalStanceVisual, "Defensive", StringComparison.OrdinalIgnoreCase);
-            bool isDefensive = string.Equals(stance, "Defensive", StringComparison.OrdinalIgnoreCase);
+            string previousStance = _activeTacticalStanceVisual;
             _activeTacticalStanceVisual = stance;
+
+            bool wasDefensive = string.Equals(previousStance, "Defensive", StringComparison.OrdinalIgnoreCase);
+            bool isDefensive = string.Equals(stance, "Defensive", StringComparison.OrdinalIgnoreCase);
+
+            bool wasAggressive = string.Equals(previousStance, "Aggressive", StringComparison.OrdinalIgnoreCase);
+            bool isAggressive = string.Equals(stance, "Aggressive", StringComparison.OrdinalIgnoreCase);
+
             if (isDefensive && !wasDefensive)
             {
                 SetAttachmentActive("Armor", true);
                 SetAttachmentActive("Shield", true);
                 SetAttachmentActive("APS", true);
+                SetAttachmentActive("ERA", true);
             }
             else if (!isDefensive && wasDefensive)
             {
                 SetAttachmentActive("Armor", false);
                 SetAttachmentActive("Shield", false);
                 SetAttachmentActive("APS", false);
+                SetAttachmentActive("ERA", false);
+            }
+
+            if (isAggressive && !wasAggressive)
+            {
+                SetAttachmentActive("Sponsons", true);
+                SetAttachmentActive("FuelDrums", true);
+            }
+            else if (!isAggressive && wasAggressive)
+            {
+                SetAttachmentActive("Sponsons", false);
+                SetAttachmentActive("FuelDrums", false);
             }
         }
 

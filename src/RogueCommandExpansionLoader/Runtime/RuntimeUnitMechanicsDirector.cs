@@ -2947,17 +2947,34 @@ namespace RogueCommandExpansionLoader.Runtime
             {
                 Component comp = entityObj as Component;
                 if (comp == null) return;
+                Component vd = null;
                 Component[] comps = comp.GetComponents<Component>();
                 for (int i = 0; i < comps.Length; i++)
                 {
                     if (comps[i] != null && comps[i].GetType().Name == "RuntimeVisualDirector")
                     {
-                        MethodInfo m = comps[i].GetType().GetMethod("TriggerWeaponFeedback", BindingFlags.Public | BindingFlags.Instance);
-                        if (m != null)
-                        {
-                            m.Invoke(comps[i], new object[] { recoilDistance });
-                        }
+                        vd = comps[i];
                         break;
+                    }
+                }
+                if (vd == null && comp.gameObject != null)
+                {
+                    Component[] childComps = comp.gameObject.GetComponentsInChildren<Component>(true);
+                    for (int i = 0; i < childComps.Length; i++)
+                    {
+                        if (childComps[i] != null && childComps[i].GetType().Name == "RuntimeVisualDirector")
+                        {
+                            vd = childComps[i];
+                            break;
+                        }
+                    }
+                }
+                if (vd != null)
+                {
+                    MethodInfo m = vd.GetType().GetMethod("TriggerWeaponFeedback", BindingFlags.Public | BindingFlags.Instance);
+                    if (m != null)
+                    {
+                        m.Invoke(vd, new object[] { recoilDistance });
                     }
                 }
             }
