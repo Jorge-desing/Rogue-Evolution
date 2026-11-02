@@ -5011,6 +5011,13 @@ namespace RogueCommandExpansionLoader.Runtime
         /// </summary>
         public static CommandAuraResult TryDispatchCommandAuraPulse(string captainKeyId, string auraType, float radius, float durationSeconds)
         {
+            if (float.IsNaN(radius) || float.IsInfinity(radius) ||
+                float.IsNaN(durationSeconds) || float.IsInfinity(durationSeconds))
+            {
+                return new CommandAuraResult(false, captainKeyId ?? string.Empty, auraType ?? string.Empty, 0,
+                    radius, durationSeconds, "Command aura radius and duration must be finite.");
+            }
+
             if (string.IsNullOrWhiteSpace(captainKeyId))
             {
                 return new CommandAuraResult(false, captainKeyId, auraType, 0, radius, durationSeconds,
@@ -5682,6 +5689,12 @@ namespace RogueCommandExpansionLoader.Runtime
 
         public static AiDoctrineResult TrySetAiDoctrine(string doctrineName, float aggressionMultiplier)
         {
+            if (float.IsNaN(aggressionMultiplier) || float.IsInfinity(aggressionMultiplier))
+            {
+                return new AiDoctrineResult(false, doctrineName ?? string.Empty, aggressionMultiplier,
+                    "Aggression multiplier must be finite.");
+            }
+
             if (string.IsNullOrWhiteSpace(doctrineName))
             {
                 return new AiDoctrineResult(false, doctrineName, aggressionMultiplier, "Doctrine name must not be empty.");
