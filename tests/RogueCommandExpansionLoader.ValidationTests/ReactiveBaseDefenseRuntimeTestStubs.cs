@@ -121,7 +121,12 @@ public sealed class EntityController : Component
     public float MaxArmor { get; set; } = 0f;
     public float DeltaArmor => MaxArmor - CurrentArmor;
     public bool HasActiveSkill { get; set; } = true;
-    public bool HasShield { get; set; }
+    private bool? _hasShieldOverride;
+    public bool HasShield
+    {
+        get => _hasShieldOverride ?? (MaxShield > 0f);
+        set => _hasShieldOverride = value;
+    }
     public float CurrentShield { get; set; } = 0f;
     public float MaxShield { get; set; } = 0f;
     public int CurrentRank { get; set; } = 0;
@@ -143,7 +148,11 @@ public sealed class EntityController : Component
             throw new NullReferenceException("EntityController.RepairArmor requires a non-null originator unless callbacks are suppressed.");
         }
     }
-    public void ChargeShield(float amount, bool displayDeltaInBar = true) { CurrentShield = System.Math.Min(CurrentShield + amount, MaxShield); }
+    public void ChargeShield(float amount, bool displayDeltaInBar = true)
+    {
+        if (!HasShield) return;
+        CurrentShield = System.Math.Min(CurrentShield + amount, MaxShield);
+    }
     public void TakeDamage(float amount, EntityController originator = null, bool doNotFireOnHasDealtDamage = false, bool ignoreArmor = false)
     {
         float damageRemaining = amount;
@@ -166,6 +175,7 @@ public sealed class EntityController : Component
     public void RemoveStatusEffect(StatusEffect effect)
     {
         _activeStatusEffects.Remove(effect);
+        AppliedStatusEffects.RemoveAll(x => x.Effect == effect);
     }
     public void AddSpecificValueChange(ChangeableValue changeableValue, SpecificValueChange change, bool isStackable = true)
     {
@@ -750,6 +760,32 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
         public bool IsOnFireVisualActive { get; set; }
         public bool IsBoostedVisualActive { get; set; }
         public string ActiveTacticalStanceVisual { get; set; } = "Standard";
+        public readonly Dictionary<string, bool> AttachmentStates = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+
+        public void SetTacticalStanceVisual(string stance)
+        {
+            if (string.IsNullOrEmpty(stance)) return;
+            bool wasDefensive = string.Equals(ActiveTacticalStanceVisual, "Defensive", StringComparison.OrdinalIgnoreCase);
+            bool isDefensive = string.Equals(stance, "Defensive", StringComparison.OrdinalIgnoreCase);
+            ActiveTacticalStanceVisual = stance;
+            if (isDefensive && !wasDefensive)
+            {
+                SetAttachmentActive("Armor", true);
+                SetAttachmentActive("Shield", true);
+                SetAttachmentActive("APS", true);
+            }
+            else if (!isDefensive && wasDefensive)
+            {
+                SetAttachmentActive("Armor", false);
+                SetAttachmentActive("Shield", false);
+                SetAttachmentActive("APS", false);
+            }
+        }
+
+        public void SetAttachmentActive(string attachmentType, bool active)
+        {
+            AttachmentStates[attachmentType] = active;
+        }
 
         public void SetTurretJammedOverride(bool? jammed) => IsTurretJammed = jammed ?? false;
         public void SetDoorOpenOverride(float? progress) => DoorOpenProgress = progress ?? 0f;
@@ -761,7 +797,11 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
                 CurrentRecoilOffset = magnitude;
             }
         }
-        public bool TrySetAttachmentState(string attachmentName, bool active) => true;
+        public bool TrySetAttachmentState(string attachmentName, bool active)
+        {
+            AttachmentStates[attachmentName] = active;
+            return true;
+        }
         public void TriggerFootstepFeedback(string footTag) { }
         public string GetVisualStatusSummary() => "Status=OK,Jammed=" + IsTurretJammed;
     }

@@ -158,6 +158,7 @@ def _get_diagnostics_go_id() -> int:
     if _DIAGNOSTICS_GO_ID is not None:
         return _DIAGNOSTICS_GO_ID
 
+    # 1. Primary: search by component name via scene:find_objects_with_component
     raw = _call_http("scene:find_objects_with_component", params={"componentName": "LoaderDiagnosticsComponent"})
     try:
         data = json.loads(raw)
@@ -167,6 +168,30 @@ def _get_diagnostics_go_id() -> int:
         elif isinstance(data, dict) and "id" in data:
             _DIAGNOSTICS_GO_ID = int(data["id"])
             return _DIAGNOSTICS_GO_ID
+    except Exception:
+        pass
+
+    # 2. Secondary fallback: search gameobjects by componentName (includes DontDestroyOnLoad)
+    try:
+        raw = _call_http("scene/search_gameobjects", params={"componentName": "LoaderDiagnosticsComponent", "includeInactive": "true", "limit": "50"})
+        data = json.loads(raw)
+        items = data if isinstance(data, list) else ([data] if isinstance(data, dict) and "id" in data else [])
+        for item in items:
+            if isinstance(item, dict) and "id" in item:
+                _DIAGNOSTICS_GO_ID = int(item["id"])
+                return _DIAGNOSTICS_GO_ID
+    except Exception:
+        pass
+
+    # 3. Tertiary fallback: search gameobjects by GameObject name (includes DontDestroyOnLoad)
+    try:
+        raw = _call_http("scene/search_gameobjects", params={"name": "LoaderDiagnostics", "includeInactive": "true", "limit": "50"})
+        data = json.loads(raw)
+        items = data if isinstance(data, list) else ([data] if isinstance(data, dict) and "id" in data else [])
+        for item in items:
+            if isinstance(item, dict) and "id" in item:
+                _DIAGNOSTICS_GO_ID = int(item["id"])
+                return _DIAGNOSTICS_GO_ID
     except Exception:
         pass
 

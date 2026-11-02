@@ -6738,6 +6738,7 @@ namespace RogueCommandExpansionLoader.Runtime
                     if (removeAll)
                     {
                         affixes.Clear();
+                        _activeUnitAffixes.Remove(key);
                         found = true;
                     }
                     else
@@ -6749,6 +6750,10 @@ namespace RogueCommandExpansionLoader.Runtime
                                 affixes.RemoveAt(i);
                                 found = true;
                             }
+                        }
+                        if (affixes.Count == 0)
+                        {
+                            _activeUnitAffixes.Remove(key);
                         }
                     }
                     activeCount = affixes.Count;
@@ -7479,6 +7484,25 @@ namespace RogueCommandExpansionLoader.Runtime
                 _activeUnitAffixes.Clear();
             }
             ClearAiProfileUnitDefaults();
+        }
+
+        public static void OnEntityDestroyed(string entityKeyId)
+        {
+            if (string.IsNullOrWhiteSpace(entityKeyId)) return;
+            string key = entityKeyId.Trim();
+            lock (_activeTacticalStances)
+            {
+                _activeTacticalStances.Remove(key);
+            }
+            lock (_activeUnitAffixes)
+            {
+                _activeUnitAffixes.Remove(key);
+            }
+            lock (_activeUnitVariants)
+            {
+                _activeUnitVariants.Remove(key);
+                _activeUnitLoadoutStats.Remove(key);
+            }
         }
 
         public static int GetLiveMechanicsDirectorCount()

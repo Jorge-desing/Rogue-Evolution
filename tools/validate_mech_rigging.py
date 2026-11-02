@@ -483,9 +483,14 @@ def main() -> int:
     if args.prefab:
         all_audits.append(validator.validate_prefab_yaml(args.prefab))
 
-    # 4. Default: scan Unity authoring project sample prefabs
+    # 4. Default: check sample pack bundles first, otherwise scan Unity authoring project sample prefabs
     if not (args.pack or args.bundle or args.prefab):
-        if args.unity_project.exists():
+        default_pack_bundles = Path("content/packs/sample-native-expansion/bundles")
+        if default_pack_bundles.exists():
+            for b in default_pack_bundles.glob("*.bundle"):
+                if "manifest" not in b.name.lower():
+                    all_audits.extend(validator.validate_asset_bundle(b))
+        elif args.unity_project.exists():
             for p in args.unity_project.rglob("*Visual.prefab"):
                 all_audits.append(validator.validate_prefab_yaml(p))
 

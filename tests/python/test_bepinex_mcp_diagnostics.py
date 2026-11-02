@@ -124,6 +124,27 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
         self.assertEqual(4, value)
         self.assertEqual(["component/get_member", "scene:find_objects_with_component", "component/get_member"], [call[0] for call in calls])
 
+    def test_diagnostics_discovery_falls_back_to_search_gameobjects(self) -> None:
+        calls: list[str] = []
+
+        def fake_http(endpoint: str, params: dict[str, object] | None = None, **_: object) -> str:
+            calls.append(endpoint)
+            if endpoint == "scene:find_objects_with_component":
+                return json.dumps([])
+            if endpoint == "scene/search_gameobjects" and params and params.get("componentName") == "LoaderDiagnosticsComponent":
+                return json.dumps([{"name": "LoaderDiagnostics", "id": 88}])
+            self.fail(f"Unexpected bridge call: {endpoint} {params}")
+
+        with (
+            mock.patch.object(SERVER, "_DIAGNOSTICS_GO_ID", None),
+            mock.patch.object(SERVER, "_call_http", side_effect=fake_http),
+        ):
+            resolved_id = SERVER._get_diagnostics_go_id()
+            self.assertEqual(88, resolved_id)
+            self.assertEqual(88, SERVER._DIAGNOSTICS_GO_ID)
+
+        self.assertEqual(["scene:find_objects_with_component", "scene/search_gameobjects"], calls)
+
     def test_bridge_return_parser_handles_escaped_strings_inside_json(self) -> None:
         payload = json.dumps({"text": 'quote: "quoted" } path C:\\folder'})
         raw = (

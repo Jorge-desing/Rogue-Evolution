@@ -84,6 +84,33 @@ class ValidateContentPackTests(unittest.TestCase):
         errors = validate_content_pack.validate_pack(d)
         self.assertEqual(errors, [])
 
+    def test_custom_schema_validation(self):
+        content = {
+            "packId": "test-pack",
+            "displayName": "Test",
+            "version": "1.0.0",
+            "customProp": "allowed",
+        }
+        custom_schema = {
+            "type": "object",
+            "required": ["packId", "customProp"],
+            "properties": {
+                "packId": {"type": "string"},
+                "customProp": {"type": "string"},
+            },
+        }
+        d = self._make_pack(content)
+        schema_path = Path(d) / "custom_schema.json"
+        schema_path.write_text(json.dumps(custom_schema), encoding="utf-8")
+
+        # Valid with custom schema
+        errors = validate_content_pack.validate_pack(d, schema_path=str(schema_path))
+        self.assertEqual(errors, [])
+
+        # Nonexistent schema file
+        errors_missing = validate_content_pack.validate_pack(d, schema_path=str(Path(d) / "not_there.json"))
+        self.assertTrue(any("Schema no encontrado" in e for e in errors_missing))
+
 
 if __name__ == "__main__":
     unittest.main()

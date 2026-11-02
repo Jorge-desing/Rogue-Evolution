@@ -53,7 +53,7 @@ CONTENT_SCHEMA = {
 }
 
 
-def validate_pack(pack_dir: str) -> list[str]:
+def validate_pack(pack_dir: str, schema_path: str | None = None) -> list[str]:
     """Valida un content pack y retorna lista de errores (vacía si OK)."""
     errors = []
     pack_path = Path(pack_dir)
@@ -70,8 +70,18 @@ def validate_pack(pack_dir: str) -> list[str]:
     except json.JSONDecodeError as e:
         return [f"content.json inválido: {e}"]
 
+    active_schema = CONTENT_SCHEMA
+    if schema_path:
+        schema_file = Path(schema_path)
+        if not schema_file.is_file():
+            return [f"Schema no encontrado: {schema_path}"]
+        try:
+            active_schema = json.loads(schema_file.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as e:
+            return [f"Schema inválido ({schema_path}): {e}"]
+
     try:
-        jsonschema.validate(instance=data, schema=CONTENT_SCHEMA)
+        jsonschema.validate(instance=data, schema=active_schema)
     except jsonschema.ValidationError as e:
         errors.append(f"Schema: {e.message} (path: {'/'.join(str(p) for p in e.absolute_path)})")
 
@@ -124,7 +134,7 @@ def main() -> int:
     parser.add_argument("--schema", help="Archivo JSON Schema externo (opcional)")
     args = parser.parse_args()
 
-    errors = validate_pack(args.pack_dir)
+    errors = validate_pack(args.pack_dir, schema_path=args.schema)
     if errors:
         print(f"ERRORES ({len(errors)}):", file=sys.stderr)
         for e in errors:

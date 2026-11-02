@@ -950,13 +950,7 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
                 string stance = RuntimeGameplayCommandDirector.GetUnitTacticalStance(key);
                 if (!string.IsNullOrEmpty(stance))
                 {
-                    _activeTacticalStanceVisual = stance;
-                    if (string.Equals(stance, "Defensive", StringComparison.OrdinalIgnoreCase))
-                    {
-                        SetAttachmentActive("Armor", true);
-                        SetAttachmentActive("Shield", true);
-                        SetAttachmentActive("APS", true);
-                    }
+                    SetTacticalStanceVisual(stance);
                 }
             }
             catch { }
@@ -1038,6 +1032,26 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
         public bool IsOnFireVisualActive => _isOnFireVisualActive;
         public bool IsBoostedVisualActive => _isBoostedVisualActive;
         public string ActiveTacticalStanceVisual => _activeTacticalStanceVisual;
+
+        public void SetTacticalStanceVisual(string stance)
+        {
+            if (string.IsNullOrEmpty(stance)) return;
+            bool wasDefensive = string.Equals(_activeTacticalStanceVisual, "Defensive", StringComparison.OrdinalIgnoreCase);
+            bool isDefensive = string.Equals(stance, "Defensive", StringComparison.OrdinalIgnoreCase);
+            _activeTacticalStanceVisual = stance;
+            if (isDefensive && !wasDefensive)
+            {
+                SetAttachmentActive("Armor", true);
+                SetAttachmentActive("Shield", true);
+                SetAttachmentActive("APS", true);
+            }
+            else if (!isDefensive && wasDefensive)
+            {
+                SetAttachmentActive("Armor", false);
+                SetAttachmentActive("Shield", false);
+                SetAttachmentActive("APS", false);
+            }
+        }
 
         public void SetTurretJammedOverride(bool? jammed)
         {

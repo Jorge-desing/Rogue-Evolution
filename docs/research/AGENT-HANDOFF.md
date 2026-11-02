@@ -549,3 +549,23 @@ The generated unit models, prefab authoring outputs, compiled visual bundle, and
       3. Respeto del tope `profile.Experience.maxLevel = 2` al promover rango en `TrySetUnitVeterancyRank`.
       4. Ejecución de pulso táctico con curación y activación de retroalimentación visual.
     - **Validación Local:** Compilación Release del plugin y de tests con **0 advertencias / 0 errores**; arnés C# con **467/468 checks pasados** (1 omitido por privilegio symlink en Windows); suite Python con **110/110 pruebas pasadas**; verificación de diff limpia. Resultados locales/estáticos; evidencia en vivo en partida Steam pendiente de validación reversible.
+
+26. **Corrección de ciclo de vida de entidades, desincronización visual de posturas tácticas y robustez en herramientas de validación y puente MCP (2026-11-02; build/local verificado):**
+    - **Transición y desincronización visual de posturas en `RuntimeVisualDirector.cs`:**
+      Al cambiar de postura táctica a "Defensive", los hardpoints visuales de protección (`Armor`, `Shield`, `APS`) se activaban mediante `SetAttachmentActive`, pero al salir de "Defensive" hacia "Standard" o "Aggressive", permanecían activados indefinidamente. Se implementó `SetTacticalStanceVisual(string stance)` que rastrea `wasDefensive` e `isDefensive`, activando los aditamentos al entrar a "Defensive" y desactivándolos al salir. Se integró tanto en la rutina periódica `UpdateStatusEffectAndStanceReactions` como en la API pública.
+    - **Fuga de memoria y limpieza de ciclo de vida en `RuntimeGameplayCommandDirector.cs` y `RuntimeUnitMechanicsDirector.cs`:**
+      Se identificó que los diccionarios por clave de entidad (`_activeTacticalStances`, `_activeUnitAffixes`, `_activeUnitVariants`, `_activeUnitLoadoutStats`) no se limpiaban cuando una unidad moría o era destruida, acumulando entradas a lo largo de partidas extensas. Además, `TryRemoveUnitAffix` dejaba listas vacías `List<string>` en `_activeUnitAffixes[key]`. Se implementó `RuntimeGameplayCommandDirector.OnEntityDestroyed(string entityKeyId)` y se conectó en `RuntimeUnitMechanicsDirector.OnEntityDestroyed` y `OnEntityDied`, removiendo de forma sincronizada y segura todas las estructuras por entidad. Asimismo, en `TryRemoveUnitAffix`, si la lista de afijos queda vacía (`affixes.Count == 0`) o se invoca `removeAll`, la clave se elimina completamente del diccionario.
+    - **Soporte de `--schema` en `tools/validate_content_pack.py`:**
+      El flag CLI `--schema` estaba definido en `argparse`, pero `validate_pack()` no aceptaba el parámetro y la validación ignoraba el archivo schema especificado. Se actualizó la firma `validate_pack(pack_dir: str, schema_path: str | None = None)` para cargar y validar contra el JSON Schema personalizado cuando se provea, manteniendo fallback a `CONTENT_SCHEMA`.
+    - **Auditoría predeterminada en `tools/validate_mech_rigging.py`:**
+      Al invocarse sin argumentos (`--pack`, `--bundle`, `--prefab`), la herramienta intentaba escanear prefabs YAML sin compilar en `unity/`, arrojando falsos positivos críticos (`UNRIGGED_WALKER`). Se actualizó para verificar primero la presencia de bundles compilados en `content/packs/sample-native-expansion/bundles` y auditarlos automáticamente, saliendo con código 0 limpio de forma predeterminada.
+    - **Descubrimiento multinivel de GameObject en `tools/bepinex_mcp_server.py`:**
+      `_get_diagnostics_go_id()` dependía exclusivamente de `scene:find_objects_with_component`. Debido a que los objetos en `DontDestroyOnLoad` pueden no ser listados por dicha llamada en transiciones de escena, se agregaron fallbacks secundarios y terciarios mediante `scene/search_gameobjects` consultando por `componentName` ("LoaderDiagnosticsComponent") y por `name` ("LoaderDiagnostics"), evitando excepciones `RuntimeError` en llamadas de telemetría y diagnóstico.
+    - **Invariantes en stubs de prueba (`ReactiveBaseDefenseRuntimeTestStubs.cs`):**
+      Se corrigió `HasShield` como propiedad con fallback automático a `MaxShield > 0f` y `ChargeShield` respetando la posesión de escudo (`if (!HasShield) return;`), y `RemoveStatusEffect` limpiando las entradas en `AppliedStatusEffects`.
+    - **Validación Automatizada:**
+      - Compilación Release de plugin y suite de validación con **0 advertencias / 0 errores**.
+      - Suite C# con **470/471 checks pasados** (1 omitido por restricción symlink en Windows).
+      - Suite Python con **112/112 pruebas pasadas** (incorporando pruebas para `--schema` y para fallback de descubrimiento de diagnóstico MCP).
+      - Auditoría de rigging `validate_mech_rigging.py` pasando con código 0.
+      - Verificación de formato y diff limpia con `git diff --check`.

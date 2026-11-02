@@ -1010,6 +1010,18 @@ namespace RogueCommandExpansionLoader.Runtime
         {
             RemoveCombatExperience(entityObj);
             RemoveAppliedCardChangeBoostKeys(entityObj);
+            try
+            {
+                int key = GetCombatExperienceKey(entityObj);
+                if (key != 0)
+                {
+                    RuntimeGameplayCommandDirector.OnEntityDestroyed(key.ToString());
+                }
+            }
+            catch
+            {
+                // Destruction cleanup must never interfere with native destruction.
+            }
         }
 
         /// <summary>
@@ -1024,6 +1036,11 @@ namespace RogueCommandExpansionLoader.Runtime
                 RemoveCombatExperience(entityObj);
                 RemoveAppliedCardChangeBoostKeys(entityObj);
                 ClearRuntimeMechanicsByObject(entityObj);
+                int key = GetCombatExperienceKey(entityObj);
+                if (key != 0)
+                {
+                    RuntimeGameplayCommandDirector.OnEntityDestroyed(key.ToString());
+                }
             }
             catch
             {

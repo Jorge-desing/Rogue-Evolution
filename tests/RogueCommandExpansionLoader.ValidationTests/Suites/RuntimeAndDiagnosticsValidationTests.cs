@@ -7550,6 +7550,123 @@ internal static partial class ValidationTestRunner
             ExistingControllers.Instance.Reset();
         }
     }),
+    ("runtime visual director transitions tactical stance visuals and deactivates attachments when leaving defensive stance", () =>
+    {
+        var director = new RuntimeVisualDirector();
+
+        director.SetTacticalStanceVisual("Defensive");
+        if (!director.ActiveTacticalStanceVisual.Equals("Defensive", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("ActiveTacticalStanceVisual was not updated to Defensive.");
+        }
+        if (!director.AttachmentStates.TryGetValue("Armor", out bool armorActive) || !armorActive ||
+            !director.AttachmentStates.TryGetValue("Shield", out bool shieldActive) || !shieldActive ||
+            !director.AttachmentStates.TryGetValue("APS", out bool apsActive) || !apsActive)
+        {
+            throw new InvalidOperationException("Defensive stance did not activate Armor, Shield, and APS attachments.");
+        }
+
+        director.SetTacticalStanceVisual("Aggressive");
+        if (!director.ActiveTacticalStanceVisual.Equals("Aggressive", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("ActiveTacticalStanceVisual was not updated to Aggressive.");
+        }
+        if (director.AttachmentStates["Armor"] || director.AttachmentStates["Shield"] || director.AttachmentStates["APS"])
+        {
+            throw new InvalidOperationException("Leaving Defensive stance did not deactivate Armor, Shield, and APS attachments.");
+        }
+    }),
+    ("runtime gameplay command director clears unit affixes and cleans up destroyed entity dictionaries", () =>
+    {
+        RuntimeGameplayCommandDirector.ClearTacticalStancesAndAffixes();
+        ExistingControllers.Instance.Reset();
+        try
+        {
+            var unit = new EntityController
+            {
+                entityId = "test:tank-8802",
+                UniqueEntityId = 8802,
+                IsUnit = true,
+                IsControlledByPlayer = true,
+                MaxHealth = 100f,
+                CurrentHealth = 100f,
+                MaxShield = 50f,
+                CurrentShield = 50f
+            };
+            ExistingControllers.Instance.PlayerUnits().Add(unit);
+
+            string entityKey = "8802";
+            var stanceRes = RuntimeGameplayCommandDirector.TrySetUnitTacticalStance(entityKey, "Aggressive");
+            if (!stanceRes.Success) throw new InvalidOperationException("Failed to set tactical stance.");
+
+            var affixRes1 = RuntimeGameplayCommandDirector.TryApplyUnitAffix(entityKey, "Swift");
+            var affixRes2 = RuntimeGameplayCommandDirector.TryApplyUnitAffix(entityKey, "Bulwark");
+            if (!affixRes1.Success || !affixRes2.Success) throw new InvalidOperationException("Failed to apply affixes.");
+
+            var rem1 = RuntimeGameplayCommandDirector.TryRemoveUnitAffix(entityKey, "Swift");
+            if (!rem1.Success || rem1.ActiveAffixCount != 1)
+            {
+                throw new InvalidOperationException($"Removing single affix failed or active count wrong: {rem1.ActiveAffixCount}");
+            }
+
+            var rem2 = RuntimeGameplayCommandDirector.TryRemoveUnitAffix(entityKey, "Bulwark");
+            if (!rem2.Success || rem2.ActiveAffixCount != 0)
+            {
+                throw new InvalidOperationException($"Removing final affix failed or active count wrong: {rem2.ActiveAffixCount}");
+            }
+
+            RuntimeGameplayCommandDirector.TrySetUnitTacticalStance(entityKey, "Defensive");
+            RuntimeGameplayCommandDirector.TryApplyUnitAffix(entityKey, "Volatile");
+
+            RuntimeGameplayCommandDirector.OnEntityDestroyed(entityKey);
+
+            string currentStance = RuntimeGameplayCommandDirector.GetUnitTacticalStance(entityKey);
+            if (!string.Equals(currentStance, "Standard", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException($"OnEntityDestroyed did not reset stance to Standard: {currentStance}");
+            }
+
+            var remAfterDestroy = RuntimeGameplayCommandDirector.TryRemoveUnitAffix(entityKey, "Volatile");
+            if (remAfterDestroy.Success)
+            {
+                throw new InvalidOperationException("Affix still reported present after entity was destroyed.");
+            }
+        }
+        finally
+        {
+            RuntimeGameplayCommandDirector.ClearTacticalStancesAndAffixes();
+            ExistingControllers.Instance.Reset();
+        }
+    }),
+    ("test stubs enforce shield capability on charge and prune removed status effects", () =>
+    {
+        var unitWithoutShield = new EntityController
+        {
+            entityId = "test:no-shield",
+            MaxShield = 0f,
+            CurrentShield = 0f
+        };
+        unitWithoutShield.ChargeShield(50f);
+        if (unitWithoutShield.CurrentShield > 0f)
+        {
+            throw new InvalidOperationException("Unit without shield capacity should not gain shield from ChargeShield.");
+        }
+
+        var unitWithStatus = new EntityController
+        {
+            entityId = "test:status-unit"
+        };
+        unitWithStatus.SetActiveStatusEffect(StatusEffect.Electrified, SetStatusEffect.DurationType.Seconds, 5f);
+        if (!unitWithStatus.HasActiveStatusEffect(StatusEffect.Electrified) || unitWithStatus.AppliedStatusEffects.Count == 0)
+        {
+            throw new InvalidOperationException("Failed to apply status effect in test stub.");
+        }
+        unitWithStatus.RemoveStatusEffect(StatusEffect.Electrified);
+        if (unitWithStatus.HasActiveStatusEffect(StatusEffect.Electrified) || unitWithStatus.AppliedStatusEffects.Exists(e => e.Effect == StatusEffect.Electrified))
+        {
+            throw new InvalidOperationException("RemoveStatusEffect did not clear AppliedStatusEffects entry in test stub.");
+        }
+    }),
     };
 
     private sealed class TestEntityAttackStub
