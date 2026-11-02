@@ -1344,6 +1344,18 @@ namespace RogueCommandExpansionLoader.Runtime
             return AgentDiagnosticsFormatter.SerializeAgentBatchLockResult(success, agentId, count, success ? count : 0, "ReleaseBatch", message);
         }
 
+        public string GetLoaderAuditCensusJson(int maxUnits = 64, int maxAiProfiles = 32)
+        {
+            return AgentDiagnosticsFormatter.SerializeLoaderRuntimeAuditCensus(
+                RuntimeGameplayCommandDirector.GetLoaderRuntimeAuditCensus(SafeSnapshot(), maxUnits, maxAiProfiles));
+        }
+
+        public string OrderReconcileLoaderStateJson()
+        {
+            return AgentDiagnosticsFormatter.SerializeLoaderReconciliationResult(
+                RuntimeGameplayCommandDirector.TryReconcileLoaderRuntimeState(SafeSnapshot()));
+        }
+
         public string GetSystemHealthJson()
         {
             return AgentDiagnosticsFormatter.SerializeSystemHealth(

@@ -100,6 +100,7 @@ namespace RogueCommandExpansionLoader.Runtime
                     {
                         Visual.RuntimeVisualDirector.AttachIfApplicable(entityObj);
                         RuntimeUnitMechanicsDirector.AttachIfApplicable(entityObj);
+                        RuntimeGameplayCommandDirector.ApplyAiProfileUnitDefaultsToEntity(entityObj);
                     };
                     harmony = new Harmony(HarmonyOwnerId);
                     var installedNames = new List<string>();

@@ -2194,6 +2194,52 @@
           "minimum": 0.1,
           "maximum": 5.0,
           "description": "Scalar multiplier adjusting AI director decision tick cadence and assault wave tempo."
+        },
+        "defaultUnitStance": {
+          "type": "string",
+          "enum": [
+            "Standard",
+            "Aggressive",
+            "Defensive",
+            "HoldFire",
+            "Kiting"
+          ],
+          "description": "Default combat tactical stance applied automatically to AI units deployed under this profile."
+        },
+        "defaultUnitLoadout": {
+          "type": "string",
+          "enum": [
+            "Standard",
+            "AP",
+            "HE",
+            "Speed",
+            "Siege",
+            "Reinforced"
+          ],
+          "description": "Default combat loadout preset applied automatically to AI units deployed under this profile."
+        },
+        "startingUnitAffixes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "Swift",
+              "Bulwark",
+              "Juggernaut",
+              "Overcharged",
+              "Vampiric",
+              "Volatile"
+            ]
+          },
+          "uniqueItems": true,
+          "maxItems": 4,
+          "description": "Squad-wide elite affixes applied automatically to AI units deployed under this profile."
+        },
+        "startingUnitVeterancyRank": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 5,
+          "description": "Initial veterancy rank (0 to 5) applied automatically to AI units deployed under this profile."
         }
       },
       "oneOf": [

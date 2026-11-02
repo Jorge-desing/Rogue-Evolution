@@ -160,6 +160,12 @@
                 ]
             },
             "cardModelScalingFactor": 0.9,
+            "defaultTacticalStance": "Kiting",
+            "defaultLoadout": "Speed",
+            "startingAffixes": [
+                "Swift"
+            ],
+            "startingVeterancyRank": 1,
             "baselineStatusEffects": [
                 "Rush"
             ],
@@ -673,6 +679,12 @@
                 ]
             },
             "cardModelScalingFactor": 0.9,
+            "defaultTacticalStance": "Aggressive",
+            "defaultLoadout": "Siege",
+            "startingAffixes": [
+                "Bulwark"
+            ],
+            "startingVeterancyRank": 1,
             "command": {
                 "commandRange": 4.5,
                 "commandType": "Attack",
@@ -829,6 +841,12 @@
                 ]
             },
             "cardModelScalingFactor": 0.85,
+            "defaultTacticalStance": "Aggressive",
+            "defaultLoadout": "AP",
+            "startingAffixes": [
+                "Overcharged"
+            ],
+            "startingVeterancyRank": 1,
             "combatBoosts": [
                 {
                     "id": "tactical-operations:arc-lance-overclock",
@@ -1131,6 +1149,15 @@
             "id": "tactical-operations:skirmish-adversary",
             "nativeTemplateId": "_01_ Quick Hunter Enemy Var",
             "scopeToReferencedStages": true,
+            "doctrine": "Assault",
+            "aggressionMultiplier": 1.25,
+            "defaultUnitStance": "Aggressive",
+            "defaultUnitLoadout": "AP",
+            "startingUnitAffixes": [
+                "Swift",
+                "Bulwark"
+            ],
+            "startingUnitVeterancyRank": 1,
             "unitEntries": [
                 {
                     "unitId": "tactical-operations:tidebreaker-skirmisher",

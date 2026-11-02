@@ -63,6 +63,8 @@
              Link="Runtime/RuntimeAudioCensus.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeVisualCensus.cs"
              Link="Runtime/RuntimeVisualCensus.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeLoaderAuditCensus.cs"
+             Link="Runtime/RuntimeLoaderAuditCensus.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeTechCatalogCensus.cs"
              Link="Runtime/RuntimeTechCatalogCensus.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeVeterancyCensus.cs"

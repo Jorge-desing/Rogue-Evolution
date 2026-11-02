@@ -3458,6 +3458,69 @@ namespace RogueCommandExpansionLoader.Content
                         "aggressionMultiplier must be a finite number between 0.1 and 5.0.");
                 }
             }
+
+            if (profile.defaultUnitStance != null)
+            {
+                string stance = profile.defaultUnitStance.Trim();
+                if (String.IsNullOrWhiteSpace(stance) || !SupportedCombatStances.Contains(stance))
+                {
+                    Add(diagnostics, "ai-profile.defaultUnitStance-invalid", path + ".defaultUnitStance",
+                        "defaultUnitStance '" + stance + "' must be one of Standard, Aggressive, Defensive, HoldFire, Kiting.");
+                }
+            }
+
+            if (profile.defaultUnitLoadout != null)
+            {
+                string loadout = profile.defaultUnitLoadout.Trim();
+                if (String.IsNullOrWhiteSpace(loadout) || !SupportedLoadoutPresets.Contains(loadout))
+                {
+                    Add(diagnostics, "ai-profile.defaultUnitLoadout-invalid", path + ".defaultUnitLoadout",
+                        "defaultUnitLoadout '" + loadout + "' must be one of Standard, AP, HE, Speed, Siege, Reinforced.");
+                }
+            }
+
+            if (profile.startingUnitAffixes != null)
+            {
+                if (profile.startingUnitAffixes.Length > 4)
+                {
+                    Add(diagnostics, "ai-profile.startingUnitAffixes-limit", path + ".startingUnitAffixes",
+                        "startingUnitAffixes cannot exceed 4 elements.");
+                }
+
+                var seenAffixes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                for (int i = 0; i < profile.startingUnitAffixes.Length; i++)
+                {
+                    string affix = profile.startingUnitAffixes[i];
+                    string affixPath = path + ".startingUnitAffixes[" + i + "]";
+                    if (String.IsNullOrWhiteSpace(affix))
+                    {
+                        Add(diagnostics, "ai-profile.startingUnitAffixes-empty", affixPath,
+                            "startingUnitAffixes element cannot be empty or whitespace.");
+                        continue;
+                    }
+
+                    string trimmed = affix.Trim();
+                    if (!SupportedEliteAffixes.Contains(trimmed))
+                    {
+                        Add(diagnostics, "ai-profile.startingUnitAffixes-invalid", affixPath,
+                            "startingUnitAffixes element '" + trimmed + "' must be one of Swift, Bulwark, Juggernaut, Overcharged, Vampiric, Volatile.");
+                    }
+                    else if (!seenAffixes.Add(trimmed))
+                    {
+                        Add(diagnostics, "ai-profile.startingUnitAffixes-duplicate", affixPath,
+                            "Duplicate startingUnitAffix '" + trimmed + "' is not permitted.");
+                    }
+                }
+            }
+
+            if (profile.startingUnitVeterancyRank.HasValue)
+            {
+                if (profile.startingUnitVeterancyRank.Value < 0 || profile.startingUnitVeterancyRank.Value > 5)
+                {
+                    Add(diagnostics, "ai-profile.startingUnitVeterancyRank-invalid", path + ".startingUnitVeterancyRank",
+                        "startingUnitVeterancyRank must be an integer between 0 and 5.");
+                }
+            }
         }
 
         private static void ValidateUnitLocalizations(

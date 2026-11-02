@@ -6898,6 +6898,566 @@ namespace RogueCommandExpansionLoader.Runtime
             return RuntimeVisualCensus.GetLoadedPrefabAuditCensus(maxEntries);
         }
 
+        private sealed class AiProfileUnitDefaultsRecord
+        {
+            public string ProfileId;
+            public string Doctrine;
+            public float AggressionMultiplier;
+            public string DefaultUnitStance;
+            public string DefaultUnitLoadout;
+            public IReadOnlyList<string> StartingUnitAffixes;
+            public int StartingUnitVeterancyRank;
+        }
+
+        private static readonly object _aiProfileDefaultsGate = new object();
+        private static readonly Dictionary<string, AiProfileUnitDefaultsRecord> _aiProfileUnitDefaults =
+            new Dictionary<string, AiProfileUnitDefaultsRecord>(StringComparer.OrdinalIgnoreCase);
+        private static string _activeAiProfileId = string.Empty;
+
+        public static void RegisterAiProfileUnitDefaults(
+            string profileId,
+            string doctrine,
+            float? aggressionMultiplier,
+            string defaultUnitStance,
+            string defaultUnitLoadout,
+            IReadOnlyList<string> startingUnitAffixes,
+            int? startingUnitVeterancyRank,
+            bool setActive = false)
+        {
+            if (string.IsNullOrWhiteSpace(profileId))
+            {
+                return;
+            }
+
+            string normalizedId = profileId.Trim();
+            var affixes = new List<string>();
+            if (startingUnitAffixes != null)
+            {
+                for (int i = 0; i < startingUnitAffixes.Count; i++)
+                {
+                    if (!string.IsNullOrWhiteSpace(startingUnitAffixes[i]))
+                    {
+                        affixes.Add(startingUnitAffixes[i].Trim());
+                    }
+                }
+            }
+
+            var record = new AiProfileUnitDefaultsRecord
+            {
+                ProfileId = normalizedId,
+                Doctrine = string.IsNullOrWhiteSpace(doctrine) ? "Standard" : doctrine.Trim(),
+                AggressionMultiplier = aggressionMultiplier.HasValue && !float.IsNaN(aggressionMultiplier.Value) && !float.IsInfinity(aggressionMultiplier.Value)
+                    ? Mathf.Clamp(aggressionMultiplier.Value, 0.1f, 5.0f)
+                    : 1.0f,
+                DefaultUnitStance = string.IsNullOrWhiteSpace(defaultUnitStance) ? string.Empty : defaultUnitStance.Trim(),
+                DefaultUnitLoadout = string.IsNullOrWhiteSpace(defaultUnitLoadout) ? string.Empty : defaultUnitLoadout.Trim(),
+                StartingUnitAffixes = affixes.AsReadOnly(),
+                StartingUnitVeterancyRank = startingUnitVeterancyRank.HasValue
+                    ? Mathf.Clamp(startingUnitVeterancyRank.Value, 0, 5)
+                    : 0,
+            };
+
+            lock (_aiProfileDefaultsGate)
+            {
+                _aiProfileUnitDefaults[normalizedId] = record;
+                if (setActive)
+                {
+                    _activeAiProfileId = normalizedId;
+                }
+            }
+        }
+
+        public static void ClearAiProfileUnitDefaults()
+        {
+            lock (_aiProfileDefaultsGate)
+            {
+                _aiProfileUnitDefaults.Clear();
+                _activeAiProfileId = string.Empty;
+            }
+        }
+
+        public static int ApplyAiProfileUnitDefaultsToEntity(object entityObj)
+        {
+            if (entityObj == null)
+            {
+                return 0;
+            }
+
+            try
+            {
+                EntityController unit = entityObj as EntityController;
+                if (unit == null || unit.IsDestroyed || unit.DestroyHasBeenStarted || unit.IsControlledByPlayer)
+                {
+                    return 0;
+                }
+
+                AiProfileUnitDefaultsRecord activeDefaults = null;
+                lock (_aiProfileDefaultsGate)
+                {
+                    if (!string.IsNullOrEmpty(_activeAiProfileId))
+                    {
+                        _aiProfileUnitDefaults.TryGetValue(_activeAiProfileId, out activeDefaults);
+                    }
+                    if (activeDefaults == null)
+                    {
+                        foreach (AiProfileUnitDefaultsRecord candidate in _aiProfileUnitDefaults.Values)
+                        {
+                            if (!string.IsNullOrEmpty(candidate.DefaultUnitStance) ||
+                                !string.IsNullOrEmpty(candidate.DefaultUnitLoadout) ||
+                                (candidate.StartingUnitAffixes != null && candidate.StartingUnitAffixes.Count > 0) ||
+                                candidate.StartingUnitVeterancyRank > 0)
+                            {
+                                activeDefaults = candidate;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if (activeDefaults == null)
+                {
+                    return 0;
+                }
+
+                string key = unit.UniqueEntityId.ToString();
+                string unitId = ResolveEntityIdString(unit);
+                UnitRuntimeMechanicsProfile unitProfile;
+                RuntimeUnitMechanicsDirector.TryGetProfile(unitId, out unitProfile);
+
+                bool modified = false;
+
+                // Apply AI profile default stance if the unit has no explicit unit-level default stance and is still Standard
+                if (!string.IsNullOrEmpty(activeDefaults.DefaultUnitStance) &&
+                    (unitProfile == null || string.IsNullOrWhiteSpace(unitProfile.DefaultTacticalStance)))
+                {
+                    string currentStance = GetUnitTacticalStance(key);
+                    if (string.Equals(currentStance, "Standard", StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (TrySetUnitTacticalStance(key, activeDefaults.DefaultUnitStance).Success)
+                        {
+                            modified = true;
+                        }
+                    }
+                }
+
+                // Apply AI profile default loadout if the unit has no explicit unit-level default loadout
+                if (!string.IsNullOrEmpty(activeDefaults.DefaultUnitLoadout) &&
+                    (unitProfile == null || string.IsNullOrWhiteSpace(unitProfile.DefaultLoadout)))
+                {
+                    string currentVariant = GetActiveUnitVariant(key);
+                    if (string.IsNullOrEmpty(currentVariant) || string.Equals(currentVariant, "Standard", StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (TryApplyUnitLoadout(key, activeDefaults.DefaultUnitLoadout).Success)
+                        {
+                            modified = true;
+                        }
+                    }
+                }
+
+                // Apply AI profile starting affixes
+                if (activeDefaults.StartingUnitAffixes != null && activeDefaults.StartingUnitAffixes.Count > 0)
+                {
+                    for (int i = 0; i < activeDefaults.StartingUnitAffixes.Count; i++)
+                    {
+                        string affix = activeDefaults.StartingUnitAffixes[i];
+                        if (!string.IsNullOrWhiteSpace(affix))
+                        {
+                            if (TryApplyUnitAffix(key, affix).Success)
+                            {
+                                modified = true;
+                            }
+                        }
+                    }
+                }
+
+                // Apply AI profile starting veterancy rank if higher than current rank
+                if (activeDefaults.StartingUnitVeterancyRank > 0)
+                {
+                    int targetRank = activeDefaults.StartingUnitVeterancyRank;
+                    if (unitProfile != null && unitProfile.StartingVeterancyRank.HasValue && unitProfile.StartingVeterancyRank.Value > targetRank)
+                    {
+                        targetRank = unitProfile.StartingVeterancyRank.Value;
+                    }
+                    int resultingRank;
+                    if (RuntimeUnitMechanicsDirector.TrySetUnitVeterancyRank(unit, targetRank, out resultingRank))
+                    {
+                        modified = true;
+                    }
+                }
+
+                return modified ? 1 : 0;
+            }
+            catch
+            {
+                return 0;
+            }
+        }
+
+        public static int ApplyActiveAiUnitDefaultsToAiUnits()
+        {
+            int appliedCount = 0;
+            try
+            {
+                ExistingControllers existing = ExistingControllers.Instance;
+                if (existing != null && existing.AiUnits() != null)
+                {
+                    foreach (EntityController aiUnit in existing.AiUnits())
+                    {
+                        if (aiUnit == null || aiUnit.IsDestroyed || aiUnit.DestroyHasBeenStarted)
+                        {
+                            continue;
+                        }
+                        appliedCount += ApplyAiProfileUnitDefaultsToEntity(aiUnit);
+                    }
+                }
+            }
+            catch
+            {
+            }
+            return appliedCount;
+        }
+
+        public static LoaderRuntimeAuditCensus GetLoaderRuntimeAuditCensus(
+            LoaderDiagnosticsSnapshot snapshot,
+            int maxUnits = 64,
+            int maxAiProfiles = 32)
+        {
+            int capUnits = maxUnits < 1 ? 1 : (maxUnits > 256 ? 256 : maxUnits);
+            int capProfiles = maxAiProfiles < 1 ? 1 : (maxAiProfiles > 128 ? 128 : maxAiProfiles);
+
+            var livingCountsById = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            try
+            {
+                ExistingControllers existing = ExistingControllers.Instance;
+                if (existing != null)
+                {
+                    var allEntities = new List<EntityController>();
+                    if (existing.PlayerUnits() != null) allEntities.AddRange(existing.PlayerUnits());
+                    if (existing.AiUnits() != null) allEntities.AddRange(existing.AiUnits());
+                    if (existing.PlayerBuildings() != null) allEntities.AddRange(existing.PlayerBuildings());
+                    if (existing.AiBuildings() != null) allEntities.AddRange(existing.AiBuildings());
+
+                    for (int i = 0; i < allEntities.Count; i++)
+                    {
+                        EntityController entity = allEntities[i];
+                        if (entity == null || entity.IsDestroyed || entity.DestroyHasBeenStarted) continue;
+                        string eid = ResolveEntityIdString(entity);
+                        if (!string.IsNullOrEmpty(eid))
+                        {
+                            int cur;
+                            livingCountsById.TryGetValue(eid, out cur);
+                            livingCountsById[eid] = cur + 1;
+                        }
+                    }
+                }
+            }
+            catch { }
+
+            var factoryMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            if (snapshot != null && snapshot.UnitFactories != null)
+            {
+                for (int i = 0; i < snapshot.UnitFactories.Count; i++)
+                {
+                    UnitFactoryDiagnosticReport uf = snapshot.UnitFactories[i];
+                    if (uf != null && !string.IsNullOrEmpty(uf.UnitId))
+                    {
+                        factoryMap[uf.UnitId] = uf.FactoryId ?? string.Empty;
+                    }
+                }
+            }
+
+            var unitRows = new List<LoaderUnitAuditRow>();
+            int totalUnits = snapshot != null && snapshot.Units != null ? snapshot.Units.Count : 0;
+            int warmedPoolUnits = 0;
+
+            if (snapshot != null && snapshot.Units != null)
+            {
+                for (int i = 0; i < snapshot.Units.Count; i++)
+                {
+                    UnitDiagnosticReport u = snapshot.Units[i];
+                    if (u == null || string.IsNullOrEmpty(u.UnitId)) continue;
+
+                    string factoryId;
+                    factoryMap.TryGetValue(u.UnitId, out factoryId);
+                    bool isBuilding = string.IsNullOrEmpty(factoryId);
+
+                    UnitRuntimeMechanicsProfile mechProfile;
+                    bool hasMech = RuntimeUnitMechanicsDirector.TryGetProfile(u.UnitId, out mechProfile) && mechProfile != null;
+                    string defStance = hasMech && !string.IsNullOrEmpty(mechProfile.DefaultTacticalStance) ? mechProfile.DefaultTacticalStance : string.Empty;
+                    string defLoadout = hasMech && !string.IsNullOrEmpty(mechProfile.DefaultLoadout) ? mechProfile.DefaultLoadout : string.Empty;
+                    int startVet = hasMech && mechProfile.StartingVeterancyRank.HasValue ? mechProfile.StartingVeterancyRank.Value : 0;
+
+                    LoadedPrefabVisualAuditRow auditRow;
+                    bool audited = RuntimeVisualCensus.TryGetLoadedPrefabAudit(u.UnitId, out auditRow);
+                    string rigType = audited && !string.IsNullOrEmpty(auditRow.RigType) ? auditRow.RigType : "StaticMesh";
+                    bool ambig = audited && auditRow.SocketAmbiguityCount > 0;
+
+                    int quota = 0;
+                    int warmed = 0;
+                    lock (_prespawnPoolQuotas)
+                    {
+                        _prespawnPoolQuotas.TryGetValue(u.UnitId, out quota);
+                        _prespawnPoolWarmed.TryGetValue(u.UnitId, out warmed);
+                    }
+                    if (quota > 0 || warmed > 0)
+                    {
+                        warmedPoolUnits++;
+                    }
+
+                    int living;
+                    livingCountsById.TryGetValue(u.UnitId, out living);
+
+                    if (unitRows.Count < capUnits)
+                    {
+                        unitRows.Add(new LoaderUnitAuditRow(
+                            u.UnitId,
+                            u.PackId ?? string.Empty,
+                            factoryId ?? string.Empty,
+                            isBuilding,
+                            hasMech,
+                            u.VariantCount,
+                            audited,
+                            rigType,
+                            ambig,
+                            quota,
+                            warmed,
+                            living,
+                            defStance,
+                            defLoadout,
+                            startVet));
+                    }
+                }
+            }
+
+            var aiRows = new List<LoaderAiProfileAuditRow>();
+            int totalAiProfiles = snapshot != null && snapshot.AiProfiles != null ? snapshot.AiProfiles.Count : 0;
+            int activeAiInstances = 0;
+
+            if (snapshot != null && snapshot.AiProfiles != null)
+            {
+                for (int i = 0; i < snapshot.AiProfiles.Count; i++)
+                {
+                    AiProfileDiagnosticReport p = snapshot.AiProfiles[i];
+                    if (p == null || string.IsNullOrEmpty(p.ProfileId)) continue;
+
+                    activeAiInstances += Math.Max(0, p.ActiveAiInstances);
+
+                    AiProfileUnitDefaultsRecord defRecord = null;
+                    lock (_aiProfileDefaultsGate)
+                    {
+                        _aiProfileUnitDefaults.TryGetValue(p.ProfileId, out defRecord);
+                    }
+
+                    string doctrine = defRecord != null && !string.IsNullOrEmpty(defRecord.Doctrine)
+                        ? defRecord.Doctrine
+                        : GetActiveAiDoctrine();
+                    float aggMult = defRecord != null
+                        ? defRecord.AggressionMultiplier
+                        : GetAiAggressionMultiplier();
+                    string defStance = defRecord != null ? defRecord.DefaultUnitStance : string.Empty;
+                    string defLoadout = defRecord != null ? defRecord.DefaultUnitLoadout : string.Empty;
+                    IReadOnlyList<string> startAffixes = defRecord != null && defRecord.StartingUnitAffixes != null
+                        ? defRecord.StartingUnitAffixes
+                        : Array.Empty<string>();
+                    int startVet = defRecord != null ? defRecord.StartingUnitVeterancyRank : 0;
+
+                    if (aiRows.Count < capProfiles)
+                    {
+                        aiRows.Add(new LoaderAiProfileAuditRow(
+                            p.ProfileId,
+                            p.PackId ?? string.Empty,
+                            p.PrefabAssetName ?? string.Empty,
+                            p.ModuleIds != null ? p.ModuleIds.Count : 0,
+                            p.ActiveAiInstances,
+                            doctrine,
+                            aggMult,
+                            defStance,
+                            defLoadout,
+                            startAffixes,
+                            startVet));
+                    }
+                }
+            }
+
+            int omittedUnits = Math.Max(0, totalUnits - unitRows.Count);
+            int omittedProfiles = Math.Max(0, totalAiProfiles - aiRows.Count);
+
+            return new LoaderRuntimeAuditCensus(
+                omittedUnits,
+                totalUnits,
+                omittedProfiles,
+                totalAiProfiles,
+                RuntimeUnitMechanicsDirector.RegisteredProfileCount,
+                RuntimeVisualCensus.AuditedPrefabCount,
+                warmedPoolUnits,
+                activeAiInstances,
+                unitRows.AsReadOnly(),
+                aiRows.AsReadOnly());
+        }
+
+        public static LoaderReconciliationResult TryReconcileLoaderRuntimeState(LoaderDiagnosticsSnapshot snapshot)
+        {
+            int reconciledUnits = 0;
+            int warmedPools = 0;
+            int attachedMechanics = 0;
+            int attachedVisuals = 0;
+            int appliedAiDefaults = 0;
+            int reconciledAiProfiles = 0;
+
+            try
+            {
+                // 1. Warm pre-spawn pools for all registered units in snapshot & mechanics profiles
+                var targetUnits = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                if (snapshot != null && snapshot.Units != null)
+                {
+                    for (int i = 0; i < snapshot.Units.Count; i++)
+                    {
+                        UnitDiagnosticReport u = snapshot.Units[i];
+                        if (u != null && !string.IsNullOrWhiteSpace(u.UnitId))
+                        {
+                            targetUnits.Add(u.UnitId.Trim());
+                        }
+                    }
+                }
+                IReadOnlyList<string> mechIds = RuntimeUnitMechanicsDirector.RegisteredProfileIds;
+                if (mechIds != null)
+                {
+                    for (int i = 0; i < mechIds.Count; i++)
+                    {
+                        if (!string.IsNullOrWhiteSpace(mechIds[i]))
+                        {
+                            targetUnits.Add(mechIds[i].Trim());
+                        }
+                    }
+                }
+
+                foreach (string unitId in targetUnits)
+                {
+                    reconciledUnits++;
+                    int quota = 0;
+                    lock (_prespawnPoolQuotas)
+                    {
+                        _prespawnPoolQuotas.TryGetValue(unitId, out quota);
+                    }
+                    int targetWarm = quota > 0 ? quota : 4;
+                    if (TryWarmPrespawnPool(unitId, targetWarm).Success)
+                    {
+                        warmedPools++;
+                    }
+                }
+
+                // 2. Reconcile active AI profiles and doctrine
+                AiProfileUnitDefaultsRecord activeAiRecord = null;
+                lock (_aiProfileDefaultsGate)
+                {
+                    reconciledAiProfiles = _aiProfileUnitDefaults.Count;
+                    if (!string.IsNullOrEmpty(_activeAiProfileId))
+                    {
+                        _aiProfileUnitDefaults.TryGetValue(_activeAiProfileId, out activeAiRecord);
+                    }
+                }
+                if (snapshot != null && snapshot.AiProfiles != null)
+                {
+                    reconciledAiProfiles = Math.Max(reconciledAiProfiles, snapshot.AiProfiles.Count);
+                }
+                if (activeAiRecord != null && !string.IsNullOrEmpty(activeAiRecord.Doctrine))
+                {
+                    TrySetAiDoctrine(activeAiRecord.Doctrine, activeAiRecord.AggressionMultiplier);
+                }
+
+                // 3. Reconcile living entities on the battlefield (VisualDirector + UnitMechanicsDirector + AI squad defaults)
+                ExistingControllers existing = ExistingControllers.Instance;
+                if (existing != null)
+                {
+                    var entities = new List<EntityController>();
+                    if (existing.PlayerUnits() != null) entities.AddRange(existing.PlayerUnits());
+                    if (existing.AiUnits() != null) entities.AddRange(existing.AiUnits());
+                    if (existing.PlayerBuildings() != null) entities.AddRange(existing.PlayerBuildings());
+                    if (existing.AiBuildings() != null) entities.AddRange(existing.AiBuildings());
+
+                    for (int i = 0; i < entities.Count; i++)
+                    {
+                        EntityController entity = entities[i];
+                        if (entity == null || entity.IsDestroyed || entity.DestroyHasBeenStarted)
+                        {
+                            continue;
+                        }
+
+                        try
+                        {
+                            Type visualDirType = Type.GetType("RogueCommandExpansionLoader.Runtime.Visual.RuntimeVisualDirector, RogueCommandExpansionLoader", false);
+                            if (visualDirType != null)
+                            {
+                                MethodInfo attachMethod = visualDirType.GetMethod("AttachIfApplicable", BindingFlags.Public | BindingFlags.Static);
+                                if (attachMethod != null)
+                                {
+                                    attachMethod.Invoke(null, new object[] { entity });
+                                }
+                                if (entity.gameObject != null)
+                                {
+                                    MethodInfo getCompMethod = typeof(GameObject).GetMethod("GetComponent", new[] { typeof(Type) });
+                                    object comp = getCompMethod != null
+                                        ? getCompMethod.Invoke(entity.gameObject, new object[] { visualDirType })
+                                        : entity.gameObject.GetComponent(visualDirType.Name);
+                                    if (comp != null)
+                                    {
+                                        attachedVisuals++;
+                                    }
+                                }
+                            }
+                        }
+                        catch { }
+
+                        try
+                        {
+                            RuntimeUnitMechanicsDirector.AttachIfApplicable(entity);
+                            if (entity.gameObject != null)
+                            {
+                                RuntimeUnitMechanicsDirector mechDir = entity.gameObject.GetComponent<RuntimeUnitMechanicsDirector>();
+                                if (mechDir != null)
+                                {
+                                    mechDir.TickMechanics();
+                                    attachedMechanics++;
+                                }
+                            }
+                        }
+                        catch { }
+
+                        if (!entity.IsControlledByPlayer)
+                        {
+                            appliedAiDefaults += ApplyAiProfileUnitDefaultsToEntity(entity);
+                        }
+                    }
+                }
+
+                string msg = "Reconciled " + reconciledUnits + " unit(s), warmed " + warmedPools +
+                             " pool(s), synchronized " + attachedMechanics + " mechanics director(s), " +
+                             attachedVisuals + " visual director(s), and applied AI squad defaults to " +
+                             appliedAiDefaults + " AI unit(s) across " + reconciledAiProfiles + " AI profile(s).";
+                return new LoaderReconciliationResult(
+                    true,
+                    reconciledUnits,
+                    warmedPools,
+                    attachedMechanics,
+                    attachedVisuals,
+                    appliedAiDefaults,
+                    reconciledAiProfiles,
+                    msg);
+            }
+            catch (Exception ex)
+            {
+                return new LoaderReconciliationResult(
+                    false,
+                    reconciledUnits,
+                    warmedPools,
+                    attachedMechanics,
+                    attachedVisuals,
+                    appliedAiDefaults,
+                    reconciledAiProfiles,
+                    "Error reconciling loader runtime state: " + ex.Message);
+            }
+        }
+
         public static void ClearTacticalStancesAndAffixes()
         {
             lock (_activeTacticalStances)
@@ -6908,6 +7468,7 @@ namespace RogueCommandExpansionLoader.Runtime
             {
                 _activeUnitAffixes.Clear();
             }
+            ClearAiProfileUnitDefaults();
         }
 
 }

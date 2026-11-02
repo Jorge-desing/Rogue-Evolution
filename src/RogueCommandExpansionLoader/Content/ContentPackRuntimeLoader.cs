@@ -2370,11 +2370,21 @@ namespace RogueCommandExpansionLoader.Content
             try
             {
                 bound.RuntimeBehaviour.OnInitialized();
+                RuntimeGameplayCommandDirector.RegisterAiProfileUnitDefaults(
+                    profile.Definition.id,
+                    profile.Definition.doctrine,
+                    profile.Definition.aggressionMultiplier,
+                    profile.Definition.defaultUnitStance,
+                    profile.Definition.defaultUnitLoadout,
+                    profile.Definition.startingUnitAffixes,
+                    profile.Definition.startingUnitVeterancyRank,
+                    true);
                 if (!String.IsNullOrWhiteSpace(profile.Definition.doctrine))
                 {
                     float mult = profile.Definition.aggressionMultiplier ?? 1.0f;
                     RuntimeGameplayCommandDirector.TrySetAiDoctrine(profile.Definition.doctrine, mult);
                 }
+                RuntimeGameplayCommandDirector.ApplyActiveAiUnitDefaultsToAiUnits();
                 // Apply AI overrides from units referenced in this profile and warm their pre-spawn pools
                 if (profile.Definition.unitEntries != null)
                 {
@@ -4544,6 +4554,15 @@ namespace RogueCommandExpansionLoader.Content
             {
                 _aiProfiles.Add(profiles[i].Id, profiles[i]);
                 _aiProfilesByResourceName.Add(profiles[i].ResourceName, profiles[i]);
+                RuntimeGameplayCommandDirector.RegisterAiProfileUnitDefaults(
+                    profiles[i].Id,
+                    profiles[i].Definition.doctrine,
+                    profiles[i].Definition.aggressionMultiplier,
+                    profiles[i].Definition.defaultUnitStance,
+                    profiles[i].Definition.defaultUnitLoadout,
+                    profiles[i].Definition.startingUnitAffixes,
+                    profiles[i].Definition.startingUnitVeterancyRank,
+                    false);
                 if (!String.IsNullOrWhiteSpace(profiles[i].Definition.doctrine))
                 {
                     float mult = profiles[i].Definition.aggressionMultiplier ?? 1.0f;

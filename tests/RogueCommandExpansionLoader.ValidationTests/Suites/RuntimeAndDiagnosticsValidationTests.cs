@@ -7029,3 +7029,222 @@ internal static partial class ValidationTestRunner
     }),
     };
 }
+    ("AI profile squad defaults validate, clone, apply to non-player units while respecting unit-level overrides, and loader audit census + reconciliation operate cleanly", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        RuntimeUnitMechanicsDirector.ClearProfiles();
+        RuntimeGameplayCommandDirector.ClearTacticalStancesAndAffixes();
+        RuntimeVisualCensus.ClearLoadedPrefabAudits();
+
+        var invalidPack = new ContentPackDefinition
+        {
+            schemaVersion = 1,
+            packId = "sample:invalid-ai-defaults",
+            assetBundles = Array.Empty<ContentAssetBundleDefinition>(),
+            units = Array.Empty<ContentUnitDefinition>(),
+            stages = Array.Empty<ContentStageDefinition>(),
+            aiProfiles = new[]
+            {
+                new ContentAiProfileDefinition
+                {
+                    id = "sample:invalid-ai",
+                    nativeTemplateId = "EnemyBase",
+                    defaultUnitStance = "Berserk",
+                    defaultUnitLoadout = "Nuclear",
+                    startingUnitAffixes = new[] { "Swift", "Swift", "InvalidAffix" },
+                    startingUnitVeterancyRank = 9,
+                    unitEntries = new[]
+                    {
+                        new ContentAiUnitEntryDefinition { unitId = "PCXBaseTank", baseIndex = 0, countAtStart = 1, maxLiving = 2 }
+                    },
+                    productionBuildingEntries = Array.Empty<ContentAiProductionBuildingEntryDefinition>(),
+                    modules = Array.Empty<ContentAiModuleDefinition>()
+                }
+            }
+        };
+
+        var invalidResult = ContentPackValidator.Validate(invalidPack, repositoryRoot, new EmptySnapshot(), new KnownModuleValidator());
+        bool hasStanceErr = false, hasLoadoutErr = false, hasAffixDupErr = false, hasAffixInvErr = false, hasVetErr = false;
+        foreach (var d in invalidResult.Diagnostics)
+        {
+            if (d.Code == "ai-profile.defaultUnitStance-invalid") hasStanceErr = true;
+            if (d.Code == "ai-profile.defaultUnitLoadout-invalid") hasLoadoutErr = true;
+            if (d.Code == "ai-profile.startingUnitAffixes-duplicate") hasAffixDupErr = true;
+            if (d.Code == "ai-profile.startingUnitAffixes-invalid") hasAffixInvErr = true;
+            if (d.Code == "ai-profile.startingUnitVeterancyRank-invalid") hasVetErr = true;
+        }
+        if (!hasStanceErr || !hasLoadoutErr || !hasAffixDupErr || !hasAffixInvErr || !hasVetErr)
+        {
+            throw new InvalidOperationException("Expected AI profile squad default validation diagnostics were not emitted.");
+        }
+
+        var validPack = new ContentPackDefinition
+        {
+            schemaVersion = 1,
+            packId = "sample:valid-ai-defaults",
+            assetBundles = Array.Empty<ContentAssetBundleDefinition>(),
+            units = Array.Empty<ContentUnitDefinition>(),
+            stages = Array.Empty<ContentStageDefinition>(),
+            aiProfiles = new[]
+            {
+                new ContentAiProfileDefinition
+                {
+                    id = "sample:valid-ai",
+                    nativeTemplateId = "EnemyBase",
+                    doctrine = "Assault",
+                    aggressionMultiplier = 1.25f,
+                    defaultUnitStance = "Aggressive",
+                    defaultUnitLoadout = "AP",
+                    startingUnitAffixes = new[] { "Swift", "Bulwark" },
+                    startingUnitVeterancyRank = 2,
+                    unitEntries = new[]
+                    {
+                        new ContentAiUnitEntryDefinition { unitId = "sample:ai-grunt", baseIndex = 0, countAtStart = 1, maxLiving = 2 }
+                    },
+                    productionBuildingEntries = Array.Empty<ContentAiProductionBuildingEntryDefinition>(),
+                    modules = Array.Empty<ContentAiModuleDefinition>()
+                }
+            }
+        };
+
+        var clonedPack = ContentPackCopy.DeepClone(validPack);
+        var clonedAi = clonedPack.aiProfiles[0];
+        if (clonedAi.defaultUnitStance != "Aggressive" ||
+            clonedAi.defaultUnitLoadout != "AP" ||
+            clonedAi.startingUnitVeterancyRank != 2 ||
+            clonedAi.startingUnitAffixes == null ||
+            clonedAi.startingUnitAffixes.Length != 2 ||
+            clonedAi.startingUnitAffixes[0] != "Swift" ||
+            clonedAi.startingUnitAffixes[1] != "Bulwark")
+        {
+            throw new InvalidOperationException("ContentPackCopy.DeepClone did not deep-copy AI profile squad defaults.");
+        }
+
+        RuntimeGameplayCommandDirector.RegisterAiProfileUnitDefaults(
+            "sample:valid-ai",
+            "Assault",
+            1.25f,
+            "Aggressive",
+            "AP",
+            new[] { "Swift", "Bulwark" },
+            2,
+            setActive: true);
+
+        var aiUnitGo = new GameObject("AiGruntUnit");
+        var aiUnit = aiUnitGo.AddComponent<EntityController>();
+        aiUnit.entityId = "sample:ai-grunt";
+        aiUnit.UniqueEntityId = 2001;
+        aiUnit.IsControlledByPlayer = false;
+        aiUnit.IsUnit = true;
+        aiUnit.IsCombatUnit = true;
+        aiUnit.CanAttackAndIsAttackEnabled = true;
+        aiUnit.CanMoveAndMovementIsEnabled = true;
+        aiUnit.MaxHealth = 300f;
+        aiUnit.CurrentHealth = 300f;
+        aiUnit.MaxRank = 5;
+        aiUnit.CurrentRank = 0;
+        ExistingControllers.Instance.AiUnits().Add(aiUnit);
+
+        var playerUnitGo = new GameObject("PlayerGruntUnit");
+        var playerUnit = playerUnitGo.AddComponent<EntityController>();
+        playerUnit.entityId = "sample:ai-grunt";
+        playerUnit.UniqueEntityId = 2002;
+        playerUnit.IsControlledByPlayer = true;
+        playerUnit.IsUnit = true;
+        playerUnit.IsCombatUnit = true;
+        playerUnit.MaxHealth = 300f;
+        playerUnit.CurrentHealth = 300f;
+        playerUnit.MaxRank = 5;
+        playerUnit.CurrentRank = 0;
+        ExistingControllers.Instance.PlayerUnits().Add(playerUnit);
+
+        RuntimeGameplayCommandDirector.ApplyAiProfileUnitDefaultsToEntity(aiUnit);
+        RuntimeGameplayCommandDirector.ApplyAiProfileUnitDefaultsToEntity(playerUnit);
+
+        if (RuntimeGameplayCommandDirector.GetUnitTacticalStance("2001") != "Aggressive")
+        {
+            throw new InvalidOperationException("AI squad default stance was not applied to AI unit.");
+        }
+        if (RuntimeGameplayCommandDirector.GetUnitTacticalStance("2002") != "Standard")
+        {
+            throw new InvalidOperationException("AI squad default stance should not apply to player-controlled units.");
+        }
+
+        UnitAffixCensus affixCensus = RuntimeGameplayCommandDirector.GetUnitAffixCensus(32);
+        bool hasAffixesOnAiUnit = false;
+        foreach (var row in affixCensus.AffixRows)
+        {
+            if (row.EntityKeyId == "2001" && row.Affixes.Count == 2)
+            {
+                hasAffixesOnAiUnit = true;
+                break;
+            }
+        }
+        if (!hasAffixesOnAiUnit)
+        {
+            throw new InvalidOperationException("AI squad starting affixes were not applied to AI unit.");
+        }
+
+        var snapshot = new LoaderDiagnosticsSnapshot(
+            "1.0.9",
+            true,
+            true,
+            1,
+            0,
+            0L,
+            Array.Empty<PackDiagnosticReport>(),
+            new[]
+            {
+                new UnitDiagnosticReport("sample:ai-grunt", "sample:valid-ai-defaults", "prefab", "img", true)
+            },
+            Array.Empty<StageDiagnosticReport>(),
+            new[]
+            {
+                new AiProfileDiagnosticReport("sample:valid-ai", "sample:valid-ai-defaults", "prefab", new[] { "sample:adaptive-commander" }, 1)
+            },
+            new[]
+            {
+                new UnitFactoryDiagnosticReport("sample:ai-grunt", "sample:ai-grunt-factory", true, "OK")
+            },
+            Array.Empty<StagePoolScopeDiagnosticReport>(),
+            Array.Empty<AiProfileStageRangeDiagnosticReport>(),
+            Array.Empty<string>());
+
+        LoaderRuntimeAuditCensus auditCensus = RuntimeGameplayCommandDirector.GetLoaderRuntimeAuditCensus(snapshot, 64, 32);
+        if (auditCensus.TotalRegisteredUnits != 1 || auditCensus.TotalRegisteredAiProfiles != 1)
+        {
+            throw new InvalidOperationException("LoaderRuntimeAuditCensus did not report expected unit and AI profile counts.");
+        }
+        if (auditCensus.AiProfileRows[0].DefaultUnitStance != "Aggressive" ||
+            auditCensus.AiProfileRows[0].DefaultUnitLoadout != "AP" ||
+            auditCensus.AiProfileRows[0].StartingUnitVeterancyRank != 2)
+        {
+            throw new InvalidOperationException("LoaderAiProfileAuditRow did not surface registered AI squad defaults.");
+        }
+
+        string auditJson = AgentDiagnosticsFormatter.SerializeLoaderRuntimeAuditCensus(auditCensus);
+        int omittedUnitIdx = auditJson.IndexOf("\"omittedUnitCount\":0", StringComparison.Ordinal);
+        int omittedAiIdx = auditJson.IndexOf("\"omittedAiProfileCount\":0", StringComparison.Ordinal);
+        int unitRowsIdx = auditJson.IndexOf("\"units\"", StringComparison.Ordinal);
+        int aiRowsIdx = auditJson.IndexOf("\"aiProfiles\"", StringComparison.Ordinal);
+        if (omittedUnitIdx < 0 || omittedAiIdx < 0 || unitRowsIdx < 0 || aiRowsIdx < 0 || omittedUnitIdx > unitRowsIdx || omittedAiIdx > unitRowsIdx)
+        {
+            throw new InvalidOperationException("Omission counters must strictly precede units and aiProfiles in loaderRuntimeAuditCensus JSON.");
+        }
+
+        LoaderReconciliationResult reconcileResult = RuntimeGameplayCommandDirector.TryReconcileLoaderRuntimeState(snapshot);
+        if (!reconcileResult.Success || reconcileResult.ReconciledUnitCount < 1)
+        {
+            throw new InvalidOperationException($"TryReconcileLoaderRuntimeState failed: success={reconcileResult.Success}, msg={reconcileResult.Message}");
+        }
+
+        string reconcileJson = AgentDiagnosticsFormatter.SerializeLoaderReconciliationResult(reconcileResult);
+        if (!reconcileJson.Contains("\"kind\":\"loaderReconciliationResult\"", StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("SerializeLoaderReconciliationResult did not include expected kind.");
+        }
+
+        ExistingControllers.Instance.Reset();
+        RuntimeUnitMechanicsDirector.ClearProfiles();
+        RuntimeGameplayCommandDirector.ClearTacticalStancesAndAffixes();
+    }),

@@ -936,6 +936,10 @@ namespace RogueCommandExpansionLoader.Content
         public ContentAiModuleDefinition[] modules;
         public string doctrine;
         public float? aggressionMultiplier;
+        public string defaultUnitStance;
+        public string defaultUnitLoadout;
+        public string[] startingUnitAffixes;
+        public int? startingUnitVeterancyRank;
     }
 
     [Serializable]
@@ -1582,7 +1586,11 @@ namespace RogueCommandExpansionLoader.Content
                     CloneAiProductionBuildingEntry),
                 modules = CloneArray(source.modules, CloneAiModule),
                 doctrine = source.doctrine,
-                aggressionMultiplier = source.aggressionMultiplier
+                aggressionMultiplier = source.aggressionMultiplier,
+                defaultUnitStance = source.defaultUnitStance,
+                defaultUnitLoadout = source.defaultUnitLoadout,
+                startingUnitAffixes = source.startingUnitAffixes != null ? (string[])source.startingUnitAffixes.Clone() : null,
+                startingUnitVeterancyRank = source.startingUnitVeterancyRank
             };
         }
 

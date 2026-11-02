@@ -930,7 +930,8 @@ internal static partial class ValidationTestRunner
         int exitCode;
         using (var process = new System.Diagnostics.Process())
         {
-            process.StartInfo.FileName = ".venv/Scripts/python.exe";
+            string venvPython = Path.Combine(repositoryRoot, ".venv", "Scripts", "python.exe");
+            process.StartInfo.FileName = File.Exists(venvPython) ? venvPython : "python";
             process.StartInfo.Arguments = "tools/validate_loader_registry.py";
             process.StartInfo.UseShellExecute = false;
             process.StartInfo.RedirectStandardOutput = true;

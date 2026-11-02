@@ -152,7 +152,7 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
 
         snapshot = json.loads(response["content"][0]["text"])
         self.assertFalse(response["isError"])
-        self.assertEqual(23, len(snapshot))
+        self.assertEqual(24, len(snapshot))
         self.assertTrue(all(isinstance(value, dict) for value in snapshot.values()))
         self.assertTrue(all(value == expected for value in snapshot.values()))
 
@@ -253,6 +253,36 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
         self.assertEqual(["test:arachnid"], calls[1][1])
         self.assertEqual("GetLoadedPrefabVisualAuditJson", calls[2][0])
         self.assertEqual([32], calls[2][1])
+
+    def test_loader_audit_census_and_reconcile_tools(self) -> None:
+        calls: list[tuple[str, list[object]]] = []
+
+        def fake_http(endpoint: str, params: dict[str, object] | None = None, **_: object) -> str:
+            params = params or {}
+            method = str(params.get("methodName", ""))
+            raw_args = json.loads(str(params.get("args", "[]")))
+            calls.append((method, raw_args))
+            payload = {"kind": "loaderRuntimeAuditCensus", "omittedUnitCount": 0, "omittedAiProfileCount": 0}
+            return json.dumps({
+                "status": "ok",
+                "message": f"Called '{method}' with {len(raw_args)} args. ReturnValue: {json.dumps(payload)}"
+            })
+
+        with (
+            mock.patch.object(SERVER, "_DIAGNOSTICS_GO_ID", 73),
+            mock.patch.object(SERVER, "_call_http", side_effect=fake_http),
+        ):
+            resp1 = SERVER.execute_tool("diagnostics_get_loader_audit_census", {"maxUnits": 24, "maxAiProfiles": 12})
+            self.assertFalse(resp1["isError"])
+
+            resp2 = SERVER.execute_tool("diagnostics_order_reconcile_loader_state", {})
+            self.assertFalse(resp2["isError"])
+
+        self.assertEqual(2, len(calls))
+        self.assertEqual("GetLoaderAuditCensusJson", calls[0][0])
+        self.assertEqual([24, 12], calls[0][1])
+        self.assertEqual("OrderReconcileLoaderStateJson", calls[1][0])
+        self.assertEqual([], calls[1][1])
 
     def test_generate_agent_configs(self) -> None:
         configs = SERVER.generate_agent_configs()

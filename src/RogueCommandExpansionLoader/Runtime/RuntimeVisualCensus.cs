@@ -496,6 +496,20 @@ namespace RogueCommandExpansionLoader.Runtime
             }
         }
 
+        public static bool TryGetLoadedPrefabAudit(string entityId, out LoadedPrefabVisualAuditRow row)
+        {
+            if (string.IsNullOrWhiteSpace(entityId))
+            {
+                row = default(LoadedPrefabVisualAuditRow);
+                return false;
+            }
+
+            lock (PrefabAuditGate)
+            {
+                return AuditedPrefabsById.TryGetValue(entityId.Trim(), out row);
+            }
+        }
+
         public static LoadedPrefabVisualAuditRow RegisterLoadedPrefabVisualAudit(string entityId, GameObject prefabRoot)
         {
             if (string.IsNullOrWhiteSpace(entityId) || prefabRoot == null)

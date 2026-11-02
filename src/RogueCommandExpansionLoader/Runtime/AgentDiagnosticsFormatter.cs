@@ -2666,6 +2666,8 @@ new Dictionary<string, object> { ["name"] = "OrderRetreatJson", ["description"] 
                 new Dictionary<string, object> { ["name"] = "AcquireAgentLockJson", ["description"] = "Acquire or renew an advisory lock on a game resource." },
                 new Dictionary<string, object> { ["name"] = "ReleaseAgentLockJson", ["description"] = "Release an advisory lock on a game resource." },
                 new Dictionary<string, object> { ["name"] = "GetLoadedPrefabVisualAuditJson", ["description"] = "Load-time visual, rig, shader, and socket audit for loaded unit and building prefabs." },
+                new Dictionary<string, object> { ["name"] = "GetLoaderAuditCensusJson", ["description"] = "Runtime readiness audit of loader-registered units, buildings, pre-spawn pools, and AI profiles." },
+                new Dictionary<string, object> { ["name"] = "OrderReconcileLoaderStateJson", ["description"] = "Actively reconcile loader runtime state: warm pre-spawn pools, attach visual/mechanics directors, and apply AI squad defaults." },
                 new Dictionary<string, object> { ["name"] = "GetDiagnosticCatalogJson", ["description"] = "Catalog of available diagnostic getters." },
             };
 
@@ -2674,6 +2676,92 @@ new Dictionary<string, object> { ["name"] = "OrderRetreatJson", ["description"] 
                 ["kind"] = "diagnosticCatalog",
                 ["diagnosticCount"] = diagnostics.Count,
                 ["diagnostics"] = diagnostics,
+            };
+            return Serialize(view);
+        }
+
+        public static string SerializeLoaderRuntimeAuditCensus(LoaderRuntimeAuditCensus census)
+        {
+            var unitRows = new List<Dictionary<string, object>>();
+            if (census != null && census.UnitRows != null)
+            {
+                for (int i = 0; i < census.UnitRows.Count; i++)
+                {
+                    LoaderUnitAuditRow r = census.UnitRows[i];
+                    unitRows.Add(new Dictionary<string, object>
+                    {
+                        ["unitId"] = r.UnitId ?? string.Empty,
+                        ["packId"] = r.PackId ?? string.Empty,
+                        ["factoryId"] = r.FactoryId ?? string.Empty,
+                        ["isBuilding"] = r.IsBuilding,
+                        ["hasMechanicsProfile"] = r.HasMechanicsProfile,
+                        ["variantCount"] = r.VariantCount,
+                        ["prefabAudited"] = r.PrefabAudited,
+                        ["rigType"] = r.RigType ?? "StaticMesh",
+                        ["hasAmbiguousSockets"] = r.HasAmbiguousSockets,
+                        ["targetPrespawnQuota"] = r.TargetPrespawnQuota,
+                        ["prespawnedPoolCount"] = r.PrespawnedPoolCount,
+                        ["livingCount"] = r.LivingCount,
+                        ["defaultStance"] = r.DefaultStance ?? string.Empty,
+                        ["defaultLoadout"] = r.DefaultLoadout ?? string.Empty,
+                        ["startingVeterancyRank"] = r.StartingVeterancyRank,
+                    });
+                }
+            }
+
+            var aiRows = new List<Dictionary<string, object>>();
+            if (census != null && census.AiProfileRows != null)
+            {
+                for (int i = 0; i < census.AiProfileRows.Count; i++)
+                {
+                    LoaderAiProfileAuditRow p = census.AiProfileRows[i];
+                    aiRows.Add(new Dictionary<string, object>
+                    {
+                        ["profileId"] = p.ProfileId ?? string.Empty,
+                        ["packId"] = p.PackId ?? string.Empty,
+                        ["prefabAssetName"] = p.PrefabAssetName ?? string.Empty,
+                        ["moduleCount"] = p.ModuleCount,
+                        ["activeInstanceCount"] = p.ActiveInstanceCount,
+                        ["doctrine"] = p.Doctrine ?? "Standard",
+                        ["aggressionMultiplier"] = p.AggressionMultiplier,
+                        ["defaultUnitStance"] = p.DefaultUnitStance ?? string.Empty,
+                        ["defaultUnitLoadout"] = p.DefaultUnitLoadout ?? string.Empty,
+                        ["startingUnitAffixes"] = p.StartingUnitAffixes != null ? p.StartingUnitAffixes : (object)Array.Empty<string>(),
+                        ["startingUnitVeterancyRank"] = p.StartingUnitVeterancyRank,
+                    });
+                }
+            }
+
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "loaderRuntimeAuditCensus",
+                ["omittedUnitCount"] = census != null ? census.OmittedUnitCount : 0,
+                ["totalRegisteredUnits"] = census != null ? census.TotalRegisteredUnits : 0,
+                ["omittedAiProfileCount"] = census != null ? census.OmittedAiProfileCount : 0,
+                ["totalRegisteredAiProfiles"] = census != null ? census.TotalRegisteredAiProfiles : 0,
+                ["mechanicsProfileCount"] = census != null ? census.MechanicsProfileCount : 0,
+                ["auditedPrefabCount"] = census != null ? census.AuditedPrefabCount : 0,
+                ["warmedPoolUnitCount"] = census != null ? census.WarmedPoolUnitCount : 0,
+                ["activeAiInstanceCount"] = census != null ? census.ActiveAiInstanceCount : 0,
+                ["units"] = unitRows,
+                ["aiProfiles"] = aiRows,
+            };
+            return Serialize(view);
+        }
+
+        public static string SerializeLoaderReconciliationResult(LoaderReconciliationResult result)
+        {
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "loaderReconciliationResult",
+                ["success"] = result.Success,
+                ["reconciledUnitCount"] = result.ReconciledUnitCount,
+                ["warmedPoolCount"] = result.WarmedPoolCount,
+                ["attachedMechanicsCount"] = result.AttachedMechanicsCount,
+                ["attachedVisualDirectorCount"] = result.AttachedVisualDirectorCount,
+                ["appliedAiUnitDefaultsCount"] = result.AppliedAiUnitDefaultsCount,
+                ["reconciledAiProfileCount"] = result.ReconciledAiProfileCount,
+                ["message"] = result.Message ?? string.Empty,
             };
             return Serialize(view);
         }

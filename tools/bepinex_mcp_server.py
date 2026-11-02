@@ -1213,6 +1213,7 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
                 "GetSelectionCensusJson",
                 "GetVisualRenderCensusJson",
                 "GetLoadedPrefabVisualAuditJson",
+                "GetLoaderAuditCensusJson",
             ]
             for getter in getters:
                 try:
@@ -1244,6 +1245,16 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
         elif name == "diagnostics_get_loaded_unit_visual_audit":
             max_entries = int(arguments.get("maxEntries", 64))
             res = _call_diagnostics_method("GetLoadedPrefabVisualAuditJson", [max_entries])
+            return _tool_response(res)
+
+        elif name == "diagnostics_get_loader_audit_census":
+            max_units = int(arguments.get("maxUnits", 64))
+            max_ai_profiles = int(arguments.get("maxAiProfiles", 32))
+            res = _call_diagnostics_method("GetLoaderAuditCensusJson", [max_units, max_ai_profiles])
+            return _tool_response(res)
+
+        elif name == "diagnostics_order_reconcile_loader_state":
+            res = _call_diagnostics_method("OrderReconcileLoaderStateJson")
             return _tool_response(res)
 
         elif name == "diagnostics_get_battlefield_census":
