@@ -440,6 +440,15 @@ namespace RogueCommandExpansionLoader.Runtime
             EnsureReflection(entityObj.GetType());
             int currentRank = ReadIntProperty(_currentRankProperty, entityObj, 0);
             int maxRank = ReadIntProperty(_maxRankProperty, entityObj, 3);
+            string entityId = ReadEntityId(entityObj);
+            UnitRuntimeMechanicsProfile profile;
+            if (TryGetProfile(entityId, out profile) && profile != null && profile.Experience != null)
+            {
+                if (profile.Experience.maxLevel > 0)
+                {
+                    maxRank = profile.Experience.maxLevel;
+                }
+            }
             int clampedTarget = (int)Mathf.Clamp((float)targetRank, 0f, (float)maxRank);
 
             if (clampedTarget > currentRank)
@@ -2442,6 +2451,8 @@ namespace RogueCommandExpansionLoader.Runtime
 
             }
 
+
+            TriggerVisualFeedback(sourceObj, 0.35f);
 
             Vector3 sourcePosition = ReadVector3Property(_positionProperty, sourceObj);
 

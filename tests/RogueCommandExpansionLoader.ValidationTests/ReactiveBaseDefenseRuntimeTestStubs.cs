@@ -120,6 +120,7 @@ public sealed class EntityController : Component
     public float CurrentArmor { get; set; } = 0f;
     public float MaxArmor { get; set; } = 0f;
     public float DeltaArmor => MaxArmor - CurrentArmor;
+    public bool HasActiveSkill { get; set; } = true;
     public bool HasShield { get; set; }
     public float CurrentShield { get; set; } = 0f;
     public float MaxShield { get; set; } = 0f;

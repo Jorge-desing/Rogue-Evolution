@@ -1235,7 +1235,8 @@ namespace RogueCommandExpansionLoader.Runtime
                         Vector3 p2 = (Vector3)_entityControllerPositionProperty.GetValue(__0, null);
                         float dx = p1.x - p2.x;
                         float dz = p1.z - p2.z;
-                        if ((dx * dx + dz * dz) < (minRange.Value * minRange.Value))
+                        float worldMinRange = minRange.Value <= 25f ? minRange.Value * 10f : minRange.Value;
+                        if ((dx * dx + dz * dz) < (worldMinRange * worldMinRange))
                         {
                             __result = false;
                         }

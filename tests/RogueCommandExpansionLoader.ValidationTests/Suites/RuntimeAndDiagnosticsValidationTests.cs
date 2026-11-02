@@ -7380,5 +7380,181 @@ internal static partial class ValidationTestRunner
         RuntimeUnitMechanicsDirector.ClearProfiles();
         RuntimeGameplayCommandDirector.ClearTacticalStancesAndAffixes();
     }),
+    ("artillery minAttackRange dead-zone scales from cells to world coordinates in EntityAttackIsTargetInRangePostfix", () =>
+    {
+        try
+        {
+            var attacker = new EntityController
+            {
+                entityId = "test:siege-artillery",
+                UniqueEntityId = 701,
+                Position = new UnityEngine.Vector3(0f, 0f, 0f)
+            };
+            var insideDeadzoneTarget = new EntityController
+            {
+                entityId = "test:deadzone-target",
+                UniqueEntityId = 702,
+                Position = new UnityEngine.Vector3(30f, 0f, 0f)
+            };
+            var outsideDeadzoneTarget = new EntityController
+            {
+                entityId = "test:outside-target",
+                UniqueEntityId = 703,
+                Position = new UnityEngine.Vector3(50f, 0f, 0f)
+            };
+
+            // 4.5 cells = 45 world units. At 30m, target is inside the dead-zone (30 < 45).
+            RuntimeHooks.MinAttackRangeResolver = id => id == "test:siege-artillery" ? 4.5f : null;
+
+            var attackComponent = new TestEntityAttackStub(attacker);
+
+            bool resultInside = true;
+            RuntimeHooks.EntityAttackIsTargetInRangePostfix(attackComponent, insideDeadzoneTarget, ref resultInside);
+            if (resultInside)
+            {
+                throw new InvalidOperationException("Target at 30m should be rejected within 4.5-cell (45m) dead-zone.");
+            }
+
+            bool resultOutside = true;
+            RuntimeHooks.EntityAttackIsTargetInRangePostfix(attackComponent, outsideDeadzoneTarget, ref resultOutside);
+            if (!resultOutside)
+            {
+                throw new InvalidOperationException("Target at 50m should be accepted outside 4.5-cell (45m) dead-zone.");
+            }
+        }
+        finally
+        {
+            RuntimeHooks.MinAttackRangeResolver = null;
+        }
+    }),
+    ("TryOrderActiveSkill validates HasActiveSkill on caster unit", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        try
+        {
+            var caster = new EntityController
+            {
+                entityId = "test:passive-caster",
+                UniqueEntityId = 710,
+                IsControlledByPlayer = true,
+                IsUnit = true,
+                HasActiveSkill = false,
+                Position = new UnityEngine.Vector3(0f, 0f, 0f)
+            };
+            ExistingControllers.Instance.PlayerUnits().Add(caster);
+
+            string key = caster.UniqueEntityId.ToString();
+            var failResult = RuntimeGameplayCommandDirector.TryOrderActiveSkill(key);
+            if (failResult.Success)
+            {
+                throw new InvalidOperationException("TryOrderActiveSkill should fail when HasActiveSkill is false.");
+            }
+            if (!failResult.Message.Contains("does not possess an active skill", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException($"Expected lack of active skill message, got: {failResult.Message}");
+            }
+
+            caster.HasActiveSkill = true;
+            var successResult = RuntimeGameplayCommandDirector.TryOrderActiveSkill(key);
+            if (!successResult.Success)
+            {
+                throw new InvalidOperationException($"TryOrderActiveSkill should succeed when HasActiveSkill is true, got: {successResult.Message}");
+            }
+        }
+        finally
+        {
+            ExistingControllers.Instance.Reset();
+        }
+    }),
+    ("TrySetUnitVeterancyRank resolves profile maxLevel when clamping rank", () =>
+    {
+        RuntimeUnitMechanicsDirector.ClearProfiles();
+        ExistingControllers.Instance.Reset();
+        try
+        {
+            RuntimeUnitMechanicsDirector.RegisterProfile("test:custom-vet-unit", new UnitRuntimeMechanicsProfile
+            {
+                EntityId = "test:custom-vet-unit",
+                Experience = new ContentUnitExperienceDefinition
+                {
+                    experiencePerLevel = 2,
+                    maxLevel = 2
+                }
+            });
+
+            var unit = new EntityController
+            {
+                entityId = "test:custom-vet-unit",
+                UniqueEntityId = 720,
+                IsControlledByPlayer = true,
+                IsUnit = true,
+                CurrentRank = 0,
+                MaxRank = 3
+            };
+
+            bool success = RuntimeUnitMechanicsDirector.TrySetUnitVeterancyRank(unit, 3, out int resultingRank);
+            if (!success || resultingRank != 2)
+            {
+                throw new InvalidOperationException($"TrySetUnitVeterancyRank should clamp against profile.Experience.maxLevel=2, got resultingRank={resultingRank}");
+            }
+        }
+        finally
+        {
+            RuntimeUnitMechanicsDirector.ClearProfiles();
+            ExistingControllers.Instance.Reset();
+        }
+    }),
+    ("tactical pulse triggers visual recoil and applies radius effect", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        try
+        {
+            var unitGo = new UnityEngine.GameObject("RCL_PulseUnit");
+            var source = unitGo.AddComponent<EntityController>();
+            source.entityId = "test:pulse-source";
+            source.UniqueEntityId = 730;
+            source.IsControlledByPlayer = true;
+            source.IsUnit = true;
+            source.Position = new UnityEngine.Vector3(0f, 0f, 0f);
+
+            var ally = new EntityController
+            {
+                entityId = "test:pulse-ally",
+                UniqueEntityId = 731,
+                IsControlledByPlayer = true,
+                IsUnit = true,
+                CurrentHealth = 50f,
+                MaxHealth = 100f,
+                Position = new UnityEngine.Vector3(5f, 0f, 0f)
+            };
+
+            ExistingControllers.Instance.PlayerUnits().Add(source);
+            ExistingControllers.Instance.PlayerUnits().Add(ally);
+
+            bool pulseOk = RuntimeUnitMechanicsDirector.TryExecuteTacticalPulse(
+                source, "Rally", 15f, 20f, 4f, 8,
+                out string normType, out int affectedCount, out float dmgApplied,
+                out float healingApplied, out int statusCount, out string msg);
+
+            if (!pulseOk || affectedCount < 1)
+            {
+                throw new InvalidOperationException($"Tactical pulse failed or affected 0 units: {msg}");
+            }
+            if (healingApplied <= 0f)
+            {
+                throw new InvalidOperationException("Tactical pulse Rally should heal injured ally.");
+            }
+        }
+        finally
+        {
+            ExistingControllers.Instance.Reset();
+        }
+    }),
     };
+
+    private sealed class TestEntityAttackStub
+    {
+        public EntityController _entityController;
+        public TestEntityAttackStub(EntityController ec) { _entityController = ec; }
+    }
 }

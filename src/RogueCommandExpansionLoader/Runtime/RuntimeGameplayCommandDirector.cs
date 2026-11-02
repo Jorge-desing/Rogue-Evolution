@@ -1886,6 +1886,16 @@ namespace RogueCommandExpansionLoader.Runtime
 
                 }
 
+                if (!caster.HasActiveSkill)
+
+                {
+
+                    return new ActiveSkillOrderResult(false, entityKeyId, "None", 0f, 0f,
+
+                        "Entity '" + entityKeyId + "' does not possess an active skill.");
+
+                }
+
 
 
                 EntityCommand skillCmd;
