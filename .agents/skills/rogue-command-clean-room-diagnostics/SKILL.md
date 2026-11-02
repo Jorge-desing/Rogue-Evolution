@@ -120,13 +120,34 @@ Pitfall: Renewing an aura without tracking ownership either (a) leaves stale lin
 - Candidate filters that invoke `source.IsEnemy(candidate)` or `attacker.IsEnemy(target)` must check `== null` first; otherwise a null delegate throws and can abort the whole sweep or assault.
 - Clamp floating-point distances, radii, durations, and magnitudes with `Mathf.Clamp` and preserve the clamped `float`; do not truncate through `int`.
 - Validate every float coordinate, radius, magnitude, and duration for `NaN`/infinity before reflection or command dispatch, returning `success: false`.
+- Game-speed, spawn, camera, audio, aura, doctrine, patrol, hazard, and group commands each need their own finite guard at method entry; `Mathf.Clamp(NaN, ...)` is not a substitute and can propagate `NaN`.
+- Group commands with non-finite targets should fail before iterating members, even though the member commands also guard, so no partial work or confusing per-unit failures occur.
+- `IsEnemy` delegates are nullable and can throw; check `== null` before invocation and wrap candidate evaluation in try/catch so one unusable candidate is omitted instead of aborting the sweep or assault.
+- `SetEnumField` is best-effort and swallows parse failures; validate enum names against the decompiled type instead of relying on runtime no-ops.
+- Map relic `CardChange.side` labels to the native `Side` enum in both `RuntimeCardChangeApplier` and `RelicContentRuntimeRegistrar.SetEnumField`; content validation accepts only the native labels `False`, `True`, and `Irrelevant`.
 - Compute `omitted*Count` from requested versus dispatched/selected counts, not from already-filtered candidate counts.
+### AI Module Eligibility and Hostility
+
+- AI modules that dispatch combat units must filter candidates through `IsControlledByAi`, `IsUnit`, `IsCombatUnit`, `CanAttackAndIsAttackEnabled`, and `CanMoveAndMovementIsEnabled` before issuing orders. Support or repair modules should require the relevant `IsUnit`/`CanMove` constraints instead of combat-attack eligibility.
+- Treat reflected `IsEnemy` as nullable: use `unit.IsEnemy == null || !unit.IsEnemy(target)`, and catch exceptions so one unusable candidate is omitted instead of aborting the whole sweep or assault.
+- Do not promote player-roster entries to hostile targets unless hostility is positively established against a real source unit; never use a squad centroid or `Vector3` as the source.
+- Counter-battery artillery classification requires `minAttackRange >= ThreatTriggerDistance`; a merely positive `minAttackRange` is not sufficient.
+- `SquadFormationAiModule` must track only mod-created captain links and release those on destruction; never call `ReleaseAllCaptains` over native links.
+
 ### AssetBundle Registry
 
 - `GlobalBundleRegistry.LoadBundleAsync(string, string)` must validate `bundleId` and `path` before locking.
 - On a race where another caller registers the same `bundleId`, unload the duplicate bundle with `Unload(false)` before returning the existing instance; otherwise the path overload leaks an AssetBundle.
 - Keep the stream and path overloads behaviorally aligned for duplicate handling.
 - Treat `UnloadAll` as terminal for all returned bundle handles; do not use a handle after it has been unloaded.
+
+### Native CardChange Contract
+
+- Decompile `CardChangeScriptableObject` before changing `RuntimeCardChangeApplier`; do not assume field names or CLR types from the mod DTO.
+- `side` is the `Side` enum (`False`, `True`, `Irrelevant`), not a faction string: map player/friendly/allied to `False`, enemy/AI/hostile to `True`, and all/any/neutral to `Irrelevant`.
+- `multiplyValueWithMetaProgressionMultiplier` is a `string` multiplier key, not a `bool`; passing `false` compiles only if mistyped and silently leaves the field unset.
+- `SetEnumField` is best-effort and swallows parse failures; validate enum names against the decompiled type instead of relying on runtime no-ops.
+- `valueToChange` must be an exact `EntityBalancingStore.ChangeableValue` name.
 
 ### Environmental Hazards
 

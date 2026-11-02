@@ -33,6 +33,11 @@ Use this skill when validating or packaging a Rogue Command loader/content chang
 - **Stage Parameter & Node Interval Validation**:
   - `StageParameterBindingContract` binds only `blueprintPoolList`, `fillFirstLevelWithCardRewards`, and `putDefaultCardRewardInCenter`. `cardReward` is a value type, not `OpenReward` (reject `cardReward.count/weight`).
   - `startCountRange` must be an ordered invariant-culture integer pair 1–64, bounded by final stage `maxWidth`.
+- **Relic CardChange Side Mapping**:
+  - Content validation accepts only native `CardChange.side` labels: `False`, `True`, `Irrelevant`.
+  - Runtime registration maps readable content labels (`Friendly`/`Player`/`Allies`, `Enemy`/`AI`/`Hostile`, `All`/`Any`/`Neutral`) to the native enum in both `RuntimeCardChangeApplier` and `RelicContentRuntimeRegistrar.SetEnumField`. Keep both mappings aligned; validation remains native-label only.
+- **AssetBundle Registry Concurrency**:
+  - `GlobalBundleRegistry` must validate IDs/paths, unload duplicate path/stream bundles with `Unload(false)`, and keep stream and path overloads behaviorally aligned.
 - **Registry Hardening**:
   - Rejects duplicate unit, factory, and pool IDs both intra-pack and cross-pack.
   - Excludes ambiguous cross-pack mappings and safely reports invalid UTF-8 manifests without crashing.

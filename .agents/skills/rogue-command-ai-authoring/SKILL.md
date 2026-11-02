@@ -349,6 +349,11 @@ Pitfalls:
 - Filter AI target candidates with `unit.IsEnemy(candidate)` and re-check hostility on the current target before applying hysteresis; never assume player-side entities are hostile after control-flag changes.
 - Require both `IsCombatUnit` and `CanAttackAndIsAttackEnabled` for AI combat-unit eligibility; avoid inverted `!A && !B` conditions.
 - Consume retarget/command budgets before native dispatch so exceptions cannot bypass caps.
+- AI combat modules must filter candidates through `IsControlledByAi`, `IsUnit`, `IsCombatUnit`, `CanAttackAndIsAttackEnabled`, and `CanMoveAndMovementIsEnabled`; support/repair modules use relevant `IsUnit`/`CanMove` constraints.
+- Treat reflected `IsEnemy` as nullable: write `unit.IsEnemy == null || !unit.IsEnemy(target)` and wrap candidate evaluation in try/catch so one unusable candidate is omitted rather than aborting the sweep or assault.
+- Counter-battery artillery classification requires `minAttackRange >= ThreatTriggerDistance`; a merely positive `minAttackRange` is not sufficient.
+- `SquadFormationAiModule` must track only mod-created captain links and release those on destruction; never call `ReleaseAllCaptains` over native links.
+- Tactical skill activation should not require combat or attack eligibility by default; filter destroyed, non-AI, and non-unit entries, but allow valid tactical-skill units to activate.
 - AI profiles allow at most 8 modules. When adding a standard module such as `sample:threat-prioritization` to every profile, append it as the last module and verify each profile stays within the limit; profiles already at 8 must have a module removed or consolidated first.
 - When adding a target field to the test `EntityCommand` stub, update every factory that carries a target (`Attack`, `AttackMoveOnTarget`, `ActiveSkillOnTarget`, etc.) consistently.
 
