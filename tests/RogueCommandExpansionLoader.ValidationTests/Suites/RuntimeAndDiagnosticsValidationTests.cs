@@ -4057,6 +4057,20 @@ internal static partial class ValidationTestRunner
     {
         try
         {
+            // Game Speed must fail closed for non-finite input.
+            UnityEngine.Time.timeScale = 1.0f;
+            GameSpeedCommandResult invalidScale = RuntimeGameplayCommandDirector.TrySetGameTimeScale(float.NaN);
+            if (invalidScale.Success || RuntimeGameplayCommandDirector.GetGameTimeScale() != 1.0f)
+            {
+                throw new InvalidOperationException("TrySetGameTimeScale must reject NaN without changing Time.timeScale.");
+            }
+
+            invalidScale = RuntimeGameplayCommandDirector.TrySetGameTimeScale(float.PositiveInfinity);
+            if (invalidScale.Success || RuntimeGameplayCommandDirector.GetGameTimeScale() != 1.0f)
+            {
+                throw new InvalidOperationException("TrySetGameTimeScale must reject infinity without changing Time.timeScale.");
+            }
+
             // Game Speed
             GameSpeedCommandResult speedRes = RuntimeGameplayCommandDirector.TrySetGameTimeScale(2.5f);
             if (!speedRes.Success || speedRes.CurrentTimeScale != 2.5f || RuntimeGameplayCommandDirector.GetGameTimeScale() != 2.5f)

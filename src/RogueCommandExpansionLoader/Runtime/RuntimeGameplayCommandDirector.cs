@@ -3739,6 +3739,12 @@ namespace RogueCommandExpansionLoader.Runtime
 
                 float prev = Time.timeScale;
 
+                if (float.IsNaN(timeScale) || float.IsInfinity(timeScale))
+                {
+                    return new GameSpeedCommandResult(false, prev, prev,
+                        "Game time scale must be finite.");
+                }
+
                 float clamped = Mathf.Clamp(timeScale, 0f, 10f);
 
                 Time.timeScale = clamped;
