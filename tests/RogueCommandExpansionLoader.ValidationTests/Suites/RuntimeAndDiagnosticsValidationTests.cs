@@ -5648,6 +5648,13 @@ internal static partial class ValidationTestRunner
             throw new InvalidOperationException("TryOrderUnitPatrol with mismatched waypoint lengths must return false.");
         }
 
+        UnitPatrolResult nonFinite = RuntimeGameplayCommandDirector.TryOrderUnitPatrol(
+            "911", new[] { float.NaN }, new[] { float.PositiveInfinity });
+        if (nonFinite.Success || unit.PatrolPositions.Count != 0 || unit.LastExecutedCommand != null)
+        {
+            throw new InvalidOperationException("TryOrderUnitPatrol must reject non-finite waypoints without mutating the route or dispatching a command.");
+        }
+
         UnitPatrolResult ok = RuntimeGameplayCommandDirector.TryOrderUnitPatrol("911", new[] { 10f, 20f, 30f }, new[] { 40f, 50f, 60f });
         if (!ok.Success || ok.WaypointCount != 3 || ok.EntityKeyId != "911")
         {

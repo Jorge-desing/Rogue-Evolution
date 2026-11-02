@@ -5841,6 +5841,16 @@ namespace RogueCommandExpansionLoader.Runtime
                     "Patrol requires at least one waypoint with matching X and Z coordinates.");
             }
 
+            for (int i = 0; i < waypointX.Count; i++)
+            {
+                if (float.IsNaN(waypointX[i]) || float.IsInfinity(waypointX[i]) ||
+                    float.IsNaN(waypointZ[i]) || float.IsInfinity(waypointZ[i]))
+                {
+                    return new UnitPatrolResult(false, entityKeyId, 0,
+                        "Patrol waypoint coordinates must be finite.");
+                }
+            }
+
             try
             {
                 ExistingControllers existing = ExistingControllers.Instance;
