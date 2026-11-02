@@ -124,8 +124,23 @@ public sealed class EntityController : Component
     public float MaxShield { get; set; } = 0f;
     public int CurrentRank { get; set; } = 0;
     public int MaxRank { get; set; } = 3;
-    public void Heal(float amount, EntityController originator = null, bool doNotFireOnHasHealed = false, bool doNotFireOnBeingHealed = false) { CurrentHealth = System.Math.Min(CurrentHealth + amount, MaxHealth); }
-    public void RepairArmor(float amount, EntityController originator = null, bool doNotFire = false) { CurrentArmor = System.Math.Min(CurrentArmor + amount, MaxArmor); }
+    public void Heal(float amount, EntityController originator = null, bool doNotFireOnHasHealed = false, bool doNotFireOnBeingHealed = false)
+    {
+        CurrentHealth = System.Math.Min(CurrentHealth + amount, MaxHealth);
+        if (originator == null && CurrentHealth > 0f && !doNotFireOnHasHealed)
+        {
+            throw new NullReferenceException("EntityController.Heal requires a non-null originator unless callbacks are suppressed.");
+        }
+    }
+    public void RepairArmor(float amount, EntityController originator = null, bool doNotFire = false)
+    {
+        float currentArmor = CurrentArmor;
+        CurrentArmor = System.Math.Min(CurrentArmor + amount, MaxArmor);
+        if (originator == null && currentArmor < CurrentArmor && !doNotFire)
+        {
+            throw new NullReferenceException("EntityController.RepairArmor requires a non-null originator unless callbacks are suppressed.");
+        }
+    }
     public void ChargeShield(float amount, bool displayDeltaInBar = true) { CurrentShield = System.Math.Min(CurrentShield + amount, MaxShield); }
     public void TakeDamage(float amount, EntityController originator = null, bool doNotFireOnHasDealtDamage = false, bool ignoreArmor = false)
     {

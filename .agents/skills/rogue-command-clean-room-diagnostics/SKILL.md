@@ -1,7 +1,7 @@
 ---
 name: rogue-command-clean-room-diagnostics
 description: "Clean-room in-game telemetry, diagnostic censuses, runtime gameplay command director, and BepInEx MCP bridge integration for Rogue Command (v1.0.9 / Unity 2021.3.45f2, Mono x64). [Diagnósticos runtime clean-room, censos de telemetría, director de comandos de gameplay y puente BepInEx MCP para Rogue Command]"
-version: 1.4.0
+version: 1.5.0
 license: MIT
 author: Hermes Agent
 metadata:
@@ -67,7 +67,7 @@ All censuses query live game singletons through fail-closed reflection and forma
 - **AI Tactical Doctrine & Deck Reinforcement** (`diagnostics_get_ai_doctrine_census`): Active AI combat doctrine, aggression scaling multiplier, and live deck unit quotas (`countAtStart`, `maxLiving`) per AI base.
 - **Tactical Combat Stances** (`diagnostics_get_tactical_stance_census`): Active combat stances (`Standard`, `Aggressive`, `Defensive`, `HoldFire`, `Kiting`), movement speeds, and weapon ranges across living units.
 - **Unit Elite Affixes & Traits** (`diagnostics_get_unit_affix_census`): Active elite modifiers (`Swift`, `Juggernaut`, `Overcharged`, `Vampiric`, `Bulwark`, `Volatile`) applied to living units.
-- **Multi-Agent Coordination** (`diagnostics_get_agent_coordination`): Active agent sessions, heartbeats, and advisory locks held on entities or camera.
+- **Multi-Agent Coordination** (`diagnostics_get_agent_coordination`): Active agent sessions (with status, sector, capabilities, ping liveness), advisory locks (with categories and contention tracking), and shared blackboard coordination messages / tactical intent log.
 
 ---
 
@@ -163,10 +163,14 @@ Pitfall: Renewing an aura without tracking ownership either (a) leaves stale lin
 - `diagnostics_order_inject_ai_deck_unit`: Dynamically reinforces an AI base deck with production quotas (`baseIndex`, `unitId`, `countAtStart`, `maxLiving`), escalating AI capabilities during matches.
 
 ### Multi-Agent Coordination & Advisory Locks
-- `diagnostics_register_agent_session`: Registers or updates an agent session in runtime (`agentId`, `agentRole`, `notes`).
+- `diagnostics_register_agent_session`: Registers or updates an agent session in runtime (`agentId`, `agentRole`, `notes`, `assignedSector`).
+- `diagnostics_deregister_agent_session`: Deregisters an agent session and automatically releases all advisory locks owned by that agent (`agentId`).
 - `diagnostics_ping_agent`: Heartbeat ping to verify bridge health and update agent activity timestamp (`agentId`, `message`).
-- `diagnostics_acquire_agent_lock`: Acquires or renews an advisory lock on a resource (`agentId`, `resourceKey`, `durationSeconds`). Fails if already locked by a different agent until expired.
+- `diagnostics_acquire_agent_lock`: Acquires or renews an advisory lock on a resource (`agentId`, `resourceKey`, `durationSeconds`). Fails if already locked by a different agent until expired, recording contention.
 - `diagnostics_release_agent_lock`: Explicitly releases an advisory lock before TTL expiry (`agentId`, `resourceKey`).
+- `diagnostics_acquire_agent_lock_batch`: Atomically acquires advisory locks on multiple resources for an agent (`agentId`, `resourceKeys`, `durationSeconds`).
+- `diagnostics_release_agent_lock_batch`: Releases advisory locks on multiple resources for an agent (`agentId`, `resourceKeys`).
+- `diagnostics_post_agent_message`: Posts a tactical coordination message or intent to the shared multi-agent blackboard (`senderAgentId`, `messageType`, `content`, `targetAgentId`).
 
 ### Selection & Control Groups
 - `diagnostics_select_units`: Selects entities by CSV or key list (`entityKeysCsv`, `additive`).
@@ -196,7 +200,7 @@ The BepInEx MCP server is built with universal cross-agent compatibility support
 
 ### 5.1 Hermes Integration (Native Plugin & Skills)
 Hermes agents can communicate with the bridge using three distinct channels:
-1. **Hermes Plugin (`bepinex-mcp`)**: Installed at `C:\Users\Alex\AppData\Local\hermes\plugins\bepinex-mcp/` and enabled in `C:\Users\Alex\AppData\Local\hermes\config.yaml` (`plugins.enabled: [bepinex-mcp]`). All 158 tools are discovered as native MCP tools.
+1. **Hermes Plugin (`bepinex-mcp`)**: Installed at `C:\Users\Alex\AppData\Local\hermes\plugins\bepinex-mcp/` and enabled in `C:\Users\Alex\AppData\Local\hermes\config.yaml` (`plugins.enabled: [bepinex-mcp]`). All 162 tools are discovered as native MCP tools.
 2. **Hermes Skill Catalog**: Registered under `C:\Users\Alex\AppData\Local\hermes\skills\rogue-command\rogue-command-clean-room-diagnostics/`.
 3. **Hermes Direct CLI Execution**: When running in a shell or terminal without an active MCP connection:
    ```bash
@@ -206,7 +210,7 @@ Hermes agents can communicate with the bridge using three distinct channels:
    ```
 
 ### 5.2 Antigravity & Google Gemini CLI
-- Fully registered under `bepinex_mcp` with 158 generated schemas in `C:\Users\Alex\.gemini\antigravity\mcp\bepinex_mcp/`.
+- Fully registered under `bepinex_mcp` with 162 generated schemas in `C:\Users\Alex\.gemini\antigravity\mcp\bepinex_mcp/`.
 - Call eagerly or lazily using `call_mcp_tool(ServerName="bepinex_mcp", ToolName="...", Arguments={...})`.
 
 ### 5.3 Anthropic Claude Desktop

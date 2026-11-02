@@ -22,6 +22,12 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
             "RegisteredUnitMechanicsProfileCount": ("System.Int32", "9"),
             "RangeDisplayGeometryMinimumSegments": ("System.Int32", "8"),
             "RangeDisplayGeometryMaximumSegments": ("System.Int32", "256"),
+            "RegisteredAgentSessionCount": ("System.Int32", "2"),
+            "ActiveAgentLockCount": ("System.Int32", "1"),
+            "ActiveAgentMessageCount": ("System.Int32", "3"),
+            "ActiveHazardZoneCount": ("System.Int32", "0"),
+            "ActiveCommandAuraCount": ("System.Int32", "0"),
+            "TrackedVeterancyUnitCount": ("System.Int32", "5"),
         }
         member_reads: list[str] = []
 
@@ -66,6 +72,12 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
                 "RegisteredUnitMechanicsProfileCount": 9,
                 "RangeDisplayGeometryMinimumSegments": 8,
                 "RangeDisplayGeometryMaximumSegments": 256,
+                "RegisteredAgentSessionCount": 2,
+                "ActiveAgentLockCount": 1,
+                "ActiveAgentMessageCount": 3,
+                "ActiveHazardZoneCount": 0,
+                "ActiveCommandAuraCount": 0,
+                "TrackedVeterancyUnitCount": 5,
                 "RangeDisplayCirclePointCount": 9,
             },
             scalars,
@@ -132,7 +144,7 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
 
         snapshot = json.loads(response["content"][0]["text"])
         self.assertFalse(response["isError"])
-        self.assertEqual(11, len(snapshot))
+        self.assertEqual(21, len(snapshot))
         self.assertTrue(all(isinstance(value, dict) for value in snapshot.values()))
         self.assertTrue(all(value == expected for value in snapshot.values()))
 
@@ -153,31 +165,51 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
             mock.patch.object(SERVER, "_DIAGNOSTICS_GO_ID", 73),
             mock.patch.object(SERVER, "_call_http", side_effect=fake_http),
         ):
-            resp1 = SERVER.execute_tool("diagnostics_register_agent_session", {"agentId": "hermes-1", "agentRole": "Coordinator"})
+            resp1 = SERVER.execute_tool("diagnostics_register_agent_session", {"agentId": "hermes-1", "agentRole": "Coordinator", "assignedSector": "North"})
             self.assertFalse(resp1["isError"])
 
             resp2 = SERVER.execute_tool("diagnostics_ping_agent", {"agentId": "hermes-1", "message": "ping"})
             self.assertFalse(resp2["isError"])
 
-            resp3 = SERVER.execute_tool("diagnostics_acquire_agent_lock", {"agentId": "hermes-1", "resourceKey": "unit:command_tank", "durationSeconds": 25.0})
+            resp3 = SERVER.execute_tool("diagnostics_post_agent_message", {"senderId": "hermes-1", "recipientId": "*", "messageType": "TacticalIntent", "payload": "Advance"})
             self.assertFalse(resp3["isError"])
 
-            resp4 = SERVER.execute_tool("diagnostics_release_agent_lock", {"agentId": "hermes-1", "resourceKey": "unit:command_tank"})
+            resp4 = SERVER.execute_tool("diagnostics_acquire_agent_lock", {"agentId": "hermes-1", "resourceKey": "unit:command_tank", "durationSeconds": 25.0})
             self.assertFalse(resp4["isError"])
 
-            resp5 = SERVER.execute_tool("diagnostics_get_agent_coordination", {})
+            resp5 = SERVER.execute_tool("diagnostics_acquire_agent_lock_batch", {"agentId": "hermes-1", "resourceKeys": ["unit:scout", "factory:tank_depot"], "durationSeconds": 15.0})
             self.assertFalse(resp5["isError"])
 
-        self.assertEqual(5, len(calls))
+            resp6 = SERVER.execute_tool("diagnostics_release_agent_lock", {"agentId": "hermes-1", "resourceKey": "unit:command_tank"})
+            self.assertFalse(resp6["isError"])
+
+            resp7 = SERVER.execute_tool("diagnostics_release_agent_lock_batch", {"agentId": "hermes-1", "resourceKeys": ["unit:scout", "factory:tank_depot"]})
+            self.assertFalse(resp7["isError"])
+
+            resp8 = SERVER.execute_tool("diagnostics_deregister_agent_session", {"agentId": "hermes-1"})
+            self.assertFalse(resp8["isError"])
+
+            resp9 = SERVER.execute_tool("diagnostics_get_agent_coordination", {})
+            self.assertFalse(resp9["isError"])
+
+        self.assertEqual(9, len(calls))
         self.assertEqual("RegisterAgentSessionJson", calls[0][0])
-        self.assertEqual(["hermes-1", "Coordinator", ""], calls[0][1])
+        self.assertEqual(["hermes-1", "Coordinator", "", "North"], calls[0][1])
         self.assertEqual("PingAgentJson", calls[1][0])
         self.assertEqual(["hermes-1", "ping"], calls[1][1])
-        self.assertEqual("AcquireAgentLockJson", calls[2][0])
-        self.assertEqual(["hermes-1", "unit:command_tank", 25.0], calls[2][1])
-        self.assertEqual("ReleaseAgentLockJson", calls[3][0])
-        self.assertEqual(["hermes-1", "unit:command_tank"], calls[3][1])
-        self.assertEqual("GetAgentCoordinationCensusJson", calls[4][0])
+        self.assertEqual("PostAgentMessageJson", calls[2][0])
+        self.assertEqual(["hermes-1", "TacticalIntent", "Advance", "*"], calls[2][1])
+        self.assertEqual("AcquireAgentLockJson", calls[3][0])
+        self.assertEqual(["hermes-1", "unit:command_tank", 25.0], calls[3][1])
+        self.assertEqual("AcquireAgentLockBatchJson", calls[4][0])
+        self.assertEqual(["hermes-1", ["unit:scout", "factory:tank_depot"], 15.0], calls[4][1])
+        self.assertEqual("ReleaseAgentLockJson", calls[5][0])
+        self.assertEqual(["hermes-1", "unit:command_tank"], calls[5][1])
+        self.assertEqual("ReleaseAgentLockBatchJson", calls[6][0])
+        self.assertEqual(["hermes-1", ["unit:scout", "factory:tank_depot"]], calls[6][1])
+        self.assertEqual("DeregisterAgentSessionJson", calls[7][0])
+        self.assertEqual(["hermes-1"], calls[7][1])
+        self.assertEqual("GetAgentCoordinationCensusJson", calls[8][0])
 
     def test_generate_agent_configs(self) -> None:
         configs = SERVER.generate_agent_configs()

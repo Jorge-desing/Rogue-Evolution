@@ -5172,12 +5172,15 @@ internal static partial class ValidationTestRunner
                 throw new InvalidOperationException("Spawn NaniteField should succeed.");
             }
 
-            // Tick nanite -> ally should heal
+            // Tick nanite -> ally should heal, repair armor, and receive Regen
             float allyHpBefore = ally.CurrentHealth;
+            float allyArmorBefore = ally.CurrentArmor;
             RuntimeHazardManager.UpdateTick(Time.time + 1.2f);
-            if (ally.CurrentHealth <= allyHpBefore)
+            if (ally.CurrentHealth <= allyHpBefore ||
+                ally.CurrentArmor <= allyArmorBefore ||
+                !ally.HasActiveStatusEffect(StatusEffect.Regen))
             {
-                throw new InvalidOperationException("NaniteField hazard tick should heal damaged friendly units.");
+                throw new InvalidOperationException("NaniteField hazard tick should heal, repair armor, and apply Regen to friendly units.");
             }
 
             // Census check
@@ -6062,6 +6065,122 @@ internal static partial class ValidationTestRunner
             {
                 throw new InvalidOperationException("SerializeAiWaveDispatchResult dispatchedUnitCount must be 2.");
             }
+        }
+    }),
+    ("runtime agent coordinator provides multi-agent blackboard messaging, batch locking, contention tracking, and session deregistration", () =>
+    {
+        RuntimeAgentCoordinator.ResetForTests();
+        UnityEngine.Time.time = 100f;
+
+        try
+        {
+            // 1. Register agent with sector and capabilities
+            bool reg = RuntimeAgentCoordinator.TryRegisterSession(
+                "agent:tactician",
+                "Tactician",
+                "Coordinates frontline micro",
+                "NorthFlank",
+                new[] { "MicroCombat", "FocusFire" },
+                100f,
+                out string regMsg);
+            if (!reg || RuntimeAgentCoordinator.RegisteredSessionCount != 1)
+            {
+                throw new InvalidOperationException($"Register agent failed: {regMsg}");
+            }
+
+            // 2. Track command execution
+            RuntimeAgentCoordinator.RecordCommandDispatched("agent:tactician");
+            RuntimeAgentCoordinator.RecordCommandDispatched("agent:tactician");
+
+            // 3. Post blackboard message
+            bool post = RuntimeAgentCoordinator.TryPostMessage(
+                "agent:tactician",
+                "TacticalIntent",
+                "Engaging northern artillery cluster",
+                "all",
+                101f,
+                out string postMsg);
+            if (!post || RuntimeAgentCoordinator.TotalMessageCount != 1)
+            {
+                throw new InvalidOperationException($"Post message failed: {postMsg}");
+            }
+
+            // 4. Lock contention tracking
+            bool lock1 = RuntimeAgentCoordinator.TryAcquireLock("agent:tactician", "unit:artillery_target", 30f, 101f, out string lockMsg1);
+            if (!lock1)
+            {
+                throw new InvalidOperationException($"Acquire lock failed: {lockMsg1}");
+            }
+
+            // Second agent fails -> increments contention
+            bool lockConflict = RuntimeAgentCoordinator.TryAcquireLock("agent:observer", "unit:artillery_target", 15f, 102f, out string lockMsg2);
+            if (lockConflict)
+            {
+                throw new InvalidOperationException("Lock conflict should have failed.");
+            }
+
+            // 5. Batch lock acquisition and release
+            bool batchAcq = RuntimeAgentCoordinator.TryAcquireLockBatch(
+                "agent:observer",
+                new[] { "camera:tactical", "factory:heavy_mech" },
+                30f,
+                102f,
+                out string batchMsg);
+            if (!batchAcq || RuntimeAgentCoordinator.ActiveLockCount != 3)
+            {
+                throw new InvalidOperationException($"Batch lock acquisition failed: {batchMsg}");
+            }
+
+            bool batchRel = RuntimeAgentCoordinator.TryReleaseLockBatch(
+                "agent:observer",
+                new[] { "camera:tactical", "factory:heavy_mech" },
+                out string relBatchMsg);
+            if (!batchRel || RuntimeAgentCoordinator.ActiveLockCount != 1)
+            {
+                throw new InvalidOperationException($"Batch lock release failed: {relBatchMsg}");
+            }
+
+            // 6. Snapshot inspection
+            AgentCoordinationSnapshot snap = RuntimeAgentCoordinator.GetSnapshot(103f);
+            if (snap.OmittedMessageCount != 0 || snap.ActiveSessions.Count != 1 || snap.RecentMessages.Count != 1)
+            {
+                throw new InvalidOperationException("Snapshot counts mismatch.");
+            }
+
+            AgentSessionRecord sess = snap.ActiveSessions[0];
+            if (sess.CommandsDispatchedCount != 2 || sess.AssignedSector != "NorthFlank" || sess.Status != "Active")
+            {
+                throw new InvalidOperationException($"Session record fields incorrect: commands={sess.CommandsDispatchedCount}, sector={sess.AssignedSector}, status={sess.Status}");
+            }
+
+            AgentAdvisoryLock lk = snap.ActiveLocks[0];
+            if (lk.ContentionCount != 1 || lk.ResourceCategory != "Unit")
+            {
+                throw new InvalidOperationException($"Lock record fields incorrect: contention={lk.ContentionCount}, category={lk.ResourceCategory}");
+            }
+
+            // 7. Full clean-room serialization
+            string json = AgentDiagnosticsFormatter.SerializeAgentCoordinationCensus(snap);
+            using (var doc = JsonDocument.Parse(json))
+            {
+                if (!doc.RootElement.TryGetProperty("kind", out var k) || k.GetString() != "agentCoordinationCensus" ||
+                    !doc.RootElement.TryGetProperty("omittedMessageCount", out var omMsg) || omMsg.GetInt32() != 0 ||
+                    !doc.RootElement.TryGetProperty("messages", out var msgs) || msgs.GetArrayLength() != 1)
+                {
+                    throw new InvalidOperationException($"JSON schema validation failed: {json}");
+                }
+            }
+
+            // 8. Session deregistration and automatic lock release
+            bool dereg = RuntimeAgentCoordinator.TryDeregisterSession("agent:tactician", out string deregMsg);
+            if (!dereg || RuntimeAgentCoordinator.RegisteredSessionCount != 0 || RuntimeAgentCoordinator.ActiveLockCount != 0)
+            {
+                throw new InvalidOperationException($"Deregister session failed to release locks: {deregMsg}");
+            }
+        }
+        finally
+        {
+            RuntimeAgentCoordinator.ResetForTests();
         }
     }),
     };

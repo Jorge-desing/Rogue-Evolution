@@ -280,8 +280,8 @@ namespace RogueCommandExpansionLoader.Runtime
                     {
                         if (zone.TickDamage > 0f)
                         {
-                            entity.Heal(zone.TickDamage, null);
-                            entity.RepairArmor(zone.TickDamage * 0.5f, null, false);
+                            entity.Heal(zone.TickDamage, null, true, true);
+                            entity.RepairArmor(zone.TickDamage * 0.5f, entity, true);
                         }
                         entity.SetActiveStatusEffect(StatusEffect.Regen, SetStatusEffect.DurationType.Seconds, 1.0f);
                     }

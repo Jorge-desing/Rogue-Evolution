@@ -1858,6 +1858,11 @@ namespace RogueCommandExpansionLoader.Runtime
                         ["agentId"] = s.AgentId ?? string.Empty,
                         ["agentRole"] = s.AgentRole ?? string.Empty,
                         ["notes"] = s.Notes ?? string.Empty,
+                        ["status"] = s.Status ?? "Active",
+                        ["secondsSinceLastPing"] = s.SecondsSinceLastPing,
+                        ["assignedSector"] = s.AssignedSector ?? "Global",
+                        ["capabilities"] = s.Capabilities != null ? s.Capabilities : (object)Array.Empty<string>(),
+                        ["commandsDispatchedCount"] = s.CommandsDispatchedCount,
                         ["registeredAtSeconds"] = s.RegisteredAtSeconds,
                         ["lastPingSeconds"] = s.LastPingSeconds,
                         ["pingCount"] = s.PingCount,
@@ -1874,10 +1879,30 @@ namespace RogueCommandExpansionLoader.Runtime
                     locks.Add(new Dictionary<string, object>
                     {
                         ["resourceKey"] = l.ResourceKey ?? string.Empty,
+                        ["resourceCategory"] = l.ResourceCategory ?? "Global",
                         ["ownerAgentId"] = l.OwnerAgentId ?? string.Empty,
                         ["acquiredAtSeconds"] = l.AcquiredAtSeconds,
                         ["expiresAtSeconds"] = l.ExpiresAtSeconds,
                         ["remainingSeconds"] = l.RemainingSeconds,
+                        ["contentionCount"] = l.ContentionCount,
+                    });
+                }
+            }
+
+            var messages = new List<Dictionary<string, object>>();
+            if (snapshot != null && snapshot.RecentMessages != null)
+            {
+                for (int i = 0; i < snapshot.RecentMessages.Count; i++)
+                {
+                    AgentCoordinationMessage m = snapshot.RecentMessages[i];
+                    messages.Add(new Dictionary<string, object>
+                    {
+                        ["messageId"] = m.MessageId ?? string.Empty,
+                        ["senderAgentId"] = m.SenderAgentId ?? string.Empty,
+                        ["messageType"] = m.MessageType ?? string.Empty,
+                        ["content"] = m.Content ?? string.Empty,
+                        ["timestampSeconds"] = m.TimestampSeconds,
+                        ["targetAgentId"] = m.TargetAgentId ?? "all",
                     });
                 }
             }
@@ -1887,10 +1912,45 @@ namespace RogueCommandExpansionLoader.Runtime
                 ["kind"] = "agentCoordinationCensus",
                 ["omittedSessionCount"] = snapshot != null ? snapshot.OmittedSessionCount : 0,
                 ["omittedLockCount"] = snapshot != null ? snapshot.OmittedLockCount : 0,
+                ["omittedMessageCount"] = snapshot != null ? snapshot.OmittedMessageCount : 0,
+                ["totalSessionCount"] = snapshot != null ? snapshot.TotalSessionCount : sessions.Count,
+                ["totalLockCount"] = snapshot != null ? snapshot.TotalLockCount : locks.Count,
+                ["totalMessageCount"] = snapshot != null ? snapshot.TotalMessageCount : messages.Count,
                 ["activeSessionCount"] = sessions.Count,
                 ["activeLockCount"] = locks.Count,
+                ["activeMessageCount"] = messages.Count,
                 ["sessions"] = sessions,
                 ["locks"] = locks,
+                ["messages"] = messages,
+            };
+            return Serialize(view);
+        }
+
+        public static string SerializeAgentMessageResult(bool success, string messageId, string senderAgentId, string messageType, string message)
+        {
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "agentMessageResult",
+                ["success"] = success,
+                ["messageId"] = messageId ?? string.Empty,
+                ["senderAgentId"] = senderAgentId ?? string.Empty,
+                ["messageType"] = messageType ?? string.Empty,
+                ["message"] = message ?? string.Empty,
+            };
+            return Serialize(view);
+        }
+
+        public static string SerializeAgentBatchLockResult(bool success, string agentId, int requestedCount, int processedCount, string action, string message)
+        {
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "agentBatchLockResult",
+                ["success"] = success,
+                ["agentId"] = agentId ?? string.Empty,
+                ["requestedCount"] = requestedCount,
+                ["processedCount"] = processedCount,
+                ["action"] = action ?? string.Empty,
+                ["message"] = message ?? string.Empty,
             };
             return Serialize(view);
         }

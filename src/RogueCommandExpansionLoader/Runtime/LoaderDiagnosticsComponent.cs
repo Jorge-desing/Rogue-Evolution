@@ -91,6 +91,7 @@ namespace RogueCommandExpansionLoader.Runtime
         public int TrackedVeterancyUnitCount => RuntimeVeterancyCensus.Current().TotalVeterancyUnitsCount;
         public int RegisteredAgentSessionCount => RuntimeAgentCoordinator.RegisteredSessionCount;
         public int ActiveAgentLockCount => RuntimeAgentCoordinator.ActiveLockCount;
+        public int ActiveAgentMessageCount => RuntimeAgentCoordinator.TotalMessageCount;
 
         public int ActivePackCount
         {
@@ -1234,15 +1235,35 @@ namespace RogueCommandExpansionLoader.Runtime
                 RuntimeAgentCoordinator.GetSnapshot(Time.time));
         }
 
-        public string RegisterAgentSessionJson(string agentId, string agentRole, string notes)
+        public string RegisterAgentSessionJson(string agentId, string agentRole, string notes, string assignedSector)
         {
             bool success = RuntimeAgentCoordinator.TryRegisterSession(
                 agentId,
                 agentRole,
                 notes,
+                assignedSector,
+                null,
                 Time.time,
                 out string message);
             return AgentDiagnosticsFormatter.SerializeAgentOperationResult(success, agentId, "RegisterSession", message);
+        }
+
+        public string RegisterAgentSessionJson(string agentId, string agentRole, string notes)
+        {
+            return RegisterAgentSessionJson(agentId, agentRole, notes, "Global");
+        }
+
+        public string DeregisterAgentSessionJson(string agentId)
+        {
+            bool success = RuntimeAgentCoordinator.TryDeregisterSession(agentId, out string message);
+            return AgentDiagnosticsFormatter.SerializeAgentOperationResult(success, agentId, "DeregisterSession", message);
+        }
+
+        public string PostAgentMessageJson(string senderAgentId, string messageType, string content, string targetAgentId)
+        {
+            bool success = RuntimeAgentCoordinator.TryPostMessage(
+                senderAgentId, messageType, content, targetAgentId, Time.time, out string message);
+            return AgentDiagnosticsFormatter.SerializeAgentMessageResult(success, "", senderAgentId, messageType, message);
         }
 
         public string PingAgentJson(string agentId, string message)
@@ -1266,6 +1287,14 @@ namespace RogueCommandExpansionLoader.Runtime
             return AgentDiagnosticsFormatter.SerializeAgentOperationResult(success, agentId, "AcquireLock", message);
         }
 
+        public string AcquireAgentLockBatchJson(string agentId, IReadOnlyList<string> resourceKeys, float durationSeconds)
+        {
+            bool success = RuntimeAgentCoordinator.TryAcquireLockBatch(
+                agentId, resourceKeys, durationSeconds, Time.time, out string message);
+            int count = resourceKeys?.Count ?? 0;
+            return AgentDiagnosticsFormatter.SerializeAgentBatchLockResult(success, agentId, count, success ? count : 0, "AcquireBatch", message);
+        }
+
         public string ReleaseAgentLockJson(string agentId, string resourceKey)
         {
             bool success = RuntimeAgentCoordinator.TryReleaseLock(
@@ -1273,6 +1302,14 @@ namespace RogueCommandExpansionLoader.Runtime
                 resourceKey,
                 out string message);
             return AgentDiagnosticsFormatter.SerializeAgentOperationResult(success, agentId, "ReleaseLock", message);
+        }
+
+        public string ReleaseAgentLockBatchJson(string agentId, IReadOnlyList<string> resourceKeys)
+        {
+            bool success = RuntimeAgentCoordinator.TryReleaseLockBatch(
+                agentId, resourceKeys, out string message);
+            int count = resourceKeys?.Count ?? 0;
+            return AgentDiagnosticsFormatter.SerializeAgentBatchLockResult(success, agentId, count, success ? count : 0, "ReleaseBatch", message);
         }
 
         public string GetSystemHealthJson()

@@ -2066,7 +2066,7 @@ namespace RogueCommandExpansionLoader.Runtime
 
                 {
 
-                    entity.Heal(amount, null, false, false);
+                    entity.Heal(amount, entity, true, true);
 
                 }
 
@@ -2074,7 +2074,7 @@ namespace RogueCommandExpansionLoader.Runtime
 
                 {
 
-                    entity.RepairArmor(amount, null, false);
+                    entity.RepairArmor(amount, entity, true);
 
                 }
 
@@ -6385,7 +6385,7 @@ namespace RogueCommandExpansionLoader.Runtime
                 }
                 else if (isJuggernaut)
                 {
-                    unit.Heal(25f, null, false, false);
+                    unit.Heal(25f, unit, true, true);
                 }
 
                 return new UnitAffixResult(true, key, normalized, "Apply", activeCount,

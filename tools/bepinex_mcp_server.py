@@ -1089,13 +1089,30 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             agent_id = str(arguments.get("agentId", ""))
             agent_role = str(arguments.get("agentRole", "Agent"))
             notes = str(arguments.get("notes", ""))
-            res = _call_diagnostics_method("RegisterAgentSessionJson", [agent_id, agent_role, notes])
+            if "assignedSector" in arguments:
+                assigned_sector = str(arguments.get("assignedSector", "Global"))
+                res = _call_diagnostics_method("RegisterAgentSessionJson", [agent_id, agent_role, notes, assigned_sector])
+            else:
+                res = _call_diagnostics_method("RegisterAgentSessionJson", [agent_id, agent_role, notes])
+            return _tool_response(res)
+
+        elif name == "diagnostics_deregister_agent_session":
+            agent_id = str(arguments.get("agentId", ""))
+            res = _call_diagnostics_method("DeregisterAgentSessionJson", [agent_id])
             return _tool_response(res)
 
         elif name == "diagnostics_ping_agent":
             agent_id = str(arguments.get("agentId", ""))
             message = str(arguments.get("message", ""))
             res = _call_diagnostics_method("PingAgentJson", [agent_id, message])
+            return _tool_response(res)
+
+        elif name == "diagnostics_post_agent_message":
+            sender_agent_id = str(arguments.get("senderAgentId") or arguments.get("senderId", ""))
+            message_type = str(arguments.get("messageType", "TacticalIntent"))
+            content = str(arguments.get("content") or arguments.get("payload", ""))
+            target_agent_id = str(arguments.get("targetAgentId") or arguments.get("recipientId", "*"))
+            res = _call_diagnostics_method("PostAgentMessageJson", [sender_agent_id, message_type, content, target_agent_id])
             return _tool_response(res)
 
         elif name == "diagnostics_acquire_agent_lock":
@@ -1105,10 +1122,31 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             res = _call_diagnostics_method("AcquireAgentLockJson", [agent_id, resource_key, duration_seconds])
             return _tool_response(res)
 
+        elif name == "diagnostics_acquire_agent_lock_batch":
+            agent_id = str(arguments.get("agentId", ""))
+            raw_keys = arguments.get("resourceKeys") or []
+            if isinstance(raw_keys, list):
+                keys = [str(k) for k in raw_keys]
+            else:
+                keys = [k.strip() for k in str(raw_keys).split(",") if k.strip()]
+            duration_seconds = float(arguments.get("durationSeconds", 30.0))
+            res = _call_diagnostics_method("AcquireAgentLockBatchJson", [agent_id, keys, duration_seconds])
+            return _tool_response(res)
+
         elif name == "diagnostics_release_agent_lock":
             agent_id = str(arguments.get("agentId", ""))
             resource_key = str(arguments.get("resourceKey", ""))
             res = _call_diagnostics_method("ReleaseAgentLockJson", [agent_id, resource_key])
+            return _tool_response(res)
+
+        elif name == "diagnostics_release_agent_lock_batch":
+            agent_id = str(arguments.get("agentId", ""))
+            raw_keys = arguments.get("resourceKeys") or []
+            if isinstance(raw_keys, list):
+                keys = [str(k) for k in raw_keys]
+            else:
+                keys = [k.strip() for k in str(raw_keys).split(",") if k.strip()]
+            res = _call_diagnostics_method("ReleaseAgentLockBatchJson", [agent_id, keys])
             return _tool_response(res)
 
         elif name == "diagnostics_get_tech_catalog":
@@ -1126,6 +1164,12 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
                 "RegisteredUnitMechanicsProfileCount",
                 "RangeDisplayGeometryMinimumSegments",
                 "RangeDisplayGeometryMaximumSegments",
+                "RegisteredAgentSessionCount",
+                "ActiveAgentLockCount",
+                "ActiveAgentMessageCount",
+                "ActiveHazardZoneCount",
+                "ActiveCommandAuraCount",
+                "TrackedVeterancyUnitCount",
             ]:
                 scalars[member_name] = _call_diagnostics_member(member_name)
 
@@ -1153,6 +1197,16 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
                 "GetBaseIntegrityCensusJson",
                 "GetThreatPrioritizationCensusJson",
                 "GetUnitThreatAssessmentJson",
+                "GetAgentCoordinationCensusJson",
+                "GetTacticalStanceCensusJson",
+                "GetUnitAffixCensusJson",
+                "GetUnitLoadoutAndPoolCensusJson",
+                "GetAiDoctrineCensusJson",
+                "GetAiDirectorCensusJson",
+                "GetHarvesterCensusJson",
+                "GetHazardCensusJson",
+                "GetVeterancyCensusJson",
+                "GetSelectionCensusJson",
             ]
             for getter in getters:
                 try:
