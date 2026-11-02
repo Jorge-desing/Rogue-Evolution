@@ -2536,6 +2536,11 @@ namespace RogueCommandExpansionLoader.Content
             List<ContentDiagnostic> diagnostics)
         {
             if (effects == null) return;
+            if (effects.Length > 16)
+            {
+                Add(diagnostics, "unit-status-effect.count-invalid", path,
+                    "A unit can declare at most 16 status effects.");
+            }
             for (int i = 0; i < effects.Length; i++)
             {
                 var effect = effects[i];
@@ -2551,10 +2556,10 @@ namespace RogueCommandExpansionLoader.Content
                     Add(diagnostics, "unit-status-effect.type-required", itemPath + ".effectType",
                         "Status effect type must be non-empty.");
                 }
-                if (!IsFiniteSingle(effect.duration) || effect.duration < 0)
+                if (!IsFiniteSingle(effect.duration) || effect.duration < 0 || effect.duration > 300f)
                 {
                     Add(diagnostics, "unit-status-effect.duration-invalid", itemPath + ".duration",
-                        "Status effect duration must be finite and non-negative.");
+                        "Status effect duration must be finite and between 0 and 300 seconds.");
                 }
                 ValidateStatusEffectMagnitude(effect, itemPath, diagnostics);
             }

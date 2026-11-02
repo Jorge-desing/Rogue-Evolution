@@ -468,6 +468,7 @@
         },
         "statusEffects": {
           "type": "array",
+          "maxItems": 16,
           "items": {
             "$ref": "#/$defs/unitStatusEffect"
           }
@@ -2726,7 +2727,8 @@
         },
         "duration": {
           "type": "number",
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 300
         },
         "magnitude": {
           "type": "number"

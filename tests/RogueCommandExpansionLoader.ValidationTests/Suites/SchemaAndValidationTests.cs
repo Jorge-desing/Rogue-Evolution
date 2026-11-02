@@ -776,6 +776,53 @@ internal static partial class ValidationTestRunner
                 "unit-status-effect.magnitude-invalid");
         });
     }),
+    ("unit status effect limits are enforced in schema and package validation", () =>
+    {
+        using (JsonDocument schemaDocument = JsonDocument.Parse(File.ReadAllText(
+            Path.Combine(repositoryRoot, "content", "schema", "content.schema.json"))))
+        {
+            JsonElement statusEffects = schemaDocument.RootElement.GetProperty("$defs").GetProperty("unit")
+                .GetProperty("properties").GetProperty("statusEffects");
+            if (!statusEffects.TryGetProperty("maxItems", out JsonElement maxItems) || maxItems.GetInt32() != 16)
+            {
+                throw new InvalidOperationException("unit.statusEffects must declare maxItems=16 in the JSON schema.");
+            }
+
+            JsonElement duration = schemaDocument.RootElement.GetProperty("$defs").GetProperty("unitStatusEffect")
+                .GetProperty("properties").GetProperty("duration");
+            if (!duration.TryGetProperty("maximum", out JsonElement maximum) || Math.Abs(maximum.GetDouble() - 300d) > 0.0001d)
+            {
+                throw new InvalidOperationException("unitStatusEffect.duration must declare maximum=300 in the JSON schema.");
+            }
+        }
+
+        WithPackage(sample, (pack, root) =>
+        {
+            pack.units[0].statusEffects = Enumerable.Range(0, 17)
+                .Select(index => new ContentUnitStatusEffectDefinition
+                {
+                    id = "sample:status-" + index,
+                    effectType = "Stun",
+                    duration = 1f
+                })
+                .ToArray();
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(), "unit-status-effect.count-invalid");
+        });
+
+        WithPackage(sample, (pack, root) =>
+        {
+            pack.units[0].statusEffects = new[]
+            {
+                new ContentUnitStatusEffectDefinition
+                {
+                    id = "sample:status-too-long",
+                    effectType = "Stun",
+                    duration = 300.01f
+                }
+            };
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(), "unit-status-effect.duration-invalid");
+        });
+    }),
     ("unit effect values and visual scale preserve schema-allowed signed and zero values", () =>
     {
         WithPackage(sample, (pack, root) =>
