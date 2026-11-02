@@ -27,6 +27,8 @@ namespace RogueCommandExpansionLoader.Runtime
         public ContentUnitVampiricLeechDefinition VampiricLeech { get; set; }
         public ContentUnitTauntDefinition Taunt { get; set; }
         public ContentUnitShieldOverloadNovaDefinition ShieldOverloadNova { get; set; }
+        public string DefaultTacticalStance { get; set; }
+        public string[] StartingAffixes { get; set; }
 
         public bool HasRuntimeComponentMechanics =>
             (Healing != null && (Healing.healAmount > 0f || Healing.repairAmount > 0f) && Healing.healRange > 0f) ||
@@ -37,7 +39,9 @@ namespace RogueCommandExpansionLoader.Runtime
             (Command != null && Command.commandRange > 0f) ||
             (ShieldRegen != null && ShieldRegen.rechargeRate > 0f) ||
             (Taunt != null && Taunt.tauntRadius > 0f) ||
-            (ShieldOverloadNova != null && ShieldOverloadNova.novaRadius > 0f);
+            (ShieldOverloadNova != null && ShieldOverloadNova.novaRadius > 0f) ||
+            (!string.IsNullOrWhiteSpace(DefaultTacticalStance) && !string.Equals(DefaultTacticalStance, "Standard", StringComparison.OrdinalIgnoreCase)) ||
+            (StartingAffixes != null && StartingAffixes.Length > 0);
 
         public bool HasOnDamageDealtMechanics =>
             (CombatBoosts != null && CombatBoosts.Length > 0) ||
@@ -52,7 +56,9 @@ namespace RogueCommandExpansionLoader.Runtime
                 !string.Equals(AiActivationTrigger, "EnemiesInRange", StringComparison.OrdinalIgnoreCase)) ||
             (MinAttackRange.HasValue && MinAttackRange.Value > 0f) ||
             (CriticalHitChance.HasValue && CriticalHitChance.Value > 0f) ||
-            (OnHitStatusEffects != null && OnHitStatusEffects.Length > 0);
+            (OnHitStatusEffects != null && OnHitStatusEffects.Length > 0) ||
+            !string.IsNullOrWhiteSpace(DefaultTacticalStance) ||
+            (StartingAffixes != null && StartingAffixes.Length > 0);
     }
 
     /// <summary>
@@ -152,6 +158,8 @@ namespace RogueCommandExpansionLoader.Runtime
         private float _previousShield;
         private bool _hasInitializedShield;
         private bool _baselineApplied;
+        private bool _defaultStanceApplied;
+        private bool _startingAffixesApplied;
 
         public static int RegisteredProfileCount
         {
@@ -882,6 +890,14 @@ namespace RogueCommandExpansionLoader.Runtime
             {
                 parts.Add("Nova EMP: " + profile.ShieldOverloadNova.damage.ToString("0") + " dmg (" + profile.ShieldOverloadNova.novaRadius.ToString("0.#") + "m)");
             }
+            if (!string.IsNullOrWhiteSpace(profile.DefaultTacticalStance))
+            {
+                parts.Add("Postura: " + profile.DefaultTacticalStance);
+            }
+            if (profile.StartingAffixes != null && profile.StartingAffixes.Length > 0)
+            {
+                parts.Add("Afijos: " + string.Join(", ", profile.StartingAffixes));
+            }
 
             return parts.Count > 0 ? string.Join(" • ", parts) : null;
         }
@@ -1149,6 +1165,17 @@ namespace RogueCommandExpansionLoader.Runtime
 
         private void ClearRuntimeState()
         {
+            if (_entityController != null)
+            {
+                try
+                {
+                    int keyInt = GetCombatExperienceKey(_entityController);
+                    string keyStr = keyInt.ToString();
+                    RuntimeGameplayCommandDirector.TryRemoveUnitAffix(keyStr, "All");
+                    RuntimeGameplayCommandDirector.ResetUnitTacticalStance(keyStr);
+                }
+                catch { }
+            }
             _entityController = null;
             _profile = null;
             _nextHealCheckTime = 0f;
@@ -1163,6 +1190,8 @@ namespace RogueCommandExpansionLoader.Runtime
             _previousShield = 0f;
             _hasInitializedShield = false;
             _baselineApplied = false;
+            _defaultStanceApplied = false;
+            _startingAffixesApplied = false;
         }
 
         private static void RevertBaselineStatusEffects(object entityObj, int key)
@@ -1266,6 +1295,13 @@ namespace RogueCommandExpansionLoader.Runtime
                 int combatExperienceKey = GetCombatExperienceKey(entityObj);
                 RevertBaselineStatusEffects(entityObj, combatExperienceKey);
                 RevertCommandLinks(entityObj);
+                try
+                {
+                    string resetKey = combatExperienceKey.ToString();
+                    RuntimeGameplayCommandDirector.TryRemoveUnitAffix(resetKey, "All");
+                    RuntimeGameplayCommandDirector.ResetUnitTacticalStance(resetKey);
+                }
+                catch { }
 
                 string entityId = ReadEntityId(entityObj);
                 if (string.IsNullOrWhiteSpace(entityId))
@@ -1680,6 +1716,8 @@ namespace RogueCommandExpansionLoader.Runtime
             _previousShield = ReadFloatProperty(_currentShieldProperty, entityController, 0f);
             _hasInitializedShield = true;
             _baselineApplied = true;
+            _defaultStanceApplied = false;
+            _startingAffixesApplied = false;
         }
 
         public void TickMechanics() => Update();
@@ -1699,6 +1737,36 @@ namespace RogueCommandExpansionLoader.Runtime
                 }
 
                 float now = Time.time;
+
+                if (!_defaultStanceApplied && !string.IsNullOrWhiteSpace(_profile.DefaultTacticalStance))
+                {
+                    int key = GetCombatExperienceKey(_entityController);
+                    var stanceResult = RuntimeGameplayCommandDirector.TrySetUnitTacticalStance(key.ToString(), _profile.DefaultTacticalStance);
+                    if (stanceResult.Success)
+                    {
+                        _defaultStanceApplied = true;
+                    }
+                }
+
+                if (!_startingAffixesApplied && _profile.StartingAffixes != null && _profile.StartingAffixes.Length > 0)
+                {
+                    int key = GetCombatExperienceKey(_entityController);
+                    bool allApplied = true;
+                    for (int i = 0; i < _profile.StartingAffixes.Length; i++)
+                    {
+                        string affix = _profile.StartingAffixes[i];
+                        if (string.IsNullOrWhiteSpace(affix)) continue;
+                        var affixResult = RuntimeGameplayCommandDirector.TryApplyUnitAffix(key.ToString(), affix);
+                        if (!affixResult.Success)
+                        {
+                            allApplied = false;
+                        }
+                    }
+                    if (allApplied)
+                    {
+                        _startingAffixesApplied = true;
+                    }
+                }
 
                 if (!_baselineApplied && _profile.BaselineStatusEffects != null && _profile.BaselineStatusEffects.Length > 0)
                 {

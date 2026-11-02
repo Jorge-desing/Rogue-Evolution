@@ -6215,6 +6215,35 @@ namespace RogueCommandExpansionLoader.Runtime
         }
 
         /// <summary>
+        /// Resets or removes the active tactical stance for a specific unit key.
+        /// </summary>
+        public static void ResetUnitTacticalStance(string entityKeyId)
+        {
+            if (string.IsNullOrWhiteSpace(entityKeyId))
+            {
+                return;
+            }
+
+            string key = entityKeyId.Trim();
+            try
+            {
+                EntityController unit = FindEntityByKey(ExistingControllers.Instance, key);
+                if (unit != null)
+                {
+                    key = unit.UniqueEntityId.ToString();
+                }
+            }
+            catch
+            {
+            }
+
+            lock (_activeTacticalStances)
+            {
+                _activeTacticalStances.Remove(key);
+            }
+        }
+
+        /// <summary>
         /// Assigns a tactical combat stance to a group of units.
         /// </summary>
         public static UnitTacticalStanceResult TrySetGroupTacticalStance(IReadOnlyList<string> entityKeyIds, string stanceName)

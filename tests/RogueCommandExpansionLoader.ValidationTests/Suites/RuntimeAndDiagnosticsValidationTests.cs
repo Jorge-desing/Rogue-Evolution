@@ -6183,5 +6183,194 @@ internal static partial class ValidationTestRunner
             RuntimeAgentCoordinator.ResetForTests();
         }
     }),
+    ("content unit and AI profile definitions validate default tactical stances, elite affixes, AI doctrines, and aggression multipliers", () =>
+    {
+        WithPackage(sample, (pack, root) =>
+        {
+            var unit = pack.units[0];
+            unit.defaultTacticalStance = "Kiting";
+            unit.startingAffixes = new[] { "Swift", "Overcharged" };
+
+            // Clone check
+            var cloneMethod = typeof(ContentPackCopy).GetMethod("CloneUnit", BindingFlags.NonPublic | BindingFlags.Static);
+            var cloned = (ContentUnitDefinition)cloneMethod!.Invoke(null, new object[] { unit })!;
+            if (cloned.defaultTacticalStance != "Kiting" || cloned.startingAffixes == null || cloned.startingAffixes.Length != 2 ||
+                cloned.startingAffixes[0] != "Swift" || cloned.startingAffixes[1] != "Overcharged")
+            {
+                throw new InvalidOperationException("Cloned unit definition failed to preserve defaultTacticalStance or startingAffixes.");
+            }
+            if (ReferenceEquals(cloned.startingAffixes, unit.startingAffixes))
+            {
+                throw new InvalidOperationException("Cloned unit definition must not share startingAffixes array instance.");
+            }
+
+            // Valid package passes
+            ExpectValid(pack, root, new EmptySnapshot(), new KnownModuleValidator());
+
+            // Invalid stance
+            unit.defaultTacticalStance = "SniperRush";
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(), "unit.defaultTacticalStance-invalid");
+            unit.defaultTacticalStance = "Kiting";
+
+            // Empty affix
+            unit.startingAffixes = new[] { "   " };
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(), "unit.startingAffixes-empty");
+
+            // Invalid affix
+            unit.startingAffixes = new[] { "MegaBlast" };
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(), "unit.startingAffixes-invalid");
+
+            // Duplicate affix
+            unit.startingAffixes = new[] { "Swift", "Swift" };
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(), "unit.startingAffixes-duplicate");
+            unit.startingAffixes = new[] { "Swift" };
+
+            // AI profile validation & cloning
+            if (pack.aiProfiles != null && pack.aiProfiles.Length > 0)
+            {
+                var ai = pack.aiProfiles[0];
+                ai.doctrine = "Assault";
+                ai.aggressionMultiplier = 1.8f;
+
+                var cloneAiMethod = typeof(ContentPackCopy).GetMethod("CloneAiProfile", BindingFlags.NonPublic | BindingFlags.Static);
+                var clonedAi = (ContentAiProfileDefinition)cloneAiMethod!.Invoke(null, new object[] { ai })!;
+                if (clonedAi.doctrine != "Assault" || clonedAi.aggressionMultiplier != 1.8f)
+                {
+                    throw new InvalidOperationException("Cloned AI profile failed to preserve doctrine or aggressionMultiplier.");
+                }
+
+                // Invalid doctrine
+                ai.doctrine = "ChaosDoctrine";
+                ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(), "ai-profile.doctrine-invalid");
+                ai.doctrine = "Assault";
+
+                // Out-of-range aggression multiplier (< 0.1)
+                ai.aggressionMultiplier = 0.05f;
+                ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(), "ai-profile.aggressionMultiplier-range");
+
+                // Out-of-range aggression multiplier (> 5.0)
+                ai.aggressionMultiplier = 6.0f;
+                ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(), "ai-profile.aggressionMultiplier-range");
+
+                // Non-finite aggression multiplier
+                ai.aggressionMultiplier = float.NaN;
+                ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(), "ai-profile.aggressionMultiplier-range");
+            }
+        });
+    }),
+    ("unit runtime mechanics director applies default tactical stance and starting affixes on spawn and cleans up on reset", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        RuntimeGameplayCommandDirector.ClearTacticalStancesAndAffixes();
+        RuntimeUnitMechanicsDirector.ClearProfiles();
+
+        var go = new GameObject("TestUnitStanceAffix");
+        var unit = go.AddComponent<EntityController>();
+        unit.entityId = "sample:custom-stance-tank";
+        unit.UniqueEntityId = 980;
+        unit.IsUnit = true;
+        unit.IsControlledByPlayer = true;
+        unit.CurrentHealth = 80f;
+        unit.MaxHealth = 100f;
+        unit.CurrentShield = 0f;
+        unit.MaxShield = 5f;
+        ExistingControllers.Instance.PlayerUnits().Add(unit);
+
+        RuntimeUnitMechanicsDirector.RegisterProfile("sample:custom-stance-tank", new UnitRuntimeMechanicsProfile
+        {
+            EntityId = "sample:custom-stance-tank",
+            DefaultTacticalStance = "Aggressive",
+            StartingAffixes = new[] { "Swift", "Bulwark" }
+        });
+
+        // 1. Summary formatting check
+        string? summary = RuntimeUnitMechanicsDirector.FormatMechanicsSummary("sample:custom-stance-tank");
+        if (summary == null || !summary.Contains("Postura: Aggressive") || !summary.Contains("Afijos: Swift, Bulwark"))
+        {
+            throw new InvalidOperationException($"Mechanics summary did not contain expected stance and affixes: '{summary}'");
+        }
+
+        // 2. Attach mechanics and tick
+        RuntimeUnitMechanicsDirector.AttachIfApplicable(unit);
+        var director = go.GetComponent<RuntimeUnitMechanicsDirector>();
+        if (director == null)
+        {
+            throw new InvalidOperationException("RuntimeUnitMechanicsDirector should be attached to unit with stance and affixes.");
+        }
+
+        director.TickMechanics();
+
+        // 3. Verify tactical stance census
+        TacticalStanceCensus stanceCensus = RuntimeGameplayCommandDirector.GetTacticalStanceCensus(32);
+        if (stanceCensus.TotalTrackedUnits != 1 || stanceCensus.AggressiveCount != 1)
+        {
+            throw new InvalidOperationException($"Stance census expected 1 Aggressive unit, got {stanceCensus.AggressiveCount} / {stanceCensus.TotalTrackedUnits}");
+        }
+
+        // 4. Verify unit affix census
+        UnitAffixCensus affixCensus = RuntimeGameplayCommandDirector.GetUnitAffixCensus(32);
+        if (affixCensus.TotalTrackedUnits != 1 || affixCensus.TotalActiveAffixes != 2 ||
+            affixCensus.AffixRows.Count != 1 || !affixCensus.AffixRows[0].Affixes.Contains("Swift") || !affixCensus.AffixRows[0].Affixes.Contains("Bulwark"))
+        {
+            throw new InvalidOperationException($"Affix census expected Swift and Bulwark, got total={affixCensus.TotalActiveAffixes}");
+        }
+
+        // 5. Clear runtime mechanics and verify cleanup
+        var clearMethod = typeof(RuntimeUnitMechanicsDirector).GetMethod("ClearRuntimeMechanics", BindingFlags.NonPublic | BindingFlags.Static, null, new[] { typeof(GameObject) }, null);
+        clearMethod!.Invoke(null, new object[] { go });
+
+        TacticalStanceCensus clearedStance = RuntimeGameplayCommandDirector.GetTacticalStanceCensus(32);
+        if (clearedStance.AggressiveCount != 0 || clearedStance.StandardCount != 1)
+        {
+            throw new InvalidOperationException($"Tactical stance should be reset to Standard upon clear. Aggressive={clearedStance.AggressiveCount}, Standard={clearedStance.StandardCount}");
+        }
+
+        UnitAffixCensus clearedAffix = RuntimeGameplayCommandDirector.GetUnitAffixCensus(32);
+        if (clearedAffix.TotalTrackedUnits != 0 || clearedAffix.TotalActiveAffixes != 0)
+        {
+            throw new InvalidOperationException("Unit affixes should be removed upon clear.");
+        }
+
+        ExistingControllers.Instance.Reset();
+        RuntimeGameplayCommandDirector.ClearTacticalStancesAndAffixes();
+        RuntimeUnitMechanicsDirector.ClearProfiles();
+    }),
+    ("content pack runtime loader applies AI doctrine on commit and initializes profile", () =>
+    {
+        RuntimeGameplayCommandDirector.TrySetAiDoctrine("Standard", 1.0f);
+        AiDoctrineAndDeckCensus initialCensus = RuntimeAiDoctrineCensus.Current();
+        if (initialCensus.ActiveDoctrine != "Standard" || Math.Abs(initialCensus.AggressionMultiplier - 1.0f) > 0.01f)
+        {
+            throw new InvalidOperationException("Initial doctrine census should be Standard.");
+        }
+
+        // Apply dynamic doctrine via TrySetAiDoctrine
+        AiDoctrineResult result = RuntimeGameplayCommandDirector.TrySetAiDoctrine("Siege", 2.2f);
+        if (!result.Success || result.DoctrineName != "Siege" || Math.Abs(result.AggressionMultiplier - 2.2f) > 0.01f)
+        {
+            throw new InvalidOperationException("Failed to set AI doctrine Siege.");
+        }
+
+        AiDoctrineAndDeckCensus updatedCensus = RuntimeAiDoctrineCensus.Current();
+        if (updatedCensus.ActiveDoctrine != "Siege" || Math.Abs(updatedCensus.AggressionMultiplier - 2.2f) > 0.01f)
+        {
+            throw new InvalidOperationException($"Updated doctrine census expected Siege 2.2, got {updatedCensus.ActiveDoctrine} {updatedCensus.AggressionMultiplier}");
+        }
+
+        // Verify bounds clamping: multiplier clamped between 0.1 and 5.0
+        AiDoctrineResult clampedLow = RuntimeGameplayCommandDirector.TrySetAiDoctrine("Kiting", 0.01f);
+        if (!clampedLow.Success || Math.Abs(clampedLow.AggressionMultiplier - 0.1f) > 0.01f)
+        {
+            throw new InvalidOperationException("Aggression multiplier below 0.1 must be clamped to 0.1.");
+        }
+
+        AiDoctrineResult clampedHigh = RuntimeGameplayCommandDirector.TrySetAiDoctrine("Assault", 10.0f);
+        if (!clampedHigh.Success || Math.Abs(clampedHigh.AggressionMultiplier - 5.0f) > 0.01f)
+        {
+            throw new InvalidOperationException("Aggression multiplier above 5.0 must be clamped to 5.0.");
+        }
+
+        RuntimeGameplayCommandDirector.TrySetAiDoctrine("Standard", 1.0f);
+    }),
     };
 }

@@ -2370,6 +2370,11 @@ namespace RogueCommandExpansionLoader.Content
             try
             {
                 bound.RuntimeBehaviour.OnInitialized();
+                if (!String.IsNullOrWhiteSpace(profile.Definition.doctrine))
+                {
+                    float mult = profile.Definition.aggressionMultiplier ?? 1.0f;
+                    RuntimeGameplayCommandDirector.TrySetAiDoctrine(profile.Definition.doctrine, mult);
+                }
                 // Apply AI overrides from units referenced in this profile
                 if (profile.Definition.unitEntries != null)
                 {
@@ -4523,6 +4528,11 @@ namespace RogueCommandExpansionLoader.Content
             {
                 _aiProfiles.Add(profiles[i].Id, profiles[i]);
                 _aiProfilesByResourceName.Add(profiles[i].ResourceName, profiles[i]);
+                if (!String.IsNullOrWhiteSpace(profiles[i].Definition.doctrine))
+                {
+                    float mult = profiles[i].Definition.aggressionMultiplier ?? 1.0f;
+                    RuntimeGameplayCommandDirector.TrySetAiDoctrine(profiles[i].Definition.doctrine, mult);
+                }
             }
 
             for (int i = 0; i < stages.Count; i++)
@@ -8533,7 +8543,9 @@ namespace RogueCommandExpansionLoader.Content
                 ShieldRegen = unit.shieldRegeneration,
                 VampiricLeech = unit.vampiricLeech,
                 Taunt = unit.tauntPulse,
-                ShieldOverloadNova = unit.shieldOverloadNova
+                ShieldOverloadNova = unit.shieldOverloadNova,
+                DefaultTacticalStance = unit.defaultTacticalStance,
+                StartingAffixes = unit.startingAffixes
             };
 
             if (profile.HasAnyMechanics)
@@ -9151,6 +9163,8 @@ namespace RogueCommandExpansionLoader.Content
             public string ResourceName { get; private set; }
             public bool ScopeToReferencedStages { get { return Definition.scopeToReferencedStages; } }
             public string[] ModuleIds { get; private set; }
+            public string Doctrine => Definition?.doctrine;
+            public float? AggressionMultiplier => Definition?.aggressionMultiplier;
             public List<object> Behaviours { get; private set; }
             public GameObject Prefab { get; private set; }
             public int StageMin { get; private set; }

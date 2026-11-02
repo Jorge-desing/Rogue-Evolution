@@ -358,6 +358,8 @@ namespace RogueCommandExpansionLoader.Content
         public ContentOnHitStatusEffectDefinition[] onHitStatusEffects;
         public float? criticalHitChance;
         public int? prespawnCount;
+        public string defaultTacticalStance;
+        public string[] startingAffixes;
         public string selectionSoundAssetName;
         public string engineSoundAssetName;
         public string weaponSoundAssetName;
@@ -930,6 +932,8 @@ namespace RogueCommandExpansionLoader.Content
         public ContentAiUnitEntryDefinition[] unitEntries;
         public ContentAiProductionBuildingEntryDefinition[] productionBuildingEntries;
         public ContentAiModuleDefinition[] modules;
+        public string doctrine;
+        public float? aggressionMultiplier;
     }
 
     [Serializable]
@@ -1043,6 +1047,8 @@ namespace RogueCommandExpansionLoader.Content
                 onHitStatusEffects = CloneArray(source.onHitStatusEffects, CloneOnHitStatusEffect),
                 criticalHitChance = source.criticalHitChance,
                 prespawnCount = source.prespawnCount,
+                defaultTacticalStance = source.defaultTacticalStance,
+                startingAffixes = source.startingAffixes != null ? (string[])source.startingAffixes.Clone() : null,
                 selectionSoundAssetName = source.selectionSoundAssetName,
                 engineSoundAssetName = source.engineSoundAssetName,
                 weaponSoundAssetName = source.weaponSoundAssetName,
@@ -1570,7 +1576,9 @@ namespace RogueCommandExpansionLoader.Content
                 unitEntries = CloneArray(source.unitEntries, CloneAiUnitEntry),
                 productionBuildingEntries = CloneArray(source.productionBuildingEntries,
                     CloneAiProductionBuildingEntry),
-                modules = CloneArray(source.modules, CloneAiModule)
+                modules = CloneArray(source.modules, CloneAiModule),
+                doctrine = source.doctrine,
+                aggressionMultiplier = source.aggressionMultiplier
             };
         }
 

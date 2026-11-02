@@ -758,6 +758,34 @@
         },
         "weaponSoundAssetName": {
           "$ref": "#/$defs/assetName"
+        },
+        "defaultTacticalStance": {
+          "type": "string",
+          "enum": [
+            "Standard",
+            "Aggressive",
+            "Defensive",
+            "HoldFire",
+            "Kiting"
+          ],
+          "description": "Default combat tactical stance applied to the unit on battlefield spawn."
+        },
+        "startingAffixes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "Swift",
+              "Bulwark",
+              "Juggernaut",
+              "Overcharged",
+              "Vampiric",
+              "Volatile"
+            ]
+          },
+          "uniqueItems": true,
+          "maxItems": 6,
+          "description": "List of elite affixes and traits active on the unit upon deployment."
         }
       },
       "oneOf": [
@@ -2136,6 +2164,23 @@
           "items": {
             "$ref": "#/$defs/aiModule"
           }
+        },
+        "doctrine": {
+          "type": "string",
+          "enum": [
+            "Standard",
+            "Assault",
+            "Siege",
+            "Kiting",
+            "Fortify"
+          ],
+          "description": "Dynamic strategic AI doctrine dictating behavior pacing and wave intensity."
+        },
+        "aggressionMultiplier": {
+          "type": "number",
+          "minimum": 0.1,
+          "maximum": 5.0,
+          "description": "Scalar multiplier adjusting AI director decision tick cadence and assault wave tempo."
         }
       },
       "oneOf": [
@@ -2343,7 +2388,7 @@
         }
       }
     },
-        "onHitStatusEffect": {
+    "onHitStatusEffect": {
       "type": "object",
       "additionalProperties": false,
       "required": [
@@ -2354,10 +2399,33 @@
         "statusEffect": {
           "type": "string",
           "enum": [
-            "CombatBoost", "Defender", "SquadEffect", "Turbo", "SlowedDown", "Stun", "OnFire", "Spikes",
-            "CriticallyHitting", "Battered", "Reaper", "Regen", "Rage", "Attacker", "Invincible", "Leaking",
-            "Vampirism", "Robust", "Marked", "Rush", "Solo", "Stealth", "Taunt", "Armored", "AttackDeactivated",
-            "Panic", "Overclocked"
+            "CombatBoost",
+            "Defender",
+            "SquadEffect",
+            "Turbo",
+            "SlowedDown",
+            "Stun",
+            "OnFire",
+            "Spikes",
+            "CriticallyHitting",
+            "Battered",
+            "Reaper",
+            "Regen",
+            "Rage",
+            "Attacker",
+            "Invincible",
+            "Leaking",
+            "Vampirism",
+            "Robust",
+            "Marked",
+            "Rush",
+            "Solo",
+            "Stealth",
+            "Taunt",
+            "Armored",
+            "AttackDeactivated",
+            "Panic",
+            "Overclocked"
           ]
         },
         "duration": {
@@ -2373,7 +2441,7 @@
         }
       }
     },
-"activeSkill": {
+    "activeSkill": {
       "type": "object",
       "additionalProperties": false,
       "required": [

@@ -235,6 +235,15 @@ namespace RogueCommandExpansionLoader.Content
                 "GainCreditsAmount", "SkillManaCost", "Duration1", "SpawnTtl", "ManaRechargePerSecond",
                 "MaxArmor", "ArmorProtection"
             }, StringComparer.Ordinal);
+        private static readonly HashSet<string> SupportedCombatStances = new HashSet<string>(
+            new[] { "Standard", "Aggressive", "Defensive", "HoldFire", "Kiting" },
+            StringComparer.OrdinalIgnoreCase);
+        private static readonly HashSet<string> SupportedEliteAffixes = new HashSet<string>(
+            new[] { "Swift", "Bulwark", "Juggernaut", "Overcharged", "Vampiric", "Volatile" },
+            StringComparer.OrdinalIgnoreCase);
+        private static readonly HashSet<string> SupportedAiDoctrines = new HashSet<string>(
+            new[] { "Standard", "Assault", "Siege", "Kiting", "Fortify" },
+            StringComparer.OrdinalIgnoreCase);
 
         public static ContentPackValidationResult Validate(
             ContentPackDefinition pack,
@@ -501,6 +510,7 @@ namespace RogueCommandExpansionLoader.Content
                 ValidateTaunt(unit.tauntPulse, itemPath + ".tauntPulse", diagnostics);
                 ValidateShieldOverloadNova(unit.shieldOverloadNova, itemPath + ".shieldOverloadNova", diagnostics);
                 ValidateUnitBalancingParameters(unit, itemPath, diagnostics);
+                ValidateUnitTacticalStanceAndAffixes(unit, itemPath, diagnostics);
                 ValidateProductionBuilding(unit.productionBuilding, itemPath + ".productionBuilding",
                                     allIds, productionBuildingIds, bundleIds, registrySnapshot, diagnostics);
                 ValidateProfileCardEligibility(unit, itemPath, diagnostics);
@@ -597,6 +607,7 @@ namespace RogueCommandExpansionLoader.Content
                 }
 
                 ValidateAiProfileStageRangeContiguity(profile, itemPath, stages, diagnostics);
+                ValidateAiDoctrineAndAggression(profile, itemPath, diagnostics);
 
                 if (!String.IsNullOrWhiteSpace(resourceName) && !aiResourceNames.Add(resourceName))
                 {
@@ -3321,6 +3332,80 @@ namespace RogueCommandExpansionLoader.Content
                         Add(diagnostics, "unit.baselineStatusEffects-duplicate", effectPath,
                             "Duplicate baselineStatusEffect '" + effect + "' is not permitted.");
                     }
+                }
+            }
+        }
+
+        private static void ValidateUnitTacticalStanceAndAffixes(
+            ContentUnitDefinition unit,
+            string path,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (unit == null) return;
+
+            if (!String.IsNullOrWhiteSpace(unit.defaultTacticalStance))
+            {
+                string stance = unit.defaultTacticalStance.Trim();
+                if (!SupportedCombatStances.Contains(stance))
+                {
+                    Add(diagnostics, "unit.defaultTacticalStance-invalid", path + ".defaultTacticalStance",
+                        "defaultTacticalStance '" + stance + "' must be one of Standard, Aggressive, Defensive, HoldFire, Kiting.");
+                }
+            }
+
+            if (unit.startingAffixes != null)
+            {
+                var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                for (int i = 0; i < unit.startingAffixes.Length; i++)
+                {
+                    string affix = unit.startingAffixes[i];
+                    string affixPath = path + ".startingAffixes[" + i + "]";
+                    if (String.IsNullOrWhiteSpace(affix))
+                    {
+                        Add(diagnostics, "unit.startingAffixes-empty", affixPath,
+                            "startingAffixes element cannot be empty or whitespace.");
+                        continue;
+                    }
+
+                    string trimmed = affix.Trim();
+                    if (!SupportedEliteAffixes.Contains(trimmed))
+                    {
+                        Add(diagnostics, "unit.startingAffixes-invalid", affixPath,
+                            "startingAffixes element '" + trimmed + "' must be one of Swift, Bulwark, Juggernaut, Overcharged, Vampiric, Volatile.");
+                    }
+                    else if (!seen.Add(trimmed))
+                    {
+                        Add(diagnostics, "unit.startingAffixes-duplicate", affixPath,
+                            "Duplicate startingAffix '" + trimmed + "' is not permitted.");
+                    }
+                }
+            }
+        }
+
+        private static void ValidateAiDoctrineAndAggression(
+            ContentAiProfileDefinition profile,
+            string path,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (profile == null) return;
+
+            if (!String.IsNullOrWhiteSpace(profile.doctrine))
+            {
+                string doctrine = profile.doctrine.Trim();
+                if (!SupportedAiDoctrines.Contains(doctrine))
+                {
+                    Add(diagnostics, "ai-profile.doctrine-invalid", path + ".doctrine",
+                        "doctrine '" + doctrine + "' must be one of Standard, Assault, Siege, Kiting, Fortify.");
+                }
+            }
+
+            if (profile.aggressionMultiplier.HasValue)
+            {
+                float mult = profile.aggressionMultiplier.Value;
+                if (float.IsNaN(mult) || float.IsInfinity(mult) || mult < 0.1f || mult > 5.0f)
+                {
+                    Add(diagnostics, "ai-profile.aggressionMultiplier-range", path + ".aggressionMultiplier",
+                        "aggressionMultiplier must be a finite number between 0.1 and 5.0.");
                 }
             }
         }
