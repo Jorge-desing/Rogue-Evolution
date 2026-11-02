@@ -29,7 +29,7 @@
         {
           "language": "es-XL",
           "name": "Explorador Sandlance",
-          "description": "Un tanque de reconocimiento rápido con mástil sensor extendido y cañón ligero."
+          "description": "Un tanque de reconocimiento r\u00e1pido con m\u00e1stil sensor extendido y ca\u00f1\u00f3n ligero."
         }
       ],
       "balanceOverrides": [
@@ -253,7 +253,13 @@
         "siphonRatio": 0.04,
         "siphonToShield": false,
         "maxSiphonPerHit": 10
-      }
+      },
+      "defaultTacticalStance": "Aggressive",
+      "defaultLoadout": "AP",
+      "startingVeterancyRank": 1,
+      "startingAffixes": [
+        "Swift"
+      ]
     },
     {
       "id": "sample-native:heavy-artillery",
@@ -429,7 +435,7 @@
           },
           {
             "language": "es-XL",
-            "name": "Fábrica de asedio Coloso",
+            "name": "F\u00e1brica de asedio Coloso",
             "description": "Produce plataformas de asedio Coloso."
           }
         ]
@@ -465,7 +471,13 @@
         "siphonRatio": 0.03,
         "siphonToShield": false,
         "maxSiphonPerHit": 10
-      }
+      },
+      "defaultTacticalStance": "HoldFire",
+      "defaultLoadout": "Siege",
+      "startingVeterancyRank": 1,
+      "startingAffixes": [
+        "Bulwark"
+      ]
     },
     {
       "id": "sample-native:assault-walker",
@@ -481,7 +493,7 @@
         {
           "language": "es-XL",
           "name": "Caminante Gatling Acorazado",
-          "description": "Un caminante bípedo de combate reforzado equipado con cañones rotativos dobles para triturar enjambres y blindaje ligero."
+          "description": "Un caminante b\u00edpedo de combate reforzado equipado con ca\u00f1ones rotativos dobles para triturar enjambres y blindaje ligero."
         }
       ],
       "balanceOverrides": [
@@ -636,7 +648,7 @@
           },
           {
             "language": "es-XL",
-            "name": "Fundición de caminantes Ironclad",
+            "name": "Fundici\u00f3n de caminantes Ironclad",
             "description": "Produce caminantes Gatling acorazados."
           }
         ]
@@ -674,7 +686,13 @@
         "siphonRatio": 0.078,
         "siphonToShield": false,
         "maxSiphonPerHit": 10
-      }
+      },
+      "defaultTacticalStance": "Aggressive",
+      "defaultLoadout": "Standard",
+      "startingVeterancyRank": 2,
+      "startingAffixes": [
+        "Juggernaut"
+      ]
     },
     {
       "id": "sample-native:atlas-crane-mech",
@@ -693,8 +711,8 @@
         },
         {
           "language": "es-XL",
-          "name": "Mecha Grúa Atlas",
-          "description": "Un mecha bípedo de combate pesado equipado con una grúa industrial y cañones dobles."
+          "name": "Mecha Gr\u00faa Atlas",
+          "description": "Un mecha b\u00edpedo de combate pesado equipado con una gr\u00faa industrial y ca\u00f1ones dobles."
         }
       ],
       "balanceOverrides": [
@@ -853,8 +871,8 @@
           },
           {
             "language": "es-XL",
-            "name": "Fábrica de Mechas Grúa Atlas",
-            "description": "Produce mechas grúa Atlas."
+            "name": "F\u00e1brica de Mechas Gr\u00faa Atlas",
+            "description": "Produce mechas gr\u00faa Atlas."
           }
         ],
         "assetBundleId": "sample-native:assets",
@@ -885,7 +903,13 @@
         "siphonRatio": 0.03,
         "siphonToShield": false,
         "maxSiphonPerHit": 10
-      }
+      },
+      "defaultTacticalStance": "Defensive",
+      "defaultLoadout": "Reinforced",
+      "startingVeterancyRank": 1,
+      "startingAffixes": [
+        "Bulwark"
+      ]
     },
     {
       "id": "sample-native:bastion-siege-mech",
@@ -902,8 +926,8 @@
         },
         {
           "language": "es-XL",
-          "name": "Mecha de Asedio Bastión",
-          "description": "Un caminante pesado fortificado que cambia velocidad por fuego de cañón y resistencia."
+          "name": "Mecha de Asedio Basti\u00f3n",
+          "description": "Un caminante pesado fortificado que cambia velocidad por fuego de ca\u00f1\u00f3n y resistencia."
         }
       ],
       "balanceOverrides": [
@@ -1057,8 +1081,8 @@
           },
           {
             "language": "es-XL",
-            "name": "Fundición del Bastión",
-            "description": "Produce mechas de asedio Bastión."
+            "name": "Fundici\u00f3n del Basti\u00f3n",
+            "description": "Produce mechas de asedio Basti\u00f3n."
           }
         ],
         "assetBundleId": "sample-native:assets",
@@ -1095,7 +1119,13 @@
         "siphonRatio": 0.078,
         "siphonToShield": false,
         "maxSiphonPerHit": 10
-      }
+      },
+      "defaultTacticalStance": "Defensive",
+      "defaultLoadout": "Siege",
+      "startingVeterancyRank": 2,
+      "startingAffixes": [
+        "Bulwark"
+      ]
     },
     {
       "id": "sample-native:arachnid-hexapod",
@@ -1116,7 +1146,7 @@
         },
         {
           "language": "es-XL",
-          "name": "Hexápodo Arácnido",
+          "name": "Hex\u00e1podo Ar\u00e1cnido",
           "description": "Una plataforma de asalto pesado con blindaje resistente y fuego sostenido a media distancia."
         }
       ],
@@ -1274,8 +1304,8 @@
           },
           {
             "language": "es-XL",
-            "name": "Pórtico de ensamblaje Arácnido",
-            "description": "Produce hexápodos Arácnidos."
+            "name": "P\u00f3rtico de ensamblaje Ar\u00e1cnido",
+            "description": "Produce hex\u00e1podos Ar\u00e1cnidos."
           }
         ]
       },
@@ -1309,7 +1339,13 @@
         "siphonRatio": 0.078,
         "siphonToShield": false,
         "maxSiphonPerHit": 10
-      }
+      },
+      "defaultTacticalStance": "Kiting",
+      "defaultLoadout": "Speed",
+      "startingVeterancyRank": 1,
+      "startingAffixes": [
+        "Swift"
+      ]
     },
     {
       "id": "sample-native:overlord-command-hq",
@@ -1331,7 +1367,7 @@
         {
           "language": "es-XL",
           "name": "Cuartel de Mando Overlord",
-          "description": "Un vehículo de mando móvil con chasis resistente y cañón convencional para sostener la línea del frente."
+          "description": "Un veh\u00edculo de mando m\u00f3vil con chasis resistente y ca\u00f1\u00f3n convencional para sostener la l\u00ednea del frente."
         }
       ],
       "balanceOverrides": [
@@ -1488,8 +1524,8 @@
           },
           {
             "language": "es-XL",
-            "name": "Parque de vehículos Overlord",
-            "description": "Produce vehículos del Cuartel General Overlord."
+            "name": "Parque de veh\u00edculos Overlord",
+            "description": "Produce veh\u00edculos del Cuartel General Overlord."
           }
         ]
       },
@@ -1528,7 +1564,13 @@
         "siphonRatio": 0.025,
         "siphonToShield": false,
         "maxSiphonPerHit": 10
-      }
+      },
+      "defaultTacticalStance": "Defensive",
+      "defaultLoadout": "Standard",
+      "startingVeterancyRank": 3,
+      "startingAffixes": [
+        "Juggernaut"
+      ]
     },
     {
       "id": "sample-native:skirmish-bike",
@@ -1549,8 +1591,8 @@
         },
         {
           "language": "es-XL",
-          "name": "Moto de Asalto Rápido",
-          "description": "Una moto de reconocimiento ultrarrápida cargada con cargas explosivas volátiles para ataques de choque y fuga.",
+          "name": "Moto de Asalto R\u00e1pido",
+          "description": "Una moto de reconocimiento ultrarr\u00e1pida cargada con cargas explosivas vol\u00e1tiles para ataques de choque y fuga.",
           "skillDescription": "Muere e invoca una #LargeMine#."
         }
       ],
@@ -1706,7 +1748,7 @@
           {
             "language": "es-XL",
             "name": "Taller de motos de asalto",
-            "description": "Produce motos de asalto rápido."
+            "description": "Produce motos de asalto r\u00e1pido."
           }
         ],
         "assetBundleId": "sample-native:assets",
@@ -1737,7 +1779,13 @@
         "experienceAmount": 2,
         "experienceType": "Combat",
         "bonusMultiplier": 1
-      }
+      },
+      "defaultTacticalStance": "Kiting",
+      "defaultLoadout": "Speed",
+      "startingVeterancyRank": 1,
+      "startingAffixes": [
+        "Swift"
+      ]
     },
     {
       "id": "sample-native:surge-tank",
@@ -1754,8 +1802,8 @@
         },
         {
           "language": "es-XL",
-          "name": "Tanque de Sobretensión de Arco",
-          "description": "Un tanque de combate electromagnético avanzado que descarga arcos eléctricos de alto voltaje para aturdir y sobrecargar circuitos enemigos."
+          "name": "Tanque de Sobretensi\u00f3n de Arco",
+          "description": "Un tanque de combate electromagn\u00e9tico avanzado que descarga arcos el\u00e9ctricos de alto voltaje para aturdir y sobrecargar circuitos enemigos."
         }
       ],
       "balanceOverrides": [
@@ -1910,7 +1958,7 @@
           {
             "language": "es-XL",
             "name": "Planta de tanques Surge Arc",
-            "description": "Produce tanques de sobretensión de arco."
+            "description": "Produce tanques de sobretensi\u00f3n de arco."
           }
         ],
         "assetBundleId": "sample-native:assets",
@@ -1958,7 +2006,13 @@
         "siphonRatio": 0.065,
         "siphonToShield": false,
         "maxSiphonPerHit": 10
-      }
+      },
+      "defaultTacticalStance": "Aggressive",
+      "defaultLoadout": "Standard",
+      "startingVeterancyRank": 2,
+      "startingAffixes": [
+        "Overcharged"
+      ]
     }
   ],
   "stages": [
@@ -2210,6 +2264,19 @@
         {
           "moduleId": "sample:threat-prioritization",
           "parameters": []
+        },
+        {
+          "moduleId": "sample:adaptive-commander",
+          "parameters": [
+            {
+              "name": "scanIntervalSeconds",
+              "value": "5"
+            },
+            {
+              "name": "baseIndex",
+              "value": "0"
+            }
+          ]
         }
       ],
       "productionBuildingEntries": [
@@ -2231,7 +2298,15 @@
           "startingInAscensionLevel": 0,
           "maxLiving": 1
         }
-      ]
+      ],
+      "doctrine": "Assault",
+      "aggressionMultiplier": 1.25,
+      "defaultUnitStance": "Aggressive",
+      "defaultUnitLoadout": "Speed",
+      "startingUnitAffixes": [
+        "Swift"
+      ],
+      "startingUnitVeterancyRank": 1
     },
     {
       "id": "sample-native:horde-swarm-assault",
@@ -2281,6 +2356,19 @@
         {
           "moduleId": "sample:threat-prioritization",
           "parameters": []
+        },
+        {
+          "moduleId": "sample:adaptive-commander",
+          "parameters": [
+            {
+              "name": "scanIntervalSeconds",
+              "value": "5"
+            },
+            {
+              "name": "baseIndex",
+              "value": "0"
+            }
+          ]
         }
       ],
       "productionBuildingEntries": [
@@ -2302,7 +2390,15 @@
           "startingInAscensionLevel": 0,
           "maxLiving": 1
         }
-      ]
+      ],
+      "doctrine": "Assault",
+      "aggressionMultiplier": 1.5,
+      "defaultUnitStance": "Aggressive",
+      "defaultUnitLoadout": "Standard",
+      "startingUnitAffixes": [
+        "Swift"
+      ],
+      "startingUnitVeterancyRank": 1
     },
     {
       "id": "sample-native:raider-patrol-strike",
@@ -2409,6 +2505,19 @@
         {
           "moduleId": "sample:threat-prioritization",
           "parameters": []
+        },
+        {
+          "moduleId": "sample:adaptive-commander",
+          "parameters": [
+            {
+              "name": "scanIntervalSeconds",
+              "value": "5"
+            },
+            {
+              "name": "baseIndex",
+              "value": "0"
+            }
+          ]
         }
       ],
       "productionBuildingEntries": [
@@ -2436,7 +2545,15 @@
           "startingInAscensionLevel": 0,
           "maxLiving": 1
         }
-      ]
+      ],
+      "doctrine": "Kiting",
+      "aggressionMultiplier": 1.1,
+      "defaultUnitStance": "Kiting",
+      "defaultUnitLoadout": "Speed",
+      "startingUnitAffixes": [
+        "Swift"
+      ],
+      "startingUnitVeterancyRank": 1
     }
   ],
   "relics": [
@@ -2459,8 +2576,8 @@
         },
         {
           "language": "es-XL",
-          "name": "Contrapeso de fundición",
-          "description": "Los mechas grúa Atlas obtienen un 10 % más de salud durante el resto de la partida."
+          "name": "Contrapeso de fundici\u00f3n",
+          "description": "Los mechas gr\u00faa Atlas obtienen un 10 % m\u00e1s de salud durante el resto de la partida."
         }
       ],
       "cardChanges": [

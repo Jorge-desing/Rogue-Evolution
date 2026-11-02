@@ -32,6 +32,10 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
             "LiveAnimatedUnitCount": ("System.Int32", "2"),
             "LivePbrShaderUnitCount": ("System.Int32", "3"),
             "AuditedUnitPrefabCount": ("System.Int32", "6"),
+            "LiveMechanicsDirectorCount": ("System.Int32", "4"),
+            "LiveVisualDirectorCount": ("System.Int32", "4"),
+            "LiveJammedTurretCount": ("System.Int32", "0"),
+            "LiveRegeneratingShieldCount": ("System.Int32", "1"),
         }
         member_reads: list[str] = []
 
@@ -86,6 +90,10 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
                 "LiveAnimatedUnitCount": 2,
                 "LivePbrShaderUnitCount": 3,
                 "AuditedUnitPrefabCount": 6,
+                "LiveMechanicsDirectorCount": 4,
+                "LiveVisualDirectorCount": 4,
+                "LiveJammedTurretCount": 0,
+                "LiveRegeneratingShieldCount": 1,
                 "RangeDisplayCirclePointCount": 9,
             },
             scalars,
@@ -152,7 +160,7 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
 
         snapshot = json.loads(response["content"][0]["text"])
         self.assertFalse(response["isError"])
-        self.assertEqual(24, len(snapshot))
+        self.assertEqual(25, len(snapshot))
         self.assertTrue(all(isinstance(value, dict) for value in snapshot.values()))
         self.assertTrue(all(value == expected for value in snapshot.values()))
 

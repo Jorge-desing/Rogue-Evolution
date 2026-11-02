@@ -112,6 +112,9 @@ namespace UnityEngine
 
     public class Object
     {
+        private static int _nextInstanceId = 1000;
+        private int _instanceId = System.Threading.Interlocked.Increment(ref _nextInstanceId);
+        public int GetInstanceID() => _instanceId;
         public static T FindObjectOfType<T>() where T : class => null;
         public static void Destroy(Object obj) { }
         public static void Destroy(Object obj, float t) { }
@@ -230,6 +233,39 @@ namespace UnityEngine
         public System.Collections.IEnumerator GetEnumerator() => _children.GetEnumerator();
     }
 
+    public struct Vector2
+    {
+        public float x;
+        public float y;
+        public Vector2(float x, float y) { this.x = x; this.y = y; }
+    }
+
+    public class ParticleSystem : Component
+    {
+        public void Play() { }
+        public void Stop() { }
+        public bool isPlaying => false;
+    }
+
+    public class AudioSource : Component
+    {
+        public void Play() { }
+        public void Stop() { }
+        public bool isPlaying => false;
+        public float pitch { get; set; } = 1f;
+        public float volume { get; set; } = 1f;
+        public void PlayOneShot(object clip, float volumeScale = 1f) { }
+    }
+
+    public class MaterialPropertyBlock
+    {
+        public void SetColor(string name, Color value) { }
+        public void SetColor(int nameID, Color value) { }
+        public void SetFloat(string name, float value) { }
+        public void SetFloat(int nameID, float value) { }
+        public void Clear() { }
+    }
+
     public class Renderer : Component
     {
         public bool enabled { get; set; } = true;
@@ -239,6 +275,8 @@ namespace UnityEngine
         public Material[] materials { get => sharedMaterials; set => sharedMaterials = value; }
         public Material sharedMaterial { get => sharedMaterials != null && sharedMaterials.Length > 0 ? sharedMaterials[0] : null; set => sharedMaterials = value != null ? new[] { value } : System.Array.Empty<Material>(); }
         public Material material { get => sharedMaterial; set => sharedMaterial = value; }
+        public void SetPropertyBlock(MaterialPropertyBlock properties) { }
+        public void GetPropertyBlock(MaterialPropertyBlock properties) { }
     }
 
     public class MeshRenderer : Renderer
@@ -499,6 +537,8 @@ namespace UnityEngine
     {
         public static float Clamp(float value, float min, float max) =>
             value < min ? min : (value > max ? max : value);
+        public static float Clamp01(float value) =>
+            value < 0f ? 0f : (value > 1f ? 1f : value);
         public static int Clamp(int value, int min, int max) =>
             value < min ? min : (value > max ? max : value);
 

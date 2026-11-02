@@ -1174,6 +1174,10 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
                 "LiveAnimatedUnitCount",
                 "LivePbrShaderUnitCount",
                 "AuditedUnitPrefabCount",
+                "LiveMechanicsDirectorCount",
+                "LiveVisualDirectorCount",
+                "LiveJammedTurretCount",
+                "LiveRegeneratingShieldCount",
             ]:
                 scalars[member_name] = _call_diagnostics_member(member_name)
 
@@ -1214,6 +1218,7 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
                 "GetVisualRenderCensusJson",
                 "GetLoadedPrefabVisualAuditJson",
                 "GetLoaderAuditCensusJson",
+                "GetUnitMechanicsCensusJson",
             ]
             for getter in getters:
                 try:
@@ -1255,6 +1260,25 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
 
         elif name == "diagnostics_order_reconcile_loader_state":
             res = _call_diagnostics_method("OrderReconcileLoaderStateJson")
+            return _tool_response(res)
+
+        elif name == "diagnostics_get_unit_mechanics_census":
+            max_units = int(arguments.get("maxUnits", 64))
+            res = _call_diagnostics_method("GetUnitMechanicsCensusJson", [max_units])
+            return _tool_response(res)
+
+        elif name == "diagnostics_order_unit_visual_feedback":
+            entity_key = str(arguments.get("entityKeyId", "")).strip()
+            feedback_type = str(arguments.get("feedbackType", "")).strip()
+            magnitude = float(arguments.get("magnitude", 0.22))
+            res = _call_diagnostics_method("OrderUnitVisualFeedbackJson", [entity_key, feedback_type, magnitude])
+            return _tool_response(res)
+
+        elif name == "diagnostics_order_unit_attachment":
+            entity_key = str(arguments.get("entityKeyId", "")).strip()
+            attachment_type = str(arguments.get("attachmentType", "")).strip()
+            active = bool(arguments.get("active", True))
+            res = _call_diagnostics_method("OrderUnitAttachmentJson", [entity_key, attachment_type, active])
             return _tool_response(res)
 
         elif name == "diagnostics_get_battlefield_census":

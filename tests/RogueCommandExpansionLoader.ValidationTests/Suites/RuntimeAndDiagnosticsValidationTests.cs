@@ -7081,8 +7081,6 @@ internal static partial class ValidationTestRunner
 
         RuntimeVisualCensus.ClearLoadedPrefabAudits();
     }),
-    };
-}
     ("AI profile squad defaults validate, clone, apply to non-player units while respecting unit-level overrides, and loader audit census + reconciliation operate cleanly", () =>
     {
         ExistingControllers.Instance.Reset();
@@ -7302,3 +7300,85 @@ internal static partial class ValidationTestRunner
         RuntimeUnitMechanicsDirector.ClearProfiles();
         RuntimeGameplayCommandDirector.ClearTacticalStancesAndAffixes();
     }),
+    ("unit mechanics census and visual feedback director command integration", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        RuntimeUnitMechanicsDirector.ClearProfiles();
+        RuntimeGameplayCommandDirector.ClearTacticalStancesAndAffixes();
+
+        var unitGo = new GameObject("TestMechanicsUnit");
+        var ec = unitGo.AddComponent<EntityController>();
+        ec.UniqueEntityId = 3001;
+        ec.entityId = "test:scout";
+        ec.IsUnit = true;
+        ec.IsCombatUnit = true;
+        ec.IsControlledByPlayer = true;
+        ec.MaxHealth = 200f;
+        ec.CurrentHealth = 150f;
+        ec.MaxShield = 50f;
+        ec.CurrentShield = 30f;
+        ec.CurrentRank = 2;
+        ExistingControllers.Instance.PlayerUnits().Add(ec);
+
+        var rvd = unitGo.AddComponent<RuntimeVisualDirector>();
+        rvd.SetTurretJammedOverride(true);
+        if (!rvd.IsTurretJammed)
+        {
+            throw new InvalidOperationException("SetTurretJammedOverride(true) did not set IsTurretJammed.");
+        }
+        rvd.SetDoorOpenOverride(0.75f);
+        if (Math.Abs(rvd.DoorOpenProgress - 0.75f) > 0.01f)
+        {
+            throw new InvalidOperationException("SetDoorOpenOverride(0.75f) did not set DoorOpenProgress.");
+        }
+        string summary = rvd.GetVisualStatusSummary();
+        if (string.IsNullOrWhiteSpace(summary))
+        {
+            throw new InvalidOperationException("GetVisualStatusSummary returned empty string.");
+        }
+
+        var census = RuntimeGameplayCommandDirector.GetUnitMechanicsCensus(16);
+        if (census.TotalTrackedUnits < 1)
+        {
+            throw new InvalidOperationException("GetUnitMechanicsCensus did not report living test unit.");
+        }
+
+        string censusJson = AgentDiagnosticsFormatter.SerializeUnitMechanicsCensus(census);
+        int omittedIdx = censusJson.IndexOf("\"omittedUnitCount\":0", StringComparison.Ordinal);
+        int unitsIdx = censusJson.IndexOf("\"units\"", StringComparison.Ordinal);
+        if (omittedIdx < 0 || unitsIdx < 0 || omittedIdx > unitsIdx)
+        {
+            throw new InvalidOperationException("Omission counter must strictly precede units collection in unitMechanicsCensus JSON.");
+        }
+
+        string ecKey = ec.UniqueEntityId.ToString();
+        var fbResult = RuntimeGameplayCommandDirector.TryOrderUnitVisualFeedback(ecKey, "CritImpact", 0.5f);
+        if (!fbResult.Success)
+        {
+            throw new InvalidOperationException($"TryOrderUnitVisualFeedback failed: {fbResult.Message}");
+        }
+
+        string fbJson = AgentDiagnosticsFormatter.SerializeVisualFeedbackResult(fbResult);
+        if (!fbJson.Contains("\"feedbackType\":\"CritImpact\"", StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("SerializeVisualFeedbackResult missing feedbackType.");
+        }
+
+        var attachResult = RuntimeGameplayCommandDirector.TryOrderUnitAttachment(ecKey, "Armor", true);
+        if (!attachResult.Success)
+        {
+            throw new InvalidOperationException($"TryOrderUnitAttachment failed: {attachResult.Message}");
+        }
+
+        var invalidFb = RuntimeGameplayCommandDirector.TryOrderUnitVisualFeedback("non-existent-key", "InvalidType", 1f);
+        if (invalidFb.Success)
+        {
+            throw new InvalidOperationException("TryOrderUnitVisualFeedback should fail for non-existent unit.");
+        }
+
+        ExistingControllers.Instance.Reset();
+        RuntimeUnitMechanicsDirector.ClearProfiles();
+        RuntimeGameplayCommandDirector.ClearTacticalStancesAndAffixes();
+    }),
+    };
+}

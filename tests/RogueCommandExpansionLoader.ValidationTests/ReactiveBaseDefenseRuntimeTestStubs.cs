@@ -736,3 +736,32 @@ public static class RelicBalancingStore
 
     public static System.Collections.Generic.List<string> AllRelicIds() => Relics;
 }
+
+
+namespace RogueCommandExpansionLoader.Runtime.Visual
+{
+    public sealed class RuntimeVisualDirector : Component
+    {
+        public bool IsTurretJammed { get; set; }
+        public float CurrentRecoilOffset { get; set; }
+        public float DoorOpenProgress { get; set; }
+        public bool IsStunnedVisualActive { get; set; }
+        public bool IsOnFireVisualActive { get; set; }
+        public bool IsBoostedVisualActive { get; set; }
+        public string ActiveTacticalStanceVisual { get; set; } = "Standard";
+
+        public void SetTurretJammedOverride(bool? jammed) => IsTurretJammed = jammed ?? false;
+        public void SetDoorOpenOverride(float? progress) => DoorOpenProgress = progress ?? 0f;
+        public void TriggerWeaponFeedback(float recoil = 0.22f) => CurrentRecoilOffset = recoil;
+        public void TriggerVisualFeedback(string feedbackType, float magnitude = 0.22f)
+        {
+            if (feedbackType == "CritImpact" || feedbackType == "Recoil")
+            {
+                CurrentRecoilOffset = magnitude;
+            }
+        }
+        public bool TrySetAttachmentState(string attachmentName, bool active) => true;
+        public void TriggerFootstepFeedback(string footTag) { }
+        public string GetVisualStatusSummary() => "Status=OK,Jammed=" + IsTurretJammed;
+    }
+}

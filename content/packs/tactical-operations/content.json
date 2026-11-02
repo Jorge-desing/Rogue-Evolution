@@ -1,1418 +1,1436 @@
 {
-    "schemaVersion": 1,
-    "packId": "tactical-operations:expansion",
-    "assetBundleManifestPath": "bundles/assetbundle-manifest.bundle",
-    "assetBundles": [
+  "schemaVersion": 1,
+  "packId": "tactical-operations:expansion",
+  "assetBundleManifestPath": "bundles/assetbundle-manifest.bundle",
+  "assetBundles": [
+    {
+      "id": "tactical-operations:assets",
+      "path": "bundles/tactical-operations.bundle"
+    }
+  ],
+  "units": [
+    {
+      "id": "tactical-operations:tidebreaker-skirmisher",
+      "nativeTemplateId": "PCXBaseTank",
+      "assetBundleId": "tactical-operations:assets",
+      "cardImageAssetName": "assets/tacticaloperations/tidebreakerhovercraftcard.png",
+      "visualAssetName": "assets/tacticaloperations/prefabs/tidebreakerhovercraftvisual.prefab",
+      "visualRootPath": "Vehicle",
+      "isAllowedAsStartingBlueprint": true,
+      "isAllowedForAi": true,
+      "isAllowedForDemo": true,
+      "isForSpecialists": false,
+      "localizations": [
         {
-            "id": "tactical-operations:assets",
-            "path": "bundles/tactical-operations.bundle"
+          "language": "en-US",
+          "name": "Tidebreaker EMP Skirmisher",
+          "description": "High-speed amphibious hovercraft equipped with pulsed EMP disruptors that stun enemy targets on impact.",
+          "skillDescription": "Fires an EMP overcharge pulse at the target area, disrupting enemy units."
+        },
+        {
+          "language": "es-XL",
+          "name": "Escaramuzador EMP Tidebreaker",
+          "description": "Aerodeslizador anfibio de alta velocidad equipado con disruptores EMP que aturden a los objetivos al impactar.",
+          "skillDescription": "Dispara un pulso de sobrecarga EMP en el \u00e1rea objetivo para desestabilizar unidades enemigas."
         }
-    ],
-    "units": [
+      ],
+      "balanceOverrides": [
         {
-            "id": "tactical-operations:tidebreaker-skirmisher",
-            "nativeTemplateId": "PCXBaseTank",
-            "assetBundleId": "tactical-operations:assets",
-            "cardImageAssetName": "assets/tacticaloperations/tidebreakerhovercraftcard.png",
-            "visualAssetName": "assets/tacticaloperations/prefabs/tidebreakerhovercraftvisual.prefab",
-            "visualRootPath": "Vehicle",
-            "isAllowedAsStartingBlueprint": true,
-            "isAllowedForAi": true,
-            "isAllowedForDemo": true,
-            "isForSpecialists": false,
-            "localizations": [
-                {
-                    "language": "en-US",
-                    "name": "Tidebreaker EMP Skirmisher",
-                    "description": "High-speed amphibious hovercraft equipped with pulsed EMP disruptors that stun enemy targets on impact.",
-                    "skillDescription": "Fires an EMP overcharge pulse at the target area, disrupting enemy units."
-                },
-                {
-                    "language": "es-XL",
-                    "name": "Escaramuzador EMP Tidebreaker",
-                    "description": "Aerodeslizador anfibio de alta velocidad equipado con disruptores EMP que aturden a los objetivos al impactar.",
-                    "skillDescription": "Dispara un pulso de sobrecarga EMP en el área objetivo para desestabilizar unidades enemigas."
-                }
-            ],
-            "balanceOverrides": [
-                {
-                    "name": "roles",
-                    "value": "Unit, Vehicle, Scout"
-                },
-                {
-                    "name": "offeredSystemTags",
-                    "value": "Vehicle, Turbo, Stun"
-                },
-                {
-                    "name": "cost",
-                    "value": "85"
-                },
-                {
-                    "name": "maxHealth",
-                    "value": "140"
-                },
-                {
-                    "name": "moveSpeed",
-                    "value": "14.5"
-                },
-                {
-                    "name": "sightRadius",
-                    "value": "8"
-                },
-                {
-                    "name": "weaponRange",
-                    "value": "3.8"
-                },
-                {
-                    "name": "attackCooldown",
-                    "value": "1.2"
-                },
-                {
-                    "name": "rarity",
-                    "value": "Common"
-                },
-                {
-                    "name": "neededExperienceLevel",
-                    "value": "0"
-                },
-                {
-                    "name": "productionDuration",
-                    "value": "38"
-                },
-                {
-                    "name": "maxCapacity",
-                    "value": "6"
-                },
-                {
-                    "name": "maxShield",
-                    "value": "0"
-                },
-                {
-                    "name": "maxMana",
-                    "value": "0"
-                },
-                {
-                    "name": "maxArmor",
-                    "value": "0"
-                },
-                {
-                    "name": "armorProtection",
-                    "value": "1"
-                }
-            ],
-            "customBalance": {
-                "Damage1": 5.0
-            },
-            "onHitStatusEffects": [
-                {
-                    "statusEffect": "Stun",
-                    "duration": 2.2,
-                    "chance": 0.35
-                }
-            ],
-            "activeSkills": [
-                {
-                    "id": "tactical-operations:tidebreaker-emp-overcharge",
-                    "skillType": "LocationAoE",
-                    "targetOrigin": "ChosenLocation",
-                    "cooldown": 12.0,
-                    "manaCost": 0,
-                    "range": 8.0,
-                    "radius": 4.0,
-                    "helpAiToActivate": true,
-                    "aiActivationTrigger": "EnemiesInRange",
-                    "aiSkillCooldown": 12.0
-                }
-            ],
-            "productionBuilding": {
-                "id": "tactical-operations:tidebreaker-factory",
-                "nativeTemplateId": "PCXBaseTankFactory",
-                "isAllowedAsStartingBlueprint": true,
-                "balanceOverrides": [
-                    {
-                        "name": "cost",
-                        "value": "550"
-                    },
-                    {
-                        "name": "maxCapacity",
-                        "value": "3"
-                    },
-                    {
-                        "name": "neededExperienceLevel",
-                        "value": "0"
-                    },
-                    {
-                        "name": "rarity",
-                        "value": "Common"
-                    }
-                ],
-                "localizations": [
-                    {
-                        "language": "en-US",
-                        "name": "Tidebreaker Hover Foundry",
-                        "description": "Manufactures amphibious Tidebreaker EMP Skirmishers."
-                    },
-                    {
-                        "language": "es-XL",
-                        "name": "Fundición de aerodeslizadores Tidebreaker",
-                        "description": "Fabrica escaramuzadores EMP anfibios Tidebreaker."
-                    }
-                ]
-            },
-            "cardModelScalingFactor": 0.9,
-            "defaultTacticalStance": "Kiting",
-            "defaultLoadout": "Speed",
-            "startingAffixes": [
-                "Swift"
-            ],
-            "startingVeterancyRank": 1,
-            "baselineStatusEffects": [
-                "Rush"
-            ],
-            "combatBoosts": [
-                {
-                    "id": "tactical-operations:tidebreaker-surge",
-                    "statName": "MoveSpeed",
-                    "multiplier": 1.3,
-                    "duration": 3.0
-                }
-            ],
-            "stealth": {
-                "stealthLevel": 2.0,
-                "cloakDuration": 4.5,
-                "detectionReduction": 0.4
-            },
-            "experienceReward": {
-                "experienceAmount": 12,
-                "experienceType": "Crystals",
-                "bonusMultiplier": 1.25
-            }
+          "name": "roles",
+          "value": "Unit, Vehicle, Scout"
         },
         {
-            "id": "tactical-operations:salvage-hauler",
-            "nativeTemplateId": "PCXBaseTank",
-            "assetBundleId": "tactical-operations:assets",
-            "cardImageAssetName": "assets/tacticaloperations/salvagehaulercard.png",
-            "visualAssetName": "assets/tacticaloperations/prefabs/salvagehaulervisual.prefab",
-            "visualRootPath": "Vehicle",
-            "isAllowedAsStartingBlueprint": true,
-            "isAllowedForAi": true,
-            "isAllowedForDemo": true,
-            "isForSpecialists": false,
-            "localizations": [
-                {
-                    "language": "en-US",
-                    "name": "Salvage Field Repair Hauler",
-                    "description": "Armored logistics crawler outfitted with autonomous nanite repair systems to maintain friendly units and production facilities.",
-                    "skillDescription": "Emits a nanite repair pulse that restores nearby allied units and structures."
-                },
-                {
-                    "language": "es-XL",
-                    "name": "Transporte de reparación en campo Salvage",
-                    "description": "Oruga logística blindada equipada con sistemas nanorrobóticos autónomos para reparar unidades e instalaciones de producción aliadas.",
-                    "skillDescription": "Emite un pulso nanorrobótico que repara unidades y estructuras aliadas cercanas."
-                }
-            ],
-            "balanceOverrides": [
-                {
-                    "name": "roles",
-                    "value": "Unit, Vehicle, Supporter, Heal"
-                },
-                {
-                    "name": "offeredSystemTags",
-                    "value": "Vehicle, Heal, Armor"
-                },
-                {
-                    "name": "cost",
-                    "value": "250"
-                },
-                {
-                    "name": "maxHealth",
-                    "value": "110"
-                },
-                {
-                    "name": "moveSpeed",
-                    "value": "12"
-                },
-                {
-                    "name": "sightRadius",
-                    "value": "9"
-                },
-                {
-                    "name": "weaponRange",
-                    "value": "3.8"
-                },
-                {
-                    "name": "attackCooldown",
-                    "value": "1.0"
-                },
-                {
-                    "name": "rarity",
-                    "value": "Rare"
-                },
-                {
-                    "name": "neededExperienceLevel",
-                    "value": "0"
-                },
-                {
-                    "name": "productionDuration",
-                    "value": "90"
-                },
-                {
-                    "name": "maxCapacity",
-                    "value": "4"
-                },
-                {
-                    "name": "maxShield",
-                    "value": "3"
-                },
-                {
-                    "name": "maxMana",
-                    "value": "0"
-                },
-                {
-                    "name": "maxArmor",
-                    "value": "0"
-                },
-                {
-                    "name": "armorProtection",
-                    "value": "1"
-                }
-            ],
-            "customBalance": {
-                "Damage1": 2.5
-            },
-            "activeSkills": [
-                {
-                    "id": "tactical-operations:salvage-nanite-pulse",
-                    "skillType": "SelfAoE",
-                    "targetOrigin": "Self",
-                    "cooldown": 18.0,
-                    "manaCost": 0,
-                    "range": 0.0,
-                    "radius": 6.0,
-                    "helpAiToActivate": true,
-                    "aiActivationTrigger": "LowHealth",
-                    "aiSkillCooldown": 18.0
-                }
-            ],
-            "productionBuilding": {
-                "id": "tactical-operations:salvage-hauler-factory",
-                "nativeTemplateId": "PCXBaseTankFactory",
-                "isAllowedAsStartingBlueprint": true,
-                "balanceOverrides": [
-                    {
-                        "name": "cost",
-                        "value": "520"
-                    },
-                    {
-                        "name": "maxCapacity",
-                        "value": "3"
-                    },
-                    {
-                        "name": "neededExperienceLevel",
-                        "value": "0"
-                    },
-                    {
-                        "name": "rarity",
-                        "value": "Rare"
-                    }
-                ],
-                "localizations": [
-                    {
-                        "language": "en-US",
-                        "name": "Salvage Logistics Works",
-                        "description": "Manufactures Salvage Field Repair Haulers."
-                    },
-                    {
-                        "language": "es-XL",
-                        "name": "Talleres logísticos Salvage",
-                        "description": "Fabrica transportes de reparación en campo Salvage."
-                    }
-                ]
-            },
-            "cardModelScalingFactor": 0.85,
-            "healing": {
-                "healAmount": 12.0,
-                "healRange": 3.5,
-                "healRate": 0.8,
-                "repairAmount": 20.0
-            },
-            "aura": {
-                "auraRadius": 3.5,
-                "auraType": "Shield",
-                "buffAmount": 8.0,
-                "affectsAllies": true,
-                "affectsEnemies": false
-            },
-            "synergies": [
-                {
-                    "id": "tactical-operations:salvage-armor-reinforcement",
-                    "statName": "ArmorProtection",
-                    "multiplier": 1.25,
-                    "radius": 4.0,
-                    "targetUnitIds": [
-                        "tactical-operations:bulwark-siege-tank",
-                        "tactical-operations:arc-lance-walker"
-                    ]
-                }
-            ],
-            "shieldRegeneration": {
-                "rechargeDelay": 4.0,
-                "rechargeRate": 1.0,
-                "burstAmount": 1.0
-            }
+          "name": "offeredSystemTags",
+          "value": "Vehicle, Turbo, Stun"
         },
         {
-            "id": "tactical-operations:skyguard-sam",
-            "nativeTemplateId": "PCXBaseTank",
-            "assetBundleId": "tactical-operations:assets",
-            "cardImageAssetName": "assets/tacticaloperations/skyguardsamcard.png",
-            "visualAssetName": "assets/tacticaloperations/prefabs/skyguardsamvisual.prefab",
-            "visualRootPath": "Vehicle",
-            "isAllowedAsStartingBlueprint": true,
-            "isAllowedForAi": true,
-            "isAllowedForDemo": true,
-            "isForSpecialists": false,
-            "localizations": [
-                {
-                    "language": "en-US",
-                    "name": "Skyguard Mobile SAM Platform",
-                    "description": "Heavy surface-to-air missile platform with precision targeting and long-range payload delivery, vulnerable to close-range assaults.",
-                    "skillDescription": "Launches a precision missile salvo at the target location."
-                },
-                {
-                    "language": "es-XL",
-                    "name": "Plataforma SAM móvil Skyguard",
-                    "description": "Plataforma pesada de misiles tierra-aire con puntería de precisión y largo alcance, vulnerable a asaltos a quemarropa.",
-                    "skillDescription": "Lanza una salva de misiles de precisión sobre la ubicación objetivo."
-                }
-            ],
-            "balanceOverrides": [
-                {
-                    "name": "roles",
-                    "value": "Unit, Vehicle, Sniper"
-                },
-                {
-                    "name": "offeredSystemTags",
-                    "value": "Vehicle, Sniper"
-                },
-                {
-                    "name": "cost",
-                    "value": "320"
-                },
-                {
-                    "name": "maxHealth",
-                    "value": "140"
-                },
-                {
-                    "name": "moveSpeed",
-                    "value": "8.5"
-                },
-                {
-                    "name": "sightRadius",
-                    "value": "13"
-                },
-                {
-                    "name": "weaponRange",
-                    "value": "12.5"
-                },
-                {
-                    "name": "attackCooldown",
-                    "value": "2.8"
-                },
-                {
-                    "name": "rarity",
-                    "value": "Rare"
-                },
-                {
-                    "name": "neededExperienceLevel",
-                    "value": "0"
-                },
-                {
-                    "name": "productionDuration",
-                    "value": "55"
-                },
-                {
-                    "name": "maxCapacity",
-                    "value": "3"
-                },
-                {
-                    "name": "maxShield",
-                    "value": "0"
-                },
-                {
-                    "name": "maxMana",
-                    "value": "0"
-                },
-                {
-                    "name": "maxArmor",
-                    "value": "0"
-                },
-                {
-                    "name": "armorProtection",
-                    "value": "1"
-                }
-            ],
-            "customBalance": {
-                "Damage1": 22.0
-            },
-            "criticalHitChance": 0.3,
-            "minAttackRange": 4.5,
-            "activeSkills": [
-                {
-                    "id": "tactical-operations:skyguard-missile-salvo",
-                    "skillType": "LocationAoE",
-                    "targetOrigin": "ChosenLocation",
-                    "cooldown": 14.0,
-                    "manaCost": 0,
-                    "range": 13.0,
-                    "radius": 3.5,
-                    "helpAiToActivate": true,
-                    "aiActivationTrigger": "EnemiesInRange",
-                    "aiSkillCooldown": 14.0
-                }
-            ],
-            "productionBuilding": {
-                "id": "tactical-operations:skyguard-sam-factory",
-                "nativeTemplateId": "PCXBaseTankFactory",
-                "isAllowedAsStartingBlueprint": true,
-                "balanceOverrides": [
-                    {
-                        "name": "cost",
-                        "value": "620"
-                    },
-                    {
-                        "name": "maxCapacity",
-                        "value": "2"
-                    },
-                    {
-                        "name": "neededExperienceLevel",
-                        "value": "0"
-                    },
-                    {
-                        "name": "rarity",
-                        "value": "Rare"
-                    }
-                ],
-                "localizations": [
-                    {
-                        "language": "en-US",
-                        "name": "Skyguard Missile Works",
-                        "description": "Produces Skyguard Mobile SAM Platforms."
-                    },
-                    {
-                        "language": "es-XL",
-                        "name": "Fábrica de misiles Skyguard",
-                        "description": "Produce plataformas SAM móviles Skyguard."
-                    }
-                ]
-            },
-            "cardModelScalingFactor": 0.85,
-            "experience": {
-                "experiencePerLevel": 1,
-                "maxLevel": 3,
-                "experienceGainMultiplier": 1.0,
-                "levelUpBonus": 0.2
-            }
+          "name": "cost",
+          "value": "85"
         },
         {
-            "id": "tactical-operations:bulwark-siege-tank",
-            "nativeTemplateId": "PCXBaseTank",
-            "assetBundleId": "tactical-operations:assets",
-            "cardImageAssetName": "assets/tacticaloperations/bulwarksiegetankcard.png",
-            "visualAssetName": "assets/tacticaloperations/prefabs/bulwarksiegetankvisual.prefab",
-            "visualRootPath": "Vehicle",
-            "isAllowedAsStartingBlueprint": true,
-            "isAllowedForAi": true,
-            "isAllowedForDemo": true,
-            "isForSpecialists": false,
-            "localizations": [
-                {
-                    "language": "en-US",
-                    "name": "Bulwark Siege Tank",
-                    "description": "Heavily armored siege platform with long-range artillery bombardment capability. Slow but devastating.",
-                    "skillDescription": "Unleashes a heavy artillery barrage across the target area."
-                },
-                {
-                    "language": "es-XL",
-                    "name": "Tanque de asedio Bulwark",
-                    "description": "Plataforma de asedio fuertemente blindada con capacidad de bombardeo de artilleria de largo alcance. Lenta pero devastadora.",
-                    "skillDescription": "Desata un bombardeo de artillería pesada sobre el área objetivo."
-                }
-            ],
-            "balanceOverrides": [
-                {
-                    "name": "roles",
-                    "value": "Unit, Vehicle, Tank, FrontalAttacker"
-                },
-                {
-                    "name": "offeredSystemTags",
-                    "value": "Vehicle, Tank, Armor"
-                },
-                {
-                    "name": "cost",
-                    "value": "360"
-                },
-                {
-                    "name": "maxHealth",
-                    "value": "160"
-                },
-                {
-                    "name": "moveSpeed",
-                    "value": "5.5"
-                },
-                {
-                    "name": "sightRadius",
-                    "value": "12"
-                },
-                {
-                    "name": "weaponRange",
-                    "value": "14.0"
-                },
-                {
-                    "name": "attackCooldown",
-                    "value": "4.5"
-                },
-                {
-                    "name": "rarity",
-                    "value": "Rare"
-                },
-                {
-                    "name": "neededExperienceLevel",
-                    "value": "0"
-                },
-                {
-                    "name": "productionDuration",
-                    "value": "60"
-                },
-                {
-                    "name": "maxCapacity",
-                    "value": "2"
-                },
-                {
-                    "name": "maxShield",
-                    "value": "0"
-                },
-                {
-                    "name": "maxMana",
-                    "value": "0"
-                },
-                {
-                    "name": "maxArmor",
-                    "value": "0"
-                },
-                {
-                    "name": "armorProtection",
-                    "value": "1"
-                }
-            ],
-            "customBalance": {
-                "Damage1": 32.0,
-                "EffectRadius1": 1.2
-            },
-            "minAttackRange": 5.0,
-            "baselineStatusEffects": [
-                "Armored",
-                "Robust"
-            ],
-            "aura": {
-                "auraRadius": 3.5,
-                "auraType": "Buff",
-                "buffAmount": 1.0,
-                "affectsAllies": true,
-                "affectsEnemies": false
-            },
-            "experience": {
-                "experiencePerLevel": 1,
-                "maxLevel": 3,
-                "experienceGainMultiplier": 1.0,
-                "levelUpBonus": 0.15
-            },
-            "activeSkills": [
-                {
-                    "id": "tactical-operations:bulwark-artillery-barrage",
-                    "skillType": "LocationAoE",
-                    "targetOrigin": "ChosenLocation",
-                    "cooldown": 18.0,
-                    "manaCost": 0,
-                    "range": 14.0,
-                    "radius": 4.5,
-                    "helpAiToActivate": true,
-                    "aiActivationTrigger": "EnemiesInRange",
-                    "aiSkillCooldown": 18.0
-                }
-            ],
-            "productionBuilding": {
-                "id": "tactical-operations:bulwark-siege-tank-factory",
-                "nativeTemplateId": "PCXBaseTankFactory",
-                "isAllowedAsStartingBlueprint": true,
-                "balanceOverrides": [
-                    {
-                        "name": "cost",
-                        "value": "750"
-                    },
-                    {
-                        "name": "maxCapacity",
-                        "value": "2"
-                    },
-                    {
-                        "name": "neededExperienceLevel",
-                        "value": "0"
-                    },
-                    {
-                        "name": "rarity",
-                        "value": "Rare"
-                    }
-                ],
-                "localizations": [
-                    {
-                        "language": "en-US",
-                        "name": "Bulwark Siege Foundry",
-                        "description": "Manufactures heavy Bulwark Siege Tanks."
-                    },
-                    {
-                        "language": "es-XL",
-                        "name": "Fundicion de asedio Bulwark",
-                        "description": "Fabrica tanques de asedio pesados Bulwark."
-                    }
-                ]
-            },
-            "cardModelScalingFactor": 0.9,
-            "defaultTacticalStance": "Aggressive",
-            "defaultLoadout": "Siege",
-            "startingAffixes": [
-                "Bulwark"
-            ],
-            "startingVeterancyRank": 1,
-            "command": {
-                "commandRange": 4.5,
-                "commandType": "Attack",
-                "maxCommandChain": 4
-            },
-            "tauntPulse": {
-                "pulseInterval": 4.0,
-                "tauntRadius": 18.0,
-                "duration": 3.0,
-                "maxTargets": 6
-            }
+          "name": "maxHealth",
+          "value": "140"
         },
         {
-            "id": "tactical-operations:arc-lance-walker",
-            "nativeTemplateId": "PCXBaseTank",
-            "assetBundleId": "tactical-operations:assets",
-            "cardImageAssetName": "assets/tacticaloperations/arclancewalkercard.png",
-            "visualAssetName": "assets/tacticaloperations/prefabs/arclancewalkervisual.prefab",
-            "visualRootPath": "Vehicle",
-            "isAllowedAsStartingBlueprint": true,
-            "isAllowedForAi": true,
-            "isAllowedForDemo": true,
-            "isForSpecialists": false,
-            "localizations": [
-                {
-                    "language": "en-US",
-                    "name": "Arc Lance Walker",
-                    "description": "Bipedal mech armed with a high-energy arc lance that chains between targets. Agile and deadly at mid-range.",
-                    "skillDescription": "Discharges a high-voltage arc lance strike at the target enemy."
-                },
-                {
-                    "language": "es-XL",
-                    "name": "Caminante de lanza de arco",
-                    "description": "Meca bipedo armado con una lanza de arco de alta energia que se encadena entre objetivos. Agil y letal a media distancia.",
-                    "skillDescription": "Descarga un impacto de lanza de arco de alto voltaje contra el objetivo enemigo."
-                }
-            ],
-            "balanceOverrides": [
-                {
-                    "name": "roles",
-                    "value": "Unit, Mech, FrontalAttacker"
-                },
-                {
-                    "name": "offeredSystemTags",
-                    "value": "Mech, Stun, AoE"
-                },
-                {
-                    "name": "cost",
-                    "value": "420"
-                },
-                {
-                    "name": "maxHealth",
-                    "value": "400"
-                },
-                {
-                    "name": "moveSpeed",
-                    "value": "11"
-                },
-                {
-                    "name": "sightRadius",
-                    "value": "10"
-                },
-                {
-                    "name": "weaponRange",
-                    "value": "8.5"
-                },
-                {
-                    "name": "attackCooldown",
-                    "value": "1.6"
-                },
-                {
-                    "name": "rarity",
-                    "value": "Rare"
-                },
-                {
-                    "name": "neededExperienceLevel",
-                    "value": "0"
-                },
-                {
-                    "name": "productionDuration",
-                    "value": "50"
-                },
-                {
-                    "name": "maxCapacity",
-                    "value": "3"
-                },
-                {
-                    "name": "maxShield",
-                    "value": "0"
-                },
-                {
-                    "name": "maxMana",
-                    "value": "0"
-                },
-                {
-                    "name": "maxArmor",
-                    "value": "0"
-                },
-                {
-                    "name": "armorProtection",
-                    "value": "1"
-                }
-            ],
-            "customBalance": {
-                "Damage1": 7.0
-            },
-            "activeSkills": [
-                {
-                    "id": "tactical-operations:arc-lance-chain",
-                    "skillType": "TargetAoE",
-                    "targetOrigin": "ChosenEntity",
-                    "cooldown": 10.0,
-                    "manaCost": 0,
-                    "range": 8.5,
-                    "radius": 0.0,
-                    "helpAiToActivate": true,
-                    "aiActivationTrigger": "EnemiesInRange",
-                    "aiSkillCooldown": 10.0
-                }
-            ],
-            "productionBuilding": {
-                "id": "tactical-operations:arc-lance-walker-factory",
-                "nativeTemplateId": "PCXBaseTankFactory",
-                "isAllowedAsStartingBlueprint": true,
-                "balanceOverrides": [
-                    {
-                        "name": "cost",
-                        "value": "680"
-                    },
-                    {
-                        "name": "maxCapacity",
-                        "value": "3"
-                    },
-                    {
-                        "name": "neededExperienceLevel",
-                        "value": "0"
-                    },
-                    {
-                        "name": "rarity",
-                        "value": "Rare"
-                    }
-                ],
-                "localizations": [
-                    {
-                        "language": "en-US",
-                        "name": "Arc Lance Assembly Bay",
-                        "description": "Assembles Arc Lance Walker mechs."
-                    },
-                    {
-                        "language": "es-XL",
-                        "name": "Bahia de ensamblaje Arc Lance",
-                        "description": "Ensambla mecas caminantes Arc Lance."
-                    }
-                ]
-            },
-            "cardModelScalingFactor": 0.85,
-            "defaultTacticalStance": "Aggressive",
-            "defaultLoadout": "AP",
-            "startingAffixes": [
-                "Overcharged"
-            ],
-            "startingVeterancyRank": 1,
-            "combatBoosts": [
-                {
-                    "id": "tactical-operations:arc-lance-overclock",
-                    "statName": "AttackSpeed",
-                    "multiplier": 1.25,
-                    "duration": 4.0
-                }
-            ],
-            "experience": {
-                "experiencePerLevel": 1,
-                "maxLevel": 3,
-                "experienceGainMultiplier": 1.0,
-                "levelUpBonus": 0.2
-            },
-            "vampiricLeech": {
-                "siphonRatio": 0.2,
-                "siphonToShield": false,
-                "maxSiphonPerHit": 25.0
-            }
+          "name": "moveSpeed",
+          "value": "14.5"
         },
         {
-            "id": "tactical-operations:field-medic-rover",
-            "nativeTemplateId": "PCXBaseTank",
-            "assetBundleId": "tactical-operations:assets",
-            "cardImageAssetName": "assets/tacticaloperations/fieldmedicrovercard.png",
-            "visualAssetName": "assets/tacticaloperations/prefabs/fieldmedicrovervisual.prefab",
-            "visualRootPath": "Vehicle",
-            "isAllowedAsStartingBlueprint": true,
-            "isAllowedForAi": true,
-            "isAllowedForDemo": true,
-            "isForSpecialists": false,
-            "localizations": [
-                {
-                    "language": "en-US",
-                    "name": "Field Medic Rover",
-                    "description": "Fast wheeled support vehicle with autonomous nanite healing systems. Repairs allies and suppresses enemies with light weaponry.",
-                    "skillDescription": "Triggers an emergency nanite pulse that heals nearby allied units."
-                },
-                {
-                    "language": "es-XL",
-                    "name": "Rover medico de campo",
-                    "description": "Vehiculo de apoyo sobre ruedas rapido con sistemas de curacion nanorroboticos autonomos. Repara aliados y suprime enemigos con armamento ligero.",
-                    "skillDescription": "Activa un pulso nanorrobótico de emergencia que repara unidades aliadas cercanas."
-                }
-            ],
-            "balanceOverrides": [
-                {
-                    "name": "roles",
-                    "value": "Unit, Vehicle, Supporter, Heal"
-                },
-                {
-                    "name": "offeredSystemTags",
-                    "value": "Vehicle, Heal, Armor"
-                },
-                {
-                    "name": "cost",
-                    "value": "240"
-                },
-                {
-                    "name": "maxHealth",
-                    "value": "100"
-                },
-                {
-                    "name": "moveSpeed",
-                    "value": "12.0"
-                },
-                {
-                    "name": "sightRadius",
-                    "value": "9"
-                },
-                {
-                    "name": "weaponRange",
-                    "value": "3.8"
-                },
-                {
-                    "name": "attackCooldown",
-                    "value": "1.0"
-                },
-                {
-                    "name": "rarity",
-                    "value": "Common"
-                },
-                {
-                    "name": "neededExperienceLevel",
-                    "value": "0"
-                },
-                {
-                    "name": "productionDuration",
-                    "value": "90"
-                },
-                {
-                    "name": "maxCapacity",
-                    "value": "5"
-                },
-                {
-                    "name": "maxShield",
-                    "value": "5"
-                },
-                {
-                    "name": "maxMana",
-                    "value": "0"
-                },
-                {
-                    "name": "maxArmor",
-                    "value": "0"
-                },
-                {
-                    "name": "armorProtection",
-                    "value": "1"
-                }
-            ],
-            "customBalance": {
-                "Damage1": 2.5
-            },
-            "onHitStatusEffects": [
-                {
-                    "statusEffect": "SlowedDown",
-                    "duration": 2.0,
-                    "chance": 0.5
-                }
-            ],
-            "activeSkills": [
-                {
-                    "id": "tactical-operations:medic-nanite-pulse",
-                    "skillType": "SelfAoE",
-                    "targetOrigin": "Self",
-                    "cooldown": 8.0,
-                    "manaCost": 0,
-                    "range": 0.0,
-                    "radius": 5.0,
-                    "helpAiToActivate": true,
-                    "aiActivationTrigger": "LowHealth",
-                    "aiSkillCooldown": 8.0
-                }
-            ],
-            "productionBuilding": {
-                "id": "tactical-operations:field-medic-rover-factory",
-                "nativeTemplateId": "PCXBaseTankFactory",
-                "isAllowedAsStartingBlueprint": true,
-                "balanceOverrides": [
-                    {
-                        "name": "cost",
-                        "value": "500"
-                    },
-                    {
-                        "name": "maxCapacity",
-                        "value": "4"
-                    },
-                    {
-                        "name": "neededExperienceLevel",
-                        "value": "0"
-                    },
-                    {
-                        "name": "rarity",
-                        "value": "Common"
-                    }
-                ],
-                "localizations": [
-                    {
-                        "language": "en-US",
-                        "name": "Field Medic Bay",
-                        "description": "Manufactures Field Medic Rovers."
-                    },
-                    {
-                        "language": "es-XL",
-                        "name": "Bahia medica de campo",
-                        "description": "Fabrica rovers medicos de campo."
-                    }
-                ]
-            },
-            "cardModelScalingFactor": 0.8,
-            "healing": {
-                "healAmount": 18.0,
-                "healRange": 4.5,
-                "healRate": 1.0,
-                "repairAmount": 12.0
-            },
-            "aura": {
-                "auraRadius": 4.0,
-                "auraType": "Heal",
-                "buffAmount": 6.0,
-                "affectsAllies": true,
-                "affectsEnemies": false
-            },
-            "synergies": [
-                {
-                    "id": "tactical-operations:medic-skirmish-overclock",
-                    "statName": "Damage",
-                    "multiplier": 1.2,
-                    "radius": 4.5,
-                    "targetUnitIds": [
-                        "tactical-operations:tidebreaker-skirmisher",
-                        "tactical-operations:skyguard-sam"
-                    ]
-                }
-            ],
-            "shieldOverloadNova": {
-                "novaRadius": 4.0,
-                "damage": 25.0,
-                "stunDuration": 2.0,
-                "cooldown": 15.0
-            },
-            "shieldRegeneration": {
-                "rechargeDelay": 5.0,
-                "rechargeRate": 1.5,
-                "burstAmount": 2.0
-            }
+          "name": "sightRadius",
+          "value": "8"
+        },
+        {
+          "name": "weaponRange",
+          "value": "3.8"
+        },
+        {
+          "name": "attackCooldown",
+          "value": "1.2"
+        },
+        {
+          "name": "rarity",
+          "value": "Common"
+        },
+        {
+          "name": "neededExperienceLevel",
+          "value": "0"
+        },
+        {
+          "name": "productionDuration",
+          "value": "38"
+        },
+        {
+          "name": "maxCapacity",
+          "value": "6"
+        },
+        {
+          "name": "maxShield",
+          "value": "0"
+        },
+        {
+          "name": "maxMana",
+          "value": "0"
+        },
+        {
+          "name": "maxArmor",
+          "value": "0"
+        },
+        {
+          "name": "armorProtection",
+          "value": "1"
         }
-    ],
-    "stages": [
+      ],
+      "customBalance": {
+        "Damage1": 5.0
+      },
+      "onHitStatusEffects": [
         {
-            "id": "tactical-operations:skirmish-trial",
-            "nativeTemplateId": "StageParameters_Pools_Level1SimpleRoleChoiceWithPriceLimit",
-            "parameterOverrides": [
-                {
-                    "name": "levelCount",
-                    "value": "8"
-                },
-                {
-                    "name": "maxWidth",
-                    "value": "5"
-                },
-                {
-                    "name": "coinReward",
-                    "value": "180"
-                },
-                {
-                    "name": "twoWayBranchingProbability",
-                    "value": "0.6"
-                },
-                {
-                    "name": "shopWeight",
-                    "value": "1.8"
-                },
-                {
-                    "name": "cardRewardWeight",
-                    "value": "3.5"
-                },
-                {
-                    "name": "fillFirstLevelWithCardRewards",
-                    "value": "true"
-                },
-                {
-                    "name": "putDefaultCardRewardInCenter",
-                    "value": "false"
-                }
-            ],
-            "mapSizeMin": 20,
-            "mapSizeMax": 60,
-            "isPartOfDemo": false,
-            "landscape": {
-                "nativeTemplateId": "27 Circles",
-                "randomSeed": 52084,
-                "alwaysUseSameSeed": true,
-                "mapSize": 33,
-                "localizations": [
-                    {
-                        "language": "en-US",
-                        "name": "Tactical Proving Grounds"
-                    },
-                    {
-                        "language": "es-XL",
-                        "name": "Campo de Pruebas Tácticas"
-                    }
-                ]
+          "statusEffect": "Stun",
+          "duration": 2.2,
+          "chance": 0.35
+        }
+      ],
+      "activeSkills": [
+        {
+          "id": "tactical-operations:tidebreaker-emp-overcharge",
+          "skillType": "LocationAoE",
+          "targetOrigin": "ChosenLocation",
+          "cooldown": 12.0,
+          "manaCost": 0,
+          "range": 8.0,
+          "radius": 4.0,
+          "helpAiToActivate": true,
+          "aiActivationTrigger": "EnemiesInRange",
+          "aiSkillCooldown": 12.0
+        }
+      ],
+      "productionBuilding": {
+        "id": "tactical-operations:tidebreaker-factory",
+        "nativeTemplateId": "PCXBaseTankFactory",
+        "isAllowedAsStartingBlueprint": true,
+        "balanceOverrides": [
+          {
+            "name": "cost",
+            "value": "550"
+          },
+          {
+            "name": "maxCapacity",
+            "value": "3"
+          },
+          {
+            "name": "neededExperienceLevel",
+            "value": "0"
+          },
+          {
+            "name": "rarity",
+            "value": "Common"
+          }
+        ],
+        "localizations": [
+          {
+            "language": "en-US",
+            "name": "Tidebreaker Hover Foundry",
+            "description": "Manufactures amphibious Tidebreaker EMP Skirmishers."
+          },
+          {
+            "language": "es-XL",
+            "name": "Fundici\u00f3n de aerodeslizadores Tidebreaker",
+            "description": "Fabrica escaramuzadores EMP anfibios Tidebreaker."
+          }
+        ]
+      },
+      "cardModelScalingFactor": 0.9,
+      "defaultTacticalStance": "Kiting",
+      "defaultLoadout": "Speed",
+      "startingAffixes": [
+        "Swift"
+      ],
+      "startingVeterancyRank": 1,
+      "baselineStatusEffects": [
+        "Rush"
+      ],
+      "combatBoosts": [
+        {
+          "id": "tactical-operations:tidebreaker-surge",
+          "statName": "MoveSpeed",
+          "multiplier": 1.3,
+          "duration": 3.0
+        }
+      ],
+      "stealth": {
+        "stealthLevel": 2.0,
+        "cloakDuration": 4.5,
+        "detectionReduction": 0.4
+      },
+      "experienceReward": {
+        "experienceAmount": 12,
+        "experienceType": "Crystals",
+        "bonusMultiplier": 1.25
+      }
+    },
+    {
+      "id": "tactical-operations:salvage-hauler",
+      "nativeTemplateId": "PCXBaseTank",
+      "assetBundleId": "tactical-operations:assets",
+      "cardImageAssetName": "assets/tacticaloperations/salvagehaulercard.png",
+      "visualAssetName": "assets/tacticaloperations/prefabs/salvagehaulervisual.prefab",
+      "visualRootPath": "Vehicle",
+      "isAllowedAsStartingBlueprint": true,
+      "isAllowedForAi": true,
+      "isAllowedForDemo": true,
+      "isForSpecialists": false,
+      "localizations": [
+        {
+          "language": "en-US",
+          "name": "Salvage Field Repair Hauler",
+          "description": "Armored logistics crawler outfitted with autonomous nanite repair systems to maintain friendly units and production facilities.",
+          "skillDescription": "Emits a nanite repair pulse that restores nearby allied units and structures."
+        },
+        {
+          "language": "es-XL",
+          "name": "Transporte de reparaci\u00f3n en campo Salvage",
+          "description": "Oruga log\u00edstica blindada equipada con sistemas nanorrob\u00f3ticos aut\u00f3nomos para reparar unidades e instalaciones de producci\u00f3n aliadas.",
+          "skillDescription": "Emite un pulso nanorrob\u00f3tico que repara unidades y estructuras aliadas cercanas."
+        }
+      ],
+      "balanceOverrides": [
+        {
+          "name": "roles",
+          "value": "Unit, Vehicle, Supporter, Heal"
+        },
+        {
+          "name": "offeredSystemTags",
+          "value": "Vehicle, Heal, Armor"
+        },
+        {
+          "name": "cost",
+          "value": "250"
+        },
+        {
+          "name": "maxHealth",
+          "value": "110"
+        },
+        {
+          "name": "moveSpeed",
+          "value": "12"
+        },
+        {
+          "name": "sightRadius",
+          "value": "9"
+        },
+        {
+          "name": "weaponRange",
+          "value": "3.8"
+        },
+        {
+          "name": "attackCooldown",
+          "value": "1.0"
+        },
+        {
+          "name": "rarity",
+          "value": "Rare"
+        },
+        {
+          "name": "neededExperienceLevel",
+          "value": "0"
+        },
+        {
+          "name": "productionDuration",
+          "value": "90"
+        },
+        {
+          "name": "maxCapacity",
+          "value": "4"
+        },
+        {
+          "name": "maxShield",
+          "value": "3"
+        },
+        {
+          "name": "maxMana",
+          "value": "0"
+        },
+        {
+          "name": "maxArmor",
+          "value": "0"
+        },
+        {
+          "name": "armorProtection",
+          "value": "1"
+        }
+      ],
+      "customBalance": {
+        "Damage1": 2.5
+      },
+      "activeSkills": [
+        {
+          "id": "tactical-operations:salvage-nanite-pulse",
+          "skillType": "SelfAoE",
+          "targetOrigin": "Self",
+          "cooldown": 18.0,
+          "manaCost": 0,
+          "range": 0.0,
+          "radius": 6.0,
+          "helpAiToActivate": true,
+          "aiActivationTrigger": "LowHealth",
+          "aiSkillCooldown": 18.0
+        }
+      ],
+      "productionBuilding": {
+        "id": "tactical-operations:salvage-hauler-factory",
+        "nativeTemplateId": "PCXBaseTankFactory",
+        "isAllowedAsStartingBlueprint": true,
+        "balanceOverrides": [
+          {
+            "name": "cost",
+            "value": "520"
+          },
+          {
+            "name": "maxCapacity",
+            "value": "3"
+          },
+          {
+            "name": "neededExperienceLevel",
+            "value": "0"
+          },
+          {
+            "name": "rarity",
+            "value": "Rare"
+          }
+        ],
+        "localizations": [
+          {
+            "language": "en-US",
+            "name": "Salvage Logistics Works",
+            "description": "Manufactures Salvage Field Repair Haulers."
+          },
+          {
+            "language": "es-XL",
+            "name": "Talleres log\u00edsticos Salvage",
+            "description": "Fabrica transportes de reparaci\u00f3n en campo Salvage."
+          }
+        ]
+      },
+      "cardModelScalingFactor": 0.85,
+      "healing": {
+        "healAmount": 12.0,
+        "healRange": 3.5,
+        "healRate": 0.8,
+        "repairAmount": 20.0
+      },
+      "aura": {
+        "auraRadius": 3.5,
+        "auraType": "Shield",
+        "buffAmount": 8.0,
+        "affectsAllies": true,
+        "affectsEnemies": false
+      },
+      "synergies": [
+        {
+          "id": "tactical-operations:salvage-armor-reinforcement",
+          "statName": "ArmorProtection",
+          "multiplier": 1.25,
+          "radius": 4.0,
+          "targetUnitIds": [
+            "tactical-operations:bulwark-siege-tank",
+            "tactical-operations:arc-lance-walker"
+          ]
+        }
+      ],
+      "shieldRegeneration": {
+        "rechargeDelay": 4.0,
+        "rechargeRate": 1.0,
+        "burstAmount": 1.0
+      },
+      "defaultTacticalStance": "Defensive",
+      "defaultLoadout": "Reinforced",
+      "startingVeterancyRank": 1,
+      "startingAffixes": [
+        "Bulwark"
+      ]
+    },
+    {
+      "id": "tactical-operations:skyguard-sam",
+      "nativeTemplateId": "PCXBaseTank",
+      "assetBundleId": "tactical-operations:assets",
+      "cardImageAssetName": "assets/tacticaloperations/skyguardsamcard.png",
+      "visualAssetName": "assets/tacticaloperations/prefabs/skyguardsamvisual.prefab",
+      "visualRootPath": "Vehicle",
+      "isAllowedAsStartingBlueprint": true,
+      "isAllowedForAi": true,
+      "isAllowedForDemo": true,
+      "isForSpecialists": false,
+      "localizations": [
+        {
+          "language": "en-US",
+          "name": "Skyguard Mobile SAM Platform",
+          "description": "Heavy surface-to-air missile platform with precision targeting and long-range payload delivery, vulnerable to close-range assaults.",
+          "skillDescription": "Launches a precision missile salvo at the target location."
+        },
+        {
+          "language": "es-XL",
+          "name": "Plataforma SAM m\u00f3vil Skyguard",
+          "description": "Plataforma pesada de misiles tierra-aire con punter\u00eda de precisi\u00f3n y largo alcance, vulnerable a asaltos a quemarropa.",
+          "skillDescription": "Lanza una salva de misiles de precisi\u00f3n sobre la ubicaci\u00f3n objetivo."
+        }
+      ],
+      "balanceOverrides": [
+        {
+          "name": "roles",
+          "value": "Unit, Vehicle, Sniper"
+        },
+        {
+          "name": "offeredSystemTags",
+          "value": "Vehicle, Sniper"
+        },
+        {
+          "name": "cost",
+          "value": "320"
+        },
+        {
+          "name": "maxHealth",
+          "value": "140"
+        },
+        {
+          "name": "moveSpeed",
+          "value": "8.5"
+        },
+        {
+          "name": "sightRadius",
+          "value": "13"
+        },
+        {
+          "name": "weaponRange",
+          "value": "12.5"
+        },
+        {
+          "name": "attackCooldown",
+          "value": "2.8"
+        },
+        {
+          "name": "rarity",
+          "value": "Rare"
+        },
+        {
+          "name": "neededExperienceLevel",
+          "value": "0"
+        },
+        {
+          "name": "productionDuration",
+          "value": "55"
+        },
+        {
+          "name": "maxCapacity",
+          "value": "3"
+        },
+        {
+          "name": "maxShield",
+          "value": "0"
+        },
+        {
+          "name": "maxMana",
+          "value": "0"
+        },
+        {
+          "name": "maxArmor",
+          "value": "0"
+        },
+        {
+          "name": "armorProtection",
+          "value": "1"
+        }
+      ],
+      "customBalance": {
+        "Damage1": 22.0
+      },
+      "criticalHitChance": 0.3,
+      "minAttackRange": 4.5,
+      "activeSkills": [
+        {
+          "id": "tactical-operations:skyguard-missile-salvo",
+          "skillType": "LocationAoE",
+          "targetOrigin": "ChosenLocation",
+          "cooldown": 14.0,
+          "manaCost": 0,
+          "range": 13.0,
+          "radius": 3.5,
+          "helpAiToActivate": true,
+          "aiActivationTrigger": "EnemiesInRange",
+          "aiSkillCooldown": 14.0
+        }
+      ],
+      "productionBuilding": {
+        "id": "tactical-operations:skyguard-sam-factory",
+        "nativeTemplateId": "PCXBaseTankFactory",
+        "isAllowedAsStartingBlueprint": true,
+        "balanceOverrides": [
+          {
+            "name": "cost",
+            "value": "620"
+          },
+          {
+            "name": "maxCapacity",
+            "value": "2"
+          },
+          {
+            "name": "neededExperienceLevel",
+            "value": "0"
+          },
+          {
+            "name": "rarity",
+            "value": "Rare"
+          }
+        ],
+        "localizations": [
+          {
+            "language": "en-US",
+            "name": "Skyguard Missile Works",
+            "description": "Produces Skyguard Mobile SAM Platforms."
+          },
+          {
+            "language": "es-XL",
+            "name": "F\u00e1brica de misiles Skyguard",
+            "description": "Produce plataformas SAM m\u00f3viles Skyguard."
+          }
+        ]
+      },
+      "cardModelScalingFactor": 0.85,
+      "experience": {
+        "experiencePerLevel": 1,
+        "maxLevel": 3,
+        "experienceGainMultiplier": 1.0,
+        "levelUpBonus": 0.2
+      },
+      "defaultTacticalStance": "HoldFire",
+      "defaultLoadout": "Standard",
+      "startingVeterancyRank": 1,
+      "startingAffixes": [
+        "Swift"
+      ]
+    },
+    {
+      "id": "tactical-operations:bulwark-siege-tank",
+      "nativeTemplateId": "PCXBaseTank",
+      "assetBundleId": "tactical-operations:assets",
+      "cardImageAssetName": "assets/tacticaloperations/bulwarksiegetankcard.png",
+      "visualAssetName": "assets/tacticaloperations/prefabs/bulwarksiegetankvisual.prefab",
+      "visualRootPath": "Vehicle",
+      "isAllowedAsStartingBlueprint": true,
+      "isAllowedForAi": true,
+      "isAllowedForDemo": true,
+      "isForSpecialists": false,
+      "localizations": [
+        {
+          "language": "en-US",
+          "name": "Bulwark Siege Tank",
+          "description": "Heavily armored siege platform with long-range artillery bombardment capability. Slow but devastating.",
+          "skillDescription": "Unleashes a heavy artillery barrage across the target area."
+        },
+        {
+          "language": "es-XL",
+          "name": "Tanque de asedio Bulwark",
+          "description": "Plataforma de asedio fuertemente blindada con capacidad de bombardeo de artilleria de largo alcance. Lenta pero devastadora.",
+          "skillDescription": "Desata un bombardeo de artiller\u00eda pesada sobre el \u00e1rea objetivo."
+        }
+      ],
+      "balanceOverrides": [
+        {
+          "name": "roles",
+          "value": "Unit, Vehicle, Tank, FrontalAttacker"
+        },
+        {
+          "name": "offeredSystemTags",
+          "value": "Vehicle, Tank, Armor"
+        },
+        {
+          "name": "cost",
+          "value": "360"
+        },
+        {
+          "name": "maxHealth",
+          "value": "160"
+        },
+        {
+          "name": "moveSpeed",
+          "value": "5.5"
+        },
+        {
+          "name": "sightRadius",
+          "value": "12"
+        },
+        {
+          "name": "weaponRange",
+          "value": "14.0"
+        },
+        {
+          "name": "attackCooldown",
+          "value": "4.5"
+        },
+        {
+          "name": "rarity",
+          "value": "Rare"
+        },
+        {
+          "name": "neededExperienceLevel",
+          "value": "0"
+        },
+        {
+          "name": "productionDuration",
+          "value": "60"
+        },
+        {
+          "name": "maxCapacity",
+          "value": "2"
+        },
+        {
+          "name": "maxShield",
+          "value": "0"
+        },
+        {
+          "name": "maxMana",
+          "value": "0"
+        },
+        {
+          "name": "maxArmor",
+          "value": "0"
+        },
+        {
+          "name": "armorProtection",
+          "value": "1"
+        }
+      ],
+      "customBalance": {
+        "Damage1": 32.0,
+        "EffectRadius1": 1.2
+      },
+      "minAttackRange": 5.0,
+      "baselineStatusEffects": [
+        "Armored",
+        "Robust"
+      ],
+      "aura": {
+        "auraRadius": 3.5,
+        "auraType": "Buff",
+        "buffAmount": 1.0,
+        "affectsAllies": true,
+        "affectsEnemies": false
+      },
+      "experience": {
+        "experiencePerLevel": 1,
+        "maxLevel": 3,
+        "experienceGainMultiplier": 1.0,
+        "levelUpBonus": 0.15
+      },
+      "activeSkills": [
+        {
+          "id": "tactical-operations:bulwark-artillery-barrage",
+          "skillType": "LocationAoE",
+          "targetOrigin": "ChosenLocation",
+          "cooldown": 18.0,
+          "manaCost": 0,
+          "range": 14.0,
+          "radius": 4.5,
+          "helpAiToActivate": true,
+          "aiActivationTrigger": "EnemiesInRange",
+          "aiSkillCooldown": 18.0
+        }
+      ],
+      "productionBuilding": {
+        "id": "tactical-operations:bulwark-siege-tank-factory",
+        "nativeTemplateId": "PCXBaseTankFactory",
+        "isAllowedAsStartingBlueprint": true,
+        "balanceOverrides": [
+          {
+            "name": "cost",
+            "value": "750"
+          },
+          {
+            "name": "maxCapacity",
+            "value": "2"
+          },
+          {
+            "name": "neededExperienceLevel",
+            "value": "0"
+          },
+          {
+            "name": "rarity",
+            "value": "Rare"
+          }
+        ],
+        "localizations": [
+          {
+            "language": "en-US",
+            "name": "Bulwark Siege Foundry",
+            "description": "Manufactures heavy Bulwark Siege Tanks."
+          },
+          {
+            "language": "es-XL",
+            "name": "Fundicion de asedio Bulwark",
+            "description": "Fabrica tanques de asedio pesados Bulwark."
+          }
+        ]
+      },
+      "cardModelScalingFactor": 0.9,
+      "defaultTacticalStance": "Aggressive",
+      "defaultLoadout": "Siege",
+      "startingAffixes": [
+        "Bulwark"
+      ],
+      "startingVeterancyRank": 1,
+      "command": {
+        "commandRange": 4.5,
+        "commandType": "Attack",
+        "maxCommandChain": 4
+      },
+      "tauntPulse": {
+        "pulseInterval": 4.0,
+        "tauntRadius": 18.0,
+        "duration": 3.0,
+        "maxTargets": 6
+      }
+    },
+    {
+      "id": "tactical-operations:arc-lance-walker",
+      "nativeTemplateId": "PCXBaseTank",
+      "assetBundleId": "tactical-operations:assets",
+      "cardImageAssetName": "assets/tacticaloperations/arclancewalkercard.png",
+      "visualAssetName": "assets/tacticaloperations/prefabs/arclancewalkervisual.prefab",
+      "visualRootPath": "Vehicle",
+      "isAllowedAsStartingBlueprint": true,
+      "isAllowedForAi": true,
+      "isAllowedForDemo": true,
+      "isForSpecialists": false,
+      "localizations": [
+        {
+          "language": "en-US",
+          "name": "Arc Lance Walker",
+          "description": "Bipedal mech armed with a high-energy arc lance that chains between targets. Agile and deadly at mid-range.",
+          "skillDescription": "Discharges a high-voltage arc lance strike at the target enemy."
+        },
+        {
+          "language": "es-XL",
+          "name": "Caminante de lanza de arco",
+          "description": "Meca bipedo armado con una lanza de arco de alta energia que se encadena entre objetivos. Agil y letal a media distancia.",
+          "skillDescription": "Descarga un impacto de lanza de arco de alto voltaje contra el objetivo enemigo."
+        }
+      ],
+      "balanceOverrides": [
+        {
+          "name": "roles",
+          "value": "Unit, Mech, FrontalAttacker"
+        },
+        {
+          "name": "offeredSystemTags",
+          "value": "Mech, Stun, AoE"
+        },
+        {
+          "name": "cost",
+          "value": "420"
+        },
+        {
+          "name": "maxHealth",
+          "value": "400"
+        },
+        {
+          "name": "moveSpeed",
+          "value": "11"
+        },
+        {
+          "name": "sightRadius",
+          "value": "10"
+        },
+        {
+          "name": "weaponRange",
+          "value": "8.5"
+        },
+        {
+          "name": "attackCooldown",
+          "value": "1.6"
+        },
+        {
+          "name": "rarity",
+          "value": "Rare"
+        },
+        {
+          "name": "neededExperienceLevel",
+          "value": "0"
+        },
+        {
+          "name": "productionDuration",
+          "value": "50"
+        },
+        {
+          "name": "maxCapacity",
+          "value": "3"
+        },
+        {
+          "name": "maxShield",
+          "value": "0"
+        },
+        {
+          "name": "maxMana",
+          "value": "0"
+        },
+        {
+          "name": "maxArmor",
+          "value": "0"
+        },
+        {
+          "name": "armorProtection",
+          "value": "1"
+        }
+      ],
+      "customBalance": {
+        "Damage1": 7.0
+      },
+      "activeSkills": [
+        {
+          "id": "tactical-operations:arc-lance-chain",
+          "skillType": "TargetAoE",
+          "targetOrigin": "ChosenEntity",
+          "cooldown": 10.0,
+          "manaCost": 0,
+          "range": 8.5,
+          "radius": 0.0,
+          "helpAiToActivate": true,
+          "aiActivationTrigger": "EnemiesInRange",
+          "aiSkillCooldown": 10.0
+        }
+      ],
+      "productionBuilding": {
+        "id": "tactical-operations:arc-lance-walker-factory",
+        "nativeTemplateId": "PCXBaseTankFactory",
+        "isAllowedAsStartingBlueprint": true,
+        "balanceOverrides": [
+          {
+            "name": "cost",
+            "value": "680"
+          },
+          {
+            "name": "maxCapacity",
+            "value": "3"
+          },
+          {
+            "name": "neededExperienceLevel",
+            "value": "0"
+          },
+          {
+            "name": "rarity",
+            "value": "Rare"
+          }
+        ],
+        "localizations": [
+          {
+            "language": "en-US",
+            "name": "Arc Lance Assembly Bay",
+            "description": "Assembles Arc Lance Walker mechs."
+          },
+          {
+            "language": "es-XL",
+            "name": "Bahia de ensamblaje Arc Lance",
+            "description": "Ensambla mecas caminantes Arc Lance."
+          }
+        ]
+      },
+      "cardModelScalingFactor": 0.85,
+      "defaultTacticalStance": "Aggressive",
+      "defaultLoadout": "AP",
+      "startingAffixes": [
+        "Overcharged"
+      ],
+      "startingVeterancyRank": 1,
+      "combatBoosts": [
+        {
+          "id": "tactical-operations:arc-lance-overclock",
+          "statName": "AttackSpeed",
+          "multiplier": 1.25,
+          "duration": 4.0
+        }
+      ],
+      "experience": {
+        "experiencePerLevel": 1,
+        "maxLevel": 3,
+        "experienceGainMultiplier": 1.0,
+        "levelUpBonus": 0.2
+      },
+      "vampiricLeech": {
+        "siphonRatio": 0.2,
+        "siphonToShield": false,
+        "maxSiphonPerHit": 25.0
+      }
+    },
+    {
+      "id": "tactical-operations:field-medic-rover",
+      "nativeTemplateId": "PCXBaseTank",
+      "assetBundleId": "tactical-operations:assets",
+      "cardImageAssetName": "assets/tacticaloperations/fieldmedicrovercard.png",
+      "visualAssetName": "assets/tacticaloperations/prefabs/fieldmedicrovervisual.prefab",
+      "visualRootPath": "Vehicle",
+      "isAllowedAsStartingBlueprint": true,
+      "isAllowedForAi": true,
+      "isAllowedForDemo": true,
+      "isForSpecialists": false,
+      "localizations": [
+        {
+          "language": "en-US",
+          "name": "Field Medic Rover",
+          "description": "Fast wheeled support vehicle with autonomous nanite healing systems. Repairs allies and suppresses enemies with light weaponry.",
+          "skillDescription": "Triggers an emergency nanite pulse that heals nearby allied units."
+        },
+        {
+          "language": "es-XL",
+          "name": "Rover medico de campo",
+          "description": "Vehiculo de apoyo sobre ruedas rapido con sistemas de curacion nanorroboticos autonomos. Repara aliados y suprime enemigos con armamento ligero.",
+          "skillDescription": "Activa un pulso nanorrob\u00f3tico de emergencia que repara unidades aliadas cercanas."
+        }
+      ],
+      "balanceOverrides": [
+        {
+          "name": "roles",
+          "value": "Unit, Vehicle, Supporter, Heal"
+        },
+        {
+          "name": "offeredSystemTags",
+          "value": "Vehicle, Heal, Armor"
+        },
+        {
+          "name": "cost",
+          "value": "240"
+        },
+        {
+          "name": "maxHealth",
+          "value": "100"
+        },
+        {
+          "name": "moveSpeed",
+          "value": "12.0"
+        },
+        {
+          "name": "sightRadius",
+          "value": "9"
+        },
+        {
+          "name": "weaponRange",
+          "value": "3.8"
+        },
+        {
+          "name": "attackCooldown",
+          "value": "1.0"
+        },
+        {
+          "name": "rarity",
+          "value": "Common"
+        },
+        {
+          "name": "neededExperienceLevel",
+          "value": "0"
+        },
+        {
+          "name": "productionDuration",
+          "value": "90"
+        },
+        {
+          "name": "maxCapacity",
+          "value": "5"
+        },
+        {
+          "name": "maxShield",
+          "value": "5"
+        },
+        {
+          "name": "maxMana",
+          "value": "0"
+        },
+        {
+          "name": "maxArmor",
+          "value": "0"
+        },
+        {
+          "name": "armorProtection",
+          "value": "1"
+        }
+      ],
+      "customBalance": {
+        "Damage1": 2.5
+      },
+      "onHitStatusEffects": [
+        {
+          "statusEffect": "SlowedDown",
+          "duration": 2.0,
+          "chance": 0.5
+        }
+      ],
+      "activeSkills": [
+        {
+          "id": "tactical-operations:medic-nanite-pulse",
+          "skillType": "SelfAoE",
+          "targetOrigin": "Self",
+          "cooldown": 8.0,
+          "manaCost": 0,
+          "range": 0.0,
+          "radius": 5.0,
+          "helpAiToActivate": true,
+          "aiActivationTrigger": "LowHealth",
+          "aiSkillCooldown": 8.0
+        }
+      ],
+      "productionBuilding": {
+        "id": "tactical-operations:field-medic-rover-factory",
+        "nativeTemplateId": "PCXBaseTankFactory",
+        "isAllowedAsStartingBlueprint": true,
+        "balanceOverrides": [
+          {
+            "name": "cost",
+            "value": "500"
+          },
+          {
+            "name": "maxCapacity",
+            "value": "4"
+          },
+          {
+            "name": "neededExperienceLevel",
+            "value": "0"
+          },
+          {
+            "name": "rarity",
+            "value": "Common"
+          }
+        ],
+        "localizations": [
+          {
+            "language": "en-US",
+            "name": "Field Medic Bay",
+            "description": "Manufactures Field Medic Rovers."
+          },
+          {
+            "language": "es-XL",
+            "name": "Bahia medica de campo",
+            "description": "Fabrica rovers medicos de campo."
+          }
+        ]
+      },
+      "cardModelScalingFactor": 0.8,
+      "healing": {
+        "healAmount": 18.0,
+        "healRange": 4.5,
+        "healRate": 1.0,
+        "repairAmount": 12.0
+      },
+      "aura": {
+        "auraRadius": 4.0,
+        "auraType": "Heal",
+        "buffAmount": 6.0,
+        "affectsAllies": true,
+        "affectsEnemies": false
+      },
+      "synergies": [
+        {
+          "id": "tactical-operations:medic-skirmish-overclock",
+          "statName": "Damage",
+          "multiplier": 1.2,
+          "radius": 4.5,
+          "targetUnitIds": [
+            "tactical-operations:tidebreaker-skirmisher",
+            "tactical-operations:skyguard-sam"
+          ]
+        }
+      ],
+      "shieldOverloadNova": {
+        "novaRadius": 4.0,
+        "damage": 25.0,
+        "stunDuration": 2.0,
+        "cooldown": 15.0
+      },
+      "shieldRegeneration": {
+        "rechargeDelay": 5.0,
+        "rechargeRate": 1.5,
+        "burstAmount": 2.0
+      },
+      "defaultTacticalStance": "Defensive",
+      "defaultLoadout": "Standard",
+      "startingVeterancyRank": 1,
+      "startingAffixes": [
+        "Bulwark"
+      ]
+    }
+  ],
+  "stages": [
+    {
+      "id": "tactical-operations:skirmish-trial",
+      "nativeTemplateId": "StageParameters_Pools_Level1SimpleRoleChoiceWithPriceLimit",
+      "parameterOverrides": [
+        {
+          "name": "levelCount",
+          "value": "8"
+        },
+        {
+          "name": "maxWidth",
+          "value": "5"
+        },
+        {
+          "name": "coinReward",
+          "value": "180"
+        },
+        {
+          "name": "twoWayBranchingProbability",
+          "value": "0.6"
+        },
+        {
+          "name": "shopWeight",
+          "value": "1.8"
+        },
+        {
+          "name": "cardRewardWeight",
+          "value": "3.5"
+        },
+        {
+          "name": "fillFirstLevelWithCardRewards",
+          "value": "true"
+        },
+        {
+          "name": "putDefaultCardRewardInCenter",
+          "value": "false"
+        }
+      ],
+      "mapSizeMin": 20,
+      "mapSizeMax": 60,
+      "isPartOfDemo": false,
+      "landscape": {
+        "nativeTemplateId": "27 Circles",
+        "randomSeed": 52084,
+        "alwaysUseSameSeed": true,
+        "mapSize": 33,
+        "localizations": [
+          {
+            "language": "en-US",
+            "name": "Tactical Proving Grounds"
+          },
+          {
+            "language": "es-XL",
+            "name": "Campo de Pruebas T\u00e1cticas"
+          }
+        ]
+      },
+      "unitIds": [
+        "tactical-operations:tidebreaker-skirmisher",
+        "tactical-operations:salvage-hauler",
+        "tactical-operations:skyguard-sam",
+        "tactical-operations:bulwark-siege-tank",
+        "tactical-operations:arc-lance-walker",
+        "tactical-operations:field-medic-rover"
+      ],
+      "blueprintPoolEntries": [
+        {
+          "poolId": "BP_CheaperVehicles",
+          "unitIds": [
+            "tactical-operations:tidebreaker-skirmisher",
+            "tactical-operations:skyguard-sam",
+            "tactical-operations:bulwark-siege-tank",
+            "tactical-operations:arc-lance-walker"
+          ]
+        },
+        {
+          "poolId": "BP_CheaperRobos",
+          "unitIds": [
+            "tactical-operations:salvage-hauler",
+            "tactical-operations:field-medic-rover"
+          ]
+        }
+      ],
+      "aiProfileIds": [
+        "tactical-operations:skirmish-adversary"
+      ]
+    }
+  ],
+  "aiProfiles": [
+    {
+      "id": "tactical-operations:skirmish-adversary",
+      "nativeTemplateId": "_01_ Quick Hunter Enemy Var",
+      "scopeToReferencedStages": true,
+      "doctrine": "Assault",
+      "aggressionMultiplier": 1.25,
+      "defaultUnitStance": "Aggressive",
+      "defaultUnitLoadout": "AP",
+      "startingUnitAffixes": [
+        "Swift",
+        "Bulwark"
+      ],
+      "startingUnitVeterancyRank": 1,
+      "unitEntries": [
+        {
+          "unitId": "tactical-operations:tidebreaker-skirmisher",
+          "baseIndex": 0,
+          "startingInAscensionLevel": 0,
+          "countAtStart": 1,
+          "maxLiving": 3
+        },
+        {
+          "unitId": "tactical-operations:salvage-hauler",
+          "baseIndex": 0,
+          "startingInAscensionLevel": 0,
+          "countAtStart": 1,
+          "maxLiving": 2
+        },
+        {
+          "unitId": "tactical-operations:skyguard-sam",
+          "baseIndex": 0,
+          "startingInAscensionLevel": 0,
+          "countAtStart": 1,
+          "maxLiving": 2
+        },
+        {
+          "unitId": "tactical-operations:bulwark-siege-tank",
+          "baseIndex": 0,
+          "startingInAscensionLevel": 0,
+          "countAtStart": 1,
+          "maxLiving": 2
+        },
+        {
+          "unitId": "tactical-operations:arc-lance-walker",
+          "baseIndex": 0,
+          "startingInAscensionLevel": 0,
+          "countAtStart": 1,
+          "maxLiving": 3
+        },
+        {
+          "unitId": "tactical-operations:field-medic-rover",
+          "baseIndex": 0,
+          "startingInAscensionLevel": 0,
+          "countAtStart": 1,
+          "maxLiving": 2
+        }
+      ],
+      "productionBuildingEntries": [
+        {
+          "unitId": "tactical-operations:tidebreaker-skirmisher",
+          "baseIndex": 0,
+          "startingInAscensionLevel": 0,
+          "maxLiving": 1
+        },
+        {
+          "unitId": "tactical-operations:salvage-hauler",
+          "baseIndex": 0,
+          "startingInAscensionLevel": 0,
+          "maxLiving": 1
+        },
+        {
+          "unitId": "tactical-operations:skyguard-sam",
+          "baseIndex": 0,
+          "startingInAscensionLevel": 0,
+          "maxLiving": 1
+        },
+        {
+          "unitId": "tactical-operations:bulwark-siege-tank",
+          "baseIndex": 0,
+          "startingInAscensionLevel": 0,
+          "maxLiving": 1
+        },
+        {
+          "unitId": "tactical-operations:arc-lance-walker",
+          "baseIndex": 0,
+          "startingInAscensionLevel": 0,
+          "maxLiving": 1
+        },
+        {
+          "unitId": "tactical-operations:field-medic-rover",
+          "baseIndex": 0,
+          "startingInAscensionLevel": 0,
+          "maxLiving": 1
+        }
+      ],
+      "modules": [
+        {
+          "moduleId": "sample:scheduled-base-build",
+          "parameters": [
+            {
+              "name": "intervalSeconds",
+              "value": "8"
             },
-            "unitIds": [
-                "tactical-operations:tidebreaker-skirmisher",
-                "tactical-operations:salvage-hauler",
-                "tactical-operations:skyguard-sam",
-                "tactical-operations:bulwark-siege-tank",
-                "tactical-operations:arc-lance-walker",
-                "tactical-operations:field-medic-rover"
-            ],
-            "blueprintPoolEntries": [
-                {
-                    "poolId": "BP_CheaperVehicles",
-                    "unitIds": [
-                        "tactical-operations:tidebreaker-skirmisher",
-                        "tactical-operations:skyguard-sam",
-                        "tactical-operations:bulwark-siege-tank",
-                        "tactical-operations:arc-lance-walker"
-                    ]
-                },
-                {
-                    "poolId": "BP_CheaperRobos",
-                    "unitIds": [
-                        "tactical-operations:salvage-hauler",
-                        "tactical-operations:field-medic-rover"
-                    ]
-                }
-            ],
-            "aiProfileIds": [
-                "tactical-operations:skirmish-adversary"
-            ]
-        }
-    ],
-    "aiProfiles": [
+            {
+              "name": "maxSuccessfulBuilds",
+              "value": "2"
+            },
+            {
+              "name": "maxAttempts",
+              "value": "4"
+            }
+          ]
+        },
         {
-            "id": "tactical-operations:skirmish-adversary",
-            "nativeTemplateId": "_01_ Quick Hunter Enemy Var",
-            "scopeToReferencedStages": true,
-            "doctrine": "Assault",
-            "aggressionMultiplier": 1.25,
-            "defaultUnitStance": "Aggressive",
-            "defaultUnitLoadout": "AP",
-            "startingUnitAffixes": [
-                "Swift",
-                "Bulwark"
-            ],
-            "startingUnitVeterancyRank": 1,
-            "unitEntries": [
-                {
-                    "unitId": "tactical-operations:tidebreaker-skirmisher",
-                    "baseIndex": 0,
-                    "startingInAscensionLevel": 0,
-                    "countAtStart": 1,
-                    "maxLiving": 3
-                },
-                {
-                    "unitId": "tactical-operations:salvage-hauler",
-                    "baseIndex": 0,
-                    "startingInAscensionLevel": 0,
-                    "countAtStart": 1,
-                    "maxLiving": 2
-                },
-                {
-                    "unitId": "tactical-operations:skyguard-sam",
-                    "baseIndex": 0,
-                    "startingInAscensionLevel": 0,
-                    "countAtStart": 1,
-                    "maxLiving": 2
-                },
-                {
-                    "unitId": "tactical-operations:bulwark-siege-tank",
-                    "baseIndex": 0,
-                    "startingInAscensionLevel": 0,
-                    "countAtStart": 1,
-                    "maxLiving": 2
-                },
-                {
-                    "unitId": "tactical-operations:arc-lance-walker",
-                    "baseIndex": 0,
-                    "startingInAscensionLevel": 0,
-                    "countAtStart": 1,
-                    "maxLiving": 3
-                },
-                {
-                    "unitId": "tactical-operations:field-medic-rover",
-                    "baseIndex": 0,
-                    "startingInAscensionLevel": 0,
-                    "countAtStart": 1,
-                    "maxLiving": 2
-                }
-            ],
-            "productionBuildingEntries": [
-                {
-                    "unitId": "tactical-operations:tidebreaker-skirmisher",
-                    "baseIndex": 0,
-                    "startingInAscensionLevel": 0,
-                    "maxLiving": 1
-                },
-                {
-                    "unitId": "tactical-operations:salvage-hauler",
-                    "baseIndex": 0,
-                    "startingInAscensionLevel": 0,
-                    "maxLiving": 1
-                },
-                {
-                    "unitId": "tactical-operations:skyguard-sam",
-                    "baseIndex": 0,
-                    "startingInAscensionLevel": 0,
-                    "maxLiving": 1
-                },
-                {
-                    "unitId": "tactical-operations:bulwark-siege-tank",
-                    "baseIndex": 0,
-                    "startingInAscensionLevel": 0,
-                    "maxLiving": 1
-                },
-                {
-                    "unitId": "tactical-operations:arc-lance-walker",
-                    "baseIndex": 0,
-                    "startingInAscensionLevel": 0,
-                    "maxLiving": 1
-                },
-                {
-                    "unitId": "tactical-operations:field-medic-rover",
-                    "baseIndex": 0,
-                    "startingInAscensionLevel": 0,
-                    "maxLiving": 1
-                }
-            ],
-            "modules": [
-                {
-                    "moduleId": "sample:scheduled-base-build",
-                    "parameters": [
-                        {
-                            "name": "intervalSeconds",
-                            "value": "8"
-                        },
-                        {
-                            "name": "maxSuccessfulBuilds",
-                            "value": "2"
-                        },
-                        {
-                            "name": "maxAttempts",
-                            "value": "4"
-                        }
-                    ]
-                },
-                {
-                    "moduleId": "sample:skirmish-kiting",
-                    "parameters": [
-                        {
-                            "name": "retreatDistanceRatio",
-                            "value": "0.65"
-                        },
-                        {
-                            "name": "preferredEngagementRatio",
-                            "value": "0.90"
-                        },
-                        {
-                            "name": "minKiteSpeed",
-                            "value": "8.0"
-                        },
-                        {
-                            "name": "fleeDistance",
-                            "value": "8.0"
-                        },
-                        {
-                            "name": "maxKiteTargets",
-                            "value": "8"
-                        },
-                        {
-                            "name": "cooldownSeconds",
-                            "value": "1.2"
-                        }
-                    ]
-                },
-                {
-                    "moduleId": "sample:support-repair",
-                    "parameters": [
-                        {
-                            "name": "healthThresholdRatio",
-                            "value": "0.85"
-                        },
-                        {
-                            "name": "repairScanRadius",
-                            "value": "22.0"
-                        },
-                        {
-                            "name": "prioritizeHarvestersAndBuildings",
-                            "value": "true"
-                        },
-                        {
-                            "name": "maxAssignedRepairersPerTarget",
-                            "value": "2"
-                        },
-                        {
-                            "name": "cooldownSeconds",
-                            "value": "1.5"
-                        }
-                    ]
-                },
-                {
-                    "moduleId": "sample:counter-battery",
-                    "parameters": [
-                        {
-                            "name": "baseIndex",
-                            "value": "0"
-                        },
-                        {
-                            "name": "threatTriggerDistance",
-                            "value": "22.0"
-                        },
-                        {
-                            "name": "minInterceptorSpeed",
-                            "value": "9.0"
-                        },
-                        {
-                            "name": "maxInterceptors",
-                            "value": "3"
-                        },
-                        {
-                            "name": "cooldownSeconds",
-                            "value": "6.0"
-                        }
-                    ]
-                },
-                {
-                    "moduleId": "sample:tactical-skill-activation",
-                    "parameters": [
-                        {
-                            "name": "baseIndex",
-                            "value": "0"
-                        },
-                        {
-                            "name": "cooldownSeconds",
-                            "value": "3.5"
-                        },
-                        {
-                            "name": "enemyTriggerRadiusCells",
-                            "value": "10.0"
-                        },
-                        {
-                            "name": "minManaRatio",
-                            "value": "0.5"
-                        }
-                    ]
-                },
-                {
-                    "moduleId": "sample:focus-fire",
-                    "parameters": [
-                        {
-                            "name": "baseIndex",
-                            "value": "0"
-                        },
-                        {
-                            "name": "checkIntervalSeconds",
-                            "value": "3.0"
-                        },
-                        {
-                            "name": "squadRadius",
-                            "value": "18.0"
-                        },
-                        {
-                            "name": "minUnitsInSquad",
-                            "value": "2"
-                        },
-                        {
-                            "name": "priorityMode",
-                            "value": "LowestHealth"
-                        }
-                    ]
-                },
-                {
-                    "moduleId": "sample:siege-assault",
-                    "parameters": [
-                        {
-                            "name": "baseIndex",
-                            "value": "0"
-                        },
-                        {
-                            "name": "cooldownSeconds",
-                            "value": "30.0"
-                        },
-                        {
-                            "name": "minSquadSize",
-                            "value": "2"
-                        },
-                        {
-                            "name": "targetPriority",
-                            "value": "ClosestBuilding"
-                        },
-                        {
-                            "name": "minGameTimeSeconds",
-                            "value": "30.0"
-                        }
-                    ]
-                },
-                {
-                    "moduleId": "sample:threat-prioritization",
-                    "parameters": []
-                }
-            ]
+          "moduleId": "sample:skirmish-kiting",
+          "parameters": [
+            {
+              "name": "retreatDistanceRatio",
+              "value": "0.65"
+            },
+            {
+              "name": "preferredEngagementRatio",
+              "value": "0.90"
+            },
+            {
+              "name": "minKiteSpeed",
+              "value": "8.0"
+            },
+            {
+              "name": "fleeDistance",
+              "value": "8.0"
+            },
+            {
+              "name": "maxKiteTargets",
+              "value": "8"
+            },
+            {
+              "name": "cooldownSeconds",
+              "value": "1.2"
+            }
+          ]
+        },
+        {
+          "moduleId": "sample:support-repair",
+          "parameters": [
+            {
+              "name": "healthThresholdRatio",
+              "value": "0.85"
+            },
+            {
+              "name": "repairScanRadius",
+              "value": "22.0"
+            },
+            {
+              "name": "prioritizeHarvestersAndBuildings",
+              "value": "true"
+            },
+            {
+              "name": "maxAssignedRepairersPerTarget",
+              "value": "2"
+            },
+            {
+              "name": "cooldownSeconds",
+              "value": "1.5"
+            }
+          ]
+        },
+        {
+          "moduleId": "sample:counter-battery",
+          "parameters": [
+            {
+              "name": "baseIndex",
+              "value": "0"
+            },
+            {
+              "name": "threatTriggerDistance",
+              "value": "22.0"
+            },
+            {
+              "name": "minInterceptorSpeed",
+              "value": "9.0"
+            },
+            {
+              "name": "maxInterceptors",
+              "value": "3"
+            },
+            {
+              "name": "cooldownSeconds",
+              "value": "6.0"
+            }
+          ]
+        },
+        {
+          "moduleId": "sample:tactical-skill-activation",
+          "parameters": [
+            {
+              "name": "baseIndex",
+              "value": "0"
+            },
+            {
+              "name": "cooldownSeconds",
+              "value": "3.5"
+            },
+            {
+              "name": "enemyTriggerRadiusCells",
+              "value": "10.0"
+            },
+            {
+              "name": "minManaRatio",
+              "value": "0.5"
+            }
+          ]
+        },
+        {
+          "moduleId": "sample:focus-fire",
+          "parameters": [
+            {
+              "name": "baseIndex",
+              "value": "0"
+            },
+            {
+              "name": "checkIntervalSeconds",
+              "value": "3.0"
+            },
+            {
+              "name": "squadRadius",
+              "value": "18.0"
+            },
+            {
+              "name": "minUnitsInSquad",
+              "value": "2"
+            },
+            {
+              "name": "priorityMode",
+              "value": "LowestHealth"
+            }
+          ]
+        },
+        {
+          "moduleId": "sample:siege-assault",
+          "parameters": [
+            {
+              "name": "baseIndex",
+              "value": "0"
+            },
+            {
+              "name": "cooldownSeconds",
+              "value": "30.0"
+            },
+            {
+              "name": "minSquadSize",
+              "value": "2"
+            },
+            {
+              "name": "targetPriority",
+              "value": "ClosestBuilding"
+            },
+            {
+              "name": "minGameTimeSeconds",
+              "value": "30.0"
+            }
+          ]
+        },
+        {
+          "moduleId": "sample:threat-prioritization",
+          "parameters": []
         }
-    ]
+      ]
+    }
+  ]
 }

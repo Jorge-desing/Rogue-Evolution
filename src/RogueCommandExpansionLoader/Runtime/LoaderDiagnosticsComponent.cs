@@ -365,6 +365,14 @@ namespace RogueCommandExpansionLoader.Runtime
 
         public int LiveHarvesterCount => RuntimeBattlefieldCensus.Current().HarvesterCount;
 
+        public int LiveMechanicsDirectorCount => RuntimeGameplayCommandDirector.GetLiveMechanicsDirectorCount();
+
+        public int LiveVisualDirectorCount => RuntimeGameplayCommandDirector.GetLiveVisualDirectorCount();
+
+        public int LiveJammedTurretCount => RuntimeGameplayCommandDirector.GetLiveJammedTurretCount();
+
+        public int LiveRegeneratingShieldCount => RuntimeGameplayCommandDirector.GetLiveRegeneratingShieldCount();
+
         /// <summary>
         /// Returns the live battlefield census (counts plus per-player-unit
         /// health/armor/shield/rank state) as JSON. Readable by an agent without
@@ -1354,6 +1362,24 @@ namespace RogueCommandExpansionLoader.Runtime
         {
             return AgentDiagnosticsFormatter.SerializeLoaderReconciliationResult(
                 RuntimeGameplayCommandDirector.TryReconcileLoaderRuntimeState(SafeSnapshot()));
+        }
+
+        public string GetUnitMechanicsCensusJson(int maxUnits = 64)
+        {
+            return AgentDiagnosticsFormatter.SerializeUnitMechanicsCensus(
+                RuntimeGameplayCommandDirector.GetUnitMechanicsCensus(maxUnits));
+        }
+
+        public string OrderUnitVisualFeedbackJson(string entityKeyId, string feedbackType, float magnitude = 0.22f)
+        {
+            return AgentDiagnosticsFormatter.SerializeVisualFeedbackResult(
+                RuntimeGameplayCommandDirector.TryOrderUnitVisualFeedback(entityKeyId, feedbackType, magnitude));
+        }
+
+        public string OrderUnitAttachmentJson(string entityKeyId, string attachmentType, bool active)
+        {
+            return AgentDiagnosticsFormatter.SerializeVisualFeedbackResult(
+                RuntimeGameplayCommandDirector.TryOrderUnitAttachment(entityKeyId, attachmentType, active));
         }
 
         public string GetSystemHealthJson()

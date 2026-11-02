@@ -375,3 +375,20 @@ ormalizedTime progressing across game ticks, and playbackSpeed > 0.
   - isTurretJammed: jamming flag during weapon malfunctions.
   - currentRecoilOffset: barrel displacement during fire recoil.
   - doorOpenProgress: deploy/bay doors opening ratio ($[0.0, 1.0]$).
+
+
+### 9.4 Runtime Unit Mechanics & Visual Director Synchronization
+
+Units with active combat mechanics (`RuntimeUnitMechanicsDirector`) and visual representations (`RuntimeVisualDirector`) synchronize state dynamically during live matches:
+- **Status Effect Reactions in `Update()`**:
+  - `Stun`: Jams weapon turret, freezes locomotion animation and halts radar traverse.
+  - `OnFire`: Triggers damage fire/smoke emitters and procedural soot vertex color blending.
+  - `CombatBoost` / `Overclocked` / `Turbo`: Multiplies radar mast rotation speed to $2.5\times$ RPM.
+- **Combat Tactical Stance Modulations**:
+  - `HoldFire`: Suppresses weapon traverse and fire recoil animations.
+  - `Aggressive`: Increases turret traverse speed by $+50\%$.
+  - `Defensive`: Auto-deploys defensive modular attachments (`Armor`, `Shield`, `APS`).
+- **Telemetry & Diagnostic Censuses**:
+  - `diagnostics_get_unit_mechanics_census`: Snapshots living unit mechanics, stances, veterancy, shield regeneration, critical hit chance, and visual director overrides (with `omittedUnitCount` placed strictly first).
+  - `diagnostics_order_unit_visual_feedback`: Commands localized weapon recoil, critical hit impacts, turret jamming overrides, bay door toggles, and footstep ground pulses.
+  - `diagnostics_order_unit_attachment`: Toggles visual hardpoint attachments (`Armor`, `Shield`, `Radar`, `APS`) dynamically.

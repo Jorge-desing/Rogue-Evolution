@@ -7471,5 +7471,436 @@ namespace RogueCommandExpansionLoader.Runtime
             ClearAiProfileUnitDefaults();
         }
 
+        public static int GetLiveMechanicsDirectorCount()
+        {
+            int count = 0;
+            try
+            {
+                ExistingControllers existing = ExistingControllers.Instance;
+                if (existing != null)
+                {
+                    List<EntityController> units = new List<EntityController>();
+                    if (existing.PlayerUnits() != null) units.AddRange(existing.PlayerUnits());
+                    if (existing.AiUnits() != null) units.AddRange(existing.AiUnits());
+                    for (int i = 0; i < units.Count; i++)
+                    {
+                        if (units[i] != null && !units[i].IsDestroyed && units[i].GetComponent<RuntimeUnitMechanicsDirector>() != null)
+                            count++;
+                    }
+                }
+            }
+            catch { }
+            return count;
+        }
+
+        public static int GetLiveVisualDirectorCount()
+        {
+            int count = 0;
+            try
+            {
+                ExistingControllers existing = ExistingControllers.Instance;
+                if (existing != null)
+                {
+                    List<EntityController> units = new List<EntityController>();
+                    if (existing.PlayerUnits() != null) units.AddRange(existing.PlayerUnits());
+                    if (existing.AiUnits() != null) units.AddRange(existing.AiUnits());
+                    for (int i = 0; i < units.Count; i++)
+                    {
+                        if (units[i] != null && !units[i].IsDestroyed)
+                        {
+                            Component[] comps = units[i].GetComponents<Component>();
+                            for (int c = 0; c < comps.Length; c++)
+                            {
+                                if (comps[c] != null && comps[c].GetType().Name == "RuntimeVisualDirector")
+                                {
+                                    count++;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            catch { }
+            return count;
+        }
+
+        public static int GetLiveJammedTurretCount()
+        {
+            int count = 0;
+            try
+            {
+                ExistingControllers existing = ExistingControllers.Instance;
+                if (existing != null)
+                {
+                    List<EntityController> units = new List<EntityController>();
+                    if (existing.PlayerUnits() != null) units.AddRange(existing.PlayerUnits());
+                    if (existing.AiUnits() != null) units.AddRange(existing.AiUnits());
+                    for (int i = 0; i < units.Count; i++)
+                    {
+                        if (units[i] != null && !units[i].IsDestroyed)
+                        {
+                            Component[] comps = units[i].GetComponents<Component>();
+                            for (int c = 0; c < comps.Length; c++)
+                            {
+                                if (comps[c] != null && comps[c].GetType().Name == "RuntimeVisualDirector")
+                                {
+                                    PropertyInfo p = comps[c].GetType().GetProperty("IsTurretJammed");
+                                    if (p != null && (bool)p.GetValue(comps[c], null)) count++;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            catch { }
+            return count;
+        }
+
+        public static int GetLiveRegeneratingShieldCount()
+        {
+            int count = 0;
+            try
+            {
+                ExistingControllers existing = ExistingControllers.Instance;
+                if (existing != null)
+                {
+                    List<EntityController> units = new List<EntityController>();
+                    if (existing.PlayerUnits() != null) units.AddRange(existing.PlayerUnits());
+                    if (existing.AiUnits() != null) units.AddRange(existing.AiUnits());
+                    for (int i = 0; i < units.Count; i++)
+                    {
+                        if (units[i] != null && !units[i].IsDestroyed && units[i].MaxShield > 0f && units[i].CurrentShield < units[i].MaxShield)
+                        {
+                            string uid = ResolveEntityIdString(units[i]);
+                            UnitRuntimeMechanicsProfile profile;
+                            if (!string.IsNullOrEmpty(uid) && RuntimeUnitMechanicsDirector.TryGetProfile(uid, out profile) && profile?.ShieldRegen != null)
+                                count++;
+                        }
+                    }
+                }
+            }
+            catch { }
+            return count;
+        }
+
+        public static UnitMechanicsCensus GetUnitMechanicsCensus(int maxUnits = 64)
+        {
+            int cap = Math.Max(1, Math.Min(512, maxUnits));
+            var rows = new List<UnitMechanicsCensusRow>();
+
+            int totalTrackedUnits = 0;
+            int totalMechanicsInstances = 0;
+            int activeHealerCount = 0;
+            int activeAuraCount = 0;
+            int activeShieldRegenCount = 0;
+
+            try
+            {
+                ExistingControllers existing = ExistingControllers.Instance;
+                if (existing != null)
+                {
+                    List<EntityController> allUnits = new List<EntityController>();
+                    if (existing.PlayerUnits() != null) allUnits.AddRange(existing.PlayerUnits());
+                    if (existing.AiUnits() != null) allUnits.AddRange(existing.AiUnits());
+
+                    for (int i = 0; i < allUnits.Count; i++)
+                    {
+                        EntityController unit = allUnits[i];
+                        if (unit == null || unit.gameObject == null || unit.IsDestroyed) continue;
+
+                        totalTrackedUnits++;
+                        string key = unit.UniqueEntityId.ToString();
+                        string unitId = ResolveEntityIdString(unit);
+
+                        UnitRuntimeMechanicsProfile profile = null;
+                        bool hasProfile = !string.IsNullOrEmpty(unitId) && RuntimeUnitMechanicsDirector.TryGetProfile(unitId, out profile) && profile != null;
+                        if (hasProfile)
+                        {
+                            totalMechanicsInstances++;
+                        }
+
+                        bool hasHealing = profile?.Healing != null && (profile.Healing.healAmount > 0f || profile.Healing.repairAmount > 0f);
+                        bool hasAura = profile?.Aura != null && profile.Aura.auraRadius > 0f;
+                        bool hasShieldRegen = profile?.ShieldRegen != null && profile.ShieldRegen.rechargeRate > 0f;
+
+                        if (hasHealing) activeHealerCount++;
+                        if (hasAura) activeAuraCount++;
+                        if (hasShieldRegen) activeShieldRegenCount++;
+
+                        if (rows.Count < cap)
+                        {
+                            float hp = unit.MaxHealth > 0.001f ? Mathf.Clamp01(unit.CurrentHealth / unit.MaxHealth) : 1f;
+                            float sh = unit.MaxShield > 0.001f ? Mathf.Clamp01(unit.CurrentShield / unit.MaxShield) : 0f;
+                            string stance = GetUnitTacticalStance(key);
+                            string loadout = GetActiveUnitVariant(key);
+                            int rank = unit.CurrentRank;
+                            int xp = RuntimeUnitMechanicsDirector.GetCombatXpForEntity(unit);
+
+                            List<string> affixesList;
+                            IReadOnlyList<string> affixes = _activeUnitAffixes.TryGetValue(key, out affixesList)
+                                ? affixesList.AsReadOnly()
+                                : Array.Empty<string>();
+
+                            float crit = profile?.CriticalHitChance ?? 0f;
+                            float minRange = profile?.MinAttackRange ?? 0f;
+
+                            int statusCount = 0;
+                            string statusSummary = string.Empty;
+                            try
+                            {
+                                var activeEffects = new List<string>();
+                                StatusEffect[] allEffects = (StatusEffect[])Enum.GetValues(typeof(StatusEffect));
+                                for (int s = 0; s < allEffects.Length; s++)
+                                {
+                                    if (unit.HasActiveStatusEffect(allEffects[s]))
+                                    {
+                                        activeEffects.Add(allEffects[s].ToString());
+                                    }
+                                }
+                                statusCount = activeEffects.Count;
+                                if (statusCount > 0)
+                                {
+                                    statusSummary = string.Join(",", activeEffects);
+                                }
+                            }
+                            catch
+                            {
+                                // Fallback
+                            }
+
+                            bool hasVd = false;
+                            bool isJammed = false;
+                            float recoil = 0f;
+                            float door = 0f;
+
+                            Component[] comps = unit.GetComponents<Component>();
+                            for (int c = 0; c < comps.Length; c++)
+                            {
+                                if (comps[c] != null && comps[c].GetType().Name == "RuntimeVisualDirector")
+                                {
+                                    hasVd = true;
+                                    Type vt = comps[c].GetType();
+                                    PropertyInfo pj = vt.GetProperty("IsTurretJammed");
+                                    if (pj != null) isJammed = (bool)pj.GetValue(comps[c], null);
+                                    PropertyInfo pr = vt.GetProperty("CurrentRecoilOffset");
+                                    if (pr != null) recoil = (float)pr.GetValue(comps[c], null);
+                                    PropertyInfo pd = vt.GetProperty("DoorOpenProgress");
+                                    if (pd != null) door = (float)pd.GetValue(comps[c], null);
+                                    break;
+                                }
+                            }
+
+                            rows.Add(new UnitMechanicsCensusRow
+                            {
+                                EntityKeyId = key,
+                                EntityId = unitId,
+                                IsControlledByPlayer = unit.IsControlledByPlayer,
+                                HealthRatio = hp,
+                                ShieldRatio = sh,
+                                TacticalStance = stance,
+                                LoadoutVariant = loadout,
+                                VeterancyRank = rank,
+                                CombatXp = xp,
+                                Affixes = affixes,
+                                HasHealing = hasHealing,
+                                HasAura = hasAura,
+                                HasShieldRegen = hasShieldRegen,
+                                CriticalHitChance = crit,
+                                MinAttackRange = minRange,
+                                ActiveStatusEffectsCount = statusCount,
+                                ActiveStatusEffectsSummary = statusSummary,
+                                HasVisualDirector = hasVd,
+                                IsVisualTurretJammed = isJammed,
+                                VisualRecoilOffset = recoil,
+                                VisualDoorProgress = door,
+                            });
+                        }
+                    }
+                }
+            }
+            catch { }
+
+            return new UnitMechanicsCensus
+            {
+                OmittedUnitCount = Math.Max(0, totalTrackedUnits - rows.Count),
+                TotalTrackedUnits = totalTrackedUnits,
+                TotalMechanicsInstancesCount = totalMechanicsInstances,
+                ActiveHealerCount = activeHealerCount,
+                ActiveAuraCount = activeAuraCount,
+                ActiveShieldRegenCount = activeShieldRegenCount,
+                Rows = rows.AsReadOnly(),
+            };
+        }
+
+        public static VisualFeedbackResult TryOrderUnitVisualFeedback(string entityKeyId, string feedbackType, float magnitude = 0.22f)
+        {
+            if (string.IsNullOrWhiteSpace(entityKeyId))
+            {
+                return new VisualFeedbackResult { Success = false, EntityKeyId = entityKeyId, FeedbackType = feedbackType, Message = "Entity key ID cannot be empty." };
+            }
+            if (string.IsNullOrWhiteSpace(feedbackType))
+            {
+                return new VisualFeedbackResult { Success = false, EntityKeyId = entityKeyId, FeedbackType = feedbackType, Message = "Feedback type cannot be empty." };
+            }
+
+            try
+            {
+                ExistingControllers existing = ExistingControllers.Instance;
+                if (existing == null)
+                {
+                    return new VisualFeedbackResult { Success = false, EntityKeyId = entityKeyId, FeedbackType = feedbackType, Message = "ExistingControllers is unavailable." };
+                }
+
+                EntityController unit = FindEntityByKey(existing, entityKeyId.Trim());
+                if (unit == null || unit.gameObject == null || unit.IsDestroyed)
+                {
+                    return new VisualFeedbackResult { Success = false, EntityKeyId = entityKeyId, FeedbackType = feedbackType, Message = "Entity not found or destroyed: " + entityKeyId };
+                }
+
+                Component visualDirector = null;
+                Component[] comps = unit.GetComponents<Component>();
+                for (int i = 0; i < comps.Length; i++)
+                {
+                    if (comps[i] != null && comps[i].GetType().Name == "RuntimeVisualDirector")
+                    {
+                        visualDirector = comps[i];
+                        break;
+                    }
+                }
+
+                if (visualDirector == null)
+                {
+                    return new VisualFeedbackResult { Success = false, EntityKeyId = entityKeyId, FeedbackType = feedbackType, Message = "RuntimeVisualDirector is not attached to entity: " + entityKeyId };
+                }
+
+                Type vdType = visualDirector.GetType();
+                string normFeedback = feedbackType.Trim();
+                if (string.Equals(normFeedback, "WeaponRecoil", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(normFeedback, "CritImpact", StringComparison.OrdinalIgnoreCase))
+                {
+                    MethodInfo m = vdType.GetMethod("TriggerWeaponFeedback", BindingFlags.Public | BindingFlags.Instance);
+                    if (m != null)
+                    {
+                        float recoil = Mathf.Clamp(magnitude, 0.05f, 1.0f);
+                        m.Invoke(visualDirector, new object[] { recoil });
+                        return new VisualFeedbackResult { Success = true, EntityKeyId = entityKeyId, FeedbackType = normFeedback, Message = "Weapon recoil/impact feedback triggered with magnitude " + recoil };
+                    }
+                }
+                else if (string.Equals(normFeedback, "JamTurret", StringComparison.OrdinalIgnoreCase))
+                {
+                    MethodInfo m = vdType.GetMethod("SetTurretJammedOverride", BindingFlags.Public | BindingFlags.Instance);
+                    if (m != null)
+                    {
+                        m.Invoke(visualDirector, new object[] { (bool?)true });
+                        return new VisualFeedbackResult { Success = true, EntityKeyId = entityKeyId, FeedbackType = normFeedback, Message = "Turret jammed override activated." };
+                    }
+                }
+                else if (string.Equals(normFeedback, "UnjamTurret", StringComparison.OrdinalIgnoreCase))
+                {
+                    MethodInfo m = vdType.GetMethod("SetTurretJammedOverride", BindingFlags.Public | BindingFlags.Instance);
+                    if (m != null)
+                    {
+                        m.Invoke(visualDirector, new object[] { (bool?)false });
+                        return new VisualFeedbackResult { Success = true, EntityKeyId = entityKeyId, FeedbackType = normFeedback, Message = "Turret jammed override cleared." };
+                    }
+                }
+                else if (string.Equals(normFeedback, "OpenBayDoors", StringComparison.OrdinalIgnoreCase))
+                {
+                    MethodInfo m = vdType.GetMethod("SetDoorOpenOverride", BindingFlags.Public | BindingFlags.Instance);
+                    if (m != null)
+                    {
+                        m.Invoke(visualDirector, new object[] { (float?)1.0f });
+                        return new VisualFeedbackResult { Success = true, EntityKeyId = entityKeyId, FeedbackType = normFeedback, Message = "Bay doors open override set to 1.0." };
+                    }
+                }
+                else if (string.Equals(normFeedback, "CloseBayDoors", StringComparison.OrdinalIgnoreCase))
+                {
+                    MethodInfo m = vdType.GetMethod("SetDoorOpenOverride", BindingFlags.Public | BindingFlags.Instance);
+                    if (m != null)
+                    {
+                        m.Invoke(visualDirector, new object[] { (float?)0.0f });
+                        return new VisualFeedbackResult { Success = true, EntityKeyId = entityKeyId, FeedbackType = normFeedback, Message = "Bay doors open override cleared to 0.0." };
+                    }
+                }
+                else if (string.Equals(normFeedback, "FootstepPulse", StringComparison.OrdinalIgnoreCase))
+                {
+                    MethodInfo m = vdType.GetMethod("TriggerFootstepFeedback", BindingFlags.Public | BindingFlags.Instance);
+                    if (m != null)
+                    {
+                        m.Invoke(visualDirector, new object[] { null });
+                        return new VisualFeedbackResult { Success = true, EntityKeyId = entityKeyId, FeedbackType = normFeedback, Message = "Footstep ground pulse triggered." };
+                    }
+                }
+
+                return new VisualFeedbackResult { Success = false, EntityKeyId = entityKeyId, FeedbackType = feedbackType, Message = "Unsupported visual feedback type: " + feedbackType };
+            }
+            catch (Exception ex)
+            {
+                return new VisualFeedbackResult { Success = false, EntityKeyId = entityKeyId, FeedbackType = feedbackType, Message = "Error executing visual feedback: " + ex.Message };
+            }
+        }
+
+        public static VisualFeedbackResult TryOrderUnitAttachment(string entityKeyId, string attachmentType, bool active)
+        {
+            if (string.IsNullOrWhiteSpace(entityKeyId))
+            {
+                return new VisualFeedbackResult { Success = false, EntityKeyId = entityKeyId, FeedbackType = "Attachment", Message = "Entity key ID cannot be empty." };
+            }
+            if (string.IsNullOrWhiteSpace(attachmentType))
+            {
+                return new VisualFeedbackResult { Success = false, EntityKeyId = entityKeyId, FeedbackType = "Attachment", Message = "Attachment type cannot be empty." };
+            }
+
+            try
+            {
+                ExistingControllers existing = ExistingControllers.Instance;
+                if (existing == null)
+                {
+                    return new VisualFeedbackResult { Success = false, EntityKeyId = entityKeyId, FeedbackType = "Attachment", Message = "ExistingControllers is unavailable." };
+                }
+
+                EntityController unit = FindEntityByKey(existing, entityKeyId.Trim());
+                if (unit == null || unit.gameObject == null || unit.IsDestroyed)
+                {
+                    return new VisualFeedbackResult { Success = false, EntityKeyId = entityKeyId, FeedbackType = "Attachment", Message = "Entity not found or destroyed: " + entityKeyId };
+                }
+
+                Component visualDirector = null;
+                Component[] comps = unit.GetComponents<Component>();
+                for (int i = 0; i < comps.Length; i++)
+                {
+                    if (comps[i] != null && comps[i].GetType().Name == "RuntimeVisualDirector")
+                    {
+                        visualDirector = comps[i];
+                        break;
+                    }
+                }
+
+                if (visualDirector == null)
+                {
+                    return new VisualFeedbackResult { Success = false, EntityKeyId = entityKeyId, FeedbackType = "Attachment", Message = "RuntimeVisualDirector is not attached to entity: " + entityKeyId };
+                }
+
+                Type vdType = visualDirector.GetType();
+                MethodInfo m = vdType.GetMethod("TrySetAttachmentState", BindingFlags.Public | BindingFlags.Instance);
+                if (m != null)
+                {
+                    bool set = (bool)m.Invoke(visualDirector, new object[] { attachmentType.Trim(), active });
+                    if (set)
+                    {
+                        return new VisualFeedbackResult { Success = true, EntityKeyId = entityKeyId, FeedbackType = "Attachment:" + attachmentType, Message = "Attachment '" + attachmentType + "' state set to " + active };
+                    }
+                    return new VisualFeedbackResult { Success = false, EntityKeyId = entityKeyId, FeedbackType = "Attachment:" + attachmentType, Message = "Attachment hardpoint '" + attachmentType + "' not found on unit visual hierarchy." };
+                }
+
+                return new VisualFeedbackResult { Success = false, EntityKeyId = entityKeyId, FeedbackType = "Attachment", Message = "TrySetAttachmentState method not found on RuntimeVisualDirector." };
+            }
+            catch (Exception ex)
+            {
+                return new VisualFeedbackResult { Success = false, EntityKeyId = entityKeyId, FeedbackType = "Attachment", Message = "Error setting attachment state: " + ex.Message };
+            }
+        }
 }
 }

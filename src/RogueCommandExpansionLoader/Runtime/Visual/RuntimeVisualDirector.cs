@@ -61,6 +61,19 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
         private bool _isDamagedStateActive;
         private bool _isCriticalStateActive;
         private bool _isTurretJammed;
+        private bool _isStunnedVisualActive;
+        private bool _isOnFireVisualActive;
+        private bool _isBoostedVisualActive;
+        private string _activeTacticalStanceVisual = "Standard";
+        private bool? _turretJammedOverride;
+        private float? _doorOpenOverride;
+
+        private static MethodInfo _hasActiveStatusEffectMethod;
+        private static object _stunStatusEffect;
+        private static object _onFireStatusEffect;
+        private static object _combatBoostStatusEffect;
+        private static object _overclockedStatusEffect;
+        private static object _turboStatusEffect;
         private bool _hasMovementAnimationParameter;
         private bool _hasFireAnimationParameter;
         private bool _hasDeathAnimationParameter;
@@ -517,6 +530,18 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             _isEnemyMethod = ecType.GetMethod("IsEnemy", BindingFlags.Public | BindingFlags.Instance,
                 null, new[] { ecType }, null);
 
+            Type statusEffectType = ecType.Assembly.GetType("StatusEffect", false);
+            if (statusEffectType != null)
+            {
+                _hasActiveStatusEffectMethod = ecType.GetMethod("HasActiveStatusEffect",
+                    BindingFlags.Public | BindingFlags.Instance, null, new[] { statusEffectType }, null);
+                try { _stunStatusEffect = Enum.Parse(statusEffectType, "Stun", true); } catch { }
+                try { _onFireStatusEffect = Enum.Parse(statusEffectType, "OnFire", true); } catch { }
+                try { _combatBoostStatusEffect = Enum.Parse(statusEffectType, "CombatBoost", true); } catch { }
+                try { _overclockedStatusEffect = Enum.Parse(statusEffectType, "Overclocked", true); } catch { }
+                try { _turboStatusEffect = Enum.Parse(statusEffectType, "Turbo", true); } catch { }
+            }
+
             Type movementType = ecType.Assembly.GetType("EntityFlockingMovement", false);
             if (movementType != null)
             {
@@ -576,6 +601,7 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
 
             UpdateNativeAudioBindings();
             UpdateLocomotionAnimation();
+            UpdateStatusEffectAndStanceReactions();
             UpdateHealthAndDamageTransitions();
             UpdateRadarSweep();
             UpdateTurretAiming();
@@ -865,18 +891,91 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             }
         }
 
+        private void UpdateStatusEffectAndStanceReactions()
+        {
+            if (_entity == null || IsEntityDead()) return;
+
+            bool hasStun = false;
+            bool hasOnFire = false;
+            bool hasBoost = false;
+
+            if (_hasActiveStatusEffectMethod != null)
+            {
+                try
+                {
+                    if (_stunStatusEffect != null && (bool)_hasActiveStatusEffectMethod.Invoke(_entity, new[] { _stunStatusEffect }))
+                        hasStun = true;
+                    if (_onFireStatusEffect != null && (bool)_hasActiveStatusEffectMethod.Invoke(_entity, new[] { _onFireStatusEffect }))
+                        hasOnFire = true;
+                    if (_combatBoostStatusEffect != null && (bool)_hasActiveStatusEffectMethod.Invoke(_entity, new[] { _combatBoostStatusEffect }))
+                        hasBoost = true;
+                    if (!hasBoost && _overclockedStatusEffect != null && (bool)_hasActiveStatusEffectMethod.Invoke(_entity, new[] { _overclockedStatusEffect }))
+                        hasBoost = true;
+                    if (!hasBoost && _turboStatusEffect != null && (bool)_hasActiveStatusEffectMethod.Invoke(_entity, new[] { _turboStatusEffect }))
+                        hasBoost = true;
+                }
+                catch { }
+            }
+
+            _isStunnedVisualActive = hasStun;
+            _isOnFireVisualActive = hasOnFire;
+            _isBoostedVisualActive = hasBoost;
+
+            if (hasStun)
+            {
+                _isTurretJammed = true;
+                if (_animator != null && _hasMovementAnimationParameter)
+                {
+                    _animator.SetBool(MovementAnimationParameter, false);
+                }
+            }
+
+            if (hasOnFire && !_isCriticalStateActive)
+            {
+                if (_authoredDamageFire != null && !_authoredDamageFire.isPlaying)
+                {
+                    _authoredDamageFire.Play(true);
+                }
+                else if (_fireVfxInstance == null)
+                {
+                    Transform fireMount = _socketDamageFire ?? transform;
+                    _fireVfxInstance = RuntimeVisualVfxFallback.SpawnDamageFire(fireMount, _entity);
+                }
+                ApplyProceduralScorch(true);
+            }
+
+            try
+            {
+                string key = _entity.UniqueEntityId.ToString();
+                string stance = RuntimeGameplayCommandDirector.GetUnitTacticalStance(key);
+                if (!string.IsNullOrEmpty(stance))
+                {
+                    _activeTacticalStanceVisual = stance;
+                    if (string.Equals(stance, "Defensive", StringComparison.OrdinalIgnoreCase))
+                    {
+                        SetAttachmentActive("Armor", true);
+                        SetAttachmentActive("Shield", true);
+                        SetAttachmentActive("APS", true);
+                    }
+                }
+            }
+            catch { }
+        }
+
         private void UpdateRadarSweep()
         {
-            if (_socketRadarMast == null || IsEntityDead()) return;
-            // Calibrate to true 30 RPM: 30 * 360 deg / 60 sec = 180 deg/sec
-            float degPerSec = _radarRpm * 6.0f;
+            if (_socketRadarMast == null || IsEntityDead() || _isStunnedVisualActive) return;
+            float effectiveRpm = _isBoostedVisualActive ? _radarRpm * 2.5f : _radarRpm;
+            float degPerSec = effectiveRpm * 6.0f;
             _socketRadarMast.Rotate(Vector3.up, degPerSec * Time.deltaTime, Space.Self);
         }
 
         private void UpdateTurretAiming()
         {
             if (_isMoving) return;
-            if (_socketTurretPivot == null || _isTurretJammed || IsEntityDead()) return;
+            if (string.Equals(_activeTacticalStanceVisual, "HoldFire", StringComparison.OrdinalIgnoreCase)) return;
+            bool effectiveJammed = _turretJammedOverride.HasValue ? _turretJammedOverride.Value : (_isTurretJammed || _isStunnedVisualActive);
+            if (_socketTurretPivot == null || effectiveJammed || IsEntityDead()) return;
 
             Transform target = ResolveEntityTarget();
             if (target == null) return;
@@ -887,8 +986,11 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             if (toTarget.sqrMagnitude > 0.01f)
             {
                 Quaternion targetRot = Quaternion.LookRotation(toTarget, Vector3.up);
+                float effectiveTraverseSpeed = string.Equals(_activeTacticalStanceVisual, "Aggressive", StringComparison.OrdinalIgnoreCase)
+                    ? _turretTraverseSpeed * 1.5f
+                    : _turretTraverseSpeed;
                 _socketTurretPivot.rotation = Quaternion.RotateTowards(
-                    _socketTurretPivot.rotation, targetRot, _turretTraverseSpeed * Time.deltaTime);
+                    _socketTurretPivot.rotation, targetRot, effectiveTraverseSpeed * Time.deltaTime);
             }
         }
 
@@ -896,8 +998,16 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
         {
             if (_socketDeployUnit == null || IsEntityDead()) return;
 
-            bool isProducing = CheckIfProducing();
-            float targetProgress = isProducing ? 1.0f : 0.0f;
+            float targetProgress;
+            if (_doorOpenOverride.HasValue)
+            {
+                targetProgress = Mathf.Clamp01(_doorOpenOverride.Value);
+            }
+            else
+            {
+                bool isProducing = CheckIfProducing();
+                targetProgress = isProducing ? 1.0f : 0.0f;
+            }
             _doorOpenProgress = Mathf.MoveTowards(_doorOpenProgress, targetProgress, Time.deltaTime * 1.8f);
 
             // Door slides upward along local Y
@@ -921,9 +1031,77 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
 
         public bool IsDamagedStateActive => _isDamagedStateActive;
         public bool IsCriticalStateActive => _isCriticalStateActive;
-        public bool IsTurretJammed => _isTurretJammed;
+        public bool IsTurretJammed => _turretJammedOverride.HasValue ? _turretJammedOverride.Value : _isTurretJammed;
         public float CurrentRecoilOffset => _currentRecoilOffset;
         public float DoorOpenProgress => _doorOpenProgress;
+        public bool IsStunnedVisualActive => _isStunnedVisualActive;
+        public bool IsOnFireVisualActive => _isOnFireVisualActive;
+        public bool IsBoostedVisualActive => _isBoostedVisualActive;
+        public string ActiveTacticalStanceVisual => _activeTacticalStanceVisual;
+
+        public void SetTurretJammedOverride(bool? jammed)
+        {
+            _turretJammedOverride = jammed;
+            if (jammed.HasValue && jammed.Value && _socketTurretPivot != null)
+            {
+                _socketTurretPivot.localRotation *= Quaternion.Euler(4.5f, 0f, 3.8f);
+            }
+        }
+
+        public void SetDoorOpenOverride(float? progress)
+        {
+            _doorOpenOverride = progress;
+        }
+
+        public bool TrySetAttachmentState(string attachmentType, bool active)
+        {
+            if (string.IsNullOrWhiteSpace(attachmentType)) return false;
+            Transform visual;
+            if (TryGetHardpointVisual(attachmentType, out visual) && visual != null)
+            {
+                visual.gameObject.SetActive(active);
+                return true;
+            }
+            return false;
+        }
+
+        public void TriggerFootstepFeedback(string footSocketName = null)
+        {
+            Transform foot = null;
+            if (!string.IsNullOrWhiteSpace(footSocketName))
+            {
+                Transform[] all = GetComponentsInChildren<Transform>(true);
+                for (int i = 0; i < all.Length; i++)
+                {
+                    if (string.Equals(all[i].name, footSocketName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        foot = all[i];
+                        break;
+                    }
+                }
+            }
+            if (foot == null)
+            {
+                Transform[] all = GetComponentsInChildren<Transform>(true);
+                for (int i = 0; i < all.Length; i++)
+                {
+                    if (all[i].name.StartsWith("Socket_FootContact", StringComparison.OrdinalIgnoreCase))
+                    {
+                        foot = all[i];
+                        break;
+                    }
+                }
+            }
+            if (foot != null)
+            {
+                RuntimeVisualVfxFallback.TriggerMuzzleFlashAt(transform, foot.position, Quaternion.identity);
+            }
+        }
+
+        public string GetVisualStatusSummary()
+        {
+            return $"damaged={_isDamagedStateActive},critical={_isCriticalStateActive},jammed={IsTurretJammed},stunned={_isStunnedVisualActive},fire={_isOnFireVisualActive},boosted={_isBoostedVisualActive},stance={_activeTacticalStanceVisual},recoil={_currentRecoilOffset:F2},door={_doorOpenProgress:F2}";
+        }
 
         public void TriggerWeaponFeedback(float recoilDistance = 0.22f)
         {

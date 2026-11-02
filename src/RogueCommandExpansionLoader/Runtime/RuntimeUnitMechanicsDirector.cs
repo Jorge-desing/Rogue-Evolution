@@ -1426,6 +1426,7 @@ namespace RogueCommandExpansionLoader.Runtime
                 }
 
                 director.InitializeOrRefresh(entityObj, profile);
+                AttachVisualDirectorIfAvailable(entityObj);
             }
             catch
             {
@@ -2711,6 +2712,7 @@ namespace RogueCommandExpansionLoader.Runtime
             {
                 return;
             }
+            TriggerVisualFeedback(self, 0.35f);
 
             IEnumerable entities = GetActiveEntities();
             if (entities == null)
@@ -2890,6 +2892,48 @@ namespace RogueCommandExpansionLoader.Runtime
             }
 
             return null;
+        }
+
+        private static void AttachVisualDirectorIfAvailable(object entityObj)
+        {
+            if (entityObj == null) return;
+            try
+            {
+                Type vdType = Type.GetType("RogueCommandExpansionLoader.Runtime.Visual.RuntimeVisualDirector, RogueCommandExpansionLoader", false);
+                if (vdType != null)
+                {
+                    MethodInfo attach = vdType.GetMethod("AttachIfApplicable", BindingFlags.Public | BindingFlags.Static);
+                    if (attach != null)
+                    {
+                        attach.Invoke(null, new object[] { entityObj });
+                    }
+                }
+            }
+            catch { }
+        }
+
+        private static void TriggerVisualFeedback(object entityObj, float recoilDistance)
+        {
+            if (entityObj == null) return;
+            try
+            {
+                Component comp = entityObj as Component;
+                if (comp == null) return;
+                Component[] comps = comp.GetComponents<Component>();
+                for (int i = 0; i < comps.Length; i++)
+                {
+                    if (comps[i] != null && comps[i].GetType().Name == "RuntimeVisualDirector")
+                    {
+                        MethodInfo m = comps[i].GetType().GetMethod("TriggerWeaponFeedback", BindingFlags.Public | BindingFlags.Instance);
+                        if (m != null)
+                        {
+                            m.Invoke(comps[i], new object[] { recoilDistance });
+                        }
+                        break;
+                    }
+                }
+            }
+            catch { }
         }
 
         private static void InvokeBankDeposit(string accountName, float amount)

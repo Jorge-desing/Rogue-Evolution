@@ -16,20 +16,43 @@
       "prefabAssetName": "ScoutTank",
       "cardImageAssetName": "ScoutTankCard",
       "balanceOverrides": [
-        { "name": "rarity", "value": "Common" },
-        { "name": "neededExperienceLevel", "value": "0" }
+        {
+          "name": "rarity",
+          "value": "Common"
+        },
+        {
+          "name": "neededExperienceLevel",
+          "value": "0"
+        }
       ],
       "productionBuilding": {
         "id": "sample:scout-tank-factory",
         "nativeTemplateId": "PCXBaseTankFactory",
         "balanceOverrides": [
-          { "name": "maxCapacity", "value": "3" },
-          { "name": "neededExperienceLevel", "value": "0" },
-          { "name": "rarity", "value": "Common" }
+          {
+            "name": "maxCapacity",
+            "value": "3"
+          },
+          {
+            "name": "neededExperienceLevel",
+            "value": "0"
+          },
+          {
+            "name": "rarity",
+            "value": "Common"
+          }
         ],
         "localizations": [
-          { "language": "en-US", "name": "Scout Tank Assembly Plant", "description": "Produces Scout Tanks." },
-          { "language": "es-XL", "name": "Planta de tanques exploradores", "description": "Produce tanques exploradores." }
+          {
+            "language": "en-US",
+            "name": "Scout Tank Assembly Plant",
+            "description": "Produces Scout Tanks."
+          },
+          {
+            "language": "es-XL",
+            "name": "Planta de tanques exploradores",
+            "description": "Produce tanques exploradores."
+          }
         ]
       },
       "localizations": [
@@ -41,7 +64,25 @@
         {
           "language": "es-XL",
           "name": "Tanque Explorador",
-          "description": "Un tanque con blindaje ligero diseñado para explorar y reposicionarse con rapidez."
+          "description": "Un tanque con blindaje ligero dise\u00f1ado para explorar y reposicionarse con rapidez."
+        }
+      ],
+      "defaultTacticalStance": "Aggressive",
+      "defaultLoadout": "Speed",
+      "startingVeterancyRank": 1,
+      "startingAffixes": [
+        "Swift"
+      ],
+      "criticalHitChance": 0.1,
+      "variants": [
+        {
+          "id": "speed",
+          "balanceOverrides": [
+            {
+              "name": "moveSpeed",
+              "value": "18"
+            }
+          ]
         }
       ]
     }
@@ -88,8 +129,29 @@
         {
           "moduleId": "sample:threat-prioritization",
           "parameters": []
+        },
+        {
+          "moduleId": "sample:adaptive-commander",
+          "parameters": [
+            {
+              "name": "scanIntervalSeconds",
+              "value": "5"
+            },
+            {
+              "name": "baseIndex",
+              "value": "0"
+            }
+          ]
         }
-      ]
+      ],
+      "doctrine": "Assault",
+      "aggressionMultiplier": 1.2,
+      "defaultUnitStance": "Aggressive",
+      "defaultUnitLoadout": "Speed",
+      "startingUnitAffixes": [
+        "Swift"
+      ],
+      "startingUnitVeterancyRank": 1
     }
   ]
 }

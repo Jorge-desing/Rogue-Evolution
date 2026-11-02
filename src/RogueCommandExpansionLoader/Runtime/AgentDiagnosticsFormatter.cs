@@ -2668,6 +2668,9 @@ new Dictionary<string, object> { ["name"] = "OrderRetreatJson", ["description"] 
                 new Dictionary<string, object> { ["name"] = "GetLoadedPrefabVisualAuditJson", ["description"] = "Load-time visual, rig, shader, and socket audit for loaded unit and building prefabs." },
                 new Dictionary<string, object> { ["name"] = "GetLoaderAuditCensusJson", ["description"] = "Runtime readiness audit of loader-registered units, buildings, pre-spawn pools, and AI profiles." },
                 new Dictionary<string, object> { ["name"] = "OrderReconcileLoaderStateJson", ["description"] = "Actively reconcile loader runtime state: warm pre-spawn pools, attach visual/mechanics directors, and apply AI squad defaults." },
+                new Dictionary<string, object> { ["name"] = "GetUnitMechanicsCensusJson", ["description"] = "Live census of active unit mechanics: healing, auras, shield regen, XP/veterancy, combat stances, and visual director state." },
+                new Dictionary<string, object> { ["name"] = "OrderUnitVisualFeedbackJson", ["description"] = "Order visual feedback pulse (WeaponRecoil, JamTurret, UnjamTurret, OpenBayDoors, CloseBayDoors, FootstepPulse) on a unit." },
+                new Dictionary<string, object> { ["name"] = "OrderUnitAttachmentJson", ["description"] = "Command hardpoint attachment state (APS, ERA, FuelDrums, Armor, Shield) on a unit visual hierarchy." },
                 new Dictionary<string, object> { ["name"] = "GetDiagnosticCatalogJson", ["description"] = "Catalog of available diagnostic getters." },
             };
 
@@ -2762,6 +2765,70 @@ new Dictionary<string, object> { ["name"] = "OrderRetreatJson", ["description"] 
                 ["appliedAiUnitDefaultsCount"] = result.AppliedAiUnitDefaultsCount,
                 ["reconciledAiProfileCount"] = result.ReconciledAiProfileCount,
                 ["message"] = result.Message ?? string.Empty,
+            };
+            return Serialize(view);
+        }
+
+        public static string SerializeUnitMechanicsCensus(UnitMechanicsCensus census)
+        {
+            var unitRows = new List<Dictionary<string, object>>();
+            if (census != null && census.Rows != null)
+            {
+                for (int i = 0; i < census.Rows.Count; i++)
+                {
+                    UnitMechanicsCensusRow r = census.Rows[i];
+                    if (r == null) continue;
+
+                    unitRows.Add(new Dictionary<string, object>
+                    {
+                        ["entityKeyId"] = r.EntityKeyId ?? string.Empty,
+                        ["entityId"] = r.EntityId ?? string.Empty,
+                        ["isControlledByPlayer"] = r.IsControlledByPlayer,
+                        ["healthRatio"] = r.HealthRatio,
+                        ["shieldRatio"] = r.ShieldRatio,
+                        ["tacticalStance"] = r.TacticalStance ?? "Standard",
+                        ["loadoutVariant"] = r.LoadoutVariant ?? "Standard",
+                        ["veterancyRank"] = r.VeterancyRank,
+                        ["combatXp"] = r.CombatXp,
+                        ["affixes"] = r.Affixes != null ? r.Affixes : (object)Array.Empty<string>(),
+                        ["hasHealing"] = r.HasHealing,
+                        ["hasAura"] = r.HasAura,
+                        ["hasShieldRegen"] = r.HasShieldRegen,
+                        ["criticalHitChance"] = r.CriticalHitChance,
+                        ["minAttackRange"] = r.MinAttackRange,
+                        ["activeStatusEffectsCount"] = r.ActiveStatusEffectsCount,
+                        ["activeStatusEffectsSummary"] = r.ActiveStatusEffectsSummary ?? string.Empty,
+                        ["hasVisualDirector"] = r.HasVisualDirector,
+                        ["isVisualTurretJammed"] = r.IsVisualTurretJammed,
+                        ["visualRecoilOffset"] = r.VisualRecoilOffset,
+                        ["visualDoorProgress"] = r.VisualDoorProgress,
+                    });
+                }
+            }
+
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "unitMechanicsCensus",
+                ["omittedUnitCount"] = census != null ? census.OmittedUnitCount : 0,
+                ["totalTrackedUnits"] = census != null ? census.TotalTrackedUnits : 0,
+                ["totalMechanicsInstancesCount"] = census != null ? census.TotalMechanicsInstancesCount : 0,
+                ["activeHealerCount"] = census != null ? census.ActiveHealerCount : 0,
+                ["activeAuraCount"] = census != null ? census.ActiveAuraCount : 0,
+                ["activeShieldRegenCount"] = census != null ? census.ActiveShieldRegenCount : 0,
+                ["units"] = unitRows,
+            };
+            return Serialize(view);
+        }
+
+        public static string SerializeVisualFeedbackResult(VisualFeedbackResult result)
+        {
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "visualFeedbackResult",
+                ["success"] = result != null ? result.Success : false,
+                ["entityKeyId"] = result != null ? (result.EntityKeyId ?? string.Empty) : string.Empty,
+                ["feedbackType"] = result != null ? (result.FeedbackType ?? string.Empty) : string.Empty,
+                ["message"] = result != null ? (result.Message ?? string.Empty) : string.Empty,
             };
             return Serialize(view);
         }
