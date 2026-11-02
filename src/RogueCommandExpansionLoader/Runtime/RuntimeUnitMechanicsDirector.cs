@@ -14,6 +14,7 @@ namespace RogueCommandExpansionLoader.Runtime
         public ContentUnitHealingDefinition Healing { get; set; }
         public ContentUnitAuraDefinition Aura { get; set; }
         public string[] BaselineStatusEffects { get; set; }
+        public ContentUnitStatusEffectDefinition[] StatusEffects { get; set; }
         public ContentCombatBoostDefinition[] CombatBoosts { get; set; }
         public ContentUnitExperienceDefinition Experience { get; set; }
         public ContentUnitSynergyDefinition[] Synergies { get; set; }
@@ -34,6 +35,7 @@ namespace RogueCommandExpansionLoader.Runtime
             (Healing != null && (Healing.healAmount > 0f || Healing.repairAmount > 0f) && Healing.healRange > 0f) ||
             (Aura != null && Aura.auraRadius > 0f && !string.IsNullOrWhiteSpace(Aura.auraType)) ||
             (BaselineStatusEffects != null && BaselineStatusEffects.Length > 0) ||
+            (StatusEffects != null && StatusEffects.Length > 0) ||
             (Synergies != null && Synergies.Length > 0) ||
             (Stealth != null && Stealth.cloakDuration > 0f && Stealth.stealthLevel > 0f) ||
             (Command != null && Command.commandRange > 0f) ||
@@ -63,7 +65,7 @@ namespace RogueCommandExpansionLoader.Runtime
 
     /// <summary>
     /// Executes native runtime mechanics for units declaring <c>healing</c>, <c>aura</c>,
-    /// <c>baselineStatusEffects</c>, <c>combatBoosts</c>, <c>experience</c>, <c>synergies</c>,
+    /// <c>baselineStatusEffects</c>, <c>statusEffects</c>, <c>combatBoosts</c>, <c>experience</c>, <c>synergies</c>,
     /// <c>stealth</c>, <c>command</c>, and <c>experienceReward</c> in <c>content.json</c>,
     /// plus bounded tactical pulses dispatched by the runtime command director.
     /// </summary>
@@ -119,6 +121,7 @@ namespace RogueCommandExpansionLoader.Runtime
         private static MethodInfo _healMethod;
         private static MethodInfo _removeCaptainMethod;
         private static readonly Dictionary<int, List<string>> _appliedBaselineEffects = new Dictionary<int, List<string>>();
+        private static readonly Dictionary<int, List<string>> _appliedTimedStatusEffects = new Dictionary<int, List<string>>();
         private static MethodInfo _repairArmorMethod;
         private static MethodInfo _chargeShieldMethod;
         private static MethodInfo _rankUpMethod;
@@ -320,6 +323,16 @@ namespace RogueCommandExpansionLoader.Runtime
             lock (_appliedCardChangeBoostKeys)
             {
                 _appliedCardChangeBoostKeys.Clear();
+            }
+
+            lock (_appliedBaselineEffects)
+            {
+                _appliedBaselineEffects.Clear();
+            }
+
+            lock (_appliedTimedStatusEffects)
+            {
+                _appliedTimedStatusEffects.Clear();
             }
         }
 
@@ -840,6 +853,10 @@ namespace RogueCommandExpansionLoader.Runtime
             {
                 parts.Add("Pasivos: " + string.Join(", ", profile.BaselineStatusEffects));
             }
+            if (profile.StatusEffects != null && profile.StatusEffects.Length > 0)
+            {
+                parts.Add("Efectos temporales: " + profile.StatusEffects.Length);
+            }
             if (profile.Healing != null && (profile.Healing.healAmount > 0f || profile.Healing.repairAmount > 0f))
             {
                 parts.Add("Curación: " + profile.Healing.healAmount.ToString("0") + " HP / " +
@@ -1171,6 +1188,8 @@ namespace RogueCommandExpansionLoader.Runtime
                 {
                     int keyInt = GetCombatExperienceKey(_entityController);
                     string keyStr = keyInt.ToString();
+                    RevertBaselineStatusEffects(_entityController, keyInt);
+                    RevertTimedStatusEffects(_entityController, keyInt);
                     RuntimeGameplayCommandDirector.TryRemoveUnitAffix(keyStr, "All");
                     RuntimeGameplayCommandDirector.ResetUnitTacticalStance(keyStr);
                 }
@@ -1225,6 +1244,51 @@ namespace RogueCommandExpansionLoader.Runtime
                     {
                         entityObj.GetType().GetMethod("RemoveStatusEffect").Invoke(entityObj, new[] { parsedEffect });
                     }
+                }
+                catch
+                {
+                    // Best-effort cleanup; never block entity reuse.
+                }
+            }
+        }
+
+        private static void RevertTimedStatusEffects(object entityObj, int key)
+        {
+            if (entityObj == null)
+            {
+                return;
+            }
+
+            List<string> applied;
+            lock (_appliedTimedStatusEffects)
+            {
+                if (!_appliedTimedStatusEffects.TryGetValue(key, out applied) || applied == null || applied.Count == 0)
+                {
+                    return;
+                }
+                _appliedTimedStatusEffects.Remove(key);
+            }
+
+            EnsureReflection(entityObj.GetType());
+            MethodInfo removeStatusEffect = entityObj.GetType().GetMethod("RemoveStatusEffect",
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            if (removeStatusEffect == null || _statusEffectEnumType == null)
+            {
+                return;
+            }
+
+            for (int i = 0; i < applied.Count; i++)
+            {
+                string effectName = applied[i];
+                if (string.IsNullOrWhiteSpace(effectName))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    object parsedEffect = Enum.Parse(_statusEffectEnumType, effectName, true);
+                    removeStatusEffect.Invoke(entityObj, new[] { parsedEffect });
                 }
                 catch
                 {
@@ -1294,6 +1358,7 @@ namespace RogueCommandExpansionLoader.Runtime
                 EnsureReflection(entityObj.GetType());
                 int combatExperienceKey = GetCombatExperienceKey(entityObj);
                 RevertBaselineStatusEffects(entityObj, combatExperienceKey);
+                RevertTimedStatusEffects(entityObj, combatExperienceKey);
                 RevertCommandLinks(entityObj);
                 try
                 {
@@ -1715,6 +1780,19 @@ namespace RogueCommandExpansionLoader.Runtime
             _nextNovaAvailableTime = Time.time;
             _previousShield = ReadFloatProperty(_currentShieldProperty, entityController, 0f);
             _hasInitializedShield = true;
+            List<string> appliedTimedStatusEffects = ApplyConfiguredStatusEffects(entityController, profile.StatusEffects);
+            int combatExperienceKey = GetCombatExperienceKey(entityController);
+            lock (_appliedTimedStatusEffects)
+            {
+                if (appliedTimedStatusEffects.Count == 0)
+                {
+                    _appliedTimedStatusEffects.Remove(combatExperienceKey);
+                }
+                else
+                {
+                    _appliedTimedStatusEffects[combatExperienceKey] = appliedTimedStatusEffects;
+                }
+            }
             _baselineApplied = true;
             _defaultStanceApplied = false;
             _startingAffixesApplied = false;
@@ -2787,6 +2865,37 @@ namespace RogueCommandExpansionLoader.Runtime
             }
         }
 
+        private static List<string> ApplyConfiguredStatusEffects(
+            object entityObj,
+            ContentUnitStatusEffectDefinition[] statusEffects)
+        {
+            var applied = new List<string>();
+            if (entityObj == null || statusEffects == null || statusEffects.Length == 0)
+            {
+                return applied;
+            }
+
+            EnsureReflection(entityObj.GetType());
+            int limit = Math.Min(statusEffects.Length, 16);
+            for (int i = 0; i < limit; i++)
+            {
+                ContentUnitStatusEffectDefinition effect = statusEffects[i];
+                if (effect == null || string.IsNullOrWhiteSpace(effect.effectType) ||
+                    effect.duration <= 0f || float.IsNaN(effect.duration) || float.IsInfinity(effect.duration))
+                {
+                    continue;
+                }
+
+                float duration = Mathf.Clamp(effect.duration, 0.05f, 300f);
+                if (ApplyTimedStatusEffect(entityObj, effect.effectType, duration))
+                {
+                    applied.Add(effect.effectType);
+                }
+            }
+
+            return applied;
+        }
+
         public static void ApplyBaselineStatusEffects(object entityObj, string[] statusEffects)
         {
             if (entityObj == null || statusEffects == null || statusEffects.Length == 0)
@@ -2823,11 +2932,12 @@ namespace RogueCommandExpansionLoader.Runtime
             }
         }
 
-        private static void ApplyTimedStatusEffect(object entityObj, string effectName, float durationSeconds)
+        private static bool ApplyTimedStatusEffect(object entityObj, string effectName, float durationSeconds)
         {
-            if (_setActiveStatusEffectMethod == null || _statusEffectEnumType == null || _durationTypeEnumType == null || durationSeconds <= 0f)
+            if (_setActiveStatusEffectMethod == null || _statusEffectEnumType == null || _durationTypeEnumType == null ||
+                entityObj == null || string.IsNullOrWhiteSpace(effectName) || durationSeconds <= 0f)
             {
-                return;
+                return false;
             }
 
             try
@@ -2835,9 +2945,11 @@ namespace RogueCommandExpansionLoader.Runtime
                 object parsedEffect = Enum.Parse(_statusEffectEnumType, effectName, true);
                 object durationSecondsEnum = Enum.ToObject(_durationTypeEnumType, 1);
                 _setActiveStatusEffectMethod.Invoke(entityObj, new object[] { parsedEffect, durationSecondsEnum, durationSeconds });
+                return true;
             }
             catch
             {
+                return false;
             }
         }
 

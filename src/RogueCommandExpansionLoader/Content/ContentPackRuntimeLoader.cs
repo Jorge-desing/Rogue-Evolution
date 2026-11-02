@@ -8535,6 +8535,7 @@ namespace RogueCommandExpansionLoader.Content
                 Healing = unit.healing,
                 Aura = unit.aura,
                 BaselineStatusEffects = unit.baselineStatusEffects,
+                StatusEffects = unit.statusEffects,
                 CombatBoosts = unit.combatBoosts,
                 Experience = unit.experience,
                 Synergies = unit.synergies,

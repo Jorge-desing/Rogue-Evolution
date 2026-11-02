@@ -2151,6 +2151,55 @@ internal static partial class ValidationTestRunner
             UnityEngine.Time.time = 0f;
         }
     }),
+    ("unit statusEffects apply timed native statuses on attachment", () =>
+    {
+        RuntimeUnitMechanicsDirector.ClearProfiles();
+        try
+        {
+            RuntimeUnitMechanicsDirector.RegisterProfile("test:timed-status", new UnitRuntimeMechanicsProfile
+            {
+                EntityId = "test:timed-status",
+                StatusEffects = new[]
+                {
+                    new ContentUnitStatusEffectDefinition
+                    {
+                        id = "test:timed-status-effect",
+                        effectType = "Stun",
+                        duration = 2.5f,
+                        magnitude = 1f
+                    }
+                }
+            });
+
+            var unit = new EntityController
+            {
+                entityId = "test:timed-status",
+                UniqueEntityId = 814,
+                IsUnit = true
+            };
+            RuntimeUnitMechanicsDirector.AttachIfApplicable(unit);
+
+            bool applied = unit.AppliedStatusEffects.Any(effect =>
+                effect.Effect == StatusEffect.Stun &&
+                effect.DurationType == SetStatusEffect.DurationType.Seconds &&
+                System.Math.Abs(effect.Duration - 2.5f) < 0.001f);
+            if (!applied)
+            {
+                throw new InvalidOperationException("A declared timed unit status effect was not applied through the native status path.");
+            }
+
+            unit.entityId = "test:timed-status-cleared";
+            RuntimeUnitMechanicsDirector.AttachIfApplicable(unit);
+            if (unit.HasActiveStatusEffect(StatusEffect.Stun))
+            {
+                throw new InvalidOperationException("A timed unit status effect leaked when the pooled controller changed profile.");
+            }
+        }
+        finally
+        {
+            RuntimeUnitMechanicsDirector.ClearProfiles();
+        }
+    }),
     ("runtime unit mechanics director executes baseline status effects, combat boosts, veterancy rank-ups, healing, and auras", () =>
     {
         ExistingControllers.Instance.Reset();

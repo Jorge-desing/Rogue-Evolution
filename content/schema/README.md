@@ -302,3 +302,8 @@ Packs can declare advanced, native-grounded runtime mechanics on units (`units[]
   - `stunDuration` (number, 0–15s): Duration of EMP stun and slow applied to surrounding hostiles.
   - `cooldown` (number, 1–120s): Internal cooldown before another overload nova can trigger.
 - **Runtime behavior:** Monitors shield transitions. When a unit's shield breaks (`> 0` to `<= 0`), emits an EMP shockwave dealing area damage, applying `StatusEffect.Stun` and `StatusEffect.SlowedDown` to surrounding enemies within `novaRadius`.
+
+### 5. Timed native status effects (`statusEffects`)
+- Entries with a non-empty native `StatusEffect` name and a positive finite duration are applied; other effect-type strings remain valid descriptive metadata and are ignored by this native bridge. The runtime clamps applied durations to `0.05`–`300` seconds and processes at most 16 entries per unit attachment.
+- The loader applies recognized statuses to the unit through `EntityController.SetActiveStatusEffect(..., DurationType.Seconds, duration)` once when the runtime profile attaches. The native controller owns expiration; `magnitude` remains preserved as declarative metadata because the pinned native status API exposes no separate magnitude parameter, so the loader does not invent a stat modifier.
+- When an EntityFactory controller is reused, the loader removes the timed statuses it applied before attaching the next profile, preventing effects from leaking between units. This is compiled loader runtime behavior and still requires a Steam match to prove the effect on a natural production path.
