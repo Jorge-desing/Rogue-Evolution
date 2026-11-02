@@ -364,6 +364,37 @@ namespace RogueCommandExpansionLoader.Content
                 nativeValue = "MaxHealth";
             }
 
+            // CardChange side is stored in the native Side enum as False/True/Irrelevant.
+            // Content packs use readable Friendly/Enemy/All labels, so translate them.
+            if (String.Equals(name, "side", StringComparison.Ordinal) &&
+                String.Equals(field.FieldType.Name, "Side", StringComparison.Ordinal))
+            {
+                string normalizedSide = string.IsNullOrWhiteSpace(value) ? "Friendly" : value.Trim();
+                if (string.Equals(normalizedSide, "Friendly", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(normalizedSide, "Player", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(normalizedSide, "Allies", StringComparison.OrdinalIgnoreCase))
+                {
+                    nativeValue = "False";
+                }
+                else if (string.Equals(normalizedSide, "Enemy", StringComparison.OrdinalIgnoreCase) ||
+                         string.Equals(normalizedSide, "AI", StringComparison.OrdinalIgnoreCase) ||
+                         string.Equals(normalizedSide, "Hostile", StringComparison.OrdinalIgnoreCase))
+                {
+                    nativeValue = "True";
+                }
+                else if (string.Equals(normalizedSide, "All", StringComparison.OrdinalIgnoreCase) ||
+                         string.Equals(normalizedSide, "Any", StringComparison.OrdinalIgnoreCase) ||
+                         string.Equals(normalizedSide, "Irrelevant", StringComparison.OrdinalIgnoreCase) ||
+                         string.Equals(normalizedSide, "Neutral", StringComparison.OrdinalIgnoreCase))
+                {
+                    nativeValue = "Irrelevant";
+                }
+                else
+                {
+                    nativeValue = normalizedSide;
+                }
+            }
+
             field.SetValue(target, Enum.Parse(field.FieldType, nativeValue, true));
         }
 
