@@ -360,6 +360,8 @@ namespace RogueCommandExpansionLoader.Content
         public int? prespawnCount;
         public string defaultTacticalStance;
         public string[] startingAffixes;
+        public string defaultLoadout;
+        public int? startingVeterancyRank;
         public string selectionSoundAssetName;
         public string engineSoundAssetName;
         public string weaponSoundAssetName;
@@ -1049,6 +1051,8 @@ namespace RogueCommandExpansionLoader.Content
                 prespawnCount = source.prespawnCount,
                 defaultTacticalStance = source.defaultTacticalStance,
                 startingAffixes = source.startingAffixes != null ? (string[])source.startingAffixes.Clone() : null,
+                defaultLoadout = source.defaultLoadout,
+                startingVeterancyRank = source.startingVeterancyRank,
                 selectionSoundAssetName = source.selectionSoundAssetName,
                 engineSoundAssetName = source.engineSoundAssetName,
                 weaponSoundAssetName = source.weaponSoundAssetName,

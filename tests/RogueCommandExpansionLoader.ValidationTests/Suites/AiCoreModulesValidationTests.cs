@@ -2142,5 +2142,158 @@ internal static partial class ValidationTestRunner
             throw new InvalidOperationException("Loader diagnostics formatting omitted a registered factory, pool, or AI stage range.");
         }
     }),
+    ("adaptive-commander AI parameter parser supplies bounded defaults and rejects invalid inputs", () =>
+    {
+        if (!AdaptiveCommanderParameterParser.TryParse(null, out AdaptiveCommanderSettings defaults, out string diagnostic) ||
+            diagnostic != null ||
+            defaults.BaseIndex != -1 ||
+            defaults.ScanIntervalSeconds != 3.0f ||
+            defaults.CommandRadius != 25.0f ||
+            defaults.HealthyStanceThreshold != 0.70f ||
+            defaults.DamagedStanceThreshold != 0.35f ||
+            defaults.AuraType != "Inspire" ||
+            defaults.PreferredLoadout != "AP" ||
+            defaults.CommanderAffix != "Overcharged" ||
+            defaults.XpGrantPerPulse != 1 ||
+            !defaults.AdaptiveDoctrine)
+        {
+            throw new InvalidOperationException("AdaptiveCommanderParameterParser did not return expected defaults.");
+        }
+
+        ContentModuleParameter[] customParams =
+        [
+            new ContentModuleParameter { name = "baseIndex", value = "2" },
+            new ContentModuleParameter { name = "scanIntervalSeconds", value = "5.0" },
+            new ContentModuleParameter { name = "commandRadius", value = "40.0" },
+            new ContentModuleParameter { name = "healthyStanceThreshold", value = "0.80" },
+            new ContentModuleParameter { name = "damagedStanceThreshold", value = "0.25" },
+            new ContentModuleParameter { name = "auraType", value = "Aegis" },
+            new ContentModuleParameter { name = "preferredLoadout", value = "Siege" },
+            new ContentModuleParameter { name = "commanderAffix", value = "Juggernaut" },
+            new ContentModuleParameter { name = "xpGrantPerPulse", value = "3" },
+            new ContentModuleParameter { name = "adaptiveDoctrine", value = "false" }
+        ];
+
+        if (!AdaptiveCommanderParameterParser.TryParse(customParams, out AdaptiveCommanderSettings custom, out diagnostic) ||
+            diagnostic != null ||
+            custom.BaseIndex != 2 ||
+            custom.ScanIntervalSeconds != 5.0f ||
+            custom.CommandRadius != 40.0f ||
+            custom.AuraType != "Aegis" ||
+            custom.PreferredLoadout != "Siege" ||
+            custom.CommanderAffix != "Juggernaut" ||
+            custom.XpGrantPerPulse != 3 ||
+            custom.AdaptiveDoctrine)
+        {
+            throw new InvalidOperationException($"AdaptiveCommanderParameterParser rejected valid custom parameters: {diagnostic}");
+        }
+
+        ContentModuleParameter[][] invalidInputs =
+        [
+            [new ContentModuleParameter { name = "unknownParam", value = "1" }],
+            [new ContentModuleParameter { name = "auraType", value = "InvalidAura" }],
+            [new ContentModuleParameter { name = "preferredLoadout", value = "InvalidLoadout" }],
+            [new ContentModuleParameter { name = "commanderAffix", value = "InvalidAffix" }],
+            [new ContentModuleParameter { name = "healthyStanceThreshold", value = "0.40" }],
+            [new ContentModuleParameter { name = "scanIntervalSeconds", value = "NaN" }],
+            [new ContentModuleParameter { name = "xpGrantPerPulse", value = "99" }]
+        ];
+
+        for (int i = 0; i < invalidInputs.Length; i++)
+        {
+            if (AdaptiveCommanderParameterParser.TryParse(invalidInputs[i], out _, out string err) || string.IsNullOrEmpty(err))
+            {
+                throw new InvalidOperationException($"AdaptiveCommanderParameterParser accepted invalid input at index {i}.");
+            }
+        }
+    }),
+    ("adaptive-commander AI module promotes commander, pulses aura, modulates squad stances, and adapts doctrine", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        RuntimeUnitMechanicsDirector.ClearProfiles();
+        RuntimeGameplayCommandDirector.ClearTacticalStancesAndAffixes();
+        UnityEngine.Time.time = 10.0f;
+
+        var commanderUnit = new EntityController
+        {
+            entityId = "sample:heavy-tank",
+            UniqueEntityId = 2001,
+            IsControlledByAi = true,
+            IsUnit = true,
+            IsCombatUnit = true,
+            CanAttackAndIsAttackEnabled = true,
+            CanMoveAndMovementIsEnabled = true,
+            IsBuilding = false,
+            aiBaseIndex = 0,
+            Position = new UnityEngine.Vector3(10f, 0f, 10f),
+            MaxHealth = 1000f,
+            CurrentHealth = 900f,
+            MaxArmor = 200f
+        };
+
+        var damagedEscort = new EntityController
+        {
+            entityId = "sample:light-tank",
+            UniqueEntityId = 2002,
+            IsControlledByAi = true,
+            IsUnit = true,
+            IsCombatUnit = true,
+            CanAttackAndIsAttackEnabled = true,
+            CanMoveAndMovementIsEnabled = true,
+            IsBuilding = false,
+            aiBaseIndex = 0,
+            Position = new UnityEngine.Vector3(14f, 0f, 12f),
+            MaxHealth = 400f,
+            CurrentHealth = 100f,
+            MaxArmor = 0f
+        };
+
+        ExistingControllers.Instance.AiUnits().Add(commanderUnit);
+        ExistingControllers.Instance.AiUnits().Add(damagedEscort);
+
+        var module = new AdaptiveCommanderAiModule();
+        var aiHost = new DefaultAiBehaviour();
+        aiHost.gameObject = new UnityEngine.GameObject("AiCommanderHost");
+
+        IRogueCommandAiRuntimeBehaviour behaviour = module.CreateBehaviour(aiHost,
+        [
+            new ContentModuleParameter { name = "auraType", value = "Inspire" },
+            new ContentModuleParameter { name = "preferredLoadout", value = "HE" },
+            new ContentModuleParameter { name = "commanderAffix", value = "Overcharged" },
+            new ContentModuleParameter { name = "xpGrantPerPulse", value = "2" }
+        ]);
+
+        behaviour.OnInitialized();
+        behaviour.Tick();
+
+        string cmdKey = commanderUnit.UniqueEntityId.ToString();
+        string escortKey = damagedEscort.UniqueEntityId.ToString();
+
+        if (RuntimeGameplayCommandDirector.GetUnitTacticalStance(cmdKey) != "Aggressive")
+        {
+            throw new InvalidOperationException("Healthy AI commander should adopt Aggressive stance.");
+        }
+        if (RuntimeGameplayCommandDirector.GetUnitTacticalStance(escortKey) != "Defensive")
+        {
+            throw new InvalidOperationException("Damaged AI escort should adopt Defensive stance.");
+        }
+
+        CommandAuraCensus auraCensus = RuntimeCommandAuraCensus.Current();
+        if (auraCensus.TotalActiveAurasCount < 1)
+        {
+            throw new InvalidOperationException("AdaptiveCommanderAiModule should dispatch a command aura pulse.");
+        }
+
+        AiDoctrineAndDeckCensus doctrineCensus = RuntimeAiDoctrineCensus.Current();
+        if (doctrineCensus.ActiveDoctrine != "Assault")
+        {
+            throw new InvalidOperationException($"Expected AI doctrine Assault when outnumbering hostiles, got {doctrineCensus.ActiveDoctrine}");
+        }
+
+        behaviour.OnDestroyed();
+        ExistingControllers.Instance.Reset();
+        RuntimeUnitMechanicsDirector.ClearProfiles();
+        RuntimeGameplayCommandDirector.ClearTacticalStancesAndAffixes();
+    }),
     };
 }

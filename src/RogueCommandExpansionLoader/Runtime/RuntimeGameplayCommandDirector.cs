@@ -6478,6 +6478,35 @@ namespace RogueCommandExpansionLoader.Runtime
             }
         }
 
+        public static string GetUnitTacticalStance(string entityKeyId)
+        {
+            if (string.IsNullOrWhiteSpace(entityKeyId))
+            {
+                return "Standard";
+            }
+
+            string key = entityKeyId.Trim();
+            try
+            {
+                EntityController unit = FindEntityByKey(ExistingControllers.Instance, key);
+                if (unit != null)
+                {
+                    key = unit.UniqueEntityId.ToString();
+                }
+            }
+            catch
+            {
+            }
+
+            lock (_activeTacticalStances)
+            {
+                string stance;
+                return _activeTacticalStances.TryGetValue(key, out stance) && !string.IsNullOrEmpty(stance)
+                    ? stance
+                    : "Standard";
+            }
+        }
+
         /// <summary>
         /// Assigns a tactical combat stance to a group of units.
         /// </summary>
@@ -6862,6 +6891,11 @@ namespace RogueCommandExpansionLoader.Runtime
         public static DetailedEntityVisualDiagnostic InspectEntityVisual(string entityKeyId)
         {
             return RuntimeVisualCensus.InspectEntity(entityKeyId);
+        }
+
+        public static LoadedPrefabVisualAuditCensus GetLoadedPrefabVisualAuditCensus(int maxEntries = 64)
+        {
+            return RuntimeVisualCensus.GetLoadedPrefabAuditCensus(maxEntries);
         }
 
         public static void ClearTacticalStancesAndAffixes()

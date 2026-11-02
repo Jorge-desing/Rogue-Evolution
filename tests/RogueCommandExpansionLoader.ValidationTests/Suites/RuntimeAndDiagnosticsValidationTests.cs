@@ -6833,5 +6833,199 @@ internal static partial class ValidationTestRunner
 
         ExistingControllers.Instance.Reset();
     }),
+    ("unit loader validates and applies defaultLoadout and startingVeterancyRank on spawn and cleans up on reuse", () =>
+    {
+        var unit = new ContentUnitDefinition
+        {
+            id = "sample:test-loadout-vet",
+            defaultLoadout = "AP",
+            startingVeterancyRank = 3,
+            variants = new[]
+            {
+                new ContentUnitVariantDefinition
+                {
+                    id = "custom_siege"
+                }
+            }
+        };
+
+        var cloneMethod = typeof(ContentPackCopy).GetMethod("CloneUnit", BindingFlags.NonPublic | BindingFlags.Static);
+        var cloned = (ContentUnitDefinition)cloneMethod!.Invoke(null, new object[] { unit })!;
+
+        if (cloned.defaultLoadout != "AP" || cloned.startingVeterancyRank != 3)
+        {
+            throw new InvalidOperationException("ContentPackCopy.CloneUnit must deep-copy defaultLoadout and startingVeterancyRank.");
+        }
+
+        ExistingControllers.Instance.Reset();
+        RuntimeUnitMechanicsDirector.ClearProfiles();
+        RuntimeGameplayCommandDirector.ClearTacticalStancesAndAffixes();
+
+        var profile = new UnitRuntimeMechanicsProfile
+        {
+            EntityId = "sample:test-loadout-vet",
+            DefaultTacticalStance = "Aggressive",
+            StartingAffixes = new[] { "Swift" },
+            DefaultLoadout = "AP",
+            StartingVeterancyRank = 2
+        };
+        if (!profile.HasAnyMechanics)
+        {
+            throw new InvalidOperationException("Profile with DefaultLoadout and StartingVeterancyRank must report HasAnyMechanics=true.");
+        }
+
+        RuntimeUnitMechanicsDirector.RegisterProfile("sample:test-loadout-vet", profile);
+
+        string? summary = RuntimeUnitMechanicsDirector.FormatMechanicsSummary("sample:test-loadout-vet");
+        if (summary == null || !summary.Contains("Loadout: AP") || !summary.Contains("Rango Inicial: 2"))
+        {
+            throw new InvalidOperationException($"Mechanics summary did not include Loadout and Rango Inicial: '{summary}'");
+        }
+
+        var go = new GameObject("DirectorHostLoadoutVet");
+        var entity = go.AddComponent<EntityController>();
+        entity.entityId = "sample:test-loadout-vet";
+        entity.UniqueEntityId = 1042;
+        entity.IsControlledByPlayer = true;
+        entity.IsUnit = true;
+        entity.IsCombatUnit = true;
+        entity.CanAttackAndIsAttackEnabled = true;
+        entity.CanMoveAndMovementIsEnabled = true;
+        entity.MaxHealth = 500f;
+        entity.CurrentHealth = 500f;
+        entity.MaxRank = 5;
+        entity.CurrentRank = 0;
+        ExistingControllers.Instance.PlayerUnits().Add(entity);
+
+        RuntimeUnitMechanicsDirector.AttachIfApplicable(entity);
+        var director = go.GetComponent<RuntimeUnitMechanicsDirector>();
+        if (director == null)
+        {
+            throw new InvalidOperationException("RuntimeUnitMechanicsDirector should be attached to unit with defaultLoadout and startingVeterancyRank.");
+        }
+
+        UnityEngine.Time.time = 5.0f;
+        director.TickMechanics();
+
+        string keyStr = entity.UniqueEntityId.ToString();
+        if (RuntimeGameplayCommandDirector.GetUnitTacticalStance(keyStr) != "Aggressive")
+        {
+            throw new InvalidOperationException("Unit spawn should apply DefaultTacticalStance.");
+        }
+
+        VeterancyCensus vetCensus = RuntimeVeterancyCensus.Current();
+        bool foundRank2 = false;
+        foreach (var row in vetCensus.Units)
+        {
+            if (row.EntityKeyId == keyStr && row.CurrentRank == 2)
+            {
+                foundRank2 = true;
+                break;
+            }
+        }
+        if (!foundRank2)
+        {
+            throw new InvalidOperationException("Unit spawn should apply StartingVeterancyRank=2.");
+        }
+
+        UnitLoadoutAndPoolCensus loadoutCensus = RuntimeUnitLoadoutCensus.Current();
+        bool foundApLoadout = false;
+        foreach (var row in loadoutCensus.UnitRows)
+        {
+            if (row.UnitKeyId == keyStr && row.LoadoutName == "AP")
+            {
+                foundApLoadout = true;
+                break;
+            }
+        }
+        if (!foundApLoadout)
+        {
+            throw new InvalidOperationException("Unit spawn should apply DefaultLoadout='AP'.");
+        }
+
+        var clearMethod = typeof(RuntimeUnitMechanicsDirector).GetMethod("ClearRuntimeMechanics", BindingFlags.NonPublic | BindingFlags.Static, null, new[] { typeof(GameObject) }, null);
+        clearMethod!.Invoke(null, new object[] { go });
+        if (RuntimeGameplayCommandDirector.GetUnitTacticalStance(keyStr) != "Standard")
+        {
+            throw new InvalidOperationException("ClearRuntimeState must reset stance to Standard.");
+        }
+
+        ExistingControllers.Instance.Reset();
+        RuntimeUnitMechanicsDirector.ClearProfiles();
+        RuntimeGameplayCommandDirector.ClearTacticalStancesAndAffixes();
+    }),
+    ("load-time prefab visual audit registers prefabs, formats JSON with omission counter first, and supports InspectEntity fallback", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        RuntimeVisualCensus.ClearLoadedPrefabAudits();
+
+        var prefabGo = new GameObject("RCL_Custom_sample_arachnid");
+        var smr = prefabGo.AddComponent<SkinnedMeshRenderer>();
+        smr.sharedMesh = new Mesh { name = "ArachnidMesh", vertexCount = 3200, subMeshCount = 2 };
+        smr.bones = new[] { new GameObject("Bone_Root").transform, new GameObject("Bone_Pelvis").transform };
+        smr.sharedMaterials = new[]
+        {
+            new Material
+            {
+                name = "M_Arachnid_PBR",
+                shader = new Shader { name = "RogueCommand/VehiclePBR_VertexWear" },
+                enableInstancing = true,
+                shaderKeywords = new[] { "_METALLICSPECGLOSSMAP", "_NORMALMAP" }
+            }
+        };
+
+        var anim = prefabGo.AddComponent<Animator>();
+        anim.runtimeAnimatorController = new RuntimeAnimatorController { name = "AC_Arachnid" };
+        anim.avatar = new Avatar { name = "Av_Arachnid", isValid = true };
+
+        var muzzle = new GameObject("Socket_MuzzlePrimary");
+        muzzle.transform.parent = prefabGo.transform;
+        var fp0 = new GameObject("FirePoint_0");
+        fp0.transform.parent = muzzle.transform;
+
+        RuntimeVisualCensus.RegisterLoadedPrefabVisualAudit("sample:arachnid", prefabGo);
+        if (RuntimeVisualCensus.AuditedPrefabCount != 1)
+        {
+            throw new InvalidOperationException($"Expected AuditedPrefabCount=1, got {RuntimeVisualCensus.AuditedPrefabCount}");
+        }
+
+        LoadedPrefabVisualAuditCensus auditCensus = RuntimeGameplayCommandDirector.GetLoadedPrefabVisualAuditCensus(64);
+        if (auditCensus.TotalAuditedPrefabs != 1 ||
+            auditCensus.SkinnedPrefabCount != 1 ||
+            auditCensus.AnimatedPrefabCount != 1 ||
+            auditCensus.PbrPrefabCount != 1 ||
+            auditCensus.AmbiguousSocketPrefabCount != 0)
+        {
+            throw new InvalidOperationException("LoadedPrefabVisualAuditCensus aggregate counters did not match expected values.");
+        }
+
+        LoadedPrefabVisualAuditRow row = auditCensus.PrefabRows[0];
+        if (row.EntityId != "sample:arachnid" ||
+            row.RigType != "SkeletalArmature" ||
+            !(row.HasMuzzlePrimary && row.HasFirePoint0) ||
+            row.TotalVertexCount != 3200)
+        {
+            throw new InvalidOperationException("LoadedPrefabVisualAuditRow did not capture expected rig/socket/mesh metadata.");
+        }
+
+        string auditJson = AgentDiagnosticsFormatter.SerializeLoadedPrefabVisualAuditCensus(auditCensus);
+        int omittedIdx = auditJson.IndexOf("\"omittedUnitCount\":0", StringComparison.Ordinal);
+        int rowsIdx = auditJson.IndexOf("\"prefabRows\"", StringComparison.Ordinal);
+        if (omittedIdx < 0 || rowsIdx < 0 || omittedIdx > rowsIdx)
+        {
+            throw new InvalidOperationException("omittedUnitCount must strictly precede prefabRows in loadedPrefabVisualAuditCensus JSON.");
+        }
+
+        DetailedEntityVisualDiagnostic prefabInspect = RuntimeGameplayCommandDirector.InspectEntityVisual("sample:arachnid");
+        if (!prefabInspect.Success ||
+            prefabInspect.EntityKeyId != "prefab:sample:arachnid" ||
+            prefabInspect.RigType != "SkeletalArmature" ||
+            prefabInspect.TotalVertexCount != 3200)
+        {
+            throw new InvalidOperationException($"InspectEntity prefab fallback failed: success={prefabInspect.Success}, msg={prefabInspect.Message}");
+        }
+
+        RuntimeVisualCensus.ClearLoadedPrefabAudits();
+    }),
     };
 }

@@ -1253,6 +1253,14 @@ namespace RogueCommandExpansionLoader.Runtime
                 RuntimeGameplayCommandDirector.InspectEntityVisual(entityKeyId));
         }
 
+        public int AuditedUnitPrefabCount => RuntimeVisualCensus.AuditedPrefabCount;
+
+        public string GetLoadedPrefabVisualAuditJson(int maxEntries = 64)
+        {
+            return AgentDiagnosticsFormatter.SerializeLoadedPrefabVisualAuditCensus(
+                RuntimeGameplayCommandDirector.GetLoadedPrefabVisualAuditCensus(maxEntries));
+        }
+
         public string GetAgentCoordinationCensusJson()
         {
             return AgentDiagnosticsFormatter.SerializeAgentCoordinationCensus(

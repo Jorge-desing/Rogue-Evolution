@@ -2375,7 +2375,7 @@ namespace RogueCommandExpansionLoader.Content
                     float mult = profile.Definition.aggressionMultiplier ?? 1.0f;
                     RuntimeGameplayCommandDirector.TrySetAiDoctrine(profile.Definition.doctrine, mult);
                 }
-                // Apply AI overrides from units referenced in this profile
+                // Apply AI overrides from units referenced in this profile and warm their pre-spawn pools
                 if (profile.Definition.unitEntries != null)
                 {
                     foreach (var entry in profile.Definition.unitEntries)
@@ -2385,8 +2385,17 @@ namespace RogueCommandExpansionLoader.Content
                             continue;
                         }
                         LoadedUnit unit;
-                        if (_units.TryGetValue(entry.unitId, out unit) && unit != null &&
-                            unit.Definition != null && unit.Definition.aiOverrides != null)
+                        _units.TryGetValue(entry.unitId, out unit);
+                        int warmQuota = Math.Min(50, Math.Max(
+                            entry.countAtStart,
+                            (unit != null && unit.Definition != null && unit.Definition.prespawnCount.HasValue)
+                                ? unit.Definition.prespawnCount.Value
+                                : 0));
+                        if (warmQuota > 0)
+                        {
+                            RuntimeGameplayCommandDirector.TryWarmPrespawnPool(entry.unitId, warmQuota);
+                        }
+                        if (unit != null && unit.Definition != null && unit.Definition.aiOverrides != null)
                         {
                             foreach (var ovr in unit.Definition.aiOverrides)
                             {
@@ -2692,6 +2701,7 @@ namespace RogueCommandExpansionLoader.Content
             if (!_loaded)
             {
                 RuntimeUnitVariantRegistry.Clear();
+                RuntimeVisualCensus.ClearLoadedPrefabAudits();
             }
             IDictionary index = _entityIndexField.GetValue(null) as IDictionary;
             if (index == null)
@@ -3587,6 +3597,7 @@ namespace RogueCommandExpansionLoader.Content
                         ApplyEntityAudioBindings(nativePrefabClone, audioBundle, unit.selectionSoundAssetName,
                             unit.engineSoundAssetName, unit.weaponSoundAssetName, unit.id, packageName);
                         EnsureMuzzleFlashHierarchy(nativePrefabClone);
+                        RuntimeVisualCensus.RegisterLoadedPrefabVisualAudit(unit.id, nativePrefabClone);
 
                         nativePrefabClone.name = "RCL_Native_" + unit.id.Replace(':', '_');
                         nativePrefabClone.SetActive(false);
@@ -3644,6 +3655,7 @@ namespace RogueCommandExpansionLoader.Content
                         ApplyEntityAudioBindings(customPrefabClone, bundle, unit.selectionSoundAssetName,
                             unit.engineSoundAssetName, unit.weaponSoundAssetName, unit.id, packageName);
                         EnsureMuzzleFlashHierarchy(customPrefabClone);
+                        RuntimeVisualCensus.RegisterLoadedPrefabVisualAudit(unit.id, customPrefabClone);
 
                         customPrefabClone.name = "RCL_Custom_" + unit.id.Replace(':', '_');
                         customPrefabClone.SetActive(false);
@@ -4965,6 +4977,7 @@ namespace RogueCommandExpansionLoader.Content
             ApplyEntityBehavioralParameters(nativePrefabClone, null, building.gridSize.HasValue ? (float?)(building.gridSize.Value * 10f) : null,
                 null, false, false, false, -1);
             EnsureMuzzleFlashHierarchy(nativePrefabClone);
+            RuntimeVisualCensus.RegisterLoadedPrefabVisualAudit(building.id, nativePrefabClone);
 
             nativePrefabClone.name = "RCL_NativeFactory_" + building.id.Replace(':', '_');
             nativePrefabClone.SetActive(false);
@@ -5581,6 +5594,7 @@ namespace RogueCommandExpansionLoader.Content
             ApplyEntityCombatEnhancements(nativePrefabClone, building.onHitStatusEffects, building.criticalHitChance, building.id);
             RegisterBuildingMechanicsProfile(building);
             EnsureMuzzleFlashHierarchy(nativePrefabClone);
+            RuntimeVisualCensus.RegisterLoadedPrefabVisualAudit(building.id, nativePrefabClone);
 
             nativePrefabClone.name = "RCL_NativeBuilding_" + building.id.Replace(':', '_');
             nativePrefabClone.SetActive(false);
@@ -8550,7 +8564,9 @@ namespace RogueCommandExpansionLoader.Content
                 Taunt = unit.tauntPulse,
                 ShieldOverloadNova = unit.shieldOverloadNova,
                 DefaultTacticalStance = unit.defaultTacticalStance,
-                StartingAffixes = unit.startingAffixes
+                StartingAffixes = unit.startingAffixes,
+                DefaultLoadout = unit.defaultLoadout,
+                StartingVeterancyRank = unit.startingVeterancyRank
             };
 
             RegisterUnitVariants(unit);

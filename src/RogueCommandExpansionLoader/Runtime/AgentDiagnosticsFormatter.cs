@@ -1151,6 +1151,64 @@ namespace RogueCommandExpansionLoader.Runtime
             return Serialize(view);
         }
 
+        public static string SerializeLoadedPrefabVisualAuditCensus(LoadedPrefabVisualAuditCensus census)
+        {
+            var rows = new List<Dictionary<string, object>>();
+            if (census != null && census.PrefabRows != null)
+            {
+                for (int i = 0; i < census.PrefabRows.Count; i++)
+                {
+                    LoadedPrefabVisualAuditRow row = census.PrefabRows[i];
+                    var socketNames = new List<string>();
+                    if (row.DiscoveredSockets != null)
+                    {
+                        for (int s = 0; s < row.DiscoveredSockets.Count; s++)
+                        {
+                            string sName = row.DiscoveredSockets[s];
+                            if (!string.IsNullOrEmpty(sName)) socketNames.Add(sName);
+                        }
+                    }
+
+                    rows.Add(new Dictionary<string, object>
+                    {
+                        ["entityId"] = row.EntityId ?? string.Empty,
+                        ["prefabName"] = row.PrefabName ?? string.Empty,
+                        ["rigType"] = row.RigType ?? "StaticVehicle",
+                        ["rootBoneName"] = row.RootBoneName ?? string.Empty,
+                        ["boneCount"] = row.BoneCount,
+                        ["rendererCount"] = row.RendererCount,
+                        ["totalVertexCount"] = row.TotalVertexCount,
+                        ["submeshCount"] = row.SubmeshCount,
+                        ["primaryShaderName"] = row.PrimaryShaderName ?? string.Empty,
+                        ["hasPbrKeywords"] = row.HasPbrKeywords,
+                        ["isGpuInstanced"] = row.IsGpuInstanced,
+                        ["hasAnimator"] = row.HasAnimator,
+                        ["avatarIsValid"] = row.AvatarIsValid,
+                        ["discoveredSockets"] = socketNames,
+                        ["socketAmbiguityCount"] = row.SocketAmbiguityCount,
+                        ["hasMuzzlePrimary"] = row.HasMuzzlePrimary,
+                        ["hasFirePoint0"] = row.HasFirePoint0,
+                        ["hasWeaponAudio"] = row.HasWeaponAudio,
+                        ["hasEngineAudio"] = row.HasEngineAudio,
+                        ["hasDamageSmoke"] = row.HasDamageSmoke
+                    });
+                }
+            }
+
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "loadedPrefabVisualAuditCensus",
+                ["omittedUnitCount"] = census != null ? census.OmittedUnitCount : 0,
+                ["totalAuditedPrefabs"] = census != null ? census.TotalAuditedPrefabs : 0,
+                ["skinnedPrefabCount"] = census != null ? census.SkinnedPrefabCount : 0,
+                ["animatedPrefabCount"] = census != null ? census.AnimatedPrefabCount : 0,
+                ["pbrPrefabCount"] = census != null ? census.PbrPrefabCount : 0,
+                ["ambiguousSocketPrefabCount"] = census != null ? census.AmbiguousSocketPrefabCount : 0,
+                ["prefabRows"] = rows
+            };
+            return Serialize(view);
+        }
+
         /// <summary>
         /// Serializes the detailed entity visual diagnostic report as JSON.
         /// </summary>
@@ -2607,6 +2665,7 @@ new Dictionary<string, object> { ["name"] = "OrderRetreatJson", ["description"] 
                 new Dictionary<string, object> { ["name"] = "PingAgentJson", ["description"] = "Send an agent heartbeat ping to the game runtime." },
                 new Dictionary<string, object> { ["name"] = "AcquireAgentLockJson", ["description"] = "Acquire or renew an advisory lock on a game resource." },
                 new Dictionary<string, object> { ["name"] = "ReleaseAgentLockJson", ["description"] = "Release an advisory lock on a game resource." },
+                new Dictionary<string, object> { ["name"] = "GetLoadedPrefabVisualAuditJson", ["description"] = "Load-time visual, rig, shader, and socket audit for loaded unit and building prefabs." },
                 new Dictionary<string, object> { ["name"] = "GetDiagnosticCatalogJson", ["description"] = "Catalog of available diagnostic getters." },
             };
 

@@ -53,6 +53,7 @@ namespace RogueCommandExpansionLoader.Modules
             modules.Register(new SupportRepairAiModule());
             modules.Register(new WaveEscalationAiModule());
             modules.Register(new ThreatPrioritizationAiModule());
+            modules.Register(new AdaptiveCommanderAiModule());
             return modules;
         }
 

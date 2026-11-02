@@ -31,6 +31,7 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
             "LiveSkinnedMeshUnitCount": ("System.Int32", "2"),
             "LiveAnimatedUnitCount": ("System.Int32", "2"),
             "LivePbrShaderUnitCount": ("System.Int32", "3"),
+            "AuditedUnitPrefabCount": ("System.Int32", "6"),
         }
         member_reads: list[str] = []
 
@@ -84,6 +85,7 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
                 "LiveSkinnedMeshUnitCount": 2,
                 "LiveAnimatedUnitCount": 2,
                 "LivePbrShaderUnitCount": 3,
+                "AuditedUnitPrefabCount": 6,
                 "RangeDisplayCirclePointCount": 9,
             },
             scalars,
@@ -150,7 +152,7 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
 
         snapshot = json.loads(response["content"][0]["text"])
         self.assertFalse(response["isError"])
-        self.assertEqual(22, len(snapshot))
+        self.assertEqual(23, len(snapshot))
         self.assertTrue(all(isinstance(value, dict) for value in snapshot.values()))
         self.assertTrue(all(value == expected for value in snapshot.values()))
 
@@ -241,11 +243,16 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
             resp2 = SERVER.execute_tool("diagnostics_inspect_entity_visual", {"entityKeyId": "test:arachnid"})
             self.assertFalse(resp2["isError"])
 
-        self.assertEqual(2, len(calls))
+            resp3 = SERVER.execute_tool("diagnostics_get_loaded_unit_visual_audit", {"maxEntries": 32})
+            self.assertFalse(resp3["isError"])
+
+        self.assertEqual(3, len(calls))
         self.assertEqual("GetVisualRenderCensusJson", calls[0][0])
         self.assertEqual([16], calls[0][1])
         self.assertEqual("InspectEntityVisualJson", calls[1][0])
         self.assertEqual(["test:arachnid"], calls[1][1])
+        self.assertEqual("GetLoadedPrefabVisualAuditJson", calls[2][0])
+        self.assertEqual([32], calls[2][1])
 
     def test_generate_agent_configs(self) -> None:
         configs = SERVER.generate_agent_configs()

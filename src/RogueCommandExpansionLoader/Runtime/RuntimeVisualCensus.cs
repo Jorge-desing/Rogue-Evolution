@@ -352,9 +352,116 @@ namespace RogueCommandExpansionLoader.Runtime
     }
 
     /// <summary>
+    /// Pure DTO capturing load-time visual, rig, shader, and socket audit telemetry for a unit/building prefab.
+    /// </summary>
+    public readonly struct LoadedPrefabVisualAuditRow
+    {
+        public LoadedPrefabVisualAuditRow(
+            string entityId,
+            string prefabName,
+            string rigType,
+            string rootBoneName,
+            int boneCount,
+            int rendererCount,
+            int totalVertexCount,
+            int submeshCount,
+            string primaryShaderName,
+            bool hasPbrKeywords,
+            bool isGpuInstanced,
+            bool hasAnimator,
+            bool avatarIsValid,
+            IReadOnlyList<string> discoveredSockets,
+            int socketAmbiguityCount,
+            bool hasMuzzlePrimary,
+            bool hasFirePoint0,
+            bool hasWeaponAudio,
+            bool hasEngineAudio,
+            bool hasDamageSmoke)
+        {
+            EntityId = entityId ?? string.Empty;
+            PrefabName = prefabName ?? string.Empty;
+            RigType = rigType ?? "StaticVehicle";
+            RootBoneName = rootBoneName ?? string.Empty;
+            BoneCount = boneCount;
+            RendererCount = rendererCount;
+            TotalVertexCount = totalVertexCount;
+            SubmeshCount = submeshCount;
+            PrimaryShaderName = primaryShaderName ?? string.Empty;
+            HasPbrKeywords = hasPbrKeywords;
+            IsGpuInstanced = isGpuInstanced;
+            HasAnimator = hasAnimator;
+            AvatarIsValid = avatarIsValid;
+            DiscoveredSockets = discoveredSockets ?? new List<string>().AsReadOnly();
+            SocketAmbiguityCount = socketAmbiguityCount;
+            HasMuzzlePrimary = hasMuzzlePrimary;
+            HasFirePoint0 = hasFirePoint0;
+            HasWeaponAudio = hasWeaponAudio;
+            HasEngineAudio = hasEngineAudio;
+            HasDamageSmoke = hasDamageSmoke;
+        }
+
+        public string EntityId { get; }
+        public string PrefabName { get; }
+        public string RigType { get; }
+        public string RootBoneName { get; }
+        public int BoneCount { get; }
+        public int RendererCount { get; }
+        public int TotalVertexCount { get; }
+        public int SubmeshCount { get; }
+        public string PrimaryShaderName { get; }
+        public bool HasPbrKeywords { get; }
+        public bool IsGpuInstanced { get; }
+        public bool HasAnimator { get; }
+        public bool AvatarIsValid { get; }
+        public IReadOnlyList<string> DiscoveredSockets { get; }
+        public int SocketAmbiguityCount { get; }
+        public bool HasMuzzlePrimary { get; }
+        public bool HasFirePoint0 { get; }
+        public bool HasWeaponAudio { get; }
+        public bool HasEngineAudio { get; }
+        public bool HasDamageSmoke { get; }
+    }
+
+    /// <summary>
+    /// Pure snapshot of load-time visual audits across all unit and building prefabs registered by the loader.
+    /// Omission counter placed strictly first to uphold clean-room bounded trace invariants.
+    /// </summary>
+    public sealed class LoadedPrefabVisualAuditCensus
+    {
+        public int OmittedUnitCount { get; }
+        public int TotalAuditedPrefabs { get; }
+        public int SkinnedPrefabCount { get; }
+        public int AnimatedPrefabCount { get; }
+        public int PbrPrefabCount { get; }
+        public int AmbiguousSocketPrefabCount { get; }
+        public IReadOnlyList<LoadedPrefabVisualAuditRow> PrefabRows { get; }
+
+        public LoadedPrefabVisualAuditCensus(
+            int omittedUnitCount,
+            int totalAuditedPrefabs,
+            int skinnedPrefabCount,
+            int animatedPrefabCount,
+            int pbrPrefabCount,
+            int ambiguousSocketPrefabCount,
+            IReadOnlyList<LoadedPrefabVisualAuditRow> prefabRows)
+        {
+            OmittedUnitCount = omittedUnitCount;
+            TotalAuditedPrefabs = totalAuditedPrefabs;
+            SkinnedPrefabCount = skinnedPrefabCount;
+            AnimatedPrefabCount = animatedPrefabCount;
+            PbrPrefabCount = pbrPrefabCount;
+            AmbiguousSocketPrefabCount = ambiguousSocketPrefabCount;
+            PrefabRows = prefabRows ?? new List<LoadedPrefabVisualAuditRow>().AsReadOnly();
+        }
+
+        public static LoadedPrefabVisualAuditCensus Empty { get; } =
+            new LoadedPrefabVisualAuditCensus(0, 0, 0, 0, 0, 0, new List<LoadedPrefabVisualAuditRow>().AsReadOnly());
+    }
+
+    /// <summary>
     /// Reads living entities from <see cref="ExistingControllers"/> and extracts observable
     /// runtime evidence of geometry rendering, skeletal/transform rigging, socket bindings,
-    /// and animator locomotion states.
+    /// and animator locomotion states, plus load-time prefab visual audits.
     /// </summary>
     public static class RuntimeVisualCensus
     {
@@ -362,6 +469,206 @@ namespace RogueCommandExpansionLoader.Runtime
         private const string MovementAnimationParameter = "RCL_IsMoving";
         private const string FireAnimationParameter = "RCL_Fire";
         private const string DeathAnimationParameter = "RCL_Death";
+
+        private static readonly object PrefabAuditGate = new object();
+        private static readonly Dictionary<string, LoadedPrefabVisualAuditRow> AuditedPrefabsById =
+            new Dictionary<string, LoadedPrefabVisualAuditRow>(StringComparer.OrdinalIgnoreCase);
+        private static readonly Dictionary<string, GameObject> LoadedPrefabObjectsById =
+            new Dictionary<string, GameObject>(StringComparer.OrdinalIgnoreCase);
+
+        public static int AuditedPrefabCount
+        {
+            get
+            {
+                lock (PrefabAuditGate)
+                {
+                    return AuditedPrefabsById.Count;
+                }
+            }
+        }
+
+        public static void ClearLoadedPrefabAudits()
+        {
+            lock (PrefabAuditGate)
+            {
+                AuditedPrefabsById.Clear();
+                LoadedPrefabObjectsById.Clear();
+            }
+        }
+
+        public static LoadedPrefabVisualAuditRow RegisterLoadedPrefabVisualAudit(string entityId, GameObject prefabRoot)
+        {
+            if (string.IsNullOrWhiteSpace(entityId) || prefabRoot == null)
+            {
+                return default(LoadedPrefabVisualAuditRow);
+            }
+
+            string normalizedId = entityId.Trim();
+            DetailedEntityVisualDiagnostic detailed = InspectGameObjectHierarchy(
+                prefabRoot,
+                "prefab:" + normalizedId,
+                normalizedId,
+                "Loaded prefab visual audit.");
+
+            bool hasPbrKeywords = false;
+            bool isInstanced = false;
+            string primaryShader = string.Empty;
+            if (detailed.Renderers != null)
+            {
+                for (int i = 0; i < detailed.Renderers.Count; i++)
+                {
+                    VisualRendererDetailRow r = detailed.Renderers[i];
+                    if (r.IsGpuInstanced) isInstanced = true;
+                    if (r.ShaderNames != null)
+                    {
+                        for (int s = 0; s < r.ShaderNames.Count; s++)
+                        {
+                            string sName = r.ShaderNames[s];
+                            if (string.IsNullOrEmpty(primaryShader) && !string.IsNullOrEmpty(sName))
+                            {
+                                primaryShader = sName;
+                            }
+                            if (sName != null && (sName.IndexOf(PbrShaderName, StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                sName.IndexOf("VehiclePBR", StringComparison.OrdinalIgnoreCase) >= 0))
+                            {
+                                primaryShader = sName;
+                            }
+                        }
+                    }
+                    if (r.ShaderKeywords != null)
+                    {
+                        for (int k = 0; k < r.ShaderKeywords.Count; k++)
+                        {
+                            string kw = r.ShaderKeywords[k];
+                            if (string.Equals(kw, "_METALLICSPECGLOSSMAP", StringComparison.OrdinalIgnoreCase) ||
+                                string.Equals(kw, "_NORMALMAP", StringComparison.OrdinalIgnoreCase))
+                            {
+                                hasPbrKeywords = true;
+                            }
+                        }
+                    }
+                }
+            }
+
+            var socketNames = new List<string>();
+            int ambiguityCount = 0;
+            bool hasMuzzlePrimary = false;
+            bool hasFirePoint0 = false;
+            bool hasWeaponAudio = false;
+            bool hasEngineAudio = false;
+            bool hasDamageSmoke = false;
+
+            if (detailed.Sockets != null)
+            {
+                for (int i = 0; i < detailed.Sockets.Count; i++)
+                {
+                    VisualSocketDetailRow s = detailed.Sockets[i];
+                    string role = !string.IsNullOrEmpty(s.CanonicalRole) ? s.CanonicalRole : s.SocketName;
+                    if (!string.IsNullOrEmpty(role) && !socketNames.Contains(role))
+                    {
+                        socketNames.Add(role);
+                    }
+                    if (s.IsAmbiguous)
+                    {
+                        ambiguityCount++;
+                    }
+                    if (string.Equals(role, "Socket_MuzzlePrimary", StringComparison.OrdinalIgnoreCase)) hasMuzzlePrimary = true;
+                    if (string.Equals(role, "FirePoint_0", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(s.SocketName, "FirePoint_0", StringComparison.OrdinalIgnoreCase)) hasFirePoint0 = true;
+                    if (string.Equals(role, "Socket_WeaponAudio", StringComparison.OrdinalIgnoreCase)) hasWeaponAudio = true;
+                    if (string.Equals(role, "Socket_EngineAudio", StringComparison.OrdinalIgnoreCase)) hasEngineAudio = true;
+                    if (string.Equals(role, "Socket_DamageSmoke", StringComparison.OrdinalIgnoreCase)) hasDamageSmoke = true;
+                }
+            }
+
+            var row = new LoadedPrefabVisualAuditRow(
+                normalizedId,
+                prefabRoot.name ?? string.Empty,
+                detailed.RigType,
+                detailed.RootBoneName,
+                detailed.BoneCount,
+                detailed.RendererCount,
+                detailed.TotalVertexCount,
+                detailed.SubmeshCount,
+                primaryShader,
+                hasPbrKeywords,
+                isInstanced,
+                detailed.HasAnimator,
+                detailed.AvatarIsValid,
+                socketNames.AsReadOnly(),
+                ambiguityCount,
+                hasMuzzlePrimary,
+                hasFirePoint0,
+                hasWeaponAudio,
+                hasEngineAudio,
+                hasDamageSmoke);
+
+            lock (PrefabAuditGate)
+            {
+                AuditedPrefabsById[normalizedId] = row;
+                LoadedPrefabObjectsById[normalizedId] = prefabRoot;
+            }
+
+            return row;
+        }
+
+        public static LoadedPrefabVisualAuditCensus GetLoadedPrefabAuditCensus(int maxEntries = 64)
+        {
+            int cap = maxEntries < 1 ? 1 : (maxEntries > 256 ? 256 : maxEntries);
+            List<LoadedPrefabVisualAuditRow> allRows;
+            lock (PrefabAuditGate)
+            {
+                allRows = new List<LoadedPrefabVisualAuditRow>(AuditedPrefabsById.Values);
+            }
+
+            allRows.Sort(delegate(LoadedPrefabVisualAuditRow a, LoadedPrefabVisualAuditRow b)
+            {
+                return string.Compare(a.EntityId, b.EntityId, StringComparison.Ordinal);
+            });
+
+            int total = allRows.Count;
+            int skinnedCount = 0;
+            int animatedCount = 0;
+            int pbrCount = 0;
+            int ambiguousCount = 0;
+            var rows = new List<LoadedPrefabVisualAuditRow>();
+
+            for (int i = 0; i < allRows.Count; i++)
+            {
+                LoadedPrefabVisualAuditRow r = allRows[i];
+                if (string.Equals(r.RigType, "SkeletalArmature", StringComparison.OrdinalIgnoreCase))
+                {
+                    skinnedCount++;
+                }
+                if (r.HasAnimator)
+                {
+                    animatedCount++;
+                }
+                if (r.HasPbrKeywords ||
+                    (r.PrimaryShaderName != null && r.PrimaryShaderName.IndexOf("VehiclePBR", StringComparison.OrdinalIgnoreCase) >= 0))
+                {
+                    pbrCount++;
+                }
+                if (r.SocketAmbiguityCount > 0)
+                {
+                    ambiguousCount++;
+                }
+                if (rows.Count < cap)
+                {
+                    rows.Add(r);
+                }
+            }
+
+            int omitted = total > rows.Count ? total - rows.Count : 0;
+            return new LoadedPrefabVisualAuditCensus(
+                omitted,
+                total,
+                skinnedCount,
+                animatedCount,
+                pbrCount,
+                ambiguousCount,
+                rows.AsReadOnly());
+        }
 
         public static VisualRenderCensus Current(int maxTrackedUnits = 32)
         {
@@ -567,20 +874,62 @@ namespace RogueCommandExpansionLoader.Runtime
 
             try
             {
+                string trimmedKey = entityKeyId.Trim();
                 ExistingControllers existing = ExistingControllers.Instance;
+                if (existing != null)
+                {
+                    EntityController entity = FindEntityByKey(existing, trimmedKey);
+                    if (entity != null && entity.gameObject != null)
+                    {
+                        return InspectGameObjectHierarchy(
+                            entity.gameObject,
+                            entityKeyId,
+                            entity.EntityId ?? string.Empty,
+                            "Visual evidence successfully collected.");
+                    }
+                }
+
+                GameObject prefabObj = null;
+                lock (PrefabAuditGate)
+                {
+                    LoadedPrefabObjectsById.TryGetValue(trimmedKey, out prefabObj);
+                }
+
+                if (prefabObj != null)
+                {
+                    return InspectGameObjectHierarchy(
+                        prefabObj,
+                        "prefab:" + trimmedKey,
+                        trimmedKey,
+                        "Visual evidence collected from loaded prefab template.");
+                }
+
                 if (existing == null)
                 {
                     return DetailedEntityVisualDiagnostic.Failed(entityKeyId, "ExistingControllers registry unavailable.");
                 }
 
-                EntityController entity = FindEntityByKey(existing, entityKeyId.Trim());
-                if (entity == null || entity.gameObject == null)
-                {
-                    return DetailedEntityVisualDiagnostic.Failed(entityKeyId, "Entity '" + entityKeyId + "' not found on battlefield.");
-                }
+                return DetailedEntityVisualDiagnostic.Failed(entityKeyId, "Entity '" + entityKeyId + "' not found on battlefield.");
+            }
+            catch (Exception ex)
+            {
+                return DetailedEntityVisualDiagnostic.Failed(entityKeyId, "Inspection error: " + ex.Message);
+            }
+        }
 
-                GameObject go = entity.gameObject;
+        private static DetailedEntityVisualDiagnostic InspectGameObjectHierarchy(
+            GameObject go,
+            string entityKeyId,
+            string entityId,
+            string message)
+        {
+            if (go == null)
+            {
+                return DetailedEntityVisualDiagnostic.Failed(entityKeyId, "Target GameObject is null.");
+            }
 
+            try
+            {
                 // 1. Render Details
                 Renderer[] renderers = go.GetComponentsInChildren<Renderer>(true);
                 var rendererRows = new List<VisualRendererDetailRow>();
@@ -779,8 +1128,8 @@ namespace RogueCommandExpansionLoader.Runtime
                 return new DetailedEntityVisualDiagnostic(
                     true,
                     entityKeyId,
-                    entity.EntityId ?? string.Empty,
-                    "Visual evidence successfully collected.",
+                    entityId ?? string.Empty,
+                    message ?? "Visual evidence successfully collected.",
                     renderers != null ? renderers.Length : 0,
                     totalVertexCount,
                     totalSubmeshCount,

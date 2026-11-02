@@ -786,6 +786,18 @@
           "uniqueItems": true,
           "maxItems": 6,
           "description": "List of elite affixes and traits active on the unit upon deployment."
+        },
+        "defaultLoadout": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "description": "Default combat loadout preset (Standard, AP, HE, Speed, Siege, Reinforced) or declared local variant ID applied to the unit on battlefield spawn."
+        },
+        "startingVeterancyRank": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 5,
+          "description": "Initial veterancy rank (0 to 5) applied to the unit upon deployment."
         }
       },
       "oneOf": [

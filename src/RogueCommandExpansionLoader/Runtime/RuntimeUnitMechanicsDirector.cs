@@ -30,6 +30,8 @@ namespace RogueCommandExpansionLoader.Runtime
         public ContentUnitShieldOverloadNovaDefinition ShieldOverloadNova { get; set; }
         public string DefaultTacticalStance { get; set; }
         public string[] StartingAffixes { get; set; }
+        public string DefaultLoadout { get; set; }
+        public int? StartingVeterancyRank { get; set; }
 
         public bool HasRuntimeComponentMechanics =>
             (Healing != null && (Healing.healAmount > 0f || Healing.repairAmount > 0f) && Healing.healRange > 0f) ||
@@ -43,7 +45,9 @@ namespace RogueCommandExpansionLoader.Runtime
             (Taunt != null && Taunt.tauntRadius > 0f) ||
             (ShieldOverloadNova != null && ShieldOverloadNova.novaRadius > 0f) ||
             (!string.IsNullOrWhiteSpace(DefaultTacticalStance) && !string.Equals(DefaultTacticalStance, "Standard", StringComparison.OrdinalIgnoreCase)) ||
-            (StartingAffixes != null && StartingAffixes.Length > 0);
+            (StartingAffixes != null && StartingAffixes.Length > 0) ||
+            (!string.IsNullOrWhiteSpace(DefaultLoadout) && !string.Equals(DefaultLoadout, "Standard", StringComparison.OrdinalIgnoreCase)) ||
+            (StartingVeterancyRank.HasValue && StartingVeterancyRank.Value > 0);
 
         public bool HasOnDamageDealtMechanics =>
             (CombatBoosts != null && CombatBoosts.Length > 0) ||
@@ -60,7 +64,9 @@ namespace RogueCommandExpansionLoader.Runtime
             (CriticalHitChance.HasValue && CriticalHitChance.Value > 0f) ||
             (OnHitStatusEffects != null && OnHitStatusEffects.Length > 0) ||
             !string.IsNullOrWhiteSpace(DefaultTacticalStance) ||
-            (StartingAffixes != null && StartingAffixes.Length > 0);
+            (StartingAffixes != null && StartingAffixes.Length > 0) ||
+            !string.IsNullOrWhiteSpace(DefaultLoadout) ||
+            (StartingVeterancyRank.HasValue && StartingVeterancyRank.Value > 0);
     }
 
     /// <summary>
@@ -163,6 +169,8 @@ namespace RogueCommandExpansionLoader.Runtime
         private bool _baselineApplied;
         private bool _defaultStanceApplied;
         private bool _startingAffixesApplied;
+        private bool _defaultLoadoutApplied;
+        private bool _startingVeterancyApplied;
 
         public static int RegisteredProfileCount
         {
@@ -915,6 +923,14 @@ namespace RogueCommandExpansionLoader.Runtime
             {
                 parts.Add("Afijos: " + string.Join(", ", profile.StartingAffixes));
             }
+            if (!string.IsNullOrWhiteSpace(profile.DefaultLoadout))
+            {
+                parts.Add("Loadout: " + profile.DefaultLoadout);
+            }
+            if (profile.StartingVeterancyRank.HasValue && profile.StartingVeterancyRank.Value > 0)
+            {
+                parts.Add("Rango Inicial: " + profile.StartingVeterancyRank.Value);
+            }
 
             return parts.Count > 0 ? string.Join(" • ", parts) : null;
         }
@@ -1192,6 +1208,7 @@ namespace RogueCommandExpansionLoader.Runtime
                     RevertTimedStatusEffects(_entityController, keyInt);
                     RuntimeGameplayCommandDirector.TryRemoveUnitAffix(keyStr, "All");
                     RuntimeGameplayCommandDirector.ResetUnitTacticalStance(keyStr);
+                    RuntimeGameplayCommandDirector.TryApplyUnitLoadout(keyStr, "Standard");
                 }
                 catch { }
             }
@@ -1211,6 +1228,8 @@ namespace RogueCommandExpansionLoader.Runtime
             _baselineApplied = false;
             _defaultStanceApplied = false;
             _startingAffixesApplied = false;
+            _defaultLoadoutApplied = false;
+            _startingVeterancyApplied = false;
         }
 
         private static void RevertBaselineStatusEffects(object entityObj, int key)
@@ -1796,6 +1815,8 @@ namespace RogueCommandExpansionLoader.Runtime
             _baselineApplied = true;
             _defaultStanceApplied = false;
             _startingAffixesApplied = false;
+            _defaultLoadoutApplied = false;
+            _startingVeterancyApplied = false;
         }
 
         public void TickMechanics() => Update();
@@ -1843,6 +1864,24 @@ namespace RogueCommandExpansionLoader.Runtime
                     if (allApplied)
                     {
                         _startingAffixesApplied = true;
+                    }
+                }
+
+                if (!_defaultLoadoutApplied && !string.IsNullOrWhiteSpace(_profile.DefaultLoadout))
+                {
+                    int key = GetCombatExperienceKey(_entityController);
+                    var loadoutResult = RuntimeGameplayCommandDirector.TryApplyUnitLoadout(key.ToString(), _profile.DefaultLoadout.Trim());
+                    if (loadoutResult.Success)
+                    {
+                        _defaultLoadoutApplied = true;
+                    }
+                }
+
+                if (!_startingVeterancyApplied && _profile.StartingVeterancyRank.HasValue && _profile.StartingVeterancyRank.Value > 0)
+                {
+                    if (TrySetUnitVeterancyRank(_entityController, _profile.StartingVeterancyRank.Value, out _))
+                    {
+                        _startingVeterancyApplied = true;
                     }
                 }
 

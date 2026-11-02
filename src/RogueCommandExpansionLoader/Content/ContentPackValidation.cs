@@ -244,6 +244,9 @@ namespace RogueCommandExpansionLoader.Content
         private static readonly HashSet<string> SupportedAiDoctrines = new HashSet<string>(
             new[] { "Standard", "Assault", "Siege", "Kiting", "Fortify" },
             StringComparer.OrdinalIgnoreCase);
+        private static readonly HashSet<string> SupportedLoadoutPresets = new HashSet<string>(
+            new[] { "Standard", "AP", "HE", "Speed", "Siege", "Reinforced" },
+            StringComparer.OrdinalIgnoreCase);
 
         public static ContentPackValidationResult Validate(
             ContentPackDefinition pack,
@@ -3378,6 +3381,48 @@ namespace RogueCommandExpansionLoader.Content
                         Add(diagnostics, "unit.startingAffixes-duplicate", affixPath,
                             "Duplicate startingAffix '" + trimmed + "' is not permitted.");
                     }
+                }
+            }
+
+            if (unit.defaultLoadout != null)
+            {
+                if (String.IsNullOrWhiteSpace(unit.defaultLoadout))
+                {
+                    Add(diagnostics, "unit.defaultLoadout-invalid", path + ".defaultLoadout",
+                        "defaultLoadout cannot be empty or whitespace.");
+                }
+                else
+                {
+                    string loadout = unit.defaultLoadout.Trim();
+                    bool matchesDeclaredVariant = false;
+                    if (unit.variants != null)
+                    {
+                        for (int i = 0; i < unit.variants.Length; i++)
+                        {
+                            if (unit.variants[i] != null &&
+                                !String.IsNullOrWhiteSpace(unit.variants[i].id) &&
+                                String.Equals(unit.variants[i].id.Trim(), loadout, StringComparison.OrdinalIgnoreCase))
+                            {
+                                matchesDeclaredVariant = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (!SupportedLoadoutPresets.Contains(loadout) && !matchesDeclaredVariant)
+                    {
+                        Add(diagnostics, "unit.defaultLoadout-invalid", path + ".defaultLoadout",
+                            "defaultLoadout '" + loadout + "' must be one of Standard, AP, HE, Speed, Siege, Reinforced, or match a declared variants[].id on this unit.");
+                    }
+                }
+            }
+
+            if (unit.startingVeterancyRank.HasValue)
+            {
+                if (unit.startingVeterancyRank.Value < 0 || unit.startingVeterancyRank.Value > 5)
+                {
+                    Add(diagnostics, "unit.startingVeterancyRank-invalid", path + ".startingVeterancyRank",
+                        "startingVeterancyRank must be an integer between 0 and 5.");
                 }
             }
         }
