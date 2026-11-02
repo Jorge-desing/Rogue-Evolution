@@ -3879,6 +3879,13 @@ namespace RogueCommandExpansionLoader.Runtime
 
         {
 
+            if (float.IsNaN(targetX) || float.IsInfinity(targetX) ||
+                float.IsNaN(targetZ) || float.IsInfinity(targetZ))
+            {
+                return new EntitySpawnResult(false, string.Empty, entityId ?? string.Empty, side ?? string.Empty,
+                    targetX, 0f, targetZ, 0f, "Spawn coordinates must be finite.");
+            }
+
             if (string.IsNullOrWhiteSpace(entityId))
 
             {
@@ -4273,6 +4280,13 @@ namespace RogueCommandExpansionLoader.Runtime
 
         {
 
+            if (float.IsNaN(targetX) || float.IsInfinity(targetX) ||
+                float.IsNaN(targetZ) || float.IsInfinity(targetZ))
+            {
+                return new CameraCommandResult(false, "MoveCamera", targetX, targetZ, 0f,
+                    "Camera target coordinates must be finite.");
+            }
+
             try
 
             {
@@ -4516,6 +4530,12 @@ namespace RogueCommandExpansionLoader.Runtime
         public static CameraCommandResult TrySetCameraZoom(float fieldOfView)
 
         {
+
+            if (float.IsNaN(fieldOfView) || float.IsInfinity(fieldOfView))
+            {
+                return new CameraCommandResult(false, "SetCameraZoom", 0f, 0f, fieldOfView,
+                    "Camera field of view must be finite.");
+            }
 
             try
 
@@ -4792,6 +4812,12 @@ namespace RogueCommandExpansionLoader.Runtime
         public static AudioCommandResult TrySetAudioVolume(string channel, float sliderValue)
 
         {
+
+            if (float.IsNaN(sliderValue) || float.IsInfinity(sliderValue))
+            {
+                return new AudioCommandResult(false, channel ?? string.Empty, sliderValue,
+                    "Audio slider value must be finite.");
+            }
 
             if (string.IsNullOrWhiteSpace(channel))
 
@@ -5915,6 +5941,16 @@ namespace RogueCommandExpansionLoader.Runtime
             bool isStop = string.Equals(normalized, "Stop", StringComparison.OrdinalIgnoreCase);
             bool isHold = string.Equals(normalized, "HoldPosition", StringComparison.OrdinalIgnoreCase);
             bool isAttackMove = string.Equals(normalized, "AttackMove", StringComparison.OrdinalIgnoreCase);
+
+            if (isMove || isAttackMove)
+            {
+                if (float.IsNaN(targetX) || float.IsInfinity(targetX) ||
+                    float.IsNaN(targetZ) || float.IsInfinity(targetZ))
+                {
+                    return new GroupCommandResult(false, normalized, 0, 0,
+                        "Group command target coordinates must be finite.");
+                }
+            }
 
             if (!isMove && !isStop && !isHold && !isAttackMove)
             {
