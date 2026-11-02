@@ -2200,6 +2200,60 @@ internal static partial class ValidationTestRunner
             RuntimeUnitMechanicsDirector.ClearProfiles();
         }
     }),
+    ("unit aiBehavior aiTag reapplies after pooled controller reuse", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        RuntimeUnitMechanicsDirector.ClearProfiles();
+        try
+        {
+            RuntimeUnitMechanicsDirector.RegisterProfile("test:ai-tag-unit", new UnitRuntimeMechanicsProfile
+            {
+                EntityId = "test:ai-tag-unit",
+                AiBehavior = new ContentUnitAiBehaviorDefinition { aiTag = "RCL_TestHarvester" }
+            });
+
+            var unit = new EntityController
+            {
+                entityId = "test:ai-tag-unit",
+                UniqueEntityId = 815,
+                IsUnit = true,
+                IsControlledByAi = true
+            };
+
+            RuntimeUnitMechanicsDirector.AttachIfApplicable(unit);
+            if (!unit.AiTags.Contains("RCL_TestHarvester"))
+            {
+                throw new InvalidOperationException("The declared unit AI tag was not applied through EntityController.AddAiTag.");
+            }
+
+            unit.RemoveAllAiTags();
+            RuntimeUnitMechanicsDirector.AttachIfApplicable(unit);
+            if (!unit.AiTags.Contains("RCL_TestHarvester"))
+            {
+                throw new InvalidOperationException("The declared unit AI tag was not reapplied after pooled controller reuse.");
+            }
+        }
+        finally
+        {
+            RuntimeUnitMechanicsDirector.ClearProfiles();
+            ExistingControllers.Instance.Reset();
+        }
+    }),
+    ("prepare runtime keeps registered profiles while async content loading is pending", () =>
+    {
+        if (RuntimeContentPreparationPolicy.ShouldRefreshNativeUnitIds(false, true))
+        {
+            throw new InvalidOperationException("PrepareContentForRuntime must not clear profiles while LoadAllPacksAsync is still pending.");
+        }
+
+        if (RuntimeContentPreparationPolicy.ShouldRefreshNativeUnitIds(false, true) ||
+            RuntimeContentPreparationPolicy.ShouldRefreshNativeUnitIds(true, false) ||
+            RuntimeContentPreparationPolicy.ShouldRefreshNativeUnitIds(true, true) ||
+            !RuntimeContentPreparationPolicy.ShouldRefreshNativeUnitIds(false, false))
+        {
+            throw new InvalidOperationException("PrepareContentForRuntime refresh gating did not distinguish ready and pending states.");
+        }
+    }),
     ("runtime unit mechanics director executes baseline status effects, combat boosts, veterancy rank-ups, healing, and auras", () =>
     {
         ExistingControllers.Instance.Reset();

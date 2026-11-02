@@ -21,6 +21,7 @@ namespace RogueCommandExpansionLoader.Runtime
         public ContentUnitStealthDefinition Stealth { get; set; }
         public ContentUnitCommandDefinition Command { get; set; }
         public ContentUnitExperienceRewardDefinition ExperienceReward { get; set; }
+        public ContentUnitAiBehaviorDefinition AiBehavior { get; set; }
         public float? MinAttackRange { get; set; }
         public float? CriticalHitChance { get; set; }
         public ContentOnHitStatusEffectDefinition[] OnHitStatusEffects { get; set; }
@@ -35,6 +36,7 @@ namespace RogueCommandExpansionLoader.Runtime
 
         public bool HasRuntimeComponentMechanics =>
             (Healing != null && (Healing.healAmount > 0f || Healing.repairAmount > 0f) && Healing.healRange > 0f) ||
+            (AiBehavior != null && !string.IsNullOrWhiteSpace(AiBehavior.aiTag)) ||
             (Aura != null && Aura.auraRadius > 0f && !string.IsNullOrWhiteSpace(Aura.auraType)) ||
             (BaselineStatusEffects != null && BaselineStatusEffects.Length > 0) ||
             (StatusEffects != null && StatusEffects.Length > 0) ||
@@ -132,6 +134,7 @@ namespace RogueCommandExpansionLoader.Runtime
         private static MethodInfo _chargeShieldMethod;
         private static MethodInfo _rankUpMethod;
         private static MethodInfo _setCaptainMethod;
+        private static MethodInfo _addAiTagMethod;
         private static MethodInfo _attackMethod;
         private static MethodInfo _takeDamageMethod;
         private static MethodInfo _setActiveStatusEffectMethod;
@@ -1799,6 +1802,7 @@ namespace RogueCommandExpansionLoader.Runtime
             _nextNovaAvailableTime = Time.time;
             _previousShield = ReadFloatProperty(_currentShieldProperty, entityController, 0f);
             _hasInitializedShield = true;
+            ApplyConfiguredAiBehavior(entityController, profile.AiBehavior);
             List<string> appliedTimedStatusEffects = ApplyConfiguredStatusEffects(entityController, profile.StatusEffects);
             int combatExperienceKey = GetCombatExperienceKey(entityController);
             lock (_appliedTimedStatusEffects)
@@ -2904,6 +2908,26 @@ namespace RogueCommandExpansionLoader.Runtime
             }
         }
 
+        private static void ApplyConfiguredAiBehavior(
+            object entityObj,
+            ContentUnitAiBehaviorDefinition aiBehavior)
+        {
+            if (entityObj == null || aiBehavior == null || string.IsNullOrWhiteSpace(aiBehavior.aiTag) ||
+                _addAiTagMethod == null)
+            {
+                return;
+            }
+
+            try
+            {
+                _addAiTagMethod.Invoke(entityObj, new object[] { aiBehavior.aiTag });
+            }
+            catch
+            {
+                // Best-effort: an unsupported optional AI tag must not block instantiation.
+            }
+        }
+
         private static List<string> ApplyConfiguredStatusEffects(
             object entityObj,
             ContentUnitStatusEffectDefinition[] statusEffects)
@@ -3151,6 +3175,7 @@ namespace RogueCommandExpansionLoader.Runtime
             _rankUpMethod = entityType.GetMethod("RankUp", flags, null, new[] { typeof(int) }, null);
             _setCaptainMethod = entityType.GetMethod("SetCaptain", flags, null, new[] { entityType }, null);
             _removeCaptainMethod = entityType.GetMethod("RemoveCaptain", flags, null, new[] { entityType }, null);
+            _addAiTagMethod = entityType.GetMethod("AddAiTag", flags, null, new[] { typeof(string) }, null);
             _attackMethod = entityType.GetMethod("Attack", flags, null, new[] { entityType }, null);
             _takeDamageMethod = entityType.GetMethod("TakeDamage", flags);
 

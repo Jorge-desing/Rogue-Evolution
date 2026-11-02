@@ -81,6 +81,7 @@ public sealed class EntityController : Component
     }
 
     private readonly HashSet<UnitRole> _roles = new();
+    public HashSet<string> AiTags { get; } = new(StringComparer.Ordinal);
     private readonly HashSet<StatusEffect> _activeStatusEffects = new();
     private readonly LinkedList<EntityCommand> _commandChain = new();
     public List<(StatusEffect Effect, SetStatusEffect.DurationType DurationType, float Duration)> AppliedStatusEffects { get; } = new();
@@ -200,6 +201,9 @@ public sealed class EntityController : Component
     public float CurrentMana { get; set; } = 100f;
 
     public void SetCaptain(EntityController captain) { CaptainOfThisEntity = captain; }
+    public void AddAiTag(string tag) { if (!string.IsNullOrWhiteSpace(tag)) AiTags.Add(tag); }
+    public void RemoveAiTag(string tag) { if (tag != null) AiTags.Remove(tag); }
+    public void RemoveAllAiTags() { AiTags.Clear(); }
     public void RemoveCaptain(EntityController captain) { if (CaptainOfThisEntity == captain) CaptainOfThisEntity = null; }
 
     public enum CommandProcessingType

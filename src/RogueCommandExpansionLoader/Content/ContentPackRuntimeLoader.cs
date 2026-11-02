@@ -736,7 +736,12 @@ namespace RogueCommandExpansionLoader.Content
                     return true;
                 }
 
-                RefreshNativeUnitIds();
+                if (RuntimeContentPreparationPolicy.ShouldRefreshNativeUnitIds(
+                    _runtimeContentReady,
+                    _loadingTask != null))
+                {
+                    RefreshNativeUnitIds();
+                }
                 if (!_nativeRegistryReady)
                 {
                     return false;
@@ -8575,6 +8580,7 @@ namespace RogueCommandExpansionLoader.Content
                 Stealth = unit.stealth,
                 Command = unit.command,
                 ExperienceReward = unit.experienceReward,
+                AiBehavior = unit.aiBehavior,
                 MinAttackRange = unit.minAttackRange,
                 CriticalHitChance = unit.criticalHitChance,
                 OnHitStatusEffects = unit.onHitStatusEffects,

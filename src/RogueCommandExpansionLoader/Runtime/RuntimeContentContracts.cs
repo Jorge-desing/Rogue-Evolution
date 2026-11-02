@@ -56,6 +56,14 @@ namespace RogueCommandExpansionLoader.Runtime
         LoaderDiagnosticsSnapshot GetDiagnosticsSnapshot();
     }
 
+    internal static class RuntimeContentPreparationPolicy
+    {
+        public static bool ShouldRefreshNativeUnitIds(bool runtimeContentReady, bool loadingTaskExists)
+        {
+            return !runtimeContentReady && !loadingTaskExists;
+        }
+    }
+
     /// <summary>Optional bridge for localized ability text on mod units.</summary>
     public interface IUnitSkillLocalizationRuntimeProvider
     {
