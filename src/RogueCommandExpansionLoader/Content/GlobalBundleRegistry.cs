@@ -108,7 +108,7 @@ namespace RogueCommandExpansionLoader.Content
                 {
                     if (!System.Object.ReferenceEquals(existing, bundle))
                     {
-                        bundle.Unload(true);
+                        bundle.Unload(false);
                     }
                     return existing;
                 }
