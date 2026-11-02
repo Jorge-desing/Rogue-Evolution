@@ -16,6 +16,19 @@ internal static partial class ValidationTestRunner
 {
     internal static IEnumerable<(string Name, Action Run)> GetRuntimeAndDiagnosticsValidationTests() => new (string Name, Action Run)[]
     {
+    ("localization language resolution falls back when the reflected getter throws", () =>
+    {
+        int logCount = 0;
+        string language = RuntimeLocalizationLanguage.GetOrDefault(
+            () => { throw new InvalidOperationException("synthetic language getter failure"); },
+            _ => logCount++,
+            "relic test");
+
+        if (language != "en-US" || logCount != 1)
+        {
+            throw new InvalidOperationException("A localization getter failure must return en-US and log once.");
+        }
+    }),
     ("diagnostics host follows the loaded additive scene", () =>
     {
         string previousSceneName = UnityEngine.SceneManagement.SceneManager.ActiveSceneName;
@@ -5008,6 +5021,87 @@ internal static partial class ValidationTestRunner
             ExistingControllers.Instance.Reset();
             RuntimeUnitMechanicsDirector.ClearProfiles();
             UnityEngine.Time.time = 0f;
+        }
+    }),
+    ("runtime hazard commands reject non-finite and invalid bounds without registering zones", () =>
+    {
+        RuntimeHazardManager.ClearAll();
+        try
+        {
+            int initialCount = RuntimeHazardManager.ActiveZoneCount;
+            HazardCommandResult[] invalidResults =
+            {
+                RuntimeGameplayCommandDirector.TrySpawnHazardZone("Firestorm", float.NaN, 0f, 10f, 10f, 1f),
+                RuntimeGameplayCommandDirector.TrySpawnHazardZone("Firestorm", 0f, float.PositiveInfinity, 10f, 10f, 1f),
+                RuntimeGameplayCommandDirector.TrySpawnHazardZone("Firestorm", 0f, 0f, float.NaN, 10f, 1f),
+                RuntimeGameplayCommandDirector.TrySpawnHazardZone("Firestorm", 0f, 0f, 10f, float.PositiveInfinity, 1f),
+                RuntimeGameplayCommandDirector.TrySpawnHazardZone("Firestorm", 0f, 0f, 10f, 10f, float.NaN),
+                RuntimeGameplayCommandDirector.TrySpawnHazardZone("Firestorm", 0f, 0f, 0f, 10f, 1f),
+                RuntimeGameplayCommandDirector.TrySpawnHazardZone("Firestorm", 0f, 0f, 10f, 0f, 1f),
+                RuntimeGameplayCommandDirector.TrySpawnHazardZone("Firestorm", 0f, 0f, 10f, 10f, -1f)
+            };
+
+            for (int i = 0; i < invalidResults.Length; i++)
+            {
+                if (invalidResults[i].Success || RuntimeHazardManager.ActiveZoneCount != initialCount)
+                {
+                    throw new InvalidOperationException("Invalid hazard input was accepted or registered a zone at index " + i + ".");
+                }
+            }
+
+            string directZoneId;
+            if (RuntimeHazardManager.TrySpawnHazardZone("Firestorm", float.NaN, 0f, 10f, 10f, 1f, out directZoneId) ||
+                RuntimeHazardManager.ActiveZoneCount != initialCount)
+            {
+                throw new InvalidOperationException("The hazard manager must reject invalid direct API input without registering a zone.");
+            }
+        }
+        finally
+        {
+            RuntimeHazardManager.ClearAll();
+        }
+    }),
+    ("runtime hazard ticks ignore non-finite clock values", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        RuntimeHazardManager.ClearAll();
+        try
+        {
+            var enemy = new EntityController
+            {
+                entityId = "unit:hazard-clock-enemy",
+                UniqueEntityId = 703,
+                IsControlledByAi = true,
+                IsUnit = true,
+                Position = new Vector3(0f, 0f, 0f),
+                CurrentHealth = 100f,
+                MaxHealth = 100f
+            };
+            ExistingControllers.Instance.AiUnits().Add(enemy);
+
+            HazardCommandResult spawn = RuntimeGameplayCommandDirector.TrySpawnHazardZone(
+                "Firestorm", 0f, 0f, 10f, 15f, 10f);
+            if (!spawn.Success)
+            {
+                throw new InvalidOperationException("The valid hazard setup did not spawn.");
+            }
+
+            RuntimeHazardManager.UpdateTick(0.6f);
+            float healthAfterValidTick = enemy.CurrentHealth;
+            int activeZonesAfterValidTick = RuntimeHazardManager.ActiveZoneCount;
+
+            RuntimeHazardManager.UpdateTick(float.NaN);
+            RuntimeHazardManager.UpdateTick(float.PositiveInfinity);
+            if (enemy.CurrentHealth != healthAfterValidTick ||
+                RuntimeHazardManager.ActiveZoneCount != activeZonesAfterValidTick)
+            {
+                throw new InvalidOperationException("Non-finite hazard clock values must not apply effects or expire zones.");
+            }
+        }
+        finally
+        {
+            ExistingControllers.Instance.Reset();
+            RuntimeHazardManager.ClearAll();
         }
     }),
     ("runtime battlefield environmental hazard zones enforce trigger colliders and amortized tick rates", () =>

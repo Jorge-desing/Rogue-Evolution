@@ -85,6 +85,17 @@ namespace RogueCommandExpansionLoader.Runtime
             out string zoneId)
         {
             string sanitizedType = string.IsNullOrWhiteSpace(hazardType) ? "Firestorm" : hazardType.Trim();
+            if (float.IsNaN(x) || float.IsInfinity(x) ||
+                float.IsNaN(z) || float.IsInfinity(z) ||
+                float.IsNaN(radius) || float.IsInfinity(radius) ||
+                float.IsNaN(durationSeconds) || float.IsInfinity(durationSeconds) ||
+                float.IsNaN(tickDamage) || float.IsInfinity(tickDamage) ||
+                radius <= 0f || durationSeconds <= 0f || tickDamage < 0f)
+            {
+                zoneId = string.Empty;
+                return false;
+            }
+
             float clampedRadius = Mathf.Clamp(radius, MinimumRadius, MaximumRadius);
             float clampedDuration = Mathf.Clamp(durationSeconds, MinimumDuration, MaximumDuration);
             float clampedDamage = Mathf.Max(0f, tickDamage);
@@ -140,6 +151,11 @@ namespace RogueCommandExpansionLoader.Runtime
 
         public static void UpdateTick(float now)
         {
+            if (float.IsNaN(now) || float.IsInfinity(now))
+            {
+                return;
+            }
+
             List<ActiveHazardZone> currentZones;
             lock (_zonesLock)
             {

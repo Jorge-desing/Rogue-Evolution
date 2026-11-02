@@ -785,21 +785,10 @@ namespace RogueCommandExpansionLoader.Content
                     return false;
                 }
 
-                string language = null;
-                try
-                {
-                    language = _localizationLanguageProperty.GetValue(null, null) as string;
-                }
-                catch (Exception exception)
-                {
-                    Log("No se pudo leer Loca.Language para la unidad " + unitId + ": " +
-                        exception.GetBaseException().Message);
-                }
-
-                if (String.IsNullOrWhiteSpace(language))
-                {
-                    language = "en-US";
-                }
+                string language = RuntimeLocalizationLanguage.GetOrDefault(
+                    () => _localizationLanguageProperty.GetValue(null, null) as string,
+                    Log,
+                    "la unidad " + unitId);
 
                 return UnitLocalizationResolver.TryResolve(unit.Definition, language, description,
                     delegate(string templateId, bool lookupDescription)
@@ -832,21 +821,10 @@ namespace RogueCommandExpansionLoader.Content
                     return false;
                 }
 
-                string language = null;
-                try
-                {
-                    language = _localizationLanguageProperty.GetValue(null, null) as string;
-                }
-                catch (Exception exception)
-                {
-                    Log("No se pudo leer Loca.Language para la habilidad de la unidad " + unitId + ": " +
-                        exception.GetBaseException().Message);
-                }
-
-                if (String.IsNullOrWhiteSpace(language))
-                {
-                    language = "en-US";
-                }
+                string language = RuntimeLocalizationLanguage.GetOrDefault(
+                    () => _localizationLanguageProperty.GetValue(null, null) as string,
+                    Log,
+                    "la habilidad de la unidad " + unitId);
 
                 return UnitLocalizationResolver.TryResolveSkillDescription(unit.Definition, language,
                     delegate(string templateId)
@@ -881,11 +859,10 @@ namespace RogueCommandExpansionLoader.Content
                     return false;
                 }
 
-                string language = _localizationLanguageProperty.GetValue(null, null) as string;
-                if (String.IsNullOrWhiteSpace(language))
-                {
-                    language = "en-US";
-                }
+                string language = RuntimeLocalizationLanguage.GetOrDefault(
+                    () => _localizationLanguageProperty.GetValue(null, null) as string,
+                    Log,
+                    "el relic " + relicId);
 
                 return RelicLocalizationResolver.TryResolve(relic, language, description, out value);
             }
@@ -1832,7 +1809,10 @@ namespace RogueCommandExpansionLoader.Content
                 if (!String.IsNullOrWhiteSpace(localizationId) &&
                     _landscapesByLocalizationId.TryGetValue(localizationId, out landscape))
                 {
-                    string language = _localizationLanguageProperty.GetValue(null, null) as string;
+                    string language = RuntimeLocalizationLanguage.GetOrDefault(
+                        () => _localizationLanguageProperty.GetValue(null, null) as string,
+                        Log,
+                        "el paisaje " + localizationId);
                     value = FindLandscapeLocalization(landscape.Definition.localizations, language);
                     if (String.IsNullOrWhiteSpace(value))
                     {

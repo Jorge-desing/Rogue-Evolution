@@ -5082,6 +5082,26 @@ namespace RogueCommandExpansionLoader.Runtime
             float durationSeconds,
             float tickDamage)
         {
+            string sanitizedType = string.IsNullOrWhiteSpace(hazardType) ? "Firestorm" : hazardType.Trim();
+            if (float.IsNaN(x) || float.IsInfinity(x) ||
+                float.IsNaN(z) || float.IsInfinity(z) ||
+                float.IsNaN(radius) || float.IsInfinity(radius) ||
+                float.IsNaN(durationSeconds) || float.IsInfinity(durationSeconds) ||
+                float.IsNaN(tickDamage) || float.IsInfinity(tickDamage) ||
+                radius <= 0f || durationSeconds <= 0f || tickDamage < 0f)
+            {
+                return new HazardCommandResult(
+                    false,
+                    "",
+                    sanitizedType,
+                    x,
+                    z,
+                    radius,
+                    durationSeconds,
+                    tickDamage,
+                    "Hazard coordinates, radius, duration, and damage must be finite; radius and duration must be positive and damage cannot be negative.");
+            }
+
             try
             {
                 string zoneId;
@@ -5091,7 +5111,6 @@ namespace RogueCommandExpansionLoader.Runtime
                 float clampedRadius = Mathf.Clamp(radius, RuntimeHazardManager.MinimumRadius, RuntimeHazardManager.MaximumRadius);
                 float clampedDuration = Mathf.Clamp(durationSeconds, RuntimeHazardManager.MinimumDuration, RuntimeHazardManager.MaximumDuration);
                 float clampedDamage = Mathf.Max(0f, tickDamage);
-                string sanitizedType = string.IsNullOrWhiteSpace(hazardType) ? "Firestorm" : hazardType.Trim();
 
                 if (success)
                 {
