@@ -321,6 +321,7 @@ internal static partial class ValidationTestRunner
         try
         {
             ContentUnitDefinition unit = ContentPackCopy.DeepClone(nativeSample).units[0];
+            unit.variants = null;
             unit.customBalance = new Dictionary<string, double>(StringComparer.Ordinal) { ["MoveSpeed"] = 14.5d };
             unit.balanceOverrides = [new ContentBalanceOverride { name = "maxHealth", value = "5" }];
             Dictionary<string, double> original = UnitBalanceOverrideMapper.CreateCustomBalance(unit);
@@ -376,7 +377,7 @@ internal static partial class ValidationTestRunner
     }),
     ("unit loadout variants omission preserves base balance mapping", () =>
     {
-        ContentUnitDefinition unit = ContentPackCopy.DeepClone(nativeSample).units[0];
+        ContentUnitDefinition unit = ContentPackCopy.DeepClone(nativeSample).units.First(u => u.variants == null);
         if (typeof(ContentUnitDefinition).GetField("variants")?.GetValue(unit) != null)
         {
             throw new InvalidOperationException("Omitted variants must stay null on the unit DTO.");

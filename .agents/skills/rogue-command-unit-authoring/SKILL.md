@@ -34,7 +34,7 @@ Use this skill when adding or reviewing a unit in this repository. Read `AGENTS.
 - Units may optionally declare up to 8 loadout variants (e.g. AP / HE munitions, scout vs siege gear) under `units[].variants`.
 - Each variant specifies a unique `id`, optional `name`, `description`, and up to 64 `balanceOverrides`.
 - **Identifier Validation**: Variant IDs must be valid identifiers and strictly reject line terminators (`\r`, `\n`, CRLF, U+2028, U+2029).
-- **Metadata-Only Invariant**: Variants are currently declarative metadata only. They are not applied to native balance rows, runtime unit instances, AI, visuals, or VFX. Loader diagnostics report them under `Variantes declaradas (solo metadatos): N`.
+- **Runtime Selection Invariant**: The loader registers validated variants in `RuntimeUnitVariantRegistry`. `diagnostics_order_apply_unit_loadout` selects a declared variant by ID on a live unit; AP/HE presets are applied first, supported instance stats (`damage1`, `attackCooldown`, `moveSpeed`, `weaponRange`, `maxHealth`, `maxArmor`, `armorProtection`, `maxShield`, `healAmount1`, `sightRadius`, `effectRadius1`, and `skillRange`) are converted from absolute values to native relative modifiers, and stale modifiers are replaced on switching. `Standard` resets the active variant. Unsupported row-only fields fail closed. This path does not claim natural card selection, AI selection, visual/VFX retargeting, or rendering.
 
 ## Structured Fields & Graph Validations
 

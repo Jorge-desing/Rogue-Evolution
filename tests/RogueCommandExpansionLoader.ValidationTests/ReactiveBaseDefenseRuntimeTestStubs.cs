@@ -183,7 +183,6 @@ public sealed class EntityController : Component
     public float Attack2Cooldown { get; set; } = 1f;
     public string EntityId { get => entityId; set => entityId = value; }
     public string entityId { get; set; }
-    public string name { get => gameObject?.name ?? string.Empty; set { if (gameObject != null) gameObject.name = value; } }
     public int UniqueEntityId { get; set; }
     public Vector2Int CurrentCell { get; set; }
     public Vector3 Position { get; set; }

@@ -162,6 +162,12 @@ namespace RogueCommandExpansionLoader.Runtime
 
         public float LiveAiStructureHealthRatio => RuntimeBaseIntegrityCensus.Current().AverageAiStructureHealthRatio;
 
+        public int LiveSkinnedMeshUnitCount => RuntimeVisualCensus.Current(32).SkinnedMeshCount;
+
+        public int LiveAnimatedUnitCount => RuntimeVisualCensus.Current(32).AnimatedUnitCount;
+
+        public int LivePbrShaderUnitCount => RuntimeVisualCensus.Current(32).PbrShaderCount;
+
         // ---- Methods callable via component/call_method ----
 
         /// <summary>
@@ -1227,6 +1233,24 @@ namespace RogueCommandExpansionLoader.Runtime
         {
             return AgentDiagnosticsFormatter.SerializeAiDeckInjectionResult(
                 RuntimeGameplayCommandDirector.TryInjectAiDeckUnit(baseIndex, unitId, countAtStart, maxLiving));
+        }
+
+        /// <summary>
+        /// Queries the visual render, rig architecture, and animation telemetry census across living units.
+        /// </summary>
+        public string GetVisualRenderCensusJson(int maxTrackedUnits = 32)
+        {
+            return AgentDiagnosticsFormatter.SerializeVisualRenderCensus(
+                RuntimeGameplayCommandDirector.GetVisualRenderCensus(maxTrackedUnits));
+        }
+
+        /// <summary>
+        /// Deeply inspects visual render evidence, rig hierarchy, animation parameters, and visual director state for a specific unit.
+        /// </summary>
+        public string InspectEntityVisualJson(string entityKeyId)
+        {
+            return AgentDiagnosticsFormatter.SerializeDetailedEntityVisualDiagnostic(
+                RuntimeGameplayCommandDirector.InspectEntityVisual(entityKeyId));
         }
 
         public string GetAgentCoordinationCensusJson()

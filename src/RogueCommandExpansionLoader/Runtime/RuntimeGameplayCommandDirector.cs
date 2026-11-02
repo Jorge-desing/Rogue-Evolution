@@ -1293,8 +1293,8 @@ namespace RogueCommandExpansionLoader.Runtime
 
 
         private static readonly Dictionary<string, string> _activeUnitVariants = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        private static readonly Dictionary<string, HashSet<string>> _activeUnitLoadoutStats =
-            new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+        private static readonly Dictionary<string, Dictionary<string, float>> _activeUnitLoadoutStats =
+            new Dictionary<string, Dictionary<string, float>>(StringComparer.OrdinalIgnoreCase);
         private static readonly Dictionary<string, int> _prespawnPoolQuotas = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         private static readonly Dictionary<string, int> _prespawnPoolWarmed = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         private static readonly object _doctrineLock = new object();
@@ -5515,10 +5515,53 @@ namespace RogueCommandExpansionLoader.Runtime
 
                 string key = entityKeyId.Trim();
                 string sanitized = string.IsNullOrWhiteSpace(loadoutId) ? "Standard" : loadoutId.Trim();
+                string unitId = ResolveEntityIdString(unit);
+                RuntimeUnitVariant declaredVariant;
+                bool isDeclaredVariant = RuntimeUnitVariantRegistry.TryGet(unitId, sanitized, out declaredVariant);
                 var changes = new Dictionary<string, float>(StringComparer.OrdinalIgnoreCase);
+                var absoluteOverrides = new Dictionary<string, float>(StringComparer.OrdinalIgnoreCase);
 
-                if (string.Equals(sanitized, "AP", StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(sanitized, "ArmorPiercing", StringComparison.OrdinalIgnoreCase))
+                if (isDeclaredVariant)
+                {
+                    sanitized = declaredVariant.VariantId;
+                    if (string.Equals(declaredVariant.Loadout, "AP", StringComparison.OrdinalIgnoreCase))
+                    {
+                        changes["Damage"] = 0.30f;
+                        changes["AttackCooldown"] = 0.20f;
+                    }
+                    else if (string.Equals(declaredVariant.Loadout, "HE", StringComparison.OrdinalIgnoreCase))
+                    {
+                        changes["Damage"] = 0.15f;
+                        changes["EffectRadius"] = 0.40f;
+                    }
+                    else if (!string.IsNullOrWhiteSpace(declaredVariant.Loadout))
+                    {
+                        return new UnitLoadoutResult(false, key, sanitized,
+                            "Declared variant '" + sanitized + "' has unsupported loadout '" + declaredVariant.Loadout + "'.");
+                    }
+
+                    foreach (RuntimeUnitVariantOverride balanceOverride in declaredVariant.BalanceOverrides)
+                    {
+                        string statName;
+                        float absoluteValue;
+                        string failure;
+                        if (!TryResolveRuntimeVariantOverride(unit, balanceOverride, out statName, out absoluteValue, out failure))
+                        {
+                            return new UnitLoadoutResult(false, key, sanitized, failure);
+                        }
+
+                        absoluteOverrides[statName] = absoluteValue;
+                        changes.Remove(statName);
+                    }
+                }
+                else if (RuntimeUnitVariantRegistry.HasVariants(unitId) &&
+                         !string.Equals(sanitized, "Standard", StringComparison.OrdinalIgnoreCase))
+                {
+                    return new UnitLoadoutResult(false, key, sanitized,
+                        "Declared unit variant '" + sanitized + "' is not supported for entity '" + unitId + "'.");
+                }
+                else if (string.Equals(sanitized, "AP", StringComparison.OrdinalIgnoreCase) ||
+                         string.Equals(sanitized, "ArmorPiercing", StringComparison.OrdinalIgnoreCase))
                 {
                     sanitized = "AP";
                     changes["Damage"] = 0.30f;
@@ -5563,25 +5606,50 @@ namespace RogueCommandExpansionLoader.Runtime
                         "Unrecognized loadout '" + sanitized + "'.");
                 }
 
-                var previousStats = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                var previousStats = new Dictionary<string, float>(StringComparer.OrdinalIgnoreCase);
                 lock (_activeUnitVariants)
                 {
-                    HashSet<string> registeredStats;
+                    Dictionary<string, float> registeredStats;
                     if (_activeUnitLoadoutStats.TryGetValue(key, out registeredStats) && registeredStats != null)
                     {
-                        previousStats.UnionWith(registeredStats);
+                        foreach (KeyValuePair<string, float> registeredStat in registeredStats)
+                        {
+                            previousStats[registeredStat.Key] = registeredStat.Value;
+                        }
                     }
                 }
 
-                foreach (string previousStat in previousStats)
+                foreach (KeyValuePair<string, float> previousStat in previousStats)
                 {
                     RuntimeUnitMechanicsDirector.ApplyTimedStatChange(
                         unit,
-                        previousStat,
+                        previousStat.Key,
                         0f,
                         3600f,
-                        UnitLoadoutOriginator(key, previousStat),
+                        UnitLoadoutOriginator(key, previousStat.Key),
                         true);
+                }
+
+                foreach (KeyValuePair<string, float> absoluteOverride in absoluteOverrides)
+                {
+                    float currentValue;
+                    if (!TryReadUnitFloatProperty(unit, RuntimeVariantPropertyName(absoluteOverride.Key), out currentValue) ||
+                        float.IsNaN(currentValue) || float.IsInfinity(currentValue) || currentValue <= 0f)
+                    {
+                        RestoreUnitLoadoutChanges(unit, key, previousStats);
+                        return new UnitLoadoutResult(false, key, sanitized,
+                            "Declared variant '" + sanitized + "' cannot apply '" + absoluteOverride.Key + "' because the current native stat is unavailable or non-positive.");
+                    }
+
+                    float relativeDelta = (absoluteOverride.Value / currentValue) - 1f;
+                    if (float.IsNaN(relativeDelta) || float.IsInfinity(relativeDelta))
+                    {
+                        RestoreUnitLoadoutChanges(unit, key, previousStats);
+                        return new UnitLoadoutResult(false, key, sanitized,
+                            "Declared variant '" + sanitized + "' produced a non-finite modifier for '" + absoluteOverride.Key + "'.");
+                    }
+
+                    changes[absoluteOverride.Key] = relativeDelta;
                 }
 
                 foreach (KeyValuePair<string, float> change in changes)
@@ -5598,7 +5666,7 @@ namespace RogueCommandExpansionLoader.Runtime
                 lock (_activeUnitVariants)
                 {
                     _activeUnitVariants[key] = sanitized;
-                    _activeUnitLoadoutStats[key] = new HashSet<string>(changes.Keys, StringComparer.OrdinalIgnoreCase);
+                    _activeUnitLoadoutStats[key] = new Dictionary<string, float>(changes, StringComparer.OrdinalIgnoreCase);
                 }
 
                 return new UnitLoadoutResult(true, key, sanitized,
@@ -5607,6 +5675,173 @@ namespace RogueCommandExpansionLoader.Runtime
             catch (Exception ex)
             {
                 return new UnitLoadoutResult(false, entityKeyId, loadoutId, "Error applying unit loadout: " + ex.Message);
+            }
+        }
+
+        private static void RestoreUnitLoadoutChanges(
+            EntityController unit,
+            string key,
+            IDictionary<string, float> previousStats)
+        {
+            if (unit == null || previousStats == null)
+            {
+                return;
+            }
+
+            foreach (KeyValuePair<string, float> previousStat in previousStats)
+            {
+                RuntimeUnitMechanicsDirector.ApplyTimedStatChange(
+                    unit,
+                    previousStat.Key,
+                    previousStat.Value,
+                    3600f,
+                    UnitLoadoutOriginator(key, previousStat.Key),
+                    true);
+            }
+        }
+
+        private static bool TryResolveRuntimeVariantOverride(
+            EntityController unit,
+            RuntimeUnitVariantOverride balanceOverride,
+            out string statName,
+            out float absoluteValue,
+            out string failure)
+        {
+            statName = string.Empty;
+            absoluteValue = 0f;
+            failure = "Declared variant balance override is invalid.";
+            if (balanceOverride == null || string.IsNullOrWhiteSpace(balanceOverride.Name) ||
+                !float.TryParse(
+                    balanceOverride.Value,
+                    System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    out absoluteValue) ||
+                float.IsNaN(absoluteValue) || float.IsInfinity(absoluteValue) || absoluteValue < 0f)
+            {
+                failure = "Declared variant balance override '" + (balanceOverride == null ? string.Empty : balanceOverride.Name) +
+                    "' must contain a finite non-negative number.";
+                return false;
+            }
+
+            string rawName = balanceOverride.Name.Trim();
+            if (string.Equals(rawName, "damage", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(rawName, "damage1", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(rawName, "attackDamage", StringComparison.OrdinalIgnoreCase))
+            {
+                statName = "Damage";
+            }
+            else if (string.Equals(rawName, "attackCooldown", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(rawName, "attack1Cooldown", StringComparison.OrdinalIgnoreCase))
+            {
+                statName = "AttackCooldown";
+            }
+            else if (string.Equals(rawName, "moveSpeed", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(rawName, "speed", StringComparison.OrdinalIgnoreCase))
+            {
+                statName = "MoveSpeed";
+            }
+            else if (string.Equals(rawName, "weaponRange", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(rawName, "attackRange", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(rawName, "range", StringComparison.OrdinalIgnoreCase))
+            {
+                statName = "WeaponRange";
+            }
+            else if (string.Equals(rawName, "maxHealth", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(rawName, "health", StringComparison.OrdinalIgnoreCase))
+            {
+                statName = "MaxHealth";
+            }
+            else if (string.Equals(rawName, "maxArmor", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(rawName, "armor", StringComparison.OrdinalIgnoreCase))
+            {
+                statName = "MaxArmor";
+            }
+            else if (string.Equals(rawName, "armorProtection", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(rawName, "defense", StringComparison.OrdinalIgnoreCase))
+            {
+                statName = "ArmorProtection";
+            }
+            else if (string.Equals(rawName, "maxShield", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(rawName, "shield", StringComparison.OrdinalIgnoreCase))
+            {
+                statName = "MaxShield";
+            }
+            else if (string.Equals(rawName, "healAmount", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(rawName, "healAmount1", StringComparison.OrdinalIgnoreCase))
+            {
+                statName = "HealAmount";
+            }
+            else if (string.Equals(rawName, "sightRadius", StringComparison.OrdinalIgnoreCase))
+            {
+                statName = "SightRadius";
+            }
+            else if (string.Equals(rawName, "effectRadius", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(rawName, "effectRadius1", StringComparison.OrdinalIgnoreCase))
+            {
+                statName = "EffectRadius";
+            }
+            else if (string.Equals(rawName, "skillRange", StringComparison.OrdinalIgnoreCase))
+            {
+                statName = "SkillRange";
+            }
+            else
+            {
+                failure = "Declared variant balance override '" + rawName + "' is not supported for live unit gameplay.";
+                return false;
+            }
+
+            float currentValue;
+            if (unit == null || !TryReadUnitFloatProperty(unit, RuntimeVariantPropertyName(statName), out currentValue))
+            {
+                failure = "Declared variant balance override '" + rawName + "' is not available on the live EntityController.";
+                return false;
+            }
+
+            return true;
+        }
+
+        private static string RuntimeVariantPropertyName(string statName)
+        {
+            if (string.Equals(statName, "Damage", StringComparison.OrdinalIgnoreCase)) return "Damage1";
+            if (string.Equals(statName, "AttackCooldown", StringComparison.OrdinalIgnoreCase)) return "Attack1Cooldown";
+            if (string.Equals(statName, "EffectRadius", StringComparison.OrdinalIgnoreCase)) return "EffectRadius1";
+            if (string.Equals(statName, "HealAmount", StringComparison.OrdinalIgnoreCase)) return "HealAmount1";
+            return statName;
+        }
+
+        private static bool TryReadUnitFloatProperty(EntityController unit, string propertyName, out float value)
+        {
+            value = 0f;
+            if (unit == null || string.IsNullOrWhiteSpace(propertyName))
+            {
+                return false;
+            }
+
+            try
+            {
+                PropertyInfo property = unit.GetType().GetProperty(
+                    propertyName,
+                    BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                object rawValue = property == null ? null : property.GetValue(unit, null);
+                if (rawValue == null)
+                {
+                    FieldInfo field = unit.GetType().GetField(
+                        propertyName,
+                        BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                    rawValue = field == null ? null : field.GetValue(unit);
+                }
+
+                if (rawValue == null)
+                {
+                    return false;
+                }
+
+                value = Convert.ToSingle(rawValue, System.Globalization.CultureInfo.InvariantCulture);
+                return !float.IsNaN(value) && !float.IsInfinity(value);
+            }
+            catch
+            {
+                return false;
             }
         }
 
@@ -6613,6 +6848,22 @@ namespace RogueCommandExpansionLoader.Runtime
         /// <summary>
         /// Clears active tactical stances and unit affixes (used for test teardown and match transitions).
         /// </summary>
+        /// <summary>
+        /// Queries the runtime visual census capturing geometry rendering, rig architecture, and animation states.
+        /// </summary>
+        public static VisualRenderCensus GetVisualRenderCensus(int maxTrackedUnits = 32)
+        {
+            return RuntimeVisualCensus.Current(maxTrackedUnits);
+        }
+
+        /// <summary>
+        /// Inspects deep visual render evidence (renderers, shaders, mesh bounds, LODs), rig hierarchy (armature bones, canonical sockets, socket ambiguity), animation parameters (RCL_IsMoving, RCL_Fire, RCL_Death), and visual director state for a specific entity.
+        /// </summary>
+        public static DetailedEntityVisualDiagnostic InspectEntityVisual(string entityKeyId)
+        {
+            return RuntimeVisualCensus.InspectEntity(entityKeyId);
+        }
+
         public static void ClearTacticalStancesAndAffixes()
         {
             lock (_activeTacticalStances)

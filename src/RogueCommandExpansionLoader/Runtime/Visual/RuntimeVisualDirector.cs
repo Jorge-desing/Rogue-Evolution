@@ -919,6 +919,12 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             }
         }
 
+        public bool IsDamagedStateActive => _isDamagedStateActive;
+        public bool IsCriticalStateActive => _isCriticalStateActive;
+        public bool IsTurretJammed => _isTurretJammed;
+        public float CurrentRecoilOffset => _currentRecoilOffset;
+        public float DoorOpenProgress => _doorOpenProgress;
+
         public void TriggerWeaponFeedback(float recoilDistance = 0.22f)
         {
             _currentRecoilOffset = recoilDistance;

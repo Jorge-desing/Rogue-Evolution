@@ -2689,6 +2689,10 @@ namespace RogueCommandExpansionLoader.Content
             ClearMinAttackRanges();
             ClearOnHitStatusEffects();
             RuntimeUnitMechanicsDirector.ClearProfiles();
+            if (!_loaded)
+            {
+                RuntimeUnitVariantRegistry.Clear();
+            }
             IDictionary index = _entityIndexField.GetValue(null) as IDictionary;
             if (index == null)
             {
@@ -8548,10 +8552,51 @@ namespace RogueCommandExpansionLoader.Content
                 StartingAffixes = unit.startingAffixes
             };
 
+            RegisterUnitVariants(unit);
             if (profile.HasAnyMechanics)
             {
                 RuntimeUnitMechanicsDirector.RegisterProfile(unit.id, profile);
             }
+        }
+
+        private static void RegisterUnitVariants(ContentUnitDefinition unit)
+        {
+            if (unit == null || string.IsNullOrWhiteSpace(unit.id))
+            {
+                return;
+            }
+
+            var variants = new List<RuntimeUnitVariant>();
+            if (unit.variants != null)
+            {
+                for (int i = 0; i < unit.variants.Length; i++)
+                {
+                    ContentUnitVariantDefinition source = unit.variants[i];
+                    if (source == null || string.IsNullOrWhiteSpace(source.id))
+                    {
+                        continue;
+                    }
+
+                    var overrides = new List<RuntimeUnitVariantOverride>();
+                    if (source.balanceOverrides != null)
+                    {
+                        for (int j = 0; j < source.balanceOverrides.Length; j++)
+                        {
+                            ContentBalanceOverride balanceOverride = source.balanceOverrides[j];
+                            if (balanceOverride != null)
+                            {
+                                overrides.Add(new RuntimeUnitVariantOverride(
+                                    balanceOverride.name,
+                                    balanceOverride.value));
+                            }
+                        }
+                    }
+
+                    variants.Add(new RuntimeUnitVariant(source.id, source.loadout, overrides));
+                }
+            }
+
+            RuntimeUnitVariantRegistry.Register(unit.id, variants);
         }
 
         private static void RegisterBuildingMechanicsProfile(ContentBuildingDefinition building)

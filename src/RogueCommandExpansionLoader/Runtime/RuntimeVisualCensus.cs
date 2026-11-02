@@ -1,0 +1,1175 @@
+using System;
+using System.Collections.Generic;
+using System.Reflection;
+using UnityEngine;
+using RogueCommandExpansionLoader.Runtime.Visual;
+
+namespace RogueCommandExpansionLoader.Runtime
+{
+    /// <summary>
+    /// Telemetry summary row capturing in-game render, rig, and animation evidence for one living unit.
+    /// Pure, decoupled from Unity types to support clean-room MCP serialization and offline verification.
+    /// </summary>
+    public readonly struct VisualUnitDiagnosticRow
+    {
+        public VisualUnitDiagnosticRow(
+            string entityKeyId,
+            string entityId,
+            bool isControlledByPlayer,
+            string rigType,
+            bool hasAnimator,
+            bool isAnimatorActive,
+            string activeClipName,
+            float clipNormalizedTime,
+            float clipSpeed,
+            bool isMovingParam,
+            bool fireTriggerParam,
+            bool deathTriggerParam,
+            int rendererCount,
+            int totalVertexCount,
+            string primaryShaderName,
+            bool hasPbrKeywords,
+            bool isGpuInstanced,
+            bool isVisible,
+            IReadOnlyList<string> discoveredSockets,
+            int socketAmbiguityCount)
+        {
+            EntityKeyId = entityKeyId ?? string.Empty;
+            EntityId = entityId ?? string.Empty;
+            IsControlledByPlayer = isControlledByPlayer;
+            RigType = rigType ?? "StaticVehicle";
+            HasAnimator = hasAnimator;
+            IsAnimatorActive = isAnimatorActive;
+            ActiveClipName = activeClipName ?? string.Empty;
+            ClipNormalizedTime = clipNormalizedTime;
+            ClipSpeed = clipSpeed;
+            IsMovingParam = isMovingParam;
+            FireTriggerParam = fireTriggerParam;
+            DeathTriggerParam = deathTriggerParam;
+            RendererCount = rendererCount;
+            TotalVertexCount = totalVertexCount;
+            PrimaryShaderName = primaryShaderName ?? string.Empty;
+            HasPbrKeywords = hasPbrKeywords;
+            IsGpuInstanced = isGpuInstanced;
+            IsVisible = isVisible;
+            DiscoveredSockets = discoveredSockets ?? new List<string>().AsReadOnly();
+            SocketAmbiguityCount = socketAmbiguityCount;
+        }
+
+        public string EntityKeyId { get; }
+        public string EntityId { get; }
+        public bool IsControlledByPlayer { get; }
+        public string RigType { get; }
+        public bool HasAnimator { get; }
+        public bool IsAnimatorActive { get; }
+        public string ActiveClipName { get; }
+        public float ClipNormalizedTime { get; }
+        public float ClipSpeed { get; }
+        public bool IsMovingParam { get; }
+        public bool FireTriggerParam { get; }
+        public bool DeathTriggerParam { get; }
+        public int RendererCount { get; }
+        public int TotalVertexCount { get; }
+        public string PrimaryShaderName { get; }
+        public bool HasPbrKeywords { get; }
+        public bool IsGpuInstanced { get; }
+        public bool IsVisible { get; }
+        public IReadOnlyList<string> DiscoveredSockets { get; }
+        public int SocketAmbiguityCount { get; }
+    }
+
+    /// <summary>
+    /// Pure snapshot of in-game render, rig, and animation telemetry across living units.
+    /// Omission counter placed strictly first to uphold clean-room bounded trace invariants.
+    /// </summary>
+    public sealed class VisualRenderCensus
+    {
+        public int OmittedUnitCount { get; }
+        public int TotalTrackedUnits { get; }
+        public int SkinnedMeshCount { get; }
+        public int StaticMeshCount { get; }
+        public int AnimatedUnitCount { get; }
+        public int PbrShaderCount { get; }
+        public IReadOnlyList<VisualUnitDiagnosticRow> UnitRows { get; }
+
+        public VisualRenderCensus(
+            int omittedUnitCount,
+            int totalTrackedUnits,
+            int skinnedMeshCount,
+            int staticMeshCount,
+            int animatedUnitCount,
+            int pbrShaderCount,
+            IReadOnlyList<VisualUnitDiagnosticRow> unitRows)
+        {
+            OmittedUnitCount = omittedUnitCount;
+            TotalTrackedUnits = totalTrackedUnits;
+            SkinnedMeshCount = skinnedMeshCount;
+            StaticMeshCount = staticMeshCount;
+            AnimatedUnitCount = animatedUnitCount;
+            PbrShaderCount = pbrShaderCount;
+            UnitRows = unitRows ?? new List<VisualUnitDiagnosticRow>().AsReadOnly();
+        }
+
+        public static VisualRenderCensus Empty { get; } =
+            new VisualRenderCensus(0, 0, 0, 0, 0, 0, new List<VisualUnitDiagnosticRow>().AsReadOnly());
+    }
+
+    /// <summary>
+    /// Pure diagnostic DTO for deep inspection of an individual renderer on a unit.
+    /// </summary>
+    public readonly struct VisualRendererDetailRow
+    {
+        public VisualRendererDetailRow(
+            string name,
+            string rendererType,
+            bool enabled,
+            bool isVisible,
+            string meshName,
+            int vertexCount,
+            int submeshCount,
+            IReadOnlyList<string> materialNames,
+            IReadOnlyList<string> shaderNames,
+            IReadOnlyList<string> shaderKeywords,
+            bool isGpuInstanced)
+        {
+            Name = name ?? string.Empty;
+            RendererType = rendererType ?? string.Empty;
+            Enabled = enabled;
+            IsVisible = isVisible;
+            MeshName = meshName ?? string.Empty;
+            VertexCount = vertexCount;
+            SubmeshCount = submeshCount;
+            MaterialNames = materialNames ?? new List<string>().AsReadOnly();
+            ShaderNames = shaderNames ?? new List<string>().AsReadOnly();
+            ShaderKeywords = shaderKeywords ?? new List<string>().AsReadOnly();
+            IsGpuInstanced = isGpuInstanced;
+        }
+
+        public string Name { get; }
+        public string RendererType { get; }
+        public bool Enabled { get; }
+        public bool IsVisible { get; }
+        public string MeshName { get; }
+        public int VertexCount { get; }
+        public int SubmeshCount { get; }
+        public IReadOnlyList<string> MaterialNames { get; }
+        public IReadOnlyList<string> ShaderNames { get; }
+        public IReadOnlyList<string> ShaderKeywords { get; }
+        public bool IsGpuInstanced { get; }
+    }
+
+    /// <summary>
+    /// Pure diagnostic DTO for deep inspection of a canonical or custom socket anchor.
+    /// </summary>
+    public readonly struct VisualSocketDetailRow
+    {
+        public VisualSocketDetailRow(
+            string socketName,
+            string canonicalRole,
+            float localPosX,
+            float localPosY,
+            float localPosZ,
+            float localRotX,
+            float localRotY,
+            float localRotZ,
+            bool isAmbiguous,
+            int duplicateCount)
+        {
+            SocketName = socketName ?? string.Empty;
+            CanonicalRole = canonicalRole ?? string.Empty;
+            LocalPosX = localPosX;
+            LocalPosY = localPosY;
+            LocalPosZ = localPosZ;
+            LocalRotX = localRotX;
+            LocalRotY = localRotY;
+            LocalRotZ = localRotZ;
+            IsAmbiguous = isAmbiguous;
+            DuplicateCount = duplicateCount;
+        }
+
+        public string SocketName { get; }
+        public string CanonicalRole { get; }
+        public float LocalPosX { get; }
+        public float LocalPosY { get; }
+        public float LocalPosZ { get; }
+        public float LocalRotX { get; }
+        public float LocalRotY { get; }
+        public float LocalRotZ { get; }
+        public bool IsAmbiguous { get; }
+        public int DuplicateCount { get; }
+    }
+
+    /// <summary>
+    /// Pure diagnostic DTO for an animator state machine parameter.
+    /// </summary>
+    public readonly struct VisualAnimationParameterRow
+    {
+        public VisualAnimationParameterRow(string name, string parameterType, string value)
+        {
+            Name = name ?? string.Empty;
+            ParameterType = parameterType ?? string.Empty;
+            Value = value ?? string.Empty;
+        }
+
+        public string Name { get; }
+        public string ParameterType { get; }
+        public string Value { get; }
+    }
+
+    /// <summary>
+    /// Pure diagnostic DTO containing deep visual render, rig, and animation evidence for a specific entity.
+    /// </summary>
+    public sealed class DetailedEntityVisualDiagnostic
+    {
+        public bool Success { get; }
+        public string EntityKeyId { get; }
+        public string EntityId { get; }
+        public string Message { get; }
+
+        // Render Evidence
+        public int RendererCount { get; }
+        public int TotalVertexCount { get; }
+        public int SubmeshCount { get; }
+        public float BoundsSizeX { get; }
+        public float BoundsSizeY { get; }
+        public float BoundsSizeZ { get; }
+        public bool HasLODGroup { get; }
+        public int LODCount { get; }
+        public IReadOnlyList<VisualRendererDetailRow> Renderers { get; }
+
+        // Rig & Hierarchy Evidence
+        public string RigType { get; }
+        public string RootBoneName { get; }
+        public int BoneCount { get; }
+        public IReadOnlyList<string> BoneNames { get; }
+        public IReadOnlyList<VisualSocketDetailRow> Sockets { get; }
+
+        // Animation Evidence
+        public bool HasAnimator { get; }
+        public bool IsAnimatorActive { get; }
+        public string ControllerName { get; }
+        public string AvatarName { get; }
+        public bool AvatarIsValid { get; }
+        public string CurrentStateName { get; }
+        public string ActiveClipName { get; }
+        public float ClipLength { get; }
+        public float NormalizedTime { get; }
+        public float Speed { get; }
+        public IReadOnlyList<VisualAnimationParameterRow> Parameters { get; }
+
+        // Visual Director Evidence
+        public bool HasVisualDirector { get; }
+        public bool IsDamagedVfxActive { get; }
+        public bool IsCriticalVfxActive { get; }
+        public bool IsTurretJammed { get; }
+        public float RecoilOffset { get; }
+        public float DoorOpenProgress { get; }
+
+        public DetailedEntityVisualDiagnostic(
+            bool success,
+            string entityKeyId,
+            string entityId,
+            string message,
+            int rendererCount,
+            int totalVertexCount,
+            int submeshCount,
+            float boundsSizeX,
+            float boundsSizeY,
+            float boundsSizeZ,
+            bool hasLodGroup,
+            int lodCount,
+            IReadOnlyList<VisualRendererDetailRow> renderers,
+            string rigType,
+            string rootBoneName,
+            int boneCount,
+            IReadOnlyList<string> boneNames,
+            IReadOnlyList<VisualSocketDetailRow> sockets,
+            bool hasAnimator,
+            bool isAnimatorActive,
+            string controllerName,
+            string avatarName,
+            bool avatarIsValid,
+            string currentStateName,
+            string activeClipName,
+            float clipLength,
+            float normalizedTime,
+            float speed,
+            IReadOnlyList<VisualAnimationParameterRow> parameters,
+            bool hasVisualDirector,
+            bool isDamagedVfxActive,
+            bool isCriticalVfxActive,
+            bool isTurretJammed,
+            float recoilOffset,
+            float doorOpenProgress)
+        {
+            Success = success;
+            EntityKeyId = entityKeyId ?? string.Empty;
+            EntityId = entityId ?? string.Empty;
+            Message = message ?? string.Empty;
+            RendererCount = rendererCount;
+            TotalVertexCount = totalVertexCount;
+            SubmeshCount = submeshCount;
+            BoundsSizeX = boundsSizeX;
+            BoundsSizeY = boundsSizeY;
+            BoundsSizeZ = boundsSizeZ;
+            HasLODGroup = hasLodGroup;
+            LODCount = lodCount;
+            Renderers = renderers ?? new List<VisualRendererDetailRow>().AsReadOnly();
+            RigType = rigType ?? "StaticVehicle";
+            RootBoneName = rootBoneName ?? string.Empty;
+            BoneCount = boneCount;
+            BoneNames = boneNames ?? new List<string>().AsReadOnly();
+            Sockets = sockets ?? new List<VisualSocketDetailRow>().AsReadOnly();
+            HasAnimator = hasAnimator;
+            IsAnimatorActive = isAnimatorActive;
+            ControllerName = controllerName ?? string.Empty;
+            AvatarName = avatarName ?? string.Empty;
+            AvatarIsValid = avatarIsValid;
+            CurrentStateName = currentStateName ?? string.Empty;
+            ActiveClipName = activeClipName ?? string.Empty;
+            ClipLength = clipLength;
+            NormalizedTime = normalizedTime;
+            Speed = speed;
+            Parameters = parameters ?? new List<VisualAnimationParameterRow>().AsReadOnly();
+            HasVisualDirector = hasVisualDirector;
+            IsDamagedVfxActive = isDamagedVfxActive;
+            IsCriticalVfxActive = isCriticalVfxActive;
+            IsTurretJammed = isTurretJammed;
+            RecoilOffset = recoilOffset;
+            DoorOpenProgress = doorOpenProgress;
+        }
+
+        public static DetailedEntityVisualDiagnostic Failed(string entityKeyId, string message) =>
+            new DetailedEntityVisualDiagnostic(
+                false, entityKeyId, string.Empty, message,
+                0, 0, 0, 0f, 0f, 0f, false, 0, new List<VisualRendererDetailRow>().AsReadOnly(),
+                "None", string.Empty, 0, new List<string>().AsReadOnly(),
+                new List<VisualSocketDetailRow>().AsReadOnly(),
+                false, false, string.Empty, string.Empty, false,
+                string.Empty, string.Empty, 0f, 0f, 0f,
+                new List<VisualAnimationParameterRow>().AsReadOnly(),
+                false, false, false, false, 0f, 0f);
+    }
+
+    /// <summary>
+    /// Reads living entities from <see cref="ExistingControllers"/> and extracts observable
+    /// runtime evidence of geometry rendering, skeletal/transform rigging, socket bindings,
+    /// and animator locomotion states.
+    /// </summary>
+    public static class RuntimeVisualCensus
+    {
+        private const string PbrShaderName = "RogueCommand/VehiclePBR_VertexWear";
+        private const string MovementAnimationParameter = "RCL_IsMoving";
+        private const string FireAnimationParameter = "RCL_Fire";
+        private const string DeathAnimationParameter = "RCL_Death";
+
+        public static VisualRenderCensus Current(int maxTrackedUnits = 32)
+        {
+            try
+            {
+                ExistingControllers existing = ExistingControllers.Instance;
+                if (existing == null)
+                {
+                    return VisualRenderCensus.Empty;
+                }
+
+                var candidates = new List<EntityController>();
+                HashSet<EntityController> playerUnits = existing.PlayerUnits();
+                if (playerUnits != null) candidates.AddRange(playerUnits);
+
+                HashSet<EntityController> aiUnits = existing.AiUnits();
+                if (aiUnits != null) candidates.AddRange(aiUnits);
+
+                int totalCount = 0;
+                int skinnedCount = 0;
+                int staticMeshCount = 0;
+                int animatedCount = 0;
+                int pbrShaderCount = 0;
+
+                var unitRows = new List<VisualUnitDiagnosticRow>();
+
+                for (int i = 0; i < candidates.Count; i++)
+                {
+                    EntityController ec = candidates[i];
+                    if (ec == null || ec.IsDestroyed || ec.DestroyHasBeenStarted)
+                    {
+                        continue;
+                    }
+
+                    totalCount++;
+                    GameObject go = ec.gameObject;
+                    if (go == null)
+                    {
+                        continue;
+                    }
+
+                    // Renderer inspection
+                    Renderer[] renderers = go.GetComponentsInChildren<Renderer>(true);
+                    int rendererCount = renderers != null ? renderers.Length : 0;
+                    int totalVertexCount = 0;
+                    bool hasSkinned = false;
+                    bool hasStatic = false;
+                    bool hasPbr = false;
+                    bool isVisible = false;
+                    bool isInstanced = false;
+                    string primaryShader = string.Empty;
+
+                    if (renderers != null)
+                    {
+                        for (int rIdx = 0; rIdx < renderers.Length; rIdx++)
+                        {
+                            Renderer r = renderers[rIdx];
+                            if (r == null) continue;
+
+                            if (r.isVisible) isVisible = true;
+
+                            if (r is SkinnedMeshRenderer smr)
+                            {
+                                hasSkinned = true;
+                                if (smr.sharedMesh != null)
+                                {
+                                    totalVertexCount += smr.sharedMesh.vertexCount;
+                                }
+                            }
+                            else if (r is MeshRenderer)
+                            {
+                                hasStatic = true;
+                                MeshFilter mf = r.GetComponent<MeshFilter>();
+                                if (mf != null && mf.sharedMesh != null)
+                                {
+                                    totalVertexCount += mf.sharedMesh.vertexCount;
+                                }
+                            }
+
+                            Material[] mats = r.sharedMaterials;
+                            if (mats != null)
+                            {
+                                for (int mIdx = 0; mIdx < mats.Length; mIdx++)
+                                {
+                                    Material mat = mats[mIdx];
+                                    if (mat == null) continue;
+
+                                    if (mat.enableInstancing) isInstanced = true;
+
+                                    string shaderName = mat.shader != null ? mat.shader.name : string.Empty;
+                                    if (string.IsNullOrEmpty(primaryShader) && !string.IsNullOrEmpty(shaderName))
+                                    {
+                                        primaryShader = shaderName;
+                                    }
+
+                                    if (string.Equals(shaderName, PbrShaderName, StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        hasPbr = true;
+                                        primaryShader = PbrShaderName;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    if (hasSkinned) skinnedCount++;
+                    if (hasStatic && !hasSkinned) staticMeshCount++;
+                    if (hasPbr) pbrShaderCount++;
+
+                    // Rig classification
+                    string rigType = ClassifyRig(go, renderers);
+
+                    // Sockets inspection
+                    var discoveredSockets = new List<string>();
+                    int socketAmbiguities = 0;
+                    InspectSockets(go, discoveredSockets, out socketAmbiguities);
+
+                    // Animator inspection
+                    Animator animator = ResolvePreferredAnimator(go);
+                    bool hasAnimator = animator != null;
+                    bool isAnimatorActive = hasAnimator && animator.isActiveAndEnabled;
+                    string activeClipName = string.Empty;
+                    float clipNormalizedTime = 0f;
+                    float clipSpeed = 1f;
+                    bool isMovingParam = false;
+                    bool fireTriggerParam = false;
+                    bool deathTriggerParam = false;
+
+                    if (hasAnimator)
+                    {
+                        animatedCount++;
+                        try
+                        {
+                            clipSpeed = animator.speed;
+                            AnimatorClipInfo[] clips = animator.GetCurrentAnimatorClipInfo(0);
+                            if (clips != null && clips.Length > 0 && clips[0].clip != null)
+                            {
+                                activeClipName = clips[0].clip.name;
+                            }
+
+                            AnimatorStateInfo stateInfo = animator.GetCurrentAnimatorStateInfo(0);
+                            clipNormalizedTime = stateInfo.normalizedTime;
+
+                            isMovingParam = animator.GetBool(MovementAnimationParameter);
+                            fireTriggerParam = animator.GetBool(FireAnimationParameter);
+                            deathTriggerParam = animator.GetBool(DeathAnimationParameter);
+                        }
+                        catch
+                        {
+                            // Fail-safe degradation
+                        }
+                    }
+
+                    if (unitRows.Count < maxTrackedUnits)
+                    {
+                        string entityKey = ec.UniqueEntityId > 0 ? ec.UniqueEntityId.ToString() : (ec.EntityId ?? go.name);
+                        unitRows.Add(new VisualUnitDiagnosticRow(
+                            entityKey,
+                            ec.EntityId ?? string.Empty,
+                            ec.IsControlledByPlayer,
+                            rigType,
+                            hasAnimator,
+                            isAnimatorActive,
+                            activeClipName,
+                            clipNormalizedTime,
+                            clipSpeed,
+                            isMovingParam,
+                            fireTriggerParam,
+                            deathTriggerParam,
+                            rendererCount,
+                            totalVertexCount,
+                            primaryShader,
+                            hasPbr,
+                            isInstanced,
+                            isVisible,
+                            discoveredSockets.AsReadOnly(),
+                            socketAmbiguities));
+                    }
+                }
+
+                int omittedCount = Math.Max(0, totalCount - unitRows.Count);
+                return new VisualRenderCensus(
+                    omittedCount,
+                    totalCount,
+                    skinnedCount,
+                    staticMeshCount,
+                    animatedCount,
+                    pbrShaderCount,
+                    unitRows.AsReadOnly());
+            }
+            catch
+            {
+                return VisualRenderCensus.Empty;
+            }
+        }
+
+        public static DetailedEntityVisualDiagnostic InspectEntity(string entityKeyId)
+        {
+            if (string.IsNullOrWhiteSpace(entityKeyId))
+            {
+                return DetailedEntityVisualDiagnostic.Failed(entityKeyId, "Entity key ID must not be empty.");
+            }
+
+            try
+            {
+                ExistingControllers existing = ExistingControllers.Instance;
+                if (existing == null)
+                {
+                    return DetailedEntityVisualDiagnostic.Failed(entityKeyId, "ExistingControllers registry unavailable.");
+                }
+
+                EntityController entity = FindEntityByKey(existing, entityKeyId.Trim());
+                if (entity == null || entity.gameObject == null)
+                {
+                    return DetailedEntityVisualDiagnostic.Failed(entityKeyId, "Entity '" + entityKeyId + "' not found on battlefield.");
+                }
+
+                GameObject go = entity.gameObject;
+
+                // 1. Render Details
+                Renderer[] renderers = go.GetComponentsInChildren<Renderer>(true);
+                var rendererRows = new List<VisualRendererDetailRow>();
+                int totalVertexCount = 0;
+                int totalSubmeshCount = 0;
+                float maxBoundsX = 0f;
+                float maxBoundsY = 0f;
+                float maxBoundsZ = 0f;
+
+                if (renderers != null)
+                {
+                    for (int i = 0; i < renderers.Length; i++)
+                    {
+                        Renderer r = renderers[i];
+                        if (r == null) continue;
+
+                        string rName = r.name ?? string.Empty;
+                        string rType = r.GetType().Name;
+                        bool enabled = r.enabled;
+                        bool isVisible = r.isVisible;
+                        string meshName = string.Empty;
+                        int vCount = 0;
+                        int sCount = 0;
+
+                        if (r is SkinnedMeshRenderer smr && smr.sharedMesh != null)
+                        {
+                            meshName = smr.sharedMesh.name;
+                            vCount = smr.sharedMesh.vertexCount;
+                            sCount = smr.sharedMesh.subMeshCount;
+                        }
+                        else if (r is MeshRenderer)
+                        {
+                            MeshFilter mf = r.GetComponent<MeshFilter>();
+                            if (mf != null && mf.sharedMesh != null)
+                            {
+                                meshName = mf.sharedMesh.name;
+                                vCount = mf.sharedMesh.vertexCount;
+                                sCount = mf.sharedMesh.subMeshCount;
+                            }
+                        }
+
+                        totalVertexCount += vCount;
+                        totalSubmeshCount += sCount;
+
+                        Bounds b = r.bounds;
+                        if (b.size.x > maxBoundsX) maxBoundsX = b.size.x;
+                        if (b.size.y > maxBoundsY) maxBoundsY = b.size.y;
+                        if (b.size.z > maxBoundsZ) maxBoundsZ = b.size.z;
+
+                        var matNames = new List<string>();
+                        var shaderNames = new List<string>();
+                        var keywordList = new List<string>();
+                        bool isInstanced = false;
+
+                        Material[] mats = r.sharedMaterials;
+                        if (mats != null)
+                        {
+                            for (int mIdx = 0; mIdx < mats.Length; mIdx++)
+                            {
+                                Material mat = mats[mIdx];
+                                if (mat == null) continue;
+                                if (!string.IsNullOrEmpty(mat.name)) matNames.Add(mat.name);
+                                if (mat.shader != null && !string.IsNullOrEmpty(mat.shader.name))
+                                {
+                                    shaderNames.Add(mat.shader.name);
+                                }
+                                if (mat.enableInstancing) isInstanced = true;
+                                if (mat.shaderKeywords != null)
+                                {
+                                    for (int k = 0; k < mat.shaderKeywords.Length; k++)
+                                    {
+                                        string kw = mat.shaderKeywords[k];
+                                        if (!string.IsNullOrEmpty(kw) && !keywordList.Contains(kw))
+                                        {
+                                            keywordList.Add(kw);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        rendererRows.Add(new VisualRendererDetailRow(
+                            rName,
+                            rType,
+                            enabled,
+                            isVisible,
+                            meshName,
+                            vCount,
+                            sCount,
+                            matNames.AsReadOnly(),
+                            shaderNames.AsReadOnly(),
+                            keywordList.AsReadOnly(),
+                            isInstanced));
+                    }
+                }
+
+                LODGroup lod = go.GetComponentInChildren<LODGroup>(true);
+                bool hasLod = lod != null;
+                int lodCount = hasLod ? lod.lodCount : 0;
+
+                // 2. Rig & Socket Details
+                string rigType = ClassifyRig(go, renderers);
+                string rootBoneName = string.Empty;
+                var boneNames = new List<string>();
+                InspectBones(go, renderers, out rootBoneName, boneNames);
+
+                var socketRows = new List<VisualSocketDetailRow>();
+                InspectDetailedSockets(go, socketRows);
+
+                // 3. Animation Details
+                Animator animator = ResolvePreferredAnimator(go);
+                bool hasAnimator = animator != null;
+                bool isAnimatorActive = hasAnimator && animator.isActiveAndEnabled;
+                string controllerName = string.Empty;
+                string avatarName = string.Empty;
+                bool avatarValid = false;
+                string currentStateName = string.Empty;
+                string activeClipName = string.Empty;
+                float clipLength = 0f;
+                float normalizedTime = 0f;
+                float speed = 1f;
+                var paramRows = new List<VisualAnimationParameterRow>();
+
+                if (hasAnimator)
+                {
+                    try
+                    {
+                        if (animator.runtimeAnimatorController != null)
+                        {
+                            controllerName = animator.runtimeAnimatorController.name ?? string.Empty;
+                        }
+
+                        if (animator.avatar != null)
+                        {
+                            avatarName = animator.avatar.name ?? string.Empty;
+                            avatarValid = animator.avatar.isValid;
+                        }
+
+                        speed = animator.speed;
+
+                        AnimatorClipInfo[] clips = animator.GetCurrentAnimatorClipInfo(0);
+                        if (clips != null && clips.Length > 0 && clips[0].clip != null)
+                        {
+                            activeClipName = clips[0].clip.name ?? string.Empty;
+                            clipLength = clips[0].clip.length;
+                        }
+
+                        AnimatorStateInfo stateInfo = animator.GetCurrentAnimatorStateInfo(0);
+                        normalizedTime = stateInfo.normalizedTime;
+
+                        if (animator.parameters != null)
+                        {
+                            for (int p = 0; p < animator.parameters.Length; p++)
+                            {
+                                AnimatorControllerParameter param = animator.parameters[p];
+                                if (param == null || string.IsNullOrEmpty(param.name)) continue;
+
+                                string pType = param.type.ToString();
+                                string valStr = string.Empty;
+                                if (param.type == AnimatorControllerParameterType.Bool)
+                                {
+                                    valStr = animator.GetBool(param.name) ? "true" : "false";
+                                }
+                                else if (param.type == AnimatorControllerParameterType.Float)
+                                {
+                                    valStr = animator.GetFloat(param.name).ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
+                                }
+                                else if (param.type == AnimatorControllerParameterType.Int)
+                                {
+                                    valStr = animator.GetInteger(param.name).ToString();
+                                }
+                                else if (param.type == AnimatorControllerParameterType.Trigger)
+                                {
+                                    valStr = animator.GetBool(param.name) ? "triggered" : "idle";
+                                }
+
+                                paramRows.Add(new VisualAnimationParameterRow(param.name, pType, valStr));
+                            }
+                        }
+                    }
+                    catch
+                    {
+                        // Fail-safe degradation
+                    }
+                }
+
+                // 4. RuntimeVisualDirector Details
+                bool hasDirector;
+                bool isDamaged;
+                bool isCritical;
+                bool isJammed;
+                float recoil;
+                float doorProgress;
+                InspectVisualDirector(go, out hasDirector, out isDamaged, out isCritical, out isJammed, out recoil, out doorProgress);
+
+                return new DetailedEntityVisualDiagnostic(
+                    true,
+                    entityKeyId,
+                    entity.EntityId ?? string.Empty,
+                    "Visual evidence successfully collected.",
+                    renderers != null ? renderers.Length : 0,
+                    totalVertexCount,
+                    totalSubmeshCount,
+                    maxBoundsX,
+                    maxBoundsY,
+                    maxBoundsZ,
+                    hasLod,
+                    lodCount,
+                    rendererRows.AsReadOnly(),
+                    rigType,
+                    rootBoneName,
+                    boneNames.Count,
+                    boneNames.AsReadOnly(),
+                    socketRows.AsReadOnly(),
+                    hasAnimator,
+                    isAnimatorActive,
+                    controllerName,
+                    avatarName,
+                    avatarValid,
+                    currentStateName,
+                    activeClipName,
+                    clipLength,
+                    normalizedTime,
+                    speed,
+                    paramRows.AsReadOnly(),
+                    hasDirector,
+                    isDamaged,
+                    isCritical,
+                    isJammed,
+                    recoil,
+                    doorProgress);
+            }
+            catch (Exception ex)
+            {
+                return DetailedEntityVisualDiagnostic.Failed(entityKeyId, "Inspection error: " + ex.Message);
+            }
+        }
+
+        private static string ClassifyRig(GameObject go, Renderer[] renderers)
+        {
+            if (go == null) return "StaticVehicle";
+
+            // 1. SkeletalArmature check: has SkinnedMeshRenderer with bones or contains Bone_* transforms
+            if (renderers != null)
+            {
+                for (int i = 0; i < renderers.Length; i++)
+                {
+                    if (renderers[i] is SkinnedMeshRenderer smr)
+                    {
+                        if (smr.bones != null && smr.bones.Length > 0)
+                        {
+                            return "SkeletalArmature";
+                        }
+                    }
+                }
+            }
+
+            Transform[] allTransforms = go.GetComponentsInChildren<Transform>(true);
+            if (allTransforms != null)
+            {
+                bool hasRotHor = false;
+                bool hasRotVert = false;
+                bool hasLegs = false;
+
+                for (int i = 0; i < allTransforms.Length; i++)
+                {
+                    Transform t = allTransforms[i];
+                    if (t == null) continue;
+                    string name = t.name ?? string.Empty;
+
+                    if (name.StartsWith("Bone_", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(name, "Armature", StringComparison.OrdinalIgnoreCase))
+                    {
+                        return "SkeletalArmature";
+                    }
+
+                    if (name.IndexOf("RotHor", StringComparison.OrdinalIgnoreCase) >= 0) hasRotHor = true;
+                    if (name.IndexOf("RotVert", StringComparison.OrdinalIgnoreCase) >= 0) hasRotVert = true;
+                    if (name.IndexOf("LEGS", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                        name.IndexOf("Legs", StringComparison.OrdinalIgnoreCase) >= 0) hasLegs = true;
+                }
+
+                if (hasRotHor || hasRotVert || hasLegs)
+                {
+                    return "NativeTransformRig";
+                }
+            }
+
+            return "StaticVehicle";
+        }
+
+        private static void InspectBones(GameObject go, Renderer[] renderers, out string rootBoneName, List<string> boneNames)
+        {
+            rootBoneName = string.Empty;
+            if (go == null) return;
+
+            if (renderers != null)
+            {
+                for (int i = 0; i < renderers.Length; i++)
+                {
+                    if (renderers[i] is SkinnedMeshRenderer smr)
+                    {
+                        if (smr.rootBone != null && string.IsNullOrEmpty(rootBoneName))
+                        {
+                            rootBoneName = smr.rootBone.name ?? string.Empty;
+                        }
+
+                        if (smr.bones != null)
+                        {
+                            for (int b = 0; b < smr.bones.Length; b++)
+                            {
+                                Transform bone = smr.bones[b];
+                                if (bone != null && !string.IsNullOrEmpty(bone.name) && !boneNames.Contains(bone.name))
+                                {
+                                    boneNames.Add(bone.name);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (boneNames.Count == 0)
+            {
+                Transform[] transforms = go.GetComponentsInChildren<Transform>(true);
+                if (transforms != null)
+                {
+                    for (int i = 0; i < transforms.Length; i++)
+                    {
+                        Transform t = transforms[i];
+                        if (t != null && t.name.StartsWith("Bone_", StringComparison.OrdinalIgnoreCase))
+                        {
+                            if (string.IsNullOrEmpty(rootBoneName) &&
+                                (string.Equals(t.name, "Bone_Root", StringComparison.OrdinalIgnoreCase) ||
+                                 string.Equals(t.name, "Bone_Pelvis", StringComparison.OrdinalIgnoreCase)))
+                            {
+                                rootBoneName = t.name;
+                            }
+                            if (!boneNames.Contains(t.name))
+                            {
+                                boneNames.Add(t.name);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        private static void InspectSockets(GameObject go, List<string> discoveredSockets, out int socketAmbiguityCount)
+        {
+            socketAmbiguityCount = 0;
+            if (go == null) return;
+
+            Transform[] transforms = go.GetComponentsInChildren<Transform>(true);
+            if (transforms == null) return;
+
+            var roleCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+            for (int i = 0; i < transforms.Length; i++)
+            {
+                Transform t = transforms[i];
+                if (t == null) continue;
+                string tName = t.name ?? string.Empty;
+
+                string canonicalRole;
+                if (RogueCommandSocketCatalog.TryResolveCanonicalSocketName(tName, out canonicalRole))
+                {
+                    if (!discoveredSockets.Contains(canonicalRole))
+                    {
+                        discoveredSockets.Add(canonicalRole);
+                    }
+
+                    int count;
+                    roleCounts.TryGetValue(canonicalRole, out count);
+                    roleCounts[canonicalRole] = count + 1;
+                }
+                else if (tName.StartsWith("FirePoint_", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (!discoveredSockets.Contains(tName))
+                    {
+                        discoveredSockets.Add(tName);
+                    }
+
+                    int count;
+                    roleCounts.TryGetValue(tName, out count);
+                    roleCounts[tName] = count + 1;
+                }
+            }
+
+            foreach (KeyValuePair<string, int> pair in roleCounts)
+            {
+                if (pair.Value > 1)
+                {
+                    socketAmbiguityCount++;
+                }
+            }
+        }
+
+        private static void InspectDetailedSockets(GameObject go, List<VisualSocketDetailRow> socketRows)
+        {
+            if (go == null) return;
+
+            Transform[] transforms = go.GetComponentsInChildren<Transform>(true);
+            if (transforms == null) return;
+
+            var roleOccurrences = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+            for (int i = 0; i < transforms.Length; i++)
+            {
+                Transform t = transforms[i];
+                if (t == null) continue;
+                string tName = t.name ?? string.Empty;
+
+                string canonicalRole;
+                if (RogueCommandSocketCatalog.TryResolveCanonicalSocketName(tName, out canonicalRole))
+                {
+                    int count;
+                    roleOccurrences.TryGetValue(canonicalRole, out count);
+                    roleOccurrences[canonicalRole] = count + 1;
+                }
+                else if (tName.StartsWith("FirePoint_", StringComparison.OrdinalIgnoreCase))
+                {
+                    int count;
+                    roleOccurrences.TryGetValue(tName, out count);
+                    roleOccurrences[tName] = count + 1;
+                }
+            }
+
+            for (int i = 0; i < transforms.Length; i++)
+            {
+                Transform t = transforms[i];
+                if (t == null) continue;
+                string tName = t.name ?? string.Empty;
+
+                string canonicalRole;
+                bool isSocket = RogueCommandSocketCatalog.TryResolveCanonicalSocketName(tName, out canonicalRole);
+                if (!isSocket && tName.StartsWith("FirePoint_", StringComparison.OrdinalIgnoreCase))
+                {
+                    canonicalRole = tName;
+                    isSocket = true;
+                }
+
+                if (isSocket)
+                {
+                    int totalForRole = roleOccurrences.TryGetValue(canonicalRole, out int c) ? c : 1;
+                    bool isAmbiguous = totalForRole > 1;
+
+                    Vector3 pos = t.localPosition;
+                    Vector3 rot = t.localEulerAngles;
+
+                    socketRows.Add(new VisualSocketDetailRow(
+                        tName,
+                        canonicalRole,
+                        pos.x,
+                        pos.y,
+                        pos.z,
+                        rot.x,
+                        rot.y,
+                        rot.z,
+                        isAmbiguous,
+                        totalForRole));
+                }
+            }
+        }
+
+        private static Animator ResolvePreferredAnimator(GameObject go)
+        {
+            if (go == null) return null;
+
+            Transform[] transforms = go.GetComponentsInChildren<Transform>(true);
+            if (transforms != null)
+            {
+                for (int i = 0; i < transforms.Length; i++)
+                {
+                    Transform candidate = transforms[i];
+                    if (candidate != null && candidate.name.StartsWith("RCL_Visual_", StringComparison.OrdinalIgnoreCase))
+                    {
+                        Animator anim = candidate.GetComponentInChildren<Animator>(true);
+                        if (anim != null && anim.runtimeAnimatorController != null)
+                        {
+                            return anim;
+                        }
+                    }
+                }
+            }
+
+            return go.GetComponentInChildren<Animator>(true);
+        }
+
+        private static void InspectVisualDirector(
+            GameObject go,
+            out bool hasDirector,
+            out bool isDamaged,
+            out bool isCritical,
+            out bool isJammed,
+            out float recoil,
+            out float doorProgress)
+        {
+            hasDirector = false;
+            isDamaged = false;
+            isCritical = false;
+            isJammed = false;
+            recoil = 0f;
+            doorProgress = 0f;
+
+            if (go == null) return;
+
+            try
+            {
+                Component director = go.GetComponent("RuntimeVisualDirector");
+                if (director != null)
+                {
+                    hasDirector = true;
+                    Type dirType = director.GetType();
+                    BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
+
+                    FieldInfo damF = dirType.GetField("_isDamagedStateActive", flags);
+                    if (damF != null) isDamaged = Convert.ToBoolean(damF.GetValue(director));
+
+                    FieldInfo critF = dirType.GetField("_isCriticalStateActive", flags);
+                    if (critF != null) isCritical = Convert.ToBoolean(critF.GetValue(director));
+
+                    FieldInfo jamF = dirType.GetField("_isTurretJammed", flags);
+                    if (jamF != null) isJammed = Convert.ToBoolean(jamF.GetValue(director));
+
+                    FieldInfo recF = dirType.GetField("_currentRecoilOffset", flags);
+                    if (recF != null) recoil = Convert.ToSingle(recF.GetValue(director));
+
+                    FieldInfo doorF = dirType.GetField("_doorOpenProgress", flags);
+                    if (doorF != null) doorProgress = Convert.ToSingle(doorF.GetValue(director));
+                }
+            }
+            catch
+            {
+                // Degrade gracefully
+            }
+        }
+
+        private static EntityController FindEntityByKey(ExistingControllers existing, string key)
+        {
+            if (existing == null || string.IsNullOrWhiteSpace(key)) return null;
+
+            var candidates = new List<EntityController>();
+            try
+            {
+                HashSet<EntityController> playerUnits = existing.PlayerUnits();
+                if (playerUnits != null) candidates.AddRange(playerUnits);
+
+                HashSet<EntityController> aiUnits = existing.AiUnits();
+                if (aiUnits != null) candidates.AddRange(aiUnits);
+
+                HashSet<EntityController> aiBuildings = existing.AiBuildings();
+                if (aiBuildings != null) candidates.AddRange(aiBuildings);
+
+                HashSet<EntityController> playerBuildings = existing.PlayerBuildings();
+                if (playerBuildings != null) candidates.AddRange(playerBuildings);
+
+                HashSet<EntityController> knownBuildings = existing.PlayerBuildingsKnownToAi();
+                if (knownBuildings != null) candidates.AddRange(knownBuildings);
+
+                EntityController hq = existing.EngineeringHq();
+                if (hq != null) candidates.Add(hq);
+
+                HashSet<EntityController> harvesters = existing.Harvesters;
+                if (harvesters != null) candidates.AddRange(harvesters);
+            }
+            catch
+            {
+                // Degrade gracefully
+            }
+
+            for (int i = 0; i < candidates.Count; i++)
+            {
+                EntityController ec = candidates[i];
+                if (ec == null || ec.IsDestroyed || ec.DestroyHasBeenStarted) continue;
+
+                string id = ec.EntityId ?? string.Empty;
+                string name = ec.name ?? string.Empty;
+                string uniqueId = ec.UniqueEntityId > 0 ? ec.UniqueEntityId.ToString() : string.Empty;
+
+                if (string.Equals(id, key, StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(name, key, StringComparison.OrdinalIgnoreCase) ||
+                    (!string.IsNullOrEmpty(uniqueId) && string.Equals(uniqueId, key, StringComparison.OrdinalIgnoreCase)))
+                {
+                    return ec;
+                }
+            }
+
+            return null;
+        }
+    }
+}

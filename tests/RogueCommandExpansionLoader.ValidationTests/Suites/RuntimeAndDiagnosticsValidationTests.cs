@@ -5542,6 +5542,86 @@ internal static partial class ValidationTestRunner
             RuntimeGameplayCommandDirector.ClearUnitLoadouts();
         }
     }),
+    ("runtime declared unit variants are selectable through the loadout director and replace stale modifiers", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        RuntimeGameplayCommandDirector.ClearUnitLoadouts();
+        RuntimeUnitVariantRegistry.Clear();
+        try
+        {
+            RuntimeUnitVariantRegistry.Register(
+                "sample-native:declared-variant",
+                new[]
+                {
+                    new RuntimeUnitVariant(
+                        "ap",
+                        "AP",
+                        new[]
+                        {
+                            new RuntimeUnitVariantOverride("damage1", "20"),
+                            new RuntimeUnitVariantOverride("attack1Cooldown", "0.5")
+                        }),
+                    new RuntimeUnitVariant(
+                        "scout",
+                        "",
+                        new[]
+                        {
+                            new RuntimeUnitVariantOverride("moveSpeed", "15"),
+                            new RuntimeUnitVariantOverride("weaponRange", "20")
+                        })
+                });
+
+            var unit = new EntityController
+            {
+                entityId = "sample-native:declared-variant",
+                UniqueEntityId = 883,
+                IsControlledByPlayer = true,
+                IsUnit = true,
+                Damage1 = 10f,
+                Attack1Cooldown = 1f,
+                MoveSpeed = 10f,
+                WeaponRange = 10f
+            };
+            ExistingControllers.Instance.PlayerUnits().Add(unit);
+
+            UnitLoadoutResult ap = RuntimeGameplayCommandDirector.TryApplyUnitLoadout("883", "ap");
+            if (!ap.Success || !string.Equals(ap.LoadoutId, "ap", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException("A declared unit variant should be selectable through TryApplyUnitLoadout.");
+            }
+
+            var apDamage = unit.AppliedSpecificValueChanges.Single(c => c.Value == EntityController.ChangeableValue.Damage);
+            var apCooldown = unit.AppliedSpecificValueChanges.Single(c => c.Value == EntityController.ChangeableValue.AttackCooldown);
+            if (Math.Abs(apDamage.Change.ValueToAdd - 1f) > 0.0001f || Math.Abs(apCooldown.Change.ValueToAdd + 0.5f) > 0.0001f)
+            {
+                throw new InvalidOperationException("Declared absolute balance overrides must be converted to relative runtime modifiers.");
+            }
+
+            UnitLoadoutResult scout = RuntimeGameplayCommandDirector.TryApplyUnitLoadout("883", "scout");
+            if (!scout.Success || !string.Equals(RuntimeGameplayCommandDirector.GetActiveUnitVariant("883"), "scout", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException("Switching to a declared variant should update the active loadout census state.");
+            }
+
+            if (unit.AppliedSpecificValueChanges.Count(c => c.Value == EntityController.ChangeableValue.Damage) != 1 ||
+                unit.AppliedSpecificValueChanges.Any(c => c.Value == EntityController.ChangeableValue.Damage && Math.Abs(c.Change.ValueToAdd) > 0.0001f))
+            {
+                throw new InvalidOperationException("Switching declared variants must neutralize the previous damage modifier.");
+            }
+
+            UnitLoadoutResult unsupported = RuntimeGameplayCommandDirector.TryApplyUnitLoadout("883", "unsupported");
+            if (unsupported.Success || unsupported.Message.IndexOf("not supported", StringComparison.OrdinalIgnoreCase) < 0)
+            {
+                throw new InvalidOperationException("Unknown declared variants must fail closed rather than becoming generic presets.");
+            }
+        }
+        finally
+        {
+            ExistingControllers.Instance.Reset();
+            RuntimeGameplayCommandDirector.ClearUnitLoadouts();
+            RuntimeUnitVariantRegistry.Clear();
+        }
+    }),
     ("runtime AI doctrine coordinator and deck reinforcement dynamically modulate doctrine and base quotas", () =>
     {
         RuntimeGameplayCommandDirector.ClearAiDoctrineAndDeckEntries();
@@ -6371,6 +6451,338 @@ internal static partial class ValidationTestRunner
         }
 
         RuntimeGameplayCommandDirector.TrySetAiDoctrine("Standard", 1.0f);
+    }),
+    ("runtime visual census discovers skinned mesh, skeletal armature, animator parameters, and canonical sockets", () =>
+    {
+        ExistingControllers.Instance.Reset();
+
+        // 1. Setup Skeletal Armature Unit with Animator, SkinnedMeshRenderer, and canonical sockets
+        var goA = new GameObject("RCL_Unit_ArachnidTank");
+        var unitA = new EntityController
+        {
+            entityId = "RCL_Unit_ArachnidTank",
+            UniqueEntityId = 991,
+            IsControlledByPlayer = true,
+            IsUnit = true,
+            gameObject = goA
+        };
+
+        var visualRoot = new GameObject("RCL_Visual_Arachnid");
+        visualRoot.transform.parent = goA.transform;
+
+        var anim = visualRoot.AddComponent<Animator>();
+        anim.parameters = new[]
+        {
+            new AnimatorControllerParameter { name = "RCL_IsMoving", type = AnimatorControllerParameterType.Bool, defaultBool = true },
+            new AnimatorControllerParameter { name = "RCL_Fire", type = AnimatorControllerParameterType.Trigger },
+            new AnimatorControllerParameter { name = "RCL_Death", type = AnimatorControllerParameterType.Trigger }
+        };
+        anim.SetBool("RCL_IsMoving", true);
+        anim.activeClip = new AnimationClip { name = "Action_Walk", length = 1.25f };
+        anim.activeStateInfo = new AnimatorStateInfo("Walk", 0.45f, 1f);
+
+        // Canonical sockets and anchors
+        var muzzleSock = new GameObject("Socket_MuzzlePrimary");
+        muzzleSock.transform.parent = goA.transform;
+        var firePoint = new GameObject("FirePoint_0");
+        firePoint.transform.parent = muzzleSock.transform;
+        var audioSock = new GameObject("Socket_EngineAudio");
+        audioSock.transform.parent = goA.transform;
+
+        // Armature bones
+        var boneRoot = new GameObject("Bone_Root");
+        boneRoot.transform.parent = goA.transform;
+        var bonePelvis = new GameObject("Bone_Pelvis");
+        bonePelvis.transform.parent = boneRoot.transform;
+        var boneThigh = new GameObject("Bone_Thigh_L1");
+        boneThigh.transform.parent = bonePelvis.transform;
+
+        // SkinnedMeshRenderer
+        var smrObj = new GameObject("Arachnid_MeshObject");
+        smrObj.transform.parent = visualRoot.transform;
+        var smr = smrObj.AddComponent<SkinnedMeshRenderer>();
+        smr.sharedMesh = new Mesh { name = "Arachnid_Mesh", vertexCount = 3500, subMeshCount = 1 };
+        smr.rootBone = boneRoot.transform;
+        smr.bones = new[] { boneRoot.transform, bonePelvis.transform, boneThigh.transform };
+        smr.sharedMaterials = new[]
+        {
+            new Material
+            {
+                name = "M_Arachnid_Atlas",
+                shader = new Shader { name = "RogueCommand/VehiclePBR_VertexWear" },
+                shaderKeywords = new[] { "_METALLICSPECGLOSSMAP", "_NORMALMAP" },
+                enableInstancing = true
+            }
+        };
+
+        // 2. Setup NativeTransformRig Unit
+        var goB = new GameObject("sample_native_walker");
+        var unitB = new EntityController
+        {
+            entityId = "sample:native-walker",
+            UniqueEntityId = 992,
+            IsControlledByPlayer = false,
+            IsUnit = true,
+            gameObject = goB
+        };
+        var rotHor = new GameObject("RotHor");
+        rotHor.transform.parent = goB.transform;
+        var rotVert = new GameObject("RotVert");
+        rotVert.transform.parent = rotHor.transform;
+        var legs = new GameObject("LEGS");
+        legs.transform.parent = goB.transform;
+
+        var mf = goB.AddComponent<MeshFilter>();
+        mf.sharedMesh = new Mesh { name = "Walker_Mesh", vertexCount = 1200, subMeshCount = 1 };
+        var mr = goB.AddComponent<MeshRenderer>();
+        mr.sharedMaterials = new[]
+        {
+            new Material
+            {
+                name = "M_Walker",
+                shader = new Shader { name = "Shader Graphs/EntityColorShader" }
+            }
+        };
+
+        ExistingControllers.Instance.PlayerUnits().Add(unitA);
+        ExistingControllers.Instance.AiUnits().Add(unitB);
+
+        // 3. Collect Visual Census
+        VisualRenderCensus census = RuntimeGameplayCommandDirector.GetVisualRenderCensus(32);
+        if (census.TotalTrackedUnits != 2)
+        {
+            throw new InvalidOperationException($"Expected 2 total tracked units, got {census.TotalTrackedUnits}");
+        }
+        if (census.SkinnedMeshCount != 1)
+        {
+            throw new InvalidOperationException($"Expected 1 skinned mesh unit, got {census.SkinnedMeshCount}");
+        }
+        if (census.StaticMeshCount != 1)
+        {
+            throw new InvalidOperationException($"Expected 1 static mesh unit, got {census.StaticMeshCount}");
+        }
+        if (census.AnimatedUnitCount != 1)
+        {
+            throw new InvalidOperationException($"Expected 1 animated unit, got {census.AnimatedUnitCount}");
+        }
+        if (census.PbrShaderCount != 1)
+        {
+            throw new InvalidOperationException($"Expected 1 PBR shader unit, got {census.PbrShaderCount}");
+        }
+
+        // Verify Unit A row
+        VisualUnitDiagnosticRow rowA = census.UnitRows[0];
+        if (rowA.RigType != "SkeletalArmature")
+        {
+            throw new InvalidOperationException($"Unit A expected SkeletalArmature rig, got {rowA.RigType}");
+        }
+        if (!rowA.HasAnimator || !rowA.IsMovingParam)
+        {
+            throw new InvalidOperationException("Unit A should have active animator with RCL_IsMoving = true");
+        }
+        if (rowA.ActiveClipName != "Action_Walk")
+        {
+            throw new InvalidOperationException($"Unit A expected active clip Action_Walk, got {rowA.ActiveClipName}");
+        }
+        if (rowA.TotalVertexCount != 3500)
+        {
+            throw new InvalidOperationException($"Unit A expected 3500 vertices, got {rowA.TotalVertexCount}");
+        }
+        if (rowA.PrimaryShaderName != "RogueCommand/VehiclePBR_VertexWear" || !rowA.HasPbrKeywords || !rowA.IsGpuInstanced)
+        {
+            throw new InvalidOperationException("Unit A expected PBR shader with keywords and GPU instancing.");
+        }
+        if (!rowA.DiscoveredSockets.Contains("Socket_MuzzlePrimary") || !rowA.DiscoveredSockets.Contains("FirePoint_0") || !rowA.DiscoveredSockets.Contains("Socket_EngineAudio"))
+        {
+            throw new InvalidOperationException("Unit A expected canonical sockets Socket_MuzzlePrimary, FirePoint_0, and Socket_EngineAudio.");
+        }
+
+        // Verify Unit B row
+        VisualUnitDiagnosticRow rowB = census.UnitRows[1];
+        if (rowB.RigType != "NativeTransformRig")
+        {
+            throw new InvalidOperationException($"Unit B expected NativeTransformRig, got {rowB.RigType}");
+        }
+        if (rowB.TotalVertexCount != 1200)
+        {
+            throw new InvalidOperationException($"Unit B expected 1200 vertices, got {rowB.TotalVertexCount}");
+        }
+
+        ExistingControllers.Instance.Reset();
+    }),
+    ("detailed entity visual inspection extracts renderer details, bone names, and socket ambiguity", () =>
+    {
+        ExistingControllers.Instance.Reset();
+
+        var go = new GameObject("RCL_Unit_AmbiguousTest");
+        var unit = new EntityController
+        {
+            entityId = "RCL_Unit_AmbiguousTest",
+            UniqueEntityId = 993,
+            IsControlledByPlayer = true,
+            IsUnit = true,
+            gameObject = go
+        };
+
+        // Add duplicate canonical socket transforms to trigger socket ambiguity detection
+        var sock1 = new GameObject("Socket_MuzzlePrimary");
+        sock1.transform.parent = go.transform;
+        sock1.transform.localPosition = new Vector3(0f, 1f, 2f);
+
+        var sock2 = new GameObject("Socket_MuzzlePrimary");
+        sock2.transform.parent = go.transform;
+        sock2.transform.localPosition = new Vector3(1f, 1f, 2f);
+
+        // Add LODGroup
+        var lod = go.AddComponent<LODGroup>();
+        lod.lodCount = 3;
+
+        ExistingControllers.Instance.PlayerUnits().Add(unit);
+
+        DetailedEntityVisualDiagnostic diag = RuntimeGameplayCommandDirector.InspectEntityVisual("993");
+        if (!diag.Success)
+        {
+            throw new InvalidOperationException($"Expected inspection success for unit 993, message: {diag.Message}");
+        }
+        if (!diag.HasLODGroup || diag.LODCount != 3)
+        {
+            throw new InvalidOperationException($"Expected LODGroup with 3 levels, got hasLod={diag.HasLODGroup}, count={diag.LODCount}");
+        }
+
+        bool foundAmbiguousSocket = false;
+        for (int s = 0; s < diag.Sockets.Count; s++)
+        {
+            if (diag.Sockets[s].CanonicalRole == "Socket_MuzzlePrimary" && diag.Sockets[s].IsAmbiguous && diag.Sockets[s].DuplicateCount == 2)
+            {
+                foundAmbiguousSocket = true;
+                break;
+            }
+        }
+        if (!foundAmbiguousSocket)
+        {
+            throw new InvalidOperationException("Detailed visual inspection should detect ambiguous duplicate Socket_MuzzlePrimary.");
+        }
+
+        // Test non-existent unit inspection
+        DetailedEntityVisualDiagnostic missing = RuntimeGameplayCommandDirector.InspectEntityVisual("unknown_nonexistent_unit");
+        if (missing.Success)
+        {
+            throw new InvalidOperationException("Inspecting non-existent unit should report failure.");
+        }
+        if (!missing.Message.Contains("not found"))
+        {
+            throw new InvalidOperationException($"Failure message should explain unit not found, got: '{missing.Message}'");
+        }
+
+        ExistingControllers.Instance.Reset();
+    }),
+    ("diagnostics formatter serializes visual render census and detailed entity diagnostics", () =>
+    {
+        var row = new VisualUnitDiagnosticRow(
+            "995", "unit:test", true, "SkeletalArmature",
+            true, true, "Action_Walk", 0.5f, 1.0f,
+            true, false, false, 1, 2400,
+            "RogueCommand/VehiclePBR_VertexWear", true, true, true,
+            new[] { "Socket_MuzzlePrimary", "FirePoint_0" }, 0);
+
+        var census = new VisualRenderCensus(
+            omittedUnitCount: 2,
+            totalTrackedUnits: 3,
+            skinnedMeshCount: 1,
+            staticMeshCount: 2,
+            animatedUnitCount: 1,
+            pbrShaderCount: 1,
+            new[] { row });
+
+        string json = AgentDiagnosticsFormatter.SerializeVisualRenderCensus(census);
+        if (!json.Contains("\"kind\":\"visualRenderCensus\""))
+        {
+            throw new InvalidOperationException($"JSON should have kind visualRenderCensus, got: {json}");
+        }
+
+        int omittedPos = json.IndexOf("\"omittedUnitCount\":2", StringComparison.Ordinal);
+        int rowsPos = json.IndexOf("\"unitRows\"", StringComparison.Ordinal);
+        if (omittedPos < 0 || rowsPos < 0 || omittedPos > rowsPos)
+        {
+            throw new InvalidOperationException("Omission counter omittedUnitCount must strictly precede unitRows in serialized JSON.");
+        }
+
+        // Test detailed entity diagnostic serialization
+        var diag = new DetailedEntityVisualDiagnostic(
+            true, "995", "unit:test", "Inspected successfully",
+            1, 2400, 1, 2.0f, 1.5f, 3.0f, true, 2,
+            new[] { new VisualRendererDetailRow("TestMesh", "SkinnedMeshRenderer", true, true, "Mesh0", 2400, 1, new[] { "M_PBR" }, new[] { "RogueCommand/VehiclePBR_VertexWear" }, new[] { "_NORMALMAP" }, true) },
+            "SkeletalArmature", "Bone_Root", 3, new[] { "Bone_Root", "Bone_Pelvis", "Bone_Foot" },
+            new[] { new VisualSocketDetailRow("Socket_MuzzlePrimary", "Socket_MuzzlePrimary", 0f, 1f, 2f, 0f, 0f, 0f, false, 1) },
+            true, true, "Controller_Walker", "Avatar_Walker", true,
+            "Walk", "Action_Walk", 1.0f, 0.5f, 1.0f,
+            new[] { new VisualAnimationParameterRow("RCL_IsMoving", "Bool", "true") },
+            true, false, false, false, 0f, 0f);
+
+        string diagJson = AgentDiagnosticsFormatter.SerializeDetailedEntityVisualDiagnostic(diag);
+        if (!diagJson.Contains("\"kind\":\"detailedEntityVisualDiagnostic\"") || !diagJson.Contains("\"render\":") || !diagJson.Contains("\"rig\":") || !diagJson.Contains("\"animation\":") || !diagJson.Contains("\"director\":"))
+        {
+            throw new InvalidOperationException($"Detailed diagnostic JSON missing required sections: {diagJson}");
+        }
+    }),
+    ("visual render census exposes living visual metrics and formats correctly", () =>
+    {
+        ExistingControllers.Instance.Reset();
+
+        var go = new GameObject("RCL_Scalar_Test");
+        var unit = new EntityController
+        {
+            entityId = "RCL_Scalar_Test",
+            UniqueEntityId = 998,
+            IsControlledByPlayer = true,
+            IsUnit = true,
+            gameObject = go
+        };
+
+        var smr = go.AddComponent<SkinnedMeshRenderer>();
+        smr.sharedMesh = new Mesh { name = "MeshScalar", vertexCount = 500 };
+        smr.sharedMaterials = new[]
+        {
+            new Material
+            {
+                name = "M_Pbr",
+                shader = new Shader { name = "RogueCommand/VehiclePBR_VertexWear" }
+            }
+        };
+
+        var anim = go.AddComponent<Animator>();
+        anim.activeClip = new AnimationClip { name = "Action_Walk", length = 1.0f };
+
+        ExistingControllers.Instance.PlayerUnits().Add(unit);
+
+        VisualRenderCensus census = RuntimeVisualCensus.Current(32);
+        if (census.SkinnedMeshCount != 1)
+        {
+            throw new InvalidOperationException($"Expected 1 live skinned mesh unit, got {census.SkinnedMeshCount}");
+        }
+        if (census.AnimatedUnitCount != 1)
+        {
+            throw new InvalidOperationException($"Expected 1 live animated unit, got {census.AnimatedUnitCount}");
+        }
+        if (census.PbrShaderCount != 1)
+        {
+            throw new InvalidOperationException($"Expected 1 live PBR shader unit, got {census.PbrShaderCount}");
+        }
+
+        string censusJson = AgentDiagnosticsFormatter.SerializeVisualRenderCensus(census);
+        if (!censusJson.Contains("\"kind\":\"visualRenderCensus\"") || !censusJson.Contains("RCL_Scalar_Test"))
+        {
+            throw new InvalidOperationException($"Census JSON missing expected content: {censusJson}");
+        }
+
+        DetailedEntityVisualDiagnostic diag = RuntimeGameplayCommandDirector.InspectEntityVisual("998");
+        string inspectJson = AgentDiagnosticsFormatter.SerializeDetailedEntityVisualDiagnostic(diag);
+        if (!inspectJson.Contains("\"success\":true") || !inspectJson.Contains("MeshScalar"))
+        {
+            throw new InvalidOperationException($"Inspect JSON missing expected content: {inspectJson}");
+        }
+
+        ExistingControllers.Instance.Reset();
     }),
     };
 }

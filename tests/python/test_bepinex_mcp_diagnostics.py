@@ -28,6 +28,9 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
             "ActiveHazardZoneCount": ("System.Int32", "0"),
             "ActiveCommandAuraCount": ("System.Int32", "0"),
             "TrackedVeterancyUnitCount": ("System.Int32", "5"),
+            "LiveSkinnedMeshUnitCount": ("System.Int32", "2"),
+            "LiveAnimatedUnitCount": ("System.Int32", "2"),
+            "LivePbrShaderUnitCount": ("System.Int32", "3"),
         }
         member_reads: list[str] = []
 
@@ -78,6 +81,9 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
                 "ActiveHazardZoneCount": 0,
                 "ActiveCommandAuraCount": 0,
                 "TrackedVeterancyUnitCount": 5,
+                "LiveSkinnedMeshUnitCount": 2,
+                "LiveAnimatedUnitCount": 2,
+                "LivePbrShaderUnitCount": 3,
                 "RangeDisplayCirclePointCount": 9,
             },
             scalars,
@@ -144,7 +150,7 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
 
         snapshot = json.loads(response["content"][0]["text"])
         self.assertFalse(response["isError"])
-        self.assertEqual(21, len(snapshot))
+        self.assertEqual(22, len(snapshot))
         self.assertTrue(all(isinstance(value, dict) for value in snapshot.values()))
         self.assertTrue(all(value == expected for value in snapshot.values()))
 
@@ -210,6 +216,36 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
         self.assertEqual("DeregisterAgentSessionJson", calls[7][0])
         self.assertEqual(["hermes-1"], calls[7][1])
         self.assertEqual("GetAgentCoordinationCensusJson", calls[8][0])
+
+    def test_visual_census_and_inspection_tools(self) -> None:
+        calls: list[tuple[str, list[object]]] = []
+
+        def fake_http(endpoint: str, params: dict[str, object] | None = None, **_: object) -> str:
+            params = params or {}
+            method = str(params.get("methodName", ""))
+            raw_args = json.loads(str(params.get("args", "[]")))
+            calls.append((method, raw_args))
+            payload = {"kind": "visualDiagnostic", "unitId": "test:arachnid"}
+            return json.dumps({
+                "status": "ok",
+                "message": f"Called '{method}' with {len(raw_args)} args. ReturnValue: {json.dumps(payload)}"
+            })
+
+        with (
+            mock.patch.object(SERVER, "_DIAGNOSTICS_GO_ID", 73),
+            mock.patch.object(SERVER, "_call_http", side_effect=fake_http),
+        ):
+            resp1 = SERVER.execute_tool("diagnostics_get_visual_census", {"maxTrackedUnits": 16})
+            self.assertFalse(resp1["isError"])
+
+            resp2 = SERVER.execute_tool("diagnostics_inspect_entity_visual", {"entityKeyId": "test:arachnid"})
+            self.assertFalse(resp2["isError"])
+
+        self.assertEqual(2, len(calls))
+        self.assertEqual("GetVisualRenderCensusJson", calls[0][0])
+        self.assertEqual([16], calls[0][1])
+        self.assertEqual("InspectEntityVisualJson", calls[1][0])
+        self.assertEqual(["test:arachnid"], calls[1][1])
 
     def test_generate_agent_configs(self) -> None:
         configs = SERVER.generate_agent_configs()

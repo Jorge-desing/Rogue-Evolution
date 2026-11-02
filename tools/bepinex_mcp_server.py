@@ -1170,6 +1170,9 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
                 "ActiveHazardZoneCount",
                 "ActiveCommandAuraCount",
                 "TrackedVeterancyUnitCount",
+                "LiveSkinnedMeshUnitCount",
+                "LiveAnimatedUnitCount",
+                "LivePbrShaderUnitCount",
             ]:
                 scalars[member_name] = _call_diagnostics_member(member_name)
 
@@ -1207,6 +1210,7 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
                 "GetHazardCensusJson",
                 "GetVeterancyCensusJson",
                 "GetSelectionCensusJson",
+                "GetVisualRenderCensusJson",
             ]
             for getter in getters:
                 try:
@@ -1223,6 +1227,16 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             getter = arguments.get("getterName", "").strip()
             args_list = arguments.get("args") or []
             res = _call_diagnostics_method(getter, args_list)
+            return _tool_response(res)
+
+        elif name == "diagnostics_get_visual_census":
+            max_units = arguments.get("maxTrackedUnits", 32)
+            res = _call_diagnostics_method("GetVisualRenderCensusJson", [max_units])
+            return _tool_response(res)
+
+        elif name == "diagnostics_inspect_entity_visual":
+            entity_key_id = str(arguments.get("entityKeyId", "")).strip()
+            res = _call_diagnostics_method("InspectEntityVisualJson", [entity_key_id])
             return _tool_response(res)
 
         elif name == "diagnostics_get_battlefield_census":

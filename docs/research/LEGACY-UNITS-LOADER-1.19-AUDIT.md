@@ -91,7 +91,7 @@ La factory de `sample:scout-tank` no declara `cardImageAssetName`, por lo que co
 
 - Los DTO `weapons`, `armor`, `healing`, `stealth`, `aura`, `resourceGathering`, `aiBehavior`, `detection`, `experienceReward`, `spawn`, `resourceCosts`, `statusEffects`, `synergies`, `upgrades`, `experience` y `visualVariants` pueden validar sin que exista un consumidor runtime general. No recomendarlos como cambios de gameplay sin trazar un caller/mapping específico. En el seguimiento se corrigió la resolución de targets upgrade/synergy contra unidades nativas y cross-pack registradas; los análisis iterativos de ciclo/profundidad siguen limitados a las unidades declaradas en un mismo pack, y estos subcampos siguen sin consumidor runtime general.
 - `unitType=Ground` de Arachnid/Overlord es aceptado por DTO/validador, pero no se halló una lectura en la ruta runtime de unidades auditada. No inferir efecto.
-- `variants` no está declarado por estas unidades. Cuando aparezca, seguirá siendo metadata-only hasta una implementación explícita de selección y aplicación.
+- `variants` no está declarado por estas unidades auditadas. Cuando aparezca, el cargador lo registra en `RuntimeUnitVariantRegistry` y `diagnostics_order_apply_unit_loadout` puede seleccionar el ID en una instancia viva; los overrides soportados se convierten a modificadores relativos y los campos row-only no soportados fallan cerrados. Esto sigue sin demostrar selección natural de cartas, decisión AI, visuales o VFX.
 - `MaxRank` es parte del mapa de 25, pero no aparece en los overrides actuales.
 
 ## 6. Validaciones y evidencia del informe original

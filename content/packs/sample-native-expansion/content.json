@@ -157,6 +157,36 @@
       "customBalance": {
         "Damage1": 4.0
       },
+      "variants": [
+        {
+          "id": "ap",
+          "loadout": "AP",
+          "balanceOverrides": [
+            {
+              "name": "damage1",
+              "value": "5.5"
+            },
+            {
+              "name": "attackCooldown",
+              "value": "0.8"
+            }
+          ]
+        },
+        {
+          "id": "he",
+          "loadout": "HE",
+          "balanceOverrides": [
+            {
+              "name": "damage1",
+              "value": "4.6"
+            },
+            {
+              "name": "effectRadius1",
+              "value": "0.35"
+            }
+          ]
+        }
+      ],
       "productionBuilding": {
         "id": "sample-native:scout-tank-factory",
         "nativeTemplateId": "PCXBaseTankFactory",

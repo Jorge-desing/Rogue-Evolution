@@ -61,6 +61,8 @@
              Link="Runtime/RuntimeHarvesterCensus.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeAudioCensus.cs"
              Link="Runtime/RuntimeAudioCensus.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeVisualCensus.cs"
+             Link="Runtime/RuntimeVisualCensus.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeTechCatalogCensus.cs"
              Link="Runtime/RuntimeTechCatalogCensus.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeVeterancyCensus.cs"
@@ -73,6 +75,8 @@
              Link="Runtime/RuntimeHazardManager.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeUnitLoadoutCensus.cs"
              Link="Runtime/RuntimeUnitLoadoutCensus.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeUnitVariantRegistry.cs"
+             Link="Runtime/RuntimeUnitVariantRegistry.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeAiDoctrineCensus.cs"
              Link="Runtime/RuntimeAiDoctrineCensus.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeAgentCoordinator.cs"

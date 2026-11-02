@@ -1090,6 +1090,208 @@ namespace RogueCommandExpansionLoader.Runtime
         }
 
         /// <summary>
+        /// Serializes the visual render, rig architecture, and animation telemetry census as JSON.
+        /// Loss/omission counter placed strictly first to uphold clean-room bounded trace invariants.
+        /// </summary>
+        public static string SerializeVisualRenderCensus(VisualRenderCensus census)
+        {
+            var rows = new List<Dictionary<string, object>>();
+            if (census != null && census.UnitRows != null)
+            {
+                for (int i = 0; i < census.UnitRows.Count; i++)
+                {
+                    VisualUnitDiagnosticRow row = census.UnitRows[i];
+                    var socketNames = new List<string>();
+                    if (row.DiscoveredSockets != null)
+                    {
+                        for (int s = 0; s < row.DiscoveredSockets.Count; s++)
+                        {
+                            string sName = row.DiscoveredSockets[s];
+                            if (!string.IsNullOrEmpty(sName)) socketNames.Add(sName);
+                        }
+                    }
+
+                    rows.Add(new Dictionary<string, object>
+                    {
+                        ["entityKeyId"] = row.EntityKeyId ?? string.Empty,
+                        ["entityId"] = row.EntityId ?? string.Empty,
+                        ["isControlledByPlayer"] = row.IsControlledByPlayer,
+                        ["rigType"] = row.RigType ?? "StaticVehicle",
+                        ["hasAnimator"] = row.HasAnimator,
+                        ["isAnimatorActive"] = row.IsAnimatorActive,
+                        ["activeClipName"] = row.ActiveClipName ?? string.Empty,
+                        ["clipNormalizedTime"] = row.ClipNormalizedTime,
+                        ["clipSpeed"] = row.ClipSpeed,
+                        ["isMovingParam"] = row.IsMovingParam,
+                        ["fireTriggerParam"] = row.FireTriggerParam,
+                        ["deathTriggerParam"] = row.DeathTriggerParam,
+                        ["rendererCount"] = row.RendererCount,
+                        ["totalVertexCount"] = row.TotalVertexCount,
+                        ["primaryShaderName"] = row.PrimaryShaderName ?? string.Empty,
+                        ["hasPbrKeywords"] = row.HasPbrKeywords,
+                        ["isGpuInstanced"] = row.IsGpuInstanced,
+                        ["isVisible"] = row.IsVisible,
+                        ["discoveredSockets"] = socketNames,
+                        ["socketAmbiguityCount"] = row.SocketAmbiguityCount
+                    });
+                }
+            }
+
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "visualRenderCensus",
+                ["omittedUnitCount"] = census != null ? census.OmittedUnitCount : 0,
+                ["totalTrackedUnits"] = census != null ? census.TotalTrackedUnits : 0,
+                ["skinnedMeshCount"] = census != null ? census.SkinnedMeshCount : 0,
+                ["staticMeshCount"] = census != null ? census.StaticMeshCount : 0,
+                ["animatedUnitCount"] = census != null ? census.AnimatedUnitCount : 0,
+                ["pbrShaderCount"] = census != null ? census.PbrShaderCount : 0,
+                ["unitRows"] = rows
+            };
+            return Serialize(view);
+        }
+
+        /// <summary>
+        /// Serializes the detailed entity visual diagnostic report as JSON.
+        /// </summary>
+        public static string SerializeDetailedEntityVisualDiagnostic(DetailedEntityVisualDiagnostic diag)
+        {
+            if (diag == null)
+            {
+                return Serialize(new Dictionary<string, object>
+                {
+                    ["kind"] = "detailedEntityVisualDiagnostic",
+                    ["success"] = false,
+                    ["entityKeyId"] = string.Empty,
+                    ["entityId"] = string.Empty,
+                    ["message"] = "Null diagnostic report."
+                });
+            }
+
+            var rendererList = new List<Dictionary<string, object>>();
+            if (diag.Renderers != null)
+            {
+                for (int i = 0; i < diag.Renderers.Count; i++)
+                {
+                    VisualRendererDetailRow r = diag.Renderers[i];
+                    rendererList.Add(new Dictionary<string, object>
+                    {
+                        ["name"] = r.Name ?? string.Empty,
+                        ["rendererType"] = r.RendererType ?? string.Empty,
+                        ["enabled"] = r.Enabled,
+                        ["isVisible"] = r.IsVisible,
+                        ["meshName"] = r.MeshName ?? string.Empty,
+                        ["vertexCount"] = r.VertexCount,
+                        ["submeshCount"] = r.SubmeshCount,
+                        ["materialNames"] = r.MaterialNames ?? new List<string>().AsReadOnly(),
+                        ["shaderNames"] = r.ShaderNames ?? new List<string>().AsReadOnly(),
+                        ["shaderKeywords"] = r.ShaderKeywords ?? new List<string>().AsReadOnly(),
+                        ["isGpuInstanced"] = r.IsGpuInstanced
+                    });
+                }
+            }
+
+            var socketList = new List<Dictionary<string, object>>();
+            if (diag.Sockets != null)
+            {
+                for (int i = 0; i < diag.Sockets.Count; i++)
+                {
+                    VisualSocketDetailRow s = diag.Sockets[i];
+                    socketList.Add(new Dictionary<string, object>
+                    {
+                        ["socketName"] = s.SocketName ?? string.Empty,
+                        ["canonicalRole"] = s.CanonicalRole ?? string.Empty,
+                        ["localPosX"] = s.LocalPosX,
+                        ["localPosY"] = s.LocalPosY,
+                        ["localPosZ"] = s.LocalPosZ,
+                        ["localRotX"] = s.LocalRotX,
+                        ["localRotY"] = s.LocalRotY,
+                        ["localRotZ"] = s.LocalRotZ,
+                        ["isAmbiguous"] = s.IsAmbiguous,
+                        ["duplicateCount"] = s.DuplicateCount
+                    });
+                }
+            }
+
+            var paramList = new List<Dictionary<string, object>>();
+            if (diag.Parameters != null)
+            {
+                for (int i = 0; i < diag.Parameters.Count; i++)
+                {
+                    VisualAnimationParameterRow p = diag.Parameters[i];
+                    paramList.Add(new Dictionary<string, object>
+                    {
+                        ["name"] = p.Name ?? string.Empty,
+                        ["parameterType"] = p.ParameterType ?? string.Empty,
+                        ["value"] = p.Value ?? string.Empty
+                    });
+                }
+            }
+
+            var renderSection = new Dictionary<string, object>
+            {
+                ["rendererCount"] = diag.RendererCount,
+                ["totalVertexCount"] = diag.TotalVertexCount,
+                ["submeshCount"] = diag.SubmeshCount,
+                ["boundsSizeX"] = diag.BoundsSizeX,
+                ["boundsSizeY"] = diag.BoundsSizeY,
+                ["boundsSizeZ"] = diag.BoundsSizeZ,
+                ["hasLODGroup"] = diag.HasLODGroup,
+                ["lodCount"] = diag.LODCount,
+                ["renderers"] = rendererList
+            };
+
+            var rigSection = new Dictionary<string, object>
+            {
+                ["rigType"] = diag.RigType ?? "StaticVehicle",
+                ["rootBoneName"] = diag.RootBoneName ?? string.Empty,
+                ["boneCount"] = diag.BoneCount,
+                ["boneNames"] = diag.BoneNames ?? new List<string>().AsReadOnly(),
+                ["sockets"] = socketList
+            };
+
+            var animSection = new Dictionary<string, object>
+            {
+                ["hasAnimator"] = diag.HasAnimator,
+                ["isAnimatorActive"] = diag.IsAnimatorActive,
+                ["controllerName"] = diag.ControllerName ?? string.Empty,
+                ["avatarName"] = diag.AvatarName ?? string.Empty,
+                ["avatarIsValid"] = diag.AvatarIsValid,
+                ["currentStateName"] = diag.CurrentStateName ?? string.Empty,
+                ["activeClipName"] = diag.ActiveClipName ?? string.Empty,
+                ["clipLength"] = diag.ClipLength,
+                ["normalizedTime"] = diag.NormalizedTime,
+                ["speed"] = diag.Speed,
+                ["parameters"] = paramList
+            };
+
+            var directorSection = new Dictionary<string, object>
+            {
+                ["hasVisualDirector"] = diag.HasVisualDirector,
+                ["isDamagedVfxActive"] = diag.IsDamagedVfxActive,
+                ["isCriticalVfxActive"] = diag.IsCriticalVfxActive,
+                ["isTurretJammed"] = diag.IsTurretJammed,
+                ["recoilOffset"] = diag.RecoilOffset,
+                ["doorOpenProgress"] = diag.DoorOpenProgress
+            };
+
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "detailedEntityVisualDiagnostic",
+                ["success"] = diag.Success,
+                ["entityKeyId"] = diag.EntityKeyId ?? string.Empty,
+                ["entityId"] = diag.EntityId ?? string.Empty,
+                ["message"] = diag.Message ?? string.Empty,
+                ["render"] = renderSection,
+                ["rig"] = rigSection,
+                ["animation"] = animSection,
+                ["director"] = directorSection
+            };
+
+            return Serialize(view);
+        }
+
+        /// <summary>
         /// Serializes the result of dispatching an AI assault wave.
         /// </summary>
         public static string SerializeAiWaveDispatchResult(AiWaveDispatchResult result)
