@@ -146,6 +146,18 @@ diagnostics = builder.build_and_export(
 )
 ```
 
+### Wave 3/4 Structural Anchor Contract
+
+The current `RogueModelKit` closes the most common anti-floating gaps in generator-backed authoring. These details are emitted by the existing fluent methods; do not add detached cubes in a preset or builder to imitate them:
+
+- `.add_continuous_tracks()` adds `Armor_SponsonBridge_L/R` floor bridges and keeps suspension/mudflap hardware tied to the track assembly.
+- `.add_all_terrain_wheels()` adds `Chassis_AxleBeam_*`, `Chassis_Differential_*`, and `Chassis_ShockStrut_*` between wheel hubs and chassis rails.
+- `.add_bipedal_legs()` / `make_bipedal_digitigrade_leg()` adds `HipFlange_*`, `CalfArmor_*`, and `AnkleClevis_*` at the pelvis, calf, and foot pivots.
+- `.add_engine_deck()` adds a recessed `Engine_RadiatorCavity` beneath the louvers; weapon and sensor helpers add their load-bearing `Gatling_PintleSaddle_*`, missile trunnion cradle/axle, `Arc_PedestalCollar`, `Sensor_AntennaDeckCollar`, `Smoke_MountBracket_*`, `Radar_DeckPylon`, and `Sponson_BridgeArm_*` components.
+- `.add_interlocking_gussets()` uses `make_interlocking_armor_gusset()` for triangular web plates at hull/superstructure joints.
+
+When refreshing a generator-backed source, invoke its `--preset` without conflicting explicit `--archetype`/`--weapon` overrides, pass `--bake-atlas` when the source owns PBR maps, and verify the expected anchor names in the resulting `.blend` before promoting the FBX or preview prefab. Keep manual Atlas/Bastion authoring on their dedicated bridge; never replace it with a generic preset.
+
 ### Scriptable CLI Tool (`generate_unit_model.py`)
 Run headless vehicle generation directly from the command line using Blender and the CLI generator script:
 

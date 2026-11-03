@@ -1,0 +1,136 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &7663311675183670016
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 5200520525821799610}
+  m_Layer: 0
+  m_Name: LongshotTanketteVisualPreview
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &5200520525821799610
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7663311675183670016}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 8310945010034011146}
+  m_Father: {fileID: 0}
+  m_RootOrder: 0
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1001 &8420835241746009057
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    m_TransformParent: {fileID: 5200520525821799610}
+    m_Modifications:
+    - target: {fileID: -8679921383154817045, guid: 2f536f4eced3abf4a963f9132d4661c2, type: 3}
+      propertyPath: m_RootOrder
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 2f536f4eced3abf4a963f9132d4661c2, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 2f536f4eced3abf4a963f9132d4661c2, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 2f536f4eced3abf4a963f9132d4661c2, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 2f536f4eced3abf4a963f9132d4661c2, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 2f536f4eced3abf4a963f9132d4661c2, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 2f536f4eced3abf4a963f9132d4661c2, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 2f536f4eced3abf4a963f9132d4661c2, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 2f536f4eced3abf4a963f9132d4661c2, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 2f536f4eced3abf4a963f9132d4661c2, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 2f536f4eced3abf4a963f9132d4661c2, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -7610864413840213308, guid: 2f536f4eced3abf4a963f9132d4661c2, type: 3}
+      propertyPath: m_Materials.Array.data[0]
+      value:
+      objectReference: {fileID: 2100000, guid: f25db5c768c8a444eb4d926252afc6fb, type: 2}
+    - target: {fileID: -6373178855208314314, guid: 2f536f4eced3abf4a963f9132d4661c2, type: 3}
+      propertyPath: m_Materials.Array.data[0]
+      value:
+      objectReference: {fileID: 2100000, guid: a8ea293250a504f48b1f8f8fca5697c5, type: 2}
+    - target: {fileID: -1901142427107076926, guid: 2f536f4eced3abf4a963f9132d4661c2, type: 3}
+      propertyPath: m_Materials.Array.data[0]
+      value:
+      objectReference: {fileID: 2100000, guid: 5e5da555d32cbce468e41428e95af7c6, type: 2}
+    - target: {fileID: 919132149155446097, guid: 2f536f4eced3abf4a963f9132d4661c2, type: 3}
+      propertyPath: m_Name
+      value: LongshotTankette
+      objectReference: {fileID: 0}
+    - target: {fileID: 2211296787770113961, guid: 2f536f4eced3abf4a963f9132d4661c2, type: 3}
+      propertyPath: m_Materials.Array.data[0]
+      value:
+      objectReference: {fileID: 2100000, guid: 6e4661597ac522241b1e33233302bade, type: 2}
+    - target: {fileID: 2834471629798319237, guid: 2f536f4eced3abf4a963f9132d4661c2, type: 3}
+      propertyPath: m_Materials.Array.data[0]
+      value:
+      objectReference: {fileID: 2100000, guid: f25db5c768c8a444eb4d926252afc6fb, type: 2}
+    - target: {fileID: 3369980773606383547, guid: 2f536f4eced3abf4a963f9132d4661c2, type: 3}
+      propertyPath: m_Materials.Array.data[0]
+      value:
+      objectReference: {fileID: 2100000, guid: b979e488d44dffa42878b59661fcce68, type: 2}
+    - target: {fileID: 4140217092764979710, guid: 2f536f4eced3abf4a963f9132d4661c2, type: 3}
+      propertyPath: m_Materials.Array.data[0]
+      value:
+      objectReference: {fileID: 2100000, guid: 3c83e86fad5fab543a1085b84ff27cb2, type: 2}
+    - target: {fileID: 4373158669402075569, guid: 2f536f4eced3abf4a963f9132d4661c2, type: 3}
+      propertyPath: m_Materials.Array.data[0]
+      value:
+      objectReference: {fileID: 2100000, guid: 5e5da555d32cbce468e41428e95af7c6, type: 2}
+    - target: {fileID: 4899964720219333257, guid: 2f536f4eced3abf4a963f9132d4661c2, type: 3}
+      propertyPath: m_Materials.Array.data[0]
+      value:
+      objectReference: {fileID: 2100000, guid: 3990f2a562b07d54fa95f19d6ac5bea6, type: 2}
+    - target: {fileID: 8867479284950696769, guid: 2f536f4eced3abf4a963f9132d4661c2, type: 3}
+      propertyPath: m_Materials.Array.data[0]
+      value:
+      objectReference: {fileID: 2100000, guid: 201d3dab720b683489f05f962274310a, type: 2}
+    m_RemovedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: 2f536f4eced3abf4a963f9132d4661c2, type: 3}
+--- !u!4 &8310945010034011146 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 2f536f4eced3abf4a963f9132d4661c2, type: 3}
+  m_PrefabInstance: {fileID: 8420835241746009057}
+  m_PrefabAsset: {fileID: 0}
