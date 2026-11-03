@@ -629,3 +629,46 @@ This is a compact, durable orientation for agents. For the changing checkout sta
 - QA/reflection safety: Profile2 is dedicated QA without a tutorial; never ask, inspect, infer, gate, bypass, or switch profiles for tutorial. Check current selector/save safety and preserve saves. Before reflection jointly verify Rogue Command version, Unity `2021.3.45f2`, Assembly-CSharp SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, and MVID `db0e9462-128d-4296-9900-de18b4bd0c00`.
 
 - Root MEMORY.md, codex memory, antigravity memory, and mem0 synced to working tree after HEAD `f125ce4`. Root MEMORY.md committed as `fa995fac67d484858758252bbbdb355a56a073e0` and pushed; upstream/HEAD match. Codex/antigravity memories and mem0 updated locally (not tracked in repo).
+
+## Refresh (2026-11-02, HEAD 8d31bc1)
+
+- Repository `C:/Users/Alex/Documents/Mod Rogue Command`, loader `1.19.0`, branch `codex/rogue-unit-balance-20261018`. Verified local HEAD, upstream, origin, and remote branch all equal `8d31bc1ff94b4d19166077fd057ba122a42b1c6e` (`feat(authoring): overhaul full-fleet 3D realism with aerodynamic fuselages, plenum skirts, and grounding coamings`), 4 commits ahead of the prior `f125ce4` sync: `fa995fa` (docs memory sync to working tree), `3d9c0af` (docs memory note root MEMORY.md commit/push), `897397c` (feat assets: refresh tactical units with Wave 7 authoring), `8d31bc1` (feat authoring: overhaul full-fleet 3D realism). Code baseline remains `0bbede6b7beb68f8f50f4ae89f10e83ecb056c0d`; implementation baseline remains `e25c6de` (arachnid middle-leg orientation normalizer); remains `d7a3a11b56b58bed6d3f06c47fd40a627c9d1ae3`.
+
+- New committed scope since `f125ce4`:
+  - `fa995fa`: docs(memory): sync root MEMORY.md to working tree after `f125ce4`.
+  - `3d9c0af`: docs(memory): note root MEMORY.md commit/push in sync entry.
+  - `897397c`: feat(assets): refresh tactical units with Wave 7 authoring. Regenerated Tactical Operations assets: `tactical-operations.bundle` now `23,632,356` bytes; 971 objects, 45 textures, 9 Sprites, 9 Animator/Avatar/controller, 6 shaders; three unit GameObjects/materials/meshes updated; hard-surface realism (aerodynamic fuselages, plenum skirts, grounding coamings); ground contact valid; Unity build SUCCESS; rigging audit 9 models, 0 critical, score 100 for the three new units.
+  - `8d31bc1`: feat(authoring): overhaul full-fleet 3D realism. `RogueModelKit.py` +738 lines (new helpers `make_cast_pelvis_assembly`, `make_articulated_mech_torso`, `make_sculpted_wheel_fender_assembly`, `make_transitional_coaming_collar` with nested `add_*`), `generate_unit_model.py` +231, `Build-*Model.py` +18/+12/+6, `test_model_kit_skill_copy.py` +69, `rogue-command-3d-model-authoring` skill +2, docs `3D-MODEL-AUTHORING-ENHANCEMENTS.md` +35. No new runtime/content changes; presets centralized (`sentinel_relay`, `gravitas_breaker`, `command_relay`), legacy `--archetype`/`--weapon` args removed.
+
+- Uncommitted working-tree changes now present (point 31, do not stage/reset/clean/overwrite):
+  - `content/packs/tactical-operations/content.json`: applied loader-backed capabilities to the three Tactical Operations units — Combat `experienceReward` (Sentinel 2, Gravitas 3, Command Relay 2), role-specific `onHitStatusEffects` (SlowedDown 1.5/0.25, SlowedDown 2.5/0.30, Marked 3.0/0.35), `minAttackRange` 4.5 on Gravitas, declarative `variants` (gravity-ap/gravity-he, relay-ap/relay-he). Existing mechanics, IDs, factories, caps, `skillActivationCheckInterval`, `PCXBaseTank`, bundle and assets preserved.
+  - `tests/python/balance/test_unused_modeled_runtime_mechanics.py`: +3 tests (combat experience rewards, on-hit controls, loader-backed variants/dead-zone), 6/6 focused pass.
+  - `docs/research/AGENT-HANDOFF.md`: point 31 added (application of pending loader capabilities).
+  - Preserved prior uncommitted state: dirty nested worktrees `cargador` @ `11e9968` (modified `MODDING_PLAN.md`/`MODLOG.md`) and `task-graph-validation` @ `d1f9045` (modified schema/runtime/validation/diagnostics/tests/tooling plus untracked localization test); untracked `.agents/skills/rogue-command-game-research/references/`; uncommitted AGENT-HANDOFF continuation snapshot; model-authoring refinements from the working-tree-after-`f125ce4` sync.
+
+- Validation (2026-11-02, dirty tree after `8d31bc1`): Release plugin build 0 warnings/0 errors; C# harness 475/476 (1 Windows symlink-privilege skip, 0 failures); Python suite 119/119 (ALL PYTHON CHECKS PASSED); AssetBundle references 18/18 for Tactical Operations (0 errors); native visual preflight 9/9, 0 errors; loader registry 4 manifests, 0 issues; schema valid; `git diff --check` clean (LF/CRLF notices). No bundle rebuild (no prefab/card/asset path changes). No fresh Steam/Unity gameplay proof: application of states, rewards, dead-zone, and variants in a live match remains pending a reversible smoke. Natural offer→selection→placement→production/render/stat and tactical AI remain unverified.
+
+- QA/reflection safety: Profile2 is dedicated QA without a tutorial; never ask, inspect, infer, gate, bypass, or switch profiles for tutorial. Check current selector/save safety and preserve saves. Before reflection jointly verify Rogue Command version, Unity `2021.3.45f2`, Assembly-CSharp SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, and MVID `db0e9462-128d-4296-9900-de18b4bd0c00`.
+
+- Root MEMORY.md, codex memory, antigravity memory, and mem0 synced to HEAD `8d31bc1` + working tree. Memory-only update; not committed.
+
+## Refresh (2026-11-02, HEAD 05b2053)
+
+- Repository `C:/Users/Alex/Documents/Mod Rogue Command`, loader `1.19.0`, branch `codex/rogue-unit-balance-20261018`. Verified local HEAD, upstream, origin, and remote branch all equal `05b2053b181ae85ce98f9e3a75a00db13fc2571a` (`feat(content): wire loader mechanics to tactical units`), 1 commit ahead of the prior `8d31bc1` sync. Code baseline remains `0bbede6b7beb68f8f50f4ae89f10e83ecb056c0d`; implementation baseline remains `e25c6de` (arachnid middle-leg orientation normalizer); remains `d7a3a11b56b58bed6d3f06c47fd40a627c9d1ae3`.
+
+- New committed scope since `8d31bc1`:
+  - `05b2053`: feat(content): wire loader mechanics to tactical units. Applies already-traced loader consumers to the three Tactical Operations units in `content/packs/tactical-operations/content.json`: Combat `experienceReward` (Sentinel 2, Gravitas 3, Command Relay 2), role-specific `onHitStatusEffects` (Sentinel SlowedDown 1.5/0.25, Gravitas SlowedDown 2.5/0.30, Command Relay Marked 3.0/0.35), Gravitas `minAttackRange` 4.5, and declarative `variants` (gravity-ap/gravity-he, relay-ap/relay-he) with AP/HE balance overrides. Existing mechanics, IDs, factories, caps, `skillActivationCheckInterval`, `PCXBaseTank`, bundle, and assets preserved; no bundle rebuild (no prefab/card/asset path changes).
+  - `tests/python/balance/test_unused_modeled_runtime_mechanics.py`: +3 tests (combat experience rewards, on-hit controls, loader-backed variants/dead-zone), 6/6 focused pass; full Python suite 123/123 (ALL PYTHON CHECKS PASSED).
+  - `docs/research/AGENT-HANDOFF.md`: point 31 records application of pending loader capabilities and TDD/validation evidence.
+
+- Uncommitted worktree preserved (do not stage/reset/clean/overwrite):
+  - Dirty nested worktrees `cargador` @ `11e9968` (modified `MODDING_PLAN.md`/`MODLOG.md`) and `task-graph-validation` @ `d1f9045` (modified schema/runtime/validation/diagnostics/tests/tooling plus untracked localization test).
+  - Untracked `.agents/skills/rogue-command-game-research/references/`.
+  - Uncommitted `docs/research/AGENT-HANDOFF.md` "Current continuation snapshot — 2026-11-02" (Profile2 Steam runtime probe evidence).
+  - No new uncommitted source changes beyond those already documented; root MEMORY.md working-tree block for `8d31bc1` remains uncommitted and is now joined by this entry.
+
+- Validation (2026-11-02, HEAD 05b2053): Python suite 123/123 (ALL PYTHON CHECKS PASSED); `git diff --check` clean (LF/CRLF notice on MEMORY.md). Release plugin build, C# harness, AssetBundle references, native visual preflight, and loader registry not rerun in this sync; last documented counts 475/476 harness, 18/18 Tactical Operations bundle refs, 9/9 native visual preflight, 4/0 registry (from the `8d31bc1` sync). No fresh Steam/Unity gameplay proof: application of states, rewards, dead-zone, and variants in a live match remains pending a reversible smoke. Natural offer->selection->placement->production/render/stat and tactical AI remain unverified.
+
+- QA/reflection safety: Profile2 is dedicated QA without a tutorial; never ask, inspect, infer, gate, bypass, or switch profiles for tutorial. Check current selector/save safety and preserve saves. Before reflection jointly verify Rogue Command version, Unity `2021.3.45f2`, Assembly-CSharp SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, and MVID `db0e9462-128d-4296-9900-de18b4bd0c00`.
+
+- Root MEMORY.md, codex memory, antigravity memory, and mem0 synced to HEAD `05b2053`. Memory-only update; root MEMORY.md commit/push pending.
