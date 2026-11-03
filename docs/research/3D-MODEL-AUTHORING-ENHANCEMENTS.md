@@ -731,3 +731,26 @@ To eliminate the visible appearance of disconnected geometric primitives ("figur
   - Flexible rubber plenum skirt pleats at bow and stern (22° deflection), lateral thrust vectoring air louvers, and perimeter welt bumper collar across all hovercraft (`hover`, `hover_cruiser`, `assault_hovercraft`, `stealth_recon_skimmer`).
 - **Architectural Plinths & Buttress Pilasters (`make_factory_assembly`, `make_turret_bunker_assembly`)**:
   - Angled foundation corner buttresses and sloped armor glacis plinth rings anchoring industrial production halls and defense bunkers firmly to Z=0.0m foundation slabs.
+
+
+### Wave 2 Hard-Surface Realism & Mechanical Fidelity Suite (local build/validation evidence)
+
+To elevate mechanical fidelity beyond basic blockout geometry, Wave 2 introduces authentic heavy hardware, suspension running gear, joint deflection shields, and field rigging across `RogueModelKit.py` and `generate_unit_model.py`:
+
+- **Heavy Forged Towing Clevis Shackles (`make_towing_shackle_assembly` / `.add_towing_shackles()`)**:
+  - Welded mounting bosses, transverse retaining clevis pins, and hanging 18° angled forged D-ring shackles mounted low on front lower glacis and rear hull plates.
+  - Deployed across 25 vehicles (`tank`, `artillery`, `arc_tank`, `super_heavy`, `flak_anti_air`, `siege_crawler`, `drone_carrier`, `combat_harvester`, `demolition_breacher`, `thermobaric_tank`, `recovery_crawler`, `mine_layer`, `sniper_tankette`, `bridge_layer`, `mortar_carrier`, `siege_drill_mole`, `gravity_siege_breaker`, `amphibious_assault_tank`, `halftrack`, `shield_truck`, `ew_jammer`, `mobile_sam_launcher`, `command_hq_rig`, `tactical_relay_carrier`, `nanite_support_rover`).
+- **Crane Rigging & Field Hoist Eye Lugs (`make_crane_lifting_lugs` / `.add_lifting_lugs()`)**:
+  - 4-point forged circular eye lugs with reinforced weld pads mounted to upper hull, chassis deck corners, and turret roofs across 30 vehicles and mechs (`tank`, `artillery`, `arc_tank`, `super_heavy`, `flak_anti_air`, `siege_crawler`, `drone_carrier`, `combat_harvester`, `demolition_breacher`, `thermobaric_tank`, `recovery_crawler`, `mine_layer`, `sniper_tankette`, `bridge_layer`, `mortar_carrier`, `siege_drill_mole`, `gravity_siege_breaker`, `amphibious_assault_tank`, `halftrack`, `shield_truck`, `ew_jammer`, `mobile_sam_launcher`, `command_hq_rig`, `tactical_relay_carrier`, `nanite_support_rover`, `colossus_titan`, `heavy_crane_mech`, `artillery_strider`, `walker`, `quad_mech`).
+- **Trailing-Arm Suspension Linkages with Torsion Bosses & Coil Springs (`with_suspension_arms=True`)**:
+  - Enabled by default on `add_continuous_tracks()`, connecting all roadwheels to the hull via mechanical swing arms, cylindrical torsion bosses, and coil shock dampers.
+- **Rear Flexible Rubber Mudflaps (`FenderRearMudflap_L/R`)**:
+  - Integrated into `make_continuous_track_assembly()`, angled at -32° to prevent realistic track debris throw.
+- **Ballistic Chevron Knee Deflector Shields & Ankle Hydraulic Dampers (`make_quad_crawler_leg`)**:
+  - Added angled chevron kneecap deflector armor (`KneeCapShield`) and parallel ankle hydraulic shock absorbers (`AnkleHydraulicShock`) to multi-leg spider, hexapod, and crawler archetypes.
+- **Rocket Backblast Deflector Cowl & Umbilical Conduit Bundle (`make_missile_launcher_pod`)**:
+  - Top overhanging blast deflector cowl (`BlastCowl`) and flexible umbilical firing cable conduit (`UmbilicalConduit`) routing rocket guidance controls into the launcher rack.
+- **Factory Electrical Substation & Cable Raceway (`make_factory_assembly`)**:
+  - Step-down electrical transformer housing (`SubstationTransformer`) and high-voltage cable raceway trunking (`CableRaceway`) running along industrial factory foundations.
+- **Fleet-Wide Commander's Crew Cupolas (`.add_crew_cupola()`)**:
+  - Armored commander cupolas with emissive periscope vision blocks deployed across 15 fighting vehicles.

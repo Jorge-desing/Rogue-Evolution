@@ -875,6 +875,15 @@ def make_continuous_track_assembly(
             (x_pos, center_y + length * 0.52, height + 0.02), fender_mat, bevel=0.015,
             rotation=(math.radians(35), 0.0, 0.0)
         ))
+        # Rear angled splash guard / rubber mudflap
+        objects.append(make_box(
+            f"{prefix}_FenderRearMudflap_{side_tag}",
+            (fender_w, length * 0.14, 0.04),
+            (x_pos, center_y - length * 0.52, height + 0.02),
+            tread_mat or fender_mat,
+            bevel=0.012,
+            rotation=(math.radians(-32), 0.0, 0.0),
+        ))
 
     if with_spaced_skirts and skirt_mat is not None:
         skirt_objs = make_spaced_armor_side_skirts(
@@ -1477,6 +1486,27 @@ def make_missile_launcher_pod(
                 (0.015, size[1] * 0.6, 0.06),
                 stripe_loc, accent_mat, bevel=0.005, rotation=rot_euler
             ))
+
+    # 6. Upper blast deflector cowl & umbilical conduit
+    cowl_loc = loc_v + forward_dir * (size[1] * 0.44) + v_vec * (size[2] * 0.52)
+    objects.append(make_box(
+        f"{prefix}_BlastCowl",
+        (size[0] * 0.95, size[1] * 0.22, 0.04),
+        cowl_loc,
+        armor_mat,
+        bevel=0.008,
+        rotation=rot_euler,
+    ))
+    conduit_start = loc_v - forward_dir * (size[1] * 0.35) - v_vec * (size[2] * 0.45)
+    conduit_end = conduit_start - Vector((0.0, 0.0, 0.18))
+    objects.append(make_rod(
+        f"{prefix}_UmbilicalConduit",
+        conduit_start,
+        conduit_end,
+        0.028,
+        cavity_mat,
+        vertices=6,
+    ))
 
     return objects
 
@@ -2191,9 +2221,29 @@ def make_quad_crawler_leg(
         f"{prefix}_KneeKnuckle", 0.15, 0.20, knee_v, joint_mat,
         rotation=(math.radians(90), 0.0, 0.0), vertices=10, bevel=0.01
     ))
+    # Ballistic chevron knee-cap deflector shield
+    objects.append(make_box(
+        f"{prefix}_KneeCapShield",
+        (0.24, 0.12, 0.22),
+        knee_v + Vector((0.0, side_y * 0.10, 0.04)),
+        armor_mat,
+        bevel=0.02,
+        rotation=(math.radians(-side_y * 18), 0.0, 0.0),
+    ))
     objects.append(make_rod(
         f"{prefix}_TibiaStrut", knee_v, foot_target + Vector((0.0, 0.0, 0.10)),
         0.075, joint_mat, vertices=8
+    ))
+    # Parallel ankle hydraulic shock damper
+    tibia_mid = (knee_v + foot_target) * 0.5
+    damper_offset = Vector((side_x * 0.08, -side_y * 0.06, 0.05))
+    objects.append(make_rod(
+        f"{prefix}_AnkleHydraulicShock",
+        knee_v + damper_offset,
+        tibia_mid + damper_offset,
+        0.032,
+        joint_mat,
+        vertices=6,
     ))
     objects.append(make_cylinder(
         f"{prefix}_FootPad", foot_radius, 0.08, foot_target + Vector((0.0, 0.0, 0.04)),
@@ -5088,6 +5138,83 @@ def make_sculpted_wheel_fender_assembly(
         rotation=(0.0, side * math.radians(12), 0.0),
     ))
 
+    return objects
+
+
+def make_towing_shackle_assembly(
+    prefix: str,
+    locations: Sequence[Tuple[float, float, float] | Vector],
+    material: bpy.types.Material | None = None,
+    pin_material: bpy.types.Material | None = None,
+    shackle_size: float = 0.12,
+    direction: Tuple[float, float, float] | Vector = (0.0, 1.0, 0.0),
+) -> list[bpy.types.Object]:
+    """Generates heavy forged towing clevis shackles with cross-pins mounted on vehicle armor."""
+    objects = []
+    dir_v = Vector(direction).normalized()
+    for idx, loc in enumerate(locations, start=1):
+        loc_v = Vector(loc)
+        # 1. Welded mounting boss
+        objects.append(make_box(
+            f"{prefix}_ShackleBracket_{idx}",
+            (shackle_size * 0.85, 0.05, shackle_size * 0.85),
+            loc_v,
+            material,
+            bevel=0.012,
+        ))
+        # 2. Transverse clevis pin
+        pin_rot = (0.0, math.radians(90.0), 0.0)
+        objects.append(make_cylinder(
+            f"{prefix}_ShacklePin_{idx}",
+            radius=shackle_size * 0.18,
+            depth=shackle_size * 1.15,
+            location=loc_v + dir_v * 0.04,
+            material=pin_material or material,
+            rotation=pin_rot,
+            vertices=8,
+            bevel=0.005,
+        ))
+        # 3. Hanging D-ring shackle loop
+        objects.append(make_box(
+            f"{prefix}_ShackleLoop_{idx}",
+            (shackle_size * 0.92, 0.035, shackle_size * 0.95),
+            loc_v + dir_v * 0.07 - Vector((0.0, 0.0, shackle_size * 0.35)),
+            material,
+            bevel=0.015,
+            rotation=(math.radians(18.0), 0.0, 0.0),
+        ))
+    return objects
+
+
+def make_crane_lifting_lugs(
+    prefix: str,
+    corner_locations: Sequence[Tuple[float, float, float] | Vector],
+    material: bpy.types.Material | None = None,
+    lug_radius: float = 0.065,
+    thickness: float = 0.035,
+) -> list[bpy.types.Object]:
+    """Generates forged circular crane lifting eye lugs welded to upper hull or turret corners."""
+    objects = []
+    for idx, loc in enumerate(corner_locations, start=1):
+        loc_v = Vector(loc)
+        lug = make_cylinder(
+            f"{prefix}_LiftingLug_{idx}",
+            radius=lug_radius,
+            depth=thickness,
+            location=loc_v,
+            material=material,
+            rotation=(0.0, math.radians(90.0), 0.0),
+            vertices=10,
+            bevel=0.008,
+        )
+        objects.append(lug)
+        objects.append(make_box(
+            f"{prefix}_LugWeldPad_{idx}",
+            (thickness * 1.5, lug_radius * 1.6, 0.03),
+            loc_v - Vector((0.0, 0.0, lug_radius * 0.7)),
+            material,
+            bevel=0.005,
+        ))
     return objects
 
 
@@ -8445,6 +8572,23 @@ def make_factory_assembly(
                 bevel=0.035,
             ))
 
+    # 2c. Electrical substation transformer and heavy cable raceway
+    substation_loc = Vector((width * 0.55, -length * 0.15, slab_h + 0.65))
+    objects.append(make_box(
+        f"{prefix}_SubstationTransformer",
+        (width * 0.16, length * 0.22, 1.30),
+        substation_loc,
+        metal_mat or foundation_mat,
+        bevel=0.03,
+    ))
+    objects.append(make_box(
+        f"{prefix}_CableRaceway",
+        (0.08, length * 0.65, 0.08),
+        Vector((width * 0.52, 0.0, slab_h + 0.12)),
+        hazard_mat or metal_mat,
+        bevel=0.01,
+    ))
+
     # 3. Chamfered / Gabled roof cap with industrial skylights
     roof_h = 0.85
     roof_z = slab_h + height + roof_h * 0.5
@@ -11375,7 +11519,7 @@ class RogueVehicleBuilder:
         roadwheels: int = 5,
         with_skirts: bool = True,
         track_sag: float = 0.0,
-        with_suspension_arms: bool = False,
+        with_suspension_arms: bool = True,
         with_spaced_skirts: bool = False,
     ) -> "RogueVehicleBuilder":
         half_w = self.hull_width * 0.5
@@ -13159,6 +13303,56 @@ class RogueVehicleBuilder:
                 fender_mat=self.palette.primary_armor,
                 skirt_mat=self.palette.light_armor,
             ))
+        return self
+
+    def add_towing_shackles(
+        self,
+        front_spacing_x: float | None = None,
+        rear_spacing_x: float | None = None,
+    ) -> "RogueVehicleBuilder":
+        sx_f = front_spacing_x if front_spacing_x is not None else (self.hull_width * 0.38)
+        sx_r = rear_spacing_x if rear_spacing_x is not None else (self.hull_width * 0.38)
+        front_y = self.hull_length * 0.48
+        rear_y = -self.hull_length * 0.48
+        shackle_z = self.ground_clearance + 0.24
+        front_locs = [(-sx_f, front_y, shackle_z), (sx_f, front_y, shackle_z)]
+        rear_locs = [(-sx_r, rear_y, shackle_z), (sx_r, rear_y, shackle_z)]
+        f_objs = make_towing_shackle_assembly(
+            f"{self.name}Armor_FrontShackle",
+            front_locs,
+            material=self.palette.gunmetal,
+            pin_material=self.palette.warning,
+            direction=(0.0, 1.0, 0.0),
+        )
+        r_objs = make_towing_shackle_assembly(
+            f"{self.name}Armor_RearShackle",
+            rear_locs,
+            material=self.palette.gunmetal,
+            pin_material=self.palette.warning,
+            direction=(0.0, -1.0, 0.0),
+        )
+        self.objects.extend(f_objs)
+        self.objects.extend(r_objs)
+        return self
+
+    def add_lifting_lugs(
+        self,
+        corners: Sequence[Tuple[float, float, float] | Vector] | None = None,
+    ) -> "RogueVehicleBuilder":
+        if corners is None:
+            hw = self.hull_width * 0.36
+            hl = self.hull_length * 0.32
+            hz = self.hull_deck_z + 0.12
+            corners = [
+                (-hw, hl, hz), (hw, hl, hz),
+                (-hw, -hl, hz), (hw, -hl, hz),
+            ]
+        objs = make_crane_lifting_lugs(
+            f"{self.name}Armor",
+            corner_locations=corners,
+            material=self.palette.gunmetal,
+        )
+        self.objects.extend(objs)
         return self
 
     def add_aerodynamic_fuselage(

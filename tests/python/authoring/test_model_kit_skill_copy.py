@@ -202,6 +202,8 @@ class TestModelKitSkillCopy(unittest.TestCase):
             "make_sculpted_wheel_fender_assembly",
             "make_transitional_coaming_collar",
             "make_aerodynamic_fuselage_assembly",
+            "make_towing_shackle_assembly",
+            "make_crane_lifting_lugs",
         ]
         for assembly in required_realism_assemblies:
             self.assertIn(assembly, func_names, f"Realism assembly {assembly} missing from RogueModelKit.py")
@@ -212,6 +214,8 @@ class TestModelKitSkillCopy(unittest.TestCase):
             "add_wheel_fenders",
             "add_transitional_coaming",
             "add_aerodynamic_fuselage",
+            "add_towing_shackles",
+            "add_lifting_lugs",
         ]
         for method in required_builder_methods:
             self.assertIn(method, vehicle_builder_methods, f"Method {method} missing from RogueVehicleBuilder")
@@ -225,6 +229,9 @@ class TestModelKitSkillCopy(unittest.TestCase):
         self.assertGreaterEqual(generator_source.count("with_fenders=True"), 4)
         self.assertGreaterEqual(generator_source.count("make_transitional_coaming_collar"), 15)
         self.assertGreaterEqual(generator_source.count("make_aerodynamic_fuselage_assembly"), 2)
+        self.assertGreaterEqual(generator_source.count("builder.add_towing_shackles"), 20)
+        self.assertGreaterEqual(generator_source.count("builder.add_lifting_lugs"), 25)
+        self.assertGreaterEqual(generator_source.count("builder.add_crew_cupola"), 12)
 
 
 if __name__ == "__main__":
