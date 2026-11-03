@@ -1,7 +1,7 @@
 ---
 name: rogue-command-clean-room-diagnostics
 description: "Clean-room in-game telemetry, diagnostic censuses, runtime gameplay command director, and BepInEx MCP bridge integration for Rogue Command (v1.0.9 / Unity 2021.3.45f2, Mono x64). [Diagnósticos runtime clean-room, censos de telemetría, director de comandos de gameplay y puente BepInEx MCP para Rogue Command]"
-version: 1.6.0
+version: 1.7.0
 license: MIT
 author: Hermes Agent
 metadata:
@@ -70,6 +70,7 @@ All censuses query live game singletons through fail-closed reflection and forma
 - **Multi-Agent Coordination** (`diagnostics_get_agent_coordination`): Active agent sessions, heartbeats, and advisory locks held on entities or camera.
 - **Visual Render, Rig & Animation Telemetry** (`diagnostics_get_visual_census`, `diagnostics_inspect_entity_visual`, `diagnostics_get_loaded_unit_visual_audit`): In-game and load-time evidence of 3D asset instantiation, active renderer components (`MeshRenderer`, `SkinnedMeshRenderer`, `ParticleSystemRenderer`), submesh and vertex counts, bounding boxes, assigned shaders (`RogueCommand/VehiclePBR_VertexWear`, `Standard`) and keywords (`_METALLICSPECGLOSSMAP`, `_NORMALMAP`), GPU instancing flags, LOD levels, rig architecture classification (`SkeletalArmature`, `NativeTransformRig`, `StaticVehicle`), root bone and bone count, canonical weapon/VFX/audio sockets (`Socket_MuzzlePrimary`, `FirePoint_0`, `Socket_WeaponAudio`, `Socket_EngineAudio`, `Socket_DamageSmoke`, `Socket_FootContact_*`), socket role ambiguity detection, Animator parameters (`RCL_IsMoving`, `RCL_Fire`, `RCL_Death`), active clips, playback speed, and `RuntimeVisualDirector` damage/jamming/recoil states. `diagnostics_inspect_entity_visual` automatically falls back to inspecting the registered loaded prefab template (`prefab:<entityId>`) when no living battlefield instance matches.
 - **Visual Surface & Vertex-Wear Census** (`diagnostics_get_visual_surface_census`): Per-living-unit telemetry of renderer/material counts, vertex counts, shader names, and averaged plus distribution counts for vertex-color channels on `RogueCommand/VehiclePBR_VertexWear` surfaces: R cavity AO/micro-relief (`R <= 0.4`), G edge wear/welds (`G >= 0.7`), B thermal soot/mud (`B >= 0.5`), and A team mask. Omission counter first.
+- **Visual Material & Texture Binding Census** (`diagnostics_get_visual_material_census`): Per-living-unit telemetry of renderer/material counts, material and shader names, bound texture names, and counts of materials exposing main/albedo, metallic-gloss, normal, and emission maps, plus shader keywords. Omission counter first.
 - **Unit & AI Loader Runtime Integration & Audit** (`diagnostics_get_loader_audit_census`, `diagnostics_order_reconcile_loader_state`):
   - Units can declare `defaultTacticalStance`, `defaultLoadout` (`"Standard"`, `"AP"`, `"HE"`, `"Speed"`, `"Siege"`, `"Reinforced"`, or a local `variants[].id`), `startingAffixes`, and `startingVeterancyRank` (`0..5`) in `content.json`, applied automatically on spawn by `RuntimeUnitMechanicsDirector` and reset on pooled reuse.
   - AI profiles can declare squad-wide defaults (`doctrine`, `aggressionMultiplier`, `defaultUnitStance`, `defaultUnitLoadout`, `startingUnitAffixes`, `startingUnitVeterancyRank`) in `content.json`. These apply automatically to AI units on spawn (`RuntimeGameplayCommandDirector.ApplyAiProfileUnitDefaultsToEntity`) and on AI initialization (`ApplyActiveAiUnitDefaultsToAiUnits`) without overriding explicit unit-level defaults.
@@ -216,7 +217,7 @@ The BepInEx MCP server is built with universal cross-agent compatibility support
 
 ### 5.1 Hermes Integration (Native Plugin & Skills)
 Hermes agents can communicate with the bridge using three distinct channels:
-1. **Hermes Plugin (`bepinex-mcp`)**: Installed at `C:\Users\Alex\AppData\Local\hermes\plugins\bepinex-mcp/` and enabled in `C:\Users\Alex\AppData\Local\hermes\config.yaml` (`plugins.enabled: [bepinex-mcp]`). All 177 tools are discovered as native MCP tools.
+1. **Hermes Plugin (`bepinex-mcp`)**: Installed at `C:\Users\Alex\AppData\Local\hermes\plugins\bepinex-mcp/` and enabled in `C:\Users\Alex\AppData\Local\hermes\config.yaml` (`plugins.enabled: [bepinex-mcp]`). All 178 tools are discovered as native MCP tools.
 2. **Hermes Skill Catalog**: Registered under `C:\Users\Alex\AppData\Local\hermes\skills\rogue-command\rogue-command-clean-room-diagnostics/`.
 3. **Hermes Direct CLI Execution**: When running in a shell or terminal without an active MCP connection:
    ```bash
@@ -226,7 +227,7 @@ Hermes agents can communicate with the bridge using three distinct channels:
    ```
 
 ### 5.2 Antigravity & Google Gemini CLI
-- Fully registered under `bepinex_mcp` with 177 generated schemas in `C:\Users\Alex\.gemini\antigravity\mcp\bepinex_mcp/`.
+- Fully registered under `bepinex_mcp` with 178 generated schemas in `C:\Users\Alex\.gemini\antigravity\mcp\bepinex_mcp/`.
 - Call eagerly or lazily using `call_mcp_tool(ServerName="bepinex_mcp", ToolName="...", Arguments={...})`.
 
 ### 5.3 Anthropic Claude Desktop
@@ -284,6 +285,12 @@ When adding any new telemetry or command endpoint:
    - Add tool spec to `tools/build_bepinex_mcp.py` and handler in `tools/bepinex_mcp_server.py`.
    - Run `python tools/build_bepinex_mcp.py` to regenerate all schemas.
    - Run `python tools/bepinex_mcp_server.py --generate-configs` to keep agent manifests in sync.
+
+### 6.1 Census additions that read Unity materials/textures
+
+- When a new census reads `Material.mainTexture` or `Material.GetTexture(...)`, add a `Texture` stub class with `name`/`width`/`height` to `UnityEngineTestStub.cs` and add `mainTexture`/`GetTexture`/`SetTexture` members to the `Material` stub, otherwise the offline harness cannot construct the row.
+- Add the new `Runtime*.cs` file to `tests/.../RogueCommandExpansionLoader.ValidationTests.csproj` as an explicit `<Compile Include>` entry (the test project does not glob `src/`); the plugin project does glob and needs no entry.
+- Keep the new tool count consistent across the skill, generated schemas, and agent manifests.
 
 ---
 
