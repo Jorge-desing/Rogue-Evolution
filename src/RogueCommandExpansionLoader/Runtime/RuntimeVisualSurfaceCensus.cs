@@ -24,28 +24,79 @@ namespace RogueCommandExpansionLoader.Runtime
         public float AverageTeamMask { get; }
         public IReadOnlyList<string> ShaderNames { get; }
 
+        public int RendererEnabledCount { get; }
+        public int VertexColorSampleCount { get; }
+        public float MinCavityAo { get; }
+        public float MaxCavityAo { get; }
+        public int MicroReliefVertexCount { get; }
+        public float MinEdgeWear { get; }
+        public float MaxEdgeWear { get; }
+        public int WeldVertexCount { get; }
+        public float MinThermalSoot { get; }
+        public float MaxThermalSoot { get; }
+        public int MudVertexCount { get; }
+        public float MinTeamMask { get; }
+        public float MaxTeamMask { get; }
+        public int LodCount { get; }
+        public IReadOnlyList<string> ShaderKeywords { get; }
+
         public VisualSurfaceRow(
             string entityKeyId,
             int rendererCount,
+            int rendererEnabledCount,
             int materialCount,
             int vertexCount,
             bool hasVertexColors,
+            int vertexColorSampleCount,
             float averageCavityAo,
+            float minCavityAo,
+            float maxCavityAo,
+            int microReliefVertexCount,
             float averageEdgeWear,
+            float minEdgeWear,
+            float maxEdgeWear,
+            int weldVertexCount,
             float averageThermalSoot,
+            float minThermalSoot,
+            float maxThermalSoot,
+            int mudVertexCount,
             float averageTeamMask,
-            IReadOnlyList<string> shaderNames)
+            float minTeamMask,
+            float maxTeamMask,
+            int lodCount,
+            IReadOnlyList<string> shaderNames,
+            IReadOnlyList<string> shaderKeywords)
         {
             EntityKeyId = entityKeyId ?? string.Empty;
             RendererCount = rendererCount < 0 ? 0 : rendererCount;
+            RendererEnabledCount = rendererEnabledCount < 0 ? 0 : rendererEnabledCount;
             MaterialCount = materialCount < 0 ? 0 : materialCount;
             VertexCount = vertexCount < 0 ? 0 : vertexCount;
             HasVertexColors = hasVertexColors;
+            VertexColorSampleCount = vertexColorSampleCount < 0 ? 0 : vertexColorSampleCount;
+
             AverageCavityAo = averageCavityAo;
+            MinCavityAo = minCavityAo;
+            MaxCavityAo = maxCavityAo;
+            MicroReliefVertexCount = microReliefVertexCount < 0 ? 0 : microReliefVertexCount;
+
             AverageEdgeWear = averageEdgeWear;
+            MinEdgeWear = minEdgeWear;
+            MaxEdgeWear = maxEdgeWear;
+            WeldVertexCount = weldVertexCount < 0 ? 0 : weldVertexCount;
+
             AverageThermalSoot = averageThermalSoot;
+            MinThermalSoot = minThermalSoot;
+            MaxThermalSoot = maxThermalSoot;
+            MudVertexCount = mudVertexCount < 0 ? 0 : mudVertexCount;
+
             AverageTeamMask = averageTeamMask;
+            MinTeamMask = minTeamMask;
+            MaxTeamMask = maxTeamMask;
+
+            LodCount = lodCount < 0 ? 0 : lodCount;
             ShaderNames = shaderNames ?? new List<string>().AsReadOnly();
+            ShaderKeywords = shaderKeywords ?? new List<string>().AsReadOnly();
         }
     }
 
@@ -136,16 +187,35 @@ namespace RogueCommandExpansionLoader.Runtime
             try { go = unit.gameObject; } catch { go = null; }
 
             int rendererCount = 0;
+            int rendererEnabledCount = 0;
             int materialCount = 0;
             int vertexCount = 0;
             bool hasColors = false;
             float sumR = 0f, sumG = 0f, sumB = 0f, sumA = 0f;
             int colorSamples = 0;
+            float minR = 1f, maxR = 0f;
+            float minG = 1f, maxG = 0f;
+            float minB = 1f, maxB = 0f;
+            float minA = 1f, maxA = 0f;
+            bool hasSample = false;
+            int weldCount = 0;
+            int mudCount = 0;
+            int microReliefCount = 0;
             var shaderNames = new List<string>();
+            var shaderKeywords = new List<string>();
             var seenShaders = new HashSet<string>(StringComparer.Ordinal);
+            var seenKeywords = new HashSet<string>(StringComparer.Ordinal);
+            int lodCount = 0;
 
             if (go != null)
             {
+                try
+                {
+                    LODGroup[] lods = go.GetComponentsInChildren<LODGroup>(true);
+                    if (lods != null) lodCount = lods.Length;
+                }
+                catch { lodCount = 0; }
+
                 Renderer[] renderers = go.GetComponentsInChildren<Renderer>(true);
                 rendererCount = renderers != null ? renderers.Length : 0;
 
@@ -154,6 +224,7 @@ namespace RogueCommandExpansionLoader.Runtime
                     foreach (Renderer renderer in renderers)
                     {
                         if (renderer == null) continue;
+                        if (renderer.enabled) rendererEnabledCount++;
 
                         Material[] mats = renderer.sharedMaterials;
                         if (mats != null)
@@ -167,6 +238,18 @@ namespace RogueCommandExpansionLoader.Runtime
                                 if (!string.IsNullOrWhiteSpace(shaderName) && seenShaders.Add(shaderName))
                                 {
                                     shaderNames.Add(shaderName);
+                                }
+                                string[] keywords = null;
+                                try { keywords = mat.shaderKeywords; } catch { keywords = null; }
+                                if (keywords != null)
+                                {
+                                    foreach (string kw in keywords)
+                                    {
+                                        if (!string.IsNullOrWhiteSpace(kw) && seenKeywords.Add(kw))
+                                        {
+                                            shaderKeywords.Add(kw);
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -194,6 +277,30 @@ namespace RogueCommandExpansionLoader.Runtime
                                     sumB += c.b;
                                     sumA += c.a;
                                     colorSamples++;
+
+                                    if (!hasSample)
+                                    {
+                                        minR = maxR = c.r;
+                                        minG = maxG = c.g;
+                                        minB = maxB = c.b;
+                                        minA = maxA = c.a;
+                                        hasSample = true;
+                                    }
+                                    else
+                                    {
+                                        if (c.r < minR) minR = c.r;
+                                        if (c.r > maxR) maxR = c.r;
+                                        if (c.g < minG) minG = c.g;
+                                        if (c.g > maxG) maxG = c.g;
+                                        if (c.b < minB) minB = c.b;
+                                        if (c.b > maxB) maxB = c.b;
+                                        if (c.a < minA) minA = c.a;
+                                        if (c.a > maxA) maxA = c.a;
+                                    }
+
+                                    if (c.g >= 0.7f) weldCount++;
+                                    if (c.b >= 0.5f) mudCount++;
+                                    if (c.r <= 0.4f) microReliefCount++;
                                 }
                             }
                         }
@@ -206,17 +313,29 @@ namespace RogueCommandExpansionLoader.Runtime
             float avgB = colorSamples > 0 ? sumB / colorSamples : 0f;
             float avgA = colorSamples > 0 ? sumA / colorSamples : 0f;
 
+            if (!hasSample)
+            {
+                minR = maxR = 0f;
+                minG = maxG = 0f;
+                minB = maxB = 0f;
+                minA = maxA = 0f;
+            }
+
             return new VisualSurfaceRow(
                 key,
                 rendererCount,
+                rendererEnabledCount,
                 materialCount,
                 vertexCount,
                 hasColors,
-                avgR,
-                avgG,
-                avgB,
-                avgA,
-                shaderNames.AsReadOnly());
+                colorSamples,
+                avgR, minR, maxR, microReliefCount,
+                avgG, minG, maxG, weldCount,
+                avgB, minB, maxB, mudCount,
+                avgA, minA, maxA,
+                lodCount,
+                shaderNames.AsReadOnly(),
+                shaderKeywords.AsReadOnly());
         }
     }
 }

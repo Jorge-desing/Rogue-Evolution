@@ -1782,14 +1782,34 @@ namespace RogueCommandExpansionLoader.Runtime
                     {
                         ["entityKeyId"] = row.EntityKeyId ?? string.Empty,
                         ["rendererCount"] = row.RendererCount,
+                        ["rendererEnabledCount"] = row.RendererEnabledCount,
                         ["materialCount"] = row.MaterialCount,
                         ["vertexCount"] = row.VertexCount,
                         ["hasVertexColors"] = row.HasVertexColors,
+                        ["vertexColorSampleCount"] = row.VertexColorSampleCount,
+
                         ["averageCavityAo"] = row.AverageCavityAo,
+                        ["minCavityAo"] = row.MinCavityAo,
+                        ["maxCavityAo"] = row.MaxCavityAo,
+                        ["microReliefVertexCount"] = row.MicroReliefVertexCount,
+
                         ["averageEdgeWear"] = row.AverageEdgeWear,
+                        ["minEdgeWear"] = row.MinEdgeWear,
+                        ["maxEdgeWear"] = row.MaxEdgeWear,
+                        ["weldVertexCount"] = row.WeldVertexCount,
+
                         ["averageThermalSoot"] = row.AverageThermalSoot,
+                        ["minThermalSoot"] = row.MinThermalSoot,
+                        ["maxThermalSoot"] = row.MaxThermalSoot,
+                        ["mudVertexCount"] = row.MudVertexCount,
+
                         ["averageTeamMask"] = row.AverageTeamMask,
+                        ["minTeamMask"] = row.MinTeamMask,
+                        ["maxTeamMask"] = row.MaxTeamMask,
+
+                        ["lodCount"] = row.LodCount,
                         ["shaderNames"] = row.ShaderNames != null ? row.ShaderNames : (object)Array.Empty<string>(),
+                        ["shaderKeywords"] = row.ShaderKeywords != null ? row.ShaderKeywords : (object)Array.Empty<string>(),
                     });
                 }
             }
