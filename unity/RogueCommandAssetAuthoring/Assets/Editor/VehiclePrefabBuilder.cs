@@ -1348,6 +1348,13 @@ namespace RogueCommandExpansion.Authoring
                 mat.SetFloat("_BumpScale", 1.0f);
             }
 
+            // Shared tileable rolled-steel micro relief (RNM-blended in the shader).
+            Texture2D detailTex = LoadConfiguredAtlasTexture(
+                "Assets/RogueCommandExpansionSample/Textures/Detail/RCL_SteelMicroDetail_Normal.png",
+                TextureImporterType.NormalMap, false, false);
+            mat.SetTexture("_DetailBumpMap", detailTex);
+            mat.SetFloat("_DetailBumpScale", detailTex != null ? 0.5f : 0.0f);
+
             if (emissionTex != null)
             {
                 mat.EnableKeyword("_EMISSION");

@@ -233,6 +233,7 @@ class TestModelKitSkillCopy(unittest.TestCase):
             "add_fuel_drums",
             "add_exhaust_deflector",
             "add_weld_seams",
+            "add_glacis_weld_seams",
         ]
         for method in required_builder_methods:
             self.assertIn(method, vehicle_builder_methods, f"Method {method} missing from RogueVehicleBuilder")
@@ -252,12 +253,27 @@ class TestModelKitSkillCopy(unittest.TestCase):
         self.assertGreaterEqual(generator_source.count("builder.add_interlocking_gussets"), 8)
         self.assertGreaterEqual(generator_source.count("builder.add_splash_rib"), 10)
         self.assertGreaterEqual(generator_source.count("builder.add_weld_seams"), 3)
+        self.assertGreaterEqual(generator_source.count("builder.add_glacis_weld_seams"), 10)
         self.assertGreaterEqual(generator_source.count("builder.add_bustle_basket"), 6)
         self.assertGreaterEqual(generator_source.count("builder.add_commander_sight"), 8)
         self.assertGreaterEqual(generator_source.count("builder.add_recovery_winch"), 6)
         self.assertGreaterEqual(generator_source.count("builder.add_fuel_drums"), 3)
         self.assertGreaterEqual(generator_source.count("builder.add_era_bricks"), 4)
         self.assertGreaterEqual(generator_source.count("builder.add_exhaust_deflector"), 4)
+    def test_shader_and_builder_wire_steel_micro_detail(self) -> None:
+        """The detail normal texture, shader sampler, and prefab builder binding must stay in sync."""
+        shader = (REPO_ROOT / "unity" / "RogueCommandAssetAuthoring" / "Assets" / "RogueCommandExpansionSample"
+                  / "Shaders" / "VehiclePBR_VertexWear.shader").read_text(encoding="utf-8")
+        self.assertIn("BlendNormalsRNM", shader)
+        self.assertIn("UnpackNormalScale(detailPacked", shader)
+        builder = (REPO_ROOT / "unity" / "RogueCommandAssetAuthoring" / "Assets" / "Editor"
+                   / "VehiclePrefabBuilder.cs").read_text(encoding="utf-8")
+        self.assertIn("RCL_SteelMicroDetail_Normal.png", builder)
+        self.assertIn('"_DetailBumpMap"', builder)
+        texture = (REPO_ROOT / "unity" / "RogueCommandAssetAuthoring" / "Assets" / "RogueCommandExpansionSample"
+                   / "Textures" / "Detail" / "RCL_SteelMicroDetail_Normal.png")
+        self.assertTrue(texture.is_file(), f"Missing {texture}")
+
     def test_surge_arc_tank_envelope_allows_f2_suspension_clearance(self) -> None:
         """The custom Surge builder must leave room for f2cd4cb track details."""
         source = (REPO_ROOT / "tools" / "Build-SurgeArcTankModel.py").read_text(encoding="utf-8")

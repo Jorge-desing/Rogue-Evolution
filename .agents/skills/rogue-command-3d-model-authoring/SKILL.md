@@ -447,6 +447,7 @@ To eliminate toy-like constant-radius cylinders and repetitive stacked rings ("t
 - **Weighted Normals Export**: `merge_meshes_by_material` applies `shade_smooth_by_angle(38°)` and `apply_weighted_normals(weight=60, keep_sharp=True)` on every exported batch.
 - **Ground Mud & Dust**: `VehiclePBR_VertexWear.shader` procedurally accumulates terrain dust/mud on chassis and wheels below `_MudHeight` (0.55m).
 - **RNM Micro-Detail**: `BlendNormalsRNM` blends micro-steel texture with Toksvig anti-shimmering at distance.
+- **Fleet Glacis Seams (Wave 9)**: `.add_glacis_weld_seams()` follows every `add_splash_rib()` call; `tools/generate_steel_micro_detail_normal.py` regenerates the shared tileable `RCL_SteelMicroDetail_Normal.png` bound by `VehiclePrefabBuilder` to `_DetailBumpMap`.
 - **Addon Tooling**: `tools/Setup-BlenderAuthoringAddons.ps1` configures `EdgeFlow`, `DreamUV`, and `Ucupaint` in Blender 4.5.14.
 
 ---

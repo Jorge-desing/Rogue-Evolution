@@ -1311,6 +1311,7 @@ def build_vehicle_model(
         builder.add_towing_shackles()
         builder.add_lifting_lugs()
         builder.add_splash_rib()
+        builder.add_glacis_weld_seams()
         builder.add_fuel_drums()
         builder.add_turret(size=(1.3, 1.4, 0.42), center_y=0.0)
         builder.add_crew_cupola()
@@ -1489,6 +1490,7 @@ def build_vehicle_model(
         builder.add_towing_shackles()
         builder.add_lifting_lugs()
         builder.add_splash_rib()
+        builder.add_glacis_weld_seams()
         builder.add_turret(size=(1.5, 1.65, 0.52), center_y=0.04)
         builder.add_crew_cupola()
         builder.add_commander_sight()
@@ -1527,6 +1529,7 @@ def build_vehicle_model(
         builder.add_towing_shackles()
         builder.add_lifting_lugs()
         builder.add_splash_rib()
+        builder.add_glacis_weld_seams()
         builder.add_commander_sight()
         builder.add_flight_deck(size=(2.10, 3.20, 0.22))
         builder.objects.extend([
@@ -1696,6 +1699,7 @@ def build_vehicle_model(
         builder.add_lifting_lugs()
         builder.add_recovery_winch()
         builder.add_splash_rib()
+        builder.add_glacis_weld_seams()
         builder.add_era_bricks()
         builder.objects.extend([
             rmk.make_cylinder(
@@ -1769,6 +1773,7 @@ def build_vehicle_model(
         builder.add_towing_shackles()
         builder.add_lifting_lugs()
         builder.add_splash_rib()
+        builder.add_glacis_weld_seams()
         builder.add_turret(size=(1.50, 1.65, 0.46), center_y=0.22)
         builder.add_crew_cupola()
         builder.add_commander_sight()
@@ -1905,6 +1910,7 @@ def build_vehicle_model(
         builder.add_towing_shackles()
         builder.add_lifting_lugs()
         builder.add_splash_rib()
+        builder.add_glacis_weld_seams()
         builder.add_exhaust_deflector()
         builder.objects.extend([
             rmk.make_box(f"{name}Armor_MineHopper", (1.70, 1.30, 0.62), (0.0, -0.80, 1.22), builder.palette.primary_armor, 0.035),
@@ -2017,6 +2023,7 @@ def build_vehicle_model(
         builder.add_lifting_lugs()
         builder.add_recovery_winch()
         builder.add_splash_rib()
+        builder.add_glacis_weld_seams()
         builder.add_exhaust_deflector()
         builder.objects.extend([
             rmk.make_box(f"{name}Armor_LaunchCradle", (1.85, 0.55, 0.36), (0.0, 1.48, 1.05), builder.palette.gunmetal, 0.025),
@@ -2142,6 +2149,7 @@ def build_vehicle_model(
         builder.add_towing_shackles()
         builder.add_lifting_lugs()
         builder.add_splash_rib()
+        builder.add_glacis_weld_seams()
         builder.add_exhaust_deflector()
         builder.objects.extend([
             rmk.make_box(f"{name}Armor_CasemateSuperstructure", (1.92, 2.05, 0.48), (0.0, -0.22, 1.16), builder.palette.primary_armor, 0.035),
@@ -2315,6 +2323,7 @@ def build_vehicle_model(
         builder.add_lifting_lugs()
         builder.add_interlocking_gussets()
         builder.add_splash_rib()
+        builder.add_glacis_weld_seams()
         builder.add_commander_sight()
         builder.add_era_bricks()
         builder.objects.extend([
@@ -2449,6 +2458,7 @@ def build_vehicle_model(
         builder.add_towing_shackles()
         builder.add_lifting_lugs()
         builder.add_splash_rib()
+        builder.add_glacis_weld_seams()
         builder.add_turret(size=(1.55, 1.75, 0.46), center_y=0.08)
         builder.add_crew_cupola()
         builder.add_bustle_basket()

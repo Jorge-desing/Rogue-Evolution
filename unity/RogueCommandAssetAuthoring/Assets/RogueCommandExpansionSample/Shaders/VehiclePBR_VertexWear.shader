@@ -222,8 +222,11 @@ Shader "RogueCommand/VehiclePBR_VertexWear"
                 // Micro-surface normal sampling with Reoriented Normal Mapping (RNM)
                 half3 baseNormalTS = SampleNormal(input.uv,
                     TEXTURE2D_ARGS(_BumpMap, sampler_BumpMap), _BumpScale);
-                half3 detailNormalTS = SampleNormal(input.uv * _DetailTiling,
-                    TEXTURE2D_ARGS(_DetailBumpMap, sampler_DetailBumpMap), _DetailBumpScale);
+                // Sampled directly (not via SampleNormal) so micro-relief works without the _NORMALMAP keyword.
+                // Fades with distance so far RTS views do not shimmer.
+                half detailFade = 1.0h - saturate((distToCam - 18.0h) / 40.0h);
+                half4 detailPacked = SAMPLE_TEXTURE2D(_DetailBumpMap, sampler_DetailBumpMap, input.uv * _DetailTiling);
+                half3 detailNormalTS = UnpackNormalScale(detailPacked, _DetailBumpScale * detailFade);
                 surfaceData.normalTS = BlendNormalsRNM(baseNormalTS, detailNormalTS);
                 surfaceData.emission = SampleEmission(input.uv, _EmissionColor.rgb,
                     TEXTURE2D_ARGS(_EmissionMap, sampler_EmissionMap));

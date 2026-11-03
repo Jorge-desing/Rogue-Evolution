@@ -850,3 +850,9 @@ To elevate realism beyond clean primitive blockouts and eliminate knife-edge joi
   - View-distance Toksvig damping softens specular highlights at high RTS camera elevations to eliminate pixel shimmering.
 - **Automated Open-Source Addon Installer (`tools/Setup-BlenderAuthoringAddons.ps1`)**:
   - Automates installation and verification of `EdgeFlow` (edge-loop curvature), `DreamUV` (trim-sheet mapping), and `Ucupaint` (layered PBR texturing) directly in Blender 4.5.14 LTS.
+
+### Wave 9: Fleet-Wide Glacis Weld Seams & Shared Steel Micro-Detail Normal (local build/validation evidence)
+
+- **`add_glacis_weld_seams()`**: hull-scaled scalloped weld beads along both glacis-to-side-plate junctions; applied to every archetype that already carries `add_splash_rib()` (13 total with the Wave 8 hand-placed trio).
+- **`RCL_SteelMicroDetail_Normal.png`** (`tools/generate_steel_micro_detail_normal.py`): deterministic, seamlessly tileable (FFT-periodic) 256 px rolled-steel/cast-grain normal with anisotropic streaks and sparse pitting. `VehiclePrefabBuilder` binds it to `_DetailBumpMap` (scale 0.5) and the shader RNM-blends it independently of `_NORMALMAP`, fading out between 18 m and 58 m camera distance to prevent RTS shimmer.
+- Runtime/Steam evidence: **none** for this wave. Builds, importer settings, and Blender previews do not prove in-game rendering; the Unity AssetBundle rebuild and a Profile2 Steam acceptance run remain pending.
