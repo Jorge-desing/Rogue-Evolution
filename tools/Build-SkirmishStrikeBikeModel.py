@@ -15,6 +15,7 @@ FBX_PATH = (REPO_ROOT / "unity" / "RogueCommandAssetAuthoring" / "Assets" /
 PREVIEW_PATH = REPO_ROOT / "artifacts" / "previews" / "skirmish-strike-bike.png"
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import RogueModelKit as modelkit
+from ActiveUnitVisualEnhancements import apply_wave2_details
 
 
 def fit_length_to_native_footprint(model_objects, max_length=2.2):
@@ -311,6 +312,13 @@ def main():
         "StrikeBikeArmor_FrontCrashBar", (0.70, 0.085, 0.095),
         (0.0, 0.98, 0.76), gunmetal, 0.025))
 
+    model_objects.extend(apply_wave2_details(
+        "SkirmishStrikeBike",
+        objects=model_objects,
+        object_prefix="StrikeBike",
+        materials={"armor": armor, "gunmetal": gunmetal, "warning": warning, "tread": rubber},
+    ))
+
     fit_length_to_native_footprint(model_objects)
     diagnostics = modelkit.validate_model_mesh_quality(model_objects)
     if not diagnostics["ground_contact_valid"] or diagnostics["missing_materials"]:
@@ -323,7 +331,7 @@ def main():
     bpy.ops.wm.save_as_mainfile(filepath=str(BLEND_PATH))
     bpy.ops.render.render(write_still=True)
 
-    batched_objects = modelkit.merge_meshes_by_material(model_objects, "StrikeBike", {
+    batched_objects = modelkit.merge_meshes_by_material(model_objects, "SkirmishStrikeBike", {
         armor: "armor", armor_light: "lightArmor", rubber: "rubber", wheel: "wheel",
         gunmetal: "gunmetal", warning: "warning", sensor: "arc"
     })

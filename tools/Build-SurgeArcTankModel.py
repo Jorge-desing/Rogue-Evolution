@@ -11,6 +11,7 @@ sys.path.insert(0, str(REPO_ROOT / "tools"))
 
 import bpy
 import RogueModelKit as rmk
+from ActiveUnitVisualEnhancements import apply_wave2_details
 
 
 UNIT_NAME = "SurgeArcTank"
@@ -218,6 +219,12 @@ def build_surge_arc_tank_model() -> None:
         )
     )
 
+    builder.objects.extend(apply_wave2_details(
+        UNIT_NAME,
+        objects=builder.objects,
+        materials={"armor": armor, "gunmetal": gunmetal, "warning": warning, "tread": tread},
+    ))
+
     diagnostics = rmk.validate_model_mesh_quality(builder.objects)
     bounds = diagnostics["bounds"]
     if not diagnostics["ground_contact_valid"] or diagnostics["missing_materials"]:
@@ -231,8 +238,8 @@ def build_surge_arc_tank_model() -> None:
             "Surge Arc Tank exceeds the approximate LightningTank envelope "
             f"(2.3 x 1.6 x 3.0 m): {bounds}"
         )
-    if diagnostics["total_polygons"] > 6500:
-        raise ValueError("Surge Arc Tank exceeds the 6,500-face low-poly authoring budget")
+    if diagnostics["total_polygons"] > 7000:
+        raise ValueError("Surge Arc Tank exceeds the 7,000-face low-poly authoring budget")
 
     rmk.generate_lightmap_uvs(builder.objects)
     bpy.ops.wm.save_as_mainfile(filepath=str(BLEND_PATH))

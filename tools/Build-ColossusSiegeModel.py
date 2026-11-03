@@ -24,6 +24,7 @@ sys.path.insert(0, str(REPO_ROOT / "tools"))
 import bpy
 from mathutils import Vector
 import RogueModelKit as rmk
+from ActiveUnitVisualEnhancements import apply_wave2_details
 
 
 # Target paths (customize for your unit)
@@ -317,6 +318,13 @@ def build_colossus_siege_model():
                          rotation=(math.radians(22), 0.0, 0.0)),
         ]
 
+    model_objects.extend(apply_wave2_details(
+        "ColossusSiegePlatform",
+        objects=model_objects,
+        object_prefix="Colossus",
+        materials={"armor": armor_primary, "gunmetal": gunmetal, "warning": warning_amber, "tread": tread_mat},
+    ))
+
     # 8. Automated Quality Diagnostics & Validation
     diagnostics = rmk.validate_model_mesh_quality(model_objects)
     if not diagnostics["ground_contact_valid"] or diagnostics["missing_materials"]:
@@ -332,7 +340,7 @@ def build_colossus_siege_model():
     bpy.ops.wm.save_as_mainfile(filepath=str(BLEND_PATH))
     bpy.ops.render.render(write_still=True)
 
-    export_batches = rmk.merge_meshes_by_material(model_objects, "Colossus", {
+    export_batches = rmk.merge_meshes_by_material(model_objects, "ColossusSiegePlatform", {
         armor_primary: "armor",
         armor_light: "lightArmor",
         gunmetal: "gunmetal",

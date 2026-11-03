@@ -12,6 +12,7 @@ from VisualModelAuthoringSupport import (
     remove_objects, run_preset_build, set_material_color,
     simplify_command_wheels,
 )
+from ActiveUnitVisualEnhancements import apply_wave2_details
 
 
 def refine(builder):
@@ -134,6 +135,12 @@ def refine(builder):
     builder.engine_audio_loc = Vector((0.0, -1.58, 0.86))
     builder.weapon_audio_loc = Vector(builder.gun_pivot)
     builder.center_of_mass_loc = Vector((0.0, -0.05, 0.92))
+
+    builder.objects.extend(apply_wave2_details(
+        "OverlordCommandHQ",
+        objects=builder.objects,
+        materials={"armor": p.primary_armor, "gunmetal": p.gunmetal, "warning": p.warning, "tread": p.tread},
+    ))
 
     builder.add_unity_locators()
     for socket in builder.locator_sockets:

@@ -11,6 +11,7 @@ sys.path.insert(0, str(REPO_ROOT / "tools"))
 
 import bpy
 import RogueModelKit as rmk
+from ActiveUnitVisualEnhancements import apply_wave2_details
 from mathutils import Vector
 
 
@@ -163,6 +164,12 @@ def build_ironclad_walker_model() -> None:
                 accent_mat=warning,
             )
         )
+
+    builder.objects.extend(apply_wave2_details(
+        UNIT_NAME,
+        objects=builder.objects,
+        materials={"armor": armor, "gunmetal": gunmetal, "warning": warning},
+    ))
 
     diagnostics = rmk.validate_model_mesh_quality(builder.objects)
     bounds = diagnostics["bounds"]

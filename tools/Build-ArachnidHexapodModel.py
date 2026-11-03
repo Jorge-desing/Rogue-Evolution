@@ -11,6 +11,7 @@ from VisualModelAuthoringSupport import (
     add_box, add_link, add_loft_shell, add_y_axis_tube, hex_color,
     remove_objects, replace_link_mesh, run_preset_build, set_material_color,
 )
+from ActiveUnitVisualEnhancements import apply_wave2_details
 
 
 def refine(builder):
@@ -162,6 +163,12 @@ def refine(builder):
         "ML": Vector((-2.45, 0.0, 0.0)), "MR": Vector((2.45, 0.0, 0.0)),
         "RL": Vector((-2.35, -2.25, 0.0)), "RR": Vector((2.35, -2.25, 0.0)),
     }
+
+    builder.objects.extend(apply_wave2_details(
+        "ArachnidHexapod",
+        objects=builder.objects,
+        materials={"armor": p.primary_armor, "gunmetal": p.gunmetal, "warning": p.warning, "tread": p.tread},
+    ))
 
     # Create canonical sockets now so the two mission-specific anchors can be
     # moved without duplicating the generator's authoritative hierarchy.

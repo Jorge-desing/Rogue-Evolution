@@ -15,6 +15,7 @@ FBX_PATH = (REPO_ROOT / "unity" / "RogueCommandAssetAuthoring" / "Assets" /
 PREVIEW_PATH = REPO_ROOT / "artifacts" / "previews" / "sandlance-scout.png"
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import RogueModelKit as modelkit
+from ActiveUnitVisualEnhancements import apply_wave2_details
 
 
 def clear_scene():
@@ -269,6 +270,13 @@ def main():
             "ScoutAccent_RearMarker_{0}".format(side_name),
             (0.12, 0.16, 0.035), (side * 0.45, -0.56, 0.92), amber, 0.012))
 
+    model_objects.extend(apply_wave2_details(
+        "SandlanceScout",
+        objects=model_objects,
+        object_prefix="Scout",
+        materials={"armor": armor, "gunmetal": gunmetal, "warning": amber, "tread": tread},
+    ))
+
     diagnostics = modelkit.validate_model_mesh_quality(model_objects)
     if not diagnostics["ground_contact_valid"] or diagnostics["missing_materials"]:
         raise ValueError("Scout model failed ground-contact or material validation")
@@ -280,7 +288,7 @@ def main():
     bpy.ops.wm.save_as_mainfile(filepath=str(BLEND_PATH))
     bpy.ops.render.render(write_still=True)
 
-    batched_objects = modelkit.merge_meshes_by_material(model_objects, "Scout", {
+    batched_objects = modelkit.merge_meshes_by_material(model_objects, "SandlanceScout", {
         armor: "armor", armor_light: "lightArmor", tread: "tread", wheel: "wheel",
         gunmetal: "gunmetal", amber: "amber", sensor: "sensor"
     })

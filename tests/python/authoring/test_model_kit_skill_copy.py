@@ -244,10 +244,62 @@ class TestModelKitSkillCopy(unittest.TestCase):
             "Surge Arc Tank envelope rejects the f2cd4cb suspension/mudflap extent",
         )
         self.assertIn(
-            'diagnostics["total_polygons"] > 6500',
+            'diagnostics["total_polygons"] > 7000',
             source,
-            "Surge Arc Tank polygon guard rejects the f2cd4cb suspension details",
+            "Surge Arc Tank polygon guard rejects the completed Wave 2 detail set",
         )
+
+    def test_custom_visual_exporters_match_unity_batch_prefixes(self) -> None:
+        """Manual source exporters must use the prefixes expected by the Unity scaffolder."""
+        expected = {
+            "Build-SampleScoutModel.py": "SandlanceScout",
+            "Build-ColossusSiegeModel.py": "ColossusSiegePlatform",
+            "Build-SkirmishStrikeBikeModel.py": "SkirmishStrikeBike",
+        }
+        for filename, prefix in expected.items():
+            with self.subTest(builder=filename):
+                source = (REPO_ROOT / "tools" / filename).read_text(encoding="utf-8")
+                self.assertIn(f'merge_meshes_by_material(model_objects, "{prefix}"', source)
+        manual = (REPO_ROOT / "tools" / "Apply-ManualUnitWave2Details.py").read_text(encoding="utf-8")
+        self.assertIn('prefix=unit_name', manual)
+        self.assertIn('include_empties=True', manual)
+
+    def test_active_units_have_wave2_visual_profiles(self) -> None:
+        """Every custom active unit has an explicit f2cd4cb/8d31bc1 integration profile."""
+        support = REPO_ROOT / "tools" / "ActiveUnitVisualEnhancements.py"
+        self.assertTrue(support.is_file(), f"Missing {support}")
+        namespace = {}
+        tree = ast.parse(support.read_text(encoding="utf-8"), filename=str(support))
+        profile_assignment = next(
+            node for node in tree.body
+            if isinstance(node, ast.Assign)
+            and any(isinstance(target, ast.Name) and target.id == "ACTIVE_UNIT_WAVE2_PROFILES" for target in node.targets)
+        )
+        profiles = ast.literal_eval(profile_assignment.value)
+        required = {
+            "SandlanceScout": {"towing", "lifting", "suspension"},
+            "ColossusSiegePlatform": {"towing", "lifting", "suspension"},
+            "IroncladWalker": {"lifting"},
+            "AtlasCraneMech": {"lifting"},
+            "BastionSiegeMech": {"lifting", "crawler"},
+            "ArachnidHexapod": {"lifting", "crawler", "missile"},
+            "OverlordCommandHQ": {"towing", "lifting", "suspension", "fenders", "coaming"},
+            "SkirmishStrikeBike": {"coaming"},
+            "SurgeArcTank": {"towing", "lifting", "suspension"},
+            "TidebreakerHovercraft": {"hover"},
+            "SalvageHauler": {"towing", "lifting"},
+            "SkyguardSAM": {"towing", "lifting", "missile"},
+            "BulwarkSiegeTank": {"towing", "lifting"},
+            "ArcLanceWalker": {"lifting"},
+            "FieldMedicRover": {"towing", "lifting", "fenders"},
+            "SentinelRelay": {"towing", "lifting"},
+            "GravitasBreaker": {"towing", "lifting"},
+            "CommandRelay": {"towing", "lifting"},
+        }
+        self.assertEqual(set(required), set(profiles), "Wave 2 profile coverage drifted from active units")
+        for unit, features in required.items():
+            with self.subTest(unit=unit):
+                self.assertTrue(features.issubset(set(profiles[unit]["features"])))
 
 
 if __name__ == "__main__":
