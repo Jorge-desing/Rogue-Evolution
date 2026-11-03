@@ -27,6 +27,11 @@ Shader "RogueCommand/VehiclePBR_VertexWear"
         _MudHeight ("Mud Splatter Height", Float) = 0.55
         _MudSmoothness ("Mud Surface Smoothness", Range(0.0, 1.0)) = 0.20
 
+        [Header(Procedural Weld Beads)]
+        _WeldBeadStrength ("Weld Bead Strength", Range(0.0, 2.0)) = 0.6
+        _WeldBeadScale ("Weld Bead Scale", Float) = 24.0
+        _WeldBeadWidth ("Weld Bead Width", Range(0.01, 0.5)) = 0.12
+
         [Header(Micro Surface Detail RNM)]
         [Normal] _DetailBumpMap ("Micro Detail Normal", 2D) = "bump" {}
         _DetailBumpScale ("Detail Normal Scale", Range(0.0, 2.0)) = 0.5
@@ -99,6 +104,9 @@ Shader "RogueCommand/VehiclePBR_VertexWear"
                 half _MudAmount;
                 half _MudHeight;
                 half _MudSmoothness;
+                half _WeldBeadStrength;
+                half _WeldBeadScale;
+                half _WeldBeadWidth;
                 half _Cutoff;
                 half _Surface;
             CBUFFER_END
@@ -205,6 +213,11 @@ Shader "RogueCommand/VehiclePBR_VertexWear"
                 surfaceData.metallic = saturate(surfaceData.metallic - soot * 0.40h);
 
                 surfaceData.smoothness = saturate(lerp(surfaceData.smoothness, 0.85h, steelMask * 0.8h) * (1.0h - primerMask * 0.4h));
+                // Procedural weld bead oxidation along high edge-wear regions
+                half weldBeadSoot = smoothstep(0.5h - _WeldBeadWidth, 0.5h + _WeldBeadWidth,
+                    sin((input.uv.x + input.uv.y) * _WeldBeadScale) * 0.5h + 0.5h) * steelMask;
+                surfaceData.albedo = lerp(surfaceData.albedo, half3(0.10h, 0.09h, 0.08h), weldBeadSoot * 0.5h);
+                surfaceData.smoothness = saturate(surfaceData.smoothness * (1.0h - weldBeadSoot * 0.4h));
                 surfaceData.smoothness *= (1.0h - soot * 0.65h);
 
                 // Procedural ground mud & road dust accumulation on chassis, tracks, and lower hull
@@ -220,6 +233,17 @@ Shader "RogueCommand/VehiclePBR_VertexWear"
                 surfaceData.smoothness = lerp(surfaceData.smoothness, surfaceData.smoothness * 0.75h, shimmerDamping);
 
                 // Micro-surface normal sampling with Reoriented Normal Mapping (RNM)
+                // Procedural weld bead: raised bead normal along high edge-wear (steel) regions
+                half weldBeadMask = steelMask;
+                half weldBead = sin((input.uv.x + input.uv.y) * _WeldBeadScale) * 0.5h + 0.5h;
+                weldBead = smoothstep(0.5h - _WeldBeadWidth, 0.5h + _WeldBeadWidth, weldBead) * weldBeadMask * _WeldBeadStrength;
+                half3 weldNormalTS = half3(0.0h, 0.0h, 1.0h + weldBead);
+
+                // Procedural hard-surface edge highlight (rim) on bare steel
+                half3 viewDirWS = GetWorldSpaceNormalizeViewDir(input.positionWS);
+                half rim = pow(saturate(1.0h - dot(input.normalWS, viewDirWS)), 3.0h);
+                half edgeHighlight = rim * steelMask * 0.35h;
+
                 half3 baseNormalTS = SampleNormal(input.uv,
                     TEXTURE2D_ARGS(_BumpMap, sampler_BumpMap), _BumpScale);
                 // Sampled directly (not via SampleNormal) so micro-relief works without the _NORMALMAP keyword.
@@ -228,8 +252,10 @@ Shader "RogueCommand/VehiclePBR_VertexWear"
                 half4 detailPacked = SAMPLE_TEXTURE2D(_DetailBumpMap, sampler_DetailBumpMap, input.uv * _DetailTiling);
                 half3 detailNormalTS = UnpackNormalScale(detailPacked, _DetailBumpScale * detailFade);
                 surfaceData.normalTS = BlendNormalsRNM(baseNormalTS, detailNormalTS);
+                surfaceData.normalTS = BlendNormalsRNM(surfaceData.normalTS, weldNormalTS);
                 surfaceData.emission = SampleEmission(input.uv, _EmissionColor.rgb,
                     TEXTURE2D_ARGS(_EmissionMap, sampler_EmissionMap));
+                surfaceData.emission += edgeHighlight * half3(1.0h, 0.95h, 0.85h);
                 surfaceData.occlusion = 1.0h;
                 surfaceData.specular = half3(0, 0, 0);
                 surfaceData.clearCoatMask = 0.0h;
