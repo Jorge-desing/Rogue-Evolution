@@ -1252,6 +1252,19 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
                 "GetLoadedPrefabVisualAuditJson",
                 "GetLoaderAuditCensusJson",
                 "GetUnitMechanicsCensusJson",
+                "GetVisualSurfaceCensusJson",
+                "GetVisualMaterialCensusJson",
+                "GetAudioCensusJson",
+                "GetCameraCensusJson",
+                "GetCommandAuraCensusJson",
+                "GetTechCatalogJson",
+                "GetMatchSummaryJson",
+                "GetEntityCatalogJson",
+                "GetCombatXpEntriesJson",
+                "GetUnitLoadoutCensusJson",
+                "GetAiModulesDiagnosticsJson",
+                "GetGridMetricsJson",
+                "GetFogStateJson",
             ]
             for getter in getters:
                 try:
