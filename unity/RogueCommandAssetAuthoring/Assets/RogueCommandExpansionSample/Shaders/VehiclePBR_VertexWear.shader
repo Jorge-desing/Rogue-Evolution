@@ -32,6 +32,11 @@ Shader "RogueCommand/VehiclePBR_VertexWear"
         _WeldBeadScale ("Weld Bead Scale", Float) = 24.0
         _WeldBeadWidth ("Weld Bead Width", Range(0.01, 0.5)) = 0.12
 
+        [Header(Thermal Tempering and Crevice Dust)]
+        _ThermalTemperingIntensity ("Thermal Tempering (Heat Bluing)", Range(0.0, 1.0)) = 0.75
+        _CreviceDustIntensity ("Crevice Micro-Dust Softening", Range(0.0, 1.0)) = 0.50
+        _ZenithBleach ("Zenith Sun Bleach", Range(0.0, 1.0)) = 0.35
+
         [Header(Micro Surface Detail RNM)]
         [Normal] _DetailBumpMap ("Micro Detail Normal", 2D) = "bump" {}
         _DetailBumpScale ("Detail Normal Scale", Range(0.0, 2.0)) = 0.5
@@ -107,6 +112,9 @@ Shader "RogueCommand/VehiclePBR_VertexWear"
                 half _WeldBeadStrength;
                 half _WeldBeadScale;
                 half _WeldBeadWidth;
+                half _ThermalTemperingIntensity;
+                half _CreviceDustIntensity;
+                half _ZenithBleach;
                 half _Cutoff;
                 half _Surface;
             CBUFFER_END
@@ -201,6 +209,21 @@ Shader "RogueCommand/VehiclePBR_VertexWear"
 
                 // Cavity AO and Thermal Soot darkening
                 surfaceData.albedo *= ao * (1.0h - soot * 0.75h);
+
+                // Thermal tempering fringe (straw and blue oxide rings) at the boundary of thermal soot
+                half temperMask = smoothstep(0.10h, 0.32h, soot) * (1.0h - smoothstep(0.48h, 0.72h, soot)) * _ThermalTemperingIntensity;
+                half blueMask = smoothstep(0.25h, 0.45h, soot) * (1.0h - smoothstep(0.55h, 0.75h, soot));
+                half3 temperColor = lerp(half3(0.83h, 0.69h, 0.22h), half3(0.26h, 0.33h, 0.53h), blueMask);
+                surfaceData.albedo = lerp(surfaceData.albedo, temperColor, temperMask * 0.70h);
+                surfaceData.metallic = saturate(surfaceData.metallic + temperMask * 0.30h);
+
+                // Crevice micro-dust softening: deep recesses lose specular gloss due to trapped dry micro-dust
+                half creviceDust = (1.0h - ao) * _CreviceDustIntensity;
+                surfaceData.smoothness = saturate(surfaceData.smoothness * (1.0h - creviceDust * 0.45h));
+
+                // Zenith sun bleach on upward-facing armor surfaces
+                half zenithBleach = saturate(input.normalWS.y - 0.55h) * (1.0h - soot) * _ZenithBleach * 0.25h;
+                surfaceData.albedo = lerp(surfaceData.albedo, surfaceData.albedo * 1.12h + half3(0.02h, 0.02h, 0.02h), zenithBleach);
 
                 // Two-tier edge wear: oxidized dark primer border (#2c2724) + bare bright alloy ridge (#c7ccd6)
                 half primerMask = smoothstep(0.12h, 0.45h, wear) * (1.0h - smoothstep(0.50h, 0.85h, wear));

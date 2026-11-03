@@ -861,3 +861,25 @@ To elevate realism beyond clean primitive blockouts and eliminate knife-edge joi
 
 - **`add_deck_edge_weld_seams()`**: scalloped weld beads along both upper deck-to-side-plate edges, scaled to the hull; emitted right after each single-line `builder.add_sloped_hull(...)` call (23 archetype branches). Combined with Wave 9 glacis seams, sloped-hull vehicles now show welded plate construction on both the front and top edges.
 - Evidence level: local Blender build only; no Unity bundle rebuild or Steam runtime run.
+
+
+### Wave 11: Turret Ring Guards, Driver Periscope Hoods, Exhaust Heat Shields & Thermal Tempering (local build/validation evidence)
+
+To banish floating boxes, disconnected primitive joins, and toy-like surfaces, Wave 11 deploys heavy load-bearing structural collars, crewed vision architecture, and metallurgical thermal tempering across `RogueModelKit.py`, `generate_unit_model.py`, and `VehiclePBR_VertexWear.shader`:
+
+- **Armored Turret Ring Guard & Shot-Trap Deflector Collar (`make_turret_ring_guard` / `.add_turret_ring_guard()`)**:
+  - Armored circular deflector ring / yaw-race coaming with upper kinetic bevel, stepped inner yaw bearing lip, and 8 radial hex bolt studs physically seating and boxing the turret into the hull deck.
+  - Deployed across 12 turreted combat archetypes (`tank`, `artillery`, `arc_tank`, `super_heavy`, `flak_anti_air`, `thermobaric_tank`, `combat_harvester`, `recovery_crawler`, `sniper_tankette`, `mortar_carrier`, `gravity_siege_breaker`, `amphibious_assault_tank`).
+- **Cast Armored Driver Periscope Hoods (`make_driver_periscope_hood` / `.add_driver_periscope_hood()`)**:
+  - Heavy cast steel hoods with sloped ballistic brows and recessed optical prisms (`Driver_PeriscopeGlass` with emissive sensor cyan) providing authentic crewed cockpit architecture.
+  - Deployed across 11 armored hull archetypes (`tank`, `artillery`, `arc_tank`, `super_heavy`, `flak_anti_air`, `demolition_breacher`, `gravity_siege_breaker`, `amphibious_assault_tank`, `mortar_carrier`, `mine_layer`, `bridge_layer`).
+- **Perforated Exhaust Heat Shield Sleeves (`make_perforated_exhaust_heat_shield` / `.add_exhaust_heat_shield()`)**:
+  - Tubular heat shield sleeves with tension clamp bands at both ends surrounding exhaust ducts to prevent plumbing pipe appearances.
+  - Deployed on heavy utility and diesel engineering vehicles (`combat_harvester`, `bridge_layer`, `mine_layer`, `mortar_carrier`).
+- **Thermal Tempering Fringe & Crevice Micro-Dust Softening (`VehiclePBR_VertexWear.shader`)**:
+  - Metallurgical heat bluing: Simulates straw bronze (`#d4af37`) and iridescent blue/violet (`#435388`) temper oxide colors at the outer boundary of channel B (thermal soot, `soot 0.10 - 0.65`) before thick carbon soot takes over.
+  - Crevice micro-dust softening: Deep recesses (channel R, Cavity AO) lose specular gloss due to trapped dry micro-dust (`smoothness *= lerp(0.70, 1.0, ao)`).
+  - Zenith sun bleach: Upward-facing armor plates (`normalWS.y > 0.55`) receive subtle atmospheric sun-bleached oxidation.
+- **Surface Diagnostics & Telemetry Expansion (`RuntimeVisualSurfaceCensus.cs`, `AgentDiagnosticsFormatter.cs`)**:
+  - Exposes `temperFringeVertexCount` in `VisualSurfaceRow` and `visualSurfaceCensus` payloads.
+- Evidence level: local build/validation evidence only; no fresh Steam runtime proof.

@@ -1802,6 +1802,7 @@ namespace RogueCommandExpansionLoader.Runtime
                         ["minThermalSoot"] = row.MinThermalSoot,
                         ["maxThermalSoot"] = row.MaxThermalSoot,
                         ["mudVertexCount"] = row.MudVertexCount,
+                        ["temperFringeVertexCount"] = row.TemperFringeVertexCount,
 
                         ["averageTeamMask"] = row.AverageTeamMask,
                         ["minTeamMask"] = row.MinTeamMask,

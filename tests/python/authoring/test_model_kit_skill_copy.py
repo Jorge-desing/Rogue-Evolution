@@ -213,6 +213,9 @@ class TestModelKitSkillCopy(unittest.TestCase):
             "make_recovery_winch_assembly",
             "make_auxiliary_fuel_drum_assembly",
             "make_exhaust_deflector_cowl",
+            "make_turret_ring_guard",
+            "make_driver_periscope_hood",
+            "make_perforated_exhaust_heat_shield",
         ]
         for assembly in required_realism_assemblies:
             self.assertIn(assembly, func_names, f"Realism assembly {assembly} missing from RogueModelKit.py")
@@ -235,6 +238,9 @@ class TestModelKitSkillCopy(unittest.TestCase):
             "add_weld_seams",
             "add_glacis_weld_seams",
             "add_deck_edge_weld_seams",
+            "add_turret_ring_guard",
+            "add_driver_periscope_hood",
+            "add_exhaust_heat_shield",
         ]
         for method in required_builder_methods:
             self.assertIn(method, vehicle_builder_methods, f"Method {method} missing from RogueVehicleBuilder")
@@ -262,12 +268,19 @@ class TestModelKitSkillCopy(unittest.TestCase):
         self.assertGreaterEqual(generator_source.count("builder.add_fuel_drums"), 3)
         self.assertGreaterEqual(generator_source.count("builder.add_era_bricks"), 4)
         self.assertGreaterEqual(generator_source.count("builder.add_exhaust_deflector"), 4)
+        self.assertGreaterEqual(generator_source.count("builder.add_turret_ring_guard"), 8)
+        self.assertGreaterEqual(generator_source.count("builder.add_driver_periscope_hood"), 10)
+        self.assertGreaterEqual(generator_source.count("builder.add_exhaust_heat_shield"), 4)
+
     def test_shader_and_builder_wire_steel_micro_detail(self) -> None:
         """The detail normal texture, shader sampler, and prefab builder binding must stay in sync."""
         shader = (REPO_ROOT / "unity" / "RogueCommandAssetAuthoring" / "Assets" / "RogueCommandExpansionSample"
                   / "Shaders" / "VehiclePBR_VertexWear.shader").read_text(encoding="utf-8")
         self.assertIn("BlendNormalsRNM", shader)
         self.assertIn("UnpackNormalScale(detailPacked", shader)
+        self.assertIn("_ThermalTemperingIntensity", shader)
+        self.assertIn("temperMask", shader)
+        self.assertIn("_CreviceDustIntensity", shader)
         builder = (REPO_ROOT / "unity" / "RogueCommandAssetAuthoring" / "Assets" / "Editor"
                    / "VehiclePrefabBuilder.cs").read_text(encoding="utf-8")
         self.assertIn("RCL_SteelMicroDetail_Normal.png", builder)

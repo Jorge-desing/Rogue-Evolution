@@ -35,6 +35,7 @@ namespace RogueCommandExpansionLoader.Runtime
         public float MinThermalSoot { get; }
         public float MaxThermalSoot { get; }
         public int MudVertexCount { get; }
+        public int TemperFringeVertexCount { get; }
         public float MinTeamMask { get; }
         public float MaxTeamMask { get; }
         public int LodCount { get; }
@@ -65,7 +66,8 @@ namespace RogueCommandExpansionLoader.Runtime
             float maxTeamMask,
             int lodCount,
             IReadOnlyList<string> shaderNames,
-            IReadOnlyList<string> shaderKeywords)
+            IReadOnlyList<string> shaderKeywords,
+            int temperFringeVertexCount = 0)
         {
             EntityKeyId = entityKeyId ?? string.Empty;
             RendererCount = rendererCount < 0 ? 0 : rendererCount;
@@ -89,6 +91,7 @@ namespace RogueCommandExpansionLoader.Runtime
             MinThermalSoot = minThermalSoot;
             MaxThermalSoot = maxThermalSoot;
             MudVertexCount = mudVertexCount < 0 ? 0 : mudVertexCount;
+            TemperFringeVertexCount = temperFringeVertexCount < 0 ? 0 : temperFringeVertexCount;
 
             AverageTeamMask = averageTeamMask;
             MinTeamMask = minTeamMask;
@@ -200,6 +203,7 @@ namespace RogueCommandExpansionLoader.Runtime
             bool hasSample = false;
             int weldCount = 0;
             int mudCount = 0;
+            int temperFringeCount = 0;
             int microReliefCount = 0;
             var shaderNames = new List<string>();
             var shaderKeywords = new List<string>();
@@ -300,6 +304,7 @@ namespace RogueCommandExpansionLoader.Runtime
 
                                     if (c.g >= 0.7f) weldCount++;
                                     if (c.b >= 0.5f) mudCount++;
+                                    if (c.b >= 0.15f && c.b <= 0.60f) temperFringeCount++;
                                     if (c.r <= 0.4f) microReliefCount++;
                                 }
                             }
@@ -335,7 +340,8 @@ namespace RogueCommandExpansionLoader.Runtime
                 avgA, minA, maxA,
                 lodCount,
                 shaderNames.AsReadOnly(),
-                shaderKeywords.AsReadOnly());
+                shaderKeywords.AsReadOnly(),
+                temperFringeCount);
         }
     }
 }

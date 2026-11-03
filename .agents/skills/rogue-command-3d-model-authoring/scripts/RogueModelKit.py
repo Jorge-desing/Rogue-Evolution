@@ -5889,6 +5889,164 @@ def make_transitional_coaming_collar(
     )
 
 
+
+def make_turret_ring_guard(
+    prefix: str,
+    location: Tuple[float, float, float] | Vector,
+    radius: float = 0.70,
+    height: float = 0.14,
+    thickness: float = 0.075,
+    armor_mat: bpy.types.Material | None = None,
+    gunmetal_mat: bpy.types.Material | None = None,
+) -> list[bpy.types.Object]:
+    """Generates an authentic circular armored shot-trap deflector collar / yaw-race coaming ring around the turret base.
+
+    Features an outer beveled kinetic deflector collar, stepped inner yaw race lip,
+    and flanged perimeter hex bolt fasteners to physically seat and shield the turret into the hull deck.
+    """
+    objects = []
+    loc_v = Vector(location)
+
+    # 1. Armored Circular Deflector Ring Collar
+    outer_r = radius + thickness
+    collar_loc = Vector((loc_v.x, loc_v.y, loc_v.z + height * 0.5))
+    collar_obj = make_cylinder(
+        f"{prefix}_DeflectorCollar",
+        radius=outer_r,
+        depth=height,
+        location=collar_loc,
+        material=armor_mat,
+        vertices=16,
+        bevel=thickness * 0.40,
+    )
+    objects.append(collar_obj)
+
+    # 2. Stepped Inner Yaw Bearing Lip
+    inner_lip_obj = make_cylinder(
+        f"{prefix}_YawRaceLip",
+        radius=radius + thickness * 0.45,
+        depth=height * 1.15,
+        location=collar_loc,
+        material=gunmetal_mat or armor_mat,
+        vertices=16,
+        bevel=0.008,
+    )
+    objects.append(inner_lip_obj)
+
+    # 3. Perimeter Hex Bolt Studs (8 radial studs around the collar)
+    bolt_count = 8
+    bolt_r = radius + thickness * 0.72
+    bolt_z = loc_v.z + height * 0.94
+    fastener_mat = gunmetal_mat or armor_mat
+    for b_idx in range(bolt_count):
+        b_angle = 2.0 * math.pi * b_idx / bolt_count
+        bx = loc_v.x + bolt_r * math.cos(b_angle)
+        by = loc_v.y + bolt_r * math.sin(b_angle)
+        objects.append(make_cylinder(
+            f"{prefix}_FastenerBolt_{b_idx}",
+            radius=0.018,
+            depth=0.026,
+            location=Vector((bx, by, bolt_z)),
+            material=fastener_mat,
+            vertices=6,
+            bevel=0.003,
+        ))
+
+    return objects
+
+
+def make_driver_periscope_hood(
+    prefix: str,
+    location: Tuple[float, float, float] | Vector,
+    armor_mat: bpy.types.Material | None = None,
+    optic_mat: bpy.types.Material | None = None,
+    size: Tuple[float, float, float] = (0.24, 0.28, 0.18),
+    brow_angle_deg: float = 18.0,
+) -> list[bpy.types.Object]:
+    """Generates an authentic cast armored driver's vision periscope hood with recessed optical prism block."""
+    objects = []
+    loc_v = Vector(location)
+    sx, sy, sz = size
+
+    # 1. Armored Cast Hood with sloped ballistic brow
+    hood_loc = loc_v + Vector((0.0, 0.0, sz * 0.5))
+    objects.append(make_box(
+        f"{prefix}_PeriscopeHood",
+        size,
+        hood_loc,
+        armor_mat,
+        bevel=sz * 0.22,
+        rotation=(math.radians(brow_angle_deg), 0.0, 0.0),
+    ))
+
+    # 2. Recessed Optical Prism Glass Block (Cyan anti-laser coating)
+    glass_loc = loc_v + Vector((0.0, sy * 0.38, sz * 0.44))
+    objects.append(make_box(
+        f"{prefix}_OpticPrism",
+        (sx * 0.72, sy * 0.22, sz * 0.38),
+        glass_loc,
+        optic_mat,
+        bevel=0.005,
+        rotation=(math.radians(brow_angle_deg + 14.0), 0.0, 0.0),
+    ))
+
+    # 3. Base Mounting Collar Pad
+    objects.append(make_box(
+        f"{prefix}_MountPad",
+        (sx * 1.25, sy * 1.20, sz * 0.22),
+        loc_v + Vector((0.0, 0.0, sz * 0.11)),
+        armor_mat,
+        bevel=0.012,
+    ))
+    return objects
+
+
+def make_perforated_exhaust_heat_shield(
+    prefix: str,
+    location: Tuple[float, float, float] | Vector,
+    pipe_radius: float = 0.065,
+    length: float = 0.55,
+    direction: Tuple[float, float, float] | Vector = (0.0, 0.0, 1.0),
+    armor_mat: bpy.types.Material | None = None,
+    gunmetal_mat: bpy.types.Material | None = None,
+) -> list[bpy.types.Object]:
+    """Generates a military perforated exhaust heat shield sleeve with clamp tension bands surrounding an exhaust duct."""
+    objects = []
+    loc_v = Vector(location)
+    dir_v = Vector(direction).normalized()
+    shield_r = pipe_radius * 1.35
+
+    rot_quat = dir_v.to_track_quat("Z", "Y")
+    rot_euler = rot_quat.to_euler()
+
+    # 1. Stamped tubular heat shield sleeve
+    shield_obj = make_cylinder(
+        f"{prefix}_ShieldSleeve",
+        radius=shield_r,
+        depth=length * 0.88,
+        location=loc_v,
+        material=armor_mat,
+        vertices=10,
+        bevel=0.008,
+        rotation=rot_euler,
+    )
+    objects.append(shield_obj)
+
+    # 2. Tension clamp bands at both ends
+    for side, tag in ((-1.0, "Start"), (1.0, "End")):
+        band_loc = loc_v + dir_v * (length * 0.35 * side)
+        objects.append(make_cylinder(
+            f"{prefix}_ClampBand_{tag}",
+            radius=shield_r * 1.15,
+            depth=length * 0.065,
+            location=band_loc,
+            material=gunmetal_mat or armor_mat,
+            vertices=8,
+            bevel=0.004,
+            rotation=rot_euler,
+        ))
+    return objects
+
 def create_unity_empty_locator(
     name: str,
     location: Tuple[float, float, float] | Vector,
@@ -14199,6 +14357,73 @@ class RogueVehicleBuilder:
             height=height,
             collar_mat=self.palette.gunmetal,
         ))
+        return self
+
+
+    def add_turret_ring_guard(
+        self,
+        radius: float | None = None,
+        height: float = 0.14,
+        thickness: float = 0.075,
+    ) -> "RogueVehicleBuilder":
+        """Adds a raised circular armored deflector ring guard around the turret base on the hull deck to eliminate shot-traps and physical gaps."""
+        if self.turret_center is None:
+            return self
+        t_radius = radius if radius is not None else 0.65
+        ring_loc = Vector((self.turret_center.x, self.turret_center.y, self.hull_deck_z))
+        guard_objs = make_turret_ring_guard(
+            f"{self.name}TurretRingGuard",
+            location=ring_loc,
+            radius=t_radius,
+            height=height,
+            thickness=thickness,
+            armor_mat=self.palette.primary_armor,
+            gunmetal_mat=self.palette.gunmetal,
+        )
+        self.objects.extend(guard_objs)
+        return self
+
+    def add_driver_periscope_hood(
+        self,
+        location: Tuple[float, float, float] | Vector | None = None,
+        size: Tuple[float, float, float] = (0.24, 0.28, 0.18),
+        brow_angle_deg: float = 18.0,
+    ) -> "RogueVehicleBuilder":
+        """Adds a cast armored driver's vision periscope hood with recessed optical prism to the forward glacis or cabin deck."""
+        if location is not None:
+            loc_v = Vector(location)
+        else:
+            loc_v = Vector((0.0, self.hull_length * 0.32, self.hull_deck_z))
+        hood_objs = make_driver_periscope_hood(
+            f"{self.name}DriverPeriscope",
+            location=loc_v,
+            armor_mat=self.palette.primary_armor,
+            optic_mat=self.palette.emissive,
+            size=size,
+            brow_angle_deg=brow_angle_deg,
+        )
+        self.objects.extend(hood_objs)
+        return self
+
+    def add_exhaust_heat_shield(
+        self,
+        location: Tuple[float, float, float] | Vector | None = None,
+        pipe_radius: float = 0.065,
+        length: float = 0.55,
+        direction: Tuple[float, float, float] | Vector = (0.0, 0.0, 1.0),
+    ) -> "RogueVehicleBuilder":
+        """Adds a perforated exhaust heat shield sleeve with clamp tension bands surrounding an exhaust duct."""
+        loc_v = Vector(location) if location is not None else (self.exhaust_l or Vector((0.0, -self.hull_length * 0.45, self.hull_deck_z + 0.25)))
+        shield_objs = make_perforated_exhaust_heat_shield(
+            f"{self.name}ExhaustHeatShield",
+            location=loc_v,
+            pipe_radius=pipe_radius,
+            length=length,
+            direction=direction,
+            armor_mat=self.palette.gunmetal,
+            gunmetal_mat=self.palette.primary_armor,
+        )
+        self.objects.extend(shield_objs)
         return self
 
     def add_unity_locators(self) -> "RogueVehicleBuilder":
