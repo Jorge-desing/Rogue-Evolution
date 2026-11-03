@@ -4603,6 +4603,59 @@ internal static partial class ValidationTestRunner
             }
         }
     }),
+    ("runtime visual surface census reports renderers materials and vertex-wear channels", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        try
+        {
+            var unit = new EntityController
+            {
+                entityId = "unit:visual-surface",
+                UniqueEntityId = 861,
+                IsControlledByPlayer = true,
+                IsUnit = true,
+                Position = new Vector3(0f, 0f, 0f)
+            };
+            var go = new GameObject { name = "VisualSurfaceUnit" };
+            var mf = go.AddComponent<MeshFilter>();
+            var mr = go.AddComponent<MeshRenderer>();
+            var mesh = new Mesh { vertexCount = 4, colors = new[] { new Color(0.3f, 0.8f, 0.1f, 1f), new Color(0.4f, 0.7f, 0.2f, 1f) } };
+            mf.sharedMesh = mesh;
+            var mat = new Material { name = "VehiclePBR", shader = new Shader { name = "RogueCommand/VehiclePBR_VertexWear" } };
+            mr.sharedMaterials = new[] { mat };
+            unit.gameObject = go;
+            ExistingControllers.Instance.PlayerUnits().Add(unit);
+
+            VisualSurfaceCensus census = RuntimeVisualSurfaceCensus.Current();
+            if (census.Rows.Count != 1)
+            {
+                throw new InvalidOperationException("Visual surface census should report one living unit.");
+            }
+
+            VisualSurfaceRow row = census.Rows[0];
+            if (row.EntityKeyId != "unit:visual-surface" || row.RendererCount != 1 ||
+                row.MaterialCount != 1 || row.VertexCount != 4 || !row.HasVertexColors ||
+                row.ShaderNames.Count != 1 || row.ShaderNames[0] != "RogueCommand/VehiclePBR_VertexWear")
+            {
+                throw new InvalidOperationException("Visual surface row should report renderer, material, vertex and shader telemetry.");
+            }
+
+            string json = AgentDiagnosticsFormatter.SerializeVisualSurfaceCensus(census);
+            using (var doc = JsonDocument.Parse(json))
+            {
+                if (doc.RootElement.GetProperty("kind").GetString() != "visualSurfaceCensus" ||
+                    doc.RootElement.GetProperty("rowCount").GetInt32() != 1 ||
+                    doc.RootElement.GetProperty("omittedRowCount").GetInt32() != 0)
+                {
+                    throw new InvalidOperationException("SerializeVisualSurfaceCensus JSON format error.");
+                }
+            }
+        }
+        finally
+        {
+            ExistingControllers.Instance.Reset();
+        }
+    }),
     ("runtime tech catalog census queries registered upgrades research branches and relics", () =>
     {
         TechCatalogCensus census = RuntimeTechCatalogCensus.Current();

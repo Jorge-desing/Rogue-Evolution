@@ -1090,6 +1090,15 @@ namespace RogueCommandExpansionLoader.Runtime
         }
 
         /// <summary>
+        /// Returns visual surface material and vertex-wear telemetry as JSON.
+        /// </summary>
+        public string GetVisualSurfaceCensusJson()
+        {
+            return AgentDiagnosticsFormatter.SerializeVisualSurfaceCensus(
+                RuntimeVisualSurfaceCensus.Current());
+        }
+
+        /// <summary>
         /// Sets volume slider level for an audio channel (Master, Music, Gameplay, UI).
         /// </summary>
         public string SetAudioVolumeJson(string channel, float sliderValue)

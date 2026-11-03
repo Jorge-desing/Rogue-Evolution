@@ -1767,6 +1767,44 @@ namespace RogueCommandExpansionLoader.Runtime
         }
 
         /// <summary>
+        /// Serializes the visual surface census (renderers, materials, vertex-wear channels).
+        /// Omission counters precede detail collections.
+        /// </summary>
+        public static string SerializeVisualSurfaceCensus(VisualSurfaceCensus census)
+        {
+            var rows = new List<Dictionary<string, object>>();
+            if (census != null && census.Rows != null)
+            {
+                foreach (VisualSurfaceRow row in census.Rows)
+                {
+                    if (row == null) continue;
+                    rows.Add(new Dictionary<string, object>
+                    {
+                        ["entityKeyId"] = row.EntityKeyId ?? string.Empty,
+                        ["rendererCount"] = row.RendererCount,
+                        ["materialCount"] = row.MaterialCount,
+                        ["vertexCount"] = row.VertexCount,
+                        ["hasVertexColors"] = row.HasVertexColors,
+                        ["averageCavityAo"] = row.AverageCavityAo,
+                        ["averageEdgeWear"] = row.AverageEdgeWear,
+                        ["averageThermalSoot"] = row.AverageThermalSoot,
+                        ["averageTeamMask"] = row.AverageTeamMask,
+                        ["shaderNames"] = row.ShaderNames != null ? row.ShaderNames : (object)Array.Empty<string>(),
+                    });
+                }
+            }
+
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "visualSurfaceCensus",
+                ["omittedRowCount"] = census != null ? census.OmittedRowCount : 0,
+                ["rowCount"] = rows.Count,
+                ["rows"] = rows,
+            };
+            return Serialize(view);
+        }
+
+        /// <summary>
         /// Serializes the result of an audio volume adjustment command.
         /// </summary>
         public static string SerializeAudioCommandResult(AudioCommandResult result)
@@ -2649,6 +2687,7 @@ new Dictionary<string, object> { ["name"] = "OrderRetreatJson", ["description"] 
                 new Dictionary<string, object> { ["name"] = "OrderHarvesterHarvestJson", ["description"] = "Order harvester to harvest nearest crystal." },
                 new Dictionary<string, object> { ["name"] = "OrderHarvesterReturnJson", ["description"] = "Order harvester to return to refinery." },
                 new Dictionary<string, object> { ["name"] = "GetAudioCensusJson", ["description"] = "Telemetry of audio mixer volume slider levels." },
+new Dictionary<string, object> { ["name"] = "GetVisualSurfaceCensusJson", ["description"] = "Telemetry of visual surface materials and vertex-wear channels (welds, mud, micro-relief)." },
                 new Dictionary<string, object> { ["name"] = "SetAudioVolumeJson", ["description"] = "Set volume slider level for Master, Music, Gameplay, UI." },
                 new Dictionary<string, object> { ["name"] = "GetTechCatalogJson", ["description"] = "Catalog of registered upgrades, research branches, and relics." },
                                 new Dictionary<string, object> { ["name"] = "GetVeterancyCensusJson", ["description"] = "Live combat XP, rank tiers, and veterancy bonus multipliers." },

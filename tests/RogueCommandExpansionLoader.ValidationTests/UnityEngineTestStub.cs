@@ -305,6 +305,8 @@ namespace UnityEngine
         public string name { get; set; } = string.Empty;
         public int vertexCount { get; set; }
         public int subMeshCount { get; set; } = 1;
+        public Color[] colors { get; set; } = System.Array.Empty<Color>();
+        public Color[] colors32 { get; set; } = System.Array.Empty<Color>();
     }
 
     public class Shader : Object
