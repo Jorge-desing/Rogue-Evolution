@@ -1076,6 +1076,10 @@
     {
       "id": "tactical-operations:sentinel-relay",
       "nativeTemplateId": "PCXBaseTank",
+      "assetBundleId": "tactical-operations:assets",
+      "cardImageAssetName": "assets/tacticaloperations/sentinelrelaycard.png",
+      "visualAssetName": "assets/tacticaloperations/prefabs/sentinelrelayvisual.prefab",
+      "visualRootPath": "Vehicle",
       "isAllowedAsStartingBlueprint": true,
       "isAllowedForAi": true,
       "isAllowedForDemo": true,
@@ -1202,6 +1206,10 @@
     {
       "id": "tactical-operations:gravitas-breaker",
       "nativeTemplateId": "PCXBaseTank",
+      "assetBundleId": "tactical-operations:assets",
+      "cardImageAssetName": "assets/tacticaloperations/gravitasbreakercard.png",
+      "visualAssetName": "assets/tacticaloperations/prefabs/gravitasbreakervisual.prefab",
+      "visualRootPath": "Vehicle",
       "isAllowedAsStartingBlueprint": true,
       "isAllowedForAi": true,
       "isAllowedForDemo": true,
@@ -1338,6 +1346,10 @@
     {
       "id": "tactical-operations:command-relay",
       "nativeTemplateId": "PCXBaseTank",
+      "assetBundleId": "tactical-operations:assets",
+      "cardImageAssetName": "assets/tacticaloperations/commandrelaycard.png",
+      "visualAssetName": "assets/tacticaloperations/prefabs/commandrelayvisual.prefab",
+      "visualRootPath": "Vehicle",
       "isAllowedAsStartingBlueprint": true,
       "isAllowedForAi": true,
       "isAllowedForDemo": true,

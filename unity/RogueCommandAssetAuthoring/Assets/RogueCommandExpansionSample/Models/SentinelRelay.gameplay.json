@@ -1,0 +1,274 @@
+{
+  "unitName": "SentinelRelay",
+  "archetype": "shield_truck",
+  "visualRootPath": "Vehicle",
+  "compatibleNativeTemplates": [
+    "PCXBaseTank"
+  ],
+  "boxCollider": {
+    "center": [
+      0.0,
+      0.0,
+      1.302
+    ],
+    "size": [
+      2.38,
+      4.246,
+      2.605
+    ]
+  },
+  "turretKinematics": {
+    "yawCenter": [
+      0.0,
+      1.1,
+      1.62
+    ],
+    "pitchCenter": [
+      0.0,
+      2.15,
+      1.77
+    ],
+    "minElevationDeg": -10.0,
+    "maxElevationDeg": 35.0,
+    "yawSpeedDegPerSec": 45.0,
+    "recoilDistanceMeters": 0.22
+  },
+  "damageThresholds": {
+    "smokeHpFraction": 0.5,
+    "fireHpFraction": 0.25
+  },
+  "rigging": {
+    "rigType": "chassis_kinematic",
+    "hasArmature": true,
+    "animatorParameters": [
+      "RCL_IsMoving",
+      "RCL_Fire",
+      "RCL_Death"
+    ],
+    "actionClips": [
+      "Action_Idle",
+      "Action_Walk",
+      "Action_Drive",
+      "Action_FireRecoil",
+      "Action_Death"
+    ]
+  },
+  "sockets": {
+    "Socket_MuzzlePrimary": {
+      "position": [
+        0.0,
+        2.15,
+        1.77
+      ],
+      "forward": [
+        0.0,
+        -0.08,
+        0.997
+      ]
+    },
+    "FirePoint_0": {
+      "position": [
+        -0.0,
+        -0.0,
+        0.0
+      ],
+      "forward": [
+        0.0,
+        -0.08,
+        0.997
+      ]
+    },
+    "Socket_TurretPivot": {
+      "position": [
+        0.0,
+        1.1,
+        1.62
+      ],
+      "forward": [
+        0.0,
+        1.0,
+        0.0
+      ]
+    },
+    "Socket_TurretPitch": {
+      "position": [
+        0.0,
+        1.35,
+        1.77
+      ],
+      "forward": [
+        0.0,
+        1.0,
+        0.0
+      ]
+    },
+    "Socket_RecoilPrimary": {
+      "position": [
+        0.0,
+        1.7,
+        1.77
+      ],
+      "forward": [
+        0.0,
+        1.0,
+        0.0
+      ]
+    },
+    "Socket_DamageSmoke": {
+      "position": [
+        -0.2,
+        0.9,
+        1.92
+      ],
+      "forward": [
+        0.0,
+        1.0,
+        0.0
+      ]
+    },
+    "Socket_DamageFire": {
+      "position": [
+        0.2,
+        0.9,
+        1.92
+      ],
+      "forward": [
+        0.0,
+        1.0,
+        0.0
+      ]
+    },
+    "Socket_RadarMast": {
+      "position": [
+        -0.25,
+        0.8,
+        2.07
+      ],
+      "forward": [
+        0.0,
+        1.0,
+        0.0
+      ]
+    },
+    "Socket_Hardpoint_ERA": {
+      "position": [
+        0.0,
+        1.5,
+        1.72
+      ],
+      "forward": [
+        0.0,
+        1.0,
+        0.0
+      ]
+    },
+    "Socket_Hardpoint_APS": {
+      "position": [
+        0.35,
+        0.75,
+        2.02
+      ],
+      "forward": [
+        0.0,
+        1.0,
+        0.0
+      ]
+    },
+    "Socket_Hardpoint_Sponsons": {
+      "position": [
+        0.95,
+        0.0,
+        0.45
+      ],
+      "forward": [
+        0.0,
+        1.0,
+        0.0
+      ]
+    },
+    "Socket_Hardpoint_FuelDrums": {
+      "position": [
+        0.0,
+        -1.25,
+        0.4
+      ],
+      "forward": [
+        0.0,
+        1.0,
+        0.0
+      ]
+    },
+    "Socket_CenterOfMass": {
+      "position": [
+        0.0,
+        0.0,
+        0.45
+      ],
+      "forward": [
+        0.0,
+        1.0,
+        0.0
+      ]
+    },
+    "Socket_GroundContact": {
+      "position": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "forward": [
+        0.0,
+        1.0,
+        0.0
+      ]
+    },
+    "Socket_GroundCenter": {
+      "position": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "forward": [
+        0.0,
+        1.0,
+        0.0
+      ]
+    },
+    "Socket_Antenna": {
+      "position": [
+        0.38,
+        0.68,
+        1.84
+      ],
+      "forward": [
+        0.0,
+        1.0,
+        0.0
+      ]
+    },
+    "Socket_EngineAudio": {
+      "position": [
+        0.0,
+        -0.65,
+        0.4
+      ],
+      "forward": [
+        0.0,
+        1.0,
+        0.0
+      ]
+    },
+    "Socket_WeaponAudio": {
+      "position": [
+        0.0,
+        2.15,
+        1.77
+      ],
+      "forward": [
+        0.0,
+        1.0,
+        0.0
+      ]
+    }
+  }
+}

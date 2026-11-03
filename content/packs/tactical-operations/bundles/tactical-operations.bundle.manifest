@@ -1,15 +1,15 @@
 ManifestFileVersion: 0
-CRC: 1700742018
+CRC: 26151347
 Hashes:
   AssetFileHash:
     serializedVersion: 2
-    Hash: 7161209d8ada19036bae541594b3c2e5
+    Hash: c7dc97a81acfeb17375a2be7a7d821c1
   TypeTreeHash:
     serializedVersion: 2
-    Hash: b2837078e3fae6a9c2efcf2d9b56351a
+    Hash: 8aa938aebb77982e2dc7121e50cd4789
   IncrementalBuildHash:
     serializedVersion: 2
-    Hash: 7161209d8ada19036bae541594b3c2e5
+    Hash: c7dc97a81acfeb17375a2be7a7d821c1
 HashAppended: 0
 ClassTypes:
 - Class: 1
@@ -18,7 +18,11 @@ ClassTypes:
   Script: {instanceID: 0}
 - Class: 21
   Script: {instanceID: 0}
+- Class: 23
+  Script: {instanceID: 0}
 - Class: 28
+  Script: {instanceID: 0}
+- Class: 33
   Script: {instanceID: 0}
 - Class: 43
   Script: {instanceID: 0}
@@ -49,15 +53,24 @@ Assets:
 - Assets/TacticalOperations/TidebreakerHovercraftCard.png
 - Assets/TacticalOperations/Prefabs/TidebreakerHovercraftVisual.prefab
 - Assets/TacticalOperations/SalvageHaulerCard.png
+- Assets/TacticalOperations/CommandRelayCard.png
+- Assets/TacticalOperations/Materials/CommandRelay_PBR.mat
 - Assets/TacticalOperations/Prefabs/BulwarkSiegeTankVisual.prefab
 - Assets/TacticalOperations/Prefabs/SalvageHaulerVisual.prefab
 - Assets/TacticalOperations/Materials/ArcLanceWalker_PBR.mat
 - Assets/TacticalOperations/Materials/FieldMedicRover_PBR.mat
+- Assets/TacticalOperations/Materials/GravitasBreaker_PBR.mat
+- Assets/TacticalOperations/Materials/SentinelRelay_PBR.mat
+- Assets/TacticalOperations/Prefabs/GravitasBreakerVisual.prefab
 - Assets/TacticalOperations/fieldmedicrovercard.png
 - Assets/TacticalOperations/Prefabs/ArcLanceWalkerVisual.prefab
 - Assets/TacticalOperations/bulwarksiegetankcard.png
+- Assets/TacticalOperations/GravitasBreakerCard.png
 - Assets/TacticalOperations/Prefabs/FieldMedicRoverVisual.prefab
 - Assets/TacticalOperations/SkyguardSAMCard.png
+- Assets/TacticalOperations/Prefabs/SentinelRelayVisual.prefab
+- Assets/TacticalOperations/Prefabs/CommandRelayVisual.prefab
+- Assets/TacticalOperations/SentinelRelayCard.png
 - Assets/TacticalOperations/Prefabs/SkyguardSAMVisual.prefab
 - Assets/TacticalOperations/arclancewalkercard.png
 - Assets/TacticalOperations/Materials/BulwarkSiegeTank_PBR.mat

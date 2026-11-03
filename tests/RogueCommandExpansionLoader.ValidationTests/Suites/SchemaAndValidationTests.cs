@@ -1332,12 +1332,27 @@ internal static partial class ValidationTestRunner
             "tactical-operations:gravitas-breaker",
             "tactical-operations:command-relay"
         };
+        var expectedVisualAssets = new Dictionary<string, (string Card, string Prefab)>(StringComparer.Ordinal)
+        {
+            ["tactical-operations:sentinel-relay"] =
+                ("assets/tacticaloperations/sentinelrelaycard.png", "assets/tacticaloperations/prefabs/sentinelrelayvisual.prefab"),
+            ["tactical-operations:gravitas-breaker"] =
+                ("assets/tacticaloperations/gravitasbreakercard.png", "assets/tacticaloperations/prefabs/gravitasbreakervisual.prefab"),
+            ["tactical-operations:command-relay"] =
+                ("assets/tacticaloperations/commandrelaycard.png", "assets/tacticaloperations/prefabs/commandrelayvisual.prefab")
+        };
 
         foreach (string id in expectedIds)
         {
             ContentUnitDefinition unit = GetUnit(id);
             ContentProductionBuildingDefinition building = unit.productionBuilding
                 ?? throw new InvalidOperationException(id + " must own a production building.");
+            Require(unit.assetBundleId == "tactical-operations:assets", id + " must use the Tactical Operations bundle.");
+            Require(expectedVisualAssets.TryGetValue(id, out var expectedVisual) &&
+                    unit.cardImageAssetName == expectedVisual.Card &&
+                    unit.visualAssetName == expectedVisual.Prefab &&
+                    unit.visualRootPath == "Vehicle",
+                id + " must declare its own card Sprite and visual prefab overlay.");
             Require(unit.nativeTemplateId == "PCXBaseTank", id + " must use the verified native tank template.");
             Require(building.id == id + "-factory",
                 id + " must own a namespaced production building.");

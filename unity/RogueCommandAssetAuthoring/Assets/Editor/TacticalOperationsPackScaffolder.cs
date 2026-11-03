@@ -18,16 +18,22 @@ namespace RogueCommandExpansion.Authoring
         public const string BulwarkSiegeTankModelPath = "Assets/RogueCommandExpansionSample/Models/BulwarkSiegeTank.fbx";
         public const string ArcLanceWalkerModelPath = "Assets/RogueCommandExpansionSample/Models/ArcLanceWalker.fbx";
         public const string FieldMedicRoverModelPath = "Assets/RogueCommandExpansionSample/Models/FieldMedicRover.fbx";
+        public const string SentinelRelayModelPath = "Assets/RogueCommandExpansionSample/Models/SentinelRelay.fbx";
+        public const string GravitasBreakerModelPath = "Assets/RogueCommandExpansionSample/Models/GravitasBreaker.fbx";
+        public const string CommandRelayModelPath = "Assets/RogueCommandExpansionSample/Models/CommandRelay.fbx";
 
         public const string TidebreakerCardPath = RootFolder + "/TidebreakerHovercraftCard.png";
         public const string SalvageHaulerCardPath = RootFolder + "/SalvageHaulerCard.png";
         public const string SkyguardSAMCardPath = RootFolder + "/SkyguardSAMCard.png";
+        public const string SentinelRelayCardPath = RootFolder + "/SentinelRelayCard.png";
+        public const string GravitasBreakerCardPath = RootFolder + "/GravitasBreakerCard.png";
+        public const string CommandRelayCardPath = RootFolder + "/CommandRelayCard.png";
 
         public const string TidebreakerPrefabPath = PrefabsFolder + "/TidebreakerHovercraftVisual.prefab";
         public const string SalvageHaulerPrefabPath = PrefabsFolder + "/SalvageHaulerVisual.prefab";
         public const string SkyguardSAMPrefabPath = PrefabsFolder + "/SkyguardSAMVisual.prefab";
 
-        // New units (reuse existing models as visual overlays)
+        // Existing manually authored Tactical Operations overlays.
         public const string BulwarkSiegeTankCardPath = RootFolder + "/bulwarksiegetankcard.png";
         public const string ArcLanceWalkerCardPath = RootFolder + "/arclancewalkercard.png";
         public const string FieldMedicRoverCardPath = RootFolder + "/fieldmedicrovercard.png";
@@ -35,6 +41,9 @@ namespace RogueCommandExpansion.Authoring
         public const string BulwarkSiegeTankPrefabPath = PrefabsFolder + "/BulwarkSiegeTankVisual.prefab";
         public const string ArcLanceWalkerPrefabPath = PrefabsFolder + "/ArcLanceWalkerVisual.prefab";
         public const string FieldMedicRoverPrefabPath = PrefabsFolder + "/FieldMedicRoverVisual.prefab";
+        public const string SentinelRelayPrefabPath = PrefabsFolder + "/SentinelRelayVisual.prefab";
+        public const string GravitasBreakerPrefabPath = PrefabsFolder + "/GravitasBreakerVisual.prefab";
+        public const string CommandRelayPrefabPath = PrefabsFolder + "/CommandRelayVisual.prefab";
 
         public const string BundleName = "tactical-operations.bundle";
 
@@ -52,11 +61,14 @@ namespace RogueCommandExpansion.Authoring
                 Directory.CreateDirectory(Path.Combine(Application.dataPath, "TacticalOperations/Materials"));
                 AssetDatabase.Refresh();
                 ConfigureRiggedWalkerModel(ArcLanceWalkerModelPath);
-                                ConfigureRiggedWalkerModel(BulwarkSiegeTankModelPath);
-                                ConfigureRiggedWalkerModel(FieldMedicRoverModelPath);
-                                ConfigureRiggedWalkerModel(TidebreakerModelPath);
+                ConfigureRiggedWalkerModel(BulwarkSiegeTankModelPath);
+                ConfigureRiggedWalkerModel(FieldMedicRoverModelPath);
+                ConfigureRiggedWalkerModel(TidebreakerModelPath);
                 ConfigureRiggedWalkerModel(SalvageHaulerModelPath);
                 ConfigureRiggedWalkerModel(SkyguardSAMModelPath);
+                ConfigureRiggedWalkerModel(SentinelRelayModelPath);
+                ConfigureRiggedWalkerModel(GravitasBreakerModelPath);
+                ConfigureRiggedWalkerModel(CommandRelayModelPath);
 
                 // 1. Configure and import card sprites
                 ConfigureCardSprite(TidebreakerCardPath);
@@ -65,6 +77,9 @@ namespace RogueCommandExpansion.Authoring
                 ConfigureCardSprite(BulwarkSiegeTankCardPath);
                 ConfigureCardSprite(ArcLanceWalkerCardPath);
                 ConfigureCardSprite(FieldMedicRoverCardPath);
+                ConfigureCardSprite(SentinelRelayCardPath);
+                ConfigureCardSprite(GravitasBreakerCardPath);
+                ConfigureCardSprite(CommandRelayCardPath);
 
                 // 2. Build Prefabs
                 string p1 = CreateTidebreakerHovercraftVisual();
@@ -73,6 +88,9 @@ namespace RogueCommandExpansion.Authoring
                 string p4 = CreateBulwarkSiegeTankVisual();
                 string p5 = CreateArcLanceWalkerVisual();
                 string p6 = CreateFieldMedicRoverVisual();
+                string p7 = CreatePbrVisual("SentinelRelay", SentinelRelayModelPath, SentinelRelayPrefabPath);
+                string p8 = CreatePbrVisual("GravitasBreaker", GravitasBreakerModelPath, GravitasBreakerPrefabPath);
+                string p9 = CreatePbrVisual("CommandRelay", CommandRelayModelPath, CommandRelayPrefabPath);
 
                 AssetDatabase.SaveAssets();
                 AssetDatabase.Refresh();
@@ -93,9 +111,15 @@ namespace RogueCommandExpansion.Authoring
                         p4, BulwarkSiegeTankCardPath,
                         p5, ArcLanceWalkerCardPath,
                         p6, FieldMedicRoverCardPath,
+                        p7, SentinelRelayCardPath,
+                        p8, GravitasBreakerCardPath,
+                        p9, CommandRelayCardPath,
                         MaterialsFolder + "/BulwarkSiegeTank_PBR.mat",
                         MaterialsFolder + "/ArcLanceWalker_PBR.mat",
-                        MaterialsFolder + "/FieldMedicRover_PBR.mat"
+                        MaterialsFolder + "/FieldMedicRover_PBR.mat",
+                        MaterialsFolder + "/SentinelRelay_PBR.mat",
+                        MaterialsFolder + "/GravitasBreaker_PBR.mat",
+                        MaterialsFolder + "/CommandRelay_PBR.mat"
                     }
                 };
 
@@ -658,6 +682,89 @@ namespace RogueCommandExpansion.Authoring
                 PrefabUtility.SaveAsPrefabAsset(root, FieldMedicRoverPrefabPath, out success);
                 if (!success) throw new InvalidOperationException("Could not save prefab to " + FieldMedicRoverPrefabPath);
                 return FieldMedicRoverPrefabPath;
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(root);
+            }
+        }
+
+        private static string CreatePbrVisual(string unitName, string modelPath, string prefabPath)
+        {
+            Material pbrMat = CreatePbrMaterial(unitName);
+            GameObject modelAsset = AssetDatabase.LoadAssetAtPath<GameObject>(modelPath);
+            if (modelAsset == null) throw new FileNotFoundException("Model not found: " + modelPath);
+            if (pbrMat == null) throw new InvalidOperationException(unitName + " PBR material is null");
+
+            var root = new GameObject(unitName + "Visual");
+            try
+            {
+                GameObject modelInstance = PrefabUtility.InstantiatePrefab(modelAsset) as GameObject;
+                if (modelInstance == null) modelInstance = UnityEngine.Object.Instantiate(modelAsset);
+                if (modelInstance == null)
+                    throw new InvalidOperationException(unitName + " model instance is null after instantiation");
+
+                modelInstance.name = unitName + "Model";
+                modelInstance.transform.SetParent(root.transform, false);
+                modelInstance.transform.localPosition = Vector3.zero;
+                modelInstance.transform.localRotation = Quaternion.identity;
+                modelInstance.transform.localScale = Vector3.one;
+
+                Renderer[] renderers = modelInstance.GetComponentsInChildren<Renderer>(true);
+                bool hasMesh = false;
+                foreach (Renderer renderer in renderers)
+                {
+                    if (renderer is MeshRenderer meshRenderer)
+                    {
+                        MeshFilter meshFilter = meshRenderer.GetComponent<MeshFilter>();
+                        hasMesh |= meshFilter != null && meshFilter.sharedMesh != null;
+                    }
+                    else if (renderer is SkinnedMeshRenderer skinnedRenderer)
+                    {
+                        hasMesh |= skinnedRenderer.sharedMesh != null;
+                    }
+
+                    if (renderer is MeshRenderer || renderer is SkinnedMeshRenderer)
+                    {
+                        if (renderer.name.IndexOf("_COLLIDER", StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            renderer.enabled = false;
+                            continue;
+                        }
+                        int count = renderer.sharedMaterials != null && renderer.sharedMaterials.Length > 0
+                            ? renderer.sharedMaterials.Length
+                            : 1;
+                        var materials = new Material[count];
+                        for (int i = 0; i < count; i++) materials[i] = pbrMat;
+                        renderer.sharedMaterials = materials;
+                    }
+                }
+
+                if (!hasMesh) throw new InvalidOperationException(unitName + " model has no mesh-bearing renderers");
+
+                FitBoxCollider(root, modelInstance);
+                VehiclePrefabBuilder.EnsureCanonicalVfxSockets(root, modelInstance);
+                VehiclePrefabBuilder.EnsureCanonicalVfxAndAudioComponents(root);
+
+                Animator[] importedAnimators = modelInstance.GetComponentsInChildren<Animator>(true);
+                for (int i = 0; i < importedAnimators.Length; i++)
+                {
+                    if (importedAnimators[i] != null) UnityEngine.Object.DestroyImmediate(importedAnimators[i]);
+                }
+
+                VehiclePrefabBuilder.SetupAnimatorIfAvailable(
+                    root, modelInstance, modelAsset, unitName, preferWalkForMovement: true);
+                Animator animator = root.GetComponent<Animator>();
+                if (animator != null && animator.avatar != null && animator.avatar.isValid &&
+                    animator.runtimeAnimatorController != null)
+                {
+                    animator.applyRootMotion = false;
+                }
+
+                bool success;
+                PrefabUtility.SaveAsPrefabAsset(root, prefabPath, out success);
+                if (!success) throw new InvalidOperationException("Could not save prefab to " + prefabPath);
+                return prefabPath;
             }
             finally
             {

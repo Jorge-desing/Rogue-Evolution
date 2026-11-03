@@ -40,6 +40,9 @@ class MechRiggingBundleTests(unittest.TestCase):
             "BulwarkSiegeTankVisual",
             "ArcLanceWalkerVisual",
             "FieldMedicRoverVisual",
+            "SentinelRelayVisual",
+            "GravitasBreakerVisual",
+            "CommandRelayVisual",
         }
 
         self.assertEqual(set(audits_by_name), expected)
