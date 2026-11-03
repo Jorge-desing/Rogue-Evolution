@@ -2228,6 +2228,26 @@ def make_hover_skimmer_assembly(
         (0.0, 0.0, float_height),
         skirt_mat, bevel=0.04
     ))
+    # Segmented rubber plenum pleats at bow and stern
+    objects.append(make_box(
+        f"{prefix}_PlenumPleat_F",
+        (hull_width * 0.86, 0.22, 0.16),
+        (0.0, hull_length * 0.42, float_height - 0.02),
+        skirt_mat, bevel=0.02, rotation=(math.radians(-22), 0.0, 0.0)
+    ))
+    objects.append(make_box(
+        f"{prefix}_PlenumPleat_R",
+        (hull_width * 0.86, 0.22, 0.16),
+        (0.0, -hull_length * 0.42, float_height - 0.02),
+        skirt_mat, bevel=0.02, rotation=(math.radians(22), 0.0, 0.0)
+    ))
+    # Flexible perimeter bumper welt collar
+    objects.append(make_box(
+        f"{prefix}_PerimeterBumper",
+        (hull_width * 0.94, hull_length * 0.90, 0.06),
+        (0.0, 0.0, float_height + 0.10),
+        thruster_mat, bevel=0.015
+    ))
     bell_rx = hull_width * 0.32
     bell_ry = hull_length * 0.28
     for sx in (-1, 1):
@@ -5067,6 +5087,109 @@ def make_sculpted_wheel_fender_assembly(
         bevel=0.01,
         rotation=(0.0, side * math.radians(12), 0.0),
     ))
+
+    return objects
+
+
+def make_aerodynamic_fuselage_assembly(
+    prefix: str,
+    length: float = 2.6,
+    width: float = 1.35,
+    height: float = 0.58,
+    location: Tuple[float, float, float] | Vector = (0.0, 0.10, 0.72),
+    primary_mat: bpy.types.Material | None = None,
+    canopy_mat: bpy.types.Material | None = None,
+    intake_mat: bpy.types.Material | None = None,
+    exhaust_mat: bpy.types.Material | None = None,
+    with_wing_fairings: bool = True,
+    wing_span_x: float = 1.5,
+) -> list[bpy.types.Object]:
+    """Generates an aerodynamic compound fuselage monocoque with faceted cockpit, intakes, and wing root fillets."""
+    objects = []
+    loc = Vector(location)
+
+    # 1. Main fuselage monocoque with tumblehome upper shoulder chamfers
+    fuselage = make_box(
+        f"{prefix}_Fuselage",
+        (width, length, height),
+        (loc.x, loc.y, loc.z),
+        primary_mat,
+        bevel=0.045,
+    )
+    objects.append(fuselage)
+
+    # 2. Sloped aerodynamic cockpit nose
+    nose_len = length * 0.35
+    nose_w = width * 0.78
+    nose_h = height * 0.72
+    nose_y = loc.y + length * 0.5 + nose_len * 0.42
+    nose_z = loc.z - height * 0.08
+    cockpit_nose = make_box(
+        f"{prefix}_CockpitNose",
+        (nose_w, nose_len, nose_h),
+        (loc.x, nose_y, nose_z),
+        canopy_mat or primary_mat,
+        bevel=0.035,
+        rotation=(math.radians(-16), 0.0, 0.0),
+    )
+    objects.append(cockpit_nose)
+
+    # 3. Faceted cockpit canopy glass
+    canopy_w = nose_w * 0.72
+    canopy_len = nose_len * 0.65
+    canopy_h = nose_h * 0.45
+    objects.append(make_box(
+        f"{prefix}_CanopyGlass",
+        (canopy_w, canopy_len, canopy_h),
+        (loc.x, nose_y - nose_len * 0.05, nose_z + nose_h * 0.48),
+        canopy_mat or primary_mat,
+        bevel=0.02,
+        rotation=(math.radians(-12), 0.0, 0.0),
+    ))
+
+    # 4. Bilateral jet/lift-fan intake scoops with splitter plates
+    intake_w = width * 0.22
+    intake_len = length * 0.38
+    intake_h = height * 0.55
+    for side in (-1, 1):
+        side_tag = "L" if side < 0 else "R"
+        ix = loc.x + side * (width * 0.5 + intake_w * 0.35)
+        iy = loc.y + length * 0.08
+        iz = loc.z
+        objects.append(make_box(
+            f"{prefix}_IntakeScoop_{side_tag}",
+            (intake_w, intake_len, intake_h),
+            (ix, iy, iz),
+            intake_mat or primary_mat,
+            bevel=0.025,
+            rotation=(0.0, 0.0, math.radians(side * -5)),
+        ))
+        objects.append(make_box(
+            f"{prefix}_IntakeSplitter_{side_tag}",
+            (0.02, intake_len * 0.95, intake_h * 0.85),
+            (ix + side * intake_w * 0.25, iy, iz),
+            exhaust_mat or intake_mat or primary_mat,
+            bevel=0.008,
+        ))
+
+    # 5. Wing root fairing fillets (bridging fuselage to wings)
+    if with_wing_fairings:
+        fairing_w = width * 0.28
+        fairing_len = length * 0.48
+        fairing_h = height * 0.25
+        for side in (-1, 1):
+            side_tag = "L" if side < 0 else "R"
+            fx = loc.x + side * (width * 0.5 + fairing_w * 0.35)
+            fy = loc.y - length * 0.05
+            fz = loc.z + height * 0.22
+            objects.append(make_box(
+                f"{prefix}_WingRootFairing_{side_tag}",
+                (fairing_w, fairing_len, fairing_h),
+                (fx, fy, fz),
+                primary_mat,
+                bevel=0.02,
+                rotation=(0.0, math.radians(side * 12), 0.0),
+            ))
 
     return objects
 
@@ -8304,6 +8427,24 @@ def make_factory_assembly(
     )
     objects.append(hall)
 
+    # 2b. Structural corner buttress pilasters with angled footing taluds
+    buttress_w = width * 0.14
+    buttress_d = length * 0.12
+    buttress_h = height * 0.75
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            btag = f"{'F' if sy > 0 else 'R'}{'L' if sx < 0 else 'R'}"
+            bx = sx * (width * 0.5 + buttress_w * 0.25)
+            by = sy * (length * 0.5 + buttress_d * 0.25)
+            bz = slab_h + buttress_h * 0.5
+            objects.append(make_box(
+                f"{prefix}_CornerButtress_{btag}",
+                (buttress_w, buttress_d, buttress_h),
+                (bx, by, bz),
+                foundation_mat,
+                bevel=0.035,
+            ))
+
     # 3. Chamfered / Gabled roof cap with industrial skylights
     roof_h = 0.85
     roof_z = slab_h + height + roof_h * 0.5
@@ -8467,6 +8608,18 @@ def make_turret_bunker_assembly(
         bevel=0.04,
     )
     objects.append(body)
+
+    # 2b. Sloped armor glacis plinth ring bridging slab to bunker wall
+    plinth_h = 0.45
+    objects.append(make_cylinder(
+        f"{prefix}_GlacisPlinth",
+        radius=radius * 1.08,
+        depth=plinth_h,
+        location=(0.0, 0.0, slab_h + plinth_h * 0.5),
+        material=foundation_mat,
+        vertices=8,
+        bevel=0.04,
+    ))
 
     # 3. Turret bearing ring collar on roof
     collar_z = slab_h + height + 0.15
@@ -11336,7 +11489,7 @@ class RogueVehicleBuilder:
         caliber: float = 0.095,
         length: float = 1.65,
         elevation_deg: float = 12.0,
-        with_dust_boot: bool = False,
+        with_dust_boot: bool = True,
     ) -> "RogueVehicleBuilder":
         gun_pivot = self.turret_center + Vector((0.0, 0.45, 0.02))
         elev_rad = math.radians(elevation_deg)
@@ -13006,6 +13159,31 @@ class RogueVehicleBuilder:
                 fender_mat=self.palette.primary_armor,
                 skirt_mat=self.palette.light_armor,
             ))
+        return self
+
+    def add_aerodynamic_fuselage(
+        self,
+        length: float = 2.6,
+        width: float = 1.35,
+        height: float = 0.58,
+        location: Tuple[float, float, float] | Vector = (0.0, 0.10, 0.72),
+        with_wing_fairings: bool = True,
+        wing_span_x: float = 1.5,
+    ) -> "RogueVehicleBuilder":
+        objs = make_aerodynamic_fuselage_assembly(
+            self.name,
+            length=length,
+            width=width,
+            height=height,
+            location=location,
+            primary_mat=self.palette.primary_armor,
+            canopy_mat=self.palette.light_armor,
+            intake_mat=self.palette.gunmetal,
+            exhaust_mat=self.palette.warning,
+            with_wing_fairings=with_wing_fairings,
+            wing_span_x=wing_span_x,
+        )
+        self.objects.extend(objs)
         return self
 
     def add_transitional_coaming(

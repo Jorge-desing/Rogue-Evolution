@@ -1258,6 +1258,9 @@ def build_vehicle_model(
             rmk.make_box(f"{name}Armor_EngineBlock", (0.46, 0.68, 0.42), (0.0, -0.18, 0.82), builder.palette.gunmetal, 0.035),
             rmk.make_box(f"{name}Armor_CockpitCowl", (0.42, 0.58, 0.32), (0.0, 0.45, 1.05), builder.palette.light_armor, 0.03,
                           (math.radians(-16), 0.0, 0.0)),
+            rmk.make_transitional_coaming_collar(
+                f"{name}Armor_CowlCollar", (0.0, 0.45, 0.89), (0.42, 0.58), height=0.035, collar_mat=builder.palette.gunmetal
+            ),
             rmk.make_rod(f"{name}Joint_Fork_L", Vector((-0.18, 0.45, 1.05)), Vector((-0.16, 0.98, 0.38)), 0.035, builder.palette.gunmetal),
             rmk.make_rod(f"{name}Joint_Fork_R", Vector((0.18, 0.45, 1.05)), Vector((0.16, 0.98, 0.38)), 0.035, builder.palette.gunmetal),
             rmk.make_box(f"{name}Joint_Handlebars", (0.64, 0.06, 0.05), (0.0, 0.38, 1.18), builder.palette.gunmetal, 0.01),
@@ -1305,16 +1308,22 @@ def build_vehicle_model(
 
     elif archetype == "spider":
         builder.add_sloped_hull(length=2.6, width=2.4, height=0.82)
+        builder.objects.append(rmk.make_transitional_coaming_collar(
+            f"{name}Armor_WaistCollar", (0.0, 0.0, 0.78), (1.50, 1.60), height=0.045, collar_mat=builder.palette.gunmetal
+        ))
         builder.add_quad_crawler_legs(knee_height=0.98, reach_x=1.12, reach_y=0.88)
         builder.add_turret(size=(1.45, 1.55, 0.44), center_y=0.04)
         builder.add_sensor_visor()
 
     elif archetype == "vtol":
         builder.is_hover = True
+        builder.objects.extend(rmk.make_aerodynamic_fuselage_assembly(
+            f"{name}Armor", length=2.60, width=1.35, height=0.58, location=(0.0, 0.10, 0.72),
+            primary_mat=builder.palette.primary_armor, canopy_mat=builder.palette.light_armor,
+            intake_mat=builder.palette.gunmetal, exhaust_mat=builder.palette.warning,
+            with_wing_fairings=True
+        ))
         builder.objects.extend([
-            rmk.make_box(f"{name}Armor_Fuselage", (1.35, 2.60, 0.58), (0.0, 0.10, 0.72), builder.palette.primary_armor, 0.04),
-            rmk.make_box(f"{name}Armor_CockpitNose", (1.05, 0.92, 0.42), (0.0, 1.45, 0.68), builder.palette.light_armor, 0.035,
-                         rotation=(math.radians(-16), 0.0, 0.0)),
             rmk.make_box(f"{name}Armor_TailBoom", (0.34, 1.65, 0.26), (0.0, -1.85, 0.82), builder.palette.primary_armor, 0.03),
             rmk.make_box(f"{name}Armor_HorizStab", (1.15, 0.38, 0.06), (0.0, -2.50, 0.88), builder.palette.light_armor, 0.015),
             rmk.make_box(f"{name}Armor_VertFin_L", (0.05, 0.42, 0.48), (-0.42, -2.55, 1.05), builder.palette.primary_armor, 0.015,
@@ -1395,10 +1404,15 @@ def build_vehicle_model(
 
     elif archetype == "super_heavy":
         builder.add_sloped_hull(length=3.8, width=2.8, height=1.05, bevel=0.055)
-        builder.objects.append(rmk.make_box(
-            f"{name}Armor_Superstructure",
-            (2.1, 2.7, 0.34), (0.0, -0.10, 1.25), builder.palette.primary_armor, 0.04
-        ))
+        builder.objects.extend([
+            rmk.make_box(
+                f"{name}Armor_Superstructure",
+                (2.1, 2.7, 0.34), (0.0, -0.10, 1.25), builder.palette.primary_armor, 0.04
+            ),
+            rmk.make_transitional_coaming_collar(
+                f"{name}Armor_SuperstructureCollar", (0.0, -0.10, 1.08), (2.1, 2.7), height=0.045, collar_mat=builder.palette.gunmetal
+            ),
+        ])
         builder.add_quad_track_pods(pod_length=1.65, pod_height=0.62, track_spacing_x=2.55, pod_spacing_y=2.0)
         builder.add_engine_deck(slat_count=5, with_exhausts=True)
         builder.add_turret(size=(1.85, 2.1, 0.58), center_y=0.15)
@@ -1408,12 +1422,22 @@ def build_vehicle_model(
         builder.add_spring_antenna()
 
     elif archetype == "buggy":
-        builder.add_all_terrain_wheels(wheelbase_y=2.2, track_width_x=1.85, wheel_radius=0.42, wheel_width=0.30)
+        builder.add_all_terrain_wheels(
+            wheelbase_y=2.2, track_width_x=1.85, wheel_radius=0.42, wheel_width=0.30, with_fenders=True
+        )
         builder.objects.extend([
             rmk.make_box(f"{name}Armor_SpineChassis", (0.85, 2.4, 0.28), (0.0, -0.05, 0.58), builder.palette.primary_armor, 0.035),
             rmk.make_box(f"{name}Armor_FrontNose", (0.72, 0.85, 0.26), (0.0, 1.05, 0.65), builder.palette.light_armor, 0.03,
                          rotation=(math.radians(-14), 0.0, 0.0)),
+            rmk.make_transitional_coaming_collar(
+                f"{name}Armor_FrontNoseCollar", (0.0, 1.05, 0.54), (0.72, 0.85), height=0.035, collar_mat=builder.palette.gunmetal
+            ),
             rmk.make_box(f"{name}Armor_EngineBlock", (0.78, 0.88, 0.46), (0.0, -0.88, 0.78), builder.palette.gunmetal, 0.03),
+            rmk.make_transitional_coaming_collar(
+                f"{name}Armor_EngineCollar", (0.0, -0.88, 0.56), (0.78, 0.88), height=0.035, collar_mat=builder.palette.gunmetal
+            ),
+            rmk.make_rod(f"{name}Joint_ShockAbsorber_L", (-0.42, 0.85, 0.58), (-0.85, 1.10, 0.42), 0.035, builder.palette.warning),
+            rmk.make_rod(f"{name}Joint_ShockAbsorber_R", (0.42, 0.85, 0.58), (0.85, 1.10, 0.42), 0.035, builder.palette.warning),
             rmk.make_cylinder(f"{name}Armor_Exhaust_L", 0.055, 0.42, (-0.28, -1.25, 0.95), builder.palette.gunmetal,
                               rotation=(math.radians(-24), 0.0, 0.0), vertices=10, bevel=0.008),
             rmk.make_cylinder(f"{name}Armor_Exhaust_R", 0.055, 0.42, (0.28, -1.25, 0.95), builder.palette.gunmetal,
@@ -1435,10 +1459,15 @@ def build_vehicle_model(
 
     elif archetype == "siege_crawler":
         builder.add_sloped_hull(length=4.2, width=3.0, height=1.15, bevel=0.055)
-        builder.objects.append(rmk.make_box(
-            f"{name}Armor_Citadel",
-            (2.3, 2.9, 0.42), (0.0, -0.05, 1.35), builder.palette.primary_armor, 0.045
-        ))
+        builder.objects.extend([
+            rmk.make_box(
+                f"{name}Armor_Citadel",
+                (2.3, 2.9, 0.42), (0.0, -0.05, 1.35), builder.palette.primary_armor, 0.045
+            ),
+            rmk.make_transitional_coaming_collar(
+                f"{name}Armor_CitadelCollar", (0.0, -0.05, 1.14), (2.3, 2.9), height=0.045, collar_mat=builder.palette.gunmetal
+            ),
+        ])
         builder.add_quad_track_pods(pod_length=1.85, pod_height=0.68, track_spacing_x=2.75, pod_spacing_y=2.3)
         builder.add_engine_deck(slat_count=6, with_exhausts=True)
         builder.add_turret(size=(2.0, 2.3, 0.62), center_y=0.18)
@@ -1454,6 +1483,9 @@ def build_vehicle_model(
         builder.add_flight_deck(size=(2.10, 3.20, 0.22))
         builder.objects.extend([
             rmk.make_box(f"{name}Armor_BridgeTower", (0.55, 1.25, 0.68), (1.18, -0.15, 1.48), builder.palette.primary_armor, 0.035),
+            rmk.make_transitional_coaming_collar(
+                f"{name}Armor_TowerCollar", (1.18, -0.15, 1.14), (0.55, 1.25), height=0.045, collar_mat=builder.palette.gunmetal
+            ),
             rmk.make_box(f"{name}Armor_BridgeRoof", (0.62, 1.32, 0.12), (1.18, -0.15, 1.84), builder.palette.light_armor, 0.02),
         ])
         builder.objects.extend(rmk.make_recessed_sensor_visor(
@@ -1467,9 +1499,9 @@ def build_vehicle_model(
 
     elif archetype == "quad_mech":
         builder.add_sloped_hull(length=2.8, width=2.5, height=0.88, bevel=0.05)
-        builder.objects.append(rmk.make_box(
-            f"{name}Armor_MechPelvisCore",
-            (1.4, 1.8, 0.48), (0.0, 0.0, 1.05), builder.palette.primary_armor, 0.04
+        builder.add_cast_pelvis(location=(0.0, 0.0, 1.05), width=1.40, depth=1.80, height=0.48)
+        builder.objects.append(rmk.make_transitional_coaming_collar(
+            f"{name}Armor_WaistCollar", (0.0, 0.0, 0.81), (1.40, 1.80), height=0.045, collar_mat=builder.palette.gunmetal
         ))
         builder.add_quad_crawler_legs(knee_height=1.25, reach_x=1.35, reach_y=1.10)
         builder.add_turret(size=(1.55, 1.7, 0.48), center_y=0.10)
@@ -1483,10 +1515,15 @@ def build_vehicle_model(
         builder.add_excavator_drum(width=2.5, radius=0.34)
         for side in (-1, 1):
             side_tag = "L" if side < 0 else "R"
-            builder.objects.append(rmk.make_box(
-                f"{name}Armor_OreHopper_{side_tag}",
-                (0.42, 1.65, 0.65), (side * 1.32, -0.42, 1.05), builder.palette.primary_armor, 0.035
-            ))
+            builder.objects.extend([
+                rmk.make_box(
+                    f"{name}Armor_OreHopper_{side_tag}",
+                    (0.42, 1.65, 0.65), (side * 1.32, -0.42, 1.05), builder.palette.primary_armor, 0.035
+                ),
+                rmk.make_transitional_coaming_collar(
+                    f"{name}Armor_HopperCollar_{side_tag}", (side * 1.32, -0.42, 0.72), (0.42, 1.65), height=0.045, collar_mat=builder.palette.gunmetal
+                ),
+            ])
         builder.add_turret(size=(1.15, 1.25, 0.38), center_y=0.25)
         builder.add_sensor_visor()
         builder.add_spring_antenna()
@@ -1529,9 +1566,13 @@ def build_vehicle_model(
 
     elif archetype == "heavy_dropship":
         builder.is_hover = True
+        builder.objects.extend(rmk.make_aerodynamic_fuselage_assembly(
+            f"{name}Armor", length=3.80, width=2.10, height=0.95, location=(0.0, 0.15, 1.15),
+            primary_mat=builder.palette.primary_armor, canopy_mat=builder.palette.light_armor,
+            intake_mat=builder.palette.gunmetal, exhaust_mat=builder.palette.warning,
+            with_wing_fairings=True
+        ))
         builder.objects.extend([
-            rmk.make_box(f"{name}Armor_CargoFuselage", (2.10, 3.80, 0.95), (0.0, 0.15, 1.15), builder.palette.primary_armor, 0.05),
-            rmk.make_box(f"{name}Armor_CockpitNose", (1.45, 1.20, 0.62), (0.0, 2.35, 1.05), builder.palette.light_armor, 0.04, rotation=(math.radians(-14), 0.0, 0.0)),
             rmk.make_box(f"{name}Armor_RampDoor", (1.55, 0.12, 0.75), (0.0, -1.78, 1.05), builder.palette.gunmetal, 0.02, rotation=(math.radians(16), 0.0, 0.0)),
             rmk.make_box(f"{name}Armor_HighWing_L", (1.45, 0.85, 0.18), (-1.65, 0.25, 1.55), builder.palette.light_armor, 0.03),
             rmk.make_box(f"{name}Armor_HighWing_R", (1.45, 0.85, 0.18), (1.65, 0.25, 1.55), builder.palette.light_armor, 0.03),
@@ -1598,6 +1639,9 @@ def build_vehicle_model(
                 rotation=(0.0, math.radians(90), 0.0), vertices=14, bevel=0.01
             ),
             rmk.make_box(f"{name}Armor_BreacherProw", (1.85, 0.42, 0.38), (0.0, 1.25, 0.55), builder.palette.primary_armor, 0.03),
+            rmk.make_transitional_coaming_collar(
+                f"{name}Armor_ProwCollar", (0.0, 1.25, 0.36), (1.85, 0.42), height=0.035, collar_mat=builder.palette.gunmetal
+            ),
         ])
         for side in (-1, 0, 1):
             builder.objects.append(rmk.make_rod(
@@ -1655,7 +1699,9 @@ def build_vehicle_model(
         builder.hull_length = 3.35
         builder.hull_width = 2.25
         builder.hull_deck_z = 0.90
-        builder.add_all_terrain_wheels(wheelbase_y=2.35, track_width_x=1.95, wheel_radius=0.39, wheel_width=0.28, middle_axle=True)
+        builder.add_all_terrain_wheels(
+            wheelbase_y=2.35, track_width_x=1.95, wheel_radius=0.39, wheel_width=0.28, middle_axle=True, with_fenders=True
+        )
         builder.objects.extend([
             rmk.make_sloped_glacis_hull(
                 f"{name}Armor_Hull",
@@ -1665,6 +1711,9 @@ def build_vehicle_model(
                 material=builder.palette.primary_armor, bevel=0.04
             ),
             rmk.make_box(f"{name}Armor_EWShelter", (1.76, 1.95, 0.62), (0.0, -0.35, 1.16), builder.palette.light_armor, 0.035),
+            rmk.make_transitional_coaming_collar(
+                f"{name}Armor_ShelterCollar", (0.0, -0.35, 0.85), (1.76, 1.95), height=0.045, collar_mat=builder.palette.gunmetal
+            ),
             rmk.make_cylinder(f"{name}Sensor_InterferenceMast", 0.16, 0.78, (0.0, -0.78, 1.75), builder.palette.gunmetal, vertices=10, bevel=0.015),
         ])
         for side in (-1, 1):
@@ -1693,12 +1742,18 @@ def build_vehicle_model(
         builder.hull_deck_z = 0.90
         builder.add_all_terrain_wheels(
             wheelbase_y=2.55, track_width_x=1.95, wheel_radius=0.40, wheel_width=0.28,
-            middle_axle=True, lug_count=6 if rts_budget else 10, bolt_count=0 if rts_budget else 6
+            middle_axle=True, lug_count=6 if rts_budget else 10, bolt_count=0 if rts_budget else 6, with_fenders=True
         )
         builder.objects.extend([
             rmk.make_box(f"{name}Armor_ChassisFrame", (1.62, 3.55, 0.34), (0.0, 0.0, 0.56), builder.palette.gunmetal, 0.03),
             rmk.make_box(f"{name}Armor_ForwardCab", (1.80, 1.05, 0.74), (0.0, 1.28, 1.02), builder.palette.primary_armor, 0.04),
+            rmk.make_transitional_coaming_collar(
+                f"{name}Armor_CabCollar", (0.0, 1.28, 0.65), (1.80, 1.05), height=0.045, collar_mat=builder.palette.gunmetal
+            ),
             rmk.make_box(f"{name}Armor_LauncherBed", (1.72, 1.95, 0.22), (0.0, -0.62, 0.86), builder.palette.light_armor, 0.025),
+            rmk.make_transitional_coaming_collar(
+                f"{name}Armor_BedCollar", (0.0, -0.62, 0.75), (1.72, 1.95), height=0.045, collar_mat=builder.palette.gunmetal
+            ),
             rmk.make_box(f"{name}Armor_ErectorCradle", (1.30, 0.32, 0.30), (0.0, -1.42, 1.08), builder.palette.gunmetal, 0.02),
         ])
         erector_rot = (math.radians(-52), 0.0, 0.0)
@@ -1733,6 +1788,9 @@ def build_vehicle_model(
         builder.add_engine_deck(slat_count=4, with_exhausts=True)
         builder.objects.extend([
             rmk.make_box(f"{name}Armor_CraneSlewBase", (0.85, 0.85, 0.28), (0.62, 0.55, 1.18), builder.palette.light_armor, 0.03),
+            rmk.make_transitional_coaming_collar(
+                f"{name}Armor_CraneCollar", (0.62, 0.55, 1.04), (0.85, 0.85), height=0.045, collar_mat=builder.palette.gunmetal
+            ),
             rmk.make_rod(f"{name}Joint_CraneBoom", (0.62, 0.55, 1.32), (0.62, -1.15, 2.55), 0.11, builder.palette.warning, vertices=8),
             rmk.make_rod(f"{name}Joint_CraneJib", (0.62, -1.15, 2.55), (0.62, -1.75, 2.20), 0.07, builder.palette.warning, vertices=8),
             rmk.make_rod(f"{name}Joint_CraneHoistCable", (0.62, -1.75, 2.20), (0.62, -1.75, 1.35), 0.015, builder.palette.gunmetal, vertices=6),
@@ -1742,6 +1800,9 @@ def build_vehicle_model(
             rmk.make_box(f"{name}Armor_EarthSpade", (2.30, 0.16, 0.52), (0.0, 1.82, 0.30), builder.palette.primary_armor, 0.025,
                          rotation=(math.radians(-18), 0.0, 0.0)),
             rmk.make_box(f"{name}Armor_ToolLocker", (0.75, 1.30, 0.38), (-0.70, -0.45, 1.14), builder.palette.light_armor, 0.025),
+            rmk.make_transitional_coaming_collar(
+                f"{name}Armor_LockerCollar", (-0.70, -0.45, 0.95), (0.75, 1.30), height=0.045, collar_mat=builder.palette.gunmetal
+            ),
         ])
         builder.add_turret(size=(0.95, 1.00, 0.32), center_y=0.40)
         builder.turret_center = Vector((-0.55, 0.40, 1.30))
@@ -1754,6 +1815,9 @@ def build_vehicle_model(
         builder.add_continuous_tracks(length=3.05, height=0.64, belt_width=0.34, roadwheels=5, with_skirts=skirts)
         builder.objects.extend([
             rmk.make_box(f"{name}Armor_MineHopper", (1.70, 1.30, 0.62), (0.0, -0.80, 1.22), builder.palette.primary_armor, 0.035),
+            rmk.make_transitional_coaming_collar(
+                f"{name}Armor_HopperCollar", (0.0, -0.80, 0.91), (1.70, 1.30), height=0.045, collar_mat=builder.palette.gunmetal
+            ),
             rmk.make_box(f"{name}Armor_HopperLid", (1.76, 1.36, 0.08), (0.0, -0.80, 1.57), builder.palette.light_armor, 0.015),
             rmk.make_box(f"{name}Joint_DispenserChute", (0.62, 1.05, 0.10), (0.0, -1.95, 0.62), builder.palette.gunmetal, 0.015,
                          rotation=(math.radians(-32), 0.0, 0.0)),
@@ -1791,9 +1855,14 @@ def build_vehicle_model(
     elif archetype == "hexapod_assault":
         # Six-legged assault crawler: four rigged crawler legs plus a static middle leg pair bound to the body.
         builder.add_sloped_hull(length=3.0, width=2.4, height=0.84, bevel=0.05)
-        builder.objects.append(rmk.make_box(
-            f"{name}Armor_ThoraxCore", (1.45, 1.95, 0.42), (0.0, 0.0, 1.02), builder.palette.primary_armor, 0.04
-        ))
+        builder.objects.extend([
+            rmk.make_box(
+                f"{name}Armor_ThoraxCore", (1.45, 1.95, 0.42), (0.0, 0.0, 1.02), builder.palette.primary_armor, 0.04
+            ),
+            rmk.make_transitional_coaming_collar(
+                f"{name}Armor_ThoraxCollar", (0.0, 0.0, 0.81), (1.45, 1.95), height=0.045, collar_mat=builder.palette.gunmetal
+            ),
+        ])
         builder.add_quad_crawler_legs(knee_height=1.05, reach_x=1.25, reach_y=1.05)
         for side in (-1, 1):
             stag = "ML" if side < 0 else "MR"
@@ -1847,6 +1916,9 @@ def build_vehicle_model(
         builder.add_engine_deck(slat_count=4, with_exhausts=True)
         builder.objects.extend([
             rmk.make_box(f"{name}Armor_LaunchCradle", (1.85, 0.55, 0.36), (0.0, 1.48, 1.05), builder.palette.gunmetal, 0.025),
+            rmk.make_transitional_coaming_collar(
+                f"{name}Armor_CradleCollar", (0.0, 1.48, 0.87), (1.85, 0.55), height=0.045, collar_mat=builder.palette.gunmetal
+            ),
             rmk.make_rod(f"{name}Joint_LaunchBoom_L", (-0.65, 0.85, 1.05), (-0.65, 1.75, 1.68), 0.065, builder.palette.warning, vertices=8),
             rmk.make_rod(f"{name}Joint_LaunchBoom_R", (0.65, 0.85, 1.05), (0.65, 1.75, 1.68), 0.065, builder.palette.warning, vertices=8),
             rmk.make_cylinder(f"{name}Joint_ScissorHingePin", 0.14, 2.35, (0.0, 1.78, 1.62), builder.palette.gunmetal,
@@ -1871,7 +1943,9 @@ def build_vehicle_model(
         builder.hull_length = 4.1
         builder.hull_width = 2.35
         builder.hull_deck_z = 0.94
-        builder.add_all_terrain_wheels(wheelbase_y=2.85, track_width_x=2.05, wheel_radius=0.41, wheel_width=0.30, middle_axle=True)
+        builder.add_all_terrain_wheels(
+            wheelbase_y=2.85, track_width_x=2.05, wheel_radius=0.41, wheel_width=0.30, middle_axle=True, with_fenders=True
+        )
         for side in (-1, 1):
             stag = "L" if side < 0 else "R"
             builder.objects.extend(rmk.make_all_terrain_wheel_assembly(
@@ -1884,6 +1958,9 @@ def build_vehicle_model(
         builder.objects.extend([
             rmk.make_box(f"{name}Armor_ChassisSpine", (1.75, 4.05, 0.36), (0.0, 0.0, 0.58), builder.palette.gunmetal, 0.03),
             rmk.make_box(f"{name}Armor_ArmoredCab", (2.05, 1.22, 0.84), (0.0, 1.38, 1.08), builder.palette.primary_armor, 0.04),
+            rmk.make_transitional_coaming_collar(
+                f"{name}Armor_CabCollar", (0.0, 1.38, 0.66), (2.05, 1.22), height=0.045, collar_mat=builder.palette.gunmetal
+            ),
             rmk.make_box(f"{name}Armor_CommandShelter", (2.18, 2.45, 0.96), (0.0, -0.62, 1.24), builder.palette.primary_armor, 0.045),
             rmk.make_box(f"{name}Armor_SlideOutBay_L", (0.24, 1.65, 0.68), (-1.18, -0.62, 1.24), builder.palette.light_armor, 0.025),
             rmk.make_box(f"{name}Armor_SlideOutBay_R", (0.24, 1.65, 0.68), (1.18, -0.62, 1.24), builder.palette.light_armor, 0.025),
@@ -1953,6 +2030,9 @@ def build_vehicle_model(
         builder.add_continuous_tracks(length=2.98, height=0.64, belt_width=0.35, roadwheels=5, with_skirts=skirts)
         builder.objects.extend([
             rmk.make_box(f"{name}Armor_CasemateSuperstructure", (1.92, 2.05, 0.48), (0.0, -0.22, 1.16), builder.palette.primary_armor, 0.035),
+            rmk.make_transitional_coaming_collar(
+                f"{name}Armor_CasemateCollar", (0.0, -0.22, 0.92), (1.92, 2.05), height=0.045, collar_mat=builder.palette.gunmetal
+            ),
             rmk.make_cylinder(f"{name}Joint_MortarTurntable", 0.68, 0.16, (0.0, -0.25, 1.18), builder.palette.gunmetal, vertices=12, bevel=0.015),
         ])
         for side in (-1, 1):
@@ -2120,10 +2200,16 @@ def build_vehicle_model(
                 (1.95, 2.40, 0.55), (0.0, -0.15, 1.25),
                 builder.palette.light_armor, bevel=0.04
             ),
+            rmk.make_transitional_coaming_collar(
+                f"{name}Armor_CasemateCollar", (0.0, -0.15, 0.97), (1.95, 2.40), height=0.045, collar_mat=builder.palette.gunmetal
+            ),
             rmk.make_box(
                 f"{name}Armor_RearPowerCore",
                 (1.45, 0.85, 0.65), (0.0, -1.35, 1.28),
                 builder.palette.gunmetal, bevel=0.035
+            ),
+            rmk.make_transitional_coaming_collar(
+                f"{name}Armor_PowerCoreCollar", (0.0, -1.35, 0.95), (1.45, 0.85), height=0.045, collar_mat=builder.palette.gunmetal
             ),
         ])
         builder.add_turret(size=(1.65, 1.95, 0.48), center_y=0.15)
@@ -2200,6 +2286,9 @@ def build_vehicle_model(
                 builder.palette.light_armor, bevel=0.035,
                 rotation=(math.radians(-18), 0.0, 0.0)
             ),
+            rmk.make_transitional_coaming_collar(
+                f"{name}Armor_BowCollar", (0.0, 1.75, builder.ground_clearance + 0.25), (1.65, 0.75), height=0.045, collar_mat=builder.palette.gunmetal
+            ),
         ])
         for side in (-1, 1):
             stag = "L" if side < 0 else "R"
@@ -2234,6 +2323,9 @@ def build_vehicle_model(
                 f"{name}Armor_CruciformCenter",
                 (1.85, 1.85, 0.52), (0.0, 0.0, 1.25),
                 builder.palette.primary_armor, bevel=0.04
+            ),
+            rmk.make_transitional_coaming_collar(
+                f"{name}Armor_CenterCollar", (0.0, 0.0, 0.99), (1.85, 1.85), height=0.045, collar_mat=builder.palette.gunmetal
             ),
             rmk.make_box(
                 f"{name}Armor_TurntablePedestal",

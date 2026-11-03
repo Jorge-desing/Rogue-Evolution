@@ -722,4 +722,12 @@ To eliminate the visible appearance of disconnected geometric primitives ("figur
   - Contoured 3-segment arched wheel well fenders hugging all-terrain tires, with forward mudflap deflectors, rear splash guards, and outer chamfered flare skirts.
   - Deployed on `nanite_support_rover`, `tactical_relay_carrier`, `halftrack`, and wheeled variants.
 - **Transitional Mounting Coamings (`make_transitional_coaming_collar` / `.add_transitional_coaming()`)**:
-  - Beveled perimeter mounting flanges bridging cabins, cowls, and equipment bays to chassis decks, eliminating unnatural computer-generated 90-degree knife-edge intersections.
+  - Beveled perimeter mounting flanges bridging cabins, cowls, superstructures, hoppers, and equipment bays to chassis decks, eliminating unnatural computer-generated 90-degree knife-edge intersections.
+  - Deployed across the full fleet: `super_heavy`, `siege_crawler`, `drone_carrier`, `combat_harvester`, `gravity_siege_breaker`, `mortar_carrier`, `mine_layer`, `recovery_crawler`, `bridge_layer`, `demolition_breacher`, `amphibious_assault_tank`, `ew_jammer`, `mobile_sam_launcher`, `command_hq_rig`, `buggy`, `bike`, `quad_mech`, `spider`, `hexapod_assault`, `plasma_mortar_strider`.
+- **Aerodynamic Compound Fuselages & Wing Root Fillets (`make_aerodynamic_fuselage_assembly` / `.add_aerodynamic_fuselage()`)**:
+  - Tapered aeronautical monocoques with multi-panel faceted cockpit canopies, upper shoulder tumblehome chamfers, bilateral jet/lift-fan intake scoops with splitter plates, ventral keel rails, and blended wing root fairings.
+  - Deployed on `vtol`, `heavy_dropship`, and `flying_wing_bomber`, eliminating primitive rectangular-block aircraft bodies.
+- **Segmented Plenum Skirt & Vectoring Louvers (`make_hover_skimmer_assembly`)**:
+  - Flexible rubber plenum skirt pleats at bow and stern (22° deflection), lateral thrust vectoring air louvers, and perimeter welt bumper collar across all hovercraft (`hover`, `hover_cruiser`, `assault_hovercraft`, `stealth_recon_skimmer`).
+- **Architectural Plinths & Buttress Pilasters (`make_factory_assembly`, `make_turret_bunker_assembly`)**:
+  - Angled foundation corner buttresses and sloped armor glacis plinth rings anchoring industrial production halls and defense bunkers firmly to Z=0.0m foundation slabs.
