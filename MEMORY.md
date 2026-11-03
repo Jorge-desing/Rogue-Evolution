@@ -760,3 +760,14 @@ This is a compact, durable orientation for agents. For the changing checkout sta
 - QA/reflection safety: Profile2 is dedicated QA without a tutorial; never ask, inspect, infer, gate, bypass, or switch profiles for tutorial. Check current selector/save safety and preserve saves. Before reflection jointly verify Rogue Command version, Unity `2021.3.45f2`, Assembly-CSharp SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, and MVID `db0e9462-128d-4296-9900-de18b4bd0c00`.
 
 - Root MEMORY.md committed and pushed as `6c959fc2b96f09e33e7ed9ce7d79678b6cba9095`; codex/antigravity memories and mem0 are memory-only and not tracked in the repo.
+## Refresh (2026-11-03, HEAD e4f4d19)
+
+- Repository `C:/Users/Alex/Documents/Mod Rogue Command`, loader `1.19.0`, branch `codex/rogue-unit-balance-20261018`. Verified local HEAD, upstream, origin, and remote branch all equal `e4f4d19bebc82b03af0edafcaf9b682f800ce48e` (`docs(memory): note root MEMORY.md commit/push in sync entry`). No code changes since `a2cc3b1`; this commit only noted that root MEMORY.md was committed/pushed as `6c959fc2b96f09e33e7ed9ce7d79678b6cba9095`. Code baseline remains `0bbede6b7beb68f8f50f4ae89f10e83ecb056c0d`; implementation baseline remains `e25c6de` (arachnid middle-leg orientation normalizer); remains `d7a3a11b56b58bed6d3f06c47fd40a627c9d1ae3`.
+
+- Working tree clean except preserved nested worktree gitlinks: `.worktrees/cargador` @ `11e9968` (modified `MODDING_PLAN.md`/`MODLOG.md`) and `.worktrees/task-graph-validation` @ `d1f9045` (modified schema/runtime/validation/diagnostics/tests/tooling plus untracked localization test). No untracked root files. Do not stage, reset, clean, or overwrite.
+
+- Validation counts unchanged from the last full run: Release plugin build 0 warnings/0 errors; C# harness 475/476 (1 Windows symlink-privilege skip, 0 failures); Python suite 126/126; AssetBundle references 25/0; native visual preflight 9/0; loader registry 4 manifests, 0 issues; `git diff --check` clean (LF/CRLF notices). Local/static evidence only; no fresh Steam/Unity gameplay proof beyond the existing tactical-operations runtime smoke (AGENT-HANDOFF point 28/33). Natural offer->selection->placement->production/render/stat and tactical AI remain unverified.
+
+- QA/reflection safety: Profile2 is dedicated QA without a tutorial; never ask, inspect, infer, gate, bypass, or switch profiles for tutorial. Check current selector/save safety and preserve saves. Before reflection jointly verify Rogue Command version, Unity `2021.3.45f2`, Assembly-CSharp SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, and MVID `db0e9462-128d-4296-9900-de18b4bd0c00`.
+
+- Root MEMORY.md committed and pushed as `e4f4d19bebc82b03af0edafcaf9b682f800ce48e`; codex/antigravity memories and mem0 are memory-only and not tracked in the repo.
