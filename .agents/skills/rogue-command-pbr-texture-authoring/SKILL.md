@@ -30,7 +30,7 @@ Write maps to the Unity authoring project's existing model texture folder using 
 | `<Name>_Normal.png` | Tangent-space normal map consistent with the Blender bake | Normal Map import type |
 | `<Name>_Emission.png` | Emissive color for authored lights and energy details | Default, sRGB on |
 
-The current `RogueCommand/VehiclePBR_VertexWear` shader samples metallic from `MetallicGloss.R` and smoothness from `.A * _GlossMapScale`. Keep G/B equal to R for compatibility with the deterministic bake, even though this shader does not read those channels. AO from external tools is not consumed by this map contract; do not silently pack it into MetallicGloss.
+The current `RogueCommand/VehiclePBR_VertexWear` shader samples metallic from `MetallicGloss.R` and smoothness from `.A * _GlossMapScale`. Keep G/B equal to R for compatibility with the deterministic bake, even though this shader does not read those channels. AO from external tools is not consumed by this map contract; do not silently pack it into MetallicGloss. The shader also exposes procedural hard-surface controls (`_WeldBeadStrength`, `_WeldBeadScale`, `_WeldBeadWidth`) driven by the edge-wear vertex-color mask; these are material/shader settings, not texture channels, and do not change the four-map contract.
 
 ## Authoring Steps
 
