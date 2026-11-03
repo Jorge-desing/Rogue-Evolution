@@ -120,6 +120,52 @@ except Exception:
 _DIAGNOSTICS_GO_ID: int | None = None
 
 
+_RUNTIME_SNAPSHOT_GETTERS = [
+    "GetSystemHealthJson",
+    "GetBattlefieldCensusJson",
+    "GetPlayerRosterJson",
+    "GetAiRosterJson",
+    "GetRunProgressionCensusJson",
+    "GetCombatStatusCensusJson",
+    "GetProductionCensusJson",
+    "GetEconomyMatchCensusJson",
+    "GetBaseIntegrityCensusJson",
+    "GetThreatPrioritizationCensusJson",
+    "GetUnitThreatAssessmentJson",
+    "GetAgentCoordinationCensusJson",
+    "GetTacticalStanceCensusJson",
+    "GetUnitAffixCensusJson",
+    "GetUnitLoadoutAndPoolCensusJson",
+    "GetAiDoctrineCensusJson",
+    "GetAiDirectorCensusJson",
+    "GetHarvesterCensusJson",
+    "GetHazardCensusJson",
+    "GetVeterancyCensusJson",
+    "GetSelectionCensusJson",
+    "GetVisualRenderCensusJson",
+    "GetLoadedPrefabVisualAuditJson",
+    "GetLoaderAuditCensusJson",
+    "GetUnitMechanicsCensusJson",
+    "GetVisualSurfaceCensusJson",
+    "GetVisualMaterialCensusJson",
+    "GetAudioCensusJson",
+    "GetCameraCensusJson",
+    "GetCommandAuraCensusJson",
+    "GetTechCatalogJson",
+    "GetMatchSummaryJson",
+    "GetEntityCatalogJson",
+    "GetCombatXpEntriesJson",
+    "GetUnitLoadoutCensusJson",
+    "GetAiModulesDiagnosticsJson",
+    "GetGridMetricsJson",
+    "GetFogStateJson",
+    "GetSocketAuditCensusJson",
+    "GetColliderAuditCensusJson",
+    "GetParticleVfxCensusJson",
+    "GetLodAuditCensusJson",
+]
+
+
 def _call_http(endpoint: str, method: str = "GET", params: dict[str, Any] | None = None, body_str: str | None = None, timeout: float = 12.0) -> str:
     url = BASE_URL.rstrip("/") + "/" + endpoint.lstrip("/")
     if params:
@@ -1241,51 +1287,14 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             return _tool_response(json.dumps(scalars, indent=2))
 
         elif name == "diagnostics_runtime_snapshot":
+            requested = arguments.get("getters")
+            excluded = set(arguments.get("exclude") or [])
+            getters = list(_RUNTIME_SNAPSHOT_GETTERS)
+            if requested:
+                req_set = set(str(x) for x in requested)
+                getters = [g for g in getters if g in req_set or g.replace("Json", "") in req_set]
+            getters = [g for g in getters if g not in excluded]
             snapshot = {}
-            getters = [
-                "GetSystemHealthJson",
-                "GetBattlefieldCensusJson",
-                "GetPlayerRosterJson",
-                "GetAiRosterJson",
-                "GetRunProgressionCensusJson",
-                "GetCombatStatusCensusJson",
-                "GetProductionCensusJson",
-                "GetEconomyMatchCensusJson",
-                "GetBaseIntegrityCensusJson",
-                "GetThreatPrioritizationCensusJson",
-                "GetUnitThreatAssessmentJson",
-                "GetAgentCoordinationCensusJson",
-                "GetTacticalStanceCensusJson",
-                "GetUnitAffixCensusJson",
-                "GetUnitLoadoutAndPoolCensusJson",
-                "GetAiDoctrineCensusJson",
-                "GetAiDirectorCensusJson",
-                "GetHarvesterCensusJson",
-                "GetHazardCensusJson",
-                "GetVeterancyCensusJson",
-                "GetSelectionCensusJson",
-                "GetVisualRenderCensusJson",
-                "GetLoadedPrefabVisualAuditJson",
-                "GetLoaderAuditCensusJson",
-                "GetUnitMechanicsCensusJson",
-                "GetVisualSurfaceCensusJson",
-                "GetVisualMaterialCensusJson",
-                "GetAudioCensusJson",
-                "GetCameraCensusJson",
-                "GetCommandAuraCensusJson",
-                "GetTechCatalogJson",
-                "GetMatchSummaryJson",
-                "GetEntityCatalogJson",
-                "GetCombatXpEntriesJson",
-                "GetUnitLoadoutCensusJson",
-                "GetAiModulesDiagnosticsJson",
-                "GetGridMetricsJson",
-                "GetFogStateJson",
-                "GetSocketAuditCensusJson",
-                "GetColliderAuditCensusJson",
-                "GetParticleVfxCensusJson",
-                "GetLodAuditCensusJson",
-            ]
             for getter in getters:
                 try:
                     raw = _call_diagnostics_method(getter)
@@ -1296,6 +1305,9 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
                 except Exception as exc:
                     snapshot[getter] = {"error": str(exc)}
             return _tool_response(json.dumps(snapshot, indent=2))
+
+        elif name == "diagnostics_list_runtime_getters":
+            return _tool_response(json.dumps({"count": len(_RUNTIME_SNAPSHOT_GETTERS), "getters": _RUNTIME_SNAPSHOT_GETTERS}, indent=2))
 
         elif name == "diagnostics_call_getter":
             getter = arguments.get("getterName", "").strip()
