@@ -13970,6 +13970,17 @@ class RogueVehicleBuilder:
                 self.objects.append(weld_obj)
         return self
 
+    def add_deck_edge_weld_seams(self, radius: float = 0.014) -> "RogueVehicleBuilder":
+        """Adds scalloped weld beads along both upper deck-to-side-plate edges of a sloped hull."""
+        hw = self.hull_width * 0.458
+        hl = self.hull_length
+        dz = self.hull_deck_z - 0.02
+        seams = [
+            ((side * hw, -hl * 0.40, dz), (side * hw, hl * 0.12, dz))
+            for side in (-1, 1)
+        ]
+        return self.add_weld_seams(seams, radius=radius, prefix="DeckEdgeWeld")
+
     def add_glacis_weld_seams(self, radius: float = 0.016) -> "RogueVehicleBuilder":
         """Adds scalloped weld seams along both glacis-to-side-plate junctions, scaled to the current hull."""
         hw = self.hull_width * 0.458

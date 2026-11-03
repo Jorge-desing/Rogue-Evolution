@@ -449,6 +449,7 @@ To eliminate toy-like constant-radius cylinders and repetitive stacked rings ("t
 - **RNM Micro-Detail**: `BlendNormalsRNM` blends micro-steel texture with Toksvig anti-shimmering at distance.
 - **Shader-level procedural weld bead (UV)**: `VehiclePBR_VertexWear.shader` adds a UV-sinusoidal weld bead crest (`_WeldBeadStrength`, `_WeldBeadScale`, `_WeldBeadWidth`) modulated by the edge-wear mask (G ≥ 0.42), blended into the normal via RNM and darkened as carbon soot; plus a fresnel rim highlight (`steelMask * 0.35`) on bare steel. Tune these three properties per material; do not bake the bead into geometry or textures.
 - **Fleet Glacis Seams (Wave 9)**: `.add_glacis_weld_seams()` follows every `add_splash_rib()` call; `tools/generate_steel_micro_detail_normal.py` regenerates the shared tileable `RCL_SteelMicroDetail_Normal.png` bound by `VehiclePrefabBuilder` to `_DetailBumpMap`.
+- **Deck-Edge Seams (Wave 10)**: `.add_deck_edge_weld_seams()` follows every single-line `add_sloped_hull(...)` call in the generator.
 - **Addon Tooling**: `tools/Setup-BlenderAuthoringAddons.ps1` configures `EdgeFlow`, `DreamUV`, and `Ucupaint` in Blender 4.5.14.
 
 ---

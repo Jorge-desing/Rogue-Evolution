@@ -856,3 +856,8 @@ To elevate realism beyond clean primitive blockouts and eliminate knife-edge joi
 - **`add_glacis_weld_seams()`**: hull-scaled scalloped weld beads along both glacis-to-side-plate junctions; applied to every archetype that already carries `add_splash_rib()` (13 total with the Wave 8 hand-placed trio).
 - **`RCL_SteelMicroDetail_Normal.png`** (`tools/generate_steel_micro_detail_normal.py`): deterministic, seamlessly tileable (FFT-periodic) 256 px rolled-steel/cast-grain normal with anisotropic streaks and sparse pitting. `VehiclePrefabBuilder` binds it to `_DetailBumpMap` (scale 0.5) and the shader RNM-blends it independently of `_NORMALMAP`, fading out between 18 m and 58 m camera distance to prevent RTS shimmer.
 - Runtime/Steam evidence: **none** for this wave. Builds, importer settings, and Blender previews do not prove in-game rendering; the Unity AssetBundle rebuild and a Profile2 Steam acceptance run remain pending.
+
+### Wave 10: Deck-Edge Weld Seams on Every Sloped Hull (local build/validation evidence)
+
+- **`add_deck_edge_weld_seams()`**: scalloped weld beads along both upper deck-to-side-plate edges, scaled to the hull; emitted right after each single-line `builder.add_sloped_hull(...)` call (23 archetype branches). Combined with Wave 9 glacis seams, sloped-hull vehicles now show welded plate construction on both the front and top edges.
+- Evidence level: local Blender build only; no Unity bundle rebuild or Steam runtime run.

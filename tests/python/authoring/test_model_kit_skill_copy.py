@@ -234,6 +234,7 @@ class TestModelKitSkillCopy(unittest.TestCase):
             "add_exhaust_deflector",
             "add_weld_seams",
             "add_glacis_weld_seams",
+            "add_deck_edge_weld_seams",
         ]
         for method in required_builder_methods:
             self.assertIn(method, vehicle_builder_methods, f"Method {method} missing from RogueVehicleBuilder")
@@ -254,6 +255,7 @@ class TestModelKitSkillCopy(unittest.TestCase):
         self.assertGreaterEqual(generator_source.count("builder.add_splash_rib"), 10)
         self.assertGreaterEqual(generator_source.count("builder.add_weld_seams"), 3)
         self.assertGreaterEqual(generator_source.count("builder.add_glacis_weld_seams"), 10)
+        self.assertGreaterEqual(generator_source.count("builder.add_deck_edge_weld_seams"), 20)
         self.assertGreaterEqual(generator_source.count("builder.add_bustle_basket"), 6)
         self.assertGreaterEqual(generator_source.count("builder.add_commander_sight"), 8)
         self.assertGreaterEqual(generator_source.count("builder.add_recovery_winch"), 6)
