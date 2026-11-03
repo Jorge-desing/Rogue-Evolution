@@ -314,12 +314,24 @@ namespace UnityEngine
         public string name { get; set; } = string.Empty;
     }
 
+    public class Texture : Object
+    {
+        public string name { get; set; } = string.Empty;
+        public int width { get; set; }
+        public int height { get; set; }
+    }
+
     public class Material : Object
     {
         public string name { get; set; } = string.Empty;
         public Shader shader { get; set; }
         public string[] shaderKeywords { get; set; } = System.Array.Empty<string>();
         public bool enableInstancing { get; set; }
+        public Texture mainTexture { get; set; }
+        private readonly System.Collections.Generic.Dictionary<string, Texture> _textures = new System.Collections.Generic.Dictionary<string, Texture>();
+        public void SetTexture(string name, Texture texture) { if (name != null) _textures[name] = texture; }
+        public Texture GetTexture(string name) { return name != null && _textures.TryGetValue(name, out var t) ? t : mainTexture; }
+        public float GetFloat(string name) { return 0f; }
     }
 
     public class LODGroup : Component

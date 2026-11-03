@@ -1098,6 +1098,12 @@ namespace RogueCommandExpansionLoader.Runtime
                 RuntimeVisualSurfaceCensus.Current());
         }
 
+        public string GetVisualMaterialCensusJson()
+        {
+            return AgentDiagnosticsFormatter.SerializeVisualMaterialCensus(
+                RuntimeVisualMaterialCensus.Current());
+        }
+
         /// <summary>
         /// Sets volume slider level for an audio channel (Master, Music, Gameplay, UI).
         /// </summary>

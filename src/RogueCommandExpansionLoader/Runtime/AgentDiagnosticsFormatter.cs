@@ -1825,6 +1825,45 @@ namespace RogueCommandExpansionLoader.Runtime
         }
 
         /// <summary>
+        /// Serializes visual material and texture binding telemetry for living units.
+        /// Omission counters precede detail collections.
+        /// </summary>
+        public static string SerializeVisualMaterialCensus(VisualMaterialCensus census)
+        {
+            var rows = new List<Dictionary<string, object>>();
+            if (census != null && census.Rows != null)
+            {
+                foreach (VisualMaterialRow row in census.Rows)
+                {
+                    if (row == null) continue;
+                    rows.Add(new Dictionary<string, object>
+                    {
+                        ["entityKeyId"] = row.EntityKeyId ?? string.Empty,
+                        ["rendererCount"] = row.RendererCount,
+                        ["materialCount"] = row.MaterialCount,
+                        ["materialNames"] = row.MaterialNames != null ? row.MaterialNames : (object)Array.Empty<string>(),
+                        ["shaderNames"] = row.ShaderNames != null ? row.ShaderNames : (object)Array.Empty<string>(),
+                        ["textureNames"] = row.TextureNames != null ? row.TextureNames : (object)Array.Empty<string>(),
+                        ["hasMainTextureCount"] = row.HasMainTextureCount,
+                        ["hasMetallicGlossMapCount"] = row.HasMetallicGlossMapCount,
+                        ["hasNormalMapCount"] = row.HasNormalMapCount,
+                        ["hasEmissionMapCount"] = row.HasEmissionMapCount,
+                        ["shaderKeywords"] = row.ShaderKeywords != null ? row.ShaderKeywords : (object)Array.Empty<string>(),
+                    });
+                }
+            }
+
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "visualMaterialCensus",
+                ["omittedRowCount"] = census != null ? census.OmittedRowCount : 0,
+                ["rowCount"] = rows.Count,
+                ["rows"] = rows,
+            };
+            return Serialize(view);
+        }
+
+        /// <summary>
         /// Serializes the result of an audio volume adjustment command.
         /// </summary>
         public static string SerializeAudioCommandResult(AudioCommandResult result)

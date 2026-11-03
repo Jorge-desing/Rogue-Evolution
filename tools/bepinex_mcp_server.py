@@ -1019,6 +1019,10 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             res = _call_diagnostics_method("GetVisualSurfaceCensusJson")
             return _tool_response(res)
 
+        elif name == "diagnostics_get_visual_material_census":
+            res = _call_diagnostics_method("GetVisualMaterialCensusJson")
+            return _tool_response(res)
+
         elif name == "diagnostics_set_audio_volume":
             channel = str(arguments.get("channel", "Master"))
             volume = float(arguments.get("volumeSlider", 1.0))
