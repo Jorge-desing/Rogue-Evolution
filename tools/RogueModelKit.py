@@ -1222,10 +1222,15 @@ def make_bipedal_digitigrade_leg(
     ankle_v = Vector((hip_v.x + side * 0.08, hip_v.y + hip_z * 0.10, ankle_z))
     foot_v = Vector((ankle_v.x, ankle_v.y + 0.12, 0.08))
 
-    # 1. Hip rotary actuator / spherical joint
+    # 1. Hip rotary actuator & flanged mounting collar boxing joint into pelvis
     objects.append(make_cylinder(
         f"{prefix}_HipJoint_{side_name}", 0.18, 0.18,
         hip_v, joint_mat, rotation=(0.0, math.radians(90), 0.0), vertices=10, bevel=0.015
+    ))
+    objects.append(make_cylinder(
+        f"{prefix}_HipFlange_{side_name}", 0.22, 0.06,
+        hip_v - Vector((side * 0.06, 0.0, 0.0)),
+        armor_mat or joint_mat, rotation=(0.0, math.radians(90), 0.0), vertices=10, bevel=0.012
     ))
 
     # 2. Thigh bone & front armor plate
@@ -1277,6 +1282,13 @@ def make_bipedal_digitigrade_leg(
         (0.22, 0.26, (knee_v - ankle_v).length * 0.75),
         shin_mid + Vector((0.0, 0.05, 0.0)), armor_mat, bevel=0.028, rotation=shin_rot
     ))
+    # Armored calf deflector plate protecting rear ankle dampers
+    objects.append(make_box(
+        f"{prefix}_CalfArmor_{side_name}",
+        (0.18, 0.16, (knee_v - ankle_v).length * 0.55),
+        shin_mid - Vector((0.0, 0.08, 0.0)),
+        armor_mat, bevel=0.02, rotation=shin_rot
+    ))
 
     # Twin ankle shock struts
     for strut_offset in (-0.08, 0.08):
@@ -1291,6 +1303,13 @@ def make_bipedal_digitigrade_leg(
     objects.append(make_cylinder(
         f"{prefix}_AnkleJoint_{side_name}", 0.10, 0.16,
         ankle_v, joint_mat, rotation=(0.0, math.radians(90), 0.0), vertices=8
+    ))
+    # Ankle clevis yoke bracket locking joint to foot
+    objects.append(make_box(
+        f"{prefix}_AnkleClevis_{side_name}",
+        (0.16, 0.18, 0.10),
+        ankle_v - Vector((0.0, 0.0, 0.04)),
+        joint_mat, bevel=0.012
     ))
     objects.append(make_box(
         f"{prefix}_FootBase_{side_name}", (0.26, 0.24, 0.12),
@@ -5138,6 +5157,43 @@ def make_sculpted_wheel_fender_assembly(
         rotation=(0.0, side * math.radians(12), 0.0),
     ))
 
+    return objects
+
+
+def make_interlocking_armor_gusset(
+    prefix: str,
+    locations: Sequence[Tuple[float, float, float] | Vector],
+    size: Tuple[float, float, float] = (0.05, 0.22, 0.22),
+    material: bpy.types.Material | None = None,
+    rotation: Tuple[float, float, float] = (0.0, 0.0, 0.0),
+) -> list[bpy.types.Object]:
+    """Generates welded triangular structural web gussets reinforcing 90-degree hull/superstructure joints."""
+    objects = []
+    w, l, h = size
+    hw = w * 0.5
+    for idx, loc in enumerate(locations, start=1):
+        mesh = bpy.data.meshes.new(f"{prefix}_Gusset_{idx}_Mesh")
+        bm = bmesh.new()
+        v0 = bm.verts.new((-hw, 0.0, 0.0))
+        v1 = bm.verts.new((hw, 0.0, 0.0))
+        v2 = bm.verts.new((hw, l, 0.0))
+        v3 = bm.verts.new((-hw, l, 0.0))
+        v4 = bm.verts.new((-hw, 0.0, h))
+        v5 = bm.verts.new((hw, 0.0, h))
+        bm.faces.new((v0, v1, v2, v3))
+        bm.faces.new((v0, v4, v5, v1))
+        bm.faces.new((v1, v5, v2))
+        bm.faces.new((v0, v3, v4))
+        bm.faces.new((v4, v3, v2, v5))
+        bm.to_mesh(mesh)
+        bm.free()
+        obj = bpy.data.objects.new(f"{prefix}_Gusset_{idx}", mesh)
+        if material is not None:
+            obj.data.materials.append(material)
+        obj.location = Vector(loc)
+        obj.rotation_euler = rotation
+        bpy.context.collection.objects.link(obj)
+        objects.append(obj)
     return objects
 
 
@@ -11528,6 +11584,15 @@ class RogueVehicleBuilder:
         eff_susp = with_suspension_arms or getattr(self, "suspension_arms", False)
         eff_spaced = with_spaced_skirts or getattr(self, "spaced_skirts", False)
         for side in (-1, 1):
+            bridge_w = track_x - (self.hull_width * 0.32)
+            if bridge_w > 0.04:
+                self.objects.append(make_box(
+                    f"{self.name}Armor_SponsonBridge_{'L' if side < 0 else 'R'}",
+                    (bridge_w, length * 0.76, 0.06),
+                    (side * (track_x * 0.68), 0.0, self.ground_clearance + height * 0.72),
+                    self.palette.primary_armor,
+                    bevel=0.012,
+                ))
             tracks = make_continuous_track_assembly(
                 f"{self.name}Treads",
                 x_pos=side * track_x,
@@ -11578,6 +11643,28 @@ class RogueVehicleBuilder:
                     lug_count=lug_count, bolt_count=bolt_count,
                 )
                 self.objects.extend(w)
+        # Transverse drive axle beam housing connecting wheels across chassis underside
+        if track_width_x > 0.15:
+            for y_pos, label in axles:
+                self.objects.append(make_rod(
+                    f"{self.name}Chassis_AxleBeam_{label}",
+                    (-track_width_x * 0.42, y_pos, effective_z),
+                    (track_width_x * 0.42, y_pos, effective_z),
+                    0.058, self.palette.gunmetal, vertices=8
+                ))
+                self.objects.append(make_cylinder(
+                    f"{self.name}Chassis_Differential_{label}",
+                    0.13, 0.20, (0.0, y_pos, effective_z),
+                    self.palette.gunmetal, rotation=(0.0, math.radians(90.0), 0.0), vertices=10, bevel=0.012
+                ))
+                for side in (-1, 1):
+                    stag = "L" if side < 0 else "R"
+                    self.objects.append(make_rod(
+                        f"{self.name}Chassis_ShockStrut_{label}_{stag}",
+                        (side * (track_width_x * 0.40), y_pos, effective_z),
+                        (side * (track_width_x * 0.34), y_pos, self.hull_deck_z),
+                        0.032, self.palette.primary_armor, vertices=6
+                    ))
         if with_fenders and track_width_x > 0.05:
             self.add_wheel_fenders(wheel_locations, radius=wheel_radius, width=wheel_width)
         return self
@@ -11673,6 +11760,23 @@ class RogueVehicleBuilder:
         self._last_mantlet_boot_pivots = []
         self._last_mantlet_boot_direction = None
         self._last_mantlet_boots_added = False
+        # Anti-floating pintle mounting bracket anchoring weapon pivot
+        self.objects.append(make_box(
+            f"{self.name}Gatling_PintleSaddle_{'L' if side < 0 else 'R'}",
+            (0.18, 0.26, 0.16),
+            Vector((side * pivot_offset[0], pivot_offset[1] - 0.06, pivot_offset[2] - 0.12)),
+            self.palette.primary_armor,
+            bevel=0.012,
+        ))
+        self.objects.append(make_cylinder(
+            f"{self.name}Gatling_PintlePin_{'L' if side < 0 else 'R'}",
+            0.055, 0.22,
+            Vector((side * pivot_offset[0], pivot_offset[1] - 0.06, pivot_offset[2] - 0.12)),
+            self.palette.gunmetal,
+            rotation=(0.0, math.radians(90.0), 0.0),
+            vertices=8,
+            bevel=0.006,
+        ))
         gatling = make_rotary_gatling_cannon(
             f"{self.name}Gatling_{'L' if side < 0 else 'R'}",
             pivot=(side * pivot_offset[0], pivot_offset[1], pivot_offset[2]),
@@ -11696,6 +11800,24 @@ class RogueVehicleBuilder:
         self._last_mantlet_boot_pivots = []
         self._last_mantlet_boot_direction = None
         self._last_mantlet_boots_added = False
+        # Anti-floating trunnion cradle anchoring pod to roof
+        cradle_h = 0.18
+        self.objects.append(make_box(
+            f"{self.name}MissilePod_TrunnionCradle",
+            (0.52, 0.62, cradle_h),
+            pod_loc - Vector((0.0, 0.0, 0.18)),
+            self.palette.primary_armor,
+            bevel=0.015,
+        ))
+        self.objects.append(make_cylinder(
+            f"{self.name}MissilePod_TrunnionAxle",
+            0.085, 0.68,
+            pod_loc - Vector((0.0, 0.0, 0.08)),
+            self.palette.gunmetal,
+            rotation=(0.0, math.radians(90.0), 0.0),
+            vertices=10,
+            bevel=0.008,
+        ))
         pod = make_missile_launcher_pod(
             f"{self.name}MissilePod",
             location=pod_loc,
@@ -11718,6 +11840,16 @@ class RogueVehicleBuilder:
         self._last_mantlet_boot_pivots = []
         self._last_mantlet_boot_direction = None
         self._last_mantlet_boots_added = False
+        # Anti-floating mounting collar seating arc emitter into face
+        self.objects.append(make_cylinder(
+            f"{self.name}Arc_PedestalCollar",
+            core_radius * 1.55, 0.12,
+            emitter_loc - Vector((0.0, 0.05, 0.04)),
+            self.palette.primary_armor,
+            rotation=(math.radians(90.0), 0.0, 0.0),
+            vertices=12,
+            bevel=0.012,
+        ))
         emitter = make_arc_energy_emitter(
             f"{self.name}ArcEmitter",
             base_location=emitter_loc,
@@ -11756,6 +11888,14 @@ class RogueVehicleBuilder:
         if size is None:
             size = (self.hull_width * 0.34, self.hull_length * 0.22, 0.07)
 
+        # Recessed dark radiator intake cavity under slats
+        self.objects.append(make_box(
+            f"{self.name}Engine_RadiatorCavity",
+            (size[0] * 0.90, size[1] * 0.88, size[2] * 0.45),
+            (0.0, deck_y, deck_z - size[2] * 0.15),
+            self.palette.gunmetal,
+            bevel=0.008,
+        ))
         grille = make_engine_deck_grille(
             f"{self.name}Armor_EngineDeck",
             location=(0.0, deck_y, deck_z),
@@ -11807,6 +11947,12 @@ class RogueVehicleBuilder:
             base_pos = Vector(location)
 
         self.antenna_loc = base_pos
+        # Anti-floating deck mounting collar
+        self.objects.append(make_cylinder(
+            f"{self.name}Sensor_AntennaDeckCollar",
+            0.062, 0.06, base_pos - Vector((0.0, 0.0, 0.03)),
+            self.palette.primary_armor, vertices=10, bevel=0.008
+        ))
         self.objects.append(make_cylinder(
             f"{self.name}Sensor_AntennaBase",
             0.038, 0.08, base_pos,
@@ -11968,6 +12114,15 @@ class RogueVehicleBuilder:
             else:
                 loc = Vector((side * (self.hull_width * 0.48), self.hull_length * 0.25, self.hull_deck_z + 0.08))
                 dir_v = Vector((side * 0.70, 0.70, 0.40)).normalized()
+            # Anti-floating structural mounting bracket connecting rack to turret cheek
+            self.objects.append(make_box(
+                f"{self.name}Smoke_MountBracket_{side_tag}",
+                (0.16, 0.18, 0.08),
+                loc - Vector((side * 0.06, 0.04, 0.04)),
+                self.palette.primary_armor,
+                bevel=0.008,
+                rotation=(0.0, side * math.radians(20.0), 0.0),
+            ))
             rack = make_smoke_launcher_rack(
                 f"{self.name}Smoke_{side_tag}",
                 location=loc,
@@ -11992,6 +12147,13 @@ class RogueVehicleBuilder:
                 loc = Vector((0.0, -self.hull_length * 0.25, self.hull_deck_z + 0.14))
         else:
             loc = Vector(location)
+        # Anti-floating structural deck pylon anchoring turntable to roof
+        pylon_h = 0.16
+        self.objects.append(make_cylinder(
+            f"{self.name}Radar_DeckPylon",
+            0.12, pylon_h, loc - Vector((0.0, 0.0, pylon_h * 0.5)),
+            self.palette.primary_armor, vertices=10, bevel=0.015
+        ))
         radar = make_radar_dish_or_rotodome(
             f"{self.name}Radar",
             location=loc,
@@ -12011,6 +12173,15 @@ class RogueVehicleBuilder:
         for side in (-1, 1):
             side_tag = "L" if side < 0 else "R"
             loc = (side * (self.hull_width * 0.54), -self.hull_length * 0.05, self.ground_clearance + size[2] * 0.8)
+            # Anti-floating cantilever support arms bridging sponson to hull
+            for y_rel, y_tag in [(-size[1] * 0.32, "Rear"), (size[1] * 0.32, "Front")]:
+                self.objects.append(make_box(
+                    f"{self.name}Sponson_BridgeArm_{side_tag}_{y_tag}",
+                    (self.hull_width * 0.14, 0.10, size[2] * 0.52),
+                    (side * (self.hull_width * 0.49), loc[1] + y_rel, loc[2]),
+                    self.palette.primary_armor,
+                    bevel=0.008,
+                ))
             sponson = make_side_sponson_assembly(
                 f"{self.name}Sponson_{side_tag}",
                 location=loc,
@@ -13303,6 +13474,27 @@ class RogueVehicleBuilder:
                 fender_mat=self.palette.primary_armor,
                 skirt_mat=self.palette.light_armor,
             ))
+        return self
+
+    def add_interlocking_gussets(
+        self,
+        locations: Sequence[Tuple[float, float, float] | Vector] | None = None,
+        size: Tuple[float, float, float] = (0.05, 0.22, 0.22),
+        rotation: Tuple[float, float, float] = (0.0, 0.0, 0.0),
+    ) -> "RogueVehicleBuilder":
+        if locations is None:
+            deck_y = -self.hull_length * 0.22
+            deck_z = self.hull_deck_z
+            hw = self.hull_width * 0.38
+            locations = [(-hw, deck_y, deck_z), (hw, deck_y, deck_z)]
+        objs = make_interlocking_armor_gusset(
+            f"{self.name}Armor",
+            locations=locations,
+            size=size,
+            material=self.palette.primary_armor,
+            rotation=rotation,
+        )
+        self.objects.extend(objs)
         return self
 
     def add_towing_shackles(

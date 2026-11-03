@@ -204,6 +204,7 @@ class TestModelKitSkillCopy(unittest.TestCase):
             "make_aerodynamic_fuselage_assembly",
             "make_towing_shackle_assembly",
             "make_crane_lifting_lugs",
+            "make_interlocking_armor_gusset",
         ]
         for assembly in required_realism_assemblies:
             self.assertIn(assembly, func_names, f"Realism assembly {assembly} missing from RogueModelKit.py")
@@ -216,6 +217,7 @@ class TestModelKitSkillCopy(unittest.TestCase):
             "add_aerodynamic_fuselage",
             "add_towing_shackles",
             "add_lifting_lugs",
+            "add_interlocking_gussets",
         ]
         for method in required_builder_methods:
             self.assertIn(method, vehicle_builder_methods, f"Method {method} missing from RogueVehicleBuilder")
@@ -232,6 +234,7 @@ class TestModelKitSkillCopy(unittest.TestCase):
         self.assertGreaterEqual(generator_source.count("builder.add_towing_shackles"), 20)
         self.assertGreaterEqual(generator_source.count("builder.add_lifting_lugs"), 25)
         self.assertGreaterEqual(generator_source.count("builder.add_crew_cupola"), 12)
+        self.assertGreaterEqual(generator_source.count("builder.add_interlocking_gussets"), 8)
     def test_surge_arc_tank_envelope_allows_f2_suspension_clearance(self) -> None:
         """The custom Surge builder must leave room for f2cd4cb track details."""
         source = (REPO_ROOT / "tools" / "Build-SurgeArcTankModel.py").read_text(encoding="utf-8")

@@ -754,3 +754,34 @@ To elevate mechanical fidelity beyond basic blockout geometry, Wave 2 introduces
   - Step-down electrical transformer housing (`SubstationTransformer`) and high-voltage cable raceway trunking (`CableRaceway`) running along industrial factory foundations.
 - **Fleet-Wide Commander's Crew Cupolas (`.add_crew_cupola()`)**:
   - Armored commander cupolas with emissive periscope vision blocks deployed across 15 fighting vehicles.
+
+### Waves 3 & 4 Hard-Surface Realism: Anti-Floating Anchors, Structural Bridging & Interlocking Armor Gussets (local build/validation evidence)
+
+To resolve floating accessories and disconnected primitive joins ("figuras geométricas flotando o unidas sin anclaje"), Waves 3 & 4 deploy physical load-bearing mounts, drive axle housings, sponson bridges, and structural web gussets across `RogueModelKit.py` and `generate_unit_model.py`:
+
+- **Structural Deck Pylons & Anti-Floating Weapon/Sensor Mounts**:
+  - **Radar Turntable Pedestal Column (`Radar_DeckPylon`)**: Heavy cylindrical pedestal anchoring the radar turntable down into the turret/hull roof, eliminating floating rotodomes and dishes.
+  - **Missile Pod Trunnion Cradle & Axle (`MissilePod_TrunnionCradle`, `MissilePod_TrunnionAxle`)**: Cast elevation saddle and trunnion pin mounting rocket pods securely to the deck rather than hovering in empty air.
+  - **Pintle Mounting Saddles & Struts (`Gatling_PintleSaddle`, `Gatling_PintlePin`)**: Forged pintle brackets and transverse pins anchoring side-mounted rotary autocannons to vehicle hulls and mech shoulders.
+  - **Arc Emitter Insulator Mounting Collar (`Arc_PedestalCollar`)**: Flanged armored pedestal collar locking the electrical arc projector core directly into the turret face plate.
+  - **Cheek Smoke Rack Brackets (`Smoke_MountBracket_L/R`)**: Angled steel mounting brackets welding smoke grenade dispensers to turret armor cheeks.
+  - **Cantilever Sponson Bridge Beams (`Sponson_BridgeArm_L/R_Front/Rear`)**: Dual load-bearing cantilever beams physically bridging external sponsons to the primary hull.
+  - **Flanged Antenna Deck Sockets (`Sensor_AntennaDeckCollar`)**: Flared armored socket collars seating spring-loaded and whip antenna bases flush into decks.
+
+- **Wheeled Chassis Drive Axle Beams & Vertical Shock Struts (`add_all_terrain_wheels`)**:
+  - Heavy transverse drive axle beam housings (`Chassis_AxleBeam`) and center differential pumpkins (`Chassis_Differential`) spanning between left and right wheels across the chassis underside.
+  - Vertical suspension shock absorber struts (`Chassis_ShockStrut_L/R`) connecting each wheel hub to the chassis frame rail, eliminating disconnected floating wheels.
+
+- **Tracked Sponson Hull Floor Bridging (`add_continuous_tracks`)**:
+  - Armored sponson floor plates (`Armor_SponsonBridge_L/R`) closing the hollow void between the inner track face and the lower hull tub.
+
+- **Mech Hip Mounting Flanges, Calf Shields & Ankle Clevises (`make_bipedal_digitigrade_leg`)**:
+  - Flanged hip rotary actuator collars (`HipFlange_L/R`) locking the leg pivot into the pelvis.
+  - Rear armored calf deflector plates (`CalfArmor_L/R`) shielding the twin ankle hydraulic dampers.
+  - Ankle clevis yoke brackets (`AnkleClevis_L/R`) physically boxing the ankle pivot to the stabilizer foot base.
+
+- **Recessed Engine Deck Radiator Cavities (`add_engine_deck`)**:
+  - Deep dark intake cavity bed (`Engine_RadiatorCavity`) recessed beneath the angled louvers to simulate real engine compartment depth.
+
+- **Welded Triangular Interlocking Armor Gussets (`make_interlocking_armor_gusset` / `.add_interlocking_gussets()`)**:
+  - 3D triangular web gusset brackets welded into 90° hull/superstructure joints across heavy combat vehicles (`tank`, `artillery`, `super_heavy`, `siege_crawler`, `colossus_titan`, `heavy_crane_mech`, `command_hq_rig`, `combat_harvester`, `demolition_breacher`, `gravity_siege_breaker`).
