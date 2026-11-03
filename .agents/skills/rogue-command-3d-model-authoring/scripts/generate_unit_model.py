@@ -1283,8 +1283,12 @@ def build_vehicle_model(
         builder.add_towing_shackles()
         builder.add_lifting_lugs()
         builder.add_interlocking_gussets()
+        builder.add_splash_rib()
+        builder.add_fuel_drums()
         builder.add_turret(size=(1.5, 1.7, 0.48), center_y=0.12)
         builder.add_crew_cupola()
+        builder.add_commander_sight()
+        builder.add_bustle_basket()
         for side in (-1, 1):
             side_tag = "L" if side < 0 else "R"
             builder.objects.extend([
@@ -1302,8 +1306,11 @@ def build_vehicle_model(
         builder.add_engine_deck(slat_count=3, with_exhausts=False)
         builder.add_towing_shackles()
         builder.add_lifting_lugs()
+        builder.add_splash_rib()
+        builder.add_fuel_drums()
         builder.add_turret(size=(1.3, 1.4, 0.42), center_y=0.0)
         builder.add_crew_cupola()
+        builder.add_bustle_basket()
         builder.add_arc_emitter(core_radius=0.22, prongs=3)
         builder.add_sensor_visor()
 
@@ -1409,6 +1416,7 @@ def build_vehicle_model(
         builder.add_troop_compartment(size=(1.42, 1.65, 0.74), location=(0.0, -0.95, 0.88))
         builder.add_towing_shackles()
         builder.add_lifting_lugs()
+        builder.add_recovery_winch()
         builder.add_turret(size=(1.05, 1.15, 0.35), center_y=0.20)
         builder.add_spring_antenna()
 
@@ -1428,8 +1436,13 @@ def build_vehicle_model(
         builder.add_towing_shackles()
         builder.add_lifting_lugs()
         builder.add_interlocking_gussets()
+        builder.add_splash_rib()
+        builder.add_fuel_drums()
+        builder.add_era_bricks()
         builder.add_turret(size=(1.85, 2.1, 0.58), center_y=0.15)
         builder.add_crew_cupola()
+        builder.add_commander_sight()
+        builder.add_bustle_basket()
         builder.add_sensor_visor()
         builder.add_radar_dish()
         builder.add_armor_applique((-0.95, 1.95, 0.95), (0.95, 1.95, 0.95), count=6)
@@ -1467,8 +1480,11 @@ def build_vehicle_model(
         builder.add_engine_deck(slat_count=4, with_exhausts=True)
         builder.add_towing_shackles()
         builder.add_lifting_lugs()
+        builder.add_splash_rib()
         builder.add_turret(size=(1.5, 1.65, 0.52), center_y=0.04)
         builder.add_crew_cupola()
+        builder.add_commander_sight()
+        builder.add_bustle_basket()
         builder.add_sensor_visor()
         builder.add_radar_dish(is_rotodome=False)
         builder.add_outriggers(count=2, reach_x=0.55)
@@ -1502,6 +1518,8 @@ def build_vehicle_model(
         builder.add_engine_deck(slat_count=4, with_exhausts=True)
         builder.add_towing_shackles()
         builder.add_lifting_lugs()
+        builder.add_splash_rib()
+        builder.add_commander_sight()
         builder.add_flight_deck(size=(2.10, 3.20, 0.22))
         builder.objects.extend([
             rmk.make_box(f"{name}Armor_BridgeTower", (0.55, 1.25, 0.68), (1.18, -0.15, 1.48), builder.palette.primary_armor, 0.035),
@@ -1527,6 +1545,8 @@ def build_vehicle_model(
         ))
         builder.add_quad_crawler_legs(knee_height=1.25, reach_x=1.35, reach_y=1.10)
         builder.add_lifting_lugs()
+        builder.add_commander_sight()
+        builder.add_era_bricks()
         builder.add_turret(size=(1.55, 1.7, 0.48), center_y=0.10)
         builder.add_crew_cupola()
         builder.add_sensor_visor()
@@ -1539,6 +1559,9 @@ def build_vehicle_model(
         builder.add_towing_shackles()
         builder.add_lifting_lugs()
         builder.add_interlocking_gussets()
+        builder.add_recovery_winch()
+        builder.add_commander_sight()
+        builder.add_exhaust_deflector()
         builder.add_excavator_drum(width=2.5, radius=0.34)
         for side in (-1, 1):
             side_tag = "L" if side < 0 else "R"
@@ -1565,6 +1588,8 @@ def build_vehicle_model(
         builder.add_mech_torso(location=(0.0, 0.02, 3.05), width=2.05, length=1.35, height=1.20)
         builder.add_lifting_lugs()
         builder.add_interlocking_gussets(locations=[(-0.85, -0.05, 2.85), (0.85, -0.05, 2.85)])
+        builder.add_commander_sight()
+        builder.add_era_bricks()
         builder.add_turret(size=(1.60, 1.75, 0.55), center_y=0.10)
         builder.turret_center = Vector((0.0, 0.10, 3.75))
         builder.add_sensor_visor()
@@ -1651,6 +1676,7 @@ def build_vehicle_model(
         ))
         builder.add_towing_shackles()
         builder.add_lifting_lugs()
+        builder.add_recovery_winch()
         builder.add_turret(size=(1.15, 1.25, 0.36), center_y=1.10)
         builder.turret_center = Vector((0.0, 1.10, 1.62))
         builder.add_spring_antenna()
@@ -1658,6 +1684,11 @@ def build_vehicle_model(
     elif archetype == "demolition_breacher":
         builder.add_sloped_hull(length=2.45, width=2.05, height=0.74, bevel=0.04)
         builder.add_continuous_tracks(length=2.35, height=0.56, belt_width=0.32, roadwheels=4, with_skirts=skirts)
+        builder.add_towing_shackles()
+        builder.add_lifting_lugs()
+        builder.add_recovery_winch()
+        builder.add_splash_rib()
+        builder.add_era_bricks()
         builder.objects.extend([
             rmk.make_cylinder(
                 f"{name}Armor_VolatileCoreDrum", 0.56, 1.35,
@@ -1729,8 +1760,11 @@ def build_vehicle_model(
             ])
         builder.add_towing_shackles()
         builder.add_lifting_lugs()
+        builder.add_splash_rib()
         builder.add_turret(size=(1.50, 1.65, 0.46), center_y=0.22)
         builder.add_crew_cupola()
+        builder.add_commander_sight()
+        builder.add_bustle_basket()
         builder.add_sensor_visor()
         builder.add_spring_antenna()
 
@@ -1849,6 +1883,7 @@ def build_vehicle_model(
         ])
         builder.add_towing_shackles()
         builder.add_lifting_lugs()
+        builder.add_recovery_winch()
         builder.add_turret(size=(0.95, 1.00, 0.32), center_y=0.40)
         builder.add_crew_cupola()
         builder.turret_center = Vector((-0.55, 0.40, 1.30))
@@ -1859,6 +1894,10 @@ def build_vehicle_model(
         # Tracked mine layer: rear hopper, angled dispensing chute and racked AT mine discs.
         builder.add_sloped_hull(length=3.2, width=2.5, height=0.92, bevel=0.045)
         builder.add_continuous_tracks(length=3.05, height=0.64, belt_width=0.34, roadwheels=5, with_skirts=skirts)
+        builder.add_towing_shackles()
+        builder.add_lifting_lugs()
+        builder.add_splash_rib()
+        builder.add_exhaust_deflector()
         builder.objects.extend([
             rmk.make_box(f"{name}Armor_MineHopper", (1.70, 1.30, 0.62), (0.0, -0.80, 1.22), builder.palette.primary_armor, 0.035),
             rmk.make_transitional_coaming_collar(
@@ -1966,6 +2005,11 @@ def build_vehicle_model(
         builder.add_sloped_hull(length=3.6, width=2.65, height=0.92, bevel=0.045)
         builder.add_continuous_tracks(length=3.4, height=0.66, belt_width=0.38, roadwheels=6, with_skirts=skirts)
         builder.add_engine_deck(slat_count=4, with_exhausts=True)
+        builder.add_towing_shackles()
+        builder.add_lifting_lugs()
+        builder.add_recovery_winch()
+        builder.add_splash_rib()
+        builder.add_exhaust_deflector()
         builder.objects.extend([
             rmk.make_box(f"{name}Armor_LaunchCradle", (1.85, 0.55, 0.36), (0.0, 1.48, 1.05), builder.palette.gunmetal, 0.025),
             rmk.make_transitional_coaming_collar(
@@ -2030,6 +2074,7 @@ def build_vehicle_model(
         builder.add_towing_shackles()
         builder.add_lifting_lugs()
         builder.add_interlocking_gussets()
+        builder.add_recovery_winch()
         builder.add_turret(size=(1.05, 1.12, 0.32), center_y=1.32)
         builder.turret_center = Vector((0.0, 1.32, 1.66))
         builder.add_radar_dish(is_rotodome=True, location=(0.45, -1.25, 2.05))
@@ -2086,6 +2131,10 @@ def build_vehicle_model(
         # Open-hatch tracked heavy siege mortar carrier with split roof doors, baseplate, and ammo racks.
         builder.add_sloped_hull(length=3.15, width=2.48, height=0.96, bevel=0.045)
         builder.add_continuous_tracks(length=2.98, height=0.64, belt_width=0.35, roadwheels=5, with_skirts=skirts)
+        builder.add_towing_shackles()
+        builder.add_lifting_lugs()
+        builder.add_splash_rib()
+        builder.add_exhaust_deflector()
         builder.objects.extend([
             rmk.make_box(f"{name}Armor_CasemateSuperstructure", (1.92, 2.05, 0.48), (0.0, -0.22, 1.16), builder.palette.primary_armor, 0.035),
             rmk.make_transitional_coaming_collar(
@@ -2254,6 +2303,12 @@ def build_vehicle_model(
         builder.add_continuous_tracks(
             length=3.8, height=0.74, belt_width=0.42, roadwheels=6, with_skirts=skirts
         )
+        builder.add_towing_shackles()
+        builder.add_lifting_lugs()
+        builder.add_interlocking_gussets()
+        builder.add_splash_rib()
+        builder.add_commander_sight()
+        builder.add_era_bricks()
         builder.objects.extend([
             rmk.make_sloped_glacis_hull(
                 f"{name}Armor_CitadelLower",
@@ -2385,8 +2440,10 @@ def build_vehicle_model(
             ])
         builder.add_towing_shackles()
         builder.add_lifting_lugs()
+        builder.add_splash_rib()
         builder.add_turret(size=(1.55, 1.75, 0.46), center_y=0.08)
         builder.add_crew_cupola()
+        builder.add_bustle_basket()
         builder.add_sensor_visor()
         builder.add_engine_deck(slat_count=3, with_exhausts=False)
 
@@ -2450,8 +2507,11 @@ def build_vehicle_model(
         builder.add_towing_shackles()
         builder.add_lifting_lugs()
         builder.add_interlocking_gussets()
+        builder.add_splash_rib()
         builder.add_turret(size=(1.4, 1.6, 0.45), center_y=0.08)
         builder.add_crew_cupola()
+        builder.add_commander_sight()
+        builder.add_bustle_basket()
         builder.add_sensor_visor()
         builder.add_spring_antenna()
 

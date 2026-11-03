@@ -785,3 +785,28 @@ To resolve floating accessories and disconnected primitive joins ("figuras geomÃ
 
 - **Welded Triangular Interlocking Armor Gussets (`make_interlocking_armor_gusset` / `.add_interlocking_gussets()`)**:
   - 3D triangular web gusset brackets welded into 90Â° hull/superstructure joints across heavy combat vehicles (`tank`, `artillery`, `super_heavy`, `siege_crawler`, `colossus_titan`, `heavy_crane_mech`, `command_hq_rig`, `combat_harvester`, `demolition_breacher`, `gravity_siege_breaker`).
+
+### Waves 5 & 6 Hard-Surface Realism: Ballistic Splash Protection, Bustle Stowage, CITV Sights, Recovery Winches, Fuel Drums & Thermal Deflectors (local build/validation evidence)
+
+To eliminate primitive boxiness and inject authentic battlefield functional architecture across `RogueModelKit.py` and `generate_unit_model.py`:
+- **V-Shaped Glacis Ballistic Splash Ribs (`make_glacis_splash_rib` / `.add_splash_rib()`)**:
+  - Chevron-angled kinetic splash breaker ribs welded to the forward glacis plate, deflecting shell fragments, ricochets, mud, and water away from driver periscopes and turret ring raceways.
+  - Deployed across 13 armored fighting vehicles (`tank`, `artillery`, `arc_tank`, `super_heavy`, `flak_anti_air`, `thermobaric_tank`, `amphibious_assault_tank`, `demolition_breacher`, `gravity_siege_breaker`, `bridge_layer`, `mine_layer`, `mortar_carrier`, `drone_carrier`).
+- **Welded Tubular Turret Bustle Stowage Baskets (`make_bustle_stowage_basket` / `.add_bustle_basket()`)**:
+  - Dual-tier welded tubular perimeter rail basket with perforated mesh floor and hull mounting standoffs cantilevered off the turret rear overhang, breaking the planar rear silhouette and providing authentic gear/camo net stowage.
+  - Deployed across 7 frontline combat turrets (`tank`, `artillery`, `super_heavy`, `arc_tank`, `flak_anti_air`, `thermobaric_tank`, `amphibious_assault_tank`).
+- **Commander's Independent Thermal Viewer (CITV) Panoramic Sights (`make_panoramic_commander_sight` / `.add_commander_sight()`)**:
+  - 360-degree rotating armored optic mast with lower turntable ring, dual sensor apertures (high-resolution FLIR thermal camera + laser rangefinder), and angled protective sunshade brow hood.
+  - Deployed across 10 combat units (`tank`, `artillery`, `super_heavy`, `flak_anti_air`, `thermobaric_tank`, `colossus_titan`, `quad_mech`, `gravity_siege_breaker`, `combat_harvester`, `drone_carrier`).
+- **Heavy Front Recovery Winch Assemblies (`make_recovery_winch_assembly` / `.add_recovery_winch()`)**:
+  - Front bumper-mounted recovery winch unit featuring armored drive housing, grooved steel cable spool drum, and dual-axis (horizontal + vertical) roller fairleads for field vehicle recovery and self-extraction.
+  - Deployed across 7 support, engineering, and heavy tracked/wheeled units (`recovery_crawler`, `halftrack`, `shield_truck`, `command_hq_rig`, `demolition_breacher`, `combat_harvester`, `bridge_layer`).
+- **Soviet-Style Auxiliary External Fuel Drums (`make_auxiliary_fuel_drum_assembly` / `.add_fuel_drums()`)**:
+  - Dual transverse cylindrical fuel/battery drums mounted to rear overhang via stamped steel cradle saddles, recessed end caps, double tension retention bands, and armored fuel transfer manifold line.
+  - Deployed across heavy tracked main battle tanks (`super_heavy`, `artillery`, `arc_tank`).
+- **Heavy Armored Exhaust Deflector Cowls (`make_exhaust_deflector_cowl` / `.add_exhaust_deflector()`)**:
+  - Angled protective exhaust hood with directional heat diffuser louvers, directing black engine smoke and thermal signature downward and backward away from optics and cooling intakes.
+  - Deployed on heavy utility and diesel engineering vehicles (`combat_harvester`, `bridge_layer`, `mine_layer`, `mortar_carrier`).
+- **Articulated Mech Torso Yaw Bearing Collar & Flexible Knee Joint Dust Gaiters**:
+  - `Torso_YawRace`: Heavy 14-vertex cast yaw bearing collar physically bridging the pelvis ring to the articulated upper torso in `add_mech_torso()`.
+  - `KneeGaiter`: Flexible accordion rubber knee joint dust boot shielding internal hydraulic pistons from grit and shrapnel in `make_bipedal_digitigrade_leg()`.

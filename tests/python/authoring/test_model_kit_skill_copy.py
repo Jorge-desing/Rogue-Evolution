@@ -205,6 +205,12 @@ class TestModelKitSkillCopy(unittest.TestCase):
             "make_towing_shackle_assembly",
             "make_crane_lifting_lugs",
             "make_interlocking_armor_gusset",
+            "make_glacis_splash_rib",
+            "make_bustle_stowage_basket",
+            "make_panoramic_commander_sight",
+            "make_recovery_winch_assembly",
+            "make_auxiliary_fuel_drum_assembly",
+            "make_exhaust_deflector_cowl",
         ]
         for assembly in required_realism_assemblies:
             self.assertIn(assembly, func_names, f"Realism assembly {assembly} missing from RogueModelKit.py")
@@ -218,6 +224,12 @@ class TestModelKitSkillCopy(unittest.TestCase):
             "add_towing_shackles",
             "add_lifting_lugs",
             "add_interlocking_gussets",
+            "add_splash_rib",
+            "add_bustle_basket",
+            "add_commander_sight",
+            "add_recovery_winch",
+            "add_fuel_drums",
+            "add_exhaust_deflector",
         ]
         for method in required_builder_methods:
             self.assertIn(method, vehicle_builder_methods, f"Method {method} missing from RogueVehicleBuilder")
@@ -235,6 +247,13 @@ class TestModelKitSkillCopy(unittest.TestCase):
         self.assertGreaterEqual(generator_source.count("builder.add_lifting_lugs"), 25)
         self.assertGreaterEqual(generator_source.count("builder.add_crew_cupola"), 12)
         self.assertGreaterEqual(generator_source.count("builder.add_interlocking_gussets"), 8)
+        self.assertGreaterEqual(generator_source.count("builder.add_splash_rib"), 10)
+        self.assertGreaterEqual(generator_source.count("builder.add_bustle_basket"), 6)
+        self.assertGreaterEqual(generator_source.count("builder.add_commander_sight"), 8)
+        self.assertGreaterEqual(generator_source.count("builder.add_recovery_winch"), 6)
+        self.assertGreaterEqual(generator_source.count("builder.add_fuel_drums"), 3)
+        self.assertGreaterEqual(generator_source.count("builder.add_era_bricks"), 4)
+        self.assertGreaterEqual(generator_source.count("builder.add_exhaust_deflector"), 4)
     def test_surge_arc_tank_envelope_allows_f2_suspension_clearance(self) -> None:
         """The custom Surge builder must leave room for f2cd4cb track details."""
         source = (REPO_ROOT / "tools" / "Build-SurgeArcTankModel.py").read_text(encoding="utf-8")
@@ -300,7 +319,6 @@ class TestModelKitSkillCopy(unittest.TestCase):
         for unit, features in required.items():
             with self.subTest(unit=unit):
                 self.assertTrue(features.issubset(set(profiles[unit]["features"])))
-
 
 if __name__ == "__main__":
     unittest.main()

@@ -1264,6 +1264,12 @@ def make_bipedal_digitigrade_leg(
         f"{prefix}_KneeJoint_{side_name}", 0.14, 0.20,
         knee_v, joint_mat, rotation=(0.0, math.radians(90), 0.0), vertices=10, bevel=0.012
     ))
+    # Flexible rubber knee joint dust gaiter
+    objects.append(make_cylinder(
+        f"{prefix}_KneeGaiter_{side_name}", 0.16, 0.12,
+        knee_v - Vector((0.0, 0.04, 0.0)),
+        piston_mat or joint_mat, rotation=(0.0, math.radians(90), 0.0), vertices=10, bevel=0.01
+    ))
     objects.append(make_box(
         f"{prefix}_KneeCapArmor_{side_name}", (0.22, 0.14, 0.22),
         knee_v + Vector((0.0, 0.10, 0.02)), armor_mat, bevel=0.025
@@ -5159,6 +5165,360 @@ def make_sculpted_wheel_fender_assembly(
 
     return objects
 
+
+def make_glacis_splash_rib(
+    prefix: str,
+    location: Tuple[float, float, float] | Vector,
+    width: float = 1.20,
+    depth: float = 0.08,
+    height: float = 0.07,
+    sweep_angle_deg: float = 24.0,
+    material: bpy.types.Material | None = None,
+) -> list[bpy.types.Object]:
+    """Generates an authentic chevron / V-shaped ballistic splash rib welded to the glacis plate."""
+    objects = []
+    loc_v = Vector(location)
+    sweep_rad = math.radians(sweep_angle_deg)
+    half_w = width * 0.5
+    for side in (-1, 1):
+        side_tag = "L" if side < 0 else "R"
+        arm_len = half_w / math.cos(sweep_rad)
+        arm_rot = (0.0, 0.0, -side * sweep_rad)
+        arm_mid = loc_v + Vector((side * half_w * 0.5, -math.sin(sweep_rad) * half_w * 0.25, 0.0))
+        objects.append(make_box(
+            f"{prefix}_SplashRib_{side_tag}",
+            (depth, arm_len * 0.95, height),
+            arm_mid,
+            material,
+            bevel=0.012,
+            rotation=arm_rot,
+        ))
+    objects.append(make_box(
+        f"{prefix}_SplashRib_Apex",
+        (depth * 1.5, depth * 1.5, height * 1.15),
+        loc_v + Vector((0.0, 0.02, 0.0)),
+        material,
+        bevel=0.012,
+    ))
+    return objects
+
+
+def make_bustle_stowage_basket(
+    prefix: str,
+    location: Tuple[float, float, float] | Vector,
+    size: Tuple[float, float, float] = (1.10, 0.42, 0.24),
+    rail_radius: float = 0.018,
+    frame_mat: bpy.types.Material | None = None,
+    mesh_mat: bpy.types.Material | None = None,
+) -> list[bpy.types.Object]:
+    """Generates a welded tubular steel equipment stowage basket mounted to the rear turret bustle."""
+    objects = []
+    loc_v = Vector(location)
+    w, l, h = size
+    hw = w * 0.5
+    hl = l * 0.5
+    hh = h * 0.5
+
+    objects.append(make_box(
+        f"{prefix}_BasketFloor",
+        (w * 0.95, l * 0.95, 0.025),
+        loc_v - Vector((0.0, 0.0, hh - 0.015)),
+        mesh_mat or frame_mat,
+        bevel=0.005,
+    ))
+
+    for z_off, z_tag in [(-hh + 0.02, "Lower"), (hh, "Upper")]:
+        p_z = loc_v.z + z_off
+        objects.append(make_rod(
+            f"{prefix}_Rail_{z_tag}_Rear",
+            Vector((loc_v.x - hw, loc_v.y - hl, p_z)),
+            Vector((loc_v.x + hw, loc_v.y - hl, p_z)),
+            rail_radius, frame_mat, vertices=8
+        ))
+        for side, s_tag in [(-1, "L"), (1, "R")]:
+            objects.append(make_rod(
+                f"{prefix}_Rail_{z_tag}_{s_tag}",
+                Vector((loc_v.x + side * hw, loc_v.y + hl, p_z)),
+                Vector((loc_v.x + side * hw, loc_v.y - hl, p_z)),
+                rail_radius, frame_mat, vertices=8
+            ))
+
+    for x_sign, x_tag in [(-1, "L"), (1, "R")]:
+        for y_sign, y_tag in [(-1, "Rear"), (1, "Front")]:
+            objects.append(make_rod(
+                f"{prefix}_Post_{x_tag}_{y_tag}",
+                Vector((loc_v.x + x_sign * hw, loc_v.y + y_sign * hl, loc_v.z - hh + 0.02)),
+                Vector((loc_v.x + x_sign * hw, loc_v.y + y_sign * hl, loc_v.z + hh)),
+                rail_radius, frame_mat, vertices=8
+            ))
+
+    for side in (-1, 1):
+        s_tag = "L" if side < 0 else "R"
+        objects.append(make_box(
+            f"{prefix}_MountBracket_{s_tag}",
+            (0.04, 0.12, 0.08),
+            loc_v + Vector((side * hw * 0.65, hl + 0.05, 0.0)),
+            frame_mat,
+            bevel=0.006,
+        ))
+    return objects
+
+
+def make_panoramic_commander_sight(
+    prefix: str,
+    location: Tuple[float, float, float] | Vector,
+    size: Tuple[float, float, float] = (0.28, 0.26, 0.32),
+    armor_mat: bpy.types.Material | None = None,
+    lens_mat: bpy.types.Material | None = None,
+    metal_mat: bpy.types.Material | None = None,
+) -> list[bpy.types.Object]:
+    """Generates a 360-degree rotating panoramic commander independent thermal viewer (CITV)."""
+    objects = []
+    loc_v = Vector(location)
+    w, l, h = size
+
+    objects.append(make_cylinder(
+        f"{prefix}_RotaryRing",
+        w * 0.45, 0.06,
+        loc_v + Vector((0.0, 0.0, 0.03)),
+        metal_mat or armor_mat,
+        vertices=12, bevel=0.008
+    ))
+
+    head_z = loc_v.z + 0.06 + h * 0.5
+    objects.append(make_box(
+        f"{prefix}_OpticHead",
+        (w, l, h * 0.85),
+        Vector((loc_v.x, loc_v.y, head_z)),
+        armor_mat,
+        bevel=0.02,
+    ))
+
+    objects.append(make_box(
+        f"{prefix}_HoodBrow",
+        (w * 0.88, l * 0.35, 0.03),
+        Vector((loc_v.x, loc_v.y + l * 0.35, head_z + h * 0.38)),
+        armor_mat,
+        bevel=0.005,
+        rotation=(math.radians(15.0), 0.0, 0.0),
+    ))
+
+    objects.append(make_cylinder(
+        f"{prefix}_ThermalLens",
+        w * 0.22, 0.04,
+        Vector((loc_v.x - w * 0.18, loc_v.y + l * 0.48, head_z)),
+        lens_mat,
+        rotation=(math.radians(90.0), 0.0, 0.0),
+        vertices=10, bevel=0.004
+    ))
+    objects.append(make_cylinder(
+        f"{prefix}_LaserAperture",
+        w * 0.12, 0.04,
+        Vector((loc_v.x + w * 0.22, loc_v.y + l * 0.48, head_z + 0.03)),
+        lens_mat,
+        rotation=(math.radians(90.0), 0.0, 0.0),
+        vertices=8, bevel=0.003
+    ))
+    return objects
+
+
+def make_recovery_winch_assembly(
+    prefix: str,
+    location: Tuple[float, float, float] | Vector,
+    size: Tuple[float, float, float] = (0.55, 0.32, 0.24),
+    housing_mat: bpy.types.Material | None = None,
+    drum_mat: bpy.types.Material | None = None,
+    roller_mat: bpy.types.Material | None = None,
+) -> list[bpy.types.Object]:
+    """Generates a heavy front recovery winch with fairlead guide rollers and steel cable drum."""
+    objects = []
+    loc_v = Vector(location)
+    w, l, h = size
+
+    objects.append(make_box(
+        f"{prefix}_Housing",
+        (w, l * 0.65, h),
+        loc_v - Vector((0.0, l * 0.15, 0.0)),
+        housing_mat,
+        bevel=0.015,
+    ))
+
+    objects.append(make_cylinder(
+        f"{prefix}_CableDrum",
+        h * 0.38, w * 0.68,
+        loc_v - Vector((0.0, l * 0.10, 0.0)),
+        drum_mat or housing_mat,
+        rotation=(0.0, math.radians(90.0), 0.0),
+        vertices=12, bevel=0.008
+    ))
+
+    fl_y = loc_v.y + l * 0.32
+    objects.append(make_box(
+        f"{prefix}_FairleadFrame",
+        (w * 0.72, 0.04, h * 0.68),
+        Vector((loc_v.x, fl_y, loc_v.z)),
+        housing_mat,
+        bevel=0.008,
+    ))
+    for z_side in (-1, 1):
+        objects.append(make_rod(
+            f"{prefix}_RollerH_{'B' if z_side < 0 else 'T'}",
+            Vector((loc_v.x - w * 0.28, fl_y + 0.03, loc_v.z + z_side * h * 0.25)),
+            Vector((loc_v.x + w * 0.28, fl_y + 0.03, loc_v.z + z_side * h * 0.25)),
+            0.018, roller_mat or housing_mat, vertices=8
+        ))
+    for x_side in (-1, 1):
+        objects.append(make_rod(
+            f"{prefix}_RollerV_{'L' if x_side < 0 else 'R'}",
+            Vector((loc_v.x + x_side * w * 0.28, fl_y + 0.03, loc_v.z - h * 0.25)),
+            Vector((loc_v.x + x_side * w * 0.28, fl_y + 0.03, loc_v.z + h * 0.25)),
+            0.018, roller_mat or housing_mat, vertices=8
+        ))
+    return objects
+
+
+def make_auxiliary_fuel_drum_assembly(
+    prefix: str,
+    location: Tuple[float, float, float] | Vector,
+    drum_radius: float = 0.18,
+    drum_length: float = 0.72,
+    spacing_x: float = 0.85,
+    drum_mat: bpy.types.Material | None = None,
+    saddle_mat: bpy.types.Material | None = None,
+    strap_mat: bpy.types.Material | None = None,
+) -> list[bpy.types.Object]:
+    """Generates dual cylindrical auxiliary fuel drums with stamped steel mounting saddles."""
+    objects = []
+    loc_v = Vector(location)
+
+    for side in (-1, 1):
+        side_tag = "L" if side < 0 else "R"
+        d_x = side * spacing_x * 0.5
+        drum_center = loc_v + Vector((d_x, 0.0, 0.0))
+
+        # Stamped mounting cradle saddle
+        objects.append(make_box(
+            f"{prefix}_FuelDrumSaddle_{side_tag}",
+            (0.12, drum_radius * 2.2, drum_radius * 1.4),
+            drum_center + Vector((0.0, drum_radius * 0.35, -drum_radius * 0.45)),
+            saddle_mat,
+            bevel=0.012,
+            rotation=(math.radians(22.0), 0.0, 0.0),
+        ))
+
+        # Cylindrical fuel tank barrel (transverse X-oriented)
+        objects.append(make_cylinder(
+            f"{prefix}_FuelDrum_{side_tag}",
+            drum_radius, drum_length,
+            drum_center,
+            drum_mat,
+            rotation=(0.0, math.radians(90.0), 0.0),
+            vertices=14, bevel=0.015,
+        ))
+
+        # Stamped end caps with recessed rim
+        for cap_side in (-1, 1):
+            cap_tag = "Out" if (cap_side * side) > 0 else "In"
+            objects.append(make_cylinder(
+                f"{prefix}_FuelDrumCap_{side_tag}_{cap_tag}",
+                drum_radius * 0.88, 0.03,
+                drum_center + Vector((cap_side * drum_length * 0.51, 0.0, 0.0)),
+                saddle_mat,
+                rotation=(0.0, math.radians(90.0), 0.0),
+                vertices=12, bevel=0.006,
+            ))
+
+        # Retention steel tension straps
+        for strap_x in (-drum_length * 0.28, drum_length * 0.28):
+            objects.append(make_cylinder(
+                f"{prefix}_FuelDrumStrap_{side_tag}_{'1' if strap_x < 0 else '2'}",
+                drum_radius * 1.04, 0.035,
+                drum_center + Vector((strap_x, 0.0, 0.0)),
+                strap_mat or saddle_mat,
+                rotation=(0.0, math.radians(90.0), 0.0),
+                vertices=14, bevel=0.005,
+            ))
+
+    # Central armored fuel manifold umbilical conduit
+    objects.append(make_rod(
+        f"{prefix}_FuelManifold",
+        loc_v + Vector((-spacing_x * 0.25, drum_radius * 0.6, 0.0)),
+        loc_v + Vector((spacing_x * 0.25, drum_radius * 0.6, 0.0)),
+        0.022, saddle_mat, vertices=8,
+    ))
+    return objects
+
+
+def make_reactive_armor_array(
+    prefix: str,
+    locations: list[Tuple[float, float, float] | Vector],
+    size: Tuple[float, float, float] = (0.28, 0.16, 0.06),
+    tilt_deg: float = 18.0,
+    brick_mat: bpy.types.Material | None = None,
+    bracket_mat: bpy.types.Material | None = None,
+) -> list[bpy.types.Object]:
+    """Generates an array of Explosive Reactive Armor (ERA) tiles on welded mounting standoffs."""
+    objects = []
+    w, l, h = size
+    tilt_rad = math.radians(tilt_deg)
+    for idx, loc in enumerate(locations, start=1):
+        loc_v = Vector(loc)
+        # ERA cassette brick
+        objects.append(make_box(
+            f"{prefix}_ERA_Brick_{idx:02d}",
+            (w, l, h),
+            loc_v,
+            brick_mat,
+            bevel=0.008,
+            rotation=(tilt_rad, 0.0, 0.0),
+        ))
+        # Welded standoff mounting plate
+        objects.append(make_box(
+            f"{prefix}_ERA_Standoff_{idx:02d}",
+            (w * 0.75, l * 0.75, 0.02),
+            loc_v - Vector((0.0, 0.0, h * 0.65)),
+            bracket_mat or brick_mat,
+            bevel=0.004,
+        ))
+    return objects
+
+
+def make_exhaust_deflector_cowl(
+    prefix: str,
+    location: Tuple[float, float, float] | Vector,
+    size: Tuple[float, float, float] = (0.42, 0.32, 0.14),
+    slat_count: int = 4,
+    frame_mat: bpy.types.Material | None = None,
+    slat_mat: bpy.types.Material | None = None,
+) -> list[bpy.types.Object]:
+    """Generates a heavy armored exhaust deflector cowl with directional heat louvers."""
+    objects = []
+    loc_v = Vector(location)
+    w, l, h = size
+
+    # Shroud hood frame
+    objects.append(make_box(
+        f"{prefix}_DeflectorHood",
+        (w, l, h * 0.5),
+        loc_v + Vector((0.0, 0.0, h * 0.25)),
+        frame_mat,
+        bevel=0.012,
+        rotation=(math.radians(-12.0), 0.0, 0.0),
+    ))
+
+    # Angled directional diffuser slats
+    slat_spacing = l / (slat_count + 1)
+    for idx in range(slat_count):
+        s_y = -l * 0.5 + (idx + 1) * slat_spacing
+        objects.append(make_box(
+            f"{prefix}_DeflectorSlat_{idx + 1}",
+            (w * 0.88, 0.025, h * 0.75),
+            loc_v + Vector((0.0, s_y, 0.0)),
+            slat_mat or frame_mat,
+            bevel=0.004,
+            rotation=(math.radians(35.0), 0.0, 0.0),
+        ))
+    return objects
 
 def make_interlocking_armor_gusset(
     prefix: str,
@@ -13441,6 +13801,15 @@ class RogueVehicleBuilder:
         height: float = 0.82,
     ) -> "RogueVehicleBuilder":
         """Adds a faceted monocoque mech torso with sloped chest glacis, armored visor cowl, shoulder pauldron cuffs, and dorsal reactor bay."""
+        loc_v = Vector(location)
+        # Heavy yaw bearing race collar physically bridging pelvis to torso
+        self.objects.append(make_cylinder(
+            f"{self.name}Armor_TorsoYawRace",
+            width * 0.38, 0.12,
+            loc_v - Vector((0.0, 0.0, height * 0.48)),
+            self.palette.gunmetal,
+            vertices=14, bevel=0.015
+        ))
         self.objects.extend(make_articulated_mech_torso(
             f"{self.name}Armor_Torso",
             location=location,
@@ -13474,6 +13843,100 @@ class RogueVehicleBuilder:
                 fender_mat=self.palette.primary_armor,
                 skirt_mat=self.palette.light_armor,
             ))
+        return self
+
+    def add_splash_rib(
+        self,
+        location: Tuple[float, float, float] | Vector | None = None,
+        width: float | None = None,
+    ) -> "RogueVehicleBuilder":
+        if location is None:
+            gy = self.hull_length * 0.28
+            gz = self.hull_deck_z + 0.02
+            location = (0.0, gy, gz)
+        eff_w = width if width is not None else (self.hull_width * 0.55)
+        objs = make_glacis_splash_rib(
+            f"{self.name}Armor",
+            location=location,
+            width=eff_w,
+            material=self.palette.primary_armor,
+        )
+        self.objects.extend(objs)
+        return self
+
+    def add_bustle_basket(
+        self,
+        location: Tuple[float, float, float] | Vector | None = None,
+        size: Tuple[float, float, float] | None = None,
+    ) -> "RogueVehicleBuilder":
+        if location is None:
+            if hasattr(self, "turret_center") and self.turret_center is not None:
+                location = self.turret_center + Vector((0.0, -self.hull_length * 0.22, 0.04))
+            else:
+                location = Vector((0.0, -self.hull_length * 0.44, self.hull_deck_z + 0.18))
+        eff_size = size if size is not None else (self.hull_width * 0.44, 0.38, 0.22)
+        objs = make_bustle_stowage_basket(
+            f"{self.name}Turret_Bustle",
+            location=location,
+            size=eff_size,
+            frame_mat=self.palette.gunmetal,
+            mesh_mat=self.palette.light_armor,
+        )
+        self.objects.extend(objs)
+        return self
+
+    def add_commander_sight(
+        self,
+        location: Tuple[float, float, float] | Vector | None = None,
+    ) -> "RogueVehicleBuilder":
+        if location is None:
+            if hasattr(self, "turret_center") and self.turret_center is not None:
+                location = self.turret_center + Vector((0.32, 0.15, 0.28))
+            else:
+                location = Vector((self.hull_width * 0.24, self.hull_length * 0.18, self.hull_deck_z + 0.15))
+        objs = make_panoramic_commander_sight(
+            f"{self.name}Sensor_CITV",
+            location=location,
+            armor_mat=self.palette.light_armor,
+            lens_mat=self.palette.emissive,
+            metal_mat=self.palette.gunmetal,
+        )
+        self.objects.extend(objs)
+        return self
+
+    def add_recovery_winch(
+        self,
+        location: Tuple[float, float, float] | Vector | None = None,
+    ) -> "RogueVehicleBuilder":
+        if location is None:
+            front_y = self.hull_length * 0.50
+            front_z = self.ground_clearance + 0.28
+            location = (0.0, front_y, front_z)
+        objs = make_recovery_winch_assembly(
+            f"{self.name}Winch",
+            location=location,
+            housing_mat=self.palette.primary_armor,
+            drum_mat=self.palette.gunmetal,
+            roller_mat=self.palette.gunmetal,
+        )
+        self.objects.extend(objs)
+        return self
+
+    def add_exhaust_deflector(
+        self,
+        location: Tuple[float, float, float] | Vector | None = None,
+        size: Tuple[float, float, float] = (0.42, 0.32, 0.14),
+    ) -> "RogueVehicleBuilder":
+        if location is None:
+            location = (0.0, -self.hull_length * 0.38, self.hull_deck_z + size[2] * 0.5)
+        objs = make_exhaust_deflector_cowl(
+            f"{self.name}ExhaustCowl",
+            location=location,
+            size=size,
+            frame_mat=self.palette.gunmetal,
+            slat_mat=self.palette.primary_armor,
+        )
+        self.objects.extend(objs)
         return self
 
     def add_interlocking_gussets(
