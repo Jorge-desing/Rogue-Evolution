@@ -1,32 +1,33 @@
 {
   "unitName": "GravitasBreaker",
-  "archetype": "demolition_breacher",
+  "archetype": "gravity_siege_breaker",
   "visualRootPath": "Vehicle",
   "compatibleNativeTemplates": [
-    "PCXBaseTank"
+    "PCXBaseTank",
+    "ArtilleryTank"
   ],
   "boxCollider": {
     "center": [
       0.0,
       0.0,
-      1.06
+      0.987
     ],
     "size": [
-      2.387,
-      3.279,
-      2.12
+      2.737,
+      6.05,
+      1.974
     ]
   },
   "turretKinematics": {
     "yawCenter": [
       0.0,
-      0.52,
-      1.14
+      0.15,
+      1.36
     ],
     "pitchCenter": [
       0.0,
-      1.804,
-      1.956
+      3.061,
+      1.615
     ],
     "minElevationDeg": -10.0,
     "maxElevationDeg": 35.0,
@@ -57,13 +58,13 @@
     "Socket_MuzzlePrimary": {
       "position": [
         0.0,
-        1.804,
-        1.956
+        3.061,
+        1.615
       ],
       "forward": [
         0.0,
-        -0.669,
-        0.743
+        -0.087,
+        0.996
       ]
     },
     "FirePoint_0": {
@@ -73,16 +74,16 @@
         0.0
       ],
       "forward": [
-        -0.0,
-        -0.669,
-        0.743
+        0.0,
+        -0.087,
+        0.996
       ]
     },
     "Socket_TurretPivot": {
       "position": [
         0.0,
-        0.52,
-        1.14
+        0.15,
+        1.36
       ],
       "forward": [
         0.0,
@@ -93,8 +94,8 @@
     "Socket_TurretPitch": {
       "position": [
         0.0,
-        0.77,
-        1.29
+        0.4,
+        1.51
       ],
       "forward": [
         0.0,
@@ -105,8 +106,8 @@
     "Socket_RecoilPrimary": {
       "position": [
         0.0,
-        1.354,
-        1.956
+        2.611,
+        1.615
       ],
       "forward": [
         0.0,
@@ -114,11 +115,11 @@
         0.0
       ]
     },
-    "Socket_SensorOptics": {
+    "Socket_Exhaust_L": {
       "position": [
-        0.0,
-        1.01,
-        1.42
+        -0.528,
+        -1.35,
+        1.18
       ],
       "forward": [
         0.0,
@@ -126,11 +127,11 @@
         0.0
       ]
     },
-    "Socket_SensorEye": {
+    "Socket_Exhaust_R": {
       "position": [
-        0.0,
-        1.01,
-        1.42
+        0.528,
+        -1.35,
+        1.18
       ],
       "forward": [
         0.0,
@@ -140,9 +141,9 @@
     },
     "Socket_DamageSmoke": {
       "position": [
-        -0.2,
-        0.32,
-        1.44
+        -0.528,
+        -1.2,
+        1.43
       ],
       "forward": [
         0.0,
@@ -153,8 +154,8 @@
     "Socket_DamageFire": {
       "position": [
         0.0,
-        0.52,
-        1.14
+        0.15,
+        1.36
       ],
       "forward": [
         0.0,
@@ -165,8 +166,8 @@
     "Socket_RadarMast": {
       "position": [
         -0.25,
-        0.22,
-        1.59
+        -0.15,
+        1.81
       ],
       "forward": [
         0.0,
@@ -177,8 +178,8 @@
     "Socket_Hardpoint_ERA": {
       "position": [
         0.0,
-        0.92,
-        1.24
+        0.55,
+        1.46
       ],
       "forward": [
         0.0,
@@ -189,8 +190,8 @@
     "Socket_Hardpoint_APS": {
       "position": [
         0.35,
-        0.17,
-        1.54
+        -0.2,
+        1.76
       ],
       "forward": [
         0.0,
@@ -261,8 +262,8 @@
     "Socket_Antenna": {
       "position": [
         0.35,
-        0.12,
-        1.39
+        -0.25,
+        1.61
       ],
       "forward": [
         0.0,
@@ -273,8 +274,8 @@
     "Socket_EngineAudio": {
       "position": [
         0.0,
-        -0.65,
-        0.4
+        -1.35,
+        1.18
       ],
       "forward": [
         0.0,
@@ -285,8 +286,8 @@
     "Socket_WeaponAudio": {
       "position": [
         0.0,
-        1.804,
-        1.956
+        3.061,
+        1.615
       ],
       "forward": [
         0.0,

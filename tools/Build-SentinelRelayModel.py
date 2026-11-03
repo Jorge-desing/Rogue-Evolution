@@ -1,4 +1,4 @@
-"""Build the original Sentinel Relay support rover and its PBR atlas."""
+"""Build the Wave 7 Sentinel Relay nanite support rover and its PBR atlas."""
 
 from __future__ import annotations
 
@@ -38,9 +38,7 @@ def build() -> None:
     run_preset_build(
         [
             "--name", "SentinelRelay",
-            "--archetype", "shield_truck",
-            "--weapon", "arc",
-            "--faction", "vanguard",
+            "--preset", "sentinel_relay",
             "--camo", "none",
             "--primary-color", "#244B56",
             "--light-armor-color", "#69A9A4",

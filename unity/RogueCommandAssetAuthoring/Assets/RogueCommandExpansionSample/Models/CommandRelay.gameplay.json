@@ -1,6 +1,6 @@
 {
   "unitName": "CommandRelay",
-  "archetype": "command_hq_rig",
+  "archetype": "tactical_relay_carrier",
   "visualRootPath": "Vehicle",
   "compatibleNativeTemplates": [
     "PCXBaseTank"
@@ -9,24 +9,24 @@
     "center": [
       0.0,
       0.0,
-      1.481
+      1.577
     ],
     "size": [
-      2.6,
-      5.679,
-      2.962
+      2.342,
+      3.909,
+      3.154
     ]
   },
   "turretKinematics": {
     "yawCenter": [
       0.0,
-      1.32,
-      1.66
+      0.15,
+      1.32
     ],
     "pitchCenter": [
       0.0,
-      3.543,
-      1.859
+      0.7,
+      1.82
     ],
     "minElevationDeg": -10.0,
     "maxElevationDeg": 35.0,
@@ -57,32 +57,32 @@
     "Socket_MuzzlePrimary": {
       "position": [
         0.0,
-        3.543,
-        1.859
+        0.7,
+        1.82
       ],
       "forward": [
         0.0,
-        -0.087,
-        0.996
+        -0.276,
+        0.961
       ]
     },
     "FirePoint_0": {
       "position": [
         0.0,
-        0.0,
+        -0.0,
         0.0
       ],
       "forward": [
         0.0,
-        -0.087,
-        0.996
+        -0.276,
+        0.961
       ]
     },
     "Socket_TurretPivot": {
       "position": [
         0.0,
-        1.32,
-        1.66
+        0.15,
+        1.32
       ],
       "forward": [
         0.0,
@@ -93,8 +93,8 @@
     "Socket_TurretPitch": {
       "position": [
         0.0,
-        1.57,
-        1.81
+        0.4,
+        1.47
       ],
       "forward": [
         0.0,
@@ -105,8 +105,32 @@
     "Socket_RecoilPrimary": {
       "position": [
         0.0,
-        3.093,
-        1.859
+        0.25,
+        1.82
+      ],
+      "forward": [
+        0.0,
+        1.0,
+        0.0
+      ]
+    },
+    "Socket_SensorOptics": {
+      "position": [
+        0.0,
+        0.64,
+        1.6
+      ],
+      "forward": [
+        0.0,
+        1.0,
+        0.0
+      ]
+    },
+    "Socket_SensorEye": {
+      "position": [
+        0.0,
+        0.64,
+        1.6
       ],
       "forward": [
         0.0,
@@ -117,8 +141,8 @@
     "Socket_DamageSmoke": {
       "position": [
         -0.2,
-        1.12,
-        1.96
+        -0.05,
+        1.62
       ],
       "forward": [
         0.0,
@@ -129,8 +153,8 @@
     "Socket_DamageFire": {
       "position": [
         0.2,
-        1.12,
-        1.96
+        -0.05,
+        1.62
       ],
       "forward": [
         0.0,
@@ -141,8 +165,8 @@
     "Socket_RadarMast": {
       "position": [
         -0.25,
-        1.02,
-        2.11
+        -0.15,
+        1.77
       ],
       "forward": [
         0.0,
@@ -153,8 +177,8 @@
     "Socket_Hardpoint_ERA": {
       "position": [
         0.0,
-        1.72,
-        1.76
+        0.55,
+        1.42
       ],
       "forward": [
         0.0,
@@ -165,8 +189,8 @@
     "Socket_Hardpoint_APS": {
       "position": [
         0.35,
-        0.97,
-        2.06
+        -0.2,
+        1.72
       ],
       "forward": [
         0.0,
@@ -237,8 +261,8 @@
     "Socket_Antenna": {
       "position": [
         0.36,
-        0.9,
-        1.88
+        -0.27,
+        1.54
       ],
       "forward": [
         0.0,
@@ -261,8 +285,8 @@
     "Socket_WeaponAudio": {
       "position": [
         0.0,
-        3.543,
-        1.859
+        0.7,
+        1.82
       ],
       "forward": [
         0.0,

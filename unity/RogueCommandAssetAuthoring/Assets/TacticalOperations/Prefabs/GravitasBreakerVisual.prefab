@@ -4915,8 +4915,8 @@ BoxCollider:
   m_IsTrigger: 0
   m_Enabled: 1
   serializedVersion: 2
-  m_Size: {x: 2.387, y: 2.1199522, z: 3.2793849}
-  m_Center: {x: 0, y: 1.119976, z: -0.3671931}
+  m_Size: {x: 2.737, y: 1.9738429, z: 6.049534}
+  m_Center: {x: -0.00000011920929, y: 0.9929214, z: -0.48243308}
 --- !u!95 &6609629409348536130
 Animator:
   serializedVersion: 5
@@ -4997,10 +4997,6 @@ PrefabInstance:
       propertyPath: m_Materials.Array.data[0]
       value:
       objectReference: {fileID: 2100000, guid: 083d2cf089038954990f7e863f04192e, type: 2}
-    - target: {fileID: -4418739953232744203, guid: 0834da16581aa7049a73dab653ac4f13, type: 3}
-      propertyPath: m_Materials.Array.data[0]
-      value:
-      objectReference: {fileID: 2100000, guid: 083d2cf089038954990f7e863f04192e, type: 2}
     - target: {fileID: -3227950615909194171, guid: 0834da16581aa7049a73dab653ac4f13, type: 3}
       propertyPath: m_Materials.Array.data[0]
       value:
@@ -5013,6 +5009,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: GravitasBreakerModel
       objectReference: {fileID: 0}
+    - target: {fileID: 4190770485610827244, guid: 0834da16581aa7049a73dab653ac4f13, type: 3}
+      propertyPath: m_Materials.Array.data[0]
+      value:
+      objectReference: {fileID: 2100000, guid: 083d2cf089038954990f7e863f04192e, type: 2}
     - target: {fileID: 4646569787695815024, guid: 0834da16581aa7049a73dab653ac4f13, type: 3}
       propertyPath: m_Enabled
       value: 0

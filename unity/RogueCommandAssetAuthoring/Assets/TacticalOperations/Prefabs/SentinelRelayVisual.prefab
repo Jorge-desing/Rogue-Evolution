@@ -45,8 +45,8 @@ BoxCollider:
   m_IsTrigger: 0
   m_Enabled: 1
   serializedVersion: 2
-  m_Size: {x: 2.3799999, y: 2.6050057, z: 4.2457385}
-  m_Center: {x: 0, y: 1.3174971, z: -0.3253703}
+  m_Size: {x: 2.342, y: 2.593266, z: 3.4268293}
+  m_Center: {x: 0, y: 1.3233669, z: -0.15771544}
 --- !u!95 &1434628877919311636
 Animator:
   serializedVersion: 5
@@ -4989,10 +4989,6 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: -6794410204924216593, guid: 5001a0988dc9f184ab9cc044cb9f774a, type: 3}
-      propertyPath: m_Materials.Array.data[0]
-      value:
-      objectReference: {fileID: 2100000, guid: 6707b121cc900b44991f4ca6208beb17, type: 2}
     - target: {fileID: -5892075739970136129, guid: 5001a0988dc9f184ab9cc044cb9f774a, type: 3}
       propertyPath: m_Materials.Array.data[0]
       value:
@@ -5005,15 +5001,11 @@ PrefabInstance:
       propertyPath: m_Materials.Array.data[0]
       value:
       objectReference: {fileID: 2100000, guid: 6707b121cc900b44991f4ca6208beb17, type: 2}
-    - target: {fileID: -1743023205273967905, guid: 5001a0988dc9f184ab9cc044cb9f774a, type: 3}
+    - target: {fileID: -978861240820120843, guid: 5001a0988dc9f184ab9cc044cb9f774a, type: 3}
       propertyPath: m_Materials.Array.data[0]
       value:
       objectReference: {fileID: 2100000, guid: 6707b121cc900b44991f4ca6208beb17, type: 2}
     - target: {fileID: -187771662344253192, guid: 5001a0988dc9f184ab9cc044cb9f774a, type: 3}
-      propertyPath: m_Materials.Array.data[0]
-      value:
-      objectReference: {fileID: 2100000, guid: 6707b121cc900b44991f4ca6208beb17, type: 2}
-    - target: {fileID: -20853863935594170, guid: 5001a0988dc9f184ab9cc044cb9f774a, type: 3}
       propertyPath: m_Materials.Array.data[0]
       value:
       objectReference: {fileID: 2100000, guid: 6707b121cc900b44991f4ca6208beb17, type: 2}

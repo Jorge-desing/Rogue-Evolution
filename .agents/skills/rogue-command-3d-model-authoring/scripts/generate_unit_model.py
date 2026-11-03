@@ -1247,12 +1247,8 @@ def build_vehicle_model(
     # 1. Mobility and Chassis by Archetype
     if archetype == "walker":
         builder.add_bipedal_legs(hip_height=1.45, hip_spacing_x=0.88)
-        builder.objects.extend([
-            rmk.make_box(f"{name}Armor_Pelvis", (0.92, 0.65, 0.42), (0.0, -0.02, 1.40), builder.palette.gunmetal, 0.08),
-            rmk.make_box(f"{name}Armor_Torso", (1.14, 0.74, 0.78), (0.0, 0.02, 1.96), builder.palette.primary_armor, 0.09),
-            rmk.make_box(f"{name}Armor_ChestPlate", (1.02, 0.22, 0.45), (0.0, 0.42, 2.04), builder.palette.light_armor, 0.065),
-            rmk.make_box(f"{name}Armor_PowerCell", (0.72, 0.40, 0.60), (0.0, -0.52, 2.03), builder.palette.gunmetal, 0.07),
-        ])
+        builder.add_cast_pelvis(location=(0.0, -0.02, 1.40), width=0.92, depth=0.65, height=0.42)
+        builder.add_mech_torso(location=(0.0, 0.02, 1.96), width=1.14, length=0.74, height=0.78)
         builder.add_sensor_visor()
 
     elif archetype == "bike":
@@ -1340,11 +1336,14 @@ def build_vehicle_model(
 
     elif archetype == "halftrack":
         wheel_z = builder.ground_clearance + 0.38 + 0.035
+        front_wheel_locs = []
         for side in (-1, 1):
             tag = "L" if side < 0 else "R"
+            w_loc = (side * 0.88, 1.25, wheel_z)
+            front_wheel_locs.append(w_loc)
             builder.objects.extend(rmk.make_all_terrain_wheel_assembly(
                 f"{name}Wheel_Front_{tag}",
-                location=(side * 0.88, 1.25, wheel_z),
+                location=w_loc,
                 radius=0.38, width=0.26,
                 tire_mat=builder.palette.tread, rim_mat=builder.palette.wheel_rim,
                 hub_mat=builder.palette.gunmetal, accent_mat=builder.palette.warning
@@ -1352,6 +1351,7 @@ def build_vehicle_model(
         builder.objects.append(rmk.make_box(
             f"{name}Joint_FrontAxle", (1.65, 0.14, 0.12), (0.0, 1.25, wheel_z), builder.palette.gunmetal, 0.02
         ))
+        builder.add_wheel_fenders(front_wheel_locs, radius=0.38, width=0.26)
         for side in (-1, 1):
             builder.objects.extend(rmk.make_continuous_track_assembly(
                 f"{name}Treads",
@@ -1368,18 +1368,19 @@ def build_vehicle_model(
                 ground_z=builder.ground_clearance,
                 center_y=-0.55
             ))
-        builder.objects.append(
+        builder.objects.extend([
             rmk.make_sloped_glacis_hull(
                 f"{name}Armor_Hood",
                 length_front=0.85, length_rear=0.65,
                 width_front=1.20, width_rear=1.35,
                 height_lower=builder.ground_clearance + 0.35, height_upper=0.92,
                 material=builder.palette.primary_armor, bevel=0.035
-            )
-        )
-        builder.objects.append(
-            rmk.make_box(f"{name}Armor_Cab", (1.38, 0.88, 0.62), (0.0, 0.20, 1.05), builder.palette.primary_armor, 0.035)
-        )
+            ),
+            rmk.make_box(f"{name}Armor_Cab", (1.38, 0.88, 0.62), (0.0, 0.20, 1.05), builder.palette.primary_armor, 0.035),
+            rmk.make_transitional_coaming_collar(
+                f"{name}Armor_CabCollar", (0.0, 0.20, 0.74), (1.38, 0.88), height=0.045, collar_mat=builder.palette.gunmetal
+            ),
+        ])
         builder.objects.extend(
             rmk.make_recessed_sensor_visor(
                 f"{name}Sensor_CabVisor",
@@ -1496,16 +1497,8 @@ def build_vehicle_model(
             hip_spacing_x=1.35,
             total_height=2.35,
         )
-        builder.objects.extend([
-            rmk.make_box(f"{name}Armor_PelvisCore", (1.50, 0.95, 0.55), (0.0, -0.05, 2.25), builder.palette.gunmetal, 0.08),
-            rmk.make_box(f"{name}Armor_CitadelTorso", (2.05, 1.35, 1.20), (0.0, 0.02, 3.05), builder.palette.primary_armor, 0.10),
-            rmk.make_box(f"{name}Armor_GlacisChest", (1.75, 0.40, 0.70), (0.0, 0.68, 3.10), builder.palette.light_armor, 0.065, rotation=(math.radians(-18), 0.0, 0.0)),
-            rmk.make_box(f"{name}Armor_ShoulderPauldrons_L", (0.65, 1.15, 0.55), (-1.35, 0.05, 3.35), builder.palette.primary_armor, 0.07),
-            rmk.make_box(f"{name}Armor_ShoulderPauldrons_R", (0.65, 1.15, 0.55), (1.35, 0.05, 3.35), builder.palette.primary_armor, 0.07),
-            rmk.make_box(f"{name}Armor_PowerReactorCore", (1.35, 0.70, 0.90), (0.0, -0.75, 3.15), builder.palette.gunmetal, 0.07),
-            rmk.make_cylinder(f"{name}Armor_CoolingStack_L", 0.12, 0.65, (-0.45, -1.15, 3.45), builder.palette.gunmetal, rotation=(math.radians(22), 0.0, 0.0)),
-            rmk.make_cylinder(f"{name}Armor_CoolingStack_R", 0.12, 0.65, (0.45, -1.15, 3.45), builder.palette.gunmetal, rotation=(math.radians(22), 0.0, 0.0)),
-        ])
+        builder.add_cast_pelvis(location=(0.0, -0.05, 2.25), width=1.50, depth=0.95, height=0.55)
+        builder.add_mech_torso(location=(0.0, 0.02, 3.05), width=2.05, length=1.35, height=1.20)
         builder.add_turret(size=(1.60, 1.75, 0.55), center_y=0.10)
         builder.turret_center = Vector((0.0, 0.10, 3.75))
         builder.add_sensor_visor()
@@ -1557,11 +1550,19 @@ def build_vehicle_model(
         builder.hull_length = 3.5
         builder.hull_width = 2.2
         builder.hull_deck_z = 0.88
-        builder.add_all_terrain_wheels(wheelbase_y=2.45, track_width_x=1.95, wheel_radius=0.40, wheel_width=0.28, middle_axle=True)
+        builder.add_all_terrain_wheels(
+            wheelbase_y=2.45, track_width_x=1.95, wheel_radius=0.40, wheel_width=0.28, middle_axle=True, with_fenders=True
+        )
         builder.objects.extend([
             rmk.make_box(f"{name}Armor_ChassisFrame", (1.65, 3.45, 0.36), (0.0, 0.0, 0.56), builder.palette.gunmetal, 0.03),
             rmk.make_box(f"{name}Armor_ForwardCab", (1.82, 1.10, 0.78), (0.0, 1.15, 1.05), builder.palette.primary_armor, 0.04),
+            rmk.make_transitional_coaming_collar(
+                f"{name}Armor_CabCollar", (0.0, 1.15, 0.74), (1.82, 1.10), height=0.045, collar_mat=builder.palette.gunmetal
+            ),
             rmk.make_box(f"{name}Armor_GeneratorBed", (1.92, 2.05, 0.56), (0.0, -0.65, 0.95), builder.palette.primary_armor, 0.04),
+            rmk.make_transitional_coaming_collar(
+                f"{name}Armor_BedCollar", (0.0, -0.65, 0.74), (1.92, 2.05), height=0.045, collar_mat=builder.palette.gunmetal
+            ),
             rmk.make_cylinder(f"{name}Armor_ProjectorPedestal", 0.68, 0.42, (0.0, -0.65, 1.40), builder.palette.light_armor, vertices=12, bevel=0.03),
             rmk.make_torus(f"{name}Armor_ShieldCoilRing", (0.0, -0.65, 1.65), major_radius=0.72, minor_radius=0.08, material=builder.palette.emissive, major_segments=14, minor_segments=6),
             rmk.make_cylinder(f"{name}Armor_ShieldDomeCore", 0.52, 0.26, (0.0, -0.65, 1.72), builder.palette.emissive, vertices=12, bevel=0.05),
@@ -1612,9 +1613,9 @@ def build_vehicle_model(
         builder.hull_length = 2.2
         builder.hull_width = 1.6
         builder.hull_deck_z = 2.25
+        builder.add_cast_pelvis(location=(0.0, -0.04, 1.72), width=1.05, depth=0.78, height=0.44)
+        builder.add_mech_torso(location=(0.0, -0.05, 2.26), width=1.28, length=1.35, height=0.68)
         builder.objects.extend([
-            rmk.make_box(f"{name}Armor_Pelvis", (1.05, 0.78, 0.44), (0.0, -0.04, 1.72), builder.palette.gunmetal, 0.07),
-            rmk.make_box(f"{name}Armor_Torso", (1.28, 1.35, 0.68), (0.0, -0.05, 2.26), builder.palette.primary_armor, 0.08),
             rmk.make_box(f"{name}Armor_CounterweightBustle", (0.96, 0.68, 0.52), (0.0, -0.92, 2.30), builder.palette.light_armor, 0.05),
             rmk.make_cylinder(f"{name}Sensor_OpticMast", 0.14, 0.55, (-0.48, 0.35, 2.78), builder.palette.gunmetal, vertices=10, bevel=0.015),
         ])
@@ -2022,9 +2023,9 @@ def build_vehicle_model(
         builder.hull_length = 2.4
         builder.hull_width = 1.9
         builder.hull_deck_z = 2.65
+        builder.add_cast_pelvis(location=(0.0, -0.04, 1.90), width=1.28, depth=0.86, height=0.48)
+        builder.add_mech_torso(location=(0.0, 0.04, 2.55), width=1.68, length=1.22, height=0.96)
         builder.objects.extend([
-            rmk.make_box(f"{name}Armor_PelvisBlock", (1.28, 0.86, 0.48), (0.0, -0.04, 1.90), builder.palette.gunmetal, 0.07),
-            rmk.make_box(f"{name}Armor_IndustrialTorso", (1.68, 1.22, 0.96), (0.0, 0.04, 2.55), builder.palette.primary_armor, 0.085),
             rmk.make_box(f"{name}Armor_RollCageCanopy", (1.12, 0.55, 0.58), (0.0, 0.62, 2.58), builder.palette.warning, 0.045),
             rmk.make_cylinder(f"{name}Armor_DorsalReactorDrum", 0.46, 1.25, (0.0, -0.72, 2.62), builder.palette.gunmetal,
                               rotation=(0.0, math.radians(90.0), 0.0), vertices=12, bevel=0.03),
@@ -2049,13 +2050,18 @@ def build_vehicle_model(
         builder.add_whip_antenna()
 
     elif archetype == "nanite_support_rover":
-        wheel_z = builder.ground_clearance + 0.38 + 0.035
+        # The Wave 7 tread-lug profile extends below the tire carcass; leave
+        # an explicit margin so every exported lug remains above Z=0.
+        wheel_z = builder.ground_clearance + 0.43 + 0.035
+        rover_wheel_locs = []
         for side in (-1, 1):
             tag = "L" if side < 0 else "R"
             for y_off, ytag in ((1.05, "F"), (-1.05, "R")):
+                w_loc = (side * 0.95, y_off, wheel_z)
+                rover_wheel_locs.append(w_loc)
                 builder.objects.extend(rmk.make_all_terrain_wheel_assembly(
                     f"{name}Wheel_{ytag}_{tag}",
-                    location=(side * 0.95, y_off, wheel_z),
+                    location=w_loc,
                     radius=0.42, width=0.28,
                     tire_mat=builder.palette.tread, rim_mat=builder.palette.wheel_rim,
                     hub_mat=builder.palette.gunmetal, accent_mat=builder.palette.warning
@@ -2080,12 +2086,19 @@ def build_vehicle_model(
                 builder.palette.light_armor, bevel=0.03,
                 rotation=(math.radians(-14), 0.0, 0.0)
             ),
+            rmk.make_transitional_coaming_collar(
+                f"{name}Armor_Cab", (0.0, 0.35, 0.81), (1.18, 0.95), height=0.045, collar_mat=builder.palette.gunmetal
+            ),
             rmk.make_box(
                 f"{name}Armor_EquipmentBay",
                 (1.24, 1.15, 0.48), (0.0, -0.65, 0.98),
                 builder.palette.primary_armor, bevel=0.03
             ),
+            rmk.make_transitional_coaming_collar(
+                f"{name}Armor_Bay", (0.0, -0.65, 0.74), (1.24, 1.15), height=0.045, collar_mat=builder.palette.gunmetal
+            ),
         ])
+        builder.add_wheel_fenders(rover_wheel_locs, radius=0.42, width=0.28)
         builder.add_turret(size=(1.10, 1.25, 0.36), center_y=0.10)
         builder.add_sensor_visor()
         builder.add_nanite_dispenser(scale=0.92, spacing_x=1.75)
@@ -2121,12 +2134,15 @@ def build_vehicle_model(
     elif archetype == "tactical_relay_carrier":
         wheel_z = builder.ground_clearance + 0.40 + 0.035
         wheel_y_positions = [(1.45, "F"), (-0.15, "M"), (-1.55, "R")]
+        relay_wheel_locs = []
         for side in (-1, 1):
             tag = "L" if side < 0 else "R"
             for y_off, ytag in wheel_y_positions:
+                w_loc = (side * 0.96, y_off, wheel_z)
+                relay_wheel_locs.append(w_loc)
                 builder.objects.extend(rmk.make_all_terrain_wheel_assembly(
                     f"{name}Wheel_{ytag}_{tag}",
-                    location=(side * 0.96, y_off, wheel_z),
+                    location=w_loc,
                     radius=0.40, width=0.26,
                     tire_mat=builder.palette.tread, rim_mat=builder.palette.wheel_rim,
                     hub_mat=builder.palette.gunmetal, accent_mat=builder.palette.warning
@@ -2149,12 +2165,19 @@ def build_vehicle_model(
                 builder.palette.light_armor, bevel=0.03,
                 rotation=(math.radians(-12), 0.0, 0.0)
             ),
+            rmk.make_transitional_coaming_collar(
+                f"{name}Armor_CabCollar", (0.0, 1.05, 0.83), (1.35, 1.15), height=0.045, collar_mat=builder.palette.gunmetal
+            ),
             rmk.make_box(
                 f"{name}Armor_ElectronicsShelter",
                 (1.48, 2.15, 0.72), (0.0, -0.65, 1.22),
                 builder.palette.primary_armor, bevel=0.035
             ),
+            rmk.make_transitional_coaming_collar(
+                f"{name}Armor_ShelterCollar", (0.0, -0.65, 0.86), (1.48, 2.15), height=0.045, collar_mat=builder.palette.gunmetal
+            ),
         ])
+        builder.add_wheel_fenders(relay_wheel_locs, radius=0.40, width=0.26)
         builder.add_turret(size=(1.25, 1.35, 0.40), center_y=0.15)
         builder.add_comms_mast(height=1.65, location=(-0.35, -1.25, 1.58))
         builder.add_sensor_visor()

@@ -4915,8 +4915,8 @@ BoxCollider:
   m_IsTrigger: 0
   m_Enabled: 1
   serializedVersion: 2
-  m_Size: {x: 2.5999997, y: 2.962336, z: 5.6790495}
-  m_Center: {x: 0.00000011920929, y: 1.4888322, z: -0.74202585}
+  m_Size: {x: 2.342, y: 3.154306, z: 3.9091816}
+  m_Center: {x: 0, y: 1.6003472, z: 0.09434211}
 --- !u!95 &8044050648240515401
 Animator:
   serializedVersion: 5
@@ -5037,10 +5037,6 @@ PrefabInstance:
       propertyPath: m_Name
       value: CommandRelayModel
       objectReference: {fileID: 0}
-    - target: {fileID: 1192158541564565439, guid: daac20eebb358e24d966d35bfb7721e2, type: 3}
-      propertyPath: m_Materials.Array.data[0]
-      value:
-      objectReference: {fileID: 2100000, guid: db3d47c5c54cfe74885a4b17c17a3956, type: 2}
     - target: {fileID: 1341353780855146862, guid: daac20eebb358e24d966d35bfb7721e2, type: 3}
       propertyPath: m_Materials.Array.data[0]
       value:

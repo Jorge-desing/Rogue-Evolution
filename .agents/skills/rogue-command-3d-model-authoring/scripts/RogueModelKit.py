@@ -433,44 +433,124 @@ def make_faceted_turret_housing(
     roof_mat: bpy.types.Material | None = None,
     bevel: float = 0.075,
 ) -> list[bpy.types.Object]:
-    """Generates a tapered turret shell with rounded transitions, mantlet, and rear bustle."""
+    """Generates an authentic compound faceted ballistic turret housing with armored bearing race collar, sloped kinetic deflector cheeks, undercut rear bustle, and cast mantlet cradle."""
     objects = []
     loc_v = Vector(location)
-    hl = size[1] * 0.5
-    shell_bevel = min(bevel, size[2] * 0.30, size[0] * 0.12) if bevel > 0.0 else 0.0
+    sx, sy, sz = size
+    hx, hy, hz = sx * 0.5, sy * 0.5, sz * 0.5
+    cr_mat = armor_mat
+    rf_mat = roof_mat if roof_mat else armor_mat
 
-    # Taper the roof inward so the primary body reads as formed armor, not a cylinder.
-    objects.append(_make_tapered_shell(
-        f"{prefix}_BaseShell",
-        size=(size[0] * 0.96, size[1] * 0.90, size[2]),
-        location=loc_v,
-        material=armor_mat,
-        top_scale=(0.90, 0.88),
-        bevel=shell_bevel,
-        bevel_segments=4,
-        smooth=True,
+    # 1. Armored Turret Bearing Ring / Race Collar
+    # Physically seats the turret onto the hull deck, eliminating the floating-box appearance
+    ring_r = min(hx, hy) * 0.88
+    ring_h = 0.08
+    ring_loc = Vector((loc_v.x, loc_v.y, loc_v.z - hz - ring_h * 0.5))
+    objects.append(make_cylinder(
+        f"{prefix}_TurretRing",
+        radius=ring_r,
+        depth=ring_h,
+        location=ring_loc,
+        material=cr_mat,
+        vertices=16,
+        bevel=0.012,
     ))
-    # Forward sloped gun mantlet cradle, rounded only at exposed hard edges.
+
+    # 2. Compound 16-Vertex Faceted Monocoque Turret Shell
+    z_bot = loc_v.z - hz
+    z_bustle_bot = loc_v.z - hz + sz * 0.28  # Undercut rear bustle allows 360° engine deck clearance!
+    z_top = loc_v.z + hz
+    z_brow_top = loc_v.z + hz * 0.82  # Sloped front roof brow for ballistic deflection
+
+    # Bottom 8 vertices (front mantlet notch, wedge cheeks, mid flanks, undercut bustle)
+    v_bottom = [
+        Vector((loc_v.x - hx * 0.44, loc_v.y + hy * 0.76, z_bot)),
+        Vector((loc_v.x - hx * 1.00, loc_v.y + hy * 0.28, z_bot)),
+        Vector((loc_v.x - hx * 0.94, loc_v.y - hy * 0.28, z_bot + (z_bustle_bot - z_bot) * 0.3)),
+        Vector((loc_v.x - hx * 0.72, loc_v.y - hy * 1.00, z_bustle_bot)),
+        Vector((loc_v.x + hx * 0.72, loc_v.y - hy * 1.00, z_bustle_bot)),
+        Vector((loc_v.x + hx * 0.94, loc_v.y - hy * 0.28, z_bot + (z_bustle_bot - z_bot) * 0.3)),
+        Vector((loc_v.x + hx * 1.00, loc_v.y + hy * 0.28, z_bot)),
+        Vector((loc_v.x + hx * 0.44, loc_v.y + hy * 0.76, z_bot)),
+    ]
+    # Top 8 vertices (tumblehome inward slope & raked brow)
+    v_top = [
+        Vector((loc_v.x - hx * 0.36, loc_v.y + hy * 0.65, z_brow_top)),
+        Vector((loc_v.x - hx * 0.84, loc_v.y + hy * 0.22, z_top)),
+        Vector((loc_v.x - hx * 0.78, loc_v.y - hy * 0.26, z_top)),
+        Vector((loc_v.x - hx * 0.62, loc_v.y - hy * 0.92, z_top)),
+        Vector((loc_v.x + hx * 0.62, loc_v.y - hy * 0.92, z_top)),
+        Vector((loc_v.x + hx * 0.78, loc_v.y - hy * 0.26, z_top)),
+        Vector((loc_v.x + hx * 0.84, loc_v.y + hy * 0.22, z_top)),
+        Vector((loc_v.x + hx * 0.36, loc_v.y + hy * 0.65, z_brow_top)),
+    ]
+    all_verts = [v[:] for v in v_bottom + v_top]
+    faces = [tuple(range(7, -1, -1)), tuple(range(8, 16))]
+    for i in range(8):
+        ni = (i + 1) % 8
+        faces.append((i, ni, ni + 8, i + 8))
+
+    mesh = bpy.data.meshes.new(f"{prefix}_BaseShell_Mesh")
+    mesh.from_pydata(all_verts, [], faces)
+    mesh.update()
+    shell_obj = bpy.data.objects.new(f"{prefix}_BaseShell", mesh)
+    bpy.context.collection.objects.link(shell_obj)
+    bpy.context.view_layer.objects.active = shell_obj
+    shell_obj.select_set(True)
+    bpy.ops.object.mode_set(mode="EDIT")
+    bpy.ops.mesh.select_all(action="SELECT")
+    bpy.ops.mesh.normals_make_consistent(inside=False)
+    bpy.ops.object.mode_set(mode="OBJECT")
+    shell_bevel = min(bevel, sz * 0.25, sx * 0.08) if bevel > 0.0 else 0.03
+    shell_obj = finish_mesh(shell_obj, cr_mat, bevel=shell_bevel, smooth=True, bevel_segments=2)
+    objects.append(shell_obj)
+
+    # 3. Recessed Cast Gun Mantlet Cradle
+    mantlet_w = sx * 0.52
+    mantlet_l = sy * 0.32
+    mantlet_h = sz * 0.82
+    mantlet_loc = loc_v + Vector((0.0, hy * 0.68, 0.0))
     objects.append(make_box(
         f"{prefix}_MantletHousing",
-        (size[0] * 0.65, size[1] * 0.35, size[2] * 0.88),
-        loc_v + Vector((0.0, hl * 0.65, 0.0)),
-        roof_mat if roof_mat else armor_mat,
-        bevel=min(bevel * 0.82, size[2] * 0.24),
-        rotation=(math.radians(-8), 0.0, 0.0),
-        bevel_segments=4,
+        (mantlet_w, mantlet_l, mantlet_h),
+        mantlet_loc,
+        rf_mat,
+        bevel=min(bevel * 0.82, sz * 0.22),
+        rotation=(math.radians(-6), 0.0, 0.0),
+        bevel_segments=2,
         smooth=True,
     ))
-    # Rear bustle counterweight / ammo compartment
+
+    # 4. Rear Bustle Counterweight / Electronics Compartment with Undercut Chamfer
+    bustle_w = sx * 0.72
+    bustle_l = sy * 0.38
+    bustle_h = sz * 0.72
+    bustle_loc = loc_v + Vector((0.0, -hy * 0.74, sz * 0.10))
     objects.append(make_box(
         f"{prefix}_RearBustle",
-        (size[0] * 0.78, size[1] * 0.42, size[2] * 0.76),
-        loc_v + Vector((0.0, -hl * 0.72, 0.0)),
-        armor_mat,
-        bevel=min(bevel * 0.78, size[2] * 0.24),
-        bevel_segments=4,
+        (bustle_w, bustle_l, bustle_h),
+        bustle_loc,
+        cr_mat,
+        bevel=min(bevel * 0.75, sz * 0.20),
+        bevel_segments=2,
         smooth=True,
     ))
+
+    # 5. Bilateral Angled Composite Cheek Armor Panels
+    for side in (-1, 1):
+        stag = "L" if side < 0 else "R"
+        cheek_pos = loc_v + Vector((side * (hx * 0.72), hy * 0.38, hz * 0.05))
+        objects.append(make_box(
+            f"{prefix}_CheekArmor_{stag}",
+            (hx * 0.38, hy * 0.48, sz * 0.65),
+            cheek_pos,
+            rf_mat,
+            bevel=0.018,
+            rotation=(math.radians(6), -side * math.radians(12), side * math.radians(22)),
+            bevel_segments=2,
+            smooth=True,
+        ))
+
     return objects
 
 
@@ -4704,6 +4784,313 @@ def make_reinforced_ram_prow_assembly(
         ))
 
     return objects
+
+
+def make_cast_pelvis_assembly(
+    prefix: str,
+    location: Tuple[float, float, float] | Vector = (0.0, 0.0, 1.40),
+    width: float = 0.95,
+    depth: float = 0.68,
+    height: float = 0.45,
+    core_mat: bpy.types.Material | None = None,
+    armor_mat: bpy.types.Material | None = None,
+    accent_mat: bpy.types.Material | None = None,
+) -> list[bpy.types.Object]:
+    """Generates an articulated heavy cast pelvis gimbal assembly with bilateral hip clevis actuator knuckles and lower groin ballistic deflector plate."""
+    objects = []
+    loc = Vector(location)
+    c_mat = core_mat or armor_mat
+    a_mat = armor_mat or core_mat
+    ac_mat = accent_mat or a_mat
+
+    w = max(0.6, width)
+    d = max(0.4, depth)
+    h = max(0.3, height)
+
+    # 1. Heavy central waist gimbal housing
+    waist_rad = min(w, d) * 0.42
+    objects.append(make_cylinder(
+        f"{prefix}_WaistGimbal",
+        radius=waist_rad,
+        depth=h * 0.65,
+        location=loc,
+        material=c_mat,
+        vertices=12,
+        bevel=0.02,
+    ))
+
+    # 2. Bilateral heavy forged hip clevis pivot brackets
+    for side in (-1, 1):
+        stag = "L" if side < 0 else "R"
+        hip_x = side * (w * 0.46)
+        objects.append(make_box(
+            f"{prefix}_HipClevis_{stag}",
+            (w * 0.26, d * 0.58, h * 0.72),
+            loc + Vector((hip_x, -d * 0.04, -h * 0.18)),
+            a_mat,
+            bevel=0.025,
+        ))
+        # Cross-pin axle boss
+        objects.append(make_cylinder(
+            f"{prefix}_HipAxle_{stag}",
+            radius=h * 0.18,
+            depth=w * 0.32,
+            location=loc + Vector((hip_x, -d * 0.04, -h * 0.18)),
+            material=c_mat,
+            vertices=10,
+            bevel=0.01,
+            rotation=(0.0, math.radians(90), 0.0),
+        ))
+
+    # 3. Lower groin chevron deflection plate
+    objects.append(make_box(
+        f"{prefix}_GroinPlate",
+        (w * 0.48, d * 0.42, h * 0.40),
+        loc + Vector((0.0, d * 0.32, -h * 0.35)),
+        a_mat,
+        bevel=0.02,
+        rotation=(math.radians(35), 0.0, 0.0),
+    ))
+
+    # 4. Rear chassis hitch / towing anchor block
+    objects.append(make_box(
+        f"{prefix}_RearTowingBlock",
+        (w * 0.52, d * 0.28, h * 0.38),
+        loc + Vector((0.0, -d * 0.45, -h * 0.15)),
+        c_mat,
+        bevel=0.018,
+    ))
+
+    return objects
+
+
+def make_articulated_mech_torso(
+    prefix: str,
+    location: Tuple[float, float, float] | Vector = (0.0, 0.0, 1.95),
+    width: float = 1.15,
+    length: float = 0.85,
+    height: float = 0.82,
+    primary_mat: bpy.types.Material | None = None,
+    secondary_mat: bpy.types.Material | None = None,
+    gunmetal_mat: bpy.types.Material | None = None,
+    emissive_mat: bpy.types.Material | None = None,
+) -> list[bpy.types.Object]:
+    """Generates an authentic faceted monocoque walker/mech torso with sloped chest glacis, armored visor cowl, shoulder pauldron cuffs, and dorsal reactor bay."""
+    objects = []
+    loc = Vector(location)
+    p_mat = primary_mat or secondary_mat
+    s_mat = secondary_mat or primary_mat
+    g_mat = gunmetal_mat or p_mat
+    e_mat = emissive_mat or s_mat
+
+    w = max(0.8, width)
+    l = max(0.6, length)
+    h = max(0.6, height)
+    hw, hl, hh = w * 0.5, l * 0.5, h * 0.5
+
+    # 1. Monocoque Tapered Torso Shell (12-vertex faceted hull)
+    v_bot = [
+        Vector((loc.x - hw * 0.55, loc.y + hl * 0.65, loc.z - hh)),
+        Vector((loc.x - hw * 0.88, loc.y - hl * 0.10, loc.z - hh)),
+        Vector((loc.x - hw * 0.72, loc.y - hl * 0.85, loc.z - hh)),
+        Vector((loc.x + hw * 0.72, loc.y - hl * 0.85, loc.z - hh)),
+        Vector((loc.x + hw * 0.88, loc.y - hl * 0.10, loc.z - hh)),
+        Vector((loc.x + hw * 0.55, loc.y + hl * 0.65, loc.z - hh)),
+    ]
+    v_top = [
+        Vector((loc.x - hw * 0.42, loc.y + hl * 0.45, loc.z + hh * 0.75)),
+        Vector((loc.x - hw * 0.78, loc.y - hl * 0.15, loc.z + hh)),
+        Vector((loc.x - hw * 0.60, loc.y - hl * 0.75, loc.z + hh * 0.88)),
+        Vector((loc.x + hw * 0.60, loc.y - hl * 0.75, loc.z + hh * 0.88)),
+        Vector((loc.x + hw * 0.78, loc.y - hl * 0.15, loc.z + hh)),
+        Vector((loc.x + hw * 0.42, loc.y + hl * 0.45, loc.z + hh * 0.75)),
+    ]
+    all_verts = [v[:] for v in v_bot + v_top]
+    faces = [(5, 4, 3, 2, 1, 0), (6, 7, 8, 9, 10, 11)]
+    for i in range(6):
+        ni = (i + 1) % 6
+        faces.append((i, ni, ni + 6, i + 6))
+
+    mesh = bpy.data.meshes.new(f"{prefix}_TorsoMonocoque_Mesh")
+    mesh.from_pydata(all_verts, [], faces)
+    mesh.update()
+    torso_obj = bpy.data.objects.new(f"{prefix}_TorsoMonocoque", mesh)
+    bpy.context.collection.objects.link(torso_obj)
+    bpy.context.view_layer.objects.active = torso_obj
+    torso_obj.select_set(True)
+    bpy.ops.object.mode_set(mode="EDIT")
+    bpy.ops.mesh.select_all(action="SELECT")
+    bpy.ops.mesh.normals_make_consistent(inside=False)
+    bpy.ops.object.mode_set(mode="OBJECT")
+    torso_obj = finish_mesh(torso_obj, p_mat, bevel=0.035, smooth=True, bevel_segments=2)
+    objects.append(torso_obj)
+
+    # 2. Sloped Forward Chest Glacis Plate
+    chest_pos = loc + Vector((0.0, hl * 0.55, hh * 0.15))
+    objects.append(make_box(
+        f"{prefix}_ChestGlacis",
+        (w * 0.82, l * 0.28, h * 0.55),
+        chest_pos,
+        s_mat,
+        bevel=0.025,
+        rotation=(math.radians(-20), 0.0, 0.0),
+        bevel_segments=2,
+        smooth=True,
+    ))
+
+    # 3. Armored Visor Cowl with Optical Sight Bar
+    cowl_pos = loc + Vector((0.0, hl * 0.38, hh * 0.65))
+    objects.append(make_box(
+        f"{prefix}_VisorCowl",
+        (w * 0.65, l * 0.35, h * 0.22),
+        cowl_pos,
+        p_mat,
+        bevel=0.018,
+        rotation=(math.radians(-14), 0.0, 0.0),
+    ))
+    objects.append(make_box(
+        f"{prefix}_VisorOpticGlass",
+        (w * 0.52, 0.05, 0.07),
+        cowl_pos + Vector((0.0, l * 0.14, -0.02)),
+        e_mat,
+        bevel=0.005,
+        rotation=(math.radians(-14), 0.0, 0.0),
+    ))
+
+    # 4. Bilateral Shoulder Pauldron Mounting Hardpoints
+    for side in (-1, 1):
+        stag = "L" if side < 0 else "R"
+        sh_pos = loc + Vector((side * (hw * 0.95), -hl * 0.08, hh * 0.45))
+        objects.append(make_cylinder(
+            f"{prefix}_ShoulderJoint_{stag}",
+            radius=h * 0.22,
+            depth=w * 0.28,
+            location=sh_pos,
+            material=g_mat,
+            vertices=12,
+            bevel=0.015,
+            rotation=(0.0, math.radians(90), 0.0),
+        ))
+        # Armored Pauldron Guard
+        objects.append(make_box(
+            f"{prefix}_ShoulderPauldron_{stag}",
+            (w * 0.32, l * 0.68, h * 0.48),
+            sh_pos + Vector((side * (w * 0.10), 0.0, hh * 0.18)),
+            p_mat,
+            bevel=0.028,
+            rotation=(0.0, side * math.radians(14), 0.0),
+        ))
+
+    # 5. Dorsal Power Reactor Core Bay with Cooling Stacks
+    core_pos = loc + Vector((0.0, -hl * 0.72, hh * 0.10))
+    objects.append(make_box(
+        f"{prefix}_ReactorCoreBay",
+        (w * 0.78, l * 0.48, h * 0.78),
+        core_pos,
+        g_mat,
+        bevel=0.025,
+    ))
+    # Angled cooling exhaust stacks
+    for side in (-1, 1):
+        stag = "L" if side < 0 else "R"
+        stack_pos = core_pos + Vector((side * (w * 0.24), -l * 0.18, hh * 0.45))
+        objects.append(make_cylinder(
+            f"{prefix}_CoolingStack_{stag}",
+            radius=0.09,
+            depth=h * 0.55,
+            location=stack_pos,
+            material=g_mat,
+            vertices=10,
+            bevel=0.01,
+            rotation=(math.radians(22), 0.0, 0.0),
+        ))
+
+    return objects
+
+
+def make_sculpted_wheel_fender_assembly(
+    prefix: str,
+    location: Tuple[float, float, float] | Vector,
+    radius: float = 0.40,
+    width: float = 0.28,
+    side: int = 1,
+    fender_mat: bpy.types.Material | None = None,
+    skirt_mat: bpy.types.Material | None = None,
+) -> list[bpy.types.Object]:
+    """Generates a contoured hard-surface wheel arch fender that hugs all-terrain tires with mudguard deflector lips."""
+    objects = []
+    loc = Vector(location)
+    f_mat = fender_mat or skirt_mat
+    s_mat = skirt_mat or fender_mat
+    r = max(0.20, radius)
+    w = max(0.15, width)
+
+    # 1. Contoured Top Fender Arch (covers upper half of wheel)
+    arch_r = r * 1.15
+    fender_w = w * 1.25
+    fender_h = r * 0.45
+    objects.append(make_box(
+        f"{prefix}_ArchTop",
+        (fender_w, r * 1.55, fender_h * 0.45),
+        loc + Vector((0.0, 0.0, r * 1.05)),
+        f_mat,
+        bevel=0.018,
+    ))
+
+    # 2. Sloped Forward Deflector Lip
+    objects.append(make_box(
+        f"{prefix}_FrontMudflap",
+        (fender_w, r * 0.55, fender_h * 0.35),
+        loc + Vector((0.0, r * 0.95, r * 0.75)),
+        s_mat,
+        bevel=0.012,
+        rotation=(math.radians(35), 0.0, 0.0),
+    ))
+
+    # 3. Rear Splash Guard Flap
+    objects.append(make_box(
+        f"{prefix}_RearMudflap",
+        (fender_w, r * 0.55, fender_h * 0.35),
+        loc + Vector((0.0, -r * 0.95, r * 0.75)),
+        s_mat,
+        bevel=0.012,
+        rotation=(math.radians(-35), 0.0, 0.0),
+    ))
+
+    # 4. Outer Chamfered Flare Skirt Lip
+    flare_x = side * (fender_w * 0.52)
+    objects.append(make_box(
+        f"{prefix}_FlareLip",
+        (0.04, r * 1.95, fender_h * 0.55),
+        loc + Vector((flare_x, 0.0, r * 0.88)),
+        f_mat,
+        bevel=0.01,
+        rotation=(0.0, side * math.radians(12), 0.0),
+    ))
+
+    return objects
+
+
+def make_transitional_coaming_collar(
+    prefix: str,
+    location: Tuple[float, float, float] | Vector,
+    size: Tuple[float, float],
+    height: float = 0.045,
+    collar_mat: bpy.types.Material | None = None,
+) -> bpy.types.Object:
+    """Generates a beveled perimeter mounting coaming / weld collar along the base of a cabin, cowl, or equipment bay where it mounts to the chassis, bridging sharp 90° intersections."""
+    loc = Vector(location)
+    sx, sy = size
+    h = max(0.02, height)
+    return make_box(
+        f"{prefix}_CoamingCollar",
+        (sx * 1.08, sy * 1.08, h),
+        loc - Vector((0.0, 0.0, h * 0.45)),
+        collar_mat,
+        bevel=h * 0.75,
+        bevel_segments=2,
+        smooth=True,
+    )
 
 
 def create_unity_empty_locator(
@@ -10796,6 +11183,35 @@ class RogueVehicleBuilder:
             bevel_segments=4,
             smooth=True,
         ))
+        # Transitional Turret Ring Coaming Collar
+        coaming_radius = half_w * 0.65
+        self.objects.append(make_cylinder(
+            f"{self.name}Armor_TurretCoaming",
+            radius=coaming_radius,
+            depth=0.06,
+            location=(0.0, 0.08, height + 0.20 + 0.03),
+            material=self.palette.gunmetal,
+            vertices=16,
+            bevel=0.008,
+        ))
+        # Raised Forward Glacis Driver Cupola & Vision Slit
+        driver_pos = (0.0, length * 0.28, height + 0.14)
+        self.objects.append(make_box(
+            f"{self.name}Armor_DriverHood",
+            (0.36, 0.32, 0.14),
+            driver_pos,
+            self.palette.light_armor,
+            bevel=0.015,
+            rotation=(math.radians(-14), 0.0, 0.0),
+        ))
+        self.objects.append(make_box(
+            f"{self.name}Armor_DriverPeriscope",
+            (0.24, 0.05, 0.04),
+            Vector(driver_pos) + Vector((0.0, 0.12, 0.04)),
+            self.palette.emissive,
+            bevel=0.004,
+            rotation=(math.radians(-14), 0.0, 0.0),
+        ))
         return self
 
     def add_continuous_tracks(
@@ -10844,23 +11260,29 @@ class RogueVehicleBuilder:
         middle_axle: bool = False,
         lug_count: int = 10,
         bolt_count: int = 6,
+        with_fenders: bool = False,
     ) -> "RogueVehicleBuilder":
         effective_z = self.ground_clearance + wheel_radius + 0.035
         axles = [(-wheelbase_y * 0.5, "Rear"), (wheelbase_y * 0.5, "Front")]
         if middle_axle:
             axles.insert(1, (-wheelbase_y * 0.06, "Mid"))
+        wheel_locations = []
         for side in (-1, 1):
             x = side * (track_width_x * 0.5)
             for y_pos, label in axles:
+                loc = (x, y_pos, effective_z)
+                wheel_locations.append(loc)
                 w = make_all_terrain_wheel_assembly(
                     f"{self.name}Wheel_{label}_{'L' if side < 0 else 'R'}",
-                    location=(x, y_pos, effective_z),
+                    location=loc,
                     radius=wheel_radius, width=wheel_width,
                     tire_mat=self.palette.tread, rim_mat=self.palette.wheel_rim,
                     hub_mat=self.palette.gunmetal, accent_mat=self.palette.warning,
                     lug_count=lug_count, bolt_count=bolt_count,
                 )
                 self.objects.extend(w)
+        if with_fenders and track_width_x > 0.05:
+            self.add_wheel_fenders(wheel_locations, radius=wheel_radius, width=wheel_width)
         return self
 
     def add_bipedal_legs(
@@ -12520,6 +12942,86 @@ class RogueVehicleBuilder:
             prow_mat=self.palette.primary_armor,
             bracket_mat=self.palette.gunmetal,
             accent_mat=self.palette.warning,
+        ))
+        return self
+
+    def add_cast_pelvis(
+        self,
+        location: Tuple[float, float, float] | Vector = (0.0, 0.0, 1.40),
+        width: float = 0.95,
+        depth: float = 0.68,
+        height: float = 0.45,
+    ) -> "RogueVehicleBuilder":
+        """Adds an articulated heavy cast pelvis gimbal assembly with bilateral hip clevis actuator knuckles and lower groin ballistic deflector plate."""
+        self.objects.extend(make_cast_pelvis_assembly(
+            f"{self.name}Armor_Pelvis",
+            location=location,
+            width=width,
+            depth=depth,
+            height=height,
+            core_mat=self.palette.gunmetal,
+            armor_mat=self.palette.primary_armor,
+            accent_mat=self.palette.warning,
+        ))
+        return self
+
+    def add_mech_torso(
+        self,
+        location: Tuple[float, float, float] | Vector = (0.0, 0.0, 1.95),
+        width: float = 1.15,
+        length: float = 0.85,
+        height: float = 0.82,
+    ) -> "RogueVehicleBuilder":
+        """Adds a faceted monocoque mech torso with sloped chest glacis, armored visor cowl, shoulder pauldron cuffs, and dorsal reactor bay."""
+        self.objects.extend(make_articulated_mech_torso(
+            f"{self.name}Armor_Torso",
+            location=location,
+            width=width,
+            length=length,
+            height=height,
+            primary_mat=self.palette.primary_armor,
+            secondary_mat=self.palette.light_armor,
+            gunmetal_mat=self.palette.gunmetal,
+            emissive_mat=self.palette.emissive,
+        ))
+        return self
+
+    def add_wheel_fenders(
+        self,
+        locations: Sequence[Tuple[float, float, float] | Vector],
+        radius: float = 0.40,
+        width: float = 0.28,
+    ) -> "RogueVehicleBuilder":
+        """Adds contoured hard-surface wheel arch fenders over all specified wheel positions."""
+        for idx, wloc in enumerate(locations, start=1):
+            w_vec = Vector(wloc)
+            side = 1 if w_vec.x >= 0 else -1
+            stag = "R" if side > 0 else "L"
+            self.objects.extend(make_sculpted_wheel_fender_assembly(
+                f"{self.name}Fender_{idx}_{stag}",
+                location=w_vec,
+                radius=radius,
+                width=width,
+                side=side,
+                fender_mat=self.palette.primary_armor,
+                skirt_mat=self.palette.light_armor,
+            ))
+        return self
+
+    def add_transitional_coaming(
+        self,
+        prefix: str,
+        location: Tuple[float, float, float] | Vector,
+        size: Tuple[float, float],
+        height: float = 0.045,
+    ) -> "RogueVehicleBuilder":
+        """Adds a beveled perimeter mounting coaming / weld collar around cabin or equipment bays to bridge 90° intersections."""
+        self.objects.append(make_transitional_coaming_collar(
+            prefix,
+            location=location,
+            size=size,
+            height=height,
+            collar_mat=self.palette.gunmetal,
         ))
         return self
 

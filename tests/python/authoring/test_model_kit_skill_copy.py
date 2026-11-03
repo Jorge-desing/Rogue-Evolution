@@ -157,6 +157,72 @@ class TestModelKitSkillCopy(unittest.TestCase):
         for method in required_structure_methods:
             self.assertIn(method, structure_builder_methods, f"Method {method} missing from RogueStructureBuilder")
 
+    def test_tactical_operations_builders_select_wave7_presets(self) -> None:
+        """The three new unit builders must consume the Wave 7 preset improvements."""
+        expected = {
+            "Build-SentinelRelayModel.py": "sentinel_relay",
+            "Build-GravitasBreakerModel.py": "gravitas_breaker",
+            "Build-CommandRelayModel.py": "command_relay",
+        }
+        builders_dir = REPO_ROOT / "tools"
+        for filename, preset in expected.items():
+            with self.subTest(builder=filename):
+                source = (builders_dir / filename).read_text(encoding="utf-8")
+                self.assertIn(f'"--preset", "{preset}"', source)
+                self.assertNotIn('"--archetype"', source)
+                self.assertNotIn('"--weapon"', source)
+
+    def test_nanite_support_rover_wheel_lugs_clear_ground_plane(self) -> None:
+        """Wave 7 support-rover wheels leave margin for the generated tread lugs."""
+        generator_source = TOOLS_GUM.read_text(encoding="utf-8")
+        self.assertIn(
+            "wheel_z = builder.ground_clearance + 0.43 + 0.035",
+            generator_source,
+        )
+
+    def test_hard_surface_realism_assemblies_and_methods(self) -> None:
+        """RogueModelKit.py must contain the anti-primitive hard-surface realism assemblies and builder chaining methods."""
+        rmk_text = TOOLS_RMK.read_text(encoding="utf-8")
+        parsed = ast.parse(rmk_text, filename=str(TOOLS_RMK))
+
+        func_names = set()
+        vehicle_builder_methods = set()
+
+        for stmt in parsed.body:
+            if isinstance(stmt, ast.FunctionDef):
+                func_names.add(stmt.name)
+            elif isinstance(stmt, ast.ClassDef) and stmt.name == "RogueVehicleBuilder":
+                for item in stmt.body:
+                    if isinstance(item, ast.FunctionDef):
+                        vehicle_builder_methods.add(item.name)
+
+        required_realism_assemblies = [
+            "make_cast_pelvis_assembly",
+            "make_articulated_mech_torso",
+            "make_sculpted_wheel_fender_assembly",
+            "make_transitional_coaming_collar",
+        ]
+        for assembly in required_realism_assemblies:
+            self.assertIn(assembly, func_names, f"Realism assembly {assembly} missing from RogueModelKit.py")
+
+        required_builder_methods = [
+            "add_cast_pelvis",
+            "add_mech_torso",
+            "add_wheel_fenders",
+            "add_transitional_coaming",
+        ]
+        for method in required_builder_methods:
+            self.assertIn(method, vehicle_builder_methods, f"Method {method} missing from RogueVehicleBuilder")
+
+    def test_archetypes_use_hard_surface_realism_assemblies(self) -> None:
+        """Archetypes must consume the new anti-primitive hard-surface realism assemblies."""
+        generator_source = TOOLS_GUM.read_text(encoding="utf-8")
+        self.assertGreaterEqual(generator_source.count("builder.add_cast_pelvis"), 4)
+        self.assertGreaterEqual(generator_source.count("builder.add_mech_torso"), 4)
+        self.assertGreaterEqual(generator_source.count("builder.add_wheel_fenders"), 3)
+        self.assertIn("with_fenders=True", generator_source)
+        self.assertGreaterEqual(generator_source.count("make_transitional_coaming_collar"), 4)
+
 
 if __name__ == "__main__":
     unittest.main()

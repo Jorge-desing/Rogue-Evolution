@@ -1,4 +1,4 @@
-"""Build the original Gravitas Breaker assault tank and its PBR atlas."""
+"""Build the Wave 7 Gravitas Breaker gravity siege breaker and its PBR atlas."""
 
 from __future__ import annotations
 
@@ -12,10 +12,8 @@ from VisualModelAuthoringSupport import add_box, add_link, run_preset_build
 
 
 def refine(builder) -> None:
-    """Add a heavy breaker prow and protected overload conduits."""
+    """Add protected overload conduits and cheek armor to the Wave 7 citadel."""
     p = builder.palette
-    add_box(builder, "GravitasBreakerArmor_BreakerProw", (0.0, 1.56, 0.58), (1.95, 0.42, 0.48), p.primary_armor)
-    add_box(builder, "GravitasBreakerArmor_BreakerEdge", (0.0, 1.80, 0.52), (1.55, 0.10, 0.22), p.light_armor)
     for side, tag in ((-1, "L"), (1, "R")):
         add_link(builder, f"GravitasBreakerJoint_OverloadConduit_{tag}", (side * 0.48, -0.35, 1.12), (side * 0.72, 0.64, 1.30), 0.055, 0.042, p.warning)
         add_box(builder, f"GravitasBreakerArmor_CheekPlate_{tag}", (side * 0.88, 0.42, 1.15), (0.18, 0.70, 0.42), p.light_armor)
@@ -29,13 +27,9 @@ def build() -> None:
     run_preset_build(
         [
             "--name", "GravitasBreaker",
-            "--archetype", "demolition_breacher",
-            "--weapon", "plasma_mortar",
-            "--faction", "siege",
+            "--preset", "gravitas_breaker",
             "--camo", "splinter",
-            "--wear", "battle_hardened",
             "--structural-wear-mask",
-            "--dozer",
             "--hull-greebles",
             "--tactical-markings",
             "--aps-suite",

@@ -696,3 +696,30 @@ VehiclePrefabBuilder.EnsureCanonicalVfxAndAudioComponents adds (idempotently) Fi
 - **Parity Unit Test & Automated Validation**:
   - Twin script byte-for-byte binary parity strictly maintained between `tools/` and `.agents/skills/rogue-command-3d-model-authoring/scripts/`.
   - Added unit test suite `tests/python/authoring/test_model_kit_skill_copy.py` verifying file parity, archetype count (42), preset count (56), procedural assemblies, and builder chaining methods.
+---
+
+## 25. Hard-Surface Realism & Anti-Primitive Architectural Overhaul (local build/validation evidence)
+
+To eliminate the visible appearance of disconnected geometric primitives ("figuras geométricas unidas") and achieve grounded military sci-fi realism, the procedural modeling pipeline has undergone a structural overhaul across `RogueModelKit.py` and `generate_unit_model.py`:
+
+- **Compound Faceted Ballistic Turret Architecture (`make_faceted_turret_housing`)**:
+  - Replaces raw 3-box stacking with a 16-vertex monocoque kinetic turret shell:
+    - **Armored Turret Bearing Ring / Race Collar (`Turret_TurretRing`)**: Cylindrical/octagonal bearing race (r ≈ width × 0.44, h = 0.08m) that physically anchors the turret into the hull deck, eliminating floating boxes.
+    - **Kinetic Deflector Cheeks**: Forward wedge cheeks sloped at 32° for authentic projectile deflection.
+    - **Inward Tumblehome Flanks & Raked Brow**: Lateral armor angles inward toward the roof with a sloped front brow.
+    - **Undercut Rear Bustle**: Rear compartment underside angles upward at 28°, providing realistic clearance over the engine deck for 360° traverse without clipping.
+    - **Recessed Cast Gun Mantlet Cradle (`Turret_MantletHousing`)**: Cast mantlet collar with sloped cheek bevels.
+    - **Bilateral Composite Cheek Applique Plates (`Turret_CheekArmor_L/R`)**: Layered kinetic standoff armor panels flanking the mantlet.
+- **Hull Turret Well Coaming & Glacis Driver Cupola (`add_sloped_hull`)**:
+  - Integrated raised cylindrical turret coaming rim on the fighting compartment deck (`Armor_TurretCoaming`) to seat the turret race.
+  - Forward glacis faceted driver cupola (`Armor_DriverHood`) with emissive periscope vision slit (`Armor_DriverPeriscope`), breaking flat upper glacis monotony.
+- **Articulated Walker / Mech Torso & Cast Pelvis Architecture (`make_articulated_mech_torso`, `make_cast_pelvis_assembly`)**:
+  - Eliminates the previous pattern of 4 vertically stacked cubes (`Pelvis`, `Torso`, `Chest`, `PowerCell`):
+    - **Cast Pelvis Gimbal Assembly (`make_cast_pelvis_assembly` / `.add_cast_pelvis()`)**: Heavy central waist gimbal cylinder, bilateral forged hip clevis actuator brackets with cross-pin axle bosses, and lower groin chevron deflector plate.
+    - **Faceted Monocoque Mech Torso (`make_articulated_mech_torso` / `.add_mech_torso()`)**: Tapered ballistic torso pod with sloped chest glacis plate (20° forward slope), recessed panoramic sensor visor cowl, bilateral shoulder pauldron mounting hardpoints with cylindrical joint cuffs, and dorsal power reactor bay with twin angled cooling exhaust stacks.
+    - Applied across `walker`, `colossus_titan`, `heavy_crane_mech`, and `artillery_strider`.
+- **Sculpted Wheel Arch Fenders (`make_sculpted_wheel_fender_assembly` / `.add_wheel_fenders()`)**:
+  - Contoured 3-segment arched wheel well fenders hugging all-terrain tires, with forward mudflap deflectors, rear splash guards, and outer chamfered flare skirts.
+  - Deployed on `nanite_support_rover`, `tactical_relay_carrier`, `halftrack`, and wheeled variants.
+- **Transitional Mounting Coamings (`make_transitional_coaming_collar` / `.add_transitional_coaming()`)**:
+  - Beveled perimeter mounting flanges bridging cabins, cowls, and equipment bays to chassis decks, eliminating unnatural computer-generated 90-degree knife-edge intersections.
