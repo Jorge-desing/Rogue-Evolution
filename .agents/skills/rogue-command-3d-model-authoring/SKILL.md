@@ -156,7 +156,7 @@ Run headless vehicle generation directly from the command line using Blender and
 ```
 
 - **Mobile Archetypes (42)**: `tank`, `walker`, `bike`, `artillery`, `arc_tank`, `hover`, `spider`, `vtol`, `halftrack`, `super_heavy`, `buggy`, `flak_anti_air`, `siege_crawler`, `drone_carrier`, `quad_mech`, `combat_harvester`, `colossus_titan`, `hover_cruiser`, `heavy_dropship`, `shield_truck`, `demolition_breacher`, `artillery_strider`, `thermobaric_tank`, `ew_jammer`, Wave 3: `mobile_sam_launcher`, `recovery_crawler`, `mine_layer`, `sniper_tankette`, `hexapod_assault`, `assault_hovercraft`, Wave 4: `bridge_layer`, `command_hq_rig`, `flying_wing_bomber`, `mortar_carrier`, `siege_drill_mole`, `heavy_crane_mech`, and Wave 7: `nanite_support_rover`, `gravity_siege_breaker`, `tactical_relay_carrier`, `amphibious_assault_tank`, `plasma_mortar_strider`, `stealth_recon_skimmer`.
-- **Strategic Structure Types (10)**: `factory`, `defense_turret`, `radar_station`, `energy_silo`, `orbital_silo`, `shield_dome`, `emp_obelisk`, `bunker_pillbox`, `anti_air_battery`, and `comms_relay_tower`. These are generated through `RogueStructureBuilder`, separate from the 36 mobile archetypes.
+- **Strategic Structure Types (10)**: `factory`, `defense_turret`, `radar_station`, `energy_silo`, `orbital_silo`, `shield_dome`, `emp_obelisk`, `bunker_pillbox`, `anti_air_battery`, and `comms_relay_tower`. These are generated through `RogueStructureBuilder`, separate from the 42 mobile archetypes.
 - **Weapons (15 CLI values)**: `cannon`, `gatling`, `missile`, `arc`, `howitzer`, `dual_cannon`, `railgun`, `quad_flak`, `plasma_mortar`, `laser_beam`, `vls_missiles`, `flamethrower`, `emp_emitter`, `nanite_projector`, and `gravity_cannon`.
 - **Factions**: `vanguard` (slate teal), `siege` (rust ochre), `syndicate` (deep cobalt), `arctic` (tundra navy).
 - **Camouflage Variants**: `digital`, `splinter`, and `tigerstripe` build procedural Voronoi/wave color patterns; `desert`, `urban`, `arctic`, and `woodland` use a procedural noise pattern with faction colors. These Blender node graphs can be baked to the atlas. They do not adapt to the map's runtime biome.
@@ -222,7 +222,7 @@ Run headless vehicle generation directly from the command line using Blender and
   - *Textures & Shading*: `--bake-atlas` (PBR atlas bake), `--bake-normals`, `--single-material` (`<Name>_Atlas.fbx`), `--camo <type>`, `--camo-scale`, `--camo-contrast`, `--panel-lines` (procedural bump), `--normal-intensity`.
   - *Attachments & Greebles*: `--suspension-arms` (trailing-arm torsion linkages), `--mantlet-boot` (open torus pleat rings around cannon-family barrels; supports cannon, dual cannon, howitzer, railgun, quad flak, plasma mortar, and flamethrower), `--spaced-skirts` (segmented standoff composite skirts), `--hydraulic-hoses` (catenary hoses with couplers), `--hull-greebles` (maintenance hatches, vents, and lifting lugs), `--tactical-markings` (BVH-snapped side stripes and zenith IDs), `--hydraulic-pistons` (telescopic hydraulic actuators), `--ammo-chutes` (articulated metallic feed chutes), `--aps-suite` (hard-kill APS launchers & LWR), `--stowage-kit` (bustle rack, tarp, Jerry cans, spare tracks), `--slat-armor` (anti-HEAT bar armor grids), `--era-bricks` (staggered ERA wedge blocks), `--camo-netting` (3D noise-displaced camouflage canopy & barrel wrap), `--thermal-radiators` (armored heat-exchanger radiator banks with glowing fins), `--nanite-dispenser` (bilateral armored nanite repair dispenser pods), `--grav-dampener` (gyroscopic grav-dampener hub with singularity core), `--comms-mast` (telescopic comms & EW jamming mast), `--ram-prow` (reinforced V-shaped kinetic battering ram prow), `--antenna` (whip antenna), `--cupola` (commander hatch), `--rivets` (seam bolts), `--track-shoes` (individual cleats), `--outriggers` (stabilizer rams), `--flight-deck`, `--excavator-drum`.
   - *Palette Overrides*: `--primary-color <hex>`, `--light-armor-color <hex>`, `--emissive-color <hex>`, `--biome <desert|arctic|woodland|urban>`.
-  - *Execution Controls*: `--dry-run` (validation without meshing), `--batch-all-archetypes` (build all 36 archetypes), `--report-json <path>`, `--lod`, `--multiview`.
+  - *Execution Controls*: `--dry-run` (validation without meshing), `--batch-all-archetypes` (build all 42 archetypes), `--report-json <path>`, `--lod`, `--multiview`.
 - **Outputs**: Generates editable `.blend`, Unity-optimized `.fbx` with lightmap UVs, 4-channel vertex color shading, canonical unprefixed `Socket_*` empties, batched submeshes, collision hulls, companion `.gameplay.json`, and 4-view orthographic preview sheet.
 
 ### Automated Quality & Subsystem Profiling Diagnostics
@@ -406,6 +406,27 @@ Verified against pinned `Assembly-CSharp.dll` (`d2da384df3318e7ac52db58eb13699ec
 - `EntityController.IsEnemy` (`0x06000844`): Authoritative hostility check to ensure turrets only target enemies.
 
 *Full member signatures and evidence ledger: [AGENT-HANDOFF.md](../../../docs/research/AGENT-HANDOFF.md#4-rea-verified-reflection-signatures--cil-tokens).*
+
+---
+
+## 12. Anti-Ring Ballistic Realism & Two-Tier Shader Wear Overhaul
+
+To eliminate toy-like constant-radius cylinders and repetitive stacked rings ("tubos rectos pegados y demasiados anillos"), the authoring pipeline enforces authentic military ballistic and electromagnetic engineering:
+
+### A. Tapered Conical Frustum Primitive (`make_tapered_cylinder`)
+- Uses `bpy.ops.mesh.primitive_cone_add(radius1, radius2, depth)` with directional tracking quaternions.
+- Provides true continuous taper ($1.25\times$ breech down to $0.92\times$ muzzle caliber) on cannon and howitzer barrels, double-conical bore evacuators, and electrode prongs.
+
+### B. Anti-Ring Weapon Assemblies
+- **Cannons & Howitzers**: Breech reinforce tapers into main tube; double-conical aerodynamic evacuator fairings (no cylindrical steps/rings); slotted multi-baffle muzzle brakes with gas venting windows.
+- **Plasma Mortar**: Four longitudinal structural stator rail beams (`StatorRail_Top`, `_Bottom`, `_L`, `_R`) with linear induction channels, replacing concentric floating rings.
+- **Collimated Beam Laser**: Faceted hexagonal jacket (`HexCollimationShroud`) and longitudinal heat-sink fin rails, replacing toroid donut rings.
+- **Arc Energy Emitter**: Octagonal ceramic dielectric housing, heavy rear transformer insulator, and dual convergent discharge prongs, replacing repetitive coils.
+- **Mantlet Dust Boot**: Dual conical accordion pleat pairs (`PleatConeA`, `PleatConeB`) forming continuous flexible bellows instead of floating toruses.
+
+### C. Two-Tier Vertex Wear & Carbon Soot Extinction (`VehiclePBR_VertexWear.shader`)
+- **Two-Tier Wear**: Dark oxidized primer boundary outline (`#2c2724`, `wear 0.12-0.50`) transitioning into bare bright hardened alloy steel ridge (`#c7ccd6`, `wear > 0.42`), simulating true multi-layer paint chipping.
+- **Carbon Soot Specular Extinction**: Soot scaling suppresses specular smoothness (`smoothness *= (1.0 - soot * 0.65)`) and reduces metallic reflection (`metallic -= soot * 0.40`), ensuring muzzles and exhausts render as velvety carbon-matte.
 
 ---
 

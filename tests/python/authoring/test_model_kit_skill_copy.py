@@ -197,6 +197,7 @@ class TestModelKitSkillCopy(unittest.TestCase):
                         vehicle_builder_methods.add(item.name)
 
         required_realism_assemblies = [
+            "make_tapered_cylinder",
             "make_cast_pelvis_assembly",
             "make_articulated_mech_torso",
             "make_sculpted_wheel_fender_assembly",
@@ -398,6 +399,15 @@ class TestModelKitSkillCopy(unittest.TestCase):
         """Colossus keeps enough vertical room for its authored antenna and structural details."""
         source = (REPO_ROOT / "tools" / "Build-ColossusSiegeModel.py").read_text(encoding="utf-8")
         self.assertIn('bounds["height_z"] > 2.0', source)
+
+    def test_generator_batch_help_matches_current_archetype_catalog(self) -> None:
+        """The public batch flag must advertise all 42 current mobile archetypes."""
+        source = TOOLS_GUM.read_text(encoding="utf-8")
+        self.assertIn(
+            'help="Batch generate all 42 archetypes into the output directory"',
+            source,
+        )
+        self.assertNotIn("Batch generate all 36 archetypes", source)
 
 if __name__ == "__main__":
     unittest.main()

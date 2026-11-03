@@ -159,12 +159,26 @@ Shader "RogueCommand/VehiclePBR_VertexWear"
                 half ao = saturate(lerp(1.0h, vColor.r, _AoStrength));
                 half wear = saturate(vColor.g * _WearStrength);
                 half soot = saturate(vColor.b * _SootStrength);
+
+                // Team color modulation
                 surfaceData.albedo = lerp(surfaceData.albedo,
                     surfaceData.albedo * _TeamColor.rgb, vColor.a);
+
+                // Cavity AO and Thermal Soot darkening
                 surfaceData.albedo *= ao * (1.0h - soot * 0.75h);
-                surfaceData.albedo = lerp(surfaceData.albedo, half3(0.72h, 0.74h, 0.76h), wear * 0.85h);
-                surfaceData.metallic = saturate(surfaceData.metallic + wear * 0.6h);
-                surfaceData.smoothness = saturate(lerp(surfaceData.smoothness, 0.82h, wear * 0.75h));
+
+                // Two-tier edge wear: oxidized dark primer border (#2c2724) + bare bright alloy ridge (#c7ccd6)
+                half primerMask = smoothstep(0.12h, 0.45h, wear) * (1.0h - smoothstep(0.50h, 0.85h, wear));
+                half steelMask = smoothstep(0.42h, 0.90h, wear);
+                surfaceData.albedo = lerp(surfaceData.albedo, half3(0.17h, 0.15h, 0.14h), primerMask * 0.85h);
+                surfaceData.albedo = lerp(surfaceData.albedo, half3(0.78h, 0.80h, 0.84h), steelMask * 0.95h);
+
+                // Physical response: Bare steel boosts metallic/smoothness; primer dulls; carbon soot extinguishes specularity
+                surfaceData.metallic = saturate(surfaceData.metallic * (1.0h - primerMask * 0.5h) + steelMask * 0.85h);
+                surfaceData.metallic = saturate(surfaceData.metallic - soot * 0.40h);
+
+                surfaceData.smoothness = saturate(lerp(surfaceData.smoothness, 0.85h, steelMask * 0.8h) * (1.0h - primerMask * 0.4h));
+                surfaceData.smoothness *= (1.0h - soot * 0.65h);
 
                 surfaceData.normalTS = SampleNormal(input.uv,
                     TEXTURE2D_ARGS(_BumpMap, sampler_BumpMap), _BumpScale);

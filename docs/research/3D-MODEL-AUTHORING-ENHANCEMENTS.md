@@ -810,3 +810,25 @@ To eliminate primitive boxiness and inject authentic battlefield functional arch
 - **Articulated Mech Torso Yaw Bearing Collar & Flexible Knee Joint Dust Gaiters**:
   - `Torso_YawRace`: Heavy 14-vertex cast yaw bearing collar physically bridging the pelvis ring to the articulated upper torso in `add_mech_torso()`.
   - `KneeGaiter`: Flexible accordion rubber knee joint dust boot shielding internal hydraulic pistons from grit and shrapnel in `make_bipedal_digitigrade_leg()`.
+### Wave 7 Hard-Surface Realism: Anti-Ring Weapon Overhaul, Tapered Cannon Barrels, Stator Rails & Two-Tier Shader Wear (local build/validation evidence)
+
+To resolve the artificial "toy-like" look caused by straight constant-radius pipes and stacked concentric/toroid rings ("demasiados anillos y tubos rectos pegados entre si"), Wave 7 replaces primitive cylinder stacks across `RogueModelKit.py` and `VehiclePBR_VertexWear.shader` with authentic military ballistic and electromagnetic engineering:
+
+- **Tapered Conical Frustum Primitive (`make_tapered_cylinder`)**:
+  - Leverages Blender's `bpy.ops.mesh.primitive_cone_add(radius1, radius2, depth)` with directional quaternion tracking to generate realistic conical frustums.
+  - Deployed across all cannon tubes, howitzer barrels, bore evacuators, and electrode prongs, providing authentic structural taper from thick reinforced breeches to narrower muzzles.
+- **Continuous Tapered Cannon & Howitzer Assemblies (`make_coaxial_cannon_assembly`, `make_heavy_howitzer_assembly`, `make_dual_cannon_assembly`)**:
+  - Heavy breech reinforce section tapering smoothly into barrel (1.25x to 0.92x caliber).
+  - Double-conical aerodynamic bore evacuators with forward and aft transition tapers, completely eliminating flat rectangular steps and floating warning rings.
+  - Multi-baffle muzzle brakes with real ventilated gas port cutouts.
+- **Electromagnetic Stator Rail Beams (`make_plasma_mortar_assembly`)**:
+  - Replaced stacked concentric floating rings/collars with four full-length longitudinal structural stator rail beams (`StatorRail_Top`, `_Bottom`, `_L`, `_R`) and recessed linear induction channels, transforming toy-like ring stacks into an authentic electromagnetic siege weapon.
+- **Faceted Shroud & Heat-Sink Collimator Rails (`make_collimated_beam_laser_assembly`)**:
+  - Replaced floating toroid donut rings with a faceted hexagonal jacket (`HexCollimationShroud`) and longitudinal heat-sink fin rails.
+- **Dielectric Ceramic Housing & Convergent Electrode Prongs (`make_arc_energy_emitter`)**:
+  - Replaced repetitive toroid coil loops with a faceted ceramic dielectric housing, heavy rear transformer insulator collar, and twin tapered convergent discharge prongs.
+- **Conical Accordion Pleat Mantlet Dust Boot (`make_mantlet_dust_boot`)**:
+  - Replaced disjoint floating toroid donuts with continuous conical accordion pleat pairs (`PleatConeA`, `PleatConeB`) producing an authentic flexible rubber/canvas protective bellows.
+- **Two-Tier Edge Wear & Carbon Soot Specular Extinction (`VehiclePBR_VertexWear.shader`)**:
+  - Two-tier wear transition curve: dark oxidized primer boundary outline (`#2c2724`, `wear 0.12-0.50`) transitioning into bare bright hardened alloy steel ridge (`#c7ccd6`, `wear > 0.42`), accurately simulating realistic paint chipping.
+  - Thermal soot specular extinction: carbon soot scaling suppresses specular smoothness (`smoothness *= (1.0 - soot * 0.65)`) and reduces metallic response (`metallic -= soot * 0.40`), ensuring burned muzzles and exhausts render as velvety carbon-matte instead of plastic or glossy metal.

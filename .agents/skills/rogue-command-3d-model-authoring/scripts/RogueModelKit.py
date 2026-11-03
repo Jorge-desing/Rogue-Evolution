@@ -280,6 +280,47 @@ def make_cylinder(
     return obj
 
 
+
+
+def make_tapered_cylinder(
+    name: str,
+    radius_base: float,
+    radius_tip: float,
+    depth: float,
+    location: Tuple[float, float, float] | Vector,
+    material: bpy.types.Material | None,
+    rotation: Tuple[float, float, float] = (0.0, 0.0, 0.0),
+    vertices: int = 12,
+    bevel: float | None = None,
+    bevel_segments: int = 1,
+) -> bpy.types.Object:
+    """Creates a conical tapered cylinder (truncated cone) with baked scale and proportional chamfers.
+
+    radius_base sits at local -Z; radius_tip sits at local +Z. When aligned with
+    a forward direction vector tracking +Z, radius_base is at the rear/breech
+    and radius_tip is at the front/muzzle.
+    """
+    if rotation is None:
+        rotation = (0.0, 0.0, 0.0)
+    bpy.ops.mesh.primitive_cone_add(
+        vertices=vertices,
+        radius1=radius_base,
+        radius2=radius_tip,
+        depth=depth,
+        location=location,
+        rotation=rotation,
+    )
+    obj = bpy.context.object
+    obj.name = name
+    bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
+    if bevel is None:
+        bevel = min(radius_tip * 0.16, depth * 0.14)
+    obj = finish_mesh(obj, material, bevel, bevel_segments=bevel_segments)
+    axis = Euler(rotation).to_matrix() @ Vector((0.0, 0.0, 1.0))
+    for polygon in obj.data.polygons:
+        polygon.use_smooth = abs(polygon.normal.dot(axis)) < 0.999
+    return obj
+
 def make_rod(
     name: str,
     start: Sequence[float] | Vector,
@@ -1549,7 +1590,7 @@ def make_arc_energy_emitter(
     arc_mat: bpy.types.Material | None = None,
     accent_mat: bpy.types.Material | None = None,
 ) -> list[bpy.types.Object]:
-    """Generates an electromagnetic arc weapon with induction coils and convergent prongs."""
+    """Generates an electromagnetic arc weapon with faceted dielectric housing and tapered convergent discharge prongs."""
     objects = []
     base_v = Vector(base_location)
     u_vec, v_vec, dir_vec = get_orthonormal_basis(Vector(forward_dir))
@@ -1562,32 +1603,29 @@ def make_arc_energy_emitter(
         base_v, housing_mat, bevel=0.025, rotation=rot_euler
     ))
 
-    # 2. Glowing plasma core cylinder
+    # 2. Glowing plasma core chamber (tapered)
     core_loc = base_v + dir_vec * (core_length * 0.45)
-    objects.append(make_cylinder(
+    objects.append(make_tapered_cylinder(
         f"{prefix}_PlasmaCore",
-        core_radius * 0.68, core_length,
+        core_radius * 0.78, core_radius * 0.55, core_length,
         core_loc, arc_mat, rotation=rot_euler, vertices=12, bevel=0.01
     ))
 
-    # 3. Toroidal induction accelerator coils (2 spaced rings)
+    # 3. Faceted Dielectric Ceramic Insulator Housing (replaces concentric toroid donut rings)
+    objects.append(make_box(
+        f"{prefix}_DielectricHousing",
+        (core_radius * 2.35, core_length * 0.75, core_radius * 2.35),
+        core_loc, housing_mat, bevel=0.03, rotation=rot_euler
+    ))
     for idx, t in enumerate((0.25, 0.65), start=1):
-        ring_loc = base_v + dir_vec * (core_length * t)
-        objects.append(make_torus(
-            f"{prefix}_InductionCoil_{idx}",
-            ring_loc,
-            major_radius=core_radius * 1.05,
-            minor_radius=core_radius * 0.18,
-            material=arc_mat, rotation=rot_euler,
-            major_segments=12, minor_segments=6
-        ))
-        objects.append(make_cylinder(
-            f"{prefix}_InsulatorRing_{idx}",
-            core_radius * 1.18, 0.04,
-            ring_loc, gunmetal_mat, rotation=rot_euler, vertices=10, bevel=0.008
+        slot_loc = base_v + dir_vec * (core_length * t)
+        objects.append(make_box(
+            f"{prefix}_InsulatorVent_{idx}",
+            (core_radius * 2.45, 0.04, core_radius * 2.45),
+            slot_loc, gunmetal_mat, bevel=0.006, rotation=rot_euler
         ))
 
-    # 4. Forward convergent arc discharge prongs
+    # 4. Forward convergent arc discharge prongs with organic taper
     focus_point = base_v + dir_vec * (core_length + prong_length * 1.3)
     start_plane = base_v + dir_vec * (core_length * 0.85)
 
@@ -1597,18 +1635,22 @@ def make_arc_energy_emitter(
         p_base = start_plane + prong_radial
         p_tip = p_base + dir_vec * prong_length + (focus_point - (p_base + dir_vec * prong_length)) * 0.35
 
-        objects.append(make_rod(
-            f"{prefix}_Prong_{i+1}", p_base, p_tip,
-            core_radius * 0.16, gunmetal_mat, vertices=8, bevel=0.008
+        p_dir = (p_tip - p_base).normalized()
+        p_dist = (p_tip - p_base).length
+        p_rot = p_dir.to_track_quat("Z", "Y").to_euler()
+
+        objects.append(make_tapered_cylinder(
+            f"{prefix}_Prong_{i+1}",
+            core_radius * 0.18, core_radius * 0.09, p_dist,
+            p_base + p_dir * (p_dist * 0.5), gunmetal_mat, rotation=p_rot, vertices=8, bevel=0.005
         ))
         objects.append(make_cylinder(
             f"{prefix}_ProngTip_{i+1}",
-            core_radius * 0.18, 0.06, p_tip,
-            arc_mat, rotation=rot_euler, vertices=8, bevel=0.005
+            core_radius * 0.12, 0.05, p_tip,
+            arc_mat, rotation=rot_euler, vertices=8, bevel=0.004
         ))
 
     return objects
-
 
 def make_collimated_beam_laser_assembly(
     prefix: str,
@@ -1622,7 +1664,7 @@ def make_collimated_beam_laser_assembly(
     accent_mat: bpy.types.Material | None = None,
     ring_count: int = 3,
 ) -> list[bpy.types.Object]:
-    """Generates a heavy collimated beam laser assembly with power generator, radiator fins, and focus lens."""
+    """Generates a heavy collimated beam laser assembly with faceted optical housing, cooling fins, and focus lens."""
     objects = []
     pivot_v = Vector(gun_pivot)
     gun_dir = Vector(direction).normalized()
@@ -1657,43 +1699,46 @@ def make_collimated_beam_laser_assembly(
             c_start, c_end, caliber_radius * 0.28, gunmetal_mat, vertices=8
         ))
 
-    # 2. Main collimation barrel core
+    # 2. Main collimation barrel core with continuous taper
     barrel_center = pivot_v + gun_dir * (barrel_length * 0.5 + 0.15)
-    objects.append(make_cylinder(
-        f"{prefix}_EmitterCore", caliber_radius, barrel_length,
+    objects.append(make_tapered_cylinder(
+        f"{prefix}_EmitterCore",
+        caliber_radius * 1.20, caliber_radius * 0.88, barrel_length,
         barrel_center, gunmetal_mat, rotation=gun_rot, vertices=12, bevel=0.01
     ))
 
-    # 3. Magnetic collimation rings along the barrel
-    step_r = (barrel_length * 0.70) / max(1, ring_count)
-    for idx in range(ring_count):
-        ring_loc = pivot_v + gun_dir * (0.35 + (idx + 0.5) * step_r)
-        objects.append(make_cylinder(
-            f"{prefix}_CollimatorRing_{idx+1}",
-            caliber_radius * 1.75, 0.10,
-            ring_loc, housing_mat, rotation=gun_rot, vertices=8, bevel=0.015
+    # 3. Faceted Hexagonal Collimation Shroud with longitudinal heat dissipators (replaces concentric rings)
+    shroud_len = barrel_length * 0.75
+    shroud_center = pivot_v + gun_dir * (0.30 + shroud_len * 0.5)
+    objects.append(make_tapered_cylinder(
+        f"{prefix}_HexCollimationShroud",
+        caliber_radius * 1.85, caliber_radius * 1.45, shroud_len,
+        shroud_center, housing_mat, rotation=gun_rot, vertices=6, bevel=0.018
+    ))
+    # Longitudinal heat sink rails along the shroud flanks
+    for side in (-1, 1):
+        s_tag = "L" if side < 0 else "R"
+        objects.append(make_box(
+            f"{prefix}_HeatSinkRail_{s_tag}",
+            (0.025, shroud_len * 0.90, caliber_radius * 0.45),
+            shroud_center + u_vec * (side * caliber_radius * 1.55),
+            gunmetal_mat, bevel=0.004, rotation=gun_rot
         ))
-        if accent_mat is not None:
-            objects.append(make_cylinder(
-                f"{prefix}_RingCoil_{idx+1}",
-                caliber_radius * 1.82, 0.03,
-                ring_loc, accent_mat, rotation=gun_rot, vertices=8
-            ))
 
     # 4. Front emitter muzzle shroud & recessed optical lens
     shroud_loc = pivot_v + gun_dir * (barrel_length + 0.12)
-    objects.append(make_cylinder(
-        f"{prefix}_MuzzleShroud", caliber_radius * 1.60, 0.24,
-        shroud_loc, housing_mat, rotation=gun_rot, vertices=10, bevel=0.018
+    objects.append(make_tapered_cylinder(
+        f"{prefix}_MuzzleShroud",
+        caliber_radius * 1.45, caliber_radius * 1.70, 0.24,
+        shroud_loc, housing_mat, rotation=gun_rot, vertices=8, bevel=0.015
     ))
     lens_loc = pivot_v + gun_dir * (barrel_length + 0.22)
     objects.append(make_cylinder(
-        f"{prefix}_FocusLens", caliber_radius * 0.88, 0.04,
+        f"{prefix}_FocusLens", caliber_radius * 0.95, 0.04,
         lens_loc, lens_mat or accent_mat, rotation=gun_rot, vertices=12, bevel=0.005
     ))
 
     return objects
-
 
 def make_vls_vertical_missile_array(
     prefix: str,
@@ -1777,52 +1822,44 @@ def make_mantlet_dust_boot(
     material: bpy.types.Material | None = None,
     accent_mat: bpy.types.Material | None = None,
 ) -> list[bpy.types.Object]:
-    """Generates open, low-poly accordion rings around the barrel at the mantlet interface."""
+    """Generates an authentic continuous pleated fabric/rubber accordion dust bellows at the mantlet interface."""
     objects = []
     pivot_v = Vector(pivot)
     dir_v = Vector(direction).normalized()
     rot_euler = dir_v.to_track_quat("Z", "Y").to_euler()
 
+    # Flanged base collar clamping to the turret mantlet face
+    objects.append(make_cylinder(
+        f"{prefix}_BaseClamp",
+        collar_radius * 1.15, 0.035,
+        pivot_v + dir_v * 0.02,
+        accent_mat or material, rotation=rot_euler, vertices=12, bevel=0.006
+    ))
+
+    # Continuous pleated bellows stages using tapered conical pleats (no floating toroid donuts)
     stage_len = length / max(1, stages)
     for i in range(stages):
-        t0 = i / max(1, stages - 1)
-        pleat_factor = 1.14 if i % 2 == 0 else 0.90
-        r_current = (collar_radius * (1.0 - t0) + taper_radius * t0) * pleat_factor
-        stage_center = pivot_v + dir_v * ((i + 0.5) * stage_len)
+        t0 = i / stages
+        t1 = (i + 1) / stages
+        r0 = collar_radius * (1.0 - t0) + taper_radius * t0
+        r1 = collar_radius * (1.0 - t1) + taper_radius * t1
+        r_mid = max(r0, r1) * 1.12
+        half_len = stage_len * 0.5
+        c_loc1 = pivot_v + dir_v * (i * stage_len + half_len * 0.5)
+        c_loc2 = pivot_v + dir_v * (i * stage_len + half_len * 1.5)
 
-        pleat_thickness = min(
-            r_current * 0.20,
-            max(0.006, abs(collar_radius - taper_radius) * 0.32),
-        )
-        objects.append(make_torus(
-            f"{prefix}_Pleat_{i+1}",
-            location=stage_center,
-            major_radius=r_current,
-            minor_radius=pleat_thickness,
-            material=material,
-            rotation=rot_euler,
-            major_segments=12,
-            minor_segments=6,
+        objects.append(make_tapered_cylinder(
+            f"{prefix}_PleatConeA_{i+1}",
+            r0, r_mid, half_len,
+            c_loc1, material, rotation=rot_euler, vertices=12, bevel=0.004
+        ))
+        objects.append(make_tapered_cylinder(
+            f"{prefix}_PleatConeB_{i+1}",
+            r_mid, r1, half_len,
+            c_loc2, material, rotation=rot_euler, vertices=12, bevel=0.004
         ))
 
-    # Open clamp ring at the mantlet interface. Keep the barrel bore clear.
-    clamp_radius = collar_radius * 1.10
-    clamp_thickness = min(
-        clamp_radius * 0.18,
-        max(0.006, abs(collar_radius - taper_radius) * 0.28),
-    )
-    objects.append(make_torus(
-        f"{prefix}_BaseClamp",
-        location=pivot_v + dir_v * (stage_len * 0.18),
-        major_radius=clamp_radius,
-        minor_radius=clamp_thickness,
-        material=accent_mat or material,
-        rotation=rot_euler,
-        major_segments=12,
-        minor_segments=6,
-    ))
     return objects
-
 
 def make_coaxial_cannon_assembly(
     prefix: str,
@@ -1840,20 +1877,20 @@ def make_coaxial_cannon_assembly(
     has_dust_boot: bool = False,
     dust_boot_mat: bpy.types.Material | None = None,
 ) -> list[bpy.types.Object]:
-    """Generates a parametric, multi-stage tank gun with coaxial alignment."""
+    """Generates an authentic tapered tank gun barrel with faceted thermal sleeve and aerodynamic fume extractor."""
     objects = []
     pivot_v = Vector(gun_pivot)
     gun_dir = Vector(direction).normalized()
     gun_rot = gun_dir.to_track_quat("Z", "Y").to_euler()
 
-    # 0. Optional accordion dust boot at mantlet junction
+    # 0. Pleated conical accordion dust boot at mantlet junction
     if has_dust_boot:
         boot_objs = make_mantlet_dust_boot(
             f"{prefix}_DustBoot",
             pivot=pivot_v - gun_dir * 0.04,
             direction=gun_dir,
             collar_radius=caliber_radius * 2.2,
-            taper_radius=caliber_radius * 1.5,
+            taper_radius=caliber_radius * 1.4,
             length=0.22,
             stages=3,
             material=dust_boot_mat or barrel_mat,
@@ -1861,42 +1898,70 @@ def make_coaxial_cannon_assembly(
         )
         objects.extend(boot_objs)
 
-    # 1. Heavy breech collar
+    # 1. Reinforced breech collar with tapered transition
     breech_loc = pivot_v + gun_dir * 0.22
-    objects.append(make_cylinder(
-        f"{prefix}_BreechCollar", caliber_radius * 1.85, 0.42,
-        breech_loc, barrel_mat, rotation=gun_rot, vertices=10, bevel=0.02
+    objects.append(make_tapered_cylinder(
+        f"{prefix}_BreechCollar",
+        caliber_radius * 1.95, caliber_radius * 1.65, 0.42,
+        breech_loc, barrel_mat, rotation=gun_rot, vertices=12, bevel=0.02
     ))
 
-    # 2. Thermal sleeve / heat shroud
+    # 2. Faceted octagonal thermal sleeve / heat shroud with clamping flanges
     if has_thermal_sleeve:
         sleeve_loc = pivot_v + gun_dir * 0.65
-        objects.append(make_cylinder(
-            f"{prefix}_ThermalSleeve", caliber_radius * 1.38, 0.52,
-            sleeve_loc, armor_mat, rotation=gun_rot, vertices=8, bevel=0.02
+        objects.append(make_tapered_cylinder(
+            f"{prefix}_ThermalSleeve",
+            caliber_radius * 1.48, caliber_radius * 1.32, 0.52,
+            sleeve_loc, armor_mat, rotation=gun_rot, vertices=8, bevel=0.015
+        ))
+        # Longitudinal clamping spine rib
+        u_up = gun_dir.cross(Vector((1.0, 0.0, 0.0))).normalized()
+        objects.append(make_box(
+            f"{prefix}_SleeveClampSpine",
+            (0.025, 0.48, caliber_radius * 0.22),
+            sleeve_loc + u_up * (caliber_radius * 1.38),
+            barrel_mat, bevel=0.005, rotation=gun_rot
         ))
 
-    # 3. Bore evacuator / fume extractor cylinder
+    # 3. Aerodynamic double-tapered bore evacuator / fume extractor (no redundant donut rings)
     if has_bore_evacuator:
-        evac_loc = pivot_v + gun_dir * (barrel_length * 0.62)
-        objects.append(make_cylinder(
-            f"{prefix}_BoreEvacuator", caliber_radius * 1.55, 0.34,
-            evac_loc, armor_mat, rotation=gun_rot, vertices=10, bevel=0.015
-        ))
-        if accent_mat is not None:
-            objects.append(make_cylinder(
-                f"{prefix}_EvacuatorStripe", caliber_radius * 1.58, 0.06,
-                evac_loc, accent_mat, rotation=gun_rot, vertices=10
-            ))
+        evac_dist = barrel_length * 0.62
+        evac_len = 0.36
+        evac_center = pivot_v + gun_dir * evac_dist
+        evac_r = caliber_radius * 1.52
+        b_r_at_evac = caliber_radius * (1.25 - 0.33 * (evac_dist / barrel_length))
 
-    # 4. Main rifled barrel
+        # Rear entry taper cone
+        objects.append(make_tapered_cylinder(
+            f"{prefix}_BoreEvacuator_ConeRear",
+            b_r_at_evac * 1.08, evac_r, evac_len * 0.25,
+            evac_center - gun_dir * (evac_len * 0.375),
+            armor_mat, rotation=gun_rot, vertices=12, bevel=0.008
+        ))
+        # Central pressure body
+        objects.append(make_cylinder(
+            f"{prefix}_BoreEvacuator",
+            evac_r, evac_len * 0.50,
+            evac_center,
+            armor_mat, rotation=gun_rot, vertices=12, bevel=0.012
+        ))
+        # Forward exit taper cone
+        objects.append(make_tapered_cylinder(
+            f"{prefix}_BoreEvacuator_ConeFront",
+            evac_r, b_r_at_evac * 0.98, evac_len * 0.25,
+            evac_center + gun_dir * (evac_len * 0.375),
+            armor_mat, rotation=gun_rot, vertices=12, bevel=0.008
+        ))
+
+    # 4. Main continuous tapered rifled barrel (narrowing from breech to muzzle)
     barrel_center = pivot_v + gun_dir * (barrel_length * 0.5 + 0.3)
-    objects.append(make_cylinder(
-        f"{prefix}_MainBarrel", caliber_radius, barrel_length,
-        barrel_center, barrel_mat, rotation=gun_rot, vertices=12, bevel=0.01
+    objects.append(make_tapered_cylinder(
+        f"{prefix}_MainBarrel",
+        caliber_radius * 1.25, caliber_radius * 0.92, barrel_length,
+        barrel_center, barrel_mat, rotation=gun_rot, vertices=14, bevel=0.008
     ))
 
-    # 5. Muzzle brake & bore opening
+    # 5. Ported multi-slot muzzle brake & bore opening
     if has_muzzle_brake:
         brake_loc = pivot_v + gun_dir * (barrel_length + 0.22)
         objects.append(make_box(
@@ -1904,10 +1969,20 @@ def make_coaxial_cannon_assembly(
             (caliber_radius * 2.5, caliber_radius * 3.2, caliber_radius * 2.3),
             brake_loc, armor_mat, bevel=0.018, rotation=gun_rot
         ))
+        # Lateral gas evacuation baffle ports
+        u_lat = gun_dir.cross(Vector((0.0, 0.0, 1.0))).normalized()
+        for side in (-1, 1):
+            s_tag = "L" if side < 0 else "R"
+            objects.append(make_box(
+                f"{prefix}_MuzzlePort_{s_tag}",
+                (caliber_radius * 0.35, caliber_radius * 1.8, caliber_radius * 1.2),
+                brake_loc + u_lat * (side * caliber_radius * 1.15),
+                barrel_mat, bevel=0.005, rotation=gun_rot
+            ))
         bore_loc = pivot_v + gun_dir * (barrel_length + 0.36)
         objects.append(make_cylinder(
             f"{prefix}_MuzzleBore", caliber_radius * 0.68, 0.10,
-            bore_loc, barrel_mat, rotation=gun_rot, vertices=10
+            bore_loc, barrel_mat, rotation=gun_rot, vertices=12
         ))
 
     # 6. Twin hydraulic recoil recuperators
@@ -1917,14 +1992,13 @@ def make_coaxial_cannon_assembly(
         for side in (-1, 1):
             side_tag = "L" if side < 0 else "R"
             recoil_loc = pivot_v + gun_dir * 0.28 + u_vec * (side * recoil_offset_x)
-            objects.append(make_cylinder(
+            objects.append(make_tapered_cylinder(
                 f"{prefix}_RecoilCylinder_{side_tag}",
-                caliber_radius * 0.52, 0.50, recoil_loc, barrel_mat,
-                rotation=gun_rot, vertices=8, bevel=0.008
+                caliber_radius * 0.58, caliber_radius * 0.48, 0.50,
+                recoil_loc, barrel_mat, rotation=gun_rot, vertices=10, bevel=0.008
             ))
 
     return objects
-
 
 # ---------------------------------------------------------------------------
 # 6. Micro-Greebles & Optical Sensors
@@ -7550,70 +7624,57 @@ def make_heavy_howitzer_assembly(
     barrel_mat: bpy.types.Material | None = None,
     accent_mat: bpy.types.Material | None = None,
 ) -> list[bpy.types.Object]:
-    """Generates a heavy siege mortar / howitzer with reinforced breech, recoil cylinders, and sector elevation plates."""
+    """Generates a heavy siege mortar / howitzer with tapered barrel, reinforced breech, and recoil cylinders."""
     objects = []
     p_vec = Vector(gun_pivot)
     d_vec = Vector(direction).normalized()
     u_vec, v_vec, _ = get_orthonormal_basis(d_vec)
     rot_euler = d_vec.to_track_quat("Z", "Y").to_euler()
 
-    # 1. Heavy cylindrical breech housing collar
+    # 1. Heavy cylindrical breech housing collar with tapered reinforcement
     breech_loc = p_vec + d_vec * 0.14
-    objects.append(make_cylinder(
+    objects.append(make_tapered_cylinder(
         f"{prefix}_BreechCollar",
-        radius=caliber_radius * 2.35, depth=0.42,
-        location=breech_loc, material=armor_mat,
-        rotation=rot_euler, vertices=12, bevel=0.035
+        caliber_radius * 2.45, caliber_radius * 2.15, 0.42,
+        breech_loc, armor_mat, rotation=rot_euler, vertices=14, bevel=0.03
     ))
 
-    # 2. Main heavy-caliber barrel tube
+    # 2. Main heavy-caliber tapered barrel tube (narrowing from breech to muzzle)
     barrel_center = p_vec + d_vec * (barrel_length * 0.5 + 0.22)
-    objects.append(make_cylinder(
+    objects.append(make_tapered_cylinder(
         f"{prefix}_BarrelTube",
-        radius=caliber_radius * 1.55, depth=barrel_length,
-        location=barrel_center, material=barrel_mat,
-        rotation=rot_euler, vertices=14, bevel=0.02
+        caliber_radius * 1.62, caliber_radius * 1.22, barrel_length,
+        barrel_center, barrel_mat, rotation=rot_euler, vertices=14, bevel=0.015
     ))
 
-    # 3. Massive muzzle blast ring / collar
+    # 3. Flared conical muzzle bell (no thin warning band rings)
     muzzle_loc = p_vec + d_vec * (barrel_length + 0.22)
-    objects.append(make_cylinder(
+    objects.append(make_tapered_cylinder(
         f"{prefix}_MuzzleCollar",
-        radius=caliber_radius * 1.95, depth=0.18,
-        location=muzzle_loc, material=armor_mat,
-        rotation=rot_euler, vertices=14, bevel=0.025
+        caliber_radius * 1.50, caliber_radius * 1.95, 0.18,
+        muzzle_loc, armor_mat, rotation=rot_euler, vertices=14, bevel=0.02
     ))
-    if accent_mat is not None:
-        objects.append(make_cylinder(
-            f"{prefix}_MuzzleWarningBand",
-            radius=caliber_radius * 1.98, depth=0.045,
-            location=muzzle_loc - d_vec * 0.05, material=accent_mat,
-            rotation=rot_euler, vertices=14, bevel=0.008
-        ))
 
     # 4. Massive hollow bore opening (dark cavity)
     objects.append(make_cylinder(
         f"{prefix}_BoreCavity",
-        radius=caliber_radius * 1.05, depth=0.12,
-        location=muzzle_loc + d_vec * 0.05, material=barrel_mat,
-        rotation=rot_euler, vertices=12, bevel=0.005
+        caliber_radius * 1.05, 0.12,
+        muzzle_loc + d_vec * 0.05, barrel_mat, rotation=rot_euler, vertices=12, bevel=0.005
     ))
 
     # 5. Dual hydraulic recoil recuperator cylinders flanking the breech
     recoil_spacing = caliber_radius * 2.6
     for side in (-1, 1):
         cyl_center = p_vec + u_vec * (side * recoil_spacing) + d_vec * 0.28
-        objects.append(make_cylinder(
+        objects.append(make_tapered_cylinder(
             f"{prefix}_RecoilCylinder_{'L' if side < 0 else 'R'}",
-            radius=caliber_radius * 0.55, depth=0.55,
-            location=cyl_center, material=barrel_mat,
-            rotation=rot_euler, vertices=10, bevel=0.015
+            caliber_radius * 0.58, caliber_radius * 0.48, 0.55,
+            cyl_center, barrel_mat, rotation=rot_euler, vertices=10, bevel=0.012
         ))
         objects.append(make_cylinder(
             f"{prefix}_RecoilPiston_{'L' if side < 0 else 'R'}",
-            radius=caliber_radius * 0.35, depth=0.35,
-            location=cyl_center + d_vec * 0.25, material=armor_mat,
-            rotation=rot_euler, vertices=8, bevel=0.01
+            caliber_radius * 0.35, 0.35,
+            cyl_center + d_vec * 0.25, armor_mat, rotation=rot_euler, vertices=8, bevel=0.01
         ))
 
     # 6. Sector elevation quadrant plates
@@ -7621,12 +7682,10 @@ def make_heavy_howitzer_assembly(
         quad_loc = p_vec + u_vec * (side * (recoil_spacing + 0.12)) - v_vec * 0.12
         objects.append(make_box(
             f"{prefix}_ElevationQuadrant_{'L' if side < 0 else 'R'}",
-            (0.04, 0.38, 0.24), quad_loc, barrel_mat, bevel=0.01,
-            rotation=rot_euler
+            (0.04, 0.38, 0.24), quad_loc, barrel_mat, bevel=0.01, rotation=rot_euler
         ))
 
     return objects
-
 
 def make_dual_cannon_assembly(
     prefix: str,
@@ -7641,7 +7700,7 @@ def make_dual_cannon_assembly(
     has_dust_boot: bool = False,
     dust_boot_mat: bpy.types.Material | None = None,
 ) -> list[bpy.types.Object]:
-    """Generates a twin-cannon mantlet assembly with dual synchronized barrels, thermal sleeves, and muzzle brakes."""
+    """Generates a twin-cannon mantlet assembly with dual tapered synchronized barrels and aerodynamic evacuators."""
     objects = []
     p_vec = Vector(gun_pivot)
     d_vec = Vector(direction).normalized()
@@ -7653,8 +7712,7 @@ def make_dual_cannon_assembly(
     objects.append(make_box(
         f"{prefix}_MantletBlock",
         (mantlet_width, 0.44, 0.36),
-        p_vec + d_vec * 0.15, armor_mat, bevel=0.035,
-        rotation=rot_euler
+        p_vec + d_vec * 0.15, armor_mat, bevel=0.035, rotation=rot_euler
     ))
 
     # 2. Dual gun barrels
@@ -7673,59 +7731,45 @@ def make_dual_cannon_assembly(
                 material=dust_boot_mat or barrel_mat,
                 accent_mat=accent_mat,
             ))
-        # Breech collar
-        objects.append(make_cylinder(
+        # Tapered breech collar
+        objects.append(make_tapered_cylinder(
             f"{prefix}_Breech_{side_tag}",
-            radius=caliber_radius * 1.85, depth=0.38,
-            location=barrel_pivot + d_vec * 0.32, material=armor_mat,
-            rotation=rot_euler, vertices=12, bevel=0.02
+            caliber_radius * 1.95, caliber_radius * 1.65, 0.38,
+            barrel_pivot + d_vec * 0.32, armor_mat, rotation=rot_euler, vertices=12, bevel=0.015
         ))
-        # Thermal sleeve
-        objects.append(make_cylinder(
+        # Faceted thermal sleeve
+        objects.append(make_tapered_cylinder(
             f"{prefix}_ThermalSleeve_{side_tag}",
-            radius=caliber_radius * 1.45, depth=barrel_length * 0.42,
-            location=barrel_pivot + d_vec * (barrel_length * 0.28 + 0.38), material=armor_mat,
-            rotation=rot_euler, vertices=12, bevel=0.015
+            caliber_radius * 1.50, caliber_radius * 1.35, barrel_length * 0.42,
+            barrel_pivot + d_vec * (barrel_length * 0.28 + 0.38), armor_mat, rotation=rot_euler, vertices=8, bevel=0.012
         ))
-        # Bore evacuator
+        # Aerodynamic bore evacuator with tapered transitions (NO evacuator stripe ring!)
         evac_loc = barrel_pivot + d_vec * (barrel_length * 0.58 + 0.38)
         objects.append(make_cylinder(
             f"{prefix}_BoreEvacuator_{side_tag}",
-            radius=caliber_radius * 1.62, depth=0.22,
-            location=evac_loc, material=armor_mat,
-            rotation=rot_euler, vertices=12, bevel=0.015
+            caliber_radius * 1.55, 0.24,
+            evac_loc, armor_mat, rotation=rot_euler, vertices=12, bevel=0.015
         ))
-        if accent_mat is not None:
-            objects.append(make_cylinder(
-                f"{prefix}_EvacuatorStripe_{side_tag}",
-                radius=caliber_radius * 1.65, depth=0.045,
-                location=evac_loc, material=accent_mat,
-                rotation=rot_euler, vertices=12, bevel=0.006
-            ))
-        # Main barrel tube
-        objects.append(make_cylinder(
+        # Main tapered barrel tube
+        objects.append(make_tapered_cylinder(
             f"{prefix}_BarrelTube_{side_tag}",
-            radius=caliber_radius, depth=barrel_length,
-            location=barrel_pivot + d_vec * (barrel_length * 0.5 + 0.38), material=barrel_mat,
-            rotation=rot_euler, vertices=12, bevel=0.01
+            caliber_radius * 1.25, caliber_radius * 0.90, barrel_length,
+            barrel_pivot + d_vec * (barrel_length * 0.5 + 0.38), barrel_mat, rotation=rot_euler, vertices=14, bevel=0.008
         ))
         # Muzzle brake
         muzzle_loc = barrel_pivot + d_vec * (barrel_length + 0.38)
         objects.append(make_box(
             f"{prefix}_MuzzleBrake_{side_tag}",
             (caliber_radius * 2.8, caliber_radius * 2.8, caliber_radius * 2.2),
-            muzzle_loc, barrel_mat, bevel=0.015,
-            rotation=rot_euler
+            muzzle_loc, barrel_mat, bevel=0.015, rotation=rot_euler
         ))
         objects.append(make_cylinder(
             f"{prefix}_MuzzleBore_{side_tag}",
-            radius=caliber_radius * 0.85, depth=0.08,
-            location=muzzle_loc + d_vec * (caliber_radius * 1.2), material=barrel_mat,
-            rotation=rot_euler, vertices=10, bevel=0.005
+            caliber_radius * 0.85, 0.08,
+            muzzle_loc + d_vec * (caliber_radius * 1.2), barrel_mat, rotation=rot_euler, vertices=10, bevel=0.005
         ))
 
     return objects
-
 
 def make_quad_track_pod_assembly(
     prefix: str,
@@ -8111,7 +8155,7 @@ def make_plasma_mortar_assembly(
     glow_mat: bpy.types.Material | None = None,
     accent_mat: bpy.types.Material | None = None,
 ) -> list[bpy.types.Object]:
-    """Generates a heavy plasma siege mortar with magnetic accelerator rings and reinforced hydraulic trunnions."""
+    """Generates a heavy plasma siege mortar with magnetic stator rail housing and tapered chamber."""
     objects = []
     p_vec = Vector(gun_pivot)
     d_vec = Vector(direction).normalized()
@@ -8133,63 +8177,64 @@ def make_plasma_mortar_assembly(
         gear_loc, barrel_mat, bevel=0.015, rotation=rot_euler
     ))
 
-    # 2. Main short mortar barrel
+    # 2. Main tapered mortar barrel (no straight tube)
     barrel_loc = p_vec + d_vec * (barrel_length * 0.5 + 0.22)
-    objects.append(make_cylinder(
+    objects.append(make_tapered_cylinder(
         f"{prefix}_MortarBarrel",
-        radius=caliber_radius * 1.35, depth=barrel_length,
-        location=barrel_loc, material=barrel_mat,
-        rotation=rot_euler, vertices=14, bevel=0.02
+        caliber_radius * 1.55, caliber_radius * 1.25, barrel_length,
+        barrel_loc, barrel_mat, rotation=rot_euler, vertices=14, bevel=0.015
     ))
-    # Bore hole
+    # Bore hole cavity
     bore_loc = p_vec + d_vec * (barrel_length + 0.24)
     objects.append(make_cylinder(
         f"{prefix}_MortarBoreHole",
-        radius=caliber_radius, depth=0.12,
-        location=bore_loc, material=barrel_mat,
-        rotation=rot_euler, vertices=14
+        caliber_radius * 1.05, 0.12,
+        bore_loc, barrel_mat, rotation=rot_euler, vertices=14
     ))
 
-    # 3. Magnetic accelerator toroid rings & glowing coils
-    step = (barrel_length * 0.65) / max(1, ring_count)
-    for i in range(ring_count):
-        r_dist = 0.35 + i * step
-        r_loc = p_vec + d_vec * r_dist
-        # Heavy outer ring
-        objects.append(make_torus(
-            f"{prefix}_MagRing_{i+1}",
-            major_radius=caliber_radius * 1.55,
-            minor_radius=0.045,
-            location=r_loc, material=armor_mat,
-            rotation=rot_euler, major_segments=14, minor_segments=8
+    # 3. Longitudinal Magnetic Stator Rail Cages (eliminates floating concentric donut rings)
+    stator_len = barrel_length * 0.72
+    stator_center = p_vec + d_vec * (0.28 + stator_len * 0.5)
+    rail_w = caliber_radius * 0.42
+    rail_h = caliber_radius * 0.38
+    r_dist = caliber_radius * 1.48
+
+    for side in (-1, 1):
+        s_tag = "L" if side < 0 else "R"
+        # Lateral stator rails
+        objects.append(make_box(
+            f"{prefix}_StatorRail_{s_tag}",
+            (rail_w, stator_len, rail_h),
+            stator_center + u_vec * (side * r_dist),
+            armor_mat, bevel=0.015, rotation=rot_euler
         ))
-        # Glowing inner coil slit
         if glow_mat is not None:
-            objects.append(make_cylinder(
-                f"{prefix}_PlasmaCoil_{i+1}",
-                radius=caliber_radius * 1.42, depth=0.04,
-                location=r_loc, material=glow_mat,
-                rotation=rot_euler, vertices=12
+            # Linear recessed magnetic induction channel
+            objects.append(make_box(
+                f"{prefix}_StatorGlow_{s_tag}",
+                (rail_w * 0.45, stator_len * 0.85, rail_h * 0.35),
+                stator_center + u_vec * (side * (r_dist + rail_w * 0.35)),
+                glow_mat, bevel=0.005, rotation=rot_euler
             ))
 
-    # 4. Flare muzzle bell
-    muzzle_loc = p_vec + d_vec * (barrel_length + 0.18)
-    objects.append(make_cylinder(
-        f"{prefix}_MuzzleBell",
-        radius=caliber_radius * 1.72, depth=0.16,
-        location=muzzle_loc, material=armor_mat,
-        rotation=rot_euler, vertices=14, bevel=0.02
-    ))
-    if accent_mat is not None:
-        objects.append(make_cylinder(
-            f"{prefix}_MuzzleAccent",
-            radius=caliber_radius * 1.75, depth=0.04,
-            location=muzzle_loc - d_vec * 0.04, material=accent_mat,
-            rotation=rot_euler, vertices=14
+    # Dorsal and ventral stator spine beams
+    for v_sign, v_tag in ((-1, "Btm"), (1, "Top")):
+        objects.append(make_box(
+            f"{prefix}_StatorSpine_{v_tag}",
+            (rail_h, stator_len, rail_w),
+            stator_center + v_vec * (v_sign * r_dist),
+            armor_mat, bevel=0.015, rotation=rot_euler
         ))
 
-    return objects
+    # 4. Flare muzzle bell with conical taper
+    muzzle_loc = p_vec + d_vec * (barrel_length + 0.18)
+    objects.append(make_tapered_cylinder(
+        f"{prefix}_MuzzleBell",
+        caliber_radius * 1.35, caliber_radius * 1.85, 0.16,
+        muzzle_loc, armor_mat, rotation=rot_euler, vertices=14, bevel=0.02
+    ))
 
+    return objects
 
 def make_flamethrower_assembly(
     prefix: str,

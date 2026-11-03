@@ -948,7 +948,7 @@ def parse_args():
     parser.add_argument("--lod", action="store_true", help="Calculate polygon budget and recommend LOD reductions")
     parser.add_argument("--smooth-angle", type=float, default=38.0, help="Smart angle-weighted auto-smooth threshold in degrees")
     parser.add_argument("--multiview", action="store_true", help="Render 4 orthographic views")
-    parser.add_argument("--batch-all-archetypes", action="store_true", help="Batch generate all 36 archetypes into the output directory")
+    parser.add_argument("--batch-all-archetypes", action="store_true", help="Batch generate all 42 archetypes into the output directory")
     parser.add_argument("--report-json", default=None, help="Path to write detailed structural and budget JSON report")
     parser.add_argument("--dry-run", action="store_true", help="Validate CLI parameters and print archetype plan without building Blender geometry")
     parser.add_argument("--out-dir", default=None, help="Base root directory for outputs")
