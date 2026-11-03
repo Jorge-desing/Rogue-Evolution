@@ -8,6 +8,7 @@ import sys
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "tools"))
 
+from ActiveUnitVisualEnhancements import apply_wave34_details
 from VisualModelAuthoringSupport import add_box, add_link, run_preset_build
 
 
@@ -17,6 +18,11 @@ def refine(builder) -> None:
     for side, tag in ((-1, "L"), (1, "R")):
         add_link(builder, f"GravitasBreakerJoint_OverloadConduit_{tag}", (side * 0.48, -0.35, 1.12), (side * 0.72, 0.64, 1.30), 0.055, 0.042, p.warning)
         add_box(builder, f"GravitasBreakerArmor_CheekPlate_{tag}", (side * 0.88, 0.42, 1.15), (0.18, 0.70, 0.42), p.light_armor)
+    builder.objects.extend(apply_wave34_details(
+        "GravitasBreaker",
+        objects=builder.objects,
+        materials={"armor": p.primary_armor, "gunmetal": p.gunmetal},
+    ))
     builder.damage_smoke_loc = builder.damage_smoke_loc or builder.center_of_mass_loc
     builder.damage_fire_loc = builder.damage_fire_loc or builder.turret_center
     builder.engine_audio_loc = builder.engine_audio_loc or builder.center_of_mass_loc

@@ -15,7 +15,7 @@ FBX_PATH = (REPO_ROOT / "unity" / "RogueCommandAssetAuthoring" / "Assets" /
 PREVIEW_PATH = REPO_ROOT / "artifacts" / "previews" / "sandlance-scout.png"
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import RogueModelKit as modelkit
-from ActiveUnitVisualEnhancements import apply_wave2_details
+from ActiveUnitVisualEnhancements import apply_wave2_details, apply_wave34_details
 
 
 def clear_scene():
@@ -271,6 +271,13 @@ def main():
             (0.12, 0.16, 0.035), (side * 0.45, -0.56, 0.92), amber, 0.012))
 
     model_objects.extend(apply_wave2_details(
+        "SandlanceScout",
+        objects=model_objects,
+        object_prefix="Scout",
+        materials={"armor": armor, "gunmetal": gunmetal, "warning": amber, "tread": tread},
+    ))
+
+    model_objects.extend(apply_wave34_details(
         "SandlanceScout",
         objects=model_objects,
         object_prefix="Scout",

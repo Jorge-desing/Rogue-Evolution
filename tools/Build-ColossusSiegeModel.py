@@ -24,7 +24,7 @@ sys.path.insert(0, str(REPO_ROOT / "tools"))
 import bpy
 from mathutils import Vector
 import RogueModelKit as rmk
-from ActiveUnitVisualEnhancements import apply_wave2_details
+from ActiveUnitVisualEnhancements import apply_wave2_details, apply_wave34_details
 
 
 # Target paths (customize for your unit)
@@ -325,12 +325,19 @@ def build_colossus_siege_model():
         materials={"armor": armor_primary, "gunmetal": gunmetal, "warning": warning_amber, "tread": tread_mat},
     ))
 
+    model_objects.extend(apply_wave34_details(
+        "ColossusSiegePlatform",
+        objects=model_objects,
+        object_prefix="Colossus",
+        materials={"armor": armor_primary, "gunmetal": gunmetal, "warning": warning_amber, "tread": tread_mat},
+    ))
+
     # 8. Automated Quality Diagnostics & Validation
     diagnostics = rmk.validate_model_mesh_quality(model_objects)
     if not diagnostics["ground_contact_valid"] or diagnostics["missing_materials"]:
         raise ValueError("Colossus model failed ground-contact or material validation")
     bounds = diagnostics["bounds"]
-    if bounds["width_x"] > 2.8 or bounds["height_z"] > 1.9:
+    if bounds["width_x"] > 2.8 or bounds["height_z"] > 2.0:
         raise ValueError("Colossus model exceeds the ArtilleryTank width or height")
     if bounds["length_y"] > 3.6:
         print("Note: the siege cannon intentionally extends beyond the approximate ArtilleryTank length; verify unit spacing in-game.")

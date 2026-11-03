@@ -8,6 +8,7 @@ import sys
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "tools"))
 
+from ActiveUnitVisualEnhancements import apply_wave34_details
 from VisualModelAuthoringSupport import (
     add_box,
     run_preset_build,
@@ -21,6 +22,11 @@ def refine(builder) -> None:
         x = side * 0.68
         add_box(builder, f"CommandRelayArmor_C2Panel_{tag}", (x, -0.62, 1.58), (0.10, 1.20, 0.56), p.light_armor)
         add_box(builder, f"CommandRelayWarning_C2Stripe_{tag}", (x + side * 0.055, -0.62, 1.60), (0.018, 0.72, 0.06), p.warning)
+    builder.objects.extend(apply_wave34_details(
+        "CommandRelay",
+        objects=builder.objects,
+        materials={"armor": p.primary_armor, "gunmetal": p.gunmetal},
+    ))
     builder.engine_audio_loc = builder.engine_audio_loc or builder.center_of_mass_loc
     builder.weapon_audio_loc = builder.weapon_audio_loc or builder.gun_pivot
 

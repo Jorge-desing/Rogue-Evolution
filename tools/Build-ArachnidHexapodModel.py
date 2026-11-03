@@ -11,7 +11,7 @@ from VisualModelAuthoringSupport import (
     add_box, add_link, add_loft_shell, add_y_axis_tube, hex_color,
     remove_objects, replace_link_mesh, run_preset_build, set_material_color,
 )
-from ActiveUnitVisualEnhancements import apply_wave2_details
+from ActiveUnitVisualEnhancements import apply_wave2_details, apply_wave34_details
 
 
 def refine(builder):
@@ -165,6 +165,12 @@ def refine(builder):
     }
 
     builder.objects.extend(apply_wave2_details(
+        "ArachnidHexapod",
+        objects=builder.objects,
+        materials={"armor": p.primary_armor, "gunmetal": p.gunmetal, "warning": p.warning, "tread": p.tread},
+    ))
+
+    builder.objects.extend(apply_wave34_details(
         "ArachnidHexapod",
         objects=builder.objects,
         materials={"armor": p.primary_armor, "gunmetal": p.gunmetal, "warning": p.warning, "tread": p.tread},

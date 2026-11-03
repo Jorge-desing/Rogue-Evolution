@@ -9,7 +9,7 @@ sys.path.insert(0, str(REPO_ROOT / "tools"))
 
 import bpy
 import RogueModelKit as rmk
-from ActiveUnitVisualEnhancements import apply_wave2_details
+from ActiveUnitVisualEnhancements import apply_wave2_details, apply_wave34_details
 from mathutils import Vector
 
 UNIT_NAME = "TidebreakerHovercraft"
@@ -61,7 +61,8 @@ def build_tidebreaker_hovercraft_model() -> None:
         raise FileNotFoundError(f"Authored Blender source not found: {SOURCE_BLEND}")
     bpy.ops.wm.open_mainfile(filepath=str(SOURCE_BLEND))
     wave2_objects = apply_wave2_details(UNIT_NAME)
-    if wave2_objects:
+    wave34_objects = apply_wave34_details(UNIT_NAME)
+    if wave2_objects or wave34_objects:
         bpy.ops.wm.save_as_mainfile(filepath=str(SOURCE_BLEND))
     MODEL_DIR.mkdir(parents=True, exist_ok=True)
     TEXTURE_DIR.mkdir(parents=True, exist_ok=True)

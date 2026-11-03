@@ -15,7 +15,7 @@ FBX_PATH = (REPO_ROOT / "unity" / "RogueCommandAssetAuthoring" / "Assets" /
 PREVIEW_PATH = REPO_ROOT / "artifacts" / "previews" / "skirmish-strike-bike.png"
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import RogueModelKit as modelkit
-from ActiveUnitVisualEnhancements import apply_wave2_details
+from ActiveUnitVisualEnhancements import apply_wave2_details, apply_wave34_details
 
 
 def fit_length_to_native_footprint(model_objects, max_length=2.2):
@@ -313,6 +313,13 @@ def main():
         (0.0, 0.98, 0.76), gunmetal, 0.025))
 
     model_objects.extend(apply_wave2_details(
+        "SkirmishStrikeBike",
+        objects=model_objects,
+        object_prefix="StrikeBike",
+        materials={"armor": armor, "gunmetal": gunmetal, "warning": warning, "tread": rubber},
+    ))
+
+    model_objects.extend(apply_wave34_details(
         "SkirmishStrikeBike",
         objects=model_objects,
         object_prefix="StrikeBike",

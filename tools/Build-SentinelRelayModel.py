@@ -8,6 +8,7 @@ import sys
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "tools"))
 
+from ActiveUnitVisualEnhancements import apply_wave34_details
 from VisualModelAuthoringSupport import (
     add_box,
     add_link,
@@ -30,6 +31,11 @@ def refine(builder) -> None:
         add_box(builder, f"SentinelRelayArmor_ShieldServicePanel_{tag}", (x, -0.38, 1.10), (0.12, 0.95, 0.46), p.light_armor)
         add_box(builder, f"SentinelRelayWarning_ServiceStripe_{tag}", (x + side * 0.066, -0.38, 1.12), (0.018, 0.56, 0.07), p.warning)
         add_link(builder, f"SentinelRelayJoint_RelayBrace_{tag}", (side * 0.46, -0.68, 1.25), (x, mast_y, 1.85), 0.035, 0.028, p.gunmetal)
+    builder.objects.extend(apply_wave34_details(
+        "SentinelRelay",
+        objects=builder.objects,
+        materials={"armor": p.primary_armor, "gunmetal": p.gunmetal},
+    ))
     builder.engine_audio_loc = builder.engine_audio_loc or builder.center_of_mass_loc
     builder.weapon_audio_loc = builder.weapon_audio_loc or builder.gun_pivot
 

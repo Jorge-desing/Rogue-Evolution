@@ -320,5 +320,84 @@ class TestModelKitSkillCopy(unittest.TestCase):
             with self.subTest(unit=unit):
                 self.assertTrue(features.issubset(set(profiles[unit]["features"])))
 
+    def test_active_units_have_wave34_anchor_profiles(self) -> None:
+        """Every active visual unit declares the 55442dd structural-detail profile it consumes."""
+        support = REPO_ROOT / "tools" / "ActiveUnitVisualEnhancements.py"
+        tree = ast.parse(support.read_text(encoding="utf-8"), filename=str(support))
+        profile_assignment = next(
+            (
+                node for node in tree.body
+                if isinstance(node, ast.Assign)
+                and any(
+                    isinstance(target, ast.Name)
+                    and target.id == "ACTIVE_UNIT_WAVE34_PROFILES"
+                    for target in node.targets
+                )
+            ),
+            None,
+        )
+        self.assertIsNotNone(profile_assignment, "ACTIVE_UNIT_WAVE34_PROFILES assignment missing")
+        assert profile_assignment is not None
+        profiles = ast.literal_eval(profile_assignment.value)
+        required = {
+            "SandlanceScout": {"sponson_bridges", "engine_cavity", "antenna_collar", "gussets"},
+            "ColossusSiegePlatform": {"sponson_bridges", "engine_cavity", "antenna_collar", "gussets"},
+            "IroncladWalker": {"leg_mounts", "gatling_mounts"},
+            "AtlasCraneMech": {"leg_mounts", "gussets"},
+            "BastionSiegeMech": {"gussets"},
+            "ArachnidHexapod": {"missile_mounts", "gussets"},
+            "OverlordCommandHQ": {"drive_axles", "gatling_mounts", "radar_mount", "antenna_collar", "smoke_brackets", "gussets"},
+            "SkirmishStrikeBike": {"drive_axles", "engine_cavity", "gussets"},
+            "SurgeArcTank": {"sponson_bridges", "arc_mount", "engine_cavity", "gussets"},
+            "TidebreakerHovercraft": {"gatling_mounts", "antenna_collar"},
+            "SalvageHauler": {"gatling_mounts", "antenna_collar"},
+            "SkyguardSAM": {"drive_axles", "missile_mounts", "radar_mount", "antenna_collar", "gussets"},
+            "BulwarkSiegeTank": {"sponson_bridges", "engine_cavity", "gussets"},
+            "ArcLanceWalker": {"leg_mounts", "arc_mount", "gussets"},
+            "FieldMedicRover": {"drive_axles", "antenna_collar", "gussets"},
+            "SentinelRelay": {"drive_axles", "antenna_collar", "gussets"},
+            "GravitasBreaker": {"sponson_bridges", "engine_cavity", "gussets"},
+            "CommandRelay": {"drive_axles", "radar_mount", "antenna_collar", "gussets"},
+        }
+        self.assertEqual(set(required), set(profiles), "Wave 3/4 profile coverage drifted from active units")
+        for unit, features in required.items():
+            with self.subTest(unit=unit):
+                self.assertTrue(features.issubset(set(profiles[unit]["features"])))
+                if "engine_cavity" in features:
+                    self.assertIn("hull_width", profiles[unit])
+                    self.assertIn("hull_length", profiles[unit])
+                    self.assertIn("deck_z", profiles[unit])
+
+    def test_active_unit_builders_apply_wave34_details(self) -> None:
+        """All active builders and the manual bridge consume the shared Wave 3/4 overlay."""
+        builder_names = [
+            "Build-SampleScoutModel.py",
+            "Build-ColossusSiegeModel.py",
+            "Build-IroncladWalkerModel.py",
+            "Build-SkirmishStrikeBikeModel.py",
+            "Build-SurgeArcTankModel.py",
+            "Build-ArachnidHexapodModel.py",
+            "Build-OverlordCommandHQModel.py",
+            "Build-TidebreakerHovercraftModel.py",
+            "Build-SalvageHaulerModel.py",
+            "Build-SkyguardSAMModel.py",
+            "Build-BulwarkSiegeTankModel.py",
+            "Build-ArcLanceWalkerModel.py",
+            "Build-FieldMedicRoverModel.py",
+            "Build-SentinelRelayModel.py",
+            "Build-GravitasBreakerModel.py",
+            "Build-CommandRelayModel.py",
+            "Apply-ManualUnitWave2Details.py",
+        ]
+        for filename in builder_names:
+            with self.subTest(builder=filename):
+                source = (REPO_ROOT / "tools" / filename).read_text(encoding="utf-8")
+                self.assertIn("apply_wave34_details", source)
+
+    def test_colossus_wave34_envelope_allows_antenna_clearance(self) -> None:
+        """Colossus keeps enough vertical room for its authored antenna and structural details."""
+        source = (REPO_ROOT / "tools" / "Build-ColossusSiegeModel.py").read_text(encoding="utf-8")
+        self.assertIn('bounds["height_z"] > 2.0', source)
+
 if __name__ == "__main__":
     unittest.main()

@@ -1,4 +1,4 @@
-"""Apply Wave 2 hard-surface details to the two manually authored mechs.
+"""Apply Wave 2/3/4 hard-surface details to the two manually authored mechs.
 
 Atlas and Bastion have no tracked source builder. This script is the explicit,
 reversible bridge for those sources: it adds only missing authored details,
@@ -16,7 +16,7 @@ import bpy
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "tools"))
 import RogueModelKit as rmk
-from ActiveUnitVisualEnhancements import apply_wave2_details
+from ActiveUnitVisualEnhancements import apply_wave2_details, apply_wave34_details
 
 UNITS = (
     ("AtlasCraneMech", "atlas-crane-mech.blend", "AtlasCraneMech.fbx", None),
@@ -32,6 +32,7 @@ def apply_unit(unit_name: str, source_name: str, fbx_name: str, leg_type: str | 
         raise FileNotFoundError(source)
     bpy.ops.wm.open_mainfile(filepath=str(source))
     new_objects = apply_wave2_details(unit_name)
+    new_objects.extend(apply_wave34_details(unit_name))
     armatures = [obj for obj in bpy.context.scene.objects if obj.type == "ARMATURE"]
     if len(armatures) != 1:
         raise ValueError(f"{unit_name} expected one authored armature, found {len(armatures)}")
@@ -53,7 +54,7 @@ def apply_unit(unit_name: str, source_name: str, fbx_name: str, leg_type: str | 
         export_meshes = meshes
     empties = [obj for obj in bpy.context.scene.objects if obj.type == "EMPTY" and not obj.name.lower().startswith("preview")]
     rmk.export_unity_fbx(fbx_path, export_meshes + [armature] + empties, include_empties=True, include_armature=True, bake_anim=True)
-    print(f"{unit_name}: added {len(new_objects)} Wave 2 meshes; exported {fbx_path}")
+    print(f"{unit_name}: added {len(new_objects)} Wave 2/3/4 meshes; exported {fbx_path}")
 
 
 if __name__ == "__main__":

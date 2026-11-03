@@ -12,7 +12,7 @@ from VisualModelAuthoringSupport import (
     remove_objects, run_preset_build, set_material_color,
     simplify_command_wheels,
 )
-from ActiveUnitVisualEnhancements import apply_wave2_details
+from ActiveUnitVisualEnhancements import apply_wave2_details, apply_wave34_details
 
 
 def refine(builder):
@@ -137,6 +137,12 @@ def refine(builder):
     builder.center_of_mass_loc = Vector((0.0, -0.05, 0.92))
 
     builder.objects.extend(apply_wave2_details(
+        "OverlordCommandHQ",
+        objects=builder.objects,
+        materials={"armor": p.primary_armor, "gunmetal": p.gunmetal, "warning": p.warning, "tread": p.tread},
+    ))
+
+    builder.objects.extend(apply_wave34_details(
         "OverlordCommandHQ",
         objects=builder.objects,
         materials={"armor": p.primary_armor, "gunmetal": p.gunmetal, "warning": p.warning, "tread": p.tread},
