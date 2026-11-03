@@ -705,3 +705,17 @@ This is a compact, durable orientation for agents. For the changing checkout sta
 - QA/reflection safety: Profile2 is dedicated QA without a tutorial; never ask, inspect, infer, gate, bypass, or switch profiles for tutorial. Check current selector/save safety and preserve saves. Before reflection jointly verify Rogue Command version, Unity `2021.3.45f2`, Assembly-CSharp SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, and MVID `db0e9462-128d-4296-9900-de18b4bd0c00`.
 
 - Root MEMORY.md, codex memory, antigravity memory, and mem0 synced to HEAD `6567308`. Memory-only update; root MEMORY.md commit/push pending.
+
+## Refresh (2026-11-03, HEAD d7e6e10 + working tree)
+
+- Repository `C:/Users/Alex/Documents/Mod Rogue Command`, loader `1.19.0`, branch `codex/rogue-unit-balance-20261018`. Verified local HEAD, upstream, origin, and remote branch all equal `d7e6e10ab01358ed1828bcc1d3453b5f8a8c492d` (`docs(memory): sync root MEMORY.md to HEAD 6567308`), 1 commit ahead of `6567308` (`docs(memory): sync root MEMORY.md to HEAD 8cacde7 + working tree`). Code baseline remains `0bbede6b7beb68f8f50f4ae89f10e83ecb056c0d`; implementation baseline remains `e25c6de` (arachnid middle-leg orientation normalizer); remains `d7a3a11b56b58bed6d3f06c47fd40a627c9d1ae3`. No code changes in this commit; it only synchronized root MEMORY.md.
+
+- Uncommitted working-tree changes now present (asset regeneration; do not stage/reset/clean/overwrite):
+  - 88 files changed, 986 insertions(+), 986 deletions(-): bundles (`content/packs/.../bundles/*`), Blender sources (`content/source-art/*.blend`), Unity prefab/FBX/texture/controller refresh (`unity/RogueCommandAssetAuthoring/Assets/...`). No src/ or tests/ changes; no schema changes.
+  - Preserved prior uncommitted state: dirty nested worktrees `cargador` @ `11e9968` (modified `MODDING_PLAN.md`/`MODLOG.md`) and `task-graph-validation` @ `d1f9045` (modified schema/runtime/validation/diagnostics/tests/tooling plus untracked localization test); untracked `.agents/skills/rogue-command-game-research/references/`; uncommitted `docs/research/AGENT-HANDOFF.md` continuation snapshot.
+
+- Validation (freshly rerun 2026-11-03, dirty tree): Release plugin build 0 warnings/0 errors; C# harness 475/476 (1 Windows symlink-privilege skip, 0 failures); Python unittest 110 ran, 3 errors (missing `UnityPy`, pre-existing env gap), 2 skipped; loader registry 4 manifests, 0 issues; `git diff --check` NOT clean — trailing whitespace in `unity/.../TacticalOperations/Prefabs/SentinelRelayVisual.prefab` (Unity-generated; not corrected to avoid asset corruption). Bundle-reference and native-visual-preflight validators could not run (missing `UnityPy`/`dnfile` modules, pre-existing env gap). Local/static evidence only; no fresh Steam/Unity gameplay proof beyond the existing tactical-operations runtime smoke (AGENT-HANDOFF point 28). Natural offer->selection->placement->production/render/stat and tactical AI remain unverified.
+
+- QA/reflection safety: Profile2 is dedicated QA without a tutorial; never ask, inspect, infer, gate, bypass, or switch profiles for tutorial. Check current selector/save safety and preserve saves. Before reflection jointly verify Rogue Command version, Unity `2021.3.45f2`, Assembly-CSharp SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, and MVID `db0e9462-128d-4296-9900-de18b4bd0c00`.
+
+- Root MEMORY.md, codex memory, antigravity memory, and mem0 synced to HEAD `d7e6e10` + working tree. Memory-only update; root MEMORY.md commit/push pending.
