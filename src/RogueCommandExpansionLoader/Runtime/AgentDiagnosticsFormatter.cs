@@ -1863,6 +1863,125 @@ namespace RogueCommandExpansionLoader.Runtime
             return Serialize(view);
         }
 
+        public static string SerializeSocketAuditCensus(SocketAuditCensus census)
+        {
+            var rows = new List<Dictionary<string, object>>();
+            if (census != null && census.Rows != null)
+            {
+                foreach (SocketAuditRow row in census.Rows)
+                {
+                    if (row == null) continue;
+                    rows.Add(new Dictionary<string, object>
+                    {
+                        ["entityKeyId"] = row.EntityKeyId ?? string.Empty,
+                        ["socketCount"] = row.SocketCount,
+                        ["socketNames"] = row.SocketNames != null ? row.SocketNames : (object)Array.Empty<string>(),
+                        ["canonicalSocketCount"] = row.CanonicalSocketCount,
+                        ["ambiguousSocketCount"] = row.AmbiguousSocketCount,
+                        ["hasMuzzlePrimary"] = row.HasMuzzlePrimary,
+                        ["hasDamageSmoke"] = row.HasDamageSmoke,
+                        ["hasFootContact"] = row.HasFootContact,
+                        ["hasEngineAudio"] = row.HasEngineAudio,
+                    });
+                }
+            }
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "socketAuditCensus",
+                ["omittedRowCount"] = census != null ? census.OmittedRowCount : 0,
+                ["rowCount"] = rows.Count,
+                ["rows"] = rows,
+            };
+            return Serialize(view);
+        }
+
+        public static string SerializeColliderAuditCensus(ColliderAuditCensus census)
+        {
+            var rows = new List<Dictionary<string, object>>();
+            if (census != null && census.Rows != null)
+            {
+                foreach (ColliderAuditRow row in census.Rows)
+                {
+                    if (row == null) continue;
+                    rows.Add(new Dictionary<string, object>
+                    {
+                        ["entityKeyId"] = row.EntityKeyId ?? string.Empty,
+                        ["colliderCount"] = row.ColliderCount,
+                        ["triggerColliderCount"] = row.TriggerColliderCount,
+                        ["solidColliderCount"] = row.SolidColliderCount,
+                        ["colliderTypes"] = row.ColliderTypes != null ? row.ColliderTypes : (object)Array.Empty<string>(),
+                        ["hasRigidbody"] = row.HasRigidbody,
+                        ["rigidbodyIsKinematic"] = row.RigidbodyIsKinematic,
+                    });
+                }
+            }
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "colliderAuditCensus",
+                ["omittedRowCount"] = census != null ? census.OmittedRowCount : 0,
+                ["rowCount"] = rows.Count,
+                ["rows"] = rows,
+            };
+            return Serialize(view);
+        }
+
+        public static string SerializeParticleVfxCensus(ParticleVfxCensus census)
+        {
+            var rows = new List<Dictionary<string, object>>();
+            if (census != null && census.Rows != null)
+            {
+                foreach (ParticleVfxRow row in census.Rows)
+                {
+                    if (row == null) continue;
+                    rows.Add(new Dictionary<string, object>
+                    {
+                        ["entityKeyId"] = row.EntityKeyId ?? string.Empty,
+                        ["particleSystemCount"] = row.ParticleSystemCount,
+                        ["activeParticleSystemCount"] = row.ActiveParticleSystemCount,
+                        ["trailRendererCount"] = row.TrailRendererCount,
+                        ["lineRendererCount"] = row.LineRendererCount,
+                        ["particleSystemNames"] = row.ParticleSystemNames != null ? row.ParticleSystemNames : (object)Array.Empty<string>(),
+                    });
+                }
+            }
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "particleVfxCensus",
+                ["omittedRowCount"] = census != null ? census.OmittedRowCount : 0,
+                ["rowCount"] = rows.Count,
+                ["rows"] = rows,
+            };
+            return Serialize(view);
+        }
+
+        public static string SerializeLodAuditCensus(LodAuditCensus census)
+        {
+            var rows = new List<Dictionary<string, object>>();
+            if (census != null && census.Rows != null)
+            {
+                foreach (LodAuditRow row in census.Rows)
+                {
+                    if (row == null) continue;
+                    rows.Add(new Dictionary<string, object>
+                    {
+                        ["entityKeyId"] = row.EntityKeyId ?? string.Empty,
+                        ["lodGroupCount"] = row.LodGroupCount,
+                        ["lodLevelCount"] = row.LodLevelCount,
+                        ["hasLodGroup"] = row.HasLodGroup,
+                        ["rendererNames"] = row.RendererNames != null ? row.RendererNames : (object)Array.Empty<string>(),
+                    });
+                }
+            }
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "lodAuditCensus",
+                ["omittedRowCount"] = census != null ? census.OmittedRowCount : 0,
+                ["rowCount"] = rows.Count,
+                ["rows"] = rows,
+            };
+            return Serialize(view);
+        }
+
         /// <summary>
         /// Serializes the result of an audio volume adjustment command.
         /// </summary>

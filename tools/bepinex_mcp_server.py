@@ -1023,6 +1023,22 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             res = _call_diagnostics_method("GetVisualMaterialCensusJson")
             return _tool_response(res)
 
+        elif name == "diagnostics_get_socket_audit_census":
+            res = _call_diagnostics_method("GetSocketAuditCensusJson")
+            return _tool_response(res)
+
+        elif name == "diagnostics_get_collider_audit_census":
+            res = _call_diagnostics_method("GetColliderAuditCensusJson")
+            return _tool_response(res)
+
+        elif name == "diagnostics_get_particle_vfx_census":
+            res = _call_diagnostics_method("GetParticleVfxCensusJson")
+            return _tool_response(res)
+
+        elif name == "diagnostics_get_lod_audit_census":
+            res = _call_diagnostics_method("GetLodAuditCensusJson")
+            return _tool_response(res)
+
         elif name == "diagnostics_set_audio_volume":
             channel = str(arguments.get("channel", "Master"))
             volume = float(arguments.get("volumeSlider", 1.0))
@@ -1265,6 +1281,10 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
                 "GetAiModulesDiagnosticsJson",
                 "GetGridMetricsJson",
                 "GetFogStateJson",
+                "GetSocketAuditCensusJson",
+                "GetColliderAuditCensusJson",
+                "GetParticleVfxCensusJson",
+                "GetLodAuditCensusJson",
             ]
             for getter in getters:
                 try:

@@ -65,6 +65,14 @@
              Link="Runtime/RuntimeVisualSurfaceCensus.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeVisualMaterialCensus.cs"
              Link="Runtime/RuntimeVisualMaterialCensus.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeSocketAuditCensus.cs"
+             Link="Runtime/RuntimeSocketAuditCensus.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeColliderAuditCensus.cs"
+             Link="Runtime/RuntimeColliderAuditCensus.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeParticleVfxCensus.cs"
+             Link="Runtime/RuntimeParticleVfxCensus.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeLodAuditCensus.cs"
+             Link="Runtime/RuntimeLodAuditCensus.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeVisualCensus.cs"
              Link="Runtime/RuntimeVisualCensus.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeLoaderAuditCensus.cs"

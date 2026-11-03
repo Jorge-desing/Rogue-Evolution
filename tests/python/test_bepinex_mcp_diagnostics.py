@@ -181,7 +181,7 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
 
         snapshot = json.loads(response["content"][0]["text"])
         self.assertFalse(response["isError"])
-        self.assertEqual(38, len(snapshot))
+        self.assertEqual(42, len(snapshot))
         self.assertTrue(all(isinstance(value, dict) for value in snapshot.values()))
         self.assertTrue(all(value == expected for value in snapshot.values()))
 

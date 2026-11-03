@@ -184,6 +184,11 @@ namespace UnityEngine
     {
     }
 
+    public class Rigidbody : Component
+    {
+        public bool isKinematic { get; set; }
+    }
+
     public class Collider : Component
     {
         public bool isTrigger { get; set; }
@@ -288,6 +293,14 @@ namespace UnityEngine
         public Mesh sharedMesh { get; set; }
         public Transform rootBone { get; set; }
         public Transform[] bones { get; set; } = System.Array.Empty<Transform>();
+    }
+
+    public class TrailRenderer : Renderer
+    {
+    }
+
+    public class LineRenderer : Renderer
+    {
     }
 
     public class ParticleSystemRenderer : Renderer
