@@ -71,6 +71,10 @@ All censuses query live game singletons through fail-closed reflection and forma
 - **Visual Render, Rig & Animation Telemetry** (`diagnostics_get_visual_census`, `diagnostics_inspect_entity_visual`, `diagnostics_get_loaded_unit_visual_audit`): In-game and load-time evidence of 3D asset instantiation, active renderer components (`MeshRenderer`, `SkinnedMeshRenderer`, `ParticleSystemRenderer`), submesh and vertex counts, bounding boxes, assigned shaders (`RogueCommand/VehiclePBR_VertexWear`, `Standard`) and keywords (`_METALLICSPECGLOSSMAP`, `_NORMALMAP`), GPU instancing flags, LOD levels, rig architecture classification (`SkeletalArmature`, `NativeTransformRig`, `StaticVehicle`), root bone and bone count, canonical weapon/VFX/audio sockets (`Socket_MuzzlePrimary`, `FirePoint_0`, `Socket_WeaponAudio`, `Socket_EngineAudio`, `Socket_DamageSmoke`, `Socket_FootContact_*`), socket role ambiguity detection, Animator parameters (`RCL_IsMoving`, `RCL_Fire`, `RCL_Death`), active clips, playback speed, and `RuntimeVisualDirector` damage/jamming/recoil states. `diagnostics_inspect_entity_visual` automatically falls back to inspecting the registered loaded prefab template (`prefab:<entityId>`) when no living battlefield instance matches.
 - **Visual Surface & Vertex-Wear Census** (`diagnostics_get_visual_surface_census`): Per-living-unit telemetry of renderer/material counts, vertex counts, shader names, and averaged plus distribution counts for vertex-color channels on `RogueCommand/VehiclePBR_VertexWear` surfaces: R cavity AO/micro-relief (`R <= 0.4`), G edge wear/welds (`G >= 0.7`), B thermal soot/mud (`B >= 0.5`), and A team mask. Omission counter first.
 - **Visual Material & Texture Binding Census** (`diagnostics_get_visual_material_census`): Per-living-unit telemetry of renderer/material counts, material and shader names, bound texture names, and counts of materials exposing main/albedo, metallic-gloss, normal, and emission maps, plus shader keywords. Omission counter first.
+- **Socket Audit Census** (`diagnostics_get_socket_audit_census`): Per-living-unit telemetry of canonical `Socket_*` transforms (muzzle primary, damage smoke/fire, foot contact, engine/weapon audio, hardpoints, radar, antenna), counts, and ambiguity detection. Omission counter first.
+- **Collider Audit Census** (`diagnostics_get_collider_audit_census`): Per-living-unit collider counts (trigger vs solid), collider type names, and rigidbody kinematic state. Omission counter first.
+- **Particle VFX Census** (`diagnostics_get_particle_vfx_census`): Per-living-unit particle system counts (active vs total), trail and line renderer counts, and particle system names. Omission counter first.
+- **LOD Audit Census** (`diagnostics_get_lod_audit_census`): Per-living-unit LOD group counts, total LOD levels, and renderer names. Omission counter first.
 - **Unit & AI Loader Runtime Integration & Audit** (`diagnostics_get_loader_audit_census`, `diagnostics_order_reconcile_loader_state`):
   - Units can declare `defaultTacticalStance`, `defaultLoadout` (`"Standard"`, `"AP"`, `"HE"`, `"Speed"`, `"Siege"`, `"Reinforced"`, or a local `variants[].id`), `startingAffixes`, and `startingVeterancyRank` (`0..5`) in `content.json`, applied automatically on spawn by `RuntimeUnitMechanicsDirector` and reset on pooled reuse.
   - AI profiles can declare squad-wide defaults (`doctrine`, `aggressionMultiplier`, `defaultUnitStance`, `defaultUnitLoadout`, `startingUnitAffixes`, `startingUnitVeterancyRank`) in `content.json`. These apply automatically to AI units on spawn (`RuntimeGameplayCommandDirector.ApplyAiProfileUnitDefaultsToEntity`) and on AI initialization (`ApplyActiveAiUnitDefaultsToAiUnits`) without overriding explicit unit-level defaults.
@@ -217,7 +221,7 @@ The BepInEx MCP server is built with universal cross-agent compatibility support
 
 ### 5.1 Hermes Integration (Native Plugin & Skills)
 Hermes agents can communicate with the bridge using three distinct channels:
-1. **Hermes Plugin (`bepinex-mcp`)**: Installed at `C:\Users\Alex\AppData\Local\hermes\plugins\bepinex-mcp/` and enabled in `C:\Users\Alex\AppData\Local\hermes\config.yaml` (`plugins.enabled: [bepinex-mcp]`). All 178 tools are discovered as native MCP tools.
+1. **Hermes Plugin (`bepinex-mcp`)**: Installed at `C:\Users\Alex\AppData\Local\hermes\plugins\bepinex-mcp/` and enabled in `C:\Users\Alex\AppData\Local\hermes\config.yaml` (`plugins.enabled: [bepinex-mcp]`). All 182 tools are discovered as native MCP tools.
 2. **Hermes Skill Catalog**: Registered under `C:\Users\Alex\AppData\Local\hermes\skills\rogue-command\rogue-command-clean-room-diagnostics/`.
 3. **Hermes Direct CLI Execution**: When running in a shell or terminal without an active MCP connection:
    ```bash
@@ -227,7 +231,7 @@ Hermes agents can communicate with the bridge using three distinct channels:
    ```
 
 ### 5.2 Antigravity & Google Gemini CLI
-- Fully registered under `bepinex_mcp` with 178 generated schemas in `C:\Users\Alex\.gemini\antigravity\mcp\bepinex_mcp/`.
+- Fully registered under `bepinex_mcp` with 182 generated schemas in `C:\Users\Alex\.gemini\antigravity\mcp\bepinex_mcp/`.
 - Call eagerly or lazily using `call_mcp_tool(ServerName="bepinex_mcp", ToolName="...", Arguments={...})`.
 
 ### 5.3 Anthropic Claude Desktop
@@ -289,6 +293,7 @@ When adding any new telemetry or command endpoint:
 ### 6.1 Census additions that read Unity materials/textures
 
 - When a new census reads `Material.mainTexture` or `Material.GetTexture(...)`, add a `Texture` stub class with `name`/`width`/`height` to `UnityEngineTestStub.cs` and add `mainTexture`/`GetTexture`/`SetTexture` members to the `Material` stub, otherwise the offline harness cannot construct the row.
+- When a census reads `Collider`, `Rigidbody`, `TrailRenderer`, or `LineRenderer`, add corresponding stub classes to `UnityEngineTestStub.cs` (with the properties the census reads, e.g. `isTrigger`, `isKinematic`) before running the harness.
 - Add the new `Runtime*.cs` file to `tests/.../RogueCommandExpansionLoader.ValidationTests.csproj` as an explicit `<Compile Include>` entry (the test project does not glob `src/`); the plugin project does glob and needs no entry.
 - Keep the new tool count consistent across the skill, generated schemas, and agent manifests.
 
@@ -300,6 +305,7 @@ When adding any new telemetry or command endpoint:
 - **Preserve Unrelated Changes**: Never use `git add -A`. Stage only task-owned files explicitly.
 - **Label Evidence Accurately**: Local build and test harness passes are local validation; in-game live MCP responses are runtime evidence.
 - **Installed vs. Local DLL Hash**: Before attributing runtime behavior to a source change, compare `BepInEx/plugins/RogueCommandExpansionLoader.dll` SHA-256 against the local build artifact. A mismatch means the running game exercises stale code; deploy the updated DLL or abort the runtime step.
+- **Session-End Deploy**: At the end of every session that changes the loader, rebuild in Release and copy `artifacts/plugin/RogueCommandExpansionLoader.dll` to `BepInEx/plugins/RogueCommandExpansionLoader.dll`, verifying SHA-256 matches. This keeps the game folder current for the next run.
 - **Time Scale Is Not Pause**: `currentTimeScale == 0.1` is slow motion, not a confirmed pause. Reversible mutation smokes must require `currentTimeScale == 0` (and ideally a stable scaled clock across two reads) before issuing orders.
 - **Profile Checkpoint Scope**: The Profile2 checkpoint covers `currentProfile.txt` plus `Profile1`, `Profile2`, `Profile4`, and `Profile5` (16 files). `Profile3` is not in the checkpoint. Compare the full file set, not just Profile2, after runtime work.
 
