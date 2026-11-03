@@ -1119,6 +1119,13 @@
       "customBalance": {
         "Damage1": 2.5
       },
+      "onHitStatusEffects": [
+        {
+          "statusEffect": "SlowedDown",
+          "duration": 1.5,
+          "chance": 0.25
+        }
+      ],
       "activeSkills": [
         {
           "id": "tactical-operations:sentinel-repair-pulse",
@@ -1190,6 +1197,11 @@
       "baselineStatusEffects": [
         "Robust"
       ],
+      "experienceReward": {
+        "experienceAmount": 2,
+        "experienceType": "Combat",
+        "bonusMultiplier": 1.0
+      },
       "defaultTacticalStance": "Defensive",
       "defaultLoadout": "Reinforced",
       "startingVeterancyRank": 1,
@@ -1250,6 +1262,13 @@
         "Damage1": 30.0,
         "EffectRadius1": 1.2
       },
+      "onHitStatusEffects": [
+        {
+          "statusEffect": "SlowedDown",
+          "duration": 2.5,
+          "chance": 0.3
+        }
+      ],
       "activeSkills": [
         {
           "id": "tactical-operations:gravitas-crush",
@@ -1330,8 +1349,44 @@
         "experienceGainMultiplier": 1.0,
         "levelUpBonus": 0.15
       },
+      "experienceReward": {
+        "experienceAmount": 3,
+        "experienceType": "Combat",
+        "bonusMultiplier": 1.0
+      },
+      "minAttackRange": 4.5,
       "defaultTacticalStance": "Aggressive",
       "defaultLoadout": "Siege",
+      "variants": [
+        {
+          "id": "gravity-ap",
+          "loadout": "AP",
+          "balanceOverrides": [
+            {
+              "name": "damage1",
+              "value": "34"
+            },
+            {
+              "name": "attackCooldown",
+              "value": "4.6"
+            }
+          ]
+        },
+        {
+          "id": "gravity-he",
+          "loadout": "HE",
+          "balanceOverrides": [
+            {
+              "name": "damage1",
+              "value": "26"
+            },
+            {
+              "name": "effectRadius1",
+              "value": "1.5"
+            }
+          ]
+        }
+      ],
       "startingVeterancyRank": 1,
       "startingAffixes": [
         "Juggernaut"
@@ -1389,6 +1444,13 @@
       "customBalance": {
         "Damage1": 12.0
       },
+      "onHitStatusEffects": [
+        {
+          "statusEffect": "Marked",
+          "duration": 3.0,
+          "chance": 0.35
+        }
+      ],
       "activeSkills": [
         {
           "id": "tactical-operations:command-relay-overwatch-salvo",
@@ -1456,11 +1518,46 @@
         "experienceGainMultiplier": 1.0,
         "levelUpBonus": 0.1
       },
+      "experienceReward": {
+        "experienceAmount": 2,
+        "experienceType": "Combat",
+        "bonusMultiplier": 1.0
+      },
       "baselineStatusEffects": [
         "Robust"
       ],
       "defaultTacticalStance": "Defensive",
       "defaultLoadout": "Standard",
+      "variants": [
+        {
+          "id": "relay-ap",
+          "loadout": "AP",
+          "balanceOverrides": [
+            {
+              "name": "damage1",
+              "value": "13.5"
+            },
+            {
+              "name": "attackCooldown",
+              "value": "2.2"
+            }
+          ]
+        },
+        {
+          "id": "relay-he",
+          "loadout": "HE",
+          "balanceOverrides": [
+            {
+              "name": "damage1",
+              "value": "10.5"
+            },
+            {
+              "name": "effectRadius1",
+              "value": "0.45"
+            }
+          ]
+        }
+      ],
       "startingVeterancyRank": 1,
       "startingAffixes": [
         "Bulwark"
