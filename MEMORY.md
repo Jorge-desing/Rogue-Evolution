@@ -719,6 +719,7 @@ This is a compact, durable orientation for agents. For the changing checkout sta
 - QA/reflection safety: Profile2 is dedicated QA without a tutorial; never ask, inspect, infer, gate, bypass, or switch profiles for tutorial. Check current selector/save safety and preserve saves. Before reflection jointly verify Rogue Command version, Unity `2021.3.45f2`, Assembly-CSharp SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, and MVID `db0e9462-128d-4296-9900-de18b4bd0c00`.
 
 - Root MEMORY.md, codex memory, antigravity memory, and mem0 synced to HEAD `d7e6e10` + working tree. Root MEMORY.md committed and pushed as `e96c42e2d391ac0c390b1e51e8e61ab2872cedbe`; agent memories and mem0 are memory-only, not tracked in repo.
+
 ## Refresh (2026-11-03, HEAD 55442dd + working tree)
 
 - Repository `C:/Users/Alex/Documents/Mod Rogue Command`, loader `1.19.0`, branch `codex/rogue-unit-balance-20261018`. Verified local HEAD, upstream, origin, and remote branch all equal `55442dd60c8e988aae2a00b14fae854298428c0f` (`feat(authoring): deploy Waves 3 and 4 anti-floating anchors, drive axles, and interlocking gussets`), 4 commits ahead of the prior `d7e6e10` sync: `8d37cdb` (`docs(memory): note root MEMORY.md commit/push in sync entry`), `d5adbbd` (`feat(art): regenerate visual fleet for authoring realism`), `28fce5d` (`fix(art): allow Surge Arc Tank realism envelope`), and `55442dd` (`feat(authoring): deploy Waves 3 and 4 anti-floating anchors, drive axles, and interlocking gussets`). Code baseline remains `0bbede6b7beb68f8f50f4ae89f10e83ecb056c0d`; implementation baseline remains `e25c6de` (arachnid middle-leg orientation normalizer); remains `d7a3a11b56b58bed6d3f06c47fd40a627c9d1ae3`.
@@ -740,4 +741,4 @@ This is a compact, durable orientation for agents. For the changing checkout sta
 
 - QA/reflection safety: Profile2 is dedicated QA without a tutorial; never ask, inspect, infer, gate, bypass, or switch profiles for tutorial. Check current selector/save safety and preserve saves. Before reflection jointly verify Rogue Command version, Unity `2021.3.45f2`, Assembly-CSharp SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, and MVID `db0e9462-128d-4296-9900-de18b4bd0c00`.
 
-- Root MEMORY.md, codex memory, antigravity memory, and mem0 synced to HEAD `55442dd` + working tree. Memory-only update; root MEMORY.md commit/push pending.
+- Root MEMORY.md, codex memory, antigravity memory, and mem0 synced to HEAD `55442dd` + working tree. Root MEMORY.md committed and pushed as `9a2537fc57e7e9bf2873611b1e7edbef1e680f2d`; codex/antigravity memories and mem0 are memory-only and not tracked in the repo.
