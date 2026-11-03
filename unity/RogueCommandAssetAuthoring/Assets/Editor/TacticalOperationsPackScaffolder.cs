@@ -847,6 +847,18 @@ namespace RogueCommandExpansion.Authoring
             mat.SetTexture("_BumpMap", normal);
             mat.SetTexture("_EmissionMap", emission);
 
+            const string detailTexturePath =
+                "Assets/RogueCommandExpansionSample/Textures/Detail/RCL_SteelMicroDetail_Normal.png";
+            AssetDatabase.ImportAsset(detailTexturePath, ImportAssetOptions.ForceUpdate);
+            Texture2D detail = AssetDatabase.LoadAssetAtPath<Texture2D>(detailTexturePath);
+            if (detail == null)
+            {
+                throw new FileNotFoundException("Shared steel micro-detail normal is missing: " + detailTexturePath);
+            }
+            mat.SetTexture("_DetailBumpMap", detail);
+            mat.SetFloat("_DetailBumpScale", 0.5f);
+            mat.SetFloat("_DetailTiling", 16.0f);
+
             mat.SetFloat("_GlossMapScale", 1.0f);
             mat.SetFloat("_Metallic", 1.0f);
             mat.SetFloat("_Smoothness", 1.0f);

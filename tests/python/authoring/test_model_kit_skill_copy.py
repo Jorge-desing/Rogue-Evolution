@@ -272,6 +272,10 @@ class TestModelKitSkillCopy(unittest.TestCase):
                    / "VehiclePrefabBuilder.cs").read_text(encoding="utf-8")
         self.assertIn("RCL_SteelMicroDetail_Normal.png", builder)
         self.assertIn('"_DetailBumpMap"', builder)
+        tactical = (REPO_ROOT / "unity" / "RogueCommandAssetAuthoring" / "Assets" / "Editor"
+                   / "TacticalOperationsPackScaffolder.cs").read_text(encoding="utf-8")
+        self.assertIn("RCL_SteelMicroDetail_Normal.png", tactical)
+        self.assertIn('SetTexture("_DetailBumpMap"', tactical)
         texture = (REPO_ROOT / "unity" / "RogueCommandAssetAuthoring" / "Assets" / "RogueCommandExpansionSample"
                    / "Textures" / "Detail" / "RCL_SteelMicroDetail_Normal.png")
         self.assertTrue(texture.is_file(), f"Missing {texture}")
