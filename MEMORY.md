@@ -611,3 +611,21 @@ This is a compact, durable orientation for agents. For the changing checkout sta
 - QA/reflection safety: Profile2 is dedicated QA without a tutorial; never ask, inspect, infer, gate, bypass, or switch profiles for tutorial. Check current selector/save safety and preserve saves. Before reflection jointly verify Rogue Command version, Unity `2021.3.45f2`, Assembly-CSharp SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, and MVID `db0e9462-128d-4296-9900-de18b4bd0c00`.
 
 - Root MEMORY.md, codex memory, antigravity memory, and mem0 synced to HEAD `e0f0a11`. Memory-only update; not committed.
+
+## Refresh (2026-11-02, working tree after HEAD f125ce4)
+
+- Repository `C:/Users/Alex/Documents/Mod Rogue Command`, loader `1.19.0`, branch `codex/rogue-unit-balance-20261018`. Verified local HEAD, upstream, and origin all equal `f125ce4cb2d32b16857cc2c62b1f6132d8e251b7` (`docs(memory): sync root MEMORY.md to HEAD e0f0a11`), after `e0f0a11` (`feat(authoring): evolve RogueModelKit and generate_unit_model with Wave 7 tactical archetypes, weapons, and hardware`). Code baseline remains `0bbede6b7beb68f8f50f4ae89f10e83ecb056c0d`; implementation baseline remains `e25c6de` (arachnid middle-leg orientation normalizer); remains `d7a3a11b56b58bed6d3f06c47fd40a627c9d1ae3`.
+
+- Uncommitted working-tree changes now present (model-authoring refinement; do not stage/reset/clean/overwrite):
+  - `tools/RogueModelKit.py` and `.agents/skills/rogue-command-3d-model-authoring/scripts/RogueModelKit.py` (+550 lines): new helpers `make_cast_pelvis_assembly`, `make_articulated_mech_torso`, `make_sculpted_wheel_fender_assembly`, `make_transitional_coaming_collar` (with nested `add_cast_pelvis`, `add_mech_torso`, `add_wheel_fenders`, `add_transitional_coaming`).
+  - `tools/generate_unit_model.py` and skill copy (+36 lines).
+  - `tools/Build-CommandRelayModel.py` (+18), `Build-GravitasBreakerModel.py` (+12), `Build-SentinelRelayModel.py` (+6).
+  - `tests/python/authoring/test_model_kit_skill_copy.py` (+23).
+  - Regenerated `content/source-art/*.blend` and Unity authoring assets: `CommandRelay/SentinelRelay/GravitasBreaker.fbx` (+atlas), gameplay JSON, texture sets, icons, and card PNGs.
+  - Preserved existing uncommitted state: dirty nested worktrees `cargador` @ `11e9968` and `task-graph-validation` @ `d1f9045`; untracked `.agents/skills/rogue-command-game-research/references/`; uncommitted `docs/research/AGENT-HANDOFF.md` continuation snapshot.
+
+- Validation (freshly rerun 2026-11-02, dirty tree): Release plugin build 0 warnings/0 errors; C# harness 475/476 (1 Windows symlink-privilege skip, 0 failures); Python unittest 118/118; AssetBundle references 25/0; native visual preflight 9/0; loader registry 4/0; `git diff --check` clean (LF/CRLF notices). Local/static evidence only; no fresh Steam/Unity gameplay proof beyond the existing tactical-operations runtime smoke (AGENT-HANDOFF point 28). Natural offer->selection->placement->production/render/stat and tactical AI remain unverified.
+
+- QA/reflection safety: Profile2 is dedicated QA without a tutorial; never ask, inspect, infer, gate, bypass, or switch profiles for tutorial. Check current selector/save safety and preserve saves. Before reflection jointly verify Rogue Command version, Unity `2021.3.45f2`, Assembly-CSharp SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, and MVID `db0e9462-128d-4296-9900-de18b4bd0c00`.
+
+- Root MEMORY.md, codex memory, antigravity memory, and mem0 synced to working tree after HEAD `f125ce4`. Memory-only update; not committed.
