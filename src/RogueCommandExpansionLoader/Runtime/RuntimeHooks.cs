@@ -1612,6 +1612,27 @@ namespace RogueCommandExpansionLoader.Runtime
             RuntimeHooks.AfterInstantiateEntity(__result);
         }
 
+        public static bool EntityControllerIsProductionPossiblePrefix(object __instance, ref bool __result)
+        {
+            if (RuntimeUnitMechanicsDirector.ShouldBlockAiProduction(__instance))
+            {
+                __result = false;
+                return false;
+            }
+
+            return true;
+        }
+
+        public static void EntityControllerFixedUpdatePrefix(object __instance)
+        {
+            RuntimeUnitMechanicsDirector.ApplyNativeAiSkillActivationInterval(__instance, false);
+        }
+
+        public static void EntityControllerFixedUpdatePostfix(object __instance)
+        {
+            RuntimeUnitMechanicsDirector.ApplyNativeAiSkillActivationInterval(__instance, true);
+        }
+
         public static void CreateEntityMeshPrefix()
         {
             RuntimeHooks.BeforeEntityFactory();

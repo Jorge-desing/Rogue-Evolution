@@ -110,6 +110,20 @@ public sealed class EntityController : Component
     public bool IsBuilding { get; set; }
     public bool IsFactory { get; set; }
     public int? InProductionCount { get; set; }
+    private ProductionInfo _productionInfo;
+    private float _lastAiSkillActivationCheckTime;
+    public float LastAiSkillActivationCheckTimeForTest
+    {
+        get => _lastAiSkillActivationCheckTime;
+        set => _lastAiSkillActivationCheckTime = value;
+    }
+    public bool HideProductionInfoProperty { get; set; }
+    public ProductionInfo ProductionInfo
+    {
+        get => HideProductionInfoProperty ? null : _productionInfo;
+        set => _productionInfo = value;
+    }
+    private void FixedUpdate() { }
     public bool IsProductionPossible(int balance) => true;
     public void Produce(bool instant = false, bool forFree = false, bool noEvent = false) { }
     public UnitRole Role { get; set; }
@@ -380,6 +394,12 @@ public enum TargetOrigin
     Self,
     ChosenEntity,
     ChosenLocation
+}
+
+public sealed class ProductionInfo
+{
+    public string entityId;
+    public int queuedCount;
 }
 
 public class SkillInfo

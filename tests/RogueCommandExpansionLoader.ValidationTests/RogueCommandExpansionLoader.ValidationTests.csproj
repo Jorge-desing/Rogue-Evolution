@@ -119,6 +119,8 @@
              Link="Runtime/UnitVariantDiagnosticsFormatter.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeContentContracts.cs"
              Link="Runtime/RuntimeContentContracts.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeUnitAiBehaviorPolicy.cs"
+             Link="Runtime/RuntimeUnitAiBehaviorPolicy.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/BlueprintPoolScopeRegistry.cs"
              Link="Runtime/BlueprintPoolScopeRegistry.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/BlueprintRewardFactoryScope.cs"

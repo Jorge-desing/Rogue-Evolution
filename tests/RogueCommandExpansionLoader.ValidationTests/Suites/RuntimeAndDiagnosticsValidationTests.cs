@@ -2200,6 +2200,111 @@ internal static partial class ValidationTestRunner
             RuntimeUnitMechanicsDirector.ClearProfiles();
         }
     }),
+    ("unit aiBehavior caps and skill intervals use bounded per-unit policy", () =>
+    {
+        if (RuntimeUnitAiBehaviorPolicy.AllowsProduction(2, 0, true, 2, 0) ||
+            RuntimeUnitAiBehaviorPolicy.AllowsProduction(1, 1, true, 2, 0) ||
+            !RuntimeUnitAiBehaviorPolicy.AllowsProduction(2, 0, false, 3, 1) ||
+            RuntimeUnitAiBehaviorPolicy.AllowsProduction(1, 0, true, 0, 1))
+        {
+            throw new InvalidOperationException("AI unit caps must count living plus queued products and apply combat caps only to combat units.");
+        }
+
+        if (RuntimeUnitAiBehaviorPolicy.ResolveSkillActivationInterval(0f, 1.5f) != 1.5f ||
+            RuntimeUnitAiBehaviorPolicy.ResolveSkillActivationInterval(2.0f, 1.5f) != 2.0f ||
+            RuntimeUnitAiBehaviorPolicy.ShouldRunAiSkillCheck(0.24f, 0f, 0f) ||
+            !RuntimeUnitAiBehaviorPolicy.ShouldRunAiSkillCheck(0.25f, 0f, 0f) ||
+            RuntimeUnitAiBehaviorPolicy.ShouldRunAiSkillCheck(0.99f, 0f, 1.0f) ||
+            !RuntimeUnitAiBehaviorPolicy.ShouldRunAiSkillCheck(1.0f, 0f, 1.0f) ||
+            !RuntimeUnitAiBehaviorPolicy.ShouldForceNativeAiSkillCheck(0.10f, 0f, 0.10f) ||
+            RuntimeUnitAiBehaviorPolicy.ShouldForceNativeAiSkillCheck(0.25f, 0f, 0.10f) ||
+            !RuntimeUnitAiBehaviorPolicy.ShouldDelayNativeAiSkillCheck(1.0f, 1.0f, 1.0f) ||
+            RuntimeUnitAiBehaviorPolicy.DelayedNativeAiSkillCheckTimestamp(1.0f, 1.0f) != 1.75f)
+        {
+            throw new InvalidOperationException("Skill activation intervals must preserve the native default and honor a valid per-unit interval.");
+        }
+        var capUnitId = "test:cap-unit";
+        float originalTime = Time.time;
+        ExistingControllers.Instance.Reset();
+        EntityBalancingStore.Reset();
+        RuntimeUnitMechanicsDirector.ClearProfiles();
+        try
+        {
+            EntityBalancingStore.RolesOf[capUnitId] = UnitRole.FrontalAttacker;
+            RuntimeUnitMechanicsDirector.RegisterProfile(capUnitId, new UnitRuntimeMechanicsProfile
+            {
+                EntityId = capUnitId,
+                AiBehavior = new ContentUnitAiBehaviorDefinition { unitCap = 2, combatUnitCap = 2 }
+            });
+
+            var liveUnit = new EntityController { entityId = capUnitId, IsUnit = true, IsControlledByAi = true };
+            var productionInfo = new ProductionInfo { entityId = capUnitId, queuedCount = 1 };
+            var producer = new EntityController
+            {
+                entityId = "native:factory",
+                IsBuilding = true,
+                IsFactory = true,
+                IsControlledByAi = true,
+                HideProductionInfoProperty = true,
+                ProductionInfo = productionInfo
+            };
+            ExistingControllers.Instance.AiUnits().Add(liveUnit);
+            ExistingControllers.Instance.AiBuildings().Add(producer);
+
+            if (!RuntimeUnitMechanicsDirector.ShouldBlockAiProduction(producer))
+            {
+                throw new InvalidOperationException("The runtime AI cap did not count a living unit and queued product together.");
+            }
+
+            producer.IsControlledByAi = false;
+            if (RuntimeUnitMechanicsDirector.ShouldBlockAiProduction(producer))
+            {
+                throw new InvalidOperationException("The AI production cap leaked into a player-controlled producer.");
+            }
+            producer.IsControlledByAi = true;
+            productionInfo.queuedCount = 0;
+            if (RuntimeUnitMechanicsDirector.ShouldBlockAiProduction(producer))
+            {
+                throw new InvalidOperationException("The runtime AI cap blocked production below the effective combat cap.");
+            }
+
+            RuntimeUnitMechanicsDirector.RegisterProfile(capUnitId, new UnitRuntimeMechanicsProfile
+            {
+                EntityId = capUnitId,
+                AiBehavior = new ContentUnitAiBehaviorDefinition { skillActivationCheckInterval = 1.0f }
+            });
+            var intervalUnit = new EntityController { entityId = capUnitId };
+            Time.time = 0f;
+            RuntimeUnitMechanicsDirector.ResetNativeAiSkillActivationInterval(intervalUnit);
+            Time.time = 0.5f;
+            RuntimeUnitMechanicsDirector.ApplyNativeAiSkillActivationInterval(intervalUnit, false);
+            if (Math.Abs(intervalUnit.LastAiSkillActivationCheckTimeForTest - 0.75f) > 0.001f)
+            {
+                throw new InvalidOperationException("The pooled unit interval reset did not preserve the logical native check timestamp.");
+            }
+
+            Time.time = 1.5f;
+            RuntimeUnitMechanicsDirector.ApplyNativeAiSkillActivationInterval(intervalUnit, false);
+            if (Math.Abs(intervalUnit.LastAiSkillActivationCheckTimeForTest - 1.25f) > 0.001f)
+            {
+                throw new InvalidOperationException("A due per-unit skill check was incorrectly delayed by the prefix.");
+            }
+
+            intervalUnit.LastAiSkillActivationCheckTimeForTest = Time.time;
+            RuntimeUnitMechanicsDirector.ApplyNativeAiSkillActivationInterval(intervalUnit, true);
+            if (Math.Abs(intervalUnit.LastAiSkillActivationCheckTimeForTest - 2.25f) > 0.001f)
+            {
+                throw new InvalidOperationException("The native skill check timestamp was not shifted by the declared interval.");
+            }
+        }
+        finally
+        {
+            Time.time = originalTime;
+            RuntimeUnitMechanicsDirector.ClearProfiles();
+            EntityBalancingStore.Reset();
+            ExistingControllers.Instance.Reset();
+        }
+    }),
     ("unit aiBehavior aiTag reapplies after pooled controller reuse", () =>
     {
         ExistingControllers.Instance.Reset();

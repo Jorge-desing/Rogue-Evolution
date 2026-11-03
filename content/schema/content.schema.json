@@ -3060,15 +3060,18 @@
       "properties": {
         "unitCap": {
           "type": "integer",
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 32
         },
         "combatUnitCap": {
           "type": "integer",
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 32
         },
         "skillActivationCheckInterval": {
           "type": "number",
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 60
         },
         "aiTag": {
           "type": "string"

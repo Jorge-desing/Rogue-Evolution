@@ -51,6 +51,13 @@ namespace RogueCommandExpansionLoader.Runtime
             (!string.IsNullOrWhiteSpace(DefaultLoadout) && !string.Equals(DefaultLoadout, "Standard", StringComparison.OrdinalIgnoreCase)) ||
             (StartingVeterancyRank.HasValue && StartingVeterancyRank.Value > 0);
 
+        public bool HasAiBehaviorMechanics =>
+            AiBehavior != null &&
+            (!string.IsNullOrWhiteSpace(AiBehavior.aiTag) ||
+             AiBehavior.unitCap > 0 ||
+             AiBehavior.combatUnitCap > 0 ||
+             AiBehavior.skillActivationCheckInterval > 0f);
+
         public bool HasOnDamageDealtMechanics =>
             (CombatBoosts != null && CombatBoosts.Length > 0) ||
             (Experience != null && Experience.maxLevel > 0) ||
@@ -59,6 +66,7 @@ namespace RogueCommandExpansionLoader.Runtime
 
         public bool HasAnyMechanics =>
             HasRuntimeComponentMechanics ||
+            HasAiBehaviorMechanics ||
             HasOnDamageDealtMechanics ||
             (!string.IsNullOrWhiteSpace(AiActivationTrigger) &&
                 !string.Equals(AiActivationTrigger, "EnemiesInRange", StringComparison.OrdinalIgnoreCase)) ||
@@ -84,6 +92,9 @@ namespace RogueCommandExpansionLoader.Runtime
 
         private static readonly Dictionary<int, int> _entityCombatXp =
             new Dictionary<int, int>();
+
+        private static readonly Dictionary<int, float> _nativeAiSkillLogicalLastChecks =
+            new Dictionary<int, float>();
 
         private static readonly HashSet<string> _appliedCardChangeBoostKeys =
             new HashSet<string>(StringComparer.Ordinal);
@@ -111,6 +122,7 @@ namespace RogueCommandExpansionLoader.Runtime
         private static PropertyInfo _isDestroyedProperty;
         private static PropertyInfo _destroyStartedProperty;
         private static PropertyInfo _isControlledByPlayerProperty;
+        private static PropertyInfo _isControlledByAiProperty;
         private static PropertyInfo _isUnitProperty;
         private static PropertyInfo _isCombatUnitProperty;
         private static PropertyInfo _positionProperty;
@@ -135,6 +147,11 @@ namespace RogueCommandExpansionLoader.Runtime
         private static MethodInfo _rankUpMethod;
         private static MethodInfo _setCaptainMethod;
         private static MethodInfo _addAiTagMethod;
+        private static FieldInfo _lastAiSkillActivationCheckTimeField;
+        private static PropertyInfo _productionInfoProperty;
+        private static FieldInfo _productionInfoField;
+        private static FieldInfo _productionEntityIdField;
+        private static FieldInfo _productionQueuedCountField;
         private static MethodInfo _attackMethod;
         private static MethodInfo _takeDamageMethod;
         private static MethodInfo _setActiveStatusEffectMethod;
@@ -310,6 +327,299 @@ namespace RogueCommandExpansionLoader.Runtime
             }
         }
 
+        /// <summary>
+        /// Applies the loader-owned per-product AI production caps before the native
+        /// IsProductionPossible gate. The native UnitCap is global, so it is never
+        /// mutated for a unit declaration.
+        /// </summary>
+        public static bool ShouldBlockAiProduction(object producerObj)
+        {
+            try
+            {
+                if (producerObj == null)
+                {
+                    return false;
+                }
+
+                EnsureReflection(producerObj.GetType());
+                if (_isControlledByAiProperty == null || !ReadBoolProperty(_isControlledByAiProperty, producerObj))
+                {
+                    return false;
+                }
+
+                object productionInfo = ReadProductionInfo(producerObj);
+                string productId = ReadProductionEntityId(productionInfo);
+                UnitRuntimeMechanicsProfile profile;
+                if (string.IsNullOrWhiteSpace(productId) || !TryGetProfile(productId, out profile) ||
+                    profile == null || profile.AiBehavior == null)
+                {
+                    return false;
+                }
+
+                ContentUnitAiBehaviorDefinition aiBehavior = profile.AiBehavior;
+                bool isCombatUnit = IsCombatProduct(productId);
+                int effectiveCap = RuntimeUnitAiBehaviorPolicy.EffectiveCap(
+                    isCombatUnit, aiBehavior.unitCap, aiBehavior.combatUnitCap);
+                if (effectiveCap <= 0)
+                {
+                    return false;
+                }
+
+                ExistingControllers existing = ExistingControllers.Instance;
+                if (existing == null)
+                {
+                    return false;
+                }
+
+                int livingCount = 0;
+                HashSet<EntityController> aiUnits = existing.AiUnits();
+                if (aiUnits != null)
+                {
+                    foreach (object unit in aiUnits)
+                    {
+                        if (unit == null || !IsEntityAlive(unit) ||
+                            !string.Equals(ReadEntityId(unit), productId, StringComparison.Ordinal))
+                        {
+                            continue;
+                        }
+
+                        livingCount++;
+                    }
+                }
+
+                int queuedCount = 0;
+                HashSet<EntityController> aiBuildings;
+                try
+                {
+                    aiBuildings = existing.AiBuildings();
+                }
+                catch
+                {
+                    return false;
+                }
+
+                if (aiBuildings != null)
+                {
+                    foreach (object building in aiBuildings)
+                    {
+                        if (building == null || !IsEntityAlive(building))
+                        {
+                            continue;
+                        }
+
+                        object buildingProductionInfo = ReadProductionInfo(building);
+                        if (!string.Equals(ReadProductionEntityId(buildingProductionInfo), productId,
+                            StringComparison.Ordinal))
+                        {
+                            continue;
+                        }
+
+                        queuedCount += ReadProductionQueuedCount(buildingProductionInfo);
+                        if (livingCount + queuedCount >= effectiveCap)
+                        {
+                            return true;
+                        }
+                    }
+                }
+
+                return !RuntimeUnitAiBehaviorPolicy.AllowsProduction(
+                    livingCount, queuedCount, isCombatUnit,
+                    aiBehavior.unitCap, aiBehavior.combatUnitCap);
+            }
+            catch
+            {
+                // An unavailable optional cap path must not block native production.
+                return false;
+            }
+        }
+
+        public static void ResetNativeAiSkillActivationInterval(object entityObj)
+        {
+            try
+            {
+                if (entityObj == null)
+                {
+                    return;
+                }
+
+                EnsureReflection(entityObj.GetType());
+                if (_lastAiSkillActivationCheckTimeField == null)
+                {
+                    return;
+                }
+
+                UnitRuntimeMechanicsProfile profile;
+                if (!TryGetProfile(ReadEntityId(entityObj), out profile) || profile == null ||
+                    profile.AiBehavior == null || profile.AiBehavior.skillActivationCheckInterval <= 0f)
+                {
+                    return;
+                }
+
+                lock (_nativeAiSkillLogicalLastChecks)
+                {
+                    _nativeAiSkillLogicalLastChecks[GetCombatExperienceKey(entityObj)] = Time.time;
+                }
+                _lastAiSkillActivationCheckTimeField.SetValue(entityObj, Time.time);
+            }
+            catch
+            {
+                // A pooled controller reset must never block re-association.
+            }
+        }
+
+        /// <summary>
+        /// Bridges the declared interval to EntityController.FixedUpdate's native
+        /// 0.25-second gate without modifying the native const or global state.
+        /// </summary>
+        public static void ApplyNativeAiSkillActivationInterval(object entityObj, bool afterNativeUpdate)
+        {
+            try
+            {
+                if (entityObj == null)
+                {
+                    return;
+                }
+
+                EnsureReflection(entityObj.GetType());
+                if (_lastAiSkillActivationCheckTimeField == null)
+                {
+                    return;
+                }
+
+                string entityId = ReadEntityId(entityObj);
+                UnitRuntimeMechanicsProfile profile;
+                if (string.IsNullOrWhiteSpace(entityId) || !TryGetProfile(entityId, out profile) ||
+                    profile == null || profile.AiBehavior == null)
+                {
+                    return;
+                }
+
+                float configuredInterval = profile.AiBehavior.skillActivationCheckInterval;
+                if (float.IsNaN(configuredInterval) || float.IsInfinity(configuredInterval) ||
+                    configuredInterval <= 0f ||
+                    configuredInterval > RuntimeUnitAiBehaviorPolicy.MaxSkillActivationCheckInterval)
+                {
+                    return;
+                }
+
+                float now = Time.time;
+                object rawLast = _lastAiSkillActivationCheckTimeField.GetValue(entityObj);
+                float lastCheck = rawLast == null ? 0f : Convert.ToSingle(rawLast);
+                if (!afterNativeUpdate && configuredInterval > RuntimeUnitAiBehaviorPolicy.NativeSkillActivationCheckInterval)
+                {
+                    int logicalKey = GetCombatExperienceKey(entityObj);
+                    float logicalLastCheck;
+                    lock (_nativeAiSkillLogicalLastChecks)
+                    {
+                        if (!_nativeAiSkillLogicalLastChecks.TryGetValue(logicalKey, out logicalLastCheck))
+                        {
+                            logicalLastCheck = lastCheck > now + 0.01f
+                                ? lastCheck - (configuredInterval - RuntimeUnitAiBehaviorPolicy.NativeSkillActivationCheckInterval)
+                                : lastCheck;
+                            _nativeAiSkillLogicalLastChecks[logicalKey] = logicalLastCheck;
+                        }
+                    }
+
+                    if (RuntimeUnitAiBehaviorPolicy.ShouldRunAiSkillCheck(
+                        now, logicalLastCheck, configuredInterval))
+                    {
+                        _lastAiSkillActivationCheckTimeField.SetValue(
+                            entityObj, now - RuntimeUnitAiBehaviorPolicy.NativeSkillActivationCheckInterval);
+                    }
+                    else
+                    {
+                        _lastAiSkillActivationCheckTimeField.SetValue(
+                            entityObj,
+                            RuntimeUnitAiBehaviorPolicy.DelayedNativeAiSkillCheckTimestamp(
+                                logicalLastCheck, configuredInterval));
+                    }
+                }
+                else if (!afterNativeUpdate && RuntimeUnitAiBehaviorPolicy.ShouldForceNativeAiSkillCheck(
+                    now, lastCheck, configuredInterval))
+                {
+                    _lastAiSkillActivationCheckTimeField.SetValue(
+                        entityObj, now - RuntimeUnitAiBehaviorPolicy.NativeSkillActivationCheckInterval);
+                }
+                else if (afterNativeUpdate && RuntimeUnitAiBehaviorPolicy.ShouldDelayNativeAiSkillCheck(
+                    now, lastCheck, configuredInterval))
+                {
+                    lock (_nativeAiSkillLogicalLastChecks)
+                    {
+                        _nativeAiSkillLogicalLastChecks[GetCombatExperienceKey(entityObj)] = now;
+                    }
+                    _lastAiSkillActivationCheckTimeField.SetValue(
+                        entityObj,
+                        RuntimeUnitAiBehaviorPolicy.DelayedNativeAiSkillCheckTimestamp(
+                            lastCheck, configuredInterval));
+                }
+            }
+            catch
+            {
+                // Optional per-unit cadence must never break the native FixedUpdate.
+            }
+        }
+
+        private static object ReadProductionInfo(object entityObj)
+        {
+            if (_productionInfoProperty != null)
+            {
+                object productionInfo = _productionInfoProperty.GetValue(entityObj, null);
+                if (productionInfo != null)
+                {
+                    return productionInfo;
+                }
+            }
+
+            return _productionInfoField == null ? null : _productionInfoField.GetValue(entityObj);
+        }
+
+        private static string ReadProductionEntityId(object productionInfo)
+        {
+            if (productionInfo == null)
+            {
+                return null;
+            }
+
+            if (_productionEntityIdField == null || _productionEntityIdField.DeclaringType != productionInfo.GetType())
+            {
+                _productionEntityIdField = productionInfo.GetType().GetField(
+                    "entityId", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            }
+
+            return _productionEntityIdField == null ? null : _productionEntityIdField.GetValue(productionInfo) as string;
+        }
+
+        private static int ReadProductionQueuedCount(object productionInfo)
+        {
+            if (productionInfo == null)
+            {
+                return 0;
+            }
+
+            if (_productionQueuedCountField == null || _productionQueuedCountField.DeclaringType != productionInfo.GetType())
+            {
+                _productionQueuedCountField = productionInfo.GetType().GetField(
+                    "queuedCount", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            }
+
+            if (_productionQueuedCountField == null)
+            {
+                return 0;
+            }
+
+            object value = _productionQueuedCountField.GetValue(productionInfo);
+            return value == null ? 0 : Math.Max(0, Convert.ToInt32(value));
+        }
+
+        private static bool IsCombatProduct(string entityId)
+        {
+            return EntityBalancingStore.HasRole(entityId, UnitRole.FrontalAttacker) ||
+                EntityBalancingStore.HasRole(entityId, UnitRole.Supporter) ||
+                EntityBalancingStore.HasRole(entityId, UnitRole.Fire) ||
+                EntityBalancingStore.HasRole(entityId, UnitRole.Sniper) ||
+                EntityBalancingStore.HasRole(entityId, UnitRole.MassDestruction);
+        }
+
         public static void ClearProfiles()
         {
             lock (_profiles)
@@ -320,6 +630,11 @@ namespace RogueCommandExpansionLoader.Runtime
             lock (_entityCombatXp)
             {
                 _entityCombatXp.Clear();
+            }
+
+            lock (_nativeAiSkillLogicalLastChecks)
+            {
+                _nativeAiSkillLogicalLastChecks.Clear();
             }
 
             lock (_activeDynamicCommandAuras)
@@ -1013,6 +1328,10 @@ namespace RogueCommandExpansionLoader.Runtime
             try
             {
                 int key = GetCombatExperienceKey(entityObj);
+                lock (_nativeAiSkillLogicalLastChecks)
+                {
+                    _nativeAiSkillLogicalLastChecks.Remove(key);
+                }
                 if (key != 0)
                 {
                     RuntimeGameplayCommandDirector.OnEntityDestroyed(key.ToString());
@@ -1037,6 +1356,10 @@ namespace RogueCommandExpansionLoader.Runtime
                 RemoveAppliedCardChangeBoostKeys(entityObj);
                 ClearRuntimeMechanicsByObject(entityObj);
                 int key = GetCombatExperienceKey(entityObj);
+                lock (_nativeAiSkillLogicalLastChecks)
+                {
+                    _nativeAiSkillLogicalLastChecks.Remove(key);
+                }
                 if (key != 0)
                 {
                     RuntimeGameplayCommandDirector.OnEntityDestroyed(key.ToString());
@@ -1429,6 +1752,8 @@ namespace RogueCommandExpansionLoader.Runtime
                     ClearRuntimeMechanics(rootObject);
                     return;
                 }
+
+                ResetNativeAiSkillActivationInterval(entityObj);
 
                 if (profile.BaselineStatusEffects != null && profile.BaselineStatusEffects.Length > 0)
                 {
@@ -3242,6 +3567,7 @@ namespace RogueCommandExpansionLoader.Runtime
             _isDestroyedProperty = entityType.GetProperty("IsDestroyed", flags);
             _destroyStartedProperty = entityType.GetProperty("DestroyHasBeenStarted", flags);
             _isControlledByPlayerProperty = entityType.GetProperty("IsControlledByPlayer", flags);
+            _isControlledByAiProperty = entityType.GetProperty("IsControlledByAi", flags);
             _isUnitProperty = entityType.GetProperty("IsUnit", flags);
             _isCombatUnitProperty = entityType.GetProperty("IsCombatUnit", flags);
             _positionProperty = entityType.GetProperty("Position", flags);
@@ -3265,6 +3591,18 @@ namespace RogueCommandExpansionLoader.Runtime
             _setCaptainMethod = entityType.GetMethod("SetCaptain", flags, null, new[] { entityType }, null);
             _removeCaptainMethod = entityType.GetMethod("RemoveCaptain", flags, null, new[] { entityType }, null);
             _addAiTagMethod = entityType.GetMethod("AddAiTag", flags, null, new[] { typeof(string) }, null);
+            _lastAiSkillActivationCheckTimeField = entityType.GetField(
+                "_lastAiSkillActivationCheckTime", flags);
+            _productionInfoProperty = entityType.GetProperty("ProductionInfo", flags);
+            _productionInfoField = entityType.GetField("_productionInfo", flags);
+            Type productionInfoType = _productionInfoProperty == null
+                ? (_productionInfoField == null ? null : _productionInfoField.FieldType)
+                : _productionInfoProperty.PropertyType;
+            if (productionInfoType != null)
+            {
+                _productionEntityIdField = productionInfoType.GetField("entityId", flags);
+                _productionQueuedCountField = productionInfoType.GetField("queuedCount", flags);
+            }
             _attackMethod = entityType.GetMethod("Attack", flags, null, new[] { entityType }, null);
             _takeDamageMethod = entityType.GetMethod("TakeDamage", flags);
 

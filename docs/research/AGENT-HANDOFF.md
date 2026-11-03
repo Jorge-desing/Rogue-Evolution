@@ -7,6 +7,18 @@
 
 ---
 
+## Current continuation snapshot — 2026-11-02
+
+- **Checkout:** branch `codex/rogue-unit-balance-20261018`, pre-commit `HEAD` `cac26b3`; unrelated dirty nested worktrees and `MEMORY.md` remain preserved and are not task-owned.
+- **Compatibility identity rechecked:** Rogue Command `1.0.9`, Unity `2021.3.45f2`, `Assembly-CSharp.dll` SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, MVID `db0e9462-128d-4296-9900-de18b4bd0c00`. The identity was verified before using the reflected `EntityController.FixedUpdate`, `_lastAiSkillActivationCheckTime`, `_productionInfo`, and `IsProductionPossible(int)` members.
+- **Declarative AI behavior:** `unitCap` and `combatUnitCap` are implemented as loader-owned per-product AI production guards. They count living plus queued instances, apply `combatUnitCap` as the stricter cap for products with native combat roles, never mutate the native global `UnitCap`, and fail open if the optional production structures cannot be read. `skillActivationCheckInterval` bridges the native per-entity 0.25-second `FixedUpdate` gate by shifting only that controller's timestamp; `0` preserves the native cadence and pooled association resets the logical timer.
+- **TDD/local validation:** RED was observed for the new policy and upper-bound cases, then GREEN after the minimal implementation. Release plugin build: 0 warnings/0 errors. Release validation harness: `474/475 validation checks passed; 1 skipped` (Windows symlink privilege). Python runner: `112` tests passed, bundle references `25/0` errors, loader registry `4/0` issues, and all Python checks passed after creating the ignored project `.venv` from `requirements.txt` plus the existing test dependency `jsonschema`.
+- **Steam runtime evidence:** A reversible Profile2 run used a temporary manifest that declared `sample-native:scout-tank` with cap `1/1` and interval `1.0`, and deployed the fresh plugin. BepInEx reported 38 hooks, 3 active packs, 0 failed packs, 30 registered units, and no compatibility error. A temporary in-process probe performed a reversible synthetic `ProductionInfo` mutation and inspected a loaded unit template; it observed `profilePresent=True;capBlocked=True;intervalApplied=True`. This is runtime evidence that the deployed bridge and reflection path executed, not evidence of a natural AI order, factory selection, or emergent gameplay. Temporary components were removed; the only post-run profile change was the expected `Profile2/metaSavegame.dat`; the plugin and manifest were restored and hash-verified.
+- **Dead-code/error pass:** Static reference audit removed the unreferenced private `SquadFormationAiModule.ReleaseAllCaptains` helper (which could have clobbered native captain links) and unused `RuntimeUnitVariantRegistry.ClearUnit`; the remaining low-reference methods are diagnostic/MCP, Unity lifecycle, test fixtures, or public extension surfaces and were preserved.
+- **Remaining evidence boundary:** No natural reward selection, factory placement, AI production order, or live combat/skill activation was claimed. Future gameplay acceptance must use a separate controlled scenario and preserve the Profile2/save safeguards.
+
+---
+
 ## 1. Authoritative Compatibility Identity
 
 Always recheck this identity before relying on reflected signatures, CIL metadata tokens, or serialized assets:

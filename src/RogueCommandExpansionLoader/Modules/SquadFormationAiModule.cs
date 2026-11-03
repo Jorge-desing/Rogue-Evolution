@@ -214,26 +214,6 @@ namespace RogueCommandExpansionLoader.Modules
                 _moduleCaptainLinks.Clear();
             }
 
-            private void ReleaseAllCaptains()
-            {
-                HashSet<EntityController> aiUnits = ExistingControllers.Instance != null
-                    ? ExistingControllers.Instance.AiUnits()
-                    : null;
-
-                if (aiUnits == null)
-                {
-                    return;
-                }
-
-                foreach (EntityController unit in aiUnits)
-                {
-                    if (unit != null && unit.CaptainOfThisEntity != null)
-                    {
-                        unit.RemoveCaptain(unit.CaptainOfThisEntity);
-                    }
-                }
-            }
-
             private static UnitRole GetUnitRoleEnum(string roleName)
             {
                 try

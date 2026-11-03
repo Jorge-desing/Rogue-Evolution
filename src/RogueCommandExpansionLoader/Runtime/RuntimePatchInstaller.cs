@@ -372,6 +372,21 @@ namespace RogueCommandExpansionLoader.Runtime
                         parameters[0].ParameterType == typeof(bool) && parameters[1].ParameterType == entityController;
                 });
             MethodInfo entityDestroyPostfix = Hook("EntityControllerDestroyPostfix");
+            MethodInfo entityFixedUpdate = RuntimeReflection.FindUniqueMethod(entityController, "FixedUpdate",
+                delegate(MethodInfo method)
+                {
+                    return method.ReturnType == typeof(void) && method.GetParameters().Length == 0;
+                });
+            MethodInfo entityFixedUpdatePrefix = Hook("EntityControllerFixedUpdatePrefix");
+            MethodInfo entityFixedUpdatePostfix = Hook("EntityControllerFixedUpdatePostfix");
+            MethodInfo isProductionPossible = RuntimeReflection.FindUniqueMethod(entityController,
+                "IsProductionPossible", delegate(MethodInfo method)
+                {
+                    ParameterInfo[] parameters = method.GetParameters();
+                    return method.ReturnType == typeof(bool) && parameters.Length == 1 &&
+                        parameters[0].ParameterType == typeof(int);
+                });
+            MethodInfo isProductionPossiblePrefix = Hook("EntityControllerIsProductionPossiblePrefix");
             MethodInfo takeDamage = RuntimeReflection.FindUniqueMethod(entityController, "TakeDamage",
                 delegate(MethodInfo method)
                 {
@@ -454,6 +469,8 @@ namespace RogueCommandExpansionLoader.Runtime
             plan.Add(new PatchPlan(setupAiPrespawning, null, setupAiPrespawningPostfix));
             plan.Add(new PatchPlan(isTargetInRange, null, isTargetInRangePostfix));
             plan.Add(new PatchPlan(entityDestroy, null, entityDestroyPostfix));
+            plan.Add(new PatchPlan(entityFixedUpdate, entityFixedUpdatePrefix, entityFixedUpdatePostfix));
+            plan.Add(new PatchPlan(isProductionPossible, isProductionPossiblePrefix, null));
             plan.Add(new PatchPlan(takeDamage, null, takeDamagePostfix));
 
             // Optional gameplay hooks (resolved defensively): death, healing, and armor

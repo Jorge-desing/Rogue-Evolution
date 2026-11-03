@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using RogueCommandExpansionLoader.Runtime;
 
 namespace RogueCommandExpansionLoader.Content
 {
@@ -2961,16 +2962,32 @@ namespace RogueCommandExpansionLoader.Content
                 Add(diagnostics, "unit-ai.cap-invalid", path + ".unitCap",
                     "Unit cap must be non-negative.");
             }
+            else if (aiBehavior.unitCap > RuntimeUnitAiBehaviorPolicy.MaxPerUnitCap)
+            {
+                Add(diagnostics, "unit-ai.cap-too-large", path + ".unitCap",
+                    "Unit cap must not exceed " + RuntimeUnitAiBehaviorPolicy.MaxPerUnitCap + ".");
+            }
             if (aiBehavior.combatUnitCap < 0)
             {
                 Add(diagnostics, "unit-ai.combat-cap-invalid", path + ".combatUnitCap",
                     "Combat unit cap must be non-negative.");
+            }
+            else if (aiBehavior.combatUnitCap > RuntimeUnitAiBehaviorPolicy.MaxPerUnitCap)
+            {
+                Add(diagnostics, "unit-ai.combat-cap-too-large", path + ".combatUnitCap",
+                    "Combat unit cap must not exceed " + RuntimeUnitAiBehaviorPolicy.MaxPerUnitCap + ".");
             }
             if (!IsFiniteSingle(aiBehavior.skillActivationCheckInterval) ||
                 aiBehavior.skillActivationCheckInterval < 0)
             {
                 Add(diagnostics, "unit-ai.interval-invalid", path + ".skillActivationCheckInterval",
                     "Skill activation check interval must be finite and non-negative.");
+            }
+            else if (aiBehavior.skillActivationCheckInterval > RuntimeUnitAiBehaviorPolicy.MaxSkillActivationCheckInterval)
+            {
+                Add(diagnostics, "unit-ai.interval-too-large", path + ".skillActivationCheckInterval",
+                    "Skill activation check interval must not exceed " +
+                    RuntimeUnitAiBehaviorPolicy.MaxSkillActivationCheckInterval + " seconds.");
             }
         }
 

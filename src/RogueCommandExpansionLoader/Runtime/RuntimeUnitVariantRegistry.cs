@@ -159,19 +159,6 @@ namespace RogueCommandExpansionLoader.Runtime
             return result.AsReadOnly();
         }
 
-        public static void ClearUnit(string unitId)
-        {
-            if (string.IsNullOrWhiteSpace(unitId))
-            {
-                return;
-            }
-
-            lock (Gate)
-            {
-                VariantsByUnit.Remove(unitId.Trim());
-            }
-        }
-
         public static void Clear()
         {
             lock (Gate)
