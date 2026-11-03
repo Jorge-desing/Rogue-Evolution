@@ -1310,8 +1310,124 @@ internal static partial class ValidationTestRunner
         WithPackage(missingBundle, (p, root) => ExpectDiagnostic(p, root, new EmptySnapshot(),
             new KnownModuleValidator(), "unit.audio-bundle-missing"));
     }),
+    ("tactical-operations new mechanics units have bounded runtime contracts", () =>
+    {
+        string tacticalPath = Path.Combine(repositoryRoot, "content", "packs", "tactical-operations", "content.json");
+        ContentPackDefinition pack = JsonSerializer.Deserialize<ContentPackDefinition>(
+                File.ReadAllText(tacticalPath), jsonOptions)
+            ?? throw new InvalidDataException("The tactical-operations content manifest is empty.");
+
+        void Require(bool condition, string message)
+        {
+            if (!condition)
+                throw new InvalidOperationException(message);
+        }
+
+        ContentUnitDefinition GetUnit(string id) => pack.units.SingleOrDefault(unit => unit.id == id)
+            ?? throw new InvalidOperationException("Missing expected unit " + id + ".");
+
+        string[] expectedIds =
+        {
+            "tactical-operations:sentinel-relay",
+            "tactical-operations:gravitas-breaker",
+            "tactical-operations:command-relay"
+        };
+
+        foreach (string id in expectedIds)
+        {
+            ContentUnitDefinition unit = GetUnit(id);
+            ContentProductionBuildingDefinition building = unit.productionBuilding
+                ?? throw new InvalidOperationException(id + " must own a production building.");
+            Require(unit.nativeTemplateId == "PCXBaseTank", id + " must use the verified native tank template.");
+            Require(building.id == id + "-factory",
+                id + " must own a namespaced production building.");
+            Require(building.nativeTemplateId == "PCXBaseTankFactory",
+                id + " must use the native PCXBaseTankFactory template.");
+            Require(unit.isAllowedForAi, id + " must be eligible for the tactical AI profile.");
+            Require(unit.localizations != null &&
+                    unit.localizations.Any(localization => localization.language == "en-US" &&
+                        !String.IsNullOrWhiteSpace(localization.name) &&
+                        !String.IsNullOrWhiteSpace(localization.description)),
+                id + " must have visible English localization.");
+        }
+
+        ContentUnitDefinition sentinel = GetUnit("tactical-operations:sentinel-relay");
+        ContentUnitAiBehaviorDefinition sentinelAi = sentinel.aiBehavior
+            ?? throw new InvalidOperationException("Sentinel Relay is missing aiBehavior.");
+        ContentUnitAuraDefinition sentinelAura = sentinel.aura
+            ?? throw new InvalidOperationException("Sentinel Relay is missing aura.");
+        Require(sentinel.healing != null && sentinel.shieldRegeneration != null &&
+                sentinel.synergies != null && sentinel.activeSkills != null &&
+                sentinel.activeSkills.Length == 1,
+            "Sentinel Relay must combine healing, aura, shield regeneration, synergy, and one active skill.");
+        Require(sentinelAura.auraType == "Shield" && sentinelAura.affectsAllies &&
+                !sentinelAura.affectsEnemies,
+            "Sentinel Relay must provide an allied shield aura only.");
+        Require(sentinelAi.unitCap == 3 && sentinelAi.combatUnitCap == 0 &&
+                Math.Abs(sentinelAi.skillActivationCheckInterval - 2.0f) < 0.0001f,
+            "Sentinel Relay aiBehavior values are not the bounded support profile.");
+        Require(RuntimeUnitAiBehaviorPolicy.AllowsProduction(
+                    2, 0, false, sentinelAi.unitCap, sentinelAi.combatUnitCap),
+            "Sentinel Relay should remain below its support cap at two live units.");
+        Require(Math.Abs(RuntimeUnitAiBehaviorPolicy.ResolveSkillActivationInterval(
+                    sentinelAi.skillActivationCheckInterval, 0.25f) - 2.0f) < 0.0001f,
+            "Sentinel Relay interval must reach the runtime policy.");
+
+        ContentUnitDefinition gravitas = GetUnit("tactical-operations:gravitas-breaker");
+        ContentUnitAiBehaviorDefinition gravitasAi = gravitas.aiBehavior
+            ?? throw new InvalidOperationException("Gravitas Breaker is missing aiBehavior.");
+        Require(gravitas.tauntPulse != null && gravitas.shieldOverloadNova != null &&
+                gravitas.aura != null && gravitas.combatBoosts != null &&
+                gravitas.experience != null && gravitas.baselineStatusEffects != null &&
+                gravitas.baselineStatusEffects.Contains("Armored"),
+            "Gravitas Breaker must combine frontline mechanics and veterancy.");
+        Require(gravitasAi.unitCap == 2 && gravitasAi.combatUnitCap == 2 &&
+                Math.Abs(gravitasAi.skillActivationCheckInterval - 1.5f) < 0.0001f,
+            "Gravitas Breaker aiBehavior values are not the bounded combat profile.");
+        Require(!RuntimeUnitAiBehaviorPolicy.AllowsProduction(
+                    2, 0, true, gravitasAi.unitCap, gravitasAi.combatUnitCap),
+            "Gravitas Breaker must be blocked at its combat cap.");
+
+        ContentUnitDefinition command = GetUnit("tactical-operations:command-relay");
+        ContentUnitAiBehaviorDefinition commandAi = command.aiBehavior
+            ?? throw new InvalidOperationException("Command Relay is missing aiBehavior.");
+        Require(command.command != null && command.aura != null && command.synergies != null &&
+                command.synergies.Length == 1 && command.activeSkills != null &&
+                command.activeSkills.Length == 1 && command.experience != null,
+            "Command Relay must combine command, aura, synergy, active skill, and veterancy.");
+        Require(commandAi.unitCap == 2 && commandAi.combatUnitCap == 1 &&
+                Math.Abs(commandAi.skillActivationCheckInterval - 2.5f) < 0.0001f,
+            "Command Relay aiBehavior values are not the bounded command profile.");
+        Require(RuntimeUnitAiBehaviorPolicy.EffectiveCap(
+                    true, commandAi.unitCap, commandAi.combatUnitCap) == 1,
+            "Command Relay combatUnitCap must be the effective combat limit.");
+
+        ContentStageDefinition stage = pack.stages.Single(stageDefinition =>
+            stageDefinition.id == "tactical-operations:skirmish-trial");
+        foreach (string id in expectedIds)
+            Require(stage.unitIds.Contains(id), "Stage is missing " + id + ".");
+
+        var vehiclePool = stage.blueprintPoolEntries.Single(pool => pool.poolId == "BP_CheaperVehicles");
+        var roboPool = stage.blueprintPoolEntries.Single(pool => pool.poolId == "BP_CheaperRobos");
+        Require(vehiclePool.unitIds.Contains("tactical-operations:gravitas-breaker") &&
+                vehiclePool.unitIds.Contains("tactical-operations:command-relay"),
+            "Vehicle blueprint pool must offer both new vehicle products.");
+        Require(roboPool.unitIds.Contains("tactical-operations:sentinel-relay"),
+            "Robo blueprint pool must offer Sentinel Relay.");
+
+        ContentAiProfileDefinition ai = pack.aiProfiles.Single(profile =>
+            profile.id == "tactical-operations:skirmish-adversary");
+        foreach (string id in expectedIds)
+        {
+            Require(ai.unitEntries.Any(entry => entry.unitId == id),
+                "AI unitEntries is missing " + id + ".");
+            Require(ai.productionBuildingEntries.Any(entry => entry.unitId == id),
+                "AI productionBuildingEntries is missing " + id + ".");
+        }
+    }),
     ("tactical-operations expansion manifest passes full content validation", () =>
     {
+
         string tacticalPath = Path.Combine(repositoryRoot, "content", "packs", "tactical-operations", "content.json");
         string tacticalRoot = Path.GetDirectoryName(tacticalPath)!;
         string json = File.ReadAllText(tacticalPath);

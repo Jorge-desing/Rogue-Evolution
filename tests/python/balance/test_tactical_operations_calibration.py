@@ -1,4 +1,4 @@
-"""Balance contract for the six Tactical Operations modded units."""
+"""Balance contract for the nine Tactical Operations modded units."""
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ class TacticalOperationsCalibrationTests(unittest.TestCase):
         cls.units = cls.repository.profiles
         cls.definitions = {unit["id"]: unit for unit in cls.manifest["units"]}
 
-    def test_six_tactical_unit_profiles_match_calibration_targets(self) -> None:
+    def test_nine_tactical_unit_profiles_match_calibration_targets(self) -> None:
         expected = {
             "tactical-operations:tidebreaker-skirmisher": {
                 "cost": 85.0, "max_health": 140.0, "max_shield": 0.0,
@@ -54,6 +54,25 @@ class TacticalOperationsCalibrationTests(unittest.TestCase):
                 "cost": 240.0, "production_duration": 90.0, "max_health": 100.0,
                 "max_shield": 5.0, "armor_protection": 1.0, "move_speed": 12.0,
                 "weapon_range": 3.8, "damage1": 2.5, "dps": 5.0,
+            },
+            "tactical-operations:sentinel-relay": {
+                "cost": 260.0, "production_duration": 90.0, "max_health": 120.0,
+                "max_shield": 8.0, "armor_protection": 1.0, "move_speed": 10.5,
+                "weapon_range": 4.0, "damage1": 2.5, "dps": 3.5714285714,
+                "cost_efficiency_index": 8.0415601898,
+            },
+            "tactical-operations:gravitas-breaker": {
+                "cost": 420.0, "production_duration": 65.0, "max_health": 220.0,
+                "max_shield": 4.0, "armor_protection": 1.0, "move_speed": 5.2,
+                "weapon_range": 9.0, "damage1": 30.0, "attack_cooldown": 4.0,
+                "effect_radius1": 1.2, "dps": 15.0,
+                "cost_efficiency_index": 14.8991425182,
+            },
+            "tactical-operations:command-relay": {
+                "cost": 300.0, "production_duration": 75.0, "max_health": 160.0,
+                "max_shield": 6.0, "armor_protection": 1.0, "move_speed": 9.0,
+                "weapon_range": 5.0, "damage1": 12.0, "attack_cooldown": 2.0,
+                "dps": 12.0, "cost_efficiency_index": 16.6281199407,
             },
         }
         self.assertEqual(set(expected), set(self.unit_ids))

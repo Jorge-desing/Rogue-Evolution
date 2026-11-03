@@ -1072,6 +1072,393 @@
       "startingAffixes": [
         "Bulwark"
       ]
+    },
+    {
+      "id": "tactical-operations:sentinel-relay",
+      "nativeTemplateId": "PCXBaseTank",
+      "isAllowedAsStartingBlueprint": true,
+      "isAllowedForAi": true,
+      "isAllowedForDemo": true,
+      "isForSpecialists": false,
+      "localizations": [
+        {
+          "language": "en-US",
+          "name": "Sentinel Relay",
+          "description": "A bounded support rover that restores shields, repairs nearby allies, and keeps a small squad alive.",
+          "skillDescription": "Emits a nanite repair pulse around itself."
+        },
+        {
+          "language": "es-XL",
+          "name": "Relé Centinela",
+          "description": "Rover de apoyo limitado que restaura escudos, repara aliados cercanos y mantiene vivo a un escuadrón pequeño.",
+          "skillDescription": "Emite un pulso de reparación nanite a su alrededor."
+        }
+      ],
+      "balanceOverrides": [
+        { "name": "roles", "value": "Unit, Vehicle, Supporter, Heal" },
+        { "name": "offeredSystemTags", "value": "Vehicle, Heal, Shield" },
+        { "name": "cost", "value": "260" },
+        { "name": "maxHealth", "value": "120" },
+        { "name": "moveSpeed", "value": "10.5" },
+        { "name": "sightRadius", "value": "9" },
+        { "name": "weaponRange", "value": "4.0" },
+        { "name": "attackCooldown", "value": "1.4" },
+        { "name": "rarity", "value": "Rare" },
+        { "name": "neededExperienceLevel", "value": "0" },
+        { "name": "productionDuration", "value": "90" },
+        { "name": "maxCapacity", "value": "4" },
+        { "name": "maxShield", "value": "8" },
+        { "name": "maxMana", "value": "0" },
+        { "name": "maxArmor", "value": "0" },
+        { "name": "armorProtection", "value": "1" }
+      ],
+      "customBalance": {
+        "Damage1": 2.5
+      },
+      "activeSkills": [
+        {
+          "id": "tactical-operations:sentinel-repair-pulse",
+          "skillType": "SelfAoE",
+          "targetOrigin": "Self",
+          "cooldown": 12.0,
+          "manaCost": 0,
+          "range": 0.0,
+          "radius": 5.0,
+          "helpAiToActivate": true,
+          "aiActivationTrigger": "LowHealth",
+          "aiSkillCooldown": 12.0
+        }
+      ],
+      "productionBuilding": {
+        "id": "tactical-operations:sentinel-relay-factory",
+        "nativeTemplateId": "PCXBaseTankFactory",
+        "isAllowedAsStartingBlueprint": true,
+        "balanceOverrides": [
+          { "name": "cost", "value": "520" },
+          { "name": "maxCapacity", "value": "4" },
+          { "name": "neededExperienceLevel", "value": "0" },
+          { "name": "rarity", "value": "Rare" }
+        ],
+        "localizations": [
+          {
+            "language": "en-US",
+            "name": "Sentinel Relay Bay",
+            "description": "Manufactures Sentinel Relay support rovers."
+          },
+          {
+            "language": "es-XL",
+            "name": "Bahía del Relé Centinela",
+            "description": "Fabrica rovers de apoyo Relé Centinela."
+          }
+        ]
+      },
+      "cardModelScalingFactor": 0.82,
+      "healing": {
+        "healAmount": 16.0,
+        "healRange": 4.5,
+        "healRate": 1.0,
+        "repairAmount": 14.0
+      },
+      "aura": {
+        "auraRadius": 4.0,
+        "auraType": "Shield",
+        "buffAmount": 5.0,
+        "affectsAllies": true,
+        "affectsEnemies": false
+      },
+      "synergies": [
+        {
+          "id": "tactical-operations:sentinel-armor-link",
+          "statName": "ArmorProtection",
+          "multiplier": 1.15,
+          "radius": 4.0,
+          "targetUnitIds": [
+            "tactical-operations:bulwark-siege-tank",
+            "tactical-operations:arc-lance-walker"
+          ]
+        }
+      ],
+      "shieldRegeneration": {
+        "rechargeDelay": 5.0,
+        "rechargeRate": 1.0,
+        "burstAmount": 1.0
+      },
+      "baselineStatusEffects": [
+        "Robust"
+      ],
+      "defaultTacticalStance": "Defensive",
+      "defaultLoadout": "Reinforced",
+      "startingVeterancyRank": 1,
+      "startingAffixes": [
+        "Bulwark"
+      ],
+      "aiBehavior": {
+        "unitCap": 3,
+        "combatUnitCap": 0,
+        "skillActivationCheckInterval": 2.0,
+        "aiTag": "RCL_TacticalSentinelRelay"
+      }
+    },
+    {
+      "id": "tactical-operations:gravitas-breaker",
+      "nativeTemplateId": "PCXBaseTank",
+      "isAllowedAsStartingBlueprint": true,
+      "isAllowedForAi": true,
+      "isAllowedForDemo": true,
+      "isForSpecialists": false,
+      "localizations": [
+        {
+          "language": "en-US",
+          "name": "Gravitas Breaker",
+          "description": "An armored frontline breaker that attracts hostile fire and overloads its shield in close combat.",
+          "skillDescription": "Detonates a shield overload nova at the target area."
+        },
+        {
+          "language": "es-XL",
+          "name": "Rompegravedad",
+          "description": "Rompedor blindado de primera línea que atrae el fuego hostil y sobrecarga su escudo en combate cercano.",
+          "skillDescription": "Detona una nova de sobrecarga de escudo en el área objetivo."
+        }
+      ],
+      "balanceOverrides": [
+        { "name": "roles", "value": "Unit, Vehicle, Tank, FrontalAttacker" },
+        { "name": "offeredSystemTags", "value": "Vehicle, Tank, Stun" },
+        { "name": "cost", "value": "420" },
+        { "name": "maxHealth", "value": "220" },
+        { "name": "moveSpeed", "value": "5.2" },
+        { "name": "sightRadius", "value": "11" },
+        { "name": "weaponRange", "value": "9.0" },
+        { "name": "attackCooldown", "value": "4.0" },
+        { "name": "rarity", "value": "Rare" },
+        { "name": "neededExperienceLevel", "value": "0" },
+        { "name": "productionDuration", "value": "65" },
+        { "name": "maxCapacity", "value": "2" },
+        { "name": "maxShield", "value": "4" },
+        { "name": "maxMana", "value": "0" },
+        { "name": "maxArmor", "value": "0" },
+        { "name": "armorProtection", "value": "1" }
+      ],
+      "customBalance": {
+        "Damage1": 30.0,
+        "EffectRadius1": 1.2
+      },
+      "activeSkills": [
+        {
+          "id": "tactical-operations:gravitas-crush",
+          "skillType": "LocationAoE",
+          "targetOrigin": "ChosenLocation",
+          "cooldown": 16.0,
+          "manaCost": 0,
+          "range": 10.0,
+          "radius": 4.0,
+          "helpAiToActivate": true,
+          "aiActivationTrigger": "EnemiesInRange",
+          "aiSkillCooldown": 16.0
+        }
+      ],
+      "productionBuilding": {
+        "id": "tactical-operations:gravitas-breaker-factory",
+        "nativeTemplateId": "PCXBaseTankFactory",
+        "isAllowedAsStartingBlueprint": true,
+        "balanceOverrides": [
+          { "name": "cost", "value": "750" },
+          { "name": "maxCapacity", "value": "2" },
+          { "name": "neededExperienceLevel", "value": "0" },
+          { "name": "rarity", "value": "Rare" }
+        ],
+        "localizations": [
+          {
+            "language": "en-US",
+            "name": "Gravitas Breaker Foundry",
+            "description": "Manufactures Gravitas Breaker frontline tanks."
+          },
+          {
+            "language": "es-XL",
+            "name": "Fundición Rompegravedad",
+            "description": "Fabrica tanques de primera línea Rompegravedad."
+          }
+        ]
+      },
+      "cardModelScalingFactor": 0.9,
+      "aura": {
+        "auraRadius": 3.5,
+        "auraType": "Buff",
+        "buffAmount": 1.0,
+        "affectsAllies": true,
+        "affectsEnemies": false
+      },
+      "shieldRegeneration": {
+        "rechargeDelay": 5.0,
+        "rechargeRate": 0.8,
+        "burstAmount": 1.0
+      },
+      "tauntPulse": {
+        "pulseInterval": 4.0,
+        "tauntRadius": 16.0,
+        "duration": 3.0,
+        "maxTargets": 5
+      },
+      "shieldOverloadNova": {
+        "novaRadius": 4.0,
+        "damage": 22.0,
+        "stunDuration": 2.0,
+        "cooldown": 16.0
+      },
+      "baselineStatusEffects": [
+        "Armored",
+        "Robust"
+      ],
+      "combatBoosts": [
+        {
+          "id": "tactical-operations:gravitas-overdrive",
+          "statName": "Damage",
+          "multiplier": 1.05,
+          "duration": 4.0
+        }
+      ],
+      "experience": {
+        "experiencePerLevel": 1,
+        "maxLevel": 3,
+        "experienceGainMultiplier": 1.0,
+        "levelUpBonus": 0.15
+      },
+      "defaultTacticalStance": "Aggressive",
+      "defaultLoadout": "Siege",
+      "startingVeterancyRank": 1,
+      "startingAffixes": [
+        "Juggernaut"
+      ],
+      "aiBehavior": {
+        "unitCap": 2,
+        "combatUnitCap": 2,
+        "skillActivationCheckInterval": 1.5,
+        "aiTag": "RCL_TacticalGravitasBreaker"
+      }
+    },
+    {
+      "id": "tactical-operations:command-relay",
+      "nativeTemplateId": "PCXBaseTank",
+      "isAllowedAsStartingBlueprint": true,
+      "isAllowedForAi": true,
+      "isAllowedForDemo": true,
+      "isForSpecialists": false,
+      "localizations": [
+        {
+          "language": "en-US",
+          "name": "Command Relay",
+          "description": "A command vehicle that coordinates nearby attackers while retaining a bounded combat role.",
+          "skillDescription": "Issues a coordinated command strike at the target location."
+        },
+        {
+          "language": "es-XL",
+          "name": "Relé de Mando",
+          "description": "Vehículo de mando que coordina atacantes cercanos y conserva un papel de combate limitado.",
+          "skillDescription": "Emite una orden de ataque coordinado en la ubicación objetivo."
+        }
+      ],
+      "balanceOverrides": [
+        { "name": "roles", "value": "Unit, Vehicle, Supporter, FrontalAttacker" },
+        { "name": "offeredSystemTags", "value": "Vehicle, Heal, Armor" },
+        { "name": "cost", "value": "300" },
+        { "name": "maxHealth", "value": "160" },
+        { "name": "moveSpeed", "value": "9.0" },
+        { "name": "sightRadius", "value": "10" },
+        { "name": "weaponRange", "value": "5.0" },
+        { "name": "attackCooldown", "value": "2.0" },
+        { "name": "rarity", "value": "Rare" },
+        { "name": "neededExperienceLevel", "value": "0" },
+        { "name": "productionDuration", "value": "75" },
+        { "name": "maxCapacity", "value": "4" },
+        { "name": "maxShield", "value": "6" },
+        { "name": "maxMana", "value": "0" },
+        { "name": "maxArmor", "value": "0" },
+        { "name": "armorProtection", "value": "1" }
+      ],
+      "customBalance": {
+        "Damage1": 12.0
+      },
+      "activeSkills": [
+        {
+          "id": "tactical-operations:command-relay-overwatch-salvo",
+          "skillType": "LocationAoE",
+          "targetOrigin": "ChosenLocation",
+          "cooldown": 14.0,
+          "manaCost": 0,
+          "range": 9.0,
+          "radius": 3.5,
+          "helpAiToActivate": true,
+          "aiActivationTrigger": "EnemiesInRange",
+          "aiSkillCooldown": 14.0
+        }
+      ],
+      "productionBuilding": {
+        "id": "tactical-operations:command-relay-factory",
+        "nativeTemplateId": "PCXBaseTankFactory",
+        "isAllowedAsStartingBlueprint": true,
+        "balanceOverrides": [
+          { "name": "cost", "value": "620" },
+          { "name": "maxCapacity", "value": "4" },
+          { "name": "neededExperienceLevel", "value": "0" },
+          { "name": "rarity", "value": "Rare" }
+        ],
+        "localizations": [
+          {
+            "language": "en-US",
+            "name": "Command Relay Motor Pool",
+            "description": "Manufactures Command Relay vehicles."
+          },
+          {
+            "language": "es-XL",
+            "name": "Parque del Relé de Mando",
+            "description": "Fabrica vehículos Relé de Mando."
+          }
+        ]
+      },
+      "cardModelScalingFactor": 0.86,
+      "command": {
+        "commandRange": 7.0,
+        "commandType": "Attack",
+        "maxCommandChain": 5
+      },
+      "aura": {
+        "auraRadius": 5.0,
+        "auraType": "Buff",
+        "buffAmount": 1.0,
+        "affectsAllies": true,
+        "affectsEnemies": false
+      },
+      "synergies": [
+        {
+          "id": "tactical-operations:command-relay-overwatch",
+          "statName": "Damage",
+          "multiplier": 1.1,
+          "radius": 5.0,
+          "targetUnitIds": [
+            "tactical-operations:gravitas-breaker"
+          ]
+        }
+      ],
+      "experience": {
+        "experiencePerLevel": 1,
+        "maxLevel": 3,
+        "experienceGainMultiplier": 1.0,
+        "levelUpBonus": 0.1
+      },
+      "baselineStatusEffects": [
+        "Robust"
+      ],
+      "defaultTacticalStance": "Defensive",
+      "defaultLoadout": "Standard",
+      "startingVeterancyRank": 1,
+      "startingAffixes": [
+        "Bulwark"
+      ],
+      "aiBehavior": {
+        "unitCap": 2,
+        "combatUnitCap": 1,
+        "skillActivationCheckInterval": 2.5,
+        "aiTag": "RCL_TacticalCommandRelay"
+      }
     }
   ],
   "stages": [
@@ -1137,7 +1524,10 @@
         "tactical-operations:skyguard-sam",
         "tactical-operations:bulwark-siege-tank",
         "tactical-operations:arc-lance-walker",
-        "tactical-operations:field-medic-rover"
+        "tactical-operations:field-medic-rover",
+        "tactical-operations:sentinel-relay",
+        "tactical-operations:gravitas-breaker",
+        "tactical-operations:command-relay"
       ],
       "blueprintPoolEntries": [
         {
@@ -1146,14 +1536,17 @@
             "tactical-operations:tidebreaker-skirmisher",
             "tactical-operations:skyguard-sam",
             "tactical-operations:bulwark-siege-tank",
-            "tactical-operations:arc-lance-walker"
+            "tactical-operations:arc-lance-walker",
+            "tactical-operations:gravitas-breaker",
+            "tactical-operations:command-relay"
           ]
         },
         {
           "poolId": "BP_CheaperRobos",
           "unitIds": [
             "tactical-operations:salvage-hauler",
-            "tactical-operations:field-medic-rover"
+            "tactical-operations:field-medic-rover",
+            "tactical-operations:sentinel-relay"
           ]
         }
       ],
@@ -1218,6 +1611,27 @@
           "startingInAscensionLevel": 0,
           "countAtStart": 1,
           "maxLiving": 2
+        },
+        {
+          "unitId": "tactical-operations:sentinel-relay",
+          "baseIndex": 0,
+          "startingInAscensionLevel": 0,
+          "countAtStart": 1,
+          "maxLiving": 2
+        },
+        {
+          "unitId": "tactical-operations:gravitas-breaker",
+          "baseIndex": 0,
+          "startingInAscensionLevel": 0,
+          "countAtStart": 1,
+          "maxLiving": 2
+        },
+        {
+          "unitId": "tactical-operations:command-relay",
+          "baseIndex": 0,
+          "startingInAscensionLevel": 0,
+          "countAtStart": 1,
+          "maxLiving": 1
         }
       ],
       "productionBuildingEntries": [
@@ -1253,6 +1667,24 @@
         },
         {
           "unitId": "tactical-operations:field-medic-rover",
+          "baseIndex": 0,
+          "startingInAscensionLevel": 0,
+          "maxLiving": 1
+        },
+        {
+          "unitId": "tactical-operations:sentinel-relay",
+          "baseIndex": 0,
+          "startingInAscensionLevel": 0,
+          "maxLiving": 1
+        },
+        {
+          "unitId": "tactical-operations:gravitas-breaker",
+          "baseIndex": 0,
+          "startingInAscensionLevel": 0,
+          "maxLiving": 1
+        },
+        {
+          "unitId": "tactical-operations:command-relay",
           "baseIndex": 0,
           "startingInAscensionLevel": 0,
           "maxLiving": 1
