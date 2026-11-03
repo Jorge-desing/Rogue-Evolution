@@ -232,6 +232,19 @@ class TestModelKitSkillCopy(unittest.TestCase):
         self.assertGreaterEqual(generator_source.count("builder.add_towing_shackles"), 20)
         self.assertGreaterEqual(generator_source.count("builder.add_lifting_lugs"), 25)
         self.assertGreaterEqual(generator_source.count("builder.add_crew_cupola"), 12)
+    def test_surge_arc_tank_envelope_allows_f2_suspension_clearance(self) -> None:
+        """The custom Surge builder must leave room for f2cd4cb track details."""
+        source = (REPO_ROOT / "tools" / "Build-SurgeArcTankModel.py").read_text(encoding="utf-8")
+        self.assertIn(
+            'bounds["length_y"] > 3.0',
+            source,
+            "Surge Arc Tank envelope rejects the f2cd4cb suspension/mudflap extent",
+        )
+        self.assertIn(
+            'diagnostics["total_polygons"] > 6500',
+            source,
+            "Surge Arc Tank polygon guard rejects the f2cd4cb suspension details",
+        )
 
 
 if __name__ == "__main__":

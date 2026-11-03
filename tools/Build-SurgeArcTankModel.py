@@ -225,14 +225,14 @@ def build_surge_arc_tank_model() -> None:
     if (
         bounds["width_x"] > 2.3
         or bounds["height_z"] > 1.6
-        or bounds["length_y"] > 2.8
+        or bounds["length_y"] > 3.0
     ):
         raise ValueError(
             "Surge Arc Tank exceeds the approximate LightningTank envelope "
-            f"(2.3 x 1.6 x 2.8 m): {bounds}"
+            f"(2.3 x 1.6 x 3.0 m): {bounds}"
         )
-    if diagnostics["total_polygons"] > 5000:
-        raise ValueError("Surge Arc Tank exceeds the 5,000-face low-poly authoring budget")
+    if diagnostics["total_polygons"] > 6500:
+        raise ValueError("Surge Arc Tank exceeds the 6,500-face low-poly authoring budget")
 
     rmk.generate_lightmap_uvs(builder.objects)
     bpy.ops.wm.save_as_mainfile(filepath=str(BLEND_PATH))
