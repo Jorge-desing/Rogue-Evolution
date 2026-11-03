@@ -135,7 +135,6 @@ _RUNTIME_SNAPSHOT_GETTERS = [
     "GetAgentCoordinationCensusJson",
     "GetTacticalStanceCensusJson",
     "GetUnitAffixCensusJson",
-    "GetUnitLoadoutAndPoolCensusJson",
     "GetAiDoctrineCensusJson",
     "GetAiDirectorCensusJson",
     "GetHarvesterCensusJson",
@@ -146,8 +145,6 @@ _RUNTIME_SNAPSHOT_GETTERS = [
     "GetLoadedPrefabVisualAuditJson",
     "GetLoaderAuditCensusJson",
     "GetUnitMechanicsCensusJson",
-    "GetVisualSurfaceCensusJson",
-    "GetVisualMaterialCensusJson",
     "GetAudioCensusJson",
     "GetCameraCensusJson",
     "GetCommandAuraCensusJson",
@@ -164,6 +161,17 @@ _RUNTIME_SNAPSHOT_GETTERS = [
     "GetParticleVfxCensusJson",
     "GetLodAuditCensusJson",
 ]
+
+_RUNTIME_SNAPSHOT_GETTER_ARGS: dict[str, list[object]] = {
+    "GetVisualRenderCensusJson": [32],
+    "GetLoadedPrefabVisualAuditJson": [64],
+    "GetLoaderAuditCensusJson": [64, 32],
+    "GetUnitMechanicsCensusJson": [64],
+}
+
+
+def _snapshot_getter_args(getter: str) -> list[object]:
+    return list(_RUNTIME_SNAPSHOT_GETTER_ARGS.get(getter, []))
 
 
 def _call_http(endpoint: str, method: str = "GET", params: dict[str, Any] | None = None, body_str: str | None = None, timeout: float = 12.0) -> str:
@@ -1297,7 +1305,7 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             snapshot = {}
             for getter in getters:
                 try:
-                    raw = _call_diagnostics_method(getter)
+                    raw = _call_diagnostics_method(getter, _snapshot_getter_args(getter))
                     try:
                         snapshot[getter] = json.loads(raw)
                     except Exception:

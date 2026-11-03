@@ -181,9 +181,40 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
 
         snapshot = json.loads(response["content"][0]["text"])
         self.assertFalse(response["isError"])
-        self.assertEqual(42, len(snapshot))
+        self.assertEqual(39, len(snapshot))
         self.assertTrue(all(isinstance(value, dict) for value in snapshot.values()))
         self.assertTrue(all(value == expected for value in snapshot.values()))
+
+    def test_runtime_snapshot_passes_safe_arguments_to_bounded_getters(self) -> None:
+        calls: list[tuple[str, list[object]]] = []
+
+        def fake_http(endpoint: str, params: dict[str, object] | None = None, **_: object) -> str:
+            self.assertEqual(endpoint, "component/call_method")
+            params = params or {}
+            method = str(params["methodName"])
+            args = json.loads(str(params.get("args", "[]")))
+            calls.append((method, args))
+            payload = json.dumps({"kind": method})
+            return (
+                '{"status":"ok", "message":"Called '
+                f"'{method}' with {len(args)} args. ReturnValue: {payload}"
+                '"}'
+            )
+
+        with (
+            mock.patch.object(SERVER, "_DIAGNOSTICS_GO_ID", 73),
+            mock.patch.object(SERVER, "_call_http", side_effect=fake_http),
+        ):
+            response = SERVER.execute_tool("diagnostics_runtime_snapshot", {})
+
+        self.assertFalse(response["isError"])
+        self.assertEqual([32], next(args for method, args in calls if method == "GetVisualRenderCensusJson"))
+        self.assertEqual([64], next(args for method, args in calls if method == "GetLoadedPrefabVisualAuditJson"))
+        self.assertEqual([64, 32], next(args for method, args in calls if method == "GetLoaderAuditCensusJson"))
+        self.assertEqual([64], next(args for method, args in calls if method == "GetUnitMechanicsCensusJson"))
+        self.assertNotIn("GetUnitLoadoutAndPoolCensusJson", [method for method, _ in calls])
+        self.assertNotIn("GetVisualMaterialCensusJson", [method for method, _ in calls])
+        self.assertNotIn("GetVisualSurfaceCensusJson", [method for method, _ in calls])
 
     def test_agent_coordination_and_locking_tools(self) -> None:
         calls: list[tuple[str, list[object]]] = []
