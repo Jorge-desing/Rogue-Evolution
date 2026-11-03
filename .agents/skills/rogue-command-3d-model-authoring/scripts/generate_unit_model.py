@@ -1284,6 +1284,10 @@ def build_vehicle_model(
         builder.add_lifting_lugs()
         builder.add_interlocking_gussets()
         builder.add_splash_rib()
+        builder.add_weld_seams([
+            ((-1.20, 0.48, 0.72), (-1.05, 1.65, 0.38)),
+            ((1.20, 0.48, 0.72), (1.05, 1.65, 0.38)),
+        ])
         builder.add_fuel_drums()
         builder.add_turret(size=(1.5, 1.7, 0.48), center_y=0.12)
         builder.add_crew_cupola()
@@ -1437,6 +1441,10 @@ def build_vehicle_model(
         builder.add_lifting_lugs()
         builder.add_interlocking_gussets()
         builder.add_splash_rib()
+        builder.add_weld_seams([
+            ((-1.32, 0.55, 0.78), (-1.15, 1.85, 0.42)),
+            ((1.32, 0.55, 0.78), (1.15, 1.85, 0.42)),
+        ])
         builder.add_fuel_drums()
         builder.add_era_bricks()
         builder.add_turret(size=(1.85, 2.1, 0.58), center_y=0.15)
@@ -2508,6 +2516,10 @@ def build_vehicle_model(
         builder.add_lifting_lugs()
         builder.add_interlocking_gussets()
         builder.add_splash_rib()
+        builder.add_weld_seams([
+            ((-1.10, 0.45, 0.65), (-0.95, 1.45, 0.35)),
+            ((1.10, 0.45, 0.65), (0.95, 1.45, 0.35)),
+        ])
         builder.add_turret(size=(1.4, 1.6, 0.45), center_y=0.08)
         builder.add_crew_cupola()
         builder.add_commander_sight()

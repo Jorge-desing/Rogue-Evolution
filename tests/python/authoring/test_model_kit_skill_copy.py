@@ -198,6 +198,7 @@ class TestModelKitSkillCopy(unittest.TestCase):
 
         required_realism_assemblies = [
             "make_tapered_cylinder",
+            "make_weld_seam_bead",
             "make_cast_pelvis_assembly",
             "make_articulated_mech_torso",
             "make_sculpted_wheel_fender_assembly",
@@ -231,6 +232,7 @@ class TestModelKitSkillCopy(unittest.TestCase):
             "add_recovery_winch",
             "add_fuel_drums",
             "add_exhaust_deflector",
+            "add_weld_seams",
         ]
         for method in required_builder_methods:
             self.assertIn(method, vehicle_builder_methods, f"Method {method} missing from RogueVehicleBuilder")
@@ -249,6 +251,7 @@ class TestModelKitSkillCopy(unittest.TestCase):
         self.assertGreaterEqual(generator_source.count("builder.add_crew_cupola"), 12)
         self.assertGreaterEqual(generator_source.count("builder.add_interlocking_gussets"), 8)
         self.assertGreaterEqual(generator_source.count("builder.add_splash_rib"), 10)
+        self.assertGreaterEqual(generator_source.count("builder.add_weld_seams"), 3)
         self.assertGreaterEqual(generator_source.count("builder.add_bustle_basket"), 6)
         self.assertGreaterEqual(generator_source.count("builder.add_commander_sight"), 8)
         self.assertGreaterEqual(generator_source.count("builder.add_recovery_winch"), 6)

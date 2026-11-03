@@ -442,6 +442,15 @@ To eliminate toy-like constant-radius cylinders and repetitive stacked rings ("t
 
 ---
 
+### D. Procedural Weld Seams, Weighted Normals & World-Space Mud (Wave 8)
+- **Scalloped Weld Seams (`make_weld_seam_bead` / `.add_weld_seams()`)**: Generates physical weld beads along plate joints with alternating fish-scale puddle cones and 45° smoothing.
+- **Weighted Normals Export**: `merge_meshes_by_material` applies `shade_smooth_by_angle(38°)` and `apply_weighted_normals(weight=60, keep_sharp=True)` on every exported batch.
+- **Ground Mud & Dust**: `VehiclePBR_VertexWear.shader` procedurally accumulates terrain dust/mud on chassis and wheels below `_MudHeight` (0.55m).
+- **RNM Micro-Detail**: `BlendNormalsRNM` blends micro-steel texture with Toksvig anti-shimmering at distance.
+- **Addon Tooling**: `tools/Setup-BlenderAuthoringAddons.ps1` configures `EdgeFlow`, `DreamUV`, and `Ucupaint` in Blender 4.5.14.
+
+---
+
 ## References & Specialized Guides
 
 - [Art Style & Palette Guide](references/art-style-and-palette.md) — grounded form language, mechanical construction checks, faction palettes, scale-aware edge treatment, and LOD/readability rules.

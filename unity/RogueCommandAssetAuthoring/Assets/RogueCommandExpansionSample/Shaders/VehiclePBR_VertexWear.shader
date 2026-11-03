@@ -21,6 +21,17 @@ Shader "RogueCommand/VehiclePBR_VertexWear"
         _SootStrength ("Thermal Soot Strength (Blue)", Range(0.0, 2.0)) = 1.0
         _TeamColor ("Team Color Tint (Alpha Mask)", Color) = (1,1,1,1)
 
+        [Header(Procedural Ground Mud and Dust)]
+        _MudAmount ("Mud & Dust Intensity", Range(0.0, 1.0)) = 0.40
+        _MudColor ("Mud Color Tint", Color) = (0.28, 0.22, 0.16, 1.0)
+        _MudHeight ("Mud Splatter Height", Float) = 0.55
+        _MudSmoothness ("Mud Surface Smoothness", Range(0.0, 1.0)) = 0.20
+
+        [Header(Micro Surface Detail RNM)]
+        [Normal] _DetailBumpMap ("Micro Detail Normal", 2D) = "bump" {}
+        _DetailBumpScale ("Detail Normal Scale", Range(0.0, 2.0)) = 0.5
+        _DetailTiling ("Detail Map Tiling", Float) = 16.0
+
         _Cutoff ("Alpha Cutoff", Range(0.0, 1.0)) = 0.5
         [Enum(UnityEngine.Rendering.CullMode)] _Cull ("Cull", Float) = 2
         [HideInInspector] _Surface ("Surface", Float) = 0
@@ -75,16 +86,32 @@ Shader "RogueCommand/VehiclePBR_VertexWear"
                 half4 _BaseColor;
                 half4 _EmissionColor;
                 half4 _TeamColor;
+                half4 _MudColor;
                 half _Metallic;
                 half _Smoothness;
                 half _GlossMapScale;
                 half _BumpScale;
+                half _DetailBumpScale;
+                half _DetailTiling;
                 half _AoStrength;
                 half _WearStrength;
                 half _SootStrength;
+                half _MudAmount;
+                half _MudHeight;
+                half _MudSmoothness;
                 half _Cutoff;
                 half _Surface;
             CBUFFER_END
+
+            TEXTURE2D(_DetailBumpMap);
+            SAMPLER(sampler_DetailBumpMap);
+
+            half3 BlendNormalsRNM(half3 n1, half3 n2)
+            {
+                half3 t = n1 + half3(0.0h, 0.0h, 1.0h);
+                half3 u = n2 * half3(-1.0h, -1.0h, 1.0h);
+                return t * dot(t, u) / max(0.0001h, t.z) - u;
+            }
 
             struct VehicleAttributes
             {
@@ -180,8 +207,24 @@ Shader "RogueCommand/VehiclePBR_VertexWear"
                 surfaceData.smoothness = saturate(lerp(surfaceData.smoothness, 0.85h, steelMask * 0.8h) * (1.0h - primerMask * 0.4h));
                 surfaceData.smoothness *= (1.0h - soot * 0.65h);
 
-                surfaceData.normalTS = SampleNormal(input.uv,
+                // Procedural ground mud & road dust accumulation on chassis, tracks, and lower hull
+                half heightFactor = saturate(1.0h - (input.positionWS.y / max(0.05h, _MudHeight)));
+                half mudFactor = heightFactor * heightFactor * _MudAmount;
+                surfaceData.albedo = lerp(surfaceData.albedo, _MudColor.rgb, mudFactor * 0.85h);
+                surfaceData.metallic *= (1.0h - mudFactor);
+                surfaceData.smoothness = lerp(surfaceData.smoothness, _MudSmoothness, mudFactor * 0.85h);
+
+                // Toksvig anti-shimmer factor for distant isometric RTS camera
+                half distToCam = length(_WorldSpaceCameraPos - input.positionWS);
+                half shimmerDamping = saturate(distToCam * 0.012h);
+                surfaceData.smoothness = lerp(surfaceData.smoothness, surfaceData.smoothness * 0.75h, shimmerDamping);
+
+                // Micro-surface normal sampling with Reoriented Normal Mapping (RNM)
+                half3 baseNormalTS = SampleNormal(input.uv,
                     TEXTURE2D_ARGS(_BumpMap, sampler_BumpMap), _BumpScale);
+                half3 detailNormalTS = SampleNormal(input.uv * _DetailTiling,
+                    TEXTURE2D_ARGS(_DetailBumpMap, sampler_DetailBumpMap), _DetailBumpScale);
+                surfaceData.normalTS = BlendNormalsRNM(baseNormalTS, detailNormalTS);
                 surfaceData.emission = SampleEmission(input.uv, _EmissionColor.rgb,
                     TEXTURE2D_ARGS(_EmissionMap, sampler_EmissionMap));
                 surfaceData.occlusion = 1.0h;

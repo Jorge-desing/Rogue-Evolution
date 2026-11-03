@@ -832,3 +832,21 @@ To resolve the artificial "toy-like" look caused by straight constant-radius pip
 - **Two-Tier Edge Wear & Carbon Soot Specular Extinction (`VehiclePBR_VertexWear.shader`)**:
   - Two-tier wear transition curve: dark oxidized primer boundary outline (`#2c2724`, `wear 0.12-0.50`) transitioning into bare bright hardened alloy steel ridge (`#c7ccd6`, `wear > 0.42`), accurately simulating realistic paint chipping.
   - Thermal soot specular extinction: carbon soot scaling suppresses specular smoothness (`smoothness *= (1.0 - soot * 0.65)`) and reduces metallic response (`metallic -= soot * 0.40`), ensuring burned muzzles and exhausts render as velvety carbon-matte instead of plastic or glossy metal.
+
+### Wave 8 Hard-Surface Realism: Procedural Scalloped Weld Seams, Weighted Normals, World-Space Mud & RNM Micro-Relief (local build/validation evidence)
+
+To elevate realism beyond clean primitive blockouts and eliminate knife-edge joins and uniform shading:
+- **Procedural Scalloped Weld Seam Chains (`make_weld_seam_bead` / `.add_weld_seams()`)**:
+  - Simulates industrial MIG/TIG weld seams along plate boundaries (glacis-to-hull joints, cheek armor) via alternating-tilt low-poly elliptical weld puddle cones with 45° angle-weighted auto-smoothing.
+  - Deployed on `tank`, `super_heavy`, and `artillery` sloped armor junctions.
+- **Automatic Weighted Normal Enforcement in FBX Export (`merge_meshes_by_material`)**:
+  - `merge_meshes_by_material` now systematically applies `shade_smooth_by_angle(38.0°)` and `apply_weighted_normals(weight=60, keep_sharp=True)` across all combined mesh batches.
+  - Keeps broad armor planes mathematically flat (no shading pinch) while 2-segment chamfers reflect sharp specular sun glints.
+- **World-Space Ground Mud & Road Dust Accumulation (`VehiclePBR_VertexWear.shader`)**:
+  - Computes vertical height falloff from `positionWS.y` and `_MudHeight` (default 0.55m).
+  - Procedurally blends albedo towards `_MudColor`, extinguishes metallic reflectivity (`metallic *= (1.0 - mudFactor)`), and dulls specularity to `_MudSmoothness` (0.20), grounding tracks, roadwheels, and lower hulls naturally onto terrain.
+- **Reoriented Normal Mapping (RNM) & Toksvig Anti-Shimmering**:
+  - Integrates `BlendNormalsRNM` for micro-armor grain (`_DetailBumpMap`) blending without flattening base normals.
+  - View-distance Toksvig damping softens specular highlights at high RTS camera elevations to eliminate pixel shimmering.
+- **Automated Open-Source Addon Installer (`tools/Setup-BlenderAuthoringAddons.ps1`)**:
+  - Automates installation and verification of `EdgeFlow` (edge-loop curvature), `DreamUV` (trim-sheet mapping), and `Ucupaint` (layered PBR texturing) directly in Blender 4.5.14 LTS.

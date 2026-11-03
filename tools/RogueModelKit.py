@@ -5240,6 +5240,62 @@ def make_sculpted_wheel_fender_assembly(
     return objects
 
 
+def make_weld_seam_bead(
+    name: str,
+    start: Tuple[float, float, float] | Vector,
+    end: Tuple[float, float, float] | Vector,
+    radius: float = 0.016,
+    bead_spacing: float = 0.032,
+    material: bpy.types.Material | None = None,
+) -> bpy.types.Object | None:
+    """Generates an authentic scalloped military weld seam bead chain between start and end coordinates."""
+    p1 = Vector(start)
+    p2 = Vector(end)
+    diff = p2 - p1
+    length = diff.length
+    if length < 0.001:
+        return None
+
+    direction = diff.normalized()
+    bead_count = max(3, int(length / bead_spacing))
+    actual_spacing = length / bead_count
+    rot_quat = direction.to_track_quat("Z", "Y")
+
+    mesh = bpy.data.meshes.new(f"{name}_Mesh")
+    bm = bmesh.new()
+
+    for i in range(bead_count + 1):
+        pos = p1 + direction * (i * actual_spacing)
+        matrix = rot_quat.to_matrix().to_4x4()
+        matrix.translation = pos
+        tilt = Euler((0.14 * (1.0 if i % 2 == 0 else -0.14), 0.0, 0.0)).to_matrix().to_4x4()
+        full_mat = matrix @ tilt
+        bmesh.ops.create_cone(
+            bm,
+            cap_ends=True,
+            cap_tris=False,
+            segments=6,
+            radius1=radius,
+            radius2=radius * 0.45,
+            depth=actual_spacing * 0.90,
+            matrix=full_mat,
+        )
+
+    bm.to_mesh(mesh)
+    bm.free()
+
+    obj = bpy.data.objects.new(name, mesh)
+    bpy.context.collection.objects.link(obj)
+    if material:
+        obj.data.materials.append(material)
+
+    bpy.context.view_layer.objects.active = obj
+    obj.select_set(True)
+    if hasattr(bpy.ops.object, "shade_smooth_by_angle"):
+        bpy.ops.object.shade_smooth_by_angle(angle=math.radians(45.0))
+    return obj
+
+
 def make_glacis_splash_rib(
     prefix: str,
     location: Tuple[float, float, float] | Vector,
@@ -6998,6 +7054,10 @@ def merge_meshes_by_material(
             polygon.material_index = 0
         combined.data.materials.clear()
         combined.data.materials.append(material)
+
+        if hasattr(bpy.ops.object, "shade_smooth_by_angle"):
+            bpy.ops.object.shade_smooth_by_angle(angle=math.radians(38.0))
+        apply_weighted_normals(combined, weight=60, keep_sharp=True, apply_modifier=True)
         exported_objects.append(combined)
 
     return exported_objects
@@ -13890,6 +13950,26 @@ class RogueVehicleBuilder:
             ))
         return self
 
+    def add_weld_seams(
+        self,
+        seams: Sequence[Tuple[Tuple[float, float, float] | Vector, Tuple[float, float, float] | Vector]],
+        radius: float = 0.016,
+        material: bpy.types.Material | None = None,
+        prefix: str = "WeldSeam",
+    ) -> "RogueVehicleBuilder":
+        """Adds authentic scalloped weld seams along specified plate seam segment tuples."""
+        mat = material or self.palette.gunmetal
+        for idx, (p1, p2) in enumerate(seams, start=1):
+            weld_obj = make_weld_seam_bead(
+                f"{self.name}_{prefix}_{idx:02d}",
+                p1, p2,
+                radius=radius,
+                material=mat,
+            )
+            if weld_obj:
+                self.objects.append(weld_obj)
+        return self
+
     def add_splash_rib(
         self,
         location: Tuple[float, float, float] | Vector | None = None,
@@ -15024,6 +15104,26 @@ class RogueStructureBuilder:
             bracket_mat=self.palette.gunmetal,
             accent_mat=self.palette.warning,
         ))
+        return self
+
+    def add_weld_seams(
+        self,
+        seams: Sequence[Tuple[Tuple[float, float, float] | Vector, Tuple[float, float, float] | Vector]],
+        radius: float = 0.018,
+        material: bpy.types.Material | None = None,
+        prefix: str = "WeldSeam",
+    ) -> "RogueStructureBuilder":
+        """Adds authentic scalloped weld seams along structure foundation or armor junctions."""
+        mat = material or self.palette.gunmetal
+        for idx, (p1, p2) in enumerate(seams, start=1):
+            weld_obj = make_weld_seam_bead(
+                f"{self.name}_{prefix}_{idx:02d}",
+                p1, p2,
+                radius=radius,
+                material=mat,
+            )
+            if weld_obj:
+                self.objects.append(weld_obj)
         return self
 
     def add_colliders(self) -> "RogueStructureBuilder":
