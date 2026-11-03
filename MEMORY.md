@@ -628,4 +628,4 @@ This is a compact, durable orientation for agents. For the changing checkout sta
 
 - QA/reflection safety: Profile2 is dedicated QA without a tutorial; never ask, inspect, infer, gate, bypass, or switch profiles for tutorial. Check current selector/save safety and preserve saves. Before reflection jointly verify Rogue Command version, Unity `2021.3.45f2`, Assembly-CSharp SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, and MVID `db0e9462-128d-4296-9900-de18b4bd0c00`.
 
-- Root MEMORY.md, codex memory, antigravity memory, and mem0 synced to working tree after HEAD `f125ce4`. Memory-only update; not committed.
+- Root MEMORY.md, codex memory, antigravity memory, and mem0 synced to working tree after HEAD `f125ce4`. Root MEMORY.md committed as `fa995fac67d484858758252bbbdb355a56a073e0` and pushed; upstream/HEAD match. Codex/antigravity memories and mem0 updated locally (not tracked in repo).
