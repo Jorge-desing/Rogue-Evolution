@@ -857,3 +857,22 @@ This is a compact, durable orientation for agents. For the changing checkout sta
 - QA/reflection safety: Profile2 is dedicated QA without a tutorial; never ask, inspect, infer, gate, bypass, or switch profiles for tutorial. Check current selector/save safety and preserve saves. Before reflection jointly verify Rogue Command version, Unity `2021.3.45f2`, Assembly-CSharp SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, and MVID `db0e9462-128d-4296-9900-de18b4bd0c00`.
 
 - Root MEMORY.md, codex memory, antigravity memory, and mem0 synced to HEAD `361bb72`. Memory-only for codex/antigravity/mem0; root MEMORY.md committed/pushed (361bb72).
+
+## Refresh (2026-11-03, HEAD c61d479 — worktree inventory and external memory sync)
+
+- Repository `C:/Users/Alex/Documents/Mod Rogue Command`, loader `1.19.0`, branch `codex/rogue-unit-balance-20261018`. Verified local HEAD, upstream-tracking ref, and origin branch all equal `c61d4791baf68d0f438054ff36fbf9fd1b9a1d3e` (`docs(memory): sync root MEMORY.md to HEAD 361bb72 + agent memories/mem0`). No code changes since `815ea56`; commits since are docs(memory) sync entries. Code baseline remains `0bbede6b7beb68f8f50f4ae89f10e83ecb056c0d`; implementation baseline remains `e25c6de` (arachnid middle-leg orientation normalizer); remains `d7a3a11b56b58bed6d3f06c47fd40a627c9d1ae3`.
+
+- Worktree inventory (preserve all; do not stage, reset, clean, or overwrite):
+  - root `c61d479` on `codex/rogue-unit-balance-20261018`, clean except nested worktree gitlinks.
+  - `.worktrees/cargador` @ `11e9968` (main), dirty (modified `MODDING_PLAN.md`/`MODLOG.md`), 99 commits behind inspected origin/main.
+  - `.worktrees/task-graph-validation` @ `d1f9045` (`codex/task-graph-validation`), dirty (schema/runtime/validation/diagnostics/tests/tooling plus untracked localization test), no upstream.
+  - `C:/Users/Alex/.codex/worktrees/runtime-content-fixes/Mod Rogue Command` @ `35bd99a` (`codex/unit-production-buildings`), clean, separate line of work (dedicated production buildings for expansion units). Do not merge without inspection.
+  - `artifacts/status-effects-clean` detached @ `b63a00b`.
+
+- Uncommitted root state preserved: nested worktree gitlinks modified; untracked `.agents/skills/rogue-command-game-research/references/`; staged Unity prefab reductions; untracked `unity/.../SampleExpansion/` (+meta); uncommitted `docs/research/AGENT-HANDOFF.md` continuation snapshot.
+
+- Validation unchanged from the `815ea56`/`361bb72` sync (no fresh run in this memory-only sync): Release plugin build 0 warnings/0 errors; C# harness `475/476` (1 Windows symlink-privilege skip, 0 failures); Python suite `129/129`; AssetBundle references sample-native `25/0` and tactical-operations `18/0`; native visual preflight `9/9` per pack, 0 errors; loader registry 4 manifests, 0 issues; `git diff --check` clean (LF/CRLF notices). Local/static evidence only; no fresh Steam/Unity gameplay proof beyond existing tactical-operations runtime smoke (AGENT-HANDOFF points 28/33/34). Natural offer->selection->placement->production/render/stat and tactical AI remain unverified.
+
+- QA/reflection safety: Profile2 is dedicated QA without a tutorial; never ask, inspect, infer, gate, bypass, or switch profiles for tutorial. Check current selector/save safety and preserve saves. Before reflection jointly verify Rogue Command version, Unity `2021.3.45f2`, Assembly-CSharp SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, and MVID `db0e9462-128d-4296-9900-de18b4bd0c00`.
+
+- Root MEMORY.md, codex memory, antigravity memory, and mem0 synced to HEAD `c61d479`. Memory-only for codex/antigravity/mem0; root MEMORY.md commit/push pending.
