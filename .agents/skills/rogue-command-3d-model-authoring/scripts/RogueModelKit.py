@@ -10,6 +10,7 @@ and Unity 2021.3.45f2 FBX export.
 from __future__ import annotations
 import json
 import math
+import re
 from pathlib import Path
 from typing import Any, Dict, Sequence, Tuple
 
@@ -4066,6 +4067,645 @@ def make_perforated_barrel_shroud_assembly(
 
 
 
+def make_nanite_projector_assembly(
+    prefix: str,
+    gun_pivot: Tuple[float, float, float] | Vector = (0.0, 1.2, 0.9),
+    direction: Tuple[float, float, float] | Vector = (0.0, 1.0, 0.0),
+    head_radius: float = 0.16,
+    length: float = 1.2,
+    cradle_mat: bpy.types.Material | None = None,
+    nozzle_mat: bpy.types.Material | None = None,
+    glow_mat: bpy.types.Material | None = None,
+    canister_mat: bpy.types.Material | None = None,
+    conduit_mat: bpy.types.Material | None = None,
+) -> list[bpy.types.Object]:
+    """Generates an articulated medical/repair nanite projector assembly with pressurized storage canisters, elevation cradle, collimating lens ring, and multi-aperture dispersal nozzle."""
+    objects: list[bpy.types.Object] = []
+    gp = Vector(gun_pivot)
+    gd = Vector(direction)
+    if gd.length_squared <= 1e-8:
+        raise ValueError("direction must be a non-zero vector.")
+    gd.normalize()
+    u_vec, v_vec, _ = get_orthonormal_basis(gd)
+    rot_euler = gd.to_track_quat("Z", "Y").to_euler()
+
+    cr_mat = cradle_mat or nozzle_mat
+    nz_mat = nozzle_mat or cradle_mat
+    gl_mat = glow_mat or cr_mat
+    ca_mat = canister_mat or cr_mat
+    cd_mat = conduit_mat or nz_mat
+
+    hr = max(0.08, head_radius)
+    bl = max(0.6, length)
+
+    # 1. Armored elevation trunnion yoke / cradle
+    cradle_w = hr * 3.8
+    cradle_h = hr * 2.6
+    cradle_loc = gp + gd * (bl * 0.12)
+    objects.append(make_box(
+        f"{prefix}_Nanite_Cradle",
+        (cradle_w, bl * 0.28, cradle_h),
+        cradle_loc,
+        cr_mat,
+        bevel=0.02,
+        rotation=rot_euler,
+    ))
+
+    # 2. Bilateral pressurized nanite chemical canisters flanking cradle
+    for side in (-1, 1):
+        stag = "L" if side < 0 else "R"
+        can_loc = cradle_loc + u_vec * (side * (cradle_w * 0.5 + hr * 0.95))
+        objects.append(make_cylinder(
+            f"{prefix}_Nanite_Canister_{stag}",
+            radius=hr * 0.85,
+            depth=bl * 0.55,
+            location=can_loc,
+            material=ca_mat,
+            vertices=12,
+            bevel=0.02,
+            rotation=rot_euler,
+        ))
+        # Glowing vertical level-indicator sight glass slot on each canister
+        objects.append(make_box(
+            f"{prefix}_Nanite_SightGlass_{stag}",
+            (hr * 0.22, bl * 0.38, hr * 0.22),
+            can_loc + u_vec * (side * hr * 0.75),
+            gl_mat,
+            bevel=0.005,
+            rotation=rot_euler,
+        ))
+        # Flexible armored feeder conduit curving into the main barrel receiver
+        tube_start = can_loc + gd * (bl * 0.22)
+        tube_end = cradle_loc + gd * (bl * 0.38) + u_vec * (side * hr * 0.8)
+        objects.append(make_rod(
+            f"{prefix}_Nanite_Conduit_{stag}",
+            tube_start,
+            tube_end,
+            radius=hr * 0.22,
+            material=cd_mat,
+            vertices=8,
+        ))
+
+    # 3. Main projection projector barrel & magnetic focusing rings
+    barrel_center = gp + gd * (bl * 0.52)
+    objects.append(make_cylinder(
+        f"{prefix}_Nanite_ProjectorTube",
+        radius=hr * 1.15,
+        depth=bl * 0.70,
+        location=barrel_center,
+        material=nz_mat,
+        vertices=12,
+        bevel=0.015,
+        rotation=rot_euler,
+    ))
+    # Stepped magnetic accelerator focusing collars
+    for f_idx in range(3):
+        f_pos = gp + gd * (bl * (0.32 + f_idx * 0.18))
+        objects.append(make_cylinder(
+            f"{prefix}_Nanite_FocusRing_{f_idx+1}",
+            radius=hr * 1.35,
+            depth=bl * 0.08,
+            location=f_pos,
+            material=ca_mat,
+            vertices=12,
+            bevel=0.01,
+            rotation=rot_euler,
+        ))
+
+    # 4. Multi-aperture dispersal nozzle & glowing collimating lens ring
+    muzzle_pos = gp + gd * (bl * 0.92)
+    objects.append(make_cylinder(
+        f"{prefix}_Nanite_DispersalBell",
+        radius=hr * 1.55,
+        depth=bl * 0.20,
+        location=muzzle_pos,
+        material=cr_mat,
+        vertices=12,
+        bevel=0.018,
+        rotation=rot_euler,
+    ))
+    # Glowing emitter ring at aperture mouth
+    objects.append(make_cylinder(
+        f"{prefix}_Nanite_CollimatorGlow",
+        radius=hr * 1.35,
+        depth=bl * 0.05,
+        location=muzzle_pos + gd * (bl * 0.10),
+        material=gl_mat,
+        vertices=12,
+        bevel=0.005,
+        rotation=rot_euler,
+    ))
+
+    return objects
+
+
+def make_gravity_cannon_assembly(
+    prefix: str,
+    gun_pivot: Tuple[float, float, float] | Vector = (0.0, 1.2, 0.9),
+    direction: Tuple[float, float, float] | Vector = (0.0, 1.0, 0.0),
+    barrel_length: float = 2.2,
+    bore_radius: float = 0.14,
+    ring_count: int = 4,
+    mount_mat: bpy.types.Material | None = None,
+    barrel_mat: bpy.types.Material | None = None,
+    core_mat: bpy.types.Material | None = None,
+    accent_mat: bpy.types.Material | None = None,
+) -> list[bpy.types.Object]:
+    """Generates a super-heavy gravitational singularity cannon / kinetic mass driver with magnetic accelerator ring stages, glowing grav-core chamber, and longitudinal stabilization rails."""
+    objects: list[bpy.types.Object] = []
+    gp = Vector(gun_pivot)
+    gd = Vector(direction)
+    if gd.length_squared <= 1e-8:
+        raise ValueError("direction must be a non-zero vector.")
+    gd.normalize()
+    u_vec, v_vec, _ = get_orthonormal_basis(gd)
+    rot_euler = gd.to_track_quat("Z", "Y").to_euler()
+
+    m_mat = mount_mat or barrel_mat
+    b_mat = barrel_mat or mount_mat
+    c_mat = core_mat or b_mat
+    a_mat = accent_mat or b_mat
+
+    br = max(0.08, bore_radius)
+    bl = max(1.2, barrel_length)
+    n_rings = max(2, ring_count)
+
+    # 1. Heavy reinforced octagonal breech & hydraulic trunnion mount
+    breech_w = br * 4.6
+    breech_h = br * 3.8
+    breech_l = bl * 0.28
+    breech_pos = gp + gd * (breech_l * 0.45)
+    objects.append(make_box(
+        f"{prefix}_Gravity_BreechMount",
+        (breech_w, breech_l, breech_h),
+        breech_pos,
+        m_mat,
+        bevel=0.035,
+        rotation=rot_euler,
+    ))
+
+    # 2. Central glowing gravitational containment core cylinder
+    core_len = bl * 0.32
+    core_pos = breech_pos + gd * (breech_l * 0.5 + core_len * 0.5)
+    objects.append(make_cylinder(
+        f"{prefix}_Gravity_SingularityCore",
+        radius=br * 1.55,
+        depth=core_len,
+        location=core_pos,
+        material=c_mat,
+        vertices=12,
+        bevel=0.015,
+        rotation=rot_euler,
+    ))
+
+    # 3. Main bore tube
+    tube_len = bl * 0.65
+    tube_pos = core_pos + gd * (core_len * 0.5 + tube_len * 0.5)
+    objects.append(make_cylinder(
+        f"{prefix}_Gravity_BoreTube",
+        radius=br,
+        depth=tube_len,
+        location=tube_pos,
+        material=b_mat,
+        vertices=12,
+        bevel=0.01,
+        rotation=rot_euler,
+    ))
+
+    # 4. Stepped concentric magnetic accelerator ring stages
+    step_d = tube_len / max(1, n_rings)
+    for r_idx in range(n_rings):
+        ring_d = core_pos + gd * (core_len * 0.5 + (r_idx + 0.5) * step_d)
+        ring_rad = br * (2.10 - 0.12 * r_idx)
+        objects.append(make_cylinder(
+            f"{prefix}_Gravity_AccelRing_{r_idx+1}",
+            radius=ring_rad,
+            depth=step_d * 0.48,
+            location=ring_d,
+            material=m_mat,
+            vertices=12,
+            bevel=0.018,
+            rotation=rot_euler,
+        ))
+        # High-voltage dielectric warning collar
+        objects.append(make_cylinder(
+            f"{prefix}_Gravity_RingCollar_{r_idx+1}",
+            radius=ring_rad * 1.08,
+            depth=step_d * 0.16,
+            location=ring_d,
+            material=a_mat,
+            vertices=12,
+            bevel=0.008,
+            rotation=rot_euler,
+        ))
+
+    # 5. Four perimeter longitudinal stabilization guide rails
+    rail_start = breech_pos + gd * (breech_l * 0.48)
+    rail_end = tube_pos + gd * (tube_len * 0.52)
+    rail_offsets = [
+        (u_vec * (br * 2.2), "Right"),
+        (-u_vec * (br * 2.2), "Left"),
+        (v_vec * (br * 2.2), "Top"),
+        (-v_vec * (br * 2.2), "Bottom"),
+    ]
+    for r_off, rtag in rail_offsets:
+        objects.append(make_rod(
+            f"{prefix}_Gravity_StabilizerRail_{rtag}",
+            rail_start + r_off,
+            rail_end + r_off,
+            radius=br * 0.22,
+            material=b_mat,
+            vertices=8,
+        ))
+
+    # 6. Muzzle crown field projector ring
+    muzzle_pos = tube_pos + gd * (tube_len * 0.5 + 0.04)
+    objects.append(make_cylinder(
+        f"{prefix}_Gravity_MuzzleCrown",
+        radius=br * 1.85,
+        depth=0.12,
+        location=muzzle_pos,
+        material=m_mat,
+        vertices=12,
+        bevel=0.015,
+        rotation=rot_euler,
+    ))
+    objects.append(make_cylinder(
+        f"{prefix}_Gravity_MuzzleEmitterGlow",
+        radius=br * 1.45,
+        depth=0.04,
+        location=muzzle_pos + gd * 0.06,
+        material=c_mat,
+        vertices=12,
+        bevel=0.005,
+        rotation=rot_euler,
+    ))
+
+    return objects
+
+
+def make_nanite_repair_dispenser_assembly(
+    prefix: str,
+    location: Tuple[float, float, float] | Vector = (0.0, 0.0, 1.0),
+    scale: float = 1.0,
+    canister_radius: float = 0.18,
+    canister_height: float = 0.55,
+    spacing_x: float = 1.8,
+    canister_mat: bpy.types.Material | None = None,
+    frame_mat: bpy.types.Material | None = None,
+    glow_mat: bpy.types.Material | None = None,
+    hose_mat: bpy.types.Material | None = None,
+) -> list[bpy.types.Object]:
+    """Generates bilateral armored field nanite repair dispenser pods with glowing inspection sight glasses, pressure manifolds, atomizing spray heads, and braided fluid hoses."""
+    objects: list[bpy.types.Object] = []
+    loc = Vector(location)
+    c_mat = canister_mat or frame_mat
+    f_mat = frame_mat or canister_mat
+    g_mat = glow_mat or f_mat
+    h_mat = hose_mat or f_mat
+
+    s = max(0.4, scale)
+    cr = canister_radius * s
+    ch = canister_height * s
+    sx = spacing_x * s
+
+    for side in (-1, 1):
+        stag = "L" if side < 0 else "R"
+        can_x = loc.x + side * (sx * 0.5)
+        can_pos = Vector((can_x, loc.y, loc.z))
+
+        # 1. Armored mounting bracket knuckle on chassis flank
+        objects.append(make_box(
+            f"{prefix}_NaniteDisp_Bracket_{stag}",
+            (0.12 * s, 0.22 * s, ch * 0.65),
+            can_pos - Vector((side * (cr * 0.9), 0.0, 0.0)),
+            f_mat,
+            bevel=0.012 * s,
+        ))
+
+        # 2. Main cylindrical nanite storage vessel
+        objects.append(make_cylinder(
+            f"{prefix}_NaniteDisp_Tank_{stag}",
+            radius=cr,
+            depth=ch,
+            location=can_pos,
+            material=c_mat,
+            vertices=12,
+            bevel=0.02 * s,
+        ))
+
+        # 3. Vertical glowing fluid level sight glass
+        objects.append(make_box(
+            f"{prefix}_NaniteDisp_LevelGlass_{stag}",
+            (cr * 0.25, cr * 0.25, ch * 0.68),
+            can_pos + Vector((side * (cr * 0.85), 0.0, 0.0)),
+            g_mat,
+            bevel=0.005 * s,
+        ))
+
+        # 4. Top atomizing distribution manifold block & spray nozzle
+        manifold_z = loc.z + ch * 0.5 + 0.06 * s
+        objects.append(make_box(
+            f"{prefix}_NaniteDisp_Manifold_{stag}",
+            (cr * 1.5, cr * 1.5, 0.10 * s),
+            Vector((can_x, loc.y, manifold_z)),
+            f_mat,
+            bevel=0.010 * s,
+        ))
+        # Forward/outward angled spray dispersal horn
+        spray_dir = Vector((side * 0.5, 0.8, 0.3)).normalized()
+        spray_rot = spray_dir.to_track_quat("Z", "Y").to_euler()
+        objects.append(make_cylinder(
+            f"{prefix}_NaniteDisp_SprayNozzle_{stag}",
+            radius=cr * 0.45,
+            depth=0.12 * s,
+            location=Vector((can_x + side * (cr * 0.4), loc.y + cr * 0.5, manifold_z + 0.04 * s)),
+            material=c_mat,
+            vertices=10,
+            bevel=0.008 * s,
+            rotation=spray_rot,
+        ))
+
+        # 5. Flexible braided armored supply hose into hull
+        hose_start = Vector((can_x, loc.y - cr * 0.5, loc.z - ch * 0.25))
+        hose_end = Vector((can_x - side * (cr * 1.4), loc.y - cr * 0.8, loc.z - ch * 0.25))
+        objects.append(make_rod(
+            f"{prefix}_NaniteDisp_Hose_{stag}",
+            hose_start,
+            hose_end,
+            radius=cr * 0.28,
+            material=h_mat,
+            vertices=8,
+        ))
+
+    return objects
+
+
+def make_grav_dampener_hub_assembly(
+    prefix: str,
+    location: Tuple[float, float, float] | Vector = (0.0, 0.0, 1.2),
+    radius: float = 0.42,
+    height: float = 0.28,
+    housing_mat: bpy.types.Material | None = None,
+    rotor_mat: bpy.types.Material | None = None,
+    core_mat: bpy.types.Material | None = None,
+    brace_mat: bpy.types.Material | None = None,
+) -> list[bpy.types.Object]:
+    """Generates a chassis-mounted gyroscopic gravitational anchor and inertial dampener hub with counter-rotating magnetic rings, glowing singularity sphere, and structural tie-down braces."""
+    objects: list[bpy.types.Object] = []
+    loc = Vector(location)
+    h_mat = housing_mat or rotor_mat
+    r_mat = rotor_mat or housing_mat
+    c_mat = core_mat or h_mat
+    b_mat = brace_mat or h_mat
+
+    rad = max(0.25, radius)
+    h = max(0.15, height)
+
+    # 1. Octagonal gyro base pedestal
+    objects.append(make_cylinder(
+        f"{prefix}_GravHub_BasePedestal",
+        radius=rad * 1.15,
+        depth=h * 0.35,
+        location=loc + Vector((0.0, 0.0, h * 0.175)),
+        material=h_mat,
+        vertices=8,
+        bevel=0.015,
+    ))
+
+    # 2. Dual concentric counter-rotating magnetic rotor rings
+    objects.append(make_torus(
+        f"{prefix}_GravHub_OuterRotor",
+        location=loc + Vector((0.0, 0.0, h * 0.55)),
+        major_radius=rad * 0.85,
+        minor_radius=rad * 0.12,
+        material=r_mat,
+        major_segments=16,
+        minor_segments=6,
+    ))
+    objects.append(make_torus(
+        f"{prefix}_GravHub_InnerRotor",
+        location=loc + Vector((0.0, 0.0, h * 0.55)),
+        major_radius=rad * 0.55,
+        minor_radius=rad * 0.10,
+        material=r_mat,
+        major_segments=14,
+        minor_segments=6,
+    ))
+
+    # 3. Central glowing singularity containment core sphere
+    objects.append(make_cylinder(
+        f"{prefix}_GravHub_SingularityCore",
+        radius=rad * 0.35,
+        depth=h * 0.65,
+        location=loc + Vector((0.0, 0.0, h * 0.55)),
+        material=c_mat,
+        vertices=12,
+        bevel=0.02,
+    ))
+
+    # 4. Four angled stabilizing tie-down anchor struts
+    corners = [(-1, -1), (1, -1), (1, 1), (-1, 1)]
+    for idx, (cx, cy) in enumerate(corners, start=1):
+        p_top = loc + Vector((cx * rad * 0.65, cy * rad * 0.65, h * 0.70))
+        p_bot = loc + Vector((cx * rad * 1.25, cy * rad * 1.25, 0.02))
+        objects.append(make_rod(
+            f"{prefix}_GravHub_AnchorStrut_{idx}",
+            p_top,
+            p_bot,
+            radius=rad * 0.075,
+            material=b_mat,
+            vertices=6,
+        ))
+
+    return objects
+
+
+def make_comms_ew_mast_assembly(
+    prefix: str,
+    location: Tuple[float, float, float] | Vector = (0.0, 0.0, 1.2),
+    height: float = 1.6,
+    base_mat: bpy.types.Material | None = None,
+    mast_mat: bpy.types.Material | None = None,
+    radome_mat: bpy.types.Material | None = None,
+    glow_mat: bpy.types.Material | None = None,
+) -> list[bpy.types.Object]:
+    """Generates a heavy-duty telescopic communications & EW jamming mast with planar high-frequency blade antenna fins, cross-dipole jamming horns, satcom dome, and glowing apex beacon LEDs."""
+    objects: list[bpy.types.Object] = []
+    loc = Vector(location)
+    b_mat = base_mat or mast_mat
+    m_mat = mast_mat or base_mat
+    r_mat = radome_mat or b_mat
+    g_mat = glow_mat or m_mat
+
+    ht = max(0.8, height)
+
+    # 1. Heavy stepped base collar on roof
+    objects.append(make_cylinder(
+        f"{prefix}_CommsMast_BaseCollar",
+        radius=0.18,
+        depth=0.14,
+        location=loc + Vector((0.0, 0.0, 0.07)),
+        material=b_mat,
+        vertices=10,
+        bevel=0.015,
+    ))
+
+    # 2. Telescopic mast tube stages (3 stages)
+    stages = 3
+    stage_h = (ht * 0.75) / stages
+    for s_idx in range(stages):
+        stage_rad = 0.09 - s_idx * 0.02
+        s_z = loc.z + 0.14 + (s_idx + 0.5) * stage_h
+        objects.append(make_cylinder(
+            f"{prefix}_CommsMast_Stage_{s_idx+1}",
+            radius=stage_rad,
+            depth=stage_h,
+            location=Vector((loc.x, loc.y, s_z)),
+            material=m_mat,
+            vertices=8,
+            bevel=0.005,
+        ))
+
+    # 3. Bilateral high-frequency planar blade antenna fins
+    blade_z = loc.z + 0.14 + stage_h * 1.5
+    for side in (-1, 1):
+        stag = "L" if side < 0 else "R"
+        objects.append(make_box(
+            f"{prefix}_CommsMast_BladeAntenna_{stag}",
+            (0.02, 0.22, 0.32),
+            Vector((loc.x + side * 0.12, loc.y, blade_z)),
+            b_mat,
+            bevel=0.006,
+        ))
+
+    # 4. Cross-dipole electronic warfare jamming horns (mid-high)
+    ew_z = loc.z + 0.14 + stage_h * 2.3
+    for angle_deg in (45.0, 135.0):
+        rad = math.radians(angle_deg)
+        objects.append(make_box(
+            f"{prefix}_CommsMast_EWHorn_{int(angle_deg)}",
+            (0.38, 0.04, 0.04),
+            Vector((loc.x, loc.y, ew_z)),
+            m_mat,
+            bevel=0.005,
+            rotation=(0.0, 0.0, rad),
+        ))
+
+    # 5. Apex satcom teardrop radome & omni beacon LEDs
+    apex_z = loc.z + 0.14 + ht * 0.75 + 0.12
+    objects.append(make_cylinder(
+        f"{prefix}_CommsMast_SatcomDome",
+        radius=0.22,
+        depth=0.18,
+        location=Vector((loc.x, loc.y, apex_z)),
+        material=r_mat,
+        vertices=12,
+        bevel=0.025,
+    ))
+    # Glowing apex beacon LEDs
+    for side in (-1, 1):
+        stag = "L" if side < 0 else "R"
+        objects.append(make_cylinder(
+            f"{prefix}_CommsMast_BeaconLED_{stag}",
+            radius=0.032,
+            depth=0.04,
+            location=Vector((loc.x + side * 0.14, loc.y, apex_z + 0.08)),
+            material=g_mat,
+            vertices=8,
+            bevel=0.004,
+        ))
+
+    return objects
+
+
+def make_reinforced_ram_prow_assembly(
+    prefix: str,
+    location: Tuple[float, float, float] | Vector = (0.0, 1.8, 0.4),
+    width: float = 2.4,
+    height: float = 0.55,
+    forward_reach: float = 0.45,
+    prow_mat: bpy.types.Material | None = None,
+    bracket_mat: bpy.types.Material | None = None,
+    accent_mat: bpy.types.Material | None = None,
+) -> list[bpy.types.Object]:
+    """Generates a heavy angled V-shaped kinetic battering ram prow / cowcatcher bumper with structural reinforcing gusset ribs, forged towing shackles, and diagonal hazard chevron plates."""
+    objects: list[bpy.types.Object] = []
+    loc = Vector(location)
+    p_mat = prow_mat or bracket_mat
+    b_mat = bracket_mat or prow_mat
+    a_mat = accent_mat or p_mat
+
+    w = max(1.2, width)
+    h = max(0.3, height)
+    reach = max(0.25, forward_reach)
+
+    # 1. Bilateral angled V-prow kinetic blade wings
+    wing_w = w * 0.55
+    v_angle = math.radians(24.0)
+    for side in (-1, 1):
+        stag = "L" if side < 0 else "R"
+        wing_center = loc + Vector((side * (wing_w * 0.42), reach * 0.45, 0.0))
+        wing_rot = (0.0, 0.0, -side * v_angle)
+        objects.append(make_box(
+            f"{prefix}_RamProw_Blade_{stag}",
+            (wing_w, 0.14, h),
+            wing_center,
+            p_mat,
+            bevel=0.02,
+            rotation=wing_rot,
+        ))
+        # High-contrast hazard chevron accent plate along blade top
+        objects.append(make_box(
+            f"{prefix}_RamProw_HazardStripe_{stag}",
+            (wing_w * 0.85, 0.04, h * 0.28),
+            wing_center + Vector((0.0, 0.06, h * 0.22)),
+            a_mat,
+            bevel=0.005,
+            rotation=wing_rot,
+        ))
+
+    # 2. Central vertical prow wedge apex nose
+    apex_pos = loc + Vector((0.0, reach * 0.85, 0.0))
+    objects.append(make_box(
+        f"{prefix}_RamProw_ApexWedge",
+        (0.18, 0.24, h * 1.08),
+        apex_pos,
+        b_mat,
+        bevel=0.025,
+    ))
+
+    # 3. Four structural gusset ribs anchoring prow to hull glacis
+    gusset_x_offsets = [-w * 0.35, -w * 0.12, w * 0.12, w * 0.35]
+    for idx, gx in enumerate(gusset_x_offsets, start=1):
+        g_start = Vector((loc.x + gx, loc.y, loc.z))
+        g_end = Vector((loc.x + gx, loc.y - 0.35, loc.z + h * 0.35))
+        objects.append(make_rod(
+            f"{prefix}_RamProw_GussetRib_{idx}",
+            g_start,
+            g_end,
+            radius=0.042,
+            material=b_mat,
+            vertices=6,
+        ))
+
+    # 4. Bilateral heavy forged towing shackles / D-rings on lower prow
+    for side in (-1, 1):
+        stag = "L" if side < 0 else "R"
+        shackle_pos = loc + Vector((side * (w * 0.32), reach * 0.25, -h * 0.32))
+        objects.append(make_torus(
+            f"{prefix}_RamProw_TowingShackle_{stag}",
+            location=shackle_pos,
+            major_radius=0.085,
+            minor_radius=0.028,
+            material=b_mat,
+            major_segments=12,
+            minor_segments=6,
+        ))
+
+    return objects
+
+
 def create_unity_empty_locator(
     name: str,
     location: Tuple[float, float, float] | Vector,
@@ -5342,6 +5982,12 @@ def export_gameplay_metadata(
         "mortar_carrier": ["ArtilleryTank"],
         "siege_drill_mole": ["PCXBaseTank"],
         "heavy_crane_mech": ["GatlingWalker"],
+        "nanite_support_rover": ["PCXBaseTank"],
+        "gravity_siege_breaker": ["PCXBaseTank", "ArtilleryTank"],
+        "tactical_relay_carrier": ["PCXBaseTank"],
+        "amphibious_assault_tank": ["PCXBaseTank"],
+        "plasma_mortar_strider": ["GatlingWalker"],
+        "stealth_recon_skimmer": ["PCXBaseTank"],
     }
 
     if archetype in ("bike", "buggy"):
@@ -5391,7 +6037,7 @@ def make_wreckage_variant(
     archetype: str = "tank",
     severity: str = "catastrophic",
     turret_keywords: Sequence[str] = (
-        "Turret", "Cannon", "Barrel", "Howitzer", "Gatling", "Missile", "Gun", "Visor", "BeamLaser", "VLS", "Flamer", "EMP"
+        "Turret", "Cannon", "Barrel", "Howitzer", "Gatling", "Missile", "Gun", "Visor", "BeamLaser", "VLS", "Flamer", "EMP", "Nanite", "Gravity", "Prow", "Dispenser", "Mast"
     ),
     smooth_by_angle: bool = True,
     smooth_angle_deg: float = 38.0,
@@ -5458,7 +6104,7 @@ def make_wreckage_variant(
             wreck_objs.append(h_obj)
 
     else:  # catastrophic
-        if archetype in ("tank", "artillery", "flak_anti_air", "arc_tank", "beam_destroyer", "halftrack", "thermobaric_tank", "demolition_breacher", "recovery_crawler", "mine_layer", "sniper_tankette", "bridge_layer", "mortar_carrier", "siege_drill_mole"):
+        if archetype in ("tank", "artillery", "flak_anti_air", "arc_tank", "beam_destroyer", "halftrack", "thermobaric_tank", "demolition_breacher", "recovery_crawler", "mine_layer", "sniper_tankette", "bridge_layer", "mortar_carrier", "siege_drill_mole", "gravity_siege_breaker", "amphibious_assault_tank"):
             roll = math.radians(5.5)
             for h_obj in hull_objs:
                 h_obj.rotation_euler.y += roll
@@ -5484,7 +6130,7 @@ def make_wreckage_variant(
             )
             wreck_objs.extend(debris)
 
-        elif archetype in ("walker", "colossus_titan", "artillery_strider", "spider", "quad_mech", "siege_crawler", "hexapod_assault", "heavy_crane_mech"):
+        elif archetype in ("walker", "colossus_titan", "artillery_strider", "spider", "quad_mech", "siege_crawler", "hexapod_assault", "heavy_crane_mech", "plasma_mortar_strider"):
             drop_z = 0.55 if archetype in ("colossus_titan", "quad_mech") else 0.35
             for h_obj in hull_objs:
                 h_obj.location.z = max(0.04, h_obj.location.z - drop_z)
@@ -5495,7 +6141,7 @@ def make_wreckage_variant(
                 t_obj.rotation_euler.x += math.radians(26.0)
                 wreck_objs.append(t_obj)
 
-        elif archetype in ("hover", "hover_cruiser", "vtol", "heavy_dropship", "assault_hovercraft", "flying_wing_bomber"):
+        elif archetype in ("hover", "hover_cruiser", "vtol", "heavy_dropship", "assault_hovercraft", "flying_wing_bomber", "stealth_recon_skimmer"):
             for h_obj in hull_objs:
                 h_obj.location.z = max(0.03, h_obj.location.z - 0.38)
                 h_obj.rotation_euler.x += math.radians(7.5)
@@ -8216,6 +8862,33 @@ def make_comms_relay_tower_assembly(
 # Procedural Armature Rigging & Animation Actions
 # ---------------------------------------------------------------------------
 
+def normalize_arachnid_middle_leg_orientation(armature: bpy.types.Object) -> None:
+    """Ensure the Arachnid Hexapod's middle legs (ML/MR) bend downward like the
+    side legs instead of folding into the hull.
+
+    The authored middle-leg shins/feet were created with their tail Z pointing
+    upward, which inverted the deformation of the gunmetal/tread meshes and
+    produced a visibly deformed model. Force those tails to point downward
+    (negative Z in armature space) while keeping head positions intact so the
+    parent/child chain is preserved.
+    """
+    if armature is None or armature.type != "ARMATURE":
+        return
+    bpy.context.view_layer.objects.active = armature
+    bpy.ops.object.mode_set(mode="EDIT")
+    try:
+        edit_bones = armature.data.edit_bones
+        for tag in ("ML", "MR"):
+            for segment in ("Shin", "Foot"):
+                bone = edit_bones.get(f"Bone_{segment}_{tag}")
+                if bone is None:
+                    continue
+                if bone.tail.z > 0.0:
+                    bone.tail.z = -bone.tail.z
+    finally:
+        bpy.ops.object.mode_set(mode="OBJECT")
+
+
 def assign_rigid_mesh_weights(
     objects: Sequence[bpy.types.Object],
     prefix: str,
@@ -8226,6 +8899,13 @@ def assign_rigid_mesh_weights(
     for obj in objects:
         if obj.type != "MESH" or obj.name.endswith(("_COLLIDER", "_ShieldBubble")):
             continue
+
+        # Rigid rebinding must not inherit stale groups/modifiers from authored
+        # or previously generated versions of the same mesh.
+        for vertex_group in list(obj.vertex_groups):
+            obj.vertex_groups.remove(vertex_group)
+        for modifier in [m for m in obj.modifiers if m.type == "ARMATURE"]:
+            obj.modifiers.remove(modifier)
 
         clean_name = obj.name
         if clean_name.startswith(prefix):
@@ -8247,19 +8927,46 @@ def assign_rigid_mesh_weights(
 
         elif leg_type == "quad":
             tag_found = None
-            for cand, norm in [
-                ("FL", "FL"), ("FR", "FR"), ("RL", "RL"), ("RR", "RR"),
-                ("L_F", "FL"), ("R_F", "FR"), ("L_R", "RL"), ("R_R", "RR"),
-            ]:
-                if cand in clean_name:
-                    tag_found = norm
-                    break
-            if tag_found:
+            # Extract the authored leg tag from "CrawlerLeg_<tag>_" so names such
+            # as "..._FemurBoom" cannot masquerade as a different leg tag.
+            crawler_match = re.search(r"CrawlerLeg_([A-Z](?:_[A-Z])?)_", clean_name)
+            if crawler_match:
+                raw_tag = crawler_match.group(1)
+                tag_found = {
+                    "FL": "FL", "FR": "FR", "RL": "RL", "RR": "RR",
+                    "L_F": "FL", "R_F": "FR", "L_R": "RL", "R_R": "RR",
+                }.get(raw_tag)
+            if tag_found is None:
+                if "_ML" in clean_name or clean_name.endswith("ML"):
+                    tag_found = "ML"
+                elif "_MR" in clean_name or clean_name.endswith("MR"):
+                    tag_found = "MR"
+            if tag_found in ("FL", "FR", "RL", "RR"):
                 if any(k in clean_name for k in ("Foot", "Talon")):
                     target_bone = f"Bone_Foot_{tag_found}"
                 elif any(k in clean_name for k in ("Tibia", "Knee")):
                     target_bone = f"Bone_Shin_{tag_found}"
                 elif any(k in clean_name for k in ("Femur", "Hip")):
+                    target_bone = f"Bone_Thigh_{tag_found}"
+            elif tag_found in ("ML", "MR"):
+                if any(k in clean_name for k in ("Foot", "Talon", "Pad")):
+                    target_bone = f"Bone_Foot_{tag_found}"
+                elif any(k in clean_name for k in ("Tibia", "Knee", "Shin")):
+                    target_bone = f"Bone_Shin_{tag_found}"
+                elif any(k in clean_name for k in ("Thigh", "Femur", "Hip")):
+                    target_bone = f"Bone_Thigh_{tag_found}"
+
+            if target_bone is None and ("HydraulicRam" in clean_name or "HipActuator" in clean_name or "Piston" in clean_name):
+                if tag_found is None:
+                    for cand, norm in [
+                        ("FL", "FL"), ("FR", "FR"), ("RL", "RL"), ("RR", "RR"),
+                        ("LF", "FL"), ("RF", "FR"), ("LR", "RL"), ("RR", "RR"),
+                        ("ML", "ML"), ("MR", "MR"),
+                    ]:
+                        if cand in clean_name:
+                            tag_found = norm
+                            break
+                if tag_found in ("ML", "MR", "FL", "FR", "RL", "RR"):
                     target_bone = f"Bone_Thigh_{tag_found}"
 
             if target_bone is None and any(k in clean_name for k in ("Pelvis", "MechPelvis")):
@@ -8649,6 +9356,13 @@ def generate_procedural_action_clips(
                 set_bone_key(f"Bone_Foot_{tag}", "rotation_euler", f, (math.radians(foot_rot), 0.0, 0.0))
         for tag in ("FR", "RL"):
             for f, (thigh_rot, shin_rot, foot_rot) in quad_gait_diag2.items():
+                set_bone_key(f"Bone_Thigh_{tag}", "rotation_euler", f, (math.radians(thigh_rot), 0.0, 0.0))
+                set_bone_key(f"Bone_Shin_{tag}", "rotation_euler", f, (math.radians(shin_rot), 0.0, 0.0))
+                set_bone_key(f"Bone_Foot_{tag}", "rotation_euler", f, (math.radians(foot_rot), 0.0, 0.0))
+
+        # Middle legs complete the hexapod tripod gait.
+        for tag, gait in (("ML", quad_gait_diag2), ("MR", quad_gait_diag1)):
+            for f, (thigh_rot, shin_rot, foot_rot) in gait.items():
                 set_bone_key(f"Bone_Thigh_{tag}", "rotation_euler", f, (math.radians(thigh_rot), 0.0, 0.0))
                 set_bone_key(f"Bone_Shin_{tag}", "rotation_euler", f, (math.radians(shin_rot), 0.0, 0.0))
                 set_bone_key(f"Bone_Foot_{tag}", "rotation_euler", f, (math.radians(foot_rot), 0.0, 0.0))
@@ -11228,7 +11942,7 @@ class RogueVehicleBuilder:
         hl = (self.hull_length * 0.34) if hasattr(self, "hull_length") else 1.15
         hz = self.hull_deck_z if hasattr(self, "hull_deck_z") else 0.85
 
-        if self.archetype in ("walker", "quad_walker", "reverse_walker", "heavy_crane_mech"):
+        if self.archetype in ("walker", "quad_walker", "reverse_walker", "heavy_crane_mech", "plasma_mortar_strider"):
             # Connect pelvis underside to upper thigh hydraulic manifolds on left & right
             pelvis_z = hz - 0.10
             thigh_z = max(0.45, pelvis_z - 0.38)
@@ -11641,6 +12355,171 @@ class RogueVehicleBuilder:
             shroud_mat=self.palette.gunmetal,
             collar_mat=self.palette.light_armor,
             brake_mat=self.palette.gunmetal,
+        ))
+        return self
+
+    def add_nanite_projector(
+        self,
+        head_radius: float = 0.16,
+        length: float = 1.2,
+        elevation_deg: float = 6.0,
+    ) -> "RogueVehicleBuilder":
+        """Adds an articulated medical/repair nanite projector assembly with pressurized storage canisters, collimating lens ring, and multi-aperture dispersal nozzle."""
+        gun_pivot = self.turret_center + Vector((0.0, 0.45, 0.04))
+        elev_rad = math.radians(elevation_deg)
+        gun_dir = Vector((0.0, math.cos(elev_rad), math.sin(elev_rad))).normalized()
+        self.gun_pivot = gun_pivot + gun_dir * (length + 0.18)
+        self.gun_dir = gun_dir
+        self._last_mantlet_boot_pivots = []
+        self._last_mantlet_boot_direction = None
+        self._last_mantlet_boots_added = False
+        projector = make_nanite_projector_assembly(
+            f"{self.name}Nanite",
+            gun_pivot=gun_pivot,
+            direction=gun_dir,
+            head_radius=head_radius,
+            length=length,
+            cradle_mat=self.palette.primary_armor,
+            nozzle_mat=self.palette.gunmetal,
+            glow_mat=self.palette.emissive,
+            canister_mat=self.palette.light_armor,
+            conduit_mat=self.palette.tread,
+        )
+        self.objects.extend(projector)
+        self.preserved_pivots.append(f"{self.name}Nanite_Nanite_Cradle")
+        return self
+
+    def add_gravity_cannon(
+        self,
+        barrel_length: float = 2.2,
+        bore_radius: float = 0.14,
+        ring_count: int = 4,
+        elevation_deg: float = 6.0,
+    ) -> "RogueVehicleBuilder":
+        """Adds a super-heavy gravitational singularity cannon / kinetic mass driver with magnetic accelerator ring stages, glowing grav-core chamber, and longitudinal stabilization rails."""
+        gun_pivot = self.turret_center + Vector((0.0, 0.45, 0.04))
+        elev_rad = math.radians(elevation_deg)
+        gun_dir = Vector((0.0, math.cos(elev_rad), math.sin(elev_rad))).normalized()
+        self.gun_pivot = gun_pivot + gun_dir * (barrel_length + 0.22)
+        self.gun_dir = gun_dir
+        self._last_mantlet_boot_pivots = []
+        self._last_mantlet_boot_direction = None
+        self._last_mantlet_boots_added = False
+        cannon = make_gravity_cannon_assembly(
+            f"{self.name}GravCannon",
+            gun_pivot=gun_pivot,
+            direction=gun_dir,
+            barrel_length=barrel_length,
+            bore_radius=bore_radius,
+            ring_count=ring_count,
+            mount_mat=self.palette.primary_armor,
+            barrel_mat=self.palette.gunmetal,
+            core_mat=self.palette.emissive,
+            accent_mat=self.palette.warning,
+        )
+        self.objects.extend(cannon)
+        self.preserved_pivots.append(f"{self.name}GravCannon_Gravity_BreechMount")
+        return self
+
+    def add_nanite_dispenser(
+        self,
+        scale: float = 1.0,
+        spacing_x: float | None = None,
+        location: Tuple[float, float, float] | Vector | None = None,
+    ) -> "RogueVehicleBuilder":
+        """Adds bilateral armored field nanite repair dispenser pods with glowing inspection sight glasses, pressure manifolds, and atomizing spray heads."""
+        hw = self.hull_width if hasattr(self, "hull_width") else 2.4
+        hz = self.hull_deck_z if hasattr(self, "hull_deck_z") else 0.88
+        hl = self.hull_length if hasattr(self, "hull_length") else 3.0
+        sp_x = spacing_x if spacing_x is not None else hw * 0.95
+        disp_loc = Vector(location) if location is not None else Vector((0.0, -hl * 0.15, hz * 0.65))
+
+        self.objects.extend(make_nanite_repair_dispenser_assembly(
+            f"{self.name}NaniteDisp",
+            location=disp_loc,
+            scale=scale,
+            spacing_x=sp_x,
+            canister_mat=self.palette.primary_armor,
+            frame_mat=self.palette.gunmetal,
+            glow_mat=self.palette.emissive,
+            hose_mat=self.palette.tread,
+        ))
+        return self
+
+    def add_grav_dampener(
+        self,
+        radius: float = 0.42,
+        height: float = 0.28,
+        location: Tuple[float, float, float] | Vector | None = None,
+    ) -> "RogueVehicleBuilder":
+        """Adds a chassis/dorsal gyroscopic gravitational anchor and inertial dampener hub with counter-rotating magnetic rings, glowing singularity sphere, and structural tie-down braces."""
+        if location is not None:
+            hub_loc = Vector(location)
+        else:
+            hl = self.hull_length if hasattr(self, "hull_length") else 3.0
+            hz = self.hull_deck_z if hasattr(self, "hull_deck_z") else 0.88
+            hub_loc = Vector((0.0, -hl * 0.28, hz))
+
+        self.objects.extend(make_grav_dampener_hub_assembly(
+            f"{self.name}GravHub",
+            location=hub_loc,
+            radius=radius,
+            height=height,
+            housing_mat=self.palette.primary_armor,
+            rotor_mat=self.palette.gunmetal,
+            core_mat=self.palette.emissive,
+            brace_mat=self.palette.light_armor,
+        ))
+        return self
+
+    def add_comms_mast(
+        self,
+        height: float = 1.6,
+        location: Tuple[float, float, float] | Vector | None = None,
+    ) -> "RogueVehicleBuilder":
+        """Adds a heavy-duty telescopic communications & EW jamming mast with planar blade antenna fins, cross-dipole jamming horns, satcom dome, and glowing apex beacon LEDs."""
+        if location is not None:
+            mast_loc = Vector(location)
+        else:
+            hw = self.hull_width if hasattr(self, "hull_width") else 2.4
+            hl = self.hull_length if hasattr(self, "hull_length") else 3.0
+            hz = self.hull_deck_z if hasattr(self, "hull_deck_z") else 0.88
+            mast_loc = Vector((-hw * 0.25, -hl * 0.28, hz))
+
+        self.objects.extend(make_comms_ew_mast_assembly(
+            f"{self.name}CommsMast",
+            location=mast_loc,
+            height=height,
+            base_mat=self.palette.primary_armor,
+            mast_mat=self.palette.gunmetal,
+            radome_mat=self.palette.light_armor,
+            glow_mat=self.palette.emissive,
+        ))
+        return self
+
+    def add_ram_prow(
+        self,
+        width: float | None = None,
+        height: float = 0.55,
+        forward_reach: float = 0.45,
+        location: Tuple[float, float, float] | Vector | None = None,
+    ) -> "RogueVehicleBuilder":
+        """Adds a heavy angled V-shaped kinetic battering ram prow / cowcatcher bumper with structural reinforcing gussets, towing shackles, and diagonal hazard chevron plates."""
+        hw = self.hull_width if hasattr(self, "hull_width") else 2.4
+        hl = self.hull_length if hasattr(self, "hull_length") else 3.0
+        hz = self.ground_clearance if hasattr(self, "ground_clearance") else 0.08
+        prow_w = width if width is not None else hw * 1.05
+        prow_loc = Vector(location) if location is not None else Vector((0.0, hl * 0.52, hz + height * 0.45))
+
+        self.objects.extend(make_reinforced_ram_prow_assembly(
+            f"{self.name}RamProw",
+            location=prow_loc,
+            width=prow_w,
+            height=height,
+            forward_reach=forward_reach,
+            prow_mat=self.palette.primary_armor,
+            bracket_mat=self.palette.gunmetal,
+            accent_mat=self.palette.warning,
         ))
         return self
 
@@ -12491,6 +13370,85 @@ class RogueStructureBuilder:
             shroud_mat=self.palette.gunmetal,
             collar_mat=self.palette.light_armor,
             brake_mat=self.palette.gunmetal,
+        ))
+        return self
+
+    def add_nanite_dispenser(
+        self,
+        scale: float = 1.0,
+        spacing_x: float = 3.2,
+        location: Tuple[float, float, float] | Vector | None = None,
+    ) -> "RogueStructureBuilder":
+        """Adds bilateral armored field nanite repair dispenser pods with glowing inspection sight glasses and spray heads to the structure."""
+        disp_loc = Vector(location) if location is not None else Vector((0.0, 0.0, 1.2))
+        self.objects.extend(make_nanite_repair_dispenser_assembly(
+            f"{self.name}Struct_NaniteDisp",
+            location=disp_loc,
+            scale=scale,
+            spacing_x=spacing_x,
+            canister_mat=self.palette.primary_armor,
+            frame_mat=self.palette.gunmetal,
+            glow_mat=self.palette.emissive,
+            hose_mat=self.palette.tread,
+        ))
+        return self
+
+    def add_grav_dampener(
+        self,
+        radius: float = 0.55,
+        height: float = 0.35,
+        location: Tuple[float, float, float] | Vector | None = None,
+    ) -> "RogueStructureBuilder":
+        """Adds a structure-mounted gyroscopic gravitational anchor and inertial dampener hub with glowing singularity sphere."""
+        hub_loc = Vector(location) if location is not None else Vector((0.0, 0.0, 2.2))
+        self.objects.extend(make_grav_dampener_hub_assembly(
+            f"{self.name}Struct_GravHub",
+            location=hub_loc,
+            radius=radius,
+            height=height,
+            housing_mat=self.palette.primary_armor,
+            rotor_mat=self.palette.gunmetal,
+            core_mat=self.palette.emissive,
+            brace_mat=self.palette.light_armor,
+        ))
+        return self
+
+    def add_comms_mast(
+        self,
+        height: float = 2.2,
+        location: Tuple[float, float, float] | Vector | None = None,
+    ) -> "RogueStructureBuilder":
+        """Adds a heavy-duty telescopic communications & EW jamming mast with planar blade antenna fins and satcom dome to the structure."""
+        mast_loc = Vector(location) if location is not None else Vector((1.2, -1.2, 2.2))
+        self.objects.extend(make_comms_ew_mast_assembly(
+            f"{self.name}Struct_CommsMast",
+            location=mast_loc,
+            height=height,
+            base_mat=self.palette.primary_armor,
+            mast_mat=self.palette.gunmetal,
+            radome_mat=self.palette.light_armor,
+            glow_mat=self.palette.emissive,
+        ))
+        return self
+
+    def add_ram_prow(
+        self,
+        width: float = 3.2,
+        height: float = 0.65,
+        forward_reach: float = 0.55,
+        location: Tuple[float, float, float] | Vector | None = None,
+    ) -> "RogueStructureBuilder":
+        """Adds reinforced perimeter kinetic ram barrier cowcatcher prow with towing shackles and hazard chevrons."""
+        prow_loc = Vector(location) if location is not None else Vector((0.0, 2.4, 0.35))
+        self.objects.extend(make_reinforced_ram_prow_assembly(
+            f"{self.name}Struct_RamProw",
+            location=prow_loc,
+            width=width,
+            height=height,
+            forward_reach=forward_reach,
+            prow_mat=self.palette.primary_armor,
+            bracket_mat=self.palette.gunmetal,
+            accent_mat=self.palette.warning,
         ))
         return self
 

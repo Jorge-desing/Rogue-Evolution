@@ -664,4 +664,35 @@ The local 50 px silhouette glance test, 30–120 px review range, and 65/25/10 v
 ## 23. Unity prefab scaffolding of muzzle VFX and 3D audio
 
 VehiclePrefabBuilder.EnsureCanonicalVfxAndAudioComponents adds (idempotently) FirePoint_0/FirePoint_1 under Socket_MuzzlePrimary/Socket_MuzzleSecondary with a ParticleSystem as child 0 (shared URP material Materials/VFX/VFX_MuzzleFlash_Additive.mat, max 25 particles), and 3D AudioSources (spatialBlend 1, logarithmic, 3-60 m, doppler 0) on Socket_WeaponAudio and Socket_EngineAudio (looping). Damage sockets stay clean for RuntimeVisualDirector. Evidence: static edit only; Unity compile and prefab build not yet run.
+---
 
+## 24. Wave 7 Tactical Archetypes, Procedural Weapons, and Support Hardware (local build/validation evidence)
+
+- **Six new mobile vehicle archetypes** (`tools/generate_unit_model.py` & `tools/RogueModelKit.py`), bringing total mobile archetypes to **42**:
+  1. `nanite_support_rover`: Agile 4x4 tactical medical/field repair rover with sloped glacis chassis, forward cab cowl, rear equipment bay, bilateral all-terrain wheel assemblies, and dual armored nanite repair dispenser pods.
+  2. `gravity_siege_breaker`: Heavy assault citadel breacher on 6-roadwheel continuous tracks with armored upper casemate, rear power core, heavy V-prow ram, and gyroscopic grav-dampener hub.
+  3. `tactical_relay_carrier`: Heavy 6x6 forward communications carrier with armored forward cab, rear electronics shelter, and high-gain telescopic comms & EW jamming mast.
+  4. `amphibious_assault_tank`: Tracked assault tank with raised water-deflecting bow prow, sloped glacis, continuous tracks with roadwheels, and dual stern propulsion waterjet thrusters with vectoring steering nozzles.
+  5. `plasma_mortar_strider`: Quadrupedal crawler siege strider (`rigType: QuadCrawler`) with cruciform center chassis, heavy turntable pedestal, articulated 2-bone crawler legs, and heavy rear ground recoil spade.
+  6. `stealth_recon_skimmer`: Low-observable hover reconnaissance skimmer with sharp faceted radar-evasion chines, sloped glacis, and flush stealth canopy.
+- **Two new procedural weapon assemblies** (`RogueModelKit.py` & `generate_unit_model.py`), bringing total weapon choices to **15**:
+  1. `nanite_projector` (`make_nanite_projector_assembly` / `.add_nanite_projector()`): Articulated nanite dispersal cannon with elevation cradle, bilateral chemical canisters with glowing level-indicator sight glasses, flexible armored feeder conduits, stepped magnetic focusing collars, and flared multi-aperture dispersal bell with glowing collimating lens ring.
+  2. `gravity_cannon` (`make_gravity_cannon_assembly` / `.add_gravity_cannon()`): Super-heavy gravitational singularity mass driver with sloped mantlet housing, dual heavy recoil damper cylinders, 4 stepped magnetic accelerator ring stages, glowing grav-core chamber, and longitudinal stabilization rails.
+- **Four new consolidated tactical hardware subsystems** (reusing canonical `FactionPalette` for **0 additional draw calls** after `batch_meshes_by_material()`):
+  1. **Armored Nanite Repair Dispensers (`make_nanite_repair_dispenser_assembly` / `--nanite-dispenser` / `.add_nanite_dispenser()`)**:
+     - Bilateral armored nanite repair canisters with glowing inspection sight glasses and omni-directional atomizer spray heads.
+  2. **Gyroscopic Grav-Dampener Hub (`make_grav_dampener_hub_assembly` / `--grav-dampener` / `.add_grav_dampener()`)**:
+     - Cylindrical gyroscopic gravitational anchor and inertial dampener hub with counter-rotating magnetic rotor rings, 4 radial structural bracing struts, and glowing spherical singularity core.
+  3. **Telescopic Comms & EW Jamming Mast (`make_comms_ew_mast_assembly` / `--comms-mast` / `.add_comms_mast()`)**:
+     - 3-stage telescopic communications and EW jamming mast with planar blade antenna fins, cross-dipole jamming horns, satcom teardrop radome, and apex beacon LEDs.
+  4. **Reinforced Kinetic Ram Prow (`make_reinforced_ram_prow_assembly` / `--ram-prow` / `.add_ram_prow()`)**:
+     - Heavy angled V-shaped kinetic battering ram cowcatcher bumper with diagonal hazard chevron accent plates, structural gusset reinforcement ribs, and forged towing shackles.
+- **Nine new presets** (bringing total presets to **56**):
+  - 6 archetype presets (`sentinel_relay`, `gravitas_breaker`, `command_relay`, `coastal_dreadnought`, `plasma_strider`, `phantom_skimmer`).
+  - 3 elite custom-palette remix presets (`emerald_warden`, `solar_colossus`, `void_spectre`) with custom primary/light/emissive color overrides and specialized VFX (muzzle star-spike, exhaust thruster plumes).
+- **Wreckage & Gameplay Metadata Integration**:
+  - `make_wreckage_variant`: Updated preservation filter to retain `"Nanite"`, `"Gravity"`, `"Prow"`, `"Dispenser"`, and `"Mast"` components across battle damage, and mapped new archetypes into respective chassis breakup categories.
+  - `export_gameplay_metadata`: Added kinematic vehicle template mappings for all 6 new mobile archetypes (`PCXBaseTank` and `GatlingWalker`).
+- **Parity Unit Test & Automated Validation**:
+  - Twin script byte-for-byte binary parity strictly maintained between `tools/` and `.agents/skills/rogue-command-3d-model-authoring/scripts/`.
+  - Added unit test suite `tests/python/authoring/test_model_kit_skill_copy.py` verifying file parity, archetype count (42), preset count (56), procedural assemblies, and builder chaining methods.

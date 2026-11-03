@@ -9,11 +9,12 @@ Archetypes:
     colossus_titan, hover_cruiser, heavy_dropship,
     shield_truck, demolition_breacher, artillery_strider, thermobaric_tank, ew_jammer,
     mobile_sam_launcher, recovery_crawler, mine_layer, sniper_tankette, hexapod_assault, assault_hovercraft,
-    bridge_layer, command_hq_rig, flying_wing_bomber, mortar_carrier, siege_drill_mole, heavy_crane_mech
+    bridge_layer, command_hq_rig, flying_wing_bomber, mortar_carrier, siege_drill_mole, heavy_crane_mech,
+    nanite_support_rover, gravity_siege_breaker, tactical_relay_carrier, amphibious_assault_tank, plasma_mortar_strider, stealth_recon_skimmer
 
 Weapons:
     cannon, gatling, missile, arc, howitzer, dual_cannon, railgun, quad_flak, plasma_mortar,
-    laser_beam, vls_missiles, flamethrower, emp_emitter
+    laser_beam, vls_missiles, flamethrower, emp_emitter, nanite_projector, gravity_cannon
 
 Presets:
     siege_breaker, recon_interceptor, gunship_alpha, apc_enforcer, dune_raider,
@@ -27,7 +28,9 @@ Presets:
     early_warning_array, fusion_silo,
     scissor_bridgelayer, overlord_command_hq, wraith_stealth_wing, thunder_mortar_carrier,
     subterranean_mole, atlas_crane_mech, fortified_pillbox, patriot_sam_battery, deep_space_relay,
-    crimson_praetorian, cobalt_widowmaker, golden_aegis_command
+    crimson_praetorian, cobalt_widowmaker, golden_aegis_command,
+    sentinel_relay, gravitas_breaker, command_relay, coastal_dreadnought, plasma_strider, phantom_skimmer,
+    emerald_warden, solar_colossus, void_spectre
     (presets may also set default camo, wear, attachments, custom hex colors, and VFX; explicit CLI options win)
 
 Options:
@@ -60,6 +63,10 @@ Options:
     --drone-dock               Attach recessed landing cradle with charging rails, LED markers, and parasitic drone
     --recoil-spade             Attach rear-mounted heavy hydraulic recoil spades / earth anchors (Z ≈ 0.02)
     --barrel-shroud            Attach ventilated thermal barrel jacket with BMesh cooling slots and muzzle brake
+    --nanite-dispenser         Attach bilateral armored field nanite repair dispenser pods with inspection sight glasses
+    --grav-dampener            Attach gyroscopic gravitational anchor and inertial dampener hub
+    --comms-mast               Attach telescopic communications & EW jamming mast with planar blade antenna fins
+    --ram-prow                 Attach heavy angled V-shaped kinetic battering ram prow / cowcatcher bumper
     --weighted-normals         Apply weighted normals (default); --no-weighted-normals disables them
     --wreckage-severity <sev>  Damage severity for wreckage: light, medium, catastrophic (default: catastrophic)
     --smoke                    Attach multi-tube smoke discharger banks
@@ -682,6 +689,108 @@ PRESETS = {
         "era_bricks": True,
         "vfx_thruster": True,
     },
+    # --- Wave 7: 6 tactical archetypes & support hardware ---
+    "sentinel_relay": {
+        "archetype": "nanite_support_rover",
+        "weapon": "nanite_projector",
+        "faction": "vanguard",
+        "wear": "factory_new",
+        "nanite_dispenser": True,
+        "hydraulic_hoses": True,
+        "aps_suite": True,
+        "tactical_markings": True,
+    },
+    "gravitas_breaker": {
+        "archetype": "gravity_siege_breaker",
+        "weapon": "gravity_cannon",
+        "faction": "siege",
+        "wear": "battle_hardened",
+        "ram_prow": True,
+        "grav_dampener": True,
+        "era_bricks": True,
+        "recoil_spade": True,
+        "thermal_radiators": True,
+    },
+    "command_relay": {
+        "archetype": "tactical_relay_carrier",
+        "weapon": "missile",
+        "faction": "vanguard",
+        "wear": "factory_new",
+        "comms_mast": True,
+        "drone_dock": True,
+        "rws_mount": True,
+        "stowage_kit": True,
+    },
+    "coastal_dreadnought": {
+        "archetype": "amphibious_assault_tank",
+        "weapon": "dual_cannon",
+        "faction": "arctic",
+        "camo": "arctic",
+        "spaced_skirts": True,
+        "thermal_radiators": True,
+        "smoke": True,
+        "tactical_markings": True,
+    },
+    "plasma_strider": {
+        "archetype": "plasma_mortar_strider",
+        "weapon": "plasma_mortar",
+        "faction": "siege",
+        "wear": "battle_hardened",
+        "ik_rig": True,
+        "recoil_spade": True,
+        "hydraulic_hoses": True,
+        "hydraulic_pistons": True,
+    },
+    "phantom_skimmer": {
+        "archetype": "stealth_recon_skimmer",
+        "weapon": "gatling",
+        "faction": "syndicate",
+        "camo": "digital",
+        "aps_suite": True,
+        "camo_netting": True,
+        "thermal_radiators": True,
+        "vfx_thruster": True,
+    },
+    # --- Wave 7: 3 elite custom-palette & VFX remixes ---
+    "emerald_warden": {
+        "archetype": "nanite_support_rover",
+        "weapon": "nanite_projector",
+        "faction": "vanguard",
+        "primary_color": "#163b27",
+        "light_armor_color": "#2a5c40",
+        "emissive_color": "#00ff88",
+        "wear": "factory_new",
+        "nanite_dispenser": True,
+        "aps_suite": True,
+        "vfx_flash": True,
+    },
+    "solar_colossus": {
+        "archetype": "gravity_siege_breaker",
+        "weapon": "gravity_cannon",
+        "faction": "siege",
+        "primary_color": "#4d2800",
+        "light_armor_color": "#784208",
+        "emissive_color": "#ff9900",
+        "wear": "battle_hardened",
+        "ram_prow": True,
+        "grav_dampener": True,
+        "thermal_radiators": True,
+        "era_bricks": True,
+        "vfx_flash": True,
+    },
+    "void_spectre": {
+        "archetype": "stealth_recon_skimmer",
+        "weapon": "laser_beam",
+        "faction": "syndicate",
+        "primary_color": "#151522",
+        "light_armor_color": "#2b2b40",
+        "emissive_color": "#9d00ff",
+        "wear": "pristine",
+        "aps_suite": True,
+        "thermal_radiators": True,
+        "vfx_thruster": True,
+    },
+
 }
 
 WAVE3_PRESETS = (
@@ -696,6 +805,12 @@ WAVE4_PRESETS = (
     "thunder_mortar_carrier", "subterranean_mole", "atlas_crane_mech",
     "fortified_pillbox", "patriot_sam_battery", "deep_space_relay",
     "crimson_praetorian", "cobalt_widowmaker", "golden_aegis_command",
+)
+
+WAVE7_PRESETS = (
+    "sentinel_relay", "gravitas_breaker", "command_relay",
+    "coastal_dreadnought", "plasma_strider", "phantom_skimmer",
+    "emerald_warden", "solar_colossus", "void_spectre",
 )
 
 
@@ -719,7 +834,7 @@ def parse_args():
             "colossus_titan", "hover_cruiser", "heavy_dropship",
             "shield_truck", "demolition_breacher", "artillery_strider", "thermobaric_tank", "ew_jammer",
             "mobile_sam_launcher", "recovery_crawler", "mine_layer", "sniper_tankette", "hexapod_assault", "assault_hovercraft",
-            "bridge_layer", "command_hq_rig", "flying_wing_bomber", "mortar_carrier", "siege_drill_mole", "heavy_crane_mech"
+            "bridge_layer", "command_hq_rig", "flying_wing_bomber", "mortar_carrier", "siege_drill_mole", "heavy_crane_mech", "nanite_support_rover", "gravity_siege_breaker", "tactical_relay_carrier", "amphibious_assault_tank", "plasma_mortar_strider", "stealth_recon_skimmer"
         ],
         help="Vehicle archetype",
     )
@@ -741,7 +856,7 @@ def parse_args():
         choices=[
             "cannon", "gatling", "missile", "arc", "howitzer", "dual_cannon",
             "railgun", "quad_flak", "plasma_mortar", "laser_beam", "vls_missiles",
-            "flamethrower", "emp_emitter"
+            "flamethrower", "emp_emitter", "nanite_projector", "gravity_cannon"
         ],
         help="Primary weapon subsystem",
     )
@@ -777,6 +892,10 @@ def parse_args():
     parser.add_argument("--drone-dock", action="store_true", help="Attach recessed roof/deck landing cradle with magnetic charging guide rails, alignment runway glow LEDs, and docked parasitic reconnaissance drone")
     parser.add_argument("--recoil-spade", action="store_true", help="Attach rear-mounted heavy hydraulic recoil spades / earth anchors that bite into the terrain plane (Z ≈ 0.02)")
     parser.add_argument("--barrel-shroud", action="store_true", help="Attach ventilated thermal barrel jacket with consolidated BMesh cooling perforation slats, reinforced clamping collars, and multi-baffle muzzle brake")
+    parser.add_argument("--nanite-dispenser", action="store_true", help="Attach bilateral armored field nanite repair dispenser pods with inspection sight glasses and spray heads")
+    parser.add_argument("--grav-dampener", action="store_true", help="Attach gyroscopic gravitational anchor and inertial dampener hub with counter-rotating magnetic rings and singularity core")
+    parser.add_argument("--comms-mast", action="store_true", help="Attach telescopic communications & EW jamming mast with planar blade antenna fins, cross-dipole horns, and satcom dome")
+    parser.add_argument("--ram-prow", action="store_true", help="Attach heavy angled V-shaped kinetic battering ram prow / cowcatcher bumper with towing shackles and hazard chevrons")
     parser.add_argument("--weighted-normals", action=argparse.BooleanOptionalAction, default=True, help="Apply face-area weighted custom split normals to eliminate low-poly chamfer shading pinch (default: enabled)")
     parser.add_argument("--smoke", action="store_true", help="Include multi-tube smoke discharger banks")
     parser.add_argument("--radar", action="store_true", help="Include command/recon radar dish")
@@ -879,6 +998,7 @@ def parse_args():
             "slat_armor", "era_bricks", "camo_netting", "thermal_radiators",
             "rws_mount", "drone_dock", "recoil_spade", "barrel_shroud",
             "vfx_flash", "vfx_thruster",
+            "nanite_dispenser", "grav_dampener", "comms_mast", "ram_prow",
         ):
             if p.get(flag) and f"--{flag.replace('_', '-')}" not in script_args:
                 setattr(args, flag, True)
@@ -918,7 +1038,7 @@ ALL_ARCHETYPES = [
     "colossus_titan", "hover_cruiser", "heavy_dropship",
     "shield_truck", "demolition_breacher", "artillery_strider", "thermobaric_tank", "ew_jammer",
     "mobile_sam_launcher", "recovery_crawler", "mine_layer", "sniper_tankette", "hexapod_assault", "assault_hovercraft",
-    "bridge_layer", "command_hq_rig", "flying_wing_bomber", "mortar_carrier", "siege_drill_mole", "heavy_crane_mech"
+    "bridge_layer", "command_hq_rig", "flying_wing_bomber", "mortar_carrier", "siege_drill_mole", "heavy_crane_mech", "nanite_support_rover", "gravity_siege_breaker", "tactical_relay_carrier", "amphibious_assault_tank", "plasma_mortar_strider", "stealth_recon_skimmer"
 ]
 
 ARCHETYPE_DEFAULT_WEAPONS = {
@@ -958,6 +1078,12 @@ ARCHETYPE_DEFAULT_WEAPONS = {
     "mortar_carrier": "plasma_mortar",
     "siege_drill_mole": "flamethrower",
     "heavy_crane_mech": "dual_cannon",
+    "nanite_support_rover": "nanite_projector",
+    "gravity_siege_breaker": "gravity_cannon",
+    "tactical_relay_carrier": "missile",
+    "amphibious_assault_tank": "dual_cannon",
+    "plasma_mortar_strider": "plasma_mortar",
+    "stealth_recon_skimmer": "gatling",
 }
 
 
@@ -1042,6 +1168,10 @@ def build_vehicle_model(
     drone_dock: bool = False,
     recoil_spade: bool = False,
     barrel_shroud: bool = False,
+    nanite_dispenser: bool = False,
+    grav_dampener: bool = False,
+    comms_mast: bool = False,
+    ram_prow: bool = False,
     weighted_normals: bool = True,
     wreckage_severity: str = "catastrophic",
     model_scale: float = 1.0,
@@ -1918,6 +2048,211 @@ def build_vehicle_model(
         builder.add_sensor_visor()
         builder.add_whip_antenna()
 
+    elif archetype == "nanite_support_rover":
+        wheel_z = builder.ground_clearance + 0.38 + 0.035
+        for side in (-1, 1):
+            tag = "L" if side < 0 else "R"
+            for y_off, ytag in ((1.05, "F"), (-1.05, "R")):
+                builder.objects.extend(rmk.make_all_terrain_wheel_assembly(
+                    f"{name}Wheel_{ytag}_{tag}",
+                    location=(side * 0.95, y_off, wheel_z),
+                    radius=0.42, width=0.28,
+                    tire_mat=builder.palette.tread, rim_mat=builder.palette.wheel_rim,
+                    hub_mat=builder.palette.gunmetal, accent_mat=builder.palette.warning
+                ))
+        builder.objects.append(rmk.make_box(
+            f"{name}Joint_FrontAxle", (1.75, 0.16, 0.14), (0.0, 1.05, wheel_z), builder.palette.gunmetal, 0.02
+        ))
+        builder.objects.append(rmk.make_box(
+            f"{name}Joint_RearAxle", (1.75, 0.16, 0.14), (0.0, -1.05, wheel_z), builder.palette.gunmetal, 0.02
+        ))
+        builder.objects.extend([
+            rmk.make_sloped_glacis_hull(
+                f"{name}Armor_Chassis",
+                length_front=1.20, length_rear=1.35,
+                width_front=1.35, width_rear=1.45,
+                height_lower=builder.ground_clearance + 0.28, height_upper=0.76,
+                material=builder.palette.primary_armor, bevel=0.035
+            ),
+            rmk.make_box(
+                f"{name}Armor_CabCowl",
+                (1.18, 0.95, 0.42), (0.0, 0.35, 1.02),
+                builder.palette.light_armor, bevel=0.03,
+                rotation=(math.radians(-14), 0.0, 0.0)
+            ),
+            rmk.make_box(
+                f"{name}Armor_EquipmentBay",
+                (1.24, 1.15, 0.48), (0.0, -0.65, 0.98),
+                builder.palette.primary_armor, bevel=0.03
+            ),
+        ])
+        builder.add_turret(size=(1.10, 1.25, 0.36), center_y=0.10)
+        builder.add_sensor_visor()
+        builder.add_nanite_dispenser(scale=0.92, spacing_x=1.75)
+
+    elif archetype == "gravity_siege_breaker":
+        builder.add_continuous_tracks(
+            length=3.8, height=0.74, belt_width=0.42, roadwheels=6, with_skirts=skirts
+        )
+        builder.objects.extend([
+            rmk.make_sloped_glacis_hull(
+                f"{name}Armor_CitadelLower",
+                length_front=1.75, length_rear=1.65,
+                width_front=2.10, width_rear=2.15,
+                height_lower=builder.ground_clearance + 0.38, height_upper=0.95,
+                material=builder.palette.primary_armor, bevel=0.045
+            ),
+            rmk.make_box(
+                f"{name}Armor_UpperCasemate",
+                (1.95, 2.40, 0.55), (0.0, -0.15, 1.25),
+                builder.palette.light_armor, bevel=0.04
+            ),
+            rmk.make_box(
+                f"{name}Armor_RearPowerCore",
+                (1.45, 0.85, 0.65), (0.0, -1.35, 1.28),
+                builder.palette.gunmetal, bevel=0.035
+            ),
+        ])
+        builder.add_turret(size=(1.65, 1.95, 0.48), center_y=0.15)
+        builder.add_ram_prow(width=2.5, height=0.60, forward_reach=0.48)
+        builder.add_grav_dampener(radius=0.38, height=0.25, location=(0.0, -0.85, 1.55))
+        builder.add_engine_deck(slat_count=4, with_exhausts=True)
+
+    elif archetype == "tactical_relay_carrier":
+        wheel_z = builder.ground_clearance + 0.40 + 0.035
+        wheel_y_positions = [(1.45, "F"), (-0.15, "M"), (-1.55, "R")]
+        for side in (-1, 1):
+            tag = "L" if side < 0 else "R"
+            for y_off, ytag in wheel_y_positions:
+                builder.objects.extend(rmk.make_all_terrain_wheel_assembly(
+                    f"{name}Wheel_{ytag}_{tag}",
+                    location=(side * 0.96, y_off, wheel_z),
+                    radius=0.40, width=0.26,
+                    tire_mat=builder.palette.tread, rim_mat=builder.palette.wheel_rim,
+                    hub_mat=builder.palette.gunmetal, accent_mat=builder.palette.warning
+                ))
+        for y_off, ytag in wheel_y_positions:
+            builder.objects.append(rmk.make_box(
+                f"{name}Joint_Axle_{ytag}", (1.75, 0.14, 0.12), (0.0, y_off, wheel_z), builder.palette.gunmetal, 0.02
+            ))
+        builder.objects.extend([
+            rmk.make_sloped_glacis_hull(
+                f"{name}Armor_Chassis",
+                length_front=1.75, length_rear=2.05,
+                width_front=1.45, width_rear=1.55,
+                height_lower=builder.ground_clearance + 0.35, height_upper=0.82,
+                material=builder.palette.primary_armor, bevel=0.038
+            ),
+            rmk.make_box(
+                f"{name}Armor_ForwardCab",
+                (1.35, 1.15, 0.58), (0.0, 1.05, 1.12),
+                builder.palette.light_armor, bevel=0.03,
+                rotation=(math.radians(-12), 0.0, 0.0)
+            ),
+            rmk.make_box(
+                f"{name}Armor_ElectronicsShelter",
+                (1.48, 2.15, 0.72), (0.0, -0.65, 1.22),
+                builder.palette.primary_armor, bevel=0.035
+            ),
+        ])
+        builder.add_turret(size=(1.25, 1.35, 0.40), center_y=0.15)
+        builder.add_comms_mast(height=1.65, location=(-0.35, -1.25, 1.58))
+        builder.add_sensor_visor()
+
+    elif archetype == "amphibious_assault_tank":
+        builder.add_continuous_tracks(
+            length=3.6, height=0.66, belt_width=0.36, roadwheels=5, with_skirts=skirts
+        )
+        builder.objects.extend([
+            rmk.make_sloped_glacis_hull(
+                f"{name}Armor_AmphibHull",
+                length_front=1.65, length_rear=1.55,
+                width_front=1.75, width_rear=1.85,
+                height_lower=builder.ground_clearance + 0.32, height_upper=0.88,
+                material=builder.palette.primary_armor, bevel=0.04
+            ),
+            rmk.make_box(
+                f"{name}Armor_BowProw",
+                (1.65, 0.75, 0.45), (0.0, 1.75, builder.ground_clearance + 0.48),
+                builder.palette.light_armor, bevel=0.035,
+                rotation=(math.radians(-18), 0.0, 0.0)
+            ),
+        ])
+        for side in (-1, 1):
+            stag = "L" if side < 0 else "R"
+            jet_x = side * 0.72
+            builder.objects.extend([
+                rmk.make_cylinder(
+                    f"{name}Waterjet_Tunnel_{stag}",
+                    radius=0.18, depth=0.45,
+                    location=(jet_x, -1.85, builder.ground_clearance + 0.28),
+                    material=builder.palette.gunmetal,
+                    vertices=12, bevel=0.015,
+                    rotation=(math.radians(90), 0.0, 0.0)
+                ),
+                rmk.make_cylinder(
+                    f"{name}Waterjet_Nozzle_{stag}",
+                    radius=0.14, depth=0.12,
+                    location=(jet_x, -2.10, builder.ground_clearance + 0.28),
+                    material=builder.palette.wheel_rim,
+                    vertices=10, bevel=0.008,
+                    rotation=(math.radians(90), 0.0, 0.0)
+                ),
+            ])
+        builder.add_turret(size=(1.55, 1.75, 0.46), center_y=0.08)
+        builder.add_sensor_visor()
+        builder.add_engine_deck(slat_count=3, with_exhausts=False)
+
+    elif archetype == "plasma_mortar_strider":
+        builder.add_sloped_hull(length=2.8, width=2.6, height=0.92)
+        builder.add_quad_crawler_legs(knee_height=1.20, reach_x=1.35, reach_y=1.15)
+        builder.objects.extend([
+            rmk.make_box(
+                f"{name}Armor_CruciformCenter",
+                (1.85, 1.85, 0.52), (0.0, 0.0, 1.25),
+                builder.palette.primary_armor, bevel=0.04
+            ),
+            rmk.make_box(
+                f"{name}Armor_TurntablePedestal",
+                (1.45, 1.45, 0.24), (0.0, 0.0, 1.55),
+                builder.palette.gunmetal, bevel=0.025
+            ),
+        ])
+        builder.add_turret(size=(1.60, 1.75, 0.52), center_y=0.0)
+        builder.add_recoil_spade(width=2.1, depth=0.85, deployed=True, location=(0.0, -1.65, 0.45))
+
+    elif archetype == "stealth_recon_skimmer":
+        builder.add_hover_skimmer(float_height=0.35)
+        builder.objects.extend([
+            rmk.make_sloped_glacis_hull(
+                f"{name}Armor_StealthGlacis",
+                length_front=1.45, length_rear=1.35,
+                width_front=1.55, width_rear=1.65,
+                height_lower=builder.ground_clearance + 0.22, height_upper=0.55,
+                material=builder.palette.primary_armor, bevel=0.035
+            ),
+            rmk.make_box(
+                f"{name}Armor_StealthChine_L",
+                (0.45, 2.20, 0.12), (-0.95, 0.0, 0.48),
+                builder.palette.light_armor, bevel=0.02,
+                rotation=(0.0, math.radians(-16), 0.0)
+            ),
+            rmk.make_box(
+                f"{name}Armor_StealthChine_R",
+                (0.45, 2.20, 0.12), (0.95, 0.0, 0.48),
+                builder.palette.light_armor, bevel=0.02,
+                rotation=(0.0, math.radians(16), 0.0)
+            ),
+            rmk.make_box(
+                f"{name}Armor_StealthCanopy",
+                (0.85, 1.15, 0.28), (0.0, 0.35, 0.68),
+                builder.palette.gunmetal, bevel=0.025,
+                rotation=(math.radians(-18), 0.0, 0.0)
+            ),
+        ])
+        builder.add_turret(size=(1.10, 1.25, 0.32), center_y=0.0)
+        builder.add_sensor_visor()
+
     else:  # standard tank
         builder.add_sloped_hull(length=3.0, width=2.4, height=0.88)
         builder.add_continuous_tracks(length=2.85, height=0.62, belt_width=0.34, roadwheels=5, with_skirts=skirts)
@@ -1930,6 +2265,10 @@ def build_vehicle_model(
     if archetype not in ("arc_tank",):
         if weapon == "railgun":
             builder.add_railgun(rail_length=2.40, rail_height=0.28, rail_width=0.40, elevation_deg=8.0)
+        elif weapon == "nanite_projector":
+            builder.add_nanite_projector(head_radius=0.16, length=1.25, elevation_deg=6.0)
+        elif weapon == "gravity_cannon":
+            builder.add_gravity_cannon(barrel_length=2.25, bore_radius=0.14, ring_count=4, elevation_deg=5.0)
         elif weapon == "laser_beam":
             builder.add_beam_laser(barrel_length=2.10, caliber=0.08, elevation_deg=6.0)
         elif weapon == "vls_missiles":
@@ -1999,7 +2338,7 @@ def build_vehicle_model(
     if dozer and archetype in ("tank", "artillery", "halftrack", "super_heavy", "combat_harvester", "demolition_breacher", "thermobaric_tank", "recovery_crawler", "mine_layer", "bridge_layer", "mortar_carrier"):
         builder.add_dozer_blade(width=builder.hull_width * 1.05, height=0.44)
 
-    if smoke and archetype in ("tank", "artillery", "hover", "spider", "halftrack", "super_heavy", "quad_mech", "flak_anti_air", "colossus_titan", "hover_cruiser", "shield_truck", "thermobaric_tank", "ew_jammer", "mobile_sam_launcher", "recovery_crawler", "mine_layer", "sniper_tankette", "hexapod_assault", "assault_hovercraft", "bridge_layer", "command_hq_rig", "mortar_carrier", "siege_drill_mole", "heavy_crane_mech"):
+    if smoke and archetype in ("tank", "artillery", "hover", "spider", "halftrack", "super_heavy", "quad_mech", "flak_anti_air", "colossus_titan", "hover_cruiser", "shield_truck", "thermobaric_tank", "ew_jammer", "mobile_sam_launcher", "recovery_crawler", "mine_layer", "sniper_tankette", "hexapod_assault", "assault_hovercraft", "bridge_layer", "command_hq_rig", "mortar_carrier", "siege_drill_mole", "heavy_crane_mech", "nanite_support_rover", "gravity_siege_breaker", "tactical_relay_carrier", "amphibious_assault_tank", "plasma_mortar_strider", "stealth_recon_skimmer"):
         builder.add_smoke_launchers(tube_count=3)
 
     if radar:
@@ -2076,6 +2415,15 @@ def build_vehicle_model(
 
     if barrel_shroud:
         builder.add_barrel_shroud()
+    if nanite_dispenser and archetype != "nanite_support_rover":
+        builder.add_nanite_dispenser()
+    if grav_dampener and archetype != "gravity_siege_breaker":
+        builder.add_grav_dampener()
+    if comms_mast and archetype != "tactical_relay_carrier":
+        builder.add_comms_mast()
+    if ram_prow and archetype != "gravity_siege_breaker":
+        builder.add_ram_prow()
+
 
     # 3. Modular Attachments
     if attachments:
@@ -2101,7 +2449,7 @@ def build_vehicle_model(
         render_multiview=multiview,
         ortho_scale=(
             8.5 if archetype in ("colossus_titan", "hover_cruiser", "heavy_dropship", "flying_wing_bomber")
-            else (7.2 if archetype in ("super_heavy", "siege_crawler", "drone_carrier", "artillery_strider", "mobile_sam_launcher", "recovery_crawler", "hexapod_assault", "assault_hovercraft", "bridge_layer", "command_hq_rig", "siege_drill_mole", "heavy_crane_mech")
+            else (7.2 if archetype in ("super_heavy", "siege_crawler", "drone_carrier", "artillery_strider", "mobile_sam_launcher", "recovery_crawler", "hexapod_assault", "assault_hovercraft", "bridge_layer", "command_hq_rig", "siege_drill_mole", "heavy_crane_mech", "nanite_support_rover", "gravity_siege_breaker", "tactical_relay_carrier", "amphibious_assault_tank", "plasma_mortar_strider", "stealth_recon_skimmer")
             else (6.2 if archetype in ("artillery", "spider", "vtol", "flak_anti_air", "quad_mech", "combat_harvester", "shield_truck", "thermobaric_tank", "ew_jammer", "mine_layer", "mortar_carrier") else 5.6))
         ),
         smooth_by_angle=True,
@@ -2203,6 +2551,10 @@ def build_structure_model(
     drone_dock: bool = False,
     recoil_spade: bool = False,
     barrel_shroud: bool = False,
+    nanite_dispenser: bool = False,
+    grav_dampener: bool = False,
+    comms_mast: bool = False,
+    ram_prow: bool = False,
     weighted_normals: bool = True,
 ) -> dict:
     rmk.clear_scene()
@@ -2305,6 +2657,15 @@ def build_structure_model(
 
     if barrel_shroud:
         builder.add_barrel_shroud()
+    if nanite_dispenser and archetype != "nanite_support_rover":
+        builder.add_nanite_dispenser()
+    if grav_dampener and archetype != "gravity_siege_breaker":
+        builder.add_grav_dampener()
+    if comms_mast and archetype != "tactical_relay_carrier":
+        builder.add_comms_mast()
+    if ram_prow and archetype != "gravity_siege_breaker":
+        builder.add_ram_prow()
+
 
     gameplay_meta_path = (fbx_file.parent / f"{name}.gameplay.json") if gameplay_json else None
 
@@ -2374,7 +2735,7 @@ def main():
                 print(f"  Colliders: {args.name}_COLLIDER_Base, {args.name}_COLLIDER_Roof")
             if args.render_icons:
                 print(f"  Tactical Icons: {args.icon_size}x{args.icon_size} Top-Down and Isometric")
-            print(f"  Authoring Details: HydraulicHoses={args.hydraulic_hoses}, HullGreebles={args.hull_greebles}, TacticalMarkings={args.tactical_markings}, HydraulicPistons={args.hydraulic_pistons}, AmmoChutes={args.ammo_chutes}, APSSuite={args.aps_suite}, StowageKit={args.stowage_kit}, SlatArmor={args.slat_armor}, ERABricks={args.era_bricks}, CamoNetting={args.camo_netting}, ThermalRadiators={args.thermal_radiators}, RWSMount={args.rws_mount}, DroneDock={args.drone_dock}, RecoilSpade={args.recoil_spade}, BarrelShroud={args.barrel_shroud}, WeightedNormals={args.weighted_normals}")
+            print(f"  Authoring Details: HydraulicHoses={args.hydraulic_hoses}, HullGreebles={args.hull_greebles}, TacticalMarkings={args.tactical_markings}, HydraulicPistons={args.hydraulic_pistons}, AmmoChutes={args.ammo_chutes}, APSSuite={args.aps_suite}, StowageKit={args.stowage_kit}, SlatArmor={args.slat_armor}, ERABricks={args.era_bricks}, CamoNetting={args.camo_netting}, ThermalRadiators={args.thermal_radiators}, RWSMount={args.rws_mount}, DroneDock={args.drone_dock}, RecoilSpade={args.recoil_spade}, BarrelShroud={args.barrel_shroud}, NaniteDispenser={args.nanite_dispenser}, GravDampener={args.grav_dampener}, CommsMast={args.comms_mast}, RamProw={args.ram_prow}, WeightedNormals={args.weighted_normals}")
             if args.bake_atlas or args.bake_normals or args.single_material or structure_camo != "none":
                 print(f"  Texture Atlas: {args.atlas_resolution}x{args.atlas_resolution} PBR (Albedo, MetallicGloss, Normal, Emission)")
             if args.single_material:
@@ -2391,7 +2752,7 @@ def main():
                 unit_name = f"{args.name}_{arch_title}"
                 def_weapon = ARCHETYPE_DEFAULT_WEAPONS.get(arch, "cannon") if args.weapon == "cannon" else args.weapon
                 is_walker = arch in ("walker", "colossus_titan", "artillery_strider", "heavy_crane_mech")
-                is_quad = arch in ("spider", "quad_mech", "siege_crawler", "hexapod_assault")
+                is_quad = arch in ("spider", "quad_mech", "siege_crawler", "hexapod_assault", "plasma_mortar_strider")
                 rig_desc = "Biped Armature (8 bones)" if is_walker else ("Quad Armature (10 bones)" if is_quad else "Standard Rig (6 bones)")
                 print(f"- {arch:<20} -> {unit_name:<30} | Weapon: {def_weapon:<14} | Rig: {rig_desc}")
             print("\n=== Dry run complete. No meshes created. ===\n")
@@ -2408,7 +2769,7 @@ def main():
         print(f"Primary Weapon: {args.weapon}")
         print(f"Subsystems: Skirts={args.skirts}, Rollcage={args.rollcage}, QuadTracks={args.quad_tracks}, TiltRotors={args.tilt_rotors}, Dozer={args.dozer}, Smoke={args.smoke}, Radar={args.radar}, Sponsons={args.sponsons}, Outriggers={args.outriggers}, FlightDeck={args.flight_deck}, ExcavatorDrum={args.excavator_drum}")
         print(f"Micro-Details: Antenna={args.antenna}, Cupola={args.cupola}, Rivets={args.rivets}, TrackShoes={args.track_shoes}, SuspensionArms={args.suspension_arms}, MantletBoot={args.mantlet_boot}, SpacedSkirts={args.spaced_skirts}")
-        print(f"Authoring Details: HydraulicHoses={args.hydraulic_hoses}, HullGreebles={args.hull_greebles}, TacticalMarkings={args.tactical_markings}, HydraulicPistons={args.hydraulic_pistons}, AmmoChutes={args.ammo_chutes}, APSSuite={args.aps_suite}, StowageKit={args.stowage_kit}, SlatArmor={args.slat_armor}, ERABricks={args.era_bricks}, CamoNetting={args.camo_netting}, ThermalRadiators={args.thermal_radiators}, RWSMount={args.rws_mount}, DroneDock={args.drone_dock}, RecoilSpade={args.recoil_spade}, BarrelShroud={args.barrel_shroud}, WeightedNormals={args.weighted_normals}")
+        print(f"Authoring Details: HydraulicHoses={args.hydraulic_hoses}, HullGreebles={args.hull_greebles}, TacticalMarkings={args.tactical_markings}, HydraulicPistons={args.hydraulic_pistons}, AmmoChutes={args.ammo_chutes}, APSSuite={args.aps_suite}, StowageKit={args.stowage_kit}, SlatArmor={args.slat_armor}, ERABricks={args.era_bricks}, CamoNetting={args.camo_netting}, ThermalRadiators={args.thermal_radiators}, RWSMount={args.rws_mount}, DroneDock={args.drone_dock}, RecoilSpade={args.recoil_spade}, BarrelShroud={args.barrel_shroud}, NaniteDispenser={args.nanite_dispenser}, GravDampener={args.grav_dampener}, CommsMast={args.comms_mast}, RamProw={args.ram_prow}, WeightedNormals={args.weighted_normals}")
         if args.attachments:
             print(f"Modular Attachments: {args.attachments} (Detached FBX: {args.export_detached_attachments})")
         if args.primary_color:
