@@ -1292,3 +1292,21 @@ This is a compact, durable orientation for agents. For the changing checkout sta
 - QA/reflection safety: Profile2 is dedicated QA without a tutorial; never ask, inspect, infer, gate, bypass, or switch profiles for tutorial. Check current selector/save safety and preserve saves. Before reflection jointly verify Rogue Command version, Unity `2021.3.45f2`, Assembly-CSharp SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, and MVID `db0e9462-128d-4296-9900-de18b4bd0c00`.
 
 - Root MEMORY.md, codex memory, antigravity memory, and mem0 synced to HEAD c2c08d0.
+
+## Refresh (2026-11-04, HEAD 37bf3b7 — animation contract lab workflow + tactical unit mechanics content)
+
+- Repository `C:/Users/Alex/Documents/Mod Rogue Command`, loader `1.19.0`, branch `codex/rogue-unit-balance-20261018`. Local/upstream/origin verified at `37bf3b7b9312d2176ad6ff022e2ad25d25490a35` (`docs(animation): expand contract lab workflow`), after `2c49b1d` (`feat(content): apply recent tactical unit mechanics`) and `2d22a46` (`docs(animation): standardize project Manim scene set`), following `c2c08d0` (`feat(material-maker): raise 3d and URP texture quality`).
+- Code baseline remains `0bbede6b7beb68f8f50f4ae89f10e83ecb056c0d`; implementation baseline remains `e25c6de` (arachnid middle-leg orientation normalizer) / `d7a3a11b56b58bed6d3f06c47fd40a627c9d1ae3`.
+
+- New committed scope since HEAD c2c08d0:
+  - `2d22a46`: animation authoring skill + `references/animation-review-and-manim.md` standardized the project Manim scene set (+18 lines).
+  - `2c49b1d`: `content/packs/sample-native-expansion/content.json` applies recent tactical unit mechanics — adds `sample:squad-formation` and `sample:wave-escalation` AI modules to native-expansion units (anchor roles Tank/Mech, follower caps, formation radius, wave interval/max waves). New `tests/python/balance/test_recent_runtime_features.py` (+69 lines) and `test_unused_modeled_runtime_mechanics.py` updated (+12); `tools/simulate_combat_balance.py` extended (+35).
+  - `37bf3b7`: animation authoring skill + `references/animation-review-and-manim.md` expanded the contract lab workflow (+9/-7 lines).
+
+- Working tree: dirty nested worktree gitlinks `.worktrees/cargador` @ `11e9968` (dirty) and `.worktrees/task-graph-validation` @ `d1f9045` (dirty) preserved. No root source/test changes in this sync beyond memory.
+
+- Validation: no fresh full run in this sync. Last documented at `c2c08d0`: Python full suite `152/152`; focused diagnostic tests `3/3`; real local reports passed `--strict` for sample and Tactical bundles. Sample: 1,470 objects, 166 meshes, 164 skinned renderers, 15 textures, 6 shaders, 12,000,964 bytes, SHA-256 `301537218e4bd46c434cfb61408bfdd76f55e50e8ed94bfc5d8206acaf9f2a7b`. Tactical: 927 objects, 80 meshes, 74 skinned renderers, 46 textures, 6 shaders, 24,534,720 bytes, SHA-256 `8016a4fc22932110feb36ea84798df4277b1aed312cd2c373c3960b92bb12a49`. AssetBundle references, native visual preflight and Steam/Unity gameplay proof not rerun in this sync; natural offer->selection->placement->production/render/stat and tactical AI remain unverified.
+
+- QA/reflection safety: Profile2 is dedicated QA without a tutorial; never ask, inspect, infer, gate, bypass, or switch profiles for tutorial. Check current selector/save safety and preserve saves. Before reflection jointly verify Rogue Command version, Unity `2021.3.45f2`, Assembly-CSharp SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, and MVID `db0e9462-128d-4296-9900-de18b4bd0c00`.
+
+- Root MEMORY.md, codex memory, antigravity memory, and mem0 synced to HEAD 37bf3b7.
