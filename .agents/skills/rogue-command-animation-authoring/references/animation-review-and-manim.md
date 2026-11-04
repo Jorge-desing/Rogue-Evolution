@@ -138,17 +138,19 @@ Do not claim that the preview is a serialized Unity curve audit. Pair it with ac
 
 ### Recommended Rogue Command render set
 
-A substantial project review should render three complementary scenes, not only a recoil diagram:
+A substantial project review should render five complementary scenes, not only a recoil diagram:
 
-1. `FireRecoilPreview` — source-local seven-key body/weapon/pitch map and RTS readability.
-2. `WalkGaitPreview` — 40-frame in-place cadence, six-leg coverage, tripod grouping, and root invariant.
-3. `AnimatorContractPreview` — canonical states, parameters, transition ownership, Generic Avatar, and root-motion policy.
+1. `FireRecoilCurveAuditPreview` — source-local body/barrel curves, moving frame cursor, and synchronized rig.
+2. `FireRecoilPrinciplesComparisonPreview` — rejected barrel-only motion versus accepted body-driven staging.
+3. `WalkContactMatrixPreview` — 40-frame cadence, six-leg coverage, tripod grouping, and root invariant.
+4. `AnimatorContractPreview` — canonical states, parameters, transition ownership, Generic Avatar, and root-motion policy.
+5. `EvidenceTierPreview` — static inspection versus local validation versus Steam runtime evidence.
 
 Render each scene independently first, inspect its still, and only then combine matching clips:
 
 ```text
-terminal(command=".venv/Scripts/python.exe -m manim -ql --disable_caching --media_dir artifacts/animation-previews/<slug>/media-project artifacts/animation-previews/<slug>/script_project.py FireRecoilPreview WalkGaitPreview AnimatorContractPreview", timeout=600)
-terminal(command=".venv/Scripts/python.exe -m manim -qh --disable_caching --media_dir artifacts/animation-previews/<slug>/media-project-hq artifacts/animation-previews/<slug>/script_project.py FireRecoilPreview WalkGaitPreview AnimatorContractPreview", timeout=900)
+terminal(command=".venv/Scripts/python.exe -m manim -ql --disable_caching --media_dir artifacts/animation-previews/<slug>/media-lab artifacts/animation-previews/<slug>/script_lab.py FireRecoilCurveAuditPreview FireRecoilPrinciplesComparisonPreview WalkContactMatrixPreview AnimatorContractPreview EvidenceTierPreview", timeout=600)
+terminal(command=".venv/Scripts/python.exe -m manim -qh --disable_caching --media_dir artifacts/animation-previews/<slug>/media-lab-hq artifacts/animation-previews/<slug>/script_lab.py FireRecoilCurveAuditPreview FireRecoilPrinciplesComparisonPreview WalkContactMatrixPreview AnimatorContractPreview EvidenceTierPreview", timeout=900)
 ```
 
 The `-s` still must hold a meaningful final pose; do not fade the entire scene before snapshotting. Record Manim version, resolution, FPS, scene names, output hashes, and the evidence boundary in an ignored render manifest.
