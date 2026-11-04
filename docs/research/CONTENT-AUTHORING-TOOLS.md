@@ -99,7 +99,7 @@ Para una referencia gráfica se puede usar `imagegen` durante la conversación o
 
 ## Generación de texturas PBR (2026-10-19)
 
-El flujo de producción continúa con el horneado determinista de Blender 4.5.14: Albedo, MetallicGloss, Normal y Emission. Se implementaron skills locales para ArmorPaint y Material Maker, una adaptación licenciada de `blendsmith` y una adaptación selectiva de las guías PBR/baking de EL4CTEO para Blender 4.5.14. Las skills centrales `rogue-command-pbr-texture-authoring` y `rogue-command-pbr-texture-validation`, más [PBR-TEXTURE-WORKFLOW.md](PBR-TEXTURE-WORKFLOW.md), siguen definiendo el traspaso a Unity.
+El flujo de producción conserva el horneado determinista de Blender 4.5.14 para geometría, UVs y vertex wear, seguido por el pase obligatorio de imágenes de Material Maker 1.7: Albedo, MetallicGloss, Normal y Emission. Se implementaron skills locales para Material Maker y ArmorPaint, una adaptación licenciada de `blendsmith` y una adaptación selectiva de las guías PBR/baking de EL4CTEO para Blender 4.5.14. Las skills centrales `rogue-command-pbr-texture-authoring` y `rogue-command-pbr-texture-validation`, más [PBR-TEXTURE-WORKFLOW.md](PBR-TEXTURE-WORKFLOW.md), siguen definiendo el traspaso a Unity.
 
 | Opción | Capacidad y compatibilidad revisadas | Decisión para Rogue Evolution |
 |---|---|---|

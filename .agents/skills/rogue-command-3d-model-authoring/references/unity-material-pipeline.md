@@ -8,6 +8,8 @@ This guide explains how Unity 2021.3.45f2 handles materials, shaders, draw-call 
 
 Rogue Command executes on Unity's **Universal Render Pipeline (URP)** (`UniversalRenderPipelineAsset` in `globalgamemanagers.assets`). Native game vehicles use untextured geometry rendered via `Shader Graphs/EntityColorShader` (which integrates URP Fog of War buffers and procedural glitter/noise).
 
+The repository-wide Material Maker matrix (`tools/material-maker/rogue-command-material-maker.json`) routes the same image contract into this URP path. `tools/Run-MaterialMakerBake.ps1 -Workflow urp` exports images only, packs `MetallicGloss` as RGB metallic plus A smoothness, and leaves `VehiclePBR_VertexWear` material creation/import to the existing Unity builder. Do not import Material Maker's generated `.mat`; it is not the authority for URP shader keywords, emission activation, or AssetBundle shader bundling.
+
 The authoring project resolves URP 12.1.15. Simple sample materials use `Universal Render Pipeline/Lit`; atlased vehicle materials use the custom URP shader `RogueCommand/VehiclePBR_VertexWear` to read vertex-wear channels. These shaders are included with the AssetBundle. The custom shader does not implement the native `EntityColorShader` fog, distortion, or glitter buffers, and runtime rendering must be confirmed in a Steam-launched game.
 
 ### Material Property Matrix

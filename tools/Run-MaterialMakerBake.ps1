@@ -2,31 +2,65 @@
 # Automatic Material Maker 1.7 bake for Rogue Command PBR textures.
 # The generated output stays under artifacts/ until PBR validation and Unity import.
 
+param(
+    [ValidateSet("urp", "blender", "three_d", "procedural")]
+    [string]$Workflow = "urp",
+    [string]$TemplatePath = "",
+    [string]$OutputDirectory = ""
+)
+
 $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent $PSScriptRoot
+$configPath = Join-Path $repoRoot "tools/material-maker/rogue-command-material-maker.json"
+$configValidator = Join-Path $repoRoot "tools/validate_material_maker_config.py"
+$config = Get-Content -LiteralPath $configPath -Raw | ConvertFrom-Json
+$workflowConfig = $config.workflows.$Workflow
+if ($null -eq $workflowConfig) {
+    throw "Material Maker workflow is missing from config: $Workflow"
+}
+
 $mmDir = Join-Path $repoRoot ".tools/MaterialMaker-1.7/material_maker_1_7_windows"
-$mmExe = Join-Path $mmDir "material_maker.exe"
-$template = Join-Path $repoRoot "artifacts/mm-templates/tactical-military-template.ptex"
-$outDir = Join-Path $repoRoot "artifacts/mm-bake-output"
+$mmExe = Join-Path $repoRoot $config.tool.installRelativePath
+$templateWasExplicit = -not [string]::IsNullOrWhiteSpace($TemplatePath)
+if ($templateWasExplicit) {
+    $template = if ([System.IO.Path]::IsPathRooted($TemplatePath)) { $TemplatePath } else { Join-Path $repoRoot $TemplatePath }
+} else {
+    $template = Join-Path $repoRoot "artifacts/mm-templates/tactical-military-template.ptex"
+}
+if ([string]::IsNullOrWhiteSpace($OutputDirectory)) {
+    $outDir = Join-Path $repoRoot ([string]$workflowConfig.outputDirectory)
+} elseif ([System.IO.Path]::IsPathRooted($OutputDirectory)) {
+    $outDir = $OutputDirectory
+} else {
+    $outDir = Join-Path $repoRoot $OutputDirectory
+}
 $rawDir = Join-Path $outDir "raw"
 $waitScript = Join-Path $repoRoot "tools/MaterialMakerWaitDevice.gd"
-$packScript = Join-Path $repoRoot "tools/pack_material_maker_pbr.py"
+$packScript = Join-Path $repoRoot ([string]$config.exportProfile.packer)
 $prepareScript = Join-Path $repoRoot "tools/Prepare-MaterialMakerTacticalTemplate.py"
 $overrideCfg = Join-Path $mmDir "override.cfg"
 $userExportDir = Join-Path $env:APPDATA "material_maker_2/export_targets"
-$exportTargetFile = Join-Path $userExportDir "material_export_roguecommand.mme"
+$profileName = [string]$config.exportProfile.name
+$exportTargetFile = Join-Path $userExportDir ("material_export-" + $profileName.ToLowerInvariant() + ".mme")
 $templatePrefix = [System.IO.Path]::GetFileNameWithoutExtension($template)
 
 New-Item -ItemType Directory -Force -Path $outDir | Out-Null
 New-Item -ItemType Directory -Force -Path $rawDir | Out-Null
 New-Item -ItemType Directory -Force -Path $userExportDir | Out-Null
 
-foreach ($required in @($mmExe, $waitScript, $packScript, $prepareScript)) {
+foreach ($required in @($configPath, $configValidator, $mmExe, $waitScript, $packScript, $prepareScript)) {
     if (-not (Test-Path $required)) {
         throw "Required Material Maker bake input is missing: $required"
     }
 }
+& python $configValidator --config $configPath
+if ($LASTEXITCODE -ne 0) {
+    throw "Material Maker workflow configuration is invalid"
+}
 if (-not (Test-Path $template)) {
+    if ($templateWasExplicit) {
+        throw "Explicit Material Maker template is missing: $template"
+    }
     & python $prepareScript --output $template
     if ($LASTEXITCODE -ne 0) {
         throw "Material Maker template preparation failed with exit code $LASTEXITCODE"
@@ -56,16 +90,18 @@ $backupExportTarget = Join-Path $env:TEMP ("rcl-material-maker-target-" + [guid]
 if ($hadExportTarget) {
     Copy-Item -LiteralPath $exportTargetFile -Destination $backupExportTarget -Force
 }
+$rawFiles = @()
+foreach ($rawFile in $config.exportProfile.rawFiles) {
+    $rawFiles += [ordered]@{
+        file_name = "`$(path_prefix)_$($rawFile.suffix).png"
+        type = "texture"
+        output = [int]$rawFile.output
+    }
+}
 $exportTarget = [ordered]@{
-    name = "RogueCommand"
-    material = "material"
-    files = @(
-        [ordered]@{ file_name = "`$(path_prefix)_Albedo.png"; type = "texture"; output = 0 }
-        [ordered]@{ file_name = "`$(path_prefix)_Metallic.png"; type = "texture"; output = 12 }
-        [ordered]@{ file_name = "`$(path_prefix)_Roughness.png"; type = "texture"; output = 13 }
-        [ordered]@{ file_name = "`$(path_prefix)_Normal.png"; type = "texture"; output = 7 }
-        [ordered]@{ file_name = "`$(path_prefix)_Emission.png"; type = "texture"; output = 2 }
-    )
+    name = $profileName
+    material = [string]$config.exportProfile.material
+    files = $rawFiles
 }
 $exportJson = $exportTarget | ConvertTo-Json -Depth 8
 [System.IO.File]::WriteAllText($exportTargetFile, $exportJson, $utf8NoBom)
@@ -73,7 +109,7 @@ $exportJson = $exportTarget | ConvertTo-Json -Depth 8
 try {
     Push-Location $mmDir
     try {
-        $mmArguments = "--export-material --target RogueCommand -o `"$rawDir`" `"$template`""
+        $mmArguments = "--export-material --target $profileName -o `"$rawDir`" `"$template`""
         $mmLog = Join-Path $outDir "material-maker.log"
         $mmErrorLog = Join-Path $outDir "material-maker-error.log"
         $materialMakerProcess = Start-Process -FilePath $mmExe -ArgumentList $mmArguments -WorkingDirectory $mmDir -RedirectStandardOutput $mmLog -RedirectStandardError $mmErrorLog -Wait -PassThru
@@ -89,6 +125,20 @@ try {
     if ($LASTEXITCODE -ne 0) {
         throw "Material Maker PBR pack failed with exit code $LASTEXITCODE"
     }
+    $workflowManifest = [ordered]@{
+        workflow = $Workflow
+        profile = $profileName
+        pipeline = [string]$config.textureContract.pipeline
+        shader = [string]$config.textureContract.shader
+        template = $template
+        outputDirectory = $outDir
+        sourceAuthority = [string]$workflowConfig.sourceAuthority
+        postProcess = [string]$workflowConfig.postProcess
+    }
+    [System.IO.File]::WriteAllText(
+        (Join-Path $outDir "material-maker-workflow.json"),
+        ($workflowManifest | ConvertTo-Json -Depth 8),
+        $utf8NoBom)
 } finally {
     if ($hadOverride) {
         Move-Item -LiteralPath $backupOverride -Destination $overrideCfg -Force
@@ -108,12 +158,10 @@ try {
     }
 }
 
-$expected = @(
-    "${templatePrefix}_Albedo.png",
-    "${templatePrefix}_MetallicGloss.png",
-    "${templatePrefix}_Normal.png",
-    "${templatePrefix}_Emission.png"
-)
+$expected = @()
+foreach ($map in $config.textureContract.requiredMaps) {
+    $expected += "${templatePrefix}_$($map.suffix).png"
+}
 foreach ($name in $expected) {
     $path = Join-Path $outDir $name
     if (-not (Test-Path $path)) {

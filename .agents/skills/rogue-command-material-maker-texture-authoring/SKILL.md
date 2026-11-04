@@ -9,7 +9,7 @@ Use this skill when Material Maker is selected for procedural PBR graphs or a su
 
 ## Setup and source protection
 
-- The optional Material Maker 1.7 copy is staged under ignored `.tools/MaterialMaker-1.7/`. To prepare it in another checkout, use `tools/Setup-TextureAuthoringTools.ps1 -MaterialMaker`; the script verifies the pinned release archive SHA-256 and extracts safely.
+- Material Maker 1.7 is the required standard tool and is staged under ignored `.tools/MaterialMaker-1.7/`. To prepare it in another checkout, use `tools/Setup-TextureAuthoringTools.ps1 -MaterialMaker`; the script verifies the pinned release archive SHA-256 and extracts safely.
 - Keep the finalized `.blend`, production FBX, UVs, sockets, hierarchy, LODs, and RGBA vertex wear unchanged. Work from a disposable copy under `artifacts/texture-work/<Name>/MaterialMaker/`.
 - Material Maker's paint project accepts OBJ/GLB/GLTF/FBX with UVs and a single submesh. If the production FBX has multiple submeshes, use procedural graphs or make a temporary texture-only copy; never change the Unity production mesh to satisfy the paint UI.
 
@@ -37,6 +37,31 @@ material_maker --export-material --target <engine> -o <output_dir> <input.ptex> 
 - Material Maker 1.7 release issue #1506 has a startup race in command-line rendering-device initialization. The runner writes a temporary `override.cfg` beside the ignored executable and autoloads `tools/MaterialMakerWaitDevice.gd`; it waits for `/root/mm_renderer`'s `RenderingDevice` before export, then restores any pre-existing override and export target. This keeps the bake headless and does not require a GUI pass.
 - The runner invokes Material Maker with `Start-Process -Wait`, exports scalar PNGs through the temporary `RogueCommand` target, then runs `tools/pack_material_maker_pbr.py` to produce the exact four-map contract. The packer writes metallic to RGB and `1 - roughness` to alpha in `<Name>_MetallicGloss.png`.
 - Verify the output directory contains the expected PNGs and dimensions before copying into the Unity texture folder; a silent empty export is possible if the target path is wrong.
+
+## Repository workflow matrix
+
+The machine-readable contract lives at `tools/material-maker/rogue-command-material-maker.json` and is validated by `tools/validate_material_maker_config.py`. It keeps one Material Maker export profile while routing the resulting images to the correct downstream workflow:
+
+- **`urp`**: default. Produces the four maps for `RogueCommand/VehiclePBR_VertexWear`, then Unity 2021.3.45f2 imports them with the existing preview builder. This is the game-bound path.
+- **`blender`**: produces the same image contract for Blender 4.5.14 preview/material inspection. Blender `.blend`, FBX, sockets, LODs and vertex wear remain authoritative; Material Maker never replaces the production mesh.
+- **`three_d`**: supports a disposable UV-frozen FBX/GLB/GLTF/OBJ paint copy. The single-submesh limitation applies only to the Material Maker paint workspace; export images only and discard any Material Maker mesh export.
+- **`procedural`**: graph-only Material Maker generation with no paint import. It still uses the same four-map packer and channel contract.
+
+Examples:
+
+```powershell
+# URP/game-bound texture set (default)
+powershell -File tools/Run-MaterialMakerBake.ps1 -Workflow urp
+
+# Blender preview-oriented output
+powershell -File tools/Run-MaterialMakerBake.ps1 -Workflow blender
+
+# A disposable 3D-paint or procedural .ptex source
+powershell -File tools/Run-MaterialMakerBake.ps1 -Workflow three_d -TemplatePath artifacts/texture-work/Hull/MaterialMaker/Hull.ptex
+powershell -File tools/Run-MaterialMakerBake.ps1 -Workflow procedural -TemplatePath artifacts/mm-templates/tactical-military-template.ptex
+```
+
+All workflows write an `material-maker-workflow.json` manifest beside the output maps. The manifest records the workflow, shader, pipeline, source authority and post-process rule for agent-readable handoff.
 
 ## Validation handoff
 

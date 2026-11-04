@@ -13,7 +13,21 @@ This document defines the project-specific handoff from vehicle texturing to Uni
 | `EL4CTEO/blender-skills` | Public Blender PBR and baking skills | Implemented as a [selective Blender 4.5.14 adaptation](../../.agents/skills/rogue-command-blender-pbr-45/SKILL.md). No unadapted Blender 5.2+ scripts are installed; ORM packing and the unsupported 5.2 `Thin Wall` socket are excluded. |
 | Adobe Substance 3D Sampler generative workflows | Optional ideation reference | Do not make beta/service-dependent generation a reproducible build requirement. |
 
-The tool adapters are discoverable project skills. Material Maker 1.7 and its release ZIP are already staged under ignored `.tools/`; the ZIP SHA-256 matches the documented pin `DEB4416BC939861D48097A866A8B2BF0363C29FF64874F2E04478658FF900808`. ArmorPaint's binary is not staged because this workspace has no user-provided official archive. The blendsmith source snapshot is included under its GPL-3.0-only license; EL4CTEO is adapted as new project-specific instructions with its MIT license retained for attribution, and none of its scripts are copied.
+## Repository Material Maker matrix
+
+The canonical configuration is `tools/material-maker/rogue-command-material-maker.json`; run `python tools/validate_material_maker_config.py` before changing it. It configures four image-authoring routes while keeping Blender authoritative for production geometry:
+
+| Workflow | Use | Authority | Downstream |
+|---|---|---|---|
+| `urp` | Game-bound vehicle maps | Blender FBX/UVs/vertex wear | Unity URP `RogueCommand/VehiclePBR_VertexWear` |
+| `blender` | Blender material/preview inspection | Blender `.blend` and original FBX | Blender 4.5.14 image/material preview |
+| `three_d` | Disposable UV-frozen paint copy | Blender production mesh | Material Maker images only; never its mesh export |
+| `procedural` | Graph-only texture generation | Blender UV contract | Same four-map packer and validation |
+
+Use `tools/Run-MaterialMakerBake.ps1 -Workflow <name>`. The runner writes a workflow manifest beside the maps, uses the same four-map contract, and never imports Material Maker-generated Unity `.mat` files.
+
+Material Maker 1.7 and its release ZIP are staged under ignored `.tools/`; the ZIP SHA-256 matches the documented pin `DEB4416BC939861D48097A866A8B2BF0363C29FF64874F2E04478658FF900808`. ArmorPaint's binary is not staged because this workspace has no user-provided official archive. The blendsmith source snapshot is included under its GPL-3.0-only license; EL4CTEO is adapted as new project-specific instructions with its MIT license retained for attribution, and none of its scripts are copied.
+
 
 ## Texture contract
 

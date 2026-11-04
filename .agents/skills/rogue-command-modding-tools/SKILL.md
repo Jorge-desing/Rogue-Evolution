@@ -39,7 +39,7 @@ Before conversion, inspect the game's reference assets and the actual consumer i
 
 - Use the existing Blender bake for `<Name>_Albedo.png`, `<Name>_MetallicGloss.png`, `<Name>_Normal.png`, and `<Name>_Emission.png`.
 - Preserve the project packing: MetallicGloss RGB = metallic, A = smoothness (`1 - roughness`), imported linear with alpha from input; Albedo/Emission are sRGB; Normal is imported as a normal map. Keep mesh vertex-wear RGBA separate from these texture channels.
-- ArmorPaint and Material Maker are optional image-only steps. Do not replace the authoritative Blender mesh, UVs, hierarchy, sockets, LODs, or vertex colors with a painter's mesh export.
+- Material Maker 1.7 is the required image-only authoring pass for mod textures; ArmorPaint remains optional. Do not replace the authoritative Blender mesh, UVs, hierarchy, sockets, LODs, or vertex colors with a painter's mesh export.
 - Before image conversion, inspect stock game's dimensions, facing, pivot/hotspot, alpha, palette, and format. Follow the current card sprite and image-authoring rules; generic sprite-strip commands are not assumed to be available.
 
 ### External generic workflows are not project commands

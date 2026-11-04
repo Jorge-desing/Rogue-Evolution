@@ -15,7 +15,7 @@ Use this skill to design, model, texture, and export original, high-readability 
 - **Node Patterns & Coordinates**: `--camo` uses procedural Object-coordinate nodes (Voronoi for `splinter`/`digital`, wave for `tigerstripe`, noise for `desert`/`urban`/`arctic`/`woodland`).
 - **Biome & Shaders**: `--biome` selects an authoring-time palette alias when `--camo` is `none` (no runtime adaptation). Atlas textures require baking and URP `VehiclePBR_VertexWear` shader.
 - **References**: Follow [Art Style & Palette](references/art-style-and-palette.md) for camera-first shape and material rules, [Design Guides Adapted](references/design-guides-adapted.md) for source-backed design checks, [Blender Procedural Techniques](references/blender-procedural-techniques.md) for the refinement sequence and recipes, [Unity Material Pipeline](references/unity-material-pipeline.md), [Native Hierarchy & Pivots](references/native-hierarchy-and-pivots.md), and [3D-MODEL-AUTHORING-ENHANCEMENTS.md](../../../docs/research/3D-MODEL-AUTHORING-ENHANCEMENTS.md).
-- **Texture workflow routing**: Use [PBR Texture Authoring](../rogue-command-pbr-texture-authoring/SKILL.md) for map creation and optional ArmorPaint/Material Maker passes; use [PBR Texture Validation](../rogue-command-pbr-texture-validation/SKILL.md) to check channels, effective Unity import settings, and mesh vertex colors. The shared integration steps are in [PBR-TEXTURE-WORKFLOW.md](../../../docs/research/PBR-TEXTURE-WORKFLOW.md).
+- **Texture workflow routing**: Use [PBR Texture Authoring](../rogue-command-pbr-texture-authoring/SKILL.md) for the required Material Maker pass and map creation; use [PBR Texture Validation](../rogue-command-pbr-texture-validation/SKILL.md) to check channels, effective Unity import settings, and mesh vertex colors. The shared integration steps are in [PBR-TEXTURE-WORKFLOW.md](../../../docs/research/PBR-TEXTURE-WORKFLOW.md).
 
 
 ## 1. Preserve and Use the Established Authoring Path
@@ -336,14 +336,17 @@ Each playable unit requires a matching `128 × 128` pixel card Sprite referenced
   - Non-overlapping UV unwrapping (`unwrap_atlas_uvs`, island margin 0.02). Headless Cycles 1-sample baking generates `<Name>_Albedo.png`, `<Name>_MetallicGloss.png` (linear RGB metallic + alpha smoothness), `<Name>_Normal.png`, and `<Name>_Emission.png`.
   - Joins batched geometry into `<Name>_Atlas.fbx` with single material slot.
 
-### Optional External Texture Passes
+### Required Material Maker Texture Pass
 
-- Blender 4.5.14 and the deterministic `--bake-atlas` workflow remain the production baseline. ArmorPaint and Material Maker are optional local texture steps, not build dependencies; stage them with `tools/Setup-TextureAuthoringTools.ps1` when available.
-- After the UV layout is final, import the FBX or Blender mesh into ArmorPaint or Material Maker and use the application only to author texture images. Material Maker 1.7 supports a paint project when the model has UVs and a single submesh; otherwise use its procedural graph path or a disposable texture-only copy. Build the Unity prefab and AssetBundle from the original Blender export to preserve canonical sockets and mesh hierarchy; after Unity import, verify that the mesh still exposes its RGBA vertex-color attribute. Do not accept an external mesh export without separately checking those contracts.
-- ArmorPaint's neural nodes run locally after their model files have been downloaded; its manual recommends at least 6 GB of VRAM. `Image to PBR` derives base color, occlusion, roughness, normal, and height from a color image. This does not provide the project's complete texture set by itself: set Metallic and Emission deliberately and preserve all four expected maps. See the [ArmorPaint manual](https://armorpaint.org/manual).
-- Export the maps with a custom preset or graph and preserve the existing names: `<Name>_Albedo.png`, `<Name>_MetallicGloss.png`, `<Name>_Normal.png`, and `<Name>_Emission.png`. ArmorPaint's Unity preset packs Metallic, Occlusion, and Smoothness; confirm its swizzle or use a custom preset so the project shader receives Metallic in R and Smoothness (`1 - roughness`) in A. The shader does not consume AO from this map. The Unity importer must keep MetallicGloss linear (`sRGBTexture = false`, alpha from input); Albedo and Emission remain sRGB and Normal uses `TextureImporterType.NormalMap`. `VehiclePrefabBuilder` applies these import settings during rebuild, so verify the effective importer settings and texture after Unity reimports it. See [Unity Material Pipeline](references/unity-material-pipeline.md).
-- Do not bake ArmorPaint's occlusion into the project's vertex-wear R channel or overwrite any RGBA vertex colors. Keep the existing cavity AO, edge wear, thermal soot, and team-mask authoring contracts on the source mesh.
-- For the complete authoring and post-import checklist, follow [PBR Texture Authoring](../rogue-command-pbr-texture-authoring/SKILL.md) and [PBR Texture Validation](../rogue-command-pbr-texture-validation/SKILL.md).
+Blender 4.5.14 remains the source of production geometry, UVs, sockets, LODs and RGBA vertex wear. Material Maker 1.7 is the required image-authoring pass for every mod texture set, including URP vehicle materials, Blender preview materials, procedural graphs and disposable 3D paint copies. Use the repository matrix and runner:
+
+```powershell
+powershell -File tools/Run-MaterialMakerBake.ps1 -Workflow urp
+powershell -File tools/Run-MaterialMakerBake.ps1 -Workflow blender
+powershell -File tools/Run-MaterialMakerBake.ps1 -Workflow three_d -TemplatePath artifacts/texture-work/<Name>/MaterialMaker/<Name>.ptex
+```
+
+Material Maker contributes PNG images only. Never promote its mesh export to Unity; keep the Blender FBX authoritative and run the existing URP importer/material builder afterward.
 
 - **Skeletal Armature Rigging & Procedural Animations (`--rig`, `--animate`)**:
   - Armature hierarchy: `Bone_Root` $\rightarrow$ `Bone_Hull` $\rightarrow$ `Bone_TurretYaw` $\rightarrow$ `Bone_TurretPitch` $\rightarrow$ `Bone_BarrelRecoil`. Rigid weights ($1.0$) per plate.

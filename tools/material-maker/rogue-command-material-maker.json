@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 1,
+  "tool": {
+    "name": "Material Maker",
+    "version": "1.7",
+    "installRelativePath": ".tools/MaterialMaker-1.7/material_maker_1_7_windows/material_maker.exe",
+    "setupCommand": "powershell -File tools/Setup-TextureAuthoringTools.ps1 -MaterialMaker",
+    "runner": "tools/Run-MaterialMakerBake.ps1"
+  },
+  "textureContract": {
+    "requiredMaps": [
+      {
+        "suffix": "Albedo",
+        "unityImporter": "Default",
+        "srgb": true,
+        "description": "Authored tactical base color"
+      },
+      {
+        "suffix": "MetallicGloss",
+        "unityImporter": "Default",
+        "srgb": false,
+        "alpha": "smoothness = 1 - roughness",
+        "description": "RGB metallic, A smoothness; AO is not packed"
+      },
+      {
+        "suffix": "Normal",
+        "unityImporter": "NormalMap",
+        "srgb": false,
+        "description": "Tangent-space normal"
+      },
+      {
+        "suffix": "Emission",
+        "unityImporter": "Default",
+        "srgb": true,
+        "description": "Intentional emissive elements only"
+      }
+    ],
+    "shader": "RogueCommand/VehiclePBR_VertexWear",
+    "pipeline": "Unity URP 12.1.15",
+    "meshVertexWear": {
+      "R": "cavity AO / micro-relief",
+      "G": "edge wear / welds",
+      "B": "thermal soot / mud",
+      "A": "team mask"
+    }
+  },
+  "exportProfile": {
+    "name": "RogueCommand",
+    "material": "material",
+    "rawFiles": [
+      { "suffix": "Albedo", "output": 0 },
+      { "suffix": "Metallic", "output": 12 },
+      { "suffix": "Roughness", "output": 13 },
+      { "suffix": "Normal", "output": 7 },
+      { "suffix": "Emission", "output": 2 }
+    ],
+    "packer": "tools/pack_material_maker_pbr.py"
+  },
+  "workflows": {
+    "urp": {
+      "description": "Material Maker images bound by the Unity URP VehiclePBR_VertexWear material.",
+      "sourceAuthority": "Blender FBX and UVs",
+      "outputDirectory": "artifacts/mm-bake-output",
+      "postProcess": "pack MetallicGloss, then run Unity importer validation"
+    },
+    "blender": {
+      "description": "Material Maker image pass previewed in Blender 4.5.14 without replacing the production mesh.",
+      "sourceAuthority": "Blender .blend, FBX, hierarchy, sockets and vertex wear",
+      "outputDirectory": "artifacts/mm-bake-output/blender",
+      "postProcess": "load PNGs into a Blender Principled preview; export the original FBX only"
+    },
+    "three_d": {
+      "description": "Material Maker 3D paint workflow for a disposable UV-frozen texture copy.",
+      "sourceAuthority": "Blender production mesh",
+      "paintInputExtensions": [".fbx", ".glb", ".gltf", ".obj"],
+      "requiresUv": true,
+      "singleSubmeshForPaint": true,
+      "outputDirectory": "artifacts/mm-bake-output/3d",
+      "postProcess": "export images only; never promote a Material Maker mesh export"
+    },
+    "procedural": {
+      "description": "Material Maker graph-only generation with no 3D paint import.",
+      "sourceAuthority": "Blender production mesh and UVs",
+      "outputDirectory": "artifacts/mm-bake-output/procedural",
+      "postProcess": "pack four maps and validate dimensions/channels"
+    }
+  },
+  "preservation": [
+    "Do not replace Blender FBX, sockets, LODs, hierarchy or RGBA vertex wear.",
+    "Do not import Material Maker generated Unity .mat files as authoritative materials.",
+    "Keep generated projects, raw maps and previews under artifacts/ until promoted deliberately.",
+    "A successful Material Maker export is local authoring evidence, not in-game runtime evidence."
+  ]
+}
