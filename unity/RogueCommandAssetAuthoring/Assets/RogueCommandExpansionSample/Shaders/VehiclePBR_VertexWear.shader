@@ -37,6 +37,10 @@ Shader "RogueCommand/VehiclePBR_VertexWear"
         _CreviceDustIntensity ("Crevice Micro-Dust Softening", Range(0.0, 1.0)) = 0.50
         _ZenithBleach ("Zenith Sun Bleach", Range(0.0, 1.0)) = 0.35
 
+        [Header(Spacecraft Aero Alloy Sheen)]
+        _AeroSheenIntensity ("Glancing Aero Sheen", Range(0.0, 1.0)) = 0.35
+        _AeroSheenTint ("Aero Sheen Color", Color) = (0.78, 0.88, 1.0, 1.0)
+
         [Header(Micro Surface Detail RNM)]
         [Normal] _DetailBumpMap ("Micro Detail Normal", 2D) = "bump" {}
         _DetailBumpScale ("Detail Normal Scale", Range(0.0, 2.0)) = 0.5
@@ -114,6 +118,8 @@ Shader "RogueCommand/VehiclePBR_VertexWear"
                 half _WeldBeadWidth;
                 half _ThermalTemperingIntensity;
                 half _CreviceDustIntensity;
+                half4 _AeroSheenTint;
+                half _AeroSheenIntensity;
                 half _ZenithBleach;
                 half _Cutoff;
                 half _Surface;
@@ -273,8 +279,14 @@ Shader "RogueCommand/VehiclePBR_VertexWear"
 
                 // Procedural hard-surface edge highlight (rim) on bare steel
                 half3 viewDirWS = GetWorldSpaceNormalizeViewDir(input.positionWS);
-                half rim = pow(saturate(1.0h - dot(input.normalWS, viewDirWS)), 3.0h);
+                half NdotV = saturate(dot(input.normalWS, viewDirWS));
+                half rim = pow(1.0h - NdotV, 3.0h);
                 half edgeHighlight = rim * steelMask * 0.35h;
+
+                // Spacecraft glancing aero-alloy specular sheen on metallic orbital hulls
+                half aeroSheen = pow(1.0h - NdotV, 3.5h) * surfaceData.metallic * _AeroSheenIntensity;
+                surfaceData.albedo = lerp(surfaceData.albedo, surfaceData.albedo + _AeroSheenTint.rgb * 0.16h, aeroSheen);
+                surfaceData.smoothness = saturate(surfaceData.smoothness + aeroSheen * 0.10h);
 
                 half3 baseNormalTS = SampleNormal(input.uv,
                     TEXTURE2D_ARGS(_BumpMap, sampler_BumpMap), _BumpScale);

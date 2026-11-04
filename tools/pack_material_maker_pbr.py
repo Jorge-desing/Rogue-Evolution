@@ -14,7 +14,7 @@ import json
 import math
 from pathlib import Path
 
-from PIL import Image, ImageChops, ImageStat
+from PIL import Image, ImageChops, ImageFilter, ImageStat
 
 # Roughness floor: a perfectly smooth (roughness 0) surface aliases badly at the
 # game's RTS camera distance, so smoothness is capped at 1 - MIN_ROUGHNESS.
@@ -58,6 +58,41 @@ def copy_opaque_rgb(source: Path, destination: Path) -> None:
     """Re-save as opaque RGB so a stray alpha channel never drives alpha clipping."""
     with Image.open(source) as image:
         save_png(image.convert("RGB"), destination)
+
+
+def process_albedo(source: Path, destination: Path) -> None:
+    """Re-save as opaque RGB with subtle PBR-safe micro-contrast for sharp panel lines."""
+    with Image.open(source) as image:
+        rgb = image.convert("RGB")
+        # Gentle unsharp mask to crisp up panel separation at RTS isometric viewports
+        # without introducing clipping or haloing.
+        try:
+            sharpened = rgb.filter(
+                ImageFilter.UnsharpMask(radius=1.2, percent=35, threshold=2)
+            )
+        except Exception:
+            sharpened = rgb
+        save_png(sharpened, destination)
+
+
+def normalize_normal(source: Path, destination: Path) -> None:
+    """Re-save tangent normal map with exact per-pixel vector renormalization."""
+    with Image.open(source) as image:
+        rgb = image.convert("RGB")
+        try:
+            import numpy as np
+
+            arr = np.asarray(rgb, dtype=np.float32) / 127.5 - 1.0
+            # Ensure Z points outward in tangent space
+            arr[..., 2] = np.maximum(arr[..., 2], 0.02)
+            lens = np.sqrt(np.sum(arr * arr, axis=-1, keepdims=True))
+            lens = np.maximum(lens, 1e-6)
+            arr = arr / lens
+            encoded = np.clip(np.round((arr + 1.0) * 127.5), 0, 255).astype(np.uint8)
+            out_img = Image.fromarray(encoded, "RGB")
+        except Exception:
+            out_img = rgb
+        save_png(out_img, destination)
 
 
 def pack_metallic_gloss(metallic_path: Path, roughness_path: Path, output_path: Path) -> None:
@@ -181,13 +216,13 @@ def pack_maps(input_dir: Path, output_dir: Path, prefix: str) -> dict[str, objec
     if len(set(dimensions.values())) != 1:
         raise ValueError(f"Material Maker maps have incompatible dimensions: {dimensions}")
 
-    copy_opaque_rgb(paths["Albedo"], output_dir / f"{prefix}_Albedo.png")
+    process_albedo(paths["Albedo"], output_dir / f"{prefix}_Albedo.png")
     pack_metallic_gloss(
         paths["Metallic"],
         paths["Roughness"],
         output_dir / f"{prefix}_MetallicGloss.png",
     )
-    copy_opaque_rgb(paths["Normal"], output_dir / f"{prefix}_Normal.png")
+    normalize_normal(paths["Normal"], output_dir / f"{prefix}_Normal.png")
     copy_opaque_rgb(paths["Emission"], output_dir / f"{prefix}_Emission.png")
 
     report = build_report(paths, dimensions)

@@ -63,7 +63,7 @@ powershell -File tools/Run-MaterialMakerBake.ps1 -Workflow three_d -UnitName Sky
 powershell -File tools/Run-MaterialMakerBake.ps1 -Workflow procedural -Preset olive_armor -Strict
 ```
 
-`tools/Prepare-MaterialMakerTacticalTemplate.py` supports `--preset` (`olive_armor`, `gunmetal_chassis`, `desert_camo`, `hazard_industrial`) and wires a bimodal `colorize_metallic` node from the panel/seam height graph so `Metallic` has distinct metal plates and dielectric seam recesses (never a flat uniform export). `tools/prepare_material_maker_3d_paint.py` builds the disposable single-submesh UV-frozen `<Unit>_PaintProxy.obj` under `artifacts/texture-work/<Unit>/MaterialMaker/` without touching the production FBX.
+`tools/Prepare-MaterialMakerTacticalTemplate.py` supports space-military presets (`--preset olive_armor | gunmetal_chassis | desert_camo | hazard_industrial | orbital_titanium`) with laser-cut seams, precision chamfers, anisotropic brushed grain, and a bimodal `colorize_metallic` node. `tools/pack_material_maker_pbr.py` renormalizes tangent-space normal maps per pixel and applies gentle PBR-safe micro-contrast on albedo. `tools/prepare_material_maker_3d_paint.py` builds the disposable single-submesh UV-frozen `<Unit>_PaintProxy.obj` under `artifacts/texture-work/<Unit>/MaterialMaker/` without touching the production FBX.
 
 All workflows write an `material-maker-workflow.json` manifest beside the output maps. The manifest records the workflow, shader, pipeline, source authority and post-process rule for agent-readable handoff.
 

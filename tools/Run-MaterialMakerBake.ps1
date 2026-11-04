@@ -5,7 +5,7 @@
 param(
     [ValidateSet("urp", "blender", "three_d", "procedural")]
     [string]$Workflow = "urp",
-    [ValidateSet("olive_armor", "gunmetal_chassis", "desert_camo", "hazard_industrial")]
+    [ValidateSet("olive_armor", "gunmetal_chassis", "desert_camo", "hazard_industrial", "orbital_titanium")]
     [string]$Preset = "olive_armor",
     [ValidateSet(9, 10, 11, 12)]
     [int]$SizePower = 11,
