@@ -1274,3 +1274,21 @@ This is a compact, durable orientation for agents. For the changing checkout sta
 - QA/reflection safety: Profile2 is dedicated QA without a tutorial; never ask, inspect, infer, gate, bypass, or switch profiles for tutorial. Before reflection jointly verify Rogue Command version, Unity `2021.3.45f2`, Assembly-CSharp SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, and MVID `db0e9462-128d-4296-9900-de18b4bd0c00`.
 
 - Root MEMORY.md, codex memory, antigravity memory, and mem0 synced to HEAD 2e4d4f8.
+
+## Refresh (2026-11-04, HEAD c2c08d0 — Material Maker 3D/URP texture quality + bundle gate honesty + audit snapshot)
+
+- Repository `C:/Users/Alex/Documents/Mod Rogue Command`, loader `1.19.0`, branch `codex/rogue-unit-balance-20261018`. Local/upstream/origin verified at `c2c08d02346223fad83864c56d304a8d05feb9cd` (`feat(material-maker): raise 3d and URP texture quality`), after `ab3de58` (`fix(diagnostics): mark unavailable bundle gates honestly`), `619ada0` (`docs(memory): sync diagnostics audit snapshot`), and `2e4d4f8` (`feat(diagnostics): audit Unity and AssetBundle quality`).
+- Code baseline remains `0bbede6b7beb68f8f50f4ae89f10e83ecb056c0d`; implementation baseline remains `e25c6de` (arachnid middle-leg orientation normalizer) / `d7a3a11b56b58bed6d3f06c47fd40a627c9d1ae3`.
+
+- New committed scope since HEAD 2e4d4f8:
+  - `ab3de58`: `tools/audit_unity_build.py` now reports unavailable legacy bundle gates as `unavailable` instead of `passed`; `tests/python/test_audit_unity_build.py` updated.
+  - `619ada0`: docs(memory) sync of the diagnostics audit snapshot.
+  - `c2c08d0`: Material Maker 3D/URP texture quality raised across `tools/Prepare-MaterialMakerTacticalTemplate.py`, `tools/Run-MaterialMakerBake.ps1`, `tools/apply_material_maker_to_blender.py`, `tools/audit_material_maker_output.py`, `tools/pack_material_maker_pbr.py`, `tools/prepare_material_maker_3d_paint.py`, plus workflow-config/PBR/audit tests and `.agents/.../SKILL.md` + `docs/research/PBR-TEXTURE-WORKFLOW.md`.
+
+- Working tree: dirty nested worktree gitlinks `.worktrees/cargador` @ `11e9968` (dirty) and `.worktrees/task-graph-validation` @ `d1f9045` (dirty) preserved. No root source/test changes in this sync beyond memory.
+
+- Validation: no fresh full run in this sync. Last documented at `2e4d4f8`: Python full suite `152/152`; focused diagnostic tests `3/3`; real local reports passed `--strict` for sample and Tactical bundles. Sample: 1,470 objects, 166 meshes, 164 skinned renderers, 15 textures, 6 shaders, 12,000,964 bytes, SHA-256 `301537218e4bd46c434cfb61408bfdd76f55e50e8ed94bfc5d8206acaf9f2a7b`. Tactical: 927 objects, 80 meshes, 74 skinned renderers, 46 textures, 6 shaders, 24,534,720 bytes, SHA-256 `8016a4fc22932110feb36ea84798df4277b1aed312cd2c373c3960b92bb12a49`. AssetBundle references, native visual preflight and Steam/Unity gameplay proof not rerun in this sync; natural offer->selection->placement->production/render/stat and tactical AI remain unverified.
+
+- QA/reflection safety: Profile2 is dedicated QA without a tutorial; never ask, inspect, infer, gate, bypass, or switch profiles for tutorial. Check current selector/save safety and preserve saves. Before reflection jointly verify Rogue Command version, Unity `2021.3.45f2`, Assembly-CSharp SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, and MVID `db0e9462-128d-4296-9900-de18b4bd0c00`.
+
+- Root MEMORY.md, codex memory, antigravity memory, and mem0 synced to HEAD c2c08d0.
