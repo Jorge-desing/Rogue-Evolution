@@ -10815,9 +10815,14 @@ def generate_procedural_action_clips(
 
 def unwrap_atlas_uvs(
     objects: Sequence[bpy.types.Object],
-    island_margin: float = 0.02,
+    island_margin: float = 0.01,
 ) -> None:
-    """Generates a unified, non-overlapping UV layout across all mesh objects into 'UVMap_Atlas'."""
+    """Generates a unified, non-overlapping UV layout across all mesh objects into 'UVMap_Atlas'.
+
+    Smart Project gives per-island unwrapping; a follow-up `pack_islands` pass rotates and
+    scales the islands to fill the atlas tightly (higher, more uniform texel density) while
+    keeping `island_margin` (fraction of the atlas) of gutter for mip/bake bleed.
+    """
     bpy.ops.object.select_all(action="DESELECT")
     valid_mesh_objs = [o for o in objects if o.type == "MESH" and not o.name.endswith(("_COLLIDER", "_ShieldBubble"))]
     if not valid_mesh_objs:
@@ -10835,6 +10840,15 @@ def unwrap_atlas_uvs(
         correct_aspect=True,
         scale_to_bounds=True
     )
+    try:
+        bpy.ops.uv.pack_islands(
+            rotate=True,
+            scale=True,
+            margin_method="FRACTION",
+            margin=island_margin,
+        )
+    except (TypeError, RuntimeError) as exc:
+        print(f"Warning: UV island packing skipped: {exc}")
     bpy.ops.object.mode_set(mode="OBJECT")
 
 
@@ -10862,10 +10876,25 @@ def bake_pbr_texture_atlas(
     scene.cycles.samples = 1
     scene.cycles.bake_type = "DIFFUSE"
 
+    # Unity expects OpenGL tangent-space normals (+X +Y +Z). Make that explicit and give the
+    # bake a pixel gutter that is wide enough for mipmaps but scales with atlas resolution.
+    bake_settings = scene.render.bake
+    bake_settings.normal_space = "TANGENT"
+    bake_settings.normal_r, bake_settings.normal_g, bake_settings.normal_b = "POS_X", "POS_Y", "POS_Z"
+    bake_settings.margin_type = "EXTEND"
+    bake_settings.margin = max(4, resolution // 128)
+    bake_settings.use_clear = True
+
+    def mark_data_image(image):
+        # Normal, roughness and metallic are data, not color: without Non-Color the sRGB
+        # transform would gamma-encode them when the PNG is written.
+        image.colorspace_settings.name = "Non-Color"
+        return image
+
     img_albedo = bpy.data.images.new(f"{prefix}_Albedo", resolution, resolution, alpha=True)
     img_emission = bpy.data.images.new(f"{prefix}_Emission", resolution, resolution, alpha=False)
-    img_normal = bpy.data.images.new(f"{prefix}_Normal", resolution, resolution, alpha=False)
-    img_metallic = bpy.data.images.new(f"{prefix}_MetallicGloss", resolution, resolution, alpha=True)
+    img_normal = mark_data_image(bpy.data.images.new(f"{prefix}_Normal", resolution, resolution, alpha=False))
+    img_metallic = mark_data_image(bpy.data.images.new(f"{prefix}_MetallicGloss", resolution, resolution, alpha=True))
 
     def set_bake_target(target_image):
         for obj in valid_mesh_objs:
@@ -10881,12 +10910,49 @@ def bake_pbr_texture_atlas(
         obj.select_set(True)
     bpy.context.view_layer.objects.active = valid_mesh_objs[0]
 
-    # 1. Bake Diffuse Color
+    # 1. Bake Albedo. The DIFFUSE/COLOR pass of a Principled BSDF is Base Color * (1 - Metallic),
+    # which would turn every metal plate near-black in Unity's metallic workflow. Route the
+    # Base Color input through a temporary Emission shader so the full base color is baked.
+    def bake_base_color_via_emission():
+        rerouted = []
+        for obj in valid_mesh_objs:
+            for mat in obj.data.materials:
+                if not (mat and mat.use_nodes):
+                    continue
+                out_node = next((n for n in mat.node_tree.nodes if n.type == "OUTPUT_MATERIAL"), None)
+                bsdf_node = next((n for n in mat.node_tree.nodes if n.type == "BSDF_PRINCIPLED"), None)
+                if not (out_node and bsdf_node and "Base Color" in bsdf_node.inputs):
+                    continue
+                saved_from = None
+                for link in mat.node_tree.links:
+                    if link.to_node == out_node and link.to_socket.name == "Surface":
+                        saved_from = link.from_socket
+                        break
+                emit_node = mat.node_tree.nodes.new("ShaderNodeEmission")
+                base_input = bsdf_node.inputs["Base Color"]
+                if base_input.is_linked:
+                    mat.node_tree.links.new(base_input.links[0].from_socket, emit_node.inputs["Color"])
+                else:
+                    emit_node.inputs["Color"].default_value = tuple(base_input.default_value)
+                mat.node_tree.links.new(emit_node.outputs["Emission"], out_node.inputs["Surface"])
+                rerouted.append((mat, out_node, emit_node, saved_from))
+        try:
+            bpy.ops.object.bake(type="EMIT")
+        finally:
+            for mat, out_node, emit_node, saved_from in rerouted:
+                if saved_from is not None:
+                    mat.node_tree.links.new(saved_from, out_node.inputs["Surface"])
+                mat.node_tree.nodes.remove(emit_node)
+
     set_bake_target(img_albedo)
     try:
-        bpy.ops.object.bake(type="DIFFUSE", pass_filter={"COLOR"})
+        bake_base_color_via_emission()
     except Exception as e:
-        print(f"Warning: Diffuse bake: {e}")
+        print(f"Warning: Base color bake failed ({e}); falling back to DIFFUSE color pass")
+        try:
+            bpy.ops.object.bake(type="DIFFUSE", pass_filter={"COLOR"})
+        except Exception as e2:
+            print(f"Warning: Diffuse bake: {e2}")
     albedo_path = output_dir / f"{prefix}_Albedo.png"
     img_albedo.filepath_raw = str(albedo_path)
     img_albedo.file_format = "PNG"
@@ -10918,7 +10984,7 @@ def bake_pbr_texture_atlas(
     maps["normal"] = normal_path
 
     # 4. Bake Roughness (Grayscale)
-    img_roughness = bpy.data.images.new(f"{prefix}_RoughnessTemp", resolution, resolution, alpha=False)
+    img_roughness = mark_data_image(bpy.data.images.new(f"{prefix}_RoughnessTemp", resolution, resolution, alpha=False))
     set_bake_target(img_roughness)
     try:
         bpy.ops.object.bake(type="ROUGHNESS")
@@ -10926,7 +10992,7 @@ def bake_pbr_texture_atlas(
         print(f"Warning: Roughness bake: {e}")
 
     # 5. Bake Metallic (Grayscale via temporary Emission shader reroute)
-    img_metallic_temp = bpy.data.images.new(f"{prefix}_MetallicTemp", resolution, resolution, alpha=False)
+    img_metallic_temp = mark_data_image(bpy.data.images.new(f"{prefix}_MetallicTemp", resolution, resolution, alpha=False))
     set_bake_target(img_metallic_temp)
     saved_surface_links = {}
     temp_emit_nodes = []
@@ -10976,7 +11042,7 @@ def bake_pbr_texture_atlas(
 
         metallic_vals = metal_arr[0::4]
         roughness_vals = rough_arr[0::4]
-        smoothness_vals = np.clip(1.0 - roughness_vals, 0.0, 1.0)
+        smoothness_vals = np.clip(1.0 - roughness_vals, 0.0, 0.96)  # roughness floor 0.04, same as pack_material_maker_pbr.py
 
         packed_arr = np.empty(num_pixels * 4, dtype=np.float32)
         packed_arr[0::4] = metallic_vals
@@ -10992,7 +11058,7 @@ def bake_pbr_texture_atlas(
         packed = []
         for i in range(0, len(r_pix), 4):
             m = m_pix[i]
-            s = max(0.0, min(1.0, 1.0 - r_pix[i]))
+            s = max(0.0, min(0.96, 1.0 - r_pix[i]))
             packed.extend([m, m, m, s])
         img_metallic.pixels = packed
 

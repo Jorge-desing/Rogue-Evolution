@@ -463,3 +463,10 @@ To eliminate toy-like constant-radius cylinders and repetitive stacked rings ("t
 - [Blender Procedural Techniques](references/blender-procedural-techniques.md) — Parametric `bpy` recipes for chamfered hulls, continuous tracks, stepped road wheels, and engine grilles.
 - [Unity Material Pipeline](references/unity-material-pipeline.md) — URP material configuration, emission keywords, GPU instancing limits, and card sprite rules.
 - [Native Hierarchy & Pivots](references/native-hierarchy-and-pivots.md) — Transform hierarchy maps for `PCXBaseTank`, `BombBike`, `ArtilleryTank`, `GatlingWalker`, and `LightningTank`.
+
+## Atlas bake contract (verified with Blender 4.5.14)
+
+- `unwrap_atlas_uvs` runs Smart Project then `uv.pack_islands` (rotate + scale, 1% gutter) for uniform, dense texel use.
+- `bake_pbr_texture_atlas` bakes **Base Color via a temporary Emission reroute**; the Principled DIFFUSE/COLOR pass is Base Color x (1 - Metallic) and darkens metals. Normal is baked as OpenGL tangent space (+X +Y +Z).
+- Normal, roughness and metallic images are `Non-Color`; otherwise PNG export gamma-encodes them (Metallic 0.5 became 188). Smoothness is capped at 0.96, matching `pack_material_maker_pbr.py`.
+- `tests/python/blender/test_blender_bake_contract.py` checks this headlessly when Blender 4.5 is installed (skips otherwise).
