@@ -1,6 +1,6 @@
 ---
 name: rogue-command-material-maker-texture-authoring
-description: "Use Material Maker 1.7 for procedural or painted Rogue Command texture images, adapting its single-submesh paint limit and Unity exports to the project's PBR contract."
+description: "Use Material Maker 1.7 for all procedural or painted Rogue Command texture images (required standard tool), adapting its single-submesh paint limit and Unity exports to the project's PBR contract."
 ---
 
 # Rogue Command Material Maker Texture Authoring
