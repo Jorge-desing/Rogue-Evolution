@@ -1,13 +1,32 @@
 #!/usr/bin/env python3
-"""Pack Material Maker scalar exports into Rogue Command's four-map PBR contract."""
+"""Pack Material Maker scalar exports into Rogue Command's four-map PBR contract.
+
+Besides channel packing, the packer sanitises the outputs for the URP
+``RogueCommand/VehiclePBR_VertexWear`` shader and writes ``<prefix>_pack-report.json``
+with per-map statistics and quality warnings (flat/blank exports, non power-of-two
+sizes, non-unit normals, albedo outside the physically plausible range, ...).
+"""
 
 from __future__ import annotations
 
 import argparse
-import shutil
+import json
+import math
 from pathlib import Path
 
-from PIL import Image, ImageChops
+from PIL import Image, ImageChops, ImageStat
+
+# Roughness floor: a perfectly smooth (roughness 0) surface aliases badly at the
+# game's RTS camera distance, so smoothness is capped at 1 - MIN_ROUGHNESS.
+MIN_ROUGHNESS = 0.04
+MAX_SMOOTHNESS = round(255 * (1.0 - MIN_ROUGHNESS))
+# Statistics are sampled on a downscaled copy so the report stays cheap on 4K atlases.
+STATS_SAMPLE_SIZE = 64
+# sRGB albedo plausibility window for non-metal surfaces (charcoal .. fresh snow).
+ALBEDO_MIN_MEAN = 30
+ALBEDO_MAX_MEAN = 240
+NORMAL_LENGTH_TOLERANCE = 0.12
+FLAT_STDDEV = 0.75
 
 
 def parse_args() -> argparse.Namespace:
@@ -15,6 +34,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--input-dir", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--prefix", required=True)
+    parser.add_argument(
+        "--strict",
+        action="store_true",
+        help="Treat quality warnings as errors (exit code 2).",
+    )
     return parser.parse_args()
 
 
@@ -25,9 +49,15 @@ def require_map(directory: Path, prefix: str, suffix: str) -> Path:
     return path
 
 
-def copy_color_map(source: Path, destination: Path) -> None:
+def save_png(image: Image.Image, destination: Path) -> None:
     destination.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(source, destination)
+    image.save(destination, format="PNG", optimize=True)
+
+
+def copy_opaque_rgb(source: Path, destination: Path) -> None:
+    """Re-save as opaque RGB so a stray alpha channel never drives alpha clipping."""
+    with Image.open(source) as image:
+        save_png(image.convert("RGB"), destination)
 
 
 def pack_metallic_gloss(metallic_path: Path, roughness_path: Path, output_path: Path) -> None:
@@ -38,55 +68,141 @@ def pack_metallic_gloss(metallic_path: Path, roughness_path: Path, output_path: 
             raise ValueError(
                 f"Metallic/Roughness dimensions differ: {metallic.size} vs {roughness.size}"
             )
-        smoothness = ImageChops.invert(roughness)
+        smoothness = ImageChops.invert(roughness).point(
+            lambda value: min(value, MAX_SMOOTHNESS)
+        )
         packed = Image.merge("RGBA", (metallic, metallic, metallic, smoothness))
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        packed.save(output_path, format="PNG", optimize=True)
+        save_png(packed, output_path)
 
 
-def pack_maps(input_dir: Path, output_dir: Path, prefix: str) -> None:
+def sample(image: Image.Image) -> Image.Image:
+    return image.resize((STATS_SAMPLE_SIZE, STATS_SAMPLE_SIZE), Image.BILINEAR)
+
+
+def channel_stats(image: Image.Image) -> dict[str, list[float]]:
+    stat = ImageStat.Stat(sample(image))
+    return {
+        "mean": [round(v, 2) for v in stat.mean],
+        "stddev": [round(v, 2) for v in stat.stddev],
+        "min": [lo for lo, _ in stat.extrema],
+        "max": [hi for _, hi in stat.extrema],
+    }
+
+
+def normal_length_error(image: Image.Image) -> float:
+    """Mean |length - 1| of decoded tangent-space normals (0 for a perfect map)."""
+    pixels = list(sample(image.convert("RGB")).getdata())
+    total = 0.0
+    for r, g, b in pixels:
+        x, y, z = r / 127.5 - 1.0, g / 127.5 - 1.0, b / 127.5 - 1.0
+        total += abs(math.sqrt(x * x + y * y + z * z) - 1.0)
+    return total / max(1, len(pixels))
+
+
+def metallic_midtone_ratio(metallic: Image.Image) -> float:
+    """Fraction of pixels that are neither dielectric (<25%) nor metal (>75%)."""
+    values = list(sample(metallic).getdata())
+    mid = sum(1 for v in values if 64 <= v <= 191)
+    return mid / max(1, len(values))
+
+
+def build_report(paths: dict[str, Path], dimensions: dict[str, tuple[int, int]]) -> dict[str, object]:
+    warnings: list[str] = []
+    stats: dict[str, object] = {}
+    width, height = next(iter(dimensions.values()))
+
+    if width & (width - 1) or height & (height - 1):
+        warnings.append(f"non-power-of-two atlas {width}x{height}; mipmaps/compression are suboptimal")
+
+    for label, path in paths.items():
+        with Image.open(path) as image:
+            gray_or_rgb = image.convert("RGB") if label in {"Albedo", "Normal", "Emission"} else image.convert("L")
+            stats[label] = channel_stats(gray_or_rgb)
+            if label in {"Albedo", "Metallic", "Roughness"}:
+                if max(stats[label]["stddev"]) < FLAT_STDDEV:
+                    warnings.append(f"{label} is flat (no variation); possible blank or failed export")
+            if label == "Albedo":
+                mean = sum(stats[label]["mean"]) / 3.0
+                if not ALBEDO_MIN_MEAN <= mean <= ALBEDO_MAX_MEAN:
+                    warnings.append(
+                        f"Albedo mean {mean:.0f} outside plausible PBR range "
+                        f"[{ALBEDO_MIN_MEAN}, {ALBEDO_MAX_MEAN}]"
+                    )
+            elif label == "Normal":
+                error = normal_length_error(image)
+                stats[label]["lengthError"] = round(error, 4)
+                if error > NORMAL_LENGTH_TOLERANCE:
+                    warnings.append(
+                        f"Normal vectors deviate from unit length (mean error {error:.3f}); "
+                        "check the export is a tangent-space (OpenGL) normal map"
+                    )
+            elif label == "Metallic":
+                ratio = metallic_midtone_ratio(image.convert("L"))
+                stats[label]["midtoneRatio"] = round(ratio, 3)
+                if ratio > 0.35:
+                    warnings.append(
+                        f"Metallic has {ratio:.0%} mid-tone pixels; metal/dielectric masks should be near-binary"
+                    )
+            elif label == "Emission":
+                if max(stats[label]["mean"]) > 96:
+                    warnings.append("Emission is bright over most of the atlas; intentional emissive elements only")
+
+    return {
+        "size": [width, height],
+        "maxSmoothness": MAX_SMOOTHNESS,
+        "stats": stats,
+        "warnings": warnings,
+    }
+
+
+def pack_maps(input_dir: Path, output_dir: Path, prefix: str) -> dict[str, object]:
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    albedo = require_map(input_dir, prefix, "Albedo")
-    metallic = require_map(input_dir, prefix, "Metallic")
-    roughness = require_map(input_dir, prefix, "Roughness")
-    normal = require_map(input_dir, prefix, "Normal")
-    emission = require_map(input_dir, prefix, "Emission")
+    paths = {
+        "Albedo": require_map(input_dir, prefix, "Albedo"),
+        "Metallic": require_map(input_dir, prefix, "Metallic"),
+        "Roughness": require_map(input_dir, prefix, "Roughness"),
+        "Normal": require_map(input_dir, prefix, "Normal"),
+        "Emission": require_map(input_dir, prefix, "Emission"),
+    }
 
-    # Validate that all maps share the same atlas dimensions before copying.
-    dimensions = {}
-    for label, path in {
-        "Albedo": albedo,
-        "Metallic": metallic,
-        "Roughness": roughness,
-        "Normal": normal,
-        "Emission": emission,
-    }.items():
+    # Validate that all maps share the same atlas dimensions before writing anything.
+    dimensions: dict[str, tuple[int, int]] = {}
+    for label, path in paths.items():
         with Image.open(path) as image:
             dimensions[label] = image.size
     if len(set(dimensions.values())) != 1:
         raise ValueError(f"Material Maker maps have incompatible dimensions: {dimensions}")
 
-    copy_color_map(albedo, output_dir / f"{prefix}_Albedo.png")
+    copy_opaque_rgb(paths["Albedo"], output_dir / f"{prefix}_Albedo.png")
     pack_metallic_gloss(
-        metallic,
-        roughness,
+        paths["Metallic"],
+        paths["Roughness"],
         output_dir / f"{prefix}_MetallicGloss.png",
     )
-    copy_color_map(normal, output_dir / f"{prefix}_Normal.png")
-    copy_color_map(emission, output_dir / f"{prefix}_Emission.png")
+    copy_opaque_rgb(paths["Normal"], output_dir / f"{prefix}_Normal.png")
+    copy_opaque_rgb(paths["Emission"], output_dir / f"{prefix}_Emission.png")
 
-    print(f"Packed {prefix}: {dimensions['Albedo'][0]}x{dimensions['Albedo'][1]}")
+    report = build_report(paths, dimensions)
+    (output_dir / f"{prefix}_pack-report.json").write_text(
+        json.dumps(report, indent=2), encoding="utf-8"
+    )
+
+    width, height = dimensions["Albedo"]
+    print(f"Packed {prefix}: {width}x{height}")
+    for warning in report["warnings"]:
+        print(f"WARNING: {warning}")
+    return report
 
 
-def main_for_test(input_dir: Path, output_dir: Path, prefix: str) -> int:
-    pack_maps(input_dir, output_dir, prefix)
-    return 0
+def main_for_test(input_dir: Path, output_dir: Path, prefix: str, strict: bool = False) -> int:
+    report = pack_maps(input_dir, output_dir, prefix)
+    return 2 if strict and report["warnings"] else 0
 
 
 def main() -> int:
     args = parse_args()
-    return main_for_test(args.input_dir, args.output_dir, args.prefix)
+    return main_for_test(args.input_dir, args.output_dir, args.prefix, args.strict)
 
 
 if __name__ == "__main__":

@@ -237,14 +237,23 @@ Shader "RogueCommand/VehiclePBR_VertexWear"
 
                 surfaceData.smoothness = saturate(lerp(surfaceData.smoothness, 0.85h, steelMask * 0.8h) * (1.0h - primerMask * 0.4h));
                 // Procedural weld bead oxidation along high edge-wear regions
-                half weldBeadSoot = smoothstep(0.5h - _WeldBeadWidth, 0.5h + _WeldBeadWidth,
-                    sin((input.uv.x + input.uv.y) * _WeldBeadScale) * 0.5h + 0.5h) * steelMask;
+                half weldPhase = (input.uv.x + input.uv.y) * _WeldBeadScale;
+                half weldProfile = smoothstep(0.5h - _WeldBeadWidth, 0.5h + _WeldBeadWidth,
+                    sin(weldPhase) * 0.5h + 0.5h);
+                half weldBeadSoot = weldProfile * steelMask;
                 surfaceData.albedo = lerp(surfaceData.albedo, half3(0.10h, 0.09h, 0.08h), weldBeadSoot * 0.5h);
                 surfaceData.smoothness = saturate(surfaceData.smoothness * (1.0h - weldBeadSoot * 0.4h));
                 surfaceData.smoothness *= (1.0h - soot * 0.65h);
 
-                // Procedural ground mud & road dust accumulation on chassis, tracks, and lower hull
-                half heightFactor = saturate(1.0h - (input.positionWS.y / max(0.05h, _MudHeight)));
+                // Micro-detail sample, shared by mud breakup and the normal blend below
+                half detailFade = 1.0h - saturate((length(_WorldSpaceCameraPos - input.positionWS) - 18.0h) / 40.0h);
+                half4 detailPacked = SAMPLE_TEXTURE2D(_DetailBumpMap, sampler_DetailBumpMap, input.uv * _DetailTiling);
+
+                // Procedural ground mud & road dust accumulation on chassis, tracks, and lower hull.
+                // The splatter edge is broken up with the detail map so it is not a clean gradient band.
+                half mudNoise = detailPacked.r * 0.6h + detailPacked.g * 0.4h;
+                half heightFactor = saturate(1.0h - (input.positionWS.y / max(0.05h, _MudHeight))
+                    + (mudNoise - 0.5h) * 0.35h);
                 half mudFactor = heightFactor * heightFactor * _MudAmount;
                 surfaceData.albedo = lerp(surfaceData.albedo, _MudColor.rgb, mudFactor * 0.85h);
                 surfaceData.metallic *= (1.0h - mudFactor);
@@ -257,10 +266,10 @@ Shader "RogueCommand/VehiclePBR_VertexWear"
 
                 // Micro-surface normal sampling with Reoriented Normal Mapping (RNM)
                 // Procedural weld bead: raised bead normal along high edge-wear (steel) regions
-                half weldBeadMask = steelMask;
-                half weldBead = sin((input.uv.x + input.uv.y) * _WeldBeadScale) * 0.5h + 0.5h;
-                weldBead = smoothstep(0.5h - _WeldBeadWidth, 0.5h + _WeldBeadWidth, weldBead) * weldBeadMask * _WeldBeadStrength;
-                half3 weldNormalTS = half3(0.0h, 0.0h, 1.0h + weldBead);
+                // The bead height is a smoothed sine ridge; its slope (cosine) tilts the normal across the
+                // bead so it catches light. Uniform (0,0,k) vectors would be a no-op after normalization.
+                half weldSlope = cos(weldPhase) * weldProfile * steelMask * _WeldBeadStrength * 0.30h;
+                half3 weldNormalTS = normalize(half3(-weldSlope, -weldSlope, 1.0h));
 
                 // Procedural hard-surface edge highlight (rim) on bare steel
                 half3 viewDirWS = GetWorldSpaceNormalizeViewDir(input.positionWS);
@@ -271,15 +280,23 @@ Shader "RogueCommand/VehiclePBR_VertexWear"
                     TEXTURE2D_ARGS(_BumpMap, sampler_BumpMap), _BumpScale);
                 // Sampled directly (not via SampleNormal) so micro-relief works without the _NORMALMAP keyword.
                 // Fades with distance so far RTS views do not shimmer.
-                half detailFade = 1.0h - saturate((distToCam - 18.0h) / 40.0h);
-                half4 detailPacked = SAMPLE_TEXTURE2D(_DetailBumpMap, sampler_DetailBumpMap, input.uv * _DetailTiling);
                 half3 detailNormalTS = UnpackNormalScale(detailPacked, _DetailBumpScale * detailFade);
                 surfaceData.normalTS = BlendNormalsRNM(baseNormalTS, detailNormalTS);
                 surfaceData.normalTS = BlendNormalsRNM(surfaceData.normalTS, weldNormalTS);
                 surfaceData.emission = SampleEmission(input.uv, _EmissionColor.rgb,
                     TEXTURE2D_ARGS(_EmissionMap, sampler_EmissionMap));
                 surfaceData.emission += edgeHighlight * half3(1.0h, 0.95h, 0.85h);
-                surfaceData.occlusion = 1.0h;
+                // Specular anti-aliasing (Kaplanyan/Toksvig style): widen the lobe where the interpolated
+                // normal changes quickly across the pixel, which tames shimmer on curved armor and edges.
+                half3 dNdx = ddx(input.normalWS);
+                half3 dNdy = ddy(input.normalWS);
+                half normalVariance = min(0.18h, 0.5h * (dot(dNdx, dNdx) + dot(dNdy, dNdy)));
+                half roughness = 1.0h - surfaceData.smoothness;
+                surfaceData.smoothness = 1.0h - saturate(sqrt(roughness * roughness + normalVariance));
+
+                // Cavity AO already darkens albedo; feed a softened copy to indirect/ambient light so
+                // recesses also lose environment fill without double-darkening direct light.
+                surfaceData.occlusion = lerp(1.0h, ao, 0.5h);
                 surfaceData.specular = half3(0, 0, 0);
                 surfaceData.clearCoatMask = 0.0h;
                 surfaceData.clearCoatSmoothness = 0.0h;

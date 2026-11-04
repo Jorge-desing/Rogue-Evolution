@@ -63,6 +63,10 @@ powershell -File tools/Run-MaterialMakerBake.ps1 -Workflow procedural -TemplateP
 
 All workflows write an `material-maker-workflow.json` manifest beside the output maps. The manifest records the workflow, shader, pipeline, source authority and post-process rule for agent-readable handoff.
 
+## Pack report and quality gates
+
+	ools/pack_material_maker_pbr.py re-saves Albedo/Normal/Emission as opaque RGB, caps smoothness at 1 - 0.04 (roughness floor, anti-aliasing at RTS distance) and writes <Name>_pack-report.json with per-map stats and warnings (flat/blank export, non power-of-two, non-unit normals, implausible albedo, mid-tone metallic, over-bright emission). Pass --strict to fail (exit 2) on warnings. Shader changes (weld normal tilt, mud breakup, specular AA, softened cavity occlusion) are local authoring changes and must be compiled/verified in Unity 2021.3.45f2 before being called validated.
+
 ## Validation handoff
 
 Run [Rogue Command PBR Texture Validation](../rogue-command-pbr-texture-validation/SKILL.md). Inspect image dimensions, UV coverage, seams, normal convention, and the MetallicGloss alpha channel, then verify effective Unity importer settings after `VehiclePrefabBuilder` reimports the maps. Confirm the original imported mesh still carries RGBA vertex wear and that the prefab uses the project's actual shader and keyword.
