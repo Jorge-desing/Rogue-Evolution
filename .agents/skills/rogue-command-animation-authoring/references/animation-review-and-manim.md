@@ -136,6 +136,23 @@ Use frame labels `1, 10, 20, 30, 40` for contact/down/passing/push-off/contact. 
 
 Do not claim that the preview is a serialized Unity curve audit. Pair it with actual FBX/Unity inspection and, for runtime claims, an observed Animator state, normalized time, and transform series in a Steam run.
 
+### Recommended Rogue Command render set
+
+A substantial project review should render three complementary scenes, not only a recoil diagram:
+
+1. `FireRecoilPreview` — source-local seven-key body/weapon/pitch map and RTS readability.
+2. `WalkGaitPreview` — 40-frame in-place cadence, six-leg coverage, tripod grouping, and root invariant.
+3. `AnimatorContractPreview` — canonical states, parameters, transition ownership, Generic Avatar, and root-motion policy.
+
+Render each scene independently first, inspect its still, and only then combine matching clips:
+
+```text
+terminal(command=".venv/Scripts/python.exe -m manim -ql --disable_caching --media_dir artifacts/animation-previews/<slug>/media-project artifacts/animation-previews/<slug>/script_project.py FireRecoilPreview WalkGaitPreview AnimatorContractPreview", timeout=600)
+terminal(command=".venv/Scripts/python.exe -m manim -qh --disable_caching --media_dir artifacts/animation-previews/<slug>/media-project-hq artifacts/animation-previews/<slug>/script_project.py FireRecoilPreview WalkGaitPreview AnimatorContractPreview", timeout=900)
+```
+
+The `-s` still must hold a meaningful final pose; do not fade the entire scene before snapshotting. Record Manim version, resolution, FPS, scene names, output hashes, and the evidence boundary in an ignored render manifest.
+
 ## 5. Render and review
 
 Check Manim CE before rendering. A preview is optional; do not install dependencies automatically for a documentation or authoring task.

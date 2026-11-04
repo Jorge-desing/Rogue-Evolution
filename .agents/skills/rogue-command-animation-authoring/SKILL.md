@@ -73,6 +73,7 @@ Use `/manim-video` as an optional explanatory-preview method, not as a replaceme
 - **Visual hierarchy:** primary body/weapon motion at full opacity, timing guides and axes around `0.15`, annotations around `0.4`, and only one highlighted focal event at a time. Leave a deliberate `wait` after each phase and a longer pause after the key reveal.
 - **Artifact hygiene:** keep `plan.md`, `script.py`, rendered frames, and video only under ignored `artifacts/animation-previews/<slug>/`. The source `.blend`, FBX, prefab, controller, and bundle remain authoritative; a Manim script must not write into `Assets/` or replace them.
 - **Draft first:** if Manim CE is available, render with `-ql` first and inspect a still; render `-qh` only when a final explanatory video is requested. If it is unavailable, keep the plan and abstract storyboard as static evidence—do not install dependencies or fabricate a render.
+- **Rogue Command scene set:** default to `FireRecoilPreview`, `WalkGaitPreview`, and `AnimatorContractPreview`; bind them to the source frame map, canonical bones, Animator parameters, and evidence boundary documented in `references/animation-review-and-manim.md` rather than producing a generic motion demo.
 
 Canonical optional commands, run through `terminal` from the repository root:
 
