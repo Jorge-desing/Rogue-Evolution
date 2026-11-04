@@ -1163,3 +1163,20 @@ This is a compact, durable orientation for agents. For the changing checkout sta
 - QA/reflection safety: Profile2 is dedicated QA without a tutorial; never ask, inspect, infer, gate, bypass, or switch profiles for tutorial. Check current selector/save safety and preserve saves. Before reflection jointly verify Rogue Command version, Unity `2021.3.45f2`, Assembly-CSharp SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, and MVID `db0e9462-128d-4296-9900-de18b4bd0c00`.
 
 - Root MEMORY.md, codex memory, antigravity memory, and mem0 synced to HEAD b581ae5.
+
+## Refresh (2026-11-03, HEAD c9d62bc — Material Maker workflows + VehiclePBR shader hardening)
+
+- Repository `C:/Users/Alex/Documents/Mod Rogue Command`, loader `1.19.0`, branch `codex/rogue-unit-balance-20261018`. Verified local HEAD, upstream-tracking ref, and origin branch all equal `c9d62bcfad8a84ae4e7eb2078700c7e1b7c6a620` (`feat(texture): harden Material Maker packer and improve VehiclePBR shader (weld normal, mud breakup, specular AA)`). Code baseline remains `0bbede6b7beb68f8f50f4ae89f10e83ecb056c0d`; implementation baseline remains `e25c6de` (arachnid middle-leg orientation normalizer) / `d7a3a11b56b58bed6d3f06c47fd40a627c9d1ae3`.
+
+- New committed scope since the last sync (b581ae5):
+  - `1bf0e71` (`docs(memory): sync root MEMORY.md to HEAD b581ae5 + agent memories/mem0`): memory-sync commit only.
+  - `c412e4e` (`feat(tools): configure Material Maker workflows for URP Blender and 3D`): Material Maker 1.7 workflows for URP Blender and 3D; added `tools/rogue-command-material-maker.json` workflow config, `tools/validate_material_maker_config.py`, extended `tools/Run-MaterialMakerBake.ps1`, updated 3D-model-authoring/PBR-texture-authoring/modding-tools skills, README and PBR workflow docs, new `tests/python/test_material_maker_workflow_config.py`.
+  - `c9d62bc` (`feat(texture): harden Material Maker packer and improve VehiclePBR shader (weld normal, mud breakup, specular AA)`): hardened `tools/pack_material_maker_pbr.py` (weld normal, mud breakup, specular AA), improved `Shaders/VehiclePBR_VertexWear.shader`, added `tests/python/test_material_maker_pbr.py`, updated PBR texture authoring skill.
+
+- Working tree: clean at root except nested worktree gitlinks `.worktrees/cargador` @ `11e9968` (dirty) and `.worktrees/task-graph-validation` @ `d1f9045` (dirty); preserve. Do not stage, reset, clean, or overwrite.
+
+- Validation: no fresh run in this sync. Last documented at b581ae5: Release plugin build 0 warnings/0 errors; C# harness 475/476 (1 Windows symlink-privilege skip, 0 failures); Python unittest 134/134; AssetBundle references 25/0 (sample-native) and 18/0 (tactical-operations); native visual preflight 9/0 per pack; loader registry 4 manifests/0 issues; `git diff --check` clean. New Material Maker Python tests added in c412e4e/c9d62bc were not rerun here. No fresh Steam/Unity gameplay proof beyond existing tactical-operations runtime smoke; natural offer->selection->placement->production/render/stat and tactical AI remain unverified.
+
+- QA/reflection safety: Profile2 is dedicated QA without a tutorial; never ask, inspect, infer, gate, bypass, or switch profiles for tutorial. Check current selector/save safety and preserve saves. Before reflection jointly verify Rogue Command version, Unity `2021.3.45f2`, Assembly-CSharp SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, and MVID `db0e9462-128d-4296-9900-de18b4bd0c00`.
+
+- Root MEMORY.md, codex memory, antigravity memory, and mem0 synced to HEAD c9d62bc.
