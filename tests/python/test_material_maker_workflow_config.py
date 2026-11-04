@@ -18,6 +18,8 @@ class MaterialMakerWorkflowConfigTests(unittest.TestCase):
     def test_config_covers_urp_blender_3d_and_procedural_workflows(self) -> None:
         errors = VALIDATOR.validate_config(CONFIG)
         self.assertEqual([], errors)
+        runner = (REPO_ROOT / "tools" / "Run-MaterialMakerBake.ps1").read_text(encoding="utf-8")
+        self.assertIn("audit_material_maker_output.py", runner)
 
     def test_config_preserves_the_four_map_contract(self) -> None:
         import json

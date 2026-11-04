@@ -168,6 +168,12 @@ namespace RogueCommandExpansionLoader.Runtime
 
         public int LivePbrShaderUnitCount => RuntimeVisualCensus.Current(32).PbrShaderCount;
 
+        public int LiveVisualQualityPassCount => RuntimeVisualQualityCensus.Current(64).PbrContractPassCount;
+
+        public int LiveVisualQualityIssueCount => RuntimeVisualQualityCensus.Current(64).PbrContractIssueCount;
+
+        public int LiveVertexWearSampleCount => RuntimeVisualQualityCensus.Current(64).VertexColorSampleCount;
+
         // ---- Methods callable via component/call_method ----
 
         /// <summary>
@@ -1096,6 +1102,12 @@ namespace RogueCommandExpansionLoader.Runtime
         {
             return AgentDiagnosticsFormatter.SerializeVisualSurfaceCensus(
                 RuntimeVisualSurfaceCensus.Current());
+        }
+
+        public string GetVisualQualityCensusJson(int maxTrackedUnits = 64)
+        {
+            return AgentDiagnosticsFormatter.SerializeVisualQualityCensus(
+                RuntimeVisualQualityCensus.Current(maxTrackedUnits));
         }
 
         public string GetVisualMaterialCensusJson()

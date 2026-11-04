@@ -31,6 +31,9 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
             "LiveSkinnedMeshUnitCount": ("System.Int32", "2"),
             "LiveAnimatedUnitCount": ("System.Int32", "2"),
             "LivePbrShaderUnitCount": ("System.Int32", "3"),
+            "LiveVisualQualityPassCount": ("System.Int32", "3"),
+            "LiveVisualQualityIssueCount": ("System.Int32", "0"),
+            "LiveVertexWearSampleCount": ("System.Int32", "1200"),
             "AuditedUnitPrefabCount": ("System.Int32", "6"),
             "LiveMechanicsDirectorCount": ("System.Int32", "4"),
             "LiveVisualDirectorCount": ("System.Int32", "4"),
@@ -89,6 +92,9 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
                 "LiveSkinnedMeshUnitCount": 2,
                 "LiveAnimatedUnitCount": 2,
                 "LivePbrShaderUnitCount": 3,
+                "LiveVisualQualityPassCount": 3,
+                "LiveVisualQualityIssueCount": 0,
+                "LiveVertexWearSampleCount": 1200,
                 "AuditedUnitPrefabCount": 6,
                 "LiveMechanicsDirectorCount": 4,
                 "LiveVisualDirectorCount": 4,
@@ -181,7 +187,7 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
 
         snapshot = json.loads(response["content"][0]["text"])
         self.assertFalse(response["isError"])
-        self.assertEqual(40, len(snapshot))
+        self.assertEqual(41, len(snapshot))
         getter_values = {k: v for k, v in snapshot.items() if k != "_meta"}
         self.assertTrue(all(isinstance(value, dict) for value in getter_values.values()))
         self.assertTrue(all(value == expected for value in getter_values.values()))
@@ -210,6 +216,7 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
 
         self.assertFalse(response["isError"])
         self.assertEqual([32], next(args for method, args in calls if method == "GetVisualRenderCensusJson"))
+        self.assertEqual([64], next(args for method, args in calls if method == "GetVisualQualityCensusJson"))
         self.assertEqual([64], next(args for method, args in calls if method == "GetLoadedPrefabVisualAuditJson"))
         self.assertEqual([64, 32], next(args for method, args in calls if method == "GetLoaderAuditCensusJson"))
         self.assertEqual([64], next(args for method, args in calls if method == "GetUnitMechanicsCensusJson"))

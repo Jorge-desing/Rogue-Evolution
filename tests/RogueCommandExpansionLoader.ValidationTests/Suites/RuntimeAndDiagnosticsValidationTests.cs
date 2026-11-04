@@ -4656,6 +4656,80 @@ internal static partial class ValidationTestRunner
             ExistingControllers.Instance.Reset();
         }
     }),
+    ("runtime visual quality census reports URP bindings and vertex-wear contract metrics", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        try
+        {
+            var unit = new EntityController
+            {
+                entityId = "sample-native:visual-quality",
+                UniqueEntityId = 862,
+                IsControlledByPlayer = true,
+                IsUnit = true,
+                Position = new Vector3(0f, 0f, 0f)
+            };
+            var go = new GameObject { name = "VisualQualityUnit" };
+            var meshFilter = go.AddComponent<MeshFilter>();
+            var renderer = go.AddComponent<MeshRenderer>();
+            meshFilter.sharedMesh = new Mesh
+            {
+                name = "VisualQualityMesh",
+                vertexCount = 4,
+                colors = new[]
+                {
+                    new Color(0.30f, 0.80f, 0.60f, 1f),
+                    new Color(0.40f, 0.70f, 0.20f, 1f),
+                }
+            };
+            var material = new Material
+            {
+                name = "VisualQualityPbr",
+                shader = new Shader { name = "RogueCommand/VehiclePBR_VertexWear" },
+                shaderKeywords = new[] { "_METALLICSPECGLOSSMAP", "_NORMALMAP" },
+                enableInstancing = true
+            };
+            material.SetTexture("_MetallicGlossMap", new Texture { name = "Quality_MetallicGloss" });
+            material.SetTexture("_BumpMap", new Texture { name = "Quality_Normal" });
+            material.SetTexture("_EmissionMap", new Texture { name = "Quality_Emission" });
+            renderer.sharedMaterials = new[] { material };
+            unit.gameObject = go;
+            ExistingControllers.Instance.PlayerUnits().Add(unit);
+
+            VisualQualityCensus census = RuntimeVisualQualityCensus.Current();
+            if (census.Rows.Count != 1 || census.LoaderOwnedUnitCount != 1 ||
+                census.PbrContractPassCount != 1 || census.PbrContractIssueCount != 0)
+            {
+                throw new InvalidOperationException("Visual quality census should pass the URP PBR contract for the namespaced unit.");
+            }
+
+            VisualQualityRow row = census.Rows[0];
+            if (!row.IsLoaderOwned || !row.ContractPass || row.PbrMaterialCount != 1 ||
+                row.MetallicGlossMapCount != 1 || row.NormalMapCount != 1 ||
+                row.EmissionMapCount != 1 || row.VertexColorSampleCount != 2 ||
+                row.EdgeWearFraction <= 0f || row.ThermalSootFraction <= 0f ||
+                row.TeamMaskCoverage != 1f || row.GpuInstancedMaterialCount != 1)
+            {
+                throw new InvalidOperationException("Visual quality row should expose URP bindings, instancing, and vertex-wear distribution metrics.");
+            }
+
+            string json = AgentDiagnosticsFormatter.SerializeVisualQualityCensus(census);
+            using (var doc = JsonDocument.Parse(json))
+            {
+                if (doc.RootElement.GetProperty("kind").GetString() != "visualQualityCensus" ||
+                    doc.RootElement.GetProperty("omittedRowCount").GetInt32() != 0 ||
+                    doc.RootElement.GetProperty("pbrContractIssueCount").GetInt32() != 0 ||
+                    doc.RootElement.GetProperty("rows").GetArrayLength() != 1)
+                {
+                    throw new InvalidOperationException("SerializeVisualQualityCensus JSON format error.");
+                }
+            }
+        }
+        finally
+        {
+            ExistingControllers.Instance.Reset();
+        }
+    }),
     ("runtime tech catalog census queries registered upgrades research branches and relics", () =>
     {
         TechCatalogCensus census = RuntimeTechCatalogCensus.Current();

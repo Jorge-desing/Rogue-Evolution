@@ -62,6 +62,7 @@ if ([string]::IsNullOrWhiteSpace($OutputDirectory)) {
 $rawDir = Join-Path $outDir "raw"
 $waitScript = Join-Path $repoRoot "tools/MaterialMakerWaitDevice.gd"
 $packScript = Join-Path $repoRoot ([string]$config.exportProfile.packer)
+$auditScript = Join-Path $repoRoot "tools/audit_material_maker_output.py"
 $overrideCfg = Join-Path $mmDir "override.cfg"
 $userExportDir = Join-Path $env:APPDATA "material_maker_2/export_targets"
 $profileName = [string]$config.exportProfile.name
@@ -72,7 +73,7 @@ New-Item -ItemType Directory -Force -Path $outDir | Out-Null
 New-Item -ItemType Directory -Force -Path $rawDir | Out-Null
 New-Item -ItemType Directory -Force -Path $userExportDir | Out-Null
 
-foreach ($required in @($configPath, $configValidator, $mmExe, $waitScript, $packScript, $prepareScript)) {
+foreach ($required in @($configPath, $configValidator, $mmExe, $waitScript, $packScript, $auditScript, $prepareScript)) {
     if (-not (Test-Path $required)) {
         throw "Required Material Maker bake input is missing: $required"
     }
@@ -154,6 +155,11 @@ try {
     & python @packArgs
     if ($LASTEXITCODE -ne 0) {
         throw "Material Maker PBR pack failed with exit code $LASTEXITCODE"
+    }
+    $qualityReport = Join-Path $outDir ("${templatePrefix}_quality-report.json")
+    & python $auditScript --directory $outDir --prefix $templatePrefix --output $qualityReport
+    if ($LASTEXITCODE -ne 0) {
+        throw "Material Maker quality audit failed with exit code $LASTEXITCODE"
     }
     $workflowManifest = [ordered]@{
         workflow = $Workflow

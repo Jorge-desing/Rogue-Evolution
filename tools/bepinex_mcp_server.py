@@ -144,6 +144,7 @@ _RUNTIME_SNAPSHOT_GETTERS = [
     "GetVeterancyCensusJson",
     "GetSelectionCensusJson",
     "GetVisualRenderCensusJson",
+    "GetVisualQualityCensusJson",
     "GetLoadedPrefabVisualAuditJson",
     "GetLoaderAuditCensusJson",
     "GetUnitMechanicsCensusJson",
@@ -166,6 +167,7 @@ _RUNTIME_SNAPSHOT_GETTERS = [
 
 _RUNTIME_SNAPSHOT_GETTER_ARGS: dict[str, list[object]] = {
     "GetVisualRenderCensusJson": [32],
+    "GetVisualQualityCensusJson": [64],
     "GetLoadedPrefabVisualAuditJson": [64],
     "GetLoaderAuditCensusJson": [64, 32],
     "GetUnitMechanicsCensusJson": [64],
@@ -1075,6 +1077,11 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             res = _call_diagnostics_method("GetVisualSurfaceCensusJson")
             return _tool_response(res)
 
+        elif name == "diagnostics_get_visual_quality_census":
+            max_units = int(arguments.get("maxTrackedUnits", 64))
+            res = _call_diagnostics_method("GetVisualQualityCensusJson", [max_units])
+            return _tool_response(res)
+
         elif name == "diagnostics_get_visual_material_census":
             res = _call_diagnostics_method("GetVisualMaterialCensusJson")
             return _tool_response(res)
@@ -1278,6 +1285,9 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
                 "LiveSkinnedMeshUnitCount",
                 "LiveAnimatedUnitCount",
                 "LivePbrShaderUnitCount",
+                "LiveVisualQualityPassCount",
+                "LiveVisualQualityIssueCount",
+                "LiveVertexWearSampleCount",
                 "AuditedUnitPrefabCount",
                 "LiveMechanicsDirectorCount",
                 "LiveVisualDirectorCount",

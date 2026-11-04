@@ -1826,9 +1826,59 @@ namespace RogueCommandExpansionLoader.Runtime
         }
 
         /// <summary>
-        /// Serializes visual material and texture binding telemetry for living units.
-        /// Omission counters precede detail collections.
+        /// Serializes URP/PBR material compliance and procedural vertex-wear quality metrics.
+        /// Omission counters precede bounded row details.
         /// </summary>
+        public static string SerializeVisualQualityCensus(VisualQualityCensus census)
+        {
+            var rows = new List<Dictionary<string, object>>();
+            if (census != null && census.Rows != null)
+            {
+                foreach (VisualQualityRow row in census.Rows)
+                {
+                    if (row == null) continue;
+                    rows.Add(new Dictionary<string, object>
+                    {
+                        ["entityKeyId"] = row.EntityKeyId ?? string.Empty,
+                        ["isLoaderOwned"] = row.IsLoaderOwned,
+                        ["contractPass"] = row.ContractPass,
+                        ["rendererCount"] = row.RendererCount,
+                        ["visibleRendererCount"] = row.VisibleRendererCount,
+                        ["materialCount"] = row.MaterialCount,
+                        ["pbrMaterialCount"] = row.PbrMaterialCount,
+                        ["standardMaterialCount"] = row.StandardMaterialCount,
+                        ["unsupportedShaderCount"] = row.UnsupportedShaderCount,
+                        ["pbrKeywordCompliantMaterialCount"] = row.PbrKeywordCompliantMaterialCount,
+                        ["gpuInstancedMaterialCount"] = row.GpuInstancedMaterialCount,
+                        ["metallicGlossMapCount"] = row.MetallicGlossMapCount,
+                        ["normalMapCount"] = row.NormalMapCount,
+                        ["emissionMapCount"] = row.EmissionMapCount,
+                        ["vertexColorSampleCount"] = row.VertexColorSampleCount,
+                        ["cavityAoLowFraction"] = row.CavityAoLowFraction,
+                        ["edgeWearFraction"] = row.EdgeWearFraction,
+                        ["thermalSootFraction"] = row.ThermalSootFraction,
+                        ["teamMaskCoverage"] = row.TeamMaskCoverage,
+                        ["lodGroupCount"] = row.LodGroupCount,
+                        ["qualityIssues"] = row.QualityIssues != null ? row.QualityIssues : (object)Array.Empty<string>(),
+                    });
+                }
+            }
+
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "visualQualityCensus",
+                ["omittedRowCount"] = census != null ? census.OmittedRowCount : 0,
+                ["loaderOwnedUnitCount"] = census != null ? census.LoaderOwnedUnitCount : 0,
+                ["pbrContractPassCount"] = census != null ? census.PbrContractPassCount : 0,
+                ["pbrContractIssueCount"] = census != null ? census.PbrContractIssueCount : 0,
+                ["pbrMaterialCount"] = census != null ? census.PbrMaterialCount : 0,
+                ["vertexColorSampleCount"] = census != null ? census.VertexColorSampleCount : 0,
+                ["rowCount"] = rows.Count,
+                ["rows"] = rows,
+            };
+            return Serialize(view);
+        }
+
         public static string SerializeVisualMaterialCensus(VisualMaterialCensus census)
         {
             var rows = new List<Dictionary<string, object>>();
@@ -2867,6 +2917,7 @@ new Dictionary<string, object> { ["name"] = "OrderRetreatJson", ["description"] 
                 new Dictionary<string, object> { ["name"] = "OrderHarvesterReturnJson", ["description"] = "Order harvester to return to refinery." },
                 new Dictionary<string, object> { ["name"] = "GetAudioCensusJson", ["description"] = "Telemetry of audio mixer volume slider levels." },
 new Dictionary<string, object> { ["name"] = "GetVisualSurfaceCensusJson", ["description"] = "Telemetry of visual surface materials and vertex-wear channels (welds, mud, micro-relief)." },
+                new Dictionary<string, object> { ["name"] = "GetVisualQualityCensusJson", ["description"] = "URP/PBR material compliance, texture bindings, instancing, and procedural vertex-wear quality metrics." },
                 new Dictionary<string, object> { ["name"] = "SetAudioVolumeJson", ["description"] = "Set volume slider level for Master, Music, Gameplay, UI." },
                 new Dictionary<string, object> { ["name"] = "GetTechCatalogJson", ["description"] = "Catalog of registered upgrades, research branches, and relics." },
                                 new Dictionary<string, object> { ["name"] = "GetVeterancyCensusJson", ["description"] = "Live combat XP, rank tiers, and veterancy bonus multipliers." },
