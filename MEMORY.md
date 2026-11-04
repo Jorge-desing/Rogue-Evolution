@@ -1219,3 +1219,29 @@ This is a compact, durable orientation for agents. For the changing checkout sta
 - QA/reflection safety: Profile2 dedicated QA without tutorial; never ask, inspect, infer, gate, bypass, or switch profiles for tutorial. Check current selector/save safety and preserve saves. Before reflection jointly verify Rogue Command version, Unity `2021.3.45f2`, Assembly-CSharp SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, and MVID `db0e9462-128d-4296-9900-de18b4bd0c00`.
 
 - Root MEMORY.md, codex memory, antigravity memory, and mem0 synced to HEAD c12c874.
+
+
+## Refresh (2026-11-04, HEAD 2f827e3 — Material Maker presets suite to 13 archetypes + visual quality metrics + animation authoring review)
+
+- Repository `C:/Users/Alex/Documents/Mod Rogue Command`, loader `1.19.0`, branch `codex/rogue-unit-balance-20261018`. Verified local HEAD, upstream-tracking ref, and origin branch all equal `2f827e30832d4306db7b7fc2daac4905950c5d4b` (`feat(pbr): expand space-military Material Maker presets suite to 13 archetypes`). Code baseline remains `0bbede6b7beb68f8f50f4ae89f10e83ecb056c0d`; implementation baseline remains `e25c6de` (arachnid middle-leg orientation normalizer) / `d7a3a11b56b58bed6d3f06c47fd40a627c9d1ae3`.
+
+- New committed scope since the last root sync (c12c874):
+  - `55154d5` (`docs(memory): sync root MEMORY.md to HEAD c12c874 + agent memories/mem0`): memory-sync commit only.
+  - `edf054f` (`feat(blender): add apply_material_maker_to_blender tool and refine isotropic satin grain for space-military PBR`): new `tools/apply_material_maker_to_blender.py`, refined isotropic satin grain in `Prepare-MaterialMakerTacticalTemplate.py`, updated Material Maker skill and authoring tests.
+  - `644dcf2` (`feat(textures): replace space military HD atlases`): replaced space-military HD atlases.
+  - `9c6047e` (`build(bundle): include Material Maker Tidebreaker atlas`): rebuilt bundle including the Material Maker Tidebreaker atlas.
+  - `b08389c` (`revert(bundle): avoid unrelated Unity reserialization`): reverted unrelated Unity reserialization from the bundle rebuild.
+  - `54cf9e8` (`feat(diagnostics): add visual quality metrics for URP and texture workflows`): added `RuntimeVisualQualityCensus` plus MCP getter `diagnostics_get_visual_quality_census` (URP shader/map/keyword/instancing and procedural vertex-wear compliance, scalar pass/issue/sample counters); added `tools/audit_material_maker_output.py` and automatic Material Maker runner integration for URP, 3D-paint and procedural JSON quality reports; regenerated 186 MCP schemas. Deployed DLL SHA-256 `8dc0090a3cd173dba6a64f4c2541a7856e454089a8cf4c31b0013621ab6f0a59` matched `artifacts/visual-quality-publish/bin/RogueCommandExpansionLoader.dll`; Profile2 selector remained `2` and 16 profile files checkpointed. No Steam match was started; runtime visual rendering remains unverified.
+  - `2f827e3` (`feat(pbr): expand space-military Material Maker presets suite to 13 archetypes`): expanded the space-military Material Maker presets suite to 13 archetypes; updated `Prepare-MaterialMakerTacticalTemplate.py`, `Run-MaterialMakerBake.ps1`, the Material Maker skill, workflow-config tests, and `docs/research/AGENT-HANDOFF.md`.
+  - `7691eab` (`docs(animation): evolve authoring review workflow`): evolved the animation authoring review workflow (skill + new reference).
+
+- Working tree: uncommitted changes preserved (do not stage, reset, clean, or overwrite):
+  - Modified: `.agents/skills/rogue-command-animation-authoring/SKILL.md`, `tests/python/test_material_maker_workflow_config.py`, `tools/Prepare-MaterialMakerTacticalTemplate.py`, `tools/audit_material_maker_output.py`
+  - New untracked: `.agents/skills/rogue-command-animation-authoring/references/animation-review-and-manim.md`
+  - Nested worktree gitlinks `.worktrees/cargador` @ `11e9968` (dirty) and `.worktrees/task-graph-validation` @ `d1f9045` (dirty).
+
+- Validation: no fresh full run in this sync. Last documented at `54cf9e8`: Release plugin/test builds 0 warnings/0 errors; C# harness `477/478` (1 Windows symlink-privilege skip, 0 failures); Python `145/145`; 186 MCP schemas regenerated. AssetBundle references, native visual preflight and Steam/Unity gameplay proof not rerun; natural offer->selection->placement->production/render/stat and tactical AI remain unverified.
+
+- QA/reflection safety: Profile2 is dedicated QA without a tutorial; never ask, inspect, infer, gate, bypass, or switch profiles for tutorial. Check current selector/save safety and preserve saves. Before reflection jointly verify Rogue Command version, Unity `2021.3.45f2`, Assembly-CSharp SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, and MVID `db0e9462-128d-4296-9900-de18b4bd0c00`.
+
+- Root MEMORY.md, codex memory, antigravity memory, and mem0 synced to HEAD 2f827e3.
