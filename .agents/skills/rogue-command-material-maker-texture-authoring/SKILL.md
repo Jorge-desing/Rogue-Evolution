@@ -22,6 +22,20 @@ Use this skill when Material Maker is selected for procedural PBR graphs or a su
 5. Keep auxiliary AO, height, and curvature maps separate unless the in-project shader is changed and verified. If an output target cannot produce the required channel layout reliably, return to Blender's deterministic `--bake-atlas` path or use a separately verified image-packing step.
 6. Preserve any Material Maker project/graph needed to reproduce the images under `artifacts/`; it is source art, not a replacement for the Blender model or Unity material builder.
 
+## Headless export (CLI)
+
+Material Maker supports batch export without the GUI:
+
+```
+material_maker --export-material --target <engine> -o <output_dir> <input.ptex> --quit
+```
+
+- Run with the working directory set to the Material Maker install dir (`.tools/MaterialMaker-1.7/material_maker_1_7_windows/`); relative output paths are resolved against that dir, so prefer absolute `-o` paths.
+- `<engine>` is one of `Blender`, `Godot`, `Unity`, `Unreal`. For this project use **`Blender`** — it emits PNGs only (albedo/normal/metallic-gloss/etc.), with no engine-specific `.mat`/`.tres`/`.mm2ue` files to discard. `Unity` target also works but writes a `.mat` we do not use.
+- Template strategy: copy an existing example `.ptex` (e.g. `examples/bricks.ptex`) into `artifacts/mm-templates/<Name>.ptex`, edit the graph in the GUI or by JSON, then export. Keep the edited `.ptex` under `artifacts/` as reproducible source art.
+- Blocker: the first run requires the GUI to create `user://export_targets` (a config file in `%APPDATA%/material_maker_2/`). If the CLI prints `Cannot open user://export_targets`, open the GUI once, add any export target, close, then retry. Do not delete or hand-edit that file.
+- Verify the output directory contains the expected PNGs and dimensions before copying into the Unity texture folder; a silent empty export is possible if the target path is wrong.
+
 ## Validation handoff
 
 Run [Rogue Command PBR Texture Validation](../rogue-command-pbr-texture-validation/SKILL.md). Inspect image dimensions, UV coverage, seams, normal convention, and the MetallicGloss alpha channel, then verify effective Unity importer settings after `VehiclePrefabBuilder` reimports the maps. Confirm the original imported mesh still carries RGBA vertex wear and that the prefab uses the project's actual shader and keyword.
