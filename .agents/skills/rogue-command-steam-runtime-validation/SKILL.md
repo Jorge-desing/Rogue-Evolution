@@ -1,26 +1,90 @@
 ---
 name: rogue-command-steam-runtime-validation
-description: "Verify Rogue Command loader or content behavior in a live match launched through Steam, using reversible deployment and explicit evidence boundaries."
+description: "Use when a Rogue Command claim needs live Steam evidence. Run a reversible, fail-closed validation session."
+version: 2.0.0
+license: MIT
+author: Hermes Agent
 metadata:
   hermes:
-    tags: [Rogue Command, Steam, runtime validation, BepInEx, MCP, QA Profile2]
+    tags: [Rogue Command, Steam, runtime validation, BepInEx, MCP, QA Profile2, evidence]
     related_skills: [rogue-command-clean-room-diagnostics, rogue-command-harmony-policy, rogue-command-pack-validation]
 ---
 
 # Rogue Command Steam Runtime Validation
 
-Use this skill when an acceptance claim requires observing a loader, unit, stage, or AI inside Rogue Command. Offline builds, package checks, and Unity Editor imports belong to `rogue-command-pack-validation`; they are not live-game evidence.
+Use this skill when the acceptance claim names behavior inside a live Rogue Command process: loader startup, pack registration, an offer, selection, building placement, production, entity instantiation, rendering, stage generation, or AI decisions. Static inspection, Release builds, Unity imports, AssetBundle audits, and CLI harnesses are useful prerequisites but are **not** in-game evidence.
 
-## Protect the Steam installation and profile
+This skill is an operational gate, not a launch script. It must fail closed when the target process, compatibility identity, installed artifact, profile, bridge, scene, or postcondition is ambiguous.
 
-- Read `AGENTS.md`, `docs/research/AGENT-HANDOFF.md`, and the current runtime notes in `README.md`. Before using reflected signatures, verify the complete identity tuple: game version, `Assembly-CSharp.dll` SHA-256, and MVID.
-- Before every live-game task, also read `docs/research/STEAM-RUNTIME-CONTROL.md`; it is the persistent runbook for the BepInEx MCP control path, profile handling, and cleanup.
-- Inspect the Steam/game process and deployment state first. Do not interfere with an already running game. Launch the game through Steam; do not start `Rogue Command.exe` directly.
-- Before changing the game folder, record the exact files and configuration that will be touched and their original hashes. Use a reversible test setup, keep the user's save data and Steam Cloud preference intact, and restore temporary deployment changes after the run. Acceptance that skips `FirstRun` may mutate only a dedicated isolated QA profile, never the user's profile.
-- If a BepInEx MCP bridge or runtime inspector is available, verify its connected target and use read-only observations first. Use at most one runtime inspector in a test profile and remove it during cleanup. Do not assume a tool is connected because its files are installed locally.
-- Prefer BepInEx MCP over Computer Use for controls exposed by the bridge. The bridge has operated in this project without the game window focused; do not request focus or invoke Computer Use solely to click a control when a bridge call can do it.
+## 1. Non-negotiable safety gates
 
-## BepInEx MCP control path
+Stop before mutation when any gate is false:
+
+1. **Repository and evidence scope** — Read `AGENTS.md`, `README.md`, `docs/research/AGENT-HANDOFF.md`, `docs/research/STEAM-RUNTIME-CONTROL.md`, and this skill. Keep reports, logs, screenshots, checkpoints, and backups under ignored `artifacts/runtime-smoke/<session-id>/`. Never commit saves, BepInEx, Harmony, game assemblies, credentials, or raw secrets.
+2. **Process ownership** — Resolve the actual process named `Rogue Command.exe` and Steam parent/launch state. If a game instance is already running, perform read-only inspection only; do not restart it, redeploy over it, switch profiles, or abandon its run.
+3. **Compatibility identity** — Before using a reflected type, method, field, metadata token, or native tutorial API, verify the complete tuple together: Rogue Command version, Unity version, `Assembly-CSharp.dll` SHA-256, and MVID. The historical baseline (`1.0.9`, Unity `2021.3.45f2`, SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, MVID `db0e9462-128d-4296-9900-de18b4bd0c00`) is a lookup hint only; it is not current evidence.
+4. **Exact deployment** — Build the artifact to test, hash it, and compare it with every installed target before launch. A successful copy is not enough. A mismatch means the run exercises stale code and must be classified as blocked until corrected.
+5. **Profile isolation** — Use the user's designated `Profile2` QA profile after resolving the authoritative selector through `ProfileManager.CurrentProfileTextPath` under `Application.persistentDataPath`. Do not switch to Profile3, edit `tutorialState.txt`, alter the selector while the game is running, or overwrite a save without a fresh checkpoint and explicit authorization. Profile2 is the established QA profile; do not gate its use on a repeated tutorial check or invent a bypass.
+6. **Checkpoint completeness** — With the game closed, checkpoint the selector and every file below the authoritative profiles directory. Use `tools/runtime_profile_checkpoint.py`; the older `tools/profile_hash_audit.py` audits only one profile and is not sufficient for a session-wide checkpoint.
+7. **Bridge identity** — Resolve the BepInEx MCP listener from the current game log or verified bridge source, then match it to the live process. A local MCP server, a stale `Listening` line, a successful ping, or an exit code of zero does not establish a live Unity target.
+8. **Pause and mutation** — Read first. Before any action that advances or mutates a run, confirm native pause state (`Navigator._isPaused=true`) and `Time.timeScale=0`, or record two stable scaled-clock observations. A visible menu is not proof of pause.
+
+
+
+
+## 2. Session state machine
+
+Use one unique session directory and record a JSON event/result for every transition. Do not skip states or report a later state when an earlier gate failed.
+
+| State | Required evidence | Allowed actions | No-go condition |
+|---|---|---|---|
+| `PREFLIGHT` | repo HEAD/branch/status, process list, Steam state, game identity, task claim | read-only filesystem/process checks | running process is not owned/understood, identity incomplete |
+| `CHECKPOINTED` | selector value/hash and all profile file hashes | no profile mutation | selector cannot be resolved or checkpoint is partial |
+| `BUILT` | fresh Release artifact hash and relevant local test output | no deployment yet | build/test failed or artifact path is ambiguous |
+| `DEPLOYED` | per-target backup, predeploy manifest, installed hashes equal local hashes | replace only declared targets while game is closed | target list or hash read-back differs |
+| `BRIDGED` | live PID, listener endpoint, ping/capabilities, one bounded Unity read | read-only bridge calls | payload is an error, target is stale, or only ping succeeds |
+| `SCENARIO_READY` | exact scene/profile/object/component and precondition snapshot | resolve IDs again after scene changes | name/type/scene/active state/member values disagree |
+| `OBSERVED` | claim-specific postcondition plus log/bridge/screenshot correlation | one bounded mutation at a time | only menu navigation, template presence, or diagnostic injection observed |
+| `EXITED` | graceful game exit and process absence | restore only after process exit | process still owns an installation/profile file |
+| `RESTORED` | deployment hashes, selector, and profile verification | no further game calls | restore mismatch or unexpected profile delta |
+| `CLOSED` | sanitized evidence index and explicit conclusion | finish | any unclassified failure or missing evidence boundary |
+
+Use `BLOCKED` for a failed prerequisite, `UNKNOWN` when the target behavior was not reached, `FAIL` for a reached assertion that contradicted its expectation, and `PASS` only for a reached assertion with direct evidence. `NOT_TESTED` is not a pass.
+
+## 3. Preflight and checkpoint commands
+
+Commands below are examples of the repository's verified interfaces. Substitute the current paths; do not copy historical absolute paths or hashes into a new session.
+
+```text
+# From the repository root; keep output under artifacts/.
+git status --short --branch
+git rev-parse HEAD
+
+# All-profile checkpoint. This does not modify the game tree.
+PYTHONPATH=.venv/Lib/site-packages .venv/Scripts/python.exe \
+  tools/runtime_profile_checkpoint.py create \
+  --profiles-root <authoritative-persistent-data>/Profiles \
+  --selector <authoritative-persistent-data>/Profiles/currentProfile.txt \
+  --output artifacts/runtime-smoke/<session-id>/profile-checkpoint.json
+
+# Discover the current first-class bridge tool set instead of relying on stale counts.
+PYTHONPATH=.venv/Lib/site-packages .venv/Scripts/python.exe \
+  tools/bepinex_mcp_server.py --list-tools
+```
+
+The checkpoint command records raw selector text, size, SHA-256, and every regular file below the profile root. It refuses symlinks, unstable files, unsafe manifest paths, and overwriting an existing checkpoint. After the run, verify with the same authoritative paths:
+
+```text
+PYTHONPATH=.venv/Lib/site-packages .venv/Scripts/python.exe \
+  tools/runtime_profile_checkpoint.py verify \
+  --manifest artifacts/runtime-smoke/<session-id>/profile-checkpoint.json \
+  --profiles-root <authoritative-persistent-data>/Profiles \
+  --selector <authoritative-persistent-data>/Profiles/currentProfile.txt
+```
+
+Append `--allow-relative Profile2/metaSavegame.dat` only when the run actually advanced the designated QA profile and the evidence explains that autosave. It does not permit selector changes, `savegame.dat` changes, tutorial-state changes, additions, deletions, or changes in other profiles. If the run did not advance, omit the allow-list and require an exact match.
+
+## 4. BepInEx MCP control path
 
 - Resolve the bridge URL and command shape from the installed `BepInExMCP` plugin, not assumptions. Prefer the current `BepInEx/LogOutput.log` listener line; if absent, verify the base URL and routes in `ModdersHelperApp.py`/`bridge_client.py` and match the listening port to the `Rogue Command.exe` process before any read-only probe. Do not infer a bridge target from unrelated local MCP transport ports; verify the base URL and listening port from `BepInEx/LogOutput.log` or `ModdersHelperApp.py`/`bridge_client.py` before any read-only probe.
 - A bridge ping timeout when no `Rogue Command.exe` process is running is expected behavior, not a failure. The presence of `BepInExMCP.dll` and a “Listening” line in `BepInEx/LogOutput.log` only prove the plugin loaded on a previous run; they do not prove a live Unity bridge is currently connected. Recheck the game process and bridge together before diagnosing connectivity.
@@ -39,32 +103,39 @@ Use this skill when an acceptance claim requires observing a loader, unit, stage
 - Record the BepInEx log lines that show pack loading and any injected probe. A successful MCP response alone is not evidence that registration occurred.
 - **MCP exit code 0 is not functional success**: The bridge and its Python wrapper return process exit code 0 even when the JSON payload contains `{"error": ...}` or `{"status": "error"}`. Always inspect the payload content and verify the observable effect (component present in scene, census populated, order applied and restored). A ping returning `{"status": "ok"}` only proves the bridge is alive, not that diagnostics or commands work. This is especially important for `find_objects_with_component` (which can return `[]` with code 0) and for `component/call_method` (which can return a 500 with a misleading code 0 from the wrapper).
 - **MCP evidence boundary**: the bridge can enumerate scenes, objects, and components, but it does not replace visual confirmation of card rendering. If vision analysis is rate-limited or the bridge cannot drive the UI to the target scene, record the boundary explicitly and do not claim runtime success from menu navigation alone.
-- **First-Class MCP Tool Suite & Aggregators**: Rather than constructing manual `component/call_method` HTTP queries, prefer using the first-class tools exposed by `tools/bepinex_mcp_server.py` and documented in `rogue-command-clean-room-diagnostics`:
-  - `diagnostics_runtime_snapshot`: Consolidated JSON snapshot combining battlefield, run progression, system health, and match summary in one call.
-  - `diagnostics_runtime_scalars`: Fast scalar metrics for live polling loops.
-  - 18 diagnostic censuses (`AiDirector`, `Camera`, `Harvester`, `Audio`, `TechCatalog`, `Selection`, `Fog`, `Grid`, `Battlefield`, `PlayerRoster`, `AiRoster`, etc.).
-  - 20+ in-game command director tools for tactical orders, active skills, vitality adjustments, harvester commands, and AI wave manipulation.
+- **First-class MCP tool suite & aggregators**: Prefer the tools exposed by `tools/bepinex_mcp_server.py` and documented in `rogue-command-clean-room-diagnostics` rather than constructing manual calls. Use `diagnostics_runtime_snapshot` for a bounded composite read, `diagnostics_runtime_scalars` for polling, and `diagnostics_list_runtime_getters`/`--list-tools` to discover the current surface. Do not hardcode historical tool or census totals.
 
-## Reversible deployment manifest
+## 5. Deployment and artifact binding
 
-- Before deploying any file into the game installation, write a predeploy manifest under `artifacts/runtime-smoke/<pack>-<YYYYMMDD-HHMMSS>/predeploy-manifest.json`. Each entry records the absolute target path, file size, and SHA-256 hash of the exact bytes that will be overwritten or added.
-- Include the authoritative profile selector path and value, plus a per-file hash manifest for every file in every user profile directory. This makes post-run profile safety a hash comparison, not a best-effort guess.
+Before touching the Steam installation, create `artifacts/runtime-smoke/<session-id>/predeploy-manifest.json`. Each entry must include:
+
+- absolute target path and reason it is task-owned;
+- whether the path is being added, replaced, or removed;
+- pre-run existence, byte length, and SHA-256;
+- local source artifact, byte length, and SHA-256;
+- post-copy SHA-256 and the process-closed check that permitted the copy.
+
+Declare the complete target set before copying. Typical targets are the loader DLL, the exact content manifest/bundles under test, and a log/probe file only when the task explicitly requires it. Do not replace unrelated plugins, BepInEx core files, the game assembly, Steam files, or user saves.
+
+Build into a fresh ignored directory, for example `artifacts/runtime-smoke/<session-id>/plugin-build/`, and bind the session to the source commit and artifact hashes. If source, build, or bundle changes after deployment, invalidate the session and redeploy; never attribute observations to a newer source revision retroactively.
+
+- The all-profile checkpoint command in section 3 records the authoritative selector and every profile file. Do not replace it with a partial list or a historical file count.
 - Before launching, verify the installed deployment hashes match the local build artifacts you intend to test. If the installed plugin or bundle hashes differ from the current repo build, the runtime test would exercise stale code; update the deployment first or abort the runtime step until the hashes match.
 - After the run, restore only the entries that the test changed; verify restored hashes match the manifest before continuing. Entries the test did not touch must remain unchanged.
 - Preserve the manifest and any captured log excerpts as evidence; do not delete them during cleanup.
 
-## Game exit and restore sequence
+## 6. Game exit and restore sequence
 
 - Verify `Rogue Command.exe` is not running before restoring deployment files or touching profile metadata. A forced termination during native shutdown can leave the installation or profile in an inconsistent state.
 - When closing the game through a native UI control, resolve the exact control first, confirm its label and interactable state, then invoke its click method once. Do not retry the same control if the first call did not exit; inspect the scene/process state instead of blind-retrying.
 - **Reliable close via inject-class**: When no UI close control is available or the game is in a non-interactive state, use `mod_inject_class` with a minimal MonoBehaviour whose `Awake` calls `Application.Quit()`. Pass the full C# source as the `classCode` parameter (not `code`). Attach to an existing GameObject via `attachToGameObjectId` or let it create its own. This is more reliable than clicking UI buttons because it does not depend on scene hierarchy or interactable state. The injected class is destroyed on exit; no cleanup needed.
 - After exit, rerun the predeploy manifest restoration and hash verification. Only after hashes pass should you touch selector files or resume runtime work.
-- **Expected profile changes during a run**: `metaSavegame.dat` changes normally when the game advances (level, progression). This is not a safety violation. The checkpoint covers 16 files across Profile1/2/4/5; compare the full set, not just Profile2. Only flag changes in files other than `metaSavegame.dat` as unexpected unless the user explicitly authorized a save overwrite.
+- **Profile verification**: use the all-profile checkpoint verifier; do not assume a fixed number of files or profiles. Only a justified `Profile2/metaSavegame.dat` autosave delta may be allowed, and only when the run actually advanced Profile2. Selector changes, `savegame.dat`, tutorial state, added/missing files, and changes in any other profile are unexpected.
 
-## Dedicated QA Profile Policy (Profile2 Invariant)
+## 7. Dedicated QA Profile Policy (Profile2 Invariant)
 
 - **Profile2 Dedicated QA Invariant**: Profile2 is the user's dedicated QA profile and has no tutorial. Do not ask, inspect, infer, gate QA on tutorial status, or propose a bypass; use Profile2 after current save/selector safety checks and do not switch to Profile3.
-- **Historical Profile3 QA Caveat**: Historical Steam QA records document an authorized Profile2→Profile3 copy, Profile2 preserved, and a progressed Profile3 run. Do not assume rollback or switch to Profile3; recheck live process, profile, and installation before any runtime work.
+- **No profile switching**: historical Profile3 copies and rollback notes are not an executable procedure. Never switch to Profile3 or infer that an old QA snapshot is safe; resolve the live selector and checkpoint again.
 - **Save & Profile Safety Checks**:
   - Always resolve the authoritative selector through `ProfileManager.CurrentProfileTextPath` under `Application.persistentDataPath`; do not trust legacy selectors in the installation directory.
   - Before any live run, record the original selector and SHA-256 hashes for every file across all profiles.
@@ -72,25 +143,98 @@ Use this skill when an acceptance claim requires observing a loader, unit, stage
   - Never edit `tutorialState.txt` directly, grant XP, or use Harmony to bypass tutorial state.
   - After the game exits, restore the original selector and verify user profile hashes match baseline.
 
-## Skip FirstRun on Native QA Flow (when applicable)
+## 8. FirstRun policy
 
-- When an acceptance run requires an isolated profile without tutorial:
-  - Recheck the game version, `Assembly-CSharp.dll` SHA-256, and MVID together before using native methods. On the verified build (`1.0.9`, SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, MVID `db0e9462-128d-4296-9900-de18b4bd0c00`), invoke `Game.TutorialState.FinishMainTutorial()` and `Game.TutorialState.OnPlayerHasFinishedLevel1()` once when flags are false.
-  - Verify both flags and next-run mode before pressing `Start Run`; after transition, verify `Game.CurrentLevelProgressionMode` is not `FirstRun`.
-  - Perform tutorial-state changes only via native methods and only within dedicated QA profiles. Restore original selector and temporary installation files after exit.
+Profile2 is the established QA profile and is used directly. Do not add a tutorial bypass, edit tutorial state, grant XP, or call native tutorial methods merely to make a test easier. If a future acceptance task genuinely requires a new no-save profile, stop and obtain explicit authorization for a newly isolated profile created through the native profile-management flow; reverify the full identity tuple first, and never use Profile3 or the user's active profile as a shortcut.
 
-## Verify the behavior that the claim names
+### Profile2 safety preflight
+
+Before changing files, launching Steam, or starting a run, perform and record these checks from current state:
+
+1. Resolve the authoritative selector through `ProfileManager.CurrentProfileTextPath` under `Application.persistentDataPath`, and confirm that its value selects `Profile2` (the native selector text may be `2`).
+2. Record whether `Profile2` contains `savegame.dat` or another saved run from the current all-profile checkpoint. A fresh no-save acceptance or any flow that would bypass `FirstRun` requires `Profile2` to have no saved run; if a save exists, stop rather than deleting or overwriting it. A read-only or explicitly authorized continuation must preserve the save and document that it is not an isolated fresh-run result.
+3. When a separate user-active profile is known or a selector change is contemplated, demonstrate that the QA target is distinct from it. If selector ownership, active-profile identity, or save safety cannot be established, stop.
+4. Do not change the selector, switch profiles, launch a bypass, or start a new run until the applicable selector, isolation, and save-safety checks are demonstrated. Never use `Profile3`.
+
+
+
+## 9. Claim-specific acceptance matrix
+
+Define the claim before launching and collect only the evidence needed to prove it. A lower row never proves a higher row.
+
+| Claim | Minimum direct evidence | Does **not** prove it |
+|---|---|---|
+| Plugin loads | exact deployed DLL hash, BepInEx load line, no startup exception | local build, hook count, installed file alone |
+| Pack registers | load line naming the pack plus runtime registry/census with expected IDs | manifest parses, inactive template, ping |
+| Blueprint is offered | rendered/selected `ChooseCard` data naming the target factory/product and stage/pool context | eligible pool inspection, one native offer, forced callback |
+| Selection/placement works | native UI selection and placed building with expected ID, scene, and postcondition | registry row, diagnostic spawn, direct factory call |
+| Production works | target factory queue, progress, completion, and target product instance linked to the factory | placing a native factory, order response, inactive prefab |
+| Visual rendering works | live target instance with active renderer, non-zero bounds, expected material/shader/sockets, and visual confirmation when required | AssetBundle inventory, prefab audit, inactive template |
+| Stage/map works | stage selection plus generated map/scene and expected stage identity in the live run | cloned stage row, jump helper, loaded stage list |
+| AI behavior works | compatible live AI profile/roster, module tick/decision trace, bounded order, and postcondition on the target | module registration, profile attachment, manual diagnostic order |
+| Stat/mechanic consumption works | spawned target instance and before/after native read or behavior tied to the target row | row/cache probe, native unit behavior, unrelated unit |
+
+For randomized offers, record the actual offer and stage. Absence from one sample is inconclusive; repeat only through a safe native path and record the number of eligible observations. For forced diagnostic spawns or injected probes, label the result `synthetic-seam` and do not promote it to natural offer/production/AI evidence.
+
+## 10. Safe runtime interaction
+
+1. Start with read-only bridge observations: process/PID, scene, profile selector, loader health, pack registry, roster, and claim-specific preconditions.
+2. Resolve the exact native control or target entity. Require agreement on name, scene, active state, component type, identity, hostility/ownership, and relevant member values.
+3. Pause natively before unattended inspection or mutation. Prefer `Navigator.Pause()`/`Navigator.Unpause()` on the verified identity. Confirm `_isPaused` and `Time.timeScale=0`; take a second scaled-clock sample when the operation is long. Do not call `ResumeAndRemove()` on a temporary time-scale helper while native pause is active.
+4. Perform one bounded action. Record the request, resolved target, response payload, and immediate read-back. Never use direct field edits, `tutorialState.txt`, profile-file edits, Harmony patches, or XP grants as substitutes for the named gameplay path.
+5. Re-read the observable postcondition. If it fails, stop and classify the result; do not loop with the same call. Remove temporary probes/components and verify their absence.
+6. Before exit, restore native pause/control state deliberately. If the run advanced Profile2, preserve the new QA autosave but document the allowed `metaSavegame.dat` delta; never silently restore or delete user data.
+
+When no native close control is available, use one minimal `mod_inject_class` `MonoBehaviour` with `classCode` (not `code`) that calls `Application.Quit()` in `Awake`. Verify process exit before restoring files. A successful injection is only a close mechanism, not gameplay evidence.
+
+## 11. Verify the behavior that the claim names
 
 - Define one observable success condition before launching: for example, the pack is accepted, the unit appears in a blueprint pool, `EntityFactory` instantiates it, the card/name/model render, a stage creates a map, or an AI module makes its intended bounded decision.
 - Follow the evidence chain in order: plugin loaded; pack discovered and validated; runtime registration reached; target content selected or spawned; intended behavior visible in the match. A successful startup, Harmony hook count, or menu scene proves only the earlier steps it directly records.
 - Capture the relevant game log and in-game observation with enough context to identify the pack, unit/stage/profile, and test session. If the game fails before the target scene or behavior, report the boundary and preserve that failure as unknown runtime behavior; do not attribute it to the mod without a control or direct evidence.
 - After the run, restore the original deployment files and verify their hashes and process state. Preserve user data and evidence artifacts; do not delete profile data created by the game unless the user specifically asks.
 
-## Temporary Unity probe cleanup
+## 12. Exit, restoration, and final verification
+
+- Do not restore an installation file or selector while `Rogue Command.exe` is running. Wait for process absence and record the exit result.
+- Restore only the declared deployment entries. Verify every restored hash against `predeploy-manifest.json`; preserve logs and evidence even when the original log file must be restored.
+- Restore the authoritative selector to the exact pre-run value and verify its hash. Do not touch legacy selectors in the Steam installation as a substitute.
+- Run the all-profile checkpoint verifier. Treat any unexpected change, selector mismatch, missing file, or added file as a cleanup failure. `Profile2/metaSavegame.dat` is the only normally allowed delta, and only when justified by actual QA progression.
+- Confirm temporary `Rcl*` probes, watcher components, injected classes, and inspectors are absent from the current scene and persistent objects. Do not leave Unity Editor probe scripts or `.meta` files in the authoring project.
+- Write a sanitized `runtime-evidence.json` using the contract in `references/runtime-evidence-contract.md`. It must contain the tested commit/artifact hashes, identity tuple, profile checkpoint result, bridge/PID, scenario assertion results, restoration result, evidence level, and explicit unknowns.
+
+## 13. Temporary Unity probe cleanup
 
 - Temporary Unity Editor scripts used to inspect AssetBundle addresses or asset resolution must be removed from the authoring project after verification. Delete both the `.cs` file and its `.meta` file; do not leave probe scripts in `Assets/Editor/`.
 - A probe script that compiles and runs successfully in batchmode is not a permanent authoring artifact. Its only valid outcomes are the observed evidence and cleanup.
 
-## State the evidence level
+## 14. Evidence boundaries and reporting
 
-Label results as **static inspection**, **local build/validation**, or **in-game runtime evidence**. Only the last can establish the observed live behavior, and only for the exact game build and scenario tested. Record gaps and failures explicitly; do not generalize a single tested unit or profile to every pack.
+Every result must separate:
+
+- **Static inspection** — source, schema, decompilation, or serialized asset facts.
+- **Local build/validation** — compiler, harness, Python tests, Unity batchmode, or offline bundle checks.
+- **In-game Steam runtime evidence** — observations from the exact launched process, exact deployed hashes, exact profile, exact scene, and exact scenario.
+
+Report the highest claim actually reached, not the highest intended. A clean build, successful AssetBundle import, loaded plugin, Harmony hook count, live ping, runtime census, inactive prefab, stage jump, injected class, or native-only unit does not prove natural content behavior. If the run stops before the claim, say `UNKNOWN` or `BLOCKED`, preserve the evidence, and do not attribute the boundary to the loader without a control or direct failure.
+
+## 15. End-of-session checklist
+
+- [ ] Current checkout, source commit, build artifacts, and installed target hashes recorded.
+- [ ] Game launched through Steam; no direct executable launch.
+- [ ] Complete game identity tuple verified before reflected calls.
+- [ ] Profile2 selected through the authoritative selector; no tutorial bypass or direct save edit.
+- [ ] All-profile checkpoint created before launch and verified after exit.
+- [ ] Bridge endpoint matched to the live game process; payloads inspected for semantic errors.
+- [ ] Native pause/clock state proven before unattended actions.
+- [ ] Claim-specific postcondition observed and read back.
+- [ ] Temporary probes/inspectors removed; process exited before restore.
+- [ ] Deployment and selector restored by hash; only an explicitly justified Profile2 `metaSavegame.dat` delta remains.
+- [ ] Evidence JSON states `PASS`, `FAIL`, `BLOCKED`, `UNKNOWN`, or `NOT_TESTED` per assertion.
+
+## References
+
+- [Runtime evidence contract](references/runtime-evidence-contract.md)
+- [Steam runtime control runbook](../../../docs/research/STEAM-RUNTIME-CONTROL.md)
+- [Clean-room diagnostics and MCP tools](../rogue-command-clean-room-diagnostics/SKILL.md)
+- [Pack validation](../rogue-command-pack-validation/SKILL.md)
