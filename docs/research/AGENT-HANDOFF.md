@@ -360,8 +360,9 @@ fc.exe /b tools\generate_unit_model.py .agents\skills\rogue-command-3d-model-aut
   & "C:\Program Files\Unity\Hub\Editor\2021.3.45f2\Editor\Unity.exe" `
     -batchmode -quit `
     -projectPath "unity\RogueCommandAssetAuthoring" `
-    -executeMethod RogueCommandExpansion.Authoring.AssetBundleBuilder.BuildAssetBundles
+    -executeMethod RogueCommandExpansion.Authoring.TacticalOperationsPackScaffolder.BuildTacticalOperationsPack
   ```
+  Use RogueCommandVisualSampleScaffolder.BuildSampleNativeExpansion for the sample-native bundle (there is no AssetBundleBuilder class). Unity reserializes tracked .controller/.prefab files with line-ending churn during these builds; revert that noise before committing.
 
 ### Research Commands for Asset & Runtime Inspection
 ```powershell
