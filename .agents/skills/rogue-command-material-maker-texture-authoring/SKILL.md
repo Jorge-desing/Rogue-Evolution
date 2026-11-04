@@ -50,16 +50,20 @@ The machine-readable contract lives at `tools/material-maker/rogue-command-mater
 Examples:
 
 ```powershell
-# URP/game-bound texture set (default)
-powershell -File tools/Run-MaterialMakerBake.ps1 -Workflow urp
+# URP/game-bound texture set (default) with preset and strict quality gate
+powershell -File tools/Run-MaterialMakerBake.ps1 -Workflow urp -Preset gunmetal_chassis -Strict
 
 # Blender preview-oriented output
-powershell -File tools/Run-MaterialMakerBake.ps1 -Workflow blender
+powershell -File tools/Run-MaterialMakerBake.ps1 -Workflow blender -Preset desert_camo -Strict
 
-# A disposable 3D-paint or procedural .ptex source
-powershell -File tools/Run-MaterialMakerBake.ps1 -Workflow three_d -TemplatePath artifacts/texture-work/Hull/MaterialMaker/Hull.ptex
-powershell -File tools/Run-MaterialMakerBake.ps1 -Workflow procedural -TemplatePath artifacts/mm-templates/tactical-military-template.ptex
+# Disposable 3D-paint workspace (auto-generates UV-frozen single-submesh proxy + .ptex)
+powershell -File tools/Run-MaterialMakerBake.ps1 -Workflow three_d -UnitName SkyguardSAM -PaintSourceModel content/source-art/skyguardsam-rigged.blend -Preset hazard_industrial -Strict
+
+# Procedural graph-only generation
+powershell -File tools/Run-MaterialMakerBake.ps1 -Workflow procedural -Preset olive_armor -Strict
 ```
+
+`tools/Prepare-MaterialMakerTacticalTemplate.py` supports `--preset` (`olive_armor`, `gunmetal_chassis`, `desert_camo`, `hazard_industrial`) and wires a bimodal `colorize_metallic` node from the panel/seam height graph so `Metallic` has distinct metal plates and dielectric seam recesses (never a flat uniform export). `tools/prepare_material_maker_3d_paint.py` builds the disposable single-submesh UV-frozen `<Unit>_PaintProxy.obj` under `artifacts/texture-work/<Unit>/MaterialMaker/` without touching the production FBX.
 
 All workflows write an `material-maker-workflow.json` manifest beside the output maps. The manifest records the workflow, shader, pipeline, source authority and post-process rule for agent-readable handoff.
 

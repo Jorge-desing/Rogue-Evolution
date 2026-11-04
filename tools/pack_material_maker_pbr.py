@@ -89,9 +89,16 @@ def channel_stats(image: Image.Image) -> dict[str, list[float]]:
     }
 
 
+def _flat_pixels(image: Image.Image) -> list:
+    getter = getattr(image, "get_flattened_data", None)
+    if callable(getter):
+        return list(getter())
+    return list(image.getdata())
+
+
 def normal_length_error(image: Image.Image) -> float:
     """Mean |length - 1| of decoded tangent-space normals (0 for a perfect map)."""
-    pixels = list(sample(image.convert("RGB")).getdata())
+    pixels = _flat_pixels(sample(image.convert("RGB")))
     total = 0.0
     for r, g, b in pixels:
         x, y, z = r / 127.5 - 1.0, g / 127.5 - 1.0, b / 127.5 - 1.0
@@ -101,7 +108,7 @@ def normal_length_error(image: Image.Image) -> float:
 
 def metallic_midtone_ratio(metallic: Image.Image) -> float:
     """Fraction of pixels that are neither dielectric (<25%) nor metal (>75%)."""
-    values = list(sample(metallic).getdata())
+    values = _flat_pixels(sample(metallic))
     mid = sum(1 for v in values if 64 <= v <= 191)
     return mid / max(1, len(values))
 

@@ -1,12 +1,20 @@
 # Run-MaterialMakerBake.ps1
 # Automatic Material Maker 1.7 bake for Rogue Command PBR textures.
-# The generated output stays under artifacts/ until PBR validation and Unity import.
+# Supports workflows: urp, blender, three_d, procedural.
 
 param(
     [ValidateSet("urp", "blender", "three_d", "procedural")]
     [string]$Workflow = "urp",
+    [ValidateSet("olive_armor", "gunmetal_chassis", "desert_camo", "hazard_industrial")]
+    [string]$Preset = "olive_armor",
+    [ValidateSet(9, 10, 11, 12)]
+    [int]$SizePower = 11,
     [string]$TemplatePath = "",
-    [string]$OutputDirectory = ""
+    [string]$OutputDirectory = "",
+    [string]$UnitName = "TacticalHull",
+    [string]$PaintSourceModel = "",
+    [switch]$ForceTemplate,
+    [switch]$Strict
 )
 
 $ErrorActionPreference = "Stop"
@@ -21,12 +29,29 @@ if ($null -eq $workflowConfig) {
 
 $mmDir = Join-Path $repoRoot ".tools/MaterialMaker-1.7/material_maker_1_7_windows"
 $mmExe = Join-Path $repoRoot $config.tool.installRelativePath
+$prepareScript = Join-Path $repoRoot "tools/Prepare-MaterialMakerTacticalTemplate.py"
+$prepare3dScript = Join-Path $repoRoot "tools/prepare_material_maker_3d_paint.py"
+
 $templateWasExplicit = -not [string]::IsNullOrWhiteSpace($TemplatePath)
 if ($templateWasExplicit) {
     $template = if ([System.IO.Path]::IsPathRooted($TemplatePath)) { $TemplatePath } else { Join-Path $repoRoot $TemplatePath }
+} elseif ($Workflow -eq "three_d") {
+    $paintWorkspace = Join-Path $repoRoot "artifacts/texture-work/$UnitName/MaterialMaker"
+    $paintArgs = @($prepare3dScript, "--unit-name", $UnitName, "--workspace", $paintWorkspace, "--preset", $Preset, "--size", "$SizePower")
+    if (-not [string]::IsNullOrWhiteSpace($PaintSourceModel)) {
+        $resolvedSource = if ([System.IO.Path]::IsPathRooted($PaintSourceModel)) { $PaintSourceModel } else { Join-Path $repoRoot $PaintSourceModel }
+        $paintArgs += @("--source-model", $resolvedSource)
+    }
+    & python @paintArgs
+    if ($LASTEXITCODE -ne 0) {
+        throw "Material Maker 3D paint workspace preparation failed with exit code $LASTEXITCODE"
+    }
+    $template = Join-Path $paintWorkspace "$UnitName.ptex"
 } else {
-    $template = Join-Path $repoRoot "artifacts/mm-templates/tactical-military-template.ptex"
+    $templateFile = if ($Preset -eq "olive_armor") { "tactical-military-template.ptex" } else { "tactical-$Preset-template.ptex" }
+    $template = Join-Path $repoRoot "artifacts/mm-templates/$templateFile"
 }
+
 if ([string]::IsNullOrWhiteSpace($OutputDirectory)) {
     $outDir = Join-Path $repoRoot ([string]$workflowConfig.outputDirectory)
 } elseif ([System.IO.Path]::IsPathRooted($OutputDirectory)) {
@@ -37,7 +62,6 @@ if ([string]::IsNullOrWhiteSpace($OutputDirectory)) {
 $rawDir = Join-Path $outDir "raw"
 $waitScript = Join-Path $repoRoot "tools/MaterialMakerWaitDevice.gd"
 $packScript = Join-Path $repoRoot ([string]$config.exportProfile.packer)
-$prepareScript = Join-Path $repoRoot "tools/Prepare-MaterialMakerTacticalTemplate.py"
 $overrideCfg = Join-Path $mmDir "override.cfg"
 $userExportDir = Join-Path $env:APPDATA "material_maker_2/export_targets"
 $profileName = [string]$config.exportProfile.name
@@ -57,20 +81,25 @@ foreach ($required in @($configPath, $configValidator, $mmExe, $waitScript, $pac
 if ($LASTEXITCODE -ne 0) {
     throw "Material Maker workflow configuration is invalid"
 }
-if (-not (Test-Path $template)) {
-    if ($templateWasExplicit) {
+
+$needsPrepare = (-not (Test-Path $template)) -or $ForceTemplate.IsPresent
+if (-not $needsPrepare -and -not $templateWasExplicit -and (Test-Path $template)) {
+    $existingContent = Get-Content -LiteralPath $template -Raw
+    if ($existingContent -notmatch "colorize_metallic") {
+        $needsPrepare = $true
+    }
+}
+if ($needsPrepare) {
+    if ($templateWasExplicit -and -not (Test-Path $template)) {
         throw "Explicit Material Maker template is missing: $template"
     }
-    & python $prepareScript --output $template
+    & python $prepareScript --output $template --preset $Preset --size $SizePower --force
     if ($LASTEXITCODE -ne 0) {
         throw "Material Maker template preparation failed with exit code $LASTEXITCODE"
     }
 }
 
-# Material Maker 1.7 issue #1506: the CLI can start exporting before the
-# background RenderingDevice exists and crash with 0xC0000005. The autoload
-# waits for that device. Keep this workaround beside the ignored local tool
-# installation and restore any pre-existing override.cfg after the bake.
+# Material Maker 1.7 issue #1506 workaround
 $hadOverride = Test-Path $overrideCfg
 $backupOverride = Join-Path $env:TEMP ("rcl-material-maker-override-" + [guid]::NewGuid().ToString("N") + ".cfg")
 if ($hadOverride) {
@@ -82,9 +111,6 @@ $quote = [char]34
 $overrideText = "[autoload]`r`n`r`nmm_wait_device=$quote*$waitScriptAbsolute$quote`r`n"
 [System.IO.File]::WriteAllText($overrideCfg, $overrideText, $utf8NoBom)
 
-# Material Maker's built-in Blender profile writes metallic/roughness as EXR.
-# This external profile forces PNG scalar exports so the packer can create the
-# project's required MetallicGloss (RGB metallic, A smoothness) map.
 $hadExportTarget = Test-Path $exportTargetFile
 $backupExportTarget = Join-Path $env:TEMP ("rcl-material-maker-target-" + [guid]::NewGuid().ToString("N") + ".mme")
 if ($hadExportTarget) {
@@ -121,12 +147,18 @@ try {
         Pop-Location
     }
 
-    & python $packScript --input-dir $rawDir --output-dir $outDir --prefix $templatePrefix
+    $packArgs = @($packScript, "--input-dir", $rawDir, "--output-dir", $outDir, "--prefix", $templatePrefix)
+    if ($Strict.IsPresent) {
+        $packArgs += "--strict"
+    }
+    & python @packArgs
     if ($LASTEXITCODE -ne 0) {
         throw "Material Maker PBR pack failed with exit code $LASTEXITCODE"
     }
     $workflowManifest = [ordered]@{
         workflow = $Workflow
+        preset = $Preset
+        resolution = (1 -shl $SizePower)
         profile = $profileName
         pipeline = [string]$config.textureContract.pipeline
         shader = [string]$config.textureContract.shader
