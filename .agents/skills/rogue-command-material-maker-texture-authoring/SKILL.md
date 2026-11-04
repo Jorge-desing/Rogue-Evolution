@@ -63,7 +63,22 @@ powershell -File tools/Run-MaterialMakerBake.ps1 -Workflow three_d -UnitName Sky
 powershell -File tools/Run-MaterialMakerBake.ps1 -Workflow procedural -Preset olive_armor -Strict
 ```
 
-`tools/Prepare-MaterialMakerTacticalTemplate.py` supports space-military presets (`--preset olive_armor | gunmetal_chassis | desert_camo | hazard_industrial | orbital_titanium`) with laser-cut seams, precision chamfers, isotropic satin grain, and a bimodal `colorize_metallic` node. `tools/pack_material_maker_pbr.py` renormalizes tangent-space normal maps per pixel and applies gentle PBR-safe micro-contrast on albedo. `tools/prepare_material_maker_3d_paint.py` builds the disposable single-submesh UV-frozen `<Unit>_PaintProxy.obj` under `artifacts/texture-work/<Unit>/MaterialMaker/` without touching the production FBX. `tools/apply_material_maker_to_blender.py` binds the four-map contract to a Principled BSDF node setup in Blender 4.5 preserving sockets and vertex wear.
+`tools/Prepare-MaterialMakerTacticalTemplate.py` supports a suite of 13 high-fidelity space-military presets (`--preset <name>`):
+- **`olive_armor`**: Exo-Atmospheric Tactical Olive Armor (standard ground/orbital assault hull).
+- **`gunmetal_chassis`**: Orbital Dreadnought Gunmetal Hull (slate-gray cold-rolled aerospace steel).
+- **`desert_camo`**: Lunar/Martian Thermal Regolith Plating (high-friction dust-resistant ceramic alloy).
+- **`hazard_industrial`**: Orbital Docking Bay EVA Hazard Plating (high-contrast industrial caution/docking slabs).
+- **`orbital_titanium`**: Cryo-Titanium Spacecraft Armor (bright specular titanium alloy with laser-cut seams).
+- **`stealth_void_composite`**: Void-Stealth Graphene Composite Plating (radar-absorbent ultra-dark dielectric body, exposed precision titanium CNC chamfers, razor seams).
+- **`solar_gold_radiator`**: Orbital Solar Gold Radiator Shielding (24K gold-titanium thermal dissipation foil, high specular gloss, dark beryllium frame brackets).
+- **`battleship_tungsten`**: Heavy Dreadnought Ballistic Tungsten Armor (monolithic tungsten-carbide kinetic defense slabs, shot-peened finish, deep ballistic chamfers).
+- **`cerberus_white_ceramic`**: Fleet Interceptor Arctic Ceramic Plating (sintered zirconium-boride thermal barrier tiles, high solar reflectance white, dark vacuum expansion joints).
+- **`plasma_cinder_ablative`**: Re-Entry Sintered Carbon-Phenolic Heatshield (pyrolyzed carbon-carbon heatshield, burnt-copper/amber thermal oxide seam margins).
+- **`cyber_nanoweave`**: Electronic Warfare High-Density Nano-Lattice (high-frequency nano-patterned stealth meta-material, cyan/slate dielectric plates, conductive waveguide traces).
+- **`anodized_cobalt`**: Anodized Cobalt-Titanium Stealth Hull (vacuum-anodized deep indigo-navy alloy, low-IR body, specular blue-violet edge relief).
+- **`quantum_hyperdrive_alloy`**: Quantum Resonance Super-Alloy Plating (tachyonic drive housing, specular nickel-chromium silver, subtle refractive violet flux margins).
+
+All presets feature laser-cut seams, precision chamfers, isotropic satin grain, and a bimodal `colorize_metallic` node. `tools/pack_material_maker_pbr.py` renormalizes tangent-space normal maps per pixel and applies gentle PBR-safe micro-contrast on albedo. `tools/prepare_material_maker_3d_paint.py` builds the disposable single-submesh UV-frozen `<Unit>_PaintProxy.obj` under `artifacts/texture-work/<Unit>/MaterialMaker/` without touching the production FBX. `tools/apply_material_maker_to_blender.py` binds the four-map contract to a Principled BSDF node setup in Blender 4.5 preserving sockets and vertex wear.
 
 All workflows write an `material-maker-workflow.json` manifest beside the output maps. The manifest records the workflow, shader, pipeline, source authority and post-process rule for agent-readable handoff.
 

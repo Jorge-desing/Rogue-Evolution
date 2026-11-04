@@ -154,6 +154,258 @@ PRESETS: dict[str, dict[str, object]] = {
             (1.0, (0.36, 0.36, 0.36)),
         ),
     },
+    "stealth_void_composite": {
+        "label": "Void-Stealth Graphene Composite Plating",
+        "name": "stealth_void_composite_hull",
+        "bricks": {"pattern": 4, "repeat": 3, "rows": 5, "columns": 3, "mortar": 0.009, "bevel": 0.028, "corner": 0.018},
+        "seam_tint": ((0.0, (0.02, 0.02, 0.03)), (1.0, (0.05, 0.06, 0.07))),
+        "bevel_mask": ((0.0, (0.0, 0.0, 0.0)), (0.05, (1.0, 1.0, 1.0))),
+        "plate_palette": (
+            (0.0, (0.12, 0.13, 0.15)),
+            (0.25, (0.18, 0.19, 0.22)),
+            (0.50, (0.10, 0.11, 0.13)),
+            (0.75, (0.22, 0.23, 0.26)),
+            (1.0, (0.15, 0.16, 0.18)),
+        ),
+        "metallic_curve": (
+            (0.0, (0.03, 0.03, 0.03)),
+            (0.04, (0.05, 0.05, 0.05)),
+            (0.07, (0.95, 0.95, 0.95)),
+            (0.12, (0.92, 0.92, 0.92)),
+            (0.16, (0.06, 0.06, 0.06)),
+            (1.0, (0.04, 0.04, 0.04)),
+        ),
+        "roughness_curve": (
+            (0.0, (0.82, 0.82, 0.82)),
+            (0.08, (0.16, 0.16, 0.16)),
+            (0.25, (0.55, 0.55, 0.55)),
+            (1.0, (0.65, 0.65, 0.65)),
+        ),
+        "warp_amount": 0.0020,
+        "perlin_scale_x": 16,
+        "perlin_scale_y": 16,
+        "micro_relief_amount": 0.028,
+        "normal_strength": 0.35,
+    },
+    "solar_gold_radiator": {
+        "label": "Orbital Solar Gold Radiator Shielding",
+        "name": "orbital_solar_radiator_plating",
+        "bricks": {"pattern": 3, "repeat": 2, "rows": 4, "columns": 4, "mortar": 0.014, "bevel": 0.030, "corner": 0.015},
+        "seam_tint": ((0.0, (0.06, 0.06, 0.07)), (1.0, (0.18, 0.17, 0.16))),
+        "bevel_mask": ((0.0, (0.0, 0.0, 0.0)), (0.05, (1.0, 1.0, 1.0))),
+        "plate_palette": (
+            (0.0, (0.86, 0.66, 0.22)),
+            (0.25, (0.96, 0.78, 0.32)),
+            (0.50, (0.82, 0.62, 0.18)),
+            (0.75, (0.98, 0.82, 0.36)),
+            (1.0, (0.90, 0.70, 0.25)),
+        ),
+        "metallic_curve": (
+            (0.0, (0.04, 0.04, 0.04)),
+            (0.04, (0.07, 0.07, 0.07)),
+            (0.07, (0.97, 0.97, 0.97)),
+            (1.0, (0.95, 0.95, 0.95)),
+        ),
+        "roughness_curve": (
+            (0.0, (0.68, 0.68, 0.68)),
+            (0.08, (0.12, 0.12, 0.12)),
+            (0.25, (0.18, 0.18, 0.18)),
+            (1.0, (0.25, 0.25, 0.25)),
+        ),
+        "warp_amount": 0.0015,
+        "perlin_scale_x": 10,
+        "perlin_scale_y": 10,
+        "micro_relief_amount": 0.022,
+        "normal_strength": 0.32,
+    },
+    "battleship_tungsten": {
+        "label": "Heavy Dreadnought Ballistic Tungsten Armor",
+        "name": "dreadnought_tungsten_armor",
+        "bricks": {"pattern": 1, "repeat": 2, "rows": 5, "columns": 2, "mortar": 0.010, "bevel": 0.038, "corner": 0.020},
+        "seam_tint": ((0.0, (0.04, 0.05, 0.06)), (1.0, (0.12, 0.14, 0.17))),
+        "bevel_mask": ((0.0, (0.0, 0.0, 0.0)), (0.05, (1.0, 1.0, 1.0))),
+        "plate_palette": (
+            (0.0, (0.24, 0.26, 0.30)),
+            (0.25, (0.34, 0.37, 0.42)),
+            (0.50, (0.20, 0.22, 0.25)),
+            (0.75, (0.40, 0.44, 0.48)),
+            (1.0, (0.28, 0.31, 0.36)),
+        ),
+        "metallic_curve": (
+            (0.0, (0.04, 0.04, 0.04)),
+            (0.04, (0.07, 0.07, 0.07)),
+            (0.07, (0.96, 0.96, 0.96)),
+            (1.0, (0.92, 0.92, 0.92)),
+        ),
+        "roughness_curve": (
+            (0.0, (0.70, 0.70, 0.70)),
+            (0.08, (0.16, 0.16, 0.16)),
+            (0.25, (0.32, 0.32, 0.32)),
+            (1.0, (0.44, 0.44, 0.44)),
+        ),
+        "warp_amount": 0.0028,
+        "perlin_scale_x": 14,
+        "perlin_scale_y": 14,
+        "micro_relief_amount": 0.045,
+        "normal_strength": 0.42,
+    },
+    "cerberus_white_ceramic": {
+        "label": "Fleet Interceptor Arctic Ceramic Plating",
+        "name": "interceptor_ceramic_white",
+        "bricks": {"pattern": 4, "repeat": 3, "rows": 6, "columns": 3, "mortar": 0.012, "bevel": 0.026, "corner": 0.016},
+        "seam_tint": ((0.0, (0.04, 0.04, 0.05)), (1.0, (0.12, 0.13, 0.14))),
+        "bevel_mask": ((0.0, (0.0, 0.0, 0.0)), (0.05, (1.0, 1.0, 1.0))),
+        "plate_palette": (
+            (0.0, (0.78, 0.80, 0.82)),
+            (0.25, (0.86, 0.88, 0.90)),
+            (0.50, (0.72, 0.74, 0.76)),
+            (0.75, (0.90, 0.92, 0.94)),
+            (1.0, (0.80, 0.82, 0.84)),
+        ),
+        "metallic_curve": (
+            (0.0, (0.03, 0.03, 0.03)),
+            (0.04, (0.06, 0.06, 0.06)),
+            (0.07, (0.94, 0.94, 0.94)),
+            (0.12, (0.90, 0.90, 0.90)),
+            (0.16, (0.06, 0.06, 0.06)),
+            (1.0, (0.04, 0.04, 0.04)),
+        ),
+        "roughness_curve": (
+            (0.0, (0.78, 0.78, 0.78)),
+            (0.08, (0.16, 0.16, 0.16)),
+            (0.25, (0.30, 0.30, 0.30)),
+            (1.0, (0.38, 0.38, 0.38)),
+        ),
+        "warp_amount": 0.0018,
+        "perlin_scale_x": 10,
+        "perlin_scale_y": 10,
+        "micro_relief_amount": 0.025,
+        "normal_strength": 0.34,
+    },
+    "plasma_cinder_ablative": {
+        "label": "Re-Entry Sintered Carbon-Phenolic Heatshield",
+        "name": "reentry_ablative_cinder",
+        "bricks": {"pattern": 3, "repeat": 2, "rows": 5, "columns": 5, "mortar": 0.015, "bevel": 0.032, "corner": 0.024},
+        "seam_tint": ((0.0, (0.08, 0.04, 0.03)), (1.0, (0.24, 0.12, 0.07))),
+        "bevel_mask": ((0.0, (0.0, 0.0, 0.0)), (0.05, (1.0, 1.0, 1.0))),
+        "plate_palette": (
+            (0.0, (0.16, 0.14, 0.13)),
+            (0.25, (0.26, 0.20, 0.17)),
+            (0.50, (0.13, 0.11, 0.10)),
+            (0.75, (0.32, 0.23, 0.18)),
+            (1.0, (0.20, 0.16, 0.14)),
+        ),
+        "metallic_curve": (
+            (0.0, (0.04, 0.04, 0.04)),
+            (0.04, (0.06, 0.06, 0.06)),
+            (0.07, (0.94, 0.94, 0.94)),
+            (1.0, (0.88, 0.88, 0.88)),
+        ),
+        "roughness_curve": (
+            (0.0, (0.80, 0.80, 0.80)),
+            (0.08, (0.20, 0.20, 0.20)),
+            (0.25, (0.40, 0.40, 0.40)),
+            (1.0, (0.50, 0.50, 0.50)),
+        ),
+        "warp_amount": 0.0032,
+        "perlin_scale_x": 14,
+        "perlin_scale_y": 14,
+        "micro_relief_amount": 0.040,
+        "normal_strength": 0.40,
+    },
+    "cyber_nanoweave": {
+        "label": "Electronic Warfare High-Density Nano-Lattice",
+        "name": "ew_nanoweave_lattice",
+        "bricks": {"pattern": 4, "repeat": 4, "rows": 6, "columns": 4, "mortar": 0.008, "bevel": 0.024, "corner": 0.015},
+        "seam_tint": ((0.0, (0.03, 0.05, 0.07)), (1.0, (0.09, 0.14, 0.19))),
+        "bevel_mask": ((0.0, (0.0, 0.0, 0.0)), (0.05, (1.0, 1.0, 1.0))),
+        "plate_palette": (
+            (0.0, (0.14, 0.20, 0.24)),
+            (0.25, (0.22, 0.32, 0.38)),
+            (0.50, (0.10, 0.15, 0.19)),
+            (0.75, (0.28, 0.40, 0.46)),
+            (1.0, (0.18, 0.26, 0.32)),
+        ),
+        "metallic_curve": (
+            (0.0, (0.04, 0.04, 0.04)),
+            (0.04, (0.07, 0.07, 0.07)),
+            (0.07, (0.96, 0.96, 0.96)),
+            (1.0, (0.90, 0.90, 0.90)),
+        ),
+        "roughness_curve": (
+            (0.0, (0.72, 0.72, 0.72)),
+            (0.08, (0.14, 0.14, 0.14)),
+            (0.25, (0.24, 0.24, 0.24)),
+            (1.0, (0.34, 0.34, 0.34)),
+        ),
+        "warp_amount": 0.0018,
+        "perlin_scale_x": 20,
+        "perlin_scale_y": 20,
+        "micro_relief_amount": 0.038,
+        "normal_strength": 0.36,
+    },
+    "anodized_cobalt": {
+        "label": "Anodized Cobalt-Titanium Stealth Hull",
+        "name": "stealth_cobalt_titanium",
+        "bricks": {"pattern": 4, "repeat": 3, "rows": 4, "columns": 2, "mortar": 0.010, "bevel": 0.030, "corner": 0.020},
+        "seam_tint": ((0.0, (0.04, 0.05, 0.08)), (1.0, (0.12, 0.15, 0.24))),
+        "bevel_mask": ((0.0, (0.0, 0.0, 0.0)), (0.05, (1.0, 1.0, 1.0))),
+        "plate_palette": (
+            (0.0, (0.15, 0.19, 0.28)),
+            (0.25, (0.24, 0.30, 0.44)),
+            (0.50, (0.12, 0.15, 0.22)),
+            (0.75, (0.30, 0.38, 0.52)),
+            (1.0, (0.20, 0.25, 0.36)),
+        ),
+        "metallic_curve": (
+            (0.0, (0.04, 0.04, 0.04)),
+            (0.04, (0.07, 0.07, 0.07)),
+            (0.07, (0.97, 0.97, 0.97)),
+            (1.0, (0.92, 0.92, 0.92)),
+        ),
+        "roughness_curve": (
+            (0.0, (0.68, 0.68, 0.68)),
+            (0.08, (0.15, 0.15, 0.15)),
+            (0.25, (0.28, 0.28, 0.28)),
+            (1.0, (0.38, 0.38, 0.38)),
+        ),
+        "warp_amount": 0.0022,
+        "perlin_scale_x": 12,
+        "perlin_scale_y": 12,
+        "micro_relief_amount": 0.032,
+        "normal_strength": 0.36,
+    },
+    "quantum_hyperdrive_alloy": {
+        "label": "Quantum Resonance Super-Alloy Plating",
+        "name": "hyperdrive_quantum_alloy",
+        "bricks": {"pattern": 4, "repeat": 3, "rows": 5, "columns": 3, "mortar": 0.010, "bevel": 0.028, "corner": 0.020},
+        "seam_tint": ((0.0, (0.07, 0.04, 0.08)), (1.0, (0.22, 0.12, 0.26))),
+        "bevel_mask": ((0.0, (0.0, 0.0, 0.0)), (0.05, (1.0, 1.0, 1.0))),
+        "plate_palette": (
+            (0.0, (0.42, 0.44, 0.50)),
+            (0.25, (0.58, 0.60, 0.68)),
+            (0.50, (0.36, 0.38, 0.44)),
+            (0.75, (0.66, 0.68, 0.76)),
+            (1.0, (0.50, 0.52, 0.60)),
+        ),
+        "metallic_curve": (
+            (0.0, (0.04, 0.04, 0.04)),
+            (0.04, (0.08, 0.08, 0.08)),
+            (0.07, (0.98, 0.98, 0.98)),
+            (1.0, (0.95, 0.95, 0.95)),
+        ),
+        "roughness_curve": (
+            (0.0, (0.64, 0.64, 0.64)),
+            (0.08, (0.10, 0.10, 0.10)),
+            (0.25, (0.20, 0.20, 0.20)),
+            (1.0, (0.30, 0.30, 0.30)),
+        ),
+        "warp_amount": 0.0020,
+        "perlin_scale_x": 16,
+        "perlin_scale_y": 16,
+        "micro_relief_amount": 0.030,
+        "normal_strength": 0.35,
+    },
 }
 
 
@@ -216,20 +468,20 @@ def build_template_project(
             _configure_subgraph_bricks(node, preset["bricks"])
         elif name == "Warp":
             # Crisp CNC-machined spacecraft seams with micro edge wear only.
-            parameters["amount"] = 0.0025
+            parameters["amount"] = float(preset.get("warp_amount", 0.0025))
             parameters["eps"] = 0.015
         elif name == "Perlin":
             # Balanced isotropic aerospace micro-grain (smooth CNC finish without streaky banding).
-            parameters["scale_x"] = 12
-            parameters["scale_y"] = 12
+            parameters["scale_x"] = int(preset.get("perlin_scale_x", 12))
+            parameters["scale_y"] = int(preset.get("perlin_scale_y", 12))
             parameters["iterations"] = 5
             parameters["persistence"] = 0.50
         elif name == "blend_2":
-            # 96.5% crisp panel bevel geometry and 3.5% satin metal micro-relief.
-            parameters["amount"] = 0.035
+            # Crisp panel bevel geometry blended with subtle satin metal micro-relief.
+            parameters["amount"] = float(preset.get("micro_relief_amount", 0.035))
         elif name == "normal_map_2":
             parameters["param0"] = int(size_power)
-            parameters["param1"] = 0.38
+            parameters["param1"] = float(preset.get("normal_strength", 0.38))
         elif name == "uniform_0":
             parameters["color"] = color(0.90, 0.90, 0.90)
         elif name == "colorize_0":

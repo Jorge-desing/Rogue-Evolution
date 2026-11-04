@@ -34,13 +34,8 @@ class MaterialMakerWorkflowConfigTests(unittest.TestCase):
     def test_all_presets_wire_bimodal_metallic_node(self) -> None:
         if not TEMPLATE_BUILDER.EXAMPLE.is_file():
             self.skipTest("Material Maker 1.7 example is not staged locally")
-        for preset in (
-            "olive_armor",
-            "gunmetal_chassis",
-            "desert_camo",
-            "hazard_industrial",
-            "orbital_titanium",
-        ):
+        self.assertGreaterEqual(len(TEMPLATE_BUILDER.PRESETS), 12)
+        for preset in sorted(TEMPLATE_BUILDER.PRESETS):
             project = TEMPLATE_BUILDER.build_template_project(preset_name=preset, size_power=10)
             node_names = {n.get("name") for n in project.get("nodes", [])}
             self.assertIn("colorize_metallic", node_names)
@@ -49,8 +44,34 @@ class MaterialMakerWorkflowConfigTests(unittest.TestCase):
                 for c in project.get("connections", [])
                 if c.get("to") == "Material" and c.get("to_port") == 1
             ]
-            self.assertEqual(1, len(metal_conns))
+            self.assertEqual(1, len(metal_conns), f"Preset {preset} missing Material port 1 connection")
             self.assertEqual("colorize_metallic", metal_conns[0].get("from"))
+
+    def test_presets_declare_space_military_pbr_contracts(self) -> None:
+        for name, preset in TEMPLATE_BUILDER.PRESETS.items():
+            self.assertTrue(preset.get("label"), f"Preset {name} missing label")
+            self.assertTrue(preset.get("name"), f"Preset {name} missing name")
+            bricks = preset.get("bricks", {})
+            self.assertIn("pattern", bricks, f"Preset {name} missing pattern")
+            self.assertIn("repeat", bricks, f"Preset {name} missing repeat")
+            self.assertIn("rows", bricks, f"Preset {name} missing rows")
+            self.assertIn("columns", bricks, f"Preset {name} missing columns")
+            self.assertIn("mortar", bricks, f"Preset {name} missing mortar")
+            self.assertIn("bevel", bricks, f"Preset {name} missing bevel")
+            self.assertIn("corner", bricks, f"Preset {name} missing corner")
+
+            # Check that bevel_mask is strictly grayscale to preserve downstream roughness stddev
+            bevel_mask = preset.get("bevel_mask", ())
+            for pos, rgb in bevel_mask:
+                self.assertEqual(rgb[0], rgb[1], f"Preset {name} bevel_mask must be grayscale")
+                self.assertEqual(rgb[1], rgb[2], f"Preset {name} bevel_mask must be grayscale")
+
+            # Check that metallic curve has bimodal metal/dielectric separation
+            metal_curve = preset.get("metallic_curve", ())
+            self.assertGreaterEqual(len(metal_curve), 3, f"Preset {name} metallic_curve needs >= 3 points")
+            metal_levels = [rgb[0] for _, rgb in metal_curve]
+            self.assertTrue(any(v < 0.15 for v in metal_levels), f"Preset {name} needs dielectric baseline")
+            self.assertTrue(any(v > 0.85 for v in metal_levels), f"Preset {name} needs metallic plateau")
 
     def test_3d_paint_workspace_creates_manifest_and_ptex(self) -> None:
         if not TEMPLATE_BUILDER.EXAMPLE.is_file():

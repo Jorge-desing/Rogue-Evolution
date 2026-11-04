@@ -5,7 +5,21 @@
 param(
     [ValidateSet("urp", "blender", "three_d", "procedural")]
     [string]$Workflow = "urp",
-    [ValidateSet("olive_armor", "gunmetal_chassis", "desert_camo", "hazard_industrial", "orbital_titanium")]
+    [ValidateSet(
+        "olive_armor",
+        "gunmetal_chassis",
+        "desert_camo",
+        "hazard_industrial",
+        "orbital_titanium",
+        "stealth_void_composite",
+        "solar_gold_radiator",
+        "battleship_tungsten",
+        "cerberus_white_ceramic",
+        "plasma_cinder_ablative",
+        "cyber_nanoweave",
+        "anodized_cobalt",
+        "quantum_hyperdrive_alloy"
+    )]
     [string]$Preset = "olive_armor",
     [ValidateSet(9, 10, 11, 12)]
     [int]$SizePower = 11,
