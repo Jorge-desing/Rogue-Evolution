@@ -1180,3 +1180,22 @@ This is a compact, durable orientation for agents. For the changing checkout sta
 - QA/reflection safety: Profile2 is dedicated QA without a tutorial; never ask, inspect, infer, gate, bypass, or switch profiles for tutorial. Check current selector/save safety and preserve saves. Before reflection jointly verify Rogue Command version, Unity `2021.3.45f2`, Assembly-CSharp SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, and MVID `db0e9462-128d-4296-9900-de18b4bd0c00`.
 
 - Root MEMORY.md, codex memory, antigravity memory, and mem0 synced to HEAD c9d62bc.
+
+## Refresh (2026-11-04, HEAD 88d5bb3 — Skyguard SAM non-color bake + bundle rebuilds)
+
+- Repository `C:/Users/Alex/Documents/Mod Rogue Command`, loader `1.19.0`, branch `codex/rogue-unit-balance-20261018`. Verified local HEAD, upstream-tracking ref, and origin branch all equal `88d5bb38bf0d0a1714291a226a75fc70224fc310` (`feat(skyguard-sam): regenerate model, atlas PBR textures, and tactical-operations bundle with non-color data bake and packed UVs`). Code baseline remains `0bbede6b7beb68f8f50f4ae89f10e83ecb056c0d`; implementation baseline remains `e25c6de` (arachnid middle-leg orientation normalizer) / `d7a3a11b56b58bed6d3f06c47fd40a627c9d1ae3`.
+
+- New committed scope since the last sync (`c9d62bc`):
+  - `09d9c80` (`docs(memory): sync root MEMORY.md to HEAD c9d62bc + agent memories/mem0`): memory-sync commit only.
+  - `be03e9a` (`build(bundles): rebuild tactical-operations bundle with improved VehiclePBR_VertexWear shader`): rebuilt `tactical-operations.bundle` (24,532,720 -> 24,545,318 bytes) with the improved `VehiclePBR_VertexWear` shader.
+  - `3b35c55` (`build(bundles): rebuild sample-native bundle with improved shader; fix handoff bundle build command`): rebuilt `sample-native-expansion.bundle` (12,004,443 -> 12,006,131 bytes) and fixed the handoff bundle build command.
+  - `4520e05` (`fix(blender): bake full base color, Non-Color data maps, OpenGL normals and packed UV islands`): updated `RogueModelKit.py` (skill + tools copy) to bake full base color, Non-Color data maps, OpenGL normals and packed UV islands; added `tests/python/blender/bake_smoke_blender.py` and `tests/python/blender/test_blender_bake_contract.py`.
+  - `88d5bb3` (`feat(skyguard-sam): regenerate model, atlas PBR textures, and tactical-operations bundle with non-color data bake and packed UVs`): regenerated `SkyguardSAM.fbx` (607,660 -> 751,564 bytes) and atlas textures, rebuilt the tactical-operations bundle (24,545,318 bytes), updated the 3D-model-authoring skill.
+
+- Working tree: clean at root except nested worktree gitlinks `.worktrees/cargador` @ `11e9968` (dirty) and `.worktrees/task-graph-validation` @ `d1f9045` (dirty); preserve. Do not stage, reset, clean, or overwrite.
+
+- Validation: no fresh full run in this sync. Last documented at `c9d62bc`: Release plugin build 0 warnings/0 errors; C# harness 475/476 (1 Windows symlink-privilege skip, 0 failures); Python unittest 134/134; AssetBundle references 25/0 (sample-native) and 18/0 (tactical-operations); native visual preflight 9/0 per pack; loader registry 4 manifests/0 issues; `git diff --check` clean. New Blender bake tests added in `4520e05` were not rerun here. No fresh Steam/Unity gameplay proof beyond existing tactical-operations runtime smoke; natural offer->selection->placement->production/render/stat and tactical AI remain unverified.
+
+- QA/reflection safety: Profile2 is dedicated QA without a tutorial; never ask, inspect, infer, gate, bypass, or switch profiles for tutorial. Check current selector/save safety and preserve saves. Before reflection jointly verify Rogue Command version, Unity `2021.3.45f2`, Assembly-CSharp SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, and MVID `db0e9462-128d-4296-9900-de18b4bd0c00`.
+
+- Root MEMORY.md, codex memory, antigravity memory, and mem0 synced to HEAD 88d5bb3.
