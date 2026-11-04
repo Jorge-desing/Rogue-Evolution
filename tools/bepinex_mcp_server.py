@@ -11,9 +11,11 @@ from __future__ import annotations
 import json
 import os
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any
 
@@ -1302,23 +1304,99 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
                 req_set = set(str(x) for x in requested)
                 getters = [g for g in getters if g in req_set or g.replace("Json", "") in req_set]
             getters = [g for g in getters if g not in excluded]
+
+            started = time.perf_counter()
             snapshot = {}
-            for getter in getters:
+            success_count = 0
+            error_count = 0
+            timings = {}
+
+            def _fetch(getter):
+                t0 = time.perf_counter()
                 try:
                     raw = _call_diagnostics_method(getter, _snapshot_getter_args(getter))
                     try:
-                        snapshot[getter] = json.loads(raw)
+                        value = json.loads(raw)
                     except Exception:
-                        snapshot[getter] = raw
+                        value = raw
+                    return getter, value, None, (time.perf_counter() - t0) * 1000.0
                 except Exception as exc:
-                    snapshot[getter] = {"error": str(exc)}
+                    return getter, {"error": str(exc)}, str(exc), (time.perf_counter() - t0) * 1000.0
+
+            with ThreadPoolExecutor(max_workers=8) as executor:
+                futures = {executor.submit(_fetch, g): g for g in getters}
+                for future in as_completed(futures):
+                    getter, value, err, elapsed = future.result()
+                    snapshot[getter] = value
+                    timings[getter] = round(elapsed, 2)
+                    if err is None:
+                        success_count += 1
+                    else:
+                        error_count += 1
+
+            snapshot["_meta"] = {
+                "getterCount": len(getters),
+                "successCount": success_count,
+                "errorCount": error_count,
+                "elapsedMs": round((time.perf_counter() - started) * 1000.0, 2),
+                "timingsMs": timings,
+            }
             return _tool_response(json.dumps(snapshot, indent=2))
 
         elif name == "diagnostics_list_runtime_getters":
             return _tool_response(json.dumps({"count": len(_RUNTIME_SNAPSHOT_GETTERS), "getters": _RUNTIME_SNAPSHOT_GETTERS}, indent=2))
 
+        elif name == "diagnostics_call_getters":
+            requested = arguments.get("getters") or []
+            getters = [str(g) for g in requested]
+            started = time.perf_counter()
+            results = {}
+            timings = {}
+
+            def _fetch(getter):
+                t0 = time.perf_counter()
+                try:
+                    raw = _call_diagnostics_method(getter, _snapshot_getter_args(getter))
+                    try:
+                        value = json.loads(raw)
+                    except Exception:
+                        value = raw
+                    return getter, value, None, (time.perf_counter() - t0) * 1000.0
+                except Exception as exc:
+                    return getter, {"error": str(exc)}, str(exc), (time.perf_counter() - t0) * 1000.0
+
+            with ThreadPoolExecutor(max_workers=8) as executor:
+                futures = {executor.submit(_fetch, g): g for g in getters}
+                for future in as_completed(futures):
+                    getter, value, err, elapsed = future.result()
+                    results[getter] = value
+                    timings[getter] = round(elapsed, 2)
+            results["_meta"] = {
+                "getterCount": len(getters),
+                "elapsedMs": round((time.perf_counter() - started) * 1000.0, 2),
+                "timingsMs": timings,
+            }
+            return _tool_response(json.dumps(results, indent=2))
+
+        elif name == "diagnostics_runtime_summary":
+            keys = ["GetSystemHealthJson", "GetBattlefieldCensusJson", "GetProductionCensusJson",
+                    "GetBaseIntegrityCensusJson", "GetHazardCensusJson", "GetVeterancyCensusJson"]
+            summary = {}
+            for g in keys:
+                try:
+                    raw = _call_diagnostics_method(g, _snapshot_getter_args(g))
+                    try:
+                        summary[g] = json.loads(raw)
+                    except Exception:
+                        summary[g] = raw
+                except Exception as exc:
+                    summary[g] = {"error": str(exc)}
+            return _tool_response(json.dumps(summary, indent=2))
+
         elif name == "diagnostics_call_getter":
             getter = arguments.get("getterName", "").strip()
+            if not getter:
+                return _tool_response(json.dumps({"error": "getterName is required"}), is_error=True)
             args_list = arguments.get("args") or []
             res = _call_diagnostics_method(getter, args_list)
             return _tool_response(res)
