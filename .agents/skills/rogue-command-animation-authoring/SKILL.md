@@ -40,24 +40,49 @@ Relevant implementations:
 - `unity/RogueCommandAssetAuthoring/Assets/Editor/VehiclePrefabBuilder.cs`
 - `unity/RogueCommandAssetAuthoring/Assets/Editor/RogueCommandVisualSampleScaffolder.cs`
 
-## Animation principles adapted to RTS units
+## Motion review contract: 12 principles for mechanical RTS units
 
-Use these as review lenses, not pass/fail formulas:
+This section is the Rogue Command adaptation of `/12-principles-of-animation`. Use the principles as review lenses and annotate the actual clip/state, not as web-UI pass/fail formulas. The source skill's 300 ms, 50 ms stagger, and generic `ease-out` rules do not apply to game actions; derive timing from mass, role, frame rate, gameplay hooks, and RTS camera scale.
 
-1. **Squash/stretch, used sparingly:** Reserve deformation for flexible hoses, suspension, recoil dampers, or an intentionally stylized hit; keep hard armor and rigid mechanical plates undeformed.
-2. **Anticipation:** A brief brace, recoil wind-up, leg load, or turret alignment can make an action readable before its main motion.
-3. **Staging:** Keep one prominent moving focal point at a time. Preserve weapon, heading, damage cue, and silhouette readability at RTS zoom.
-4. **Pose-to-pose vs. continuous motion:** Prefer deterministic keyed poses for mechanical action clips and damage states; use continuous updates for truly procedural tracking/sweeps. Keep one owner per transform to avoid Animator/runtime fighting.
-5. **Follow-through and overlap:** Let a barrel mount, hose, sensor, or antenna settle after the main chassis/weapon when that secondary motion is mechanically plausible.
-6. **Slow in and slow out:** Shape starts/stops for mass and control. Do not ease a system that is intended to rotate at constant angular velocity.
-7. **Arcs:** Turrets rotate around their authored pivot, barrels pitch about the correct joint, and recoil follows the weapon axis. Check axis inversion, pivot drift, and clipping.
-8. **Secondary action:** Keep antenna sway, radiator flutter, shell ejection, and debris subordinate to the principal action; disable or reduce them if they obscure combat feedback.
-9. **Timing:** Convey mass and role through acceleration, hold, impact, and recovery. A heavy cannon, autocannon, radar sweep, gait, and death sequence need different durations; browser 300 ms rules do not apply.
-10. **Exaggeration, restrained:** Enlarge a short impact, recoil, or silhouette change only enough to read at game zoom; do not distort armor proportions or imply unsupported gameplay effects.
-11. **Solid form:** Maintain coherent 3D mass, rigid plate weights, mechanically plausible pivots, and consistent scale; inspect both rendered frames and the actual rig hierarchy.
-12. **Appeal and clarity:** Preserve faction palette, unit role, and distinctive silhouette. Animation should make intent obvious without competing motion or visual clutter.
+| Principle | Mechanical audit | Evidence to record |
+|---|---|---|
+| **Squash/stretch** | Deform only compliant parts (suspension, hoses, recoil dampers); rigid armor keeps its volume and rigid weights. | Animated transforms and representative close/RTS frames. |
+| **Anticipation** | Brace the hull/pelvis, load the legs, or align the turret before impact; anticipation must precede the weapon impulse. | Frame numbers and body/weapon curve values. |
+| **Staging** | Keep one focal event—muzzle, gait contact, damage, or death—dominant; do not let radar, antenna, and recoil compete. | Silhouette/readability check at both camera scales. |
+| **Pose-to-pose / continuous motion** | Key deterministic actions in Blender/FBX; reserve runtime updates for tracking, sweeps, and native movement. One owner writes each transform. | Binding ownership table: Animator vs. `RuntimeVisualDirector` vs. native gameplay. |
+| **Follow-through / overlap** | Let mount, barrel, sensor, cable, or antenna settle after the primary body impulse, with plausible hierarchy order. | Phase order and secondary curve offsets. |
+| **Slow in / slow out** | Use shaped curves for starting, braking, brace, and recovery; preserve constant angular velocity for radar/turret sweeps driven by RPM. | F-curve tangents or runtime angular-velocity calculation. |
+| **Arcs** | Rotate around authored pivots, pitch around the barrel joint, and recoil along the weapon axis; reject pivot drift, axis inversion, and clipping. | Pivot coordinates, socket alignment, and frame review. |
+| **Secondary action** | Keep antenna sway, radiator flutter, shell ejection, dust, and audio cues subordinate to the main intent. | Visibility/contrast review and attachment ownership. |
+| **Timing** | Separate anticipation, impact, hold, follow-through, and recovery; heavy cannons, autocannons, gaits, radar, and death need role-specific durations. | Clip frame rate, phase frame map, and transition durations. |
+| **Exaggeration** | Enlarge only the smallest local displacement/rotation needed to read at game zoom; never fake unsupported gameplay or deform the silhouette. | Maximum local displacement/angle and bounds comparison. |
+| **Solid form** | Preserve mass, scale, rigid plate weights, contact with ground, colliders, bounds, sockets, and Generic Avatar integrity. | Rig/weight report, bounds, foot-contact and collider checks. |
+| **Appeal / clarity** | Make faction, role, heading, weapon intent, and damage state legible without visual clutter or ambiguous motion. | Static thumbnail strip plus runtime observation when available. |
 
-There is no blanket 300 ms limit for game animation. A short muzzle flash, a full gait cycle, and a death sequence have different jobs and durations. Keep transitions only as long as needed for clear state changes and avoid excessive overlap that muddies combat feedback.
+### Required review pass
+
+For each authored action, mark `neutral → anticipation → contact/impact → hold → follow-through → recovery`. Check the body chain and the weapon chain separately, then check their phase ordering together. A clip name, controller state, barrel curve, or successful AssetBundle import is not sufficient evidence. For `Action_Walk`, inspect contact, passing, lift, and weight-transfer poses; for `Action_FireRecoil`, require body plus weapon motion; for `Action_Death`, verify a readable loss of support without root-motion drift.
+
+The review result must classify each finding as **static inspection**, **local build/validation**, or **in-game Steam runtime**. Do not promote a Manim preview, Unity import, or bundle audit into proof that the target game deforms or transitions correctly.
+
+## Manim preview and communication workflow
+
+Use `/manim-video` as an optional explanatory-preview method, not as a replacement for Blender, FBX, Unity, or Steam validation. A preview should teach the motion phases with abstract geometry: hull/pelvis, turret/mount, barrel, ground contact, phase labels, and a timeline. Never copy proprietary game meshes, extracted assets, credentials, or installation data into a preview.
+
+- **Narrative arc:** begin with the neutral pose, reveal anticipation, isolate impact/recoil, show follow-through, then hold on recovery and the invariant (`Bone_Root` remains fixed). Geometry comes before labels; labels explain a visible relationship rather than substitute for it.
+- **Visual hierarchy:** primary body/weapon motion at full opacity, timing guides and axes around `0.15`, annotations around `0.4`, and only one highlighted focal event at a time. Leave a deliberate `wait` after each phase and a longer pause after the key reveal.
+- **Artifact hygiene:** keep `plan.md`, `script.py`, rendered frames, and video only under ignored `artifacts/animation-previews/<slug>/`. The source `.blend`, FBX, prefab, controller, and bundle remain authoritative; a Manim script must not write into `Assets/` or replace them.
+- **Draft first:** if Manim CE is available, render with `-ql` first and inspect a still; render `-qh` only when a final explanatory video is requested. If it is unavailable, keep the plan and abstract storyboard as static evidence—do not install dependencies or fabricate a render.
+
+Canonical optional commands, run through `terminal` from the repository root:
+
+```text
+terminal(command="manim -ql artifacts/animation-previews/<slug>/script.py FireRecoilPreview", timeout=300)
+terminal(command="manim -ql --format=png -s artifacts/animation-previews/<slug>/script.py FireRecoilPreview", timeout=300)
+terminal(command="ffmpeg -y -f concat -safe 0 -i artifacts/animation-previews/<slug>/concat.txt -c copy artifacts/animation-previews/<slug>/final.mp4", timeout=300)
+```
+
+Use the [animation review and Manim reference](references/animation-review-and-manim.md) for the storyboard template, abstract mechanical scene contract, and post-render checklist. The preview is communication evidence only; use the Unity/bundle commands below and the Steam runtime skill for implementation evidence.
 
 ## Stripping non-walk animations from a rigged model
 
