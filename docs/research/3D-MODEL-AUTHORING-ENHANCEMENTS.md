@@ -591,7 +591,7 @@ dotnet run --project tests/RogueCommandExpansionLoader.ValidationTests -- .
 - Six new mobile archetypes in `tools/generate_unit_model.py`: `mobile_sam_launcher`, `recovery_crawler`, `mine_layer`, `sniper_tankette`, `hexapod_assault`, `assault_hovercraft`. All are composed from existing RogueModelKit primitives and the faction palette (no new materials). Wreckage, gameplay-JSON template and rig metadata tables in `RogueModelKit.py` were extended.
 - Twelve new presets (6 archetype presets, 4 remixes: `urban_brawler`, `arctic_sentinel`, `night_stalker`, `armored_hauler`; 2 structures: `early_warning_array`, `fusion_silo`). Presets may now declare `camo`, `wear` and `attachments` defaults; explicit CLI options win. `--preset` choices derive from `PRESETS` keys.
 - Blender 4.5.14 headless: all 12 presets built with `Ground OK: True` (4.5k-8.5k tris before LOD); `arachnid_hexapod --rig --animate` built; `--batch-all-archetypes --dry-run` plans 30 archetypes. No in-game runtime evidence yet.
-- Boundary: the hexapod middle legs are static, body-bound geometry; only the four crawler legs are rigged.
+- Boundary: the generic `hexapod_assault` preset still uses a static body-bound middle pair; the active `ArachnidHexapod` rigged bridge now materializes `Bone_Thigh/Shin/Foot_ML/MR`, assigns rigid weights, and animates all six leg chains.
 
 ---
 

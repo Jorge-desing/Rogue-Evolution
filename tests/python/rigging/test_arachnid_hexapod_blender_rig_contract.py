@@ -69,6 +69,30 @@ class ArachnidHexapodBlenderRigContractTests(unittest.TestCase):
                 self.assertEqual(1, len(armature_modifiers), f"{mesh_name} needs exactly one armature modifier")
                 self.assertIs(self.armature, armature_modifiers[0].object)
 
+    def test_all_render_meshes_have_complete_rigid_weights(self) -> None:
+        """Every exported production mesh must be fully and rigidly bound."""
+        for mesh_name, mesh in self.meshes.items():
+            if mesh.name.endswith(("_COLLIDER", "_ShieldBubble")):
+                continue
+            with self.subTest(mesh=mesh_name):
+                self.assertEqual(
+                    1,
+                    len(mesh.vertex_groups),
+                    f"{mesh_name} must have exactly one rigid vertex group",
+                )
+                group = mesh.vertex_groups[0]
+                self.assertEqual(1, len(mesh.modifiers), f"{mesh_name} must only carry its armature modifier")
+                self.assertEqual("ARMATURE", mesh.modifiers[0].type)
+                self.assertIs(self.armature, mesh.modifiers[0].object)
+                for vertex in mesh.data.vertices:
+                    assignments = [
+                        assignment
+                        for assignment in vertex.groups
+                        if assignment.group == group.index and assignment.weight > 1e-6
+                    ]
+                    self.assertEqual(1, len(assignments), f"{mesh_name} vertex {vertex.index} is not assigned")
+                    self.assertAlmostEqual(1.0, assignments[0].weight, places=5)
+
     def test_walk_animates_all_six_leg_chains_in_place(self) -> None:
         self.assertIsNotNone(self.walk)
         animated_bones = {

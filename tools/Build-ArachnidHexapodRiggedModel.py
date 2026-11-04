@@ -27,6 +27,56 @@ ATLAS_FBX_PATH = MODEL_DIR / f"{UNIT_NAME}_Atlas.fbx"
 TEXTURE_DIR = MODEL_DIR / "Textures"
 
 
+def _ensure_middle_leg_bones(armature: bpy.types.Object) -> None:
+    """Create ML/MR chains when the source carries their meshes but not bones."""
+    if armature is None or armature.type != "ARMATURE":
+        raise ValueError("Arachnid Hexapod source has no valid armature")
+
+    bpy.context.view_layer.objects.active = armature
+    armature.select_set(True)
+    bpy.ops.object.mode_set(mode="EDIT")
+    try:
+        edit_bones = armature.data.edit_bones
+        hull = edit_bones.get("Bone_Hull")
+        if hull is None:
+            raise ValueError("Arachnid Hexapod armature is missing Bone_Hull")
+
+        for tag, sign in (("ML", -1.0), ("MR", 1.0)):
+            hip = Vector((sign * 1.152, 0.0, 0.95))
+            knee = Vector((sign * 1.913, 0.0, 0.6463))
+            foot = Vector((sign * 2.452, 0.0, 0.04))
+            thigh = edit_bones.get(f"Bone_Thigh_{tag}") or edit_bones.new(f"Bone_Thigh_{tag}")
+            thigh.head, thigh.tail, thigh.parent, thigh.use_deform = hip, knee, hull, True
+            shin = edit_bones.get(f"Bone_Shin_{tag}") or edit_bones.new(f"Bone_Shin_{tag}")
+            shin.head, shin.tail, shin.parent, shin.use_deform = (
+                knee, Vector((foot.x, foot.y, foot.z + 0.12)), thigh, True
+            )
+            foot_bone = edit_bones.get(f"Bone_Foot_{tag}") or edit_bones.new(f"Bone_Foot_{tag}")
+            foot_bone.head, foot_bone.tail, foot_bone.parent, foot_bone.use_deform = (
+                Vector((foot.x, foot.y, foot.z + 0.12)), foot, shin, True
+            )
+    finally:
+        bpy.ops.object.mode_set(mode="OBJECT")
+
+
+def _validate_rigid_weights(meshes: list[bpy.types.Object], armature: bpy.types.Object) -> None:
+    bone_names = {bone.name for bone in armature.data.bones}
+    for mesh in meshes:
+        if mesh.type != "MESH" or mesh.name.endswith(("_COLLIDER", "_ShieldBubble")):
+            continue
+        groups = {group.index: group.name for group in mesh.vertex_groups}
+        for vertex in mesh.data.vertices:
+            influences = [
+                (groups[assignment.group], assignment.weight)
+                for assignment in vertex.groups
+                if assignment.group in groups and assignment.weight > 1e-6
+            ]
+            if len(influences) != 1 or abs(influences[0][1] - 1.0) > 1e-5:
+                raise ValueError(f"{mesh.name} has non-rigid vertex weights at vertex {vertex.index}: {influences}")
+            if influences[0][0] not in bone_names:
+                raise ValueError(f"{mesh.name} references missing bone {influences[0][0]}")
+
+
 def _validate_root_motion(armature: bpy.types.Object, walk_action: bpy.types.Action) -> None:
     root_path = 'pose.bones["Bone_Root"].location'
     root_curves = [curve for curve in walk_action.fcurves if curve.data_path == root_path]
@@ -55,7 +105,12 @@ def build_arachnid_hexapod_rigged_model() -> None:
     if armature is None or armature.type != "ARMATURE":
         raise ValueError("Arachnid Hexapod source has no armature")
 
-    # Generate animation clips for the existing armature
+    _ensure_middle_leg_bones(armature)
+    rmk.normalize_arachnid_middle_leg_orientation(armature)
+    rmk.assign_rigid_mesh_weights(meshes, prefix=UNIT_NAME, armature_obj=armature, leg_type="quad")
+    _validate_rigid_weights(meshes, armature)
+
+    # Generate animation clips for the complete six-leg armature.
     actions = rmk.generate_procedural_action_clips(armature, prefix=UNIT_NAME, leg_type="quad")
     _validate_root_motion(armature, actions["Walk"])
 

@@ -55,6 +55,7 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
+    - _AeroSheenIntensity: 0.35
     - _AlphaClip: 0
     - _AoStrength: 1
     - _BumpScale: 1
@@ -78,6 +79,7 @@ Material:
     - _WeldBeadWidth: 0.12
     - _ZenithBleach: 0.35
     m_Colors:
+    - _AeroSheenTint: {r: 0.78, g: 0.88, b: 1, a: 1}
     - _BaseColor: {r: 0.5019608, g: 0.5686275, b: 0.6431373, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
     - _MudColor: {r: 0.28, g: 0.22, b: 0.16, a: 1}

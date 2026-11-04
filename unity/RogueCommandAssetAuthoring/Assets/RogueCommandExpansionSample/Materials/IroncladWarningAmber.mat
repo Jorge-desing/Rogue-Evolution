@@ -96,6 +96,7 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
+    - _AeroSheenIntensity: 0.35
     - _AlphaClip: 0
     - _AoStrength: 1
     - _Blend: 0
@@ -139,6 +140,7 @@ Material:
     - _ZWrite: 1
     - _ZenithBleach: 0.35
     m_Colors:
+    - _AeroSheenTint: {r: 0.78, g: 0.88, b: 1, a: 1}
     - _BaseColor: {r: 0.9372549, g: 0.40784314, b: 0.09411765, a: 1}
     - _Color: {r: 0.9372549, g: 0.40784314, b: 0.09411765, a: 1}
     - _EmissionColor: {r: 1.41, g: 0.45000002, b: 0.089999996, a: 1.5}
