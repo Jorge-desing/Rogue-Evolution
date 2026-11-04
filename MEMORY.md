@@ -1141,3 +1141,25 @@ This is a compact, durable orientation for agents. For the changing checkout sta
 - QA/reflection safety: Profile2 is dedicated QA without a tutorial; never ask, inspect, infer, gate, bypass, or switch profiles for tutorial. Check current selector/save safety and preserve saves. Before reflection jointly verify Rogue Command version, Unity `2021.3.45f2`, Assembly-CSharp SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, and MVID `db0e9462-128d-4296-9900-de18b4bd0c00`.
 
 - Root MEMORY.md, codex memory, antigravity memory, and mem0 synced to HEAD `85684f1`. Root MEMORY.md committed/pushed in this sync; codex/antigravity/mem0 updated locally.
+
+## Refresh (2026-11-03, HEAD b581ae5)
+
+- Repository `C:/Users/Alex/Documents/Mod Rogue Command`, loader `1.19.0`, branch `codex/rogue-unit-balance-20261018`. Verified local HEAD, upstream-tracking ref, and origin branch all equal `b581ae583549df38022a781c47a94ec4b8ef5d77` (`feat(tools): automate Material Maker HD tactical texture bake`). Code baseline remains `0bbede6b7beb68f8f50f4ae89f10e83ecb056c0d`; implementation baseline remains `e25c6de` (arachnid middle-leg orientation normalizer) / `d7a3a11b56b58bed6d3f06c47fd40a627c9d1ae3`.
+
+- New committed scope since the last agent-memory sync (85684f1):
+  - `3bb56af` (`feat(authoring): configure Atlas Crane surface treatment materials`): Atlas Crane (plus Bastion, Ironclad) surface-treatment material configuration in Unity prefabs; texture/metadata refreshes.
+  - `9a91bc4` (`fix(animation): make fire recoil body-driven`): FireRecoil now body-driven across pelvis/hull/turret/barrel in `RogueModelKit.py` (skill + tools); `VehiclePrefabBuilder.cs` destroys imported Animators, sets `applyRootMotion=false`, rebuilds the generated animator graph, and generates/validates a body-driven FireRecoil clip with a hard failure; animation/mech-rigging skills updated; new test `tests/python/rigging/test_attack_clip_authoring_contract.py`; regenerated bundles/assets.
+  - `bbb5230` (`docs(skills): make Material Maker 1.7 the required standard texture authoring tool`): Material Maker 1.7 mandated in `AGENTS.md` and 2 skills.
+  - `5ef1281` (`docs(skill): update clean-room diagnostics with MCP evolution and 185 tools`): clean-room diagnostics skill updated to MCP evolution + 185 tools.
+  - `a79a6b2` (`feat(tools): add Material Maker bake runner script`): new `tools/Run-MaterialMakerBake.ps1`.
+  - `85684f1` (`docs(skill): add Material Maker headless export workflow and blocker`): skill gains headless export workflow + blocker.
+  - `f9a3778` (`docs(memory): sync root MEMORY.md to HEAD 85684f1 + agent memories/mem0`): memory-sync commit only.
+  - `b581ae5` (`feat(tools): automate Material Maker HD tactical texture bake`): extended `tools/Run-MaterialMakerBake.ps1` with HD tactical texture bake automation, added `tools/Prepare-MaterialMakerTacticalTemplate.py`, `tools/pack_material_maker_pbr.py`, `tools/MaterialMakerWaitDevice.gd`, `tests/python/test_material_maker_pbr.py`; `requirements.txt` updated; README/PBR workflow/skill updated. Material Maker 1.7 is the required standard texture authoring tool.
+
+- Working tree: clean at root except nested worktree gitlinks `.worktrees/cargador` @ `11e9968` (dirty) and `.worktrees/task-graph-validation` @ `d1f9045` (dirty); preserve. Do not stage, reset, clean, or overwrite.
+
+- Validation (freshly rerun 2026-11-03): Release plugin build 0 warnings/0 errors; C# harness 475/476 (1 Windows symlink-privilege skip, 0 failures); Python unittest 134/134; AssetBundle references 25/0 (sample-native) and 18/0 (tactical-operations); native visual preflight 9/0 per pack; loader registry 4 manifests/0 issues; `git diff --check` clean. No fresh Steam/Unity gameplay proof beyond existing tactical-operations runtime smoke; natural offer->selection->placement->production/render/stat and tactical AI remain unverified.
+
+- QA/reflection safety: Profile2 is dedicated QA without a tutorial; never ask, inspect, infer, gate, bypass, or switch profiles for tutorial. Check current selector/save safety and preserve saves. Before reflection jointly verify Rogue Command version, Unity `2021.3.45f2`, Assembly-CSharp SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, and MVID `db0e9462-128d-4296-9900-de18b4bd0c00`.
+
+- Root MEMORY.md, codex memory, antigravity memory, and mem0 synced to HEAD b581ae5.
