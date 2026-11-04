@@ -2369,6 +2369,48 @@
               "value": "0"
             }
           ]
+        },
+        {
+          "moduleId": "sample:squad-formation",
+          "parameters": [
+            {
+              "name": "baseIndex",
+              "value": "0"
+            },
+            {
+              "name": "anchorRole",
+              "value": "Tank"
+            },
+            {
+              "name": "maxFollowersPerCaptain",
+              "value": "3"
+            },
+            {
+              "name": "formationRadiusCells",
+              "value": "18"
+            },
+            {
+              "name": "cooldownSeconds",
+              "value": "6"
+            }
+          ]
+        },
+        {
+          "moduleId": "sample:wave-escalation",
+          "parameters": [
+            {
+              "name": "baseIndex",
+              "value": "0"
+            },
+            {
+              "name": "waveIntervalSeconds",
+              "value": "75"
+            },
+            {
+              "name": "maxWaves",
+              "value": "6"
+            }
+          ]
         }
       ],
       "productionBuildingEntries": [
@@ -2516,6 +2558,31 @@
             {
               "name": "baseIndex",
               "value": "0"
+            }
+          ]
+        },
+        {
+          "moduleId": "sample:squad-formation",
+          "parameters": [
+            {
+              "name": "baseIndex",
+              "value": "0"
+            },
+            {
+              "name": "anchorRole",
+              "value": "Mech"
+            },
+            {
+              "name": "maxFollowersPerCaptain",
+              "value": "2"
+            },
+            {
+              "name": "formationRadiusCells",
+              "value": "14"
+            },
+            {
+              "name": "cooldownSeconds",
+              "value": "8"
             }
           ]
         }

@@ -61,6 +61,18 @@ class UnusedModeledRuntimeMechanicsTests(unittest.TestCase):
                     f"{unit_id} declares {', '.join(declared)} but has maxShield=0",
                 )
 
+    def test_simulator_imports_manifest_critical_hits_and_shield_recharge(self) -> None:
+        skyguard = self.profiles["tactical-operations:skyguard-sam"]
+        self.assertAlmostEqual(skyguard.crit_chance, 0.3)
+
+        surge = self.profiles["sample-native:surge-tank"]
+        self.assertAlmostEqual(surge.shield_recharge_per_second, 1.5)
+        self.assertAlmostEqual(surge.shield_recharge_cooldown, 4.0)
+
+        scout = self.profiles["sample-native:scout-tank"]
+        self.assertEqual(scout.shield_recharge_per_second, 0.0)
+        self.assertEqual(scout.shield_recharge_cooldown, 0.0)
+
     def test_arc_lance_leech_restores_health_without_shield_capacity(self) -> None:
         self.assertFalse(
             self.definitions["tactical-operations:arc-lance-walker"]["vampiricLeech"]["siphonToShield"],

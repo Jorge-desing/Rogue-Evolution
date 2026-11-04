@@ -235,8 +235,8 @@ class UnitProfile:
     # game values -- see module-level constants).
     crit_chance: float = 0.0  # Probability of a critical hit per volley (0.0-1.0)
     crit_multiplier: float = CRITICAL_HIT_MULTIPLIER_DEFAULT  # Critical damage multiplier
-    shield_recharge_per_second: float = SHIELD_RECHARGE_PER_SECOND_DEFAULT  # Shield charges regenerated per second
-    shield_recharge_cooldown: float = SHIELD_RECHARGE_COOLDOWN_DEFAULT  # Seconds before shield recharge starts
+    shield_recharge_per_second: float = 0.0  # 0 unless the manifest declares shieldRegeneration
+    shield_recharge_cooldown: float = 0.0  # 0 unless the manifest declares shieldRegeneration
     mana_recharge_per_second: float = MANA_RECHARGE_PER_SECOND_DEFAULT  # Mana regenerated per second (ability DPS)
     ignore_armor: bool = False  # If True, attacks bypass defender armor (DealDamage.ignoreArmor)
 
@@ -912,6 +912,37 @@ class BalanceRepository:
                     display_name=display_name,
                     source="mod",
                     template_id=template_id,
+                )
+
+            # Import loader-backed combat mechanics that affect the duel model.
+            # criticalHitChance is applied by EntityController.AddCriticalHitChanceBonus;
+            # shieldRegeneration is opt-in, so units without that declaration must not
+            # regenerate merely because they have a copied native template.
+            if "criticalHitChance" in u:
+                profile.crit_chance = _finite_number(
+                    u["criticalHitChance"], f"criticalHitChance for {uid}"
+                )
+            else:
+                profile.crit_chance = 0.0
+
+            shield_regeneration = u.get("shieldRegeneration")
+            if shield_regeneration is None:
+                profile.shield_recharge_per_second = 0.0
+                profile.shield_recharge_cooldown = 0.0
+            else:
+                if not isinstance(shield_regeneration, dict):
+                    raise ValueError(f"Invalid shieldRegeneration for {uid}: expected an object")
+                profile.shield_recharge_per_second = _finite_number(
+                    shield_regeneration.get(
+                        "rechargeRate", SHIELD_RECHARGE_PER_SECOND_DEFAULT
+                    ),
+                    f"shieldRegeneration.rechargeRate for {uid}",
+                )
+                profile.shield_recharge_cooldown = _finite_number(
+                    shield_regeneration.get(
+                        "rechargeDelay", SHIELD_RECHARGE_COOLDOWN_DEFAULT
+                    ),
+                    f"shieldRegeneration.rechargeDelay for {uid}",
                 )
 
             raw_overrides = u.get("balanceOverrides", [])
