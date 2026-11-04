@@ -63,13 +63,13 @@ powershell -File tools/Run-MaterialMakerBake.ps1 -Workflow three_d -UnitName Sky
 powershell -File tools/Run-MaterialMakerBake.ps1 -Workflow procedural -Preset olive_armor -Strict
 ```
 
-`tools/Prepare-MaterialMakerTacticalTemplate.py` supports space-military presets (`--preset olive_armor | gunmetal_chassis | desert_camo | hazard_industrial | orbital_titanium`) with laser-cut seams, precision chamfers, anisotropic brushed grain, and a bimodal `colorize_metallic` node. `tools/pack_material_maker_pbr.py` renormalizes tangent-space normal maps per pixel and applies gentle PBR-safe micro-contrast on albedo. `tools/prepare_material_maker_3d_paint.py` builds the disposable single-submesh UV-frozen `<Unit>_PaintProxy.obj` under `artifacts/texture-work/<Unit>/MaterialMaker/` without touching the production FBX.
+`tools/Prepare-MaterialMakerTacticalTemplate.py` supports space-military presets (`--preset olive_armor | gunmetal_chassis | desert_camo | hazard_industrial | orbital_titanium`) with laser-cut seams, precision chamfers, isotropic satin grain, and a bimodal `colorize_metallic` node. `tools/pack_material_maker_pbr.py` renormalizes tangent-space normal maps per pixel and applies gentle PBR-safe micro-contrast on albedo. `tools/prepare_material_maker_3d_paint.py` builds the disposable single-submesh UV-frozen `<Unit>_PaintProxy.obj` under `artifacts/texture-work/<Unit>/MaterialMaker/` without touching the production FBX. `tools/apply_material_maker_to_blender.py` binds the four-map contract to a Principled BSDF node setup in Blender 4.5 preserving sockets and vertex wear.
 
 All workflows write an `material-maker-workflow.json` manifest beside the output maps. The manifest records the workflow, shader, pipeline, source authority and post-process rule for agent-readable handoff.
 
 ## Pack report and quality gates
 
-	ools/pack_material_maker_pbr.py re-saves Albedo/Normal/Emission as opaque RGB, caps smoothness at 1 - 0.04 (roughness floor, anti-aliasing at RTS distance) and writes <Name>_pack-report.json with per-map stats and warnings (flat/blank export, non power-of-two, non-unit normals, implausible albedo, mid-tone metallic, over-bright emission). Pass --strict to fail (exit 2) on warnings. Shader changes (weld normal tilt, mud breakup, specular AA, softened cavity occlusion) are local authoring changes and must be compiled/verified in Unity 2021.3.45f2 before being called validated.
+`tools/pack_material_maker_pbr.py` re-saves Albedo/Normal/Emission as opaque RGB, caps smoothness at 1 - 0.04 (roughness floor, anti-aliasing at RTS distance) and writes `<Name>_pack-report.json` with per-map stats and warnings (flat/blank export, non power-of-two, non-unit normals, implausible albedo, mid-tone metallic, over-bright emission). Pass `--strict` to fail (exit 2) on warnings. Shader changes (weld normal tilt, mud breakup, specular AA, softened cavity occlusion, aero-alloy glancing sheen) are local authoring changes and must be compiled/verified in Unity 2021.3.45f2 before being called validated.
 
 ## Validation handoff
 

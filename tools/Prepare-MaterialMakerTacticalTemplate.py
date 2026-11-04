@@ -219,17 +219,17 @@ def build_template_project(
             parameters["amount"] = 0.0025
             parameters["eps"] = 0.015
         elif name == "Perlin":
-            # Anisotropic brushed cold-rolled alloy micro-grain instead of blurry blobs.
-            parameters["scale_x"] = 32
-            parameters["scale_y"] = 8
-            parameters["iterations"] = 6
-            parameters["persistence"] = 0.62
+            # Balanced isotropic aerospace micro-grain (smooth CNC finish without streaky banding).
+            parameters["scale_x"] = 12
+            parameters["scale_y"] = 12
+            parameters["iterations"] = 5
+            parameters["persistence"] = 0.50
         elif name == "blend_2":
-            # Keep 92% crisp panel bevel geometry and 8% brushed metal micro-relief.
-            parameters["amount"] = 0.08
+            # 96.5% crisp panel bevel geometry and 3.5% satin metal micro-relief.
+            parameters["amount"] = 0.035
         elif name == "normal_map_2":
             parameters["param0"] = int(size_power)
-            parameters["param1"] = 0.45
+            parameters["param1"] = 0.38
         elif name == "uniform_0":
             parameters["color"] = color(0.90, 0.90, 0.90)
         elif name == "colorize_0":
