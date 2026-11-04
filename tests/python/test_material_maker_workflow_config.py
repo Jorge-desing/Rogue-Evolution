@@ -26,6 +26,12 @@ class MaterialMakerWorkflowConfigTests(unittest.TestCase):
         self.assertIn("Remove-Item -LiteralPath $rawDir -Recurse -Force", runner)
         self.assertIn("stale Material Maker output", runner)
         self.assertIn("--template", runner)
+        self.assertIn("edge_detect_emission", runner)
+
+    def test_runner_supports_blender_preview_for_3d_and_urp(self) -> None:
+        runner = (REPO_ROOT / "tools" / "Run-MaterialMakerBake.ps1").read_text(encoding="utf-8")
+        self.assertIn("BlenderPreviewModel", runner)
+        self.assertIn("apply_material_maker_to_blender.py", runner)
 
     def test_config_preserves_the_four_map_contract(self) -> None:
         import json

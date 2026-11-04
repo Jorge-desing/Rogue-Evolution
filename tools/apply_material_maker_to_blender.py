@@ -23,6 +23,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 
 BLENDER_CANDIDATES = [
     shutil.which("blender"),
+    str(REPO_ROOT / ".tools" / "Blender-4.5.14" / "blender-4.5.14-windows-x64" / "blender.exe"),
     r"C:\Program Files\Blender Foundation\Blender 4.5\blender.exe",
 ]
 

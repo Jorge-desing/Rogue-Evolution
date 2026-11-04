@@ -27,6 +27,7 @@ param(
     [string]$OutputDirectory = "",
     [string]$UnitName = "TacticalHull",
     [string]$PaintSourceModel = "",
+    [string]$BlenderPreviewModel = "",
     [switch]$ForceTemplate,
     [switch]$Strict
 )
@@ -45,6 +46,8 @@ $mmDir = Join-Path $repoRoot ".tools/MaterialMaker-1.7/material_maker_1_7_window
 $mmExe = Join-Path $repoRoot $config.tool.installRelativePath
 $prepareScript = Join-Path $repoRoot "tools/Prepare-MaterialMakerTacticalTemplate.py"
 $prepare3dScript = Join-Path $repoRoot "tools/prepare_material_maker_3d_paint.py"
+$applyBlenderScript = Join-Path $repoRoot "tools/apply_material_maker_to_blender.py"
+$blenderPreviewSource = ""
 
 $templateWasExplicit = -not [string]::IsNullOrWhiteSpace($TemplatePath)
 if ($templateWasExplicit) {
@@ -54,6 +57,7 @@ if ($templateWasExplicit) {
     $paintArgs = @($prepare3dScript, "--unit-name", $UnitName, "--workspace", $paintWorkspace, "--preset", $Preset, "--size", "$SizePower")
     if (-not [string]::IsNullOrWhiteSpace($PaintSourceModel)) {
         $resolvedSource = if ([System.IO.Path]::IsPathRooted($PaintSourceModel)) { $PaintSourceModel } else { Join-Path $repoRoot $PaintSourceModel }
+        $blenderPreviewSource = $resolvedSource
         $paintArgs += @("--source-model", $resolvedSource)
     }
     & python @paintArgs
@@ -64,6 +68,14 @@ if ($templateWasExplicit) {
 } else {
     $templateFile = if ($Preset -eq "olive_armor") { "tactical-military-template.ptex" } else { "tactical-$Preset-template.ptex" }
     $template = Join-Path $repoRoot "artifacts/mm-templates/$templateFile"
+}
+
+if (-not [string]::IsNullOrWhiteSpace($BlenderPreviewModel)) {
+    $blenderPreviewSource = if ([System.IO.Path]::IsPathRooted($BlenderPreviewModel)) {
+        $BlenderPreviewModel
+    } else {
+        Join-Path $repoRoot $BlenderPreviewModel
+    }
 }
 
 if ([string]::IsNullOrWhiteSpace($OutputDirectory)) {
@@ -95,6 +107,7 @@ $staleOutputs = @(
     "${templatePrefix}_Emission.png",
     "${templatePrefix}_pack-report.json",
     "${templatePrefix}_quality-report.json",
+    "${templatePrefix}_blender-preview.blend",
     "material-maker-workflow.json"
 )
 foreach ($staleOutput in $staleOutputs) {
@@ -106,7 +119,7 @@ foreach ($staleOutput in $staleOutputs) {
 }
 New-Item -ItemType Directory -Force -Path $userExportDir | Out-Null
 
-foreach ($required in @($configPath, $configValidator, $mmExe, $waitScript, $packScript, $auditScript, $prepareScript)) {
+foreach ($required in @($configPath, $configValidator, $mmExe, $waitScript, $packScript, $auditScript, $prepareScript, $applyBlenderScript)) {
     if (-not (Test-Path $required)) {
         throw "Required Material Maker bake input is missing: $required"
     }
@@ -119,7 +132,9 @@ if ($LASTEXITCODE -ne 0) {
 $needsPrepare = (-not (Test-Path $template)) -or $ForceTemplate.IsPresent
 if (-not $needsPrepare -and -not $templateWasExplicit -and (Test-Path $template)) {
     $existingContent = Get-Content -LiteralPath $template -Raw
-    if ($existingContent -notmatch "colorize_metallic") {
+    if ($existingContent -notmatch "colorize_metallic" -or
+        $existingContent -notmatch "edge_detect_emission" -or
+        $existingContent -notmatch "colorize_emission") {
         $needsPrepare = $true
     }
 }
@@ -204,6 +219,24 @@ try {
     if ($LASTEXITCODE -ne 0) {
         throw "Material Maker quality audit failed with exit code $LASTEXITCODE"
     }
+    $blenderPreviewBlend = ""
+    if (-not [string]::IsNullOrWhiteSpace($blenderPreviewSource)) {
+        if (-not (Test-Path $blenderPreviewSource)) {
+            throw "Blender preview source model is missing: $blenderPreviewSource"
+        }
+        $blenderPreviewBlend = Join-Path $outDir "${templatePrefix}_blender-preview.blend"
+        $previewArgs = @(
+            $applyBlenderScript,
+            "--model", $blenderPreviewSource,
+            "--texture-dir", $outDir,
+            "--prefix", $templatePrefix,
+            "--output-blend", $blenderPreviewBlend
+        )
+        & python @previewArgs
+        if ($LASTEXITCODE -ne 0 -or -not (Test-Path $blenderPreviewBlend)) {
+            throw "Blender PBR preview generation failed with exit code $LASTEXITCODE"
+        }
+    }
     $workflowManifest = [ordered]@{
         workflow = $Workflow
         preset = $Preset
@@ -215,6 +248,8 @@ try {
         outputDirectory = $outDir
         sourceAuthority = [string]$workflowConfig.sourceAuthority
         postProcess = [string]$workflowConfig.postProcess
+        blenderPreviewSource = $blenderPreviewSource
+        blenderPreviewBlend = $blenderPreviewBlend
     }
     [System.IO.File]::WriteAllText(
         (Join-Path $outDir "material-maker-workflow.json"),

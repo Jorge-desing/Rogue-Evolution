@@ -59,9 +59,14 @@ powershell -File tools/Run-MaterialMakerBake.ps1 -Workflow blender -Preset deser
 # Disposable 3D-paint workspace (auto-generates UV-frozen single-submesh proxy + .ptex)
 powershell -File tools/Run-MaterialMakerBake.ps1 -Workflow three_d -UnitName SkyguardSAM -PaintSourceModel content/source-art/skyguardsam-rigged.blend -Preset hazard_industrial -Strict
 
+# URP/game-bound output plus a disposable Blender 4.5 material preview
+powershell -File tools/Run-MaterialMakerBake.ps1 -Workflow urp -UnitName SkyguardSAM -Preset quantum_hyperdrive_alloy -BlenderPreviewModel content/source-art/skyguardsam-rigged.blend -Strict
+
 # Procedural graph-only generation
 powershell -File tools/Run-MaterialMakerBake.ps1 -Workflow procedural -Preset olive_armor -Strict
 ```
+
+`-BlenderPreviewModel` is optional for `urp`/`blender` and creates a disposable `.blend` with the four maps bound to Principled BSDF. The `three_d` workflow automatically previews the supplied source `.blend` without modifying it; all preview blends stay under `artifacts/`.
 
 `tools/Prepare-MaterialMakerTacticalTemplate.py` supports a suite of 13 high-fidelity space-military presets (`--preset <name>`):
 - **`olive_armor`**: Exo-Atmospheric Tactical Olive Armor (standard ground/orbital assault hull).
