@@ -67,14 +67,15 @@ class MaterialMakerPbrPackingTests(unittest.TestCase):
             self.assertIn("non-power-of-two", joined)
             self.assertIn("flat", joined)
 
-    def test_flags_non_unit_normals(self) -> None:
+    def test_renormalizes_non_unit_normals_before_quality_report(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             self._write_raw(root / "raw", (8, 8))
             Image.new("RGBA", (8, 8), (255, 255, 255, 255)).save(root / "raw" / "Hull_Normal.png")
             PACKER.main_for_test(root / "raw", root / "out", "Hull")
             report = json.loads((root / "out" / "Hull_pack-report.json").read_text(encoding="utf-8"))
-            self.assertTrue(any("unit length" in w for w in report["warnings"]))
+            self.assertLess(report["stats"]["Normal"]["lengthError"], 0.02)
+            self.assertFalse(any("unit length" in w for w in report["warnings"]))
 
 
 if __name__ == "__main__":

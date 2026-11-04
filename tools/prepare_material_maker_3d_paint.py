@@ -12,6 +12,7 @@ a paint handoff manifest, leaving production meshes untouched.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import importlib.util
 import json
 import shutil
@@ -24,6 +25,7 @@ PREPARE_TEMPLATE_PATH = REPO_ROOT / "tools" / "Prepare-MaterialMakerTacticalTemp
 
 BLENDER_CANDIDATES = [
     shutil.which("blender"),
+    str(REPO_ROOT / ".tools" / "Blender-4.5.14" / "blender-4.5.14-windows-x64" / "blender.exe"),
     r"C:\Program Files\Blender Foundation\Blender 4.5\blender.exe",
 ]
 
@@ -126,36 +128,41 @@ def prepare_3d_paint_workspace(
 
     proxy_obj_path = workspace / f"{unit_name}_PaintProxy.obj"
     proxy_exported = False
+    source_sha256 = None
     if source_model is not None:
         if not source_model.is_file():
             raise FileNotFoundError(f"Source model for 3D paint is missing: {source_model}")
+        source_sha256 = hashlib.sha256(source_model.read_bytes()).hexdigest()
         blender = find_blender()
-        if blender is not None:
-            runner = workspace / "_export_paint_proxy.py"
-            runner.write_text(BLENDER_PROXY_SNIPPET, encoding="utf-8")
-            try:
-                proc = subprocess.run(
-                    [
-                        blender,
-                        "-b",
-                        "--python",
-                        str(runner),
-                        "--",
-                        str(source_model.resolve()),
-                        str(proxy_obj_path.resolve()),
-                        str(REPO_ROOT.resolve()),
-                    ],
-                    capture_output=True,
-                    text=True,
-                    timeout=300,
+        if blender is None:
+            raise RuntimeError(
+                "A Blender 4.5.14 executable is required to create the 3D paint proxy"
+            )
+        runner = workspace / "_export_paint_proxy.py"
+        runner.write_text(BLENDER_PROXY_SNIPPET, encoding="utf-8")
+        try:
+            proc = subprocess.run(
+                [
+                    blender,
+                    "-b",
+                    "--python",
+                    str(runner),
+                    "--",
+                    str(source_model.resolve()),
+                    str(proxy_obj_path.resolve()),
+                    str(REPO_ROOT.resolve()),
+                ],
+                capture_output=True,
+                text=True,
+                timeout=300,
+            )
+            if proc.returncode != 0 or not proxy_obj_path.is_file():
+                raise RuntimeError(
+                    f"Blender paint proxy export failed:\n{proc.stdout[-1500:]}\n{proc.stderr[-1500:]}"
                 )
-                if proc.returncode != 0 or not proxy_obj_path.is_file():
-                    raise RuntimeError(
-                        f"Blender paint proxy export failed:\n{proc.stdout[-1500:]}\n{proc.stderr[-1500:]}"
-                    )
-                proxy_exported = True
-            finally:
-                runner.unlink(missing_ok=True)
+            proxy_exported = True
+        finally:
+            runner.unlink(missing_ok=True)
 
     manifest = {
         "unitName": unit_name,
@@ -164,9 +171,14 @@ def prepare_3d_paint_workspace(
         "resolution": 1 << size_power,
         "ptexPath": str(ptex_path),
         "paintProxyMesh": str(proxy_obj_path) if proxy_exported else None,
+        "paintProxyRequired": source_model is not None,
+        "paintProxyPresent": proxy_exported and proxy_obj_path.is_file(),
         "singleSubmeshForPaint": True,
         "requiresUv": True,
+        "uvFrozen": True,
         "productionMeshUntouched": True,
+        "sourceModel": str(source_model.resolve()) if source_model is not None else None,
+        "sourceModelSha256": source_sha256,
     }
     manifest_path = workspace / "paint-workspace.json"
     manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")

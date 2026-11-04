@@ -14,6 +14,7 @@ Principled BSDF node setup:
 from __future__ import annotations
 
 import argparse
+import json
 import shutil
 import subprocess
 import sys
@@ -37,6 +38,7 @@ def find_blender() -> str | None:
 
 BLENDER_SCRIPT_SNIPPET = """
 import sys
+import json
 from pathlib import Path
 import bpy
 
@@ -45,6 +47,7 @@ model_path = Path(argv[0])
 texture_dir = Path(argv[1])
 prefix = argv[2]
 output_blend = Path(argv[3]) if len(argv) > 3 and argv[3] else None
+report_path = Path(argv[4]) if len(argv) > 4 and argv[4] else None
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
 if model_path.suffix.lower() == ".blend":
@@ -58,6 +61,16 @@ meshes = [o for o in bpy.context.scene.objects if o.type == "MESH" and not o.nam
 if not meshes:
     raise RuntimeError(f"No valid mesh objects found in {model_path}")
 
+map_paths = {
+    "Albedo": texture_dir / f"{prefix}_Albedo.png",
+    "MetallicGloss": texture_dir / f"{prefix}_MetallicGloss.png",
+    "Normal": texture_dir / f"{prefix}_Normal.png",
+    "Emission": texture_dir / f"{prefix}_Emission.png",
+}
+missing_maps = [str(path) for path in map_paths.values() if not path.is_file()]
+if missing_maps:
+    raise RuntimeError("Missing required PBR maps: " + ", ".join(missing_maps))
+
 mat_name = f"{prefix}_SpaceMilitary_PBR"
 mat = bpy.data.materials.get(mat_name) or bpy.data.materials.new(name=mat_name)
 mat.use_nodes = True
@@ -70,55 +83,63 @@ out_node.location = (400, 0)
 bsdf = nodes.new("ShaderNodeBsdfPrincipled")
 bsdf.location = (100, 0)
 links.new(bsdf.outputs["BSDF"], out_node.inputs["Surface"])
+mat["rcl_quality_profile"] = "tactical-hd-v2"
+mat["rcl_shader_contract"] = "RogueCommand/VehiclePBR_VertexWear"
+mat["rcl_map_contract"] = "Albedo;MetallicGloss;Normal;Emission"
+maps_bound = []
 
-albedo_path = texture_dir / f"{prefix}_Albedo.png"
-if albedo_path.is_file():
-    img_alb = bpy.data.images.load(str(albedo_path))
-    node_alb = nodes.new("ShaderNodeTexImage")
-    node_alb.location = (-300, 200)
-    node_alb.image = img_alb
-    links.new(node_alb.outputs["Color"], bsdf.inputs["Base Color"])
+def configure_texture_node(node, image, colorspace):
+    image.colorspace_settings.name = colorspace
+    node.interpolation = "Linear"
+    node.extension = "CLIP"
+    node.image = image
 
-mg_path = texture_dir / f"{prefix}_MetallicGloss.png"
-if mg_path.is_file():
-    img_mg = bpy.data.images.load(str(mg_path))
-    img_mg.colorspace_settings.name = "Non-Color"
-    node_mg = nodes.new("ShaderNodeTexImage")
-    node_mg.location = (-600, -100)
-    node_mg.image = img_mg
+albedo_path = map_paths["Albedo"]
+img_alb = bpy.data.images.load(str(albedo_path))
+node_alb = nodes.new("ShaderNodeTexImage")
+node_alb.location = (-300, 200)
+configure_texture_node(node_alb, img_alb, "sRGB")
+links.new(node_alb.outputs["Color"], bsdf.inputs["Base Color"])
+maps_bound.append("Albedo")
 
-    sep = nodes.new("ShaderNodeSeparateColor")
-    sep.location = (-350, -100)
-    links.new(node_mg.outputs["Color"], sep.inputs["Color"])
-    links.new(sep.outputs["Red"], bsdf.inputs["Metallic"])
+mg_path = map_paths["MetallicGloss"]
+img_mg = bpy.data.images.load(str(mg_path))
+node_mg = nodes.new("ShaderNodeTexImage")
+node_mg.location = (-600, -100)
+configure_texture_node(node_mg, img_mg, "Non-Color")
 
-    inv = nodes.new("ShaderNodeInvert")
-    inv.location = (-150, -250)
-    links.new(node_mg.outputs["Alpha"], inv.inputs["Color"])
-    links.new(inv.outputs["Color"], bsdf.inputs["Roughness"])
+sep = nodes.new("ShaderNodeSeparateColor")
+sep.location = (-350, -100)
+links.new(node_mg.outputs["Color"], sep.inputs["Color"])
+links.new(sep.outputs["Red"], bsdf.inputs["Metallic"])
 
-norm_path = texture_dir / f"{prefix}_Normal.png"
-if norm_path.is_file():
-    img_norm = bpy.data.images.load(str(norm_path))
-    img_norm.colorspace_settings.name = "Non-Color"
-    node_norm = nodes.new("ShaderNodeTexImage")
-    node_norm.location = (-400, -450)
-    node_norm.image = img_norm
+inv = nodes.new("ShaderNodeInvert")
+inv.location = (-150, -250)
+links.new(node_mg.outputs["Alpha"], inv.inputs["Color"])
+links.new(inv.outputs["Color"], bsdf.inputs["Roughness"])
+maps_bound.append("MetallicGloss")
 
-    nmap = nodes.new("ShaderNodeNormalMap")
-    nmap.location = (-150, -450)
-    links.new(node_norm.outputs["Color"], nmap.inputs["Color"])
-    links.new(nmap.outputs["Normal"], bsdf.inputs["Normal"])
+norm_path = map_paths["Normal"]
+img_norm = bpy.data.images.load(str(norm_path))
+node_norm = nodes.new("ShaderNodeTexImage")
+node_norm.location = (-400, -450)
+configure_texture_node(node_norm, img_norm, "Non-Color")
 
-emit_path = texture_dir / f"{prefix}_Emission.png"
-if emit_path.is_file():
-    img_emit = bpy.data.images.load(str(emit_path))
-    node_emit = nodes.new("ShaderNodeTexImage")
-    node_emit.location = (-300, -700)
-    node_emit.image = img_emit
-    links.new(node_emit.outputs["Color"], bsdf.inputs["Emission Color"])
-    if "Emission Strength" in bsdf.inputs:
-        bsdf.inputs["Emission Strength"].default_value = 2.0
+nmap = nodes.new("ShaderNodeNormalMap")
+nmap.location = (-150, -450)
+links.new(node_norm.outputs["Color"], nmap.inputs["Color"])
+links.new(nmap.outputs["Normal"], bsdf.inputs["Normal"])
+maps_bound.append("Normal")
+
+emit_path = map_paths["Emission"]
+img_emit = bpy.data.images.load(str(emit_path))
+node_emit = nodes.new("ShaderNodeTexImage")
+node_emit.location = (-300, -700)
+configure_texture_node(node_emit, img_emit, "sRGB")
+links.new(node_emit.outputs["Color"], bsdf.inputs["Emission Color"])
+if "Emission Strength" in bsdf.inputs:
+    bsdf.inputs["Emission Strength"].default_value = 2.0
+maps_bound.append("Emission")
 
 for mesh in meshes:
     mesh.data.materials.clear()
@@ -127,6 +148,27 @@ for mesh in meshes:
 if output_blend is not None:
     output_blend.parent.mkdir(parents=True, exist_ok=True)
     bpy.ops.wm.save_as_mainfile(filepath=str(output_blend))
+
+if report_path is not None:
+    vertex_wear_attributes = sorted({
+        attribute.name
+        for mesh in meshes
+        for attribute in getattr(mesh.data, "color_attributes", [])
+    })
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    report_path.write_text(json.dumps({
+        "kind": "rogueCommandBlenderPbrPreview",
+        "qualityProfile": "tactical-hd-v2",
+        "shaderContract": "RogueCommand/VehiclePBR_VertexWear",
+        "mapContract": maps_bound,
+        "maps": maps_bound,
+        "meshCount": len(meshes),
+        "socketCount": sum(1 for obj in bpy.context.scene.objects if obj.name.startswith("Socket_")),
+        "lodGroupCount": sum(1 for obj in bpy.context.scene.objects if obj.type == "EMPTY" and obj.name.startswith("LOD")),
+        "vertexWearAttributes": vertex_wear_attributes,
+        "sourceModel": str(model_path),
+        "outputBlend": str(output_blend) if output_blend is not None else None,
+    }, indent=2), encoding="utf-8")
 
 print(f"APPLIED_MATERIAL_MAKER_TEXTURES: {mat_name} on {len(meshes)} meshes")
 """
@@ -137,6 +179,7 @@ def apply_textures(
     texture_dir: Path,
     prefix: str,
     output_blend: Path | None = None,
+    report_path: Path | None = None,
 ) -> bool:
     blender = find_blender()
     if blender is None:
@@ -156,6 +199,7 @@ def apply_textures(
             str(texture_dir.resolve()),
             prefix,
             str(output_blend.resolve()) if output_blend else "",
+            str(report_path.resolve()) if report_path else "",
         ]
         proc = subprocess.run(args, capture_output=True, text=True, timeout=120)
         if proc.returncode != 0 or "APPLIED_MATERIAL_MAKER_TEXTURES" not in proc.stdout:
@@ -172,9 +216,10 @@ def main() -> int:
     parser.add_argument("--texture-dir", type=Path, required=True)
     parser.add_argument("--prefix", required=True)
     parser.add_argument("--output-blend", type=Path, default=None)
+    parser.add_argument("--report", type=Path, default=None)
     args = parser.parse_args()
 
-    ok = apply_textures(args.model, args.texture_dir, args.prefix, args.output_blend)
+    ok = apply_textures(args.model, args.texture_dir, args.prefix, args.output_blend, args.report)
     return 0 if ok else 1
 
 

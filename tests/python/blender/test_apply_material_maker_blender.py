@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import shutil
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -14,6 +15,7 @@ from tests.python.helpers import load_tool_module
 APPLY_TOOL = load_tool_module("apply_material_maker_to_blender")
 BLENDER_CANDIDATES = [
     shutil.which("blender"),
+    str(Path(".tools/Blender-4.5.14/blender-4.5.14-windows-x64/blender.exe")),
     r"C:\Program Files\Blender Foundation\Blender 4.5\blender.exe",
 ]
 BLENDER = next((c for c in BLENDER_CANDIDATES if c and Path(c).is_file()), None)
@@ -40,14 +42,20 @@ class ApplyMaterialMakerToBlenderTests(unittest.TestCase):
             Image.new("RGB", size, (0, 0, 0)).save(tex_dir / f"{prefix}_Emission.png")
 
             output_blend = tmp_root / "output.blend"
+            preview_report = tmp_root / "preview-report.json"
             ok = APPLY_TOOL.apply_textures(
                 model_path=model_source,
                 texture_dir=tex_dir,
                 prefix=prefix,
                 output_blend=output_blend,
+                report_path=preview_report,
             )
             self.assertTrue(ok)
             self.assertTrue(output_blend.is_file())
+            report = json.loads(preview_report.read_text(encoding="utf-8"))
+            self.assertEqual("tactical-hd-v2", report["qualityProfile"])
+            self.assertEqual(4, len(report["maps"]))
+            self.assertGreaterEqual(report["meshCount"], 1)
 
 
 if __name__ == "__main__":

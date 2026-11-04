@@ -45,7 +45,16 @@ def _channel_stats(image: Image.Image) -> dict[str, list[float]]:
 
 
 def _normal_metrics(image: Image.Image) -> dict[str, float]:
-    pixels = _pixels(image.convert("RGB"))
+    # Do not average encoded tangent vectors before checking their length:
+    # bilinear filtering in RGB space produces a false under-length warning on
+    # valid high-frequency normal detail.
+    sampled = image.convert("RGB").resize(
+        (min(SAMPLE_SIZE, image.width), min(SAMPLE_SIZE, image.height)),
+        Image.Resampling.NEAREST,
+    )
+    getter = getattr(sampled, "get_flattened_data", None)
+    raw: Any = getter() if callable(getter) else sampled.getdata()
+    pixels = [tuple(pixel) for pixel in raw]
     length_error = 0.0
     z_non_positive = 0
     for red, green, blue in pixels:
@@ -97,6 +106,7 @@ def build_quality_report(
     prefix: str,
     template_path: Path | None = None,
     workspace_path: Path | None = None,
+    workflow_name: str = "",
 ) -> dict[str, Any]:
     directory = Path(directory)
     paths = {suffix: directory / f"{prefix}_{suffix}.png" for suffix in REQUIRED_MAPS}
@@ -152,21 +162,48 @@ def build_quality_report(
         and connection.get("to_port") == 0
         for connection in connections
     )
+    micro_detail_connected = any(
+        isinstance(connection, dict)
+        and connection.get("from") == "micro_detail_blend"
+        and connection.get("to") == "normal_map_2"
+        and connection.get("to_port") == 0
+        for connection in connections
+    )
+    micro_roughness_connected = any(
+        isinstance(connection, dict)
+        and connection.get("from") == "micro_roughness_blend"
+        and connection.get("to") == "Material"
+        and connection.get("to_port") == 2
+        for connection in connections
+    )
     material_node = next(
         (node for node in nodes if isinstance(node, dict) and node.get("name") == "Material"),
         {},
     )
     material_parameters = material_node.get("parameters", {}) if isinstance(material_node, dict) else {}
+    quality_profile = (
+        ptex.get("rogueCommandQuality", {}).get("profile", "")
+        if ptex
+        else ""
+    )
 
     workspace_directory = Path(workspace_path) if workspace_path is not None else directory
     workspace = _read_json_if_present(workspace_directory / "paint-workspace.json") or {}
+    paint_proxy_path = workspace.get("paintProxyMesh")
+    paint_proxy_present = bool(
+        paint_proxy_path and Path(str(paint_proxy_path)).is_file()
+    )
     three_d = {
         "manifestPresent": bool(workspace),
         "workflow": workspace.get("workflow", ""),
         "requiresUv": bool(workspace.get("requiresUv", False)),
+        "uvFrozen": bool(workspace.get("uvFrozen", False)),
         "singleSubmeshForPaint": bool(workspace.get("singleSubmeshForPaint", False)),
         "productionMeshUntouched": bool(workspace.get("productionMeshUntouched", False)),
-        "paintProxyMesh": workspace.get("paintProxyMesh"),
+        "paintProxyRequired": bool(workspace.get("paintProxyRequired", False)),
+        "paintProxyPresent": paint_proxy_present,
+        "paintProxyMesh": paint_proxy_path,
+        "sourceModelSha256": workspace.get("sourceModelSha256"),
     }
     procedural = {
         "ptexPresent": ptex is not None,
@@ -178,6 +215,10 @@ def build_quality_report(
         "emissionConnected": emission_connected,
         "hasEdgeEmissionNode": "edge_detect_emission" in node_names,
         "edgeEmissionConnected": edge_emission_connected,
+        "hasMicroPerlinNode": "micro_perlin" in node_names,
+        "microDetailConnected": micro_detail_connected,
+        "microRoughnessConnected": micro_roughness_connected,
+        "qualityProfile": quality_profile,
         "emissionEnergy": material_parameters.get("emission_energy", 0),
         "normalNodePresent": "normal_map_2" in node_names,
     }
@@ -199,10 +240,22 @@ def build_quality_report(
         failures.append("procedural-emission-graph-not-connected")
     if ptex is not None and not edge_emission_connected:
         failures.append("procedural-edge-emission-graph-not-connected")
+    if ptex is not None and "micro_perlin" not in node_names:
+        failures.append("procedural-micro-perlin-node-missing")
+    if ptex is not None and quality_profile != "tactical-hd-v2":
+        failures.append("procedural-quality-profile-outdated")
+    if ptex is not None and not micro_detail_connected:
+        failures.append("procedural-micro-normal-graph-not-connected")
+    if ptex is not None and not micro_roughness_connected:
+        failures.append("procedural-micro-roughness-graph-not-connected")
     if ptex is not None and float(material_parameters.get("emission_energy", 0)) <= 0.0:
         failures.append("procedural-emission-energy-not-positive")
     if workspace and not three_d["singleSubmeshForPaint"]:
         failures.append("3d-paint-proxy-not-single-submesh")
+    if workspace and not three_d["uvFrozen"]:
+        failures.append("3d-paint-uvs-not-frozen")
+    if workspace and three_d["paintProxyRequired"] and not three_d["paintProxyPresent"]:
+        failures.append("3d-paint-proxy-missing")
     if workspace and not three_d["productionMeshUntouched"]:
         failures.append("3d-paint-production-mesh-not-preserved")
 
@@ -210,7 +263,7 @@ def build_quality_report(
     return {
         "kind": "materialMakerQualityReport",
         "prefix": prefix,
-        "workflow": workflow_manifest.get("workflow", workspace.get("workflow", "unknown")),
+        "workflow": workflow_manifest.get("workflow") or workflow_name or workspace.get("workflow", "unknown"),
         "maps": maps,
         "dimensions": [list(value) for value in sorted(dimensions)],
         "procedural": procedural,
@@ -229,6 +282,7 @@ def main() -> int:
     parser.add_argument("--prefix", required=True)
     parser.add_argument("--template", type=Path, default=None)
     parser.add_argument("--workspace", type=Path, default=None)
+    parser.add_argument("--workflow", default="")
     parser.add_argument("--output", type=Path, default=None)
     args = parser.parse_args()
     report = build_quality_report(
@@ -236,6 +290,7 @@ def main() -> int:
         args.prefix,
         template_path=args.template,
         workspace_path=args.workspace,
+        workflow_name=args.workflow,
     )
     output = args.output or args.directory / f"{args.prefix}_quality-report.json"
     output.parent.mkdir(parents=True, exist_ok=True)

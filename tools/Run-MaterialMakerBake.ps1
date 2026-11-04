@@ -108,6 +108,7 @@ $staleOutputs = @(
     "${templatePrefix}_pack-report.json",
     "${templatePrefix}_quality-report.json",
     "${templatePrefix}_blender-preview.blend",
+    "${templatePrefix}_blender-preview.json",
     "material-maker-workflow.json"
 )
 foreach ($staleOutput in $staleOutputs) {
@@ -134,7 +135,11 @@ if (-not $needsPrepare -and -not $templateWasExplicit -and (Test-Path $template)
     $existingContent = Get-Content -LiteralPath $template -Raw
     if ($existingContent -notmatch "colorize_metallic" -or
         $existingContent -notmatch "edge_detect_emission" -or
-        $existingContent -notmatch "colorize_emission") {
+        $existingContent -notmatch "colorize_emission" -or
+        $existingContent -notmatch "micro_perlin" -or
+        $existingContent -notmatch "micro_detail_blend" -or
+        $existingContent -notmatch "micro_roughness_blend" -or
+        $existingContent -notmatch "tactical-hd-v2") {
         $needsPrepare = $true
     }
 }
@@ -210,6 +215,7 @@ try {
         "--directory", $outDir,
         "--prefix", $templatePrefix,
         "--template", $template,
+        "--workflow", $Workflow,
         "--output", $qualityReport
     )
     if ($Workflow -eq "three_d") {
@@ -219,28 +225,43 @@ try {
     if ($LASTEXITCODE -ne 0) {
         throw "Material Maker quality audit failed with exit code $LASTEXITCODE"
     }
+    $qualityData = Get-Content -LiteralPath $qualityReport -Raw | ConvertFrom-Json
+    $requestedResolution = 1 -shl $SizePower
+    $actualResolution = 0
+    if ($null -ne $qualityData.dimensions -and $qualityData.dimensions.Count -gt 0) {
+        $actualResolution = [int]$qualityData.dimensions[0][0]
+    }
+    if ($Strict.IsPresent -and $actualResolution -ne $requestedResolution) {
+        throw "Material Maker renderer produced ${actualResolution}x${actualResolution}; requested ${requestedResolution}x${requestedResolution}"
+    }
     $blenderPreviewBlend = ""
+    $blenderPreviewReport = ""
     if (-not [string]::IsNullOrWhiteSpace($blenderPreviewSource)) {
         if (-not (Test-Path $blenderPreviewSource)) {
             throw "Blender preview source model is missing: $blenderPreviewSource"
         }
         $blenderPreviewBlend = Join-Path $outDir "${templatePrefix}_blender-preview.blend"
+        $blenderPreviewReport = Join-Path $outDir "${templatePrefix}_blender-preview.json"
         $previewArgs = @(
             $applyBlenderScript,
             "--model", $blenderPreviewSource,
             "--texture-dir", $outDir,
             "--prefix", $templatePrefix,
-            "--output-blend", $blenderPreviewBlend
+            "--output-blend", $blenderPreviewBlend,
+            "--report", $blenderPreviewReport
         )
         & python @previewArgs
-        if ($LASTEXITCODE -ne 0 -or -not (Test-Path $blenderPreviewBlend)) {
+        if ($LASTEXITCODE -ne 0 -or
+            -not (Test-Path $blenderPreviewBlend) -or
+            -not (Test-Path $blenderPreviewReport)) {
             throw "Blender PBR preview generation failed with exit code $LASTEXITCODE"
         }
     }
     $workflowManifest = [ordered]@{
         workflow = $Workflow
         preset = $Preset
-        resolution = (1 -shl $SizePower)
+        resolutionRequested = $requestedResolution
+        resolutionActual = $actualResolution
         profile = $profileName
         pipeline = [string]$config.textureContract.pipeline
         shader = [string]$config.textureContract.shader
@@ -250,6 +271,7 @@ try {
         postProcess = [string]$workflowConfig.postProcess
         blenderPreviewSource = $blenderPreviewSource
         blenderPreviewBlend = $blenderPreviewBlend
+        blenderPreviewReport = $blenderPreviewReport
     }
     [System.IO.File]::WriteAllText(
         (Join-Path $outDir "material-maker-workflow.json"),

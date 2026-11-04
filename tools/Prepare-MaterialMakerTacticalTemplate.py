@@ -9,6 +9,8 @@ military-spacecraft and tactical armor plating:
   instead of looking like wavy masonry bricks.
 - Anisotropic cold-rolled brushed alloy grain (`scale_x = 32, scale_y = 8`) with
   controlled normal relief (`blend_2.amount = 0.08`, `normal_map_2.param1 = 0.45`).
+- A second high-frequency micrograin layer drives both the tangent normal and
+  roughness, preserving panel readability while preventing flat 2048/4096 maps.
 - Bimodal procedural `colorize_metallic` node wired from the panel height graph.
 """
 
@@ -17,6 +19,7 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+from typing import cast
 
 EXAMPLE = Path(
     ".tools/MaterialMaker-1.7/material_maker_1_7_windows/examples/bricks.ptex"
@@ -460,6 +463,28 @@ def _configure_subgraph_bricks(subgraph_node: dict[str, object], bricks_cfg: dic
             cparams["source"] = 0
 
 
+def _ensure_node(
+    nodes: list[dict[str, object]],
+    name: str,
+    node_type: str,
+    position: tuple[float, float],
+    parameters: dict[str, object],
+) -> dict[str, object]:
+    """Create or refresh an idempotent Material Maker detail node."""
+    node = next((entry for entry in nodes if entry.get("name") == name), None)
+    if node is None:
+        node = {
+            "name": name,
+            "node_position": {"x": position[0], "y": position[1]},
+            "parameters": {},
+            "type": node_type,
+        }
+        nodes.append(node)
+    node["type"] = node_type
+    node["parameters"] = dict(parameters)
+    return node
+
+
 def build_template_project(
     preset_name: str = "olive_armor",
     size_power: int = 11,
@@ -475,6 +500,18 @@ def build_template_project(
     project = json.loads(example_path.read_text(encoding="utf-8"))
     project["label"] = preset["label"]
     project["name"] = preset["name"]
+    project["rogueCommandQuality"] = {
+        "profile": "tactical-hd-v2",
+        "authoringTool": "Material Maker 1.7",
+        "shader": "RogueCommand/VehiclePBR_VertexWear",
+        "microDetail": "multi-scale-normal-and-roughness",
+        "mapContract": ["Albedo", "MetallicGloss", "Normal", "Emission"],
+    }
+
+    normal_strength = float(cast(float, preset.get("normal_strength", 0.38)))
+    micro_scale = int(cast(int, preset.get("micro_perlin_scale", 96)))
+    micro_blend_amount = float(cast(float, preset.get("micro_blend_amount", 0.12)))
+    micro_roughness_amount = float(cast(float, preset.get("micro_roughness_amount", 0.10)))
 
     nodes = project.get("nodes", [])
     for node in nodes:
@@ -503,7 +540,7 @@ def build_template_project(
             parameters["amount"] = float(preset.get("micro_relief_amount", 0.035))
         elif name == "normal_map_2":
             parameters["param0"] = int(size_power)
-            parameters["param1"] = float(preset.get("normal_strength", 0.38))
+            parameters["param1"] = normal_strength
         elif name == "uniform_0":
             parameters["color"] = color(0.90, 0.90, 0.90)
         elif name == "colorize_0":
@@ -531,6 +568,41 @@ def build_template_project(
         for n in nodes:
             if n.get("name") == "colorize_metallic":
                 n.setdefault("parameters", {})["gradient"] = gradient(*preset["metallic_curve"])
+
+    _ensure_node(
+        nodes,
+        "micro_perlin",
+        "perlin",
+        (480.0, 520.0),
+        {
+            "iterations": 3,
+            "persistence": 0.34,
+            "scale_x": micro_scale,
+            "scale_y": micro_scale,
+        },
+    )
+    _ensure_node(
+        nodes,
+        "micro_detail_blend",
+        "blend",
+        (700.0, 520.0),
+        {"amount": micro_blend_amount, "blend_type": 0},
+    )
+    _ensure_node(
+        nodes,
+        "micro_roughness_blend",
+        "blend",
+        (920.0, 240.0),
+        {"amount": micro_roughness_amount, "blend_type": 0},
+    )
+    project["rogueCommandQuality"].update(
+        {
+            "microPerlinScale": micro_scale,
+            "microNormalStrength": round(normal_strength * 0.34, 4),
+            "microNormalBlend": micro_blend_amount,
+            "microRoughnessBlend": micro_roughness_amount,
+        }
+    )
 
     emission_gradient = gradient(
         (0.0, (0.0, 0.0, 0.0)),
@@ -568,8 +640,14 @@ def build_template_project(
         c
         for c in project.get("connections", [])
         if not (
-            (c.get("to") == "Material" and c.get("to_port") in (1, 3))
-            or c.get("to") in ("colorize_emission", "edge_detect_emission")
+            (c.get("to") == "Material" and c.get("to_port") in (1, 2, 3))
+            or c.get("to") in (
+                "colorize_emission",
+                "edge_detect_emission",
+                "micro_detail_blend",
+                "micro_roughness_blend",
+                "normal_map_2",
+            )
         )
     ]
     connections.append(
@@ -611,6 +689,46 @@ def build_template_project(
             "to": "Material",
             "to_port": 3,
         }
+    )
+    connections.extend(
+        [
+            {
+                "from": "blend_2",
+                "from_port": 0,
+                "to": "micro_detail_blend",
+                "to_port": 0,
+            },
+            {
+                "from": "micro_perlin",
+                "from_port": 0,
+                "to": "micro_detail_blend",
+                "to_port": 1,
+            },
+            {
+                "from": "micro_detail_blend",
+                "from_port": 0,
+                "to": "normal_map_2",
+                "to_port": 0,
+            },
+            {
+                "from": "colorize_4",
+                "from_port": 0,
+                "to": "micro_roughness_blend",
+                "to_port": 0,
+            },
+            {
+                "from": "micro_perlin",
+                "from_port": 0,
+                "to": "micro_roughness_blend",
+                "to_port": 1,
+            },
+            {
+                "from": "micro_roughness_blend",
+                "from_port": 0,
+                "to": "Material",
+                "to_port": 2,
+            },
+        ]
     )
     project["connections"] = connections
     return project

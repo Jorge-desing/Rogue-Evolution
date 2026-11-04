@@ -32,6 +32,8 @@ class MaterialMakerWorkflowConfigTests(unittest.TestCase):
         runner = (REPO_ROOT / "tools" / "Run-MaterialMakerBake.ps1").read_text(encoding="utf-8")
         self.assertIn("BlenderPreviewModel", runner)
         self.assertIn("apply_material_maker_to_blender.py", runner)
+        self.assertIn("blenderPreviewReport", runner)
+        self.assertIn("resolutionActual", runner)
 
     def test_config_preserves_the_four_map_contract(self) -> None:
         import json
@@ -52,6 +54,9 @@ class MaterialMakerWorkflowConfigTests(unittest.TestCase):
             node_names = {n.get("name") for n in project.get("nodes", [])}
             self.assertIn("colorize_emission", node_names, preset)
             self.assertIn("edge_detect_emission", node_names, preset)
+            self.assertIn("micro_perlin", node_names, preset)
+            self.assertIn("micro_detail_blend", node_names, preset)
+            self.assertIn("micro_roughness_blend", node_names, preset)
             emission_connections = [
                 c for c in project.get("connections", [])
                 if c.get("to") == "Material" and c.get("to_port") == 3
@@ -60,6 +65,27 @@ class MaterialMakerWorkflowConfigTests(unittest.TestCase):
             self.assertEqual("colorize_emission", emission_connections[0].get("from"))
             material = next(n for n in project["nodes"] if n.get("name") == "Material")
             self.assertGreater(float(material["parameters"]["emission_energy"]), 0.0)
+            self.assertEqual("tactical-hd-v2", project["rogueCommandQuality"]["profile"])
+
+            detail_connections = [
+                c for c in project.get("connections", [])
+                if c.get("from") == "micro_detail_blend"
+                and c.get("to") == "normal_map_2"
+                and c.get("to_port") == 0
+            ]
+            roughness_connections = [
+                c for c in project.get("connections", [])
+                if c.get("from") == "micro_roughness_blend"
+                and c.get("to") == "Material"
+                and c.get("to_port") == 2
+            ]
+            material_roughness_connections = [
+                c for c in project.get("connections", [])
+                if c.get("to") == "Material" and c.get("to_port") == 2
+            ]
+            self.assertEqual(1, len(detail_connections), preset)
+            self.assertEqual(1, len(roughness_connections), preset)
+            self.assertEqual(1, len(material_roughness_connections), preset)
 
     def test_all_presets_wire_bimodal_metallic_node(self) -> None:
         if not TEMPLATE_BUILDER.EXAMPLE.is_file():

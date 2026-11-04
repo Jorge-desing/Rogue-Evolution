@@ -133,7 +133,13 @@ def _flat_pixels(image: Image.Image) -> list:
 
 def normal_length_error(image: Image.Image) -> float:
     """Mean |length - 1| of decoded tangent-space normals (0 for a perfect map)."""
-    pixels = _flat_pixels(sample(image.convert("RGB")))
+    # Bilinear filtering in encoded RGB space averages direction vectors and
+    # creates an artificial under-length vector on detailed maps. Nearest
+    # sampling keeps this audit about the authored texels, not mip filtering.
+    sampled = image.convert("RGB").resize(
+        (STATS_SAMPLE_SIZE, STATS_SAMPLE_SIZE), Image.Resampling.NEAREST
+    )
+    pixels = _flat_pixels(sampled)
     total = 0.0
     for r, g, b in pixels:
         x, y, z = r / 127.5 - 1.0, g / 127.5 - 1.0, b / 127.5 - 1.0
@@ -216,16 +222,31 @@ def pack_maps(input_dir: Path, output_dir: Path, prefix: str) -> dict[str, objec
     if len(set(dimensions.values())) != 1:
         raise ValueError(f"Material Maker maps have incompatible dimensions: {dimensions}")
 
-    process_albedo(paths["Albedo"], output_dir / f"{prefix}_Albedo.png")
+    output_paths = {
+        "Albedo": output_dir / f"{prefix}_Albedo.png",
+        "MetallicGloss": output_dir / f"{prefix}_MetallicGloss.png",
+        "Normal": output_dir / f"{prefix}_Normal.png",
+        "Emission": output_dir / f"{prefix}_Emission.png",
+    }
+    process_albedo(paths["Albedo"], output_paths["Albedo"])
     pack_metallic_gloss(
         paths["Metallic"],
         paths["Roughness"],
-        output_dir / f"{prefix}_MetallicGloss.png",
+        output_paths["MetallicGloss"],
     )
-    normalize_normal(paths["Normal"], output_dir / f"{prefix}_Normal.png")
-    copy_opaque_rgb(paths["Emission"], output_dir / f"{prefix}_Emission.png")
+    normalize_normal(paths["Normal"], output_paths["Normal"])
+    copy_opaque_rgb(paths["Emission"], output_paths["Emission"])
 
-    report = build_report(paths, dimensions)
+    # Audit the final packed outputs. In particular, checking the raw Material
+    # Maker normal before renormalization makes strict mode reject valid maps.
+    report_paths = {
+        "Albedo": output_paths["Albedo"],
+        "Metallic": paths["Metallic"],
+        "Roughness": paths["Roughness"],
+        "Normal": output_paths["Normal"],
+        "Emission": output_paths["Emission"],
+    }
+    report = build_report(report_paths, dimensions)
     (output_dir / f"{prefix}_pack-report.json").write_text(
         json.dumps(report, indent=2), encoding="utf-8"
     )
