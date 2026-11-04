@@ -1199,3 +1199,23 @@ This is a compact, durable orientation for agents. For the changing checkout sta
 - QA/reflection safety: Profile2 is dedicated QA without a tutorial; never ask, inspect, infer, gate, bypass, or switch profiles for tutorial. Check current selector/save safety and preserve saves. Before reflection jointly verify Rogue Command version, Unity `2021.3.45f2`, Assembly-CSharp SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, and MVID `db0e9462-128d-4296-9900-de18b4bd0c00`.
 
 - Root MEMORY.md, codex memory, antigravity memory, and mem0 synced to HEAD 88d5bb3.
+
+## Refresh (2026-11-04, HEAD c12c874 — Material Maker PBR evolution + texture workflows)
+
+- Repository `C:/Users/Alex/Documents/Mod Rogue Command`, loader `1.19.0`, branch `codex/rogue-unit-balance-20261018`. Verified local HEAD, upstream-tracking ref, and origin branch all equal `c12c8740246d90f15b3e172b69c306402e77651a` (`feat(texture): evolve space-military PBR generation with crisp CNC panels, aero-alloy sheen, and exact normal renormalization`). Code baseline remains `0bbede6b7beb68f8f50f4ae89f10e83ecb056c0d`; implementation baseline remains `e25c6de` (arachnid middle-leg orientation normalizer) / `d7a3a11b56b58bed6d3f06c47fd40a627c9d1ae3`.
+
+- New committed scope since the last sync (88d5bb3):
+  - `00b59a6` (`feat(material-maker): add bimodal metallic graph, tactical presets, and 3D paint single-submesh proxy builder`): bimodal metallic graph, tactical presets, 3D paint single-submesh proxy builder; extended `Prepare-MaterialMakerTacticalTemplate.py`, `Run-MaterialMakerBake.ps1`, `pack_material_maker_pbr.py`; new `prepare_material_maker_3d_paint.py`; updated skill; new workflow-config test cases.
+  - `3703c1c` (`docs: require Material Maker texture workflows`): AGENTS.md updated to require Material Maker texture workflows.
+  - `c12c874` (`feat(texture): evolve space-military PBR generation with crisp CNC panels, aero-alloy sheen, and exact normal renormalization`): evolved `Prepare-MaterialMakerTacticalTemplate.py`, `pack_material_maker_pbr.py`, `Run-MaterialMakerBake.ps1`, `VehiclePBR_VertexWear.shader`; updated skill; bundle rebuilds (sample-native-expansion 12,006,131 -> 12,000,964 bytes; tactical-operations 24,545,318 -> 24,534,720 bytes); test updates.
+
+- Working tree: uncommitted changes preserved (do not stage, reset, clean, or overwrite):
+  - Modified: `tools/Prepare-MaterialMakerTacticalTemplate.py`
+  - Untracked: `tests/python/blender/test_apply_material_maker_blender.py`, `tools/apply_material_maker_to_blender.py`
+  - Nested worktree gitlinks `.worktrees/cargador` @ `11e9968` (dirty) and `.worktrees/task-graph-validation` @ `d1f9045` (dirty).
+
+- Validation (freshly rerun 2026-11-04): Python Material Maker tests 9/9 passed (`test_material_maker_pbr`, `test_material_maker_workflow_config`, `test_blender_bake_contract`) plus `test_apply_material_maker_blender` 1/1; `git diff --check` clean (LF/CRLF warning only). No fresh C# harness, bundle-reference, native visual preflight, or Steam/Unity gameplay run in this sync. Natural offer->selection->placement->production/render/stat and tactical AI remain unverified.
+
+- QA/reflection safety: Profile2 dedicated QA without tutorial; never ask, inspect, infer, gate, bypass, or switch profiles for tutorial. Check current selector/save safety and preserve saves. Before reflection jointly verify Rogue Command version, Unity `2021.3.45f2`, Assembly-CSharp SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, and MVID `db0e9462-128d-4296-9900-de18b4bd0c00`.
+
+- Root MEMORY.md, codex memory, antigravity memory, and mem0 synced to HEAD c12c874.
