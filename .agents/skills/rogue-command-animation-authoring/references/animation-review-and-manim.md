@@ -110,7 +110,33 @@ class FireRecoilPreview(Scene):
 
 This code communicates phase ordering only. It does not reproduce Unity coordinate axes, FBX interpolation, rigid weights, Animator transitions, muzzle VFX, or gameplay movement. Keep those claims in the corresponding local/runtime evidence records.
 
-## 4. Render and review
+## 4. Rogue Command project contract
+
+A project preview should expose the contracts that a generic Manim scene would hide. Keep the numeric values in a side panel and use frame labels rather than inventing seconds when the source clip's imported FPS has not been measured.
+
+### `Action_FireRecoil`
+
+Use the source-authored key map from `tools/RogueModelKit.py`:
+
+| Frame | Phase | Body Y (m) | Barrel Y (m) | Body pitch (deg) | Turret pitch (deg) |
+|---:|---|---:|---:|---:|---:|
+| 1 | Neutral | 0.000 | 0.000 | 0.00 | 0.00 |
+| 2 | Brace | +0.008 | +0.035 | +0.25 | +0.35 |
+| 3 | Impact | -0.024 | -0.220 | -1.40 | -0.90 |
+| 5 | Follow-through | -0.010 | -0.080 | +0.45 | +0.25 |
+| 9 | Settle | -0.002 | -0.018 | +0.12 | +0.08 |
+| 12 | Recovery | 0.000 | 0.000 | 0.00 | 0.00 |
+| 15 | Neutral | 0.000 | 0.000 | 0.00 | 0.00 |
+
+The body binding is `Bone_Hull` for vehicles or `Bone_Pelvis` for bipedal units; the weapon chain is `Bone_BarrelRecoil` plus `Bone_TurretPitch` when present. A preview may exaggerate displacement for readability, but must label the display scale and preserve the source-local numbers in the panel. Never move `Bone_Root`.
+
+### `Action_Walk` and Animator state graph
+
+Use frame labels `1, 10, 20, 30, 40` for contact/down/passing/push-off/contact. Show the canonical walker tokens `FL`, `ML`, `RL`, `FR`, `MR`, `RR` when previewing hexapod coverage, and state explicitly that `EntityFlockingMovement` owns world translation. Show the Unity parameters and routes exactly: `RCL_IsMoving` → `Action_Walk`/`Action_Drive`, `RCL_Fire` → `Action_FireRecoil`, and `RCL_Death` → `Action_Death`; FireRecoil returns to movement before its idle fallback. Include the Generic Avatar, exactly-one-Animator, and `applyRootMotion=false` constraints in a contract scene or annotation.
+
+Do not claim that the preview is a serialized Unity curve audit. Pair it with actual FBX/Unity inspection and, for runtime claims, an observed Animator state, normalized time, and transform series in a Steam run.
+
+## 5. Render and review
 
 Check Manim CE before rendering. A preview is optional; do not install dependencies automatically for a documentation or authoring task.
 
