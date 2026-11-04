@@ -8007,6 +8007,45 @@ internal static partial class ValidationTestRunner
             throw new InvalidOperationException("SetTacticalStanceVisual did not transition to Standard.");
         }
     }),
+    ("AI profile defaults target the declared unit roster", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        RuntimeGameplayCommandDirector.ClearTacticalStancesAndAffixes();
+
+        var firstGo = new GameObject("AiProfileUnitA");
+        var first = firstGo.AddComponent<EntityController>();
+        first.entityId = "sample:unit-a";
+        first.UniqueEntityId = 9101;
+        first.IsControlledByPlayer = false;
+        first.IsUnit = true;
+        ExistingControllers.Instance.AiUnits().Add(first);
+
+        var secondGo = new GameObject("AiProfileUnitB");
+        var second = secondGo.AddComponent<EntityController>();
+        second.entityId = "sample:unit-b";
+        second.UniqueEntityId = 9102;
+        second.IsControlledByPlayer = false;
+        second.IsUnit = true;
+        ExistingControllers.Instance.AiUnits().Add(second);
+
+        RuntimeGameplayCommandDirector.RegisterAiProfileUnitDefaults(
+            "sample:profile-a", "Assault", 1.0f, "Aggressive", string.Empty,
+            Array.Empty<string>(), 0, setActive: false, targetUnitIds: new[] { "sample:unit-a" });
+        RuntimeGameplayCommandDirector.RegisterAiProfileUnitDefaults(
+            "sample:profile-b", "Defensive", 1.0f, "Defensive", string.Empty,
+            Array.Empty<string>(), 0, setActive: false, targetUnitIds: new[] { "sample:unit-b" });
+
+        RuntimeGameplayCommandDirector.ApplyAiProfileUnitDefaultsToEntity(first);
+        RuntimeGameplayCommandDirector.ApplyAiProfileUnitDefaultsToEntity(second);
+        if (RuntimeGameplayCommandDirector.GetUnitTacticalStance("9101") != "Aggressive" ||
+            RuntimeGameplayCommandDirector.GetUnitTacticalStance("9102") != "Defensive")
+        {
+            throw new InvalidOperationException("AI defaults must follow each profile's declared unit roster instead of the last registered profile.");
+        }
+
+        ExistingControllers.Instance.Reset();
+        RuntimeGameplayCommandDirector.ClearTacticalStancesAndAffixes();
+    }),
     };
 
     private sealed class TestCardChangeTarget

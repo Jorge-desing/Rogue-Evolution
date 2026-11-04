@@ -6953,6 +6953,7 @@ namespace RogueCommandExpansionLoader.Runtime
             public string DefaultUnitStance;
             public string DefaultUnitLoadout;
             public IReadOnlyList<string> StartingUnitAffixes;
+            public IReadOnlyList<string> TargetUnitIds;
             public int StartingUnitVeterancyRank;
         }
 
@@ -6969,7 +6970,8 @@ namespace RogueCommandExpansionLoader.Runtime
             string defaultUnitLoadout,
             IReadOnlyList<string> startingUnitAffixes,
             int? startingUnitVeterancyRank,
-            bool setActive = false)
+            bool setActive = false,
+            IReadOnlyList<string> targetUnitIds = null)
         {
             if (string.IsNullOrWhiteSpace(profileId))
             {
@@ -6989,6 +6991,31 @@ namespace RogueCommandExpansionLoader.Runtime
                 }
             }
 
+            var targetIds = new List<string>();
+            if (targetUnitIds != null)
+            {
+                for (int i = 0; i < targetUnitIds.Count; i++)
+                {
+                    if (!string.IsNullOrWhiteSpace(targetUnitIds[i]))
+                    {
+                        string targetId = targetUnitIds[i].Trim();
+                        bool alreadyAdded = false;
+                        for (int targetIndex = 0; targetIndex < targetIds.Count; targetIndex++)
+                        {
+                            if (String.Equals(targetIds[targetIndex], targetId, StringComparison.OrdinalIgnoreCase))
+                            {
+                                alreadyAdded = true;
+                                break;
+                            }
+                        }
+                        if (!alreadyAdded)
+                        {
+                            targetIds.Add(targetId);
+                        }
+                    }
+                }
+            }
+
             var record = new AiProfileUnitDefaultsRecord
             {
                 ProfileId = normalizedId,
@@ -6999,6 +7026,7 @@ namespace RogueCommandExpansionLoader.Runtime
                 DefaultUnitStance = string.IsNullOrWhiteSpace(defaultUnitStance) ? string.Empty : defaultUnitStance.Trim(),
                 DefaultUnitLoadout = string.IsNullOrWhiteSpace(defaultUnitLoadout) ? string.Empty : defaultUnitLoadout.Trim(),
                 StartingUnitAffixes = affixes.AsReadOnly(),
+                TargetUnitIds = targetIds.AsReadOnly(),
                 StartingUnitVeterancyRank = startingUnitVeterancyRank.HasValue
                     ? Mathf.Clamp(startingUnitVeterancyRank.Value, 0, 5)
                     : 0,
@@ -7023,6 +7051,34 @@ namespace RogueCommandExpansionLoader.Runtime
             }
         }
 
+        private static bool HasAiProfileDefaults(AiProfileUnitDefaultsRecord record)
+        {
+            return record != null &&
+                (!string.IsNullOrEmpty(record.DefaultUnitStance) ||
+                 !string.IsNullOrEmpty(record.DefaultUnitLoadout) ||
+                 (record.StartingUnitAffixes != null && record.StartingUnitAffixes.Count > 0) ||
+                 record.StartingUnitVeterancyRank > 0);
+        }
+
+        private static bool ProfileTargetsUnit(AiProfileUnitDefaultsRecord record, string unitId)
+        {
+            if (record == null || string.IsNullOrWhiteSpace(unitId) ||
+                record.TargetUnitIds == null || record.TargetUnitIds.Count == 0)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < record.TargetUnitIds.Count; i++)
+            {
+                if (String.Equals(record.TargetUnitIds[i], unitId, StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         public static int ApplyAiProfileUnitDefaultsToEntity(object entityObj)
         {
             if (entityObj == null)
@@ -7038,21 +7094,40 @@ namespace RogueCommandExpansionLoader.Runtime
                     return 0;
                 }
 
+                string unitId = ResolveEntityIdString(unit);
                 AiProfileUnitDefaultsRecord activeDefaults = null;
                 lock (_aiProfileDefaultsGate)
                 {
-                    if (!string.IsNullOrEmpty(_activeAiProfileId))
+                    // Prefer the profile whose declared AI roster contains this product.
+                    // The previous global "last profile wins" fallback applied one profile's
+                    // stance/loadout to every AI unit when several scoped profiles were loaded.
+                    foreach (AiProfileUnitDefaultsRecord candidate in _aiProfileUnitDefaults.Values)
                     {
-                        _aiProfileUnitDefaults.TryGetValue(_activeAiProfileId, out activeDefaults);
+                        if (ProfileTargetsUnit(candidate, unitId) &&
+                            (activeDefaults == null || String.Equals(candidate.ProfileId, _activeAiProfileId, StringComparison.OrdinalIgnoreCase)))
+                        {
+                            activeDefaults = candidate;
+                        }
                     }
+
+                    if (activeDefaults == null && !string.IsNullOrEmpty(_activeAiProfileId))
+                    {
+                        AiProfileUnitDefaultsRecord activeCandidate;
+                        if (_aiProfileUnitDefaults.TryGetValue(_activeAiProfileId, out activeCandidate) &&
+                            (activeCandidate.TargetUnitIds == null || activeCandidate.TargetUnitIds.Count == 0))
+                        {
+                            activeDefaults = activeCandidate;
+                        }
+                    }
+
                     if (activeDefaults == null)
                     {
+                        // Preserve the legacy API behavior for callers that do not provide
+                        // roster metadata, but never use a scoped profile as a global fallback.
                         foreach (AiProfileUnitDefaultsRecord candidate in _aiProfileUnitDefaults.Values)
                         {
-                            if (!string.IsNullOrEmpty(candidate.DefaultUnitStance) ||
-                                !string.IsNullOrEmpty(candidate.DefaultUnitLoadout) ||
-                                (candidate.StartingUnitAffixes != null && candidate.StartingUnitAffixes.Count > 0) ||
-                                candidate.StartingUnitVeterancyRank > 0)
+                            if ((candidate.TargetUnitIds == null || candidate.TargetUnitIds.Count == 0) &&
+                                HasAiProfileDefaults(candidate))
                             {
                                 activeDefaults = candidate;
                                 break;
@@ -7067,7 +7142,6 @@ namespace RogueCommandExpansionLoader.Runtime
                 }
 
                 string key = unit.UniqueEntityId.ToString();
-                string unitId = ResolveEntityIdString(unit);
                 UnitRuntimeMechanicsProfile unitProfile;
                 RuntimeUnitMechanicsDirector.TryGetProfile(unitId, out unitProfile);
 

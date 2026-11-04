@@ -2291,6 +2291,42 @@ namespace RogueCommandExpansionLoader.Content
             }
         }
 
+        private static IReadOnlyList<string> GetAiProfileTargetUnitIds(ContentAiProfileDefinition definition)
+        {
+            var ids = new List<string>();
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (definition != null)
+            {
+                if (definition.unitEntries != null)
+                {
+                    for (int i = 0; i < definition.unitEntries.Length; i++)
+                    {
+                        string unitId = definition.unitEntries[i] == null ? null : definition.unitEntries[i].unitId;
+                        if (!String.IsNullOrWhiteSpace(unitId) && seen.Add(unitId.Trim()))
+                        {
+                            ids.Add(unitId.Trim());
+                        }
+                    }
+                }
+
+                if (definition.productionBuildingEntries != null)
+                {
+                    for (int i = 0; i < definition.productionBuildingEntries.Length; i++)
+                    {
+                        string unitId = definition.productionBuildingEntries[i] == null
+                            ? null
+                            : definition.productionBuildingEntries[i].unitId;
+                        if (!String.IsNullOrWhiteSpace(unitId) && seen.Add(unitId.Trim()))
+                        {
+                            ids.Add(unitId.Trim());
+                        }
+                    }
+                }
+            }
+
+            return ids.AsReadOnly();
+        }
+
         public void OnAiBehaviourInitialized(object gameBehaviour)
         {
             DefaultAiBehaviour behaviour = gameBehaviour as DefaultAiBehaviour;
@@ -2383,7 +2419,8 @@ namespace RogueCommandExpansionLoader.Content
                     profile.Definition.defaultUnitLoadout,
                     profile.Definition.startingUnitAffixes,
                     profile.Definition.startingUnitVeterancyRank,
-                    true);
+                    true,
+                    GetAiProfileTargetUnitIds(profile.Definition));
                 if (!String.IsNullOrWhiteSpace(profile.Definition.doctrine))
                 {
                     float mult = profile.Definition.aggressionMultiplier ?? 1.0f;
@@ -4567,7 +4604,8 @@ namespace RogueCommandExpansionLoader.Content
                     profiles[i].Definition.defaultUnitLoadout,
                     profiles[i].Definition.startingUnitAffixes,
                     profiles[i].Definition.startingUnitVeterancyRank,
-                    false);
+                    false,
+                    GetAiProfileTargetUnitIds(profiles[i].Definition));
                 if (!String.IsNullOrWhiteSpace(profiles[i].Definition.doctrine))
                 {
                     float mult = profiles[i].Definition.aggressionMultiplier ?? 1.0f;
@@ -6205,6 +6243,31 @@ namespace RogueCommandExpansionLoader.Content
             return null;
         }
 
+        private static bool HasVehiclePbrContract(Material source)
+        {
+            if (source == null)
+            {
+                return false;
+            }
+
+            try
+            {
+                string shaderName = source.shader != null ? source.shader.name : String.Empty;
+                if (String.Equals(shaderName, "RogueCommand/VehiclePBR_VertexWear", StringComparison.Ordinal))
+                {
+                    return true;
+                }
+
+                // A missing/unsupported shader can still leave the authored map on the
+                // material. Treat that map as the durable signal for this PBR contract.
+                return GetTextureIfAny(source, "_MetallicGlossMap") != null;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         private static Material EnsureMaterialSupported(Material source, Material fallbackMaterial)
         {
             if (source == null)
@@ -6243,16 +6306,19 @@ namespace RogueCommandExpansionLoader.Content
                 }
                 else
                 {
-                    // Try supported shaders in priority order:
-                    // 1. Universal Render Pipeline/Lit (standard URP lit shader, highest fidelity)
-                    // 2. RogueCommand/VehiclePBR_VertexWear (bundle-loaded PBR shader)
-                    // 3. Universal Render Pipeline/Simple Lit (native URP simple lit shader)
-                    // 4. Universal Render Pipeline/Unlit
-                    // 5. Native fallback material shader
-                    targetShader = FindNativeShader("Universal Render Pipeline/Lit");
+                    bool preferVehiclePbr = HasVehiclePbrContract(source);
+                    if (preferVehiclePbr)
+                    {
+                        // Keep the authored PBR contract ahead of generic native shaders.
+                        // Otherwise an unsupported source shader is rebound to URP/Lit and
+                        // the bundle's metallic/normal maps are lost on the live instance.
+                        targetShader = FindNativeShader("RogueCommand/VehiclePBR_VertexWear");
+                    }
+
+                    // Generic native fallbacks remain unchanged for untextured overlays.
                     if (targetShader == null || !IsShaderSupportedAndValid(targetShader))
                     {
-                        targetShader = FindNativeShader("RogueCommand/VehiclePBR_VertexWear");
+                        targetShader = FindNativeShader("Universal Render Pipeline/Lit");
                     }
                     if (targetShader == null || !IsShaderSupportedAndValid(targetShader))
                     {
