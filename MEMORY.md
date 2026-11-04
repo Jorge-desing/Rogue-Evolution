@@ -1264,3 +1264,13 @@ This is a compact, durable orientation for agents. For the changing checkout sta
 - QA/reflection safety: Profile2 is dedicated QA without a tutorial; never ask, inspect, infer, gate, bypass, or switch profiles for tutorial. Check current selector/save safety and preserve saves. Before reflection jointly verify Rogue Command version, Unity `2021.3.45f2`, Assembly-CSharp SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, and MVID `db0e9462-128d-4296-9900-de18b4bd0c00`.
 
 - Root MEMORY.md, codex memory, antigravity memory, and mem0 synced to HEAD 669e512.
+
+## Refresh (2026-11-04, HEAD 2e4d4f8 — unified Unity/URP/3D/AssetBundle diagnostics)
+
+- Repository `C:/Users/Alex/Documents/Mod Rogue Command`, loader `1.19.0`, branch `codex/rogue-unit-balance-20261018`. Local/upstream/origin are verified at `2e4d4f848c3edfc1e58f5e61d46b4ce1a743d55e` (`feat(diagnostics): audit Unity and AssetBundle quality`).
+- New committed scope: `tools/audit_unity_build.py` combines Unity batch logs with offline UnityPy AssetBundle audits; `tests/python/test_audit_unity_build.py` covers success, fatal errors, licensing diagnostics, and URP/3D summaries; PBR workflow and handoff document the evidence boundary.
+- Validation: Python full suite `152/152`; focused tests `3/3`; real sample and Tactical Unity/AssetBundle reports passed `--strict`. Sample: 1,470 objects, 166 meshes, 164 skinned renderers, 15 textures, 6 shaders, 12,000,964 bytes, SHA-256 `301537218e4bd46c434cfb61408bfdd76f55e50e8ed94bfc5d8206acaf9f2a7b`. Tactical: 927 objects, 80 meshes, 74 skinned renderers, 46 textures, 6 shaders, 24,534,720 bytes, SHA-256 `8016a4fc22932110feb36ea84798df4277b1aed312cd2c373c3960b92bb12a49`.
+- Working tree contains unrelated Material Maker authoring changes and dirty nested worktrees; they were not staged or altered. No fresh Steam match; shader-name resolution/rendering remains unverified.
+- QA/reflection safety: Profile2 is dedicated QA without a tutorial; never ask, inspect, infer, gate, bypass, or switch profiles for tutorial. Before reflection jointly verify Rogue Command version, Unity `2021.3.45f2`, Assembly-CSharp SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, and MVID `db0e9462-128d-4296-9900-de18b4bd0c00`.
+
+- Root MEMORY.md, codex memory, antigravity memory, and mem0 synced to HEAD 2e4d4f8.
