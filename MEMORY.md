@@ -1245,3 +1245,22 @@ This is a compact, durable orientation for agents. For the changing checkout sta
 - QA/reflection safety: Profile2 is dedicated QA without a tutorial; never ask, inspect, infer, gate, bypass, or switch profiles for tutorial. Check current selector/save safety and preserve saves. Before reflection jointly verify Rogue Command version, Unity `2021.3.45f2`, Assembly-CSharp SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, and MVID `db0e9462-128d-4296-9900-de18b4bd0c00`.
 
 - Root MEMORY.md, codex memory, antigravity memory, and mem0 synced to HEAD 2f827e3.
+
+## Refresh (2026-11-04, HEAD 669e512 — Material Maker edge emission/clean quality pipeline + 3D/URP preview generation + Manim previews grounded in project contracts)
+
+- Repository `C:/Users/Alex/Documents/Mod Rogue Command`, loader `1.19.0`, branch `codex/rogue-unit-balance-20261018`. Verified local HEAD, upstream-tracking ref, and origin branch all equal `669e5121b8a1cf86d53aa6136d1da78d232d8afe` (`docs(animation): ground Manim previews in project contracts`). Code baseline remains `0bbede6b7beb68f8f50f4ae89f10e83ecb056c0d`; implementation baseline remains `e25c6de` (arachnid middle-leg orientation normalizer) / `d7a3a11b56b58bed6d3f06c47fd40a627c9d1ae3`.
+
+- New committed scope since the last root sync (2f827e3):
+  - `7691eab` (`docs(animation): evolve authoring review workflow`): evolved the animation authoring review workflow (skill + new `references/animation-review-and-manim.md`).
+  - `f9749fc` (`feat(material-maker): add edge emission and clean quality pipeline`): added edge emission and a clean quality pipeline to the Material Maker workflow; updated `Prepare-MaterialMakerTacticalTemplate.py`, `Run-MaterialMakerBake.ps1`, `audit_material_maker_output.py`, workflow-config tests, material-quality audit tests, the Material Maker skill, and `docs/research/PBR-TEXTURE-WORKFLOW.md`.
+  - `06dc390` (`feat(material-maker): improve 3d and URP preview generation`): improved 3D and URP preview generation in `Run-MaterialMakerBake.ps1`; updated `apply_material_maker_to_blender.py`, workflow-config tests, and the Material Maker skill.
+  - `669e512` (`docs(animation): ground Manim previews in project contracts`): grounded Manim previews in project contracts in `references/animation-review-and-manim.md`.
+
+- Working tree: uncommitted changes preserved (do not stage, reset, clean, or overwrite):
+  - Nested worktree gitlinks `.worktrees/cargador` @ `11e9968` (dirty) and `.worktrees/task-graph-validation` @ `d1f9045` (dirty). No other root changes.
+
+- Validation: no fresh full run in this sync. Last documented at `54cf9e8`: Release plugin/test builds 0 warnings/errors; C# harness `477/478` (1 Windows symlink skip); Python `145/145`; 186 MCP schemas regenerated. AssetBundle references, native visual preflight and Steam/Unity gameplay proof not rerun; natural offer->selection->placement->production/render/stat and tactical AI remain unverified.
+
+- QA/reflection safety: Profile2 is dedicated QA without a tutorial; never ask, inspect, infer, gate, bypass, or switch profiles for tutorial. Check current selector/save safety and preserve saves. Before reflection jointly verify Rogue Command version, Unity `2021.3.45f2`, Assembly-CSharp SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, and MVID `db0e9462-128d-4296-9900-de18b4bd0c00`.
+
+- Root MEMORY.md, codex memory, antigravity memory, and mem0 synced to HEAD 669e512.
