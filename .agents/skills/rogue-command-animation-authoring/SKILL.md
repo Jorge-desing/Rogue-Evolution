@@ -26,6 +26,14 @@ Use this skill for Unity Animator/AnimationClip integration and mechanical anima
 - Current builder transitions use 0.12 s for movement-state changes and 0.05 s for Any State fire/death triggers. Fire returns after its exit time; death is not an ordinary looping locomotion transition. Treat these as implementation values, not universal artistic limits.
 - The director's current mechanical feedback is separate from the Animator: radar sweep is configured at 30 RPM (180°/s), turret traverse at 120°/s, recoil is set to 0.22 m on shot with a `Mathf.Lerp` recovery, and the procedural muzzle burst defaults to 0.07 s. Re-read source before relying on these values after a change.
 
+## Attack clip contract: body, weapon, and state graph
+
+A `FireRecoil` clip must never animate only `Bone_BarrelRecoil` while the chassis/pelvis remains static. Author all four layers as one readable action: (1) anticipation/brace on `Bone_Hull` or `Bone_Pelvis`, (2) ballistic barrel recoil and body compression at impact, (3) turret-pitch or mount follow-through, and (4) damped recovery to the neutral pose. Keep the body translation local and small; never key `Bone_Root` or introduce gameplay root motion. Rigid armor remains rigid; use only mechanically plausible suspension/recoil travel.
+
+The generated controller must contain one canonical state per imported action, prefer armature-qualified `Action_*` clips over legacy short names, default to `Action_Idle`, route `RCL_IsMoving` to `Action_Walk`/`Action_Drive`, and return `FireRecoil` to locomotion when `RCL_IsMoving` is still true before falling back to idle. Rebuild the state machine instead of accumulating stale `Idle`/`Walk`/`Drive`/`Death` duplicates. Remove imported FBX `Animator` components from the model instance so the visual root owns exactly one non-root-motion Animator.
+
+When auditing every pack, inspect actual FireRecoil curves for body and weapon channels, not merely clip names or controller references. A valid AssetBundle is local authoring evidence; only a Steam run showing the Animator state and changing body/weapon transforms proves effective in-game motion.
+
 Relevant implementations:
 
 - `src/RogueCommandExpansionLoader/Runtime/Visual/RuntimeVisualDirector.cs`
@@ -78,7 +86,7 @@ When the user requests that a unit should only have walking leg animations (no i
            if "Walk" not in (track.name or ""):
                armature.animation_data.nla_tracks.remove(track)
    ```
-4. **Regenerate the blend and FBX** with `include_armature=True, bake_anim=True, bake_space_transform=True`.
+4. **Regenerate the blend and FBX** with `include_armature=True, bake_anim=True, bake_space_transform=False`. Unity performs the axis conversion at import; enabling Blender's space bake can corrupt bind poses and collapse the skinned mesh.
 5. **Update the Unity validator** (`RogueCommandVisualSampleScaffolder.cs`): if the validator requires `Action_Idle`, `Action_FireRecoil`, or `Action_Death` clips, add a `requireIdleFireDeath` parameter (default `true`) and pass `false` for the unit being stripped. The validator's `missingActions` check must be conditional on this flag.
 6. **Rebuild the Unity bundle** and deploy.
 7. **Note**: The AnimatorController may still reference Idle/FireRecoil/Death states, but since those clips no longer exist in the FBX, those states will play the bind pose (static). This is acceptable when the user only wants walking animations. To fully remove those states, edit the `.controller` file manually.

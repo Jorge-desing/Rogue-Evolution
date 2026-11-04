@@ -77,7 +77,9 @@ class IroncladWalkerAssetContractTests(unittest.TestCase):
 
     def test_walking_transition_targets_walk_clip_not_death(self) -> None:
         walk_id = next(key for key, value in self.states.items() if "Action_Walk" in value)
-        idle_id = next(key for key, value in self.states.items() if value == "Idle")
+        idle_id = next(
+            key for key, value in self.states.items() if value.endswith("_Action_Idle")
+        )
         transitions = [
             transition for transition in self.transitions.values()
             if transition.get("source") == idle_id and transition["destination"] == walk_id
@@ -87,7 +89,9 @@ class IroncladWalkerAssetContractTests(unittest.TestCase):
 
     def test_fire_recoil_returns_to_walk_when_unit_is_moving(self) -> None:
         walk_id = next(key for key, value in self.states.items() if "Action_Walk" in value)
-        fire_id = next(key for key, value in self.states.items() if value == "FireRecoil")
+        fire_id = next(
+            key for key, value in self.states.items() if value.endswith("_Action_FireRecoil")
+        )
         transitions = [
             transition for transition in self.transitions.values()
             if transition["source"] == fire_id and transition["destination"] == walk_id

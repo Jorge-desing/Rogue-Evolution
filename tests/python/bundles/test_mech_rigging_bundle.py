@@ -89,6 +89,24 @@ class MechRiggingBundleTests(unittest.TestCase):
                 self.assertTrue(any("Action_FireRecoil" in clip for clip in audit.animation_clips))
                 self.assertTrue(any("Action_Death" in clip for clip in audit.animation_clips))
 
+    def test_all_fire_recoil_clips_have_dynamic_serialized_samples(self) -> None:
+        for bundle_path in (TACTICAL_BUNDLE, SAMPLE_NATIVE_BUNDLE):
+            with self.subTest(bundle=bundle_path.name):
+                env = validator.UnityPy.load(str(bundle_path))
+                fire_clips = [
+                    obj.read()
+                    for obj in env.objects
+                    if obj.type.name == "AnimationClip" and "FireRecoil" in obj.read().m_Name
+                ]
+                self.assertEqual(len(fire_clips), 9)
+                for clip in fire_clips:
+                    payload = clip.m_MuscleClip.m_Clip.data
+                    dynamic_count = (
+                        (payload.m_StreamedClip.curveCount or 0)
+                        + (payload.m_DenseClip.m_CurveCount or 0)
+                    )
+                    self.assertGreater(dynamic_count, 0, clip.m_Name)
+
 
 if __name__ == "__main__":
     unittest.main()

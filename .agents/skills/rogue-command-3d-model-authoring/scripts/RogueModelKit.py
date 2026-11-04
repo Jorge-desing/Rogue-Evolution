@@ -10751,19 +10751,32 @@ def generate_procedural_action_clips(
         actions["Drive"] = act_drive
         actions["Walk"] = act_drive
 
-    # 3. Action_FireRecoil (Sharp ballistic backward impulse & recovery: 20 frames)
+    # 3. Action_FireRecoil: body-driven anticipation, impact, follow-through and recovery.
+    # The chassis/pelvis must not remain static while only the barrel moves: at RTS
+    # distance the body impulse is what makes a shot read as mass rather than a
+    # floating weapon. All translations remain local to the rig; gameplay still owns
+    # world movement and Bone_Root remains untouched.
     act_fire = bpy.data.actions.new(name=f"{prefix}_Action_FireRecoil")
     armature_obj.animation_data.action = act_fire
     body_bone = "Bone_Pelvis" if leg_type == "biped" else "Bone_Hull"
-    for f in (1, 20):
-        set_bone_key("Bone_BarrelRecoil", "location", f, (0.0, 0.0, 0.0))
-        set_bone_key(body_bone, "rotation_euler", f, (0.0, 0.0, 0.0))
-    set_bone_key("Bone_BarrelRecoil", "location", 2, (0.0, -0.22, 0.0))
-    set_bone_key(body_bone, "rotation_euler", 2, (math.radians(-1.2), 0.0, 0.0))
-    set_bone_key("Bone_BarrelRecoil", "location", 6, (0.0, -0.06, 0.0))
-    set_bone_key(body_bone, "rotation_euler", 6, (math.radians(0.4), 0.0, 0.0))
-    set_bone_key("Bone_BarrelRecoil", "location", 14, (0.0, 0.0, 0.0))
-    set_bone_key(body_bone, "rotation_euler", 14, (0.0, 0.0, 0.0))
+    fire_poses = {
+        1: ((0.0, 0.0, 0.0), (0.0, 0.0, 0.0), (0.0, 0.0, 0.0), (0.0, 0.0, 0.0)),
+        # Anticipation: a tiny forward brace before the impulse.
+        2: ((0.0, 0.008, 0.0), (math.radians(0.25), 0.0, 0.0), (0.0, 0.035, 0.0), (math.radians(0.35), 0.0, 0.0)),
+        # Impact: body mass compresses backward while the barrel reaches peak recoil.
+        3: ((0.0, -0.024, 0.0), (math.radians(-1.4), 0.0, 0.0), (0.0, -0.22, 0.0), (math.radians(-0.9), 0.0, 0.0)),
+        # Follow-through: the mount overshoots briefly before settling.
+        5: ((0.0, -0.010, 0.0), (math.radians(0.45), 0.0, 0.0), (0.0, -0.08, 0.0), (math.radians(0.25), 0.0, 0.0)),
+        9: ((0.0, -0.002, 0.0), (math.radians(0.12), 0.0, 0.0), (0.0, -0.018, 0.0), (math.radians(0.08), 0.0, 0.0)),
+        # Recovery: every authored recoil channel returns to its neutral pose.
+        12: ((0.0, 0.0, 0.0), (0.0, 0.0, 0.0), (0.0, 0.0, 0.0), (0.0, 0.0, 0.0)),
+        15: ((0.0, 0.0, 0.0), (0.0, 0.0, 0.0), (0.0, 0.0, 0.0), (0.0, 0.0, 0.0)),
+    }
+    for frame, (body_location, body_rotation, barrel_location, pitch_rotation) in fire_poses.items():
+        set_bone_key(body_bone, "location", frame, body_location)
+        set_bone_key(body_bone, "rotation_euler", frame, body_rotation)
+        set_bone_key("Bone_TurretPitch", "rotation_euler", frame, pitch_rotation)
+        set_bone_key("Bone_BarrelRecoil", "location", frame, barrel_location)
     act_fire.use_fake_user = True
     actions["FireRecoil"] = act_fire
 

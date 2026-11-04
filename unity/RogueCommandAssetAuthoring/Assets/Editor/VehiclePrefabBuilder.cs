@@ -798,6 +798,18 @@ namespace RogueCommandExpansion.Authoring
             string unitName,
             bool preferWalkForMovement = false)
         {
+            // Imported FBX files may carry an Animator of their own. The prefab must
+            // have exactly one controller owner on the visual root; two Animators can
+            // fight over the same rigid bones and make FireRecoil appear frozen.
+            Animator[] importedAnimators = modelInstance.GetComponentsInChildren<Animator>(true);
+            foreach (Animator importedAnimator in importedAnimators)
+            {
+                if (importedAnimator != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(importedAnimator);
+                }
+            }
+
             SkinnedMeshRenderer smr = modelInstance.GetComponentInChildren<SkinnedMeshRenderer>(true);
             bool hasBones = false;
             foreach (Transform t in modelInstance.GetComponentsInChildren<Transform>(true))
@@ -835,6 +847,7 @@ namespace RogueCommandExpansion.Authoring
                 {
                     animator = root.AddComponent<Animator>();
                 }
+                animator.applyRootMotion = false;
 
                 Animator modelAnimator = modelAsset.GetComponent<Animator>();
                 if (importedAvatar != null)
@@ -867,7 +880,12 @@ namespace RogueCommandExpansion.Authoring
                         controller = AnimatorController.CreateAnimatorControllerAtPath(controllerPath);
                     }
 
-                    ConfigureAnimationController(controller, animationClips, preferWalkForMovement);
+                    ConfigureAnimationController(
+                        controller,
+                        animationClips,
+                        preferWalkForMovement,
+                        modelInstance,
+                        unitName);
 
                     animator.runtimeAnimatorController = controller;
                 }
@@ -877,27 +895,59 @@ namespace RogueCommandExpansion.Authoring
         private static void ConfigureAnimationController(
             AnimatorController controller,
             List<AnimationClip> clips,
-            bool preferWalkForMovement)
+            bool preferWalkForMovement,
+            GameObject modelInstance,
+            string unitName)
         {
             if (controller == null || clips == null || clips.Count == 0 || controller.layers.Length == 0) return;
 
             AnimatorStateMachine stateMachine = controller.layers[0].stateMachine;
-            AnimationClip idleClip = FindAnimationClip(clips, "Action_Idle") ?? FindAnimationClip(clips, "Idle") ?? clips[0];
+            // Rebuild this generated graph instead of accumulating stale short-name
+            // states from previous imports. The old graph could leave a Death or
+            // legacy Walk state as the movement destination, making attack clips and
+            // locomotion look static even though the FBX contained valid curves.
+            foreach (ChildAnimatorState child in stateMachine.states)
+            {
+                if (child.state != null)
+                {
+                    stateMachine.RemoveState(child.state);
+                }
+            }
+            foreach (AnimatorStateTransition transition in stateMachine.anyStateTransitions)
+            {
+                stateMachine.RemoveAnyStateTransition(transition);
+            }
+
+            AnimationClip idleClip = FindAnimationClipByPriority(clips, "Action_Idle", "Idle") ?? clips[0];
             AnimationClip driveClip = preferWalkForMovement
-                ? (FindAnimationClip(clips, "Action_Walk") ?? FindAnimationClip(clips, "Action_Drive") ?? FindAnimationClip(clips, "Walk") ?? FindAnimationClip(clips, "Drive"))
-                : (FindAnimationClip(clips, "Action_Drive") ?? FindAnimationClip(clips, "Action_Walk") ?? FindAnimationClip(clips, "Drive") ?? FindAnimationClip(clips, "Walk"));
-            AnimationClip fireClip = FindAnimationClip(clips, "Action_FireRecoil") ?? FindAnimationClip(clips, "FireRecoil") ?? FindAnimationClip(clips, "Fire");
-            AnimationClip deathClip = FindAnimationClip(clips, "Action_Death") ?? FindAnimationClip(clips, "Death");
+                ? FindAnimationClipByPriority(clips, "Action_Walk", "Action_Drive", "Walk", "Drive")
+                : FindAnimationClipByPriority(clips, "Action_Drive", "Action_Walk", "Drive", "Walk");
+            AnimationClip fireClip = FindAnimationClipByPriority(clips, "Action_FireRecoil", "FireRecoil", "Fire");
+            AnimationClip deathClip = FindAnimationClipByPriority(clips, "Action_Death", "Death");
+            if (fireClip != null && !HasBodyDrivenFireRecoilClip(fireClip))
+            {
+                AnimationClip generatedClip = CreateBodyDrivenFireRecoilClip(
+                    controller,
+                    fireClip,
+                    modelInstance,
+                    unitName);
+                if (generatedClip != null)
+                {
+                    clips.Remove(fireClip);
+                    clips.Add(generatedClip);
+                    fireClip = generatedClip;
+                }
+            }
+            if (fireClip != null && !HasBodyDrivenFireRecoilClip(fireClip))
+            {
+                throw new InvalidDataException(
+                    controller.name + " FireRecoil must animate a body/pelvis position curve plus a weapon or turret curve.");
+            }
 
             AnimatorState idleState = GetOrCreateAnimationState(stateMachine, idleClip);
             AnimatorState driveState = driveClip != null ? GetOrCreateAnimationState(stateMachine, driveClip) : null;
             AnimatorState fireState = fireClip != null ? GetOrCreateAnimationState(stateMachine, fireClip) : null;
             AnimatorState deathState = deathClip != null ? GetOrCreateAnimationState(stateMachine, deathClip) : null;
-
-            foreach (AnimationClip clip in clips)
-            {
-                GetOrCreateAnimationState(stateMachine, clip);
-            }
 
             stateMachine.defaultState = idleState;
 
@@ -910,10 +960,6 @@ namespace RogueCommandExpansion.Authoring
 
             if (hasMovementParameter && driveState != idleState)
             {
-                RemoveStateTransitionsWithConditionExcept(
-                    idleState, "RCL_IsMoving", AnimatorConditionMode.If, driveState);
-                RemoveStateTransitionsWithConditionExcept(
-                    driveState, "RCL_IsMoving", AnimatorConditionMode.IfNot, idleState);
                 EnsureStateTransition(idleState, driveState, "RCL_IsMoving", AnimatorConditionMode.If, 0.12f);
                 EnsureStateTransition(driveState, idleState, "RCL_IsMoving", AnimatorConditionMode.IfNot, 0.12f);
             }
@@ -921,27 +967,15 @@ namespace RogueCommandExpansion.Authoring
             if (fireState != null && idleState != null && hasFireParameter)
             {
                 EnsureAnyStateTriggerTransition(stateMachine, fireState, "RCL_Fire");
-                EnsureExitTransition(fireState, idleState);
+                // Add the conditioned locomotion exit before the fallback idle exit.
+                // Unity evaluates transitions in serialized order; this prevents a
+                // shot from interrupting a moving unit and leaving it in a static pose.
                 if (driveState != null && driveState != fireState && hasMovementParameter)
                 {
-                    bool hasMovingExit = false;
-                    foreach (AnimatorStateTransition existing in fireState.transitions)
-                    {
-                        if (existing.destinationState == driveState && HasTransitionCondition(existing, "RCL_IsMoving", AnimatorConditionMode.If))
-                        {
-                            hasMovingExit = true;
-                            break;
-                        }
-                    }
-                    if (!hasMovingExit)
-                    {
-                        AnimatorStateTransition movingExit = fireState.AddTransition(driveState);
-                        movingExit.hasExitTime = true;
-                        movingExit.exitTime = 1f;
-                        movingExit.duration = 0.05f;
-                        movingExit.AddCondition(AnimatorConditionMode.If, 0f, "RCL_IsMoving");
-                    }
+                    EnsureExitTransitionWithCondition(
+                        fireState, driveState, "RCL_IsMoving", AnimatorConditionMode.If);
                 }
+                EnsureExitTransition(fireState, idleState);
             }
 
             if (deathState != null && hasDeathParameter)
@@ -953,9 +987,245 @@ namespace RogueCommandExpansion.Authoring
             AssetDatabase.SaveAssets();
         }
 
-        private static AnimationClip FindAnimationClip(List<AnimationClip> clips, string nameFragment)
+        private static AnimationClip FindAnimationClipByPriority(
+            List<AnimationClip> clips,
+            params string[] nameFragments)
         {
-            return clips.Find(clip => clip != null && clip.name.IndexOf(nameFragment, StringComparison.OrdinalIgnoreCase) >= 0);
+            if (clips == null || nameFragments == null) return null;
+            for (int fragmentIndex = 0; fragmentIndex < nameFragments.Length; fragmentIndex++)
+            {
+                string fragment = nameFragments[fragmentIndex];
+                if (string.IsNullOrEmpty(fragment)) continue;
+                foreach (AnimationClip clip in clips)
+                {
+                    if (clip == null) continue;
+                    string clipName = clip.name ?? string.Empty;
+                    if (string.Equals(clipName, fragment, StringComparison.OrdinalIgnoreCase) ||
+                        clipName.EndsWith("|" + fragment, StringComparison.OrdinalIgnoreCase) ||
+                        clipName.EndsWith(fragment, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return clip;
+                    }
+                }
+            }
+
+            return null;
+        }
+
+        private static bool HasBodyDrivenFireRecoilClip(AnimationClip clip)
+        {
+            if (clip == null) return false;
+            bool bodyPosition = false;
+            bool weaponMotion = false;
+            EditorCurveBinding[] bindings = AnimationUtility.GetCurveBindings(clip);
+            foreach (EditorCurveBinding binding in bindings)
+            {
+                string path = binding.path ?? string.Empty;
+                string property = binding.propertyName ?? string.Empty;
+                bool positionCurve = property.IndexOf("LocalPosition", StringComparison.OrdinalIgnoreCase) >= 0;
+                bool rotationCurve = property.IndexOf("LocalRotation", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    property.IndexOf("Euler", StringComparison.OrdinalIgnoreCase) >= 0;
+                AnimationCurve curve = AnimationUtility.GetEditorCurve(clip, binding);
+                bool dynamicCurve = HasMeaningfulCurveVariation(curve);
+                if ((path.IndexOf("Bone_Hull", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                     path.IndexOf("Bone_Pelvis", StringComparison.OrdinalIgnoreCase) >= 0) &&
+                    positionCurve && dynamicCurve)
+                {
+                    bodyPosition = true;
+                }
+                if (((path.IndexOf("Bone_BarrelRecoil", StringComparison.OrdinalIgnoreCase) >= 0 && positionCurve) ||
+                     (path.IndexOf("Bone_TurretPitch", StringComparison.OrdinalIgnoreCase) >= 0 && rotationCurve)) &&
+                    dynamicCurve)
+                {
+                    weaponMotion = true;
+                }
+            }
+
+            return bodyPosition && weaponMotion;
+        }
+
+        private static bool HasMeaningfulCurveVariation(AnimationCurve curve)
+        {
+            if (curve == null || curve.length < 2) return false;
+            float first = curve.keys[0].value;
+            for (int index = 1; index < curve.length; index++)
+            {
+                if (Mathf.Abs(curve.keys[index].value - first) > 0.0001f)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static string FindAnimationCurvePath(
+            AnimationClip clip,
+            string boneName,
+            string propertyToken)
+        {
+            if (clip == null) return string.Empty;
+            foreach (EditorCurveBinding binding in AnimationUtility.GetCurveBindings(clip))
+            {
+                if ((binding.path ?? string.Empty).IndexOf(boneName, StringComparison.OrdinalIgnoreCase) < 0)
+                {
+                    continue;
+                }
+
+                if ((binding.propertyName ?? string.Empty).IndexOf(propertyToken, StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    return binding.path ?? string.Empty;
+                }
+            }
+
+            return string.Empty;
+        }
+
+        private static Transform ResolveAnimationTransform(
+            GameObject modelInstance,
+            string animationPath,
+            string boneName)
+        {
+            if (modelInstance == null) return null;
+            if (!string.IsNullOrEmpty(animationPath))
+            {
+                Transform direct = modelInstance.transform.Find(animationPath);
+                if (direct != null) return direct;
+            }
+
+            return FindTransformRecursive(modelInstance.transform, boneName);
+        }
+
+        private static AnimationCurve CreateRecoilCurve(
+            float frameRate,
+            float[] offsets,
+            float baseValue)
+        {
+            var keys = new Keyframe[offsets.Length];
+            for (int index = 0; index < offsets.Length; index++)
+            {
+                keys[index] = new Keyframe(
+                    new[] { 0f, 1f, 2f, 4f, 8f, 11f, 14f }[index] / frameRate,
+                    baseValue + offsets[index]);
+            }
+
+            return new AnimationCurve(keys);
+        }
+
+        private static void SetRecoilVectorCurves(
+            AnimationClip clip,
+            string path,
+            Vector3 baseline,
+            float[] xOffsets,
+            float[] yOffsets,
+            float[] zOffsets,
+            float frameRate)
+        {
+            clip.SetCurve(path, typeof(Transform), "m_LocalPosition.x",
+                CreateRecoilCurve(frameRate, xOffsets, baseline.x));
+            clip.SetCurve(path, typeof(Transform), "m_LocalPosition.y",
+                CreateRecoilCurve(frameRate, yOffsets, baseline.y));
+            clip.SetCurve(path, typeof(Transform), "m_LocalPosition.z",
+                CreateRecoilCurve(frameRate, zOffsets, baseline.z));
+        }
+
+        private static void SetRecoilEulerCurves(
+            AnimationClip clip,
+            string path,
+            Vector3 baseline,
+            float[] xOffsets,
+            float frameRate)
+        {
+            float[] zeroOffsets = new float[xOffsets.Length];
+            clip.SetCurve(path, typeof(Transform), "localEulerAnglesRaw.x",
+                CreateRecoilCurve(frameRate, xOffsets, baseline.x));
+            clip.SetCurve(path, typeof(Transform), "localEulerAnglesRaw.y",
+                CreateRecoilCurve(frameRate, zeroOffsets, baseline.y));
+            clip.SetCurve(path, typeof(Transform), "localEulerAnglesRaw.z",
+                CreateRecoilCurve(frameRate, zeroOffsets, baseline.z));
+        }
+
+        private static AnimationClip CreateBodyDrivenFireRecoilClip(
+            AnimatorController controller,
+            AnimationClip importedClip,
+            GameObject modelInstance,
+            string unitName)
+        {
+            if (controller == null || importedClip == null || modelInstance == null)
+            {
+                return null;
+            }
+
+            string bodyBone = FindAnimationCurvePath(importedClip, "Bone_Hull", "LocalPosition");
+            string bodyBoneName = "Bone_Hull";
+            if (string.IsNullOrEmpty(bodyBone))
+            {
+                bodyBone = FindAnimationCurvePath(importedClip, "Bone_Pelvis", "LocalPosition");
+                bodyBoneName = "Bone_Pelvis";
+            }
+
+            string barrelPath = FindAnimationCurvePath(importedClip, "Bone_BarrelRecoil", "LocalPosition");
+            string pitchPath = FindAnimationCurvePath(importedClip, "Bone_TurretPitch", "LocalRotation");
+            if (string.IsNullOrEmpty(pitchPath))
+            {
+                pitchPath = FindAnimationCurvePath(importedClip, "Bone_TurretPitch", "Euler");
+            }
+            if (string.IsNullOrEmpty(bodyBone) || (string.IsNullOrEmpty(barrelPath) && string.IsNullOrEmpty(pitchPath)))
+            {
+                Debug.LogWarning("[VehiclePrefabBuilder] Cannot synthesize body-driven FireRecoil for " + unitName +
+                    ": imported clip has no resolvable body and weapon paths.");
+                return null;
+            }
+
+            string controllerPath = AssetDatabase.GetAssetPath(controller);
+            if (string.IsNullOrEmpty(controllerPath)) return null;
+            foreach (UnityEngine.Object asset in AssetDatabase.LoadAllAssetsAtPath(controllerPath))
+            {
+                AnimationClip oldGenerated = asset as AnimationClip;
+                if (oldGenerated != null && oldGenerated.name == importedClip.name && oldGenerated != importedClip)
+                {
+                    UnityEngine.Object.DestroyImmediate(oldGenerated, true);
+                }
+            }
+
+            AnimationClip generatedClip = new AnimationClip();
+            generatedClip.name = importedClip.name;
+            generatedClip.frameRate = importedClip.frameRate > 0f ? importedClip.frameRate : 24f;
+            generatedClip.wrapMode = WrapMode.ClampForever;
+            generatedClip.hideFlags = HideFlags.HideInHierarchy;
+            AssetDatabase.AddObjectToAsset(generatedClip, controller);
+
+            Transform bodyTransform = ResolveAnimationTransform(modelInstance, bodyBone, bodyBoneName);
+            Transform barrelTransform = ResolveAnimationTransform(modelInstance, barrelPath, "Bone_BarrelRecoil");
+            Transform pitchTransform = ResolveAnimationTransform(modelInstance, pitchPath, "Bone_TurretPitch");
+            Vector3 bodyPosition = bodyTransform != null ? bodyTransform.localPosition : Vector3.zero;
+            Vector3 bodyEuler = bodyTransform != null ? bodyTransform.localEulerAngles : Vector3.zero;
+            Vector3 barrelPosition = barrelTransform != null ? barrelTransform.localPosition : Vector3.zero;
+            Vector3 pitchEuler = pitchTransform != null ? pitchTransform.localEulerAngles : Vector3.zero;
+
+            float[] zero = { 0f, 0f, 0f, 0f, 0f, 0f, 0f };
+            float[] bodyY = { 0f, 0.008f, -0.024f, -0.010f, -0.002f, 0f, 0f };
+            float[] bodyPitch = { 0f, 0.25f, -1.4f, 0.45f, 0.12f, 0f, 0f };
+            float[] barrelY = { 0f, 0.035f, -0.22f, -0.080f, -0.018f, 0f, 0f };
+            float[] pitch = { 0f, 0.35f, -0.90f, 0.25f, 0.08f, 0f, 0f };
+
+            SetRecoilVectorCurves(generatedClip, bodyBone, bodyPosition, zero, bodyY, zero, generatedClip.frameRate);
+            SetRecoilEulerCurves(generatedClip, bodyBone, bodyEuler, bodyPitch, generatedClip.frameRate);
+            if (!string.IsNullOrEmpty(barrelPath))
+            {
+                SetRecoilVectorCurves(generatedClip, barrelPath, barrelPosition, zero, barrelY, zero, generatedClip.frameRate);
+            }
+            if (!string.IsNullOrEmpty(pitchPath))
+            {
+                SetRecoilEulerCurves(generatedClip, pitchPath, pitchEuler, pitch, generatedClip.frameRate);
+            }
+
+            EditorUtility.SetDirty(generatedClip);
+            EditorUtility.SetDirty(controller);
+            AssetDatabase.SaveAssets();
+            Debug.Log("[VehiclePrefabBuilder] Synthesized body-driven FireRecoil for " + unitName +
+                " from imported paths (body=" + bodyBone + ", barrel=" + barrelPath + ", pitch=" + pitchPath + ").");
+            return generatedClip;
         }
 
         private static AnimatorState GetOrCreateAnimationState(AnimatorStateMachine stateMachine, AnimationClip clip)
@@ -1066,6 +1336,29 @@ namespace RogueCommandExpansion.Authoring
             transition.hasExitTime = true;
             transition.exitTime = 1f;
             transition.duration = 0.05f;
+        }
+
+        private static void EnsureExitTransitionWithCondition(
+            AnimatorState source,
+            AnimatorState destination,
+            string parameterName,
+            AnimatorConditionMode condition)
+        {
+            if (source == null || destination == null) return;
+            foreach (AnimatorStateTransition existing in source.transitions)
+            {
+                if (existing.destinationState == destination && existing.hasExitTime &&
+                    HasTransitionCondition(existing, parameterName, condition))
+                {
+                    return;
+                }
+            }
+
+            AnimatorStateTransition transition = source.AddTransition(destination);
+            transition.hasExitTime = true;
+            transition.exitTime = 1f;
+            transition.duration = 0.05f;
+            transition.AddCondition(condition, 0f, parameterName);
         }
 
         private static bool HasTransitionCondition(

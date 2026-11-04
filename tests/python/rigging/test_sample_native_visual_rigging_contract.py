@@ -13,6 +13,10 @@ import UnityPy
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 BUNDLE_PATH = REPO_ROOT / "content/packs/sample-native-expansion/bundles/sample-native-expansion.bundle"
+SCAFFOLDER_PATH = (
+    REPO_ROOT
+    / "unity/RogueCommandAssetAuthoring/Assets/Editor/RogueCommandVisualSampleScaffolder.cs"
+)
 VISUAL_UNITS = {
     "ArachnidHexapod": "ArachnidHexapodVisual",
     "OverlordCommandHQ": "OverlordCommandHQVisual",
@@ -26,18 +30,11 @@ VISUAL_UNITS = {
 }
 VISUAL_PREFABS = tuple(VISUAL_UNITS.values())
 MOVEMENT_ACTIONS = {
-    "ArachnidHexapod": "ArachnidHexapod_Armature|ArachnidHexapod_Action_Walk",
-    "OverlordCommandHQ": "OverlordCommandHQ_Armature|OverlordCommandHQ_Action_Drive",
-    "AtlasCraneMech": "AtlasCraneMech_Armature|AtlasCraneMech_Action_Walk",
-    "BastionSiegeMech": "Walk",
-    "ColossusSiegePlatform": "ColossusSiegePlatform_Armature|ColossusSiegePlatform_Action_Drive",
-    "IroncladWalker": "IroncladWalker_Armature|IroncladWalker_Action_Walk",
-    "SandlanceScout": "SandlanceScout_Armature|SandlanceScout_Action_Drive",
-    "SkirmishStrikeBike": "SkirmishStrikeBike_Armature|SkirmishStrikeBike_Action_Drive",
-    "SurgeArcTank": "SurgeArcTank_Armature|SurgeArcTank_Action_Drive",
+    unit_name: f"{unit_name}_Armature|{unit_name}_Action_Walk"
+    for unit_name in VISUAL_UNITS
 }
 IDLE_ACTIONS = {
-    unit_name: ("Idle" if unit_name == "BastionSiegeMech" else f"{unit_name}_Armature|{unit_name}_Action_Idle")
+    unit_name: f"{unit_name}_Armature|{unit_name}_Action_Idle"
     for unit_name in VISUAL_UNITS
 }
 
@@ -74,6 +71,13 @@ class SampleNativeVisualRiggingContractTests(unittest.TestCase):
             for obj in cls.objects
             if obj.type.name == "GameObject" and obj.read().m_Name in VISUAL_PREFABS
         }
+
+    def test_visual_only_rigged_prefabs_rebuild_their_animator_graph(self) -> None:
+        """Visual-only rigged units must use the same body-driven Animator builder."""
+        text = SCAFFOLDER_PATH.read_text(encoding="utf-8")
+        self.assertIn("RefreshRiggedPbrPrefabAnimator", text)
+        self.assertIn("ArachnidHexapodVisualPrefabPath", text)
+        self.assertIn("OverlordCommandHQVisualPrefabPath", text)
 
     def test_walker_visual_prefabs_disable_root_motion(self) -> None:
         prefab_paths = {
@@ -133,6 +137,33 @@ class SampleNativeVisualRiggingContractTests(unittest.TestCase):
                     expected_action,
                     bundle_clips,
                     f"{unit_name} movement clip must be imported into the sample bundle",
+                )
+
+    def test_each_fire_recoil_clip_has_serialized_dynamic_curve_payload(self) -> None:
+        fire_clips = {
+            obj.read().m_Name: obj.read()
+            for obj in self.objects
+            if obj.type.name == "AnimationClip" and "FireRecoil" in obj.read().m_Name
+        }
+        for unit_name in VISUAL_UNITS:
+            expected_action = f"{unit_name}_Armature|{unit_name}_Action_FireRecoil"
+            with self.subTest(unit=unit_name):
+                self.assertIn(expected_action, fire_clips)
+                clip = fire_clips[expected_action]
+                payload = clip.m_MuscleClip.m_Clip.data
+                dynamic_curve_count = (
+                    (payload.m_StreamedClip.curveCount or 0)
+                    + (payload.m_DenseClip.m_CurveCount or 0)
+                )
+                self.assertGreater(
+                    dynamic_curve_count,
+                    0,
+                    f"{unit_name} FireRecoil must serialize changing curve samples, not constants only",
+                )
+                self.assertGreaterEqual(
+                    len(clip.m_ClipBindingConstant.genericBindings),
+                    4,
+                    f"{unit_name} FireRecoil must bind body and weapon transform channels",
                 )
 
     def test_each_visual_fbx_imports_all_locomotion_clips_as_loops(self) -> None:

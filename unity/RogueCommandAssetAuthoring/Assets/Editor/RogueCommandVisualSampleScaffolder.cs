@@ -49,6 +49,8 @@ namespace RogueCommandExpansion.Authoring
             AssetRoot + "/VisualOnly/Prefabs/OverlordCommandHQVisual.prefab";
         private const string OverlordCommandHQFactoryVisualPrefabPath =
             AssetRoot + "/VisualOnly/Prefabs/OverlordCommandHQFactoryVisual.prefab";
+        private const string ArachnidHexapodModelPath = AssetRoot + "/Models/ArachnidHexapod.fbx";
+        private const string OverlordCommandHQModelPath = AssetRoot + "/Models/OverlordCommandHQ.fbx";
         private const string MaterialRoot = AssetRoot + "/Materials";
         private const string VertexWearShaderName = "RogueCommand/VehiclePBR_VertexWear";
         private const float FactoryNewWearStrength = 0.25f;
@@ -285,6 +287,8 @@ namespace RogueCommandExpansion.Authoring
                 string surgeArcTankPrefabPath = CreateSurgeArcTankVisual();
                 ImportCardSprite(SurgeArcTankCardSpritePath);
                 ConfigureArachnidOverlordPbrTextureImports();
+                RefreshRiggedPbrPrefabAnimator("ArachnidHexapod", ArachnidHexapodModelPath, ArachnidHexapodVisualPrefabPath);
+                RefreshRiggedPbrPrefabAnimator("OverlordCommandHQ", OverlordCommandHQModelPath, OverlordCommandHQVisualPrefabPath);
                 string outputPath = Path.GetFullPath(Path.Combine(projectRoot, BundleOutputPath));
                 Directory.CreateDirectory(outputPath);
 
@@ -1690,6 +1694,52 @@ namespace RogueCommandExpansion.Authoring
             }
 
             return new Bounds((min + max) * 0.5f, max - min);
+        }
+
+        private static void RefreshRiggedPbrPrefabAnimator(
+            string unitName,
+            string modelPath,
+            string prefabPath)
+        {
+            GameObject modelAsset = AssetDatabase.LoadAssetAtPath<GameObject>(modelPath);
+            GameObject prefabAsset = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+            if (modelAsset == null || prefabAsset == null)
+            {
+                throw new FileNotFoundException(
+                    "The rigged PBR visual requires both model and prefab assets for " + unitName + ".");
+            }
+
+            GameObject instance = PrefabUtility.InstantiatePrefab(prefabAsset) as GameObject;
+            if (instance == null)
+            {
+                throw new InvalidOperationException("Unity could not instantiate the existing " + unitName + " visual prefab.");
+            }
+
+            try
+            {
+                VehiclePrefabBuilder.SetupAnimatorIfAvailable(
+                    instance, instance, modelAsset, unitName, preferWalkForMovement: true);
+                Animator animator = instance.GetComponent<Animator>();
+                if (animator == null || animator.avatar == null || !animator.avatar.isValid ||
+                    animator.runtimeAnimatorController == null)
+                {
+                    throw new InvalidDataException(
+                        unitName + " visual prefab must have one valid Generic Animator after refresh.");
+                }
+
+                animator.applyRootMotion = false;
+                bool success;
+                PrefabUtility.SaveAsPrefabAsset(instance, prefabPath, out success);
+                if (!success)
+                {
+                    throw new InvalidOperationException("Unity could not save refreshed " + prefabPath + ".");
+                }
+                Debug.Log("[RogueCommandVisualSampleScaffolder] Refreshed body-driven Animator graph for " + unitName + ".");
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(instance);
+            }
         }
 
         private static string CreateSampleVisual()
