@@ -84,7 +84,26 @@ $exportTargetFile = Join-Path $userExportDir ("material_export-" + $profileName.
 $templatePrefix = [System.IO.Path]::GetFileNameWithoutExtension($template)
 
 New-Item -ItemType Directory -Force -Path $outDir | Out-Null
+if (Test-Path $rawDir) {
+    Remove-Item -LiteralPath $rawDir -Recurse -Force
+}
 New-Item -ItemType Directory -Force -Path $rawDir | Out-Null
+$staleOutputs = @(
+    "${templatePrefix}_Albedo.png",
+    "${templatePrefix}_MetallicGloss.png",
+    "${templatePrefix}_Normal.png",
+    "${templatePrefix}_Emission.png",
+    "${templatePrefix}_pack-report.json",
+    "${templatePrefix}_quality-report.json",
+    "material-maker-workflow.json"
+)
+foreach ($staleOutput in $staleOutputs) {
+    $stalePath = Join-Path $outDir $staleOutput
+    if (Test-Path $stalePath) {
+        Remove-Item -LiteralPath $stalePath -Force
+        Write-Host "Removed stale Material Maker output: $stalePath"
+    }
+}
 New-Item -ItemType Directory -Force -Path $userExportDir | Out-Null
 
 foreach ($required in @($configPath, $configValidator, $mmExe, $waitScript, $packScript, $auditScript, $prepareScript)) {
@@ -171,7 +190,17 @@ try {
         throw "Material Maker PBR pack failed with exit code $LASTEXITCODE"
     }
     $qualityReport = Join-Path $outDir ("${templatePrefix}_quality-report.json")
-    & python $auditScript --directory $outDir --prefix $templatePrefix --output $qualityReport
+    $auditArgs = @(
+        $auditScript,
+        "--directory", $outDir,
+        "--prefix", $templatePrefix,
+        "--template", $template,
+        "--output", $qualityReport
+    )
+    if ($Workflow -eq "three_d") {
+        $auditArgs += @("--workspace", (Split-Path -Parent $template))
+    }
+    & python @auditArgs
     if ($LASTEXITCODE -ne 0) {
         throw "Material Maker quality audit failed with exit code $LASTEXITCODE"
     }

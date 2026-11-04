@@ -27,9 +27,17 @@ class MaterialQualityAuditTests(unittest.TestCase):
             (root / "QualityUnit.ptex").write_text(
                 json.dumps(
                     {
-                        "nodes": [{"name": "colorize_metallic"}, {"name": "normal_map_2"}],
+                        "nodes": [
+                            {"name": "Material", "parameters": {"emission_energy": 1.5}},
+                            {"name": "colorize_metallic"},
+                            {"name": "colorize_emission"},
+                            {"name": "edge_detect_emission"},
+                            {"name": "normal_map_2"},
+                        ],
                         "connections": [
-                            {"from": "colorize_metallic", "to": "Material", "to_port": 1}
+                            {"from": "colorize_metallic", "to": "Material", "to_port": 1},
+                            {"from": "edge_detect_emission", "to": "colorize_emission", "to_port": 0},
+                            {"from": "colorize_emission", "to": "Material", "to_port": 3},
                         ],
                     }
                 ),
@@ -54,6 +62,9 @@ class MaterialQualityAuditTests(unittest.TestCase):
             self.assertEqual(0, report["maps"]["MetallicGloss"]["rgbMaxDelta"])
             self.assertLess(report["maps"]["Normal"]["normalLengthMeanError"], 0.01)
             self.assertTrue(report["procedural"]["bimodalMetallicConnected"])
+            self.assertTrue(report["procedural"]["emissionConnected"])
+            self.assertTrue(report["procedural"]["edgeEmissionConnected"])
+            self.assertGreater(report["procedural"]["emissionEnergy"], 0.0)
             self.assertTrue(report["threeDPaint"]["singleSubmeshForPaint"])
             self.assertTrue(report["threeDPaint"]["productionMeshUntouched"])
 

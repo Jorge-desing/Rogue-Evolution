@@ -4,7 +4,8 @@
 This is an authoring-side report for URP, disposable 3D-paint, and procedural
 Material Maker workflows. It never imports a mesh into Unity and never changes
 production FBX/Blend files. The output is JSON-friendly so an agent can consume
-metrics without a screenshot.
+metrics without a screenshot. Pass `--template <path.ptex>` when the graph lives
+outside the output directory and `--workspace <paint-dir>` for a 3D-paint manifest.
 """
 
 from __future__ import annotations
@@ -81,7 +82,9 @@ def _read_json_if_present(path: Path) -> dict[str, Any] | None:
     return value if isinstance(value, dict) else None
 
 
-def _find_ptex(directory: Path, prefix: str) -> Path | None:
+def _find_ptex(directory: Path, prefix: str, template_path: Path | None = None) -> Path | None:
+    if template_path is not None and template_path.is_file():
+        return template_path
     preferred = directory / f"{prefix}.ptex"
     if preferred.is_file():
         return preferred
@@ -89,7 +92,12 @@ def _find_ptex(directory: Path, prefix: str) -> Path | None:
     return candidates[0] if candidates else None
 
 
-def build_quality_report(directory: Path, prefix: str) -> dict[str, Any]:
+def build_quality_report(
+    directory: Path,
+    prefix: str,
+    template_path: Path | None = None,
+    workspace_path: Path | None = None,
+) -> dict[str, Any]:
     directory = Path(directory)
     paths = {suffix: directory / f"{prefix}_{suffix}.png" for suffix in REQUIRED_MAPS}
     missing = [str(path) for path in paths.values() if not path.is_file()]
@@ -118,7 +126,7 @@ def build_quality_report(directory: Path, prefix: str) -> dict[str, Any]:
                 entry["nonzeroFraction"] = round(nonzero / max(1, len(pixels)), 6)
             maps[suffix] = entry
 
-    ptex_path = _find_ptex(directory, prefix)
+    ptex_path = _find_ptex(directory, prefix, template_path)
     ptex = _read_json_if_present(ptex_path) if ptex_path else None
     nodes = ptex.get("nodes", []) if ptex else []
     connections = ptex.get("connections", []) if ptex else []
@@ -130,8 +138,28 @@ def build_quality_report(directory: Path, prefix: str) -> dict[str, Any]:
         and connection.get("to_port") == 1
         for connection in connections
     )
+    emission_connected = any(
+        isinstance(connection, dict)
+        and connection.get("from") == "colorize_emission"
+        and connection.get("to") == "Material"
+        and connection.get("to_port") == 3
+        for connection in connections
+    )
+    edge_emission_connected = any(
+        isinstance(connection, dict)
+        and connection.get("from") == "edge_detect_emission"
+        and connection.get("to") == "colorize_emission"
+        and connection.get("to_port") == 0
+        for connection in connections
+    )
+    material_node = next(
+        (node for node in nodes if isinstance(node, dict) and node.get("name") == "Material"),
+        {},
+    )
+    material_parameters = material_node.get("parameters", {}) if isinstance(material_node, dict) else {}
 
-    workspace = _read_json_if_present(directory / "paint-workspace.json") or {}
+    workspace_directory = Path(workspace_path) if workspace_path is not None else directory
+    workspace = _read_json_if_present(workspace_directory / "paint-workspace.json") or {}
     three_d = {
         "manifestPresent": bool(workspace),
         "workflow": workspace.get("workflow", ""),
@@ -146,6 +174,11 @@ def build_quality_report(directory: Path, prefix: str) -> dict[str, Any]:
         "connectionCount": len(connections) if isinstance(connections, list) else 0,
         "hasBimodalMetallicNode": "colorize_metallic" in node_names,
         "bimodalMetallicConnected": bimodal_connected,
+        "hasEmissionNode": "colorize_emission" in node_names,
+        "emissionConnected": emission_connected,
+        "hasEdgeEmissionNode": "edge_detect_emission" in node_names,
+        "edgeEmissionConnected": edge_emission_connected,
+        "emissionEnergy": material_parameters.get("emission_energy", 0),
         "normalNodePresent": "normal_map_2" in node_names,
     }
 
@@ -162,6 +195,12 @@ def build_quality_report(directory: Path, prefix: str) -> dict[str, Any]:
         failures.append("normal-z-has-invalid-negative-area")
     if ptex is not None and not bimodal_connected:
         failures.append("procedural-metallic-graph-not-connected")
+    if ptex is not None and not emission_connected:
+        failures.append("procedural-emission-graph-not-connected")
+    if ptex is not None and not edge_emission_connected:
+        failures.append("procedural-edge-emission-graph-not-connected")
+    if ptex is not None and float(material_parameters.get("emission_energy", 0)) <= 0.0:
+        failures.append("procedural-emission-energy-not-positive")
     if workspace and not three_d["singleSubmeshForPaint"]:
         failures.append("3d-paint-proxy-not-single-submesh")
     if workspace and not three_d["productionMeshUntouched"]:
@@ -188,9 +227,16 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--directory", type=Path, required=True)
     parser.add_argument("--prefix", required=True)
+    parser.add_argument("--template", type=Path, default=None)
+    parser.add_argument("--workspace", type=Path, default=None)
     parser.add_argument("--output", type=Path, default=None)
     args = parser.parse_args()
-    report = build_quality_report(args.directory, args.prefix)
+    report = build_quality_report(
+        args.directory,
+        args.prefix,
+        template_path=args.template,
+        workspace_path=args.workspace,
+    )
     output = args.output or args.directory / f"{args.prefix}_quality-report.json"
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(report, indent=2), encoding="utf-8")

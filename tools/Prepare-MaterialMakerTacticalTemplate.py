@@ -409,6 +409,26 @@ PRESETS: dict[str, dict[str, object]] = {
 }
 
 
+# Edge-only emission profiles keep the atlas mostly unlit while giving each
+# tactical material a restrained sensor/thermal accent at machined bevels.
+# Values are linear RGB, bevel threshold, and Material Maker emission energy.
+EMISSION_PROFILES: dict[str, tuple[tuple[float, float, float], float, float]] = {
+    "olive_armor": ((0.08, 0.35, 0.12), 0.50, 1.8),
+    "gunmetal_chassis": ((0.03, 0.22, 0.65), 0.50, 1.7),
+    "desert_camo": ((0.85, 0.20, 0.04), 0.45, 1.6),
+    "hazard_industrial": ((1.0, 0.42, 0.03), 0.45, 2.0),
+    "orbital_titanium": ((0.06, 0.42, 1.0), 0.50, 1.8),
+    "stealth_void_composite": ((0.02, 0.16, 0.75), 0.60, 1.5),
+    "solar_gold_radiator": ((1.0, 0.26, 0.02), 0.45, 2.2),
+    "battleship_tungsten": ((0.34, 0.55, 1.0), 0.50, 1.7),
+    "cerberus_white_ceramic": ((0.25, 0.75, 1.0), 0.45, 1.5),
+    "plasma_cinder_ablative": ((1.0, 0.16, 0.02), 0.40, 2.4),
+    "cyber_nanoweave": ((0.02, 0.85, 1.0), 0.45, 2.0),
+    "anodized_cobalt": ((0.22, 0.28, 1.0), 0.50, 1.8),
+    "quantum_hyperdrive_alloy": ((0.72, 0.12, 1.0), 0.40, 2.2),
+}
+
+
 def color(r: float, g: float, b: float) -> dict[str, object]:
     return {"a": 1.0, "b": b, "g": g, "r": r, "type": "Color"}
 
@@ -451,6 +471,7 @@ def build_template_project(
         raise FileNotFoundError(f"Material Maker example is missing: {example_path}")
 
     preset = PRESETS[preset_name]
+    emission_rgb, emission_threshold, emission_energy = EMISSION_PROFILES[preset_name]
     project = json.loads(example_path.read_text(encoding="utf-8"))
     project["label"] = preset["label"]
     project["name"] = preset["name"]
@@ -464,6 +485,7 @@ def build_template_project(
             parameters["metallic"] = 1
             parameters["roughness"] = 1
             parameters["normal"] = 1
+            parameters["emission_energy"] = float(emission_energy)
         elif name == "graph":
             _configure_subgraph_bricks(node, preset["bricks"])
         elif name == "Warp":
@@ -510,10 +532,45 @@ def build_template_project(
             if n.get("name") == "colorize_metallic":
                 n.setdefault("parameters", {})["gradient"] = gradient(*preset["metallic_curve"])
 
+    emission_gradient = gradient(
+        (0.0, (0.0, 0.0, 0.0)),
+        (float(emission_threshold), (0.0, 0.0, 0.0)),
+        (1.0, emission_rgb),
+    )
+    emission_node = next((n for n in nodes if n.get("name") == "colorize_emission"), None)
+    if emission_node is None:
+        nodes.append(
+            {
+                "name": "colorize_emission",
+                "node_position": {"x": 760.0, "y": 360.0},
+                "parameters": {"gradient": emission_gradient},
+                "type": "colorize",
+            }
+        )
+    else:
+        emission_node.setdefault("parameters", {})["gradient"] = emission_gradient
+
+    edge_node = next((n for n in nodes if n.get("name") == "edge_detect_emission"), None)
+    edge_parameters = {"size": int(size_power), "threshold": 0.06, "width": 1}
+    if edge_node is None:
+        nodes.append(
+            {
+                "name": "edge_detect_emission",
+                "node_position": {"x": 560.0, "y": 360.0},
+                "parameters": edge_parameters,
+                "type": "edge_detect",
+            }
+        )
+    else:
+        edge_node["parameters"] = edge_parameters
+
     connections = [
         c
         for c in project.get("connections", [])
-        if not (c.get("to") == "Material" and c.get("to_port") == 1)
+        if not (
+            (c.get("to") == "Material" and c.get("to_port") in (1, 3))
+            or c.get("to") in ("colorize_emission", "edge_detect_emission")
+        )
     ]
     connections.append(
         {
@@ -529,6 +586,30 @@ def build_template_project(
             "from_port": 0,
             "to": "Material",
             "to_port": 1,
+        }
+    )
+    connections.append(
+        {
+            "from": "graph",
+            "from_port": 0,
+            "to": "edge_detect_emission",
+            "to_port": 0,
+        }
+    )
+    connections.append(
+        {
+            "from": "edge_detect_emission",
+            "from_port": 0,
+            "to": "colorize_emission",
+            "to_port": 0,
+        }
+    )
+    connections.append(
+        {
+            "from": "colorize_emission",
+            "from_port": 0,
+            "to": "Material",
+            "to_port": 3,
         }
     )
     project["connections"] = connections

@@ -21,6 +21,12 @@ class MaterialMakerWorkflowConfigTests(unittest.TestCase):
         runner = (REPO_ROOT / "tools" / "Run-MaterialMakerBake.ps1").read_text(encoding="utf-8")
         self.assertIn("audit_material_maker_output.py", runner)
 
+    def test_runner_clears_stale_raw_and_packed_outputs(self) -> None:
+        runner = (REPO_ROOT / "tools" / "Run-MaterialMakerBake.ps1").read_text(encoding="utf-8")
+        self.assertIn("Remove-Item -LiteralPath $rawDir -Recurse -Force", runner)
+        self.assertIn("stale Material Maker output", runner)
+        self.assertIn("--template", runner)
+
     def test_config_preserves_the_four_map_contract(self) -> None:
         import json
 
@@ -30,6 +36,24 @@ class MaterialMakerWorkflowConfigTests(unittest.TestCase):
             {entry["suffix"] for entry in data["textureContract"]["requiredMaps"]},
         )
         self.assertEqual("RogueCommand/VehiclePBR_VertexWear", data["textureContract"]["shader"])
+
+    def test_all_presets_wire_tactical_edge_emission(self) -> None:
+        if not TEMPLATE_BUILDER.EXAMPLE.is_file():
+            self.skipTest("Material Maker 1.7 example is not staged locally")
+        self.assertEqual(set(TEMPLATE_BUILDER.PRESETS), set(TEMPLATE_BUILDER.EMISSION_PROFILES))
+        for preset in sorted(TEMPLATE_BUILDER.PRESETS):
+            project = TEMPLATE_BUILDER.build_template_project(preset_name=preset, size_power=10)
+            node_names = {n.get("name") for n in project.get("nodes", [])}
+            self.assertIn("colorize_emission", node_names, preset)
+            self.assertIn("edge_detect_emission", node_names, preset)
+            emission_connections = [
+                c for c in project.get("connections", [])
+                if c.get("to") == "Material" and c.get("to_port") == 3
+            ]
+            self.assertEqual(1, len(emission_connections), preset)
+            self.assertEqual("colorize_emission", emission_connections[0].get("from"))
+            material = next(n for n in project["nodes"] if n.get("name") == "Material")
+            self.assertGreater(float(material["parameters"]["emission_energy"]), 0.0)
 
     def test_all_presets_wire_bimodal_metallic_node(self) -> None:
         if not TEMPLATE_BUILDER.EXAMPLE.is_file():
