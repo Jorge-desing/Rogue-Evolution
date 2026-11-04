@@ -48,6 +48,7 @@ Material:
     - _AlphaClip: 0
     - _AoStrength: 1
     - _BumpScale: 1
+    - _CreviceDustIntensity: 0.5
     - _Cull: 2
     - _Cutoff: 0.5
     - _DetailBumpScale: 0.5
@@ -60,10 +61,12 @@ Material:
     - _Smoothness: 1
     - _SootStrength: 1
     - _Surface: 0
+    - _ThermalTemperingIntensity: 0.75
     - _WearStrength: 1
     - _WeldBeadScale: 24
     - _WeldBeadStrength: 0.6
     - _WeldBeadWidth: 0.12
+    - _ZenithBleach: 0.35
     m_Colors:
     - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
     - _EmissionColor: {r: 1, g: 1, b: 1, a: 1}

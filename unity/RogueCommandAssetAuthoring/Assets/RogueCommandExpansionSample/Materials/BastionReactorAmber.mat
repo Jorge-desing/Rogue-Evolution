@@ -29,6 +29,10 @@ Material:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
+    - _DetailBumpMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     - _EmissionMap:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
@@ -42,17 +46,29 @@ Material:
     - _AlphaClip: 0
     - _AoStrength: 1
     - _BumpScale: 1
+    - _CreviceDustIntensity: 0.5
     - _Cull: 2
     - _Cutoff: 0.5
+    - _DetailBumpScale: 0.5
+    - _DetailTiling: 16
     - _GlossMapScale: 1
     - _Metallic: 0.16
+    - _MudAmount: 0.4
+    - _MudHeight: 0.55
+    - _MudSmoothness: 0.2
     - _Smoothness: 0.82
     - _SootStrength: 1
     - _Surface: 0
+    - _ThermalTemperingIntensity: 0.75
     - _WearStrength: 0.25
+    - _WeldBeadScale: 24
+    - _WeldBeadStrength: 0.6
+    - _WeldBeadWidth: 0.12
+    - _ZenithBleach: 0.35
     m_Colors:
     - _BaseColor: {r: 0.9490196, g: 0.6627451, b: 0.11372549, a: 1}
     - _EmissionColor: {r: 1.8, g: 0.86399996, b: 0.089999996, a: 1.8}
+    - _MudColor: {r: 0.28, g: 0.22, b: 0.16, a: 1}
     - _TeamColor: {r: 1, g: 1, b: 1, a: 1}
   m_BuildTextureStacks: []
 --- !u!114 &3624154925106883110

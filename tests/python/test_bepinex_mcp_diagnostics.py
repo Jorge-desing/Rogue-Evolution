@@ -181,9 +181,10 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
 
         snapshot = json.loads(response["content"][0]["text"])
         self.assertFalse(response["isError"])
-        self.assertEqual(39, len(snapshot))
-        self.assertTrue(all(isinstance(value, dict) for value in snapshot.values()))
-        self.assertTrue(all(value == expected for value in snapshot.values()))
+        self.assertEqual(40, len(snapshot))
+        getter_values = {k: v for k, v in snapshot.items() if k != "_meta"}
+        self.assertTrue(all(isinstance(value, dict) for value in getter_values.values()))
+        self.assertTrue(all(value == expected for value in getter_values.values()))
 
     def test_runtime_snapshot_passes_safe_arguments_to_bounded_getters(self) -> None:
         calls: list[tuple[str, list[object]]] = []
