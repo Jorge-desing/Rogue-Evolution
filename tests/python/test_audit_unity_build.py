@@ -75,6 +75,7 @@ class AuditUnityBuildTests(unittest.TestCase):
         self.assertEqual(summary["three_d"]["mesh_count"], 2)
         self.assertEqual(summary["three_d"]["skinned_mesh_renderer_count"], 1)
         self.assertEqual(summary["three_d"]["lod_group_count"], 1)
+        self.assertEqual(summary["legacy_quality_gate"]["status"], "not_available")
 
         report = audit_unity_build.parse_unity_build_log(
             "Version is '2021.3.45f2'\nException: BuildPipeline failed\n"

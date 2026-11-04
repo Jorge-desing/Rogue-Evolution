@@ -147,13 +147,20 @@ def summarize_bundle_report(report: dict[str, Any]) -> dict[str, Any]:
         "lod_group_count": int(type_counts.get("LODGroup", 0) or 0),
         "serialized_object_count": int(report.get("object_count", 0) or 0),
     }
+    legacy_quality_gate = report.get("quality_gate")
+    if not isinstance(legacy_quality_gate, dict):
+        legacy_quality_gate = {
+            "passed": None,
+            "status": "not_available",
+            "issues": ["legacy-bundle-audit-did-not-provide-quality-gate"],
+        }
     return {
         "bundle_path": report.get("bundle_path", ""),
         "bundle_size_bytes": int(report.get("bundle_size_bytes", 0) or 0),
         "bundle_sha256": report.get("bundle_sha256", ""),
         "urp": urp,
         "three_d": three_d,
-        "legacy_quality_gate": report.get("quality_gate", {"passed": True, "issues": []}),
+        "legacy_quality_gate": legacy_quality_gate,
     }
 
 
