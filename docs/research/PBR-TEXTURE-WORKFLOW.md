@@ -26,6 +26,23 @@ The canonical configuration is `tools/material-maker/rogue-command-material-make
 
 Use `tools/Run-MaterialMakerBake.ps1 -Workflow <name>`. The runner clears stale raw/final outputs before every export, writes a workflow manifest beside the maps, passes the `.ptex` and 3D-paint workspace to `audit_material_maker_output.py`, uses the same four-map contract, and never imports Material Maker-generated Unity `.mat` files. The audit report exposes machine-readable URP map metrics (dimensions, MetallicGloss RGB consistency and smoothness alpha, tangent-normal length/Z health, emission coverage), procedural graph metrics (`colorize_metallic`, `edge_detect_emission`, and `colorize_emission` connections, energy, and node counts), and 3D-paint preservation flags (`requiresUv`, `singleSubmeshForPaint`, `productionMeshUntouched`). Keep the report under `artifacts/`; it is authoring/local evidence, not runtime render evidence.
 
+## Unity and AssetBundle diagnostic report
+
+After a Unity batch build, generate a combined report instead of relying on the process exit code alone:
+
+```bash
+PYTHONPATH=".venv/Lib/site-packages" .venv/Scripts/python.exe \
+  tools/audit_unity_build.py \
+  --log artifacts/unity-visual-build-final.log \
+  --bundle content/packs/sample-native-expansion/bundles/sample-native-expansion.bundle \
+  --output artifacts/unity-visual-build-final-diagnostic.json \
+  --strict
+```
+
+The report separates three evidence layers: Unity batch-log success, offline AssetBundle serialization, and Steam runtime (which remains unknown until a Steam-launched match). It records the Unity version, success/fatal/licensing diagnostics, build duration, bundle size and SHA-256, serialized object totals, shader resolution, texture dimensions/color space, material and URP indicators, mesh/renderer/Animator/animation/particle/LOD counts, and the legacy bundle quality gate. Licensing-client errors are retained as diagnostics but do not fail a build when the builder emits an explicit success marker; missing shutdown markers remain visible through `batchmode_completed`. UnityPy shader names may be unresolved on some serialized shader variants, so `shader_names_unresolved_count` must not be reported as proof that a shader rendered in-game.
+
+Run the same audit for Tactical Operations or other packs by repeating `--bundle`. Keep JSON reports in ignored `artifacts/`; they are local Unity/AssetBundle evidence, not gameplay or render proof.
+
 Material Maker 1.7 and its release ZIP are staged under ignored `.tools/`; the ZIP SHA-256 matches the documented pin `DEB4416BC939861D48097A866A8B2BF0363C29FF64874F2E04478658FF900808`. ArmorPaint's binary is not staged because this workspace has no user-provided official archive. The blendsmith source snapshot is included under its GPL-3.0-only license; EL4CTEO is adapted as new project-specific instructions with its MIT license retained for attribution, and none of its scripts are copied.
 
 
