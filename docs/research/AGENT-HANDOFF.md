@@ -29,6 +29,15 @@
 
 ---
 
+## 2026-11-04 locomotion animation follow-up
+
+- **Implementation commit:** `2c3cabd` (`fix(animation): switch idle and locomotion states from live motion`). `RuntimeVisualDirector` now samples motion before updating the Animator and uses the pure `LocomotionAnimationPolicy`, so a measurable displacement or sampled velocity sets `RCL_IsMoving=true`; stationary samples set it false immediately. The existing controller contract keeps `Action_Idle`/`Action_Walk`/`Action_Drive` looping and transitions Idle → locomotion on `RCL_IsMoving`, then back to Idle on `!RCL_IsMoving`.
+- **TDD/local validation:** The focused RED build failed because `LocomotionAnimationPolicy` was absent; GREEN passed `158/158` RuntimeAndDiagnostics checks. The final Release harness passed `481/482` with one Windows symlink-privilege skip; the plugin build had 0 warnings and 0 errors. The Python runner passed `166` tests with one platform skip, checked 25 AssetBundle references with 0 errors, and passed 4 manifest checks.
+- **Steam runtime evidence:** Session `artifacts/runtime-smoke/steam-locomotion-20261104-211817-d5ffb1f/` deployed plugin SHA-256 `d5ffb11a391f0e2b0dbdfe72c2355a172b664a5e88fba48bb57b30fffa7f443c` after verifying the complete 1.0.9/Unity/Assembly-CSharp identity. A live synthetic `sample-native:arachnid-hexapod` spawn reported `Action_Idle` with `RCL_IsMoving=false` and a high normalized time (`8.999357`), proving the idle clip loop. A direct move order to `(100, 0)` then reported `Action_Walk` with `RCL_IsMoving=true` (`normalizedTime=0.0764554143`); a direct stop order returned to `Action_Idle` with `RCL_IsMoving=false` (`normalizedTime=0.8536548`). This is in-game Steam evidence for the Animator state transitions through the synthetic spawn/order seam, not natural blueprint or production evidence.
+- **Cleanup:** The game process exited, the installed plugin was restored to SHA-256 `fbe7584c2176f7c00c434e1f0ff1d4a60d29595fb475c069c341aa81dff1fb2b`, and `profile-verification.json` reports `selectorMatch=true`, `unexpectedChanged=[]`, only the authorized `Profile2/metaSavegame.dat` delta, and `safe_to_finalize=true`.
+
+---
+
 ## 1. Authoritative Compatibility Identity
 
 Always recheck this identity before relying on reflected signatures, CIL metadata tokens, or serialized assets:
