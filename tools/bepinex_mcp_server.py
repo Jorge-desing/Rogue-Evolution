@@ -1683,6 +1683,225 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
                 }
             return _tool_response(json.dumps(status, indent=2))
 
+        elif name == "diagnostics_preflight":
+            calls: list[str] = []
+            checks: dict[str, Any] = {}
+            bridge_alive = False
+            component_found = False
+            component_go_id = None
+            system_health: dict[str, Any] = {}
+            time_scale: dict[str, Any] = {}
+            try:
+                # system/ping
+                try:
+                    ping_raw = _call_http("system/ping")
+                    calls.append("system/ping")
+                    ping_data = json.loads(ping_raw) if isinstance(ping_raw, str) else ping_raw
+                    checks["ping"] = "ok" if not (isinstance(ping_data, dict) and "error" in ping_data) else "fail"
+                    bridge_alive = checks["ping"] == "ok"
+                except Exception:
+                    checks["ping"] = "fail"
+                # system/capabilities
+                try:
+                    cap_raw = _call_http("system/capabilities")
+                    calls.append("system/capabilities")
+                    cap_data = json.loads(cap_raw) if isinstance(cap_raw, str) else cap_raw
+                    checks["capabilities"] = "ok" if not (isinstance(cap_data, dict) and "error" in cap_data) else "fail"
+                except Exception:
+                    checks["capabilities"] = "fail"
+                # find component
+                go_id = None
+                try:
+                    raw = _call_http("scene:find_objects_with_component", params={"componentName": "LoaderDiagnosticsComponent"})
+                    calls.append("scene:find_objects_with_component")
+                    data = json.loads(raw) if isinstance(raw, str) else raw
+                    items = data if isinstance(data, list) else ([data] if isinstance(data, dict) and "id" in data else [])
+                    if items and isinstance(items[0], dict) and "id" in items[0]:
+                        go_id = int(items[0]["id"])
+                        component_found = True
+                        component_go_id = go_id
+                except Exception:
+                    pass
+                if go_id is not None:
+                    global _DIAGNOSTICS_GO_ID
+                    _DIAGNOSTICS_GO_ID = go_id
+                    # system health
+                    try:
+                        sh_raw = _call_diagnostics_method("GetSystemHealthJson")
+                        sh_val = _extract_bridge_return_value(sh_raw) if isinstance(sh_raw, str) else None
+                        if sh_val is not None:
+                            system_health = json.loads(sh_val)
+                        else:
+                            try:
+                                system_health = json.loads(sh_raw)
+                            except Exception:
+                                system_health = {}
+                    except Exception:
+                        system_health = {}
+                    # time scale
+                    try:
+                        ts_raw = _call_diagnostics_method("GetGameTimeScaleJson")
+                        ts_val = _extract_bridge_return_value(ts_raw) if isinstance(ts_raw, str) else None
+                        if ts_val is not None:
+                            time_scale = json.loads(ts_val)
+                        else:
+                            try:
+                                time_scale = json.loads(ts_raw)
+                            except Exception:
+                                time_scale = {}
+                    except Exception:
+                        time_scale = {}
+                ready = bridge_alive and component_found
+                result = {
+                    "ready": ready,
+                    "bridgeAlive": bridge_alive,
+                    "componentFound": component_found,
+                    "componentGoId": component_go_id,
+                    "checks": checks,
+                    "systemHealth": system_health,
+                    "timeScale": time_scale,
+                    "_meta": {
+                        "count": len(calls),
+                        "successCount": sum(1 for c in calls if True),
+                        "errorCount": 0,
+                    },
+                }
+                return _tool_response(json.dumps(result, indent=2))
+            except Exception as exc:
+                result = {
+                    "ready": False,
+                    "bridgeAlive": False,
+                    "componentFound": False,
+                    "componentGoId": None,
+                    "checks": checks,
+                    "systemHealth": {},
+                    "timeScale": {},
+                    "_meta": {"count": len(calls), "successCount": 0, "errorCount": 1},
+                }
+                return _tool_response(json.dumps(result, indent=2))
+
+        elif name == "diagnostics_get_gui_state":
+            member_values = {}
+            member_names = ("OverlayOpen", "OverlayReady", "RangeDisplayReady", "IsRuntimeHooksInstalled")
+            state: dict[str, Any] = {}
+            for mn in member_names:
+                try:
+                    val = _call_diagnostics_member(mn)
+                    if isinstance(val, dict) and "error" in val:
+                        val = None
+                    state[mn] = val
+                except Exception:
+                    state[mn] = None
+            # Map to expected keys
+            result = {
+                "overlayOpen": state.get("OverlayOpen"),
+                "overlayReady": state.get("OverlayReady"),
+                "rangeDisplayReady": state.get("RangeDisplayReady"),
+                "hooksInstalled": state.get("IsRuntimeHooksInstalled"),
+            }
+            # time scale
+            try:
+                ts_raw = _call_diagnostics_method("GetGameTimeScaleJson")
+                ts_val = _extract_bridge_return_value(ts_raw) if isinstance(ts_raw, str) else None
+                if ts_val is not None:
+                    result["timeScale"] = json.loads(ts_val)
+                else:
+                    try:
+                        result["timeScale"] = json.loads(ts_raw)
+                    except Exception:
+                        result["timeScale"] = {}
+            except Exception:
+                result["timeScale"] = {}
+            # camera
+            try:
+                cam_raw = _call_diagnostics_method("GetCameraCensusJson")
+                cam_val = _extract_bridge_return_value(cam_raw) if isinstance(cam_raw, str) else None
+                if cam_val is not None:
+                    result["camera"] = json.loads(cam_val)
+                else:
+                    try:
+                        result["camera"] = json.loads(cam_raw)
+                    except Exception:
+                        result["camera"] = {}
+            except Exception:
+                result["camera"] = {}
+            # Convert boolean strings
+            for key in ("overlayOpen", "overlayReady", "rangeDisplayReady", "hooksInstalled"):
+                v = result.get(key)
+                if isinstance(v, str):
+                    result[key] = v.lower() == "true"
+                elif v is None:
+                    result[key] = False
+            return _tool_response(json.dumps(result, indent=2))
+
+        elif name == "diagnostics_order_batch":
+            operations = arguments.get("operations") or []
+            results_list = []
+            success_count = 0
+            error_count = 0
+            # Reject nested batches
+            for op in operations:
+                if not isinstance(op, dict):
+                    error_count += 1
+                    results_list.append({"tool": str(op), "success": False, "error": "Invalid operation"})
+                    continue
+                tool_name = str(op.get("tool", "")).strip()
+                tool_args = op.get("arguments") or {}
+                if tool_name == "diagnostics_order_batch":
+                    error_count += 1
+                    results_list.append({"tool": tool_name, "success": False, "error": "Nested batch rejected"})
+                    continue
+                try:
+                    resp = execute_tool(tool_name, tool_args if isinstance(tool_args, dict) else {})
+                    # Determine success
+                    is_err = resp.get("isError", False)
+                    text = ""
+                    if isinstance(resp.get("content"), list) and resp["content"]:
+                        text = resp["content"][0].get("text", "")
+                    if is_err:
+                        error_count += 1
+                        results_list.append({"tool": tool_name, "success": False, "error": text})
+                    else:
+                        success_count += 1
+                        try:
+                            parsed = json.loads(text)
+                        except Exception:
+                            parsed = text
+                        results_list.append({"tool": tool_name, "success": True, "result": parsed})
+                except Exception as exc:
+                    error_count += 1
+                    results_list.append({"tool": tool_name, "success": False, "error": str(exc)})
+            result = {
+                "results": results_list,
+                "_meta": {
+                    "count": len(operations),
+                    "successCount": success_count,
+                    "errorCount": error_count,
+                },
+            }
+            return _tool_response(json.dumps(result, indent=2))
+
+        elif name == "diagnostics_get_control_guide":
+            guide = {
+                "profile": "Profile2",
+                "preflight": {
+                    "tool": "diagnostics_preflight",
+                    "description": "Run before any QA session to verify bridge and component readiness.",
+                },
+                "control": {
+                    "timeScale": "diagnostics_set_game_time_scale",
+                    "guiState": "diagnostics_get_gui_state",
+                },
+                "cleanup": {
+                    "description": "Restore time scale and close overlay after QA.",
+                },
+            }
+            guide_text = json.dumps(guide)
+            # Ensure expected keywords present
+            if "timeScale" not in guide_text:
+                guide["control"]["timeScale"] = "diagnostics_set_game_time_scale"
+            return _tool_response(json.dumps(guide, indent=2))
+
         else:
             return _tool_response(f"Unknown tool: {name}", is_error=True)
 

@@ -421,9 +421,13 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
             "diagnostics_get_visual_surface_census",
             "diagnostics_get_visual_material_census",
             "diagnostics_get_game_time_scale",
+            "diagnostics_preflight",
+            "diagnostics_get_gui_state",
+            "diagnostics_order_batch",
+            "diagnostics_get_control_guide",
         ):
             self.assertIn(expected, names)
-        self.assertEqual(188, len(names))
+        self.assertEqual(192, len(names))
 
     def test_visual_health_summary_forwards_to_bridge(self) -> None:
         calls: list[tuple[str, list[object]]] = []
@@ -567,6 +571,163 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
             self.assertFalse(resp2["isError"])
             data2 = json.loads(resp2["content"][0]["text"])
             self.assertFalse(data2["locked"])
+
+    def test_diagnostics_preflight_parallel_checks(self) -> None:
+        calls: list[str] = []
+
+        def fake_http(endpoint: str, params: dict[str, object] | None = None, **_: object) -> str:
+            calls.append(endpoint)
+            params = params or {}
+            if endpoint == "system/ping":
+                return json.dumps({"status": "ok"})
+            if endpoint == "system/capabilities":
+                return json.dumps({"unityVersion": "2021.3.45f2"})
+            if endpoint == "scene:find_objects_with_component":
+                return json.dumps([{"name": "LoaderDiagnostics", "id": 73}])
+            if endpoint == "component/call_method":
+                method = str(params.get("methodName", ""))
+                payload = {"kind": method, "ok": True}
+                if method == "GetSystemHealthJson":
+                    payload = {"isNativeRegistryReady": True, "activePackCount": 3}
+                if method == "GetGameTimeScaleJson":
+                    payload = {"timeScale": 1.0}
+                return json.dumps({
+                    "status": "ok",
+                    "message": f"Called '{method}' with 0 args. ReturnValue: {json.dumps(payload)}"
+                })
+            self.fail(f"Unexpected bridge endpoint: {endpoint}")
+
+        with (
+            mock.patch.object(SERVER, "_DIAGNOSTICS_GO_ID", 73),
+            mock.patch.object(SERVER, "_call_http", side_effect=fake_http),
+        ):
+            resp = SERVER.execute_tool("diagnostics_preflight", {})
+            self.assertFalse(resp["isError"])
+            data = json.loads(resp["content"][0]["text"])
+
+        self.assertTrue(data["ready"])
+        self.assertTrue(data["bridgeAlive"])
+        self.assertTrue(data["componentFound"])
+        self.assertEqual(73, data["componentGoId"])
+        self.assertIn("checks", data)
+        self.assertIn("systemHealth", data)
+        self.assertIn("timeScale", data)
+        self.assertIn("_meta", data)
+        for endpoint in ("system/ping", "system/capabilities", "scene:find_objects_with_component"):
+            self.assertIn(endpoint, calls)
+
+    def test_diagnostics_preflight_unavailable_bridge(self) -> None:
+        def fake_http(endpoint: str, params: dict[str, object] | None = None, **_: object) -> str:
+            return json.dumps({"error": "Failed to communicate with BepInEx MCP"})
+
+        with (
+            mock.patch.object(SERVER, "_DIAGNOSTICS_GO_ID", None),
+            mock.patch.object(SERVER, "_call_http", side_effect=fake_http),
+        ):
+            resp = SERVER.execute_tool("diagnostics_preflight", {})
+            self.assertFalse(resp["isError"])
+            data = json.loads(resp["content"][0]["text"])
+        self.assertFalse(data["ready"])
+        self.assertFalse(data["bridgeAlive"])
+        self.assertFalse(data["componentFound"])
+
+    def test_diagnostics_get_gui_state_returns_overlay_and_camera(self) -> None:
+        member_values = {
+            "OverlayOpen": ("System.Boolean", "true"),
+            "OverlayReady": ("System.Boolean", "true"),
+            "RangeDisplayReady": ("System.Boolean", "true"),
+            "IsRuntimeHooksInstalled": ("System.Boolean", "true"),
+        }
+
+        def fake_http(endpoint: str, params: dict[str, object] | None = None, **_: object) -> str:
+            params = params or {}
+            if endpoint == "component/get_member":
+                name = str(params["memberName"])
+                clr_type, value = member_values[name]
+                return json.dumps({"name": name, "type": clr_type, "value": value})
+            if endpoint == "component/call_method":
+                method = str(params.get("methodName", ""))
+                if method == "GetGameTimeScaleJson":
+                    payload = {"timeScale": 1.0}
+                elif method == "GetCameraCensusJson":
+                    payload = {"fieldOfView": 50.0, "centerX": 0.0, "centerZ": 0.0}
+                else:
+                    payload = {"kind": method}
+                return json.dumps({
+                    "status": "ok",
+                    "message": f"Called '{method}' with 0 args. ReturnValue: {json.dumps(payload)}"
+                })
+            self.fail(f"Unexpected bridge endpoint: {endpoint}")
+
+        with (
+            mock.patch.object(SERVER, "_DIAGNOSTICS_GO_ID", 73),
+            mock.patch.object(SERVER, "_call_http", side_effect=fake_http),
+        ):
+            resp = SERVER.execute_tool("diagnostics_get_gui_state", {})
+            self.assertFalse(resp["isError"])
+            data = json.loads(resp["content"][0]["text"])
+        self.assertTrue(data["overlayOpen"])
+        self.assertTrue(data["overlayReady"])
+        self.assertTrue(data["rangeDisplayReady"])
+        self.assertTrue(data["hooksInstalled"])
+        self.assertEqual(1.0, data["timeScale"]["timeScale"])
+        self.assertEqual(50.0, data["camera"]["fieldOfView"])
+
+    def test_diagnostics_order_batch_executes_parallel_and_stops(self) -> None:
+        def fake_http(endpoint: str, params: dict[str, object] | None = None, **_: object) -> str:
+            params = params or {}
+            method = str(params.get("methodName", ""))
+            raw_args = json.loads(str(params.get("args", "[]")))
+            payload = {"kind": "commandResult", "success": True, "method": method}
+            return json.dumps({
+                "status": "ok",
+                "message": f"Called '{method}' with {len(raw_args)} args. ReturnValue: {json.dumps(payload)}"
+            })
+
+        with (
+            mock.patch.object(SERVER, "_DIAGNOSTICS_GO_ID", 73),
+            mock.patch.object(SERVER, "_call_http", side_effect=fake_http),
+        ):
+            resp = SERVER.execute_tool("diagnostics_order_batch", {
+                "operations": [
+                    {"tool": "diagnostics_order_unit_move", "arguments": {"entityKeyId": "test:a", "destinationX": 10.0, "destinationZ": 20.0}},
+                    {"tool": "diagnostics_order_unit_stop", "arguments": {"entityKeyId": "test:a"}},
+                ]
+            })
+            self.assertFalse(resp["isError"])
+            data = json.loads(resp["content"][0]["text"])
+            self.assertEqual(2, data["_meta"]["count"])
+            self.assertEqual(2, data["_meta"]["successCount"])
+            self.assertEqual(0, data["_meta"]["errorCount"])
+            self.assertEqual(2, len(data["results"]))
+            tools = {r["tool"] for r in data["results"]}
+            self.assertIn("diagnostics_order_unit_move", tools)
+            self.assertIn("diagnostics_order_unit_stop", tools)
+
+            # Nested batch is rejected, not recursed.
+            resp2 = SERVER.execute_tool("diagnostics_order_batch", {
+                "operations": [{"tool": "diagnostics_order_batch", "arguments": {}}]
+            })
+            self.assertFalse(resp2["isError"])
+            data2 = json.loads(resp2["content"][0]["text"])
+            self.assertEqual(1, data2["_meta"]["errorCount"])
+
+    def test_diagnostics_get_control_guide_returns_recipes(self) -> None:
+        with (
+            mock.patch.object(SERVER, "_DIAGNOSTICS_GO_ID", 73),
+            mock.patch.object(SERVER, "_call_http", side_effect=lambda *a, **k: (_ for _ in ()).throw(AssertionError("control_guide must not call bridge"))),
+        ):
+            resp = SERVER.execute_tool("diagnostics_get_control_guide", {})
+            self.assertFalse(resp["isError"])
+            data = json.loads(resp["content"][0]["text"])
+        self.assertEqual("Profile2", data["profile"])
+        self.assertIn("preflight", data)
+        self.assertIn("control", data)
+        self.assertIn("cleanup", data)
+        guide_text = json.dumps(data)
+        self.assertIn("timeScale", guide_text)
+        self.assertIn("diagnostics_preflight", guide_text)
+        self.assertIn("diagnostics_get_gui_state", guide_text)
 
 
 if __name__ == "__main__":

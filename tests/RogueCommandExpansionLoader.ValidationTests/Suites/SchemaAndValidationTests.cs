@@ -928,28 +928,29 @@ internal static partial class ValidationTestRunner
         }
     }),
     ("offline loader registry tool validates declared pack relationships", () =>
-    {
-        string output;
-        int exitCode;
-        using (var process = new System.Diagnostics.Process())
-        {
-            string venvPython = Path.Combine(repositoryRoot, ".venv", "Scripts", "python.exe");
-            process.StartInfo.FileName = File.Exists(venvPython) ? venvPython : "python";
-            process.StartInfo.Arguments = "tools/validate_loader_registry.py";
-            process.StartInfo.UseShellExecute = false;
-            process.StartInfo.RedirectStandardOutput = true;
-            process.StartInfo.CreateNoWindow = true;
-            process.Start();
-            output = process.StandardOutput.ReadToEnd();
-            process.WaitForExit();
-            exitCode = process.ExitCode;
-        }
+            {
+                string output;
+                int exitCode;
+                using (var process = new System.Diagnostics.Process())
+                {
+                    string venvPython = Path.Combine(repositoryRoot, ".venv", "Scripts", "python.exe");
+                    process.StartInfo.FileName = File.Exists(venvPython) ? venvPython : "python";
+                    process.StartInfo.Arguments = "tools/validate_loader_registry.py";
+                    process.StartInfo.WorkingDirectory = repositoryRoot;
+                    process.StartInfo.UseShellExecute = false;
+                    process.StartInfo.RedirectStandardOutput = true;
+                    process.StartInfo.CreateNoWindow = true;
+                    process.Start();
+                    output = process.StandardOutput.ReadToEnd();
+                    process.WaitForExit();
+                    exitCode = process.ExitCode;
+                }
 
-        if (exitCode != 0 || !System.Text.RegularExpressions.Regex.IsMatch(output, @"PASS checked \d+ manifests") || output.Contains("FAIL"))
-        {
-            throw new InvalidOperationException("Loader registry tool failed: " + output);
-        }
-    }),
+                if (exitCode != 0 || !System.Text.RegularExpressions.Regex.IsMatch(output, @"PASS checked \d+ manifests") || output.Contains("FAIL"))
+                {
+                    throw new InvalidOperationException("Loader registry tool failed: " + output);
+                }
+            }),
     ("unit reference graph validation is stack-safe for a deep chain", () =>
     {
         var process = new System.Diagnostics.Process();

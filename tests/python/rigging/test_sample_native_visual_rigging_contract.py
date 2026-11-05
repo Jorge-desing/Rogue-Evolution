@@ -29,9 +29,17 @@ VISUAL_UNITS = {
     "SurgeArcTank": "SurgeArcTankVisual",
 }
 VISUAL_PREFABS = tuple(VISUAL_UNITS.values())
+# Units with wheeled/tracked locomotion use Action_Drive; legged walkers use Action_Walk
 MOVEMENT_ACTIONS = {
-    unit_name: f"{unit_name}_Armature|{unit_name}_Action_Walk"
-    for unit_name in VISUAL_UNITS
+    "ArachnidHexapod": "ArachnidHexapod_Armature|ArachnidHexapod_Action_Walk",
+    "OverlordCommandHQ": "OverlordCommandHQ_Armature|OverlordCommandHQ_Action_Drive",
+    "AtlasCraneMech": "AtlasCraneMech_Armature|AtlasCraneMech_Action_Walk",
+    "BastionSiegeMech": "BastionSiegeMech_Armature|BastionSiegeMech_Action_Walk",
+    "ColossusSiegePlatform": "ColossusSiegePlatform_Armature|ColossusSiegePlatform_Action_Drive",
+    "IroncladWalker": "IroncladWalker_Armature|IroncladWalker_Action_Walk",
+    "SandlanceScout": "SandlanceScout_Armature|SandlanceScout_Action_Drive",
+    "SkirmishStrikeBike": "SkirmishStrikeBike_Armature|SkirmishStrikeBike_Action_Drive",
+    "SurgeArcTank": "SurgeArcTank_Armature|SurgeArcTank_Action_Drive",
 }
 IDLE_ACTIONS = {
     unit_name: f"{unit_name}_Armature|{unit_name}_Action_Idle"
