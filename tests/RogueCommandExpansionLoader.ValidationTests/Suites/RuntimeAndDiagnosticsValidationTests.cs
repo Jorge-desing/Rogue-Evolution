@@ -4730,6 +4730,84 @@ internal static partial class ValidationTestRunner
             ExistingControllers.Instance.Reset();
         }
     }),
+    ("runtime visual quality census accepts active URP rigged overlay materials", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        try
+        {
+            var unit = new EntityController
+            {
+                entityId = "sample-native:rigged-urp-overlay",
+                UniqueEntityId = 864,
+                IsControlledByPlayer = true,
+                IsUnit = true,
+                Position = new Vector3(0f, 0f, 0f)
+            };
+            var go = new GameObject { name = "RiggedUrpOverlay" };
+            var renderer = go.AddComponent<MeshRenderer>();
+            renderer.sharedMaterials = new[]
+            {
+                new Material
+                {
+                    name = "RiggedUrpMaterial",
+                    shader = new Shader { name = "Universal Render Pipeline/Lit" }
+                }
+            };
+            unit.gameObject = go;
+            ExistingControllers.Instance.PlayerUnits().Add(unit);
+
+            VisualQualityCensus census = RuntimeVisualQualityCensus.Current();
+            if (census.Rows.Count != 1 || census.Rows[0].UnsupportedShaderCount != 0 ||
+                census.Rows[0].QualityIssues.Count != 0)
+            {
+                throw new InvalidOperationException("Active URP rigged overlay materials must not be classified as unsupported shaders.");
+            }
+        }
+        finally
+        {
+            ExistingControllers.Instance.Reset();
+        }
+    }),
+    ("runtime visual quality census ignores disabled native renderer materials", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        try
+        {
+            var unit = new EntityController
+            {
+                entityId = "sample-native:disabled-native-materials",
+                UniqueEntityId = 863,
+                IsControlledByPlayer = true,
+                IsUnit = true,
+                Position = new Vector3(0f, 0f, 0f)
+            };
+            var go = new GameObject { name = "DisabledNativeVisual" };
+            var renderer = go.AddComponent<MeshRenderer>();
+            renderer.enabled = false;
+            renderer.sharedMaterials = new[]
+            {
+                new Material
+                {
+                    name = "DisabledNativeMaterial",
+                    shader = new Shader { name = "Universal Render Pipeline/Lit" }
+                }
+            };
+            unit.gameObject = go;
+            ExistingControllers.Instance.PlayerUnits().Add(unit);
+
+            VisualQualityCensus census = RuntimeVisualQualityCensus.Current();
+            if (census.Rows.Count != 1 || census.Rows[0].UnsupportedShaderCount != 0 ||
+                census.Rows[0].MaterialCount != 0 || census.Rows[0].VertexColorSampleCount != 0 ||
+                census.Rows[0].QualityIssues.Count != 0)
+            {
+                throw new InvalidOperationException("Disabled native renderers must not create active visual quality failures for loader-owned units.");
+            }
+        }
+        finally
+        {
+            ExistingControllers.Instance.Reset();
+        }
+    }),
     ("runtime tech catalog census queries registered upgrades research branches and relics", () =>
     {
         TechCatalogCensus census = RuntimeTechCatalogCensus.Current();

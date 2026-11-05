@@ -236,7 +236,21 @@ namespace RogueCommandExpansionLoader.Runtime
                 foreach (Renderer renderer in renderers)
                 {
                     if (renderer == null) continue;
-                    try { if (renderer.enabled && renderer.isVisible) visibleRendererCount++; } catch { }
+                    bool rendererEnabled = false;
+                    try
+                    {
+                        rendererEnabled = renderer.enabled;
+                        if (rendererEnabled && renderer.isVisible) visibleRendererCount++;
+                    }
+                    catch { }
+
+                    // Native template renderers remain in the cloned gameplay hierarchy
+                    // but are disabled when a bundle overlay replaces that subtree. They
+                    // must not count as active shader/material failures for the live unit.
+                    if (!rendererEnabled)
+                    {
+                        continue;
+                    }
 
                     Material[] materials = null;
                     try { materials = renderer.sharedMaterials; } catch { }
@@ -252,7 +266,7 @@ namespace RogueCommandExpansionLoader.Runtime
                         bool isNative = string.Equals(shaderName, NativeShaderName, StringComparison.Ordinal);
                         if (isPbr) pbrCount++;
                         if (isStandard) standardCount++;
-                        if (isLoaderOwned && !isPbr && !isStandard && !isNative) unsupportedCount++;
+                        if (isLoaderOwned && !IsAcceptedRuntimeShaderName(shaderName)) unsupportedCount++;
 
                         string[] keywords = null;
                         try { keywords = material.shaderKeywords; } catch { }
@@ -384,9 +398,61 @@ namespace RogueCommandExpansionLoader.Runtime
             try { return unit.name ?? string.Empty; } catch { return string.Empty; }
         }
 
+        private static bool IsAcceptedRuntimeShaderName(string shaderName)
+        {
+            if (string.IsNullOrEmpty(shaderName) ||
+                shaderName.IndexOf("Error", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                shaderName.IndexOf("Hidden", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return false;
+            }
+
+            return string.Equals(shaderName, PbrShaderName, StringComparison.Ordinal) ||
+                   string.Equals(shaderName, StandardShaderName, StringComparison.Ordinal) ||
+                   string.Equals(shaderName, NativeShaderName, StringComparison.Ordinal) ||
+                   shaderName.StartsWith("Universal Render Pipeline/", StringComparison.Ordinal) ||
+                   shaderName.StartsWith("Shader Graphs/", StringComparison.Ordinal) ||
+                   shaderName.StartsWith("Shapes/", StringComparison.Ordinal) ||
+                   shaderName.StartsWith("Sprites/", StringComparison.Ordinal);
+        }
+
         private static Texture GetTexture(Material material, string property)
         {
-            try { return material.GetTexture(property); } catch { return null; }
+            try
+            {
+                if (material == null || string.IsNullOrEmpty(property) || !HasMaterialProperty(material, property))
+                {
+                    return null;
+                }
+
+                return material.GetTexture(property);
+            }
+            catch { return null; }
+        }
+
+        private static bool HasMaterialProperty(Material material, string property)
+        {
+            try
+            {
+                MethodInfo hasProperty = material.GetType().GetMethod(
+                    "HasProperty",
+                    BindingFlags.Instance | BindingFlags.Public,
+                    null,
+                    new[] { typeof(string) },
+                    null);
+                if (hasProperty == null)
+                {
+                    // The dependency-free test stub does not model Unity's property API.
+                    return true;
+                }
+
+                object result = hasProperty.Invoke(material, new object[] { property });
+                return result is bool && (bool)result;
+            }
+            catch
+            {
+                return true;
+            }
         }
 
         private static bool Contains(string[] keywords, string value)
