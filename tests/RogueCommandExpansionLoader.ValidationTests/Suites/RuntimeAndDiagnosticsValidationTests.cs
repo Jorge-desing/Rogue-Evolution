@@ -6899,6 +6899,25 @@ internal static partial class ValidationTestRunner
 
         RuntimeGameplayCommandDirector.TrySetAiDoctrine("Standard", 1.0f);
     }),
+    ("locomotion animation policy loops idle only while stationary", () =>
+    {
+        if (LocomotionAnimationPolicy.IsMoving(0f, 0.016f, 0f))
+        {
+            throw new InvalidOperationException("A stationary unit must keep its idle loop active.");
+        }
+        if (!LocomotionAnimationPolicy.IsMoving(0.0001f, 0.016f, 0f))
+        {
+            throw new InvalidOperationException("A measurable position delta must stop the idle loop and enter locomotion.");
+        }
+        if (!LocomotionAnimationPolicy.IsMoving(0f, 0.016f, 0.000002f))
+        {
+            throw new InvalidOperationException("A sampled movement velocity must stop the idle loop even when position is quantized.");
+        }
+        if (LocomotionAnimationPolicy.IsMoving(0f, 0f, 1f))
+        {
+            throw new InvalidOperationException("A zero-delta-time sample must not activate locomotion.");
+        }
+    }),
     ("runtime visual census discovers skinned mesh, skeletal armature, animator parameters, and canonical sockets", () =>
     {
         ExistingControllers.Instance.Reset();

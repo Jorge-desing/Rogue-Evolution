@@ -600,6 +600,7 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             if (_entity == null) return;
 
             UpdateNativeAudioBindings();
+            UpdateMotionSample(Time.deltaTime);
             UpdateLocomotionAnimation();
             UpdateStatusEffectAndStanceReactions();
             UpdateHealthAndDamageTransitions();
@@ -608,7 +609,6 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             UpdateFactoryDeployAnimation();
             UpdateAutomaticWeaponFeedback();
             UpdateRecoilRecovery();
-            UpdateMotionSample(Time.deltaTime);
             UpdateAntennaWobble(Time.deltaTime);
             UpdateVtolThrusterVectoring(Time.deltaTime);
         }
@@ -621,13 +621,14 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
 
             Vector3 currentPosition = _entity.transform.position;
             float deltaTime = Time.deltaTime;
-            bool positionMoved = _hasLastAnimationPosition && deltaTime > Mathf.Epsilon &&
-                (currentPosition - _lastAnimationPosition).sqrMagnitude > 1e-8f;
-            // Fall back to the sampled velocity so a unit whose transform reports
-            // only tiny per-frame deltas (or whose position is quantized) still
-            // drives its walk cycle instead of staying locked in the idle clip.
-            bool velocityMoving = _hasLastPosition && _lastVelocity.sqrMagnitude > 1e-6f;
-            bool isMoving = positionMoved || velocityMoving;
+            float positionDeltaSquared = _hasLastAnimationPosition
+                ? (currentPosition - _lastAnimationPosition).sqrMagnitude
+                : 0f;
+            float velocitySquared = _hasLastPosition ? _lastVelocity.sqrMagnitude : 0f;
+            bool isMoving = LocomotionAnimationPolicy.IsMoving(
+                positionDeltaSquared,
+                deltaTime,
+                velocitySquared);
 
             _isMoving = isMoving;
             _animator.SetBool(MovementAnimationParameter, isMoving);

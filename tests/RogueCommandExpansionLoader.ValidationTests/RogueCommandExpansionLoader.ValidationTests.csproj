@@ -147,6 +147,8 @@
              Link="Runtime/Visual/RogueCommandSocketCatalog.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/Visual/UniqueSocketRoleBinding.cs"
              Link="Runtime/Visual/UniqueSocketRoleBinding.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/Visual/LocomotionAnimationPolicy.cs"
+             Link="Runtime/Visual/LocomotionAnimationPolicy.cs" />
 
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/StageFallbackSnapshot.cs"
              Link="Runtime/StageFallbackSnapshot.cs" />
