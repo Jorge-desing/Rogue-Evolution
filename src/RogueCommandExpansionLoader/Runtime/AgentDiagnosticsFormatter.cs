@@ -1879,6 +1879,51 @@ namespace RogueCommandExpansionLoader.Runtime
             return Serialize(view);
         }
 
+        public static string SerializeVisualHealthSummary(VisualHealthSummary summary)
+        {
+            var rows = new List<Dictionary<string, object>>();
+            if (summary != null && summary.Rows != null)
+            {
+                foreach (VisualHealthRow row in summary.Rows)
+                {
+                    if (row == null) continue;
+                    rows.Add(new Dictionary<string, object>
+                    {
+                        ["entityKeyId"] = row.EntityKeyId ?? string.Empty,
+                        ["isLoaderOwned"] = row.IsLoaderOwned,
+                        ["contractPass"] = row.ContractPass,
+                        ["qualityIssueCount"] = row.QualityIssueCount,
+                        ["rendererCount"] = row.RendererCount,
+                        ["materialCount"] = row.MaterialCount,
+                        ["pbrMaterialCount"] = row.PbrMaterialCount,
+                        ["vertexColorSampleCount"] = row.VertexColorSampleCount,
+                        ["surfaceVertexCount"] = row.SurfaceVertexCount,
+                        ["materialTextureCount"] = row.MaterialTextureCount,
+                        ["socketCount"] = row.SocketCount,
+                        ["ambiguousSocketCount"] = row.AmbiguousSocketCount,
+                        ["totalIssueCount"] = row.TotalIssueCount,
+                    });
+                }
+            }
+
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "visualHealthSummary",
+                ["omittedUnitCount"] = summary != null ? summary.OmittedUnitCount : 0,
+                ["trackedUnitCount"] = summary != null ? summary.TrackedUnitCount : 0,
+                ["loaderOwnedUnitCount"] = summary != null ? summary.LoaderOwnedUnitCount : 0,
+                ["qualityPassCount"] = summary != null ? summary.QualityPassCount : 0,
+                ["qualityIssueCount"] = summary != null ? summary.QualityIssueCount : 0,
+                ["totalVertexColorSampleCount"] = summary != null ? summary.TotalVertexColorSampleCount : 0,
+                ["totalMaterialCount"] = summary != null ? summary.TotalMaterialCount : 0,
+                ["totalSocketCount"] = summary != null ? summary.TotalSocketCount : 0,
+                ["ambiguousSocketUnitCount"] = summary != null ? summary.AmbiguousSocketUnitCount : 0,
+                ["rowCount"] = rows.Count,
+                ["rows"] = rows,
+            };
+            return Serialize(view);
+        }
+
         public static string SerializeVisualMaterialCensus(VisualMaterialCensus census)
         {
             var rows = new List<Dictionary<string, object>>();
@@ -2918,6 +2963,7 @@ new Dictionary<string, object> { ["name"] = "OrderRetreatJson", ["description"] 
                 new Dictionary<string, object> { ["name"] = "GetAudioCensusJson", ["description"] = "Telemetry of audio mixer volume slider levels." },
 new Dictionary<string, object> { ["name"] = "GetVisualSurfaceCensusJson", ["description"] = "Telemetry of visual surface materials and vertex-wear channels (welds, mud, micro-relief)." },
                 new Dictionary<string, object> { ["name"] = "GetVisualQualityCensusJson", ["description"] = "URP/PBR material compliance, texture bindings, instancing, and procedural vertex-wear quality metrics." },
+                new Dictionary<string, object> { ["name"] = "GetVisualHealthSummaryJson", ["description"] = "Consolidated visual health verdict across quality, surface, material, and socket censuses." },
                 new Dictionary<string, object> { ["name"] = "SetAudioVolumeJson", ["description"] = "Set volume slider level for Master, Music, Gameplay, UI." },
                 new Dictionary<string, object> { ["name"] = "GetTechCatalogJson", ["description"] = "Catalog of registered upgrades, research branches, and relics." },
                                 new Dictionary<string, object> { ["name"] = "GetVeterancyCensusJson", ["description"] = "Live combat XP, rank tiers, and veterancy bonus multipliers." },

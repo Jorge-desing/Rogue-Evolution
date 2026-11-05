@@ -77,6 +77,8 @@
              Link="Runtime/RuntimeVisualCensus.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeVisualQualityCensus.cs"
              Link="Runtime/RuntimeVisualQualityCensus.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeVisualHealthCensus.cs"
+             Link="Runtime/RuntimeVisualHealthCensus.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeLoaderAuditCensus.cs"
              Link="Runtime/RuntimeLoaderAuditCensus.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeUnitMechanicsCensus.cs"

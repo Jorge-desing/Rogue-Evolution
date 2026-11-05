@@ -8143,6 +8143,80 @@ internal static partial class ValidationTestRunner
         ExistingControllers.Instance.Reset();
         RuntimeGameplayCommandDirector.ClearTacticalStancesAndAffixes();
     }),
+    ("visual health summary aggregates quality surface material and sockets", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        try
+        {
+            var unit = new EntityController
+            {
+                entityId = "sample-native:visual-health",
+                UniqueEntityId = 9201,
+                IsControlledByPlayer = true,
+                IsUnit = true,
+                Position = new Vector3(0f, 0f, 0f)
+            };
+            var go = new GameObject { name = "VisualHealthUnit" };
+            var meshFilter = go.AddComponent<MeshFilter>();
+            var renderer = go.AddComponent<MeshRenderer>();
+            meshFilter.sharedMesh = new Mesh
+            {
+                name = "VisualHealthMesh",
+                vertexCount = 4,
+                colors = new[]
+                {
+                    new Color(0.30f, 0.80f, 0.60f, 1f),
+                    new Color(0.40f, 0.70f, 0.20f, 1f),
+                }
+            };
+            var material = new Material
+            {
+                name = "VisualHealthPbr",
+                shader = new Shader { name = "RogueCommand/VehiclePBR_VertexWear" },
+                shaderKeywords = new[] { "_METALLICSPECGLOSSMAP", "_NORMALMAP" },
+                enableInstancing = true
+            };
+            material.SetTexture("_MetallicGlossMap", new Texture { name = "Health_MetallicGloss" });
+            material.SetTexture("_BumpMap", new Texture { name = "Health_Normal" });
+            material.SetTexture("_EmissionMap", new Texture { name = "Health_Emission" });
+            renderer.sharedMaterials = new[] { material };
+            unit.gameObject = go;
+            ExistingControllers.Instance.PlayerUnits().Add(unit);
+
+            VisualHealthSummary summary = RuntimeVisualHealthCensus.Current(64);
+            if (summary.TrackedUnitCount != 1)
+            {
+                throw new InvalidOperationException("Visual health summary must track the single loader-owned unit.");
+            }
+            if (summary.Rows.Count != 1 || summary.Rows[0].EntityKeyId != "sample-native:visual-health")
+            {
+                throw new InvalidOperationException("Visual health summary row must identify the loader-owned unit.");
+            }
+
+            string json = AgentDiagnosticsFormatter.SerializeVisualHealthSummary(summary);
+            using (var doc = JsonDocument.Parse(json))
+            {
+                if (doc.RootElement.GetProperty("kind").GetString() != "visualHealthSummary" ||
+                    doc.RootElement.GetProperty("omittedUnitCount").GetInt32() != 0 ||
+                    doc.RootElement.GetProperty("trackedUnitCount").GetInt32() != 1 ||
+                    doc.RootElement.GetProperty("rows").GetArrayLength() != 1)
+                {
+                    throw new InvalidOperationException("SerializeVisualHealthSummary JSON format error.");
+                }
+                // Omission counters must precede unbounded detail collections.
+                int omittedIndex = json.IndexOf("\"omittedUnitCount\"", StringComparison.Ordinal);
+                int rowsIndex = json.IndexOf("\"rows\"", StringComparison.Ordinal);
+                if (omittedIndex < 0 || rowsIndex < 0 || omittedIndex > rowsIndex)
+                {
+                    throw new InvalidOperationException("Visual health summary must place omittedUnitCount before rows.");
+                }
+            }
+        }
+        finally
+        {
+            ExistingControllers.Instance.Reset();
+        }
+    }),
     };
 
     private sealed class TestCardChangeTarget

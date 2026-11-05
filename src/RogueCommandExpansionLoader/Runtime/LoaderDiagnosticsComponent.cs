@@ -1110,6 +1110,12 @@ namespace RogueCommandExpansionLoader.Runtime
                 RuntimeVisualQualityCensus.Current(maxTrackedUnits));
         }
 
+        public string GetVisualHealthSummaryJson(int maxTrackedUnits = 64)
+        {
+            return AgentDiagnosticsFormatter.SerializeVisualHealthSummary(
+                RuntimeVisualHealthCensus.Current(maxTrackedUnits));
+        }
+
         public string GetVisualMaterialCensusJson()
         {
             return AgentDiagnosticsFormatter.SerializeVisualMaterialCensus(

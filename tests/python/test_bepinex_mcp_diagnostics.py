@@ -39,6 +39,26 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
             "LiveVisualDirectorCount": ("System.Int32", "4"),
             "LiveJammedTurretCount": ("System.Int32", "0"),
             "LiveRegeneratingShieldCount": ("System.Int32", "1"),
+            # Expanded scalars (already-available LoaderDiagnosticsComponent properties).
+            "ActivePackCount": ("System.Int32", "3"),
+            "FailedPackCount": ("System.Int32", "0"),
+            "RegisteredUnitCount": ("System.Int32", "18"),
+            "RegisteredStageCount": ("System.Int32", "5"),
+            "RegisteredAiProfileCount": ("System.Int32", "5"),
+            "RegisteredAiModuleCount": ("System.Int32", "7"),
+            "RegisteredRuntimeCombatXpCount": ("System.Int32", "2"),
+            "RuntimeInstalledHookCount": ("System.Int32", "38"),
+            "LivePlayerCredits": ("System.Int32", "500"),
+            "LiveAiCredits": ("System.Int32", "300"),
+            "LiveAttackWaveNumber": ("System.Int32", "2"),
+            "LiveCombatActiveUnitCount": ("System.Int32", "4"),
+            "LiveUnitsWithStatusEffectsCount": ("System.Int32", "1"),
+            "LiveTotalFactoryCount": ("System.Int32", "6"),
+            "LiveActiveProducingFactoryCount": ("System.Int32", "1"),
+            "LiveQueuedUnitCount": ("System.Int32", "2"),
+            "LiveHasPlayerHq": ("System.Boolean", "true"),
+            "LivePlayerHqHealthRatio": ("System.Single", "0.85"),
+            "LiveAiStructureHealthRatio": ("System.Single", "0.72"),
         }
         member_reads: list[str] = []
 
@@ -100,6 +120,25 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
                 "LiveVisualDirectorCount": 4,
                 "LiveJammedTurretCount": 0,
                 "LiveRegeneratingShieldCount": 1,
+                "ActivePackCount": 3,
+                "FailedPackCount": 0,
+                "RegisteredUnitCount": 18,
+                "RegisteredStageCount": 5,
+                "RegisteredAiProfileCount": 5,
+                "RegisteredAiModuleCount": 7,
+                "RegisteredRuntimeCombatXpCount": 2,
+                "RuntimeInstalledHookCount": 38,
+                "LivePlayerCredits": 500,
+                "LiveAiCredits": 300,
+                "LiveAttackWaveNumber": 2,
+                "LiveCombatActiveUnitCount": 4,
+                "LiveUnitsWithStatusEffectsCount": 1,
+                "LiveTotalFactoryCount": 6,
+                "LiveActiveProducingFactoryCount": 1,
+                "LiveQueuedUnitCount": 2,
+                "LiveHasPlayerHq": True,
+                "LivePlayerHqHealthRatio": 0.85,
+                "LiveAiStructureHealthRatio": 0.72,
                 "RangeDisplayCirclePointCount": 9,
             },
             scalars,
@@ -187,7 +226,7 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
 
         snapshot = json.loads(response["content"][0]["text"])
         self.assertFalse(response["isError"])
-        self.assertEqual(41, len(snapshot))
+        self.assertEqual(44, len(snapshot))
         getter_values = {k: v for k, v in snapshot.items() if k != "_meta"}
         self.assertTrue(all(isinstance(value, dict) for value in getter_values.values()))
         self.assertTrue(all(value == expected for value in getter_values.values()))
@@ -221,8 +260,9 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
         self.assertEqual([64, 32], next(args for method, args in calls if method == "GetLoaderAuditCensusJson"))
         self.assertEqual([64], next(args for method, args in calls if method == "GetUnitMechanicsCensusJson"))
         self.assertNotIn("GetUnitLoadoutAndPoolCensusJson", [method for method, _ in calls])
-        self.assertNotIn("GetVisualMaterialCensusJson", [method for method, _ in calls])
-        self.assertNotIn("GetVisualSurfaceCensusJson", [method for method, _ in calls])
+        self.assertIn("GetVisualMaterialCensusJson", [method for method, _ in calls])
+        self.assertIn("GetVisualSurfaceCensusJson", [method for method, _ in calls])
+        self.assertIn("GetGameTimeScaleJson", [method for method, _ in calls])
 
     def test_agent_coordination_and_locking_tools(self) -> None:
         calls: list[tuple[str, list[object]]] = []
@@ -358,6 +398,175 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
         self.assertIn("cursor", configs)
         self.assertIn("vscode", configs)
         self.assertIn("hermes", configs)
+
+    def test_tool_specs_have_unique_names_and_evolved_tools(self) -> None:
+        from pathlib import Path as _P
+        import importlib.util as _ilu
+        import sys as _sys
+        _spec = _ilu.spec_from_file_location(
+            "build_bepinex_mcp_check", _P(__file__).resolve().parents[2] / "tools" / "build_bepinex_mcp.py"
+        )
+        assert _spec is not None and _spec.loader is not None
+        _mod = _ilu.module_from_spec(_spec)
+        _sys.modules[_spec.name] = _mod
+        _spec.loader.exec_module(_mod)
+        names = [s["name"] for s in _mod.TOOL_SPECS]
+        self.assertEqual(len(names), len(set(names)), f"Duplicate tool specs: {[n for n in set(names) if names.count(n) > 1]}")
+        # Evolved bridge: dedup keeps unique count; new summaries/detail/lock tools present.
+        for expected in (
+            "diagnostics_get_visual_health_summary",
+            "diagnostics_get_combat_health_summary",
+            "diagnostics_get_entity_detail",
+            "diagnostics_get_agent_lock_status",
+            "diagnostics_get_visual_surface_census",
+            "diagnostics_get_visual_material_census",
+            "diagnostics_get_game_time_scale",
+        ):
+            self.assertIn(expected, names)
+        self.assertEqual(188, len(names))
+
+    def test_visual_health_summary_forwards_to_bridge(self) -> None:
+        calls: list[tuple[str, list[object]]] = []
+
+        def fake_http(endpoint: str, params: dict[str, object] | None = None, **_: object) -> str:
+            params = params or {}
+            method = str(params.get("methodName", ""))
+            raw_args = json.loads(str(params.get("args", "[]")))
+            calls.append((method, raw_args))
+            payload = {"kind": "visualHealthSummary", "omittedUnitCount": 0, "trackedUnitCount": 2}
+            return json.dumps({
+                "status": "ok",
+                "message": f"Called '{method}' with {len(raw_args)} args. ReturnValue: {json.dumps(payload)}"
+            })
+
+        with (
+            mock.patch.object(SERVER, "_DIAGNOSTICS_GO_ID", 73),
+            mock.patch.object(SERVER, "_call_http", side_effect=fake_http),
+        ):
+            resp = SERVER.execute_tool("diagnostics_get_visual_health_summary", {})
+            self.assertFalse(resp["isError"])
+            data = json.loads(resp["content"][0]["text"])
+            self.assertEqual("visualHealthSummary", data["kind"])
+            resp2 = SERVER.execute_tool("diagnostics_get_visual_health_summary", {"maxTrackedUnits": 16})
+            self.assertFalse(resp2["isError"])
+
+        self.assertEqual(2, len(calls))
+        self.assertEqual("GetVisualHealthSummaryJson", calls[0][0])
+        self.assertEqual([64], calls[0][1])
+        self.assertEqual("GetVisualHealthSummaryJson", calls[1][0])
+        self.assertEqual([16], calls[1][1])
+
+    def test_combat_health_summary_aggregates_getters(self) -> None:
+        calls: list[str] = []
+
+        def fake_http(endpoint: str, params: dict[str, object] | None = None, **_: object) -> str:
+            params = params or {}
+            method = str(params.get("methodName", ""))
+            calls.append(method)
+            payload = {"kind": method, "count": 1}
+            return json.dumps({
+                "status": "ok",
+                "message": f"Called '{method}' with 0 args. ReturnValue: {json.dumps(payload)}"
+            })
+
+        with (
+            mock.patch.object(SERVER, "_DIAGNOSTICS_GO_ID", 73),
+            mock.patch.object(SERVER, "_call_http", side_effect=fake_http),
+        ):
+            resp = SERVER.execute_tool("diagnostics_get_combat_health_summary", {})
+            self.assertFalse(resp["isError"])
+            data = json.loads(resp["content"][0]["text"])
+
+        expected_getters = [
+            "GetBattlefieldCensusJson", "GetPlayerRosterJson", "GetAiRosterJson",
+            "GetProductionCensusJson", "GetBaseIntegrityCensusJson",
+            "GetAiDirectorCensusJson", "GetHazardCensusJson",
+            "GetVeterancyCensusJson", "GetCombatStatusCensusJson",
+            "GetEconomyMatchCensusJson", "GetSystemHealthJson",
+        ]
+        for getter in expected_getters:
+            self.assertIn(getter, data)
+            self.assertIn(getter, calls)
+        self.assertIn("_meta", data)
+        self.assertEqual(len(expected_getters), data["_meta"]["getterCount"])
+
+    def test_entity_detail_filters_rows_by_entity_key(self) -> None:
+        calls: list[tuple[str, list[object]]] = []
+
+        def fake_http(endpoint: str, params: dict[str, object] | None = None, **_: object) -> str:
+            params = params or {}
+            method = str(params.get("methodName", ""))
+            raw_args = json.loads(str(params.get("args", "[]")))
+            calls.append((method, raw_args))
+            if method in ("InspectEntityVisualJson", "GetEntityBalanceJson"):
+                payload = {"entityKeyId": "test:arachnid", "kind": method}
+            elif method == "GetUnitMechanicsCensusJson":
+                payload = {"rows": [{"entityKeyId": "test:arachnid"}, {"entityKeyId": "other"}]}
+            else:
+                payload = {"playerUnitRows": [{"entityKeyId": "test:arachnid", "healthRatio": 0.8}, {"entityKeyId": "other", "healthRatio": 0.5}], "kind": method}
+            return json.dumps({
+                "status": "ok",
+                "message": f"Called '{method}' with {len(raw_args)} args. ReturnValue: {json.dumps(payload)}"
+            })
+
+        with (
+            mock.patch.object(SERVER, "_DIAGNOSTICS_GO_ID", 73),
+            mock.patch.object(SERVER, "_call_http", side_effect=fake_http),
+        ):
+            resp = SERVER.execute_tool("diagnostics_get_entity_detail", {"entityKeyId": "test:arachnid"})
+            self.assertFalse(resp["isError"])
+            data = json.loads(resp["content"][0]["text"])
+
+        self.assertEqual("test:arachnid", data["entityKeyId"])
+        self.assertTrue(data["found"])
+        self.assertGreater(data["matchedRowCount"], 0)
+        # Battlefield rows must be filtered to only the requested entity.
+        battlefield_section = data["sections"]["GetBattlefieldCensusJson"]
+        self.assertEqual([{"entityKeyId": "test:arachnid", "healthRatio": 0.8}], battlefield_section["matchedRows"])
+        # All expected getters were consulted.
+        called_methods = {m for m, _ in calls}
+        for getter in ("GetBattlefieldCensusJson", "GetPlayerRosterJson", "GetAiRosterJson", "GetUnitThreatAssessmentJson", "GetTacticalStanceCensusJson", "GetUnitAffixCensusJson", "GetVeterancyCensusJson", "GetUnitLoadoutCensusJson", "InspectEntityVisualJson", "GetEntityBalanceJson"):
+            self.assertIn(getter, called_methods)
+
+    def test_agent_lock_status_reports_ownership(self) -> None:
+        coordination = {
+            "kind": "agentCoordinationCensus",
+            "omittedSessionCount": 0,
+            "omittedLockCount": 0,
+            "omittedMessageCount": 0,
+            "activeSessionCount": 1,
+            "activeLockCount": 1,
+            "sessions": [{"agentId": "hermes-1", "status": "Active", "assignedSector": "Global"}],
+            "locks": [{"resourceKey": "unit:scout_1", "ownerAgentId": "hermes-1", "resourceCategory": "Unit", "remainingSeconds": 12.5, "contentionCount": 2}],
+            "messages": [],
+        }
+
+        def fake_http(endpoint: str, params: dict[str, object] | None = None, **_: object) -> str:
+            params = params or {}
+            method = str(params.get("methodName", ""))
+            self.assertEqual("GetAgentCoordinationCensusJson", method)
+            return json.dumps({
+                "status": "ok",
+                "message": f"Called '{method}' with 0 args. ReturnValue: {json.dumps(coordination)}"
+            })
+
+        with (
+            mock.patch.object(SERVER, "_DIAGNOSTICS_GO_ID", 73),
+            mock.patch.object(SERVER, "_call_http", side_effect=fake_http),
+        ):
+            resp = SERVER.execute_tool("diagnostics_get_agent_lock_status", {"agentId": "hermes-1", "resourceKey": "unit:scout_1"})
+            self.assertFalse(resp["isError"])
+            data = json.loads(resp["content"][0]["text"])
+            self.assertTrue(data["sessionActive"])
+            self.assertTrue(data["locked"])
+            self.assertEqual("hermes-1", data["ownerAgentId"])
+            self.assertEqual(12.5, data["remainingSeconds"])
+            self.assertEqual(2, data["contentionCount"])
+
+            resp2 = SERVER.execute_tool("diagnostics_get_agent_lock_status", {"agentId": "hermes-1", "resourceKey": "unit:other"})
+            self.assertFalse(resp2["isError"])
+            data2 = json.loads(resp2["content"][0]["text"])
+            self.assertFalse(data2["locked"])
 
 
 if __name__ == "__main__":

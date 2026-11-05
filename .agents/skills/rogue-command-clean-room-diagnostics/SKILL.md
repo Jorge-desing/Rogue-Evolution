@@ -75,7 +75,7 @@ All censuses query live game singletons through fail-closed reflection and forma
 - **Collider Audit Census** (`diagnostics_get_collider_audit_census`): Per-living-unit collider counts (trigger vs solid), collider type names, and rigidbody kinematic state. Omission counter first.
 - **Particle VFX Census** (`diagnostics_get_particle_vfx_census`): Per-living-unit particle system counts (active vs total), trail and line renderer counts, and particle system names. Omission counter first.
 - **LOD Audit Census** (`diagnostics_get_lod_audit_census`): Per-living-unit LOD group counts, total LOD levels, and renderer names. Omission counter first.
-- **MCP Snapshot Evolution**: `diagnostics_runtime_snapshot` now runs its getters in parallel (ThreadPoolExecutor), emits a `_meta` block (getterCount, successCount, errorCount, elapsedMs, per-getter timingsMs), and accepts `getters`/`exclude` filters. Companion tools: `diagnostics_call_getters` (parallel batch), `diagnostics_runtime_summary` (compact scalars), `diagnostics_list_runtime_getters` (discovery).
+- **MCP Snapshot Evolution**: `diagnostics_runtime_snapshot` now runs its getters in parallel (ThreadPoolExecutor), emits a `_meta` block (getterCount, successCount, errorCount, elapsedMs, per-getter timingsMs), and accepts `getters`/`exclude` filters. Companion tools: `diagnostics_call_getters` (parallel batch), `diagnostics_runtime_summary` (compact scalars), `diagnostics_list_runtime_getters` (discovery). Snapshot includes `GetVisualSurfaceCensusJson`, `GetVisualMaterialCensusJson`, and `GetGameTimeScaleJson`; `diagnostics_runtime_scalars` exposes 44 scalar properties plus circle point count. New aggregators: `diagnostics_get_visual_health_summary` (C# `GetVisualHealthSummaryJson` consolidating quality/surface/material/socket), `diagnostics_get_combat_health_summary` (11 getters), `diagnostics_get_entity_detail` (single-entity drill-down across 11 sources), `diagnostics_get_agent_lock_status` (lock owner/remaining/session check).
 - **Unit & AI Loader Runtime Integration & Audit** (`diagnostics_get_loader_audit_census`, `diagnostics_order_reconcile_loader_state`):
   - Units can declare `defaultTacticalStance`, `defaultLoadout` (`"Standard"`, `"AP"`, `"HE"`, `"Speed"`, `"Siege"`, `"Reinforced"`, or a local `variants[].id`), `startingAffixes`, and `startingVeterancyRank` (`0..5`) in `content.json`, applied automatically on spawn by `RuntimeUnitMechanicsDirector` and reset on pooled reuse.
   - AI profiles can declare squad-wide defaults (`doctrine`, `aggressionMultiplier`, `defaultUnitStance`, `defaultUnitLoadout`, `startingUnitAffixes`, `startingUnitVeterancyRank`) in `content.json`. These apply automatically to AI units on spawn (`RuntimeGameplayCommandDirector.ApplyAiProfileUnitDefaultsToEntity`) and on AI initialization (`ApplyActiveAiUnitDefaultsToAiUnits`) without overriding explicit unit-level defaults.
@@ -222,7 +222,7 @@ The BepInEx MCP server is built with universal cross-agent compatibility support
 
 ### 5.1 Hermes Integration (Native Plugin & Skills)
 Hermes agents can communicate with the bridge using three distinct channels:
-1. **Hermes Plugin (`bepinex-mcp`)**: Installed at `C:\Users\Alex\AppData\Local\hermes\plugins\bepinex-mcp/` and enabled in `C:\Users\Alex\AppData\Local\hermes\config.yaml` (`plugins.enabled: [bepinex-mcp]`). All 185 tools are discovered as native MCP tools.
+1. **Hermes Plugin (`bepinex-mcp`)**: Installed at `C:\Users\Alex\AppData\Local\hermes\plugins\bepinex-mcp/` and enabled in `C:\Users\Alex\AppData\Local\hermes\config.yaml` (`plugins.enabled: [bepinex-mcp]`). All 188 tools are discovered as native MCP tools.
 2. **Hermes Skill Catalog**: Registered under `C:\Users\Alex\AppData\Local\hermes\skills\rogue-command\rogue-command-clean-room-diagnostics/`.
 3. **Hermes Direct CLI Execution**: When running in a shell or terminal without an active MCP connection:
    ```bash
@@ -232,7 +232,7 @@ Hermes agents can communicate with the bridge using three distinct channels:
    ```
 
 ### 5.2 Antigravity & Google Gemini CLI
-- Fully registered under `bepinex_mcp` with 185 generated schemas in `C:\Users\Alex\.gemini\antigravity\mcp\bepinex_mcp/`.
+- Fully registered under `bepinex_mcp` with 188 generated schemas in `C:\Users\Alex\.gemini\antigravity\mcp\bepinex_mcp/`.
 - Call eagerly or lazily using `call_mcp_tool(ServerName="bepinex_mcp", ToolName="...", Arguments={...})`.
 
 ### 5.3 Anthropic Claude Desktop

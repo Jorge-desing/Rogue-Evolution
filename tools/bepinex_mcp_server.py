@@ -163,11 +163,15 @@ _RUNTIME_SNAPSHOT_GETTERS = [
     "GetColliderAuditCensusJson",
     "GetParticleVfxCensusJson",
     "GetLodAuditCensusJson",
+    "GetVisualSurfaceCensusJson",
+    "GetVisualMaterialCensusJson",
+    "GetGameTimeScaleJson",
 ]
 
 _RUNTIME_SNAPSHOT_GETTER_ARGS: dict[str, list[object]] = {
     "GetVisualRenderCensusJson": [32],
     "GetVisualQualityCensusJson": [64],
+    "GetVisualHealthSummaryJson": [64],
     "GetLoadedPrefabVisualAuditJson": [64],
     "GetLoaderAuditCensusJson": [64, 32],
     "GetUnitMechanicsCensusJson": [64],
@@ -1293,6 +1297,25 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
                 "LiveVisualDirectorCount",
                 "LiveJammedTurretCount",
                 "LiveRegeneratingShieldCount",
+                "ActivePackCount",
+                "FailedPackCount",
+                "RegisteredUnitCount",
+                "RegisteredStageCount",
+                "RegisteredAiProfileCount",
+                "RegisteredAiModuleCount",
+                "RegisteredRuntimeCombatXpCount",
+                "RuntimeInstalledHookCount",
+                "LivePlayerCredits",
+                "LiveAiCredits",
+                "LiveAttackWaveNumber",
+                "LiveCombatActiveUnitCount",
+                "LiveUnitsWithStatusEffectsCount",
+                "LiveTotalFactoryCount",
+                "LiveActiveProducingFactoryCount",
+                "LiveQueuedUnitCount",
+                "LiveHasPlayerHq",
+                "LivePlayerHqHealthRatio",
+                "LiveAiStructureHealthRatio",
             ]:
                 scalars[member_name] = _call_diagnostics_member(member_name)
 
@@ -1507,6 +1530,158 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
         elif name == "diagnostics_get_ai_modules":
             res = _call_diagnostics_method("GetAiModulesDiagnosticsJson")
             return _tool_response(res)
+
+        elif name == "diagnostics_get_visual_health_summary":
+            max_units = int(arguments.get("maxTrackedUnits", 64))
+            res = _call_diagnostics_method("GetVisualHealthSummaryJson", [max_units])
+            return _tool_response(res)
+
+        elif name == "diagnostics_get_combat_health_summary":
+            getters = [
+                "GetBattlefieldCensusJson", "GetPlayerRosterJson", "GetAiRosterJson",
+                "GetProductionCensusJson", "GetBaseIntegrityCensusJson",
+                "GetAiDirectorCensusJson", "GetHazardCensusJson",
+                "GetVeterancyCensusJson", "GetCombatStatusCensusJson",
+                "GetEconomyMatchCensusJson", "GetSystemHealthJson",
+            ]
+            started = time.perf_counter()
+            summary: dict[str, Any] = {}
+            timings: dict[str, float] = {}
+
+            def _fetch(getter: str):
+                t0 = time.perf_counter()
+                raw = _call_diagnostics_method(getter, _snapshot_getter_args(getter))
+                try:
+                    value = json.loads(raw)
+                except Exception:
+                    value = raw
+                return getter, value, (time.perf_counter() - t0) * 1000.0
+
+            with ThreadPoolExecutor(max_workers=8) as executor:
+                futures = {executor.submit(_fetch, g): g for g in getters}
+                for future in as_completed(futures):
+                    getter, value, elapsed = future.result()
+                    summary[getter] = value
+                    timings[getter] = round(elapsed, 2)
+            summary["_meta"] = {
+                "getterCount": len(getters),
+                "elapsedMs": round((time.perf_counter() - started) * 1000.0, 2),
+                "timingsMs": timings,
+            }
+            return _tool_response(json.dumps(summary, indent=2))
+
+        elif name == "diagnostics_get_entity_detail":
+            entity_key = str(arguments.get("entityKeyId", "")).strip()
+            if not entity_key:
+                return _tool_response(json.dumps({"error": "entityKeyId is required"}), is_error=True)
+            detail_getters: list[tuple[str, list[object]]] = [
+                ("GetBattlefieldCensusJson", []),
+                ("GetPlayerRosterJson", []),
+                ("GetAiRosterJson", []),
+                ("GetUnitThreatAssessmentJson", []),
+                ("GetTacticalStanceCensusJson", []),
+                ("GetUnitAffixCensusJson", []),
+                ("GetVeterancyCensusJson", []),
+                ("GetUnitLoadoutCensusJson", []),
+                ("GetUnitMechanicsCensusJson", [64]),
+                ("InspectEntityVisualJson", [entity_key]),
+                ("GetEntityBalanceJson", [entity_key]),
+            ]
+            started = time.perf_counter()
+
+            def _fetch_detail(getter: str, getter_args: list[object]):
+                t0 = time.perf_counter()
+                raw = _call_diagnostics_method(getter, getter_args)
+                try:
+                    value = json.loads(raw)
+                except Exception:
+                    value = raw
+                return getter, value, (time.perf_counter() - t0) * 1000.0
+
+            sections: dict[str, Any] = {}
+            timings: dict[str, float] = {}
+            with ThreadPoolExecutor(max_workers=8) as executor:
+                futures = {executor.submit(_fetch_detail, g, a): g for g, a in detail_getters}
+                for future in as_completed(futures):
+                    getter, value, elapsed = future.result()
+                    timings[getter] = round(elapsed, 2)
+                    matched: list[object] = []
+                    if isinstance(value, dict):
+                        for candidate in value.values():
+                            if isinstance(candidate, list):
+                                for item in candidate:
+                                    if isinstance(item, dict) and (
+                                        item.get("entityKeyId") == entity_key
+                                        or item.get("entityId") == entity_key
+                                        or item.get("entityKey") == entity_key
+                                    ):
+                                        matched.append(item)
+                        if not matched and (value.get("entityKeyId") == entity_key or value.get("entityId") == entity_key):
+                            matched.append(value)
+                    sections[getter] = {"matchedRows": matched, "raw": value}
+            matched_total = sum(len((s.get("matchedRows") or [])) for s in sections.values() if isinstance(s, dict))
+            detail: dict[str, Any] = {
+                "entityKeyId": entity_key,
+                "found": matched_total > 0,
+                "matchedRowCount": matched_total,
+                "sections": sections,
+                "_meta": {
+                    "getterCount": len(detail_getters),
+                    "elapsedMs": round((time.perf_counter() - started) * 1000.0, 2),
+                    "timingsMs": timings,
+                },
+            }
+            return _tool_response(json.dumps(detail, indent=2))
+
+        elif name == "diagnostics_get_agent_lock_status":
+            agent_id = str(arguments.get("agentId", "")).strip()
+            resource_key = str(arguments.get("resourceKey", "")).strip()
+            if not agent_id or not resource_key:
+                return _tool_response(json.dumps({"error": "agentId and resourceKey are required"}), is_error=True)
+            raw = _call_diagnostics_method("GetAgentCoordinationCensusJson")
+            try:
+                coordination = json.loads(raw)
+            except Exception:
+                coordination = {}
+            if not isinstance(coordination, dict):
+                coordination = {}
+            sessions = coordination.get("sessions") if isinstance(coordination.get("sessions"), list) else []
+            locks = coordination.get("locks") if isinstance(coordination.get("locks"), list) else []
+            session_active = any(isinstance(s, dict) and s.get("agentId") == agent_id for s in sessions)
+            lock_entry = None
+            for entry in locks:
+                if isinstance(entry, dict) and entry.get("resourceKey") == resource_key:
+                    lock_entry = entry
+                    break
+            if lock_entry is None:
+                status: dict[str, Any] = {
+                    "agentId": agent_id,
+                    "resourceKey": resource_key,
+                    "sessionActive": session_active,
+                    "locked": False,
+                    "ownerAgentId": None,
+                    "remainingSeconds": 0.0,
+                    "contentionCount": 0,
+                    "resourceCategory": None,
+                    "lock": None,
+                    "activeLockCount": coordination.get("activeLockCount", len(locks)),
+                    "activeSessionCount": coordination.get("activeSessionCount", len(sessions)),
+                }
+            else:
+                status = {
+                    "agentId": agent_id,
+                    "resourceKey": resource_key,
+                    "sessionActive": session_active,
+                    "locked": True,
+                    "ownerAgentId": lock_entry.get("ownerAgentId"),
+                    "remainingSeconds": lock_entry.get("remainingSeconds", 0.0),
+                    "contentionCount": lock_entry.get("contentionCount", 0),
+                    "resourceCategory": lock_entry.get("resourceCategory"),
+                    "lock": lock_entry,
+                    "activeLockCount": coordination.get("activeLockCount", len(locks)),
+                    "activeSessionCount": coordination.get("activeSessionCount", len(sessions)),
+                }
+            return _tool_response(json.dumps(status, indent=2))
 
         else:
             return _tool_response(f"Unknown tool: {name}", is_error=True)
