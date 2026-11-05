@@ -108,6 +108,7 @@ namespace RogueCommandExpansionLoader.Runtime
             Dictionary<Material, RuntimeVisualCensusSupport.MaterialBindingSnapshot> materialCache)
         {
             string key = RuntimeVisualCensusSupport.ResolveEntityKey(unit);
+            bool isLoaderOwned = RuntimeVisualCensusSupport.IsLoaderOwned(key);
 
             GameObject go = null;
             try { go = unit.gameObject; } catch { go = null; }
@@ -162,6 +163,13 @@ namespace RogueCommandExpansionLoader.Runtime
                         if (material == null) continue;
                         inspectedMaterialSlots++;
                         materialCount++;
+
+                        if (!isLoaderOwned)
+                        {
+                            materialSamplingBounded = true;
+                            nameSamplingBounded = true;
+                            continue;
+                        }
 
                         RuntimeVisualCensusSupport.MaterialBindingSnapshot binding;
                         if (!materialCache.TryGetValue(material, out binding))

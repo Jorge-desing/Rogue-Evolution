@@ -5072,6 +5072,45 @@ internal static partial class ValidationTestRunner
             ExistingControllers.Instance.Reset();
         }
     }),
+    ("standalone material census skips native binding detail when not needed", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        try
+        {
+            var nativeMaterial = new Material
+            {
+                name = "NativeMaterial",
+                shader = new Shader { name = "Shader Graphs/EntityColorShader" },
+                shaderKeywords = new[] { "_EMISSION" }
+            };
+            nativeMaterial.SetTexture("_EmissionMap", new Texture { name = "NativeEmission" });
+            var unit = new EntityController
+            {
+                entityId = "Engineer",
+                UniqueEntityId = 9200,
+                IsControlledByPlayer = true,
+                IsUnit = true,
+                Position = Vector3.zero
+            };
+            var root = new GameObject("NativeMaterialUnit");
+            var renderer = root.AddComponent<MeshRenderer>();
+            renderer.sharedMaterials = new[] { nativeMaterial };
+            unit.gameObject = root;
+            ExistingControllers.Instance.PlayerUnits().Add(unit);
+
+            VisualMaterialRow row = RuntimeVisualMaterialCensus.Current(1).Rows[0];
+            if (row.MaterialCount != 1 || row.MaterialNames.Count != 0 ||
+                !row.MaterialSamplingBounded || !row.NameSamplingBounded ||
+                nativeMaterial.HasPropertyCallCount != 0 || nativeMaterial.GetTextureCallCount != 0)
+            {
+                throw new InvalidOperationException("Native material rows must avoid detailed binding reflection and expose partial coverage.");
+            }
+        }
+        finally
+        {
+            ExistingControllers.Instance.Reset();
+        }
+    }),
     ("runtime tech catalog census queries registered upgrades research branches and relics", () =>
     {
         TechCatalogCensus census = RuntimeTechCatalogCensus.Current();
