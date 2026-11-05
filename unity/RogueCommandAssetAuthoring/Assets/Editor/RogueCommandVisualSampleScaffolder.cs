@@ -1696,6 +1696,82 @@ namespace RogueCommandExpansion.Authoring
             return new Bounds((min + max) * 0.5f, max - min);
         }
 
+        private static void ReplaceRiggedModelFromSource(
+            GameObject prefabInstance,
+            GameObject modelAsset,
+            string unitName)
+        {
+            // The sample prefab is serialized as a flattened copy of the FBX. Refreshing only
+            // its Animator leaves the old bone hierarchy in the bundle, so Arachnid would still
+            // inherit Bone_Hull's idle motion. Replace that model subtree from the current FBX
+            // while preserving the authored prefab materials and root-level sockets.
+            if (!String.Equals(unitName, "ArachnidHexapod", StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            Transform oldModel = GetUniqueNamedTransform(prefabInstance, unitName + "Model", true);
+            Transform parent = oldModel.parent;
+            Vector3 localPosition = oldModel.localPosition;
+            Quaternion localRotation = oldModel.localRotation;
+            Vector3 localScale = oldModel.localScale;
+            int siblingIndex = oldModel.GetSiblingIndex();
+            var materialsByPath = new Dictionary<string, Material[]>();
+            Renderer[] oldRenderers = oldModel.GetComponentsInChildren<Renderer>(true);
+            for (int i = 0; i < oldRenderers.Length; i++)
+            {
+                Renderer renderer = oldRenderers[i];
+                if (renderer != null)
+                {
+                    materialsByPath[GetRelativeTransformPath(oldModel, renderer.transform)] = renderer.sharedMaterials;
+                }
+            }
+
+            GameObject replacement = PrefabUtility.InstantiatePrefab(modelAsset) as GameObject;
+            if (replacement == null)
+            {
+                throw new InvalidOperationException("Unity could not instantiate the refreshed " + unitName + " FBX.");
+            }
+
+            replacement.name = oldModel.name;
+            replacement.transform.SetParent(parent, false);
+            replacement.transform.localPosition = localPosition;
+            replacement.transform.localRotation = localRotation;
+            replacement.transform.localScale = localScale;
+            replacement.transform.SetSiblingIndex(siblingIndex);
+
+            Renderer[] replacementRenderers = replacement.GetComponentsInChildren<Renderer>(true);
+            for (int i = 0; i < replacementRenderers.Length; i++)
+            {
+                Renderer renderer = replacementRenderers[i];
+                if (renderer == null)
+                {
+                    continue;
+                }
+
+                Material[] materials;
+                if (materialsByPath.TryGetValue(GetRelativeTransformPath(replacement.transform, renderer.transform), out materials))
+                {
+                    renderer.sharedMaterials = materials;
+                }
+            }
+
+            UnityEngine.Object.DestroyImmediate(oldModel.gameObject);
+        }
+
+        private static string GetRelativeTransformPath(Transform root, Transform child)
+        {
+            var segments = new List<string>();
+            Transform current = child;
+            while (current != null && current != root)
+            {
+                segments.Add(current.name);
+                current = current.parent;
+            }
+            segments.Reverse();
+            return String.Join("/", segments.ToArray());
+        }
+
         private static void RefreshRiggedPbrPrefabAnimator(
             string unitName,
             string modelPath,
@@ -1714,9 +1790,12 @@ namespace RogueCommandExpansion.Authoring
             {
                 throw new InvalidOperationException("Unity could not instantiate the existing " + unitName + " visual prefab.");
             }
+            PrefabUtility.UnpackPrefabInstance(
+                instance, PrefabUnpackMode.Completely, InteractionMode.AutomatedAction);
 
             try
             {
+                ReplaceRiggedModelFromSource(instance, modelAsset, unitName);
                 VehiclePrefabBuilder.SetupAnimatorIfAvailable(
                     instance, instance, modelAsset, unitName, preferWalkForMovement: true);
                 Animator animator = instance.GetComponent<Animator>();

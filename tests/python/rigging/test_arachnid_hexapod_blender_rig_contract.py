@@ -69,6 +69,24 @@ class ArachnidHexapodBlenderRigContractTests(unittest.TestCase):
                 self.assertEqual(1, len(armature_modifiers), f"{mesh_name} needs exactly one armature modifier")
                 self.assertIs(self.armature, armature_modifiers[0].object)
 
+    def test_leg_attachments_do_not_bind_to_idle_hull(self) -> None:
+        """Leg hardware must not inherit the hull's stationary breathing curve."""
+        leg_prefixes = (
+            "ArachnidHexapodCrawlerLeg_",
+            "ArachnidHexapodPiston_Quad_",
+            "ArachnidHexapodHydraulicRam_",
+            "ArachnidHexapodHydraulicRod_",
+        )
+        for mesh_name, mesh in self.meshes.items():
+            if not mesh_name.startswith(leg_prefixes):
+                continue
+            with self.subTest(mesh=mesh_name):
+                self.assertNotEqual(
+                    "Bone_Hull",
+                    mesh.vertex_groups[0].name,
+                    f"{mesh_name} must not inherit Bone_Hull idle motion",
+                )
+
     def test_all_render_meshes_have_complete_rigid_weights(self) -> None:
         """Every exported production mesh must be fully and rigidly bound."""
         for mesh_name, mesh in self.meshes.items():
@@ -93,6 +111,26 @@ class ArachnidHexapodBlenderRigContractTests(unittest.TestCase):
                     self.assertEqual(1, len(assignments), f"{mesh_name} vertex {vertex.index} is not assigned")
                     self.assertAlmostEqual(1.0, assignments[0].weight, places=5)
 
+    def test_export_does_not_mix_animation_actions_through_nla(self) -> None:
+        self.assertIsNotNone(self.armature.animation_data)
+        self.assertEqual(
+            len(self.armature.animation_data.nla_tracks),
+            0,
+            "Arachnid clips must export independently; overlapping NLA strips reanimate legs in Idle",
+        )
+
+    def test_leg_chains_do_not_use_runtime_ik_in_idle(self) -> None:
+        """Authored gait clips, not a live IK solver, own the six leg poses."""
+        pose_bones = self.armature.pose.bones
+        for tag in LEG_TAGS:
+            with self.subTest(leg=tag):
+                shin = pose_bones.get(f"Bone_Shin_{tag}")
+                self.assertIsNotNone(shin)
+                self.assertFalse(
+                    any(constraint.type == "IK" for constraint in shin.constraints),
+                    f"Bone_Shin_{tag} must not solve an IK pose while Idle is active",
+                )
+
     def test_walk_animates_all_six_leg_chains_in_place(self) -> None:
         self.assertIsNotNone(self.walk)
         animated_bones = {
@@ -113,7 +151,8 @@ class ArachnidHexapodBlenderRigContractTests(unittest.TestCase):
         for curve in root_location:
             self.assertTrue(all(abs(float(point.co.y)) <= 1e-6 for point in curve.keyframe_points))
 
-    def test_idle_does_not_animate_any_leg_bones(self) -> None:
+    def test_idle_does_not_animate_any_leg_ancestors(self) -> None:
+        """Idle body breathing must not be inherited by the six leg chains."""
         self.assertIsNotNone(self.idle)
         animated_bones = {
             curve.data_path.split('"')[1]
@@ -121,9 +160,17 @@ class ArachnidHexapodBlenderRigContractTests(unittest.TestCase):
             if curve.data_path.startswith('pose.bones["')
             and any(abs(float(point.co.y)) > 1e-6 for point in curve.keyframe_points)
         }
+        leg_ancestors = set()
+        for tag in LEG_TAGS:
+            for segment in ("Thigh", "Shin", "Foot"):
+                bone = self.armature.data.bones.get(f"Bone_{segment}_{tag}")
+                while bone is not None:
+                    bone = bone.parent
+                    if bone is not None:
+                        leg_ancestors.add(bone.name)
         self.assertFalse(
-            any(bone.startswith(("Bone_Thigh_", "Bone_Shin_", "Bone_Foot_")) for bone in animated_bones),
-            "Idle may animate the hull, but must not keep cycling the leg gait while stopped",
+            animated_bones.intersection(leg_ancestors),
+            "Idle body curves must not move an ancestor of any leg chain",
         )
 
 

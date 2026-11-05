@@ -59,6 +59,87 @@ def _ensure_middle_leg_bones(armature: bpy.types.Object) -> None:
         bpy.ops.object.mode_set(mode="OBJECT")
 
 
+def _decouple_leg_chains_from_idle_hull(armature: bpy.types.Object) -> None:
+    """Keep the six leg chains outside the hull's idle-breathing hierarchy."""
+    bpy.context.view_layer.objects.active = armature
+    armature.select_set(True)
+    bpy.ops.object.mode_set(mode="EDIT")
+    try:
+        edit_bones = armature.data.edit_bones
+        root = edit_bones.get("Bone_Root")
+        if root is None:
+            raise ValueError("Arachnid Hexapod armature is missing Bone_Root")
+        for tag in ("FL", "FR", "ML", "MR", "RL", "RR"):
+            thigh = edit_bones.get(f"Bone_Thigh_{tag}")
+            if thigh is None:
+                raise ValueError(f"Arachnid Hexapod armature is missing Bone_Thigh_{tag}")
+            authored_matrix = thigh.matrix.copy()
+            thigh.parent = root
+            thigh.use_connect = False
+            thigh.matrix = authored_matrix
+    finally:
+        bpy.ops.object.mode_set(mode="OBJECT")
+
+
+def _remove_leg_ik_constraints(armature: bpy.types.Object) -> None:
+    """Leave authored six-leg gait clips in control while the unit is idle."""
+    bpy.context.view_layer.objects.active = armature
+    armature.select_set(True)
+    bpy.ops.object.mode_set(mode="POSE")
+    try:
+        for tag in ("FL", "FR", "ML", "MR", "RL", "RR"):
+            shin = armature.pose.bones.get(f"Bone_Shin_{tag}")
+            if shin is None:
+                raise ValueError(f"Arachnid Hexapod armature is missing Bone_Shin_{tag}")
+            for constraint in list(shin.constraints):
+                if constraint.type == "IK":
+                    shin.constraints.remove(constraint)
+    finally:
+        bpy.ops.object.mode_set(mode="OBJECT")
+
+
+def _normalise_leg_tag(name: str) -> str | None:
+    for raw_tag, normalized in (
+        ("_L_F_", "FL"), ("_R_F_", "FR"), ("_L_R_", "RL"), ("_R_R_", "RR"),
+        ("_LF_", "FL"), ("_RF_", "FR"), ("_LR_", "RL"), ("_RR_", "RR"),
+        ("_ML_", "ML"), ("_MR_", "MR"), ("_FL_", "FL"), ("_FR_", "FR"), ("_RL_", "RL"),
+    ):
+        if raw_tag in name or name.endswith(raw_tag[:-1]):
+            return normalized
+    return None
+
+
+def _retarget_leg_attachments(meshes: list[bpy.types.Object]) -> None:
+    """Bind loose leg hardware to its chain instead of animated Bone_Hull."""
+    for mesh in meshes:
+        if mesh.type != "MESH":
+            continue
+        name = mesh.name
+        tag = _normalise_leg_tag(name)
+        target_bone = None
+        if name.startswith(f"{UNIT_NAME}CrawlerLeg_") and tag:
+            if any(part in name for part in ("Foot", "Talon", "Ankle")):
+                target_bone = f"Bone_Foot_{tag}"
+            elif any(part in name for part in ("Tibia", "Knee", "Shin")):
+                target_bone = f"Bone_Shin_{tag}"
+            elif any(part in name for part in ("Femur", "Hip")):
+                target_bone = f"Bone_Thigh_{tag}"
+        elif name.startswith(f"{UNIT_NAME}Piston_Quad_") and tag:
+            target_bone = f"Bone_Thigh_{tag}"
+        elif name.startswith(f"{UNIT_NAME}HydraulicRam_") and tag:
+            target_bone = f"Bone_Thigh_{tag}"
+        elif name.startswith(f"{UNIT_NAME}HydraulicRod_") and tag:
+            target_bone = f"Bone_Thigh_{tag}"
+        if target_bone is None:
+            continue
+        for vertex_group in list(mesh.vertex_groups):
+            mesh.vertex_groups.remove(vertex_group)
+        vertex_group = mesh.vertex_groups.new(name=target_bone)
+        vertex_indices = list(range(len(mesh.data.vertices)))
+        if vertex_indices:
+            vertex_group.add(vertex_indices, 1.0, "REPLACE")
+
+
 def _validate_rigid_weights(meshes: list[bpy.types.Object], armature: bpy.types.Object) -> None:
     bone_names = {bone.name for bone in armature.data.bones}
     for mesh in meshes:
@@ -75,6 +156,14 @@ def _validate_rigid_weights(meshes: list[bpy.types.Object], armature: bpy.types.
                 raise ValueError(f"{mesh.name} has non-rigid vertex weights at vertex {vertex.index}: {influences}")
             if influences[0][0] not in bone_names:
                 raise ValueError(f"{mesh.name} references missing bone {influences[0][0]}")
+
+
+def _clear_nla_tracks(armature: bpy.types.Object) -> None:
+    """Prevent overlapping NLA strips from leaking Walk poses into exported Idle."""
+    if armature.animation_data is None:
+        return
+    for track in list(armature.animation_data.nla_tracks):
+        armature.animation_data.nla_tracks.remove(track)
 
 
 def _validate_root_motion(armature: bpy.types.Object, walk_action: bpy.types.Action) -> None:
@@ -106,12 +195,17 @@ def build_arachnid_hexapod_rigged_model() -> None:
         raise ValueError("Arachnid Hexapod source has no armature")
 
     _ensure_middle_leg_bones(armature)
+    _decouple_leg_chains_from_idle_hull(armature)
+    _remove_leg_ik_constraints(armature)
     rmk.normalize_arachnid_middle_leg_orientation(armature)
     rmk.assign_rigid_mesh_weights(meshes, prefix=UNIT_NAME, armature_obj=armature, leg_type="quad")
+    _retarget_leg_attachments(meshes)
     _validate_rigid_weights(meshes, armature)
 
     # Generate animation clips for the complete six-leg armature.
     actions = rmk.generate_procedural_action_clips(armature, prefix=UNIT_NAME, leg_type="quad")
+    _clear_nla_tracks(armature)
+    armature.animation_data.action = actions["Idle"]
     _validate_root_motion(armature, actions["Walk"])
 
     # Strip hull movement from Walk so ONLY legs animate (no body bob/pitch/roll).
