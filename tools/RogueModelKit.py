@@ -10226,14 +10226,12 @@ def make_comms_relay_tower_assembly(
 # ---------------------------------------------------------------------------
 
 def normalize_arachnid_middle_leg_orientation(armature: bpy.types.Object) -> None:
-    """Ensure the Arachnid Hexapod's middle legs (ML/MR) bend downward like the
-    side legs instead of folding into the hull.
+    """Keep ML/MR shin and foot bones connected at the authored ground contact.
 
-    The authored middle-leg shins/feet were created with their tail Z pointing
-    upward, which inverted the deformation of the gunmetal/tread meshes and
-    produced a visibly deformed model. Force those tails to point downward
-    (negative Z in armature space) while keeping head positions intact so the
-    parent/child chain is preserved.
+    The middle-leg chains are synthesized by the Arachnid rig builder.  Older
+    normalization logic mirrored a positive shin tail to negative Z without
+    moving the child foot head, which detached the pad and deformed the FBX.
+    Repair the joint in edit space and retain the authored downward foot length.
     """
     if armature is None or armature.type != "ARMATURE":
         return
@@ -10242,12 +10240,17 @@ def normalize_arachnid_middle_leg_orientation(armature: bpy.types.Object) -> Non
     try:
         edit_bones = armature.data.edit_bones
         for tag in ("ML", "MR"):
-            for segment in ("Shin", "Foot"):
-                bone = edit_bones.get(f"Bone_{segment}_{tag}")
-                if bone is None:
-                    continue
-                if bone.tail.z > 0.0:
-                    bone.tail.z = -bone.tail.z
+            shin = edit_bones.get(f"Bone_Shin_{tag}")
+            foot = edit_bones.get(f"Bone_Foot_{tag}")
+            if shin is None or foot is None:
+                continue
+            foot_length = max((foot.tail - foot.head).length, 0.20)
+            if shin.tail.z < 0.0:
+                shin.tail.z = abs(shin.tail.z)
+            foot.head = shin.tail
+            foot.tail = foot.head + Vector((0.0, 0.0, -foot_length))
+            foot.parent = shin
+            foot.use_connect = False
     finally:
         bpy.ops.object.mode_set(mode="OBJECT")
 

@@ -39,7 +39,23 @@ class ArachnidHexapodBlenderRigContractTests(unittest.TestCase):
                     self.assertIsNotNone(bone, f"missing Bone_{segment}_{tag}")
                     self.assertTrue(bone.use_deform, f"Bone_{segment}_{tag} must deform its rigid mesh parts")
 
-    def test_each_leg_mesh_is_rigidly_bound_to_its_own_leg(self) -> None:
+    def test_middle_leg_bones_remain_connected_at_ground_contact(self) -> None:
+        """Middle shin and foot rest matrices must share a joint and keep the pad above Z=0."""
+        bones = self.armature.data.bones
+        for tag in ("ML", "MR"):
+            with self.subTest(leg=tag):
+                shin = bones[f"Bone_Shin_{tag}"]
+                foot = bones[f"Bone_Foot_{tag}"]
+                for axis in range(3):
+                    self.assertAlmostEqual(
+                        shin.tail_local[axis],
+                        foot.head_local[axis],
+                        places=5,
+                        msg=f"Bone_Foot_{tag} must start at Bone_Shin_{tag} tail on axis {axis}",
+                    )
+                self.assertGreaterEqual(foot.head_local.z, 0.0)
+                self.assertLess(foot.tail_local.z, foot.head_local.z)
+
         expected_groups = {
             "ArachnidHexapodCrawlerLeg_L_F_FemurBoom": "Bone_Thigh_FL",
             "ArachnidHexapodCrawlerLeg_R_F_FemurBoom": "Bone_Thigh_FR",
@@ -131,7 +147,25 @@ class ArachnidHexapodBlenderRigContractTests(unittest.TestCase):
                     f"Bone_Shin_{tag} must not solve an IK pose while Idle is active",
                 )
 
-    def test_walk_animates_all_six_leg_chains_in_place(self) -> None:
+    def test_idle_keys_neutral_pose_for_all_leg_chains(self) -> None:
+        """Idle must author a rest pose, not inherit the last generated gait pose."""
+        self.assertIsNotNone(self.idle)
+        for tag in LEG_TAGS:
+            for segment in ("Thigh", "Shin", "Foot"):
+                bone_name = f"Bone_{segment}_{tag}"
+                for channel in ("location", "rotation_euler"):
+                    with self.subTest(bone=bone_name, channel=channel):
+                        curves = [
+                            curve
+                            for curve in self.idle.fcurves
+                            if curve.data_path == f'pose.bones["{bone_name}"].{channel}'
+                        ]
+                        self.assertEqual(3, len(curves), f"Idle must key all {channel} channels for {bone_name}")
+                        self.assertTrue(
+                            all(abs(float(point.co.y)) <= 1e-6 for curve in curves for point in curve.keyframe_points),
+                            f"Idle must keep {bone_name} at its authored rest pose",
+                        )
+
         self.assertIsNotNone(self.walk)
         animated_bones = {
             curve.data_path.split('"')[1]

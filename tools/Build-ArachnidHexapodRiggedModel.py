@@ -166,6 +166,33 @@ def _clear_nla_tracks(armature: bpy.types.Object) -> None:
         armature.animation_data.nla_tracks.remove(track)
 
 
+def _author_idle_leg_rest_pose(armature: bpy.types.Object, idle_action: bpy.types.Action) -> None:
+    """Key every leg chain at rest so export cannot retain the prior Walk/Death pose."""
+    if armature.animation_data is None:
+        raise ValueError("Arachnid Hexapod armature has no animation data")
+    armature.animation_data.action = idle_action
+    bpy.context.view_layer.objects.active = armature
+    armature.select_set(True)
+    bpy.ops.object.mode_set(mode="POSE")
+    try:
+        for tag in ("FL", "FR", "ML", "MR", "RL", "RR"):
+            for segment in ("Thigh", "Shin", "Foot"):
+                bone_name = f"Bone_{segment}_{tag}"
+                pose_bone = armature.pose.bones.get(bone_name)
+                if pose_bone is None:
+                    raise ValueError(f"Arachnid Hexapod armature is missing {bone_name}")
+                pose_bone.location = (0.0, 0.0, 0.0)
+                pose_bone.rotation_mode = "XYZ"
+                pose_bone.rotation_euler = (0.0, 0.0, 0.0)
+                for frame in (1, 30):
+                    pose_bone.keyframe_insert(data_path="location", frame=frame, group=bone_name)
+                    pose_bone.keyframe_insert(data_path="rotation_euler", frame=frame, group=bone_name)
+    finally:
+        bpy.ops.object.mode_set(mode="OBJECT")
+    armature.animation_data.action = idle_action
+    bpy.context.view_layer.update()
+
+
 def _validate_root_motion(armature: bpy.types.Object, walk_action: bpy.types.Action) -> None:
     root_path = 'pose.bones["Bone_Root"].location'
     root_curves = [curve for curve in walk_action.fcurves if curve.data_path == root_path]
@@ -205,7 +232,7 @@ def build_arachnid_hexapod_rigged_model() -> None:
     # Generate animation clips for the complete six-leg armature.
     actions = rmk.generate_procedural_action_clips(armature, prefix=UNIT_NAME, leg_type="quad")
     _clear_nla_tracks(armature)
-    armature.animation_data.action = actions["Idle"]
+    _author_idle_leg_rest_pose(armature, actions["Idle"])
     _validate_root_motion(armature, actions["Walk"])
 
     # Strip hull movement from Walk so ONLY legs animate (no body bob/pitch/roll).
