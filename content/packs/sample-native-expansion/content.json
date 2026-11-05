@@ -1132,6 +1132,7 @@
       "nativeTemplateId": "GatlingWalker",
       "unitType": "Ground",
       "assetBundleId": "sample-native:assets",
+      "cardImageAssetName": "assets/roguecommandexpansionsample/arachnidhexapodcard.png",
       "visualAssetName": "assets/roguecommandexpansionsample/visualonly/prefabs/arachnidhexapodvisual.prefab",
       "visualRootPath": "RoboMarine_Mesh",
       "isAllowedAsStartingBlueprint": true,
@@ -1280,6 +1281,7 @@
         "id": "sample-native:arachnid-hexapod-factory",
         "nativeTemplateId": "GatlingWalkerFactory",
         "assetBundleId": "sample-native:assets",
+        "cardImageAssetName": "assets/roguecommandexpansionsample/arachnidhexapodcard.png",
         "visualAssetName": "assets/roguecommandexpansionsample/visualonly/prefabs/arachnidhexapodfactoryvisual.prefab",
         "visualRootPath": "GatlingWalkerFactory",
         "balanceOverrides": [
@@ -1352,6 +1354,7 @@
       "nativeTemplateId": "PCXBaseTank",
       "unitType": "Ground",
       "assetBundleId": "sample-native:assets",
+      "cardImageAssetName": "assets/roguecommandexpansionsample/overlordcommandhqcard.png",
       "visualAssetName": "assets/roguecommandexpansionsample/visualonly/prefabs/overlordcommandhqvisual.prefab",
       "visualRootPath": "Vehicle",
       "isAllowedAsStartingBlueprint": true,
@@ -1500,6 +1503,7 @@
         "id": "sample-native:overlord-command-hq-factory",
         "nativeTemplateId": "PCXBaseTankFactory",
         "assetBundleId": "sample-native:assets",
+        "cardImageAssetName": "assets/roguecommandexpansionsample/overlordcommandhqcard.png",
         "visualAssetName": "assets/roguecommandexpansionsample/visualonly/prefabs/overlordcommandhqfactoryvisual.prefab",
         "visualRootPath": "PCXBaseTankFactory",
         "balanceOverrides": [

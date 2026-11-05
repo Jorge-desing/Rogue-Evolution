@@ -51,6 +51,8 @@ namespace RogueCommandExpansion.Authoring
             AssetRoot + "/VisualOnly/Prefabs/OverlordCommandHQFactoryVisual.prefab";
         private const string ArachnidHexapodModelPath = AssetRoot + "/Models/ArachnidHexapod.fbx";
         private const string OverlordCommandHQModelPath = AssetRoot + "/Models/OverlordCommandHQ.fbx";
+        private const string ArachnidHexapodCardSpritePath = AssetRoot + "/ArachnidHexapodCard.png";
+        private const string OverlordCommandHQCardSpritePath = AssetRoot + "/OverlordCommandHQCard.png";
         private const string MaterialRoot = AssetRoot + "/Materials";
         private const string VertexWearShaderName = "RogueCommand/VehiclePBR_VertexWear";
         private const float FactoryNewWearStrength = 0.25f;
@@ -286,6 +288,8 @@ namespace RogueCommandExpansion.Authoring
                 ImportCardSprite(BastionSiegeMechCardSpritePath, true);
                 string surgeArcTankPrefabPath = CreateSurgeArcTankVisual();
                 ImportCardSprite(SurgeArcTankCardSpritePath);
+                ImportCardSprite(ArachnidHexapodCardSpritePath);
+                ImportCardSprite(OverlordCommandHQCardSpritePath);
                 ConfigureArachnidOverlordPbrTextureImports();
                 RefreshRiggedPbrPrefabAnimator("ArachnidHexapod", ArachnidHexapodModelPath, ArachnidHexapodVisualPrefabPath);
                 RefreshRiggedPbrPrefabAnimator("OverlordCommandHQ", OverlordCommandHQModelPath, OverlordCommandHQVisualPrefabPath);
@@ -304,6 +308,7 @@ namespace RogueCommandExpansion.Authoring
                         atlasCraneMechPrefabPath, AtlasCraneMechCardSpritePath,
                         bastionSiegeMechPrefabPath, BastionSiegeMechCardSpritePath,
                         surgeArcTankPrefabPath, SurgeArcTankCardSpritePath,
+                        ArachnidHexapodCardSpritePath, OverlordCommandHQCardSpritePath,
                         ArachnidHexapodVisualPrefabPath, ArachnidHexapodFactoryVisualPrefabPath,
                         OverlordCommandHQVisualPrefabPath, OverlordCommandHQFactoryVisualPrefabPath
                     }
@@ -337,8 +342,8 @@ namespace RogueCommandExpansion.Authoring
                     Path.Combine(packBundles, "assetbundle-manifest.bundle"));
 
                 AssetDatabase.Refresh();
-                Debug.Log("Built seven script-free Sandlance, Skirmish Bike, Colossus, Ironclad Walker, " +
-                    "Atlas Crane Mech, Bastion Siege Mech, and Surge Arc Tank visual overlays plus seven card Sprites in " +
+                Debug.Log("Built nine script-free Sandlance, Skirmish Bike, Colossus, Ironclad Walker, " +
+                    "Atlas Crane Mech, Bastion Siege Mech, Surge Arc Tank, Arachnid Hexapod, and Overlord Command HQ visual overlays plus nine card Sprites in " +
                     BundleName + " at " + packBundles + ".");
                 if (Application.isBatchMode)
                 {
@@ -393,6 +398,8 @@ namespace RogueCommandExpansion.Authoring
                 EnsureExistingBundleAsset(BastionSiegeMechCardSpritePath, typeof(Sprite));
                 EnsureExistingBundleAsset(SurgeArcTankPrefabPath, typeof(GameObject));
                 EnsureExistingBundleAsset(SurgeArcTankCardSpritePath, typeof(Sprite));
+                EnsureExistingBundleAsset(ArachnidHexapodCardSpritePath, typeof(Sprite));
+                EnsureExistingBundleAsset(OverlordCommandHQCardSpritePath, typeof(Sprite));
                 EnsureExistingBundleAsset(BastionEngineLoopAudioPath, typeof(AudioClip));
                 EnsureExistingBundleAsset(BastionWeaponShotAudioPath, typeof(AudioClip));
                 EnsureExistingBundleAsset(ArachnidHexapodVisualPrefabPath, typeof(GameObject));
@@ -431,6 +438,7 @@ namespace RogueCommandExpansion.Authoring
                         AtlasCraneMechPrefabPath, AtlasCraneMechCardSpritePath,
                         BastionSiegeMechPrefabPath, BastionSiegeMechCardSpritePath,
                         SurgeArcTankPrefabPath, SurgeArcTankCardSpritePath,
+                        ArachnidHexapodCardSpritePath, OverlordCommandHQCardSpritePath,
                         ArachnidHexapodVisualPrefabPath, ArachnidHexapodFactoryVisualPrefabPath,
                         OverlordCommandHQVisualPrefabPath, OverlordCommandHQFactoryVisualPrefabPath
                     }
@@ -2278,11 +2286,11 @@ namespace RogueCommandExpansion.Authoring
                     "surgearctankcard.png", "SurgeArcTankCard", "Surge Arc Tank",
                     requireFootContactSockets: false);
                 ValidateVisualBundleAssets(bundle, assetNames, "arachnidhexapodvisual.prefab",
-                    "ArachnidHexapodVisual", null, null, 0, "Arachnid Hexapod");
+                    "ArachnidHexapodVisual", "arachnidhexapodcard.png", "ArachnidHexapodCard", 0, "Arachnid Hexapod");
                 ValidateVisualBundleAssets(bundle, assetNames, "arachnidhexapodfactoryvisual.prefab",
                     "ArachnidHexapodFactoryVisual", null, null, 0, "Arachnid Hexapod Factory");
                 ValidateVisualBundleAssets(bundle, assetNames, "overlordcommandhqvisual.prefab",
-                    "OverlordCommandHQVisual", null, null, 0, "Overlord Command HQ");
+                    "OverlordCommandHQVisual", "overlordcommandhqcard.png", "OverlordCommandHQCard", 0, "Overlord Command HQ");
                 ValidateVisualBundleAssets(bundle, assetNames, "overlordcommandhqfactoryvisual.prefab",
                     "OverlordCommandHQFactoryVisual", null, null, 0, "Overlord Command HQ Factory");
                 // PBR validation skipped: ArachnidHexapod is now a rigged model.

@@ -161,6 +161,30 @@ internal static partial class ValidationTestRunner
                 "Ironclad must declare its rigged native visual overlay and its independently bundled card Sprite.");
         }
     }),
+    ("Arachnid Hexapod and Overlord Command HQ declare custom card Sprites", () =>
+    {
+        ContentUnitDefinition arachnid = nativeSample.units.Single(
+            unit => unit.id == "sample-native:arachnid-hexapod");
+        ContentUnitDefinition overlord = nativeSample.units.Single(
+            unit => unit.id == "sample-native:overlord-command-hq");
+        if (arachnid.cardImageAssetName != "assets/roguecommandexpansionsample/arachnidhexapodcard.png" ||
+            arachnid.productionBuilding == null ||
+            arachnid.productionBuilding.cardImageAssetName !=
+                "assets/roguecommandexpansionsample/arachnidhexapodcard.png")
+        {
+            throw new InvalidOperationException(
+                "Arachnid Hexapod must declare its own bundled card Sprite matching the blue hexapod model.");
+        }
+
+        if (overlord.cardImageAssetName != "assets/roguecommandexpansionsample/overlordcommandhqcard.png" ||
+            overlord.productionBuilding == null ||
+            overlord.productionBuilding.cardImageAssetName !=
+                "assets/roguecommandexpansionsample/overlordcommandhqcard.png")
+        {
+            throw new InvalidOperationException(
+                "Overlord Command HQ must declare its own bundled card Sprite matching its model.");
+        }
+    }),
     ("Foundry Counterweight targets player Atlas Health without Heat or meta scaling", () =>
     {
         ContentRelicDefinition relic = nativeSample.relics.Single(
