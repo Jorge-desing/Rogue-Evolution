@@ -81,11 +81,13 @@ namespace RogueCommandExpansionLoader.Runtime
             try
             {
                 List<EntityController> units = RuntimeVisualCensusSupport.CollectLivingUnits(maxRows, out omitted);
+                var materialCache = new Dictionary<Material, RuntimeVisualCensusSupport.MaterialBindingSnapshot>(
+                    ReferenceEqualityComparer<Material>.Instance);
                 for (int i = 0; i < units.Count; i++)
                 {
                     try
                     {
-                        rows.Add(CollectRow(units[i]));
+                        rows.Add(CollectRow(units[i], materialCache));
                     }
                     catch
                     {
@@ -101,7 +103,9 @@ namespace RogueCommandExpansionLoader.Runtime
             return new VisualMaterialCensus(rows.AsReadOnly(), omitted);
         }
 
-        private static VisualMaterialRow CollectRow(EntityController unit)
+        private static VisualMaterialRow CollectRow(
+            EntityController unit,
+            Dictionary<Material, RuntimeVisualCensusSupport.MaterialBindingSnapshot> materialCache)
         {
             string key = RuntimeVisualCensusSupport.ResolveEntityKey(unit);
 
@@ -159,21 +163,27 @@ namespace RogueCommandExpansionLoader.Runtime
                         inspectedMaterialSlots++;
                         materialCount++;
 
+                        RuntimeVisualCensusSupport.MaterialBindingSnapshot binding;
+                        if (!materialCache.TryGetValue(material, out binding))
+                        {
+                            binding = RuntimeVisualCensusSupport.InspectMaterial(material);
+                            materialCache[material] = binding;
+                        }
+
                         RuntimeVisualCensusSupport.AddUniqueBounded(
                             materialNames,
                             seenMaterialNames,
-                            material.name,
+                            binding.MaterialName,
                             RuntimeVisualCensusSupport.MaxDiagnosticNamesPerUnit,
                             ref nameSamplingBounded);
                         RuntimeVisualCensusSupport.AddUniqueBounded(
                             shaderNames,
                             seenShaderNames,
-                            RuntimeVisualCensusSupport.ResolveShaderName(material),
+                            binding.ShaderName,
                             RuntimeVisualCensusSupport.MaxDiagnosticNamesPerUnit,
                             ref nameSamplingBounded);
 
-                        string[] keywords = null;
-                        try { keywords = material.shaderKeywords; } catch { }
+                        string[] keywords = binding.ShaderKeywords;
                         if (keywords != null)
                         {
                             for (int keywordIndex = 0; keywordIndex < keywords.Length; keywordIndex++)
@@ -187,8 +197,7 @@ namespace RogueCommandExpansionLoader.Runtime
                             }
                         }
 
-                        Texture main = null;
-                        try { main = material.mainTexture; } catch { }
+                        Texture main = binding.MainTexture;
                         if (main != null)
                         {
                             mainTexCount++;
@@ -202,7 +211,7 @@ namespace RogueCommandExpansionLoader.Runtime
                                 ref nameSamplingBounded);
                         }
 
-                        Texture metallicGloss = RuntimeVisualCensusSupport.GetTexture(material, "_MetallicGlossMap");
+                        Texture metallicGloss = binding.MetallicGlossMap;
                         if (metallicGloss != null)
                         {
                             metallicGlossCount++;
@@ -216,8 +225,7 @@ namespace RogueCommandExpansionLoader.Runtime
                                 ref nameSamplingBounded);
                         }
 
-                        Texture normal = RuntimeVisualCensusSupport.GetTexture(material, "_BumpMap");
-                        if (normal == null) normal = RuntimeVisualCensusSupport.GetTexture(material, "_NormalMap");
+                        Texture normal = binding.NormalMap;
                         if (normal != null)
                         {
                             normalCount++;
@@ -231,7 +239,7 @@ namespace RogueCommandExpansionLoader.Runtime
                                 ref nameSamplingBounded);
                         }
 
-                        Texture emission = RuntimeVisualCensusSupport.GetTexture(material, "_EmissionMap");
+                        Texture emission = binding.EmissionMap;
                         if (emission != null)
                         {
                             emissionCount++;

@@ -341,10 +341,20 @@ namespace UnityEngine
         public string[] shaderKeywords { get; set; } = System.Array.Empty<string>();
         public bool enableInstancing { get; set; }
         public Texture mainTexture { get; set; }
+        public int HasPropertyCallCount { get; private set; }
+        public int GetTextureCallCount { get; private set; }
         private readonly System.Collections.Generic.Dictionary<string, Texture> _textures = new System.Collections.Generic.Dictionary<string, Texture>();
         public void SetTexture(string name, Texture texture) { if (name != null) _textures[name] = texture; }
-        public bool HasProperty(string name) => name != null && _textures.ContainsKey(name);
-        public Texture GetTexture(string name) { return name != null && _textures.TryGetValue(name, out var t) ? t : mainTexture; }
+        public bool HasProperty(string name)
+        {
+            HasPropertyCallCount++;
+            return name != null && _textures.ContainsKey(name);
+        }
+        public Texture GetTexture(string name)
+        {
+            GetTextureCallCount++;
+            return name != null && _textures.TryGetValue(name, out var t) ? t : mainTexture;
+        }
         public float GetFloat(string name) { return 0f; }
     }
 

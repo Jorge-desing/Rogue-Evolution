@@ -154,6 +154,34 @@ namespace RogueCommandExpansionLoader.Runtime
             try { return material.GetTexture(propertyName); } catch { return null; }
         }
 
+        internal static MaterialBindingSnapshot InspectMaterial(Material material)
+        {
+            var snapshot = new MaterialBindingSnapshot();
+            if (material == null) return snapshot;
+
+            try { snapshot.MaterialName = material.name ?? string.Empty; } catch { }
+            snapshot.ShaderName = ResolveShaderName(material);
+            try { snapshot.ShaderKeywords = material.shaderKeywords ?? new string[0]; } catch { }
+            try { snapshot.MainTexture = material.mainTexture; } catch { }
+            snapshot.MetallicGlossMap = GetTexture(material, "_MetallicGlossMap");
+            Texture normal = GetTexture(material, "_BumpMap");
+            if (normal == null) normal = GetTexture(material, "_NormalMap");
+            snapshot.NormalMap = normal;
+            snapshot.EmissionMap = GetTexture(material, "_EmissionMap");
+            return snapshot;
+        }
+
+        internal sealed class MaterialBindingSnapshot
+        {
+            internal string MaterialName = string.Empty;
+            internal string ShaderName = string.Empty;
+            internal string[] ShaderKeywords = new string[0];
+            internal Texture MainTexture;
+            internal Texture MetallicGlossMap;
+            internal Texture NormalMap;
+            internal Texture EmissionMap;
+        }
+
         internal static bool AddUniqueBounded(
             List<string> values,
             HashSet<string> seen,

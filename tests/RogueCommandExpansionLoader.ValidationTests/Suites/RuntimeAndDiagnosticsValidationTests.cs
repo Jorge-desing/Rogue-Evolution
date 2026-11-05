@@ -5028,6 +5028,50 @@ internal static partial class ValidationTestRunner
             ExistingControllers.Instance.Reset();
         }
     }),
+    ("standalone material census caches binding reflection for shared materials", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        try
+        {
+            var sharedMaterial = new Material
+            {
+                name = "SharedMaterial",
+                shader = new Shader { name = "Standard" },
+                shaderKeywords = new[] { "_EMISSION" }
+            };
+            var sharedTexture = new Texture { name = "SharedTexture" };
+            sharedMaterial.mainTexture = sharedTexture;
+            sharedMaterial.SetTexture("_EmissionMap", sharedTexture);
+
+            for (int i = 0; i < 2; i++)
+            {
+                var unit = new EntityController
+                {
+                    entityId = "sample-native:shared-material-" + i,
+                    UniqueEntityId = 9100 + i,
+                    IsControlledByPlayer = true,
+                    IsUnit = true,
+                    Position = new Vector3(i, 0f, 0f)
+                };
+                var root = new GameObject("SharedMaterialUnit" + i);
+                var renderer = root.AddComponent<MeshRenderer>();
+                renderer.sharedMaterials = new[] { sharedMaterial };
+                unit.gameObject = root;
+                ExistingControllers.Instance.PlayerUnits().Add(unit);
+            }
+
+            VisualMaterialCensus census = RuntimeVisualMaterialCensus.Current(2);
+            if (census.Rows.Count != 2 || sharedMaterial.HasPropertyCallCount != 4 ||
+                sharedMaterial.GetTextureCallCount != 1)
+            {
+                throw new InvalidOperationException("Standalone material census must inspect each shared material binding once per sweep.");
+            }
+        }
+        finally
+        {
+            ExistingControllers.Instance.Reset();
+        }
+    }),
     ("runtime tech catalog census queries registered upgrades research branches and relics", () =>
     {
         TechCatalogCensus census = RuntimeTechCatalogCensus.Current();
