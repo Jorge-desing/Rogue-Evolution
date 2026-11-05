@@ -1895,16 +1895,15 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
                 return _tool_response(json.dumps(result, indent=2))
 
         elif name == "diagnostics_get_gui_state":
-            # Fast path: single composite getter (1 round-trip vs 6)
+            # Fast path: single composite getter (1 round-trip vs 6).
+            # _call_diagnostics_method already extracts the bridge ReturnValue,
+            # so parse fast_raw directly instead of re-extracting (which would
+            # always return None and silently disable the fast path).
             try:
                 fast_raw = _call_diagnostics_method("GetGuiStateJson")
-                fast_val = _extract_bridge_return_value(fast_raw) if isinstance(fast_raw, str) else fast_raw
-                if isinstance(fast_val, str):
-                    parsed = json.loads(fast_val)
-                    if isinstance(parsed, dict) and parsed.get("kind") == "guiState":
-                        return _tool_response(json.dumps(parsed, indent=2))
-                elif isinstance(fast_val, dict) and fast_val.get("kind") == "guiState":
-                    return _tool_response(json.dumps(fast_val, indent=2))
+                parsed = json.loads(fast_raw) if isinstance(fast_raw, str) else fast_raw
+                if isinstance(parsed, dict) and parsed.get("kind") == "guiState":
+                    return _tool_response(json.dumps(parsed, indent=2))
             except Exception:
                 pass
             member_values = {}
@@ -2117,16 +2116,23 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             target = selector or button_name
             if not target:
                 return _tool_response(json.dumps({"success": False, "message": "buttonName or selector required"}), True)
-            # search
-            try:
-                search_raw = _call_http("scene/search_gameobjects", params={"query": target})
-                items = json.loads(search_raw) if isinstance(search_raw, str) else search_raw
-                if isinstance(items, dict):
-                    items = items.get("objects", [items]) if "objects" in items else [items]
-                if not isinstance(items, list):
+            # search (bridge uses `name`/`componentName`; `query` kept as fallback)
+            items = []
+            search_params_candidates = [
+                {"name": target, "includeInactive": "true", "limit": "20"},
+                {"query": target, "includeInactive": "true", "limit": "20"},
+            ]
+            for sp in search_params_candidates:
+                try:
+                    search_raw = _call_http("scene/search_gameobjects", params=sp)
+                    parsed_items = json.loads(search_raw) if isinstance(search_raw, str) else search_raw
+                    if isinstance(parsed_items, dict):
+                        parsed_items = parsed_items.get("objects", [parsed_items]) if "objects" in parsed_items else [parsed_items]
+                    if isinstance(parsed_items, list) and parsed_items:
+                        items = parsed_items
+                        break
+                except Exception:
                     items = []
-            except Exception:
-                items = []
             if not items:
                 return _tool_response(json.dumps({"success": False, "message": f'button not found: {target}', "candidates": []}))
             game_object_id = items[0].get("id") if isinstance(items[0], dict) else None
