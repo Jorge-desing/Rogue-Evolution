@@ -48,6 +48,16 @@
 
 ---
 
+## 2026-11-05 complete synthetic-seam runtime
+
+- **Implementation:** Added the one-call `diagnostics_run_synthetic_gameplay_scenario` seam. It requires `Time.timeScale == 0`, validates a bounded primitive plan, reconciles loader state, spawns only requested namespaced units, applies tactical stances, loadouts, affixes, veterancy, formation movement, command aura, tactical pulse, hazard, and visual feedback, then clears loader-owned effects and destroys only the entities it created. Results put `omittedFailureCount` before bounded evidence collections.
+- **Bridge hardening:** Added CSV-compatible adapters for patrol, group, formation, group stance, coordinated assault, and agent-lock batch commands. The Python bridge converts list arguments to semicolon-delimited strings because commas are unsafe in the installed reflection argument parser; the runtime parser accepts both comma and semicolon separators. Unsupported formations and non-finite visual-feedback magnitudes now fail closed.
+- **Local validation:** Final Release plugin and validation-test builds completed with 0 warnings/errors. Fresh exact Release harness: `488/489 validation checks passed; 1 skipped` (Windows symlink privilege). Python suite: `182` passed with `1` platform skip; diagnostics bridge tests: `26/26`.
+- **Steam runtime evidence:** Session `artifacts/runtime-smoke/synthetic-seam-complete-v2-20261105-110436/` rechecked Rogue Command `1.0.9`, Unity `2021.3.45f2`/runtime `2021.3.45.8976527`, Assembly-CSharp SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, and MVID `db0e9462-128d-4296-9900-de18b4bd0c00`. Final deployed loader SHA-256 was `ea3d6bccb09ab7ef09462293bcb2fd075b7b857ed2f7ea764c429559b2330b64`. The one-call scenario passed with 3/3 spawns, 3/3 formation dispatches, 3/3 stance/loadout/affix/veterancy operations, 2 aura followers, 2 pulse targets, 1 hazard, 1 visual-feedback success, and 3/3 synthetic entities destroyed. Post-cleanup aura/affix/hazard counts were zero, time scale returned to 1, and Profile2 verification allowed only `metaSavegame.dat`.
+- **Evidence boundary:** This is `synthetic-seam` runtime evidence only; it does not prove natural blueprint offers, factory placement/production, natural AI selection, or emergent combat decisions. `GetVisualHealthSummaryJson` remains a separate slow aggregator that exceeded a 60-second direct bridge timeout; the scenario's bounded visual-director feedback path passed.
+
+---
+
 ## 1. Authoritative Compatibility Identity
 
 Always recheck this identity before relying on reflected signatures, CIL metadata tokens, or serialized assets:

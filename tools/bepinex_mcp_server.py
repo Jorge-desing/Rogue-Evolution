@@ -862,9 +862,10 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
                 attacker_keys = []
             attacker_keys = [str(value) for value in attacker_keys]
             max_attackers = int(arguments.get("maxAttackers", 8))
+            attacker_keys_csv = ";".join(value.strip() for value in attacker_keys)
             res = _call_diagnostics_method(
-                "OrderCoordinatedAssaultJson",
-                [target_key, attacker_keys, max_attackers],
+                "OrderCoordinatedAssaultCsvJson",
+                [target_key, attacker_keys_csv, max_attackers],
             )
             return _tool_response(res)
         elif name == "diagnostics_order_retreat":
@@ -1019,7 +1020,9 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             e_key = str(arguments.get("entityKeyId", ""))
             wx = arguments.get("waypointX") or []
             wz = arguments.get("waypointZ") or []
-            res = _call_diagnostics_method("OrderUnitPatrolJson", [e_key, [float(v) for v in wx], [float(v) for v in wz]])
+            waypoint_x_csv = ";".join(str(float(v)) for v in wx)
+            waypoint_z_csv = ";".join(str(float(v)) for v in wz)
+            res = _call_diagnostics_method("OrderUnitPatrolCsvJson", [e_key, waypoint_x_csv, waypoint_z_csv])
             return _tool_response(res)
 
         elif name == "diagnostics_order_group_command":
@@ -1027,7 +1030,8 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             cmd_type = str(arguments.get("commandType", ""))
             x = float(arguments.get("targetX", 0.0))
             z = float(arguments.get("targetZ", 0.0))
-            res = _call_diagnostics_method("OrderGroupCommandJson", [[str(k) for k in keys], cmd_type, x, z])
+            keys_csv = ";".join(str(k).strip() for k in keys)
+            res = _call_diagnostics_method("OrderGroupCommandCsvJson", [keys_csv, cmd_type, x, z])
             return _tool_response(res)
 
         elif name == "diagnostics_order_formation_move":
@@ -1036,7 +1040,20 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             x = float(arguments.get("targetX", 0.0))
             z = float(arguments.get("targetZ", 0.0))
             spacing = float(arguments.get("spacing", 4.0))
-            res = _call_diagnostics_method("OrderFormationMoveJson", [[str(k) for k in keys], f_type, x, z, spacing])
+            keys_csv = ";".join(str(k).strip() for k in keys)
+            res = _call_diagnostics_method("OrderFormationMoveCsvJson", [keys_csv, f_type, x, z, spacing])
+            return _tool_response(res)
+
+        elif name == "diagnostics_run_synthetic_gameplay_scenario":
+            unit_ids_csv = str(arguments.get("unitIdsCsv", "")).replace(",", ";")
+            target_x = float(arguments.get("targetX", 0.0))
+            target_z = float(arguments.get("targetZ", 0.0))
+            formation_type = str(arguments.get("formationType", "Wedge"))
+            spacing = float(arguments.get("spacing", 4.0))
+            res = _call_diagnostics_method(
+                "RunSyntheticGameplayScenarioJson",
+                [unit_ids_csv, target_x, target_z, formation_type, spacing],
+            )
             return _tool_response(res)
 
         elif name == "diagnostics_order_unit_tactical_stance":
@@ -1048,7 +1065,8 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
         elif name == "diagnostics_order_group_tactical_stance":
             keys = arguments.get("entityKeyIds") or []
             s_name = str(arguments.get("stanceName", "Standard"))
-            res = _call_diagnostics_method("OrderGroupTacticalStanceJson", [[str(k) for k in keys], s_name])
+            keys_csv = ";".join(str(k).strip() for k in keys)
+            res = _call_diagnostics_method("OrderGroupTacticalStanceCsvJson", [keys_csv, s_name])
             return _tool_response(res)
 
         elif name == "diagnostics_get_tactical_stance_census":
@@ -1359,8 +1377,9 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
                 keys = [str(k) for k in raw_keys]
             else:
                 keys = [k.strip() for k in str(raw_keys).split(",") if k.strip()]
+            keys_csv = ";".join(k.strip() for k in keys)
             duration_seconds = float(arguments.get("durationSeconds", 30.0))
-            res = _call_diagnostics_method("AcquireAgentLockBatchJson", [agent_id, keys, duration_seconds])
+            res = _call_diagnostics_method("AcquireAgentLockBatchCsvJson", [agent_id, keys_csv, duration_seconds])
             return _tool_response(res)
 
         elif name == "diagnostics_release_agent_lock":
@@ -1376,7 +1395,8 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
                 keys = [str(k) for k in raw_keys]
             else:
                 keys = [k.strip() for k in str(raw_keys).split(",") if k.strip()]
-            res = _call_diagnostics_method("ReleaseAgentLockBatchJson", [agent_id, keys])
+            keys_csv = ";".join(k.strip() for k in keys)
+            res = _call_diagnostics_method("ReleaseAgentLockBatchCsvJson", [agent_id, keys_csv])
             return _tool_response(res)
 
         elif name == "diagnostics_get_tech_catalog":

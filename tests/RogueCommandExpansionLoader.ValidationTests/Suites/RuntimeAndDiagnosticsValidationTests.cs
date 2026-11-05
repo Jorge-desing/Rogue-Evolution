@@ -6357,7 +6357,94 @@ internal static partial class ValidationTestRunner
             }
         }
     }),
+    ("synthetic gameplay seam plan validates bounded CSV units, formations, and finite coordinates", () =>
+    {
+        if (!SyntheticGameplayScenarioPlan.TryCreate(
+                "unit:alpha, unit:beta",
+                "Wedge",
+                10f,
+                20f,
+                4f,
+                out SyntheticGameplayScenarioPlan plan,
+                out string diagnostic))
+        {
+            throw new InvalidOperationException("A valid synthetic gameplay plan was rejected: " + diagnostic);
+        }
+
+        if (plan.UnitIds.Count != 2 || plan.FormationType != "Wedge" ||
+            plan.TargetX != 10f || plan.TargetZ != 20f || plan.Spacing != 4f)
+        {
+            throw new InvalidOperationException("Synthetic gameplay plan did not preserve its bounded primitive inputs.");
+        }
+
+        if (SyntheticGameplayScenarioPlan.TryCreate(
+                "unit:alpha,,unit:beta",
+                "Wedge",
+                10f,
+                20f,
+                4f,
+                out _,
+                out diagnostic) || !diagnostic.Contains("empty"))
+        {
+            throw new InvalidOperationException("Synthetic gameplay plan must reject empty CSV entries.");
+        }
+
+        if (SyntheticGameplayScenarioPlan.TryCreate(
+                "unit:alpha",
+                "Unsupported",
+                float.NaN,
+                20f,
+                4f,
+                out _,
+                out diagnostic) || !diagnostic.Contains("finite"))
+        {
+            throw new InvalidOperationException("Synthetic gameplay plan must fail closed for non-finite coordinates.");
+        }
+    }),
+    ("synthetic gameplay scenario result serializes omission counters before bounded evidence", () =>
+    {
+        var result = new SyntheticGameplayScenarioResult(
+            true,
+            true,
+            2,
+            2,
+            2,
+            2,
+            2,
+            2,
+            2,
+            1,
+            2,
+            1,
+            3,
+            1,
+            0,
+            0,
+            0,
+            "Wedge",
+            new[] { "unit:alpha", "unit:beta" },
+            new[] { "none" },
+            "synthetic scenario complete");
+        string json = AgentDiagnosticsFormatter.SerializeSyntheticGameplayScenarioResult(result);
+        using (var doc = JsonDocument.Parse(json))
+        {
+            var properties = doc.RootElement.EnumerateObject().Select(property => property.Name).ToList();
+            if (properties[0] != "kind" || properties[1] != "omittedFailureCount")
+            {
+                throw new InvalidOperationException("Synthetic scenario omission counter must precede bounded evidence.");
+            }
+            if (doc.RootElement.GetProperty("kind").GetString() != "syntheticGameplayScenario")
+            {
+                throw new InvalidOperationException("Synthetic scenario result kind is incorrect.");
+            }
+            if (doc.RootElement.GetProperty("createdEntityKeys").GetArrayLength() != 2)
+            {
+                throw new InvalidOperationException("Synthetic scenario created entity keys were not serialized.");
+            }
+        }
+    }),
     ("runtime formation move dispatches calculated offset positions for Line, Wedge, and Box formations", () =>
+
     {
         ExistingControllers.Instance.Reset();
         RuntimeGameplayCommandDirector.ClearUnitLoadouts();
@@ -6431,6 +6518,13 @@ internal static partial class ValidationTestRunner
         if (infSpacing.Success || !infSpacing.Message.Contains("finite"))
         {
             throw new InvalidOperationException("TryOrderFormationMove must fail with non-finite spacing.");
+        }
+
+        FormationOrderResult invalidFormation = RuntimeGameplayCommandDirector.TryOrderFormationMove(
+            new[] { "931", "932", "933" }, "NotAFormation", 50f, 50f, 4f);
+        if (invalidFormation.Success || !invalidFormation.Message.Contains("Unsupported"))
+        {
+            throw new InvalidOperationException("TryOrderFormationMove must fail closed for unsupported formation types.");
         }
 
         // Serialization
@@ -7818,6 +7912,12 @@ internal static partial class ValidationTestRunner
         if (invalidFb.Success)
         {
             throw new InvalidOperationException("TryOrderUnitVisualFeedback should fail for non-existent unit.");
+        }
+
+        var invalidMagnitude = RuntimeGameplayCommandDirector.TryOrderUnitVisualFeedback(ecKey, "CritImpact", float.NaN);
+        if (invalidMagnitude.Success || !invalidMagnitude.Message.Contains("finite"))
+        {
+            throw new InvalidOperationException("TryOrderUnitVisualFeedback must reject non-finite magnitude before reflection.");
         }
 
         ExistingControllers.Instance.Reset();

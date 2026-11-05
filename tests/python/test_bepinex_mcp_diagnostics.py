@@ -204,6 +204,99 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
 
         self.assertEqual(json.dumps(json.loads(payload), indent=2), value)
 
+    def test_group_array_commands_use_csv_bridge_overloads(self) -> None:
+        calls: list[tuple[str, list[object]]] = []
+
+        def fake_http(endpoint: str, params: dict[str, object] | None = None, **_: object) -> str:
+            self.assertEqual(endpoint, "component/call_method")
+            params = params or {}
+            method = str(params["methodName"])
+            args = json.loads(str(params.get("args", "[]")))
+            calls.append((method, args))
+            payload = json.dumps({"kind": "groupCommandResult", "success": True})
+            return json.dumps({
+                "status": "ok",
+                "message": f"Called '{method}' with {len(args)} args. ReturnValue: {payload}",
+            })
+
+        with (
+            mock.patch.object(SERVER, "_DIAGNOSTICS_GO_ID", 73),
+            mock.patch.object(SERVER, "_call_http", side_effect=fake_http),
+        ):
+            formation = SERVER.execute_tool(
+                "diagnostics_order_formation_move",
+                {
+                    "entityKeyIds": ["unit:alpha", "unit:beta"],
+                    "formationType": "Wedge",
+                    "targetX": 10.0,
+                    "targetZ": 20.0,
+                    "spacing": 4.0,
+                },
+            )
+            stance = SERVER.execute_tool(
+                "diagnostics_order_group_tactical_stance",
+                {"entityKeyIds": ["unit:alpha", "unit:beta"], "stanceName": "Defensive"},
+            )
+
+        self.assertFalse(formation["isError"])
+        self.assertFalse(stance["isError"])
+        self.assertEqual(
+            (
+                "OrderFormationMoveCsvJson",
+                ["unit:alpha;unit:beta", "Wedge", 10.0, 20.0, 4.0],
+            ),
+            calls[0],
+        )
+        self.assertEqual(
+            ("OrderGroupTacticalStanceCsvJson", ["unit:alpha;unit:beta", "Defensive"]),
+            calls[1],
+        )
+
+    def test_synthetic_gameplay_scenario_forwards_bounded_primitive_arguments(self) -> None:
+        calls: list[tuple[str, list[object]]] = []
+
+        def fake_http(endpoint: str, params: dict[str, object] | None = None, **_: object) -> str:
+            self.assertEqual(endpoint, "component/call_method")
+            params = params or {}
+            method = str(params["methodName"])
+            args = json.loads(str(params.get("args", "[]")))
+            calls.append((method, args))
+            payload = json.dumps({"kind": "syntheticGameplayScenario", "success": True})
+            return json.dumps({
+                "status": "ok",
+                "message": f"Called '{method}' with {len(args)} args. ReturnValue: {payload}",
+            })
+
+        with (
+            mock.patch.object(SERVER, "_DIAGNOSTICS_GO_ID", 73),
+            mock.patch.object(SERVER, "_call_http", side_effect=fake_http),
+        ):
+            response = SERVER.execute_tool(
+                "diagnostics_run_synthetic_gameplay_scenario",
+                {
+                    "unitIdsCsv": "sample-native:scout-tank,sample-native:arachnid-hexapod",
+                    "targetX": -10.0,
+                    "targetZ": 145.0,
+                    "formationType": "Wedge",
+                    "spacing": 4.0,
+                },
+            )
+
+        self.assertFalse(response["isError"])
+        self.assertEqual(
+            (
+                "RunSyntheticGameplayScenarioJson",
+                [
+                    "sample-native:scout-tank;sample-native:arachnid-hexapod",
+                    -10.0,
+                    145.0,
+                    "Wedge",
+                    4.0,
+                ],
+            ),
+            calls[0],
+        )
+
     def test_runtime_snapshot_decodes_bridge_return_values(self) -> None:
         expected = {"kind": "systemHealth", "activePackCount": 3}
 
@@ -317,12 +410,12 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
         self.assertEqual(["hermes-1", "TacticalIntent", "Advance", "*"], calls[2][1])
         self.assertEqual("AcquireAgentLockJson", calls[3][0])
         self.assertEqual(["hermes-1", "unit:command_tank", 25.0], calls[3][1])
-        self.assertEqual("AcquireAgentLockBatchJson", calls[4][0])
-        self.assertEqual(["hermes-1", ["unit:scout", "factory:tank_depot"], 15.0], calls[4][1])
+        self.assertEqual("AcquireAgentLockBatchCsvJson", calls[4][0])
+        self.assertEqual(["hermes-1", "unit:scout;factory:tank_depot", 15.0], calls[4][1])
         self.assertEqual("ReleaseAgentLockJson", calls[5][0])
         self.assertEqual(["hermes-1", "unit:command_tank"], calls[5][1])
-        self.assertEqual("ReleaseAgentLockBatchJson", calls[6][0])
-        self.assertEqual(["hermes-1", ["unit:scout", "factory:tank_depot"]], calls[6][1])
+        self.assertEqual("ReleaseAgentLockBatchCsvJson", calls[6][0])
+        self.assertEqual(["hermes-1", "unit:scout;factory:tank_depot"], calls[6][1])
         self.assertEqual("DeregisterAgentSessionJson", calls[7][0])
         self.assertEqual(["hermes-1"], calls[7][1])
         self.assertEqual("GetAgentCoordinationCensusJson", calls[8][0])
@@ -424,6 +517,7 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
             "diagnostics_preflight",
             "diagnostics_get_gui_state",
             "diagnostics_order_batch",
+            "diagnostics_run_synthetic_gameplay_scenario",
             "diagnostics_get_control_guide",
             "diagnostics_gui_control",
             "diagnostics_ui_press_button",
@@ -432,12 +526,12 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
             "describe_tool",
         ):
             self.assertIn(expected, names)
-        self.assertEqual(197, len(names))
+        self.assertEqual(198, len(names))
 
     def test_tools_list_default_is_all_and_paginates(self) -> None:
         full = SERVER.handle_request({"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}})
         tools = full["result"]["tools"]
-        self.assertEqual(197, len(tools))
+        self.assertEqual(198, len(tools))
         page = SERVER.handle_request({"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {"limit": 10}})
         self.assertEqual(10, len(page["result"]["tools"]))
         cursor = page["result"]["nextCursor"]

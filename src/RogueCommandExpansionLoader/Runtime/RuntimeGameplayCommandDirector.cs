@@ -6325,8 +6325,8 @@ namespace RogueCommandExpansionLoader.Runtime
 
             if (!isLine && !isWedge && !isColumn && !isBox && !isSurround)
             {
-                normalized = "Line";
-                isLine = true;
+                return new FormationOrderResult(false, normalized, 0, 0, targetX, targetZ, spacing,
+                    "Unsupported formation type '" + normalized + "'. Supported: Line, Wedge, Column, Box, Surround.");
             }
 
             if (float.IsNaN(targetX) || float.IsInfinity(targetX) ||
@@ -7909,6 +7909,17 @@ namespace RogueCommandExpansionLoader.Runtime
             if (string.IsNullOrWhiteSpace(feedbackType))
             {
                 return new VisualFeedbackResult { Success = false, EntityKeyId = entityKeyId, FeedbackType = feedbackType, Message = "Feedback type cannot be empty." };
+            }
+
+            if (float.IsNaN(magnitude) || float.IsInfinity(magnitude))
+            {
+                return new VisualFeedbackResult
+                {
+                    Success = false,
+                    EntityKeyId = entityKeyId,
+                    FeedbackType = feedbackType,
+                    Message = "Visual feedback magnitude must be finite."
+                };
             }
 
             try

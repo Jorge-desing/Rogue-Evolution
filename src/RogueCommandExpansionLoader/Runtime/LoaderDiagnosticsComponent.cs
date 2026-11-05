@@ -797,6 +797,333 @@ namespace RogueCommandExpansionLoader.Runtime
         }
 
         /// <summary>
+        /// CSV-compatible bridge overload for native patrol waypoints. The HTTP
+        /// reflection bridge cannot reliably materialize IReadOnlyList arguments.
+        /// </summary>
+        public string OrderUnitPatrolCsvJson(string entityKeyId, string waypointXCsv, string waypointZCsv)
+        {
+            IReadOnlyList<float> waypointX;
+            IReadOnlyList<float> waypointZ;
+            string diagnostic;
+            if (!RuntimeBridgeArgumentParser.TryParseFloatCsv(waypointXCsv, 1, 32, out waypointX, out diagnostic) ||
+                !RuntimeBridgeArgumentParser.TryParseFloatCsv(waypointZCsv, 1, 32, out waypointZ, out diagnostic))
+            {
+                return AgentDiagnosticsFormatter.SerializeUnitPatrolResult(
+                    new UnitPatrolResult(false, entityKeyId, 0, diagnostic));
+            }
+
+            return AgentDiagnosticsFormatter.SerializeUnitPatrolResult(
+                RuntimeGameplayCommandDirector.TryOrderUnitPatrol(entityKeyId, waypointX, waypointZ));
+        }
+
+        /// <summary>CSV-compatible bridge overload for group commands.</summary>
+        public string OrderGroupCommandCsvJson(string entityKeysCsv, string commandType, float targetX, float targetZ)
+        {
+            IReadOnlyList<string> entityKeyIds;
+            string diagnostic;
+            if (!RuntimeBridgeArgumentParser.TryParseStringCsv(entityKeysCsv, 1, 32, out entityKeyIds, out diagnostic))
+            {
+                return AgentDiagnosticsFormatter.SerializeGroupCommandResult(
+                    new GroupCommandResult(false, commandType, 0, 0, diagnostic));
+            }
+
+            return AgentDiagnosticsFormatter.SerializeGroupCommandResult(
+                RuntimeGameplayCommandDirector.TryOrderGroupCommand(entityKeyIds, commandType, targetX, targetZ));
+        }
+
+        /// <summary>CSV-compatible bridge overload for tactical formations.</summary>
+        public string OrderFormationMoveCsvJson(string entityKeysCsv, string formationType, float targetX, float targetZ, float spacing)
+        {
+            IReadOnlyList<string> entityKeyIds;
+            string diagnostic;
+            string normalizedFormation = SyntheticGameplayScenarioPlan.NormalizeFormation(formationType);
+            if (!RuntimeBridgeArgumentParser.TryParseStringCsv(entityKeysCsv, 1, 32, out entityKeyIds, out diagnostic))
+            {
+                return AgentDiagnosticsFormatter.SerializeFormationOrderResult(
+                    new FormationOrderResult(false, normalizedFormation, 0, 0, targetX, targetZ, spacing, diagnostic));
+            }
+            if (normalizedFormation.Length == 0)
+            {
+                return AgentDiagnosticsFormatter.SerializeFormationOrderResult(
+                    new FormationOrderResult(false, formationType, 0, 0, targetX, targetZ, spacing,
+                        "Unsupported formation type. Supported: Line, Wedge, Column, Box, Surround."));
+            }
+
+            return AgentDiagnosticsFormatter.SerializeFormationOrderResult(
+                RuntimeGameplayCommandDirector.TryOrderFormationMove(entityKeyIds, normalizedFormation, targetX, targetZ, spacing));
+        }
+
+        /// <summary>CSV-compatible bridge overload for group tactical stances.</summary>
+        public string OrderGroupTacticalStanceCsvJson(string entityKeysCsv, string stanceName)
+        {
+            IReadOnlyList<string> entityKeyIds;
+            string diagnostic;
+            if (!RuntimeBridgeArgumentParser.TryParseStringCsv(entityKeysCsv, 1, 32, out entityKeyIds, out diagnostic))
+            {
+                return AgentDiagnosticsFormatter.SerializeUnitTacticalStanceResult(
+                    new UnitTacticalStanceResult(false, "Group", stanceName, 0, diagnostic));
+            }
+
+            return AgentDiagnosticsFormatter.SerializeUnitTacticalStanceResult(
+                RuntimeGameplayCommandDirector.TrySetGroupTacticalStance(entityKeyIds, stanceName));
+        }
+
+        /// <summary>CSV-compatible bridge overload for coordinated assaults.</summary>
+        public string OrderCoordinatedAssaultCsvJson(string targetEntityKeyId, string attackerEntityKeysCsv, int maxAttackers)
+        {
+            IReadOnlyList<string> attackerEntityKeyIds;
+            string diagnostic;
+            if (!RuntimeBridgeArgumentParser.TryParseStringCsv(attackerEntityKeysCsv, 1, 32, out attackerEntityKeyIds, out diagnostic))
+            {
+                return AgentDiagnosticsFormatter.SerializeCoordinatedAssaultResult(
+                    new CoordinatedAssaultResult(false, targetEntityKeyId, 0, 0, 0,
+                        new List<string>().AsReadOnly(), 0f, 0f, diagnostic));
+            }
+
+            return AgentDiagnosticsFormatter.SerializeCoordinatedAssaultResult(
+                RuntimeGameplayCommandDirector.TryExecuteCoordinatedAssault(
+                    targetEntityKeyId, attackerEntityKeyIds, maxAttackers));
+        }
+
+        /// <summary>
+        /// Executes one bounded, paused synthetic gameplay seam. The scenario is
+        /// intentionally self-cleaning: it only tracks entities created by this call,
+        /// clears loader-owned effects, and destroys those synthetic instances before
+        /// returning its primitive evidence. It is not natural offer/production/AI evidence.
+        /// </summary>
+        public string RunSyntheticGameplayScenarioJson(
+            string unitIdsCsv,
+            float targetX,
+            float targetZ,
+            string formationType = "Wedge",
+            float spacing = 4f)
+        {
+            bool paused = RuntimeGameplayCommandDirector.GetGameTimeScale() == 0f;
+            SyntheticGameplayScenarioPlan plan;
+            string planDiagnostic;
+            if (!SyntheticGameplayScenarioPlan.TryCreate(
+                    unitIdsCsv, formationType, targetX, targetZ, spacing,
+                    out plan, out planDiagnostic))
+            {
+                return AgentDiagnosticsFormatter.SerializeSyntheticGameplayScenarioResult(
+                    CreateSyntheticScenarioFailure(
+                        paused, 0, formationType, planDiagnostic, null, 0));
+            }
+
+            if (!paused)
+            {
+                return AgentDiagnosticsFormatter.SerializeSyntheticGameplayScenarioResult(
+                    CreateSyntheticScenarioFailure(
+                        false, plan.UnitIds.Count, plan.FormationType,
+                        "Synthetic gameplay scenario requires Time.timeScale == 0 and native pause before mutation.",
+                        null, 0));
+            }
+
+            var createdKeys = new List<string>();
+            var failures = new List<string>();
+            int omittedFailures = 0;
+            int stanceAffected = 0;
+            int formationTargeted = 0;
+            int formationDispatched = 0;
+            int loadoutSuccess = 0;
+            int affixSuccess = 0;
+            int veterancySuccess = 0;
+            int visualFeedbackSuccess = 0;
+            int auraLinkedFollowers = 0;
+            int pulseAffected = 0;
+            int activeHazards = 0;
+            int mechanicsInstances = 0;
+            int destroyedSyntheticEntities = 0;
+
+            Action<string> recordFailure = message =>
+            {
+                string text = string.IsNullOrWhiteSpace(message) ? "unspecified synthetic seam failure" : message;
+                if (failures.Count < 16) failures.Add(text);
+                else omittedFailures++;
+            };
+
+            Action cleanup = () =>
+            {
+                try
+                {
+                    if (createdKeys.Count > 0)
+                    {
+                        RuntimeGameplayCommandDirector.TryClearCommandAuraLinks(createdKeys[0]);
+                    }
+                }
+                catch { }
+
+                try
+                {
+                    RuntimeGameplayCommandDirector.TryClearHazardZones();
+                }
+                catch { }
+
+                for (int i = 0; i < createdKeys.Count; i++)
+                {
+                    string key = createdKeys[i];
+                    try { RuntimeGameplayCommandDirector.TryClearStatusEffect(key, "SquadEffect"); } catch { }
+                    try { RuntimeGameplayCommandDirector.TryRemoveUnitAffix(key, "All"); } catch { }
+                    try { RuntimeGameplayCommandDirector.TryApplyUnitLoadout(key, "Standard"); } catch { }
+                    try { RuntimeGameplayCommandDirector.ResetUnitTacticalStance(key); } catch { }
+
+                    try
+                    {
+                        EntityController entity = FindSyntheticEntity(key);
+                        if (entity != null && entity.gameObject != null)
+                        {
+                            RuntimeGameplayCommandDirector.OnEntityDestroyed(key);
+                            UnityEngine.Object.Destroy(entity.gameObject);
+                            destroyedSyntheticEntities++;
+                        }
+                    }
+                    catch { }
+                }
+            };
+
+            try
+            {
+                LoaderReconciliationResult reconciliation =
+                    RuntimeGameplayCommandDirector.TryReconcileLoaderRuntimeState(SafeSnapshot());
+                if (!reconciliation.Success)
+                {
+                    recordFailure(reconciliation.Message);
+                    return AgentDiagnosticsFormatter.SerializeSyntheticGameplayScenarioResult(
+                        new SyntheticGameplayScenarioResult(
+                            false, true, plan.UnitIds.Count, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                            omittedFailures, plan.FormationType, createdKeys, failures,
+                            "Loader reconciliation failed; no synthetic entities were created."));
+                }
+
+                float spawnZ = targetZ - Math.Max(8f, plan.Spacing * 2f);
+                for (int i = 0; i < plan.UnitIds.Count; i++)
+                {
+                    float spawnX = targetX + (i - (plan.UnitIds.Count - 1) / 2f) * plan.Spacing;
+                    EntitySpawnResult spawn = RuntimeGameplayCommandDirector.TrySpawnEntity(
+                        plan.UnitIds[i], "Friendly", spawnX, spawnZ, "RCL_SyntheticSeam_" + i);
+                    if (spawn.Success && !string.IsNullOrWhiteSpace(spawn.EntityKeyId))
+                    {
+                        createdKeys.Add(spawn.EntityKeyId);
+                    }
+                    else
+                    {
+                        recordFailure(spawn.Message);
+                    }
+                }
+
+                if (createdKeys.Count != plan.UnitIds.Count)
+                {
+                    cleanup();
+                    return AgentDiagnosticsFormatter.SerializeSyntheticGameplayScenarioResult(
+                        new SyntheticGameplayScenarioResult(
+                            false, true, plan.UnitIds.Count, createdKeys.Count, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                            destroyedSyntheticEntities, omittedFailures, plan.FormationType, createdKeys, failures,
+                            "Synthetic entity creation was incomplete; the partial scenario was cleaned up."));
+                }
+
+                string[] stances = { "Kiting", "Aggressive", "Defensive", "Standard" };
+                string[] loadouts = { "HE", "Speed", "Standard", "Standard" };
+                string[] affixes = { "Swift", "Overcharged", "Bulwark", "Vampiric" };
+                for (int i = 0; i < createdKeys.Count; i++)
+                {
+                    string key = createdKeys[i];
+                    if (RuntimeGameplayCommandDirector.TrySetUnitTacticalStance(key, stances[Math.Min(i, stances.Length - 1)]).Success) stanceAffected++;
+                    if (RuntimeGameplayCommandDirector.TryApplyUnitLoadout(key, loadouts[Math.Min(i, loadouts.Length - 1)]).Success) loadoutSuccess++;
+                    if (RuntimeGameplayCommandDirector.TryApplyUnitAffix(key, affixes[Math.Min(i, affixes.Length - 1)]).Success) affixSuccess++;
+                    if (RuntimeGameplayCommandDirector.TryGrantEntityCombatXp(key, 5 + i * 5).Success) veterancySuccess++;
+                }
+
+                FormationOrderResult formation = RuntimeGameplayCommandDirector.TryOrderFormationMove(
+                    createdKeys, plan.FormationType, plan.TargetX, plan.TargetZ, plan.Spacing);
+                formationTargeted = formation.TargetedCount;
+                formationDispatched = formation.DispatchedCount;
+                if (!formation.Success) recordFailure(formation.Message);
+
+                CommandAuraResult aura = RuntimeGameplayCommandDirector.TryDispatchCommandAuraPulse(
+                    createdKeys[0], "Inspire", 18f, 30f);
+                auraLinkedFollowers = aura.LinkedFollowersCount;
+                if (!aura.Success) recordFailure(aura.Message);
+
+                TacticalPulseResult pulse = RuntimeGameplayCommandDirector.TryExecuteTacticalPulse(
+                    createdKeys[createdKeys.Count - 1], "Repair", 15f, 12f, 8f, 3);
+                pulseAffected = pulse.AffectedEntityCount;
+                if (!pulse.Success) recordFailure(pulse.Message);
+
+                HazardCommandResult hazard = RuntimeGameplayCommandDirector.TrySpawnHazardZone(
+                    "CryoMist", plan.TargetX, plan.TargetZ, 8f, 30f, 0.5f);
+                activeHazards = RuntimeHazardManager.ActiveZoneCount;
+                if (!hazard.Success) recordFailure(hazard.Message);
+
+                VisualFeedbackResult feedback = RuntimeGameplayCommandDirector.TryOrderUnitVisualFeedback(
+                    createdKeys[0], "FootstepPulse", 0.5f);
+                if (feedback.Success) visualFeedbackSuccess++;
+                else recordFailure(feedback.Message);
+
+                mechanicsInstances = RuntimeGameplayCommandDirector.GetLiveMechanicsDirectorCount();
+                bool allCommandsSucceeded = stanceAffected == createdKeys.Count &&
+                    loadoutSuccess == createdKeys.Count && affixSuccess == createdKeys.Count &&
+                    veterancySuccess == createdKeys.Count && formation.Success &&
+                    formationDispatched == createdKeys.Count && aura.Success && pulse.Success &&
+                    hazard.Success && visualFeedbackSuccess > 0;
+                string message = allCommandsSucceeded
+                    ? "Synthetic gameplay scenario completed and cleaned up."
+                    : "Synthetic gameplay scenario reached the runtime seam with one or more failed steps.";
+
+                cleanup();
+                return AgentDiagnosticsFormatter.SerializeSyntheticGameplayScenarioResult(
+                    new SyntheticGameplayScenarioResult(
+                        allCommandsSucceeded, true, plan.UnitIds.Count, createdKeys.Count, stanceAffected,
+                        formationTargeted, formationDispatched, loadoutSuccess, affixSuccess,
+                        veterancySuccess, visualFeedbackSuccess, auraLinkedFollowers, pulseAffected,
+                        activeHazards, mechanicsInstances, destroyedSyntheticEntities, omittedFailures,
+                        plan.FormationType, createdKeys, failures, message));
+            }
+            catch (Exception ex)
+            {
+                recordFailure("Synthetic scenario exception: " + ex.Message);
+                cleanup();
+                return AgentDiagnosticsFormatter.SerializeSyntheticGameplayScenarioResult(
+                    new SyntheticGameplayScenarioResult(
+                        false, true, plan.UnitIds.Count, createdKeys.Count, stanceAffected, formationTargeted,
+                        formationDispatched, loadoutSuccess, affixSuccess, veterancySuccess, visualFeedbackSuccess,
+                        auraLinkedFollowers, pulseAffected, activeHazards, mechanicsInstances,
+                        destroyedSyntheticEntities, omittedFailures, plan.FormationType, createdKeys, failures,
+                        "Synthetic gameplay scenario failed closed: " + ex.Message));
+            }
+        }
+
+        private static SyntheticGameplayScenarioResult CreateSyntheticScenarioFailure(
+            bool paused, int requestedUnitCount, string formationType, string message,
+            IReadOnlyList<string> failures, int omittedFailureCount)
+        {
+            var boundedFailures = failures ?? new List<string>().AsReadOnly();
+            return new SyntheticGameplayScenarioResult(
+                false, paused, requestedUnitCount, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                omittedFailureCount, formationType, new List<string>().AsReadOnly(), boundedFailures, message);
+        }
+
+        private static EntityController FindSyntheticEntity(string entityKeyId)
+        {
+            ExistingControllers existing = ExistingControllers.Instance;
+            if (existing == null || string.IsNullOrWhiteSpace(entityKeyId)) return null;
+            var units = new List<EntityController>();
+            try { if (existing.PlayerUnits() != null) units.AddRange(existing.PlayerUnits()); } catch { }
+            try { if (existing.AiUnits() != null) units.AddRange(existing.AiUnits()); } catch { }
+            for (int i = 0; i < units.Count; i++)
+            {
+                EntityController unit = units[i];
+                if (unit == null) continue;
+                if (string.Equals(unit.EntityId, entityKeyId, StringComparison.Ordinal) ||
+                    string.Equals(unit.name, entityKeyId, StringComparison.Ordinal) ||
+                    unit.UniqueEntityId.ToString() == entityKeyId)
+                {
+                    return unit;
+                }
+            }
+            return null;
+        }
+
+        /// <summary>
         /// Assigns a tactical combat stance to a unit (Standard, Aggressive, Defensive, HoldFire, Kiting).
         /// </summary>
         public string OrderUnitTacticalStanceJson(string entityKeyId, string stanceName)
@@ -1384,6 +1711,21 @@ namespace RogueCommandExpansionLoader.Runtime
             return AgentDiagnosticsFormatter.SerializeAgentOperationResult(success, agentId, "AcquireLock", message);
         }
 
+        public string AcquireAgentLockBatchCsvJson(string agentId, string resourceKeysCsv, float durationSeconds)
+        {
+            IReadOnlyList<string> resourceKeys;
+            string diagnostic;
+            if (!RuntimeBridgeArgumentParser.TryParseStringCsv(resourceKeysCsv, 1, 64, out resourceKeys, out diagnostic))
+            {
+                return AgentDiagnosticsFormatter.SerializeAgentBatchLockResult(false, agentId, 0, 0, "AcquireBatch", diagnostic);
+            }
+
+            bool success = RuntimeAgentCoordinator.TryAcquireLockBatch(
+                agentId, resourceKeys, durationSeconds, Time.time, out string message);
+            int count = resourceKeys.Count;
+            return AgentDiagnosticsFormatter.SerializeAgentBatchLockResult(success, agentId, count, success ? count : 0, "AcquireBatch", message);
+        }
+
         public string AcquireAgentLockBatchJson(string agentId, IReadOnlyList<string> resourceKeys, float durationSeconds)
         {
             bool success = RuntimeAgentCoordinator.TryAcquireLockBatch(
@@ -1399,6 +1741,21 @@ namespace RogueCommandExpansionLoader.Runtime
                 resourceKey,
                 out string message);
             return AgentDiagnosticsFormatter.SerializeAgentOperationResult(success, agentId, "ReleaseLock", message);
+        }
+
+        public string ReleaseAgentLockBatchCsvJson(string agentId, string resourceKeysCsv)
+        {
+            IReadOnlyList<string> resourceKeys;
+            string diagnostic;
+            if (!RuntimeBridgeArgumentParser.TryParseStringCsv(resourceKeysCsv, 1, 64, out resourceKeys, out diagnostic))
+            {
+                return AgentDiagnosticsFormatter.SerializeAgentBatchLockResult(false, agentId, 0, 0, "ReleaseBatch", diagnostic);
+            }
+
+            bool success = RuntimeAgentCoordinator.TryReleaseLockBatch(
+                agentId, resourceKeys, out string message);
+            int count = resourceKeys.Count;
+            return AgentDiagnosticsFormatter.SerializeAgentBatchLockResult(success, agentId, count, success ? count : 0, "ReleaseBatch", message);
         }
 
         public string ReleaseAgentLockBatchJson(string agentId, IReadOnlyList<string> resourceKeys)

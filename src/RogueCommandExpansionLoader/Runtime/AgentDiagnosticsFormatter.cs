@@ -981,6 +981,36 @@ namespace RogueCommandExpansionLoader.Runtime
         /// <summary>
         /// Serializes the result of assigning a tactical stance to a unit or group.
         /// </summary>
+        public static string SerializeSyntheticGameplayScenarioResult(SyntheticGameplayScenarioResult result)
+        {
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "syntheticGameplayScenario",
+                ["omittedFailureCount"] = result != null ? result.OmittedFailureCount : 0,
+                ["success"] = result != null && result.Success,
+                ["pausedPrecondition"] = result != null && result.PausedPrecondition,
+                ["requestedUnitCount"] = result != null ? result.RequestedUnitCount : 0,
+                ["spawnedUnitCount"] = result != null ? result.SpawnedUnitCount : 0,
+                ["stanceAffectedCount"] = result != null ? result.StanceAffectedCount : 0,
+                ["formationTargetedCount"] = result != null ? result.FormationTargetedCount : 0,
+                ["formationDispatchedCount"] = result != null ? result.FormationDispatchedCount : 0,
+                ["loadoutSuccessCount"] = result != null ? result.LoadoutSuccessCount : 0,
+                ["affixSuccessCount"] = result != null ? result.AffixSuccessCount : 0,
+                ["veterancySuccessCount"] = result != null ? result.VeterancySuccessCount : 0,
+                ["visualFeedbackSuccessCount"] = result != null ? result.VisualFeedbackSuccessCount : 0,
+                ["auraLinkedFollowerCount"] = result != null ? result.AuraLinkedFollowerCount : 0,
+                ["pulseAffectedEntityCount"] = result != null ? result.PulseAffectedEntityCount : 0,
+                ["activeHazardCount"] = result != null ? result.ActiveHazardCount : 0,
+                ["mechanicsInstanceCount"] = result != null ? result.MechanicsInstanceCount : 0,
+                ["destroyedSyntheticEntityCount"] = result != null ? result.DestroyedSyntheticEntityCount : 0,
+                ["formationType"] = result != null ? result.FormationType : string.Empty,
+                ["createdEntityKeys"] = result != null && result.CreatedEntityKeys != null ? result.CreatedEntityKeys : Array.Empty<string>(),
+                ["failures"] = result != null && result.Failures != null ? result.Failures : Array.Empty<string>(),
+                ["message"] = result != null ? result.Message : string.Empty,
+            };
+            return Serialize(view);
+        }
+
         public static string SerializeUnitTacticalStanceResult(UnitTacticalStanceResult result)
         {
             var view = new Dictionary<string, object>

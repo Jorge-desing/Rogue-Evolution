@@ -46,6 +46,8 @@
              Link="Runtime/RuntimeRunProgressionCensus.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeGameplayCommandDirector.cs"
              Link="Runtime/RuntimeGameplayCommandDirector.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeSyntheticGameplayScenario.cs"
+             Link="Runtime/RuntimeSyntheticGameplayScenario.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeGridCensus.cs"
              Link="Runtime/RuntimeGridCensus.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeSelectionCensus.cs"
