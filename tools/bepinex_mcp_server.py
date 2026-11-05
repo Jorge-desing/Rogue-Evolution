@@ -277,6 +277,9 @@ _RUNTIME_SNAPSHOT_GETTER_ARGS: dict[str, list[object]] = {
     "GetLoadedPrefabVisualAuditJson": [64],
     "GetLoaderAuditCensusJson": [64, 32],
     "GetUnitMechanicsCensusJson": [64],
+    "GetVisualSurfaceCensusJson": [64],
+    "GetVisualMaterialCensusJson": [64],
+    "GetSocketAuditCensusJson": [64],
 }
 
 
@@ -1210,7 +1213,8 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             return _tool_response(res)
 
         elif name == "diagnostics_get_visual_surface_census":
-            res = _call_diagnostics_method("GetVisualSurfaceCensusJson")
+            max_units = int(arguments.get("maxTrackedUnits", 64))
+            res = _call_diagnostics_method("GetVisualSurfaceCensusJson", [max_units])
             return _tool_response(res)
 
         elif name == "diagnostics_get_visual_quality_census":
@@ -1219,11 +1223,13 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             return _tool_response(res)
 
         elif name == "diagnostics_get_visual_material_census":
-            res = _call_diagnostics_method("GetVisualMaterialCensusJson")
+            max_units = int(arguments.get("maxTrackedUnits", 64))
+            res = _call_diagnostics_method("GetVisualMaterialCensusJson", [max_units])
             return _tool_response(res)
 
         elif name == "diagnostics_get_socket_audit_census":
-            res = _call_diagnostics_method("GetSocketAuditCensusJson")
+            max_units = int(arguments.get("maxTrackedUnits", 64))
+            res = _call_diagnostics_method("GetSocketAuditCensusJson", [max_units])
             return _tool_response(res)
 
         elif name == "diagnostics_get_collider_audit_census":

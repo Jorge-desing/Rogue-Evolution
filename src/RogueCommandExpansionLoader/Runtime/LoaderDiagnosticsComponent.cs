@@ -22,6 +22,10 @@ namespace RogueCommandExpansionLoader.Runtime
         private IRuntimeContentProvider _provider;
         private RuntimeOverlayUi _overlay;
         private RangeDisplayRuntime _rangeDisplay;
+        private VisualRenderCensus _liveVisualRenderCensus;
+        private int _liveVisualRenderCensusFrame = -1;
+        private VisualQualityCensus _liveVisualQualityCensus;
+        private int _liveVisualQualityCensusFrame = -1;
 
         public void Initialize(
             IRuntimeContentProvider provider,
@@ -31,6 +35,30 @@ namespace RogueCommandExpansionLoader.Runtime
             _provider = provider;
             _overlay = overlay;
             _rangeDisplay = rangeDisplay;
+        }
+
+        private VisualRenderCensus GetLiveVisualRenderCensus()
+        {
+            int frame = -1;
+            try { frame = Time.frameCount; } catch { }
+            if (_liveVisualRenderCensus == null || frame < 0 || _liveVisualRenderCensusFrame != frame)
+            {
+                _liveVisualRenderCensus = RuntimeVisualCensus.Current(32);
+                _liveVisualRenderCensusFrame = frame;
+            }
+            return _liveVisualRenderCensus;
+        }
+
+        private VisualQualityCensus GetLiveVisualQualityCensus()
+        {
+            int frame = -1;
+            try { frame = Time.frameCount; } catch { }
+            if (_liveVisualQualityCensus == null || frame < 0 || _liveVisualQualityCensusFrame != frame)
+            {
+                _liveVisualQualityCensus = RuntimeVisualQualityCensus.Current(64);
+                _liveVisualQualityCensusFrame = frame;
+            }
+            return _liveVisualQualityCensus;
         }
 
         private void Update()
@@ -162,17 +190,17 @@ namespace RogueCommandExpansionLoader.Runtime
 
         public float LiveAiStructureHealthRatio => RuntimeBaseIntegrityCensus.Current().AverageAiStructureHealthRatio;
 
-        public int LiveSkinnedMeshUnitCount => RuntimeVisualCensus.Current(32).SkinnedMeshCount;
+        public int LiveSkinnedMeshUnitCount => GetLiveVisualRenderCensus().SkinnedMeshCount;
 
-        public int LiveAnimatedUnitCount => RuntimeVisualCensus.Current(32).AnimatedUnitCount;
+        public int LiveAnimatedUnitCount => GetLiveVisualRenderCensus().AnimatedUnitCount;
 
-        public int LivePbrShaderUnitCount => RuntimeVisualCensus.Current(32).PbrShaderCount;
+        public int LivePbrShaderUnitCount => GetLiveVisualRenderCensus().PbrShaderCount;
 
-        public int LiveVisualQualityPassCount => RuntimeVisualQualityCensus.Current(64).PbrContractPassCount;
+        public int LiveVisualQualityPassCount => GetLiveVisualQualityCensus().PbrContractPassCount;
 
-        public int LiveVisualQualityIssueCount => RuntimeVisualQualityCensus.Current(64).PbrContractIssueCount;
+        public int LiveVisualQualityIssueCount => GetLiveVisualQualityCensus().PbrContractIssueCount;
 
-        public int LiveVertexWearSampleCount => RuntimeVisualQualityCensus.Current(64).VertexColorSampleCount;
+        public int LiveVertexWearSampleCount => GetLiveVisualQualityCensus().VertexColorSampleCount;
 
         // ---- Methods callable via component/call_method ----
 
@@ -1425,10 +1453,10 @@ namespace RogueCommandExpansionLoader.Runtime
         /// <summary>
         /// Returns visual surface material and vertex-wear telemetry as JSON.
         /// </summary>
-        public string GetVisualSurfaceCensusJson()
+        public string GetVisualSurfaceCensusJson(int maxTrackedUnits = 64)
         {
             return AgentDiagnosticsFormatter.SerializeVisualSurfaceCensus(
-                RuntimeVisualSurfaceCensus.Current());
+                RuntimeVisualSurfaceCensus.Current(maxTrackedUnits));
         }
 
         public string GetVisualQualityCensusJson(int maxTrackedUnits = 64)
@@ -1443,16 +1471,16 @@ namespace RogueCommandExpansionLoader.Runtime
                 RuntimeVisualHealthCensus.Current(maxTrackedUnits));
         }
 
-        public string GetVisualMaterialCensusJson()
+        public string GetVisualMaterialCensusJson(int maxTrackedUnits = 64)
         {
             return AgentDiagnosticsFormatter.SerializeVisualMaterialCensus(
-                RuntimeVisualMaterialCensus.Current());
+                RuntimeVisualMaterialCensus.Current(maxTrackedUnits));
         }
 
-        public string GetSocketAuditCensusJson()
+        public string GetSocketAuditCensusJson(int maxTrackedUnits = 64)
         {
             return AgentDiagnosticsFormatter.SerializeSocketAuditCensus(
-                RuntimeSocketAuditCensus.Current());
+                RuntimeSocketAuditCensus.Current(maxTrackedUnits));
         }
 
         public string GetColliderAuditCensusJson()

@@ -1,7 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
 using UnityEngine;
 
 namespace RogueCommandExpansionLoader.Runtime
@@ -40,6 +38,9 @@ namespace RogueCommandExpansionLoader.Runtime
         public float MaxTeamMask { get; }
         public int LodCount { get; }
         public IReadOnlyList<string> ShaderKeywords { get; }
+        public bool HierarchyTruncated { get; }
+        public bool VertexColorSamplingBounded { get; }
+        public bool NameSamplingBounded { get; }
 
         public VisualSurfaceRow(
             string entityKeyId,
@@ -67,7 +68,10 @@ namespace RogueCommandExpansionLoader.Runtime
             int lodCount,
             IReadOnlyList<string> shaderNames,
             IReadOnlyList<string> shaderKeywords,
-            int temperFringeVertexCount = 0)
+            int temperFringeVertexCount = 0,
+            bool hierarchyTruncated = false,
+            bool vertexColorSamplingBounded = false,
+            bool nameSamplingBounded = false)
         {
             EntityKeyId = entityKeyId ?? string.Empty;
             RendererCount = rendererCount < 0 ? 0 : rendererCount;
@@ -100,6 +104,9 @@ namespace RogueCommandExpansionLoader.Runtime
             LodCount = lodCount < 0 ? 0 : lodCount;
             ShaderNames = shaderNames ?? new List<string>().AsReadOnly();
             ShaderKeywords = shaderKeywords ?? new List<string>().AsReadOnly();
+            HierarchyTruncated = hierarchyTruncated;
+            VertexColorSamplingBounded = vertexColorSamplingBounded;
+            NameSamplingBounded = nameSamplingBounded;
         }
     }
 
@@ -125,36 +132,15 @@ namespace RogueCommandExpansionLoader.Runtime
         {
             var rows = new List<VisualSurfaceRow>();
             int omitted = 0;
-            int clampedMax = Math.Max(1, Math.Min(maxRows, 256));
 
             try
             {
-                ExistingControllers existing = ExistingControllers.Instance;
-                if (existing == null)
+                List<EntityController> units = RuntimeVisualCensusSupport.CollectLivingUnits(maxRows, out omitted);
+                for (int i = 0; i < units.Count; i++)
                 {
-                    return new VisualSurfaceCensus(rows.AsReadOnly(), 0);
-                }
-
-                var units = new List<EntityController>();
-                try { if (existing.PlayerUnits() != null) units.AddRange(existing.PlayerUnits()); } catch { }
-                try { if (existing.AiUnits() != null) units.AddRange(existing.AiUnits()); } catch { }
-
-                foreach (EntityController unit in units)
-                {
-                    if (unit == null || unit.IsDestroyed || unit.DestroyHasBeenStarted)
-                    {
-                        continue;
-                    }
-
-                    if (rows.Count >= clampedMax)
-                    {
-                        omitted++;
-                        continue;
-                    }
-
                     try
                     {
-                        rows.Add(CollectRow(unit));
+                        rows.Add(CollectRow(units[i]));
                     }
                     catch
                     {
@@ -164,7 +150,7 @@ namespace RogueCommandExpansionLoader.Runtime
             }
             catch
             {
-                // Degrade gracefully.
+                omitted++;
             }
 
             return new VisualSurfaceCensus(rows.AsReadOnly(), omitted);
@@ -172,19 +158,8 @@ namespace RogueCommandExpansionLoader.Runtime
 
         private static VisualSurfaceRow CollectRow(EntityController unit)
         {
-            string key = string.Empty;
-            try
-            {
-                PropertyInfo prop = unit.GetType().GetProperty("EntityId") ?? unit.GetType().GetProperty("entityId");
-                if (prop != null) key = prop.GetValue(unit, null) as string ?? string.Empty;
-                if (string.IsNullOrWhiteSpace(key))
-                {
-                    FieldInfo field = unit.GetType().GetField("entityId") ?? unit.GetType().GetField("EntityId");
-                    if (field != null) key = field.GetValue(unit) as string ?? string.Empty;
-                }
-            }
-            catch { }
-            if (string.IsNullOrWhiteSpace(key)) key = unit != null ? unit.name : string.Empty;
+            string key = RuntimeVisualCensusSupport.ResolveEntityKey(unit);
+            bool loaderOwned = RuntimeVisualCensusSupport.IsLoaderOwned(key);
 
             GameObject go = null;
             try { go = unit.gameObject; } catch { go = null; }
@@ -210,106 +185,131 @@ namespace RogueCommandExpansionLoader.Runtime
             var seenShaders = new HashSet<string>(StringComparer.Ordinal);
             var seenKeywords = new HashSet<string>(StringComparer.Ordinal);
             int lodCount = 0;
+            bool hierarchyTruncated = false;
+            bool vertexColorSamplingBounded = false;
+            bool nameSamplingBounded = false;
+            bool materialSamplingBounded = false;
 
             if (go != null)
             {
-                try
-                {
-                    LODGroup[] lods = go.GetComponentsInChildren<LODGroup>(true);
-                    if (lods != null) lodCount = lods.Length;
-                }
-                catch { lodCount = 0; }
+                VisualHierarchySnapshot snapshot = RuntimeVisualCensusSupport.CaptureHierarchy(go);
+                hierarchyTruncated = snapshot.HierarchyTruncated;
+                rendererCount = snapshot.Renderers.Count;
+                lodCount = snapshot.LodGroups.Count;
+                int inspectedMaterialSlots = 0;
+                int inspectedMeshes = 0;
 
-                Renderer[] renderers = go.GetComponentsInChildren<Renderer>(true);
-                rendererCount = renderers != null ? renderers.Length : 0;
-
-                if (renderers != null)
+                for (int rendererIndex = 0; rendererIndex < snapshot.Renderers.Count; rendererIndex++)
                 {
-                    foreach (Renderer renderer in renderers)
+                    Renderer renderer = snapshot.Renderers[rendererIndex];
+                    if (renderer == null) continue;
+                    bool rendererEnabled = false;
+                    try { rendererEnabled = renderer.enabled; } catch { }
+                    if (rendererEnabled) rendererEnabledCount++;
+                    if (!rendererEnabled) continue;
+
+                    Material[] materials = null;
+                    try { materials = renderer.sharedMaterials; } catch { }
+                    if (materials != null)
                     {
-                        if (renderer == null) continue;
-                        if (renderer.enabled) rendererEnabledCount++;
-
-                        Material[] mats = renderer.sharedMaterials;
-                        if (mats != null)
+                        for (int materialIndex = 0; materialIndex < materials.Length; materialIndex++)
                         {
-                            foreach (Material mat in mats)
+                            if (inspectedMaterialSlots >= RuntimeVisualCensusSupport.MaxMaterialSlotsPerUnit)
                             {
-                                if (mat == null) continue;
-                                materialCount++;
-                                string shaderName = string.Empty;
-                                try { if (mat.shader != null) shaderName = mat.shader.name ?? string.Empty; } catch { shaderName = string.Empty; }
-                                if (!string.IsNullOrWhiteSpace(shaderName) && seenShaders.Add(shaderName))
-                                {
-                                    shaderNames.Add(shaderName);
-                                }
-                                string[] keywords = null;
-                                try { keywords = mat.shaderKeywords; } catch { keywords = null; }
-                                if (keywords != null)
-                                {
-                                    foreach (string kw in keywords)
-                                    {
-                                        if (!string.IsNullOrWhiteSpace(kw) && seenKeywords.Add(kw))
-                                        {
-                                            shaderKeywords.Add(kw);
-                                        }
-                                    }
-                                }
+                                materialSamplingBounded = true;
+                                break;
                             }
-                        }
 
-                        Mesh mesh = null;
-                        MeshFilter filter = renderer.GetComponent<MeshFilter>();
-                        if (filter != null) mesh = filter.sharedMesh;
-                        if (mesh == null)
-                        {
-                            var skinned = renderer as SkinnedMeshRenderer;
-                            if (skinned != null) mesh = skinned.sharedMesh;
-                        }
+                            Material material = materials[materialIndex];
+                            if (material == null) continue;
+                            inspectedMaterialSlots++;
+                            materialCount++;
+                            RuntimeVisualCensusSupport.AddUniqueBounded(
+                                shaderNames,
+                                seenShaders,
+                                RuntimeVisualCensusSupport.ResolveShaderName(material),
+                                RuntimeVisualCensusSupport.MaxDiagnosticNamesPerUnit,
+                                ref nameSamplingBounded);
 
-                        if (mesh != null)
-                        {
-                            vertexCount += mesh.vertexCount;
-                            Color[] colors = mesh.colors;
-                            if (colors != null && colors.Length > 0)
+                            string[] keywords = null;
+                            try { keywords = material.shaderKeywords; } catch { }
+                            if (keywords != null)
                             {
-                                hasColors = true;
-                                foreach (Color c in colors)
+                                for (int keywordIndex = 0; keywordIndex < keywords.Length; keywordIndex++)
                                 {
-                                    sumR += c.r;
-                                    sumG += c.g;
-                                    sumB += c.b;
-                                    sumA += c.a;
-                                    colorSamples++;
-
-                                    if (!hasSample)
-                                    {
-                                        minR = maxR = c.r;
-                                        minG = maxG = c.g;
-                                        minB = maxB = c.b;
-                                        minA = maxA = c.a;
-                                        hasSample = true;
-                                    }
-                                    else
-                                    {
-                                        if (c.r < minR) minR = c.r;
-                                        if (c.r > maxR) maxR = c.r;
-                                        if (c.g < minG) minG = c.g;
-                                        if (c.g > maxG) maxG = c.g;
-                                        if (c.b < minB) minB = c.b;
-                                        if (c.b > maxB) maxB = c.b;
-                                        if (c.a < minA) minA = c.a;
-                                        if (c.a > maxA) maxA = c.a;
-                                    }
-
-                                    if (c.g >= 0.7f) weldCount++;
-                                    if (c.b >= 0.5f) mudCount++;
-                                    if (c.b >= 0.15f && c.b <= 0.60f) temperFringeCount++;
-                                    if (c.r <= 0.4f) microReliefCount++;
+                                    RuntimeVisualCensusSupport.AddUniqueBounded(
+                                        shaderKeywords,
+                                        seenKeywords,
+                                        keywords[keywordIndex],
+                                        RuntimeVisualCensusSupport.MaxDiagnosticNamesPerUnit,
+                                        ref nameSamplingBounded);
                                 }
                             }
                         }
                     }
+
+                    Mesh mesh = RuntimeVisualCensusSupport.ResolveMesh(renderer);
+                    if (mesh == null) continue;
+                    try { vertexCount += Math.Max(0, mesh.vertexCount); } catch { }
+                    if (!loaderOwned) continue;
+                    if (inspectedMeshes >= RuntimeVisualCensusSupport.MaxMeshInspectionsPerUnit)
+                    {
+                        vertexColorSamplingBounded = true;
+                        continue;
+                    }
+                    inspectedMeshes++;
+                    if (colorSamples >= RuntimeVisualCensusSupport.MaxColorSamplesPerUnit)
+                    {
+                        vertexColorSamplingBounded = true;
+                        continue;
+                    }
+
+                    Color[] colors = null;
+                    try { colors = mesh.colors; } catch { }
+                    if (colors == null || colors.Length == 0) continue;
+                    hasColors = true;
+                    int colorLimit = Math.Min(colors.Length,
+                        RuntimeVisualCensusSupport.MaxColorSamplesPerUnit - colorSamples);
+                    for (int colorIndex = 0; colorIndex < colorLimit; colorIndex++)
+                    {
+                        Color color = colors[colorIndex];
+                        sumR += color.r;
+                        sumG += color.g;
+                        sumB += color.b;
+                        sumA += color.a;
+                        colorSamples++;
+
+                        if (!hasSample)
+                        {
+                            minR = maxR = color.r;
+                            minG = maxG = color.g;
+                            minB = maxB = color.b;
+                            minA = maxA = color.a;
+                            hasSample = true;
+                        }
+                        else
+                        {
+                            if (color.r < minR) minR = color.r;
+                            if (color.r > maxR) maxR = color.r;
+                            if (color.g < minG) minG = color.g;
+                            if (color.g > maxG) maxG = color.g;
+                            if (color.b < minB) minB = color.b;
+                            if (color.b > maxB) maxB = color.b;
+                            if (color.a < minA) minA = color.a;
+                            if (color.a > maxA) maxA = color.a;
+                        }
+
+                        if (color.g >= 0.7f) weldCount++;
+                        if (color.b >= 0.5f) mudCount++;
+                        if (color.b >= 0.15f && color.b <= 0.60f) temperFringeCount++;
+                        if (color.r <= 0.4f) microReliefCount++;
+                    }
+                    if (colorLimit < colors.Length) vertexColorSamplingBounded = true;
+                }
+
+                if (snapshot.RendererListTruncated || snapshot.LodListTruncated)
+                {
+                    nameSamplingBounded = true;
                 }
             }
 
@@ -341,7 +341,10 @@ namespace RogueCommandExpansionLoader.Runtime
                 lodCount,
                 shaderNames.AsReadOnly(),
                 shaderKeywords.AsReadOnly(),
-                temperFringeCount);
+                temperFringeCount,
+                hierarchyTruncated,
+                vertexColorSamplingBounded,
+                nameSamplingBounded || materialSamplingBounded);
         }
     }
 }

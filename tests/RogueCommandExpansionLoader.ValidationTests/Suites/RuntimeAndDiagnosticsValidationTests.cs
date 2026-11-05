@@ -4889,6 +4889,145 @@ internal static partial class ValidationTestRunner
             ExistingControllers.Instance.Reset();
         }
     }),
+    ("independent visual censuses deduplicate units shared by player and AI rosters", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        try
+        {
+            var shared = new EntityController
+            {
+                entityId = "sample-native:shared-visual-roster",
+                UniqueEntityId = 8641,
+                IsControlledByPlayer = true,
+                IsUnit = true,
+                Position = new Vector3(0f, 0f, 0f),
+                gameObject = new GameObject("SharedVisualRosterUnit")
+            };
+            shared.gameObject.AddComponent<MeshRenderer>();
+            ExistingControllers.Instance.PlayerUnits().Add(shared);
+            ExistingControllers.Instance.AiUnits().Add(shared);
+
+            VisualQualityCensus quality = RuntimeVisualQualityCensus.Current(8);
+            VisualSurfaceCensus surface = RuntimeVisualSurfaceCensus.Current(8);
+            VisualMaterialCensus material = RuntimeVisualMaterialCensus.Current(8);
+            SocketAuditCensus sockets = RuntimeSocketAuditCensus.Current(8);
+
+            if (quality.Rows.Count != 1 || surface.Rows.Count != 1 ||
+                material.Rows.Count != 1 || sockets.Rows.Count != 1 ||
+                quality.OmittedRowCount != 0 || surface.OmittedRowCount != 0 ||
+                material.OmittedRowCount != 0 || sockets.OmittedRowCount != 0)
+            {
+                throw new InvalidOperationException("Independent visual censuses must process a unit shared by player and AI rosters once.");
+            }
+        }
+        finally
+        {
+            ExistingControllers.Instance.Reset();
+        }
+    }),
+    ("standalone visual censuses ignore disabled renderer materials and mesh work", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        try
+        {
+            var unit = new EntityController
+            {
+                entityId = "sample-native:disabled-standalone-visual",
+                UniqueEntityId = 8642,
+                IsControlledByPlayer = true,
+                IsUnit = true,
+                Position = new Vector3(0f, 0f, 0f)
+            };
+            var go = new GameObject("DisabledStandaloneVisual");
+            var meshFilter = go.AddComponent<MeshFilter>();
+            meshFilter.sharedMesh = new Mesh
+            {
+                vertexCount = 4,
+                colors = new[] { new Color(0.2f, 0.8f, 0.6f, 1f) }
+            };
+            var renderer = go.AddComponent<MeshRenderer>();
+            renderer.enabled = false;
+            renderer.sharedMaterials = new[]
+            {
+                new Material
+                {
+                    name = "DisabledStandaloneMaterial",
+                    shader = new Shader { name = "RogueCommand/VehiclePBR_VertexWear" },
+                    mainTexture = new Texture { name = "DisabledStandaloneTexture" }
+                }
+            };
+            unit.gameObject = go;
+            ExistingControllers.Instance.PlayerUnits().Add(unit);
+
+            VisualSurfaceCensus surface = RuntimeVisualSurfaceCensus.Current(1);
+            VisualMaterialCensus material = RuntimeVisualMaterialCensus.Current(1);
+            if (surface.Rows.Count != 1 || surface.Rows[0].RendererCount != 1 ||
+                surface.Rows[0].RendererEnabledCount != 0 || surface.Rows[0].MaterialCount != 0 ||
+                surface.Rows[0].VertexColorSampleCount != 0)
+            {
+                throw new InvalidOperationException("Disabled renderers must not cause standalone surface material or mesh work.");
+            }
+            if (material.Rows.Count != 1 || material.Rows[0].RendererCount != 1 ||
+                material.Rows[0].MaterialCount != 0 || material.Rows[0].HasMainTextureCount != 0)
+            {
+                throw new InvalidOperationException("Disabled renderers must not cause standalone material or texture work.");
+            }
+        }
+        finally
+        {
+            ExistingControllers.Instance.Reset();
+        }
+    }),
+    ("standalone visual censuses bound mesh color sampling", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        try
+        {
+            var unit = new EntityController
+            {
+                entityId = "sample-native:bounded-standalone-meshes",
+                UniqueEntityId = 8643,
+                IsControlledByPlayer = true,
+                IsUnit = true,
+                Position = new Vector3(0f, 0f, 0f)
+            };
+            var root = new GameObject("BoundedStandaloneMeshes");
+            for (int i = 0; i < 33; i++)
+            {
+                var child = new GameObject("MeshChild" + i);
+                child.transform.parent = root.transform;
+                var meshFilter = child.AddComponent<MeshFilter>();
+                meshFilter.sharedMesh = new Mesh
+                {
+                    vertexCount = 4,
+                    colors = new[] { new Color(0.3f, 0.8f, 0.6f, 1f) }
+                };
+                var renderer = child.AddComponent<MeshRenderer>();
+                renderer.sharedMaterials = new[]
+                {
+                    new Material
+                    {
+                        shader = new Shader { name = "RogueCommand/VehiclePBR_VertexWear" },
+                        shaderKeywords = new[] { "_METALLICSPECGLOSSMAP", "_NORMALMAP" }
+                    }
+                };
+            }
+            unit.gameObject = root;
+            ExistingControllers.Instance.PlayerUnits().Add(unit);
+
+            VisualSurfaceRow surface = RuntimeVisualSurfaceCensus.Current(1).Rows[0];
+            VisualQualityRow quality = RuntimeVisualQualityCensus.Current(1).Rows[0];
+            if (surface.VertexColorSampleCount != 32 || !surface.VertexColorSamplingBounded ||
+                quality.VertexColorSampleCount != 32 || !quality.VertexColorSamplingBounded)
+            {
+                throw new InvalidOperationException("Standalone visual censuses must cap mesh color inspections at the bounded limit.");
+            }
+        }
+        finally
+        {
+            ExistingControllers.Instance.Reset();
+        }
+    }),
     ("runtime tech catalog census queries registered upgrades research branches and relics", () =>
     {
         TechCatalogCensus census = RuntimeTechCatalogCensus.Current();

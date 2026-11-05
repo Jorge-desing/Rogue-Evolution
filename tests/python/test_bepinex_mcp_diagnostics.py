@@ -352,6 +352,9 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
         self.assertEqual([64], next(args for method, args in calls if method == "GetLoadedPrefabVisualAuditJson"))
         self.assertEqual([64, 32], next(args for method, args in calls if method == "GetLoaderAuditCensusJson"))
         self.assertEqual([64], next(args for method, args in calls if method == "GetUnitMechanicsCensusJson"))
+        self.assertEqual([64], next(args for method, args in calls if method == "GetVisualSurfaceCensusJson"))
+        self.assertEqual([64], next(args for method, args in calls if method == "GetVisualMaterialCensusJson"))
+        self.assertEqual([64], next(args for method, args in calls if method == "GetSocketAuditCensusJson"))
         self.assertNotIn("GetUnitLoadoutAndPoolCensusJson", [method for method, _ in calls])
         self.assertIn("GetVisualMaterialCensusJson", [method for method, _ in calls])
         self.assertIn("GetVisualSurfaceCensusJson", [method for method, _ in calls])
@@ -447,13 +450,28 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
             resp3 = SERVER.execute_tool("diagnostics_get_loaded_unit_visual_audit", {"maxEntries": 32})
             self.assertFalse(resp3["isError"])
 
-        self.assertEqual(3, len(calls))
+            resp4 = SERVER.execute_tool("diagnostics_get_visual_surface_census", {"maxTrackedUnits": 16})
+            self.assertFalse(resp4["isError"])
+
+            resp5 = SERVER.execute_tool("diagnostics_get_visual_material_census", {"maxTrackedUnits": 16})
+            self.assertFalse(resp5["isError"])
+
+            resp6 = SERVER.execute_tool("diagnostics_get_socket_audit_census", {"maxTrackedUnits": 16})
+            self.assertFalse(resp6["isError"])
+
+        self.assertEqual(6, len(calls))
         self.assertEqual("GetVisualRenderCensusJson", calls[0][0])
         self.assertEqual([16], calls[0][1])
         self.assertEqual("InspectEntityVisualJson", calls[1][0])
         self.assertEqual(["test:arachnid"], calls[1][1])
         self.assertEqual("GetLoadedPrefabVisualAuditJson", calls[2][0])
         self.assertEqual([32], calls[2][1])
+        self.assertEqual("GetVisualSurfaceCensusJson", calls[3][0])
+        self.assertEqual([16], calls[3][1])
+        self.assertEqual("GetVisualMaterialCensusJson", calls[4][0])
+        self.assertEqual([16], calls[4][1])
+        self.assertEqual("GetSocketAuditCensusJson", calls[5][0])
+        self.assertEqual([16], calls[5][1])
 
     def test_loader_audit_census_and_reconcile_tools(self) -> None:
         calls: list[tuple[str, list[object]]] = []

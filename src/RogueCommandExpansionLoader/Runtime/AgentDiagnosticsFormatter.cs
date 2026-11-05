@@ -1922,6 +1922,9 @@ namespace RogueCommandExpansionLoader.Runtime
                         ["maxTeamMask"] = row.MaxTeamMask,
 
                         ["lodCount"] = row.LodCount,
+                        ["hierarchyTruncated"] = row.HierarchyTruncated,
+                        ["vertexColorSamplingBounded"] = row.VertexColorSamplingBounded,
+                        ["nameSamplingBounded"] = row.NameSamplingBounded,
                         ["shaderNames"] = row.ShaderNames != null ? row.ShaderNames : (object)Array.Empty<string>(),
                         ["shaderKeywords"] = row.ShaderKeywords != null ? row.ShaderKeywords : (object)Array.Empty<string>(),
                     });
@@ -1972,6 +1975,9 @@ namespace RogueCommandExpansionLoader.Runtime
                         ["thermalSootFraction"] = row.ThermalSootFraction,
                         ["teamMaskCoverage"] = row.TeamMaskCoverage,
                         ["lodGroupCount"] = row.LodGroupCount,
+                        ["hierarchyTruncated"] = row.HierarchyTruncated,
+                        ["vertexColorSamplingBounded"] = row.VertexColorSamplingBounded,
+                        ["materialSamplingBounded"] = row.MaterialSamplingBounded,
                         ["qualityIssues"] = row.QualityIssues != null ? row.QualityIssues : (object)Array.Empty<string>(),
                     });
                 }
@@ -2057,6 +2063,9 @@ namespace RogueCommandExpansionLoader.Runtime
                         ["hasMetallicGlossMapCount"] = row.HasMetallicGlossMapCount,
                         ["hasNormalMapCount"] = row.HasNormalMapCount,
                         ["hasEmissionMapCount"] = row.HasEmissionMapCount,
+                        ["hierarchyTruncated"] = row.HierarchyTruncated,
+                        ["materialSamplingBounded"] = row.MaterialSamplingBounded,
+                        ["nameSamplingBounded"] = row.NameSamplingBounded,
                         ["shaderKeywords"] = row.ShaderKeywords != null ? row.ShaderKeywords : (object)Array.Empty<string>(),
                     });
                 }
@@ -2091,6 +2100,8 @@ namespace RogueCommandExpansionLoader.Runtime
                         ["hasDamageSmoke"] = row.HasDamageSmoke,
                         ["hasFootContact"] = row.HasFootContact,
                         ["hasEngineAudio"] = row.HasEngineAudio,
+                        ["hierarchyTruncated"] = row.HierarchyTruncated,
+                        ["socketNameListBounded"] = row.SocketNameListBounded,
                     });
                 }
             }

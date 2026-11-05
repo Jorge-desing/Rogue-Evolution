@@ -1,7 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
 using UnityEngine;
 
 namespace RogueCommandExpansionLoader.Runtime
@@ -22,6 +20,8 @@ namespace RogueCommandExpansionLoader.Runtime
         public bool HasDamageSmoke { get; }
         public bool HasFootContact { get; }
         public bool HasEngineAudio { get; }
+        public bool HierarchyTruncated { get; }
+        public bool SocketNameListBounded { get; }
 
         public SocketAuditRow(
             string entityKeyId,
@@ -32,7 +32,9 @@ namespace RogueCommandExpansionLoader.Runtime
             bool hasMuzzlePrimary,
             bool hasDamageSmoke,
             bool hasFootContact,
-            bool hasEngineAudio)
+            bool hasEngineAudio,
+            bool hierarchyTruncated = false,
+            bool socketNameListBounded = false)
         {
             EntityKeyId = entityKeyId ?? string.Empty;
             SocketCount = socketCount < 0 ? 0 : socketCount;
@@ -43,6 +45,8 @@ namespace RogueCommandExpansionLoader.Runtime
             HasDamageSmoke = hasDamageSmoke;
             HasFootContact = hasFootContact;
             HasEngineAudio = hasEngineAudio;
+            HierarchyTruncated = hierarchyTruncated;
+            SocketNameListBounded = socketNameListBounded;
         }
     }
 
@@ -71,101 +75,95 @@ namespace RogueCommandExpansionLoader.Runtime
         {
             var rows = new List<SocketAuditRow>();
             int omitted = 0;
-            int clampedMax = Math.Max(1, Math.Min(maxRows, 256));
 
             try
             {
-                ExistingControllers existing = ExistingControllers.Instance;
-                if (existing == null) return new SocketAuditCensus(rows.AsReadOnly(), 0);
-
-                var units = new List<EntityController>();
-                try { if (existing.PlayerUnits() != null) units.AddRange(existing.PlayerUnits()); } catch { }
-                try { if (existing.AiUnits() != null) units.AddRange(existing.AiUnits()); } catch { }
-
-                foreach (EntityController unit in units)
+                List<EntityController> units = RuntimeVisualCensusSupport.CollectLivingUnits(maxRows, out omitted);
+                for (int i = 0; i < units.Count; i++)
                 {
-                    if (unit == null || unit.IsDestroyed || unit.DestroyHasBeenStarted) continue;
-                    if (rows.Count >= clampedMax) { omitted++; continue; }
-                    try { rows.Add(CollectRow(unit)); }
+                    try { rows.Add(CollectRow(units[i])); }
                     catch { omitted++; }
                 }
             }
-            catch { }
+            catch
+            {
+                omitted++;
+            }
 
             return new SocketAuditCensus(rows.AsReadOnly(), omitted);
         }
 
         private static SocketAuditRow CollectRow(EntityController unit)
         {
-            string key = ResolveKey(unit);
+            string key = RuntimeVisualCensusSupport.ResolveEntityKey(unit);
             GameObject go = null;
             try { go = unit.gameObject; } catch { go = null; }
 
             var socketNames = new List<string>();
+            int socketCount = 0;
             int canonical = 0;
             int ambiguous = 0;
             bool hasMuzzle = false, hasSmoke = false, hasFoot = false, hasEngine = false;
+            bool hierarchyTruncated = false;
+            bool socketNameListBounded = false;
 
             if (go != null)
             {
-                Transform[] transforms = null;
-                try { transforms = go.GetComponentsInChildren<Transform>(true); } catch { transforms = null; }
-                if (transforms != null)
+                VisualHierarchySnapshot snapshot = RuntimeVisualCensusSupport.CaptureHierarchy(go);
+                hierarchyTruncated = snapshot.HierarchyTruncated;
+                var counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                var seenNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (Transform transform in snapshot.Transforms)
                 {
-                    var counts = new Dictionary<string, int>(StringComparer.Ordinal);
-                    foreach (Transform t in transforms)
+                    if (transform == null) continue;
+                    string name = transform.name ?? string.Empty;
+                    if (!name.StartsWith("Socket_", StringComparison.Ordinal)) continue;
+
+                    socketCount++;
+                    RuntimeVisualCensusSupport.AddUniqueBounded(
+                        socketNames,
+                        seenNames,
+                        name,
+                        RuntimeVisualCensusSupport.MaxDiagnosticNamesPerUnit,
+                        ref socketNameListBounded);
+                    counts[name] = counts.TryGetValue(name, out int count) ? count + 1 : 1;
+                    if (name.StartsWith("Socket_MuzzlePrimary", StringComparison.Ordinal)) hasMuzzle = true;
+                    if (name.StartsWith("Socket_DamageSmoke", StringComparison.Ordinal)) hasSmoke = true;
+                    if (name.StartsWith("Socket_FootContact", StringComparison.Ordinal)) hasFoot = true;
+                    if (name.StartsWith("Socket_EngineAudio", StringComparison.Ordinal)) hasEngine = true;
+                    for (int prefixIndex = 0; prefixIndex < CanonicalPrefixes.Length; prefixIndex++)
                     {
-                        if (t == null) continue;
-                        string name = t.name ?? string.Empty;
-                        if (!name.StartsWith("Socket_", StringComparison.Ordinal)) continue;
-                        socketNames.Add(name);
-                        counts[name] = counts.TryGetValue(name, out int c) ? c + 1 : 1;
-                        if (name.StartsWith("Socket_MuzzlePrimary", StringComparison.Ordinal)) hasMuzzle = true;
-                        if (name.StartsWith("Socket_DamageSmoke", StringComparison.Ordinal)) hasSmoke = true;
-                        if (name.StartsWith("Socket_FootContact", StringComparison.Ordinal)) hasFoot = true;
-                        if (name.StartsWith("Socket_EngineAudio", StringComparison.Ordinal)) hasEngine = true;
-                        bool isCanonical = false;
-                        foreach (string prefix in CanonicalPrefixes)
+                        if (name.StartsWith(CanonicalPrefixes[prefixIndex], StringComparison.Ordinal))
                         {
-                            if (name.StartsWith(prefix, StringComparison.Ordinal)) { isCanonical = true; break; }
+                            canonical++;
+                            break;
                         }
-                        if (isCanonical) canonical++;
                     }
-                    foreach (var kv in counts)
-                    {
-                        if (kv.Value > 1) ambiguous += kv.Value - 1;
-                    }
+                }
+
+                foreach (KeyValuePair<string, int> pair in counts)
+                {
+                    if (pair.Value > 1) ambiguous += pair.Value - 1;
+                }
+                if (snapshot.RendererListTruncated || snapshot.LodListTruncated)
+                {
+                    socketNameListBounded = true;
                 }
             }
 
             return new SocketAuditRow(
                 key,
-                socketNames.Count,
-                socketNames.Distinct().ToList().AsReadOnly(),
+                socketCount,
+                socketNames.AsReadOnly(),
                 canonical,
                 ambiguous,
                 hasMuzzle,
                 hasSmoke,
                 hasFoot,
-                hasEngine);
+                hasEngine,
+                hierarchyTruncated,
+                socketNameListBounded);
         }
 
-        private static string ResolveKey(EntityController unit)
-        {
-            string key = string.Empty;
-            try
-            {
-                PropertyInfo prop = unit.GetType().GetProperty("EntityId") ?? unit.GetType().GetProperty("entityId");
-                if (prop != null) key = prop.GetValue(unit, null) as string ?? string.Empty;
-                if (string.IsNullOrWhiteSpace(key))
-                {
-                    FieldInfo field = unit.GetType().GetField("entityId") ?? unit.GetType().GetField("EntityId");
-                    if (field != null) key = field.GetValue(unit) as string ?? string.Empty;
-                }
-            }
-            catch { }
-            if (string.IsNullOrWhiteSpace(key)) key = unit != null ? unit.name : string.Empty;
-            return key;
-        }
     }
 }

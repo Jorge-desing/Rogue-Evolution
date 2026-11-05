@@ -58,6 +58,15 @@
 
 ---
 
+## 2026-11-05 standalone visual census optimization
+
+- **Scope:** The four independent visual censuses (`RuntimeVisualQualityCensus`, `RuntimeVisualSurfaceCensus`, `RuntimeVisualMaterialCensus`, and `RuntimeSocketAuditCensus`) now share `RuntimeVisualCensusSupport` for roster collection, identity accessors, bounded hierarchy traversal, mesh/material helpers, and deduplicated diagnostic names.
+- **Performance contract:** Each census reads player/AI registries once, deduplicates entity references, clamps rows to 256, visits at most 4,096 hierarchy nodes, caps renderer components at 256, material slots at 512, diagnostic names at 256, mesh color inspections at 32, and color samples at 4,096. Disabled renderers remain visible in renderer/hierarchy counts but do not contribute material, texture, or mesh telemetry. `sharedMaterials` is used without the material-instancing fallback, and texture maps require `Material.HasProperty`.
+- **Partial-result contract:** Quality, surface, material, and socket rows expose hierarchy/detail sampling flags. Socket canonical-prefix semantics remain unchanged; no catalog semantic migration was introduced. `LoaderDiagnosticsComponent` now accepts `maxTrackedUnits` for surface, material, and socket getters; MCP snapshot/tool forwarding passes `[64]`.
+- **Getter fan-out:** Same-frame scalar reads for visual render and visual-quality properties reuse one bounded census per frame, avoiding repeated Unity main-thread sweeps while preserving per-frame freshness.
+- **TDD/local validation:** RED was observed for duplicated player/AI roster entries, disabled-renderer standalone work, and the 33-mesh sampling bound; GREEN passed the focused `RuntimeAndDiagnostics` suite with `169/169`. Fresh Release harness: `493/494` with one Windows symlink-privilege skip. Release builds completed with 0 warnings/errors. Python bridge suite: `26/26`. Full Python suite: `190` tests with one platform skip and one unrelated pre-existing failure in `Build-SurgeArcTankModel.py` requiring `bake_advanced_vertex_shading`; this failure is outside the census change and is not claimed fixed.
+- **Evidence boundary:** These are static/local validations. No new Steam runtime run has yet been performed for the standalone censuses; the prior `GetVisualHealthSummaryJson` runtime result remains synthetic-seam evidence for the earlier aggregator change only.
+
 ## 1. Authoritative Compatibility Identity
 
 Always recheck this identity before relying on reflected signatures, CIL metadata tokens, or serialized assets:

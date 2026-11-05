@@ -1,7 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
 using UnityEngine;
 
 namespace RogueCommandExpansionLoader.Runtime
@@ -24,6 +22,9 @@ namespace RogueCommandExpansionLoader.Runtime
         public int HasNormalMapCount { get; }
         public int HasEmissionMapCount { get; }
         public IReadOnlyList<string> ShaderKeywords { get; }
+        public bool HierarchyTruncated { get; }
+        public bool MaterialSamplingBounded { get; }
+        public bool NameSamplingBounded { get; }
 
         public VisualMaterialRow(
             string entityKeyId,
@@ -36,7 +37,10 @@ namespace RogueCommandExpansionLoader.Runtime
             int hasMetallicGlossMapCount,
             int hasNormalMapCount,
             int hasEmissionMapCount,
-            IReadOnlyList<string> shaderKeywords)
+            IReadOnlyList<string> shaderKeywords,
+            bool hierarchyTruncated = false,
+            bool materialSamplingBounded = false,
+            bool nameSamplingBounded = false)
         {
             EntityKeyId = entityKeyId ?? string.Empty;
             RendererCount = rendererCount < 0 ? 0 : rendererCount;
@@ -49,6 +53,9 @@ namespace RogueCommandExpansionLoader.Runtime
             HasNormalMapCount = hasNormalMapCount < 0 ? 0 : hasNormalMapCount;
             HasEmissionMapCount = hasEmissionMapCount < 0 ? 0 : hasEmissionMapCount;
             ShaderKeywords = shaderKeywords ?? new List<string>().AsReadOnly();
+            HierarchyTruncated = hierarchyTruncated;
+            MaterialSamplingBounded = materialSamplingBounded;
+            NameSamplingBounded = nameSamplingBounded;
         }
     }
 
@@ -70,36 +77,15 @@ namespace RogueCommandExpansionLoader.Runtime
         {
             var rows = new List<VisualMaterialRow>();
             int omitted = 0;
-            int clampedMax = Math.Max(1, Math.Min(maxRows, 256));
 
             try
             {
-                ExistingControllers existing = ExistingControllers.Instance;
-                if (existing == null)
+                List<EntityController> units = RuntimeVisualCensusSupport.CollectLivingUnits(maxRows, out omitted);
+                for (int i = 0; i < units.Count; i++)
                 {
-                    return new VisualMaterialCensus(rows.AsReadOnly(), 0);
-                }
-
-                var units = new List<EntityController>();
-                try { if (existing.PlayerUnits() != null) units.AddRange(existing.PlayerUnits()); } catch { }
-                try { if (existing.AiUnits() != null) units.AddRange(existing.AiUnits()); } catch { }
-
-                foreach (EntityController unit in units)
-                {
-                    if (unit == null || unit.IsDestroyed || unit.DestroyHasBeenStarted)
-                    {
-                        continue;
-                    }
-
-                    if (rows.Count >= clampedMax)
-                    {
-                        omitted++;
-                        continue;
-                    }
-
                     try
                     {
-                        rows.Add(CollectRow(unit));
+                        rows.Add(CollectRow(units[i]));
                     }
                     catch
                     {
@@ -109,6 +95,7 @@ namespace RogueCommandExpansionLoader.Runtime
             }
             catch
             {
+                omitted++;
             }
 
             return new VisualMaterialCensus(rows.AsReadOnly(), omitted);
@@ -116,19 +103,7 @@ namespace RogueCommandExpansionLoader.Runtime
 
         private static VisualMaterialRow CollectRow(EntityController unit)
         {
-            string key = string.Empty;
-            try
-            {
-                PropertyInfo prop = unit.GetType().GetProperty("EntityId") ?? unit.GetType().GetProperty("entityId");
-                if (prop != null) key = prop.GetValue(unit, null) as string ?? string.Empty;
-                if (string.IsNullOrWhiteSpace(key))
-                {
-                    FieldInfo field = unit.GetType().GetField("entityId") ?? unit.GetType().GetField("EntityId");
-                    if (field != null) key = field.GetValue(unit) as string ?? string.Empty;
-                }
-            }
-            catch { }
-            if (string.IsNullOrWhiteSpace(key)) key = unit != null ? unit.name : string.Empty;
+            string key = RuntimeVisualCensusSupport.ResolveEntityKey(unit);
 
             GameObject go = null;
             try { go = unit.gameObject; } catch { go = null; }
@@ -144,108 +119,137 @@ namespace RogueCommandExpansionLoader.Runtime
             int normalCount = 0;
             int emissionCount = 0;
             var shaderKeywords = new List<string>();
+            var seenMaterialNames = new HashSet<string>(StringComparer.Ordinal);
+            var seenShaderNames = new HashSet<string>(StringComparer.Ordinal);
+            var seenTextureNames = new HashSet<string>(StringComparer.Ordinal);
+            var seenKeywords = new HashSet<string>(StringComparer.Ordinal);
+            bool hierarchyTruncated = false;
+            bool materialSamplingBounded = false;
+            bool nameSamplingBounded = false;
 
             if (go != null)
             {
-                Renderer[] renderers = null;
-                try { renderers = go.GetComponentsInChildren<Renderer>(true); } catch { renderers = null; }
-                if (renderers != null)
+                VisualHierarchySnapshot snapshot = RuntimeVisualCensusSupport.CaptureHierarchy(go);
+                hierarchyTruncated = snapshot.HierarchyTruncated;
+                rendererCount = snapshot.Renderers.Count;
+                int inspectedMaterialSlots = 0;
+
+                for (int rendererIndex = 0; rendererIndex < snapshot.Renderers.Count; rendererIndex++)
                 {
-                    foreach (Renderer renderer in renderers)
+                    Renderer renderer = snapshot.Renderers[rendererIndex];
+                    if (renderer == null) continue;
+                    bool rendererEnabled = false;
+                    try { rendererEnabled = renderer.enabled; } catch { }
+                    if (!rendererEnabled) continue;
+                    if (rendererEnabled) rendererEnabledCount++;
+
+                    Material[] materials = null;
+                    try { materials = renderer.sharedMaterials; } catch { }
+                    if (materials == null) continue;
+                    for (int materialIndex = 0; materialIndex < materials.Length; materialIndex++)
                     {
-                        if (renderer == null) continue;
-                        rendererCount++;
-                        try { if (renderer.enabled) rendererEnabledCount++; } catch { }
-
-                        Material[] mats = null;
-                        try { mats = renderer.sharedMaterials; } catch { mats = null; }
-                        if (mats == null)
+                        if (inspectedMaterialSlots >= RuntimeVisualCensusSupport.MaxMaterialSlotsPerUnit)
                         {
-                            try { mats = renderer.materials; } catch { mats = null; }
+                            materialSamplingBounded = true;
+                            break;
                         }
-                        if (mats == null) continue;
 
-                        foreach (Material mat in mats)
+                        Material material = materials[materialIndex];
+                        if (material == null) continue;
+                        inspectedMaterialSlots++;
+                        materialCount++;
+
+                        RuntimeVisualCensusSupport.AddUniqueBounded(
+                            materialNames,
+                            seenMaterialNames,
+                            material.name,
+                            RuntimeVisualCensusSupport.MaxDiagnosticNamesPerUnit,
+                            ref nameSamplingBounded);
+                        RuntimeVisualCensusSupport.AddUniqueBounded(
+                            shaderNames,
+                            seenShaderNames,
+                            RuntimeVisualCensusSupport.ResolveShaderName(material),
+                            RuntimeVisualCensusSupport.MaxDiagnosticNamesPerUnit,
+                            ref nameSamplingBounded);
+
+                        string[] keywords = null;
+                        try { keywords = material.shaderKeywords; } catch { }
+                        if (keywords != null)
                         {
-                            if (mat == null) continue;
-                            materialCount++;
-                            try { if (!string.IsNullOrWhiteSpace(mat.name)) materialNames.Add(mat.name); } catch { }
-                            try
+                            for (int keywordIndex = 0; keywordIndex < keywords.Length; keywordIndex++)
                             {
-                                if (mat.shader != null && !string.IsNullOrWhiteSpace(mat.shader.name))
-                                {
-                                    shaderNames.Add(mat.shader.name);
-                                }
+                                RuntimeVisualCensusSupport.AddUniqueBounded(
+                                    shaderKeywords,
+                                    seenKeywords,
+                                    keywords[keywordIndex],
+                                    RuntimeVisualCensusSupport.MaxDiagnosticNamesPerUnit,
+                                    ref nameSamplingBounded);
                             }
-                            catch { }
-                            try
-                            {
-                                if (mat.shaderKeywords != null)
-                                {
-                                    foreach (string kw in mat.shaderKeywords)
-                                    {
-                                        if (!string.IsNullOrWhiteSpace(kw) && !shaderKeywords.Contains(kw))
-                                        {
-                                            shaderKeywords.Add(kw);
-                                        }
-                                    }
-                                }
-                            }
-                            catch { }
+                        }
 
-                            try
-                            {
-                                Texture main = null;
-                                try { main = mat.mainTexture; } catch { main = null; }
-                                if (main != null)
-                                {
-                                    mainTexCount++;
-                                    try { if (!string.IsNullOrWhiteSpace(main.name)) textureNames.Add(main.name); } catch { }
-                                }
-                            }
-                            catch { }
+                        Texture main = null;
+                        try { main = material.mainTexture; } catch { }
+                        if (main != null)
+                        {
+                            mainTexCount++;
+                            string textureName = string.Empty;
+                            try { textureName = main.name; } catch { }
+                            RuntimeVisualCensusSupport.AddUniqueBounded(
+                                textureNames,
+                                seenTextureNames,
+                                textureName,
+                                RuntimeVisualCensusSupport.MaxDiagnosticNamesPerUnit,
+                                ref nameSamplingBounded);
+                        }
 
-                            try
-                            {
-                                Texture mg = null;
-                                try { mg = mat.GetTexture("_MetallicGlossMap"); } catch { mg = null; }
-                                if (mg != null)
-                                {
-                                    metallicGlossCount++;
-                                    try { if (!string.IsNullOrWhiteSpace(mg.name) && !textureNames.Contains(mg.name)) textureNames.Add(mg.name); } catch { }
-                                }
-                            }
-                            catch { }
+                        Texture metallicGloss = RuntimeVisualCensusSupport.GetTexture(material, "_MetallicGlossMap");
+                        if (metallicGloss != null)
+                        {
+                            metallicGlossCount++;
+                            string textureName = string.Empty;
+                            try { textureName = metallicGloss.name; } catch { }
+                            RuntimeVisualCensusSupport.AddUniqueBounded(
+                                textureNames,
+                                seenTextureNames,
+                                textureName,
+                                RuntimeVisualCensusSupport.MaxDiagnosticNamesPerUnit,
+                                ref nameSamplingBounded);
+                        }
 
-                            try
-                            {
-                                Texture nm = null;
-                                try { nm = mat.GetTexture("_BumpMap"); } catch { nm = null; }
-                                if (nm == null)
-                                {
-                                    try { nm = mat.GetTexture("_NormalMap"); } catch { nm = null; }
-                                }
-                                if (nm != null)
-                                {
-                                    normalCount++;
-                                    try { if (!string.IsNullOrWhiteSpace(nm.name) && !textureNames.Contains(nm.name)) textureNames.Add(nm.name); } catch { }
-                                }
-                            }
-                            catch { }
+                        Texture normal = RuntimeVisualCensusSupport.GetTexture(material, "_BumpMap");
+                        if (normal == null) normal = RuntimeVisualCensusSupport.GetTexture(material, "_NormalMap");
+                        if (normal != null)
+                        {
+                            normalCount++;
+                            string textureName = string.Empty;
+                            try { textureName = normal.name; } catch { }
+                            RuntimeVisualCensusSupport.AddUniqueBounded(
+                                textureNames,
+                                seenTextureNames,
+                                textureName,
+                                RuntimeVisualCensusSupport.MaxDiagnosticNamesPerUnit,
+                                ref nameSamplingBounded);
+                        }
 
-                            try
-                            {
-                                Texture em = null;
-                                try { em = mat.GetTexture("_EmissionMap"); } catch { em = null; }
-                                if (em != null)
-                                {
-                                    emissionCount++;
-                                    try { if (!string.IsNullOrWhiteSpace(em.name) && !textureNames.Contains(em.name)) textureNames.Add(em.name); } catch { }
-                                }
-                            }
-                            catch { }
+                        Texture emission = RuntimeVisualCensusSupport.GetTexture(material, "_EmissionMap");
+                        if (emission != null)
+                        {
+                            emissionCount++;
+                            string textureName = string.Empty;
+                            try { textureName = emission.name; } catch { }
+                            RuntimeVisualCensusSupport.AddUniqueBounded(
+                                textureNames,
+                                seenTextureNames,
+                                textureName,
+                                RuntimeVisualCensusSupport.MaxDiagnosticNamesPerUnit,
+                                ref nameSamplingBounded);
                         }
                     }
+                }
+
+                if (snapshot.RendererListTruncated || snapshot.LodListTruncated)
+                {
+                    nameSamplingBounded = true;
                 }
             }
 
@@ -253,14 +257,17 @@ namespace RogueCommandExpansionLoader.Runtime
                 key,
                 rendererCount,
                 materialCount,
-                materialNames.Distinct().ToList().AsReadOnly(),
-                shaderNames.Distinct().ToList().AsReadOnly(),
-                textureNames.Distinct().ToList().AsReadOnly(),
+                materialNames.AsReadOnly(),
+                shaderNames.AsReadOnly(),
+                textureNames.AsReadOnly(),
                 mainTexCount,
                 metallicGlossCount,
                 normalCount,
                 emissionCount,
-                shaderKeywords.Distinct().ToList().AsReadOnly());
+                shaderKeywords.AsReadOnly(),
+                hierarchyTruncated,
+                materialSamplingBounded,
+                nameSamplingBounded);
         }
     }
 }
