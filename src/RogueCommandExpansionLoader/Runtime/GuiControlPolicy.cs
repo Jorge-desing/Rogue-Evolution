@@ -12,7 +12,7 @@ namespace RogueCommandExpansionLoader.Runtime
         public const int MinimumTab = 0;
         public const int MaximumTab = 7;
         public const float MinimumTimeScale = 0f;
-        public const float MaximumTimeScale = 8f;
+        public const float MaximumTimeScale = 10f;
 
         public static bool TryClampTab(int requested, out int tab)
         {

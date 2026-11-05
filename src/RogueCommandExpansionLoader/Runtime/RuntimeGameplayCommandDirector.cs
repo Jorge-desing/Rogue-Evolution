@@ -3773,13 +3773,12 @@ namespace RogueCommandExpansionLoader.Runtime
 
                 float prev = Time.timeScale;
 
-                if (float.IsNaN(timeScale) || float.IsInfinity(timeScale))
+                float clamped;
+                if (!GuiControlPolicy.TryValidateTimeScale(timeScale, out clamped))
                 {
                     return new GameSpeedCommandResult(false, prev, prev,
                         "Game time scale must be finite.");
                 }
-
-                float clamped = Mathf.Clamp(timeScale, 0f, 10f);
 
                 Time.timeScale = clamped;
 
@@ -4314,12 +4313,16 @@ namespace RogueCommandExpansionLoader.Runtime
 
         {
 
-            if (float.IsNaN(targetX) || float.IsInfinity(targetX) ||
-                float.IsNaN(targetZ) || float.IsInfinity(targetZ))
+            float validatedX;
+            float validatedZ;
+            if (!GuiControlPolicy.TryValidateCameraFloat(targetX, out validatedX) ||
+                !GuiControlPolicy.TryValidateCameraFloat(targetZ, out validatedZ))
             {
                 return new CameraCommandResult(false, "MoveCamera", targetX, targetZ, 0f,
                     "Camera target coordinates must be finite.");
             }
+            targetX = validatedX;
+            targetZ = validatedZ;
 
             try
 
@@ -4565,11 +4568,13 @@ namespace RogueCommandExpansionLoader.Runtime
 
         {
 
-            if (float.IsNaN(fieldOfView) || float.IsInfinity(fieldOfView))
+            float validatedFov;
+            if (!GuiControlPolicy.TryValidateCameraFloat(fieldOfView, out validatedFov))
             {
                 return new CameraCommandResult(false, "SetCameraZoom", 0f, 0f, fieldOfView,
                     "Camera field of view must be finite.");
             }
+            fieldOfView = validatedFov;
 
             try
 

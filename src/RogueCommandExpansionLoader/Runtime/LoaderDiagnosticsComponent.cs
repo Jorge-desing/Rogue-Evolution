@@ -1466,12 +1466,13 @@ namespace RogueCommandExpansionLoader.Runtime
                 RangeDisplayLineWidth,
                 RangeDisplaySegments,
                 RangeDisplayHeightOffset);
+            var liveCamera = RuntimeCameraCensus.Current();
             var playbackView = new GuiPlaybackView(
                 RuntimeGameplayCommandDirector.GetGameTimeScale(),
                 IsRuntimeHooksInstalled,
-                0f,
-                0f,
-                60f);
+                liveCamera != null ? liveCamera.PositionX : 0f,
+                liveCamera != null ? liveCamera.PositionZ : 0f,
+                liveCamera != null ? liveCamera.FieldOfView : 0f);
             return AgentDiagnosticsFormatter.SerializeGuiState(
                 overlayView,
                 rangeView,

@@ -215,6 +215,27 @@ internal static partial class ValidationTestRunner
             throw new InvalidOperationException("TryValidateTimeScale must reject infinity.");
         }
     }),
+    ("gui control policy exposes unified ten-times time scale cap", () =>
+    {
+        if (GuiControlPolicy.MaximumTimeScale != 10f)
+        {
+            throw new InvalidOperationException("GuiControlPolicy.MaximumTimeScale must match the native 0-10 time scale contract.");
+        }
+        float ts;
+        if (!GuiControlPolicy.TryValidateTimeScale(9.5f, out ts) || System.Math.Abs(ts - 9.5f) > 0.001f)
+        {
+            throw new InvalidOperationException("TryValidateTimeScale must accept 9.5 within the 0-10 contract.");
+        }
+        float cx;
+        if (!GuiControlPolicy.TryValidateCameraFloat(-42.5f, out cx) || System.Math.Abs(cx - (-42.5f)) > 0.001f)
+        {
+            throw new InvalidOperationException("TryValidateCameraFloat must accept finite camera coordinates.");
+        }
+        if (GuiControlPolicy.TryValidateCameraFloat(float.NaN, out cx))
+        {
+            throw new InvalidOperationException("TryValidateCameraFloat must reject NaN camera coordinates.");
+        }
+    }),
     ("gui state serializes overlay and range with counters first", () =>
     {
         string json = AgentDiagnosticsFormatter.SerializeGuiState(
