@@ -8373,6 +8373,14 @@ internal static partial class ValidationTestRunner
             {
                 throw new InvalidOperationException("Visual health summary row must identify the loader-owned unit.");
             }
+            VisualHealthRow healthRow = summary.Rows[0];
+            if (healthRow.RendererCount != 1 || healthRow.MaterialCount != 1 ||
+                healthRow.PbrMaterialCount != 1 || healthRow.VertexColorSampleCount != 2 ||
+                healthRow.SurfaceVertexCount != 4 || healthRow.MaterialTextureCount != 3 ||
+                !healthRow.ContractPass)
+            {
+                throw new InvalidOperationException("Visual health summary must retain the single-pass render, material, surface, and contract metrics.");
+            }
 
             string json = AgentDiagnosticsFormatter.SerializeVisualHealthSummary(summary);
             using (var doc = JsonDocument.Parse(json))
@@ -8391,6 +8399,75 @@ internal static partial class ValidationTestRunner
                 {
                     throw new InvalidOperationException("Visual health summary must place omittedUnitCount before rows.");
                 }
+            }
+        }
+        finally
+        {
+            ExistingControllers.Instance.Reset();
+        }
+    }),
+    ("visual health summary counts bounded roster omissions once", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        try
+        {
+            for (int i = 0; i < 2; i++)
+            {
+                ExistingControllers.Instance.PlayerUnits().Add(new EntityController
+                {
+                    entityId = "sample-native:bounded-visual-health-" + i,
+                    UniqueEntityId = 9210 + i,
+                    IsControlledByPlayer = true,
+                    IsUnit = true,
+                    Position = new Vector3(i, 0f, 0f)
+                });
+            }
+
+            VisualHealthSummary summary = RuntimeVisualHealthCensus.Current(1);
+            if (summary.TrackedUnitCount != 1 || summary.Rows.Count != 1)
+            {
+                throw new InvalidOperationException("Visual health summary must enforce the requested row bound.");
+            }
+            if (summary.OmittedUnitCount != 1)
+            {
+                throw new InvalidOperationException("Visual health summary must count each omitted unit once.");
+            }
+        }
+        finally
+        {
+            ExistingControllers.Instance.Reset();
+        }
+    }),
+    ("visual health summary counts only bound material textures", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        try
+        {
+            var unit = new EntityController
+            {
+                entityId = "sample-native:texture-health",
+                UniqueEntityId = 9220,
+                IsControlledByPlayer = true,
+                IsUnit = true
+            };
+            var go = new GameObject("TextureHealthUnit");
+            var renderer = go.AddComponent<MeshRenderer>();
+            renderer.sharedMaterials = new[]
+            {
+                new Material
+                {
+                    name = "TextureOnlyMaterial",
+                    shader = new Shader { name = "Standard" },
+                    mainTexture = new Texture { name = "TextureOnlyAlbedo" }
+                }
+            };
+            unit.gameObject = go;
+            ExistingControllers.Instance.PlayerUnits().Add(unit);
+
+            VisualHealthSummary summary = RuntimeVisualHealthCensus.Current(1);
+            if (summary.Rows.Count != 1 || summary.Rows[0].MaterialTextureCount != 1)
+            {
+                throw new InvalidOperationException("Visual health summary must not treat a main texture as an unbound metallic, normal, or emission map.");
             }
         }
         finally

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using UnityEngine;
 
 namespace RogueCommandExpansionLoader.Runtime
 {
@@ -99,85 +100,44 @@ namespace RogueCommandExpansionLoader.Runtime
     }
 
     /// <summary>
-    /// Collects a bounded consolidated visual health snapshot from live units by
-    /// merging the already-verified visual quality, surface, material, and
-    /// socket censuses. Uses no new reflection beyond those collectors and
-    /// degrades to <see cref="VisualHealthSummary.Empty"/> on failure.
+    /// Collects a bounded consolidated visual health snapshot from living units in
+    /// one renderer/material/mesh/socket hierarchy pass. It avoids invoking the
+    /// four standalone visual censuses, which would repeat Unity main-thread
+    /// traversal and allocations, and degrades to a partial snapshot on failure.
     /// </summary>
     public static class RuntimeVisualHealthCensus
     {
+        private const string PbrShaderName = "RogueCommand/VehiclePBR_VertexWear";
+        private const string StandardShaderName = "Standard";
+        private const string NativeShaderName = "Shader Graphs/EntityColorShader";
+        private const int MaxHierarchyNodesPerUnit = 4096;
+        private const int MaxMeshInspectionsPerLoaderUnit = 32;
+
+        /// <summary>
+        /// Collects the consolidated health report in one bounded live-unit sweep.
+        /// The previous implementation invoked four independent censuses, causing
+        /// each hierarchy, renderer, material, and vertex-color tree to be walked
+        /// repeatedly on Unity's main thread.
+        /// </summary>
         public static VisualHealthSummary Current(int maxRows = 64)
         {
             int limit = Math.Max(1, Math.Min(maxRows, 256));
+            var rows = new List<VisualHealthRow>(limit);
+            var candidates = new List<EntityController>();
+            var seenUnits = new HashSet<EntityController>();
+            int omitted = 0;
+
             try
             {
-                VisualQualityCensus quality = null;
-                VisualSurfaceCensus surface = null;
-                VisualMaterialCensus material = null;
-                SocketAuditCensus socket = null;
-
-                try { quality = RuntimeVisualQualityCensus.Current(limit); } catch { quality = null; }
-                try { surface = RuntimeVisualSurfaceCensus.Current(limit); } catch { surface = null; }
-                try { material = RuntimeVisualMaterialCensus.Current(limit); } catch { material = null; }
-                try { socket = RuntimeSocketAuditCensus.Current(limit); } catch { socket = null; }
-
-                var surfaceByKey = new Dictionary<string, VisualSurfaceRow>(StringComparer.Ordinal);
-                if (surface != null && surface.Rows != null)
+                ExistingControllers existing = ExistingControllers.Instance;
+                if (existing == null)
                 {
-                    foreach (VisualSurfaceRow row in surface.Rows)
-                    {
-                        if (row == null) continue;
-                        if (!surfaceByKey.ContainsKey(row.EntityKeyId))
-                            surfaceByKey[row.EntityKeyId] = row;
-                    }
-                }
-                var materialByKey = new Dictionary<string, VisualMaterialRow>(StringComparer.Ordinal);
-                if (material != null && material.Rows != null)
-                {
-                    foreach (VisualMaterialRow row in material.Rows)
-                    {
-                        if (row == null) continue;
-                        if (!materialByKey.ContainsKey(row.EntityKeyId))
-                            materialByKey[row.EntityKeyId] = row;
-                    }
-                }
-                var socketByKey = new Dictionary<string, SocketAuditRow>(StringComparer.Ordinal);
-                if (socket != null && socket.Rows != null)
-                {
-                    foreach (SocketAuditRow row in socket.Rows)
-                    {
-                        if (row == null) continue;
-                        if (!socketByKey.ContainsKey(row.EntityKeyId))
-                            socketByKey[row.EntityKeyId] = row;
-                    }
+                    return VisualHealthSummary.Empty;
                 }
 
-                var keys = new List<string>();
-                var seen = new HashSet<string>(StringComparer.Ordinal);
-                if (quality != null && quality.Rows != null)
-                {
-                    foreach (VisualQualityRow row in quality.Rows)
-                    {
-                        if (row == null) continue;
-                        if (seen.Add(row.EntityKeyId)) keys.Add(row.EntityKeyId);
-                    }
-                }
-                foreach (string key in surfaceByKey.Keys) if (seen.Add(key)) keys.Add(key);
-                foreach (string key in materialByKey.Keys) if (seen.Add(key)) keys.Add(key);
-                foreach (string key in socketByKey.Keys) if (seen.Add(key)) keys.Add(key);
+                try { AppendLivingUnits(existing.PlayerUnits(), candidates, seenUnits); } catch { }
+                try { AppendLivingUnits(existing.AiUnits(), candidates, seenUnits); } catch { }
 
-                var qualityByKey = new Dictionary<string, VisualQualityRow>(StringComparer.Ordinal);
-                if (quality != null && quality.Rows != null)
-                {
-                    foreach (VisualQualityRow row in quality.Rows)
-                    {
-                        if (row == null) continue;
-                        if (!qualityByKey.ContainsKey(row.EntityKeyId))
-                            qualityByKey[row.EntityKeyId] = row;
-                    }
-                }
-
-                var rows = new List<VisualHealthRow>();
                 int loaderOwned = 0;
                 int passCount = 0;
                 int issueCount = 0;
@@ -186,44 +146,28 @@ namespace RogueCommandExpansionLoader.Runtime
                 int totalSockets = 0;
                 int ambiguousUnits = 0;
 
-                foreach (string key in keys)
+                foreach (EntityController unit in candidates)
                 {
+                    if (rows.Count >= limit)
+                    {
+                        omitted++;
+                        continue;
+                    }
+
                     try
                     {
-                        VisualQualityRow q = qualityByKey.TryGetValue(key, out VisualQualityRow v) ? v : null;
-                        VisualSurfaceRow s = surfaceByKey.TryGetValue(key, out VisualSurfaceRow sv) ? sv : null;
-                        VisualMaterialRow m = materialByKey.TryGetValue(key, out VisualMaterialRow mv) ? mv : null;
-                        SocketAuditRow so = socketByKey.TryGetValue(key, out SocketAuditRow sov) ? sov : null;
-
-                        bool isLoaderOwned = q != null ? q.IsLoaderOwned : key.IndexOf(':') >= 0;
-                        bool contractPass = q != null ? q.ContractPass : true;
-                        int qualityIssues = q != null && q.QualityIssues != null ? q.QualityIssues.Count : 0;
-                        int rendererCount = q != null ? q.RendererCount : (s != null ? s.RendererCount : (m != null ? m.RendererCount : 0));
-                        int materialCount = q != null ? q.MaterialCount : (s != null ? s.MaterialCount : (m != null ? m.MaterialCount : 0));
-                        int pbrCount = q != null ? q.PbrMaterialCount : 0;
-                        int vertexSamples = q != null ? q.VertexColorSampleCount : 0;
-                        int surfaceVertices = s != null ? s.VertexCount : 0;
-                        int materialTextures = m != null ? (m.HasMainTextureCount + m.HasMetallicGlossMapCount + m.HasNormalMapCount + m.HasEmissionMapCount) : 0;
-                        int socketCount = so != null ? so.SocketCount : 0;
-                        int ambiguous = so != null ? so.AmbiguousSocketCount : 0;
-
-                        var row = new VisualHealthRow(
-                            key,
-                            isLoaderOwned,
-                            contractPass,
-                            qualityIssues,
-                            rendererCount,
-                            materialCount,
-                            pbrCount,
-                            vertexSamples,
-                            surfaceVertices,
-                            materialTextures,
-                            socketCount,
-                            ambiguous);
+                        VisualHealthRow row = CollectRow(unit);
                         rows.Add(row);
                         if (row.IsLoaderOwned) loaderOwned++;
-                        if (row.IsLoaderOwned && row.ContractPass && row.TotalIssueCount == 0) passCount++;
-                        else if (row.TotalIssueCount > 0) issueCount++;
+                        if (row.IsLoaderOwned && row.ContractPass && row.TotalIssueCount == 0)
+                        {
+                            passCount++;
+                        }
+                        else if (row.TotalIssueCount > 0)
+                        {
+                            issueCount++;
+                        }
+
                         totalVertexSamples += row.VertexColorSampleCount;
                         totalMaterials += row.MaterialCount;
                         totalSockets += row.SocketCount;
@@ -231,15 +175,9 @@ namespace RogueCommandExpansionLoader.Runtime
                     }
                     catch
                     {
-                        // Skip an unusable unit instead of aborting the sweep.
+                        omitted++;
                     }
                 }
-
-                int omitted = 0;
-                if (quality != null) omitted += quality.OmittedRowCount;
-                if (surface != null) omitted += surface.OmittedRowCount;
-                if (material != null) omitted += material.OmittedRowCount;
-                if (socket != null) omitted += socket.OmittedRowCount;
 
                 return new VisualHealthSummary(
                     omitted,
@@ -255,8 +193,331 @@ namespace RogueCommandExpansionLoader.Runtime
             }
             catch
             {
-                return VisualHealthSummary.Empty;
+                return new VisualHealthSummary(
+                    omitted,
+                    rows.Count,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    rows.AsReadOnly());
             }
+        }
+
+        private static void AppendLivingUnits(
+            IEnumerable<EntityController> source,
+            List<EntityController> destination,
+            HashSet<EntityController> seen)
+        {
+            if (source == null) return;
+
+            foreach (EntityController unit in source)
+            {
+                if (unit == null || unit.IsDestroyed || unit.DestroyHasBeenStarted) continue;
+                if (seen.Add(unit)) destination.Add(unit);
+            }
+        }
+
+        private static VisualHealthRow CollectRow(EntityController unit)
+        {
+            string key = ResolveEntityKey(unit);
+            bool isLoaderOwned = key.IndexOf(':') >= 0;
+            var qualityIssues = new List<string>();
+            var socketCounts = new Dictionary<string, int>(StringComparer.Ordinal);
+
+            int rendererCount = 0;
+            int materialCount = 0;
+            int pbrCount = 0;
+            int vertexSamples = 0;
+            int surfaceVertices = 0;
+            int materialTextures = 0;
+            int socketCount = 0;
+            int ambiguousSocketCount = 0;
+            int keywordCompliantCount = 0;
+            int metallicGlossCount = 0;
+            int normalMapCount = 0;
+            int unsupportedShaderCount = 0;
+            int inspectedMeshes = 0;
+            bool meshSamplingTruncated = false;
+            bool hierarchyTruncated = false;
+
+            GameObject go = null;
+            try { go = unit.gameObject; } catch { }
+            if (go == null)
+            {
+                if (isLoaderOwned) qualityIssues.Add("missing-game-object");
+                return BuildRow(key, isLoaderOwned, qualityIssues, rendererCount, materialCount,
+                    pbrCount, vertexSamples, surfaceVertices, materialTextures, socketCount,
+                    ambiguousSocketCount, false);
+            }
+
+            Transform root = null;
+            try { root = go.transform; } catch { }
+            if (root == null)
+            {
+                if (isLoaderOwned) qualityIssues.Add("missing-transform");
+                return BuildRow(key, isLoaderOwned, qualityIssues, rendererCount, materialCount,
+                    pbrCount, vertexSamples, surfaceVertices, materialTextures, socketCount,
+                    ambiguousSocketCount, false);
+            }
+
+            Renderer[] renderers = null;
+            try { renderers = go.GetComponentsInChildren<Renderer>(true); } catch { }
+            if (renderers != null)
+            {
+                if (renderers.Length > MaxHierarchyNodesPerUnit) hierarchyTruncated = true;
+                int rendererLimit = Math.Min(renderers.Length, MaxHierarchyNodesPerUnit);
+                for (int i = 0; i < rendererLimit; i++)
+                {
+                    Renderer renderer = renderers[i];
+                    if (renderer == null) continue;
+                    rendererCount++;
+
+                    bool enabled = false;
+                    try { enabled = renderer.enabled; } catch { }
+                    if (enabled)
+                    {
+                        Material[] materials = null;
+                        try { materials = renderer.sharedMaterials; } catch { }
+                        if (materials != null)
+                        {
+                            for (int materialIndex = 0; materialIndex < materials.Length; materialIndex++)
+                            {
+                                Material material = materials[materialIndex];
+                                if (material == null) continue;
+                                materialCount++;
+                                InspectMaterial(
+                                    material,
+                                    isLoaderOwned,
+                                    ref pbrCount,
+                                    ref keywordCompliantCount,
+                                    ref metallicGlossCount,
+                                    ref normalMapCount,
+                                    ref materialTextures,
+                                    ref unsupportedShaderCount);
+                            }
+                        }
+                    }
+
+                    if (!isLoaderOwned)
+                    {
+                        continue;
+                    }
+                    if (inspectedMeshes >= MaxMeshInspectionsPerLoaderUnit)
+                    {
+                        meshSamplingTruncated = true;
+                        continue;
+                    }
+                    inspectedMeshes++;
+
+                    Mesh mesh = null;
+                    try
+                    {
+                        MeshFilter filter = renderer.GetComponent<MeshFilter>();
+                        if (filter != null) mesh = filter.sharedMesh;
+                        if (mesh == null)
+                        {
+                            SkinnedMeshRenderer skinned = renderer as SkinnedMeshRenderer;
+                            if (skinned != null) mesh = skinned.sharedMesh;
+                        }
+                    }
+                    catch { }
+
+                    if (mesh != null)
+                    {
+                        surfaceVertices += Math.Max(0, mesh.vertexCount);
+                        if (enabled)
+                        {
+                            Color[] colors = null;
+                            try { colors = mesh.colors; } catch { }
+                            if (colors != null) vertexSamples += colors.Length;
+                        }
+                    }
+                }
+            }
+
+            Transform[] transforms = null;
+            try { transforms = go.GetComponentsInChildren<Transform>(true); } catch { }
+            if (transforms != null)
+            {
+                if (transforms.Length > MaxHierarchyNodesPerUnit) hierarchyTruncated = true;
+                int transformLimit = Math.Min(transforms.Length, MaxHierarchyNodesPerUnit);
+                for (int i = 0; i < transformLimit; i++)
+                {
+                    Transform transform = transforms[i];
+                    if (transform == null) continue;
+                    string transformName = string.Empty;
+                    try { transformName = transform.name ?? string.Empty; } catch { }
+                    if (!transformName.StartsWith("Socket_", StringComparison.Ordinal)) continue;
+                    socketCount++;
+                    socketCounts[transformName] = socketCounts.TryGetValue(transformName, out int count)
+                        ? count + 1
+                        : 1;
+                }
+            }
+
+            foreach (KeyValuePair<string, int> pair in socketCounts)
+            {
+                if (pair.Value > 1) ambiguousSocketCount += pair.Value - 1;
+            }
+
+            if (isLoaderOwned && rendererCount == 0) qualityIssues.Add("no-renderer");
+            if (isLoaderOwned && unsupportedShaderCount > 0) qualityIssues.Add("unsupported-shader");
+            if (isLoaderOwned && pbrCount > 0)
+            {
+                if (keywordCompliantCount < pbrCount) qualityIssues.Add("pbr-keywords-incomplete");
+                if (metallicGlossCount < pbrCount) qualityIssues.Add("missing-metallic-gloss-map");
+                if (normalMapCount < pbrCount) qualityIssues.Add("missing-normal-map");
+                if (vertexSamples == 0) qualityIssues.Add("missing-vertex-wear-colors");
+            }
+            if (isLoaderOwned && hierarchyTruncated) qualityIssues.Add("hierarchy-truncated");
+            if (isLoaderOwned && pbrCount > 0 && meshSamplingTruncated)
+            {
+                qualityIssues.Add("geometry-sampling-bounded");
+            }
+
+            return BuildRow(
+                key,
+                isLoaderOwned,
+                qualityIssues,
+                rendererCount,
+                materialCount,
+                pbrCount,
+                vertexSamples,
+                surfaceVertices,
+                materialTextures,
+                socketCount,
+                ambiguousSocketCount,
+                isLoaderOwned && pbrCount > 0 && qualityIssues.Count == 0);
+        }
+
+        private static void InspectMaterial(
+            Material material,
+            bool isLoaderOwned,
+            ref int pbrCount,
+            ref int keywordCompliantCount,
+            ref int metallicGlossCount,
+            ref int normalMapCount,
+            ref int materialTextures,
+            ref int unsupportedShaderCount)
+        {
+            string shaderName = string.Empty;
+            try { shaderName = material.shader != null ? material.shader.name ?? string.Empty : string.Empty; } catch { }
+            bool isPbr = string.Equals(shaderName, PbrShaderName, StringComparison.Ordinal);
+            if (isPbr) pbrCount++;
+            if (isLoaderOwned && !IsAcceptedRuntimeShaderName(shaderName)) unsupportedShaderCount++;
+
+            string[] keywords = null;
+            try { keywords = material.shaderKeywords; } catch { }
+            if (isPbr && Contains(keywords, "_METALLICSPECGLOSSMAP") && Contains(keywords, "_NORMALMAP"))
+            {
+                keywordCompliantCount++;
+            }
+
+            if (TryGetTexture(material, null) != null) materialTextures++;
+            if (TryGetTexture(material, "_MetallicGlossMap") != null)
+            {
+                metallicGlossCount++;
+                materialTextures++;
+            }
+            if (TryGetTexture(material, "_BumpMap") != null || TryGetTexture(material, "_NormalMap") != null)
+            {
+                normalMapCount++;
+                materialTextures++;
+            }
+            if (TryGetTexture(material, "_EmissionMap") != null)
+            {
+                materialTextures++;
+            }
+        }
+
+        private static Texture TryGetTexture(Material material, string property)
+        {
+            try
+            {
+                if (property == null) return material.mainTexture;
+                if (!material.HasProperty(property)) return null;
+                return material.GetTexture(property);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static VisualHealthRow BuildRow(
+            string key,
+            bool isLoaderOwned,
+            List<string> qualityIssues,
+            int rendererCount,
+            int materialCount,
+            int pbrCount,
+            int vertexSamples,
+            int surfaceVertices,
+            int materialTextures,
+            int socketCount,
+            int ambiguousSocketCount,
+            bool contractPass)
+        {
+            var boundedIssues = qualityIssues.Count <= 8
+                ? qualityIssues
+                : qualityIssues.GetRange(0, 8);
+            bool pass = contractPass || !isLoaderOwned || pbrCount == 0;
+            return new VisualHealthRow(
+                key,
+                isLoaderOwned,
+                pass,
+                boundedIssues.Count,
+                rendererCount,
+                materialCount,
+                pbrCount,
+                vertexSamples,
+                surfaceVertices,
+                materialTextures,
+                socketCount,
+                ambiguousSocketCount);
+        }
+
+        private static string ResolveEntityKey(EntityController unit)
+        {
+            try
+            {
+                string value = unit.EntityId;
+                if (!string.IsNullOrWhiteSpace(value)) return value;
+            }
+            catch { }
+            try { return unit.name ?? string.Empty; } catch { return string.Empty; }
+        }
+
+        private static bool IsAcceptedRuntimeShaderName(string shaderName)
+        {
+            if (string.IsNullOrEmpty(shaderName) ||
+                shaderName.IndexOf("Error", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                shaderName.IndexOf("Hidden", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return false;
+            }
+
+            return string.Equals(shaderName, PbrShaderName, StringComparison.Ordinal) ||
+                   string.Equals(shaderName, StandardShaderName, StringComparison.Ordinal) ||
+                   string.Equals(shaderName, NativeShaderName, StringComparison.Ordinal) ||
+                   shaderName.StartsWith("Universal Render Pipeline/", StringComparison.Ordinal) ||
+                   shaderName.StartsWith("Shader Graphs/", StringComparison.Ordinal) ||
+                   shaderName.StartsWith("Shapes/", StringComparison.Ordinal) ||
+                   shaderName.StartsWith("Sprites/", StringComparison.Ordinal);
+        }
+
+        private static bool Contains(string[] keywords, string value)
+        {
+            if (keywords == null) return false;
+            for (int i = 0; i < keywords.Length; i++)
+            {
+                if (string.Equals(keywords[i], value, StringComparison.Ordinal)) return true;
+            }
+            return false;
         }
     }
 }
