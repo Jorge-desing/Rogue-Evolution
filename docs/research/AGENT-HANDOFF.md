@@ -19,6 +19,16 @@
 
 ---
 
+## 2026-11-04 visual census and AI-default follow-up
+
+- **Implementation commit:** `46ca5738434bc135234fab1d06f3792c8ea02a1a`, pushed to `origin/codex/rogue-unit-balance-20261018`. The earlier runtime binding commit `316696a3569027678f2226e55122d0713a308c24` remains its parent.
+- **Static/local fix:** `RuntimeVisualQualityCensus` now measures only enabled renderers for active material/shader quality, accepts the supported URP/Shader Graph/Shapes/Sprite shader families used by rigged batch overlays, and guards `Material.GetTexture` with a compatibility-safe `HasProperty` reflection check. This prevents disabled native template renderers and missing shader properties from producing false `unsupported-shader` findings or Unity log floods. The census regression suite covers both disabled native renderers and active URP rigged overlays.
+- **Steam runtime evidence:** Session `artifacts/runtime-smoke/steam-pbr-ai-20261104-163340-316696a/` deployed tested plugin SHA-256 `19da0d2289b00ae9d467632a5040c4bdb8bf46f77f731ef37fb57138ea8de47a` after verifying Rogue Command `1.0.9`, Unity `2021.3.45f2`/runtime `2021.3.45.8976527`, Assembly-CSharp SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, and MVID `db0e9462-128d-4296-9900-de18b4bd0c00`. A synthetic `SpawnEntityJson` seam created `sample-native:arachnid-hexapod`; the live visual-quality census then reported `rendererCount=102`, `unsupportedShaderCount=0`, `qualityIssues=[]`, and `vertexColorSampleCount=12`. Deep live inspection reported `SkeletalArmature`, 32 bones, valid `ArachnidHexapodController`/avatar, idle clip, 10 canonical sockets, and zero socket ambiguity. The rigged Arachnid uses the authored batch URP material path, so `pbrMaterialCount=0` is expected for that visual variant; it is not evidence that a PBR-texture static overlay was consumed.
+- **AI boundary:** Live loader census reported 5 registered AI profiles but `activeAiInstanceCount=0`; no natural modded AI decision was observed in this continuation save. The roster-targeted AI default fix is covered by the local harness test (`157/157` runtime-suite checks) and should not be described as natural AI runtime evidence. The session's synthetic spawn/visual result does not prove natural offer, production, stage selection, or AI behavior.
+- **Cleanup:** Deployment targets were restored by hash from the prior backup; Profile2 remained selected, with only the authorized `Profile2/metaSavegame.dat` delta. `profile-verification.json` reports `unexpectedChanged=[]` and `safe_to_finalize=true`; the game process was absent before restoration.
+
+---
+
 ## 1. Authoritative Compatibility Identity
 
 Always recheck this identity before relying on reflected signatures, CIL metadata tokens, or serialized assets:
