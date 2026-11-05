@@ -132,6 +132,23 @@ def build_model():
     if firepoint is None or firepoint.type != "EMPTY" or firepoint.parent != bpy.data.objects.get("Socket_MuzzlePrimary"):
         raise ValueError("Existing FirePoint_0 must remain nested under Socket_MuzzlePrimary")
 
+    # Backfill the RGBA vertex-wear contract (R cavity AO, G structural edge
+    # wear, B thermal soot, A team mask) on meshes that lack it — notably the
+    # wave-detail meshes added above — before batching/export.
+    missing_vertex_color = [
+        obj for obj in meshes
+        if obj.type == "MESH" and obj.data.color_attributes.get("Color") is None
+    ]
+    if missing_vertex_color:
+        rmk.bake_advanced_vertex_shading(
+            missing_vertex_color,
+            wear_level="field_tested",
+            soot_intensity=1.0,
+            exhaust_locs=[socket_positions["Socket_EngineAudio"]],
+            muzzle_loc=socket_positions["Socket_MuzzlePrimary"],
+            structural_wear_mask=True,
+        )
+
     bpy.context.view_layer.update()
     bpy.ops.wm.save_as_mainfile(filepath=str(RIGGED_BLEND))
 

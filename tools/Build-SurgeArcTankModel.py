@@ -247,6 +247,11 @@ def build_surge_arc_tank_model() -> None:
     if diagnostics["total_polygons"] > 7000:
         raise ValueError("Surge Arc Tank exceeds the 7,000-face low-poly authoring budget")
 
+    rmk.bake_advanced_vertex_shading(
+        builder.objects,
+        wear_level="field_tested",
+        structural_wear_mask=True,
+    )
     rmk.generate_lightmap_uvs(builder.objects)
     bpy.ops.wm.save_as_mainfile(filepath=str(BLEND_PATH))
 

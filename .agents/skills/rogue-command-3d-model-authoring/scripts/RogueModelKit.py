@@ -15506,6 +15506,7 @@ class RogueStructureBuilder:
         wear_level: str = "field_tested",
         soot_intensity: float = 1.0,
         bake_vertex_shading: bool = True,
+        structural_wear_mask: bool = False,
     ) -> dict[str, Any]:
         blend_path.parent.mkdir(parents=True, exist_ok=True)
         fbx_path.parent.mkdir(parents=True, exist_ok=True)
@@ -15532,6 +15533,7 @@ class RogueStructureBuilder:
                 soot_intensity=soot_intensity,
                 exhaust_locs=s_exhausts if s_exhausts else None,
                 muzzle_loc=muz_pos,
+                structural_wear_mask=structural_wear_mask,
             )
 
         bpy.ops.wm.save_as_mainfile(filepath=str(blend_path))

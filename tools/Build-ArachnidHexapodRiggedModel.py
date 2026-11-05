@@ -241,6 +241,25 @@ def build_arachnid_hexapod_rigged_model() -> None:
         if 'Bone_Hull' in fc.data_path:
             walk_act.fcurves.remove(fc)
 
+    # Backfill the RGBA vertex-wear contract (R cavity AO, G structural edge
+    # wear, B thermal soot, A team mask) on meshes that lack it before
+    # batching/export.
+    muzzle_socket = bpy.data.objects.get("Socket_MuzzlePrimary")
+    engine_socket = bpy.data.objects.get("Socket_EngineAudio")
+    missing_vertex_color = [
+        obj for obj in meshes
+        if obj.type == "MESH" and obj.data.color_attributes.get("Color") is None
+    ]
+    if missing_vertex_color:
+        rmk.bake_advanced_vertex_shading(
+            missing_vertex_color,
+            wear_level="field_tested",
+            soot_intensity=1.0,
+            exhaust_locs=[Vector(engine_socket.location)] if engine_socket else None,
+            muzzle_loc=Vector(muzzle_socket.location) if muzzle_socket else None,
+            structural_wear_mask=True,
+        )
+
     bpy.context.view_layer.update()
     bpy.ops.wm.save_as_mainfile(filepath=str(RIGGED_BLEND))
 
@@ -252,6 +271,20 @@ def build_arachnid_hexapod_rigged_model() -> None:
         weighted_normals=True,
         unity_batch_names=True,
     )
+    # Refresh the PBR atlas (Albedo, MetallicGloss, Normal, Emission) so the
+    # Unity VehiclePBR_VertexWear import matches the rigged mesh.
+    atlas_maps = rmk.bake_pbr_texture_atlas(
+        batched_meshes,
+        prefix=UNIT_NAME,
+        output_dir=TEXTURE_DIR,
+        resolution=2048,
+    )
+    rmk.create_single_material_atlas_model(
+        batched_meshes,
+        prefix=UNIT_NAME,
+        texture_maps=atlas_maps,
+        output_fbx_path=ATLAS_FBX_PATH,
+    )
     rmk.export_unity_fbx(
         FBX_PATH,
         list(batched_meshes) + [armature],
@@ -261,6 +294,7 @@ def build_arachnid_hexapod_rigged_model() -> None:
     )
     print(f"Editable rigged Blender source: {RIGGED_BLEND}")
     print(f"Rigged animated Unity FBX: {FBX_PATH}")
+    print(f"Static atlas FBX: {ATLAS_FBX_PATH}")
     print("Arachnid Hexapod armature animated and exported.")
 
 

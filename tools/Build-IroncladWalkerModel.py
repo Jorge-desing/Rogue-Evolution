@@ -202,6 +202,9 @@ def build_ironclad_walker_model() -> None:
         profile_budget=True,
         structural_wear_mask=True,
         unity_batch_names=True,
+        bake_atlas=True,
+        atlas_resolution=2048,
+        single_material_atlas=True,
     )
     if not result.get("ground_contact_valid"):
         raise ValueError("Rigged Ironclad Walker failed the export ground-contact check")

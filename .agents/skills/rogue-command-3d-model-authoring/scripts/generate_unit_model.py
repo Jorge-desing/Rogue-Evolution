@@ -2882,6 +2882,7 @@ def build_structure_model(
     comms_mast: bool = False,
     ram_prow: bool = False,
     weighted_normals: bool = True,
+    structural_wear_mask: bool = False,
 ) -> dict:
     rmk.clear_scene()
 
@@ -3011,6 +3012,7 @@ def build_structure_model(
         weighted_normals=weighted_normals,
         wear_level=wear,
         soot_intensity=soot_intensity,
+        structural_wear_mask=structural_wear_mask,
     )
 
     print("\n========================================================")
@@ -3302,6 +3304,7 @@ def main():
             recoil_spade=args.recoil_spade,
             barrel_shroud=args.barrel_shroud,
             weighted_normals=args.weighted_normals,
+            structural_wear_mask=args.structural_wear_mask,
         )
     else:
         res = build_vehicle_model(

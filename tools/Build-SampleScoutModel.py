@@ -292,6 +292,11 @@ def main():
         raise ValueError("Scout model exceeds the PCXBaseTank native footprint")
 
     add_preview_stage(model_objects)
+    modelkit.bake_advanced_vertex_shading(
+        model_objects,
+        wear_level="field_tested",
+        structural_wear_mask=True,
+    )
     bpy.ops.wm.save_as_mainfile(filepath=str(BLEND_PATH))
     bpy.ops.render.render(write_still=True)
 
