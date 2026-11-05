@@ -425,9 +425,12 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
             "diagnostics_get_gui_state",
             "diagnostics_order_batch",
             "diagnostics_get_control_guide",
+            "diagnostics_gui_control",
+            "diagnostics_ui_press_button",
+            "diagnostics_fast_snapshot",
         ):
             self.assertIn(expected, names)
-        self.assertEqual(192, len(names))
+        self.assertEqual(195, len(names))
 
     def test_visual_health_summary_forwards_to_bridge(self) -> None:
         calls: list[tuple[str, list[object]]] = []

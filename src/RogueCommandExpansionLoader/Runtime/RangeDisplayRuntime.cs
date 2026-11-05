@@ -90,6 +90,16 @@ namespace RogueCommandExpansionLoader.Runtime
         /// <summary>Circle height offset above the unit, readable by an agent without a visual capture.</summary>
         public float HeightOffset => _heightOffset != null ? _heightOffset.Value : 0.15f;
 
+        /// <summary>Enables or disables range circles programmatically (bridge control).</summary>
+        public void SetEnabled(bool enabled)
+        {
+            if (_enabled != null)
+            {
+                _enabled.Value = enabled;
+                _nextRefreshAt = 0f;
+            }
+        }
+
         private void Update()
         {
             if (_enabled == null || _toggleKey == null)

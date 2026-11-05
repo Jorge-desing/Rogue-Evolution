@@ -186,6 +186,66 @@ internal static partial class ValidationTestRunner
             throw new InvalidOperationException("SerializeInspectorToggleState must report resolvedOpen=false when close is pressed.");
         }
     }),
+    ("gui control policy validates tab and time scale", () =>
+    {
+        int tab;
+        if (!GuiControlPolicy.TryClampTab(3, out tab) || tab != 3)
+        {
+            throw new InvalidOperationException("TryClampTab must accept in-range tab 3.");
+        }
+        if (!GuiControlPolicy.TryClampTab(-1, out tab) || tab != 0)
+        {
+            throw new InvalidOperationException("TryClampTab must clamp negative tab to 0.");
+        }
+        if (!GuiControlPolicy.TryClampTab(99, out tab) || tab != 7)
+        {
+            throw new InvalidOperationException("TryClampTab must clamp high tab to 7.");
+        }
+        float ts;
+        if (!GuiControlPolicy.TryValidateTimeScale(1.5f, out ts) || System.Math.Abs(ts - 1.5f) > 0.001f)
+        {
+            throw new InvalidOperationException("TryValidateTimeScale must accept finite 1.5.");
+        }
+        if (GuiControlPolicy.TryValidateTimeScale(float.NaN, out ts))
+        {
+            throw new InvalidOperationException("TryValidateTimeScale must reject NaN.");
+        }
+        if (GuiControlPolicy.TryValidateTimeScale(float.PositiveInfinity, out ts))
+        {
+            throw new InvalidOperationException("TryValidateTimeScale must reject infinity.");
+        }
+    }),
+    ("gui state serializes overlay and range with counters first", () =>
+    {
+        string json = AgentDiagnosticsFormatter.SerializeGuiState(
+            new OverlayStateView(true, true, "F8", 2, true, false, false, "", "1.19.0", "", true, ""),
+            new RangeStateView(true, true, "F11", 5, true, true, true, false, 0.08f, 48, 0.15f),
+            new GuiPlaybackView(1.0f, true, 10f, 20f, 60f),
+            3,
+            5,
+            2);
+        int kindIdx = json.IndexOf("\"kind\"", System.StringComparison.Ordinal);
+        int omittedIdx = json.IndexOf("\"omittedGuiFieldCount\"", System.StringComparison.Ordinal);
+        int overlayIdx = json.IndexOf("\"overlay\"", System.StringComparison.Ordinal);
+        if (kindIdx < 0 || omittedIdx < 0 || overlayIdx < 0 || omittedIdx > overlayIdx)
+        {
+            throw new InvalidOperationException("SerializeGuiState must place omittedGuiFieldCount before overlay detail.");
+        }
+        if (!json.Contains("\"overlayOpen\":true") || !json.Contains("\"rangeEnabled\":true"))
+        {
+            throw new InvalidOperationException("SerializeGuiState must report overlayOpen and rangeEnabled.");
+        }
+        string control = AgentDiagnosticsFormatter.SerializeGuiControlResult(true, "", 0f, 0f, 0f);
+        if (!control.Contains("\"success\":true"))
+        {
+            throw new InvalidOperationException("SerializeGuiControlResult must report success.");
+        }
+        string failed = AgentDiagnosticsFormatter.SerializeGuiControlResult(false, "bad tab", 0f, 0f, 0f);
+        if (!failed.Contains("\"success\":false") || !failed.Contains("bad tab"))
+        {
+            throw new InvalidOperationException("SerializeGuiControlResult must report failure with message.");
+        }
+    }),
     ("range circle point count serializes validity and count", () =>
     {
         string validJson = AgentDiagnosticsFormatter.SerializeRangeCirclePointCount(32);

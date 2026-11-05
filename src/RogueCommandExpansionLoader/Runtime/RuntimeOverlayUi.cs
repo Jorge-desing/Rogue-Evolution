@@ -117,6 +117,20 @@ namespace RogueCommandExpansionLoader.Runtime
         /// <summary>Runtime patch installation message, readable by an agent without a visual capture.</summary>
         public string PatchResultMessage => _patchResult != null ? _patchResult.Message : string.Empty;
 
+        /// <summary>Sets inspector visibility programmatically (bridge control).</summary>
+        public void SetOpen(bool open)
+        {
+            _isOpen = open;
+        }
+
+        /// <summary>Selects inspector tab programmatically (bridge control).</summary>
+        public void SetSelectedTab(int tab)
+        {
+            int clamped;
+            GuiControlPolicy.TryClampTab(tab, out clamped);
+            _selectedTab = clamped;
+        }
+
         private void Update()
         {
             if (_provider != null && Time.unscaledTime >= _nextSnapshotRefresh)

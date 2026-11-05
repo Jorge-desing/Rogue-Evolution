@@ -166,6 +166,89 @@ namespace RogueCommandExpansionLoader.Runtime
             return Serialize(view);
         }
 
+        public static string SerializeGuiState(
+            OverlayStateView overlay,
+            RangeStateView range,
+            GuiPlaybackView playback,
+            int selectedEntityCount,
+            int controlGroupCount,
+            int hazardZoneCount)
+        {
+            int omittedGuiFieldCount = 0;
+            var overlayView = new Dictionary<string, object>
+            {
+                ["ready"] = overlay != null && overlay.Ready,
+                ["open"] = overlay != null && overlay.IsOpen,
+                ["toggleShortcut"] = overlay != null ? overlay.ToggleShortcut : string.Empty,
+                ["tab"] = overlay != null ? overlay.SelectedTab : 0,
+                ["watermark"] = overlay != null && overlay.WatermarkVisible,
+                ["guiDisabled"] = overlay != null && overlay.IsGuiDisabled,
+                ["failureReported"] = overlay != null && overlay.IsGuiFailureReported,
+                ["logFilter"] = overlay != null ? overlay.LogFilter : string.Empty,
+                ["pluginVersion"] = overlay != null ? overlay.PluginVersion : string.Empty,
+            };
+            if (overlay == null) omittedGuiFieldCount++;
+            var rangeView = new Dictionary<string, object>
+            {
+                ["ready"] = range != null && range.Ready,
+                ["enabled"] = range != null && range.IsEnabled,
+                ["toggleKey"] = range != null ? range.ToggleKey : string.Empty,
+                ["tracked"] = range != null ? range.TrackedEntities : 0,
+                ["showWeapon"] = range != null && range.ShowWeaponRange,
+                ["showSkill"] = range != null && range.ShowSkillRange,
+                ["showEffect"] = range != null && range.ShowEffectRadius,
+                ["showSight"] = range != null && range.ShowSightRange,
+                ["lineWidth"] = range != null ? range.LineWidth : 0f,
+                ["segments"] = range != null ? range.Segments : 0,
+                ["heightOffset"] = range != null ? range.HeightOffset : 0f,
+            };
+            if (range == null) omittedGuiFieldCount++;
+            var playbackView = new Dictionary<string, object>
+            {
+                ["timeScale"] = playback != null ? playback.TimeScale : 1f,
+                ["hooksInstalled"] = playback != null && playback.HooksInstalled,
+                ["cameraX"] = playback != null ? playback.CameraX : 0f,
+                ["cameraZ"] = playback != null ? playback.CameraZ : 0f,
+                ["fov"] = playback != null ? playback.Fov : 0f,
+            };
+            if (playback == null) omittedGuiFieldCount++;
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "guiState",
+                ["omittedGuiFieldCount"] = omittedGuiFieldCount,
+                ["overlay"] = overlayView,
+                ["overlayOpen"] = overlay != null && overlay.IsOpen,
+                ["overlayTab"] = overlay != null ? overlay.SelectedTab : 0,
+                ["range"] = rangeView,
+                ["rangeEnabled"] = range != null && range.IsEnabled,
+                ["playback"] = playbackView,
+                ["selectedEntityCount"] = selectedEntityCount,
+                ["controlGroupCount"] = controlGroupCount,
+                ["hazardZoneCount"] = hazardZoneCount,
+            };
+            return Serialize(view);
+        }
+
+        public static string SerializeGuiControlResult(
+            bool success,
+            string message,
+            float timeScale,
+            float cameraX,
+            float cameraZ)
+        {
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "guiControlResult",
+                ["omittedGuiFieldCount"] = 0,
+                ["success"] = success,
+                ["message"] = message ?? string.Empty,
+                ["timeScale"] = timeScale,
+                ["cameraX"] = cameraX,
+                ["cameraZ"] = cameraZ,
+            };
+            return Serialize(view);
+        }
+
         public static string SerializeRangeCirclePointCount(int segments)
         {
             const int minimumSegments = 8;

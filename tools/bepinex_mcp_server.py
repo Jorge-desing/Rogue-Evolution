@@ -1781,6 +1781,18 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
                 return _tool_response(json.dumps(result, indent=2))
 
         elif name == "diagnostics_get_gui_state":
+            # Fast path: single composite getter (1 round-trip vs 6)
+            try:
+                fast_raw = _call_diagnostics_method("GetGuiStateJson")
+                fast_val = _extract_bridge_return_value(fast_raw) if isinstance(fast_raw, str) else fast_raw
+                if isinstance(fast_val, str):
+                    parsed = json.loads(fast_val)
+                    if isinstance(parsed, dict) and parsed.get("kind") == "guiState":
+                        return _tool_response(json.dumps(parsed, indent=2))
+                elif isinstance(fast_val, dict) and fast_val.get("kind") == "guiState":
+                    return _tool_response(json.dumps(fast_val, indent=2))
+            except Exception:
+                pass
             member_values = {}
             member_names = ("OverlayOpen", "OverlayReady", "RangeDisplayReady", "IsRuntimeHooksInstalled")
             state: dict[str, Any] = {}
@@ -1836,6 +1848,44 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
 
         elif name == "diagnostics_order_batch":
             operations = arguments.get("operations") or []
+            # Parallel path (order preserved) for multi-op speed
+            def _run_one(op):
+                if not isinstance(op, dict):
+                    return {"tool": str(op), "success": False, "error": "Invalid operation"}
+                tool_name = str(op.get("tool", "")).strip()
+                tool_args = op.get("arguments") or {}
+                if tool_name == "diagnostics_order_batch":
+                    return {"tool": tool_name, "success": False, "error": "Nested batch rejected"}
+                if not tool_name:
+                    return {"tool": tool_name, "success": False, "error": "Empty tool name"}
+                try:
+                    resp = execute_tool(tool_name, tool_args if isinstance(tool_args, dict) else {})
+                    is_err = resp.get("isError", False)
+                    text = ""
+                    if isinstance(resp.get("content"), list) and resp["content"]:
+                        text = resp["content"][0].get("text", "")
+                    if is_err:
+                        return {"tool": tool_name, "success": False, "error": text}
+                    try:
+                        parsed = json.loads(text)
+                    except Exception:
+                        parsed = text
+                    return {"tool": tool_name, "success": True, "result": parsed}
+                except Exception as exc:
+                    return {"tool": tool_name, "success": False, "error": str(exc)}
+            # Execute in parallel preserving input order
+            if operations:
+                with ThreadPoolExecutor(max_workers=min(8, len(operations))) as pool:
+                    results_list = list(pool.map(_run_one, operations))
+            else:
+                results_list = []
+            success_count = sum(1 for r in results_list if r.get("success"))
+            error_count = len(results_list) - success_count
+            result = {"results": results_list, "_meta": {"count": len(operations), "successCount": success_count, "errorCount": error_count}}
+            return _tool_response(json.dumps(result, indent=2))
+
+        elif name == "_diagnostics_order_batch_serial_legacy":
+            operations = arguments.get("operations") or []
             results_list = []
             success_count = 0
             error_count = 0
@@ -1880,6 +1930,101 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
                 },
             }
             return _tool_response(json.dumps(result, indent=2))
+
+        elif name == "diagnostics_fast_snapshot":
+            preset = str(arguments.get("preset", "match")).lower().strip() or "match"
+            presets = {
+                "gui": ["GetGuiStateJson", "GetGameTimeScaleJson", "GetCameraCensusJson", "GetRuntimeHooksStateJson"],
+                "match": ["GetSystemHealthJson", "GetMatchSummaryJson", "GetBattlefieldCensusJson", "GetRunProgressionCensusJson", "GetGameTimeScaleJson"],
+                "combat": ["GetBattlefieldCensusJson", "GetPlayerRosterJson", "GetAiRosterJson", "GetCombatStatusCensusJson", "GetUnitThreatAssessmentJson"],
+                "health": ["GetSystemHealthJson", "GetBaseIntegrityCensusJson", "GetProductionCensusJson", "GetAiDirectorCensusJson"],
+            }
+            getters = presets.get(preset, presets["match"])
+            results = {}
+            def _fetch_fast(getter: str):
+                try:
+                    raw = _call_diagnostics_method(getter, _snapshot_getter_args(getter))
+                    try:
+                        return getter, json.loads(raw)
+                    except Exception:
+                        return getter, raw
+                except Exception as exc:
+                    return getter, {"error": str(exc)}
+            with ThreadPoolExecutor(max_workers=min(8, len(getters))) as pool:
+                for getter, value in pool.map(_fetch_fast, getters):
+                    results[getter] = value
+            results["_meta"] = {"preset": preset, "count": len(getters)}
+            return _tool_response(json.dumps(results, indent=2))
+
+        elif name == "diagnostics_gui_control":
+            steps = []
+            # overlay
+            if "overlayOpen" in arguments:
+                raw = _call_diagnostics_method("SetOverlayOpenJson", [bool(arguments.get("overlayOpen"))])
+                steps.append({"step": "overlay", "raw": raw})
+            if "rangeEnabled" in arguments:
+                raw = _call_diagnostics_method("SetRangeDisplayEnabledJson", [bool(arguments.get("rangeEnabled"))])
+                steps.append({"step": "range", "raw": raw})
+            if "overlayTab" in arguments:
+                try:
+                    tab = int(arguments.get("overlayTab"))
+                except Exception:
+                    tab = 0
+                raw = _call_diagnostics_method("SetOverlayTabJson", [tab])
+                steps.append({"step": "tab", "raw": raw})
+            if "timeScale" in arguments:
+                raw = _call_diagnostics_method("SetGameTimeScaleJson", [float(arguments.get("timeScale"))])
+                steps.append({"step": "timeScale", "raw": raw})
+            if arguments.get("focusEntityKeyId"):
+                raw = _call_diagnostics_method("FocusCameraOnEntityJson", [str(arguments.get("focusEntityKeyId"))])
+                steps.append({"step": "focus", "raw": raw})
+            elif "cameraX" in arguments and "cameraZ" in arguments:
+                raw = _call_diagnostics_method("MoveCameraJson", [float(arguments.get("cameraX")), float(arguments.get("cameraZ"))])
+                steps.append({"step": "camera", "raw": raw})
+            # final state
+            try:
+                final_raw = _call_diagnostics_method("GetGuiStateJson")
+                try:
+                    final_val = json.loads(final_raw)
+                except Exception:
+                    # Some bridge versions return envelope; fallback to extract
+                    final_val = _extract_bridge_return_value(final_raw) if isinstance(final_raw, str) else final_raw
+                    if isinstance(final_val, str):
+                        try: final_val = json.loads(final_val)
+                        except Exception: pass
+            except Exception:
+                final_val = None
+            result = {"steps": steps, "finalState": final_val, "_meta": {"count": len(steps)}}
+            return _tool_response(json.dumps(result, indent=2))
+
+        elif name == "diagnostics_ui_press_button":
+            button_name = str(arguments.get("buttonName", "")).strip()
+            selector = str(arguments.get("selector", "")).strip()
+            target = selector or button_name
+            if not target:
+                return _tool_response(json.dumps({"success": False, "message": "buttonName or selector required"}), True)
+            # search
+            try:
+                search_raw = _call_http("scene/search_gameobjects", params={"query": target})
+                items = json.loads(search_raw) if isinstance(search_raw, str) else search_raw
+                if isinstance(items, dict):
+                    items = items.get("objects", [items]) if "objects" in items else [items]
+                if not isinstance(items, list):
+                    items = []
+            except Exception:
+                items = []
+            if not items:
+                return _tool_response(json.dumps({"success": False, "message": f'button not found: {target}', "candidates": []}))
+            game_object_id = items[0].get("id") if isinstance(items[0], dict) else None
+            if game_object_id is None:
+                return _tool_response(json.dumps({"success": False, "message": "button has no id"}))
+            # call Press on Button component
+            try:
+                payload = json.dumps({"gameObjectId": game_object_id, "componentName": "UnityEngine.UI.Button", "methodName": "Press", "args": []})
+                press_raw = _call_http("component/call_method", method="POST", body_str=payload)
+                return _tool_response(json.dumps({"success": True, "gameObjectId": game_object_id, "press": press_raw}))
+            except Exception as exc:
+                return _tool_response(json.dumps({"success": False, "message": str(exc)}), True)
 
         elif name == "diagnostics_get_control_guide":
             guide = {

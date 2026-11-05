@@ -1439,6 +1439,101 @@ namespace RogueCommandExpansionLoader.Runtime
                 RuntimeGameplayCommandDirector.TryOrderUnitAttachment(entityKeyId, attachmentType, active));
         }
 
+        public string GetGuiStateJson()
+        {
+            var overlayView = new OverlayStateView(
+                OverlayReady,
+                OverlayOpen,
+                OverlayToggleShortcut,
+                OverlaySelectedTab,
+                OverlayWatermarkVisible,
+                OverlayGuiDisabled,
+                OverlayGuiFailureReported,
+                OverlayLogFilter,
+                OverlayPluginVersion,
+                OverlayCompatibilityError,
+                OverlayPatchResultSuccess,
+                OverlayPatchResultMessage);
+            var rangeView = new RangeStateView(
+                RangeDisplayReady,
+                RangeDisplayEnabled,
+                RangeDisplayToggleKey,
+                RangeDisplayTrackedEntities,
+                RangeDisplayShowWeapon,
+                RangeDisplayShowSkill,
+                RangeDisplayShowEffect,
+                RangeDisplayShowSight,
+                RangeDisplayLineWidth,
+                RangeDisplaySegments,
+                RangeDisplayHeightOffset);
+            var playbackView = new GuiPlaybackView(
+                RuntimeGameplayCommandDirector.GetGameTimeScale(),
+                IsRuntimeHooksInstalled,
+                0f,
+                0f,
+                60f);
+            return AgentDiagnosticsFormatter.SerializeGuiState(
+                overlayView,
+                rangeView,
+                playbackView,
+                0,
+                0,
+                RuntimeHazardManager.ActiveZoneCount);
+        }
+
+        public string SetOverlayOpenJson(bool open)
+        {
+            try
+            {
+                if (_overlay == null)
+                {
+                    return AgentDiagnosticsFormatter.SerializeGuiControlResult(false, "overlay unavailable", RuntimeGameplayCommandDirector.GetGameTimeScale(), 0f, 0f);
+                }
+                _overlay.SetOpen(open);
+                return AgentDiagnosticsFormatter.SerializeGuiControlResult(true, "", RuntimeGameplayCommandDirector.GetGameTimeScale(), 0f, 0f);
+            }
+            catch (Exception ex)
+            {
+                return AgentDiagnosticsFormatter.SerializeGuiControlResult(false, ex.Message, RuntimeGameplayCommandDirector.GetGameTimeScale(), 0f, 0f);
+            }
+        }
+
+        public string SetRangeDisplayEnabledJson(bool enabled)
+        {
+            try
+            {
+                if (_rangeDisplay == null)
+                {
+                    return AgentDiagnosticsFormatter.SerializeGuiControlResult(false, "range display unavailable", RuntimeGameplayCommandDirector.GetGameTimeScale(), 0f, 0f);
+                }
+                _rangeDisplay.SetEnabled(enabled);
+                return AgentDiagnosticsFormatter.SerializeGuiControlResult(true, "", RuntimeGameplayCommandDirector.GetGameTimeScale(), 0f, 0f);
+            }
+            catch (Exception ex)
+            {
+                return AgentDiagnosticsFormatter.SerializeGuiControlResult(false, ex.Message, RuntimeGameplayCommandDirector.GetGameTimeScale(), 0f, 0f);
+            }
+        }
+
+        public string SetOverlayTabJson(int tab)
+        {
+            int clamped;
+            GuiControlPolicy.TryClampTab(tab, out clamped);
+            try
+            {
+                if (_overlay == null)
+                {
+                    return AgentDiagnosticsFormatter.SerializeGuiControlResult(false, "overlay unavailable", RuntimeGameplayCommandDirector.GetGameTimeScale(), 0f, 0f);
+                }
+                _overlay.SetSelectedTab(clamped);
+                return AgentDiagnosticsFormatter.SerializeGuiControlResult(true, "", RuntimeGameplayCommandDirector.GetGameTimeScale(), 0f, 0f);
+            }
+            catch (Exception ex)
+            {
+                return AgentDiagnosticsFormatter.SerializeGuiControlResult(false, ex.Message, RuntimeGameplayCommandDirector.GetGameTimeScale(), 0f, 0f);
+            }
+        }
+
         public string GetSystemHealthJson()
         {
             return AgentDiagnosticsFormatter.SerializeSystemHealth(

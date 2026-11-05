@@ -13,6 +13,7 @@
              Link="Runtime/RangeDisplayPolicy.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/LoaderLogBurstSummaryPolicy.cs"
              Link="Runtime/LoaderLogBurstSummaryPolicy.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/GuiControlPolicy.cs" Link="GuiControlPolicy.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/InspectorTogglePolicy.cs"
              Link="Runtime/InspectorTogglePolicy.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/IdentifierColorPolicy.cs"
