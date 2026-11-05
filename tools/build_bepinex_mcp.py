@@ -1245,6 +1245,8 @@ TOOL_SPECS = [
     {"name": "diagnostics_gui_control", "description": "Composite GUI control: open/close overlay, toggle range display, select tab, set timeScale, move/focus camera, and select units in one round-trip.", "parameters": {"type": "object", "properties": {"overlayOpen": {"type": "boolean"}, "rangeEnabled": {"type": "boolean"}, "overlayTab": {"type": "integer"}, "timeScale": {"type": "number"}, "cameraX": {"type": "number"}, "cameraZ": {"type": "number"}, "focusEntityKeyId": {"type": "string"}}, "additionalProperties": False}},
     {"name": "diagnostics_ui_press_button", "description": "Find a Unity UI Button by name/path and press it in one call (search + resolve + Press).", "parameters": {"type": "object", "properties": {"buttonName": {"type": "string"}, "selector": {"type": "string"}}, "additionalProperties": False}},
     {"name": "diagnostics_fast_snapshot", "description": "Curated preset snapshot: gui, match, combat, health. Faster than full runtime_snapshot.", "parameters": {"type": "object", "properties": {"preset": {"type": "string"}}, "additionalProperties": False}},
+    {"name": "discover_tools", "description": "Lightweight tool index (name and description only) filtered by query or category. Use before fetching full schemas.", "parameters": {"type": "object", "properties": {"query": {"type": "string"}, "category": {"type": "string"}, "prefix": {"type": "string"}, "includeAliases": {"type": "boolean"}}, "additionalProperties": False}},
+    {"name": "describe_tool", "description": "Full input schema for a single tool on demand (lazy schema fetch).", "parameters": {"type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"], "additionalProperties": False}},
 ]
 
 def generate_mcp_schema_files():

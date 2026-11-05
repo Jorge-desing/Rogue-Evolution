@@ -428,9 +428,47 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
             "diagnostics_gui_control",
             "diagnostics_ui_press_button",
             "diagnostics_fast_snapshot",
+            "discover_tools",
+            "describe_tool",
         ):
             self.assertIn(expected, names)
-        self.assertEqual(195, len(names))
+        self.assertEqual(197, len(names))
+
+    def test_tools_list_default_is_all_and_paginates(self) -> None:
+        full = SERVER.handle_request({"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}})
+        tools = full["result"]["tools"]
+        self.assertEqual(197, len(tools))
+        page = SERVER.handle_request({"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {"limit": 10}})
+        self.assertEqual(10, len(page["result"]["tools"]))
+        cursor = page["result"]["nextCursor"]
+        page2 = SERVER.handle_request({"jsonrpc": "2.0", "id": 3, "method": "tools/list", "params": {"cursor": cursor, "limit": 10}})
+        self.assertEqual(10, len(page2["result"]["tools"]))
+        self.assertNotEqual(page["result"]["tools"][0]["name"], page2["result"]["tools"][0]["name"])
+
+    def test_tools_list_filters_by_category_and_query(self) -> None:
+        resp = SERVER.handle_request({"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {"category": "diagnostics", "query": "gui"}})
+        names = [t["name"] for t in resp["result"]["tools"]]
+        self.assertTrue(len(names) >= 1)
+        self.assertTrue(len(names) >= 1)
+        resp2 = SERVER.handle_request({"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {"includeAliases": False}})
+        self.assertLess(len(resp2["result"]["tools"]), 197)
+        self.assertNotIn("ping_unity_bridge", [t["name"] for t in resp2["result"]["tools"]])
+        self.assertIn("system_ping", [t["name"] for t in resp2["result"]["tools"]])
+
+    def test_discover_tools_returns_lightweight_index(self) -> None:
+        resp = SERVER.execute_tool("discover_tools", {"query": "gui", "includeAliases": False})
+        self.assertFalse(resp["isError"])
+        data = json.loads(resp["content"][0]["text"])
+        self.assertGreaterEqual(data["total"], 1)
+        self.assertTrue(all("inputSchema" not in t for t in data["tools"]))
+        self.assertTrue(all("gui" in t["name"] or "gui" in t["description"].lower() for t in data["tools"]))
+
+    def test_describe_tool_returns_full_schema_on_demand(self) -> None:
+        resp = SERVER.execute_tool("describe_tool", {"name": "diagnostics_get_gui_state"})
+        self.assertFalse(resp["isError"])
+        data = json.loads(resp["content"][0]["text"])
+        self.assertEqual(data["name"], "diagnostics_get_gui_state")
+        self.assertIn("inputSchema", data)
 
     def test_visual_health_summary_forwards_to_bridge(self) -> None:
         calls: list[tuple[str, list[object]]] = []

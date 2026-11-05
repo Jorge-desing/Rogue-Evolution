@@ -119,6 +119,108 @@ try:
 except Exception:
     TOOLS = []
 
+_TOOL_ALIAS_CACHE: set[str] | None = None
+
+def _is_tool_alias(tool: dict[str, Any]) -> bool:
+    return str(tool.get("description", "")).startswith("Alias for")
+
+def _alias_names() -> set[str]:
+    global _TOOL_ALIAS_CACHE
+    if _TOOL_ALIAS_CACHE is not None:
+        return _TOOL_ALIAS_CACHE
+    _TOOL_ALIAS_CACHE = {t["name"] for t in TOOLS if _is_tool_alias(t)}
+    return _TOOL_ALIAS_CACHE
+
+def _tool_category(name: str) -> str:
+    n = name.lower()
+    if n.startswith("diagnostics_"):
+        return "diagnostics"
+    if n in ("system_ping", "ping_unity_bridge", "system_capabilities", "get_runtime_capabilities", "system_paths", "get_game_paths", "discover_tools", "describe_tool"):
+        return "system"
+    if n.startswith("scene_") or n.startswith("gameobject_") or n.startswith("component_") or n.startswith("type_") or n in ("search_gameobjects", "find_objects_with_component", "list_root_gameobjects", "get_hierarchy_snapshot", "resolve_gameobject_selector", "list_children", "inspect_components", "get_component_details", "get_component_member", "set_component_value", "call_component_method", "list_component_methods", "search_runtime_types", "describe_runtime_type"):
+        return "scene"
+    if n.startswith("mod_") or n.startswith("watch_") or n in ("run_bridge_batch",):
+        return "mod"
+    if n in ("save_mod_profile", "get_mod_profile", "list_mod_profiles", "delete_mod_profile", "activate_mod_profile", "list_mod_patches"):
+        return "profiles"
+    return "other"
+
+def _parse_tool_filter_env(raw: str | None) -> dict[str, Any]:
+    out: dict[str, Any] = {}
+    if not raw:
+        return out
+    for part in raw.replace(",", ";").split(";"):
+        part = part.strip()
+        if not part:
+            continue
+        if part == "no-aliases":
+            out["includeAliases"] = False
+            continue
+        if "=" in part:
+            k, v = part.split("=", 1)
+            v = v.strip()
+            if k.strip() == "includeAliases":
+                out[k.strip()] = v.lower() not in ("0", "false", "no")
+            elif k.strip() in ("limit", "pageSize"):
+                try:
+                    out[k.strip()] = int(v)
+                except ValueError:
+                    pass
+            else:
+                out[k.strip()] = v
+    return out
+
+def _filter_and_page_tools(params: dict[str, Any] | None) -> tuple[list[dict[str, Any]], str | None, int]:
+    params = params or {}
+    # env defaults only when caller sent no filtering keys (backward compat)
+    env = _parse_tool_filter_env(os.environ.get("BEPINEX_MCP_TOOL_FILTER"))
+    merged: dict[str, Any] = dict(env)
+    for k, v in params.items():
+        if k != "cursor":
+            merged[k] = v
+    tools = list(TOOLS)
+    include_aliases = merged.get("includeAliases")
+    if include_aliases is False:
+        aliases = _alias_names()
+        tools = [t for t in tools if t["name"] not in aliases]
+    category = str(merged.get("category", "") or "").strip().lower()
+    if category:
+        tools = [t for t in tools if _tool_category(t["name"]) == category]
+    prefix = str(merged.get("prefix", "") or "").strip()
+    if prefix:
+        tools = [t for t in tools if t["name"].startswith(prefix)]
+    query = str(merged.get("query", "") or "").strip().lower()
+    if query:
+        tools = [t for t in tools if query in t["name"].lower() or query in str(t.get("description", "")).lower()]
+    total = len(tools)
+    limit = merged.get("limit", merged.get("pageSize"))
+    if limit is not None:
+        try:
+            limit = int(limit)
+        except (TypeError, ValueError):
+            limit = None
+    if limit is not None and limit <= 0:
+        limit = None
+    cursor = params.get("cursor")
+    offset = 0
+    if cursor:
+        try:
+            offset = int(str(cursor))
+        except ValueError:
+            offset = 0
+        if offset < 0:
+            offset = 0
+    if limit is None:
+        page = tools[offset:]
+        next_cursor = None
+    else:
+        page = tools[offset:offset + limit]
+        next_cursor = str(offset + limit) if offset + limit < total else None
+    detail = str(merged.get("detail", "") or "").strip().lower()
+    if detail == "summary":
+        page = [{"name": t["name"], "description": t.get("description", "")} for t in page]
+    return page, next_cursor, total
+
 _DIAGNOSTICS_GO_ID: int | None = None
 
 
@@ -419,6 +521,18 @@ def _call_diagnostics_method(method_name: str, args: list | None = None) -> str:
 
 def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
     try:
+        # ---- Discovery (lazy, lightweight) ----
+        if name == "discover_tools":
+            page, _nc, total = _filter_and_page_tools({**arguments, "detail": "summary"})
+            for entry in page:
+                entry["category"] = _tool_category(entry["name"])
+            return _tool_response(json.dumps({"total": total, "returned": len(page), "tools": page}, indent=2))
+        elif name == "describe_tool":
+            target = str(arguments.get("name", "")).strip()
+            for entry in TOOLS:
+                if entry["name"] == target:
+                    return _tool_response(json.dumps(entry, indent=2))
+            return _tool_response(json.dumps({"success": False, "message": f"tool not found: {target}"}), True)
         # ---- Core Bridge & System ----
         if name in ("system_ping", "ping_unity_bridge"):
             res = _call_http("system/ping")
@@ -2077,13 +2191,14 @@ def handle_request(message: dict[str, Any]) -> dict[str, Any] | None:
         return {"jsonrpc": "2.0", "id": request_id, "result": {}}
 
     if method == "tools/list":
-        return {
-            "jsonrpc": "2.0",
-            "id": request_id,
-            "result": {
-                "tools": TOOLS
-            },
-        }
+        page, next_cursor, total = _filter_and_page_tools(message.get("params") or {})
+        result: dict[str, Any] = {"tools": page}
+        if next_cursor is not None:
+            result["nextCursor"] = next_cursor
+        # Non-standard but backward-compatible: total helps filtered clients
+        # without breaking strict clients (unknown fields are ignored).
+        result["totalCount"] = total
+        return {"jsonrpc": "2.0", "id": request_id, "result": result}
 
     if method == "tools/call":
         params = message.get("params") or {}
@@ -2241,6 +2356,12 @@ def main() -> int:
     parser.add_argument("--call", type=str, help="Directly execute an MCP tool by name and print JSON result.")
     parser.add_argument("--args", type=str, default="{}", help="JSON arguments dictionary for --call.")
     parser.add_argument("--list-tools", action="store_true", help="Print available tools and descriptions.")
+    parser.add_argument("--category", type=str, default="", help="Filter --list-tools by category: system, scene, mod, diagnostics, profiles.")
+    parser.add_argument("--query", type=str, default="", help="Filter --list-tools by name/description substring.")
+    parser.add_argument("--prefix", type=str, default="", help="Filter --list-tools by name prefix.")
+    parser.add_argument("--no-aliases", action="store_true", help="Exclude alias tools from --list-tools.")
+    parser.add_argument("--summary", action="store_true", help="Print only name + category for --list-tools (lightweight).")
+    parser.add_argument("--describe-tool", type=str, default="", help="Print full schema for one tool and exit (lazy).")
     parser.add_argument("--ping", action="store_true", help="Ping game bridge and exit.")
     parser.add_argument("--generate-configs", action="store_true", help="Generate MCP configuration snippets for Hermes, Claude, Cursor, and VS Code.")
     parser.add_argument("--url", type=str, help="Override BEPINEX_MCP_URL (e.g. http://127.0.0.1:8080/mcp/).")
@@ -2264,10 +2385,32 @@ def main() -> int:
             print(json.dumps(res, indent=2))
             return 0 if not res.get("isError") else 1
 
-        if args.list_tools:
-            print(f"Total available tools: {len(TOOLS)}")
+        if args.describe_tool:
             for t in TOOLS:
-                print(f"  - {t['name']}: {t['description']}")
+                if t["name"] == args.describe_tool:
+                    print(json.dumps(t, indent=2))
+                    return 0
+            print(f"Tool not found: {args.describe_tool}", file=sys.stderr)
+            return 1
+        if args.list_tools:
+            params: dict[str, object] = {}
+            if args.category:
+                params["category"] = args.category
+            if args.query:
+                params["query"] = args.query
+            if args.prefix:
+                params["prefix"] = args.prefix
+            if args.no_aliases:
+                params["includeAliases"] = False
+            if args.summary:
+                params["detail"] = "summary"
+            page, _nc, total = _filter_and_page_tools(params)
+            print(f"Total available tools: {total} (showing {len(page)})")
+            for t in page:
+                if args.summary:
+                    print(f"  - {t['name']} [{_tool_category(t['name'])}]")
+                else:
+                    print(f"  - {t['name']}: {t['description']}")
             return 0
 
         if args.call:
