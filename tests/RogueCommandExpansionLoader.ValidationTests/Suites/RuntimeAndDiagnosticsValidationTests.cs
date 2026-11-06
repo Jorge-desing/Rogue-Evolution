@@ -7315,6 +7315,29 @@ internal static partial class ValidationTestRunner
             throw new InvalidOperationException("A zero-delta-time sample must not activate locomotion.");
         }
     }),
+    ("turret aim policy only allows enemies within weapon range", () =>
+    {
+        if (!TurretAimPolicy.IsInWeaponRange(30f, 3.8f, null))
+        {
+            throw new InvalidOperationException("An enemy inside weapon range (3.8 cells = 38 world units) must authorize turret aim.");
+        }
+        if (TurretAimPolicy.IsInWeaponRange(39f, 3.8f, null))
+        {
+            throw new InvalidOperationException("An enemy beyond weapon range must not authorize turret aim.");
+        }
+        if (TurretAimPolicy.IsInWeaponRange(30f, 0f, null))
+        {
+            throw new InvalidOperationException("A unit with no weapon range must not aim its turret.");
+        }
+        if (TurretAimPolicy.IsInWeaponRange(20f, 14f, 5f))
+        {
+            throw new InvalidOperationException("An enemy inside the min-range deadzone (5 cells = 50 world units) must not authorize turret aim.");
+        }
+        if (!TurretAimPolicy.IsInWeaponRange(80f, 14f, 5f))
+        {
+            throw new InvalidOperationException("An enemy between min and max range must authorize turret aim.");
+        }
+    }),
     ("runtime visual census discovers skinned mesh, skeletal armature, animator parameters, and canonical sockets", () =>
     {
         ExistingControllers.Instance.Reset();
@@ -8695,6 +8718,136 @@ internal static partial class ValidationTestRunner
         finally
         {
             ExistingControllers.Instance.Reset();
+        }
+    }),
+    ("performance budget policy classifies healthy degraded and critical frames", () =>
+    {
+        if (PerformanceBudgetPolicy.Classify(60f, 16.7f, 50f) != PerformanceVerdict.Healthy)
+        {
+            throw new InvalidOperationException("A 60 FPS, 16.7ms frame must be classified healthy.");
+        }
+
+        if (PerformanceBudgetPolicy.Classify(30f, 33.3f, 120f) != PerformanceVerdict.Degraded)
+        {
+            throw new InvalidOperationException("A 30 FPS frame must be classified degraded.");
+        }
+
+        if (PerformanceBudgetPolicy.Classify(10f, 100f, 400f) != PerformanceVerdict.Critical)
+        {
+            throw new InvalidOperationException("A 10 FPS frame with high GC pressure must be classified critical.");
+        }
+
+        if (PerformanceBudgetPolicy.Classify(float.NaN, float.NaN, float.NaN) != PerformanceVerdict.Critical)
+        {
+            throw new InvalidOperationException("Non-finite frame metrics must fail closed as critical, never healthy.");
+        }
+
+        if (PerformanceBudgetPolicy.Classify(60f, -1f, 50f) != PerformanceVerdict.Critical)
+        {
+            throw new InvalidOperationException("A negative frame time must fail closed as critical.");
+        }
+
+        (PerformanceVerdict verdict, string reason) = PerformanceBudgetPolicy.Evaluate(30f, 33.3f, 120f);
+        if (verdict != PerformanceVerdict.Degraded || string.IsNullOrWhiteSpace(reason))
+        {
+            throw new InvalidOperationException("Evaluate must return a reason alongside the verdict.");
+        }
+    }),
+    ("performance census serializer puts omission counters before recommendations", () =>
+    {
+        var census = new PerformanceCensus(
+            120, 16.7f, 60f, 1f, 60, 48f, 512f, "2021.3.45f2",
+            PerformanceVerdict.Healthy, "frame budget met", 0, 0.0f,
+            new[] { "profile-ok" });
+        string json = AgentDiagnosticsFormatter.SerializePerformanceCensus(census);
+        int omittedIndex = json.IndexOf("\"omittedSampleCount\"", StringComparison.Ordinal);
+        int recommendationsIndex = json.IndexOf("\"recommendations\"", StringComparison.Ordinal);
+        if (omittedIndex < 0 || recommendationsIndex < 0 || omittedIndex > recommendationsIndex)
+        {
+            throw new InvalidOperationException("Performance census JSON must place omittedSampleCount before the unbounded recommendations list.");
+        }
+
+        using (var doc = JsonDocument.Parse(json))
+        {
+            if (doc.RootElement.GetProperty("verdict").GetString() != "Healthy" ||
+                doc.RootElement.GetProperty("frameCount").GetInt32() != 120 ||
+                doc.RootElement.GetProperty("fps").GetSingle() < 59.9f)
+            {
+                throw new InvalidOperationException("Performance census JSON fields do not match the census DTO.");
+            }
+        }
+
+        string empty = AgentDiagnosticsFormatter.SerializePerformanceCensus(null);
+        using (var doc = JsonDocument.Parse(empty))
+        {
+            if (doc.RootElement.GetProperty("verdict").GetString() != "Critical" ||
+                doc.RootElement.GetProperty("frameCount").GetInt32() != 0)
+            {
+                throw new InvalidOperationException("A null performance census must serialize as critical defaults, never healthy.");
+            }
+        }
+    }),
+    ("snapshot diff records added removed and changed keys with bounded omissions", () =>
+    {
+        var before = new Dictionary<string, object>
+        {
+            ["packs"] = 3,
+            ["units"] = 18,
+            ["stale"] = true,
+            ["mode"] = "paused",
+        };
+        var after = new Dictionary<string, object>
+        {
+            ["packs"] = 3,
+            ["units"] = 19,
+            ["mode"] = "running",
+            ["newKey"] = "yes",
+        };
+        SnapshotDiffResult diff = RuntimeSnapshotDiff.DiffDictionaries(before, after, 16);
+        if (!diff.IsValid || diff.AddedKeyCount != 1 || diff.RemovedKeyCount != 1 || diff.ChangedKeyCount != 2)
+        {
+            throw new InvalidOperationException("Snapshot diff must count one added, one removed, and two changed top-level keys.");
+        }
+
+        var bounded = new Dictionary<string, object>();
+        var expanded = new Dictionary<string, object>(before);
+        for (int i = 0; i < 10; i++)
+        {
+            expanded["extra-" + i] = i;
+        }
+        SnapshotDiffResult boundedDiff = RuntimeSnapshotDiff.DiffDictionaries(bounded, expanded, 4);
+        if (boundedDiff.AddedKeyCount != 14 || boundedDiff.OmittedAddedCount != 10 ||
+            boundedDiff.AddedKeys.Count != 4)
+        {
+            throw new InvalidOperationException("Snapshot diff must bound detail rows and report omitted added keys.");
+        }
+
+        SnapshotDiffResult nullDiff = RuntimeSnapshotDiff.DiffDictionaries(null, null, 0);
+        if (!nullDiff.IsValid || nullDiff.TotalChangeCount != 0)
+        {
+            throw new InvalidOperationException("A null snapshot diff must be a valid empty diff, not an exception.");
+        }
+    }),
+    ("snapshot diff serializer puts omission counters before detail lists", () =>
+    {
+        var result = new SnapshotDiffResult(true, "", 1, 1, 1, 0, 0, 0, 1, 1, 1,
+            new[] { "newKey" }, new[] { "stale" },
+            new[] { new SnapshotDiffChange("units", "18", "19") });
+        string json = AgentDiagnosticsFormatter.SerializeSnapshotDiff(result);
+        int omittedIndex = json.IndexOf("\"omittedAddedCount\"", StringComparison.Ordinal);
+        int addedIndex = json.IndexOf("\"addedKeys\"", StringComparison.Ordinal);
+        if (omittedIndex < 0 || addedIndex < 0 || omittedIndex > addedIndex)
+        {
+            throw new InvalidOperationException("Snapshot diff JSON must place omission counters before detail lists.");
+        }
+
+        using (var doc = JsonDocument.Parse(json))
+        {
+            if (doc.RootElement.GetProperty("addedKeyCount").GetInt32() != 1 ||
+                doc.RootElement.GetProperty("changedKeys")[0].GetProperty("key").GetString() != "units")
+            {
+                throw new InvalidOperationException("Snapshot diff JSON fields do not match the diff DTO.");
+            }
         }
     }),
     };

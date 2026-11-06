@@ -174,10 +174,11 @@ def build_model():
         output_fbx_path=ATLAS_FBX_PATH,
     )
 
+    sockets = [obj for obj in bpy.context.scene.objects if obj.type == "EMPTY"]
     rmk.export_unity_fbx(
         FBX_PATH,
-        list(batched_meshes) + [armature],
-        include_empties=False,
+        list(batched_meshes) + [armature] + sockets,
+        include_empties=True,
         include_armature=True,
         bake_anim=True,
     )

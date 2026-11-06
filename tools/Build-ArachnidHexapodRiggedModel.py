@@ -285,10 +285,24 @@ def build_arachnid_hexapod_rigged_model() -> None:
         texture_maps=atlas_maps,
         output_fbx_path=ATLAS_FBX_PATH,
     )
+    # Ensure turret sockets for RuntimeVisualDirector range-limited aiming.
+    # Legs-only Walk anim is untouched; these empties are not keyed.
+    for _sock_name, _bone_name in (
+        ("Socket_TurretPivot", "Bone_TurretYaw"),
+        ("Socket_TurretPitch", "Bone_TurretPitch"),
+    ):
+        if _sock_name not in bpy.data.objects:
+            _bone = armature.data.bones.get(_bone_name)
+            _loc = Vector(_bone.head) if _bone is not None else Vector((0.0, 0.0, 1.67))
+            _sock = bpy.data.objects.new(_sock_name, None)
+            _sock.empty_display_size = 0.1
+            bpy.context.collection.objects.link(_sock)
+            _sock.location = _loc
+    sockets = [obj for obj in bpy.context.scene.objects if obj.type == "EMPTY"]
     rmk.export_unity_fbx(
         FBX_PATH,
-        list(batched_meshes) + [armature],
-        include_empties=False,
+        list(batched_meshes) + [armature] + sockets,
+        include_empties=True,
         include_armature=True,
         bake_anim=True,
     )

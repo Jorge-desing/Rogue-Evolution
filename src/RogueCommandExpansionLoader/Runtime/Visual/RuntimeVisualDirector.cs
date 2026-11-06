@@ -978,6 +978,34 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             Vector3 toTarget = target.position - _socketTurretPivot.position;
             toTarget.y = 0f; // Horizontal planar azimuth
 
+            // Turrets only track hostile targets inside the native weapon range.
+            // ResolveEntityTarget already verified hostility via IsEnemy; this gate
+            // adds the range (and min-range deadzone) check before any rotation.
+            float weaponRangeCells = 0f;
+            try
+            {
+                weaponRangeCells = _entity != null ? _entity.WeaponRange : 0f;
+            }
+            catch
+            {
+                return;
+            }
+            float? minRangeCells = null;
+            try
+            {
+                string entityId = _entity != null ? _entity.EntityId : null;
+                if (!string.IsNullOrEmpty(entityId) && RuntimeHooks.MinAttackRangeResolver != null)
+                {
+                    minRangeCells = RuntimeHooks.MinAttackRangeResolver(entityId);
+                }
+            }
+            catch { }
+            float worldDistance = toTarget.magnitude;
+            if (!TurretAimPolicy.IsInWeaponRange(worldDistance, weaponRangeCells, minRangeCells))
+            {
+                return;
+            }
+
             if (toTarget.sqrMagnitude > 0.01f)
             {
                 Quaternion targetRot = Quaternion.LookRotation(toTarget, Vector3.up);

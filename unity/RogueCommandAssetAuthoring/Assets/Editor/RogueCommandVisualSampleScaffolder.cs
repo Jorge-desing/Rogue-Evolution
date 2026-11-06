@@ -1713,7 +1713,9 @@ namespace RogueCommandExpansion.Authoring
             // its Animator leaves the old bone hierarchy in the bundle, so Arachnid would still
             // inherit Bone_Hull's idle motion. Replace that model subtree from the current FBX
             // while preserving the authored prefab materials and root-level sockets.
-            if (!String.Equals(unitName, "ArachnidHexapod", StringComparison.Ordinal))
+            // Overlord is included so its authored turret sockets reach the bundle.
+            if (!String.Equals(unitName, "ArachnidHexapod", StringComparison.Ordinal) &&
+                !String.Equals(unitName, "OverlordCommandHQ", StringComparison.Ordinal))
             {
                 return;
             }

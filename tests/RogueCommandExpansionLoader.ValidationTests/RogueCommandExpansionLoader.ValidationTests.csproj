@@ -38,6 +38,10 @@
              Link="Runtime/RuntimeEconomyCensus.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeCombatStatusCensus.cs"
              Link="Runtime/RuntimeCombatStatusCensus.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimePerformanceCensus.cs"
+             Link="Runtime/RuntimePerformanceCensus.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeSnapshotDiff.cs"
+             Link="Runtime/RuntimeSnapshotDiff.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeProductionCensus.cs"
              Link="Runtime/RuntimeProductionCensus.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeBaseIntegrityCensus.cs"
@@ -156,6 +160,8 @@
              Link="Runtime/Visual/UniqueSocketRoleBinding.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/Visual/LocomotionAnimationPolicy.cs"
              Link="Runtime/Visual/LocomotionAnimationPolicy.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/Visual/TurretAimPolicy.cs"
+             Link="Runtime/Visual/TurretAimPolicy.cs" />
 
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/StageFallbackSnapshot.cs"
              Link="Runtime/StageFallbackSnapshot.cs" />
