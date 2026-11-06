@@ -164,12 +164,12 @@ def build_arc_lance_walker_model() -> None:
         output_fbx_path=ATLAS_FBX_PATH,
     )
 
-    # Keep authored sockets in the editable Blend. Unity's pack scaffolder creates the
-    # uniquely named serialized sockets so FBX importer suffixes cannot create role ambiguity.
+    # Export authored canonical sockets so RuntimeVisualDirector turret/radar/
+    # antenna/recoil animations have their pivots in the Unity prefab.
     rmk.export_unity_fbx(
         FBX_PATH,
-        list(batched_meshes) + [armature],
-        include_empties=False,
+        list(batched_meshes) + [armature] + sockets,
+        include_empties=True,
         include_armature=True,
         bake_anim=True,
     )

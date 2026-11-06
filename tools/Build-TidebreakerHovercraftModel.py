@@ -151,8 +151,8 @@ def build_tidebreaker_hovercraft_model() -> None:
 
     rmk.export_unity_fbx(
         FBX_PATH,
-        list(batched_meshes) + [armature],
-        include_empties=False,
+        list(batched_meshes) + [armature] + sockets,
+        include_empties=True,
         include_armature=True,
         bake_anim=True,
     )
