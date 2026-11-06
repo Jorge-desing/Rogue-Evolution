@@ -591,6 +591,8 @@ namespace UnityEngine
     {
         public static float time { get; set; }
         public static float timeScale { get; set; } = 1.0f;
+        public static float deltaTime { get; set; }
+        public static int frameCount { get; set; }
     }
 
     public static class Debug
@@ -607,6 +609,7 @@ namespace UnityEngine
     internal static class Application
     {
         public static string unityVersion { get; set; } = "2021.3.45f2";
+        public static int targetFrameRate { get; set; } = -1;
     }
 }
 

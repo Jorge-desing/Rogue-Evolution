@@ -268,6 +268,7 @@ _RUNTIME_SNAPSHOT_GETTERS = [
     "GetVisualSurfaceCensusJson",
     "GetVisualMaterialCensusJson",
     "GetGameTimeScaleJson",
+    "GetPerformanceCensusJson",
 ]
 
 _RUNTIME_SNAPSHOT_GETTER_ARGS: dict[str, list[object]] = {
@@ -1674,6 +1675,21 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
         elif name == "diagnostics_get_visual_health_summary":
             max_units = int(arguments.get("maxTrackedUnits", 64))
             res = _call_diagnostics_method("GetVisualHealthSummaryJson", [max_units])
+            return _tool_response(res)
+
+        elif name == "diagnostics_get_performance_census":
+            res = _call_diagnostics_method("GetPerformanceCensusJson")
+            return _tool_response(res)
+
+        elif name == "diagnostics_get_frame_timing_census":
+            res = _call_diagnostics_method("GetFrameTimingCensusJson")
+            return _tool_response(res)
+
+        elif name == "diagnostics_diff_snapshots":
+            before_json = str(arguments.get("beforeJson", "") or "")
+            after_json = str(arguments.get("afterJson", "") or "")
+            max_changes = int(arguments.get("maxChanges", 16))
+            res = _call_diagnostics_method("GetSnapshotDiffJson", [before_json, after_json, max_changes])
             return _tool_response(res)
 
         elif name == "diagnostics_get_combat_health_summary":

@@ -319,7 +319,7 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
 
         snapshot = json.loads(response["content"][0]["text"])
         self.assertFalse(response["isError"])
-        self.assertEqual(44, len(snapshot))
+        self.assertEqual(45, len(snapshot))
         getter_values = {k: v for k, v in snapshot.items() if k != "_meta"}
         self.assertTrue(all(isinstance(value, dict) for value in getter_values.values()))
         self.assertTrue(all(value == expected for value in getter_values.values()))
@@ -544,12 +544,12 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
             "describe_tool",
         ):
             self.assertIn(expected, names)
-        self.assertEqual(198, len(names))
+        self.assertEqual(201, len(names))
 
     def test_tools_list_default_is_all_and_paginates(self) -> None:
         full = SERVER.handle_request({"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}})
         tools = full["result"]["tools"]
-        self.assertEqual(198, len(tools))
+        self.assertEqual(201, len(tools))
         page = SERVER.handle_request({"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {"limit": 10}})
         self.assertEqual(10, len(page["result"]["tools"]))
         cursor = page["result"]["nextCursor"]
@@ -881,6 +881,93 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
         self.assertIn("timeScale", guide_text)
         self.assertIn("diagnostics_preflight", guide_text)
         self.assertIn("diagnostics_get_gui_state", guide_text)
+
+    def test_performance_census_tool_forwards_without_arguments(self) -> None:
+        calls: list[tuple[str, list[object]]] = []
+
+        def fake_http(endpoint: str, params: dict[str, object] | None = None, **_: object) -> str:
+            self.assertEqual(endpoint, "component/call_method")
+            params = params or {}
+            method = str(params["methodName"])
+            args = json.loads(str(params.get("args", "[]")))
+            calls.append((method, args))
+            payload = json.dumps({"kind": "performanceCensus", "verdict": "Healthy"})
+            return (
+                '{"status":"ok", "message":"Called '
+                f"'{method}' with {len(args)} args. ReturnValue: {payload}"
+                '"}'
+            )
+
+        with (
+            mock.patch.object(SERVER, "_DIAGNOSTICS_GO_ID", 73),
+            mock.patch.object(SERVER, "_call_http", side_effect=fake_http),
+        ):
+            response = SERVER.execute_tool("diagnostics_get_performance_census", {})
+
+        self.assertFalse(response["isError"])
+        self.assertEqual([("GetPerformanceCensusJson", [])], calls)
+        payload = json.loads(response["content"][0]["text"])
+        self.assertEqual("Healthy", payload["verdict"])
+
+    def test_frame_timing_census_tool_forwards_without_arguments(self) -> None:
+        calls: list[tuple[str, list[object]]] = []
+
+        def fake_http(endpoint: str, params: dict[str, object] | None = None, **_: object) -> str:
+            self.assertEqual(endpoint, "component/call_method")
+            params = params or {}
+            method = str(params["methodName"])
+            args = json.loads(str(params.get("args", "[]")))
+            calls.append((method, args))
+            payload = json.dumps({"kind": "frameTimingCensus", "verdict": "Smooth"})
+            return (
+                '{"status":"ok", "message":"Called '
+                f"'{method}' with {len(args)} args. ReturnValue: {payload}"
+                '"}'
+            )
+
+        with (
+            mock.patch.object(SERVER, "_DIAGNOSTICS_GO_ID", 73),
+            mock.patch.object(SERVER, "_call_http", side_effect=fake_http),
+        ):
+            response = SERVER.execute_tool("diagnostics_get_frame_timing_census", {})
+
+        self.assertFalse(response["isError"])
+        self.assertEqual([("GetFrameTimingCensusJson", [])], calls)
+        payload = json.loads(response["content"][0]["text"])
+        self.assertEqual("Smooth", payload["verdict"])
+
+    def test_diff_snapshots_tool_forwards_bounded_arguments(self) -> None:
+        calls: list[tuple[str, list[object]]] = []
+
+        def fake_http(endpoint: str, params: dict[str, object] | None = None, **_: object) -> str:
+            self.assertEqual(endpoint, "component/call_method")
+            params = params or {}
+            method = str(params["methodName"])
+            args = json.loads(str(params.get("args", "[]")))
+            calls.append((method, args))
+            payload = json.dumps({"isValid": True, "totalChangeCount": 1})
+            return (
+                '{"status":"ok", "message":"Called '
+                f"'{method}' with {len(args)} args. ReturnValue: {payload}"
+                '"}'
+            )
+
+        before = json.dumps({"units": 18})
+        after = json.dumps({"units": 19})
+        with (
+            mock.patch.object(SERVER, "_DIAGNOSTICS_GO_ID", 73),
+            mock.patch.object(SERVER, "_call_http", side_effect=fake_http),
+        ):
+            response = SERVER.execute_tool(
+                "diagnostics_diff_snapshots",
+                {"beforeJson": before, "afterJson": after, "maxChanges": 8},
+            )
+
+        self.assertFalse(response["isError"])
+        self.assertEqual([("GetSnapshotDiffJson", [before, after, 8])], calls)
+        payload = json.loads(response["content"][0]["text"])
+        self.assertTrue(payload["isValid"])
+        self.assertEqual(1, payload["totalChangeCount"])
 
 
 if __name__ == "__main__":

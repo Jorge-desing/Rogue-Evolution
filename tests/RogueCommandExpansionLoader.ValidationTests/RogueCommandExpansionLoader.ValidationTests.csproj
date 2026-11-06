@@ -40,6 +40,8 @@
              Link="Runtime/RuntimeCombatStatusCensus.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimePerformanceCensus.cs"
              Link="Runtime/RuntimePerformanceCensus.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeFrameTimingCensus.cs"
+             Link="Runtime/RuntimeFrameTimingCensus.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeSnapshotDiff.cs"
              Link="Runtime/RuntimeSnapshotDiff.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeProductionCensus.cs"

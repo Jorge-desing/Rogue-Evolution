@@ -3,6 +3,8 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using RogueCommandExpansionLoader.Content;
 using RogueCommandExpansionLoader.Modules;
 using RogueCommandExpansionLoader.Runtime;
@@ -539,6 +541,114 @@ namespace RogueCommandExpansionLoader.Runtime
         {
             return AgentDiagnosticsFormatter.SerializeAiModulesCensus(
                 RuntimeAiModulesCensus.Current());
+        }
+
+        /// <summary>
+        /// Returns the live frame performance census (FPS, frame time, time
+        /// scale, managed memory, and budget verdict) as JSON.
+        /// </summary>
+        public string GetPerformanceCensusJson()
+        {
+            return AgentDiagnosticsFormatter.SerializePerformanceCensus(
+                RuntimePerformanceCensus.Current());
+        }
+
+        /// <summary>
+        /// Returns the windowed frame-timing census (average/min/max/p95 frame time,
+        /// stutter and hitch counts, and smoothness verdict) as JSON.
+        /// </summary>
+        public string GetFrameTimingCensusJson()
+        {
+            return AgentDiagnosticsFormatter.SerializeFrameTimingCensus(
+                RuntimeFrameTimingCensus.Current());
+        }
+
+        /// <summary>
+        /// Compares two JSON snapshot payloads at the top level and returns the
+        /// bounded diff as JSON. Invalid JSON fails closed with
+        /// <c>isValid=false</c> and a diagnostic in <c>error</c>.
+        /// </summary>
+        public string GetSnapshotDiffJson(string beforeJson, string afterJson, int maxChanges)
+        {
+            Dictionary<string, object> before;
+            Dictionary<string, object> after;
+            try
+            {
+                before = ParseSnapshotObject(beforeJson);
+            }
+            catch (Exception exception)
+            {
+                return AgentDiagnosticsFormatter.SerializeSnapshotDiff(
+                    new SnapshotDiffResult(false, "beforeJson: " + exception.Message,
+                        0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        new List<string>().AsReadOnly(),
+                        new List<string>().AsReadOnly(),
+                        new List<SnapshotDiffChange>().AsReadOnly()));
+            }
+
+            try
+            {
+                after = ParseSnapshotObject(afterJson);
+            }
+            catch (Exception exception)
+            {
+                return AgentDiagnosticsFormatter.SerializeSnapshotDiff(
+                    new SnapshotDiffResult(false, "afterJson: " + exception.Message,
+                        0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        new List<string>().AsReadOnly(),
+                        new List<string>().AsReadOnly(),
+                        new List<SnapshotDiffChange>().AsReadOnly()));
+            }
+
+            return AgentDiagnosticsFormatter.SerializeSnapshotDiff(
+                RuntimeSnapshotDiff.DiffDictionaries(before, after, maxChanges));
+        }
+
+        private static Dictionary<string, object> ParseSnapshotObject(string json)
+        {
+            var parsed = new Dictionary<string, object>();
+            if (string.IsNullOrWhiteSpace(json))
+            {
+                return parsed;
+            }
+
+            JObject root = JObject.Parse(json);
+            foreach (KeyValuePair<string, JToken> entry in root)
+            {
+                parsed[entry.Key] = ToClrValue(entry.Value);
+            }
+
+            return parsed;
+        }
+
+        private static object ToClrValue(JToken token)
+        {
+            if (token == null || token.Type == JTokenType.Null || token.Type == JTokenType.Undefined)
+            {
+                return null;
+            }
+
+            if (token.Type == JTokenType.String)
+            {
+                return token.Value<string>();
+            }
+
+            if (token.Type == JTokenType.Integer)
+            {
+                return token.Value<long>();
+            }
+
+            if (token.Type == JTokenType.Float)
+            {
+                return token.Value<double>();
+            }
+
+            if (token.Type == JTokenType.Boolean)
+            {
+                return token.Value<bool>();
+            }
+
+            return token.ToString(Formatting.None);
         }
 
         /// <summary>

@@ -727,6 +727,121 @@ namespace RogueCommandExpansionLoader.Runtime
         }
 
         /// <summary>
+        /// Serializes the live frame performance census. Omission counters are
+        /// serialized before detail collections.
+        /// </summary>
+        public static string SerializePerformanceCensus(PerformanceCensus census)
+        {
+            var recommendations = new List<string>();
+            if (census != null && census.Recommendations != null)
+            {
+                recommendations.AddRange(census.Recommendations);
+            }
+
+            var view = new Dictionary<string, object>
+            {
+                ["omittedSampleCount"] = census != null ? census.OmittedSampleCount : 0,
+                ["frameCount"] = census != null ? census.FrameCount : 0,
+                ["frameTimeMs"] = census != null ? census.FrameTimeMs : 0f,
+                ["fps"] = census != null ? census.Fps : 0f,
+                ["timeScale"] = census != null ? census.TimeScale : 1f,
+                ["targetFrameRate"] = census != null ? census.TargetFrameRate : -1,
+                ["gcMemoryMb"] = census != null ? census.GcMemoryMb : 0f,
+                ["totalMemoryMb"] = census != null ? census.TotalMemoryMb : 0f,
+                ["averageFrameTimeMs"] = census != null ? census.AverageFrameTimeMs : 0f,
+                ["unityVersion"] = census != null && census.UnityVersion != null ? census.UnityVersion : string.Empty,
+                ["verdict"] = census != null ? census.Verdict.ToString() : PerformanceVerdict.Critical.ToString(),
+                ["verdictReason"] = census != null && census.VerdictReason != null ? census.VerdictReason : "performance unavailable",
+                ["recommendationCount"] = recommendations.Count,
+                ["recommendations"] = recommendations,
+            };
+            return Serialize(view);
+        }
+
+        /// <summary>
+        /// Serializes a snapshot diff result. Omission counters are serialized
+        /// before detail collections so bounded truncation never hides loss.
+        /// </summary>
+/// <summary>
+        /// Serializes a windowed frame-timing census. Omission counters are placed
+        /// before the recommendations list so bounded truncation never hides loss.
+        /// </summary>
+        public static string SerializeFrameTimingCensus(FrameTimingCensus census)
+        {
+            var recommendations = new List<string>();
+            if (census != null && census.Recommendations != null)
+            {
+                recommendations.AddRange(census.Recommendations);
+            }
+
+            var view = new Dictionary<string, object>
+            {
+                ["omittedSampleCount"] = census != null ? census.OmittedSampleCount : 0,
+                ["sampleCount"] = census != null ? census.SampleCount : 0,
+                ["averageFrameTimeMs"] = census != null ? census.AverageFrameTimeMs : 0f,
+                ["minFrameTimeMs"] = census != null ? census.MinFrameTimeMs : 0f,
+                ["maxFrameTimeMs"] = census != null ? census.MaxFrameTimeMs : 0f,
+                ["p95FrameTimeMs"] = census != null ? census.P95FrameTimeMs : 0f,
+                ["stutterCount"] = census != null ? census.StutterCount : 0,
+                ["hitchCount"] = census != null ? census.HitchCount : 0,
+                ["verdict"] = census != null ? census.Verdict.ToString() : FrameTimingVerdict.MajorStutter.ToString(),
+                ["verdictReason"] = census != null && census.VerdictReason != null ? census.VerdictReason : "frame timing unavailable",
+                ["recommendationCount"] = recommendations.Count,
+                ["recommendations"] = recommendations,
+            };
+            return Serialize(view);
+        }
+
+        public static string SerializeSnapshotDiff(SnapshotDiffResult result)
+        {
+            var added = new List<string>();
+            if (result != null && result.AddedKeys != null)
+            {
+                added.AddRange(result.AddedKeys);
+            }
+
+            var removed = new List<string>();
+            if (result != null && result.RemovedKeys != null)
+            {
+                removed.AddRange(result.RemovedKeys);
+            }
+
+            var changed = new List<Dictionary<string, object>>();
+            if (result != null && result.ChangedKeys != null)
+            {
+                foreach (SnapshotDiffChange change in result.ChangedKeys)
+                {
+                    changed.Add(new Dictionary<string, object>
+                    {
+                        ["key"] = change.Key ?? string.Empty,
+                        ["before"] = change.BeforeValue ?? string.Empty,
+                        ["after"] = change.AfterValue ?? string.Empty,
+                    });
+                }
+            }
+
+            var view = new Dictionary<string, object>
+            {
+                ["isValid"] = result != null && result.IsValid,
+                ["error"] = result != null && result.Error != null ? result.Error : string.Empty,
+                ["omittedAddedCount"] = result != null ? result.OmittedAddedCount : 0,
+                ["omittedRemovedCount"] = result != null ? result.OmittedRemovedCount : 0,
+                ["omittedChangedCount"] = result != null ? result.OmittedChangedCount : 0,
+                ["addedKeyCount"] = result != null ? result.AddedKeyCount : 0,
+                ["removedKeyCount"] = result != null ? result.RemovedKeyCount : 0,
+                ["changedKeyCount"] = result != null ? result.ChangedKeyCount : 0,
+                ["totalChangeCount"] = result != null ? result.TotalChangeCount : 0,
+                ["addedRowCount"] = result != null ? result.AddedRowCount : 0,
+                ["removedRowCount"] = result != null ? result.RemovedRowCount : 0,
+                ["changedRowCount"] = result != null ? result.ChangedRowCount : 0,
+                ["addedKeys"] = added,
+                ["removedKeys"] = removed,
+                ["changedKeys"] = changed,
+            };
+            return Serialize(view);
+        }
+
+        /// <summary>
         /// Serializes factory production queue metrics and living factory status across
         /// player and AI battlefield entities. Omission counters are serialized before detail collections.
         /// </summary>

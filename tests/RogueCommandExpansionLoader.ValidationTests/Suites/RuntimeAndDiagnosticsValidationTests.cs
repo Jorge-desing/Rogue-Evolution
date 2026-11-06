@@ -8850,6 +8850,114 @@ internal static partial class ValidationTestRunner
             }
         }
     }),
+    ("frame timing policy classifies smooth minor and major stutter", () =>
+    {
+        if (FrameTimingPolicy.Classify(10f, 12f, 0, 10) != FrameTimingVerdict.Smooth)
+        {
+            throw new InvalidOperationException("A 10ms average frame must be smooth.");
+        }
+
+        if (FrameTimingPolicy.Classify(25f, 40f, 2, 10) != FrameTimingVerdict.MinorStutter)
+        {
+            throw new InvalidOperationException("A 25ms average frame must be minor stutter.");
+        }
+
+        if (FrameTimingPolicy.Classify(40f, 120f, 5, 10) != FrameTimingVerdict.MajorStutter)
+        {
+            throw new InvalidOperationException("A 40ms average with severe hitches must be major stutter.");
+        }
+
+        if (FrameTimingPolicy.Classify(10f, 12f, 0, 0) != FrameTimingVerdict.MajorStutter)
+        {
+            throw new InvalidOperationException("Empty frame samples must fail closed as major stutter.");
+        }
+
+        if (FrameTimingPolicy.Classify(float.NaN, 12f, 0, 10) != FrameTimingVerdict.MajorStutter)
+        {
+            throw new InvalidOperationException("Non-finite frame metrics must fail closed as major stutter.");
+        }
+
+        (FrameTimingVerdict verdict, string reason) = FrameTimingPolicy.Evaluate(25f, 40f, 2, 10);
+        if (verdict != FrameTimingVerdict.MinorStutter || string.IsNullOrWhiteSpace(reason))
+        {
+            throw new InvalidOperationException("Evaluate must return a reason alongside the verdict.");
+        }
+
+        if (FrameTimingPolicy.ComputePercentile(new[] { 8f, 16f, 24f, 32f }, 0.95f) < 31f)
+        {
+            throw new InvalidOperationException("Percentile computation must approximate the 95th percentile.");
+        }
+    }),
+    ("frame timing census aggregates samples and omits invalid and overflow entries", () =>
+    {
+        var samples = new List<float> { 10f, 12f, 14f, 40f, 110f, float.NaN, -1f };
+        FrameTimingCensus census = RuntimeFrameTimingCensus.Aggregate(samples);
+        if (census.SampleCount != 5 || census.OmittedSampleCount != 2)
+        {
+            throw new InvalidOperationException("Frame timing census must count valid samples and omit invalid ones.");
+        }
+
+        if (census.HitchCount != 1)
+        {
+            throw new InvalidOperationException("Frame timing census must count hitches above 100ms.");
+        }
+
+        if (census.Verdict != FrameTimingVerdict.MajorStutter)
+        {
+            throw new InvalidOperationException("A window with a 110ms hitch must be major stutter.");
+        }
+
+        FrameTimingCensus empty = RuntimeFrameTimingCensus.Aggregate(new List<float>());
+        if (empty != FrameTimingCensus.Empty)
+        {
+            throw new InvalidOperationException("An empty frame window must return the empty census.");
+        }
+    }),
+    ("frame timing census serializer puts omission counters before recommendations", () =>
+    {
+        var census = new FrameTimingCensus(
+            10, 16.7f, 8f, 110f, 33.3f, 2, 1,
+            FrameTimingVerdict.MinorStutter, "frame time above smooth budget", 3,
+            new[] { "reduce non-essential visual effects" });
+        string json = AgentDiagnosticsFormatter.SerializeFrameTimingCensus(census);
+        int omittedIndex = json.IndexOf("\"omittedSampleCount\"", StringComparison.Ordinal);
+        int recommendationsIndex = json.IndexOf("\"recommendations\"", StringComparison.Ordinal);
+        if (omittedIndex < 0 || recommendationsIndex < 0 || omittedIndex > recommendationsIndex)
+        {
+            throw new InvalidOperationException("Frame timing census JSON must place omittedSampleCount before recommendations.");
+        }
+
+        using (var doc = JsonDocument.Parse(json))
+        {
+            if (doc.RootElement.GetProperty("sampleCount").GetInt32() != 10 ||
+                doc.RootElement.GetProperty("hitchCount").GetInt32() != 1)
+            {
+                throw new InvalidOperationException("Frame timing census JSON fields do not match the DTO.");
+            }
+        }
+
+        string empty = AgentDiagnosticsFormatter.SerializeFrameTimingCensus(null);
+        using (var doc = JsonDocument.Parse(empty))
+        {
+            if (doc.RootElement.GetProperty("verdict").GetString() != "MajorStutter" ||
+                doc.RootElement.GetProperty("sampleCount").GetInt32() != 0)
+            {
+                throw new InvalidOperationException("A null frame timing census must serialize as major stutter defaults.");
+            }
+        }
+    }),
+    ("performance census current samples live unity frame data", () =>
+    {
+        UnityEngine.Time.deltaTime = 0.0167f;
+        UnityEngine.Time.timeScale = 1.0f;
+        UnityEngine.Time.frameCount = 42;
+        UnityEngine.Application.targetFrameRate = 60;
+        PerformanceCensus census = RuntimePerformanceCensus.Current();
+        if (census.FrameCount != 42 || census.Fps <= 0f)
+        {
+            throw new InvalidOperationException("Performance census must sample live Unity frame data.");
+        }
+    }),
     };
 
     private sealed class TestCardChangeTarget
