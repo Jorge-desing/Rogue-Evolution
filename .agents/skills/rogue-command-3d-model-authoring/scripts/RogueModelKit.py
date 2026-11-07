@@ -6865,55 +6865,6 @@ def profile_model_budget_and_drawcalls(
     return report
 
 
-def merge_meshes_by_material(
-    objects: Sequence[bpy.types.Object],
-    prefix: str,
-    material_map: Dict[bpy.types.Material, str] | None = None,
-) -> list[bpy.types.Object]:
-    """Merges meshes sharing the same PBR material and names them <prefix>_Batch_<materialKey>."""
-    material_groups: Dict[bpy.types.Material | None, list[bpy.types.Object]] = {}
-
-    for obj in objects:
-        if obj.type != "MESH":
-            continue
-        mat = obj.data.materials[0] if obj.data.materials else None
-        material_groups.setdefault(mat, []).append(obj)
-
-    merged_objects: list[bpy.types.Object] = []
-
-    for mat, group in material_groups.items():
-        if not group:
-            continue
-        key = material_map.get(mat, mat.name.replace(" ", "_") if mat else "None") if material_map else (mat.name.replace(" ", "_") if mat else "None")
-        batch_name = f"{prefix}_Batch_{key}"
-
-        if len(group) == 1:
-            group[0].name = batch_name
-            merged_objects.append(group[0])
-            continue
-
-        bpy.ops.object.select_all(action="DESELECT")
-        for obj in group:
-            obj.select_set(True)
-        bpy.context.view_layer.objects.active = group[0]
-
-        bpy.ops.object.join()
-        joined_obj = bpy.context.view_layer.objects.active
-        joined_obj.name = batch_name
-
-        bpy.ops.object.mode_set(mode="EDIT")
-        bpy.ops.mesh.select_all(action="SELECT")
-        bpy.ops.mesh.normals_make_consistent(inside=False)
-        bpy.ops.object.mode_set(mode="OBJECT")
-
-        for poly in joined_obj.data.polygons:
-            poly.use_smooth = False
-
-        merged_objects.append(joined_obj)
-
-    return merged_objects
-
-
 
 def validate_model_mesh_quality(
     objects: Sequence[bpy.types.Object],
@@ -7022,36 +6973,14 @@ def frame_camera_to_model(
     return target
 
 
-def setup_preview_studio(
-    model_objects: Sequence[bpy.types.Object],
-    preview_path: Path,
-    ortho_scale: float = 5.8,
-) -> None:
-    """Configures 3-point studio lighting, floor shadow plane, and AgX isometric RTS camera."""
-    preview_path.parent.mkdir(parents=True, exist_ok=True)
-
+def _setup_studio_lighting_and_floor() -> bpy.types.Object:
+    """Configures floor shadow plane, 3-point area lights, and AgX EEVEE color management."""
     # Floor shadow plane
     bpy.ops.mesh.primitive_plane_add(size=200, location=(0.0, 0.0, -0.015))
     floor = bpy.context.object
     floor.name = "PreviewFloor"
     floor_mat = make_material("PreviewFloorMat", (0.035, 0.052, 0.065), 0.0, 0.92)
     finish_mesh(floor, floor_mat)
-
-    scene = bpy.context.scene
-    scene.render.resolution_x = 900
-    scene.render.resolution_y = 760
-    scene.render.resolution_percentage = 100
-
-    # Camera: Standard RTS orthographic view
-    bpy.ops.object.camera_add(location=(4.8, 5.8, 3.6))
-    camera = bpy.context.object
-    camera.name = "PreviewCamera"
-    target = Vector((0.0, 0.0, 0.72))
-    camera.rotation_euler = (target - camera.location).to_track_quat("-Z", "Y").to_euler()
-    camera.data.type = "ORTHO"
-    camera.data.ortho_scale = ortho_scale
-    frame_camera_to_model(camera, model_objects, target)
-    bpy.context.scene.camera = camera
 
     # 3-Point Area Lights
     lights = [
@@ -7076,8 +7005,31 @@ def setup_preview_studio(
     scene.render.resolution_percentage = 100
     scene.render.image_settings.file_format = "PNG"
     scene.view_settings.view_transform = "AgX"
-    scene.render.filepath = str(preview_path)
     scene.world.color = (0.035, 0.045, 0.065)
+    return floor
+
+
+def setup_preview_studio(
+    model_objects: Sequence[bpy.types.Object],
+    preview_path: Path,
+    ortho_scale: float = 5.8,
+) -> None:
+    """Configures 3-point studio lighting, floor shadow plane, and AgX isometric RTS camera."""
+    preview_path.parent.mkdir(parents=True, exist_ok=True)
+    _setup_studio_lighting_and_floor()
+
+    # Camera: Standard RTS orthographic view
+    bpy.ops.object.camera_add(location=(4.8, 5.8, 3.6))
+    camera = bpy.context.object
+    camera.name = "PreviewCamera"
+    target = Vector((0.0, 0.0, 0.72))
+    camera.rotation_euler = (target - camera.location).to_track_quat("-Z", "Y").to_euler()
+    camera.data.type = "ORTHO"
+    camera.data.ortho_scale = ortho_scale
+    frame_camera_to_model(camera, model_objects, target)
+    scene = bpy.context.scene
+    scene.camera = camera
+    scene.render.filepath = str(preview_path)
 
 
 def setup_multi_view_studio(
@@ -7090,35 +7042,9 @@ def setup_multi_view_studio(
 ) -> dict[str, bpy.types.Object]:
     """Sets up AgX studio lighting, floor shadow plane, and calibrated cameras for multiple perspectives."""
     preview_dir.mkdir(parents=True, exist_ok=True)
-    scene = bpy.context.scene
-    scene.render.resolution_x = 900
-    scene.render.resolution_y = 760
-    scene.render.resolution_percentage = 100
+    _setup_studio_lighting_and_floor()
 
-    # 1. Floor shadow plane
-    bpy.ops.mesh.primitive_plane_add(size=200, location=(0.0, 0.0, -0.015))
-    floor = bpy.context.object
-    floor.name = "PreviewFloor"
-    floor_mat = make_material("PreviewFloorMat", (0.035, 0.052, 0.065), 0.0, 0.92)
-    finish_mesh(floor, floor_mat)
-
-    # 2. 3-Point Area Lights
-    lights = [
-        ("Key", (3.5, 4.5, 6.0), 850, 4.0),
-        ("Fill", (-4.2, 1.0, 3.5), 520, 3.5),
-        ("Rim", (-1.5, -4.2, 4.5), 980, 3.0),
-    ]
-    for name, pos, energy, size in lights:
-        bpy.ops.object.light_add(type="AREA", location=pos)
-        l = bpy.context.object
-        l.name = f"PreviewLight_{name}"
-        l.data.energy = energy
-        l.data.shape = "DISK"
-        l.data.size = size
-        direction = Vector((0.0, 0.0, 0.6)) - l.location
-        l.rotation_euler = direction.to_track_quat("-Z", "Y").to_euler()
-
-    # 3. View Cameras
+    # View Cameras
     camera_configs = {
         "ISOMETRIC": ((4.8, 5.8, 3.6), Vector((0.0, 0.0, 0.72)), ortho_scale),
         "TOP_DOWN": ((0.0, 0.001, 8.5), Vector((0.0, 0.0, 0.6)), ortho_scale * 1.1),
@@ -7141,18 +7067,11 @@ def setup_multi_view_studio(
         frame_camera_to_model(cam, model_objects, target)
         cameras[view_name] = cam
 
+    scene = bpy.context.scene
     if "ISOMETRIC" in cameras:
         scene.camera = cameras["ISOMETRIC"]
     elif cameras:
         scene.camera = next(iter(cameras.values()))
-
-    scene.render.engine = "BLENDER_EEVEE_NEXT"
-    scene.render.resolution_x = 900
-    scene.render.resolution_y = 760
-    scene.render.resolution_percentage = 100
-    scene.render.image_settings.file_format = "PNG"
-    scene.view_settings.view_transform = "AgX"
-    scene.world.color = (0.035, 0.045, 0.065)
 
     if render_all:
         for v_name, cam in cameras.items():
@@ -7172,7 +7091,7 @@ def setup_multi_view_studio(
 def merge_meshes_by_material(
     model_objects: Sequence[bpy.types.Object],
     model_prefix: str,
-    material_keys: dict[bpy.types.Material, str],
+    material_keys: dict[bpy.types.Material, str] | None = None,
 ) -> list[bpy.types.Object]:
     """Create export-only mesh batches per material while preserving the editable source objects."""
     batches: dict[str, tuple[bpy.types.Material, list[bpy.types.Object]]] = {}
@@ -7183,7 +7102,7 @@ def merge_meshes_by_material(
             raise ValueError(f"{source.name} must have exactly one material before FBX batching")
 
         material = source.data.materials[0]
-        material_key = material_keys.get(material)
+        material_key = material_keys.get(material) if material_keys is not None else material.name.replace(" ", "_")
         if not material_key:
             raise ValueError(f"No export batch material key was provided for {material.name}")
 
@@ -11673,6 +11592,61 @@ class FactionPalette:
             apply_procedural_normal_relief(self.gunmetal, scale=1.5, strength=0.12 * normal_intensity)
 
 
+CAMO_COLOR_PALETTES: dict[str, tuple[Tuple[float, float, float], Tuple[float, float, float], Tuple[float, float, float], Tuple[float, float, float], Tuple[float, float, float], Tuple[float, float, float], float]] = {
+    "desert": (
+        (0.42, 0.32, 0.18), (0.55, 0.44, 0.26), (0.07, 0.08, 0.09),
+        (0.04, 0.045, 0.05), (0.92, 0.52, 0.10), (0.98, 0.42, 0.08), 2.0,
+    ),
+    "urban": (
+        (0.22, 0.24, 0.26), (0.36, 0.39, 0.42), (0.05, 0.06, 0.07),
+        (0.03, 0.035, 0.04), (0.85, 0.85, 0.20), (0.0, 0.85, 1.0), 2.2,
+    ),
+    "arctic": (
+        (0.76, 0.82, 0.88), (0.52, 0.58, 0.66), (0.08, 0.10, 0.14),
+        (0.05, 0.06, 0.08), (0.92, 0.15, 0.18), (0.15, 0.85, 1.0), 2.2,
+    ),
+    "woodland": (
+        (0.18, 0.25, 0.14), (0.28, 0.36, 0.22), (0.06, 0.07, 0.08),
+        (0.04, 0.045, 0.05), (0.90, 0.65, 0.12), (0.20, 0.95, 0.45), 2.0,
+    ),
+    "jungle": (
+        (0.18, 0.25, 0.14), (0.28, 0.36, 0.22), (0.06, 0.07, 0.08),
+        (0.04, 0.045, 0.05), (0.90, 0.65, 0.12), (0.20, 0.95, 0.45), 2.0,
+    ),
+    "digital": (
+        (0.22, 0.26, 0.28), (0.48, 0.45, 0.38), (0.07, 0.08, 0.09),
+        (0.04, 0.045, 0.05), (0.88, 0.72, 0.15), (0.12, 0.95, 0.85), 2.2,
+    ),
+    "splinter": (
+        (0.14, 0.16, 0.18), (0.68, 0.72, 0.74), (0.05, 0.06, 0.07),
+        (0.03, 0.035, 0.04), (0.95, 0.22, 0.15), (0.98, 0.45, 0.10), 2.3,
+    ),
+    "tigerstripe": (
+        (0.16, 0.24, 0.14), (0.34, 0.26, 0.18), (0.06, 0.07, 0.08),
+        (0.04, 0.045, 0.05), (0.85, 0.60, 0.12), (0.10, 0.88, 0.42), 2.0,
+    ),
+}
+
+FACTION_COLOR_PALETTES: dict[str, tuple[Tuple[float, float, float], Tuple[float, float, float], Tuple[float, float, float], Tuple[float, float, float], Tuple[float, float, float], Tuple[float, float, float], float]] = {
+    "siege": (
+        (0.26, 0.14, 0.075), (0.43, 0.30, 0.16), (0.065, 0.072, 0.078),
+        (0.035, 0.040, 0.043), (0.92, 0.48, 0.08), (0.98, 0.35, 0.05), 2.2,
+    ),
+    "syndicate": (
+        (0.055, 0.11, 0.20), (0.28, 0.34, 0.42), (0.035, 0.042, 0.055),
+        (0.025, 0.031, 0.038), (0.77, 0.045, 0.31), (0.0, 0.74, 1.0), 2.4,
+    ),
+    "arctic": (
+        (0.72, 0.78, 0.85), (0.45, 0.52, 0.62), (0.08, 0.10, 0.14),
+        (0.05, 0.06, 0.08), (0.90, 0.12, 0.15), (0.15, 0.85, 1.0), 2.0,
+    ),
+    "vanguard": (
+        (0.12, 0.19, 0.24), (0.22, 0.32, 0.38), (0.07, 0.10, 0.12),
+        (0.045, 0.055, 0.06), (0.95, 0.32, 0.05), (0.04, 0.72, 0.88), 1.9,
+    ),
+}
+
+
 def get_faction_palette(
     faction: str = "vanguard",
     prefix: str = "Unit",
@@ -11687,96 +11661,13 @@ def get_faction_palette(
 ) -> FactionPalette:
     """Returns a pre-calibrated 5-tone PBR material set with optional custom color overrides."""
     c = camo.lower()
-    if c == "desert":
-        p_col = (0.42, 0.32, 0.18)
-        l_col = (0.55, 0.44, 0.26)
-        g_col = (0.07, 0.08, 0.09)
-        t_col = (0.04, 0.045, 0.05)
-        w_col = (0.92, 0.52, 0.10)
-        e_col = (0.98, 0.42, 0.08)
-        e_str = 2.0
-    elif c == "urban":
-        p_col = (0.22, 0.24, 0.26)
-        l_col = (0.36, 0.39, 0.42)
-        g_col = (0.05, 0.06, 0.07)
-        t_col = (0.03, 0.035, 0.04)
-        w_col = (0.85, 0.85, 0.20)
-        e_col = (0.0, 0.85, 1.0)
-        e_str = 2.2
-    elif c == "arctic":
-        p_col = (0.76, 0.82, 0.88)
-        l_col = (0.52, 0.58, 0.66)
-        g_col = (0.08, 0.10, 0.14)
-        t_col = (0.05, 0.06, 0.08)
-        w_col = (0.92, 0.15, 0.18)
-        e_col = (0.15, 0.85, 1.0)
-        e_str = 2.2
-    elif c in ("woodland", "jungle"):
-        p_col = (0.18, 0.25, 0.14)
-        l_col = (0.28, 0.36, 0.22)
-        g_col = (0.06, 0.07, 0.08)
-        t_col = (0.04, 0.045, 0.05)
-        w_col = (0.90, 0.65, 0.12)
-        e_col = (0.20, 0.95, 0.45)
-        e_str = 2.0
-    elif c == "digital":
-        p_col = (0.22, 0.26, 0.28)
-        l_col = (0.48, 0.45, 0.38)
-        g_col = (0.07, 0.08, 0.09)
-        t_col = (0.04, 0.045, 0.05)
-        w_col = (0.88, 0.72, 0.15)
-        e_col = (0.12, 0.95, 0.85)
-        e_str = 2.2
-    elif c == "splinter":
-        p_col = (0.14, 0.16, 0.18)
-        l_col = (0.68, 0.72, 0.74)
-        g_col = (0.05, 0.06, 0.07)
-        t_col = (0.03, 0.035, 0.04)
-        w_col = (0.95, 0.22, 0.15)
-        e_col = (0.98, 0.45, 0.10)
-        e_str = 2.3
-    elif c == "tigerstripe":
-        p_col = (0.16, 0.24, 0.14)
-        l_col = (0.34, 0.26, 0.18)
-        g_col = (0.06, 0.07, 0.08)
-        t_col = (0.04, 0.045, 0.05)
-        w_col = (0.85, 0.60, 0.12)
-        e_col = (0.10, 0.88, 0.42)
-        e_str = 2.0
+    if c in CAMO_COLOR_PALETTES:
+        p_col, l_col, g_col, t_col, w_col, e_col, e_str = CAMO_COLOR_PALETTES[c]
     else:
         f = faction.lower()
-        if f == "siege":
-            p_col = (0.26, 0.14, 0.075)
-            l_col = (0.43, 0.30, 0.16)
-            g_col = (0.065, 0.072, 0.078)
-            t_col = (0.035, 0.040, 0.043)
-            w_col = (0.92, 0.48, 0.08)
-            e_col = (0.98, 0.35, 0.05)
-            e_str = 2.2
-        elif f == "syndicate":
-            p_col = (0.055, 0.11, 0.20)
-            l_col = (0.28, 0.34, 0.42)
-            g_col = (0.035, 0.042, 0.055)
-            t_col = (0.025, 0.031, 0.038)
-            w_col = (0.77, 0.045, 0.31)
-            e_col = (0.0, 0.74, 1.0)
-            e_str = 2.4
-        elif f == "arctic":
-            p_col = (0.72, 0.78, 0.85)
-            l_col = (0.45, 0.52, 0.62)
-            g_col = (0.08, 0.10, 0.14)
-            t_col = (0.05, 0.06, 0.08)
-            w_col = (0.90, 0.12, 0.15)
-            e_col = (0.15, 0.85, 1.0)
-            e_str = 2.0
-        else:
-            p_col = (0.12, 0.19, 0.24)
-            l_col = (0.22, 0.32, 0.38)
-            g_col = (0.07, 0.10, 0.12)
-            t_col = (0.045, 0.055, 0.06)
-            w_col = (0.95, 0.32, 0.05)
-            e_col = (0.04, 0.72, 0.88)
-            e_str = 1.9
+        p_col, l_col, g_col, t_col, w_col, e_col, e_str = FACTION_COLOR_PALETTES.get(
+            f, FACTION_COLOR_PALETTES["vanguard"]
+        )
 
     if primary_override is not None:
         p_col = primary_override

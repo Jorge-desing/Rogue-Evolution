@@ -814,6 +814,34 @@ WAVE7_PRESETS = (
 )
 
 
+def _validate_in_range(name: str, value: float, min_val: float, max_val: float) -> None:
+    """Validate that a CLI float argument is finite and falls within [min_val, max_val]."""
+    if not math.isfinite(value) or not (min_val <= value <= max_val):
+        raise SystemExit(f"--{name} must be finite and between {min_val} and {max_val}.")
+
+
+def _calculate_ortho_scale(archetype: str) -> float:
+    """Calculates viewport framing extent based on archetype mass and visual profile."""
+    if archetype in ("colossus_titan", "hover_cruiser", "heavy_dropship", "flying_wing_bomber"):
+        return 8.5
+    if archetype in (
+        "super_heavy", "siege_crawler", "drone_carrier", "artillery_strider",
+        "mobile_sam_launcher", "recovery_crawler", "hexapod_assault",
+        "assault_hovercraft", "bridge_layer", "command_hq_rig", "siege_drill_mole",
+        "heavy_crane_mech", "nanite_support_rover", "gravity_siege_breaker",
+        "tactical_relay_carrier", "amphibious_assault_tank", "plasma_mortar_strider",
+        "stealth_recon_skimmer",
+    ):
+        return 7.2
+    if archetype in (
+        "artillery", "spider", "vtol", "flak_anti_air", "quad_mech",
+        "combat_harvester", "shield_truck", "thermobaric_tank", "ew_jammer",
+        "mine_layer", "mortar_carrier",
+    ):
+        return 6.2
+    return 5.6
+
+
 def parse_args():
     # Blender passes all args after '--' to Python script
     argv = sys.argv
@@ -2616,8 +2644,12 @@ def build_vehicle_model(
                 builder.add_dual_cannon(caliber=0.082, length=1.65, spacing=0.38, elevation_deg=11.0)
         elif weapon == "gatling":
             if archetype in ("walker", "bike", "colossus_titan", "artillery_strider", "heavy_crane_mech"):
-                p_z = 3.25 if archetype == "colossus_titan" else (2.85 if archetype == "heavy_crane_mech" else (2.45 if archetype == "artillery_strider" else 1.25))
-                p_x = 1.35 if archetype == "colossus_titan" else (1.15 if archetype == "heavy_crane_mech" else (0.95 if archetype == "artillery_strider" else 0.75))
+                gatling_offsets = {
+                    "colossus_titan": (1.35, 3.25),
+                    "heavy_crane_mech": (1.15, 2.85),
+                    "artillery_strider": (0.95, 2.45),
+                }
+                p_x, p_z = gatling_offsets.get(archetype, (0.75, 1.25))
                 builder.add_rotary_gatling(side=-1, pivot_offset=(p_x, 0.35, p_z))
                 builder.add_rotary_gatling(side=1, pivot_offset=(p_x, 0.35, p_z))
             elif archetype in ("vtol", "heavy_dropship", "flying_wing_bomber"):
@@ -2773,11 +2805,7 @@ def build_vehicle_model(
         preview_path=preview_file,
         card_path=card_path,
         render_multiview=multiview,
-        ortho_scale=(
-            8.5 if archetype in ("colossus_titan", "hover_cruiser", "heavy_dropship", "flying_wing_bomber")
-            else (7.2 if archetype in ("super_heavy", "siege_crawler", "drone_carrier", "artillery_strider", "mobile_sam_launcher", "recovery_crawler", "hexapod_assault", "assault_hovercraft", "bridge_layer", "command_hq_rig", "siege_drill_mole", "heavy_crane_mech", "nanite_support_rover", "gravity_siege_breaker", "tactical_relay_carrier", "amphibious_assault_tank", "plasma_mortar_strider", "stealth_recon_skimmer")
-            else (6.2 if archetype in ("artillery", "spider", "vtol", "flak_anti_air", "quad_mech", "combat_harvester", "shield_truck", "thermobaric_tank", "ew_jammer", "mine_layer", "mortar_carrier") else 5.6))
-        ),
+        ortho_scale=_calculate_ortho_scale(archetype),
         smooth_by_angle=True,
         smooth_angle_deg=smooth_angle,
         weighted_normals=weighted_normals,
@@ -3031,16 +3059,11 @@ def build_structure_model(
 
 def main():
     args = parse_args()
-    if not math.isfinite(args.camo_scale) or not 0.1 <= args.camo_scale <= 10.0:
-        raise SystemExit("--camo-scale must be finite and between 0.1 and 10.0.")
-    if not math.isfinite(args.camo_contrast) or not 0.0 <= args.camo_contrast <= 4.0:
-        raise SystemExit("--camo-contrast must be finite and between 0.0 and 4.0.")
-    if not math.isfinite(args.normal_intensity) or not 0.0 <= args.normal_intensity <= 4.0:
-        raise SystemExit("--normal-intensity must be finite and between 0.0 and 4.0.")
-    if not math.isfinite(args.soot_intensity) or not 0.0 <= args.soot_intensity <= 2.0:
-        raise SystemExit("--soot-intensity must be finite and between 0.0 and 2.0.")
-    if not math.isfinite(args.model_scale) or not 0.1 <= args.model_scale <= 10.0:
-        raise SystemExit("--model-scale must be finite and between 0.1 and 10.0.")
+    _validate_in_range("camo-scale", args.camo_scale, 0.1, 10.0)
+    _validate_in_range("camo-contrast", args.camo_contrast, 0.0, 4.0)
+    _validate_in_range("normal-intensity", args.normal_intensity, 0.0, 4.0)
+    _validate_in_range("soot-intensity", args.soot_intensity, 0.0, 2.0)
+    _validate_in_range("model-scale", args.model_scale, 0.1, 10.0)
     out_root = resolve_path(args.out_dir, REPO_ROOT) or REPO_ROOT
 
     if args.dry_run:
