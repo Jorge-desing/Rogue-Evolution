@@ -72,7 +72,23 @@ The `um sprite`, `um render3d`, and `um scan` commands from the universal-modder
 
 ## Pack and Asset Validation
 
-### Python tooling and test loading
+### Content pack authoring and comparison tools
+
+- `tools/scaffold_pack.py` generates a minimal valid `content.json` (unit, 1:1 production building, stage, AI profile) with namespaced IDs. Use `--validate` to check against `content/schema/content.schema.json`.
+- `tools/merge_content_packs.py --left <pack> --right <pack> --out-dir <dir>` merges two packs additively (units, stages, AI profiles, bundles), reporting ID/content conflicts; use `--pack-id` to resolve differing pack IDs and `--force` only when conflicts are acceptable.
+- `tools/diff_content_packs.py --left <pack> --right <pack>` reports added/removed/changed units, stages, AI profiles, and metadata; use `--json` for machine-readable output.
+- These tools operate on `content.json` files or pack directories. Tests in `tests/python/` load them via `load_tool_module()` from `tests/python/helpers.py`; do not import them as a package.
+- `tools/validate_content_pack.py` is a quick preflight only (embedded simplified schema, does not consume `--schema`); use `tools/validate_loader_registry.py` and the C# harness for authoritative checks.
+- `tools/audit_content_references.py <pack-dir> [--all] [--json]` detects dangling cross-references (stage `unitIds`/`aiProfileIds`, blueprint pool entries, AI `unitEntries`/`productionBuildingEntries`), shared factories, and missing `en-US` localizations; use `known_*` ID sets to resolve cross-pack references.
+- `tools/clone_content_pack.py` clones a pack into a new namespaced `packId`, re-prefixing only `ns:` IDs; native template names are never rewritten.
+- `tools/migrate_content_pack.py` migrates a pack between supported schema versions, applying bounded mechanical upgrades.
+- `tools/inspect_content_pack.py <pack-dir> [--json]` summarizes pack identity, counts, factory→unit mapping, stages with pools, AI profiles/modules, and localization coverage.
+- `tools/validate_ai_modules.py <pack-dir> [--all] [--json]` validates AI profiles against the loader's compiled module registry (21 `sample:*` modules): module count cap (8/profile), unknown modules/parameters, parameter bounds, `scopeToReferencedStages`, and dangling `unitEntries`.
+- `tools/analyze_blueprint_pools.py <pack-dir> [--json]` reports per-stage blueprint pool scoping: declared vs pool-covered units, uncovered (fallback-dependent) units, and factory mapping.
+- `tools/analyze_relic_synergy.py <pack-dir> [--json]` cross-checks relic `neededSystemTags` against unit `offeredSystemTags` (via `systemTags`) and flags `cardChanges` using unknown `ChangeableValue` names.
+- `tools/validate_native_templates.py <pack-dir> [--json]` checks `nativeTemplateId` values against known game template IDs for units, factories, stages, landscapes, and AI profiles.
+- `tools/export_balance_table.py <pack-dir> [--json|--csv]` exports the effective per-unit balance with loader precedence (`customBalance` > `balanceOverrides` > structured fields) for balance-simulator integration.
+- `tools/lint_content_pack.py <pack-dir> [--all] [--json]` emits quality warnings: missing `es-XL` localizations, factory IDs used in AI `unitEntries`, and inverted `mapSizeMin`/`mapSizeMax` ranges.
 
 - Run `./tools/run_python_checks.sh` from the repository root for the supported Python verification path. It selects the project `.venv`, clears inherited `PYTHONPATH` so Hermes' cp314 packages cannot shadow cp312 wheels, runs `tests/python`, then checks bundle references, the loader registry, and whitespace. Do not substitute a system interpreter or install dependencies globally.
 - Tests in `tests/python/` load scripts from `tools/` through `load_tool_module()` in `tests/python/helpers.py`; do not use direct `from tools.X import Y` imports because `tools/` is not a Python package.
