@@ -64,7 +64,7 @@
         {
           "language": "es-XL",
           "name": "Tanque Explorador",
-          "description": "Un tanque con blindaje ligero dise\u00f1ado para explorar y reposicionarse con rapidez."
+          "description": "Un tanque con blindaje ligero diseñado para explorar y reposicionarse con rapidez."
         }
       ],
       "defaultTacticalStance": "Aggressive",
@@ -100,6 +100,17 @@
           "id": "sample-expansion:scout-tank-martian-iron-rust",
           "colorTint": "#8b4528",
           "scale": 1.0
+        }
+      ],
+      "prespawnCount": 2,
+      "baselineStatusEffects": [
+        "Turbo"
+      ],
+      "onHitStatusEffects": [
+        {
+          "statusEffect": "Marked",
+          "duration": 2.0,
+          "chance": 0.25
         }
       ]
     }

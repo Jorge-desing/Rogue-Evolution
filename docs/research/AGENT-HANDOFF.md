@@ -917,3 +917,19 @@ The generated unit models, prefab authoring outputs, compiled visual bundle, and
       - Python Test Suite: `404/404` pasaron (1 skip, 0 fallos).
       - Despliegue obligatorio de sesión: DLL Release desplegada a `BepInEx/plugins/RogueCommandExpansionLoader.dll` con respaldo previo (`plugin-predeploy-backup-20261107-211646.dll`), manifiesto (`plugin-deploy-manifest-20261107-211646.json`) y verificación de hash SHA-256 idéntico (`5e5fc27d98137086cd7ac729fd7b6e566f5f321009681c54b892ca6f125fb146`).
     - **Límite de evidencia:** verificación en arnés de pruebas unitarias/offline, simulación MCP y compilación de DLL desplegada; la verificación visual runtime en partida Steam permanece como siguiente paso.
+
+52. **Implementación de las últimas mejoras y mecánicas a todas las unidades de los packs (2026-11-07; Content Packs & Runtime Stability):**
+    - **Cobertura universal en las 19 unidades de los 3 packs (`sample-expansion`, `sample-native-expansion`, `tactical-operations`):**
+      - **Pre-spawning anti-hitch pool quotas (`prespawnCount: 2-3`):** Se implementó pre-calentamiento de instancias en el pool `EntityFactory.PrespawnedEntities` para eliminar tirones (*hitches*) de cuadros durante la producción en fábrica y la invocación de oleadas de asalto en combate.
+      - **Efectos de estado dinámicos al impactar (`onHitStatusEffects`):** Asignación calibrada por rol (Stun eléctrico en `surge-tank`, Battered balístico en `heavy-artillery`/`assault-walker`/`bastion-siege-mech`/`bulwark-siege-tank`, SlowedDown de interferencia en `arachnid-hexapod`/`atlas-crane-mech`/`salvage-hauler`, Marked táctico en `scout-tank`/`command-relay`/`skyguard-sam`, OnFire de dispersión en `skirmish-bike`, y AttackDeactivated por pulso en `arc-lance-walker`).
+      - **Efectos de estado basales intrínsecos (`baselineStatusEffects`):** Rasgos pasivos vinculados al chasis (`Armored` y `Robust` en blindados pesados y mechs de asedio; `Turbo` y `Rush` en exploradores ligeros y motos de ataque).
+      - **Zonas muertas de alcance mínimo de artillería (`minAttackRange`):** Balística pesada calibrada (`5.5` en `sample-native:heavy-artillery`, `4.0` en `sample-native:bastion-siege-mech`, manteniendo `4.5`/`5.0` en `skyguard-sam`/`bulwark-siege-tank`/`gravitas-breaker`).
+      - **Especialización en impacto crítico de precisión (`criticalHitChance`):** Probabilidad de crítico acotada [0.08 - 0.15] en unidades de precisión, artillería y asedio.
+      - **Posturas tácticas y veterancy predeterminadas (`defaultTacticalStance`, `startingVeterancyRank`, `startingAffixes`):** Asignación explícita para todas las unidades que carecían de ellas, permitiendo orquestación inmediata por parte de la IA y el jugador.
+    - **Validación Hermética:**
+      - Release build del plugin: 0 advertencias / 0 errores.
+      - C# Test Suite: `518/519` pasaron (1 skip symlink, 0 fallos).
+      - Python Test Suite: `405/405` pasaron (1 skip plataforma, 0 fallos).
+      - Auditoría de referencias de contenido: 4 manifiestos PASS.
+      - Despliegue de fin de sesión: DLL Release verificada y desplegada a `BepInEx/plugins/RogueCommandExpansionLoader.dll` con hash SHA-256 idéntico (`b0bc033e60550da182bf844a73a3f1ba5145c31600fd16bf2331c1869779ba90`), manifiesto `plugin-deploy-manifest-20261107-213940.json` y respaldo previo `plugin-predeploy-backup-20261107-213940.dll`. Proceso `Rogue Command` verificado cerrado antes del despliegue.
+    - **Límite de evidencia:** validación hermética en arnés C#, suite Python y auditoría de esquemas/manifiestos; la prueba interactiva runtime in-game continúa según protocolo Profile2.

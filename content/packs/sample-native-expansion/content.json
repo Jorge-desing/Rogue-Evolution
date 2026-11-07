@@ -29,7 +29,7 @@
         {
           "language": "es-XL",
           "name": "Explorador Sandlance",
-          "description": "Un tanque de reconocimiento r\u00e1pido con m\u00e1stil sensor extendido y ca\u00f1\u00f3n ligero."
+          "description": "Un tanque de reconocimiento rápido con mástil sensor extendido y cañón ligero."
         }
       ],
       "balanceOverrides": [
@@ -281,6 +281,18 @@
           "colorTint": "#36453b",
           "scale": 1.0
         }
+      ],
+      "prespawnCount": 2,
+      "criticalHitChance": 0.1,
+      "baselineStatusEffects": [
+        "Turbo"
+      ],
+      "onHitStatusEffects": [
+        {
+          "statusEffect": "Marked",
+          "duration": 2.5,
+          "chance": 0.25
+        }
       ]
     },
     {
@@ -457,7 +469,7 @@
           },
           {
             "language": "es-XL",
-            "name": "F\u00e1brica de asedio Coloso",
+            "name": "Fábrica de asedio Coloso",
             "description": "Produce plataformas de asedio Coloso."
           }
         ]
@@ -526,6 +538,20 @@
           "colorTint": "#35393d",
           "scale": 1.0
         }
+      ],
+      "prespawnCount": 2,
+      "minAttackRange": 5.5,
+      "criticalHitChance": 0.15,
+      "baselineStatusEffects": [
+        "Armored",
+        "Robust"
+      ],
+      "onHitStatusEffects": [
+        {
+          "statusEffect": "Battered",
+          "duration": 3.0,
+          "chance": 0.3
+        }
       ]
     },
     {
@@ -542,7 +568,7 @@
         {
           "language": "es-XL",
           "name": "Caminante Gatling Acorazado",
-          "description": "Un caminante b\u00edpedo de combate reforzado equipado con ca\u00f1ones rotativos dobles para triturar enjambres y blindaje ligero."
+          "description": "Un caminante bípedo de combate reforzado equipado con cañones rotativos dobles para triturar enjambres y blindaje ligero."
         }
       ],
       "balanceOverrides": [
@@ -697,7 +723,7 @@
           },
           {
             "language": "es-XL",
-            "name": "Fundici\u00f3n de caminantes Ironclad",
+            "name": "Fundición de caminantes Ironclad",
             "description": "Produce caminantes Gatling acorazados."
           }
         ]
@@ -758,6 +784,19 @@
           "colorTint": "#41474e",
           "scale": 1.0
         }
+      ],
+      "prespawnCount": 2,
+      "criticalHitChance": 0.08,
+      "baselineStatusEffects": [
+        "Armored",
+        "Robust"
+      ],
+      "onHitStatusEffects": [
+        {
+          "statusEffect": "Battered",
+          "duration": 2.0,
+          "chance": 0.25
+        }
       ]
     },
     {
@@ -777,8 +816,8 @@
         },
         {
           "language": "es-XL",
-          "name": "Mecha Gr\u00faa Atlas",
-          "description": "Un mecha b\u00edpedo de combate pesado equipado con una gr\u00faa industrial y ca\u00f1ones dobles."
+          "name": "Mecha Grúa Atlas",
+          "description": "Un mecha bípedo de combate pesado equipado con una grúa industrial y cañones dobles."
         }
       ],
       "balanceOverrides": [
@@ -937,8 +976,8 @@
           },
           {
             "language": "es-XL",
-            "name": "F\u00e1brica de Mechas Gr\u00faa Atlas",
-            "description": "Produce mechas gr\u00faa Atlas."
+            "name": "Fábrica de Mechas Grúa Atlas",
+            "description": "Produce mechas grúa Atlas."
           }
         ],
         "assetBundleId": "sample-native:assets",
@@ -987,6 +1026,17 @@
           "colorTint": "#6c7784",
           "scale": 1.0
         }
+      ],
+      "prespawnCount": 2,
+      "baselineStatusEffects": [
+        "Robust"
+      ],
+      "onHitStatusEffects": [
+        {
+          "statusEffect": "SlowedDown",
+          "duration": 1.5,
+          "chance": 0.2
+        }
       ]
     },
     {
@@ -1004,8 +1054,8 @@
         },
         {
           "language": "es-XL",
-          "name": "Mecha de Asedio Basti\u00f3n",
-          "description": "Un caminante pesado fortificado que cambia velocidad por fuego de ca\u00f1\u00f3n y resistencia."
+          "name": "Mecha de Asedio Bastión",
+          "description": "Un caminante pesado fortificado que cambia velocidad por fuego de cañón y resistencia."
         }
       ],
       "balanceOverrides": [
@@ -1159,8 +1209,8 @@
           },
           {
             "language": "es-XL",
-            "name": "Fundici\u00f3n del Basti\u00f3n",
-            "description": "Produce mechas de asedio Basti\u00f3n."
+            "name": "Fundición del Bastión",
+            "description": "Produce mechas de asedio Bastión."
           }
         ],
         "assetBundleId": "sample-native:assets",
@@ -1202,7 +1252,7 @@
       "defaultLoadout": "Siege",
       "startingVeterancyRank": 2,
       "startingAffixes": [
-        "Bulwark"
+        "Juggernaut"
       ],
       "visualVariants": [
         {
@@ -1219,6 +1269,20 @@
           "id": "sample-native-expansion:bastion-siege-mech-cryo-glacier-camo",
           "colorTint": "#7292a6",
           "scale": 1.0
+        }
+      ],
+      "prespawnCount": 2,
+      "minAttackRange": 4.0,
+      "criticalHitChance": 0.1,
+      "baselineStatusEffects": [
+        "Armored",
+        "Robust"
+      ],
+      "onHitStatusEffects": [
+        {
+          "statusEffect": "Battered",
+          "duration": 2.5,
+          "chance": 0.3
         }
       ]
     },
@@ -1242,7 +1306,7 @@
         },
         {
           "language": "es-XL",
-          "name": "Hex\u00e1podo Ar\u00e1cnido",
+          "name": "Hexápodo Arácnido",
           "description": "Una plataforma de asalto pesado con blindaje resistente y fuego sostenido a media distancia."
         }
       ],
@@ -1401,8 +1465,8 @@
           },
           {
             "language": "es-XL",
-            "name": "P\u00f3rtico de ensamblaje Ar\u00e1cnido",
-            "description": "Produce hex\u00e1podos Ar\u00e1cnidos."
+            "name": "Pórtico de ensamblaje Arácnido",
+            "description": "Produce hexápodos Arácnidos."
           }
         ]
       },
@@ -1437,8 +1501,8 @@
         "siphonToShield": false,
         "maxSiphonPerHit": 10
       },
-      "defaultTacticalStance": "Kiting",
-      "defaultLoadout": "Speed",
+      "defaultTacticalStance": "Aggressive",
+      "defaultLoadout": "AP",
       "startingVeterancyRank": 1,
       "startingAffixes": [
         "Swift"
@@ -1458,6 +1522,18 @@
           "id": "sample-native-expansion:arachnid-hexapod-stealth-void-composite",
           "colorTint": "#181a1d",
           "scale": 1.0
+        }
+      ],
+      "prespawnCount": 2,
+      "criticalHitChance": 0.1,
+      "baselineStatusEffects": [
+        "Robust"
+      ],
+      "onHitStatusEffects": [
+        {
+          "statusEffect": "SlowedDown",
+          "duration": 2.0,
+          "chance": 0.3
         }
       ]
     },
@@ -1482,7 +1558,7 @@
         {
           "language": "es-XL",
           "name": "Cuartel de Mando Overlord",
-          "description": "Un veh\u00edculo de mando m\u00f3vil con chasis resistente y ca\u00f1\u00f3n convencional para sostener la l\u00ednea del frente."
+          "description": "Un vehículo de mando móvil con chasis resistente y cañón convencional para sostener la línea del frente."
         }
       ],
       "balanceOverrides": [
@@ -1640,8 +1716,8 @@
           },
           {
             "language": "es-XL",
-            "name": "Parque de veh\u00edculos Overlord",
-            "description": "Produce veh\u00edculos del Cuartel General Overlord."
+            "name": "Parque de vehículos Overlord",
+            "description": "Produce vehículos del Cuartel General Overlord."
           }
         ]
       },
@@ -1683,9 +1759,9 @@
       },
       "defaultTacticalStance": "Defensive",
       "defaultLoadout": "Standard",
-      "startingVeterancyRank": 3,
+      "startingVeterancyRank": 2,
       "startingAffixes": [
-        "Juggernaut"
+        "Bulwark"
       ],
       "visualVariants": [
         {
@@ -1697,6 +1773,18 @@
           "id": "sample-native-expansion:overlord-command-hq-solar-gold-radiator",
           "colorTint": "#d19f32",
           "scale": 1.0
+        }
+      ],
+      "prespawnCount": 1,
+      "baselineStatusEffects": [
+        "Armored",
+        "Robust"
+      ],
+      "onHitStatusEffects": [
+        {
+          "statusEffect": "Marked",
+          "duration": 3.0,
+          "chance": 0.35
         }
       ]
     },
@@ -1719,8 +1807,8 @@
         },
         {
           "language": "es-XL",
-          "name": "Moto de Asalto R\u00e1pido",
-          "description": "Una moto de reconocimiento ultrarr\u00e1pida cargada con cargas explosivas vol\u00e1tiles para ataques de choque y fuga.",
+          "name": "Moto de Asalto Rápido",
+          "description": "Una moto de reconocimiento ultrarrápida cargada con cargas explosivas volátiles para ataques de choque y fuga.",
           "skillDescription": "Muere e invoca una #LargeMine#."
         }
       ],
@@ -1876,7 +1964,7 @@
           {
             "language": "es-XL",
             "name": "Taller de motos de asalto",
-            "description": "Produce motos de asalto r\u00e1pido."
+            "description": "Produce motos de asalto rápido."
           }
         ],
         "assetBundleId": "sample-native:assets",
@@ -1908,7 +1996,7 @@
         "experienceType": "Combat",
         "bonusMultiplier": 1
       },
-      "defaultTacticalStance": "Kiting",
+      "defaultTacticalStance": "Aggressive",
       "defaultLoadout": "Speed",
       "startingVeterancyRank": 1,
       "startingAffixes": [
@@ -1930,6 +2018,18 @@
           "colorTint": "#e1e6eb",
           "scale": 1.0
         }
+      ],
+      "prespawnCount": 3,
+      "criticalHitChance": 0.12,
+      "baselineStatusEffects": [
+        "Turbo"
+      ],
+      "onHitStatusEffects": [
+        {
+          "statusEffect": "OnFire",
+          "duration": 2.0,
+          "chance": 0.25
+        }
       ]
     },
     {
@@ -1947,8 +2047,8 @@
         },
         {
           "language": "es-XL",
-          "name": "Tanque de Sobretensi\u00f3n de Arco",
-          "description": "Un tanque de combate electromagn\u00e9tico avanzado que descarga arcos el\u00e9ctricos de alto voltaje para aturdir y sobrecargar circuitos enemigos."
+          "name": "Tanque de Sobretensión de Arco",
+          "description": "Un tanque de combate electromagnético avanzado que descarga arcos eléctricos de alto voltaje para aturdir y sobrecargar circuitos enemigos."
         }
       ],
       "balanceOverrides": [
@@ -2103,7 +2203,7 @@
           {
             "language": "es-XL",
             "name": "Planta de tanques Surge Arc",
-            "description": "Produce tanques de sobretensi\u00f3n de arco."
+            "description": "Produce tanques de sobretensión de arco."
           }
         ],
         "assetBundleId": "sample-native:assets",
@@ -2154,9 +2254,9 @@
       },
       "defaultTacticalStance": "Aggressive",
       "defaultLoadout": "Standard",
-      "startingVeterancyRank": 2,
+      "startingVeterancyRank": 1,
       "startingAffixes": [
-        "Overcharged"
+        "Swift"
       ],
       "visualVariants": [
         {
@@ -2173,6 +2273,18 @@
           "id": "sample-native-expansion:surge-tank-antimatter-containment-lattice",
           "colorTint": "#1f182c",
           "scale": 1.0
+        }
+      ],
+      "prespawnCount": 2,
+      "criticalHitChance": 0.08,
+      "baselineStatusEffects": [
+        "Armored"
+      ],
+      "onHitStatusEffects": [
+        {
+          "statusEffect": "Stun",
+          "duration": 1.2,
+          "chance": 0.25
         }
       ]
     }
@@ -2805,8 +2917,8 @@
         },
         {
           "language": "es-XL",
-          "name": "Contrapeso de fundici\u00f3n",
-          "description": "Los mechas gr\u00faa Atlas obtienen un 10 % m\u00e1s de salud durante el resto de la partida."
+          "name": "Contrapeso de fundición",
+          "description": "Los mechas grúa Atlas obtienen un 10 % más de salud durante el resto de la partida."
         }
       ],
       "cardChanges": [
