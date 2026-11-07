@@ -20,6 +20,7 @@ namespace RogueCommandExpansionLoader.Content
         public ContentStageDefinition[] stages;
         public ContentAiProfileDefinition[] aiProfiles;
         public ContentRelicDefinition[] relics;
+        public ContentUpgradeDefinition[] upgrades;
 
         public ContentPackDefinition Clone() => ContentPackCopy.DeepClone(this);
     }
@@ -702,6 +703,41 @@ namespace RogueCommandExpansionLoader.Content
     }
 
     [Serializable]
+    public sealed class ContentUpgradeDefinition
+    {
+        public string id;
+        public string assetBundleId;
+        public string imageAssetName;
+        public string rarity;
+        public string tech;
+        public string offeredSystemTags;
+        public string neededSystemTags;
+        public int coinsAmount;
+        public int neededExperienceLevel;
+        public bool isAllowedForDemo;
+        public bool isForSpecialists;
+        public bool inactive;
+        public bool applyToFactoryWhereApplicable;
+        public string[] entityMustHaveOneOfTheseRoles;
+        public string[] entityMustNotHaveOneOfTheseRoles;
+        public string attackTypeFilterHandling;
+        public string attackTypeFilter;
+        public string skillTypeFilterHandling;
+        public string skillTypeFilter;
+        public string[] mustNotHaveOneOfTheseEntityIds;
+        public ContentUpgradeLocalizationDefinition[] localizations;
+        public ContentCardChangeDefinition[] cardChanges;
+    }
+
+    [Serializable]
+    public sealed class ContentUpgradeLocalizationDefinition
+    {
+        public string language;
+        public string name;
+        public string description;
+    }
+
+    [Serializable]
     public sealed class ContentCardChangeDefinition
     {
         public string valueToChange;
@@ -999,7 +1035,8 @@ namespace RogueCommandExpansionLoader.Content
                 buildings = CloneArray(source.buildings, CloneBuilding),
                 stages = CloneArray(source.stages, CloneStage),
                 aiProfiles = CloneArray(source.aiProfiles, CloneAiProfile),
-                relics = CloneArray(source.relics, CloneRelic)
+                relics = CloneArray(source.relics, CloneRelic),
+                upgrades = CloneArray(source.upgrades, CloneUpgrade)
             };
         }
 
@@ -1619,6 +1656,52 @@ namespace RogueCommandExpansionLoader.Content
             ContentRelicLocalizationDefinition source)
         {
             return source == null ? null : new ContentRelicLocalizationDefinition
+            {
+                language = source.language,
+                name = source.name,
+                description = source.description
+            };
+        }
+
+        private static ContentUpgradeDefinition CloneUpgrade(ContentUpgradeDefinition source)
+        {
+            return source == null ? null : new ContentUpgradeDefinition
+            {
+                id = source.id,
+                assetBundleId = source.assetBundleId,
+                imageAssetName = source.imageAssetName,
+                rarity = source.rarity,
+                tech = source.tech,
+                offeredSystemTags = source.offeredSystemTags,
+                neededSystemTags = source.neededSystemTags,
+                coinsAmount = source.coinsAmount,
+                neededExperienceLevel = source.neededExperienceLevel,
+                isAllowedForDemo = source.isAllowedForDemo,
+                isForSpecialists = source.isForSpecialists,
+                inactive = source.inactive,
+                applyToFactoryWhereApplicable = source.applyToFactoryWhereApplicable,
+                entityMustHaveOneOfTheseRoles = source.entityMustHaveOneOfTheseRoles == null
+                    ? null
+                    : (string[])source.entityMustHaveOneOfTheseRoles.Clone(),
+                entityMustNotHaveOneOfTheseRoles = source.entityMustNotHaveOneOfTheseRoles == null
+                    ? null
+                    : (string[])source.entityMustNotHaveOneOfTheseRoles.Clone(),
+                attackTypeFilterHandling = source.attackTypeFilterHandling,
+                attackTypeFilter = source.attackTypeFilter,
+                skillTypeFilterHandling = source.skillTypeFilterHandling,
+                skillTypeFilter = source.skillTypeFilter,
+                mustNotHaveOneOfTheseEntityIds = source.mustNotHaveOneOfTheseEntityIds == null
+                    ? null
+                    : (string[])source.mustNotHaveOneOfTheseEntityIds.Clone(),
+                localizations = CloneArray(source.localizations, CloneUpgradeLocalization),
+                cardChanges = CloneArray(source.cardChanges, CloneCardChange)
+            };
+        }
+
+        private static ContentUpgradeLocalizationDefinition CloneUpgradeLocalization(
+            ContentUpgradeLocalizationDefinition source)
+        {
+            return source == null ? null : new ContentUpgradeLocalizationDefinition
             {
                 language = source.language,
                 name = source.name,

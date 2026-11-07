@@ -286,6 +286,10 @@ namespace RogueCommandExpansionLoader.Runtime
                 HasSingleStringArgumentReturningString);
             MethodInfo relicDescription = RuntimeReflection.FindUniqueMethod(loca, "RelicDescription",
                 HasSingleStringArgumentReturningString);
+            MethodInfo upgradeName = RuntimeReflection.FindUniqueMethod(loca, "UpgradeName",
+                HasSingleStringArgumentReturningString);
+            MethodInfo upgradeDescription = RuntimeReflection.FindUniqueMethod(loca, "UpgradeDescription",
+                HasSingleStringArgumentReturningString);
             MethodInfo globalLocalization = RuntimeReflection.FindUniqueMethod(loca, "Global",
                 delegate(MethodInfo method)
                 {
@@ -344,6 +348,8 @@ namespace RogueCommandExpansionLoader.Runtime
             MethodInfo skillDescriptionPrefix = Hook("SkillDescriptionPrefix");
             MethodInfo relicNamePrefix = Hook("RelicNamePrefix");
             MethodInfo relicDescriptionPrefix = Hook("RelicDescriptionPrefix");
+            MethodInfo upgradeNamePrefix = Hook("UpgradeNamePrefix");
+            MethodInfo upgradeDescriptionPrefix = Hook("UpgradeDescriptionPrefix");
             MethodInfo globalLocalizationPrefix = Hook("LandscapeLocalizationPrefix");
             MethodInfo globalLocalizationFinalizer = Hook("LandscapeLocalizationFinalizer");
             MethodInfo fallbackLandscapesPostfix = Hook("FallbackLandscapeGeneratorsPostfix");
@@ -450,6 +456,8 @@ namespace RogueCommandExpansionLoader.Runtime
             plan.Add(new PatchPlan(skillDescription, skillDescriptionPrefix, null));
             plan.Add(new PatchPlan(relicName, relicNamePrefix, null));
             plan.Add(new PatchPlan(relicDescription, relicDescriptionPrefix, null));
+            plan.Add(new PatchPlan(upgradeName, upgradeNamePrefix, null));
+            plan.Add(new PatchPlan(upgradeDescription, upgradeDescriptionPrefix, null));
             plan.Add(new PatchPlan(globalLocalization, globalLocalizationPrefix, null, globalLocalizationFinalizer));
             plan.Add(new PatchPlan(fallbackLandscapes, null, fallbackLandscapesPostfix));
             plan.Add(new PatchPlan(outlyingStartAiBuildingDistance,

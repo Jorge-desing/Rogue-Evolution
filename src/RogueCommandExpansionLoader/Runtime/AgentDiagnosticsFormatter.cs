@@ -2357,6 +2357,95 @@ namespace RogueCommandExpansionLoader.Runtime
         }
 
         /// <summary>
+        /// Serializes the detailed card upgrade telemetry census.
+        /// Omission counters precede detail collections.
+        /// </summary>
+        public static string SerializeUpgradeCensus(UpgradeCensus census)
+        {
+            var rows = new List<Dictionary<string, object>>();
+            if (census != null && census.Upgrades != null)
+            {
+                for (int i = 0; i < census.Upgrades.Count; i++)
+                {
+                    UpgradeDetailEntry entry = census.Upgrades[i];
+                    if (entry == null) continue;
+                    rows.Add(new Dictionary<string, object>
+                    {
+                        ["id"] = entry.Id ?? string.Empty,
+                        ["rarity"] = entry.Rarity ?? string.Empty,
+                        ["tech"] = entry.Tech ?? string.Empty,
+                        ["coinsAmount"] = entry.CoinsAmount,
+                        ["neededExperienceLevel"] = entry.NeededExperienceLevel,
+                        ["isAllowedForDemo"] = entry.IsAllowedForDemo,
+                        ["isForSpecialists"] = entry.IsForSpecialists,
+                        ["inactive"] = entry.Inactive,
+                        ["offeredSystemTags"] = entry.OfferedSystemTags ?? string.Empty,
+                        ["neededSystemTags"] = entry.NeededSystemTags ?? string.Empty,
+                        ["applyToFactoryWhereApplicable"] = entry.ApplyToFactoryWhereApplicable,
+                        ["cardChangeCount"] = entry.CardChangeCount,
+                        ["isModded"] = entry.IsModded,
+                    });
+                }
+            }
+
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "upgradeCensus",
+                ["omittedUpgradeCount"] = census != null ? census.OmittedUpgradeCount : 0,
+                ["totalUpgrades"] = census != null ? census.TotalUpgrades : 0,
+                ["activeUpgrades"] = census != null ? census.ActiveUpgrades : 0,
+                ["moddedUpgrades"] = census != null ? census.ModdedUpgrades : 0,
+                ["isReady"] = census != null && census.IsReady,
+                ["upgrades"] = rows,
+            };
+            return Serialize(view);
+        }
+
+        /// <summary>
+        /// Serializes the detailed player relic telemetry census.
+        /// Omission counters precede detail collections.
+        /// </summary>
+        public static string SerializeRelicCensus(RelicCensus census)
+        {
+            var rows = new List<Dictionary<string, object>>();
+            if (census != null && census.Relics != null)
+            {
+                for (int i = 0; i < census.Relics.Count; i++)
+                {
+                    RelicDetailEntry entry = census.Relics[i];
+                    if (entry == null) continue;
+                    rows.Add(new Dictionary<string, object>
+                    {
+                        ["id"] = entry.Id ?? string.Empty,
+                        ["rarity"] = entry.Rarity ?? string.Empty,
+                        ["tech"] = entry.Tech ?? string.Empty,
+                        ["coinsAmount"] = entry.CoinsAmount,
+                        ["neededExperienceLevel"] = entry.NeededExperienceLevel,
+                        ["isAllowedForDemo"] = entry.IsAllowedForDemo,
+                        ["isForSpecialists"] = entry.IsForSpecialists,
+                        ["inactive"] = entry.Inactive,
+                        ["offeredSystemTags"] = entry.OfferedSystemTags ?? string.Empty,
+                        ["neededSystemTags"] = entry.NeededSystemTags ?? string.Empty,
+                        ["cardChangeCount"] = entry.CardChangeCount,
+                        ["isModded"] = entry.IsModded,
+                    });
+                }
+            }
+
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "relicCensus",
+                ["omittedRelicCount"] = census != null ? census.OmittedRelicCount : 0,
+                ["totalRelics"] = census != null ? census.TotalRelics : 0,
+                ["activeRelics"] = census != null ? census.ActiveRelics : 0,
+                ["moddedRelics"] = census != null ? census.ModdedRelics : 0,
+                ["isReady"] = census != null && census.IsReady,
+                ["relics"] = rows,
+            };
+            return Serialize(view);
+        }
+
+        /// <summary>
         /// Serializes unit veterancy, combat XP, rank tiers, and stat multipliers.
         /// Omission counters precede detail collections.
         /// </summary>
@@ -3225,6 +3314,8 @@ new Dictionary<string, object> { ["name"] = "GetVisualSurfaceCensusJson", ["desc
                 new Dictionary<string, object> { ["name"] = "GetUnitMechanicsCensusJson", ["description"] = "Live census of active unit mechanics: healing, auras, shield regen, XP/veterancy, combat stances, and visual director state." },
                 new Dictionary<string, object> { ["name"] = "OrderUnitVisualFeedbackJson", ["description"] = "Order visual feedback pulse (WeaponRecoil, JamTurret, UnjamTurret, OpenBayDoors, CloseBayDoors, FootstepPulse) on a unit." },
                 new Dictionary<string, object> { ["name"] = "OrderUnitAttachmentJson", ["description"] = "Command hardpoint attachment state (APS, ERA, FuelDrums, Armor, Shield) on a unit visual hierarchy." },
+                new Dictionary<string, object> { ["name"] = "GetUpgradeCensusJson", ["description"] = "Telemetry census of registered card upgrades in the UpgradeBalancingStore." },
+                new Dictionary<string, object> { ["name"] = "GetRelicCensusJson", ["description"] = "Telemetry census of registered player relics in the RelicBalancingStore." },
                 new Dictionary<string, object> { ["name"] = "GetDiagnosticCatalogJson", ["description"] = "Catalog of available diagnostic getters." },
             };
 

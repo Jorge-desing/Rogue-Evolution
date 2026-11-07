@@ -96,6 +96,10 @@
              Link="Runtime/RuntimeUnitMechanicsCensus.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeTechCatalogCensus.cs"
              Link="Runtime/RuntimeTechCatalogCensus.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeUpgradeCensus.cs"
+             Link="Runtime/RuntimeUpgradeCensus.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeRelicCensus.cs"
+             Link="Runtime/RuntimeRelicCensus.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeVeterancyCensus.cs"
              Link="Runtime/RuntimeVeterancyCensus.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeCommandAuraCensus.cs"
@@ -134,6 +138,8 @@
              Link="Content/BalanceOverrideFlags.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Content/RelicLocalizationResolver.cs"
              Link="Content/RelicLocalizationResolver.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Content/UpgradeLocalizationResolver.cs"
+             Link="Content/UpgradeLocalizationResolver.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Content/StageGenerationCompatibility.cs"
              Link="Content/StageGenerationCompatibility.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Compatibility/GameCompatibility.cs"

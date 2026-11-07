@@ -170,6 +170,7 @@ namespace RogueCommandExpansionLoader.Content
         public const int MaxAiProductionBuildingEntriesPerProfile = 32;
         public const int MaxAiUnitDependenciesPerProfile = 64;
         public const int MaxRelicsPerPack = 128;
+        public const int MaxUpgradesPerPack = 128;
         public const int MaxAiUnitCountAtStart = 8;
         public const int MaxAiUnitMaxLiving = 32;
         public const int MaxAiBaseIndex = 31;
@@ -236,6 +237,9 @@ namespace RogueCommandExpansionLoader.Content
                 "GainCreditsAmount", "SkillManaCost", "Duration1", "SpawnTtl", "ManaRechargePerSecond",
                 "MaxArmor", "ArmorProtection"
             }, StringComparer.Ordinal);
+        private static readonly HashSet<string> SupportedTypeFilterHandlings = new HashSet<string>(
+            new[] { "AllAllowed", "OnlyIfEntityHasType", "OnlyIfEntityHasNotType" },
+            StringComparer.Ordinal);
         private static readonly HashSet<string> SupportedCombatStances = new HashSet<string>(
             new[] { "Standard", "Aggressive", "Defensive", "HoldFire", "Kiting" },
             StringComparer.OrdinalIgnoreCase);
@@ -278,11 +282,12 @@ namespace RogueCommandExpansionLoader.Content
             var aiProfiles = RequireArray(pack.aiProfiles, "aiProfiles", diagnostics);
             ContentRelicDefinition[] relics = pack.relics ?? new ContentRelicDefinition[0];
             ContentBuildingDefinition[] buildings = pack.buildings ?? new ContentBuildingDefinition[0];
+            ContentUpgradeDefinition[] upgrades = pack.upgrades ?? new ContentUpgradeDefinition[0];
 
-            if (units.Length == 0 && stages.Length == 0 && aiProfiles.Length == 0 && relics.Length == 0 && buildings.Length == 0)
+            if (units.Length == 0 && stages.Length == 0 && aiProfiles.Length == 0 && relics.Length == 0 && buildings.Length == 0 && upgrades.Length == 0)
             {
                 Add(diagnostics, "content.empty", "content.json",
-                    "A content pack must declare at least one unit, building, stage, AI profile, or relic.");
+                    "A content pack must declare at least one unit, building, stage, AI profile, relic, or upgrade.");
             }
 
             if (assetBundles.Length > MaxAssetBundlesPerPack)
@@ -779,6 +784,18 @@ namespace RogueCommandExpansionLoader.Content
             for (int i = 0; i < relics.Length; i++)
             {
                 ValidateRelic(relics[i], "relics[" + i + "]", allIds, bundleIds, unitIds,
+                    registrySnapshot, diagnostics);
+            }
+
+            if (upgrades.Length > MaxUpgradesPerPack)
+            {
+                Add(diagnostics, "upgrade.count-exceeds-limit", "upgrades",
+                    "A content pack can declare at most " + MaxUpgradesPerPack + " upgrades.");
+            }
+
+            for (int i = 0; i < upgrades.Length; i++)
+            {
+                ValidateUpgrade(upgrades[i], "upgrades[" + i + "]", allIds, bundleIds, unitIds,
                     registrySnapshot, diagnostics);
             }
 
@@ -3771,6 +3788,322 @@ namespace RogueCommandExpansionLoader.Content
                 {
                     Add(diagnostics, "relic.role-filter-duplicate", path + "[" + i + "]",
                         "Duplicate role '" + role + "' in relic role filter.");
+                }
+            }
+        }
+
+        private static void ValidateUpgradeRoleFilter(string[] roles, string path, List<ContentDiagnostic> diagnostics)
+        {
+            if (roles == null)
+            {
+                return;
+            }
+
+            if (roles.Length > 16)
+            {
+                Add(diagnostics, "upgrade.role-filter-limit", path,
+                    "A card upgrade can declare at most 16 role flags per filter.");
+            }
+
+            var seenRoles = new HashSet<string>(StringComparer.Ordinal);
+            for (int i = 0; i < roles.Length; i++)
+            {
+                string role = roles[i];
+                if (String.IsNullOrWhiteSpace(role) || !SupportedUnitRoles.Contains(role))
+                {
+                    Add(diagnostics, "upgrade.role-filter-invalid", path + "[" + i + "]",
+                        "Upgrade role filter must be one of the supported UnitRole values.");
+                }
+                else if (!seenRoles.Add(role))
+                {
+                    Add(diagnostics, "upgrade.role-filter-duplicate", path + "[" + i + "]",
+                        "Duplicate role '" + role + "' in upgrade role filter.");
+                }
+            }
+        }
+
+        private static void ValidateUpgradeLocalizations(
+            ContentUpgradeLocalizationDefinition[] localizations,
+            string path,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (localizations == null || localizations.Length == 0)
+            {
+                Add(diagnostics, "upgrade.localization-required", path,
+                    "An upgrade must provide at least its en-US name and description.");
+                return;
+            }
+
+            if (localizations.Length > MaxLocalizationsPerDefinition)
+            {
+                Add(diagnostics, "upgrade.localization-limit", path,
+                    "An upgrade can declare at most " + MaxLocalizationsPerDefinition + " localizations.");
+            }
+
+            var languages = new HashSet<string>(StringComparer.Ordinal);
+            bool hasEnglish = false;
+            for (int i = 0; i < localizations.Length; i++)
+            {
+                ContentUpgradeLocalizationDefinition localization = localizations[i];
+                string itemPath = path + "[" + i + "]";
+                if (localization == null)
+                {
+                    Add(diagnostics, "entry.null", itemPath, "Upgrade localization entries cannot be null.");
+                    continue;
+                }
+
+                if (String.IsNullOrWhiteSpace(localization.language) ||
+                    !SupportedUnitLocalizationLanguages.Contains(localization.language))
+                {
+                    Add(diagnostics, "upgrade.localization-language-unsupported", itemPath + ".language",
+                        "Upgrade localization language must match one of the game's supported language IDs exactly.");
+                }
+                else if (!languages.Add(localization.language))
+                {
+                    Add(diagnostics, "upgrade.localization-language-duplicate", itemPath + ".language",
+                        "An upgrade can declare at most one localization for each language.");
+                }
+
+                if (String.IsNullOrWhiteSpace(localization.name))
+                {
+                    Add(diagnostics, "upgrade.localization-name-required", itemPath + ".name",
+                        "Every upgrade localization must include a non-empty display name.");
+                }
+                else if (String.Equals(localization.language, "en-US", StringComparison.Ordinal))
+                {
+                    hasEnglish = true;
+                }
+
+                if (String.IsNullOrWhiteSpace(localization.description))
+                {
+                    Add(diagnostics, "upgrade.localization-description-required", itemPath + ".description",
+                        "Every upgrade localization must include a non-empty description.");
+                }
+            }
+
+            if (!hasEnglish)
+            {
+                Add(diagnostics, "upgrade.localization-english-required", path,
+                    "Upgrade localizations must include an en-US name and description for fallback.");
+            }
+        }
+
+        private static void ValidateUpgrade(
+            ContentUpgradeDefinition upgrade,
+            string path,
+            HashSet<string> allIds,
+            HashSet<string> bundleIds,
+            HashSet<string> unitIds,
+            IContentRegistrySnapshot registrySnapshot,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (upgrade == null)
+            {
+                Add(diagnostics, "entry.null", path, "Upgrade entries cannot be null.");
+                return;
+            }
+
+            RegisterId(upgrade.id, path + ".id", "upgrade", allIds, registrySnapshot, diagnostics);
+            ValidateBundleReference(upgrade.assetBundleId, path + ".assetBundleId", bundleIds, diagnostics);
+            ValidateAssetName(upgrade.imageAssetName, path + ".imageAssetName", diagnostics);
+
+            if (String.IsNullOrWhiteSpace(upgrade.rarity) || !SupportedRelicRarities.Contains(upgrade.rarity))
+            {
+                Add(diagnostics, "upgrade.rarity-invalid", path + ".rarity",
+                    "Upgrade rarity must be one of the game's supported rarity IDs.");
+            }
+
+            if (String.IsNullOrWhiteSpace(upgrade.tech) || !SupportedRelicTechs.Contains(upgrade.tech))
+            {
+                Add(diagnostics, "upgrade.tech-invalid", path + ".tech",
+                    "Upgrade tech must be one of the game's supported tech IDs.");
+            }
+
+            if (String.IsNullOrWhiteSpace(upgrade.offeredSystemTags) ||
+                !SupportedRelicSystemTags.Contains(upgrade.offeredSystemTags))
+            {
+                Add(diagnostics, "upgrade.offered-system-tags-invalid", path + ".offeredSystemTags",
+                    "Upgrade offeredSystemTags must be one supported system tag.");
+            }
+
+            if (String.IsNullOrWhiteSpace(upgrade.neededSystemTags) ||
+                !SupportedRelicSystemTags.Contains(upgrade.neededSystemTags))
+            {
+                Add(diagnostics, "upgrade.needed-system-tags-invalid", path + ".neededSystemTags",
+                    "Upgrade neededSystemTags must be one supported system tag.");
+            }
+
+            if (upgrade.neededExperienceLevel < 0 || upgrade.neededExperienceLevel > MaxNeededExperienceLevel)
+            {
+                Add(diagnostics, "upgrade.experience-level-invalid", path + ".neededExperienceLevel",
+                    "Upgrade experience level must be between 0 and " + MaxNeededExperienceLevel + ".");
+            }
+
+            if (upgrade.coinsAmount < 0)
+            {
+                Add(diagnostics, "upgrade.coins-amount-invalid", path + ".coinsAmount",
+                    "Upgrade coins amount cannot be negative.");
+            }
+
+            if (!String.IsNullOrWhiteSpace(upgrade.attackTypeFilterHandling) &&
+                !SupportedTypeFilterHandlings.Contains(upgrade.attackTypeFilterHandling))
+            {
+                Add(diagnostics, "upgrade.attack-filter-handling-invalid", path + ".attackTypeFilterHandling",
+                    "Upgrade attackTypeFilterHandling must be AllAllowed, OnlyIfEntityHasType, or OnlyIfEntityHasNotType.");
+            }
+
+            if (!String.IsNullOrWhiteSpace(upgrade.attackTypeFilter) &&
+                !SupportedAttackTypes.Contains(upgrade.attackTypeFilter))
+            {
+                Add(diagnostics, "upgrade.attack-filter-invalid", path + ".attackTypeFilter",
+                    "Upgrade attackTypeFilter must be a supported AttackType.");
+            }
+
+            if (!String.IsNullOrWhiteSpace(upgrade.skillTypeFilterHandling) &&
+                !SupportedTypeFilterHandlings.Contains(upgrade.skillTypeFilterHandling))
+            {
+                Add(diagnostics, "upgrade.skill-filter-handling-invalid", path + ".skillTypeFilterHandling",
+                    "Upgrade skillTypeFilterHandling must be AllAllowed, OnlyIfEntityHasType, or OnlyIfEntityHasNotType.");
+            }
+
+            if (!String.IsNullOrWhiteSpace(upgrade.skillTypeFilter) &&
+                !SupportedSkillTypes.Contains(upgrade.skillTypeFilter))
+            {
+                Add(diagnostics, "upgrade.skill-filter-invalid", path + ".skillTypeFilter",
+                    "Upgrade skillTypeFilter must be a supported SkillType.");
+            }
+
+            ValidateUpgradeRoleFilter(upgrade.entityMustHaveOneOfTheseRoles, path + ".entityMustHaveOneOfTheseRoles", diagnostics);
+            ValidateUpgradeRoleFilter(upgrade.entityMustNotHaveOneOfTheseRoles, path + ".entityMustNotHaveOneOfTheseRoles", diagnostics);
+
+            ValidateUpgradeLocalizations(upgrade.localizations, path + ".localizations", diagnostics);
+
+            ContentCardChangeDefinition[] changes = RequireArray(upgrade.cardChanges,
+                path + ".cardChanges", diagnostics);
+            if (changes.Length == 0)
+            {
+                Add(diagnostics, "upgrade.card-change-required", path + ".cardChanges",
+                    "An upgrade must declare at least one native card change.");
+            }
+
+            if (changes.Length > 16)
+            {
+                Add(diagnostics, "upgrade.card-change-limit", path + ".cardChanges",
+                    "An upgrade can declare at most 16 card changes.");
+            }
+
+            for (int i = 0; i < changes.Length; i++)
+            {
+                ContentCardChangeDefinition change = changes[i];
+                string changePath = path + ".cardChanges[" + i + "]";
+                if (change == null)
+                {
+                    Add(diagnostics, "entry.null", changePath, "Card change entries cannot be null.");
+                    continue;
+                }
+
+                if (String.IsNullOrWhiteSpace(change.valueToChange) ||
+                    !SupportedRelicChangeableValues.Contains(change.valueToChange))
+                {
+                    Add(diagnostics, "upgrade.change-value-unsupported", changePath + ".valueToChange",
+                        "Card change valueToChange must be one of the game's supported ChangeableValue attributes.");
+                }
+
+                if (!String.Equals(change.operation, "Add", StringComparison.Ordinal) &&
+                    !String.Equals(change.operation, "Multiply", StringComparison.Ordinal))
+                {
+                    Add(diagnostics, "upgrade.change-operation-invalid", changePath + ".operation",
+                        "Card change operation must be Add or Multiply.");
+                }
+
+                if (Single.IsNaN(change.value) || Single.IsInfinity(change.value) ||
+                    change.value <= 0f || change.value > 10000f)
+                {
+                    Add(diagnostics, "upgrade.change-value-invalid", changePath + ".value",
+                        "Card change value must be greater than 0 and at most 10000.");
+                }
+
+                if (change.multiplyValueWithCurrentHeatLevel)
+                {
+                    Add(diagnostics, "upgrade.heat-scaling-unsupported",
+                        changePath + ".multiplyValueWithCurrentHeatLevel",
+                        "Pack-authored upgrade changes must keep Heat scaling disabled until the per-level balance budget is validated.");
+                }
+
+                if (!String.Equals(change.side, "False", StringComparison.Ordinal) &&
+                    !String.Equals(change.side, "True", StringComparison.Ordinal) &&
+                    !String.Equals(change.side, "Irrelevant", StringComparison.Ordinal))
+                {
+                    Add(diagnostics, "upgrade.change-side-invalid", changePath + ".side",
+                        "Card change side must match the game's False, True, or Irrelevant value.");
+                }
+
+                if (change.multiplyValueWithMetaProgressionMultiplier != null &&
+                    String.IsNullOrWhiteSpace(change.multiplyValueWithMetaProgressionMultiplier))
+                {
+                    Add(diagnostics, "upgrade.meta-progression-invalid",
+                        changePath + ".multiplyValueWithMetaProgressionMultiplier",
+                        "A meta progression multiplier key must be non-empty when provided.");
+                }
+
+                ValidateUpgradeRoleFilter(change.cardMustHaveAllOfTheseRoles, changePath + ".cardMustHaveAllOfTheseRoles", diagnostics);
+                ValidateUpgradeRoleFilter(change.cardMustHaveOneOfTheseRoles, changePath + ".cardMustHaveOneOfTheseRoles", diagnostics);
+                ValidateUpgradeRoleFilter(change.cardMustNotHaveOneOfTheseRoles, changePath + ".cardMustNotHaveOneOfTheseRoles", diagnostics);
+
+                if (change.cardMustNotHaveOneOfTheseTechs != null)
+                {
+                    if (change.cardMustNotHaveOneOfTheseTechs.Length > 16)
+                    {
+                        Add(diagnostics, "upgrade.tech-filter-limit", changePath + ".cardMustNotHaveOneOfTheseTechs",
+                            "A card change can declare at most 16 excluded tech flags.");
+                    }
+                    var seenTechs = new HashSet<string>(StringComparer.Ordinal);
+                    for (int t = 0; t < change.cardMustNotHaveOneOfTheseTechs.Length; t++)
+                    {
+                        string techName = change.cardMustNotHaveOneOfTheseTechs[t];
+                        if (String.IsNullOrWhiteSpace(techName) || !SupportedUnitTechs.Contains(techName))
+                        {
+                            Add(diagnostics, "upgrade.tech-filter-invalid", changePath + ".cardMustNotHaveOneOfTheseTechs[" + t + "]",
+                                "Excluded tech must match one of the supported Tech values.");
+                        }
+                        else if (!seenTechs.Add(techName))
+                        {
+                            Add(diagnostics, "upgrade.tech-filter-duplicate", changePath + ".cardMustNotHaveOneOfTheseTechs[" + t + "]",
+                                "Duplicate tech '" + techName + "' in excluded tech list.");
+                        }
+                    }
+                }
+
+                bool hasTargetIds = change.onlyForTheseEntityIds != null && change.onlyForTheseEntityIds.Length > 0;
+                bool hasRoleFilter = (change.cardMustHaveAllOfTheseRoles != null && change.cardMustHaveAllOfTheseRoles.Length > 0) ||
+                                     (change.cardMustHaveOneOfTheseRoles != null && change.cardMustHaveOneOfTheseRoles.Length > 0);
+
+                if (!hasTargetIds && !hasRoleFilter)
+                {
+                    Add(diagnostics, "upgrade.target-unspecified", changePath,
+                        "A card change must declare either target entity IDs or at least one role filter.");
+                }
+
+                if (hasTargetIds)
+                {
+                    if (change.onlyForTheseEntityIds.Length > 64)
+                    {
+                        Add(diagnostics, "upgrade.target-ids-limit", changePath + ".onlyForTheseEntityIds",
+                            "A card change can declare at most 64 target entity IDs.");
+                    }
+                    ValidateReferences(change.onlyForTheseEntityIds, changePath + ".onlyForTheseEntityIds",
+                        unitIds, registrySnapshot, false, diagnostics);
+                }
+
+                if (change.entityIdsNotAllowed != null && change.entityIdsNotAllowed.Length > 0)
+                {
+                    if (change.entityIdsNotAllowed.Length > 64)
+                    {
+                        Add(diagnostics, "upgrade.excluded-ids-limit", changePath + ".entityIdsNotAllowed",
+                            "A card change can declare at most 64 excluded entity IDs.");
+                    }
+                    ValidateReferences(change.entityIdsNotAllowed, changePath + ".entityIdsNotAllowed",
+                        unitIds, registrySnapshot, false, diagnostics);
                 }
             }
         }

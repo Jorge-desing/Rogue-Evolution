@@ -204,6 +204,14 @@ namespace RogueCommandExpansionLoader.Runtime
 
         public int LiveVertexWearSampleCount => GetLiveVisualQualityCensus().VertexColorSampleCount;
 
+        public int LiveTotalUpgradeCount => RuntimeUpgradeCensus.Current(0).TotalUpgrades;
+        public int LiveActiveUpgradeCount => RuntimeUpgradeCensus.Current(0).ActiveUpgrades;
+        public int LiveModdedUpgradeCount => RuntimeUpgradeCensus.Current(0).ModdedUpgrades;
+
+        public int LiveTotalRelicCount => RuntimeRelicCensus.Current(0).TotalRelics;
+        public int LiveActiveRelicCount => RuntimeRelicCensus.Current(0).ActiveRelics;
+        public int LiveModdedRelicCount => RuntimeRelicCensus.Current(0).ModdedRelics;
+
         // ---- Methods callable via component/call_method ----
 
         /// <summary>
@@ -1627,6 +1635,24 @@ namespace RogueCommandExpansionLoader.Runtime
         {
             return AgentDiagnosticsFormatter.SerializeTechCatalogCensus(
                 RuntimeTechCatalogCensus.Current());
+        }
+
+        /// <summary>
+        /// Returns telemetry census of registered card upgrades in the balancing store as JSON.
+        /// </summary>
+        public string GetUpgradeCensusJson(int maxEntries = 64)
+        {
+            return AgentDiagnosticsFormatter.SerializeUpgradeCensus(
+                RuntimeUpgradeCensus.Current(maxEntries));
+        }
+
+        /// <summary>
+        /// Returns telemetry census of registered player relics in the balancing store as JSON.
+        /// </summary>
+        public string GetRelicCensusJson(int maxEntries = 64)
+        {
+            return AgentDiagnosticsFormatter.SerializeRelicCensus(
+                RuntimeRelicCensus.Current(maxEntries));
         }
 
         /// <summary>

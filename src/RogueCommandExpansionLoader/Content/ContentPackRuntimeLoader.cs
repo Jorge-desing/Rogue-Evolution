@@ -23,7 +23,7 @@ namespace RogueCommandExpansionLoader.Content
     /// keeps their AssetBundles and Unity objects alive for the whole game session.
     /// </summary>
     public sealed class ContentPackRuntimeLoader : IRuntimeContentProvider, IUnitSkillLocalizationRuntimeProvider,
-        IRelicLocalizationRuntimeProvider, IStageLandscapeRuntimeProvider,
+        IRelicLocalizationRuntimeProvider, IUpgradeLocalizationRuntimeProvider, IStageLandscapeRuntimeProvider,
         IBlueprintPoolRuntimeProvider, IStageFallbackRuntimeProvider,
         IStageOwnedAiPlacementDistanceRuntimeProvider, IBlueprintRewardFactoryScopeProvider,
         IPrespawnRuntimeProvider, IGuaranteedModCardRewardProvider, IGlobalBlueprintCandidateProvider
@@ -122,6 +122,7 @@ namespace RogueCommandExpansionLoader.Content
         private readonly string _packsRoot;
         private readonly Assembly _gameAssembly;
         private readonly RelicContentRuntimeRegistrar _relicRegistrar;
+        private readonly UpgradeContentRuntimeRegistrar _upgradeRegistrar;
         private readonly AiModuleRegistry _moduleRegistry;
         private readonly Action<string> _log;
         private readonly RuntimeMutationManager _mutationManager;
@@ -277,6 +278,7 @@ namespace RogueCommandExpansionLoader.Content
         private readonly List<ScriptableObject> _landscapeClones = new List<ScriptableObject>();
         private readonly List<ScriptableObject> _blueprintPoolClones = new List<ScriptableObject>();
         private readonly List<ScriptableObject> _retainedRelicObjects = new List<ScriptableObject>();
+        private readonly List<ScriptableObject> _retainedUpgradeObjects = new List<ScriptableObject>();
         private readonly List<object> _blueprintPools = new List<object>();
         private readonly BlueprintPoolScopeRegistry _blueprintPoolScopeRegistry =
             new BlueprintPoolScopeRegistry();
@@ -295,6 +297,8 @@ namespace RogueCommandExpansionLoader.Content
             new Dictionary<string, LoadedUnit>(StringComparer.Ordinal);
         private readonly Dictionary<string, ContentRelicDefinition> _relicDefinitions =
             new Dictionary<string, ContentRelicDefinition>(StringComparer.Ordinal);
+        private readonly Dictionary<string, ContentUpgradeDefinition> _upgradeDefinitions =
+            new Dictionary<string, ContentUpgradeDefinition>(StringComparer.Ordinal);
         private readonly HashSet<string> _knownIds = new HashSet<string>(StringComparer.Ordinal);
         private readonly HashSet<string> _nativeUnitIds = new HashSet<string>(StringComparer.Ordinal);
         private readonly HashSet<string> _nativeFactoryIds = new HashSet<string>(StringComparer.Ordinal);
@@ -337,6 +341,7 @@ namespace RogueCommandExpansionLoader.Content
             _packsRoot = Path.GetFullPath(packsRoot);
             _gameAssembly = gameAssembly ?? throw new ArgumentNullException("gameAssembly");
             _relicRegistrar = new RelicContentRuntimeRegistrar(_gameAssembly);
+            _upgradeRegistrar = new UpgradeContentRuntimeRegistrar(_gameAssembly);
             _moduleRegistry = moduleRegistry ?? throw new ArgumentNullException("moduleRegistry");
             _log = logger;
             _mutationManager = new RuntimeMutationManager(_log ?? (msg => { }));
@@ -870,6 +875,26 @@ namespace RogueCommandExpansionLoader.Content
                     "el relic " + relicId);
 
                 return RelicLocalizationResolver.TryResolve(relic, language, description, out value);
+            }
+        }
+
+        public bool TryGetUpgradeLocalization(string upgradeId, bool description, out string value)
+        {
+            value = null;
+            lock (_gate)
+            {
+                ContentUpgradeDefinition upgrade;
+                if (String.IsNullOrWhiteSpace(upgradeId) || !_upgradeDefinitions.TryGetValue(upgradeId, out upgrade))
+                {
+                    return false;
+                }
+
+                string language = RuntimeLocalizationLanguage.GetOrDefault(
+                    () => _localizationLanguageProperty.GetValue(null, null) as string,
+                    Log,
+                    "el upgrade " + upgradeId);
+
+                return UpgradeLocalizationResolver.TryResolve(upgrade, language, description, out value);
             }
         }
 
@@ -4579,6 +4604,12 @@ namespace RogueCommandExpansionLoader.Content
                 return bundle.LoadAsset<Sprite>(relic.imageAssetName);
             }, _retainedRelicObjects);
 
+            _upgradeRegistrar.Register(definition.upgrades, delegate(ContentUpgradeDefinition upgrade)
+            {
+                AssetBundle bundle = GetBundle(bundles, upgrade.assetBundleId, definition.packId);
+                return bundle.LoadAsset<Sprite>(upgrade.imageAssetName);
+            }, _retainedUpgradeObjects);
+
             for (int i = 0; i < units.Count; i++)
             {
                 _units.Add(units[i].Id, units[i]);
@@ -4588,6 +4619,11 @@ namespace RogueCommandExpansionLoader.Content
             for (int i = 0; i < (definition.relics ?? new ContentRelicDefinition[0]).Length; i++)
             {
                 _relicDefinitions.Add(definition.relics[i].id, definition.relics[i]);
+            }
+
+            for (int i = 0; i < (definition.upgrades ?? new ContentUpgradeDefinition[0]).Length; i++)
+            {
+                _upgradeDefinitions.Add(definition.upgrades[i].id, definition.upgrades[i]);
             }
 
             _blueprintPoolScopeRegistry.Register(poolScopeRegistrations);

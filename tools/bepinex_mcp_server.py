@@ -1410,6 +1410,16 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             res = _call_diagnostics_method("GetTechCatalogJson")
             return _tool_response(res)
 
+        elif name == "diagnostics_get_upgrade_census":
+            max_entries = int(arguments.get("maxEntries", 64))
+            res = _call_diagnostics_method("GetUpgradeCensusJson", [max_entries])
+            return _tool_response(res)
+
+        elif name == "diagnostics_get_relic_census":
+            max_entries = int(arguments.get("maxEntries", 64))
+            res = _call_diagnostics_method("GetRelicCensusJson", [max_entries])
+            return _tool_response(res)
+
         elif name == "diagnostics_runtime_scalars":
             scalars = {}
             for member_name in [
@@ -1433,6 +1443,12 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
                 "LiveVisualQualityPassCount",
                 "LiveVisualQualityIssueCount",
                 "LiveVertexWearSampleCount",
+                "LiveTotalUpgradeCount",
+                "LiveActiveUpgradeCount",
+                "LiveModdedUpgradeCount",
+                "LiveTotalRelicCount",
+                "LiveActiveRelicCount",
+                "LiveModdedRelicCount",
                 "AuditedUnitPrefabCount",
                 "LiveMechanicsDirectorCount",
                 "LiveVisualDirectorCount",

@@ -34,6 +34,12 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
             "LiveVisualQualityPassCount": ("System.Int32", "3"),
             "LiveVisualQualityIssueCount": ("System.Int32", "0"),
             "LiveVertexWearSampleCount": ("System.Int32", "1200"),
+            "LiveTotalUpgradeCount": ("System.Int32", "12"),
+            "LiveActiveUpgradeCount": ("System.Int32", "10"),
+            "LiveModdedUpgradeCount": ("System.Int32", "2"),
+            "LiveTotalRelicCount": ("System.Int32", "8"),
+            "LiveActiveRelicCount": ("System.Int32", "7"),
+            "LiveModdedRelicCount": ("System.Int32", "1"),
             "AuditedUnitPrefabCount": ("System.Int32", "6"),
             "LiveMechanicsDirectorCount": ("System.Int32", "4"),
             "LiveVisualDirectorCount": ("System.Int32", "4"),
@@ -115,6 +121,12 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
                 "LiveVisualQualityPassCount": 3,
                 "LiveVisualQualityIssueCount": 0,
                 "LiveVertexWearSampleCount": 1200,
+                "LiveTotalUpgradeCount": 12,
+                "LiveActiveUpgradeCount": 10,
+                "LiveModdedUpgradeCount": 2,
+                "LiveTotalRelicCount": 8,
+                "LiveActiveRelicCount": 7,
+                "LiveModdedRelicCount": 1,
                 "AuditedUnitPrefabCount": 6,
                 "LiveMechanicsDirectorCount": 4,
                 "LiveVisualDirectorCount": 4,
@@ -540,16 +552,18 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
             "diagnostics_gui_control",
             "diagnostics_ui_press_button",
             "diagnostics_fast_snapshot",
+            "diagnostics_get_upgrade_census",
+            "diagnostics_get_relic_census",
             "discover_tools",
             "describe_tool",
         ):
             self.assertIn(expected, names)
-        self.assertEqual(201, len(names))
+        self.assertEqual(203, len(names))
 
     def test_tools_list_default_is_all_and_paginates(self) -> None:
         full = SERVER.handle_request({"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}})
         tools = full["result"]["tools"]
-        self.assertEqual(201, len(tools))
+        self.assertEqual(203, len(tools))
         page = SERVER.handle_request({"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {"limit": 10}})
         self.assertEqual(10, len(page["result"]["tools"]))
         cursor = page["result"]["nextCursor"]

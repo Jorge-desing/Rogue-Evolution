@@ -76,6 +76,12 @@ namespace RogueCommandExpansionLoader.Runtime
         bool TryGetRelicLocalization(string relicId, bool description, out string value);
     }
 
+    /// <summary>Optional bridge for native card upgrade names and descriptions.</summary>
+    public interface IUpgradeLocalizationRuntimeProvider
+    {
+        bool TryGetUpgradeLocalization(string upgradeId, bool description, out string value);
+    }
+
     /// <summary>
     /// Optional bridge for a stage-owned procedural landscape. The returned scope is temporary
     /// and must be ended from a Harmony finalizer so game collections are restored after failures.

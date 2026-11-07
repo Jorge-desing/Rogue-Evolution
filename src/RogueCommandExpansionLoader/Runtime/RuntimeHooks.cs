@@ -721,6 +721,16 @@ namespace RogueCommandExpansionLoader.Runtime
             return TryResolveRelicLocalization(__0, true, ref __result);
         }
 
+        public static bool UpgradeNamePrefix(string __0, ref string __result)
+        {
+            return TryResolveUpgradeLocalization(__0, false, ref __result);
+        }
+
+        public static bool UpgradeDescriptionPrefix(string __0, ref string __result)
+        {
+            return TryResolveUpgradeLocalization(__0, true, ref __result);
+        }
+
         public static bool SkillDescriptionPrefix(string __0, ref string __result)
         {
             IUnitSkillLocalizationRuntimeProvider provider;
@@ -1086,6 +1096,44 @@ namespace RogueCommandExpansionLoader.Runtime
                 if (logger != null)
                 {
                     logger("Could not resolve localized text for relic '" + relicId + "': " +
+                        exception.GetType().Name + ": " + exception.Message);
+                }
+
+                return true;
+            }
+        }
+
+        private static bool TryResolveUpgradeLocalization(string upgradeId, bool description, ref string result)
+        {
+            IUpgradeLocalizationRuntimeProvider provider;
+            Action<string> logger;
+            lock (Gate)
+            {
+                provider = _provider as IUpgradeLocalizationRuntimeProvider;
+                logger = _log;
+            }
+
+            if (provider == null)
+            {
+                return true;
+            }
+
+            try
+            {
+                string value;
+                if (!provider.TryGetUpgradeLocalization(upgradeId, description, out value))
+                {
+                    return true;
+                }
+
+                result = value ?? String.Empty;
+                return false;
+            }
+            catch (Exception exception)
+            {
+                if (logger != null)
+                {
+                    logger("Could not resolve localized text for upgrade '" + upgradeId + "': " +
                         exception.GetType().Name + ": " + exception.Message);
                 }
 
@@ -1676,6 +1724,16 @@ namespace RogueCommandExpansionLoader.Runtime
         public static bool RelicDescriptionPrefix(string __0, ref string __result)
         {
             return RuntimeHooks.RelicDescriptionPrefix(__0, ref __result);
+        }
+
+        public static bool UpgradeNamePrefix(string __0, ref string __result)
+        {
+            return RuntimeHooks.UpgradeNamePrefix(__0, ref __result);
+        }
+
+        public static bool UpgradeDescriptionPrefix(string __0, ref string __result)
+        {
+            return RuntimeHooks.UpgradeDescriptionPrefix(__0, ref __result);
         }
 
         public static bool LandscapeLocalizationPrefix(ref string __0, ref string __result)

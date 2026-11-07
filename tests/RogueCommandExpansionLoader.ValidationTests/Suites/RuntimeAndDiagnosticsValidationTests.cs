@@ -5175,7 +5175,9 @@ internal static partial class ValidationTestRunner
                 !names.Contains("OrderUnitTacticalPulseJson") ||
                 !names.Contains("OrderDirectorThreatSweepJson") ||
                 !names.Contains("OrderCoordinatedAssaultJson") ||
-                !names.Contains("OrderRetreatJson"))
+                !names.Contains("OrderRetreatJson") ||
+                !names.Contains("GetUpgradeCensusJson") ||
+                !names.Contains("GetRelicCensusJson"))
             {
                 throw new InvalidOperationException("Diagnostic catalog should include all newly exposed endpoints.");
             }
@@ -8956,6 +8958,129 @@ internal static partial class ValidationTestRunner
         if (census.FrameCount != 42 || census.Fps <= 0f)
         {
             throw new InvalidOperationException("Performance census must sample live Unity frame data.");
+        }
+    }),
+    ("runtime upgrade census and relic census serialize valid schema and respect omission bounds", () =>
+    {
+        // 1. Upgrade census tests
+        UpgradeCensus emptyUpgrade = RuntimeUpgradeCensus.Current();
+        string emptyUpgradeJson = AgentDiagnosticsFormatter.SerializeUpgradeCensus(emptyUpgrade);
+        using (var doc = JsonDocument.Parse(emptyUpgradeJson))
+        {
+            if (doc.RootElement.GetProperty("kind").GetString() != "upgradeCensus" ||
+                doc.RootElement.GetProperty("omittedUpgradeCount").GetInt32() != 0 ||
+                !doc.RootElement.TryGetProperty("upgrades", out var upgradesProp))
+            {
+                throw new InvalidOperationException("Empty upgrade census JSON mismatch.");
+            }
+        }
+
+        var dummyUpgrades = new List<UpgradeDetailEntry>
+        {
+            new UpgradeDetailEntry(
+                id: "Upgrade_TestHull",
+                rarity: "Rare",
+                tech: "Armor",
+                coinsAmount: 50,
+                neededExperienceLevel: 2,
+                isAllowedForDemo: true,
+                isForSpecialists: false,
+                inactive: false,
+                offeredSystemTags: "Mech;Heavy",
+                neededSystemTags: "",
+                applyToFactoryWhereApplicable: true,
+                cardChangeCount: 2,
+                isModded: true)
+        };
+        var populatedUpgrade = new UpgradeCensus(
+            omittedUpgradeCount: 0,
+            totalUpgrades: 1,
+            activeUpgrades: 1,
+            moddedUpgrades: 1,
+            upgrades: dummyUpgrades,
+            isReady: true);
+
+        string populatedUpgradeJson = AgentDiagnosticsFormatter.SerializeUpgradeCensus(populatedUpgrade);
+        using (var doc = JsonDocument.Parse(populatedUpgradeJson))
+        {
+            if (doc.RootElement.GetProperty("kind").GetString() != "upgradeCensus" ||
+                doc.RootElement.GetProperty("totalUpgrades").GetInt32() != 1 ||
+                doc.RootElement.GetProperty("activeUpgrades").GetInt32() != 1 ||
+                doc.RootElement.GetProperty("moddedUpgrades").GetInt32() != 1 ||
+                !doc.RootElement.GetProperty("isReady").GetBoolean())
+            {
+                throw new InvalidOperationException("Populated upgrade census header JSON mismatch.");
+            }
+            var first = doc.RootElement.GetProperty("upgrades")[0];
+            if (first.GetProperty("id").GetString() != "Upgrade_TestHull" ||
+                first.GetProperty("rarity").GetString() != "Rare" ||
+                first.GetProperty("coinsAmount").GetInt32() != 50 ||
+                !first.GetProperty("isModded").GetBoolean() ||
+                !first.GetProperty("applyToFactoryWhereApplicable").GetBoolean() ||
+                first.GetProperty("cardChangeCount").GetInt32() != 2)
+            {
+                throw new InvalidOperationException("Populated upgrade entry JSON mismatch.");
+            }
+        }
+
+        // 2. Relic census tests
+        RelicCensus emptyRelic = RuntimeRelicCensus.Current();
+        string emptyRelicJson = AgentDiagnosticsFormatter.SerializeRelicCensus(emptyRelic);
+        using (var doc = JsonDocument.Parse(emptyRelicJson))
+        {
+            if (doc.RootElement.GetProperty("kind").GetString() != "relicCensus" ||
+                doc.RootElement.GetProperty("omittedRelicCount").GetInt32() != 0 ||
+                !doc.RootElement.TryGetProperty("relics", out var relicsProp))
+            {
+                throw new InvalidOperationException("Empty relic census JSON mismatch.");
+            }
+        }
+
+        var dummyRelics = new List<RelicDetailEntry>
+        {
+            new RelicDetailEntry(
+                id: "Relic_TestReactor",
+                rarity: "Epic",
+                tech: "Energy",
+                coinsAmount: 120,
+                neededExperienceLevel: 3,
+                isAllowedForDemo: false,
+                isForSpecialists: true,
+                inactive: false,
+                offeredSystemTags: "Energy;Power",
+                neededSystemTags: "",
+                cardChangeCount: 3,
+                isModded: true)
+        };
+        var populatedRelic = new RelicCensus(
+            omittedRelicCount: 0,
+            totalRelics: 1,
+            activeRelics: 1,
+            moddedRelics: 1,
+            relics: dummyRelics,
+            isReady: true);
+
+        string populatedRelicJson = AgentDiagnosticsFormatter.SerializeRelicCensus(populatedRelic);
+        using (var doc = JsonDocument.Parse(populatedRelicJson))
+        {
+            if (doc.RootElement.GetProperty("kind").GetString() != "relicCensus" ||
+                doc.RootElement.GetProperty("totalRelics").GetInt32() != 1 ||
+                doc.RootElement.GetProperty("activeRelics").GetInt32() != 1 ||
+                doc.RootElement.GetProperty("moddedRelics").GetInt32() != 1 ||
+                !doc.RootElement.GetProperty("isReady").GetBoolean())
+            {
+                throw new InvalidOperationException("Populated relic census header JSON mismatch.");
+            }
+            var first = doc.RootElement.GetProperty("relics")[0];
+            if (first.GetProperty("id").GetString() != "Relic_TestReactor" ||
+                first.GetProperty("rarity").GetString() != "Epic" ||
+                first.GetProperty("coinsAmount").GetInt32() != 120 ||
+                !first.GetProperty("isModded").GetBoolean() ||
+                !first.GetProperty("isForSpecialists").GetBoolean() ||
+                first.GetProperty("cardChangeCount").GetInt32() != 3)
+            {
+                throw new InvalidOperationException("Populated relic entry JSON mismatch.");
+            }
         }
     }),
     };

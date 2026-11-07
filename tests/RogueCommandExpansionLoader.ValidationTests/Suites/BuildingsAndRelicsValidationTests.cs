@@ -589,6 +589,219 @@ internal static partial class ValidationTestRunner
         WithPackage(duplicateRoles, (pack, root) => ExpectDiagnostic(pack, root, new EmptySnapshot(),
             new KnownModuleValidator(), "relic.role-filter-duplicate"));
     }),
+    ("upgrade clone and localization preserve independent card data", () =>
+    {
+        var sampleUpgrade = new ContentUpgradeDefinition
+        {
+            id = "test:hyper-accelerator",
+            assetBundleId = "sample:bundle",
+            imageAssetName = "assets/hyper_accel.png",
+            rarity = "Rare",
+            tech = "Mech",
+            offeredSystemTags = "Kinetic",
+            neededSystemTags = "Mech",
+            coinsAmount = 150,
+            neededExperienceLevel = 2,
+            isAllowedForDemo = true,
+            isForSpecialists = false,
+            applyToFactoryWhereApplicable = false,
+            entityMustHaveOneOfTheseRoles = new[] { "Unit", "Mech" },
+            entityMustNotHaveOneOfTheseRoles = new[] { "Building" },
+            attackTypeFilterHandling = "OnlyIfEntityHasType",
+            attackTypeFilter = "Single",
+            skillTypeFilterHandling = "AllAllowed",
+            mustNotHaveOneOfTheseEntityIds = new[] { "test:excluded-unit" },
+            localizations = new[]
+            {
+                new ContentUpgradeLocalizationDefinition
+                {
+                    language = "en-US",
+                    name = "Hyper Accelerator",
+                    description = "Increases weapon range and projectile velocity."
+                },
+                new ContentUpgradeLocalizationDefinition
+                {
+                    language = "es-XL",
+                    name = "Hiper Acelerador",
+                    description = "Incrementa el alcance de arma y velocidad."
+                }
+            },
+            cardChanges = new[]
+            {
+                new ContentCardChangeDefinition
+                {
+                    valueToChange = "WeaponRange",
+                    operation = "Multiply",
+                    value = 1.25f,
+                    side = "Irrelevant",
+                    cardMustHaveOneOfTheseRoles = new[] { "Unit" }
+                }
+            }
+        };
+
+        string enDesc = null!;
+        if (!UpgradeLocalizationResolver.TryResolve(sampleUpgrade, "es-XL", false, out string esName) ||
+            esName != "Hiper Acelerador" ||
+            !UpgradeLocalizationResolver.TryResolve(sampleUpgrade, "de-DE", true, out enDesc) ||
+            enDesc != "Increases weapon range and projectile velocity.")
+        {
+            throw new InvalidOperationException("Upgrade localization or en-US fallback did not resolve correctly.");
+        }
+
+        var packWithUpgrade = new ContentPackDefinition
+        {
+            schemaVersion = 1,
+            packId = "test:pack",
+            upgrades = new[] { sampleUpgrade }
+        };
+
+        ContentPackDefinition copy = ContentPackCopy.DeepClone(packWithUpgrade);
+        ContentUpgradeDefinition cloned = copy.upgrades[0];
+        cloned.localizations[0].name = "Mutated Name";
+        cloned.entityMustHaveOneOfTheseRoles[0] = "MutatedRole";
+        cloned.cardChanges[0].value = 999.0f;
+
+        if (sampleUpgrade.localizations[0].name == "Mutated Name" ||
+            sampleUpgrade.entityMustHaveOneOfTheseRoles[0] == "MutatedRole" ||
+            Math.Abs(sampleUpgrade.cardChanges[0].value - 1.25f) > 0.0001f)
+        {
+            throw new InvalidOperationException("Upgrade deep clone shared mutable array references.");
+        }
+    }),
+    ("upgrade validation rejects negative coinsAmount, invalid ChangeableValue, invalid attack/skill filters, and duplicate roles", () =>
+    {
+        ContentPackDefinition pack = ContentPackCopy.DeepClone(nativeSample);
+        pack.upgrades = new[]
+        {
+            new ContentUpgradeDefinition
+            {
+                id = "sample-native:test-upgrade",
+                assetBundleId = nativeSample.assetBundles[0].id,
+                imageAssetName = nativeSample.relics[0].imageAssetName,
+                rarity = "Rare",
+                tech = "Mech",
+                offeredSystemTags = "Kinetic",
+                neededSystemTags = "Mech",
+                coinsAmount = 100,
+                neededExperienceLevel = 1,
+                isAllowedForDemo = true,
+                isForSpecialists = false,
+                localizations = new[]
+                {
+                    new ContentUpgradeLocalizationDefinition
+                    {
+                        language = "en-US",
+                        name = "Test Upgrade",
+                        description = "Test description"
+                    }
+                },
+                cardChanges = new[]
+                {
+                    new ContentCardChangeDefinition
+                    {
+                        valueToChange = "MoveSpeed",
+                        operation = "Multiply",
+                        value = 1.2f,
+                        side = "Irrelevant",
+                        cardMustHaveOneOfTheseRoles = new[] { "Unit" }
+                    }
+                }
+            }
+        };
+
+        // Negative coinsAmount
+        ContentPackDefinition invalidCoins = ContentPackCopy.DeepClone(pack);
+        invalidCoins.upgrades[0].coinsAmount = -25;
+        WithPackage(invalidCoins, (p, root) => ExpectDiagnostic(p, root, new EmptySnapshot(),
+            new KnownModuleValidator(), "upgrade.coins-amount-invalid"));
+
+        // Invalid ChangeableValue
+        ContentPackDefinition invalidStat = ContentPackCopy.DeepClone(pack);
+        invalidStat.upgrades[0].cardChanges[0].valueToChange = "InvalidValueName";
+        WithPackage(invalidStat, (p, root) => ExpectDiagnostic(p, root, new EmptySnapshot(),
+            new KnownModuleValidator(), "upgrade.change-value-unsupported"));
+
+        // Duplicate role filter
+        ContentPackDefinition duplicateRoles = ContentPackCopy.DeepClone(pack);
+        duplicateRoles.upgrades[0].entityMustHaveOneOfTheseRoles = new[] { "Unit", "Unit" };
+        WithPackage(duplicateRoles, (p, root) => ExpectDiagnostic(p, root, new EmptySnapshot(),
+            new KnownModuleValidator(), "upgrade.role-filter-duplicate"));
+
+        // Invalid attackTypeFilterHandling
+        ContentPackDefinition invalidAttackHandling = ContentPackCopy.DeepClone(pack);
+        invalidAttackHandling.upgrades[0].attackTypeFilterHandling = "InvalidHandling";
+        WithPackage(invalidAttackHandling, (p, root) => ExpectDiagnostic(p, root, new EmptySnapshot(),
+            new KnownModuleValidator(), "upgrade.attack-filter-handling-invalid"));
+
+        // Invalid skillTypeFilter
+        ContentPackDefinition invalidSkill = ContentPackCopy.DeepClone(pack);
+        invalidSkill.upgrades[0].skillTypeFilter = "InvalidSkillType";
+        WithPackage(invalidSkill, (p, root) => ExpectDiagnostic(p, root, new EmptySnapshot(),
+            new KnownModuleValidator(), "upgrade.skill-filter-invalid"));
+    }),
+    ("upgrade validation accepts valid complete upgrade definition", () =>
+    {
+        ContentPackDefinition pack = ContentPackCopy.DeepClone(nativeSample);
+        pack.upgrades = new[]
+        {
+            new ContentUpgradeDefinition
+            {
+                id = "sample-native:rapid-fire-servos",
+                assetBundleId = nativeSample.assetBundles[0].id,
+                imageAssetName = nativeSample.relics[0].imageAssetName,
+                rarity = "Rare",
+                tech = "Mech",
+                offeredSystemTags = "Turbo",
+                neededSystemTags = "Mech",
+                coinsAmount = 120,
+                neededExperienceLevel = 2,
+                isAllowedForDemo = true,
+                isForSpecialists = false,
+                applyToFactoryWhereApplicable = false,
+                entityMustHaveOneOfTheseRoles = new[] { "Unit", "Mech" },
+                attackTypeFilterHandling = "OnlyIfEntityHasType",
+                attackTypeFilter = "Single",
+                skillTypeFilterHandling = "AllAllowed",
+                localizations = new[]
+                {
+                    new ContentUpgradeLocalizationDefinition
+                    {
+                        language = "en-US",
+                        name = "Rapid-Fire Servos",
+                        description = "Increases attack speed and movement responsiveness."
+                    },
+                    new ContentUpgradeLocalizationDefinition
+                    {
+                        language = "es-XL",
+                        name = "Servos de Disparo Rápido",
+                        description = "Aumenta la cadencia de disparo y respuesta."
+                    }
+                },
+                cardChanges = new[]
+                {
+                    new ContentCardChangeDefinition
+                    {
+                        valueToChange = "Attack1Cooldown",
+                        operation = "Multiply",
+                        value = 0.85f,
+                        side = "Irrelevant",
+                        cardMustHaveOneOfTheseRoles = new[] { "Unit" }
+                    }
+                }
+            }
+        };
+
+        WithPackage(pack, (p, root) =>
+        {
+            ContentPackValidationResult result = ContentPackValidator.Validate(
+                p, root, new EmptySnapshot(), new KnownModuleValidator());
+            if (result.Diagnostics.Count > 0)
+            {
+                throw new InvalidOperationException("Valid upgrade was rejected: " +
+                    string.Join("; ", result.Diagnostics.Select(d => d.Code + ": " + d.Message)));
+            }
+        });
+    }),
     ("productionBuilding structured parameters accept valid ranges and reject invalid values", () =>
     {
         ContentPackDefinition pack = ContentPackCopy.DeepClone(nativeSample);
