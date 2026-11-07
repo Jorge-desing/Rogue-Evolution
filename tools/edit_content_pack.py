@@ -12,7 +12,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from tools.merge_content_packs import _as_list, _entity_key
+from tools.merge_content_packs import _as_dict, _as_list, _entity_key
 
 
 def _unit_index(pack: dict) -> dict[str, dict]:
@@ -718,6 +718,296 @@ def apply_edits(
             all_diagnostics.append(f"ops[{index}] {name}: {item}")
 
     return current, all_diagnostics
+
+
+def extract_units_to_pack(
+    pack: dict, unit_ids: list[str]
+) -> tuple[dict, list[str]]:
+    """Extrae un subconjunto de unidades a un pack nuevo (con dependencias).
+
+    Incluye las unidades pedidas (con sus fábricas) y solo las etapas/perfiles
+    AI que referencian esas unidades. Falla si alguna unidad no existe.
+    """
+    source = _as_dict(pack)
+    diagnostics: list[str] = []
+    index = _unit_index(source)
+    for uid in unit_ids:
+        if uid not in index:
+            diagnostics.append(f"unit '{uid}' no existe en el pack")
+    if diagnostics:
+        return {}, diagnostics
+
+    extracted: dict[str, Any] = {}
+    if isinstance(source.get("packId"), str):
+        extracted["packId"] = source["packId"]
+    if "schemaVersion" in source:
+        extracted["schemaVersion"] = source["schemaVersion"]
+
+    wanted = set(unit_ids)
+    extracted["units"] = [
+        u for u in _as_list(source.get("units")) if _entity_key(u) in wanted
+    ]
+
+    stages = []
+    for stage in _as_list(source.get("stages")):
+        if not isinstance(stage, dict):
+            continue
+        stage_units = set(_as_list(stage.get("unitIds")))
+        if stage_units & wanted:
+            stages.append(stage)
+    if stages:
+        extracted["stages"] = stages
+
+    wanted_profiles = set()
+    for stage in stages:
+        wanted_profiles.update(_as_list(stage.get("aiProfileIds")))
+    profiles = []
+    for profile in _as_list(source.get("aiProfiles")):
+        if not isinstance(profile, dict):
+            continue
+        if _entity_key(profile) in wanted_profiles:
+            profiles.append(profile)
+    if profiles:
+        extracted["aiProfiles"] = profiles
+
+    # bundles: only those whose produced units are extracted
+    # (keep assetBundles empty unless units declare assetBundleId)
+    has_bundle_units = any(
+        u.get("assetBundleId") for u in extracted["units"]
+    )
+    extracted["assetBundles"] = list(_as_list(source.get("assetBundles"))) if has_bundle_units else []
+
+    return extracted, []
+
+
+def import_units(
+    pack: dict, source: dict, unit_ids: list[str]
+) -> tuple[dict, list[str]]:
+    """Importa unidades desde ``source`` al pack actual.
+
+    Duplica las unidades pedidas (con fábricas) y las etapas/perfiles mínimos
+    que las referencian. Falla si alguna ya existe.
+    """
+    updated = json.loads(json.dumps(pack)) if isinstance(pack, dict) else {}
+    src = _as_dict(source)
+    diagnostics: list[str] = []
+
+    src_index = _unit_index(src)
+    existing = _unit_index(updated)
+    existing_factories = _factory_index(updated)
+
+    to_import = []
+    for uid in unit_ids:
+        if uid not in src_index:
+            diagnostics.append(f"unit '{uid}' no existe en el pack origen")
+            continue
+        if uid in existing:
+            diagnostics.append(f"unit '{uid}' ya existe en el pack destino")
+            continue
+        unit = src_index[uid]
+        factory = unit.get("productionBuilding") if isinstance(unit, dict) else None
+        fid = _entity_key(factory) if isinstance(factory, dict) else None
+        if fid and fid in existing_factories:
+            diagnostics.append(f"factory '{fid}' ya existe en el pack destino")
+            continue
+        to_import.append(unit)
+
+    if diagnostics:
+        return updated, diagnostics
+
+    for unit in to_import:
+        updated.setdefault("units", []).append(json.loads(json.dumps(unit)))
+
+    wanted = set(unit_ids)
+    # import stages that reference the imported units (if not already present)
+    existing_stages = {
+        _entity_key(s) for s in _as_list(updated.get("stages")) if isinstance(s, dict)
+    }
+    for stage in _as_list(src.get("stages")):
+        if not isinstance(stage, dict):
+            continue
+        if set(_as_list(stage.get("unitIds"))) & wanted and _entity_key(stage) not in existing_stages:
+            updated.setdefault("stages", []).append(json.loads(json.dumps(stage)))
+            existing_stages.add(_entity_key(stage))
+
+    existing_profiles = {
+        _entity_key(p) for p in _as_list(updated.get("aiProfiles")) if isinstance(p, dict)
+    }
+    wanted_profiles = set()
+    for stage in _as_list(updated.get("stages")):
+        if isinstance(stage, dict):
+            wanted_profiles.update(_as_list(stage.get("aiProfileIds")))
+    for profile in _as_list(src.get("aiProfiles")):
+        if not isinstance(profile, dict):
+            continue
+        if _entity_key(profile) in wanted_profiles and _entity_key(profile) not in existing_profiles:
+            updated.setdefault("aiProfiles", []).append(json.loads(json.dumps(profile)))
+            existing_profiles.add(_entity_key(profile))
+
+    return updated, []
+
+
+def purge_dangling_references(pack: dict) -> tuple[dict, list[str]]:
+    """Elimina referencias a entidades no definidas (auto-sanación).
+
+    Devuelve ``(pack, cleared)`` donde ``cleared`` lista los IDs eliminados.
+    """
+    updated = json.loads(json.dumps(pack)) if isinstance(pack, dict) else {}
+    known_units = set(_unit_index(updated))
+    known_factories = set(_factory_index(updated))
+    known_profiles = {
+        _entity_key(p) for p in _as_list(updated.get("aiProfiles")) if isinstance(p, dict)
+    }
+    cleared: list[str] = []
+
+    for stage in _as_list(updated.get("stages")):
+        if not isinstance(stage, dict):
+            continue
+        for key in ("unitIds", "aiProfileIds"):
+            ids = stage.get(key, [])
+            if not isinstance(ids, list):
+                continue
+            known = known_units if key == "unitIds" else known_profiles
+            kept = []
+            for value in ids:
+                if isinstance(value, str) and value not in known:
+                    cleared.append(value)
+                else:
+                    kept.append(value)
+            stage[key] = kept
+        for pool in _as_list(stage.get("blueprintPoolEntries")):
+            if not isinstance(pool, dict):
+                continue
+            ids = pool.get("unitIds", [])
+            if not isinstance(ids, list):
+                continue
+            kept = []
+            for value in ids:
+                if isinstance(value, str) and value not in known_units:
+                    cleared.append(value)
+                else:
+                    kept.append(value)
+            pool["unitIds"] = kept
+
+    for profile in _as_list(updated.get("aiProfiles")):
+        if not isinstance(profile, dict):
+            continue
+        for section in ("unitEntries", "productionBuildingEntries"):
+            entries = profile.get(section)
+            if not isinstance(entries, list):
+                continue
+            kept = []
+            for entry in entries:
+                if not isinstance(entry, dict):
+                    kept.append(entry)
+                    continue
+                scalar = entry.get("unitId")
+                if isinstance(scalar, str) and scalar not in known_units:
+                    cleared.append(scalar)
+                    continue
+                kept.append(entry)
+            profile[section] = kept
+
+    return updated, sorted(set(cleared))
+
+
+def rename_stage(pack: dict, old_id: str, new_id: str) -> tuple[dict, list[str]]:
+    """Renombra una etapa. Falla si no existe o el nuevo id colisiona."""
+    updated = json.loads(json.dumps(pack)) if isinstance(pack, dict) else {}
+    ids = {_entity_key(s) for s in _as_list(updated.get("stages")) if isinstance(s, dict)}
+    if old_id not in ids:
+        return updated, [f"stage '{old_id}' no existe en el pack"]
+    if new_id in ids:
+        return updated, [f"stage '{new_id}' ya existe en el pack"]
+    for stage in _as_list(updated.get("stages")):
+        if isinstance(stage, dict) and _entity_key(stage) == old_id:
+            stage["id"] = new_id
+            break
+    return updated, []
+
+
+def rename_ai_profile(pack: dict, old_id: str, new_id: str) -> tuple[dict, list[str]]:
+    """Renombra un perfil AI (y su referencia en etapas)."""
+    updated = json.loads(json.dumps(pack)) if isinstance(pack, dict) else {}
+    ids = {_entity_key(p) for p in _as_list(updated.get("aiProfiles")) if isinstance(p, dict)}
+    if old_id not in ids:
+        return updated, [f"ai profile '{old_id}' no existe en el pack"]
+    if new_id in ids:
+        return updated, [f"ai profile '{new_id}' ya existe en el pack"]
+    for profile in _as_list(updated.get("aiProfiles")):
+        if isinstance(profile, dict) and _entity_key(profile) == old_id:
+            profile["id"] = new_id
+            break
+    for stage in _as_list(updated.get("stages")):
+        if isinstance(stage, dict) and isinstance(stage.get("aiProfileIds"), list):
+            stage["aiProfileIds"] = [
+                new_id if v == old_id else v for v in stage["aiProfileIds"]
+            ]
+    return updated, []
+
+
+def clone_stage(pack: dict, stage_id: str, new_id: str) -> tuple[dict, list[str]]:
+    """Clona una etapa con un nuevo id."""
+    updated = json.loads(json.dumps(pack)) if isinstance(pack, dict) else {}
+    ids = {_entity_key(s) for s in _as_list(updated.get("stages")) if isinstance(s, dict)}
+    if stage_id not in ids:
+        return updated, [f"stage '{stage_id}' no existe en el pack"]
+    if new_id in ids:
+        return updated, [f"stage '{new_id}' ya existe en el pack"]
+    for stage in _as_list(updated.get("stages")):
+        if isinstance(stage, dict) and _entity_key(stage) == stage_id:
+            clone = json.loads(json.dumps(stage))
+            clone["id"] = new_id
+            updated.setdefault("stages", []).append(clone)
+            return updated, []
+    return updated, [f"stage '{stage_id}' no encontrado al clonar"]
+
+
+def clone_ai_profile(pack: dict, profile_id: str, new_id: str) -> tuple[dict, list[str]]:
+    """Clona un perfil AI con un nuevo id."""
+    updated = json.loads(json.dumps(pack)) if isinstance(pack, dict) else {}
+    ids = {_entity_key(p) for p in _as_list(updated.get("aiProfiles")) if isinstance(p, dict)}
+    if profile_id not in ids:
+        return updated, [f"ai profile '{profile_id}' no existe en el pack"]
+    if new_id in ids:
+        return updated, [f"ai profile '{new_id}' ya existe en el pack"]
+    for profile in _as_list(updated.get("aiProfiles")):
+        if isinstance(profile, dict) and _entity_key(profile) == profile_id:
+            clone = json.loads(json.dumps(profile))
+            clone["id"] = new_id
+            updated.setdefault("aiProfiles", []).append(clone)
+            return updated, []
+    return updated, [f"ai profile '{profile_id}' no encontrado al clonar"]
+
+
+def bulk_set_balance(
+    pack: dict, name: str, value: Any, factory: bool = False
+) -> tuple[dict, list[str]]:
+    """Aplica un ``balanceOverride`` a TODAS las unidades (o fábricas)."""
+    updated = json.loads(json.dumps(pack)) if isinstance(pack, dict) else {}
+    if not isinstance(name, str) or not name.strip():
+        return updated, ["name de balanceOverride vacío"]
+    count = 0
+    for unit in _as_list(updated.get("units")):
+        if not isinstance(unit, dict):
+            continue
+        entity = _resolve_entity(updated, _entity_key(unit) or "", factory)
+        if entity is None:
+            continue
+        overrides = entity.setdefault("balanceOverrides", [])
+        string_value = value if isinstance(value, str) else str(value)
+        replaced = False
+        for entry in overrides:
+            if isinstance(entry, dict) and entry.get("name") == name:
+                entry["value"] = string_value
+                replaced = True
+                break
+        if not replaced:
+            overrides.append({"name": name, "value": string_value})
+        count += 1
+    if count == 0:
+        return updated, [f"sin unidades objetivo para '{name}'"]
+    return updated, []
 
 
 def write_pack(pack: dict, out_dir: str | Path) -> Path:
