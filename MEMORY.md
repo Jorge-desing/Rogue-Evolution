@@ -1459,3 +1459,5 @@ This is a compact, durable orientation for agents. For the changing checkout sta
 - Validation (as documented at HEAD 29886d8): Release 0 warnings/0 errors; C# harness 518/519 (1 Windows symlink skip); Python 404/404 (1 skip); MCP 210 schemas; no fresh Steam gameplay proof beyond documented smoke/director evidence. Natural offer→selection→placement→production/render/stat and tactical AI unverified.
 - Profile2 dedicated QA without tutorial; protect saves. Before reflection verify Rogue Command 1.0.9, Unity `2021.3.45f2`, Assembly-CSharp SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, MVID `db0e9462-128d-4296-9900-de18b4bd0c00`.
 - Root MEMORY.md, codex memory, antigravity memory, and mem0 synced to HEAD 29886d8.
+
+- Regla duradera (2026-11-07): todo agente consulta contexto antes de actuar — memoria mem0 primero y git (status/log/HEAD), más handoff, README y memory.csv; nunca confiar solo en el estado recordado.
