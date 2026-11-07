@@ -1349,3 +1349,12 @@ This is a compact, durable orientation for agents. For the changing checkout sta
 - Headless bake of `stealth_radar_absorbent_ferrite` at 2048x2048 with Material Maker 1.7 passed `--strict` quality gate with 0 failures (normal error 0.00192, MetallicGloss delta 0, emission 0.344).
 - Full Python test suite passed (258/258, 1 skip in 11.3s); C# harness passed (504/505, 1 Windows symlink skip); Release DLL deployed and verified.
 - Root MEMORY.md, codex memory, antigravity memory, and mem0 synced.
+## Refresh (2026-11-07 — expansion to 36 high-fidelity space-military presets + tachyon warp validation)
+
+- Repository `C:/Users/Alex/Documents/Mod Rogue Command`, loader `1.19.0`, branch `codex/rogue-unit-balance-20261018`.
+- Expanded the space-military presets suite in `tools/Prepare-MaterialMakerTacticalTemplate.py` from 28 to 36 distinct archetypes by adding: `tachyon_warp_radiator`, `graphene_ablative_lattice`, `dreadnought_adamantine_hull`, `void_stalker_metamaterial`, `orbital_drop_pod_cermet`, `pulsar_magnetic_shield`, `exoskeleton_reactive_scale`, and `cryogenic_fuel_shroud`.
+- All 36 presets strictly enforce bimodal metallic curves, grayscale bevel masks, high-frequency micrograin detail stack (`tactical-hd-v2`), and edge-only emission profiles.
+- Runner `tools/Run-MaterialMakerBake.ps1` updated with full `[ValidateSet(...)]`; contract tests in `tests/python/test_material_maker_workflow_config.py` verified (36 presets); documentation in `.agents/skills/rogue-command-material-maker-texture-authoring/SKILL.md` and `docs/research/AGENT-HANDOFF.md` updated.
+- Headless bake of `tachyon_warp_radiator` at 2048x2048 with Material Maker 1.7 passed strict quality gate with 0 failures (normal error 0.002065, MetallicGloss delta 0, emission 0.344).
+- Full Python test suite passed (258/258, 1 skip); C# harness passed (508/509, 1 Windows symlink skip); Release build passed with 0 warnings/0 errors.
+- Root MEMORY.md, codex memory, antigravity memory, and mem0 synced.

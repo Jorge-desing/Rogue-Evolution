@@ -33,7 +33,15 @@ param(
         "nanite_repair_chitin",
         "tungsten_heavy_flak_plating",
         "zero_g_docking_alloy",
-        "plasma_arc_containment"
+        "plasma_arc_containment",
+        "tachyon_warp_radiator",
+        "graphene_ablative_lattice",
+        "dreadnought_adamantine_hull",
+        "void_stalker_metamaterial",
+        "orbital_drop_pod_cermet",
+        "pulsar_magnetic_shield",
+        "exoskeleton_reactive_scale",
+        "cryogenic_fuel_shroud"
     )]
     [string]$Preset = "olive_armor",
     [ValidateSet(9, 10, 11, 12)]

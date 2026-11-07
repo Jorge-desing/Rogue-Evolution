@@ -90,7 +90,7 @@ class MaterialMakerWorkflowConfigTests(unittest.TestCase):
     def test_all_presets_wire_bimodal_metallic_node(self) -> None:
         if not TEMPLATE_BUILDER.EXAMPLE.is_file():
             self.skipTest("Material Maker 1.7 example is not staged locally")
-        self.assertGreaterEqual(len(TEMPLATE_BUILDER.PRESETS), 28)
+        self.assertGreaterEqual(len(TEMPLATE_BUILDER.PRESETS), 36)
         for preset in sorted(TEMPLATE_BUILDER.PRESETS):
             project = TEMPLATE_BUILDER.build_template_project(preset_name=preset, size_power=10)
             node_names = {n.get("name") for n in project.get("nodes", [])}
