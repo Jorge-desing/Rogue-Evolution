@@ -1368,3 +1368,18 @@ This is a compact, durable orientation for agents. For the changing checkout sta
 - Validation: as documented at HEAD a917709 (Python 264; diagnostics 35/35; no fresh build in this sync). No new Steam/Unity gameplay proof beyond recorded evidence. Profile2 dedicated QA without tutorial; protect saves.
 - Before reflection verify Rogue Command version, Unity `2021.3.45f2`, Assembly-CSharp SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, MVID `db0e9462-128d-4296-9900-de18b4bd0c00`.
 - Root MEMORY.md, codex memory, antigravity memory, and mem0 synced to HEAD a917709.
+
+## Refresh (2026-11-07 — modernización de los 18 presets tácticos heredados a alta definición militar-espacial)
+
+- Repository `C:/Users/Alex/Documents/Mod Rogue Command`, loader `1.19.0`, branch `codex/rogue-unit-balance-20261018`.
+- Modernizados integralmente los 18 presets tácticos heredados en `tools/Prepare-MaterialMakerTacticalTemplate.py` (`olive_armor`, `gunmetal_chassis`, `desert_camo`, `hazard_industrial`, `orbital_titanium`, `stealth_void_composite`, `solar_gold_radiator`, `battleship_tungsten`, `cerberus_white_ceramic`, `plasma_cinder_ablative`, `cyber_nanoweave`, `anodized_cobalt`, `quantum_hyperdrive_alloy`, `beryllium_mirror_hull`, `fusion_reactor_core_plating`, `martian_iron_rust`, `neosteel_command_citadel`, `cryo_glacier_camo`).
+- Mejoras de precisión aeroespacial CNC:
+  - Reducción de `warp_amount` (de 0.0025-0.0032 a 0.0012-0.0020) para biseles y líneas de corte limpias sin ondulaciones orgánicas de mampostería.
+  - Geometría de uniones y biselado de placas ajustada (`mortar` <= 0.010, `bevel` <= 0.028, `corner` <= 0.018).
+  - Elevación de micro-grano de alta frecuencia (`micro_perlin_scale` de 64-96 a 112-148; `perlin_scale` base a 16-22).
+  - Curvas de rugosidad calibradas con mesetas satinadas/brillantes (0.20-0.40) y curvas bimetálicas con meseta metálica 0.90-0.98.
+  - Perfiles de emisión unificados en `EMISSION_PROFILES` (umbrales 0.40-0.48, energía 1.8-2.5).
+- Validación de calidad estricta: horneado headless de `olive_armor` a 2048×2048 con Material Maker 1.7 superó `--strict` con 0 fallas (error normal medio 0.002068, delta MetallicGloss 0, emisión no nula 0.344).
+- Suite de pruebas: Python 264/264 OK (1 skip); harness C# 508/509 OK (1 skip); build Release limpio (0 advertencias, 0 errores).
+- DLL Release desplegada a Steam (`C:\Program Files (x86)\Steam\steamapps\common\Rogue Command\BepInEx\plugins\RogueCommandExpansionLoader.dll`) con hash SHA-256 verificado `8922628CFE689F53F86A98E01B0B3EFDA94333A364A1C1B93E419D960189E25B`.
+- Root MEMORY.md, codex memory, antigravity memory y mem0 sincronizados.
