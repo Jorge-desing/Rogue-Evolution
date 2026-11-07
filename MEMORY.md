@@ -1428,3 +1428,18 @@ This is a compact, durable orientation for agents. For the changing checkout sta
   - Python tests: 316/316 pasados (1 skip), incluyendo `tests/python/test_unit_pbr_preset_registry.py` (7/7 pasados).
   - Compilación Release: 0 advertencias, 0 errores.
   - Despliegue de plugin verificado a Steam BepInEx con SHA-256 `30DEC3D3A9F1FDCF48FA0509BD0B5B2E1E6D2B8C6FA07C5142E3E604C0644C7F`.
+
+## Refresh (2026-11-07, HEAD 2cd8df6 — content-loader balance validator/set-template, node-selection director, 44 presets integration, tooling dedup)
+
+- Repository `C:/Users/Alex/Documents/Mod Rogue Command`, loader `1.19.0`, branch `codex/rogue-unit-balance-20261018`. Local/upstream/origin verified at `2cd8df6` (`feat(content-loader): add balance validator and set-template (REA-grounded)`), after `ab0a584` (docs runtime node-selection director controls + live map smoke), `01ac738` (PBR integrate 44 presets across all pack units), `a69e79c` (RuntimeIntermissionDirector node selection and enter flow), `05e3e5e` (content-loader extract/import/purge/rename/clone/bulk), `8c05a3e` (refactor tools dedup model builders/setup scripts), `729605f` (docs memory sync to f62aea8), `f62aea8`.
+- New committed scope since f62aea8:
+  - Tooling refactor (8c05a3e): deduplicated model builders/setup scripts across 37 files; added `Setup-ArchiveSupport.ps1`; reduced unused imports.
+  - Content loader (05e3e5e): extract/import/purge/rename/clone/bulk operations in `tools/edit_content_pack.py`; new `test_edit_content_pack_composition.py`.
+  - Runtime intermission (a69e79c): new `Runtime/RuntimeIntermissionDirector.cs` (node selection + enter flow), `AgentDiagnosticsFormatter` serializers, `LoaderDiagnosticsComponent` updates, MCP intermission tests extended; AGENT-HANDOFF updated.
+  - PBR integration (01ac738): canonical thematic mapping in `tools/UnitPbrPresetRegistry.py` for 19 units across 3 packs; 44 presets mapped, 0 orphans; `tools/Apply-UnitPbrPresets.py` CLI (audit/list/prepare-templates/prepare-paint/export-json); `visualVariants` declared in all pack manifests. Validation: C# 517/518, Python 316/316, Release 0/0; DLL SHA `30DEC3D3A9F1FDCF48FA0509BD0B5B2E1E6D2B8C6FA07C5142E3E604C0644C7F`.
+  - Docs (ab0a584): recorded node-selection director controls + live map smoke in AGENT-HANDOFF.
+  - Content loader balance (2cd8df6): new `tools/validate_balance_overrides.py` (REA-grounded balance validator) and set-template command in `edit_content_pack.py`; tests `test_edit_content_pack_template.py`, `test_validate_balance_overrides.py`.
+- Working tree: modified `.agents/skills/.../RogueModelKit.py`, `generate_unit_model.py`, and `tools/RogueModelKit.py`, `tools/generate_unit_model.py` (uncommitted); dirty nested worktrees `.worktrees/cargador` (11e9968) and `.worktrees/task-graph-validation` (d1f9045) preserved. Do not stage, reset, or clean.
+- Validation (last documented at 01ac738): Release 0 warnings/0 errors; C# harness 517/518 (1 Windows symlink skip); Python 316/316 (1 skip); no fresh Steam/Unity gameplay proof beyond documented smoke. Natural offer→selection→placement→production/render/stat and tactical AI unverified.
+- Profile2 dedicated QA without tutorial; protect saves. Before reflection verify Rogue Command 1.0.9, Unity `2021.3.45f2`, Assembly-CSharp SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, MVID `db0e9462-128d-4296-9900-de18b4bd0c00`.
+- Root MEMORY.md, codex memory, antigravity memory, and mem0 synced to HEAD 2cd8df6.
