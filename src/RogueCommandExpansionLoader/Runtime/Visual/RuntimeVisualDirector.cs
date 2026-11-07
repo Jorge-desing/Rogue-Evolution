@@ -65,6 +65,10 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
         private bool _isOnFireVisualActive;
         private bool _isBoostedVisualActive;
         private string _activeTacticalStanceVisual = "Standard";
+        private string _activeVisualVariantId;
+        private string _activePresetName;
+        private Color? _activeColorTint;
+        private List<Renderer> _cachedRenderers;
         private bool? _turretJammedOverride;
         private float? _doorOpenOverride;
 
@@ -1061,6 +1065,96 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
         public bool IsOnFireVisualActive => _isOnFireVisualActive;
         public bool IsBoostedVisualActive => _isBoostedVisualActive;
         public string ActiveTacticalStanceVisual => _activeTacticalStanceVisual;
+        public string ActiveVisualVariantId => _activeVisualVariantId;
+        public string ActivePresetName => _activePresetName;
+        public Color? ActiveColorTint => _activeColorTint;
+
+        public bool TryApplyVisualVariant(RuntimeUnitVisualVariant variant)
+        {
+            if (variant == null)
+            {
+                ResetVisualVariant();
+                return true;
+            }
+
+            _activeVisualVariantId = variant.VariantId;
+            _activePresetName = variant.PresetName;
+            _activeColorTint = variant.ColorTint;
+
+            ApplyColorTintToRenderers(variant.ColorTint);
+
+            if (variant.Scale > 0.01f && Math.Abs(variant.Scale - 1f) > 0.001f)
+            {
+                if (_intactMeshObject != null)
+                {
+                    _intactMeshObject.transform.localScale = Vector3.one * variant.Scale;
+                }
+            }
+
+            return true;
+        }
+
+        public void ResetVisualVariant()
+        {
+            _activeVisualVariantId = null;
+            _activePresetName = null;
+            _activeColorTint = null;
+            ApplyColorTintToRenderers(new Color(1f, 1f, 1f, 1f));
+            if (_intactMeshObject != null)
+            {
+                _intactMeshObject.transform.localScale = Vector3.one;
+            }
+        }
+
+        private void ApplyColorTintToRenderers(Color tintColor)
+        {
+            if (_cachedRenderers == null)
+            {
+                _cachedRenderers = new List<Renderer>();
+                Renderer[] allRenderers = GetComponentsInChildren<Renderer>(true);
+                for (int i = 0; i < allRenderers.Length; i++)
+                {
+                    Renderer r = allRenderers[i];
+                    if (r != null && !(r is ParticleSystemRenderer))
+                    {
+                        string rName = r.name ?? string.Empty;
+                        if (!rName.EndsWith("_COLLIDER", StringComparison.OrdinalIgnoreCase) &&
+                            !rName.EndsWith("_ShieldBubble", StringComparison.OrdinalIgnoreCase))
+                        {
+                            _cachedRenderers.Add(r);
+                        }
+                    }
+                }
+            }
+
+            for (int i = 0; i < _cachedRenderers.Count; i++)
+            {
+                Renderer renderer = _cachedRenderers[i];
+                if (renderer == null) continue;
+
+                Material[] mats = renderer.materials;
+                if (mats == null) continue;
+
+                for (int m = 0; m < mats.Length; m++)
+                {
+                    Material mat = mats[m];
+                    if (mat == null) continue;
+
+                    if (mat.HasProperty("_TeamColor"))
+                    {
+                        mat.SetColor("_TeamColor", tintColor);
+                    }
+                    if (mat.HasProperty("_BaseColor"))
+                    {
+                        mat.SetColor("_BaseColor", tintColor);
+                    }
+                    else if (mat.HasProperty("_Color"))
+                    {
+                        mat.SetColor("_Color", tintColor);
+                    }
+                }
+            }
+        }
 
         public void SetTacticalStanceVisual(string stance)
         {
@@ -1162,7 +1256,9 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
 
         public string GetVisualStatusSummary()
         {
-            return $"damaged={_isDamagedStateActive},critical={_isCriticalStateActive},jammed={IsTurretJammed},stunned={_isStunnedVisualActive},fire={_isOnFireVisualActive},boosted={_isBoostedVisualActive},stance={_activeTacticalStanceVisual},recoil={_currentRecoilOffset:F2},door={_doorOpenProgress:F2}";
+            string variant = _activeVisualVariantId ?? "none";
+            string preset = _activePresetName ?? "default";
+            return $"damaged={_isDamagedStateActive},critical={_isCriticalStateActive},jammed={IsTurretJammed},stunned={_isStunnedVisualActive},fire={_isOnFireVisualActive},boosted={_isBoostedVisualActive},stance={_activeTacticalStanceVisual},variant={variant},preset={preset},recoil={_currentRecoilOffset:F2},door={_doorOpenProgress:F2}";
         }
 
         public void TriggerWeaponFeedback(float recoilDistance = 0.22f)

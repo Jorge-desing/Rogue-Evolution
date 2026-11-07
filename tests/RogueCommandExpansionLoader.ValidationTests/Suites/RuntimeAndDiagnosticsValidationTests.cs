@@ -9468,6 +9468,116 @@ internal static partial class ValidationTestRunner
                     }
                 }
                 }),
+                ("two-level visual variant registry and director lifecycle handles primary and tactical variants", () =>
+                {
+                    RuntimeUnitVisualVariantRegistry.Clear();
+                    try
+                    {
+                        if (RuntimeUnitVisualVariantRegistry.GetRegisteredUnitCount() != 0 ||
+                            RuntimeUnitVisualVariantRegistry.GetTotalVariantCount() != 0)
+                        {
+                            throw new InvalidOperationException("Registry must be empty after Clear().");
+                        }
+
+                        var primaryVariant = new RuntimeUnitVisualVariant(
+                            "primary",
+                            "sample:heavy-tank",
+                            "sample:heavy-tank/desert-pbr",
+                            "#E6B800",
+                            1.0f,
+                            "Assets/SampleUnits/HeavyTank_Desert.prefab",
+                            "VisualRoot",
+                            isPrimary: true);
+
+                        var arcticVariant = new RuntimeUnitVisualVariant(
+                            "arctic-ops",
+                            "sample:heavy-tank",
+                            "sample:heavy-tank/arctic-pbr",
+                            "#D8E2E8",
+                            1.0f,
+                            "Assets/SampleUnits/HeavyTank_Arctic.prefab",
+                            "VisualRoot",
+                            isPrimary: false);
+
+                        var stealthVariant = new RuntimeUnitVisualVariant(
+                            "stealth-night",
+                            "sample:heavy-tank",
+                            "sample:heavy-tank/stealth-pbr",
+                            "#1A1A1A",
+                            1.0f,
+                            "Assets/SampleUnits/HeavyTank_Stealth.prefab",
+                            "VisualRoot",
+                            isPrimary: false);
+
+                        RuntimeUnitVisualVariantRegistry.Register("sample:heavy-tank", new[] { primaryVariant, arcticVariant, stealthVariant });
+
+                        if (!RuntimeUnitVisualVariantRegistry.HasVariants("sample:heavy-tank"))
+                        {
+                            throw new InvalidOperationException("Registry must report variants exist for registered unit.");
+                        }
+
+                        if (!RuntimeUnitVisualVariantRegistry.TryGetPrimary("sample:heavy-tank", out var foundPrimary) ||
+                            !foundPrimary.IsPrimary ||
+                            foundPrimary.PresetName != "sample:heavy-tank/desert-pbr")
+                        {
+                            throw new InvalidOperationException("Registry must resolve Level 1 Primary chassis preset.");
+                        }
+
+                        if (!RuntimeUnitVisualVariantRegistry.TryGet("sample:heavy-tank", "arctic-ops", out var foundArctic) ||
+                            foundArctic.IsPrimary ||
+                            foundArctic.PresetName != "sample:heavy-tank/arctic-pbr")
+                        {
+                            throw new InvalidOperationException("Registry must resolve Level 2 Tactical variant.");
+                        }
+
+                        Color tint = foundArctic.ColorTint;
+                        if (tint.r < 0.8f || tint.g < 0.8f || tint.b < 0.8f)
+                        {
+                            throw new InvalidOperationException("Hex color parser must accurately decode RGB values.");
+                        }
+
+                        string censusJson = AgentDiagnosticsFormatter.SerializeVisualVariantCensus();
+                        using (JsonDocument doc = JsonDocument.Parse(censusJson))
+                        {
+                            JsonElement root = doc.RootElement;
+                            if (root.GetProperty("kind").GetString() != "visualVariantCensus" ||
+                                root.GetProperty("totalUnits").GetInt32() < 1 ||
+                                root.GetProperty("totalVariants").GetInt32() < 3)
+                            {
+                                throw new InvalidOperationException("Visual variant census serializer failed contract check.");
+                            }
+                        }
+
+                        var successResult = new UnitVisualVariantResult(true, "unit_123", "arctic-ops", "Sub-Zero Tundra", "Applied variant successfully");
+                        string resultJson = AgentDiagnosticsFormatter.SerializeUnitVisualVariantResult(successResult);
+                        using (JsonDocument doc = JsonDocument.Parse(resultJson))
+                        {
+                            JsonElement root = doc.RootElement;
+                            if (!root.GetProperty("success").GetBoolean() ||
+                                root.GetProperty("variantId").GetString() != "arctic-ops" ||
+                                root.GetProperty("presetName").GetString() != "Sub-Zero Tundra")
+                            {
+                                throw new InvalidOperationException("UnitVisualVariantResult serializer failed contract check.");
+                            }
+                        }
+
+                        UnitVisualVariantResult failResult = RuntimeGameplayCommandDirector.TryApplyUnitVisualVariant("nonexistent_entity", "arctic-ops");
+                        if (failResult.Success)
+                        {
+                            throw new InvalidOperationException("TryApplyUnitVisualVariant must fail closed on missing entity.");
+                        }
+
+                        UnitVisualVariantResult invalidResult = RuntimeGameplayCommandDirector.TryApplyUnitVisualVariant("", "arctic-ops");
+                        if (invalidResult.Success)
+                        {
+                            throw new InvalidOperationException("TryApplyUnitVisualVariant must fail closed on empty entity ID.");
+                        }
+                    }
+                    finally
+                    {
+                        RuntimeUnitVisualVariantRegistry.Clear();
+                    }
+                }),
     };
 
     private sealed class TestCardChangeTarget

@@ -2784,6 +2784,41 @@ namespace RogueCommandExpansionLoader.Runtime
             return Serialize(view);
         }
 
+        public static string SerializeUnitVisualVariantResult(UnitVisualVariantResult result)
+        {
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "unitVisualVariantResult",
+                ["success"] = result.Success,
+                ["entityKeyId"] = result.EntityKeyId ?? string.Empty,
+                ["variantId"] = result.VariantId ?? string.Empty,
+                ["presetName"] = result.PresetName ?? string.Empty,
+                ["message"] = result.Message ?? string.Empty,
+            };
+            return Serialize(view);
+        }
+
+        public static string SerializeVisualVariantCensus(int maxUnits = 64)
+        {
+            int totalUnits = RuntimeUnitVisualVariantRegistry.GetRegisteredUnitCount();
+            int totalVariants = RuntimeUnitVisualVariantRegistry.GetTotalVariantCount();
+            int omittedUnits = 0;
+            if (maxUnits > 0 && totalUnits > maxUnits)
+            {
+                omittedUnits = totalUnits - maxUnits;
+            }
+
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "visualVariantCensus",
+                ["omittedUnitCount"] = omittedUnits,
+                ["totalUnits"] = totalUnits,
+                ["totalVariants"] = totalVariants,
+                ["systemTier"] = "Two-Level Canonical PBR System (Level 1: Primary Chassis, Level 2: Tactical Variants)",
+            };
+            return Serialize(view);
+        }
+
         public static string SerializePrespawnWarmResult(PrespawnWarmResult result)
         {
             var view = new Dictionary<string, object>

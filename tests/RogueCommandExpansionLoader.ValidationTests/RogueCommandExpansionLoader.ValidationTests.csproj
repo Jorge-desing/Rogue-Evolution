@@ -116,6 +116,8 @@
              Link="Runtime/RuntimeUnitLoadoutCensus.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeUnitVariantRegistry.cs"
              Link="Runtime/RuntimeUnitVariantRegistry.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeUnitVisualVariantRegistry.cs"
+             Link="Runtime/RuntimeUnitVisualVariantRegistry.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeAiDoctrineCensus.cs"
              Link="Runtime/RuntimeAiDoctrineCensus.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeAgentCoordinator.cs"

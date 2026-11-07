@@ -1316,6 +1316,17 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             res = _call_diagnostics_method("OrderApplyUnitLoadoutJson", [entity_key_id, loadout_id])
             return _tool_response(res)
 
+        elif name == "diagnostics_order_apply_visual_variant":
+            entity_key_id = arguments.get("entityKeyId")
+            variant_id = arguments.get("variantId")
+            res = _call_diagnostics_method("OrderApplyUnitVisualVariantJson", [entity_key_id, variant_id])
+            return _tool_response(res)
+
+        elif name == "diagnostics_get_visual_variant_census":
+            max_units = arguments.get("maxUnits", 64)
+            res = _call_diagnostics_method("GetVisualVariantCensusJson", [max_units])
+            return _tool_response(res)
+
         elif name == "diagnostics_order_warm_prespawn_pool":
             entity_id = arguments.get("entityId")
             count = arguments.get("count")

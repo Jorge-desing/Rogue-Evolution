@@ -896,3 +896,24 @@ The generated unit models, prefab authoring outputs, compiled visual bundle, and
     - El censo de intermission leyó en vivo `kind=intermissionCensus` (RunSetup: `isIntermissionActive=false`, nodos []) y el estado Navigator (isPaused=false, timeScale restaurado 0->1 por el propio control). La intro (PlayableDirector) avanzó 0.0->0.4s tras `Play()` pero el botón `FinishTextButtonRunStart` (interactuable) pulsado repetidamente no transicionó la escena; tampoco la seleccion de cartas (`CardNew.PressedChooseButton` devuelve ok sin poblar el deck) ni el botón `Start Run` (`INICIAR UNA PARTIDA`, `InvokeOnClick` ok sin transición). La setup no liberó `IntermissionScreen`: patrón de bloqueo de UI ya documentado (requiere interacción manual por cursor).
     - Cierre: proceso ausente tras `Application.Quit()` inyectado fail-soft + salida natural; selector restaurado a los bytes exactos `2\r\n` (SHA df4e26a04a...); Profile1/2/4 intactos (savegame.dat Profile2 231214ef... intacto), solo cambió `Profile5/excludedStrings.txt` (estado QA del run, 144 bytes, documentado). Evidencia: runtime-evidence-director-live.json (censo/navigator PASS, select/enter BLOCKED/NOT_TESTED).
     - **Límite de evidencia:** controles director y censo verificados en build/harness/tests herméticos + lectura en vivo fuera de Intermission; la transición real selección→entrada con evidencia observada sigue pendiente hasta poder atravesar la setup del run con interacción supervisada.
+
+51. **Sistema canónico de dos niveles PBR: Runtime, Registro y Orquestación en Vivo (2026-11-07; C# loader + MCP tools):**
+    - **Arquitectura de dos niveles completada y operacionalizada:**
+      - **Nivel 1 (Chassis Primario):** Preset canónico base de materiales PBR asignado a cada unidad vehicular (e.g. `sample:heavy-tank/desert-pbr`), garantizando la identidad de facción y texturizado consistente según el contrato URP `VehiclePBR_VertexWear`.
+      - **Nivel 2 (Variantes Tácticas Especializadas):** Colección declarativa de `visualVariants` por unidad en los manifiestos `content/packs/*/content.json`, indexadas por ID con soporte para alias locales y presets.
+    - **C# Expansion Loader:**
+      - `RuntimeUnitVisualVariantRegistry.cs`: Estructura inmutable `RuntimeUnitVisualVariant` con parseo puro de colores hex RGBA/RGB (`TryParseHexColor`) y registro thread-safe process-local `RuntimeUnitVisualVariantRegistry` (`Register`, `TryGet`, `TryGetPrimary`, `HasVariants`, `GetVisualVariantIds`, `GetAllVariants`, `Clear`).
+      - `ContentPackRuntimeLoader.cs`: Registro automático durante la carga de packs con aislamiento y `Clear()` en resets.
+      - `RuntimeVisualDirector.cs`: Métodos `TryApplyVisualVariant(targetVariant)` y `ResetVisualVariant()` con aplicación dinámica de tintes de color (`_activeColorTint`) a `Renderer.material` / `Renderer.materials` y gestión de estado.
+      - `RuntimeGameplayCommandDirector.cs`: Comandos runtime fail-closed `TryApplyUnitVisualVariant(entityKeyId, variantId)` y `OrderApplyUnitVisualVariantJson` con resolución segura de entidades mediante `FindEntityByKey`.
+      - `AgentDiagnosticsFormatter.cs`: Serializadores estructurados `SerializeUnitVisualVariantResult` y `SerializeVisualVariantCensus` (con contadores de omisión y cabeceras prioritarias).
+      - `LoaderDiagnosticsComponent.cs`: Métodos JSON expuestos para puente BepInEx.
+    - **Herramientas BepInEx MCP (210 schemas totales):**
+      - `diagnostics_order_apply_visual_variant`: Aplica variantes tácticas de Nivel 2 o restaura el chasis primario de Nivel 1 a una unidad en combate.
+      - `diagnostics_get_visual_variant_census`: Proporciona telemetría exhaustiva de todas las variantes registradas, unidades mapeadas y tier canónico del sistema.
+    - **Validación Hermética:**
+      - Release build del plugin: 0 advertencias / 0 errores.
+      - C# Test Suite: `518/519` pasaron (1 skip symlink, 0 fallos).
+      - Python Test Suite: `404/404` pasaron (1 skip, 0 fallos).
+      - Despliegue obligatorio de sesión: DLL Release desplegada a `BepInEx/plugins/RogueCommandExpansionLoader.dll` con respaldo previo (`plugin-predeploy-backup-20261107-211646.dll`), manifiesto (`plugin-deploy-manifest-20261107-211646.json`) y verificación de hash SHA-256 idéntico (`5e5fc27d98137086cd7ac729fd7b6e566f5f321009681c54b892ca6f125fb146`).
+    - **Límite de evidencia:** verificación en arnés de pruebas unitarias/offline, simulación MCP y compilación de DLL desplegada; la verificación visual runtime en partida Steam permanece como siguiente paso.

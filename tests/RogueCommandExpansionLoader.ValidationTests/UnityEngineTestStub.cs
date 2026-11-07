@@ -344,11 +344,14 @@ namespace UnityEngine
         public int HasPropertyCallCount { get; private set; }
         public int GetTextureCallCount { get; private set; }
         private readonly System.Collections.Generic.Dictionary<string, Texture> _textures = new System.Collections.Generic.Dictionary<string, Texture>();
+        private readonly System.Collections.Generic.Dictionary<string, Color> _colors = new System.Collections.Generic.Dictionary<string, Color>();
         public void SetTexture(string name, Texture texture) { if (name != null) _textures[name] = texture; }
+        public void SetColor(string name, Color color) { if (name != null) _colors[name] = color; }
+        public Color GetColor(string name) { return name != null && _colors.TryGetValue(name, out var c) ? c : new Color(1f, 1f, 1f, 1f); }
         public bool HasProperty(string name)
         {
             HasPropertyCallCount++;
-            return name != null && _textures.ContainsKey(name);
+            return name != null && (_textures.ContainsKey(name) || _colors.ContainsKey(name) || name == "_TeamColor" || name == "_BaseColor" || name == "_Color");
         }
         public Texture GetTexture(string name)
         {

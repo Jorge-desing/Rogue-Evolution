@@ -2778,6 +2778,7 @@ namespace RogueCommandExpansionLoader.Content
             if (!_loaded)
             {
                 RuntimeUnitVariantRegistry.Clear();
+                RuntimeUnitVisualVariantRegistry.Clear();
                 RuntimeVisualCensus.ClearLoadedPrefabAudits();
             }
             IDictionary index = _entityIndexField.GetValue(null) as IDictionary;
@@ -8697,6 +8698,7 @@ namespace RogueCommandExpansionLoader.Content
             };
 
             RegisterUnitVariants(unit);
+            RegisterUnitVisualVariants(unit);
             if (profile.HasAnyMechanics)
             {
                 RuntimeUnitMechanicsDirector.RegisterProfile(unit.id, profile);
@@ -8741,6 +8743,51 @@ namespace RogueCommandExpansionLoader.Content
             }
 
             RuntimeUnitVariantRegistry.Register(unit.id, variants);
+        }
+
+        private static void RegisterUnitVisualVariants(ContentUnitDefinition unit)
+        {
+            if (unit == null || string.IsNullOrWhiteSpace(unit.id))
+            {
+                return;
+            }
+
+            var visualVariants = new List<RuntimeUnitVisualVariant>();
+            if (unit.visualVariants != null)
+            {
+                for (int i = 0; i < unit.visualVariants.Length; i++)
+                {
+                    ContentUnitVisualVariantDefinition source = unit.visualVariants[i];
+                    if (source == null || string.IsNullOrWhiteSpace(source.id))
+                    {
+                        continue;
+                    }
+
+                    bool isPrimary = (i == 0);
+                    string presetName = ExtractPresetNameFromVariantId(source.id);
+
+                    visualVariants.Add(new RuntimeUnitVisualVariant(
+                        source.id,
+                        unit.id,
+                        presetName,
+                        source.colorTint,
+                        source.scale,
+                        source.visualAssetName,
+                        source.visualRootPath,
+                        isPrimary));
+                }
+            }
+
+            RuntimeUnitVisualVariantRegistry.Register(unit.id, visualVariants);
+        }
+
+        private static string ExtractPresetNameFromVariantId(string variantId)
+        {
+            if (string.IsNullOrWhiteSpace(variantId)) return string.Empty;
+            string id = variantId.Trim();
+            int colon = id.IndexOf(':');
+            string name = colon >= 0 ? id.Substring(colon + 1) : id;
+            return name.Replace('-', '_');
         }
 
         private static void RegisterBuildingMechanicsProfile(ContentBuildingDefinition building)

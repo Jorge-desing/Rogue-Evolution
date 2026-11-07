@@ -974,6 +974,29 @@ namespace RogueCommandExpansionLoader.Runtime
     }
 
     /// <summary>
+    /// Pure diagnostic DTO returned when applying or switching a unit visual variant.
+    /// Supports the canonical two-level system: Level 1 Primary Chassis and Level 2 Tactical Variants.
+    /// Decoupled from Unity types.
+    /// </summary>
+    public readonly struct UnitVisualVariantResult
+    {
+        public UnitVisualVariantResult(bool success, string entityKeyId, string variantId, string presetName, string message)
+        {
+            Success = success;
+            EntityKeyId = entityKeyId ?? string.Empty;
+            VariantId = variantId ?? string.Empty;
+            PresetName = presetName ?? string.Empty;
+            Message = message ?? string.Empty;
+        }
+
+        public bool Success { get; }
+        public string EntityKeyId { get; }
+        public string VariantId { get; }
+        public string PresetName { get; }
+        public string Message { get; }
+    }
+
+    /// <summary>
     /// Pure diagnostic DTO returned when manually warming an EntityFactory pre-spawn pool.
     /// Decoupled from Unity types.
     /// </summary>
@@ -5529,6 +5552,85 @@ namespace RogueCommandExpansionLoader.Runtime
             {
                 return null;
             }
+        }
+
+        public static UnitVisualVariantResult TryApplyUnitVisualVariant(string entityKeyId, string variantId)
+        {
+            if (string.IsNullOrWhiteSpace(entityKeyId))
+            {
+                return new UnitVisualVariantResult(false, entityKeyId, variantId, string.Empty, "Entity key ID must not be empty.");
+            }
+
+            try
+            {
+                ExistingControllers existing = ExistingControllers.Instance;
+                if (existing == null)
+                {
+                    return new UnitVisualVariantResult(false, entityKeyId, variantId, string.Empty, "ExistingControllers instance not available.");
+                }
+
+                EntityController unit = FindEntityByKey(existing, entityKeyId.Trim());
+                if (unit == null || unit.gameObject == null || unit.IsDestroyed)
+                {
+                    return new UnitVisualVariantResult(false, entityKeyId, variantId, string.Empty, "Entity '" + entityKeyId + "' not found or destroyed.");
+                }
+
+                string key = entityKeyId.Trim();
+                string unitId = ResolveEntityIdString(unit);
+
+                RuntimeUnitVisualVariant targetVariant = null;
+                bool isReset = string.IsNullOrWhiteSpace(variantId) ||
+                               string.Equals(variantId, "default", StringComparison.OrdinalIgnoreCase) ||
+                               string.Equals(variantId, "primary", StringComparison.OrdinalIgnoreCase);
+
+                if (isReset)
+                {
+                    if (!RuntimeUnitVisualVariantRegistry.TryGetPrimary(unitId, out targetVariant))
+                    {
+                        targetVariant = null;
+                    }
+                }
+                else
+                {
+                    if (!RuntimeUnitVisualVariantRegistry.TryGet(unitId, variantId.Trim(), out targetVariant))
+                    {
+                        return new UnitVisualVariantResult(false, key, variantId, string.Empty,
+                            "Visual variant '" + variantId + "' is not registered for unit '" + unitId + "'.");
+                    }
+                }
+
+                RogueCommandExpansionLoader.Runtime.Visual.RuntimeVisualDirector.AttachIfApplicable(unit);
+                RogueCommandExpansionLoader.Runtime.Visual.RuntimeVisualDirector director = unit.gameObject.GetComponent<RogueCommandExpansionLoader.Runtime.Visual.RuntimeVisualDirector>();
+                if (director == null)
+                {
+                    return new UnitVisualVariantResult(false, key, variantId, targetVariant != null ? targetVariant.PresetName : string.Empty,
+                        "Unit '" + unitId + "' does not possess an active RuntimeVisualDirector.");
+                }
+
+                director.TryApplyVisualVariant(targetVariant);
+                string appliedId = targetVariant != null ? targetVariant.VariantId : "default";
+                string preset = targetVariant != null ? targetVariant.PresetName : "default";
+                string levelLabel = targetVariant != null && targetVariant.IsPrimary ? "Level 1 Primary Chassis" : "Level 2 Tactical Variant";
+
+                return new UnitVisualVariantResult(true, key, appliedId, preset,
+                    "Applied " + levelLabel + " [" + preset + "] to '" + key + "'.");
+            }
+            catch (Exception ex)
+            {
+                return new UnitVisualVariantResult(false, entityKeyId, variantId, string.Empty,
+                    "Failed to apply visual variant: " + ex.Message);
+            }
+        }
+
+        public static string OrderApplyUnitVisualVariantJson(string entityKeyId, string variantId)
+        {
+            return AgentDiagnosticsFormatter.SerializeUnitVisualVariantResult(
+                TryApplyUnitVisualVariant(entityKeyId, variantId));
+        }
+
+        public static string GetVisualVariantCensusJson(int maxUnits = 64)
+        {
+            return AgentDiagnosticsFormatter.SerializeVisualVariantCensus(maxUnits);
         }
 
         public static UnitLoadoutResult TryApplyUnitLoadout(string entityKeyId, string loadoutId)

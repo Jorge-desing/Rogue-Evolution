@@ -773,6 +773,7 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
 {
     public sealed class RuntimeVisualDirector : Component
     {
+        public static void AttachIfApplicable(object entityObj) { }
         public bool IsTurretJammed { get; set; }
         public float CurrentRecoilOffset { get; set; }
         public float DoorOpenProgress { get; set; }
@@ -780,7 +781,30 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
         public bool IsOnFireVisualActive { get; set; }
         public bool IsBoostedVisualActive { get; set; }
         public string ActiveTacticalStanceVisual { get; set; } = "Standard";
+        public string ActiveVisualVariantId { get; set; }
+        public string ActivePresetName { get; set; }
+        public Color? ActiveColorTint { get; set; }
         public readonly Dictionary<string, bool> AttachmentStates = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+
+        public bool TryApplyVisualVariant(RuntimeUnitVisualVariant variant)
+        {
+            if (variant == null)
+            {
+                ResetVisualVariant();
+                return true;
+            }
+            ActiveVisualVariantId = variant.VariantId;
+            ActivePresetName = variant.PresetName;
+            ActiveColorTint = variant.ColorTint;
+            return true;
+        }
+
+        public void ResetVisualVariant()
+        {
+            ActiveVisualVariantId = null;
+            ActivePresetName = null;
+            ActiveColorTint = null;
+        }
 
         public void SetTacticalStanceVisual(string stance)
         {

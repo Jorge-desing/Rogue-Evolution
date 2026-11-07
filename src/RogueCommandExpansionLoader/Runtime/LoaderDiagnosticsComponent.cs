@@ -1820,6 +1820,22 @@ namespace RogueCommandExpansionLoader.Runtime
         }
 
         /// <summary>
+        /// Dispatches a visual variant change (Level 1 primary or Level 2 tactical variant) to a living unit.
+        /// </summary>
+        public string OrderApplyUnitVisualVariantJson(string entityKeyId, string variantId)
+        {
+            return RuntimeGameplayCommandDirector.OrderApplyUnitVisualVariantJson(entityKeyId, variantId);
+        }
+
+        /// <summary>
+        /// Returns a structured census of registered visual variants across units.
+        /// </summary>
+        public string GetVisualVariantCensusJson(int maxUnits = 64)
+        {
+            return RuntimeGameplayCommandDirector.GetVisualVariantCensusJson(maxUnits);
+        }
+
+        /// <summary>
         /// Manually warms an EntityFactory pre-spawn pool.
         /// </summary>
         public string OrderWarmPrespawnPoolJson(string entityId, int count)
