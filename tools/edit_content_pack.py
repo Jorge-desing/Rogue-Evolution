@@ -710,6 +710,11 @@ def apply_edits(
                     current, op.get("profileId", ""), op.get("field", ""),
                     op.get("value"),
                 )
+            elif name == "set-template":
+                current, d = set_unit_template(
+                    current, op.get("unitId", ""), op.get("templateId", ""),
+                    factory=bool(op.get("factory", False)),
+                )
             else:
                 d = [f"op desconocida '{name}'"]
         except Exception as exc:  # keep the batch running per-op
@@ -980,6 +985,33 @@ def clone_ai_profile(pack: dict, profile_id: str, new_id: str) -> tuple[dict, li
     return updated, [f"ai profile '{profile_id}' no encontrado al clonar"]
 
 
+def set_unit_template(
+    pack: dict, unit_id: str, template_id: str, factory: bool = False
+) -> tuple[dict, list[str]]:
+    """Fija el ``nativeTemplateId`` de una unidad o fábrica, validado.
+
+    El valor debe estar en el allowlist nativo (per the REA-verified asset
+    inventory). Vacío = se restaura el id por defecto del scaffold.
+    """
+    updated = json.loads(json.dumps(pack)) if isinstance(pack, dict) else {}
+    if not isinstance(template_id, str) or not template_id.strip():
+        return updated, ["template_id vacío"]
+    from tools.validate_native_templates import (
+        KNOWN_UNIT_TEMPLATES, KNOWN_FACTORY_TEMPLATES,
+    )
+    allowlist = KNOWN_FACTORY_TEMPLATES if factory else KNOWN_UNIT_TEMPLATES
+    if template_id not in allowlist:
+        return updated, [
+            f"template '{template_id}' fuera del allowlist nativo"
+            f" ({'factory' if factory else 'unit'})"
+        ]
+    entity = _resolve_entity(updated, unit_id, factory)
+    if entity is None:
+        return updated, [f"unit '{unit_id}' no existe (o sin factory) en el pack"]
+    entity["nativeTemplateId"] = template_id
+    return updated, []
+
+
 def bulk_set_balance(
     pack: dict, name: str, value: Any, factory: bool = False
 ) -> tuple[dict, list[str]]:
@@ -1062,6 +1094,7 @@ def main(argv: list[str] | None = None) -> int:
             "add-ai-profile", "remove-ai-profile",
             "add-ai-module", "remove-ai-module",
             "set-stage-param", "set-ai-field",
+            "set-template",
             "batch",
         ],
         required=True,
@@ -1103,6 +1136,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--sp-value", help="Valor del stage parameterOverride")
     parser.add_argument("--ai-field", help="Campo escalar del perfil AI")
     parser.add_argument("--ai-field-value", help="Valor del campo AI")
+    parser.add_argument("--template-id", help="nativeTemplateId (set-template)")
     parser.add_argument("--script", help="Ruta a un script JSON de operaciones (batch)")
     parser.add_argument("--out-dir", required=True, help="Directorio destino")
     args = parser.parse_args(argv)
@@ -1262,6 +1296,13 @@ def main(argv: list[str] | None = None) -> int:
             field_value = args.ai_field_value
         updated, diagnostics = set_ai_profile_field(
             pack, args.profile_id, args.ai_field, field_value
+        )
+    elif args.operation == "set-template":
+        if not (args.unit_id and args.template_id):
+            print("--unit-id y --template-id son obligatorios", file=sys.stderr)
+            return 2
+        updated, diagnostics = set_unit_template(
+            pack, args.unit_id, args.template_id, factory=args.factory
         )
     elif args.operation == "batch":
         if not args.script:
