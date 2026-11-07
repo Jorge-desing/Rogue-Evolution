@@ -9254,6 +9254,217 @@ internal static partial class ValidationTestRunner
                 }
                 }
                 }),
+                ("UI click serializer puts the clicked outcome before detail", () =>
+                {
+                    string json = AgentDiagnosticsFormatter.SerializeUiClickResult(
+                        new UiClickResult(true, RuntimeUiClickDirector.ViaEventSystem, "StartButton", "StartButton",
+                            100f, 100f, new[] { "pointerEnter", "pointerDown", "pointerUp", "pointerClick" },
+                            "clicked StartButton by real coordinates (pointerEnter→pointerDown→pointerUp→pointerClick)."));
+                    using (JsonDocument doc = JsonDocument.Parse(json))
+                    {
+                        JsonElement root = doc.RootElement;
+                        if (root.GetProperty("kind").GetString() != "uiClickResult" || !root.GetProperty("clicked").GetBoolean())
+                        {
+                            throw new InvalidOperationException("UI click serializer must expose the clicked outcome first.");
+                        }
+
+                        if (root.GetProperty("via").GetString() != "EventSystemRaycast"
+                            || root.GetProperty("targetName").GetString() != "StartButton"
+                            || root.GetProperty("screenX").GetSingle() != 100f
+                            || root.GetProperty("phases").GetArrayLength() != 4)
+                        {
+                            throw new InvalidOperationException("UI click serializer mismatch: " + json);
+                        }
+
+                        int clickedIndex = json.IndexOf("\"clicked\"", StringComparison.Ordinal);
+                        int messageIndex = json.IndexOf("\"message\"", StringComparison.Ordinal);
+                        if (clickedIndex > messageIndex)
+                        {
+                            throw new InvalidOperationException("UI click serializer must place the outcome before the message detail.");
+                        }
+                    }
+                }),
+                ("UI click at real screen coordinates replays the input-module sequence", () =>
+                {
+                    EventSystemsHarnessScope scope = EventSystemsHarnessScope.CreateUiClickScene(out GameObject button,
+                        out TestUiClickHandler handler);
+                    try
+                    {
+                        UiClickResult result = RuntimeUiClickDirector.TryClickGameObject(button);
+
+                        if (!result.Clicked)
+                        {
+                            throw new InvalidOperationException("A UI click on a raycast-reachable button must be delivered.");
+                        }
+
+                        if (result.Via != RuntimeUiClickDirector.ViaEventSystem)
+                        {
+                            throw new InvalidOperationException("UI clicks must report the EventSystem raycast path.");
+                        }
+
+                        if (result.ScreenX != 100f || result.ScreenY != 100f)
+                        {
+                            throw new InvalidOperationException("The click must target the button's real screen center (100, 100).");
+                        }
+
+                        string[] expected = { "pointerEnter", "pointerDown", "pointerUp", "pointerClick" };
+                        if (!string.Join(",", result.Phases).Equals(string.Join(",", expected), StringComparison.Ordinal))
+                        {
+                            throw new InvalidOperationException("The replayed sequence must be pointerEnter→pointerDown→pointerUp→pointerClick, got " + string.Join(",", result.Phases) + ".");
+                        }
+
+                        if (!string.Join(",", handler.Events).Equals("OnPointerEnter,OnPointerDown,OnPointerUp,OnPointerClick", StringComparison.Ordinal))
+                        {
+                            throw new InvalidOperationException("The button must receive the full pointer sequence, got " + string.Join(",", handler.Events) + ".");
+                        }
+                    }
+                    finally { scope.Dispose(); }
+                }),
+                ("UI click fails closed when an unrelated element occludes the target", () =>
+                {
+                    EventSystemsHarnessScope scope = EventSystemsHarnessScope.CreateUiClickScene(out GameObject button,
+                        out TestUiClickHandler handler);
+                    var occluder = new GameObject("Occluder");
+                    UnityEngine.EventSystems.EventSystem.TestRaycastResults = new List<UnityEngine.EventSystems.RaycastResult>
+                    {
+                        new UnityEngine.EventSystems.RaycastResult { gameObject = occluder, screenPoint = new Vector2(100f, 100f) },
+                    };
+                    try
+                    {
+                        UiClickResult result = RuntimeUiClickDirector.TryClickGameObject(button);
+
+                        if (result.Clicked || result.Phases.Length != 0)
+                        {
+                            throw new InvalidOperationException("An occluded UI click must fail closed with no dispatched phases.");
+                        }
+
+                        if (!result.Message.Contains("Occluder") || !result.Message.Contains("occlusion gate"))
+                        {
+                            throw new InvalidOperationException("The occlusion failure must name the occluder and the stop point, got: " + result.Message);
+                        }
+
+                        if (handler.Events.Count != 0)
+                        {
+                            throw new InvalidOperationException("No pointer events may reach the button while occluded.");
+                        }
+                    }
+                    finally { scope.Dispose(); }
+                }),
+                ("UI click fails closed when the target center projects off-screen", () =>
+                {
+                    EventSystemsHarnessScope scope = EventSystemsHarnessScope.CreateUiClickScene(out GameObject button,
+                        out TestUiClickHandler handler);
+                    try
+                    {
+                        RectTransformUtility.WorldToScreenPointHook = world => new Vector2(-50f, 5000f);
+                        UiClickResult result = RuntimeUiClickDirector.TryClickGameObject(button);
+
+                        if (result.Clicked || result.Phases.Length != 0)
+                        {
+                            throw new InvalidOperationException("An off-screen UI click must fail closed with no dispatched phases.");
+                        }
+
+                        if (!result.Message.Contains("off-screen"))
+                        {
+                            throw new InvalidOperationException("The off-screen failure must carry a stop point, got: " + result.Message);
+                        }
+
+                        if (handler.Events.Count != 0)
+                        {
+                            throw new InvalidOperationException("No pointer events may be dispatched past the off-screen gate.");
+                        }
+                    }
+                    finally { scope.Dispose(); }
+                }),
+                ("point click delivers the full sequence to the top element even without an expected target", () =>
+                {
+                    EventSystemsHarnessScope scope = EventSystemsHarnessScope.CreateUiClickScene(out GameObject button,
+                        out TestUiClickHandler handler);
+                    try
+                    {
+                        UiClickResult result = RuntimeUiClickDirector.TryClickAtScreenPoint(new Vector2(100f, 100f));
+
+                        if (!result.Clicked || result.TargetName != string.Empty)
+                        {
+                            throw new InvalidOperationException("Point mode must click the top element without a target name.");
+                        }
+
+                        if (!string.Join(",", handler.Events).Equals("OnPointerEnter,OnPointerDown,OnPointerUp,OnPointerClick", StringComparison.Ordinal))
+                        {
+                            throw new InvalidOperationException("Point mode must hit the button's handlers, got " + string.Join(",", handler.Events) + ".");
+                        }
+                    }
+                    finally { scope.Dispose(); }
+                }),
+                ("world click at the node's real screen position dispatches engine messages", () =>
+                {
+                    EventSystemsHarnessScope scope = EventSystemsHarnessScope.CreateWorldClickScene(out GameObject node);
+                    try
+                    {
+                        Physics.TestHasHit = true;
+                        Physics.TestHit = new RaycastHit { transform = node.transform, collider = null, distance = 5f };
+
+                        UiClickResult result = RuntimeUiClickDirector.TryClickWorldObject(node);
+
+                        if (!result.Clicked || result.Via != RuntimeUiClickDirector.ViaPhysics)
+                        {
+                            throw new InvalidOperationException("A world click must succeed when physics pick hits the node: " + result.Message);
+                        }
+
+                        if (!string.Join(",", node.SentMessages).Equals("OnMouseEnter,OnMouseDown", StringComparison.Ordinal))
+                        {
+                            throw new InvalidOperationException("The node must receive OnMouseEnter+OnMouseDown via SendMessage, got " + string.Join(",", node.SentMessages) + ".");
+                        }
+                    }
+                    finally { scope.Dispose(); }
+                }),
+                ("world click fails closed when physics picks another object in front", () =>
+                {
+                    EventSystemsHarnessScope scope = EventSystemsHarnessScope.CreateWorldClickScene(out GameObject node);
+                    var occluder = new GameObject("ForegroundRubble");
+                    try
+                    {
+                        Physics.TestHasHit = true;
+                        Physics.TestHit = new RaycastHit { transform = occluder.transform, collider = null, distance = 5f };
+
+                        UiClickResult result = RuntimeUiClickDirector.TryClickWorldObject(node);
+
+                        if (result.Clicked || result.Phases.Length != 0)
+                        {
+                            throw new InvalidOperationException("A world click must fail closed when physics hits another object first.");
+                        }
+
+                        if (!result.Message.Contains("occlusion gate") || !result.Message.Contains("ForegroundRubble"))
+                        {
+                            throw new InvalidOperationException("The world occlusion failure must name the occluder, got: " + result.Message);
+                        }
+
+                        if (node.SentMessages.Count != 0 || occluder.SentMessages.Count != 0)
+                        {
+                            throw new InvalidOperationException("No mouse messages may be dispatched past the occlusion gate.");
+                        }
+                    }
+                    finally { scope.Dispose(); }
+                }),
+                ("hierarchy gate accepts self and descendants only", () =>
+                {
+                    var parent = new GameObject("Parent");
+                    var child = new GameObject("Child");
+                    child.transform.parent = parent.transform;
+                    var unrelated = new GameObject("Unrelated");
+
+                    if (!RuntimeUiClickDirector.IsInHierarchyOrSelf(parent, parent)
+                        || !RuntimeUiClickDirector.IsInHierarchyOrSelf(child, parent))
+                    {
+                        throw new InvalidOperationException("The hierarchy gate must accept self and descendants.");
+                    }
+
+                    if (RuntimeUiClickDirector.IsInHierarchyOrSelf(unrelated, parent)
+                        || RuntimeUiClickDirector.IsInHierarchyOrSelf(parent, child))
+                    {
+                        throw new InvalidOperationException("The hierarchy gate must reject unrelated and parent hits.");
+                    }
+                }),
                 ("intermission director picks exact choosable node before frontier", () =>
                 {
                 var rows = new List<IntermissionNodeRow>
@@ -9593,5 +9804,100 @@ internal static partial class ValidationTestRunner
     {
         public EntityController _entityController;
         public TestEntityAttackStub(EntityController ec) { _entityController = ec; }
+    }
+
+    private sealed class TestUiClickHandler : MonoBehaviour,
+        UnityEngine.EventSystems.IPointerEnterHandler,
+        UnityEngine.EventSystems.IPointerDownHandler,
+        UnityEngine.EventSystems.IPointerUpHandler,
+        UnityEngine.EventSystems.IPointerClickHandler
+    {
+        public readonly List<string> Events = new List<string>();
+
+        public void OnPointerEnter(UnityEngine.EventSystems.PointerEventData eventData)
+        {
+            Events.Add("OnPointerEnter");
+        }
+
+        public void OnPointerDown(UnityEngine.EventSystems.PointerEventData eventData)
+        {
+            Events.Add("OnPointerDown");
+        }
+
+        public void OnPointerUp(UnityEngine.EventSystems.PointerEventData eventData)
+        {
+            Events.Add("OnPointerUp");
+        }
+
+        public void OnPointerClick(UnityEngine.EventSystems.PointerEventData eventData)
+        {
+            Events.Add("OnPointerClick");
+        }
+    }
+
+    private sealed class EventSystemsHarnessScope : IDisposable
+    {
+        private readonly UnityEngine.EventSystems.EventSystem _eventSystem;
+        private readonly Camera _previousCamera;
+
+        private EventSystemsHarnessScope(UnityEngine.EventSystems.EventSystem eventSystem, Camera previousCamera)
+        {
+            _eventSystem = eventSystem;
+            _previousCamera = previousCamera;
+        }
+
+        public static EventSystemsHarnessScope CreateUiClickScene(out GameObject button, out TestUiClickHandler handler)
+        {
+            var canvasGo = new GameObject("Canvas");
+            canvasGo.AddComponent<Canvas>();
+            var panelGo = new GameObject("Panel");
+            panelGo.transform.parent = canvasGo.transform;
+            button = new GameObject("StartButton");
+            button.transform.parent = panelGo.transform;
+            button.transform.position = new Vector3(100f, 100f, 0f);
+
+            handler = button.AddComponent<TestUiClickHandler>();
+            RectTransform rectTransform = button.AddComponent<RectTransform>();
+            rectTransform.rect = new Rect(-100f, -50f, 200f, 100f);
+
+            var system = new UnityEngine.EventSystems.EventSystem { gameObject = canvasGo, currentSelectedGameObject = null };
+            UnityEngine.EventSystems.EventSystem.current = system;
+            UnityEngine.EventSystems.EventSystem.TestRaycastResults = new List<UnityEngine.EventSystems.RaycastResult>
+            {
+                new UnityEngine.EventSystems.RaycastResult { gameObject = button, screenPoint = new Vector2(100f, 100f) },
+            };
+            RectTransformUtility.WorldToScreenPointHook = world => new Vector2(world.x, world.y);
+            Screen.width = 1920;
+            Screen.height = 1080;
+
+            return new EventSystemsHarnessScope(system, Camera.main);
+        }
+
+        public static EventSystemsHarnessScope CreateWorldClickScene(out GameObject node)
+        {
+            node = new GameObject("LevelNode");
+            node.AddComponent<MeshRenderer>();
+            Camera camera = Camera.main ?? new Camera();
+            Camera.main = camera;
+            Camera.WorldToScreenPointHook = position => new Vector3(position.x, position.y, 1f);
+            Screen.width = 1920;
+            Screen.height = 1080;
+            Physics.TestHasHit = false;
+            var system = new UnityEngine.EventSystems.EventSystem { gameObject = new GameObject("EventSystem") };
+            UnityEngine.EventSystems.EventSystem.current = system;
+            UnityEngine.EventSystems.EventSystem.TestRaycastResults = new List<UnityEngine.EventSystems.RaycastResult>();
+
+            return new EventSystemsHarnessScope(system, camera);
+        }
+
+        public void Dispose()
+        {
+            UnityEngine.EventSystems.EventSystem.current = null;
+            UnityEngine.EventSystems.EventSystem.TestRaycastResults = new List<UnityEngine.EventSystems.RaycastResult>();
+            RectTransformUtility.WorldToScreenPointHook = null;
+            Camera.WorldToScreenPointHook = null;
+            Physics.TestHasHit = false;
+            Physics.TestHit = default(RaycastHit);
+        }
     }
 }

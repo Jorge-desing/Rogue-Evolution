@@ -108,6 +108,16 @@ namespace UnityEngine
         public float fieldOfView { get; set; } = 45f;
         public bool orthographic { get; set; } = false;
         public float orthographicSize { get; set; } = 10f;
+
+        public static Func<Vector3, Vector3> WorldToScreenPointHook;
+
+        public Vector3 WorldToScreenPoint(Vector3 position)
+        {
+            if (WorldToScreenPointHook != null) return WorldToScreenPointHook(position);
+            return new Vector3(position.x, position.y, 1f);
+        }
+
+        public Ray ScreenPointToRay(Vector2 position) => new Ray(new Vector3(position.x, position.y, 0f), new Vector3(0f, 0f, 1f));
     }
 
     public class Object
@@ -536,6 +546,10 @@ namespace UnityEngine
             return comp;
         }
 
+        public readonly System.Collections.Generic.List<string> SentMessages = new System.Collections.Generic.List<string>();
+
+        public void SendMessage(string message, SendMessageOptions options) => SentMessages.Add(message);
+
         public T GetComponentInChildren<T>(bool includeInactive = false) where T : Component
         {
             T direct = GetComponent<T>();
@@ -650,5 +664,272 @@ namespace UnityEngine.Audio
     {
         public bool SetFloat(string name, float value) => true;
         public bool GetFloat(string name, out float value) { value = 0f; return true; }
+    }
+}
+
+namespace UnityEngine.EventSystems
+{
+    public class BaseEventData
+    {
+    }
+
+    public class PointerEventData : BaseEventData
+    {
+        public enum InputButton
+        {
+            Left,
+            Right,
+            Middle,
+        }
+
+        public EventSystem eventSystem;
+        public Vector2 position;
+        public InputButton button;
+        public int clickCount;
+        public float clickTime;
+        public GameObject pointerPress;
+        public GameObject pointerClick;
+        public GameObject pointerEnter;
+        public GameObject pointerDrag;
+        public RaycastResult pointerCurrentRaycast;
+        public RaycastResult pointerPressRaycast;
+        public bool eligibleForClick = true;
+
+        public PointerEventData(EventSystem eventSystem)
+        {
+            this.eventSystem = eventSystem;
+        }
+    }
+
+    public class EventSystem : Component
+    {
+        public static EventSystem current { get; set; }
+        public GameObject currentSelectedGameObject { get; set; }
+        public static List<RaycastResult> TestRaycastResults = new List<RaycastResult>();
+
+        public void RaycastAll(PointerEventData eventData, List<RaycastResult> raycastResults)
+        {
+            raycastResults.Clear();
+            if (TestRaycastResults != null)
+            {
+                raycastResults.AddRange(TestRaycastResults);
+            }
+        }
+
+        public void SetSelectedGameObject(GameObject go)
+        {
+            currentSelectedGameObject = go;
+        }
+    }
+
+    public class GraphicRaycaster : Component
+    {
+    }
+
+    public struct RaycastResult
+    {
+        public GameObject gameObject;
+        public GraphicRaycaster module;
+        public int depth;
+        public Vector2 screenPoint;
+        public Vector3 worldPosition;
+        public int sortingLayer;
+        public int sortingOrder;
+        public int index;
+    }
+
+    public interface IEventSystemHandler
+    {
+    }
+
+    public interface IPointerEnterHandler : IEventSystemHandler
+    {
+        void OnPointerEnter(PointerEventData eventData);
+    }
+
+    public interface IPointerDownHandler : IEventSystemHandler
+    {
+        void OnPointerDown(PointerEventData eventData);
+    }
+
+    public interface IPointerUpHandler : IEventSystemHandler
+    {
+        void OnPointerUp(PointerEventData eventData);
+    }
+
+    public interface IPointerClickHandler : IEventSystemHandler
+    {
+        void OnPointerClick(PointerEventData eventData);
+    }
+
+    public interface IInitializePotentialDragHandler : IEventSystemHandler
+    {
+        void OnInitializePotentialDrag(PointerEventData eventData);
+    }
+
+    public interface IDragHandler : IEventSystemHandler
+    {
+        void OnDrag(PointerEventData eventData);
+    }
+
+    public delegate void EventFunction<T>(T handler, BaseEventData eventData);
+
+    public static class ExecuteEvents
+    {
+        public static readonly EventFunction<IPointerEnterHandler> pointerEnterHandler =
+            (handler, eventData) => handler.OnPointerEnter((PointerEventData)eventData);
+        public static readonly EventFunction<IPointerDownHandler> pointerDownHandler =
+            (handler, eventData) => handler.OnPointerDown((PointerEventData)eventData);
+        public static readonly EventFunction<IPointerUpHandler> pointerUpHandler =
+            (handler, eventData) => handler.OnPointerUp((PointerEventData)eventData);
+        public static readonly EventFunction<IPointerClickHandler> pointerClickHandler =
+            (handler, eventData) => handler.OnPointerClick((PointerEventData)eventData);
+        public static readonly EventFunction<IInitializePotentialDragHandler> initializePotentialDrag =
+            (handler, eventData) => handler.OnInitializePotentialDrag((PointerEventData)eventData);
+
+        public static bool Execute<T>(GameObject target, BaseEventData eventData, EventFunction<T> functor)
+            where T : IEventSystemHandler
+        {
+            if (target == null || functor == null) return false;
+            foreach (Component component in target.GetComponents<Component>())
+            {
+                if (component is T handler)
+                {
+                    functor(handler, eventData);
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        public static GameObject ExecuteHierarchy<T>(GameObject root, BaseEventData eventData, EventFunction<T> callbackFunction)
+            where T : IEventSystemHandler
+        {
+            for (GameObject go = root; go != null; go = go.transform != null ? go.transform.parent != null ? go.transform.parent.gameObject : null : null)
+            {
+                foreach (Component component in go.GetComponents<Component>())
+                {
+                    if (component is T handler)
+                    {
+                        callbackFunction(handler, eventData);
+                        return go;
+                    }
+                }
+            }
+            return null;
+        }
+
+        public static GameObject GetEventHandler<T>(GameObject root)
+            where T : IEventSystemHandler
+        {
+            for (GameObject go = root; go != null; go = go.transform != null ? go.transform.parent != null ? go.transform.parent.gameObject : null : null)
+            {
+                foreach (Component component in go.GetComponents<Component>())
+                {
+                    if (component is T) return go;
+                }
+            }
+            return null;
+        }
+    }
+}
+
+namespace UnityEngine
+{
+    public enum SendMessageOptions
+    {
+        RequireReceiver,
+        DontRequireReceiver,
+    }
+
+    public struct Rect
+    {
+        public float x;
+        public float y;
+        public float width;
+        public float height;
+
+        public Rect(float x, float y, float width, float height)
+        {
+            this.x = x;
+            this.y = y;
+            this.width = width;
+            this.height = height;
+        }
+
+        public Vector2 center => new Vector2(x + width / 2f, y + height / 2f);
+    }
+
+    public class RectTransform : Component
+    {
+        public Rect rect { get; set; } = new Rect(0f, 0f, 0f, 0f);
+
+        public Vector3 TransformPoint(Vector3 position) => position + transform.position;
+
+        public void GetWorldCorners(Vector3[] fourCornersArray)
+        {
+            if (fourCornersArray == null || fourCornersArray.Length < 4) return;
+            Vector3 center = transform.position;
+            fourCornersArray[0] = new Vector3(center.x - rect.width / 2f, center.y - rect.height / 2f, center.z);
+            fourCornersArray[1] = new Vector3(center.x + rect.width / 2f, center.y - rect.height / 2f, center.z);
+            fourCornersArray[2] = new Vector3(center.x + rect.width / 2f, center.y + rect.height / 2f, center.z);
+            fourCornersArray[3] = new Vector3(center.x - rect.width / 2f, center.y + rect.height / 2f, center.z);
+        }
+    }
+
+    public static class RectTransformUtility
+    {
+        public static Func<Vector3, Vector2> WorldToScreenPointHook;
+
+        public static Vector2 WorldToScreenPoint(Camera cam, Vector3 worldPoint)
+        {
+            if (WorldToScreenPointHook != null) return WorldToScreenPointHook(worldPoint);
+            return new Vector2(worldPoint.x, worldPoint.y);
+        }
+    }
+
+    public class Canvas : Component
+    {
+        public bool enabled = true;
+        public Camera worldCamera;
+    }
+
+    public struct Ray
+    {
+        public Vector3 origin;
+        public Vector3 direction;
+
+        public Ray(Vector3 origin, Vector3 direction)
+        {
+            this.origin = origin;
+            this.direction = direction;
+        }
+    }
+
+    public struct RaycastHit
+    {
+        public Collider collider;
+        public Transform transform;
+        public float distance;
+        public Vector3 point;
+        public Vector3 normal;
+    }
+
+    public static class Physics
+    {
+        public static bool TestHasHit;
+        public static RaycastHit TestHit;
+
+        public static bool Raycast(Vector3 origin, Vector3 direction, out RaycastHit hitInfo, float maxDistance, int layerMask)
+        {
+            hitInfo = TestHit;
+            return TestHasHit;
+        }
+    }
+
+    public static class Screen
+    {
+        public static int width = 1920;
+        public static int height = 1080;
     }
 }

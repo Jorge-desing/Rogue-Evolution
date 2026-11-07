@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using UnityEngine;
 
 namespace RogueCommandExpansionLoader.Runtime
 {
@@ -161,10 +162,11 @@ namespace RogueCommandExpansionLoader.Runtime
         // ---- Runtime selection (no load) ----
 
         /// <summary>
-        /// Selects a choosable node without loading: census, pick, then invoke
-        /// the node's native OnMouseEnter/OnMouseDown surface (the same calls
-        /// the game click path performs) so the screen can show selection/confirm
-        /// UI. Selected is true only when a subsequent census observes the node
+        /// Selects a choosable node without loading: census, pick, then a real
+        /// coordinate click — the node's screen position is projected through
+        /// the main camera and a physics raycast verifies the node is under the
+        /// point before the engine-message dispatch (OnMouseEnter/OnMouseDown).
+        /// Selected is true only when a subsequent census observes the node
         /// as IsCurrentNodeOfPath; otherwise the stop point is reported.
         /// </summary>
         public static IntermissionNodeSelection TrySelectLevelNode(int level, int field)
@@ -210,54 +212,39 @@ namespace RogueCommandExpansionLoader.Runtime
                     return false;
                 }
 
-                bool invoked = false;
-                string invokedVia = string.Empty;
+                GameObject nodeGameObject = (target as Component)?.gameObject;
+                if (nodeGameObject == null)
+                {
+                    selected = new IntermissionNodeSelection(
+                        picked.Level, picked.Field, picked.InstanceId, false,
+                        "Live node has no GameObject for level " + picked.Level
+                        + " field " + picked.Field + " (stop point: node visual/registry).");
+                    return false;
+                }
+
+                string invokedVia;
                 try
                 {
-                    MethodInfo enterMethod = nodeType.GetMethod(
-                        "OnMouseEnter", InstanceMethods, null, Type.EmptyTypes, null);
-                    if (enterMethod != null)
+                    UiClickResult click = RuntimeUiClickDirector.TryClickWorldObject(nodeGameObject);
+                    if (!click.Clicked)
                     {
-                        enterMethod.Invoke(target, null);
-                        invoked = true;
-                        invokedVia = "OnMouseEnter";
+                        selected = new IntermissionNodeSelection(
+                            picked.Level, picked.Field, picked.InstanceId, false,
+                            "Coordinate click gate failed for level " + picked.Level + " field "
+                            + picked.Field + ": " + click.Message);
+                        return false;
                     }
+
+                    invokedVia = "coordinate-click (WorldToScreenPoint + Physics.Raycast → SendMessage OnMouseEnter/OnMouseDown)"
+                        + " at (" + click.ScreenX.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                        + ", " + click.ScreenY.ToString(System.Globalization.CultureInfo.InvariantCulture) + ")";
                 }
                 catch (Exception ex)
                 {
                     selected = new IntermissionNodeSelection(
                         picked.Level, picked.Field, picked.InstanceId, false,
-                        "OnMouseEnter threw for level " + picked.Level + " field " + picked.Field
-                        + ": " + ex.Message);
-                    return false;
-                }
-
-                try
-                {
-                    MethodInfo downMethod = nodeType.GetMethod(
-                        "OnMouseDown", InstanceMethods, null, Type.EmptyTypes, null);
-                    if (downMethod != null)
-                    {
-                        downMethod.Invoke(target, null);
-                        invoked = true;
-                        invokedVia = invokedVia.Length == 0 ? "OnMouseDown" : invokedVia + "+OnMouseDown";
-                    }
-                }
-                catch (Exception ex)
-                {
-                    selected = new IntermissionNodeSelection(
-                        picked.Level, picked.Field, picked.InstanceId, false,
-                        "OnMouseDown threw for level " + picked.Level + " field " + picked.Field
-                        + ": " + ex.Message);
-                    return false;
-                }
-
-                if (!invoked)
-                {
-                    selected = new IntermissionNodeSelection(
-                        picked.Level, picked.Field, picked.InstanceId, false,
-                        "Node located but neither OnMouseEnter nor OnMouseDown was found on "
-                        + "OverWorldMapEnemy (stop point: handler lookup).");
+                        "Coordinate click for level " + picked.Level + " field " + picked.Field
+                        + " threw: " + ex.Message);
                     return false;
                 }
 
@@ -273,7 +260,7 @@ namespace RogueCommandExpansionLoader.Runtime
 
                 selected = new IntermissionNodeSelection(
                     picked.Level, picked.Field, picked.InstanceId, false,
-                    "Invoked " + invokedVia + " for level " + picked.Level + " field "
+                    "Clicked " + invokedVia + " for level " + picked.Level + " field "
                     + picked.Field + " but selection was not observable via census "
                     + "(stop point: selection observation).");
                 return false;

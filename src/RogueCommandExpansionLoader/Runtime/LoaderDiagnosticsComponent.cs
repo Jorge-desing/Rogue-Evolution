@@ -755,6 +755,63 @@ namespace RogueCommandExpansionLoader.Runtime
         }
 
         /// <summary>
+        /// Clicks a UI element or a 3D world object by real screen coordinates
+        /// (RectTransform projection → EventSystem raycast → input-module
+        /// pointer sequence replay; or camera projection → physics raycast →
+        /// engine SendMessage OnMouseEnter/OnMouseDown). Resolves by instance
+        /// ID when gameObjectId &gt; 0, otherwise by name or hierarchy path.
+        /// Never calls InvokeOnClick/Button.Press.
+        /// </summary>
+        public string TryUiClickJson(string target, int gameObjectId)
+        {
+            GameObject resolved = ResolveUiClickTarget(target, gameObjectId);
+            if (resolved == null)
+            {
+                return AgentDiagnosticsFormatter.SerializeUiClickResult(
+                    new UiClickResult(false, string.Empty, target ?? string.Empty, string.Empty, 0f, 0f,
+                        Array.Empty<string>(),
+                        "target not found (stop point: target resolution)."));
+            }
+
+            return AgentDiagnosticsFormatter.SerializeUiClickResult(
+                RuntimeUiClickDirector.TryClickGameObject(resolved));
+        }
+
+        /// <summary>
+        /// Clicks whatever element is on top at raw screen pixel coordinates
+        /// (x, y) — the genuine coordinate-click primitive for agent use.
+        /// </summary>
+        public string TryUiClickPointJson(int x, int y)
+        {
+            return AgentDiagnosticsFormatter.SerializeUiClickResult(
+                RuntimeUiClickDirector.TryClickAtScreenPoint(new Vector2(x, y)));
+        }
+
+        private static GameObject ResolveUiClickTarget(string target, int gameObjectId)
+        {
+            if (gameObjectId > 0)
+            {
+                foreach (Transform candidate in UnityEngine.Object.FindObjectsOfType<Transform>())
+                {
+                    if (candidate != null && candidate.gameObject != null
+                        && candidate.gameObject.GetInstanceID() == gameObjectId)
+                    {
+                        return candidate.gameObject;
+                    }
+                }
+
+                return null;
+            }
+
+            if (!string.IsNullOrEmpty(target))
+            {
+                return GameObject.Find(target);
+            }
+
+            return null;
+        }
+
+        /// <summary>
         /// Live Navigator pause/time state as agent-readable JSON.
         /// </summary>
         public string GetNavigatorStateJson()

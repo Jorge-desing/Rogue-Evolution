@@ -55,6 +55,14 @@
       <HintPath>$(GameManagedPath)\UnityEngine.PhysicsModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
+    <Reference Include="UnityEngine.UI">
+      <HintPath>$(GameManagedPath)\UnityEngine.UI.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.UIModule">
+      <HintPath>$(GameManagedPath)\UnityEngine.UIModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
     <Reference Include="UnityEngine.JSONSerializeModule">
       <HintPath>$(GameManagedPath)\UnityEngine.JSONSerializeModule.dll</HintPath>
       <Private>false</Private>

@@ -225,16 +225,35 @@ class IntermissionDiagnosticsTests(unittest.TestCase):
 class UiPressButtonEnvelopeTests(unittest.TestCase):
     def _press_with_search_payload(self, search_payload, arguments=None):
         calls = []
+        click_body = {
+            "kind": "uiClickResult",
+            "clicked": True,
+            "via": "EventSystemRaycast",
+            "targetName": "StartButton",
+            "topHitName": "StartButton",
+            "screenX": 100.0,
+            "screenY": 100.0,
+            "phases": ["pointerEnter", "pointerDown", "pointerUp", "pointerClick"],
+            "message": "clicked StartButton by real coordinates (pointerEnter→pointerDown→pointerUp→pointerClick).",
+        }
 
         def fake_http(endpoint, params=None, method="GET", body_str=None, **_):
             if endpoint == "scene/search_gameobjects":
                 return search_payload if isinstance(search_payload, str) else json.dumps(search_payload)
             if endpoint == "component/call_method":
-                calls.append({"method": method, "body": body_str})
-                return json.dumps({"status": "ok", "message": "pressed"})
+                calls.append({"method": method, "params": dict(params or {}), "body": body_str})
+                return json.dumps(
+                    {
+                        "status": "ok",
+                        "message": "Called 'TryUiClickJson' with 2 args. ReturnValue: " + json.dumps(click_body),
+                    }
+                )
             self.fail(f"Unexpected bridge endpoint: {endpoint}")
 
-        with mock.patch.object(SERVER, "_call_http", side_effect=fake_http):
+        with (
+            mock.patch.object(SERVER, "_DIAGNOSTICS_GO_ID", 77),
+            mock.patch.object(SERVER, "_call_http", side_effect=fake_http),
+        ):
             response = SERVER.execute_tool(
                 "diagnostics_ui_press_button", arguments or {"buttonName": "StartButton"}
             )
@@ -246,50 +265,125 @@ class UiPressButtonEnvelopeTests(unittest.TestCase):
         )
         self.assertFalse(response["isError"])
         payload = json.loads(response["content"][0]["text"])
-        self.assertTrue(payload["success"])
-        self.assertEqual(555, payload["gameObjectId"])
+        self.assertTrue(payload["clicked"])
+        self.assertEqual("StartButton", payload["targetName"])
         self.assertEqual(1, len(calls))
+        self.assertEqual("TryUiClickJson", calls[0]["params"]["methodName"])
+        self.assertEqual(["StartButton", 555], json.loads(calls[0]["params"]["args"]))
 
     def test_press_button_accepts_objects_envelope_no_regression(self) -> None:
         response, calls = self._press_with_search_payload(
             {"objects": [{"id": 777, "name": "StartButton"}]}
         )
         payload = json.loads(response["content"][0]["text"])
-        self.assertTrue(payload["success"])
-        self.assertEqual(777, payload["gameObjectId"])
+        self.assertTrue(payload["clicked"])
+        self.assertEqual(["StartButton", 777], json.loads(calls[0]["params"]["args"]))
 
     def test_press_button_accepts_results_and_bare_list_envelopes(self) -> None:
-        response, _ = self._press_with_search_payload(
+        response, calls = self._press_with_search_payload(
             {"results": [{"id": 888, "name": "StartButton"}]}
         )
         payload = json.loads(response["content"][0]["text"])
-        self.assertEqual(888, payload["gameObjectId"])
+        self.assertEqual(888, json.loads(calls[0]["params"]["args"])[1])
 
-        response, _ = self._press_with_search_payload([{"id": 999, "name": "StartButton"}])
+        response, calls = self._press_with_search_payload([{"id": 999, "name": "StartButton"}])
         payload = json.loads(response["content"][0]["text"])
-        self.assertEqual(999, payload["gameObjectId"])
+        self.assertEqual(999, json.loads(calls[0]["params"]["args"])[1])
 
     def test_press_button_direct_gameobject_id_skips_search(self) -> None:
         searched = []
+        calls = []
 
         def fake_http(endpoint, params=None, method="GET", body_str=None, **_):
             if endpoint == "scene/search_gameobjects":
                 searched.append(endpoint)
                 return json.dumps({"items": [{"id": 111, "name": "Other"}]})
             if endpoint == "component/call_method":
-                return json.dumps({"status": "ok", "message": "pressed"})
+                calls.append({"method": method, "params": dict(params or {})})
+                return json.dumps(
+                    {
+                        "status": "ok",
+                        "message": "Called 'TryUiClickJson' with 2 args. "
+                        'ReturnValue: {"kind": "uiClickResult", "clicked": true}',
+                    }
+                )
             self.fail(f"Unexpected bridge endpoint: {endpoint}")
 
-        with mock.patch.object(SERVER, "_call_http", side_effect=fake_http):
+        with (
+            mock.patch.object(SERVER, "_DIAGNOSTICS_GO_ID", 77),
+            mock.patch.object(SERVER, "_call_http", side_effect=fake_http),
+        ):
             response = SERVER.execute_tool(
                 "diagnostics_ui_press_button", {"gameObjectId": 4242}
             )
 
         self.assertFalse(response["isError"])
         payload = json.loads(response["content"][0]["text"])
-        self.assertTrue(payload["success"])
-        self.assertEqual(4242, payload["gameObjectId"])
+        self.assertTrue(payload["clicked"])
         self.assertEqual([], searched)
+        self.assertEqual("TryUiClickJson", calls[0]["params"]["methodName"])
+        self.assertEqual(["", 4242], json.loads(calls[0]["params"]["args"]))
+
+
+class UiClickTests(unittest.TestCase):
+    def test_ui_click_point_mode_uses_screen_coordinates(self) -> None:
+        calls = []
+
+        def fake_http(endpoint, params=None, **_):
+            self.assertEqual("component/call_method", endpoint)
+            calls.append({"params": dict(params or {})})
+            return json.dumps(
+                {
+                    "status": "ok",
+                    "message": "Called 'TryUiClickPointJson' with 2 args. "
+                    'ReturnValue: {"kind": "uiClickResult", "clicked": true, "screenX": 640, "screenY": 360}',
+                }
+            )
+
+        with (
+            mock.patch.object(SERVER, "_DIAGNOSTICS_GO_ID", 77),
+            mock.patch.object(SERVER, "_call_http", side_effect=fake_http),
+        ):
+            response = SERVER.execute_tool("diagnostics_ui_click", {"x": 640, "y": 360})
+
+        self.assertFalse(response["isError"])
+        payload = json.loads(response["content"][0]["text"])
+        self.assertTrue(payload["clicked"])
+        self.assertEqual("TryUiClickPointJson", calls[0]["params"]["methodName"])
+        self.assertEqual([640, 360], json.loads(calls[0]["params"]["args"]))
+
+    def test_ui_click_target_mode_resolves_then_clicks_by_coordinates(self) -> None:
+        calls = []
+
+        def fake_http(endpoint, params=None, **_):
+            if endpoint == "scene/search_gameobjects":
+                return json.dumps({"items": [{"id": 314, "name": "ConfirmButton"}]})
+            self.assertEqual("component/call_method", endpoint)
+            calls.append({"params": dict(params or {})})
+            return json.dumps(
+                {
+                    "status": "ok",
+                    "message": "Called 'TryUiClickJson' with 2 args. "
+                    'ReturnValue: {"kind": "uiClickResult", "clicked": true}',
+                }
+            )
+
+        with (
+            mock.patch.object(SERVER, "_DIAGNOSTICS_GO_ID", 77),
+            mock.patch.object(SERVER, "_call_http", side_effect=fake_http),
+        ):
+            response = SERVER.execute_tool("diagnostics_ui_click", {"buttonName": "ConfirmButton"})
+
+        self.assertFalse(response["isError"])
+        self.assertTrue(json.loads(response["content"][0]["text"])["clicked"])
+        self.assertEqual("TryUiClickJson", calls[0]["params"]["methodName"])
+        self.assertEqual(["ConfirmButton", 314], json.loads(calls[0]["params"]["args"]))
+
+    def test_ui_click_requires_a_target_or_point(self) -> None:
+        response = SERVER.execute_tool("diagnostics_ui_click", {})
+        self.assertTrue(response["isError"])
+        payload = json.loads(response["content"][0]["text"])
+        self.assertIn("buttonName", payload["message"])
 
 
 if __name__ == "__main__":

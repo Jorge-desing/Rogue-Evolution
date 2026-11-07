@@ -2216,9 +2216,16 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             res = _call_diagnostics_method("SetNavigatorPausedJson", [arguments["paused"]])
             return _tool_response(res)
 
-        elif name == "diagnostics_ui_press_button":
+        elif name in ("diagnostics_ui_press_button", "diagnostics_ui_click"):
+            # Point mode takes precedence: explicit x/y clicks whatever is on top.
+            dx = arguments.get("x")
+            dy = arguments.get("y")
+            if isinstance(dx, (int, float)) and isinstance(dy, (int, float)):
+                res = _call_diagnostics_method("TryUiClickPointJson", [int(dx), int(dy)])
+                return _tool_response(res)
             target = None
             direct_id = arguments.get("gameObjectId")
+            resolved_name = None
             if direct_id is not None:
                 try:
                     items = [{"id": int(direct_id)}]
@@ -2229,7 +2236,7 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
                 selector = str(arguments.get("selector", "")).strip()
                 target = selector or button_name
                 if not target:
-                    return _tool_response(json.dumps({"success": False, "message": "buttonName or selector required"}), True)
+                    return _tool_response(json.dumps({"success": False, "message": "buttonName, selector or gameObjectId required"}), True)
                 # search (bridge uses `name`/`componentName`; `query` kept as fallback)
                 items = []
                 search_params_candidates = [
@@ -2263,13 +2270,9 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             game_object_id = items[0].get("id") if isinstance(items[0], dict) else None
             if game_object_id is None:
                 return _tool_response(json.dumps({"success": False, "message": "button has no id"}))
-            # call Press on Button component
-            try:
-                payload = json.dumps({"gameObjectId": game_object_id, "componentName": "UnityEngine.UI.Button", "methodName": "Press", "args": []})
-                press_raw = _call_http("component/call_method", method="POST", body_str=payload)
-                return _tool_response(json.dumps({"success": True, "gameObjectId": game_object_id, "press": press_raw}))
-            except Exception as exc:
-                return _tool_response(json.dumps({"success": False, "message": str(exc)}), True)
+            resolved_name = items[0].get("name") if isinstance(items[0], dict) else None
+            res = _call_diagnostics_method("TryUiClickJson", [resolved_name or target or "", int(game_object_id)])
+            return _tool_response(res)
 
         elif name == "diagnostics_get_control_guide":
             guide = {

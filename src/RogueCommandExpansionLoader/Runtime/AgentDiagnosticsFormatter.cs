@@ -1038,6 +1038,27 @@ namespace RogueCommandExpansionLoader.Runtime
         }
 
         /// <summary>
+        /// Serializes the coordinate-click result. The clicked outcome comes
+        /// before detail so bounded truncation never hides it.
+        /// </summary>
+        public static string SerializeUiClickResult(UiClickResult result)
+        {
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "uiClickResult",
+                ["clicked"] = result != null && result.Clicked,
+                ["via"] = result != null ? result.Via ?? string.Empty : string.Empty,
+                ["targetName"] = result != null ? result.TargetName ?? string.Empty : string.Empty,
+                ["topHitName"] = result != null ? result.TopHitName ?? string.Empty : string.Empty,
+                ["screenX"] = result != null ? result.ScreenX : 0f,
+                ["screenY"] = result != null ? result.ScreenY : 0f,
+                ["phases"] = result != null ? result.Phases ?? Array.Empty<string>() : Array.Empty<string>(),
+                ["message"] = result != null ? result.Message ?? string.Empty : string.Empty,
+            };
+            return Serialize(view);
+        }
+
+        /// <summary>
         /// Serializes the intermission node-selection result. Status fields come
         /// before the reason detail so bounded truncation never hides the outcome.
         /// </summary>
