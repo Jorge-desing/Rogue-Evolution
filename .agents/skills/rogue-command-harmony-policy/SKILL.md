@@ -65,6 +65,18 @@ Always recheck this tuple before relying on reflected signatures, CIL metadata t
 - **Never** let a patch body throw: wrap in try/catch, log, return default.
 - **Never** call a game method unless its declaring type, name, parameter count, and calling convention are verified against the pinned assembly.
 
+## Project Patch Registration Pattern
+
+This project uses a centralized installer rather than attribute-based patches. Follow this exact sequence when adding a new hook:
+
+1. **Declare the hook body** in `src/RogueCommandExpansionLoader/Runtime/RuntimeHooks.cs`:
+   - Add a `public static void MethodName(...)` entry inside `RuntimeHooks` for the actual logic.
+   - Add a matching `public static void MethodName(...)` entry inside `RuntimeHarmonyPatches` that delegates to `RuntimeHooks.MethodName(...)`.
+2. **Resolve the target method** in `src/RogueCommandExpansionLoader/Runtime/RuntimePatchInstaller.cs` using `RuntimeReflection.FindUniqueMethod(...)` with a shape predicate.
+3. **Resolve the Harmony hook method** with `Hook("MethodName")`.
+4. **Register the plan** with `plan.Add(new PatchPlan(targetMethod, prefix, postfix, finalizer))`.
+5. **Build and run validation tests**; the test project links `RuntimeHooks.cs` directly.
+
 ## Harmony Patching Patterns
 
 Reference: claude-mod-skills `harmony-patch-review` checklist. Patch only the verified target; assert the original method is still present in the pinned assembly.
@@ -185,6 +197,12 @@ harmony.Patch(target, postfix: new HarmonyMethod(wrapper));
 - `harmony.Patch(original, prefix, postfix, transpiler, finalizer, ...)` returns a `MethodInfo` (the patched original), **not** a `bool`. A `null` return means the patch was not applied.
 - To count or list installed hooks, assign the result and check non-null: `MethodInfo patched = harmony.Patch(...); if (patched != null) { names.Add(...); count++; }`. Writing `if (harmony.Patch(...))` is `CS0029` (cannot implicitly convert `MethodInfo` to `bool`) — it will not compile, so a hook-count getter that relies on it silently fails at build time rather than reporting a wrong count at runtime.
 - Reset the count and name list in the same teardown that clears the `Harmony` instance; re-install accumulates into a fresh zeroed list, never into the previous run's.
+
+## Test Compilation Constraint
+
+`tests/RogueCommandExpansionLoader.ValidationTests/*.csproj` links `RuntimeHooks.cs` as a compile item but does **not** reference the game assembly. Any code in `RuntimeHooks.cs` that uses `Game.`, `ProfileManager.`, or other game types directly will fail to build in the test project.
+
+**Rule:** when a hook needs game types, resolve them through reflection inside the hook body using `RuntimeReflection.FindUniqueType(mutator.GameAssembly, "TypeName")` and `BindingFlags`. Do not add `using GameNamespace;` or direct field/method calls on game types in `RuntimeHooks.cs`.
 
 ## IL2CPP Considerations
 
