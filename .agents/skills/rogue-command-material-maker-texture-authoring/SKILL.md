@@ -68,7 +68,7 @@ powershell -File tools/Run-MaterialMakerBake.ps1 -Workflow procedural -Preset ol
 
 `-BlenderPreviewModel` is optional for `urp`/`blender` and creates a disposable `.blend` with the four maps bound to Principled BSDF. The `three_d` workflow automatically previews the supplied source `.blend` without modifying it; all preview blends stay under `artifacts/`. Use `-SizePower 11` for the validated 2048×2048 hero path. `-SizePower 12` is allowed only when the quality report confirms a real 4096×4096 export; the runner records requested versus actual resolution and strict mode fails a renderer cap mismatch.
 
-`tools/Prepare-MaterialMakerTacticalTemplate.py` supports a suite of 13 high-fidelity space-military presets (`--preset <name>`):
+`tools/Prepare-MaterialMakerTacticalTemplate.py` supports a suite of 20 high-fidelity space-military presets (`--preset <name>`):
 - **`olive_armor`**: Exo-Atmospheric Tactical Olive Armor (standard ground/orbital assault hull).
 - **`gunmetal_chassis`**: Orbital Dreadnought Gunmetal Hull (slate-gray cold-rolled aerospace steel).
 - **`desert_camo`**: Lunar/Martian Thermal Regolith Plating (high-friction dust-resistant ceramic alloy).
@@ -82,6 +82,13 @@ powershell -File tools/Run-MaterialMakerBake.ps1 -Workflow procedural -Preset ol
 - **`cyber_nanoweave`**: Electronic Warfare High-Density Nano-Lattice (high-frequency nano-patterned stealth meta-material, cyan/slate dielectric plates, conductive waveguide traces).
 - **`anodized_cobalt`**: Anodized Cobalt-Titanium Stealth Hull (vacuum-anodized deep indigo-navy alloy, low-IR body, specular blue-violet edge relief).
 - **`quantum_hyperdrive_alloy`**: Quantum Resonance Super-Alloy Plating (tachyonic drive housing, specular nickel-chromium silver, subtle refractive violet flux margins).
+- **`beryllium_mirror_hull`**: Exo-Atmospheric Lightweight Beryllium Optical Shielding (high-reflectance beryllium-palladium mirror plates, razor seams, laser alignment indicators).
+- **`obsidian_strike_interceptor`**: Deep-Space Interceptor Carbon-Graphite Hull (diamond-like carbon DLC obsidian hull, precision CNC titanium bevels, tactical cyan HUD edges).
+- **`fusion_reactor_core_plating`**: High-Energy Magnetic Confinement Armor (copper-tungsten and sintered bronze tokamak containment slabs with thermal relief seams).
+- **`martian_iron_rust`**: Colonial Expedition Heavy Ferrous Plating (oxidized hematite iron plating, shot-peened finish, thermal hazard warning edges).
+- **`neosteel_command_citadel`**: Flagship Reinforced Heavy Neosteel Armor (prestigious cold-rolled naval neosteel slabs, mirror-beveled chamfers, command bridge blue accents).
+- **`antimatter_containment_lattice`**: Void Vacuum Antimatter Superconducting Tiles (superconducting cryogenic ceramic-metal matrix tiles, Cherenkov violet flux channels).
+- **`cryo_glacier_camo`**: Europa Sub-Zero Cryogenic Camouflage Armor (sub-zero arctic frost titanium, pale turquoise pulse, low-dissipation thermal seams).
 
 All presets feature laser-cut seams, precision chamfers, isotropic satin grain, a bimodal `colorize_metallic` node, an edge-only `edge_detect_emission` → `colorize_emission` graph, and the `tactical-hd-v2` `micro_perlin` → normal/roughness detail stack connected to the Material Maker emission/material ports with preset-specific sensor/thermal colors. `tools/pack_material_maker_pbr.py` renormalizes tangent-space normal maps per pixel and applies gentle PBR-safe micro-contrast on albedo. `tools/prepare_material_maker_3d_paint.py` builds the disposable single-submesh UV-frozen `<Unit>_PaintProxy.obj` under `artifacts/texture-work/<Unit>/MaterialMaker/` without touching the production FBX, records the source SHA-256, and fails closed when Blender 4.5.14 cannot create a required proxy. `tools/apply_material_maker_to_blender.py` binds the four-map contract to a Principled BSDF node setup in Blender 4.5 preserving sockets and vertex wear. The runner clears stale raw/final outputs and passes the graph/workspace paths to `tools/audit_material_maker_output.py`, which verifies micro-detail, emission, UV-frozen proxy, and source-preservation metrics.
 

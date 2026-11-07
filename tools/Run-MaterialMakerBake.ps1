@@ -18,7 +18,14 @@ param(
         "plasma_cinder_ablative",
         "cyber_nanoweave",
         "anodized_cobalt",
-        "quantum_hyperdrive_alloy"
+        "quantum_hyperdrive_alloy",
+        "beryllium_mirror_hull",
+        "obsidian_strike_interceptor",
+        "fusion_reactor_core_plating",
+        "martian_iron_rust",
+        "neosteel_command_citadel",
+        "antimatter_containment_lattice",
+        "cryo_glacier_camo"
     )]
     [string]$Preset = "olive_armor",
     [ValidateSet(9, 10, 11, 12)]
