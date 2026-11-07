@@ -1329,3 +1329,13 @@ This is a compact, durable orientation for agents. For the changing checkout sta
 - Headless bake of `beryllium_mirror_hull` at 2048x2048 with Material Maker 1.7 passed strict quality gate with 0 failures.
 - Validation: full Python test suite passed (258/258, 1 skip); C# validation harness passed (504/505, 1 Windows symlink skip); Release build passed with 0 warnings/0 errors. Release DLL deployed to Steam plugins directory with matching hash `0DDE80822E968F929D355B9275AB8931694A4A7BD68A86309A1F1DD8CD223281`.
 - Root MEMORY.md, codex memory, antigravity memory, and mem0 synced to HEAD 9cddfe7.
+
+## Refresh (2026-11-07, HEAD c50b — 28 space-military presets + hypervelocity cermet validation)
+
+- Repository `C:/Users/Alex/Documents/Mod Rogue Command`, loader `1.19.0`, branch `codex/rogue-unit-balance-20261018`.
+- Expanded the space-military presets suite in `tools/Prepare-MaterialMakerTacticalTemplate.py` to 28 distinct archetypes by adding: `hypervelocity_railgun_cermet`, `stealth_radar_absorbent_ferrite`, `solar_flare_radiation_shield`, `ion_thruster_titanium_grate`, `nanite_repair_chitin`, `tungsten_heavy_flak_plating`, `zero_g_docking_alloy`, and `plasma_arc_containment`.
+- All 28 presets strictly enforce bimodal metallic curves, grayscale bevel masks, high-frequency micrograin detail stack (`tactical-hd-v2`), and edge-only emission profiles.
+- Runner `tools/Run-MaterialMakerBake.ps1` updated with full `[ValidateSet(...)]`; contract tests in `tests/python/test_material_maker_workflow_config.py` verified; documentation in `.agents/skills/rogue-command-material-maker-texture-authoring/SKILL.md` and `docs/research/AGENT-HANDOFF.md` updated.
+- Headless bake of `hypervelocity_railgun_cermet` at 2048x2048 with Material Maker 1.7 passed strict quality gate with 0 failures (normal error 0.00207, MetallicGloss delta 0, emission 0.344).
+- Full Python test suite passed (258/258, 1 skip); C# harness passed (504/505, 1 Windows symlink skip).
+- Root MEMORY.md, codex memory, antigravity memory, and mem0 synced.

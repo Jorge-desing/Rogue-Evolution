@@ -25,7 +25,15 @@ param(
         "martian_iron_rust",
         "neosteel_command_citadel",
         "antimatter_containment_lattice",
-        "cryo_glacier_camo"
+        "cryo_glacier_camo",
+        "hypervelocity_railgun_cermet",
+        "stealth_radar_absorbent_ferrite",
+        "solar_flare_radiation_shield",
+        "ion_thruster_titanium_grate",
+        "nanite_repair_chitin",
+        "tungsten_heavy_flak_plating",
+        "zero_g_docking_alloy",
+        "plasma_arc_containment"
     )]
     [string]$Preset = "olive_armor",
     [ValidateSet(9, 10, 11, 12)]
