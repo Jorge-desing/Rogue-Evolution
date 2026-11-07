@@ -1358,3 +1358,13 @@ This is a compact, durable orientation for agents. For the changing checkout sta
 - Headless bake of `tachyon_warp_radiator` at 2048x2048 with Material Maker 1.7 passed strict quality gate with 0 failures (normal error 0.002065, MetallicGloss delta 0, emission 0.344).
 - Full Python test suite passed (258/258, 1 skip); C# harness passed (508/509, 1 Windows symlink skip); Release build passed with 0 warnings/0 errors.
 - Root MEMORY.md, codex memory, antigravity memory, and mem0 synced.
+
+## Refresh (2026-11-07, HEAD a917709 — MCP schema compaction + Profile5 QA fresh-run evidence)
+
+- Repository `C:/Users/Alex/Documents/Mod Rogue Command`, loader `1.19.0`, branch `codex/rogue-unit-balance-20261018`. Local/upstream/origin verified at `a917709ab958f2caac760ac6ddc600251f5c84d0` (`docs(runtime): record fresh QA-profile run (Profile5) map evidence`), after `713d25d` (`feat(mcp): compact BepInEx schemas without losing tools`) and `ac070d2` (36 space-military presets).
+- `713d25d`: compacted BepInEx MCP schemas — stripped `LoaderDiagnosticsComponent` provenance boilerplate (132 mentions), compacted 70 empty param schemas to `{type:object,additionalProperties:false}`, shortened repeated property descriptions, unified alias schemas with canonical tools; canonical `scene_resolve_selector` now exposes `selector_json`. All 203 tools preserved (184 canonical + 19 aliases); types, required, enums, and handler endpoints unchanged. TOOL_SPECS 78,080 -> 72,136 bytes (-7.6%); tools/list ~72.4k. Regenerated 203 Antigravity schemas. 6 new regression tests; diagnostics suite 35/35; full Python 264.
+- `a917709`: recorded fresh isolated Profile5 QA run evidence — native selection + new run reaches generated progression map with loader registry live (3 packs, 36 entities, 38 hooks). Direct map-node entry via bridge did not transition; natural offer/production/AI acceptance remains open. Profile2 preserved byte-for-byte; selector restored exactly. Only `Profile5/excludedStrings.txt` changed (QA state).
+- Working tree preserved: nested worktrees `.worktrees/cargador` (11e9968, dirty) and `.worktrees/task-graph-validation` (d1f9045, dirty) unchanged; no src/tests changes in this sync.
+- Validation: as documented at HEAD a917709 (Python 264; diagnostics 35/35; no fresh build in this sync). No new Steam/Unity gameplay proof beyond recorded evidence. Profile2 dedicated QA without tutorial; protect saves.
+- Before reflection verify Rogue Command version, Unity `2021.3.45f2`, Assembly-CSharp SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, MVID `db0e9462-128d-4296-9900-de18b4bd0c00`.
+- Root MEMORY.md, codex memory, antigravity memory, and mem0 synced to HEAD a917709.
