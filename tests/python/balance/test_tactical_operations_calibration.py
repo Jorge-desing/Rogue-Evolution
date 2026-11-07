@@ -33,11 +33,11 @@ class TacticalOperationsCalibrationTests(unittest.TestCase):
             "tactical-operations:salvage-hauler": {
                 "cost": 250.0, "production_duration": 90.0, "max_health": 110.0,
                 "max_shield": 3.0, "armor_protection": 1.0, "move_speed": 12.0,
-                "weapon_range": 3.8, "damage1": 2.5, "dps": 5.0,
+                "weapon_range": 3.8, "damage1": 3.5, "dps": 7.0,
             },
             "tactical-operations:skyguard-sam": {
                 "cost": 320.0, "max_health": 140.0, "move_speed": 8.5,
-                "damage1": 22.0, "dps": 15.7142857143,
+                "damage1": 18.0, "dps": 12.8571428571,
             },
             "tactical-operations:bulwark-siege-tank": {
                 "cost": 360.0, "max_health": 160.0, "armor_protection": 1.0,
@@ -48,18 +48,19 @@ class TacticalOperationsCalibrationTests(unittest.TestCase):
             "tactical-operations:arc-lance-walker": {
                 "cost": 420.0, "max_health": 400.0, "max_shield": 0.0,
                 "move_speed": 11.0, "damage1": 7.0, "dps": 8.75,
+                "weapon_range": 6.5,
                 "cost_efficiency_index": 13.0332576900,
             },
             "tactical-operations:field-medic-rover": {
                 "cost": 240.0, "production_duration": 90.0, "max_health": 100.0,
                 "max_shield": 5.0, "armor_protection": 1.0, "move_speed": 12.0,
-                "weapon_range": 3.8, "damage1": 2.5, "dps": 5.0,
+                "weapon_range": 3.8, "damage1": 3.0, "dps": 6.0,
             },
             "tactical-operations:sentinel-relay": {
                 "cost": 260.0, "production_duration": 90.0, "max_health": 120.0,
-                "max_shield": 8.0, "armor_protection": 1.0, "move_speed": 10.5,
-                "weapon_range": 4.0, "damage1": 2.5, "dps": 3.5714285714,
-                "cost_efficiency_index": 8.0415601898,
+                "max_shield": 5.0, "armor_protection": 1.0, "move_speed": 10.5,
+                "weapon_range": 4.0, "damage1": 3.5, "dps": 5.0,
+                "cost_efficiency_index": 9.3950154745,
             },
             "tactical-operations:gravitas-breaker": {
                 "cost": 420.0, "production_duration": 65.0, "max_health": 220.0,
@@ -70,9 +71,9 @@ class TacticalOperationsCalibrationTests(unittest.TestCase):
             },
             "tactical-operations:command-relay": {
                 "cost": 300.0, "production_duration": 75.0, "max_health": 160.0,
-                "max_shield": 6.0, "armor_protection": 1.0, "move_speed": 9.0,
+                "max_shield": 5.0, "armor_protection": 1.0, "move_speed": 9.0,
                 "weapon_range": 5.0, "damage1": 12.0, "attack_cooldown": 2.0,
-                "dps": 12.0, "cost_efficiency_index": 16.6281199407,
+                "dps": 12.0, "cost_efficiency_index": 16.1440373370,
             },
         }
         self.assertEqual(set(expected), set(self.unit_ids))

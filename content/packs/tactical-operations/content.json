@@ -297,7 +297,7 @@
         }
       ],
       "customBalance": {
-        "Damage1": 2.5
+        "Damage1": 3.5
       },
       "activeSkills": [
         {
@@ -495,7 +495,7 @@
         }
       ],
       "customBalance": {
-        "Damage1": 22.0
+        "Damage1": 18.0
       },
       "criticalHitChance": 0.3,
       "minAttackRange": 4.5,
@@ -829,7 +829,7 @@
         },
         {
           "name": "weaponRange",
-          "value": "8.5"
+          "value": "6.5"
         },
         {
           "name": "attackCooldown",
@@ -1051,7 +1051,7 @@
         }
       ],
       "customBalance": {
-        "Damage1": 2.5
+        "Damage1": 3.0
       },
       "onHitStatusEffects": [
         {
@@ -1241,7 +1241,7 @@
         },
         {
           "name": "maxShield",
-          "value": "8"
+          "value": "5"
         },
         {
           "name": "maxMana",
@@ -1257,7 +1257,7 @@
         }
       ],
       "customBalance": {
-        "Damage1": 2.5
+        "Damage1": 3.5
       },
       "onHitStatusEffects": [
         {
@@ -1720,7 +1720,7 @@
         },
         {
           "name": "maxShield",
-          "value": "6"
+          "value": "5"
         },
         {
           "name": "maxMana",

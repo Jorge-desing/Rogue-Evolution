@@ -904,7 +904,7 @@
         }
       ],
       "customBalance": {
-        "Damage1": 1.8
+        "Damage1": 2.5
       },
       "healing": {
         "healAmount": 6.0,
@@ -1031,7 +1031,7 @@
         },
         {
           "name": "damage1",
-          "value": "4"
+          "value": "6"
         },
         {
           "name": "attackCooldown",
@@ -1735,7 +1735,7 @@
         },
         {
           "name": "cost",
-          "value": "55"
+          "value": "50"
         },
         {
           "name": "maxHealth",
