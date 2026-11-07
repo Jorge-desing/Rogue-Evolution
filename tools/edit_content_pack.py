@@ -153,8 +153,209 @@ def remove_unit(pack: dict, unit_id: str) -> tuple[dict, list[str]]:
                 kept.append(entry)
             profile[section] = kept
 
+        # Module parameters that reference the removed factory/unit (entityId)
+        for module in _as_list(profile.get("modules")):
+            if not isinstance(module, dict):
+                continue
+            params = module.get("parameters")
+            if not isinstance(params, list):
+                continue
+            module["parameters"] = [
+                p for p in params
+                if not (isinstance(p, dict) and p.get("value") in removed_ids)
+            ]
+
     diagnostics.append(f"unit '{unit_id}' eliminada con sus referencias")
     return updated, diagnostics
+
+
+# ---------------------------------------------------------------------------
+# Operaciones avanzadas de edición
+# ---------------------------------------------------------------------------
+
+UNIT_BOOL_FLAGS = (
+    "isAllowedAsStartingBlueprint",
+    "isAllowedForAi",
+    "isAllowedForDemo",
+    "isForSpecialists",
+)
+
+
+def _find_unit(pack: dict, unit_id: str) -> dict | None:
+    return _unit_index(pack).get(unit_id)
+
+
+def _resolve_entity(pack: dict, unit_id: str, factory: bool) -> dict | None:
+    unit = _find_unit(pack, unit_id)
+    if unit is None:
+        return None
+    if not factory:
+        return unit
+    build = unit.get("productionBuilding")
+    return build if isinstance(build, dict) else None
+
+
+def set_unit_flag(
+    pack: dict, unit_id: str, flag: str, value: bool
+) -> tuple[dict, list[str]]:
+    """Fija un flag booleano de unidad. Devuelve ``(pack, diagnostics)``."""
+    updated = json.loads(json.dumps(pack)) if isinstance(pack, dict) else {}
+    if flag not in UNIT_BOOL_FLAGS:
+        return updated, [
+            f"flag desconocido '{flag}' (permitidos: {', '.join(UNIT_BOOL_FLAGS)})"
+        ]
+    if not isinstance(value, bool):
+        return updated, [f"value de '{flag}' debe ser booleano"]
+    unit = _find_unit(updated, unit_id)
+    if unit is None:
+        return updated, [f"unit '{unit_id}' no existe en el pack"]
+    unit[flag] = value
+    return updated, []
+
+
+def set_balance_override(
+    pack: dict, unit_id: str, name: str, value: Any, factory: bool = False
+) -> tuple[dict, list[str]]:
+    """Inserta o actualiza un ``balanceOverride`` (unidad o fábrica)."""
+    updated = json.loads(json.dumps(pack)) if isinstance(pack, dict) else {}
+    if not isinstance(name, str) or not name.strip():
+        return updated, ["name de balanceOverride vacío"]
+    entity = _resolve_entity(updated, unit_id, factory)
+    if entity is None:
+        return updated, [f"unit '{unit_id}' no existe (o sin factory) en el pack"]
+    overrides = entity.setdefault("balanceOverrides", [])
+    string_value = value if isinstance(value, str) else str(value)
+    for entry in overrides:
+        if isinstance(entry, dict) and entry.get("name") == name:
+            entry["value"] = string_value
+            return updated, []
+    overrides.append({"name": name, "value": string_value})
+    return updated, []
+
+
+def remove_balance_override(
+    pack: dict, unit_id: str, name: str, factory: bool = False
+) -> tuple[dict, list[str]]:
+    """Elimina un ``balanceOverride`` por nombre (unidad o fábrica)."""
+    updated = json.loads(json.dumps(pack)) if isinstance(pack, dict) else {}
+    entity = _resolve_entity(updated, unit_id, factory)
+    if entity is None:
+        return updated, [f"unit '{unit_id}' no existe (o sin factory) en el pack"]
+    overrides = entity.get("balanceOverrides", [])
+    kept = [
+        e for e in _as_list(overrides)
+        if not (isinstance(e, dict) and e.get("name") == name)
+    ]
+    if len(kept) == len(_as_list(overrides)):
+        return updated, [f"balanceOverride '{name}' no encontrado en '{unit_id}'"]
+    entity["balanceOverrides"] = kept
+    return updated, []
+
+
+def set_stage_map_size(
+    pack: dict, stage_id: str, min_size: int, max_size: int
+) -> tuple[dict, list[str]]:
+    """Fija el rango de tamaño del mapa de una etapa (1..64, min<=max)."""
+    updated = json.loads(json.dumps(pack)) if isinstance(pack, dict) else {}
+    if not isinstance(min_size, int) or not isinstance(max_size, int):
+        return updated, ["map sizes deben ser enteros"]
+    if min_size < 1 or max_size > 128:
+        return updated, ["map size fuera de rango 1..128"]
+    if max_size < min_size:
+        return updated, ["mapSizeMax debe ser >= mapSizeMin"]
+
+    stage = None
+    for candidate in _as_list(updated.get("stages")):
+        if isinstance(candidate, dict) and _entity_key(candidate) == stage_id:
+            stage = candidate
+            break
+    if stage is None:
+        return updated, [f"stage '{stage_id}' no existe en el pack"]
+    stage["mapSizeMin"] = min_size
+    stage["mapSizeMax"] = max_size
+    return updated, []
+
+
+def add_pool_entry(
+    pack: dict, stage_id: str, pool_id: str, unit_ids: list[str]
+) -> tuple[dict, list[str]]:
+    """Crea o actualiza una entrada de blueprint pool en una etapa."""
+    updated = json.loads(json.dumps(pack)) if isinstance(pack, dict) else {}
+    if not isinstance(pool_id, str) or not pool_id.strip():
+        return updated, ["poolId vacío"]
+    valid_units = _unit_index(updated)
+    for uid in unit_ids:
+        if uid not in valid_units and uid not in _factory_index(updated):
+            return updated, [f"unit '{uid}' no definida en el pack"]
+
+    stage = None
+    for candidate in _as_list(updated.get("stages")):
+        if isinstance(candidate, dict) and _entity_key(candidate) == stage_id:
+            stage = candidate
+            break
+    if stage is None:
+        return updated, [f"stage '{stage_id}' no existe en el pack"]
+
+    pools = stage.setdefault("blueprintPoolEntries", [])
+    for entry in pools:
+        if isinstance(entry, dict) and entry.get("poolId") == pool_id:
+            entry["unitIds"] = list(unit_ids)
+            return updated, []
+    pools.append({"poolId": pool_id, "unitIds": list(unit_ids)})
+    return updated, []
+
+
+def remove_pool_entry(
+    pack: dict, stage_id: str, pool_id: str
+) -> tuple[dict, list[str]]:
+    """Elimina una entrada de blueprint pool de una etapa."""
+    updated = json.loads(json.dumps(pack)) if isinstance(pack, dict) else {}
+    stage = None
+    for candidate in _as_list(updated.get("stages")):
+        if isinstance(candidate, dict) and _entity_key(candidate) == stage_id:
+            stage = candidate
+            break
+    if stage is None:
+        return updated, [f"stage '{stage_id}' no existe en el pack"]
+    pools = _as_list(stage.get("blueprintPoolEntries"))
+    kept = [p for p in pools if not (isinstance(p, dict) and p.get("poolId") == pool_id)]
+    if len(kept) == len(pools):
+        return updated, [f"pool '{pool_id}' no encontrado en stage '{stage_id}'"]
+    stage["blueprintPoolEntries"] = kept
+    return updated, []
+
+
+def set_ai_module_param(
+    pack: dict, profile_id: str, module_id: str, param_name: str, value: Any
+) -> tuple[dict, list[str]]:
+    """Inserta o actualiza un parámetro de un módulo AI de un perfil."""
+    updated = json.loads(json.dumps(pack)) if isinstance(pack, dict) else {}
+    if not isinstance(param_name, str) or not param_name.strip():
+        return updated, ["param_name vacío"]
+    profile = None
+    for candidate in _as_list(updated.get("aiProfiles")):
+        if isinstance(candidate, dict) and _entity_key(candidate) == profile_id:
+            profile = candidate
+            break
+    if profile is None:
+        return updated, [f"ai profile '{profile_id}' no existe en el pack"]
+
+    module = None
+    for candidate in _as_list(profile.get("modules")):
+        if isinstance(candidate, dict) and candidate.get("moduleId") == module_id:
+            module = candidate
+            break
+    if module is None:
+        return updated, [f"módulo '{module_id}' no encontrado en '{profile_id}'"]
+
+    params = module.setdefault("parameters", [])
+    string_value = value if isinstance(value, str) else str(value)
+    for entry in params:
+        if isinstance(entry, dict) and entry.get("name") == param_name:
+            entry["value"] = string_value
+            return updated, []
+    params.append({"name": param_name, "value": string_value})
+    return updated, []
 
 
 def write_pack(pack: dict, out_dir: str | Path) -> Path:
@@ -183,14 +384,42 @@ def main(argv: list[str] | None = None) -> int:
     import argparse
 
     parser = argparse.ArgumentParser(
-        description="Añade o elimina una unidad de un content pack"
+        description="Edita un content pack (unidades, flags, balance, etapas, pools, módulos AI)"
     )
     parser.add_argument("--pack", required=True, help="Directorio o content.json")
-    parser.add_argument("--operation", choices=["add", "remove"], required=True)
-    parser.add_argument("--unit-id", help="ID de la unidad (para remove)")
+    parser.add_argument(
+        "--operation",
+        choices=[
+            "add", "remove", "set-flag", "set-balance", "remove-balance",
+            "set-map-size", "add-pool", "remove-pool", "set-ai-param",
+        ],
+        required=True,
+    )
+    parser.add_argument("--unit-id", help="ID de la unidad")
     parser.add_argument("--unit-json", help="Ruta a un unit.json (para add)")
     parser.add_argument("--stage-ids", nargs="*", default=None,
                         help="Etapas donde registrar la unidad (add)")
+    # set-flag
+    parser.add_argument("--flag", help="Flag booleano (set-flag)")
+    parser.add_argument("--flag-value", choices=["true", "false"],
+                        help="Valor del flag (set-flag)")
+    # balance
+    parser.add_argument("--balance-name", help="Nombre del balanceOverride")
+    parser.add_argument("--balance-value", help="Valor del balanceOverride")
+    parser.add_argument("--factory", action="store_true", help="Apunta a la fábrica")
+    # map size
+    parser.add_argument("--stage-id", help="ID de la etapa")
+    parser.add_argument("--map-min", type=int, help="mapSizeMin")
+    parser.add_argument("--map-max", type=int, help="mapSizeMax")
+    # pools
+    parser.add_argument("--pool-id", help="ID del blueprint pool")
+    parser.add_argument("--pool-unit-ids", nargs="*", default=None,
+                        help="IDs de unidad del pool")
+    # ai param
+    parser.add_argument("--profile-id", help="ID del perfil AI")
+    parser.add_argument("--module-id", help="ID del módulo AI")
+    parser.add_argument("--param-name", help="Nombre del parámetro")
+    parser.add_argument("--param-value", help="Valor del parámetro")
     parser.add_argument("--out-dir", required=True, help="Directorio destino")
     args = parser.parse_args(argv)
 
@@ -198,6 +427,9 @@ def main(argv: list[str] | None = None) -> int:
     if error:
         print(error, file=sys.stderr)
         return 2
+
+    updated = None
+    diagnostics: list[str] = []
 
     if args.operation == "add":
         if not args.unit_json:
@@ -217,7 +449,7 @@ def main(argv: list[str] | None = None) -> int:
             for d in diagnostics:
                 print(f"  ! {d}", file=sys.stderr)
             return 1
-    else:
+    elif args.operation == "remove":
         if not args.unit_id:
             print("--unit-id es obligatorio para remove", file=sys.stderr)
             return 2
@@ -226,9 +458,62 @@ def main(argv: list[str] | None = None) -> int:
             for d in diagnostics:
                 print(f"  ! {d}", file=sys.stderr)
             return 1
+    elif args.operation == "set-flag":
+        if not (args.unit_id and args.flag and args.flag_value):
+            print("--unit-id, --flag y --flag-value son obligatorios", file=sys.stderr)
+            return 2
+        updated, diagnostics = set_unit_flag(
+            pack, args.unit_id, args.flag, args.flag_value == "true"
+        )
+    elif args.operation == "set-balance":
+        if not (args.unit_id and args.balance_name and args.balance_value):
+            print("--unit-id, --balance-name y --balance-value son obligatorios", file=sys.stderr)
+            return 2
+        updated, diagnostics = set_balance_override(
+            pack, args.unit_id, args.balance_name, args.balance_value,
+            factory=args.factory,
+        )
+    elif args.operation == "remove-balance":
+        if not (args.unit_id and args.balance_name):
+            print("--unit-id y --balance-name son obligatorios", file=sys.stderr)
+            return 2
+        updated, diagnostics = remove_balance_override(
+            pack, args.unit_id, args.balance_name, factory=args.factory
+        )
+    elif args.operation == "set-map-size":
+        if not (args.stage_id and args.map_min is not None and args.map_max is not None):
+            print("--stage-id, --map-min y --map-max son obligatorios", file=sys.stderr)
+            return 2
+        updated, diagnostics = set_stage_map_size(
+            pack, args.stage_id, args.map_min, args.map_max
+        )
+    elif args.operation == "add-pool":
+        if not (args.stage_id and args.pool_id):
+            print("--stage-id y --pool-id son obligatorios", file=sys.stderr)
+            return 2
+        updated, diagnostics = add_pool_entry(
+            pack, args.stage_id, args.pool_id, args.pool_unit_ids or []
+        )
+    elif args.operation == "remove-pool":
+        if not (args.stage_id and args.pool_id):
+            print("--stage-id y --pool-id son obligatorios", file=sys.stderr)
+            return 2
+        updated, diagnostics = remove_pool_entry(pack, args.stage_id, args.pool_id)
+    elif args.operation == "set-ai-param":
+        if not (args.profile_id and args.module_id and args.param_name and args.param_value):
+            print("--profile-id, --module-id, --param-name y --param-value son obligatorios",
+                  file=sys.stderr)
+            return 2
+        updated, diagnostics = set_ai_module_param(
+            pack, args.profile_id, args.module_id, args.param_name, args.param_value
+        )
 
-    for d in diagnostics:
-        print(f"  ! {d}")
+    if diagnostics:
+        for d in diagnostics:
+            print(f"  ! {d}")
+        # operaciones que dejan el pack sin cambios válidos no escriben
+        if args.operation in ("remove",) and any("no existe" in d for d in diagnostics):
+            return 1
     written = write_pack(updated, args.out_dir)
     print(f"Pack escrito en {written}")
     return 0
