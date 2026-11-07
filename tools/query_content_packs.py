@@ -207,6 +207,75 @@ def find_units_without_stage(pack: dict) -> list[str]:
     return sorted(orphans)
 
 
+def query_stages(pack: dict, unit_id: str | None = None) -> list[dict]:
+    """Filas compactas de etapas (oferta, tamaño de mapa, perfiles, pools)."""
+    pack = _as_dict(pack)
+    rows: list[dict] = []
+    for stage in _as_list(pack.get("stages")):
+        if not isinstance(stage, dict):
+            continue
+        direct = [v for v in _as_list(stage.get("unitIds")) if isinstance(v, str)]
+        pools = [
+            [v for v in _as_list(e.get("unitIds")) if isinstance(v, str)]
+            for e in _as_list(stage.get("blueprintPoolEntries"))
+            if isinstance(e, dict)
+        ]
+        pooled = [uid for pool in pools for uid in pool]
+        profiles = [v for v in _as_list(stage.get("aiProfileIds"))
+                    if isinstance(v, str)]
+        if unit_id is not None and unit_id not in direct and unit_id not in pooled:
+            continue
+        rows.append({
+            "stageId": _entity_key(stage),
+            "nativeTemplateId": stage.get("nativeTemplateId"),
+            "mapSizeMin": stage.get("mapSizeMin"),
+            "mapSizeMax": stage.get("mapSizeMax"),
+            "unitCount": len(direct),
+            "poolUnitCount": len(pooled),
+            "pools": sorted({str(e.get("poolId", "")) for e in
+                             _as_list(stage.get("blueprintPoolEntries"))
+                             if isinstance(e, dict)}),
+            "profileCount": len(profiles),
+            "profiles": sorted(profiles),
+        })
+    rows.sort(key=lambda r: str(r["stageId"]))
+    return rows
+
+
+def query_ai_profiles(pack: dict, unit_id: str | None = None) -> list[dict]:
+    """Filas compactas de perfiles AI (módulos y entradas de roster)."""
+    pack = _as_dict(pack)
+    rows: list[dict] = []
+    for profile in _as_list(pack.get("aiProfiles")):
+        if not isinstance(profile, dict):
+            continue
+        unit_entries = [e for e in _as_list(profile.get("unitEntries"))
+                        if isinstance(e, dict)]
+        factory_entries = [e for e in _as_list(profile.get("productionBuildingEntries"))
+                           if isinstance(e, dict)]
+        if unit_id is not None:
+            referenced = any(
+                e.get("unitId") == unit_id
+                for e in unit_entries + factory_entries
+            )
+            if not referenced:
+                continue
+        rows.append({
+            "profileId": _entity_key(profile),
+            "nativeTemplateId": profile.get("nativeTemplateId"),
+            "scopeToReferencedStages": profile.get("scopeToReferencedStages", False),
+            "unitEntryCount": len(unit_entries),
+            "factoryEntryCount": len(factory_entries),
+            "moduleIds": sorted([
+                str(m.get("moduleId"))
+                for m in _as_list(profile.get("modules"))
+                if isinstance(m, dict)
+            ]),
+        })
+    rows.sort(key=lambda r: str(r["profileId"]))
+    return rows
+
+
 def _resolve_pack(path: Path) -> Path:
     return path / "content.json" if path.is_dir() else path
 
