@@ -1,9 +1,35 @@
 #!/usr/bin/env python3
-"""Añade o elimina una unidad (y su fábrica) de un content pack.
+"""Editor de content packs de Rogue Command (unidades, etapas, AI, relics...).
 
-Funciones puras :func:`add_unit` y :func:`remove_unit` que mantienen
-consistentes etapas, blueprint pools y perfiles AI. El CLI aplica la operación
-y escribe el pack.
+Este es el único punto de edición de ``content.json``: toda operación es una
+función pura que devuelve ``(pack, diagnostics)`` y el CLI solo parsea flags.
+
+Catálogo breve (ver ``docs/research/CONTENT-LOADER-TOOLS.md`` para la guía
+completa y ``--list-operations`` para el uso en runtime):
+
+  Unidades     add | remove | duplicate-unit | rename-unit | set-flag
+               set-balance | remove-balance | set-template | set-unit-assets
+  Etapas       add-stage | remove-stage | rename-stage | clone-stage
+               set-map-size | add-pool | remove-pool | set-landscape
+  Perfiles AI  add-ai-profile | remove-ai-profile | rename-ai-profile
+               clone-ai-profile | set-ai-field | set-ai-param
+               add-ai-module | remove-ai-module
+  Relics       add-relic | remove-relic | set-relic-card-change
+  Upgrades     add-upgrade | remove-upgrade | set-upgrade-field
+               set-upgrade-card-change
+  Bundles      add-bundle | remove-bundle
+  Composición  extract-units | import-units | purge-dangling
+  Identity     set-pack-id | set-schema-version
+  Batch        batch (--script, lista de {"op": ..., ...})
+  Utilidades   list-operations (catálogo legible/JSON)
+
+Vocabulario clave (ver guía):
+  - IDs namespaced ``ns:slug``; las plantillas nativas (``PCXBaseTank``) nunca
+    se remapean.
+  - ``apply_edits`` consume claves declarativas (``unitId``, ``stageId``,
+    ``profileId``, ``name``, ``value``, ``min``/``max``, ``unitIds``), no flags.
+  - ``--dry-run`` muestra el pack sin escribir; ``--validate-after`` valida
+    balance + referencias tras editar.
 """
 from __future__ import annotations
 
@@ -13,6 +39,57 @@ from pathlib import Path
 from typing import Any
 
 from tools.merge_content_packs import _as_dict, _as_list, _entity_key
+
+
+def operations_catalog() -> list[dict]:
+    """Catálogo completo de operaciones del editor (descubrimiento en runtime).
+
+    Cada entrada: ``op``, ``summary`` y ``args`` (claves declarativas del
+    batch; el CLI mapea flags a estas mismas claves).
+    """
+    return [
+        {"op": "add", "summary": "Añade una unidad (con fábrica 1:1)", "args": ["unit", "stageIds"]},
+        {"op": "remove", "summary": "Elimina unidad + purga referencias", "args": ["unitId"]},
+        {"op": "duplicate-unit", "summary": "Clona una unidad con nuevo id", "args": ["unitId", "newId"]},
+        {"op": "rename-unit", "summary": "Renombra unidad + fábrica en todo el pack", "args": ["unitId", "newId"]},
+        {"op": "set-flag", "summary": "Flag booleano de unidad", "args": ["unitId", "flag", "value"]},
+        {"op": "set-balance", "summary": "Upsert balanceOverride (unidad/factory)", "args": ["unitId", "name", "value", "factory"]},
+        {"op": "remove-balance", "summary": "Elimina balanceOverride por nombre", "args": ["unitId", "name", "factory"]},
+        {"op": "set-template", "summary": "Fija nativeTemplateId validado (allowlist)", "args": ["unitId", "templateId", "factory"]},
+        {"op": "set-unit-assets", "summary": "Fija assetBundleId/cardImageAssetName", "args": ["unitId", "assetBundleId", "cardImage", "factory"]},
+        {"op": "set-localization", "summary": "Upsert de localización (unidad/factory)", "args": ["unitId", "language", "name", "description", "factory"]},
+        {"op": "add-stage", "summary": "Añade una etapa", "args": ["stage"]},
+        {"op": "remove-stage", "summary": "Elimina una etapa", "args": ["stageId"]},
+        {"op": "rename-stage", "summary": "Renombra una etapa", "args": ["stageId", "newId"]},
+        {"op": "clone-stage", "summary": "Clona una etapa con nuevo id", "args": ["stageId", "newId"]},
+        {"op": "set-map-size", "summary": "Rango de mapa 1..128 (min<=max)", "args": ["stageId", "min", "max"]},
+        {"op": "add-pool", "summary": "Crea/actualiza blueprint pool", "args": ["stageId", "poolId", "unitIds"]},
+        {"op": "remove-pool", "summary": "Elimina blueprint pool", "args": ["stageId", "poolId"]},
+        {"op": "set-landscape", "summary": "Campos del landscape (seed, mapSize impar)", "args": ["stageId", "seed", "mapSize", "nativeTemplateId"]},
+        {"op": "add-ai-profile", "summary": "Añade perfil AI", "args": ["profile"]},
+        {"op": "remove-ai-profile", "summary": "Elimina perfil AI (+purga etapas)", "args": ["profileId"]},
+        {"op": "rename-ai-profile", "summary": "Renombra perfil AI (+etapas)", "args": ["profileId", "newId"]},
+        {"op": "clone-ai-profile", "summary": "Clona perfil AI con nuevo id", "args": ["profileId", "newId"]},
+        {"op": "set-ai-field", "summary": "Campo escalar de perfil AI", "args": ["profileId", "field", "value"]},
+        {"op": "set-ai-param", "summary": "Upsert parámetro de módulo AI", "args": ["profileId", "moduleId", "name", "value"]},
+        {"op": "add-ai-module", "summary": "Añade módulo a un perfil", "args": ["profileId", "module"]},
+        {"op": "remove-ai-module", "summary": "Elimina módulo de un perfil", "args": ["profileId", "moduleId"]},
+        {"op": "set-stage-param", "summary": "Upsert parameterOverride de etapa", "args": ["stageId", "name", "value"]},
+        {"op": "add-relic", "summary": "Añade reliquia", "args": ["relic"]},
+        {"op": "remove-relic", "summary": "Elimina reliquia", "args": ["relicId"]},
+        {"op": "set-relic-card-change", "summary": "Upsert cardChange de reliquia", "args": ["relicId", "valueToChange", "operation", "value"]},
+        {"op": "add-upgrade", "summary": "Añade upgrade", "args": ["upgrade"]},
+        {"op": "remove-upgrade", "summary": "Elimina upgrade", "args": ["upgradeId"]},
+        {"op": "set-upgrade-field", "summary": "Campo escalar de upgrade", "args": ["upgradeId", "field", "value"]},
+        {"op": "set-upgrade-card-change", "summary": "Upsert cardChange de upgrade", "args": ["upgradeId", "valueToChange", "operation", "value"]},
+        {"op": "add-bundle", "summary": "Añade AssetBundle", "args": ["bundle"]},
+        {"op": "remove-bundle", "summary": "Elimina AssetBundle", "args": ["bundleId"]},
+        {"op": "extract-units", "summary": "Extrae unidades a un pack nuevo", "args": ["unitIds"]},
+        {"op": "import-units", "summary": "Importa unidades de otro pack", "args": ["source", "unitIds"]},
+        {"op": "purge-dangling", "summary": "Elimina referencias colgantes", "args": []},
+        {"op": "set-pack-id", "summary": "Fija packId (namespace:local)", "args": ["newId"]},
+        {"op": "set-schema-version", "summary": "Fija schemaVersion (solo 1)", "args": ["version"]},
+    ]
 
 
 def _unit_index(pack: dict) -> dict[str, dict]:
@@ -1434,7 +1511,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Edita un content pack (unidades, flags, balance, etapas, pools, módulos AI)"
     )
-    parser.add_argument("--pack", required=True, help="Directorio o content.json")
+    parser.add_argument("--pack", required=False, help="Directorio o content.json")
     parser.add_argument(
         "--operation",
         choices=[
@@ -1453,7 +1530,7 @@ def main(argv: list[str] | None = None) -> int:
             "set-pack-id", "set-schema-version",
             "batch",
         ],
-        required=True,
+        required=False,
     )
     parser.add_argument("--unit-id", help="ID de la unidad")
     parser.add_argument("--unit-json", help="Ruta a un unit.json (para add)")
@@ -1511,12 +1588,25 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--new-pack-id", help="Nuevo packId (set-pack-id)")
     parser.add_argument("--schema-version", help="Versión de schema (set-schema-version)")
     parser.add_argument("--script", help="Ruta a un script JSON de operaciones (batch)")
+    parser.add_argument("--operations-json", action="store_true",
+                        help="Imprime el catálogo de operaciones (JSON) y sale")
     parser.add_argument("--dry-run", action="store_true",
                         help="No escribe; muestra el pack resultante por stdout")
     parser.add_argument("--validate-after", action="store_true",
                         help="Valida balance + referencias tras la edición")
-    parser.add_argument("--out-dir", required=True, help="Directorio destino")
+    parser.add_argument("--out-dir", help="Directorio destino (no requerido con --operations-json/--dry-run)")
     args = parser.parse_args(argv)
+
+    # Catálogo de operaciones (agente puede descubrirlas sin --pack).
+    if getattr(args, "operations_json", False):
+        print(json.dumps(operations_catalog(), indent=2, ensure_ascii=False))
+        return 0
+
+    if not args.out_dir and not args.dry_run:
+        parser.error("--out-dir es obligatorio salvo --dry-run/--operations-json")
+
+    if not args.pack or not args.operation:
+        parser.error("--pack y --operation son obligatorios (salvo --operations-json)")
 
     pack, error = _load_pack(args.pack)
     if error:
