@@ -6285,6 +6285,273 @@ def make_armored_access_hatch_assembly(
 
     return objects
 
+
+def make_track_tensioner_idler_yoke_assembly(
+    prefix: str,
+    idler_center: Tuple[float, float, float] | Vector,
+    track_width: float = 2.4,
+    arm_radius: float = 0.14,
+    arm_length: float = 0.28,
+    cylinder_radius: float = 0.055,
+    cylinder_length: float = 0.32,
+    armor_mat: bpy.types.Material | None = None,
+    gunmetal_mat: bpy.types.Material | None = None,
+) -> list[bpy.types.Object]:
+    """Generates hydraulic track tensioner cylinders, swing yokes and mud scrapers for front idler wheels.
+
+    Provides authentic mechanical mounting for front idlers with longitudinal hydraulic tensioner
+    cylinders recessed along the front sponson wall, swinging trailing yoke arms connecting to the
+    idler spindle, and heavy angled mud scraper blades behind the idler wheel.
+    """
+    objects = []
+    idler_v = Vector(idler_center)
+    rot_trans = (0.0, math.radians(90.0), 0.0)
+
+    for side, stag in ((-1, "L"), (1, "R")):
+        ix = idler_v.x + side * (track_width * 0.42)
+        iy = idler_v.y
+        iz = idler_v.z
+
+        # 1. Longitudinal Hydraulic Tensioner Cylinder Barrel
+        cyl_x = ix - side * 0.08
+        cyl_y = iy - arm_length * 0.70
+        cyl_z = iz
+        cyl_obj = make_cylinder(
+            f"{prefix}_TensionerCyl_{stag}",
+            radius=cylinder_radius,
+            depth=cylinder_length,
+            location=(cyl_x, cyl_y, cyl_z),
+            material=armor_mat,
+            vertices=12,
+            bevel=0.006,
+            rotation=(math.radians(90.0), 0.0, 0.0),
+        )
+        objects.append(cyl_obj)
+
+        # 2. Chrome Extension Piston Shaft
+        piston_obj = make_cylinder(
+            f"{prefix}_TensionerPiston_{stag}",
+            radius=cylinder_radius * 0.65,
+            depth=cylinder_length * 0.55,
+            location=(cyl_x, cyl_y + cylinder_length * 0.35, cyl_z),
+            material=gunmetal_mat or armor_mat,
+            vertices=12,
+            bevel=0.003,
+            rotation=(math.radians(90.0), 0.0, 0.0),
+        )
+        objects.append(piston_obj)
+
+        # 3. Heavy Cast Idler Swing-Arm Trailing Yoke
+        arm_obj = make_box(
+            f"{prefix}_IdlerYokeArm_{stag}",
+            (arm_radius * 0.90, arm_length, arm_radius * 1.30),
+            (ix, iy - arm_length * 0.30, iz),
+            armor_mat,
+            bevel=arm_radius * 0.20,
+        )
+        objects.append(arm_obj)
+
+        # 4. Spindle Hub Collar
+        hub_obj = make_cylinder(
+            f"{prefix}_IdlerSpindleHub_{stag}",
+            radius=arm_radius * 0.85,
+            depth=arm_radius * 0.75,
+            location=(ix + side * 0.04, iy, iz),
+            material=gunmetal_mat or armor_mat,
+            vertices=12,
+            bevel=0.005,
+            rotation=rot_trans,
+        )
+        objects.append(hub_obj)
+
+        # 5. Heavy Angled Mud / Ice Scraper Blade
+        scraper_obj = make_box(
+            f"{prefix}_TrackScraper_{stag}",
+            (arm_radius * 1.40, 0.04, arm_radius * 0.90),
+            (ix, iy - arm_length * 0.65, iz - arm_radius * 0.45),
+            gunmetal_mat or armor_mat,
+            bevel=0.004,
+            rotation=(math.radians(22.0), 0.0, 0.0),
+        )
+        objects.append(scraper_obj)
+
+    return objects
+
+
+def make_coaxial_gun_port_assembly(
+    prefix: str,
+    location: Tuple[float, float, float] | Vector,
+    caliber: float = 0.032,
+    barrel_length: float = 0.38,
+    housing_size: Tuple[float, float, float] = (0.16, 0.24, 0.16),
+    direction: Tuple[float, float, float] = (0.0, 1.0, 0.0),
+    armor_mat: bpy.types.Material | None = None,
+    gunmetal_mat: bpy.types.Material | None = None,
+) -> list[bpy.types.Object]:
+    """Generates an armored coaxial secondary weapon port, blast deflector cowl, and barrel sleeve.
+
+    Integrates into turret cheeks or hull mantlet bezels beside main ordnance, featuring a heavy
+    cast port housing, recessed secondary barrel sleeve with perforated muzzle flash hider, and an
+    angled ballistic blast deflector cowl.
+    """
+    objects = []
+    loc_v = Vector(location)
+    hx, hy, hz = housing_size
+    dir_v = Vector(direction).normalized()
+    rot_barrel = (math.radians(90.0), 0.0, 0.0)
+
+    # 1. Cast Armored Coaxial Port Housing Block
+    housing_obj = make_box(
+        f"{prefix}_PortHousing",
+        housing_size,
+        loc_v,
+        armor_mat,
+        bevel=min(hx, hz) * 0.22,
+    )
+    objects.append(housing_obj)
+
+    # 2. Armored Ballistic Blast Deflector Brow / Cowl
+    brow_obj = make_box(
+        f"{prefix}_BlastCowl",
+        (hx * 1.15, hy * 0.55, hz * 0.35),
+        loc_v + Vector((0.0, hy * 0.22, hz * 0.48)),
+        armor_mat,
+        bevel=0.006,
+        rotation=(math.radians(-14.0), 0.0, 0.0),
+    )
+    objects.append(brow_obj)
+
+    # 3. Recessed Secondary Barrel Sleeve
+    sleeve_center = loc_v + dir_v * (barrel_length * 0.45)
+    sleeve_obj = make_cylinder(
+        f"{prefix}_CoaxSleeve",
+        radius=caliber * 1.55,
+        depth=barrel_length * 0.65,
+        location=sleeve_center,
+        material=gunmetal_mat or armor_mat,
+        vertices=10,
+        bevel=0.003,
+        rotation=rot_barrel,
+    )
+    objects.append(sleeve_obj)
+
+    # 4. Perforated Flash Hider / Barrel Tip
+    muzzle_center = loc_v + dir_v * (barrel_length * 0.90)
+    muzzle_obj = make_cylinder(
+        f"{prefix}_CoaxMuzzle",
+        radius=caliber * 1.20,
+        depth=barrel_length * 0.35,
+        location=muzzle_center,
+        material=gunmetal_mat or armor_mat,
+        vertices=10,
+        bevel=0.002,
+        rotation=rot_barrel,
+    )
+    objects.append(muzzle_obj)
+
+    return objects
+
+
+def make_pioneer_tool_rack_assembly(
+    prefix: str,
+    location: Tuple[float, float, float] | Vector,
+    length: float = 0.95,
+    width: float = 0.20,
+    rotation: Tuple[float, float, float] = (0.0, 0.0, 0.0),
+    armor_mat: bpy.types.Material | None = None,
+    gunmetal_mat: bpy.types.Material | None = None,
+) -> list[bpy.types.Object]:
+    """Generates exterior pioneer entrenching tool racks (spade, track crowbar, retention cleats).
+
+    Eliminates flat featureless sponson and hull side plates by mounting field pioneer entrenching
+    gear: dual stamped steel C-brackets with dogging clamp clasps, an entrenching shovel with
+    spade blade and handle shaft, and an octagonal steel track breaker pry bar.
+    """
+    objects = []
+    loc_v = Vector(location)
+    rot_euler = Euler(rotation)
+    mat_rot = rot_euler.to_matrix()
+    fastener_mat = gunmetal_mat or armor_mat
+
+    # 1. Dual Stamped Steel Mounting Cleats / Clamps
+    half_len = length * 0.40
+    for c_idx, y_off in enumerate((-half_len, half_len)):
+        c_pos = loc_v + mat_rot @ Vector((0.0, y_off, 0.02))
+        cleat_obj = make_box(
+            f"{prefix}_MountCleat_{c_idx}",
+            (width * 1.15, 0.05, 0.06),
+            c_pos,
+            fastener_mat,
+            bevel=0.004,
+            rotation=rotation,
+        )
+        objects.append(cleat_obj)
+
+        # Dogging Clamp Clasp
+        clasp_pos = loc_v + mat_rot @ Vector((0.0, y_off, 0.06))
+        clasp_obj = make_box(
+            f"{prefix}_ClampClasp_{c_idx}",
+            (width * 0.75, 0.035, 0.035),
+            clasp_pos,
+            armor_mat or fastener_mat,
+            bevel=0.003,
+            rotation=rotation,
+        )
+        objects.append(clasp_obj)
+
+    # 2. Entrenching Shovel (Handle Shaft + Spade Head)
+    shaft_pos = loc_v + mat_rot @ Vector((-width * 0.22, 0.0, 0.045))
+    shaft_obj = make_cylinder(
+        f"{prefix}_SpadeShaft",
+        radius=0.016,
+        depth=length * 0.88,
+        location=shaft_pos,
+        material=fastener_mat,
+        vertices=8,
+        bevel=0.002,
+        rotation=(rotation[0] + math.radians(90.0), rotation[1], rotation[2]),
+    )
+    objects.append(shaft_obj)
+
+    spade_pos = loc_v + mat_rot @ Vector((-width * 0.22, length * 0.38, 0.045))
+    spade_obj = make_box(
+        f"{prefix}_SpadeBlade",
+        (width * 0.55, length * 0.22, 0.018),
+        spade_pos,
+        fastener_mat,
+        bevel=0.003,
+        rotation=rotation,
+    )
+    objects.append(spade_obj)
+
+    # 3. Track-Pin Breaker Octagonal Pry Bar
+    crowbar_pos = loc_v + mat_rot @ Vector((width * 0.24, -length * 0.05, 0.045))
+    crowbar_obj = make_cylinder(
+        f"{prefix}_PryBar",
+        radius=0.018,
+        depth=length * 0.92,
+        location=crowbar_pos,
+        material=fastener_mat,
+        vertices=8,
+        bevel=0.002,
+        rotation=(rotation[0] + math.radians(90.0), rotation[1], rotation[2]),
+    )
+    objects.append(crowbar_obj)
+
+    # Chisel Claw Tip
+    claw_pos = loc_v + mat_rot @ Vector((width * 0.24, length * 0.42, 0.045))
+    claw_obj = make_box(
+        f"{prefix}_PryBarClaw",
+        (0.032, 0.06, 0.024),
+        claw_pos,
+        fastener_mat,
+        bevel=0.003,
+        rotation=(rotation[0] + math.radians(18.0), rotation[1], rotation[2]),
+    )
+    objects.append(claw_obj)
+
+    return objects
+
 def create_unity_empty_locator(
     name: str,
     location: Tuple[float, float, float] | Vector,
@@ -14707,6 +14974,76 @@ class RogueVehicleBuilder:
         self.objects.extend(hatch_objs)
         return self
 
+    def add_track_tensioners(
+        self,
+        radius: float = 0.16,
+        depth: float = 0.10,
+    ) -> "RogueVehicleBuilder":
+        """Adds hydraulic track tensioners, swing yokes and mud scrapers for front idler wheels."""
+        fy = self.hull_length * 0.38
+        fz = self.ground_clearance + radius * 1.15
+        idler_center = Vector((0.0, fy, fz))
+        tensioner_objs = make_track_tensioner_idler_yoke_assembly(
+            f"{self.name}TrackTensioner",
+            idler_center=idler_center,
+            track_width=self.hull_width,
+            arm_radius=radius,
+            arm_length=depth * 2.4,
+            cylinder_radius=radius * 0.36,
+            cylinder_length=depth * 2.8,
+            armor_mat=self.palette.primary_armor,
+            gunmetal_mat=self.palette.gunmetal,
+        )
+        self.objects.extend(tensioner_objs)
+        return self
+
+    def add_coaxial_weapon_ports(
+        self,
+        offset_x: float = 0.32,
+        offset_z: float = 0.06,
+        caliber: float = 0.032,
+        barrel_length: float = 0.35,
+    ) -> "RogueVehicleBuilder":
+        """Adds an armored secondary coaxial weapon port beside the main gun mantlet."""
+        pivot = self.turret_pitch_loc or (self.turret_center + Vector((0.0, 0.45, 0.10)) if self.turret_center else None)
+        if pivot is None:
+            pivot = Vector((0.0, self.hull_length * 0.25, self.hull_deck_z + 0.15))
+        port_loc = pivot + Vector((offset_x, 0.05, offset_z))
+        port_objs = make_coaxial_gun_port_assembly(
+            f"{self.name}CoaxPort",
+            location=port_loc,
+            caliber=caliber,
+            barrel_length=barrel_length,
+            armor_mat=self.palette.primary_armor,
+            gunmetal_mat=self.palette.gunmetal,
+        )
+        self.objects.extend(port_objs)
+        return self
+
+    def add_pioneer_tool_racks(
+        self,
+        location: Tuple[float, float, float] | Vector | None = None,
+        length: float = 0.95,
+        width: float = 0.20,
+        rotation: Tuple[float, float, float] = (0.0, 0.0, 0.0),
+    ) -> "RogueVehicleBuilder":
+        """Adds an exterior pioneer tool rack with spade and track crowbar along hull side or sponson."""
+        if location is not None:
+            loc_v = Vector(location)
+        else:
+            loc_v = Vector((-self.hull_width * 0.48, 0.0, self.hull_deck_z * 0.85))
+        rack_objs = make_pioneer_tool_rack_assembly(
+            f"{self.name}PioneerRack",
+            location=loc_v,
+            length=length,
+            width=width,
+            rotation=rotation,
+            armor_mat=self.palette.primary_armor,
+            gunmetal_mat=self.palette.gunmetal,
+        )
+        self.objects.extend(rack_objs)
+        return self
+
     def add_unity_locators(self) -> "RogueVehicleBuilder":
         self.locator_sockets = create_unity_locator_sockets(
             name_prefix=self.name,
@@ -15680,6 +16017,27 @@ class RogueStructureBuilder:
             gunmetal_mat=self.palette.gunmetal,
         )
         self.objects.extend(hatch_objs)
+        return self
+
+    def add_pioneer_tool_racks(
+        self,
+        location: Tuple[float, float, float] | Vector | None = None,
+        length: float = 1.10,
+        width: float = 0.24,
+        rotation: Tuple[float, float, float] = (0.0, 0.0, 0.0),
+    ) -> "RogueStructureBuilder":
+        """Adds an exterior pioneer damage-control tool rack to the facility wall or deck."""
+        loc_v = Vector(location) if location is not None else Vector((-1.45, 0.20, 0.45))
+        rack_objs = make_pioneer_tool_rack_assembly(
+            f"{self.name}Struct_PioneerRack",
+            location=loc_v,
+            length=length,
+            width=width,
+            rotation=rotation,
+            armor_mat=self.palette.light_armor,
+            gunmetal_mat=self.palette.gunmetal,
+        )
+        self.objects.extend(rack_objs)
         return self
 
     def add_unity_locators(self) -> "RogueStructureBuilder":

@@ -904,3 +904,24 @@ To banish primitive "stuck-on/floating" geometry and establish realistic structu
   - Supported on both vehicles (`RogueVehicleBuilder.add_access_hatches()`) and structures (`RogueStructureBuilder.add_access_hatches()`).
   - Deployed across 14 combat, command, and engineering vehicle archetypes (`artillery`, `super_heavy`, `combat_harvester`, `demolition_breacher`, `thermobaric_tank`, `recovery_crawler`, `mine_layer`, `bridge_layer`, `command_hq_rig`, `mortar_carrier`, `siege_drill_mole`, `gravity_siege_breaker`, `amphibious_assault_tank`, `standard_tank`).
 - Evidence level: local build/validation evidence only; no fresh Steam runtime proof.
+
+### Wave 13: Hydraulic Track Tensioners, Coaxial Gun Ports & Pioneer Entrenching Tool Racks (local build/validation evidence)
+
+To banish floating track idlers, plain featureless sponsons, and flat turret faces, Wave 13 introduces 3 procedural assemblies across `RogueModelKit.py` and `generate_unit_model.py`:
+
+- **Hydraulic Track Tensioners & Front Idler Wheel Yokes (`make_track_tensioner_idler_yoke_assembly` / `.add_track_tensioners()`)**:
+  - Mechanical front idler wheel mounting linking the front sponson wall to the track loop.
+  - Features longitudinal hydraulic tensioner cylinder barrels (`_TensionerCyl_L/R`), chrome-finished extension piston shafts (`_TensionerPiston_L/R`), heavy cast trailing yoke swing-arms (`_IdlerYokeArm_L/R`), idler spindle hub collars (`_IdlerSpindleHub_L/R`), and angled debris/mud scraper blades (`_TrackScraper_L/R`).
+  - Completes the mechanical suspension loop alongside Wave 12 rear final-drive housings: both ends of the track assembly are now structurally engineered into the chassis.
+  - Deployed across all 16 tracked combat and engineering archetypes (`artillery`, `arc_tank`, `super_heavy`, `flak_anti_air`, `combat_harvester`, `demolition_breacher`, `thermobaric_tank`, `recovery_crawler`, `mine_layer`, `sniper_tankette`, `bridge_layer`, `mortar_carrier`, `siege_drill_mole`, `gravity_siege_breaker`, `amphibious_assault_tank`, `standard_tank`).
+- **Turret Coaxial Weapon Ports & Blast Deflector Cowls (`make_coaxial_gun_port_assembly` / `.add_coaxial_weapon_ports()`)**:
+  - Armored secondary weapon port flanking main ordnance on the turret cheek or mantlet bezel.
+  - Features a cast armored port housing block (`_PortHousing`), sloped ballistic blast deflector brow cowl (`_BlastCowl`), recessed secondary barrel sleeve (`_CoaxSleeve`), and perforated flash hider tip (`_CoaxMuzzle`).
+  - Banishes empty, flat turret cheeks by establishing authentic secondary coaxial defense armament.
+  - Deployed across 10 turreted combat archetypes (`standard_tank`, `super_heavy`, `artillery`, `flak_anti_air`, `thermobaric_tank`, `sniper_tankette`, `gravity_siege_breaker`, `amphibious_assault_tank`, `arc_tank`, `combat_harvester`).
+- **Exterior Pioneer Entrenching Tool Racks & Sponson Stowage Cleats (`make_pioneer_tool_rack_assembly` / `.add_pioneer_tool_racks()`)**:
+  - Field pioneer entrenching gear and stowage racks mounted along vehicle flanks, sponsons, and facility exterior decks.
+  - Features dual stamped steel mounting C-cleats (`_MountCleat_0/1`) with dogging clamp clasps (`_ClampClasp_0/1`), an entrenching shovel (`_SpadeShaft`, `_SpadeBlade`), and an octagonal steel track-pin breaker pry bar with curved chisel claw tip (`_PryBar`, `_PryBarClaw`).
+  - Supported on both vehicles (`RogueVehicleBuilder.add_pioneer_tool_racks()`) and structures (`RogueStructureBuilder.add_pioneer_tool_racks()`).
+  - Deployed across 14 military combat and engineering vehicles (`standard_tank`, `super_heavy`, `combat_harvester`, `demolition_breacher`, `thermobaric_tank`, `recovery_crawler`, `mine_layer`, `bridge_layer`, `command_hq_rig`, `mortar_carrier`, `siege_drill_mole`, `gravity_siege_breaker`, `halftrack`, `shield_truck`).
+- Evidence level: local build/validation evidence only; no fresh Steam runtime proof.

@@ -219,6 +219,9 @@ class TestModelKitSkillCopy(unittest.TestCase):
             "make_weapon_trunnion_bracket_assembly",
             "make_final_drive_housing_assembly",
             "make_armored_access_hatch_assembly",
+            "make_track_tensioner_idler_yoke_assembly",
+            "make_coaxial_gun_port_assembly",
+            "make_pioneer_tool_rack_assembly",
         ]
         for assembly in required_realism_assemblies:
             self.assertIn(assembly, func_names, f"Realism assembly {assembly} missing from RogueModelKit.py")
@@ -247,6 +250,9 @@ class TestModelKitSkillCopy(unittest.TestCase):
             "add_weapon_trunnions",
             "add_final_drive_housings",
             "add_access_hatches",
+            "add_track_tensioners",
+            "add_coaxial_weapon_ports",
+            "add_pioneer_tool_racks",
         ]
         for method in required_builder_methods:
             self.assertIn(method, vehicle_builder_methods, f"Method {method} missing from RogueVehicleBuilder")
@@ -280,6 +286,9 @@ class TestModelKitSkillCopy(unittest.TestCase):
         self.assertGreaterEqual(generator_source.count("builder.add_weapon_trunnions"), 8)
         self.assertGreaterEqual(generator_source.count("builder.add_final_drive_housings"), 12)
         self.assertGreaterEqual(generator_source.count("builder.add_access_hatches"), 10)
+        self.assertGreaterEqual(generator_source.count("builder.add_track_tensioners"), 12)
+        self.assertGreaterEqual(generator_source.count("builder.add_coaxial_weapon_ports"), 8)
+        self.assertGreaterEqual(generator_source.count("builder.add_pioneer_tool_racks"), 10)
 
     def test_shader_and_builder_wire_steel_micro_detail(self) -> None:
         """The detail normal texture, shader sampler, and prefab builder binding must stay in sync."""
