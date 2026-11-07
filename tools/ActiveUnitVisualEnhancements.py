@@ -222,6 +222,157 @@ ACTIVE_UNIT_WAVE34_PROFILES = {
 }
 
 
+ACTIVE_UNIT_REALISM_PROFILES = {
+    "SandlanceScout": {
+        "features": {"access_hatches", "final_drive", "track_tensioners", "pioneer_racks", "turret_ring_guard", "coaxial_port", "driver_periscope"},
+        "hull_width": 2.10, "hull_length": 2.60, "deck_z": 0.76, "ground_clearance": 0.055,
+        "hatch_location": (0.35, -0.42, 0.78),
+        "periscope_location": (0.0, 0.95, 0.72),
+        "tool_rack_location": (-0.88, -0.15, 0.76),
+        "turret_ring_location": (0.0, 0.28, 0.76), "turret_ring_radius": 0.52,
+        "coaxial_location": (0.22, 0.78, 0.92),
+        "drive_center": (0.0, -1.05, 0.35),
+        "idler_center": (0.0, 1.05, 0.35),
+    },
+    "ColossusSiegePlatform": {
+        "features": {"access_hatches", "final_drive", "track_tensioners", "pioneer_racks", "turret_ring_guard", "coaxial_port", "driver_periscope", "weapon_trunnions"},
+        "hull_width": 2.50, "hull_length": 2.90, "deck_z": 0.88, "ground_clearance": 0.06,
+        "hatch_location": (0.48, -0.55, 0.92),
+        "periscope_location": (0.0, 1.15, 0.84),
+        "tool_rack_location": (-1.05, -0.25, 0.88),
+        "turret_ring_location": (0.0, 0.35, 0.92), "turret_ring_radius": 0.74,
+        "coaxial_location": (0.34, 0.95, 1.15),
+        "weapon_trunnion_center": (0.0, 1.10, 1.15),
+        "drive_center": (0.0, -1.25, 0.38),
+        "idler_center": (0.0, 1.25, 0.38),
+    },
+    "IroncladWalker": {
+        "features": {"access_hatches", "weapon_trunnions"},
+        "hatch_location": (0.0, -0.22, 2.45),
+        "weapon_trunnion_center": (0.0, 0.38, 2.25), "trunnion_spacing": 0.62,
+    },
+    "AtlasCraneMech": {
+        "features": {"access_hatches", "weapon_trunnions"},
+        "hatch_location": (0.0, -0.35, 2.65),
+        "weapon_trunnion_center": (0.0, 0.45, 2.45), "trunnion_spacing": 0.75,
+    },
+    "BastionSiegeMech": {
+        "features": {"access_hatches", "weapon_trunnions", "turret_ring_guard"},
+        "hatch_location": (0.0, -0.42, 2.55),
+        "turret_ring_location": (0.0, 0.15, 2.45), "turret_ring_radius": 0.72,
+        "weapon_trunnion_center": (0.0, 0.65, 2.48), "trunnion_spacing": 0.68,
+    },
+    "ArachnidHexapod": {
+        "features": {"access_hatches", "weapon_trunnions", "turret_ring_guard"},
+        "hatch_location": (0.0, -0.45, 1.62),
+        "turret_ring_location": (0.0, 0.10, 1.58), "turret_ring_radius": 0.68,
+        "weapon_trunnion_center": (0.0, 0.55, 1.62), "trunnion_spacing": 0.60,
+    },
+    "OverlordCommandHQ": {
+        "features": {"access_hatches", "driver_periscope", "pioneer_racks", "turret_ring_guard"},
+        "hull_width": 2.55, "hull_length": 3.55, "deck_z": 1.38, "ground_clearance": 0.06,
+        "hatch_location": (0.55, -0.45, 1.42),
+        "periscope_location": (0.0, 1.65, 1.35),
+        "tool_rack_location": (-1.10, -0.30, 1.38),
+        "turret_ring_location": (0.0, 0.52, 1.42), "turret_ring_radius": 0.55,
+    },
+    "SkirmishStrikeBike": {
+        "features": {"access_hatches", "pioneer_racks"},
+        "hull_width": 0.96, "hull_length": 1.60, "deck_z": 1.22, "ground_clearance": 0.03,
+        "hatch_location": (0.0, -0.35, 1.15),
+        "tool_rack_location": (-0.32, -0.15, 0.85),
+    },
+    "SurgeArcTank": {
+        "features": {"access_hatches", "final_drive", "track_tensioners", "pioneer_racks", "turret_ring_guard", "driver_periscope"},
+        "hull_width": 1.78, "hull_length": 2.54, "deck_z": 1.18, "ground_clearance": 0.06,
+        "hatch_location": (0.38, -0.38, 1.22),
+        "periscope_location": (0.0, 0.92, 1.15),
+        "tool_rack_location": (-0.78, -0.10, 1.18),
+        "turret_ring_location": (0.0, 0.18, 1.18), "turret_ring_radius": 0.58,
+        "drive_center": (0.0, -1.05, 0.34),
+        "idler_center": (0.0, 1.05, 0.34),
+    },
+    "TidebreakerHovercraft": {
+        "features": {"access_hatches", "driver_periscope", "turret_ring_guard", "coaxial_port"},
+        "hull_width": 2.60, "hull_length": 3.40, "deck_z": 1.25, "ground_clearance": 0.42,
+        "hatch_location": (0.42, -0.45, 1.28),
+        "periscope_location": (0.0, 1.35, 1.22),
+        "turret_ring_location": (0.0, 0.35, 1.25), "turret_ring_radius": 0.62,
+        "coaxial_location": (0.28, 0.85, 1.38),
+    },
+    "SalvageHauler": {
+        "features": {"access_hatches", "driver_periscope", "pioneer_racks", "turret_ring_guard"},
+        "hull_width": 2.37, "hull_length": 3.20, "deck_z": 1.40, "ground_clearance": 0.06,
+        "hatch_location": (0.45, -0.35, 1.44),
+        "periscope_location": (0.0, 1.25, 1.36),
+        "tool_rack_location": (-0.98, -0.20, 1.40),
+        "turret_ring_location": (0.0, 0.35, 1.40), "turret_ring_radius": 0.54,
+    },
+    "SkyguardSAM": {
+        "features": {"access_hatches", "driver_periscope", "pioneer_racks", "turret_ring_guard"},
+        "hull_width": 2.05, "hull_length": 3.10, "deck_z": 1.65, "ground_clearance": 0.06,
+        "hatch_location": (0.38, 0.35, 1.68),
+        "periscope_location": (0.0, 1.35, 1.58),
+        "tool_rack_location": (-0.88, 0.15, 1.65),
+        "turret_ring_location": (0.0, -0.55, 1.68), "turret_ring_radius": 0.62,
+    },
+    "BulwarkSiegeTank": {
+        "features": {"access_hatches", "final_drive", "track_tensioners", "pioneer_racks", "turret_ring_guard", "coaxial_port", "driver_periscope", "weapon_trunnions"},
+        "hull_width": 2.35, "hull_length": 3.25, "deck_z": 1.45, "ground_clearance": 0.06,
+        "hatch_location": (0.45, -0.65, 1.48),
+        "periscope_location": (0.0, 1.35, 1.38),
+        "tool_rack_location": (-1.02, -0.25, 1.45),
+        "turret_ring_location": (0.0, 0.25, 1.45), "turret_ring_radius": 0.70,
+        "coaxial_location": (0.32, 0.95, 1.62),
+        "weapon_trunnion_center": (0.0, 1.05, 1.62),
+        "drive_center": (0.0, -1.35, 0.36),
+        "idler_center": (0.0, 1.35, 0.36),
+    },
+    "ArcLanceWalker": {
+        "features": {"access_hatches", "weapon_trunnions"},
+        "hatch_location": (0.0, -0.25, 2.15),
+        "weapon_trunnion_center": (0.0, 0.45, 1.95), "trunnion_spacing": 0.58,
+    },
+    "FieldMedicRover": {
+        "features": {"access_hatches", "driver_periscope", "pioneer_racks", "turret_ring_guard"},
+        "hull_width": 2.10, "hull_length": 2.70, "deck_z": 1.45, "ground_clearance": 0.06,
+        "hatch_location": (0.40, -0.32, 1.48),
+        "periscope_location": (0.0, 1.10, 1.40),
+        "tool_rack_location": (-0.88, -0.15, 1.45),
+        "turret_ring_location": (0.0, 0.20, 1.45), "turret_ring_radius": 0.52,
+    },
+    "SentinelRelay": {
+        "features": {"access_hatches", "driver_periscope", "pioneer_racks", "turret_ring_guard"},
+        "hull_width": 2.20, "hull_length": 2.80, "deck_z": 1.30, "ground_clearance": 0.06,
+        "hatch_location": (0.42, -0.38, 1.35),
+        "periscope_location": (0.0, 1.15, 1.28),
+        "tool_rack_location": (-0.92, -0.18, 1.30),
+        "turret_ring_location": (0.0, 0.25, 1.32), "turret_ring_radius": 0.55,
+    },
+    "GravitasBreaker": {
+        "features": {"access_hatches", "final_drive", "track_tensioners", "pioneer_racks", "turret_ring_guard", "coaxial_port", "driver_periscope", "weapon_trunnions"},
+        "hull_width": 2.40, "hull_length": 3.20, "deck_z": 1.35, "ground_clearance": 0.06,
+        "hatch_location": (0.48, -0.58, 1.38),
+        "periscope_location": (0.0, 1.30, 1.28),
+        "tool_rack_location": (-1.05, -0.20, 1.35),
+        "turret_ring_location": (0.0, 0.22, 1.35), "turret_ring_radius": 0.68,
+        "coaxial_location": (0.30, 0.88, 1.52),
+        "weapon_trunnion_center": (0.0, 1.02, 1.52),
+        "drive_center": (0.0, -1.30, 0.36),
+        "idler_center": (0.0, 1.30, 0.36),
+    },
+    "CommandRelay": {
+        "features": {"access_hatches", "driver_periscope", "pioneer_racks", "turret_ring_guard"},
+        "hull_width": 2.20, "hull_length": 2.90, "deck_z": 1.30, "ground_clearance": 0.06,
+        "hatch_location": (0.42, -0.42, 1.35),
+        "periscope_location": (0.0, 1.20, 1.28),
+        "tool_rack_location": (-0.92, -0.22, 1.30),
+        "turret_ring_location": (0.0, 0.28, 1.32), "turret_ring_radius": 0.55,
+    },
+}
+
+
+
 def _object_exists(name: str) -> bool:
     return bpy.data.objects.get(name) is not None
 
@@ -453,6 +604,161 @@ def _add_wave34_gussets(prefix: str, profile: Mapping[str, object], armor) -> li
     )
 
 
+
+def _add_realism_access_hatches(prefix: str, profile: Mapping[str, object], armor, gunmetal) -> list:
+    if _has_object(prefix, "Armor_AccessHatch") or _has_object(prefix, "Armor_Hatch"):
+        return []
+    loc = profile.get("hatch_location")
+    if not loc:
+        return []
+    return rmk.make_armored_access_hatch_assembly(
+        f"{prefix}Armor_AccessHatch",
+        location=loc,
+        armor_mat=armor,
+        gunmetal_mat=gunmetal,
+    )
+
+
+def _add_realism_driver_periscope(prefix: str, profile: Mapping[str, object], armor, gunmetal) -> list:
+    if _has_object(prefix, "Sensor_DriverPeriscope") or _has_object(prefix, "Periscope"):
+        return []
+    loc = profile.get("periscope_location")
+    if not loc:
+        return []
+    return rmk.make_driver_periscope_hood(
+        f"{prefix}Sensor_DriverPeriscope",
+        location=loc,
+        armor_mat=armor,
+        optic_mat=gunmetal,
+    )
+
+
+def _add_realism_pioneer_racks(prefix: str, profile: Mapping[str, object], armor, gunmetal) -> list:
+    if _has_object(prefix, "Armor_PioneerRack") or _has_object(prefix, "PioneerTool"):
+        return []
+    loc = profile.get("tool_rack_location")
+    if not loc:
+        return []
+    return rmk.make_pioneer_tool_rack_assembly(
+        f"{prefix}Armor_PioneerRack",
+        location=loc,
+        armor_mat=armor,
+        gunmetal_mat=gunmetal,
+    )
+
+
+def _add_realism_turret_ring_guard(prefix: str, profile: Mapping[str, object], armor, gunmetal) -> list:
+    if _has_object(prefix, "Armor_TurretRingGuard") or _has_object(prefix, "RingGuard"):
+        return []
+    loc = profile.get("turret_ring_location")
+    if not loc:
+        return []
+    radius = float(profile.get("turret_ring_radius", 0.65))
+    return rmk.make_turret_ring_guard(
+        f"{prefix}Armor_TurretRingGuard",
+        location=loc,
+        radius=radius,
+        armor_mat=armor,
+        gunmetal_mat=gunmetal,
+    )
+
+
+def _add_realism_coaxial_port(prefix: str, profile: Mapping[str, object], armor, gunmetal) -> list:
+    if _has_object(prefix, "Weapon_CoaxialPort") or _has_object(prefix, "Coaxial"):
+        return []
+    loc = profile.get("coaxial_location")
+    if not loc:
+        return []
+    return rmk.make_coaxial_gun_port_assembly(
+        f"{prefix}Weapon_CoaxialPort",
+        location=loc,
+        armor_mat=armor,
+        gunmetal_mat=gunmetal,
+    )
+
+
+def _add_realism_weapon_trunnions(prefix: str, profile: Mapping[str, object], armor, gunmetal) -> list:
+    if _has_object(prefix, "Armor_TrunnionBracket") or _has_object(prefix, "Trunnion"):
+        return []
+    loc = profile.get("weapon_trunnion_center")
+    if not loc:
+        return []
+    spacing = float(profile.get("trunnion_spacing", 0.60))
+    return rmk.make_weapon_trunnion_bracket_assembly(
+        f"{prefix}Armor_TrunnionBracket",
+        pivot_center=loc,
+        spacing_x=spacing,
+        armor_mat=armor,
+        gunmetal_mat=gunmetal,
+    )
+
+
+def _add_realism_final_drive(prefix: str, profile: Mapping[str, object], armor, gunmetal) -> list:
+    if _has_object(prefix, "Chassis_FinalDrive") or _has_object(prefix, "FinalDrive"):
+        return []
+    loc = profile.get("drive_center")
+    if not loc:
+        return []
+    width = float(profile.get("hull_width", 2.4))
+    return rmk.make_final_drive_housing_assembly(
+        f"{prefix}Chassis_FinalDrive",
+        hub_center=loc,
+        track_width=width,
+        armor_mat=armor,
+        gunmetal_mat=gunmetal,
+    )
+
+
+def _add_realism_track_tensioners(prefix: str, profile: Mapping[str, object], armor, gunmetal) -> list:
+    if _has_object(prefix, "Chassis_TrackTensioner") or _has_object(prefix, "TrackTensioner"):
+        return []
+    loc = profile.get("idler_center")
+    if not loc:
+        return []
+    width = float(profile.get("hull_width", 2.4))
+    return rmk.make_track_tensioner_idler_yoke_assembly(
+        f"{prefix}Chassis_TrackTensioner",
+        idler_center=loc,
+        track_width=width,
+        armor_mat=armor,
+        gunmetal_mat=gunmetal,
+    )
+
+
+def apply_realism_details(
+    unit_name: str,
+    objects: list | None = None,
+    materials: Mapping[str, object] | None = None,
+    object_prefix: str | None = None,
+) -> list:
+    """Add Wave 11-13 hard-surface realism assemblies to active pack unit."""
+    if unit_name not in ACTIVE_UNIT_REALISM_PROFILES:
+        return []
+    profile = ACTIVE_UNIT_REALISM_PROFILES[unit_name]
+    prefix = object_prefix or unit_name
+    features = set(profile["features"])
+    armor = _resolve_material(materials, "armor", (0.18, 0.24, 0.28))
+    gunmetal = _resolve_material(materials, "gunmetal", (0.07, 0.09, 0.11))
+    result = []
+    if "access_hatches" in features:
+        result.extend(_add_realism_access_hatches(prefix, profile, armor, gunmetal))
+    if "driver_periscope" in features:
+        result.extend(_add_realism_driver_periscope(prefix, profile, armor, gunmetal))
+    if "pioneer_racks" in features:
+        result.extend(_add_realism_pioneer_racks(prefix, profile, armor, gunmetal))
+    if "turret_ring_guard" in features:
+        result.extend(_add_realism_turret_ring_guard(prefix, profile, armor, gunmetal))
+    if "coaxial_port" in features:
+        result.extend(_add_realism_coaxial_port(prefix, profile, armor, gunmetal))
+    if "weapon_trunnions" in features:
+        result.extend(_add_realism_weapon_trunnions(prefix, profile, armor, gunmetal))
+    if "final_drive" in features:
+        result.extend(_add_realism_final_drive(prefix, profile, armor, gunmetal))
+    if "track_tensioners" in features:
+        result.extend(_add_realism_track_tensioners(prefix, profile, armor, gunmetal))
+    return result
+
+
 def apply_wave34_details(
     unit_name: str,
     objects: list | None = None,
@@ -490,6 +796,8 @@ def apply_wave34_details(
         result.extend(_add_wave34_leg_mounts(prefix, armor, gunmetal))
     if "gussets" in features:
         result.extend(_add_wave34_gussets(prefix, profile, armor))
+    if unit_name in ACTIVE_UNIT_REALISM_PROFILES:
+        result.extend(apply_realism_details(unit_name, objects=objects, materials=materials, object_prefix=object_prefix))
     return result
 
 

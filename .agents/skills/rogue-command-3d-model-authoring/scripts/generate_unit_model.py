@@ -1278,10 +1278,15 @@ def build_vehicle_model(
         builder.add_cast_pelvis(location=(0.0, -0.02, 1.40), width=0.92, depth=0.65, height=0.42)
         builder.add_mech_torso(location=(0.0, 0.02, 1.96), width=1.14, length=0.74, height=0.78)
         builder.add_lifting_lugs()
+        builder.add_driver_periscope_hood()
+        builder.add_access_hatches()
+        builder.add_weapon_trunnions()
         builder.add_sensor_visor()
 
     elif archetype == "bike":
         builder.add_all_terrain_wheels(wheelbase_y=1.95, track_width_x=0.0, wheel_radius=0.38, wheel_width=0.22)
+        builder.add_access_hatches()
+        builder.add_pioneer_tool_racks()
         builder.objects.extend([
             rmk.make_box(f"{name}Armor_SpineFrame", (0.34, 1.85, 0.38), (0.0, -0.05, 0.72), builder.palette.primary_armor, 0.04),
             rmk.make_box(f"{name}Armor_EngineBlock", (0.46, 0.68, 0.42), (0.0, -0.18, 0.82), builder.palette.gunmetal, 0.035),
@@ -1311,6 +1316,9 @@ def build_vehicle_model(
         builder.add_final_drive_housings()
         builder.add_track_tensioners()
         builder.add_engine_deck(slat_count=4, with_exhausts=True)
+        builder.add_exhaust_heat_shield()
+        builder.add_exhaust_heat_shield()
+        builder.add_pioneer_tool_racks()
         builder.add_towing_shackles()
         builder.add_lifting_lugs()
         builder.add_interlocking_gussets()
@@ -1347,11 +1355,15 @@ def build_vehicle_model(
         builder.add_final_drive_housings()
         builder.add_track_tensioners()
         builder.add_engine_deck(slat_count=3, with_exhausts=False)
+        builder.add_exhaust_heat_shield()
         builder.add_towing_shackles()
         builder.add_lifting_lugs()
         builder.add_splash_rib()
         builder.add_driver_periscope_hood()
         builder.add_glacis_weld_seams()
+        builder.add_access_hatches()
+        builder.add_pioneer_tool_racks()
+        builder.add_exhaust_heat_shield()
         builder.add_fuel_drums()
         builder.add_turret(size=(1.3, 1.4, 0.42), center_y=0.0)
         builder.add_turret_ring_guard()
@@ -1365,7 +1377,11 @@ def build_vehicle_model(
         builder.add_sloped_hull(length=2.9, width=2.5, height=0.78)
         builder.add_deck_edge_weld_seams()
         builder.add_hover_skimmer(float_height=0.48)
+        builder.add_access_hatches()
+        builder.add_driver_periscope_hood()
         builder.add_turret(size=(1.35, 1.5, 0.42), center_y=0.06)
+        builder.add_turret_ring_guard()
+        builder.add_coaxial_weapon_ports(offset_x=0.28)
         builder.add_sensor_visor()
         builder.add_spring_antenna()
 
@@ -1375,12 +1391,19 @@ def build_vehicle_model(
         builder.objects.append(rmk.make_transitional_coaming_collar(
             f"{name}Armor_WaistCollar", (0.0, 0.0, 0.78), (1.50, 1.60), height=0.045, collar_mat=builder.palette.gunmetal
         ))
+        builder.add_cast_pelvis(location=(0.0, 0.0, 0.72), width=1.10, depth=1.30, height=0.35)
         builder.add_quad_crawler_legs(knee_height=0.98, reach_x=1.12, reach_y=0.88)
+        builder.add_access_hatches()
+        builder.add_lifting_lugs()
         builder.add_turret(size=(1.45, 1.55, 0.44), center_y=0.04)
+        builder.add_turret_ring_guard()
+        builder.add_coaxial_weapon_ports(offset_x=0.28)
+        builder.add_weapon_trunnions()
         builder.add_sensor_visor()
 
     elif archetype == "vtol":
         builder.is_hover = True
+        builder.add_access_hatches()
         builder.objects.extend(rmk.make_aerodynamic_fuselage_assembly(
             f"{name}Armor", length=2.60, width=1.35, height=0.58, location=(0.0, 0.10, 0.72),
             primary_mat=builder.palette.primary_armor, canopy_mat=builder.palette.light_armor,
@@ -1466,8 +1489,14 @@ def build_vehicle_model(
         builder.add_towing_shackles()
         builder.add_lifting_lugs()
         builder.add_recovery_winch()
+        builder.add_final_drive_housings(radius=0.18)
+        builder.add_track_tensioners(radius=0.14)
+        builder.add_access_hatches()
+        builder.add_driver_periscope_hood()
         builder.add_pioneer_tool_racks()
         builder.add_turret(size=(1.05, 1.15, 0.35), center_y=0.20)
+        builder.add_turret_ring_guard()
+        builder.add_coaxial_weapon_ports(offset_x=0.25)
         builder.add_spring_antenna()
 
     elif archetype == "super_heavy":
@@ -1486,6 +1515,7 @@ def build_vehicle_model(
         builder.add_final_drive_housings(radius=0.22, depth=0.14)
         builder.add_track_tensioners(radius=0.18, depth=0.12)
         builder.add_engine_deck(slat_count=5, with_exhausts=True)
+        builder.add_exhaust_heat_shield()
         builder.add_towing_shackles()
         builder.add_lifting_lugs()
         builder.add_interlocking_gussets()
@@ -1533,6 +1563,9 @@ def build_vehicle_model(
                               rotation=(math.radians(-24), 0.0, 0.0), vertices=10, bevel=0.008),
         ])
         builder.add_rollcage(size=(1.15, 1.5, 0.82), location=(0.0, 0.02, 1.02))
+        builder.add_access_hatches()
+        builder.add_driver_periscope_hood()
+        builder.add_pioneer_tool_racks()
         builder.add_sensor_visor()
         builder.turret_center = Vector((0.0, 0.05, 1.45))
 
@@ -1543,11 +1576,15 @@ def build_vehicle_model(
         builder.add_final_drive_housings()
         builder.add_track_tensioners()
         builder.add_engine_deck(slat_count=4, with_exhausts=True)
+        builder.add_exhaust_heat_shield()
         builder.add_towing_shackles()
         builder.add_lifting_lugs()
         builder.add_splash_rib()
         builder.add_driver_periscope_hood()
         builder.add_glacis_weld_seams()
+        builder.add_access_hatches()
+        builder.add_pioneer_tool_racks()
+        builder.add_exhaust_heat_shield()
         builder.add_turret(size=(1.5, 1.65, 0.52), center_y=0.04)
         builder.add_turret_ring_guard()
         builder.add_coaxial_weapon_ports(offset_x=0.30)
@@ -1572,11 +1609,18 @@ def build_vehicle_model(
             ),
         ])
         builder.add_quad_track_pods(pod_length=1.85, pod_height=0.68, track_spacing_x=2.75, pod_spacing_y=2.3)
+        builder.add_final_drive_housings(radius=0.22, depth=0.14)
+        builder.add_track_tensioners(radius=0.18, depth=0.12)
         builder.add_engine_deck(slat_count=6, with_exhausts=True)
         builder.add_towing_shackles()
         builder.add_lifting_lugs()
         builder.add_interlocking_gussets()
+        builder.add_access_hatches()
+        builder.add_driver_periscope_hood()
+        builder.add_pioneer_tool_racks()
         builder.add_turret(size=(2.0, 2.3, 0.62), center_y=0.18)
+        builder.add_turret_ring_guard()
+        builder.add_coaxial_weapon_ports(offset_x=0.38)
         builder.add_sensor_visor()
         builder.add_outriggers(count=4, reach_x=0.85)
         builder.add_side_sponsons()
@@ -1586,11 +1630,18 @@ def build_vehicle_model(
         builder.add_sloped_hull(length=4.4, width=3.2, height=0.92, bevel=0.045)
         builder.add_deck_edge_weld_seams()
         builder.add_continuous_tracks(length=4.1, height=0.68, belt_width=0.40, roadwheels=7, with_skirts=skirts)
+        builder.add_final_drive_housings(radius=0.22)
+        builder.add_track_tensioners(radius=0.18)
         builder.add_engine_deck(slat_count=4, with_exhausts=True)
         builder.add_towing_shackles()
         builder.add_lifting_lugs()
         builder.add_splash_rib()
+        builder.add_driver_periscope_hood()
         builder.add_glacis_weld_seams()
+        builder.add_pioneer_tool_racks()
+        builder.add_access_hatches()
+        builder.add_driver_periscope_hood()
+        builder.add_pioneer_tool_racks()
         builder.add_commander_sight()
         builder.add_flight_deck(size=(2.10, 3.20, 0.22))
         builder.objects.extend([
@@ -1617,10 +1668,14 @@ def build_vehicle_model(
             f"{name}Armor_WaistCollar", (0.0, 0.0, 0.81), (1.40, 1.80), height=0.045, collar_mat=builder.palette.gunmetal
         ))
         builder.add_quad_crawler_legs(knee_height=1.25, reach_x=1.35, reach_y=1.10)
+        builder.add_access_hatches()
         builder.add_lifting_lugs()
         builder.add_commander_sight()
         builder.add_era_bricks()
         builder.add_turret(size=(1.55, 1.7, 0.48), center_y=0.10)
+        builder.add_turret_ring_guard()
+        builder.add_coaxial_weapon_ports(offset_x=0.30)
+        builder.add_weapon_trunnions()
         builder.add_crew_cupola()
         builder.add_sensor_visor()
         builder.add_spring_antenna()
@@ -1669,7 +1724,9 @@ def build_vehicle_model(
         )
         builder.add_cast_pelvis(location=(0.0, -0.05, 2.25), width=1.50, depth=0.95, height=0.55)
         builder.add_mech_torso(location=(0.0, 0.02, 3.05), width=2.05, length=1.35, height=1.20)
+        builder.add_access_hatches()
         builder.add_lifting_lugs()
+        builder.add_weapon_trunnions()
         builder.add_interlocking_gussets(locations=[(-0.85, -0.05, 2.85), (0.85, -0.05, 2.85)])
         builder.add_commander_sight()
         builder.add_era_bricks()
@@ -1697,13 +1754,18 @@ def build_vehicle_model(
             rmk.make_cylinder(f"{name}Engine_JetPod_L", 0.22, 1.15, (-1.15, -2.05, 0.72), builder.palette.gunmetal, rotation=(math.radians(90), 0.0, 0.0)),
             rmk.make_cylinder(f"{name}Engine_JetPod_R", 0.22, 1.15, (1.15, -2.05, 0.72), builder.palette.gunmetal, rotation=(math.radians(90), 0.0, 0.0)),
         ])
+        builder.add_access_hatches()
+        builder.add_driver_periscope_hood()
         builder.add_turret(size=(1.75, 2.05, 0.52), center_y=0.45)
+        builder.add_turret_ring_guard()
+        builder.add_coaxial_weapon_ports(offset_x=0.35)
         builder.add_sensor_visor()
         builder.add_radar_dish(is_rotodome=True, location=(0.0, -0.95, 1.95))
         builder.add_whip_antenna()
 
     elif archetype == "heavy_dropship":
         builder.is_hover = True
+        builder.add_access_hatches()
         builder.objects.extend(rmk.make_aerodynamic_fuselage_assembly(
             f"{name}Armor", length=3.80, width=2.10, height=0.95, location=(0.0, 0.15, 1.15),
             primary_mat=builder.palette.primary_armor, canopy_mat=builder.palette.light_armor,
@@ -1761,8 +1823,12 @@ def build_vehicle_model(
         builder.add_towing_shackles()
         builder.add_lifting_lugs()
         builder.add_recovery_winch()
+        builder.add_access_hatches()
+        builder.add_driver_periscope_hood()
         builder.add_pioneer_tool_racks()
         builder.add_turret(size=(1.15, 1.25, 0.36), center_y=1.10)
+        builder.add_turret_ring_guard()
+        builder.add_coaxial_weapon_ports(offset_x=0.25)
         builder.turret_center = Vector((0.0, 1.10, 1.62))
         builder.add_spring_antenna()
 
@@ -1821,8 +1887,10 @@ def build_vehicle_model(
             rmk.make_box(f"{name}Armor_CounterweightBustle", (0.96, 0.68, 0.52), (0.0, -0.92, 2.30), builder.palette.light_armor, 0.05),
             rmk.make_cylinder(f"{name}Sensor_OpticMast", 0.14, 0.55, (-0.48, 0.35, 2.78), builder.palette.gunmetal, vertices=10, bevel=0.015),
         ])
+        builder.add_access_hatches()
         builder.add_lifting_lugs()
         builder.add_turret(size=(1.25, 1.55, 0.44), center_y=0.05)
+        builder.add_weapon_trunnions()
         builder.turret_center = Vector((0.0, 0.05, 2.75))
         builder.add_sensor_visor()
         builder.add_whip_antenna()
@@ -1858,7 +1926,13 @@ def build_vehicle_model(
         builder.add_towing_shackles()
         builder.add_lifting_lugs()
         builder.add_splash_rib()
+        builder.add_driver_periscope_hood()
         builder.add_glacis_weld_seams()
+        builder.add_exhaust_heat_shield()
+        builder.add_weapon_trunnions()
+        builder.add_turret_ring_guard()
+        builder.add_exhaust_heat_shield()
+        builder.add_weapon_trunnions()
         builder.add_turret(size=(1.50, 1.65, 0.46), center_y=0.22)
         builder.add_turret_ring_guard()
         builder.add_coaxial_weapon_ports(offset_x=0.34)
@@ -1905,7 +1979,11 @@ def build_vehicle_model(
             ])
         builder.add_towing_shackles()
         builder.add_lifting_lugs()
+        builder.add_access_hatches()
+        builder.add_driver_periscope_hood()
+        builder.add_pioneer_tool_racks()
         builder.add_turret(size=(1.22, 1.35, 0.38), center_y=0.42)
+        builder.add_turret_ring_guard()
         builder.turret_center = Vector((0.0, 0.42, 1.58))
         builder.add_sensor_visor()
         builder.add_whip_antenna()
@@ -1953,7 +2031,11 @@ def build_vehicle_model(
         ))
         builder.add_towing_shackles()
         builder.add_lifting_lugs()
+        builder.add_access_hatches()
+        builder.add_driver_periscope_hood()
+        builder.add_pioneer_tool_racks()
         builder.add_turret(size=(0.95, 1.00, 0.30), center_y=1.20)
+        builder.add_turret_ring_guard()
         builder.turret_center = Vector((0.0, 1.20, 1.55))
         builder.add_radar_dish(is_rotodome=False)
         builder.add_spring_antenna()
@@ -1988,6 +2070,7 @@ def build_vehicle_model(
         ])
         builder.add_towing_shackles()
         builder.add_lifting_lugs()
+        builder.add_driver_periscope_hood()
         builder.add_recovery_winch()
         builder.add_turret(size=(0.95, 1.00, 0.32), center_y=0.40)
         builder.add_turret_ring_guard()
@@ -2035,6 +2118,7 @@ def build_vehicle_model(
         builder.add_towing_shackles()
         builder.add_lifting_lugs()
         builder.add_turret(size=(1.05, 1.15, 0.34), center_y=0.62)
+        builder.add_turret_ring_guard()
         builder.add_crew_cupola()
         builder.turret_center = Vector((0.0, 0.62, 1.30))
         builder.add_sensor_visor()
@@ -2056,6 +2140,9 @@ def build_vehicle_model(
         ])
         builder.add_towing_shackles()
         builder.add_lifting_lugs()
+        builder.add_access_hatches()
+        builder.add_driver_periscope_hood()
+        builder.add_pioneer_tool_racks()
         builder.add_turret(size=(1.05, 1.15, 0.28), center_y=0.05)
         builder.add_turret_ring_guard()
         builder.add_coaxial_weapon_ports(offset_x=0.24, caliber=0.024, barrel_length=0.28)
@@ -2066,6 +2153,9 @@ def build_vehicle_model(
         # Six-legged assault crawler: four rigged crawler legs plus a static middle leg pair bound to the body.
         builder.add_sloped_hull(length=3.0, width=2.4, height=0.84, bevel=0.05)
         builder.add_deck_edge_weld_seams()
+        builder.add_cast_pelvis(location=(0.0, 0.0, 0.78), width=1.25, depth=1.65, height=0.38)
+        builder.add_access_hatches()
+        builder.add_lifting_lugs()
         builder.objects.extend([
             rmk.make_box(
                 f"{name}Armor_ThoraxCore", (1.45, 1.95, 0.42), (0.0, 0.0, 1.02), builder.palette.primary_armor, 0.04
@@ -2089,6 +2179,9 @@ def build_vehicle_model(
                                   builder.palette.tread, vertices=10, bevel=0.01),
             ])
         builder.add_turret(size=(1.45, 1.55, 0.44), center_y=0.08)
+        builder.add_turret_ring_guard()
+        builder.add_coaxial_weapon_ports(offset_x=0.30)
+        builder.add_weapon_trunnions()
         builder.add_sensor_visor()
         builder.add_spring_antenna()
 
@@ -2117,7 +2210,11 @@ def build_vehicle_model(
                 rmk.make_box(f"{name}Armor_Rudder_{stag}", (0.05, 0.28, 0.70), (side * 0.78, -2.25, 1.55),
                              builder.palette.warning, 0.01),
             ])
+        builder.add_access_hatches()
+        builder.add_driver_periscope_hood()
         builder.add_turret(size=(1.15, 1.25, 0.36), center_y=0.85)
+        builder.add_turret_ring_guard()
+        builder.add_coaxial_weapon_ports(offset_x=0.28)
         builder.add_sensor_visor()
         builder.add_whip_antenna()
 
@@ -2203,8 +2300,12 @@ def build_vehicle_model(
         builder.add_towing_shackles()
         builder.add_lifting_lugs()
         builder.add_interlocking_gussets()
+        builder.add_access_hatches()
+        builder.add_driver_periscope_hood()
+        builder.add_pioneer_tool_racks()
         builder.add_recovery_winch()
         builder.add_turret(size=(1.05, 1.12, 0.32), center_y=1.32)
+        builder.add_turret_ring_guard()
         builder.turret_center = Vector((0.0, 1.32, 1.66))
         builder.add_radar_dish(is_rotodome=True, location=(0.45, -1.25, 2.05))
         builder.add_whip_antenna()
@@ -2212,6 +2313,7 @@ def build_vehicle_model(
     elif archetype == "flying_wing_bomber":
         # Low-observable delta flying-wing strike craft with swept wings, dorsal intakes, and landing skids.
         builder.is_hover = True
+        builder.add_access_hatches()
         builder.hull_length = 3.2
         builder.hull_width = 4.2
         builder.hull_deck_z = 1.05
@@ -2260,6 +2362,7 @@ def build_vehicle_model(
         # Open-hatch tracked heavy siege mortar carrier with split roof doors, baseplate, and ammo racks.
         builder.add_sloped_hull(length=3.15, width=2.48, height=0.96, bevel=0.045)
         builder.add_deck_edge_weld_seams()
+        builder.add_driver_periscope_hood()
         builder.add_access_hatches()
         builder.add_pioneer_tool_racks()
         builder.add_continuous_tracks(length=2.98, height=0.64, belt_width=0.35, roadwheels=5, with_skirts=skirts)
@@ -2348,7 +2451,9 @@ def build_vehicle_model(
             ])
         builder.add_towing_shackles()
         builder.add_lifting_lugs()
+        builder.add_driver_periscope_hood()
         builder.add_turret(size=(1.22, 1.32, 0.36), center_y=0.05)
+        builder.add_turret_ring_guard()
         builder.add_sensor_visor()
         builder.add_spring_antenna()
 
@@ -2380,8 +2485,10 @@ def build_vehicle_model(
         # The compact rear-set turret places both cannon firepoints at the native
         # GatlingWalker muzzle envelope after the preset's 0.75 model scale.
         builder.add_lifting_lugs()
+        builder.add_access_hatches()
         builder.add_interlocking_gussets(locations=[(-0.75, -0.05, 2.35), (0.75, -0.05, 2.35)])
         builder.add_turret(size=(1.28, 1.42, 0.42), center_y=-0.40)
+        builder.add_turret_ring_guard()
         builder.turret_center = Vector((0.0, -0.40, 2.145))
         builder.add_sensor_visor()
         builder.add_whip_antenna()
@@ -2438,7 +2545,11 @@ def build_vehicle_model(
         builder.add_wheel_fenders(rover_wheel_locs, radius=0.42, width=0.28)
         builder.add_towing_shackles()
         builder.add_lifting_lugs()
+        builder.add_access_hatches()
+        builder.add_driver_periscope_hood()
+        builder.add_pioneer_tool_racks()
         builder.add_turret(size=(1.10, 1.25, 0.36), center_y=0.10)
+        builder.add_turret_ring_guard()
         builder.add_sensor_visor()
         builder.add_nanite_dispenser(scale=0.92, spacing_x=1.75)
 
@@ -2542,7 +2653,11 @@ def build_vehicle_model(
         builder.add_wheel_fenders(relay_wheel_locs, radius=0.40, width=0.26)
         builder.add_towing_shackles()
         builder.add_lifting_lugs()
+        builder.add_access_hatches()
+        builder.add_driver_periscope_hood()
+        builder.add_pioneer_tool_racks()
         builder.add_turret(size=(1.25, 1.35, 0.40), center_y=0.15)
+        builder.add_turret_ring_guard()
         builder.add_comms_mast(height=1.65, location=(-0.35, -1.25, 1.58))
         builder.add_sensor_visor()
 
@@ -2597,6 +2712,7 @@ def build_vehicle_model(
         builder.add_driver_periscope_hood()
         builder.add_glacis_weld_seams()
         builder.add_access_hatches()
+        builder.add_pioneer_tool_racks()
         builder.add_turret(size=(1.55, 1.75, 0.46), center_y=0.08)
         builder.add_turret_ring_guard()
         builder.add_coaxial_weapon_ports(offset_x=0.32)
@@ -2608,7 +2724,10 @@ def build_vehicle_model(
     elif archetype == "plasma_mortar_strider":
         builder.add_sloped_hull(length=2.8, width=2.6, height=0.92)
         builder.add_deck_edge_weld_seams()
+        builder.add_cast_pelvis(location=(0.0, 0.0, 0.95), width=1.30, depth=1.50, height=0.42)
         builder.add_quad_crawler_legs(knee_height=1.20, reach_x=1.35, reach_y=1.15)
+        builder.add_access_hatches()
+        builder.add_lifting_lugs()
         builder.objects.extend([
             rmk.make_box(
                 f"{name}Armor_CruciformCenter",
@@ -2625,6 +2744,9 @@ def build_vehicle_model(
             ),
         ])
         builder.add_turret(size=(1.60, 1.75, 0.52), center_y=0.0)
+        builder.add_turret_ring_guard()
+        builder.add_coaxial_weapon_ports(offset_x=0.32)
+        builder.add_weapon_trunnions()
         builder.add_recoil_spade(width=2.1, depth=0.85, deployed=True, location=(0.0, -1.65, 0.45))
 
     elif archetype == "stealth_recon_skimmer":
@@ -2656,7 +2778,10 @@ def build_vehicle_model(
                 rotation=(math.radians(-18), 0.0, 0.0)
             ),
         ])
+        builder.add_access_hatches()
         builder.add_turret(size=(1.10, 1.25, 0.32), center_y=0.0)
+        builder.add_turret_ring_guard()
+        builder.add_coaxial_weapon_ports(offset_x=0.25)
         builder.add_sensor_visor()
 
     else:  # standard tank
@@ -2717,6 +2842,7 @@ def build_vehicle_model(
         elif weapon == "dual_cannon":
             if archetype == "heavy_crane_mech":
                 builder.add_dual_cannon(caliber=0.082, length=0.60, spacing=0.38, elevation_deg=11.0)
+                builder.add_weapon_trunnions(spacing_x=0.48, bracket_width=0.10)
             else:
                 builder.add_dual_cannon(caliber=0.082, length=1.65, spacing=0.38, elevation_deg=11.0)
                 builder.add_weapon_trunnions(spacing_x=0.62, bracket_width=0.14)

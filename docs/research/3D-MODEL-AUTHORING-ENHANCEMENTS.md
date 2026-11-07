@@ -925,3 +925,31 @@ To banish floating track idlers, plain featureless sponsons, and flat turret fac
   - Supported on both vehicles (`RogueVehicleBuilder.add_pioneer_tool_racks()`) and structures (`RogueStructureBuilder.add_pioneer_tool_racks()`).
   - Deployed across 14 military combat and engineering vehicles (`standard_tank`, `super_heavy`, `combat_harvester`, `demolition_breacher`, `thermobaric_tank`, `recovery_crawler`, `mine_layer`, `bridge_layer`, `command_hq_rig`, `mortar_carrier`, `siege_drill_mole`, `gravity_siege_breaker`, `halftrack`, `shield_truck`).
 - Evidence level: local build/validation evidence only; no fresh Steam runtime proof.
+
+### Full Fleet & Active Unit Realism Rollout (Waves 11–13 Completed Integration)
+
+To establish complete realism across the entire vehicle catalog, all Wave 11–13 anti-primitive hard-surface assemblies are now integrated across **all 42 archetypes** in `generate_unit_model.py` and across **all 18 active pack units** in `ActiveUnitVisualEnhancements.py`:
+
+- **Complete 42-Archetype Generator Coverage (`generate_unit_model.py` & skill twin)**:
+  - **Raised Access & Maintenance Hatches (`add_access_hatches`)**: 43 deployments across tanks, tracked crawlers, walkers, mechs, wheeled vehicles, and aircraft.
+  - **Turret Ring Deflector Guards (`add_turret_ring_guard`)**: 32 deployments across turreted combat vehicles and weapon stations.
+  - **Driver Periscope Ballistic Hoods (`add_driver_periscope_hood`)**: 31 deployments on enclosed glacis and cab roofs.
+  - **Pioneer Entrenching Tool Racks (`add_pioneer_tool_racks`)**: 29 deployments along sponsons, fenders, and side armor.
+  - **Coaxial Secondary Gun Ports (`add_coaxial_weapon_ports`)**: 21 deployments beside main guns on combat turrets.
+  - **Elevation Weapon Trunnions (`add_weapon_trunnions`)**: 20 deployments on elevating barrels and heavy weapon mounts.
+  - **Planetary Final-Drive Housings (`add_final_drive_housings`)**: 19 deployments on tracked chassis and heavy crawlers.
+  - **Hydraulic Track Tensioners & Front Idlers (`add_track_tensioners`)**: 19 deployments on front track sponsons.
+  - **Exhaust Heat Shields (`add_exhaust_heat_shield`)**: 13 deployments over engine manifolds and exhaust pipes.
+  - Zero archetypes remain unenhanced or lacking hard-surface assemblies.
+- **Full Active Pack Unit Integration (`ActiveUnitVisualEnhancements.py`)**:
+  - Authoring profile map `ACTIVE_UNIT_REALISM_PROFILES` added for all 18 active units:
+    - Tracked: `SandlanceScout`, `ColossusSiegePlatform`, `SurgeArcTank`, `BulwarkSiegeTank`, `GravitasBreaker` (final drive, track tensioner, access hatch, pioneer rack, turret ring guard, coaxial port, driver periscope, weapon trunnions).
+    - Wheeled: `OverlordCommandHQ`, `FieldMedicRover`, `SentinelRelay`, `CommandRelay`, `SkyguardSAM`, `SalvageHauler` (access hatch, driver periscope, pioneer rack, turret ring guard).
+    - Mechs / Walkers: `IroncladWalker`, `AtlasCraneMech`, `BastionSiegeMech`, `ArachnidHexapod`, `ArcLanceWalker` (access hatch, weapon trunnions, turret ring guard where turreted).
+    - Hovercraft & Bike: `TidebreakerHovercraft` (access hatch, driver periscope, turret ring guard, coaxial port), `SkirmishStrikeBike` (access hatch, pioneer rack).
+  - Idempotent builder integration via `apply_realism_details()`, chained into `apply_wave34_details()`.
+- **Twin Script Parity & Quality Verification**:
+  - Byte-for-byte binary parity between `tools/generate_unit_model.py` and `.agents/skills/rogue-command-3d-model-authoring/scripts/generate_unit_model.py` verified via `fc.exe /b`.
+  - Comprehensive unit test `test_active_units_have_realism_profiles` and updated threshold assertions verified in `tests/python/authoring/test_model_kit_skill_copy.py`.
+  - Full Python test suite passed cleanly (131/131 tests).
+- Evidence level: local build/validation evidence only; no fresh Steam runtime proof.

@@ -280,15 +280,15 @@ class TestModelKitSkillCopy(unittest.TestCase):
         self.assertGreaterEqual(generator_source.count("builder.add_fuel_drums"), 3)
         self.assertGreaterEqual(generator_source.count("builder.add_era_bricks"), 4)
         self.assertGreaterEqual(generator_source.count("builder.add_exhaust_deflector"), 4)
-        self.assertGreaterEqual(generator_source.count("builder.add_turret_ring_guard"), 8)
-        self.assertGreaterEqual(generator_source.count("builder.add_driver_periscope_hood"), 10)
-        self.assertGreaterEqual(generator_source.count("builder.add_exhaust_heat_shield"), 4)
-        self.assertGreaterEqual(generator_source.count("builder.add_weapon_trunnions"), 8)
-        self.assertGreaterEqual(generator_source.count("builder.add_final_drive_housings"), 12)
-        self.assertGreaterEqual(generator_source.count("builder.add_access_hatches"), 10)
-        self.assertGreaterEqual(generator_source.count("builder.add_track_tensioners"), 12)
-        self.assertGreaterEqual(generator_source.count("builder.add_coaxial_weapon_ports"), 8)
-        self.assertGreaterEqual(generator_source.count("builder.add_pioneer_tool_racks"), 10)
+        self.assertGreaterEqual(generator_source.count("builder.add_turret_ring_guard"), 28)
+        self.assertGreaterEqual(generator_source.count("builder.add_driver_periscope_hood"), 28)
+        self.assertGreaterEqual(generator_source.count("builder.add_exhaust_heat_shield"), 10)
+        self.assertGreaterEqual(generator_source.count("builder.add_weapon_trunnions"), 18)
+        self.assertGreaterEqual(generator_source.count("builder.add_final_drive_housings"), 18)
+        self.assertGreaterEqual(generator_source.count("builder.add_access_hatches"), 38)
+        self.assertGreaterEqual(generator_source.count("builder.add_track_tensioners"), 18)
+        self.assertGreaterEqual(generator_source.count("builder.add_coaxial_weapon_ports"), 18)
+        self.assertGreaterEqual(generator_source.count("builder.add_pioneer_tool_racks"), 26)
 
     def test_shader_and_builder_wire_steel_micro_detail(self) -> None:
         """The detail normal texture, shader sampler, and prefab builder binding must stay in sync."""
@@ -424,6 +424,31 @@ class TestModelKitSkillCopy(unittest.TestCase):
                     self.assertIn("hull_width", profiles[unit])
                     self.assertIn("hull_length", profiles[unit])
                     self.assertIn("deck_z", profiles[unit])
+
+    def test_active_units_have_realism_profiles(self) -> None:
+        """Every active unit declares its Wave 11-13 hard-surface realism profile."""
+        support = REPO_ROOT / "tools" / "ActiveUnitVisualEnhancements.py"
+        tree = ast.parse(support.read_text(encoding="utf-8"), filename=str(support))
+        profile_assignment = next(
+            (
+                node for node in tree.body
+                if isinstance(node, ast.Assign)
+                and any(
+                    isinstance(target, ast.Name)
+                    and target.id == "ACTIVE_UNIT_REALISM_PROFILES"
+                    for target in node.targets
+                )
+            ),
+            None,
+        )
+        self.assertIsNotNone(profile_assignment, "ACTIVE_UNIT_REALISM_PROFILES assignment missing")
+        assert profile_assignment is not None
+        profiles = ast.literal_eval(profile_assignment.value)
+        self.assertEqual(len(profiles), 18, "Expected 18 active unit realism profiles")
+        for unit, prof in profiles.items():
+            with self.subTest(unit=unit):
+                self.assertIn("features", prof)
+                self.assertTrue(len(prof["features"]) >= 2, f"Active unit {unit} has insufficient realism features")
 
     def test_active_unit_builders_apply_wave34_details(self) -> None:
         """All active builders and the manual bridge consume the shared Wave 3/4 overlay."""
