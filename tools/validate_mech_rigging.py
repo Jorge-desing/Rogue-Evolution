@@ -33,11 +33,10 @@ from __future__ import annotations
 import argparse
 from dataclasses import dataclass, field, asdict
 import json
-import os
 from pathlib import Path
 import re
 import sys
-from typing import List, Dict, Any, Set, Tuple
+from typing import List, Any, Set
 
 # Try importing UnityPy for compiled AssetBundle / assets inspection
 try:

@@ -10,6 +10,7 @@ sys.path.insert(0, str(REPO_ROOT / "tools"))
 import bpy
 import RogueModelKit as rmk
 from ActiveUnitVisualEnhancements import apply_wave2_details, apply_wave34_details
+from VisualModelAuthoringSupport import validate_rigid_weights, validate_root_motion
 from mathutils import Vector
 
 UNIT_NAME = "SalvageHauler"
@@ -29,31 +30,10 @@ TEXTURE_DIR = MODEL_DIR / "Textures"
 
 
 def _validate_root_motion(armature: bpy.types.Object, walk_action: bpy.types.Action) -> None:
-    root_path = 'pose.bones["Bone_Root"].location'
-    root_curves = [curve for curve in walk_action.fcurves if curve.data_path == root_path]
-    for curve in root_curves:
-        if any(abs(float(point.co.y)) > 1e-6 for point in curve.keyframe_points):
-            raise ValueError("Salvage Hauler Action_Walk violates the zero-root-translation invariant")
-    if armature.animation_data is None:
-        raise ValueError("Salvage Hauler armature has no animation data")
+    validate_root_motion(armature, walk_action, "Salvage Hauler")
 
 
-def _validate_rigid_weights(meshes: list[bpy.types.Object], armature: bpy.types.Object) -> None:
-    bone_names = {bone.name for bone in armature.data.bones}
-    for mesh in meshes:
-        if mesh.type != "MESH" or mesh.name.endswith(("_COLLIDER", "_ShieldBubble")):
-            continue
-        groups = {group.index: group.name for group in mesh.vertex_groups}
-        for vertex in mesh.data.vertices:
-            influences = [
-                (groups[assignment.group], assignment.weight)
-                for assignment in vertex.groups
-                if assignment.group in groups and assignment.weight > 1e-6
-            ]
-            if len(influences) != 1 or abs(influences[0][1] - 1.0) > 1e-5:
-                raise ValueError(f"{mesh.name} has non-rigid vertex weights at vertex {vertex.index}: {influences}")
-            if influences[0][0] not in bone_names:
-                raise ValueError(f"{mesh.name} references missing bone {influences[0][0]}")
+_validate_rigid_weights = validate_rigid_weights
 
 
 def build_salvage_hauler_model() -> None:

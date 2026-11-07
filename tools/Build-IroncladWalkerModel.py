@@ -9,7 +9,6 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "tools"))
 
-import bpy
 import RogueModelKit as rmk
 from ActiveUnitVisualEnhancements import apply_wave2_details, apply_wave34_details
 from mathutils import Vector

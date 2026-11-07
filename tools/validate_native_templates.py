@@ -13,7 +13,6 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from typing import Any
 
 from tools.merge_content_packs import _as_dict, _as_list, _entity_key
 

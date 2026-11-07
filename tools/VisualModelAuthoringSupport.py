@@ -10,7 +10,7 @@ from __future__ import annotations
 import math
 import sys
 from pathlib import Path
-from typing import Callable, Iterable, Sequence
+from typing import Any, Callable, Mapping, Sequence
 
 import bpy
 import bmesh
@@ -322,3 +322,51 @@ def simplify_command_wheels(builder) -> int:
                                   vertices, faces, builder.palette.tread)
         builder.objects.append(tread)
     return len(removed)
+
+
+def validate_root_motion(armature: Any, walk_action: Any, unit_label: str = "Unit") -> None:
+    """Validate zero-translation invariant on Bone_Root during Action_Walk."""
+    root_path = 'pose.bones["Bone_Root"].location'
+    root_curves = [curve for curve in walk_action.fcurves if curve.data_path == root_path]
+    if len(root_curves) != 3:
+        raise ValueError(f"{unit_label} Action_Walk must key all three Bone_Root location axes")
+    for curve in root_curves:
+        if any(abs(float(point.co.y)) > 1e-6 for point in curve.keyframe_points):
+            raise ValueError(f"{unit_label} Action_Walk violates the zero-root-translation invariant")
+    if getattr(armature, "animation_data", None) is None:
+        raise ValueError(f"{unit_label} armature has no animation data")
+
+
+def validate_rigid_weights(meshes: Sequence[Any], armature: Any) -> None:
+    """Validate that mesh vertices are rigidly bound (weight = 1.0) to exactly one bone."""
+    bone_names = {bone.name for bone in armature.data.bones}
+    for mesh in meshes:
+        if getattr(mesh, "type", None) != "MESH" or mesh.name.endswith(("_COLLIDER", "_ShieldBubble")):
+            continue
+        groups = {group.index: group.name for group in mesh.vertex_groups}
+        for vertex in mesh.data.vertices:
+            influences = [
+                (groups[assignment.group], assignment.weight)
+                for assignment in vertex.groups
+                if assignment.group in groups and assignment.weight > 1e-6
+            ]
+            if len(influences) != 1 or abs(influences[0][1] - 1.0) > 1e-5:
+                raise ValueError(f"{mesh.name} has non-rigid vertex weights at vertex {vertex.index}: {influences}")
+            if influences[0][0] not in bone_names:
+                raise ValueError(f"{mesh.name} references missing bone {influences[0][0]}")
+
+
+def create_canonical_sockets(socket_defs: Mapping[str, Sequence[float]]) -> None:
+    """Create canonical socket empties and FirePoint_0 child if they do not exist."""
+    for name, loc in socket_defs.items():
+        if name not in bpy.data.objects:
+            empty = bpy.data.objects.new(name, None)
+            empty.empty_display_size = 0.1
+            bpy.context.collection.objects.link(empty)
+            empty.location = tuple(loc)
+    if "FirePoint_0" not in bpy.data.objects and "Socket_MuzzlePrimary" in bpy.data.objects:
+        fp = bpy.data.objects.new("FirePoint_0", None)
+        fp.empty_display_size = 0.05
+        bpy.context.collection.objects.link(fp)
+        fp.parent = bpy.data.objects["Socket_MuzzlePrimary"]
+        fp.location = (0.0, 0.0, 0.0)

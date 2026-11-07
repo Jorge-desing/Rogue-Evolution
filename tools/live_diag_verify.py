@@ -1,4 +1,4 @@
-import subprocess, time, urllib.request, urllib.parse, json, os
+import subprocess, time, urllib.request, urllib.parse, json
 
 BASE = "http://127.0.0.1:8080/mcp"
 GAME = r"C:\Program Files (x86)\Steam\steamapps\common\Rogue Command\Rogue Command.exe"

@@ -14,7 +14,7 @@ import json
 import math
 from pathlib import Path
 
-from PIL import Image, ImageChops, ImageFilter, ImageStat
+from PIL import Image, ImageFilter, ImageStat
 
 # Roughness floor: a perfectly smooth (roughness 0) surface aliases badly at the
 # game's RTS camera distance, so smoothness is capped at 1 - MIN_ROUGHNESS.
