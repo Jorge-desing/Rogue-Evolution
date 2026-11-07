@@ -732,6 +732,36 @@ def apply_edits(
                 current, d = duplicate_unit(
                     current, op.get("unitId", ""), op.get("newId", "")
                 )
+            elif name == "add-upgrade":
+                current, d = add_upgrade(current, op.get("upgrade", {}))
+            elif name == "remove-upgrade":
+                current, d = remove_upgrade(current, op.get("upgradeId", ""))
+            elif name == "set-upgrade-field":
+                current, d = set_upgrade_field(
+                    current, op.get("upgradeId", ""), op.get("field", ""), op.get("value")
+                )
+            elif name == "set-upgrade-card-change":
+                current, d = set_upgrade_card_change(
+                    current, op.get("upgradeId", ""), op.get("valueToChange", ""),
+                    op.get("operation", "Add"), op.get("value"),
+                )
+            elif name == "set-landscape":
+                current, d = set_stage_landscape(
+                    current, op.get("stageId", ""),
+                    seed=op.get("seed"), map_size=op.get("mapSize"),
+                    native_template_id=op.get("nativeTemplateId"),
+                )
+            elif name == "set-unit-assets":
+                current, d = set_unit_assets(
+                    current, op.get("unitId", ""),
+                    asset_bundle_id=op.get("assetBundleId"),
+                    card_image=op.get("cardImage"),
+                    factory=bool(op.get("factory", False)),
+                )
+            elif name == "set-pack-id":
+                current, d = set_pack_id(current, op.get("newId", ""))
+            elif name == "set-schema-version":
+                current, d = set_schema_version(current, op.get("version"))
             else:
                 d = [f"op desconocida '{name}'"]
         except Exception as exc:  # keep the batch running per-op
@@ -1194,6 +1224,175 @@ def duplicate_unit(
     return updated, []
 
 
+# ---------------------------------------------------------------------------
+# Upgrades, landscape, assets de unidad e identidad del pack
+# ---------------------------------------------------------------------------
+
+def _upgrade_index(pack: dict) -> dict[str, dict]:
+    index = {}
+    for upgrade in _as_list(pack.get("upgrades")):
+        if not isinstance(upgrade, dict):
+            continue
+        uid = _entity_key(upgrade)
+        if uid:
+            index[uid] = upgrade
+    return index
+
+
+def add_upgrade(pack: dict, upgrade: dict) -> tuple[dict, list[str]]:
+    """Añade un upgrade (requiere los campos $defs/upgrade del schema)."""
+    updated = json.loads(json.dumps(pack)) if isinstance(pack, dict) else {}
+    if not isinstance(upgrade, dict) or not _entity_key(upgrade):
+        return updated, ["upgrade.id vacío o ausente"]
+    upgrade_id = _entity_key(upgrade)
+    if upgrade_id in _upgrade_index(updated):
+        return updated, [f"upgrade '{upgrade_id}' ya existe en el pack"]
+    updated.setdefault("upgrades", []).append(upgrade)
+    return updated, []
+
+
+def remove_upgrade(pack: dict, upgrade_id: str) -> tuple[dict, list[str]]:
+    """Elimina un upgrade. Falla si no existe."""
+    updated = json.loads(json.dumps(pack)) if isinstance(pack, dict) else {}
+    upgrades = _as_list(updated.get("upgrades"))
+    kept = [u for u in upgrades if not (isinstance(u, dict) and _entity_key(u) == upgrade_id)]
+    if len(kept) == len(upgrades):
+        return updated, [f"upgrade '{upgrade_id}' no existe en el pack"]
+    updated["upgrades"] = kept
+    return updated, []
+
+
+UPGRADE_FIELDS = (
+    "rarity", "tech", "offeredSystemTags", "neededSystemTags",
+    "neededExperienceLevel", "isAllowedForDemo", "isForSpecialists",
+    "assetBundleId", "imageAssetName",
+)
+
+
+def set_upgrade_field(
+    pack: dict, upgrade_id: str, field: str, value: Any
+) -> tuple[dict, list[str]]:
+    """Fija un campo escalar de un upgrade."""
+    updated = json.loads(json.dumps(pack)) if isinstance(pack, dict) else {}
+    if field not in UPGRADE_FIELDS:
+        return updated, [
+            f"campo '{field}' no permitido (permitidos: {', '.join(UPGRADE_FIELDS)})"
+        ]
+    upgrade = _upgrade_index(updated).get(upgrade_id)
+    if upgrade is None:
+        return updated, [f"upgrade '{upgrade_id}' no existe en el pack"]
+    upgrade[field] = value
+    return updated, []
+
+
+def set_upgrade_card_change(
+    pack: dict, upgrade_id: str, value_to_change: str, operation: str, value: Any
+) -> tuple[dict, list[str]]:
+    """Inserta o actualiza un ``cardChange`` de un upgrade."""
+    updated = json.loads(json.dumps(pack)) if isinstance(pack, dict) else {}
+    if not isinstance(value_to_change, str) or not value_to_change.strip():
+        return updated, ["valueToChange vacío"]
+    if operation not in ("Add", "Multiply", "Set"):
+        return updated, [f"operation '{operation}' no válida (Add/Multiply/Set)"]
+    upgrade = _upgrade_index(updated).get(upgrade_id)
+    if upgrade is None:
+        return updated, [f"upgrade '{upgrade_id}' no existe en el pack"]
+    changes = upgrade.setdefault("cardChanges", [])
+    numeric = _coerce_number(value)
+    for change in changes:
+        if isinstance(change, dict) and change.get("valueToChange") == value_to_change:
+            change["operation"] = operation
+            change["value"] = numeric
+            return updated, []
+    changes.append({
+        "valueToChange": value_to_change,
+        "operation": operation,
+        "value": numeric,
+    })
+    return updated, []
+
+
+def set_stage_landscape(
+    pack: dict, stage_id: str, seed: Any = None, map_size: Any = None,
+    native_template_id: str | None = None,
+) -> tuple[dict, list[str]]:
+    """Fija campos del landscape de una etapa (schema stageLandscape).
+
+    ``mapSize`` debe ser entero impar en 1..255; ``randomSeed`` 0..99998.
+    """
+    updated = json.loads(json.dumps(pack)) if isinstance(pack, dict) else {}
+
+    stage = None
+    for candidate in _as_list(updated.get("stages")):
+        if isinstance(candidate, dict) and _entity_key(candidate) == stage_id:
+            stage = candidate
+            break
+    if stage is None:
+        return updated, [f"stage '{stage_id}' no existe en el pack"]
+
+    landscape = stage.setdefault("landscape", {
+        "nativeTemplateId": "27 Circles",
+        "randomSeed": 0,
+        "alwaysUseSameSeed": True,
+        "mapSize": 45,
+        "localizations": [{"language": "en-US", "name": "Landscape"}],
+    })
+
+    if seed is not None:
+        if not isinstance(seed, int) or isinstance(seed, bool) or not (0 <= seed <= 99998):
+            return updated, ["randomSeed fuera de rango 0..99998"]
+        landscape["randomSeed"] = seed
+    if map_size is not None:
+        if not isinstance(map_size, int) or isinstance(map_size, bool) or not (1 <= map_size <= 255) or map_size % 2 == 0:
+            return updated, ["mapSize debe ser entero impar en 1..255"]
+        landscape["mapSize"] = map_size
+    if native_template_id is not None:
+        if not isinstance(native_template_id, str) or not native_template_id.strip():
+            return updated, ["nativeTemplateId vacío"]
+        landscape["nativeTemplateId"] = native_template_id
+
+    return updated, []
+
+
+def set_unit_assets(
+    pack: dict, unit_id: str, asset_bundle_id: str | None = None,
+    card_image: str | None = None, factory: bool = False,
+) -> tuple[dict, list[str]]:
+    """Fija ``assetBundleId``/``cardImageAssetName`` de una unidad o fábrica."""
+    updated = json.loads(json.dumps(pack)) if isinstance(pack, dict) else {}
+    entity = _resolve_entity(updated, unit_id, factory)
+    if entity is None:
+        return updated, [f"unit '{unit_id}' no existe (o sin factory) en el pack"]
+    if asset_bundle_id is None and card_image is None:
+        return updated, ["se requiere asset_bundle_id o card_image"]
+    if asset_bundle_id is not None:
+        entity["assetBundleId"] = asset_bundle_id
+    if card_image is not None:
+        entity["cardImageAssetName"] = card_image
+    return updated, []
+
+
+def set_pack_id(pack: dict, new_pack_id: str) -> tuple[dict, list[str]]:
+    """Fija el ``packId`` (forma ``namespace:local``)."""
+    updated = json.loads(json.dumps(pack)) if isinstance(pack, dict) else {}
+    if not isinstance(new_pack_id, str) or ":" not in new_pack_id:
+        return updated, ["packId debe tener forma 'namespace:local'"]
+    namespace, _, slug = new_pack_id.partition(":")
+    if not namespace or not slug or ":" in slug:
+        return updated, ["packId debe tener forma 'namespace:local'"]
+    updated["packId"] = new_pack_id
+    return updated, []
+
+
+def set_schema_version(pack: dict, version: Any) -> tuple[dict, list[str]]:
+    """Fija el ``schemaVersion`` (solo la versión actual soportada: 1)."""
+    updated = json.loads(json.dumps(pack)) if isinstance(pack, dict) else {}
+    if version != 1:
+        return updated, ["schemaVersion no soportada (solo 1)"]
+    updated["schemaVersion"] = version
+    return updated, []
+
+
 def write_pack(pack: dict, out_dir: str | Path) -> Path:
     out_path = Path(out_dir)
     out_path.mkdir(parents=True, exist_ok=True)
@@ -1249,6 +1448,9 @@ def main(argv: list[str] | None = None) -> int:
             "set-template",
             "add-relic", "remove-relic", "set-relic-card-change",
             "add-bundle", "remove-bundle", "duplicate-unit",
+            "add-upgrade", "remove-upgrade", "set-upgrade-field",
+            "set-upgrade-card-change", "set-landscape", "set-unit-assets",
+            "set-pack-id", "set-schema-version",
             "batch",
         ],
         required=True,
@@ -1298,6 +1500,16 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--card-value")
     parser.add_argument("--bundle-json", help="Ruta a un bundle.json (add-bundle)")
     parser.add_argument("--bundle-id", help="ID de AssetBundle")
+    parser.add_argument("--upgrade-json", help="Ruta a un upgrade.json (add-upgrade)")
+    parser.add_argument("--upgrade-id", help="ID de upgrade")
+    parser.add_argument("--upgrade-field", help="Campo escalar de upgrade")
+    parser.add_argument("--upgrade-value", help="Valor del campo de upgrade")
+    parser.add_argument("--seed", type=int, help="randomSeed (set-landscape)")
+    parser.add_argument("--map-size", type=int, help="mapSize landscape")
+    parser.add_argument("--asset-bundle-id", help="assetBundleId (set-unit-assets)")
+    parser.add_argument("--card-image", help="cardImageAssetName (set-unit-assets)")
+    parser.add_argument("--new-pack-id", help="Nuevo packId (set-pack-id)")
+    parser.add_argument("--schema-version", help="Versión de schema (set-schema-version)")
     parser.add_argument("--script", help="Ruta a un script JSON de operaciones (batch)")
     parser.add_argument("--dry-run", action="store_true",
                         help="No escribe; muestra el pack resultante por stdout")
@@ -1513,6 +1725,75 @@ def main(argv: list[str] | None = None) -> int:
             print("--unit-id y --new-id son obligatorios", file=sys.stderr)
             return 2
         updated, diagnostics = duplicate_unit(pack, args.unit_id, args.new_id)
+    elif args.operation == "add-upgrade":
+        if not args.upgrade_json:
+            print("--upgrade-json es obligatorio para add-upgrade", file=sys.stderr)
+            return 2
+        upgrade = _read_json_file(args.upgrade_json)
+        if upgrade is None:
+            return 2
+        updated, diagnostics = add_upgrade(pack, upgrade)
+    elif args.operation == "remove-upgrade":
+        if not args.upgrade_id:
+            print("--upgrade-id es obligatorio", file=sys.stderr)
+            return 2
+        updated, diagnostics = remove_upgrade(pack, args.upgrade_id)
+    elif args.operation == "set-upgrade-field":
+        if not (args.upgrade_id and args.upgrade_field and args.upgrade_value is not None):
+            print("--upgrade-id, --upgrade-field y --upgrade-value son obligatorios",
+                  file=sys.stderr)
+            return 2
+        try:
+            ug_value = json.loads(args.upgrade_value)
+        except json.JSONDecodeError:
+            ug_value = args.upgrade_value
+        updated, diagnostics = set_upgrade_field(
+            pack, args.upgrade_id, args.upgrade_field, ug_value
+        )
+    elif args.operation == "set-upgrade-card-change":
+        if not (args.upgrade_id and args.value_to_change and args.card_operation
+                and args.card_value is not None):
+            print("--upgrade-id, --value-to-change, --card-operation y --card-value son obligatorios",
+                  file=sys.stderr)
+            return 2
+        try:
+            card_value = json.loads(args.card_value)
+        except json.JSONDecodeError:
+            card_value = args.card_value
+        updated, diagnostics = set_upgrade_card_change(
+            pack, args.upgrade_id, args.value_to_change, args.card_operation, card_value
+        )
+    elif args.operation == "set-landscape":
+        if not args.stage_id:
+            print("--stage-id es obligatorio", file=sys.stderr)
+            return 2
+        updated, diagnostics = set_stage_landscape(
+            pack, args.stage_id, seed=args.seed, map_size=args.map_size,
+            native_template_id=args.template_id,
+        )
+    elif args.operation == "set-unit-assets":
+        if not (args.unit_id and (args.asset_bundle_id or args.card_image)):
+            print("--unit-id y (--asset-bundle-id|--card-image) son obligatorios",
+                  file=sys.stderr)
+            return 2
+        updated, diagnostics = set_unit_assets(
+            pack, args.unit_id, asset_bundle_id=args.asset_bundle_id,
+            card_image=args.card_image, factory=args.factory,
+        )
+    elif args.operation == "set-pack-id":
+        if not args.new_pack_id:
+            print("--new-pack-id es obligatorio", file=sys.stderr)
+            return 2
+        updated, diagnostics = set_pack_id(pack, args.new_pack_id)
+    elif args.operation == "set-schema-version":
+        if args.schema_version is None:
+            print("--schema-version es obligatorio", file=sys.stderr)
+            return 2
+        try:
+            version = int(args.schema_version)
+        except ValueError:
+            version = args.schema_version
+        updated, diagnostics = set_schema_version(pack, version)
     elif args.operation == "batch":
         if not args.script:
             print("--script es obligatorio para batch", file=sys.stderr)
