@@ -11022,14 +11022,48 @@ def generate_procedural_action_clips(
     armature_obj: bpy.types.Object,
     prefix: str,
     leg_type: str | None = None,
+    fire_profile: str | None = None,
+    hover: bool | None = None,
 ) -> dict[str, bpy.types.Action]:
     """Generates baked NLA animation clips (Idle, Walk/Drive, FireRecoil, Death) on the armature.
 
     Enforces the In-Place Locomotion Invariant: Bone_Root position delta is strictly ZERO
     across all animation frames, ensuring tactical flocking translations work without double-stepping.
+
+    ``fire_profile`` differentiates the FireRecoil impulse by mass/role for the
+    tactical-operations pack (and any re-rigged unit): ``light`` (hover/medic/
+    sentinel/scout) is subtle, ``medium`` is the legacy baseline, ``heavy``
+    (siege/bulwark/gravitas) compresses further with a longer recovery, ``sam``
+    (skyguard) pitches the launcher harder, and ``walker`` (biped) additionally
+    braces the legs. ``None`` auto-resolves from ``prefix``/``leg_type`` so all
+    nine tactical builders keep working without a call-site change. ``hover``
+    raises the Drive bob for hovercraft (auto when the prefix suggests it).
     """
     if not armature_obj.animation_data:
         armature_obj.animation_data_create()
+
+    # Resolve the recoil profile/hover from prefix when the caller does not
+    # pass one explicitly (tactical-operations builders pass neither).
+    _prefix_lower = prefix.lower()
+    if fire_profile is None:
+        if leg_type == "biped":
+            _resolved_fire_profile = "walker"
+        elif any(tok in _prefix_lower for tok in ("bulwark", "gravitas", "colossus", "overlord")):
+            _resolved_fire_profile = "heavy"
+        elif "skyguard" in _prefix_lower:
+            _resolved_fire_profile = "sam"
+        elif any(tok in _prefix_lower for tok in ("tidebreaker", "fieldmedic", "sentinel", "sandlance", "skirmish")):
+            _resolved_fire_profile = "light"
+        else:
+            _resolved_fire_profile = "medium"
+    else:
+        _resolved_fire_profile = fire_profile.strip().lower()
+    if _resolved_fire_profile not in ("light", "medium", "heavy", "sam", "walker"):
+        raise ValueError(
+            f"Unknown fire_profile '{fire_profile}'; expected light|medium|heavy|sam|walker"
+        )
+    if hover is None:
+        hover = "hovercraft" in _prefix_lower or "tidebreaker" in _prefix_lower
 
     actions = {}
 
@@ -11052,8 +11086,12 @@ def generate_procedural_action_clips(
     for f in (1, 30):
         set_bone_key(base_body, "location", f, (0.0, 0.0, 0.0))
         set_bone_key(base_body, "rotation_euler", f, (0.0, 0.0, 0.0))
-    set_bone_key(base_body, "location", 15, (0.0, 0.0, -0.008 if leg_type else -0.006))
-    set_bone_key(base_body, "rotation_euler", 15, (math.radians(0.35), 0.0, 0.0))
+    # RTS-legible breathing: a touch deeper than the legacy 0.006/0.35°, still subtle.
+    if hover:
+        set_bone_key(base_body, "location", 15, (0.0, 0.0, -0.014))
+    else:
+        set_bone_key(base_body, "location", 15, (0.0, 0.0, -0.010))
+    set_bone_key(base_body, "rotation_euler", 15, (math.radians(0.55), 0.0, 0.0))
     act_idle.use_fake_user = True
     actions["Idle"] = act_idle
 
@@ -11065,15 +11103,15 @@ def generate_procedural_action_clips(
             set_bone_key("Bone_Root", "location", f, (0.0, 0.0, 0.0))
             set_bone_key("Bone_Root", "rotation_euler", f, (0.0, 0.0, 0.0))
 
-        # Pelvis bob and weight-absorption dip
+        # Pelvis bob, lateral weight transfer and yaw (RTS-legible gait)
         set_bone_key("Bone_Pelvis", "location", 1, (0.0, 0.0, 0.0))
         set_bone_key("Bone_Pelvis", "rotation_euler", 1, (0.0, 0.0, 0.0))
-        set_bone_key("Bone_Pelvis", "location", 10, (0.015, 0.0, -0.04))
-        set_bone_key("Bone_Pelvis", "rotation_euler", 10, (0.0, math.radians(0.6), math.radians(-0.8)))
+        set_bone_key("Bone_Pelvis", "location", 10, (0.035, 0.0, -0.04))
+        set_bone_key("Bone_Pelvis", "rotation_euler", 10, (0.0, math.radians(0.8), math.radians(3.5)))
         set_bone_key("Bone_Pelvis", "location", 20, (0.0, 0.0, 0.015))
         set_bone_key("Bone_Pelvis", "rotation_euler", 20, (0.0, 0.0, 0.0))
-        set_bone_key("Bone_Pelvis", "location", 30, (-0.015, 0.0, -0.04))
-        set_bone_key("Bone_Pelvis", "rotation_euler", 30, (0.0, math.radians(-0.6), math.radians(0.8)))
+        set_bone_key("Bone_Pelvis", "location", 30, (-0.035, 0.0, -0.04))
+        set_bone_key("Bone_Pelvis", "rotation_euler", 30, (0.0, math.radians(-0.8), math.radians(-3.5)))
         set_bone_key("Bone_Pelvis", "location", 40, (0.0, 0.0, 0.0))
         set_bone_key("Bone_Pelvis", "rotation_euler", 40, (0.0, 0.0, 0.0))
 
@@ -11102,6 +11140,20 @@ def generate_procedural_action_clips(
             set_bone_key("Bone_Thigh_R", "rotation_euler", f, (math.radians(thigh_rot), 0.0, 0.0))
             set_bone_key("Bone_Shin_R", "rotation_euler", f, (math.radians(shin_rot), 0.0, 0.0))
             set_bone_key("Bone_Foot_R", "rotation_euler", f, (math.radians(foot_rot), 0.0, 0.0))
+
+        # Foot lift (contact -> passing -> push-off): the swing foot rises and
+        # returns to the ground plane; stance feet stay at Z=0 so the gait does
+        # not slide or penetrate. Mirrors the thigh passing poses above.
+        set_bone_key("Bone_Foot_L", "location", 1, (0.0, 0.0, 0.0))
+        set_bone_key("Bone_Foot_L", "location", 10, (0.0, 0.0, 0.0))
+        set_bone_key("Bone_Foot_L", "location", 20, (0.0, 0.04, 0.09))
+        set_bone_key("Bone_Foot_L", "location", 30, (0.0, 0.02, 0.05))
+        set_bone_key("Bone_Foot_L", "location", 40, (0.0, 0.0, 0.0))
+        set_bone_key("Bone_Foot_R", "location", 1, (0.0, 0.02, 0.05))
+        set_bone_key("Bone_Foot_R", "location", 10, (0.0, 0.04, 0.09))
+        set_bone_key("Bone_Foot_R", "location", 20, (0.0, 0.0, 0.0))
+        set_bone_key("Bone_Foot_R", "location", 30, (0.0, 0.0, 0.0))
+        set_bone_key("Bone_Foot_R", "location", 40, (0.0, 0.02, 0.05))
 
         act_walk.use_fake_user = True
         actions["Walk"] = act_walk
@@ -11162,18 +11214,36 @@ def generate_procedural_action_clips(
         actions["Drive"] = act_walk
 
     else:
-        # Wheeled or Tracked vehicle: Action_Drive and alias Action_Walk
+        # Wheeled or Tracked vehicle: Action_Drive and alias Action_Walk.
+        # Hull bob + pitch/roll differential (front vs rear) so the motion reads
+        # as a vehicle at RTS distance; hovercraft float higher with a softer tilt.
         act_drive = bpy.data.actions.new(name=f"{prefix}_Action_Drive")
         armature_obj.animation_data.action = act_drive
-        for f in (1, 40):
-            set_bone_key("Bone_Hull", "location", f, (0.0, 0.0, 0.0))
-            set_bone_key("Bone_Hull", "rotation_euler", f, (0.0, 0.0, 0.0))
-        set_bone_key("Bone_Hull", "location", 10, (0.0, 0.0, 0.012))
-        set_bone_key("Bone_Hull", "rotation_euler", 10, (math.radians(-0.8), math.radians(0.6), 0.0))
-        set_bone_key("Bone_Hull", "location", 20, (0.0, 0.0, -0.010))
-        set_bone_key("Bone_Hull", "rotation_euler", 20, (math.radians(0.6), math.radians(-0.5), 0.0))
-        set_bone_key("Bone_Hull", "location", 30, (0.0, 0.0, 0.008))
-        set_bone_key("Bone_Hull", "rotation_euler", 30, (math.radians(-0.5), math.radians(0.4), 0.0))
+        # In-place invariant: Bone_Root stays at (0,0,0) (validator requires it)
+        for _root_f in (1, 10, 20, 30, 40):
+            set_bone_key("Bone_Root", "location", _root_f, (0.0, 0.0, 0.0))
+        if hover:
+            # Hover: 0.035 m float, gentle sway -- still an in-place hull motion.
+            set_bone_key("Bone_Hull", "location", 1, (0.0, 0.0, 0.0))
+            set_bone_key("Bone_Hull", "rotation_euler", 1, (0.0, 0.0, 0.0))
+            set_bone_key("Bone_Hull", "location", 10, (0.0, 0.0, 0.035))
+            set_bone_key("Bone_Hull", "rotation_euler", 10, (math.radians(-1.2), math.radians(1.0), 0.0))
+            set_bone_key("Bone_Hull", "location", 20, (0.0, 0.0, -0.018))
+            set_bone_key("Bone_Hull", "rotation_euler", 20, (math.radians(1.0), math.radians(-0.8), 0.0))
+            set_bone_key("Bone_Hull", "location", 30, (0.0, 0.0, 0.028))
+            set_bone_key("Bone_Hull", "rotation_euler", 30, (math.radians(-0.8), math.radians(0.7), 0.0))
+            set_bone_key("Bone_Hull", "location", 40, (0.0, 0.0, 0.0))
+            set_bone_key("Bone_Hull", "rotation_euler", 40, (0.0, 0.0, 0.0))
+        else:
+            for f in (1, 40):
+                set_bone_key("Bone_Hull", "location", f, (0.0, 0.0, 0.0))
+                set_bone_key("Bone_Hull", "rotation_euler", f, (0.0, 0.0, 0.0))
+            set_bone_key("Bone_Hull", "location", 10, (0.0, 0.0, 0.018))
+            set_bone_key("Bone_Hull", "rotation_euler", 10, (math.radians(-1.4), math.radians(1.2), 0.0))
+            set_bone_key("Bone_Hull", "location", 20, (0.0, 0.0, -0.016))
+            set_bone_key("Bone_Hull", "rotation_euler", 20, (math.radians(1.1), math.radians(-0.9), 0.0))
+            set_bone_key("Bone_Hull", "location", 30, (0.0, 0.0, 0.014))
+            set_bone_key("Bone_Hull", "rotation_euler", 30, (math.radians(-0.9), math.radians(0.7), 0.0))
         act_drive.use_fake_user = True
         actions["Drive"] = act_drive
         actions["Walk"] = act_drive
@@ -11183,20 +11253,62 @@ def generate_procedural_action_clips(
     # distance the body impulse is what makes a shot read as mass rather than a
     # floating weapon. All translations remain local to the rig; gameplay still owns
     # world movement and Bone_Root remains untouched.
+    #
+    # Role profiles (tactical-operations): the impulse scales with mass --
+    # light hover/medic/sentinel is subtle, medium is the legacy baseline, heavy
+    # siege (bulwark/gravitas) compresses further with a longer recovery, sam
+    # pitches the launcher harder, and walker additionally braces the legs.
+    # The phase map is explicit and strictly monotonic: neutral (1) -> anticipation
+    # brace (3) -> impact (5) -> follow-through (7) -> recovery (11) -> neutral.
     act_fire = bpy.data.actions.new(name=f"{prefix}_Action_FireRecoil")
     armature_obj.animation_data.action = act_fire
     body_bone = "Bone_Pelvis" if leg_type == "biped" else "Bone_Hull"
+    # (body_y_impact, body_pitch_deg, barrel_y_impact, pitch_deg, end_frame)
+    _fire_impulse = {
+        "light": (-0.016, -0.9, -0.14, -0.6, 15),
+        "medium": (-0.024, -1.4, -0.22, -0.9, 15),
+        "heavy": (-0.038, -2.2, -0.34, -1.6, 21),
+        "sam": (-0.028, -1.8, -0.26, -2.0, 18),
+        "walker": (-0.030, -1.8, -0.22, -1.2, 18),
+    }
+    _body_impulse_y, _body_pitch_deg, _barrel_impulse_y, _pitch_deg, _fire_end_frame = _fire_impulse[
+        _resolved_fire_profile
+    ]
+    # Anticipation brace is proportional to the impact (forward + up), so light
+    # guns brace less and heavy siege braces more -- anticipation precedes impact.
+    _brace_body_y = round(-_body_impulse_y * 0.33, 4)
+    _brace_pitch_deg = round(-_body_pitch_deg * 0.18, 3)
+    _brace_barrel_y = round(-_barrel_impulse_y * 0.16, 4)
+    _brace_pitch = round(-_pitch_deg * 0.39, 3)
+    _follow_body_y = round(_body_impulse_y * 0.42, 4)
+    _follow_pitch_deg = round(-_body_pitch_deg * 0.32, 3)
+    _follow_barrel_y = round(_barrel_impulse_y * 0.36, 4)
+    _follow_pitch = round(-_pitch_deg * 0.28, 3)
     fire_poses = {
         1: ((0.0, 0.0, 0.0), (0.0, 0.0, 0.0), (0.0, 0.0, 0.0), (0.0, 0.0, 0.0)),
-        # Anticipation: a tiny forward brace before the impulse.
-        2: ((0.0, 0.008, 0.0), (math.radians(0.25), 0.0, 0.0), (0.0, 0.035, 0.0), (math.radians(0.35), 0.0, 0.0)),
+        # Anticipation: a visible forward brace (3 frames) before the impulse.
+        3: (
+            (0.0, _brace_body_y, 0.0),
+            (math.radians(_brace_pitch_deg), 0.0, 0.0),
+            (0.0, _brace_barrel_y, 0.0),
+            (math.radians(_brace_pitch), 0.0, 0.0),
+        ),
         # Impact: body mass compresses backward while the barrel reaches peak recoil.
-        3: ((0.0, -0.024, 0.0), (math.radians(-1.4), 0.0, 0.0), (0.0, -0.22, 0.0), (math.radians(-0.9), 0.0, 0.0)),
+        5: (
+            (0.0, _body_impulse_y, 0.0),
+            (math.radians(_body_pitch_deg), 0.0, 0.0),
+            (0.0, _barrel_impulse_y, 0.0),
+            (math.radians(_pitch_deg), 0.0, 0.0),
+        ),
         # Follow-through: the mount overshoots briefly before settling.
-        5: ((0.0, -0.010, 0.0), (math.radians(0.45), 0.0, 0.0), (0.0, -0.08, 0.0), (math.radians(0.25), 0.0, 0.0)),
-        9: ((0.0, -0.002, 0.0), (math.radians(0.12), 0.0, 0.0), (0.0, -0.018, 0.0), (math.radians(0.08), 0.0, 0.0)),
+        7: (
+            (0.0, _follow_body_y, 0.0),
+            (math.radians(_follow_pitch_deg), 0.0, 0.0),
+            (0.0, _follow_barrel_y, 0.0),
+            (math.radians(_follow_pitch), 0.0, 0.0),
+        ),
+        11: ((0.0, -0.002, 0.0), (math.radians(0.12), 0.0, 0.0), (0.0, -0.018, 0.0), (math.radians(0.08), 0.0, 0.0)),
         # Recovery: every authored recoil channel returns to its neutral pose.
-        12: ((0.0, 0.0, 0.0), (0.0, 0.0, 0.0), (0.0, 0.0, 0.0), (0.0, 0.0, 0.0)),
         15: ((0.0, 0.0, 0.0), (0.0, 0.0, 0.0), (0.0, 0.0, 0.0), (0.0, 0.0, 0.0)),
     }
     for frame, (body_location, body_rotation, barrel_location, pitch_rotation) in fire_poses.items():
@@ -11204,6 +11316,29 @@ def generate_procedural_action_clips(
         set_bone_key(body_bone, "rotation_euler", frame, body_rotation)
         set_bone_key("Bone_TurretPitch", "rotation_euler", frame, pitch_rotation)
         set_bone_key("Bone_BarrelRecoil", "location", frame, barrel_location)
+    # Heavy/sam/walker clips hold neutral to their later end frame so the
+    # recovery reads as mass, not a snap back.
+    if _fire_end_frame != 15:
+        set_bone_key(body_bone, "location", _fire_end_frame, (0.0, 0.0, 0.0))
+        set_bone_key(body_bone, "rotation_euler", _fire_end_frame, (0.0, 0.0, 0.0))
+        set_bone_key("Bone_TurretPitch", "rotation_euler", _fire_end_frame, (0.0, 0.0, 0.0))
+        set_bone_key("Bone_BarrelRecoil", "location", _fire_end_frame, (0.0, 0.0, 0.0))
+    # Walker brace: legs absorb the impulse (secondary action) before recovery.
+    if _resolved_fire_profile == "walker" and leg_type == "biped":
+        set_bone_key("Bone_Thigh_L", "rotation_euler", 1, (0.0, 0.0, 0.0))
+        set_bone_key("Bone_Thigh_R", "rotation_euler", 1, (0.0, 0.0, 0.0))
+        set_bone_key("Bone_Thigh_L", "rotation_euler", 5, (math.radians(6.0), 0.0, math.radians(-4.0)))
+        set_bone_key("Bone_Thigh_R", "rotation_euler", 5, (math.radians(6.0), 0.0, math.radians(4.0)))
+        set_bone_key("Bone_Shin_L", "rotation_euler", 5, (math.radians(-14.0), 0.0, 0.0))
+        set_bone_key("Bone_Shin_R", "rotation_euler", 5, (math.radians(-14.0), 0.0, 0.0))
+        set_bone_key("Bone_Thigh_L", "rotation_euler", 13, (math.radians(2.0), 0.0, math.radians(-1.0)))
+        set_bone_key("Bone_Thigh_R", "rotation_euler", 13, (math.radians(2.0), 0.0, math.radians(1.0)))
+        set_bone_key("Bone_Shin_L", "rotation_euler", 13, (math.radians(-4.0), 0.0, 0.0))
+        set_bone_key("Bone_Shin_R", "rotation_euler", 13, (math.radians(-4.0), 0.0, 0.0))
+        set_bone_key("Bone_Thigh_L", "rotation_euler", 18, (0.0, 0.0, 0.0))
+        set_bone_key("Bone_Thigh_R", "rotation_euler", 18, (0.0, 0.0, 0.0))
+        set_bone_key("Bone_Shin_L", "rotation_euler", 18, (0.0, 0.0, 0.0))
+        set_bone_key("Bone_Shin_R", "rotation_euler", 18, (0.0, 0.0, 0.0))
     act_fire.use_fake_user = True
     actions["FireRecoil"] = act_fire
 
@@ -11213,16 +11348,20 @@ def generate_procedural_action_clips(
     set_bone_key(body_bone, "location", 1, (0.0, 0.0, 0.0))
     set_bone_key(body_bone, "rotation_euler", 1, (0.0, 0.0, 0.0))
     set_bone_key("Bone_TurretPitch", "rotation_euler", 1, (0.0, 0.0, 0.0))
-    collapse_z = -0.55 if leg_type == "biped" else (-0.28 if leg_type == "quad" else -0.12)
-    for f in (28, 35):
-        set_bone_key(body_bone, "location", f, (0.0, 0.0, collapse_z))
-        set_bone_key(body_bone, "rotation_euler", f, (math.radians(4.5), math.radians(-6.5), math.radians(2.0)))
-        set_bone_key("Bone_TurretPitch", "rotation_euler", f, (math.radians(-22.0), 0.0, 0.0))
+    # Vehicle collapse must read at RTS distance: -0.22 m (legacy -0.12 was a
+    # near-invisible settle). Biped/quad keep their deeper drops.
+    collapse_z = -0.55 if leg_type == "biped" else (-0.28 if leg_type == "quad" else -0.22)
+    # Slow in/out: frame 16 is half-collapse, 28-35 is the final rest pose.
+    for f in (16, 28, 35):
+        _collapse_factor = 0.5 if f == 16 else 1.0
+        set_bone_key(body_bone, "location", f, (0.0, 0.0, collapse_z * _collapse_factor))
+        set_bone_key(body_bone, "rotation_euler", f, (math.radians(7.0 * _collapse_factor), math.radians(-9.0 * _collapse_factor), math.radians(3.5 * _collapse_factor)))
+        set_bone_key("Bone_TurretPitch", "rotation_euler", f, (math.radians(-34.0 * _collapse_factor), 0.0, 0.0))
         if leg_type == "biped":
-            set_bone_key("Bone_Thigh_L", "rotation_euler", f, (math.radians(12.0), 0.0, math.radians(-18.0)))
-            set_bone_key("Bone_Thigh_R", "rotation_euler", f, (math.radians(12.0), 0.0, math.radians(18.0)))
-            set_bone_key("Bone_Shin_L", "rotation_euler", f, (math.radians(-35.0), 0.0, 0.0))
-            set_bone_key("Bone_Shin_R", "rotation_euler", f, (math.radians(-35.0), 0.0, 0.0))
+            set_bone_key("Bone_Thigh_L", "rotation_euler", f, (math.radians(12.0 * _collapse_factor), 0.0, math.radians(-18.0 * _collapse_factor)))
+            set_bone_key("Bone_Thigh_R", "rotation_euler", f, (math.radians(12.0 * _collapse_factor), 0.0, math.radians(18.0 * _collapse_factor)))
+            set_bone_key("Bone_Shin_L", "rotation_euler", f, (math.radians(-35.0 * _collapse_factor), 0.0, 0.0))
+            set_bone_key("Bone_Shin_R", "rotation_euler", f, (math.radians(-35.0 * _collapse_factor), 0.0, 0.0))
 
     act_death.use_fake_user = True
     actions["Death"] = act_death
