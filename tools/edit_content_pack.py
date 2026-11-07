@@ -715,6 +715,23 @@ def apply_edits(
                     current, op.get("unitId", ""), op.get("templateId", ""),
                     factory=bool(op.get("factory", False)),
                 )
+            elif name == "add-relic":
+                current, d = add_relic(current, op.get("relic", {}))
+            elif name == "remove-relic":
+                current, d = remove_relic(current, op.get("relicId", ""))
+            elif name == "set-relic-card-change":
+                current, d = set_relic_card_change(
+                    current, op.get("relicId", ""), op.get("valueToChange", ""),
+                    op.get("operation", "Add"), op.get("value"),
+                )
+            elif name == "add-bundle":
+                current, d = add_bundle(current, op.get("bundle", {}))
+            elif name == "remove-bundle":
+                current, d = remove_bundle(current, op.get("bundleId", ""))
+            elif name == "duplicate-unit":
+                current, d = duplicate_unit(
+                    current, op.get("unitId", ""), op.get("newId", "")
+                )
             else:
                 d = [f"op desconocida '{name}'"]
         except Exception as exc:  # keep the batch running per-op
@@ -1042,6 +1059,141 @@ def bulk_set_balance(
     return updated, []
 
 
+# ---------------------------------------------------------------------------
+# Relics, bundles y duplicación de unidades
+# ---------------------------------------------------------------------------
+
+def _relic_index(pack: dict) -> dict[str, dict]:
+    index = {}
+    for relic in _as_list(pack.get("relics")):
+        if not isinstance(relic, dict):
+            continue
+        rid = _entity_key(relic)
+        if rid:
+            index[rid] = relic
+    return index
+
+
+def add_relic(pack: dict, relic: dict) -> tuple[dict, list[str]]:
+    """Añade una reliquia. Falla si el id ya existe."""
+    updated = json.loads(json.dumps(pack)) if isinstance(pack, dict) else {}
+    if not isinstance(relic, dict) or not _entity_key(relic):
+        return updated, ["relic.id vacío o ausente"]
+    relic_id = _entity_key(relic)
+    if relic_id in _relic_index(updated):
+        return updated, [f"relic '{relic_id}' ya existe en el pack"]
+    updated.setdefault("relics", []).append(relic)
+    return updated, []
+
+
+def remove_relic(pack: dict, relic_id: str) -> tuple[dict, list[str]]:
+    """Elimina una reliquia. Falla si no existe."""
+    updated = json.loads(json.dumps(pack)) if isinstance(pack, dict) else {}
+    relics = _as_list(updated.get("relics"))
+    kept = [r for r in relics if not (isinstance(r, dict) and _entity_key(r) == relic_id)]
+    if len(kept) == len(relics):
+        return updated, [f"relic '{relic_id}' no existe en el pack"]
+    updated["relics"] = kept
+    return updated, []
+
+
+def set_relic_card_change(
+    pack: dict, relic_id: str, value_to_change: str, operation: str, value: Any
+) -> tuple[dict, list[str]]:
+    """Inserta o actualiza un ``cardChange`` de una reliquia.
+
+    ``operation`` es ``Add``/``Multiply``/``Set`` (semántica nativa). El valor
+    se preserva como número.
+    """
+    updated = json.loads(json.dumps(pack)) if isinstance(pack, dict) else {}
+    if not isinstance(value_to_change, str) or not value_to_change.strip():
+        return updated, ["valueToChange vacío"]
+    if operation not in ("Add", "Multiply", "Set"):
+        return updated, [f"operation '{operation}' no válida (Add/Multiply/Set)"]
+
+    relic = _relic_index(updated).get(relic_id)
+    if relic is None:
+        return updated, [f"relic '{relic_id}' no existe en el pack"]
+
+    changes = relic.setdefault("cardChanges", [])
+    numeric = _coerce_number(value)
+    for change in changes:
+        if isinstance(change, dict) and change.get("valueToChange") == value_to_change:
+            change["operation"] = operation
+            change["value"] = numeric
+            return updated, []
+    changes.append({
+        "valueToChange": value_to_change,
+        "operation": operation,
+        "value": numeric,
+    })
+    return updated, []
+
+
+def _coerce_number(value: Any):
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return value
+    if isinstance(value, str):
+        try:
+            f = float(value)
+            return int(f) if f.is_integer() else f
+        except ValueError:
+            return value
+    return value
+
+
+def add_bundle(pack: dict, bundle: dict) -> tuple[dict, list[str]]:
+    """Añade un AssetBundle al pack. Falla si el id ya existe."""
+    updated = json.loads(json.dumps(pack)) if isinstance(pack, dict) else {}
+    if not isinstance(bundle, dict):
+        return updated, ["bundle debe ser un objeto"]
+    bundle_id = _entity_key(bundle)
+    if not bundle_id:
+        return updated, ["bundle.id vacío o ausente"]
+    existing = {_entity_key(b) for b in _as_list(updated.get("assetBundles")) if isinstance(b, dict)}
+    if bundle_id in existing:
+        return updated, [f"bundle '{bundle_id}' ya existe en el pack"]
+    updated.setdefault("assetBundles", []).append(bundle)
+    return updated, []
+
+
+def remove_bundle(pack: dict, bundle_id: str) -> tuple[dict, list[str]]:
+    """Elimina un AssetBundle por id."""
+    updated = json.loads(json.dumps(pack)) if isinstance(pack, dict) else {}
+    bundles = _as_list(updated.get("assetBundles"))
+    kept = [b for b in bundles if not (isinstance(b, dict) and _entity_key(b) == bundle_id)]
+    if len(kept) == len(bundles):
+        return updated, [f"bundle '{bundle_id}' no existe en el pack"]
+    updated["assetBundles"] = kept
+    return updated, []
+
+
+def duplicate_unit(
+    pack: dict, unit_id: str, new_id: str
+) -> tuple[dict, list[str]]:
+    """Duplica una unidad con nuevo id (y fábrica generada 1:1)."""
+    updated = json.loads(json.dumps(pack)) if isinstance(pack, dict) else {}
+    source = _unit_index(updated).get(unit_id)
+    if source is None:
+        return updated, [f"unit '{unit_id}' no existe en el pack"]
+    if new_id in _unit_index(updated) or new_id in _factory_index(updated):
+        return updated, [f"new id '{new_id}' ya existe en el pack (unidad o fábrica)"]
+
+    clone = json.loads(json.dumps(source))
+    clone["id"] = new_id
+    factory = clone.get("productionBuilding") if isinstance(clone, dict) else None
+    if isinstance(factory, dict):
+        old_fid = _entity_key(factory)
+        suffix = "-factory"
+        if old_fid and old_fid.startswith(unit_id):
+            suffix = old_fid[len(unit_id):]
+        factory["id"] = new_id + suffix
+    updated.setdefault("units", []).append(clone)
+    return updated, []
+
+
 def write_pack(pack: dict, out_dir: str | Path) -> Path:
     out_path = Path(out_dir)
     out_path.mkdir(parents=True, exist_ok=True)
@@ -1095,6 +1247,8 @@ def main(argv: list[str] | None = None) -> int:
             "add-ai-module", "remove-ai-module",
             "set-stage-param", "set-ai-field",
             "set-template",
+            "add-relic", "remove-relic", "set-relic-card-change",
+            "add-bundle", "remove-bundle", "duplicate-unit",
             "batch",
         ],
         required=True,
@@ -1137,7 +1291,18 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--ai-field", help="Campo escalar del perfil AI")
     parser.add_argument("--ai-field-value", help="Valor del campo AI")
     parser.add_argument("--template-id", help="nativeTemplateId (set-template)")
+    parser.add_argument("--relic-json", help="Ruta a un relic.json (add-relic)")
+    parser.add_argument("--relic-id", help="ID de reliquia")
+    parser.add_argument("--value-to-change", help="valueToChange (set-relic-card-change)")
+    parser.add_argument("--card-operation", choices=["Add", "Multiply", "Set"])
+    parser.add_argument("--card-value")
+    parser.add_argument("--bundle-json", help="Ruta a un bundle.json (add-bundle)")
+    parser.add_argument("--bundle-id", help="ID de AssetBundle")
     parser.add_argument("--script", help="Ruta a un script JSON de operaciones (batch)")
+    parser.add_argument("--dry-run", action="store_true",
+                        help="No escribe; muestra el pack resultante por stdout")
+    parser.add_argument("--validate-after", action="store_true",
+                        help="Valida balance + referencias tras la edición")
     parser.add_argument("--out-dir", required=True, help="Directorio destino")
     args = parser.parse_args(argv)
 
@@ -1304,6 +1469,50 @@ def main(argv: list[str] | None = None) -> int:
         updated, diagnostics = set_unit_template(
             pack, args.unit_id, args.template_id, factory=args.factory
         )
+    elif args.operation == "add-relic":
+        if not args.relic_json:
+            print("--relic-json es obligatorio para add-relic", file=sys.stderr)
+            return 2
+        relic = _read_json_file(args.relic_json)
+        if relic is None:
+            return 2
+        updated, diagnostics = add_relic(pack, relic)
+    elif args.operation == "remove-relic":
+        if not args.relic_id:
+            print("--relic-id es obligatorio", file=sys.stderr)
+            return 2
+        updated, diagnostics = remove_relic(pack, args.relic_id)
+    elif args.operation == "set-relic-card-change":
+        if not (args.relic_id and args.value_to_change and args.card_operation
+                and args.card_value is not None):
+            print("--relic-id, --value-to-change, --card-operation y --card-value son obligatorios",
+                  file=sys.stderr)
+            return 2
+        try:
+            card_value = json.loads(args.card_value)
+        except json.JSONDecodeError:
+            card_value = args.card_value
+        updated, diagnostics = set_relic_card_change(
+            pack, args.relic_id, args.value_to_change, args.card_operation, card_value
+        )
+    elif args.operation == "add-bundle":
+        if not args.bundle_json:
+            print("--bundle-json es obligatorio para add-bundle", file=sys.stderr)
+            return 2
+        bundle = _read_json_file(args.bundle_json)
+        if bundle is None:
+            return 2
+        updated, diagnostics = add_bundle(pack, bundle)
+    elif args.operation == "remove-bundle":
+        if not args.bundle_id:
+            print("--bundle-id es obligatorio", file=sys.stderr)
+            return 2
+        updated, diagnostics = remove_bundle(pack, args.bundle_id)
+    elif args.operation == "duplicate-unit":
+        if not (args.unit_id and args.new_id):
+            print("--unit-id y --new-id son obligatorios", file=sys.stderr)
+            return 2
+        updated, diagnostics = duplicate_unit(pack, args.unit_id, args.new_id)
     elif args.operation == "batch":
         if not args.script:
             print("--script es obligatorio para batch", file=sys.stderr)
@@ -1322,6 +1531,23 @@ def main(argv: list[str] | None = None) -> int:
         # operaciones que dejan el pack sin cambios válidos no escriben
         if args.operation in ("remove",) and any("no existe" in d for d in diagnostics):
             return 1
+
+    if args.validate_after:
+        from tools.validate_balance_overrides import validate_balance
+        from tools.audit_content_references import audit_pack
+        issues = validate_balance(updated) + audit_pack(updated)
+        if issues:
+            print(f"Validación post-edición: {len(issues)} issue(s)")
+            for issue in issues:
+                print(f"  - {issue}")
+            return 1
+        print("Validación post-edición: OK")
+
+    if args.dry_run:
+        print(json.dumps(updated, indent=2, ensure_ascii=False))
+        print("(dry-run: no se escribió)")
+        return 0
+
     written = write_pack(updated, args.out_dir)
     print(f"Pack escrito en {written}")
     return 0
