@@ -20,6 +20,7 @@ from PIL import Image, ImageChops, ImageFilter, ImageStat
 # game's RTS camera distance, so smoothness is capped at 1 - MIN_ROUGHNESS.
 MIN_ROUGHNESS = 0.04
 MAX_SMOOTHNESS = round(255 * (1.0 - MIN_ROUGHNESS))
+SMOOTHNESS_LUT = [min(255 - i, MAX_SMOOTHNESS) for i in range(256)]
 # Statistics are sampled on a downscaled copy so the report stays cheap on 4K atlases.
 STATS_SAMPLE_SIZE = 64
 # sRGB albedo plausibility window for non-metal surfaces (charcoal .. fresh snow).
@@ -103,9 +104,7 @@ def pack_metallic_gloss(metallic_path: Path, roughness_path: Path, output_path: 
             raise ValueError(
                 f"Metallic/Roughness dimensions differ: {metallic.size} vs {roughness.size}"
             )
-        smoothness = ImageChops.invert(roughness).point(
-            lambda value: min(value, MAX_SMOOTHNESS)
-        )
+        smoothness = roughness.point(SMOOTHNESS_LUT)
         packed = Image.merge("RGBA", (metallic, metallic, metallic, smoothness))
         save_png(packed, output_path)
 
@@ -139,19 +138,34 @@ def normal_length_error(image: Image.Image) -> float:
     sampled = image.convert("RGB").resize(
         (STATS_SAMPLE_SIZE, STATS_SAMPLE_SIZE), Image.Resampling.NEAREST
     )
-    pixels = _flat_pixels(sampled)
-    total = 0.0
-    for r, g, b in pixels:
-        x, y, z = r / 127.5 - 1.0, g / 127.5 - 1.0, b / 127.5 - 1.0
-        total += abs(math.sqrt(x * x + y * y + z * z) - 1.0)
-    return total / max(1, len(pixels))
+    try:
+        import numpy as np
+
+        arr = np.asarray(sampled, dtype=np.float32) / 127.5 - 1.0
+        lens = np.sqrt(np.sum(arr * arr, axis=-1))
+        return float(np.mean(np.abs(lens - 1.0)))
+    except Exception:
+        pixels = _flat_pixels(sampled)
+        total = 0.0
+        for r, g, b in pixels:
+            x, y, z = r / 127.5 - 1.0, g / 127.5 - 1.0, b / 127.5 - 1.0
+            total += abs(math.sqrt(x * x + y * y + z * z) - 1.0)
+        return total / max(1, len(pixels))
 
 
 def metallic_midtone_ratio(metallic: Image.Image) -> float:
     """Fraction of pixels that are neither dielectric (<25%) nor metal (>75%)."""
-    values = _flat_pixels(sample(metallic))
-    mid = sum(1 for v in values if 64 <= v <= 191)
-    return mid / max(1, len(values))
+    sampled = sample(metallic).convert("L")
+    try:
+        import numpy as np
+
+        arr = np.asarray(sampled, dtype=np.uint8)
+        mid = int(np.count_nonzero((arr >= 64) & (arr <= 191)))
+        return float(mid / max(1, arr.size))
+    except Exception:
+        values = _flat_pixels(sampled)
+        mid = sum(1 for v in values if 64 <= v <= 191)
+        return mid / max(1, len(values))
 
 
 def build_report(paths: dict[str, Path], dimensions: dict[str, tuple[int, int]]) -> dict[str, object]:

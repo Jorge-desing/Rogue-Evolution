@@ -1339,3 +1339,13 @@ This is a compact, durable orientation for agents. For the changing checkout sta
 - Headless bake of `hypervelocity_railgun_cermet` at 2048x2048 with Material Maker 1.7 passed strict quality gate with 0 failures (normal error 0.00207, MetallicGloss delta 0, emission 0.344).
 - Full Python test suite passed (258/258, 1 skip); C# harness passed (504/505, 1 Windows symlink skip).
 - Root MEMORY.md, codex memory, antigravity memory, and mem0 synced.
+
+## Refresh (2026-11-07 — archetype pipeline optimization without quality loss)
+
+- Repository `C:/Users/Alex/Documents/Mod Rogue Command`, loader `1.19.0`, branch `codex/rogue-unit-balance-20261018`.
+- Optimized `tools/Prepare-MaterialMakerTacticalTemplate.py` with in-memory `.ptex` template caching, float-rounding (4 decimals), and 4-octave base Perlin tuning.
+- Optimized `tools/pack_material_maker_pbr.py` with precomputed smoothness LUT (`SMOOTHNESS_LUT`) and NumPy vectorization for normal and metallic checks.
+- Optimized `tools/audit_material_maker_output.py` with NumPy vectorized metrics for normal length error and metallic/gloss delta checks.
+- Headless bake of `stealth_radar_absorbent_ferrite` at 2048x2048 with Material Maker 1.7 passed `--strict` quality gate with 0 failures (normal error 0.00192, MetallicGloss delta 0, emission 0.344).
+- Full Python test suite passed (258/258, 1 skip in 11.3s); C# harness passed (504/505, 1 Windows symlink skip); Release DLL deployed and verified.
+- Root MEMORY.md, codex memory, antigravity memory, and mem0 synced.

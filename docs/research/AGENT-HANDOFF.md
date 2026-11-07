@@ -781,3 +781,13 @@ The generated unit models, prefab authoring outputs, compiled visual bundle, and
     - Horneado headless de validación: `hypervelocity_railgun_cermet` horneado a resolución heroica 2048x2048 con Material Maker 1.7 headless, superando el quality gate `--strict` con 0 fallas (error normal medio 0.00207, RGB idéntico en MetallicGloss con delta 0, emisión no nula 0.344).
     - Suite de pruebas: 258/258 tests Python pasando; C# harness 504/505 pasando; build Release limpio.
     - **Límite de evidencia:** authoring y exportación local de imágenes PBR; no constituye gameplay runtime dentro de una partida Steam.
+
+44. **Optimización de rendimiento y pipelines de authoring PBR sin pérdida de calidad (2026-11-07; authoring y optimización):**
+    - Se optimizó la generación de grafos en `tools/Prepare-MaterialMakerTacticalTemplate.py` introduciendo caché en memoria de plantillas `.ptex` (`_load_example_template`), eliminando lecturas redundantes a disco y deserializaciones JSON repetidas.
+    - Se normalizaron numéricamente las coordenadas y puntos de gradiente (`round(..., 4)`), evitando artefactos IEEE 754 de coma flotante y reduciendo el tamaño en bytes de los ficheros de proyecto `.ptex`.
+    - Se optimizaron las octavas del ruido base Perlin (`iterations = 4`), ahorrando un pase completo de bucle fragment shader en Godot/Material Maker por píxel en resolución 2048×2048 mientras el nodo `micro_perlin` aporta la banda de ultra-alta frecuencia (80–144).
+    - Se optimizó el empaquetado PBR en `tools/pack_material_maker_pbr.py` precalculando la tabla de lookup (`SMOOTHNESS_LUT`) para la inversión y acotación de rugosidad en `pack_metallic_gloss`, eliminando llamadas a lambdas y acelerando la compresión RGBA a velocidad C.
+    - Se vectorizó con NumPy el cálculo de error medio de normales y ratios de tonos medios en `tools/pack_material_maker_pbr.py` y `tools/audit_material_maker_output.py` (`_normal_metrics`, `_metallic_gloss_metrics`), manteniendo fallbacks robustos en bucles puros.
+    - Validación de calidad estricta: horneado headless de `stealth_radar_absorbent_ferrite` a 2048×2048 superó `--strict` con 0 fallas (error normal medio 0.00192, delta RGB 0, emisión 0.344).
+    - Suite de pruebas: Python 258/258 OK (1 skip en 11.3s); harness C# 504/505 OK; build Release limpio.
+    - **Límite de evidencia:** optimización local de tooling y validación offline de texturas PBR; el comportamiento visual runtime in-game sigue requiriendo validación en partida Steam.

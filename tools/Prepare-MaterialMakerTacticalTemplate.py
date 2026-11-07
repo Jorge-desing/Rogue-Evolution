@@ -1028,17 +1028,29 @@ EMISSION_PROFILES: dict[str, tuple[tuple[float, float, float], float, float]] = 
 
 
 def color(r: float, g: float, b: float) -> dict[str, object]:
-    return {"a": 1.0, "b": b, "g": g, "r": r, "type": "Color"}
+    return {"a": 1.0, "b": round(float(b), 4), "g": round(float(g), 4), "r": round(float(r), 4), "type": "Color"}
 
 
 def gradient(*points: tuple[float, tuple[float, float, float]]) -> dict[str, object]:
     return {
         "interpolation": 1,
         "points": [
-            {**color(*rgb), "pos": position} for position, rgb in points
+            {**color(*rgb), "pos": round(float(position), 4)} for position, rgb in points
         ],
         "type": "Gradient",
     }
+
+
+_TEMPLATE_CACHE: dict[str, dict[str, object]] = {}
+
+
+def _load_example_template(example_path: Path) -> dict[str, object]:
+    import copy
+
+    resolved = str(example_path.resolve())
+    if resolved not in _TEMPLATE_CACHE:
+        _TEMPLATE_CACHE[resolved] = json.loads(example_path.read_text(encoding="utf-8"))
+    return copy.deepcopy(_TEMPLATE_CACHE[resolved])
 
 
 def _configure_subgraph_bricks(subgraph_node: dict[str, object], bricks_cfg: dict[str, object]) -> None:
@@ -1092,7 +1104,7 @@ def build_template_project(
 
     preset = PRESETS[preset_name]
     emission_rgb, emission_threshold, emission_energy = EMISSION_PROFILES[preset_name]
-    project = json.loads(example_path.read_text(encoding="utf-8"))
+    project = _load_example_template(example_path)
     project["label"] = preset["label"]
     project["name"] = preset["name"]
     project["rogueCommandQuality"] = {
@@ -1128,7 +1140,7 @@ def build_template_project(
             # Balanced isotropic aerospace micro-grain (smooth CNC finish without streaky banding).
             parameters["scale_x"] = int(preset.get("perlin_scale_x", 12))
             parameters["scale_y"] = int(preset.get("perlin_scale_y", 12))
-            parameters["iterations"] = 5
+            parameters["iterations"] = 4
             parameters["persistence"] = 0.50
         elif name == "blend_2":
             # Crisp panel bevel geometry blended with subtle satin metal micro-relief.

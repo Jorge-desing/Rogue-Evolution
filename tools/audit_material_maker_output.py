@@ -52,36 +52,65 @@ def _normal_metrics(image: Image.Image) -> dict[str, float]:
         (min(SAMPLE_SIZE, image.width), min(SAMPLE_SIZE, image.height)),
         Image.Resampling.NEAREST,
     )
-    getter = getattr(sampled, "get_flattened_data", None)
-    raw: Any = getter() if callable(getter) else sampled.getdata()
-    pixels = [tuple(pixel) for pixel in raw]
-    length_error = 0.0
-    z_non_positive = 0
-    for red, green, blue in pixels:
-        x = red / 127.5 - 1.0
-        y = green / 127.5 - 1.0
-        z = blue / 127.5 - 1.0
-        length_error += abs(math.sqrt(x * x + y * y + z * z) - 1.0)
-        z_non_positive += z <= 0.0
-    count = max(1, len(pixels))
-    return {
-        "normalLengthMeanError": round(length_error / count, 6),
-        "normalZNonPositiveFraction": round(z_non_positive / count, 6),
-    }
+    try:
+        import numpy as np
+
+        arr = np.asarray(sampled, dtype=np.float32) / 127.5 - 1.0
+        lens = np.sqrt(np.sum(arr * arr, axis=-1))
+        error = np.mean(np.abs(lens - 1.0))
+        z_neg = np.count_nonzero(arr[..., 2] <= 0.0) / arr[..., 2].size
+        return {
+            "normalLengthMeanError": round(float(error), 6),
+            "normalZNonPositiveFraction": round(float(z_neg), 6),
+        }
+    except Exception:
+        getter = getattr(sampled, "get_flattened_data", None)
+        raw: Any = getter() if callable(getter) else sampled.getdata()
+        pixels = [tuple(pixel) for pixel in raw]
+        length_error = 0.0
+        z_non_positive = 0
+        for red, green, blue in pixels:
+            x = red / 127.5 - 1.0
+            y = green / 127.5 - 1.0
+            z = blue / 127.5 - 1.0
+            length_error += abs(math.sqrt(x * x + y * y + z * z) - 1.0)
+            z_non_positive += z <= 0.0
+        count = max(1, len(pixels))
+        return {
+            "normalLengthMeanError": round(length_error / count, 6),
+            "normalZNonPositiveFraction": round(z_non_positive / count, 6),
+        }
 
 
 def _metallic_gloss_metrics(image: Image.Image) -> dict[str, float | int]:
-    pixels = _pixels(image.convert("RGBA"))
-    max_delta = 0
-    alpha_nonzero = 0
-    for red, green, blue, alpha in pixels:
-        max_delta = max(max_delta, abs(red - green), abs(red - blue), abs(green - blue))
-        alpha_nonzero += alpha > 0
-    count = max(1, len(pixels))
-    return {
-        "rgbMaxDelta": max_delta,
-        "smoothnessAlphaNonzeroFraction": round(alpha_nonzero / count, 6),
-    }
+    try:
+        import numpy as np
+
+        sampled = _sample(image.convert("RGBA"))
+        rgba = np.asarray(sampled, dtype=np.int16)
+        r, g, b, a = rgba[..., 0], rgba[..., 1], rgba[..., 2], rgba[..., 3]
+        rg = np.abs(r - g)
+        rb = np.abs(r - b)
+        gb = np.abs(g - b)
+        max_delta = int(np.max(np.maximum(np.maximum(rg, rb), gb)))
+        alpha_nonzero = int(np.count_nonzero(a > 0))
+        count = max(1, a.size)
+        return {
+            "rgbMaxDelta": max_delta,
+            "smoothnessAlphaNonzeroFraction": round(alpha_nonzero / count, 6),
+        }
+    except Exception:
+        pixels = _pixels(image.convert("RGBA"))
+        max_delta = 0
+        alpha_nonzero = 0
+        for red, green, blue, alpha in pixels:
+            max_delta = max(max_delta, abs(red - green), abs(red - blue), abs(green - blue))
+            alpha_nonzero += alpha > 0
+        count = max(1, len(pixels))
+        return {
+            "rgbMaxDelta": max_delta,
+            "smoothnessAlphaNonzeroFraction": round(alpha_nonzero / count, 6),
+        }
 
 
 def _read_json_if_present(path: Path) -> dict[str, Any] | None:
