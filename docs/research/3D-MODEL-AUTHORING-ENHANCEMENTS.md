@@ -883,3 +883,24 @@ To banish floating boxes, disconnected primitive joins, and toy-like surfaces, W
 - **Surface Diagnostics & Telemetry Expansion (`RuntimeVisualSurfaceCensus.cs`, `AgentDiagnosticsFormatter.cs`)**:
   - Exposes `temperFringeVertexCount` in `VisualSurfaceRow` and `visualSurfaceCensus` payloads.
 - Evidence level: local build/validation evidence only; no fresh Steam runtime proof.
+
+### Wave 12: Weapon Trunnion Brackets, Final Drive Planetary Housings & Armored Access Hatches (local build/validation evidence)
+
+To banish primitive "stuck-on/floating" geometry and establish realistic structural load paths between weapons, drivetrain sprockets, and armored hulls, Wave 12 introduces 3 procedural mechanical assemblies across `RogueModelKit.py` and integrates them into `generate_unit_model.py`:
+
+- **Weapon Elevation Trunnion Bracket Assemblies (`make_weapon_trunnion_bracket_assembly` / `.add_weapon_trunnions()`)**:
+  - Heavy cast/machined elevation trunnion bearing cheek brackets flanking the weapon mantlet or gun pivot center.
+  - Features left and right trunnion cheek housing blocks (`_CheekBlock_L/R`), heavy horizontal pivot pins (`_TrunnionPin_L/R`), flanged retention end caps / hub nuts (`_RetentionCap_L/R`), and flanged base mounting saddles (`_MountFlange_L/R`).
+  - Physically anchors elevating gun tubes and ballistic barrels to the turret or casemate carriage.
+  - Deployed across 10 weapon configurations and heavy artillery mounts (`railgun`, `gravity_cannon`, `laser_beam`, `quad_flak`, `plasma_mortar`, `howitzer`, `dual_cannon`, `sniper_tankette`, standard `cannon`, and `artillery` turret).
+- **Planetary Final-Drive Transmission Gearbox Housings (`make_final_drive_housing_assembly` / `.add_final_drive_housings()`)**:
+  - Stepped cylindrical cast planetary final-drive transmission gearbox housings connecting the lower hull sponson wall to drive sprockets.
+  - Features heavy stepped main housing cylinders (`_DriveHousing_L/R`), circular 8-bolt mounting flange rings (`_FlangeRing_L/R`), and protruding center bearing lubrication hub caps (`_HubCap_L/R`).
+  - Mechanically grounds the continuous track assemblies to the armored chassis, resolving the appearance of floating track belts.
+  - Deployed across all 16 tracked combat and engineering archetypes (`artillery`, `arc_tank`, `super_heavy`, `flak_anti_air`, `combat_harvester`, `demolition_breacher`, `thermobaric_tank`, `recovery_crawler`, `mine_layer`, `sniper_tankette`, `bridge_layer`, `mortar_carrier`, `siege_drill_mole`, `gravity_siege_breaker`, `amphibious_assault_tank`, `standard_tank`).
+- **Raised Armored Crew & Maintenance Access Hatches (`make_armored_access_hatch_assembly` / `.add_access_hatches()`)**:
+  - Raised armored crew ingress/egress and engine/battery inspection hatches.
+  - Features raised perimeter coaming weld rims (`_HatchCoaming`), beveled protective hatch cover plates (`_HatchCover`), heavy cylindrical transverse hinge knuckles (`_HatchHinge`), and rotating dogging-clamp locking latch handles (`_HatchLatch`).
+  - Supported on both vehicles (`RogueVehicleBuilder.add_access_hatches()`) and structures (`RogueStructureBuilder.add_access_hatches()`).
+  - Deployed across 14 combat, command, and engineering vehicle archetypes (`artillery`, `super_heavy`, `combat_harvester`, `demolition_breacher`, `thermobaric_tank`, `recovery_crawler`, `mine_layer`, `bridge_layer`, `command_hq_rig`, `mortar_carrier`, `siege_drill_mole`, `gravity_siege_breaker`, `amphibious_assault_tank`, `standard_tank`).
+- Evidence level: local build/validation evidence only; no fresh Steam runtime proof.

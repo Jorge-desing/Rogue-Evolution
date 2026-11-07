@@ -6047,6 +6047,244 @@ def make_perforated_exhaust_heat_shield(
         ))
     return objects
 
+
+
+def make_weapon_trunnion_bracket_assembly(
+    prefix: str,
+    pivot_center: Tuple[float, float, float] | Vector,
+    spacing_x: float = 0.52,
+    bracket_width: float = 0.12,
+    bracket_height: float = 0.22,
+    bracket_depth: float = 0.28,
+    pin_radius: float = 0.045,
+    armor_mat: bpy.types.Material | None = None,
+    gunmetal_mat: bpy.types.Material | None = None,
+) -> list[bpy.types.Object]:
+    """Generates heavy cast/machined elevation trunnion bearing cheek brackets flanking the weapon mantlet.
+
+    Provides physical load-bearing support for elevating gun tubes, featuring left and right
+    trunnion cheek blocks, horizontal bearing pins with end retention plates, and flanged base mount pads.
+    """
+    objects = []
+    center_v = Vector(pivot_center)
+    half_spacing = spacing_x * 0.5
+    rot_pin = (0.0, math.radians(90.0), 0.0)
+
+    for side, stag in ((-1, "L"), (1, "R")):
+        cx = center_v.x + side * half_spacing
+        cy = center_v.y
+        cz = center_v.z
+
+        # 1. Armored Trunnion Cheek Housing Block
+        cheek_obj = make_box(
+            f"{prefix}_CheekBlock_{stag}",
+            (bracket_width, bracket_depth, bracket_height),
+            (cx, cy, cz),
+            armor_mat,
+            bevel=min(bracket_width * 0.25, bracket_height * 0.20),
+        )
+        objects.append(cheek_obj)
+
+        # 2. Horizontal Bearing Pivot Pin
+        pin_obj = make_cylinder(
+            f"{prefix}_TrunnionPin_{stag}",
+            radius=pin_radius,
+            depth=bracket_width * 1.35,
+            location=(cx + side * (bracket_width * 0.12), cy, cz),
+            material=gunmetal_mat or armor_mat,
+            vertices=12,
+            bevel=0.005,
+            rotation=rot_pin,
+        )
+        objects.append(pin_obj)
+
+        # 3. Flanged Retention End Cap / Hub Nut
+        cap_obj = make_cylinder(
+            f"{prefix}_RetentionCap_{stag}",
+            radius=pin_radius * 1.35,
+            depth=bracket_width * 0.18,
+            location=(cx + side * (bracket_width * 0.65), cy, cz),
+            material=gunmetal_mat or armor_mat,
+            vertices=8,
+            bevel=0.003,
+            rotation=rot_pin,
+        )
+        objects.append(cap_obj)
+
+        # 4. Lower Mounting Saddle Flange
+        flange_obj = make_box(
+            f"{prefix}_MountFlange_{stag}",
+            (bracket_width * 1.30, bracket_depth * 1.15, bracket_height * 0.20),
+            (cx, cy, cz - bracket_height * 0.50),
+            armor_mat,
+            bevel=0.008,
+        )
+        objects.append(flange_obj)
+
+    return objects
+
+
+def make_final_drive_housing_assembly(
+    prefix: str,
+    hub_center: Tuple[float, float, float] | Vector,
+    track_width: float = 2.4,
+    housing_radius: float = 0.20,
+    housing_depth: float = 0.12,
+    is_rear: bool = True,
+    armor_mat: bpy.types.Material | None = None,
+    gunmetal_mat: bpy.types.Material | None = None,
+) -> list[bpy.types.Object]:
+    """Generates heavy planetary final-drive transmission gearbox housings connecting lower hull to drive sprockets.
+
+    Features stepped cylindrical cast transmission housings protruding laterally from the hull sponson,
+    with an 8-bolt circular flange ring and protruding center grease/bearing hub cap.
+    """
+    objects = []
+    hub_v = Vector(hub_center)
+    rot_trans = (0.0, math.radians(90.0), 0.0)
+
+    for side, stag in ((-1, "L"), (1, "R")):
+        hx = hub_v.x + side * (track_width * 0.42)
+        hy = hub_v.y
+        hz = hub_v.z
+
+        # 1. Stepped Cylindrical Cast Transmission Housing
+        housing_obj = make_cylinder(
+            f"{prefix}_Housing_{stag}",
+            radius=housing_radius,
+            depth=housing_depth,
+            location=(hx, hy, hz),
+            material=armor_mat,
+            vertices=14,
+            bevel=housing_depth * 0.20,
+            rotation=rot_trans,
+        )
+        objects.append(housing_obj)
+
+        # 2. Bolt Retaining Flange Ring
+        flange_x = hx - side * (housing_depth * 0.25)
+        flange_obj = make_cylinder(
+            f"{prefix}_Flange_{stag}",
+            radius=housing_radius * 1.14,
+            depth=housing_depth * 0.28,
+            location=(flange_x, hy, hz),
+            material=gunmetal_mat or armor_mat,
+            vertices=14,
+            bevel=0.006,
+            rotation=rot_trans,
+        )
+        objects.append(flange_obj)
+
+        # 3. Perimeter Retention Studs (8 radial hex bolts)
+        bolt_r = housing_radius * 0.95
+        bolt_x = hx + side * (housing_depth * 0.45)
+        fastener_mat = gunmetal_mat or armor_mat
+        for b_idx in range(8):
+            b_angle = 2.0 * math.pi * b_idx / 8
+            by = hy + bolt_r * math.cos(b_angle)
+            bz = hz + bolt_r * math.sin(b_angle)
+            objects.append(make_cylinder(
+                f"{prefix}_Bolt_{stag}_{b_idx}",
+                radius=0.016,
+                depth=0.024,
+                location=(bolt_x, by, bz),
+                material=fastener_mat,
+                vertices=6,
+                bevel=0.003,
+                rotation=rot_trans,
+            ))
+
+        # 4. Protruding Center Bearing Hub Cap
+        cap_x = hx + side * (housing_depth * 0.55)
+        cap_obj = make_cylinder(
+            f"{prefix}_HubCap_{stag}",
+            radius=housing_radius * 0.42,
+            depth=housing_depth * 0.32,
+            location=(cap_x, hy, hz),
+            material=gunmetal_mat or armor_mat,
+            vertices=12,
+            bevel=0.005,
+            rotation=rot_trans,
+        )
+        objects.append(cap_obj)
+
+    return objects
+
+
+def make_armored_access_hatch_assembly(
+    prefix: str,
+    location: Tuple[float, float, float] | Vector,
+    size: Tuple[float, float] = (0.42, 0.48),
+    thickness: float = 0.045,
+    coaming_height: float = 0.025,
+    rotation: Tuple[float, float, float] = (0.0, 0.0, 0.0),
+    armor_mat: bpy.types.Material | None = None,
+    gunmetal_mat: bpy.types.Material | None = None,
+) -> list[bpy.types.Object]:
+    """Generates a raised armored crew access or maintenance inspection hatch with hinge knuckle and dogging latch.
+
+    Eliminates flat bare armor slabs on decks and superstructures with authentic raised coaming rim,
+    beveled hatch cover plate, heavy cylindrical hinge bar, and rotating dog-clamp handle.
+    """
+    objects = []
+    loc_v = Vector(location)
+    sx, sy = size
+    rot_euler = Euler(rotation)
+
+    # 1. Raised Coaming Rim
+    coaming_z = loc_v.z + coaming_height * 0.5
+    coaming_obj = make_box(
+        f"{prefix}_CoamingRim",
+        (sx * 1.10, sy * 1.08, coaming_height),
+        Vector((loc_v.x, loc_v.y, coaming_z)),
+        armor_mat,
+        bevel=0.008,
+        rotation=rotation,
+    )
+    objects.append(coaming_obj)
+
+    # 2. Beveled Armor Hatch Plate
+    plate_z = loc_v.z + coaming_height + thickness * 0.5
+    plate_obj = make_box(
+        f"{prefix}_HatchPlate",
+        (sx, sy, thickness),
+        Vector((loc_v.x, loc_v.y, plate_z)),
+        armor_mat,
+        bevel=thickness * 0.35,
+        rotation=rotation,
+    )
+    objects.append(plate_obj)
+
+    # 3. Heavy Transverse Hinge Bar Knuckle
+    hinge_offset = rot_euler.to_matrix() @ Vector((0.0, -sy * 0.46, coaming_height + thickness * 0.70))
+    hinge_loc = loc_v + hinge_offset
+    hinge_obj = make_cylinder(
+        f"{prefix}_HingeBar",
+        radius=thickness * 0.55,
+        depth=sx * 0.75,
+        location=hinge_loc,
+        material=gunmetal_mat or armor_mat,
+        vertices=10,
+        bevel=0.004,
+        rotation=(rotation[0], rotation[1] + math.radians(90.0), rotation[2]),
+    )
+    objects.append(hinge_obj)
+
+    # 4. Dogging Clamp Locking Latch Handle
+    latch_offset = rot_euler.to_matrix() @ Vector((0.0, sy * 0.38, coaming_height + thickness + 0.015))
+    latch_loc = loc_v + latch_offset
+    latch_obj = make_box(
+        f"{prefix}_DogLatch",
+        (sx * 0.28, sy * 0.12, 0.022),
+        latch_loc,
+        gunmetal_mat or armor_mat,
+        bevel=0.003,
+        rotation=rotation,
+    )
+    objects.append(latch_obj)
+
+    return objects
+
 def create_unity_empty_locator(
     name: str,
     location: Tuple[float, float, float] | Vector,
@@ -14399,6 +14637,76 @@ class RogueVehicleBuilder:
         self.objects.extend(shield_objs)
         return self
 
+    def add_weapon_trunnions(
+        self,
+        spacing_x: float | None = None,
+        bracket_width: float = 0.12,
+        bracket_height: float = 0.22,
+        bracket_depth: float = 0.28,
+    ) -> "RogueVehicleBuilder":
+        """Adds cast elevation trunnion bearing cheek brackets flanking the weapon mantlet cradle."""
+        pivot = self.turret_pitch_loc or self.gun_pivot or (self.turret_center + Vector((0.0, 0.45, 0.10)) if self.turret_center else None)
+        if pivot is None:
+            return self
+        spacing = spacing_x if spacing_x is not None else 0.52
+        trunnion_objs = make_weapon_trunnion_bracket_assembly(
+            f"{self.name}WeaponTrunnions",
+            pivot_center=pivot,
+            spacing_x=spacing,
+            bracket_width=bracket_width,
+            bracket_height=bracket_height,
+            bracket_depth=bracket_depth,
+            armor_mat=self.palette.primary_armor,
+            gunmetal_mat=self.palette.gunmetal,
+        )
+        self.objects.extend(trunnion_objs)
+        return self
+
+    def add_final_drive_housings(
+        self,
+        radius: float = 0.20,
+        depth: float = 0.12,
+        is_rear: bool = True,
+    ) -> "RogueVehicleBuilder":
+        """Adds heavy cast final-drive transmission gearbox housings connecting lower hull to drive sprockets."""
+        hy = (-self.hull_length * 0.38) if is_rear else (self.hull_length * 0.38)
+        hz = self.ground_clearance + radius * 1.15
+        hub_center = Vector((0.0, hy, hz))
+        drive_objs = make_final_drive_housing_assembly(
+            f"{self.name}FinalDrive",
+            hub_center=hub_center,
+            track_width=self.hull_width,
+            housing_radius=radius,
+            housing_depth=depth,
+            is_rear=is_rear,
+            armor_mat=self.palette.primary_armor,
+            gunmetal_mat=self.palette.gunmetal,
+        )
+        self.objects.extend(drive_objs)
+        return self
+
+    def add_access_hatches(
+        self,
+        location: Tuple[float, float, float] | Vector | None = None,
+        size: Tuple[float, float] = (0.42, 0.48),
+        rotation: Tuple[float, float, float] = (0.0, 0.0, 0.0),
+    ) -> "RogueVehicleBuilder":
+        """Adds a raised armored crew access or maintenance inspection hatch with hinge knuckle and dogging latch."""
+        if location is not None:
+            loc_v = Vector(location)
+        else:
+            loc_v = Vector((self.hull_width * 0.22, -self.hull_length * 0.25, self.hull_deck_z))
+        hatch_objs = make_armored_access_hatch_assembly(
+            f"{self.name}AccessHatch",
+            location=loc_v,
+            size=size,
+            rotation=rotation,
+            armor_mat=self.palette.primary_armor,
+            gunmetal_mat=self.palette.gunmetal,
+        )
+        self.objects.extend(hatch_objs)
+        return self
+
     def add_unity_locators(self) -> "RogueVehicleBuilder":
         self.locator_sockets = create_unity_locator_sockets(
             name_prefix=self.name,
@@ -15352,6 +15660,26 @@ class RogueStructureBuilder:
         self.collider_objects = generate_collision_hulls(
             self.objects, prefix=self.name, include_turret_collider=True
         )
+        return self
+
+    def add_access_hatches(
+        self,
+        location: Tuple[float, float, float] | Vector | None = None,
+        size: Tuple[float, float] = (0.48, 0.54),
+        rotation: Tuple[float, float, float] = (0.0, 0.0, 0.0),
+    ) -> "RogueStructureBuilder":
+        """Adds a raised armored maintenance or personnel access hatch to the structure roof or deck."""
+        roof_pos = self.sockets.get("Socket_RoofMount", Vector((0.0, 0.0, 2.2)))
+        loc_v = Vector(location) if location is not None else Vector((1.2, -0.8, roof_pos.z * 0.48))
+        hatch_objs = make_armored_access_hatch_assembly(
+            f"{self.name}Struct_AccessHatch",
+            location=loc_v,
+            size=size,
+            rotation=rotation,
+            armor_mat=self.palette.light_armor,
+            gunmetal_mat=self.palette.gunmetal,
+        )
+        self.objects.extend(hatch_objs)
         return self
 
     def add_unity_locators(self) -> "RogueStructureBuilder":

@@ -216,6 +216,9 @@ class TestModelKitSkillCopy(unittest.TestCase):
             "make_turret_ring_guard",
             "make_driver_periscope_hood",
             "make_perforated_exhaust_heat_shield",
+            "make_weapon_trunnion_bracket_assembly",
+            "make_final_drive_housing_assembly",
+            "make_armored_access_hatch_assembly",
         ]
         for assembly in required_realism_assemblies:
             self.assertIn(assembly, func_names, f"Realism assembly {assembly} missing from RogueModelKit.py")
@@ -241,6 +244,9 @@ class TestModelKitSkillCopy(unittest.TestCase):
             "add_turret_ring_guard",
             "add_driver_periscope_hood",
             "add_exhaust_heat_shield",
+            "add_weapon_trunnions",
+            "add_final_drive_housings",
+            "add_access_hatches",
         ]
         for method in required_builder_methods:
             self.assertIn(method, vehicle_builder_methods, f"Method {method} missing from RogueVehicleBuilder")
@@ -271,6 +277,9 @@ class TestModelKitSkillCopy(unittest.TestCase):
         self.assertGreaterEqual(generator_source.count("builder.add_turret_ring_guard"), 8)
         self.assertGreaterEqual(generator_source.count("builder.add_driver_periscope_hood"), 10)
         self.assertGreaterEqual(generator_source.count("builder.add_exhaust_heat_shield"), 4)
+        self.assertGreaterEqual(generator_source.count("builder.add_weapon_trunnions"), 8)
+        self.assertGreaterEqual(generator_source.count("builder.add_final_drive_housings"), 12)
+        self.assertGreaterEqual(generator_source.count("builder.add_access_hatches"), 10)
 
     def test_shader_and_builder_wire_steel_micro_detail(self) -> None:
         """The detail normal texture, shader sampler, and prefab builder binding must stay in sync."""

@@ -1308,12 +1308,14 @@ def build_vehicle_model(
         builder.add_sloped_hull(length=3.4, width=2.6, height=0.96)
         builder.add_deck_edge_weld_seams()
         builder.add_continuous_tracks(length=3.2, height=0.68, belt_width=0.36, roadwheels=6, with_skirts=skirts)
+        builder.add_final_drive_housings()
         builder.add_engine_deck(slat_count=4, with_exhausts=True)
         builder.add_towing_shackles()
         builder.add_lifting_lugs()
         builder.add_interlocking_gussets()
         builder.add_splash_rib()
         builder.add_driver_periscope_hood()
+        builder.add_access_hatches()
         builder.add_weld_seams([
             ((-1.20, 0.48, 0.72), (-1.05, 1.65, 0.38)),
             ((1.20, 0.48, 0.72), (1.05, 1.65, 0.38)),
@@ -1321,6 +1323,7 @@ def build_vehicle_model(
         builder.add_fuel_drums()
         builder.add_turret(size=(1.5, 1.7, 0.48), center_y=0.12)
         builder.add_turret_ring_guard()
+        builder.add_weapon_trunnions(spacing_x=0.60, bracket_width=0.14)
         builder.add_crew_cupola()
         builder.add_commander_sight()
         builder.add_bustle_basket()
@@ -1339,6 +1342,7 @@ def build_vehicle_model(
         builder.add_sloped_hull(length=2.8, width=2.3, height=0.86)
         builder.add_deck_edge_weld_seams()
         builder.add_continuous_tracks(length=2.7, height=0.58, belt_width=0.32, roadwheels=5, with_skirts=skirts)
+        builder.add_final_drive_housings()
         builder.add_engine_deck(slat_count=3, with_exhausts=False)
         builder.add_towing_shackles()
         builder.add_lifting_lugs()
@@ -1474,12 +1478,14 @@ def build_vehicle_model(
             ),
         ])
         builder.add_quad_track_pods(pod_length=1.65, pod_height=0.62, track_spacing_x=2.55, pod_spacing_y=2.0)
+        builder.add_final_drive_housings(radius=0.22, depth=0.14)
         builder.add_engine_deck(slat_count=5, with_exhausts=True)
         builder.add_towing_shackles()
         builder.add_lifting_lugs()
         builder.add_interlocking_gussets()
         builder.add_splash_rib()
         builder.add_driver_periscope_hood()
+        builder.add_access_hatches()
         builder.add_weld_seams([
             ((-1.32, 0.55, 0.78), (-1.15, 1.85, 0.42)),
             ((1.32, 0.55, 0.78), (1.15, 1.85, 0.42)),
@@ -1526,6 +1532,7 @@ def build_vehicle_model(
         builder.add_sloped_hull(length=3.2, width=2.4, height=0.90)
         builder.add_deck_edge_weld_seams()
         builder.add_continuous_tracks(length=3.0, height=0.64, belt_width=0.34, roadwheels=5, with_skirts=skirts)
+        builder.add_final_drive_housings()
         builder.add_engine_deck(slat_count=4, with_exhausts=True)
         builder.add_towing_shackles()
         builder.add_lifting_lugs()
@@ -1611,11 +1618,14 @@ def build_vehicle_model(
     elif archetype == "combat_harvester":
         builder.add_sloped_hull(length=3.6, width=2.7, height=1.05, bevel=0.045)
         builder.add_deck_edge_weld_seams()
+        builder.add_access_hatches()
         builder.add_continuous_tracks(length=3.3, height=0.68, belt_width=0.38, roadwheels=6, with_skirts=skirts)
+        builder.add_final_drive_housings(radius=0.22)
         builder.add_engine_deck(slat_count=5, with_exhausts=True)
         builder.add_towing_shackles()
         builder.add_lifting_lugs()
         builder.add_interlocking_gussets()
+        builder.add_access_hatches()
         builder.add_recovery_winch()
         builder.add_commander_sight()
         builder.add_exhaust_deflector()
@@ -1744,7 +1754,9 @@ def build_vehicle_model(
     elif archetype == "demolition_breacher":
         builder.add_sloped_hull(length=2.45, width=2.05, height=0.74, bevel=0.04)
         builder.add_deck_edge_weld_seams()
+        builder.add_access_hatches()
         builder.add_continuous_tracks(length=2.35, height=0.56, belt_width=0.32, roadwheels=4, with_skirts=skirts)
+        builder.add_final_drive_housings(radius=0.18)
         builder.add_towing_shackles()
         builder.add_lifting_lugs()
         builder.add_recovery_winch()
@@ -1801,7 +1813,9 @@ def build_vehicle_model(
     elif archetype == "thermobaric_tank":
         builder.add_sloped_hull(length=3.25, width=2.55, height=0.92, bevel=0.045)
         builder.add_deck_edge_weld_seams()
+        builder.add_access_hatches()
         builder.add_continuous_tracks(length=3.05, height=0.64, belt_width=0.36, roadwheels=6, with_skirts=skirts)
+        builder.add_final_drive_housings()
         builder.add_engine_deck(slat_count=4, with_exhausts=True)
         for side in (-1, 1):
             stag = "L" if side < 0 else "R"
@@ -1928,7 +1942,9 @@ def build_vehicle_model(
         # Armored recovery vehicle: tracked hull, slewing crane boom, winch drum and earth spade.
         builder.add_sloped_hull(length=3.4, width=2.6, height=0.96, bevel=0.045)
         builder.add_deck_edge_weld_seams()
+        builder.add_access_hatches()
         builder.add_continuous_tracks(length=3.2, height=0.66, belt_width=0.36, roadwheels=6, with_skirts=skirts)
+        builder.add_final_drive_housings(radius=0.21)
         builder.add_engine_deck(slat_count=4, with_exhausts=True)
         builder.objects.extend([
             rmk.make_box(f"{name}Armor_CraneSlewBase", (0.85, 0.85, 0.28), (0.62, 0.55, 1.18), builder.palette.light_armor, 0.03),
@@ -1962,7 +1978,9 @@ def build_vehicle_model(
         # Tracked mine layer: rear hopper, angled dispensing chute and racked AT mine discs.
         builder.add_sloped_hull(length=3.2, width=2.5, height=0.92, bevel=0.045)
         builder.add_deck_edge_weld_seams()
+        builder.add_access_hatches()
         builder.add_continuous_tracks(length=3.05, height=0.64, belt_width=0.34, roadwheels=5, with_skirts=skirts)
+        builder.add_final_drive_housings()
         builder.add_towing_shackles()
         builder.add_lifting_lugs()
         builder.add_splash_rib()
@@ -2003,6 +2021,7 @@ def build_vehicle_model(
         builder.add_sloped_hull(length=2.35, width=1.95, height=0.62, bevel=0.035)
         builder.add_deck_edge_weld_seams()
         builder.add_continuous_tracks(length=2.25, height=0.50, belt_width=0.28, roadwheels=4, with_skirts=skirts)
+        builder.add_final_drive_housings(radius=0.16, depth=0.10)
         builder.add_engine_deck(slat_count=3, with_exhausts=True)
         builder.objects.extend([
             rmk.make_box(f"{name}Armor_CasemateShield", (1.10, 0.18, 0.30), (0.0, 0.62, 0.88), builder.palette.light_armor, 0.02,
@@ -2080,7 +2099,9 @@ def build_vehicle_model(
         # Tracked scissor-bridge layer (AVLB) with hydraulic launch boom and twin folded treadway spans.
         builder.add_sloped_hull(length=3.6, width=2.65, height=0.92, bevel=0.045)
         builder.add_deck_edge_weld_seams()
+        builder.add_access_hatches()
         builder.add_continuous_tracks(length=3.4, height=0.66, belt_width=0.38, roadwheels=6, with_skirts=skirts)
+        builder.add_final_drive_housings(radius=0.22)
         builder.add_engine_deck(slat_count=4, with_exhausts=True)
         builder.add_towing_shackles()
         builder.add_lifting_lugs()
@@ -2211,7 +2232,9 @@ def build_vehicle_model(
         # Open-hatch tracked heavy siege mortar carrier with split roof doors, baseplate, and ammo racks.
         builder.add_sloped_hull(length=3.15, width=2.48, height=0.96, bevel=0.045)
         builder.add_deck_edge_weld_seams()
+        builder.add_access_hatches()
         builder.add_continuous_tracks(length=2.98, height=0.64, belt_width=0.35, roadwheels=5, with_skirts=skirts)
+        builder.add_final_drive_housings()
         builder.add_towing_shackles()
         builder.add_lifting_lugs()
         builder.add_splash_rib()
@@ -2259,7 +2282,9 @@ def build_vehicle_model(
         # Subterranean assault bore vehicle with stepped conical front auger drill, side vents, and heavy tracks.
         builder.add_sloped_hull(length=3.35, width=2.62, height=0.98, bevel=0.045)
         builder.add_deck_edge_weld_seams()
+        builder.add_access_hatches()
         builder.add_continuous_tracks(length=3.15, height=0.68, belt_width=0.38, roadwheels=6, with_skirts=skirts)
+        builder.add_final_drive_housings(radius=0.22)
         builder.add_engine_deck(slat_count=5, with_exhausts=True)
         # Multi-stage stepped conical borer head + helical cutter rings along +Y prow
         builder.objects.append(rmk.make_cylinder(
@@ -2389,12 +2414,14 @@ def build_vehicle_model(
         builder.add_continuous_tracks(
             length=3.8, height=0.74, belt_width=0.42, roadwheels=6, with_skirts=skirts
         )
+        builder.add_final_drive_housings(radius=0.24, depth=0.15)
         builder.add_towing_shackles()
         builder.add_lifting_lugs()
         builder.add_interlocking_gussets()
         builder.add_splash_rib()
         builder.add_driver_periscope_hood()
         builder.add_glacis_weld_seams()
+        builder.add_access_hatches()
         builder.add_commander_sight()
         builder.add_era_bricks()
         builder.objects.extend([
@@ -2488,6 +2515,7 @@ def build_vehicle_model(
         builder.add_continuous_tracks(
             length=3.6, height=0.66, belt_width=0.36, roadwheels=5, with_skirts=skirts
         )
+        builder.add_final_drive_housings(radius=0.20)
         builder.objects.extend([
             rmk.make_sloped_glacis_hull(
                 f"{name}Armor_AmphibHull",
@@ -2532,6 +2560,7 @@ def build_vehicle_model(
         builder.add_splash_rib()
         builder.add_driver_periscope_hood()
         builder.add_glacis_weld_seams()
+        builder.add_access_hatches()
         builder.add_turret(size=(1.55, 1.75, 0.46), center_y=0.08)
         builder.add_turret_ring_guard()
         builder.add_crew_cupola()
@@ -2597,12 +2626,14 @@ def build_vehicle_model(
         builder.add_sloped_hull(length=3.0, width=2.4, height=0.88)
         builder.add_deck_edge_weld_seams()
         builder.add_continuous_tracks(length=2.85, height=0.62, belt_width=0.34, roadwheels=5, with_skirts=skirts)
+        builder.add_final_drive_housings()
         builder.add_engine_deck(slat_count=4, with_exhausts=True)
         builder.add_towing_shackles()
         builder.add_lifting_lugs()
         builder.add_interlocking_gussets()
         builder.add_splash_rib()
         builder.add_driver_periscope_hood()
+        builder.add_access_hatches()
         builder.add_weld_seams([
             ((-1.10, 0.45, 0.65), (-0.95, 1.45, 0.35)),
             ((1.10, 0.45, 0.65), (0.95, 1.45, 0.35)),
@@ -2619,12 +2650,15 @@ def build_vehicle_model(
     if archetype not in ("arc_tank",):
         if weapon == "railgun":
             builder.add_railgun(rail_length=2.40, rail_height=0.28, rail_width=0.40, elevation_deg=8.0)
+            builder.add_weapon_trunnions(spacing_x=0.56, bracket_width=0.14)
         elif weapon == "nanite_projector":
             builder.add_nanite_projector(head_radius=0.16, length=1.25, elevation_deg=6.0)
         elif weapon == "gravity_cannon":
             builder.add_gravity_cannon(barrel_length=2.25, bore_radius=0.14, ring_count=4, elevation_deg=5.0)
+            builder.add_weapon_trunnions(spacing_x=0.58, bracket_width=0.14)
         elif weapon == "laser_beam":
             builder.add_beam_laser(barrel_length=2.10, caliber=0.08, elevation_deg=6.0)
+            builder.add_weapon_trunnions(spacing_x=0.50, bracket_width=0.12)
         elif weapon == "vls_missiles":
             builder.add_vls_missile_array(rows=2, cols=4)
         elif weapon == "flamethrower":
@@ -2633,15 +2667,19 @@ def build_vehicle_model(
             builder.add_emp_emitter(core_radius=0.14, length=1.55, elevation_deg=5.0)
         elif weapon == "quad_flak":
             builder.add_quad_flak(barrel_length=1.65, caliber_radius=0.038, elevation_deg=34.0)
+            builder.add_weapon_trunnions(spacing_x=0.54, bracket_width=0.12)
         elif weapon == "plasma_mortar":
             builder.add_plasma_mortar(caliber=0.175, length=0.95, elevation_deg=42.0)
+            builder.add_weapon_trunnions(spacing_x=0.60, bracket_width=0.15)
         elif weapon == "howitzer":
             builder.add_howitzer(caliber=0.135, length=1.15, elevation_deg=26.0)
+            builder.add_weapon_trunnions(spacing_x=0.58, bracket_width=0.14)
         elif weapon == "dual_cannon":
             if archetype == "heavy_crane_mech":
                 builder.add_dual_cannon(caliber=0.082, length=0.60, spacing=0.38, elevation_deg=11.0)
             else:
                 builder.add_dual_cannon(caliber=0.082, length=1.65, spacing=0.38, elevation_deg=11.0)
+                builder.add_weapon_trunnions(spacing_x=0.62, bracket_width=0.14)
         elif weapon == "gatling":
             if archetype in ("walker", "bike", "colossus_titan", "artillery_strider", "heavy_crane_mech"):
                 gatling_offsets = {
@@ -2680,8 +2718,10 @@ def build_vehicle_model(
         elif archetype == "sniper_tankette":
             # Long-barrel precision gun: thinner caliber, ~40% longer tube, flatter elevation.
             builder.add_cannon(caliber=0.072, length=2.45, elevation_deg=4.0)
+            builder.add_weapon_trunnions(spacing_x=0.46, bracket_width=0.10)
         else:  # cannon
             builder.add_cannon(caliber=0.095, length=1.70, elevation_deg=11.0)
+            builder.add_weapon_trunnions(spacing_x=0.52, bracket_width=0.12)
 
     # 3. Optional Subsystems & Greebles
     if rollcage and archetype not in ("buggy",):
