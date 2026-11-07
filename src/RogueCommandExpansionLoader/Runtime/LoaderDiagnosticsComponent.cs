@@ -710,6 +710,47 @@ namespace RogueCommandExpansionLoader.Runtime
         }
 
         /// <summary>
+        /// Read-only intermission level-select census (OverWorldMapEnemy nodes)
+        /// as agent-readable JSON. Field order puts omission counters before
+        /// the node detail list.
+        /// </summary>
+        public string GetIntermissionCensusJson(int maxRows = 64)
+        {
+            return AgentDiagnosticsFormatter.SerializeIntermissionCensus(
+                RuntimeIntermissionCensus.Current(maxRows));
+        }
+
+        /// <summary>
+        /// Enters an intermission level node via its native OnMouseDown handler
+        /// (with the native LoadScene.LoadNextLevel fallback). Never uses
+        /// StageMap.JumpTo and never touches profile/save files.
+        /// </summary>
+        public string TryEnterLevelNodeJson(int level, int field)
+        {
+            return AgentDiagnosticsFormatter.SerializeEnterLevelNodeResult(
+                RuntimeIntermissionEnter.TryEnterLevelNode(level, field));
+        }
+
+        /// <summary>
+        /// Live Navigator pause/time state as agent-readable JSON.
+        /// </summary>
+        public string GetNavigatorStateJson()
+        {
+            return AgentDiagnosticsFormatter.SerializeNavigatorState(
+                RuntimeNavigatorState.Current());
+        }
+
+        /// <summary>
+        /// Pauses (true) or unpauses (false) via the native Navigator,
+        /// failing closed when the Navigator type/instance is missing.
+        /// </summary>
+        public string SetNavigatorPausedJson(bool paused)
+        {
+            return AgentDiagnosticsFormatter.SerializeNavigatorPauseResult(
+                RuntimeNavigatorState.TrySetPaused(paused));
+        }
+
+        /// <summary>
         /// Pure JSON telemetry of run progression, ascension/heat scaling, active relics,
         /// and offered blueprint reward pools.
         /// </summary>

@@ -1250,11 +1250,15 @@ TOOL_SPECS = [
     {"name": "diagnostics_order_batch", "description": "Executes multiple diagnostic commands in parallel and returns aggregated results with meta counts.", "parameters": {"type": "object", "properties": {"operations": {"type": "array", "items": {"type": "object", "properties": {"tool": {"type": "string"}, "arguments": {"type": "object"}}, "required": ["tool"]}, "description": "List of operations to execute."}}, "required": ["operations"], "additionalProperties": False}},
     {"name": "diagnostics_get_control_guide", "description": "Returns a control guide with preflight, control, and cleanup recipes for Profile2 QA.", "parameters": {"type": "object", "properties": {}, "additionalProperties": False}},
     {"name": "diagnostics_gui_control", "description": "Composite GUI control: open/close overlay, toggle range display, select tab, set timeScale, move/focus camera, and select units in one round-trip.", "parameters": {"type": "object", "properties": {"overlayOpen": {"type": "boolean"}, "rangeEnabled": {"type": "boolean"}, "overlayTab": {"type": "integer"}, "timeScale": {"type": "number"}, "cameraX": {"type": "number"}, "cameraZ": {"type": "number"}, "focusEntityKeyId": {"type": "string"}}, "additionalProperties": False}},
-    {"name": "diagnostics_ui_press_button", "description": "Find a Unity UI Button by name/path and press it in one call (search + resolve + Press).", "parameters": {"type": "object", "properties": {"buttonName": {"type": "string"}, "selector": {"type": "string"}}, "additionalProperties": False}},
+    {"name": "diagnostics_ui_press_button", "description": "Find a Unity UI Button by name/path and press it in one call (search + resolve + Press).", "parameters": {"type": "object", "properties": {"buttonName": {"type": "string"}, "selector": {"type": "string"}, "gameObjectId": {"type": "integer"}}, "additionalProperties": False}},
     {"name": "diagnostics_fast_snapshot", "description": "Curated preset snapshot: gui, match, combat, health. Faster than full runtime_snapshot.", "parameters": {"type": "object", "properties": {"preset": {"type": "string"}}, "additionalProperties": False}},
     {"name": "diagnostics_get_performance_census", "description": "Queries live frame performance (FPS, frame time, time scale, managed memory, and budget verdict) via LoaderDiagnosticsComponent.", "parameters": {"type": "object", "properties": {}, "additionalProperties": False}},
     {"name": "diagnostics_get_frame_timing_census", "description": "Queries windowed frame timing (average/min/max/p95 frame time, stutter and hitch counts, smoothness verdict) via LoaderDiagnosticsComponent.", "parameters": {"type": "object", "properties": {}, "additionalProperties": False}},
     {"name": "diagnostics_diff_snapshots", "description": "Compares two JSON snapshot payloads at the top level (added/removed/changed keys, bounded detail with omission counters) via LoaderDiagnosticsComponent.", "parameters": {"type": "object", "properties": {"beforeJson": {"type": "string", "description": "JSON object snapshot before the change."}, "afterJson": {"type": "string", "description": "JSON object snapshot after the change."}, "maxChanges": {"type": "integer", "description": "Maximum detail rows per category (default 16, range 1 to 128)."}}, "required": ["beforeJson", "afterJson"], "additionalProperties": False}},
+    {"name": "diagnostics_get_intermission_census", "description": "Queries the read-only intermission level-node census with a bounded row count.", "parameters": {"type": "object", "properties": {"maxRows": {"type": "integer", "description": "Max rows to return (default 64)."}}, "additionalProperties": False}},
+    {"name": "diagnostics_order_enter_level", "description": "Enters a level node (MUTATION). Evidence boundary: entering a level mutates the active run; use only on an authorized QA profile; the tool itself never edits profile or save files.", "parameters": {"type": "object", "properties": {"level": {"type": "string", "description": "Level node name to enter."}, "field": {"type": "string", "description": "Intermission field name attached to the level node."}}, "required": ["level", "field"], "additionalProperties": False}},
+    {"name": "diagnostics_get_navigator_state", "description": "Reads the navigator state (current level node and paused flag) read-only.", "parameters": {"type": "object", "properties": {}, "additionalProperties": False}},
+    {"name": "diagnostics_order_navigator_pause", "description": "Pauses or unpauses the navigator (MUTATION of in-game state only).", "parameters": {"type": "object", "properties": {"paused": {"type": "boolean", "description": "Whether the navigator should be paused."}}, "required": ["paused"], "additionalProperties": False}},
     {"name": "discover_tools", "description": "Lightweight tool index (name and description only) filtered by query or category. Use before fetching full schemas.", "parameters": {"type": "object", "properties": {"query": {"type": "string"}, "category": {"type": "string"}, "prefix": {"type": "string"}, "includeAliases": {"type": "boolean"}}, "additionalProperties": False}},
     {"name": "describe_tool", "description": "Full input schema for a single tool on demand (lazy schema fetch).", "parameters": {"type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"], "additionalProperties": False}},
 ]
@@ -1262,7 +1266,7 @@ TOOL_SPECS = [
 # ---------------------------------------------------------------------------
 # Schema optimisation (wire-size reduction without losing functionality)
 # ---------------------------------------------------------------------------
-# Single source of truth remains TOOL_SPECS above (203 tools). The helpers
+# Single source of truth remains TOOL_SPECS above (207 tools). The helpers
 # below produce the optimised view that bepinex_mcp_server and the
 # Antigravity schema files advertise:
 # - Strip redundant LoaderDiagnosticsComponent provenance phrases from tool
@@ -1277,7 +1281,7 @@ TOOL_SPECS = [
 #   "GameObject ID.", etc.) so alias/canonical pairs cannot drift.
 # - Add the runtime-supported optional selector_json to the canonical
 #   scene_resolve_selector, then copy canonical parameters to every alias so
-#   all 19 aliases deep-equal their canonical tool. All 203 names, types,
+#   all 19 aliases deep-equal their canonical tool. All 207 names, types,
 #   required lists, enums, and handler endpoints are preserved.
 
 _PROPERTY_DESCRIPTION_SHORTENING: dict[str, str] = {

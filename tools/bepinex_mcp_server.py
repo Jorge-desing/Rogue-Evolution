@@ -269,6 +269,8 @@ _RUNTIME_SNAPSHOT_GETTERS = [
     "GetVisualMaterialCensusJson",
     "GetGameTimeScaleJson",
     "GetPerformanceCensusJson",
+    "GetIntermissionCensusJson",
+    "GetNavigatorStateJson",
 ]
 
 _RUNTIME_SNAPSHOT_GETTER_ARGS: dict[str, list[object]] = {
@@ -281,6 +283,7 @@ _RUNTIME_SNAPSHOT_GETTER_ARGS: dict[str, list[object]] = {
     "GetVisualSurfaceCensusJson": [64],
     "GetVisualMaterialCensusJson": [64],
     "GetSocketAuditCensusJson": [64],
+    "GetIntermissionCensusJson": [64],
 }
 
 
@@ -492,11 +495,12 @@ def _call_diagnostics_member(member_name: str) -> Any:
 def _call_diagnostics_method(method_name: str, args: list | None = None) -> str:
     global _DIAGNOSTICS_GO_ID
     args_json = json.dumps(args or [])
+    component_name = "RogueCommandExpansionLoader.Runtime.LoaderDiagnosticsComponent"
     try:
         go_id = _get_diagnostics_go_id()
         raw = _call_http("component/call_method", params={
             "id": go_id,
-            "componentName": "LoaderDiagnosticsComponent",
+            "componentName": component_name,
             "methodName": method_name,
             "args": args_json,
         })
@@ -506,7 +510,7 @@ def _call_diagnostics_method(method_name: str, args: list | None = None) -> str:
             go_id = _get_diagnostics_go_id()
             raw = _call_http("component/call_method", params={
                 "id": go_id,
-                "componentName": "LoaderDiagnosticsComponent",
+                "componentName": component_name,
                 "methodName": method_name,
                 "args": args_json,
             })
@@ -2168,29 +2172,75 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             result = {"steps": steps, "finalState": final_val, "_meta": {"count": len(steps)}}
             return _tool_response(json.dumps(result, indent=2))
 
+        elif name == "diagnostics_get_intermission_census":
+            max_rows = int(arguments.get("maxRows", 64))
+            res = _call_diagnostics_method("GetIntermissionCensusJson", [max_rows])
+            return _tool_response(res)
+
+        elif name == "diagnostics_order_enter_level":
+            level = arguments.get("level")
+            if not isinstance(level, str) or not level.strip():
+                return _tool_response(json.dumps({"error": "level must be a non-empty string"}), is_error=True)
+            field = arguments.get("field", "")
+            if field is None:
+                field = ""
+            if not isinstance(field, str):
+                return _tool_response(json.dumps({"error": "field must be a string"}), is_error=True)
+            res = _call_diagnostics_method("TryEnterLevelNodeJson", [level.strip(), field.strip()])
+            return _tool_response(res)
+
+        elif name == "diagnostics_get_navigator_state":
+            res = _call_diagnostics_method("GetNavigatorStateJson")
+            return _tool_response(res)
+
+        elif name == "diagnostics_order_navigator_pause":
+            if "paused" not in arguments or not isinstance(arguments.get("paused"), bool):
+                return _tool_response(json.dumps({"error": "paused must be a boolean"}), is_error=True)
+            res = _call_diagnostics_method("SetNavigatorPausedJson", [arguments["paused"]])
+            return _tool_response(res)
+
         elif name == "diagnostics_ui_press_button":
-            button_name = str(arguments.get("buttonName", "")).strip()
-            selector = str(arguments.get("selector", "")).strip()
-            target = selector or button_name
-            if not target:
-                return _tool_response(json.dumps({"success": False, "message": "buttonName or selector required"}), True)
-            # search (bridge uses `name`/`componentName`; `query` kept as fallback)
-            items = []
-            search_params_candidates = [
-                {"name": target, "includeInactive": "true", "limit": "20"},
-                {"query": target, "includeInactive": "true", "limit": "20"},
-            ]
-            for sp in search_params_candidates:
+            target = None
+            direct_id = arguments.get("gameObjectId")
+            if direct_id is not None:
                 try:
-                    search_raw = _call_http("scene/search_gameobjects", params=sp)
-                    parsed_items = json.loads(search_raw) if isinstance(search_raw, str) else search_raw
-                    if isinstance(parsed_items, dict):
-                        parsed_items = parsed_items.get("objects", [parsed_items]) if "objects" in parsed_items else [parsed_items]
-                    if isinstance(parsed_items, list) and parsed_items:
-                        items = parsed_items
-                        break
-                except Exception:
-                    items = []
+                    items = [{"id": int(direct_id)}]
+                except (TypeError, ValueError):
+                    return _tool_response(json.dumps({"success": False, "message": "gameObjectId must be an integer"}), True)
+            else:
+                button_name = str(arguments.get("buttonName", "")).strip()
+                selector = str(arguments.get("selector", "")).strip()
+                target = selector or button_name
+                if not target:
+                    return _tool_response(json.dumps({"success": False, "message": "buttonName or selector required"}), True)
+                # search (bridge uses `name`/`componentName`; `query` kept as fallback)
+                items = []
+                search_params_candidates = [
+                    {"name": target, "includeInactive": "true", "limit": "20"},
+                    {"query": target, "includeInactive": "true", "limit": "20"},
+                ]
+                for sp in search_params_candidates:
+                    try:
+                        search_raw = _call_http("scene/search_gameobjects", params=sp)
+                        parsed_items = json.loads(search_raw) if isinstance(search_raw, str) else search_raw
+                        if isinstance(parsed_items, list):
+                            candidate_items = parsed_items
+                        elif isinstance(parsed_items, dict):
+                            candidate_items = None
+                            for envelope_key in ("objects", "items", "results"):
+                                envelope_items = parsed_items.get(envelope_key)
+                                if isinstance(envelope_items, list) and envelope_items:
+                                    candidate_items = envelope_items
+                                    break
+                            if candidate_items is None:
+                                candidate_items = [parsed_items] if "id" in parsed_items else []
+                        else:
+                            candidate_items = []
+                        if isinstance(candidate_items, list) and candidate_items:
+                            items = candidate_items
+                            break
+                    except Exception:
+                        items = []
             if not items:
                 return _tool_response(json.dumps({"success": False, "message": f'button not found: {target}', "candidates": []}))
             game_object_id = items[0].get("id") if isinstance(items[0], dict) else None

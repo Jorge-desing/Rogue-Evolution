@@ -988,6 +988,80 @@ namespace RogueCommandExpansionLoader.Runtime
         }
 
         /// <summary>
+        /// Serializes the intermission level-select census. Field order is fixed
+        /// by contract: counters (omittedNodeCount, nodeCount) come BEFORE the
+        /// detail list (nodes) so bounded truncation never hides loss counts.
+        /// </summary>
+        public static string SerializeIntermissionCensus(IntermissionCensus census)
+        {
+            var rows = new List<Dictionary<string, object>>();
+            if (census != null && census.Nodes != null)
+            {
+                foreach (IntermissionNodeRow row in census.Nodes)
+                {
+                    rows.Add(new Dictionary<string, object>
+                    {
+                        ["level"] = row.Level,
+                        ["field"] = row.Field,
+                        ["isChoosable"] = row.IsChoosable,
+                        ["isCurrentNodeOfPath"] = row.IsCurrentNodeOfPath,
+                        ["hasCardReward"] = row.HasCardReward,
+                        ["position"] = row.Position ?? string.Empty,
+                        ["instanceId"] = row.InstanceId,
+                    });
+                }
+            }
+
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "intermissionCensus",
+                ["isIntermissionActive"] = census != null && census.IsIntermissionActive,
+                ["omittedNodeCount"] = census != null ? census.OmittedNodeCount : 0,
+                ["nodeCount"] = census != null ? census.NodeCount : 0,
+                ["currentStage"] = census != null ? census.CurrentStage : 0,
+                ["currentLevel"] = census != null ? census.CurrentLevel : 0,
+                ["nodes"] = rows,
+            };
+            return Serialize(view);
+        }
+
+        public static string SerializeEnterLevelNodeResult(EnterLevelNodeResult result)
+        {
+            var view = new Dictionary<string, object>
+            {
+                ["success"] = result.Success,
+                ["message"] = result.Message ?? string.Empty,
+                ["level"] = result.Level,
+                ["field"] = result.Field,
+            };
+            return Serialize(view);
+        }
+
+        public static string SerializeNavigatorState(NavigatorStateSnapshot state)
+        {
+            var view = new Dictionary<string, object>
+            {
+                ["isPaused"] = state.IsPaused,
+                ["isDebugPaused"] = state.IsDebugPaused,
+                ["timeScale"] = state.TimeScale,
+                ["scaledTime"] = state.ScaledTime,
+                ["unscaledTime"] = state.UnscaledTime,
+            };
+            return Serialize(view);
+        }
+
+        public static string SerializeNavigatorPauseResult(NavigatorPauseResult result)
+        {
+            var view = new Dictionary<string, object>
+            {
+                ["success"] = result.Success,
+                ["message"] = result.Message ?? string.Empty,
+                ["isPaused"] = result.IsPaused,
+            };
+            return Serialize(view);
+        }
+
+        /// <summary>
         /// Serializes the result of an in-game credit grant command.
         /// </summary>
         public static string SerializeCreditGrantResult(CreditGrantResult result)

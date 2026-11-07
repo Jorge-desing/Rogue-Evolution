@@ -590,6 +590,7 @@ namespace UnityEngine
     public static class Time
     {
         public static float time { get; set; }
+        public static float unscaledTime { get; set; }
         public static float timeScale { get; set; } = 1.0f;
         public static float deltaTime { get; set; }
         public static int frameCount { get; set; }

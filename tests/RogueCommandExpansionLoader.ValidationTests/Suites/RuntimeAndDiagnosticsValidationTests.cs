@@ -9083,6 +9083,177 @@ internal static partial class ValidationTestRunner
             }
         }
     }),
+    ("intermission census clamps rows and puts omission counter before node list", () =>
+    {
+        var rows = new List<IntermissionNodeRow>();
+        for (int i = 0; i < 100; i++)
+        {
+            rows.Add(new IntermissionNodeRow(
+                level: i % 10,
+                field: i / 10,
+                isChoosable: i % 2 == 0,
+                isCurrentNodeOfPath: i == 0,
+                hasCardReward: i % 3 == 0,
+                position: i + ",0,0",
+                instanceId: 1000 + i));
+        }
+
+        IntermissionCensus census = IntermissionCensus.Build(rows, true, 2, 3, 64);
+        if (census.NodeCount != 64 || census.OmittedNodeCount != 36 || census.Nodes.Count != 64)
+        {
+            throw new InvalidOperationException(
+                "Intermission census must keep maxRows rows and report the remainder as omitted.");
+        }
+
+        // Sorted by level asc then field asc; first kept row must be (0,0), last kept (6,0)... verify ordering broadly.
+        for (int i = 1; i < census.Nodes.Count; i++)
+        {
+            IntermissionNodeRow prev = census.Nodes[i - 1];
+            IntermissionNodeRow current = census.Nodes[i];
+            if (prev.Level > current.Level || (prev.Level == current.Level && prev.Field > current.Field))
+            {
+                throw new InvalidOperationException("Intermission census rows must be sorted by level then field.");
+            }
+        }
+
+        string json = AgentDiagnosticsFormatter.SerializeIntermissionCensus(census);
+        int omittedIndex = json.IndexOf("\"omittedNodeCount\"", StringComparison.Ordinal);
+        int nodesIndex = json.IndexOf("\"nodes\"", StringComparison.Ordinal);
+        if (omittedIndex < 0 || nodesIndex < 0 || omittedIndex > nodesIndex)
+        {
+            throw new InvalidOperationException("The omission counter must appear before the nodes detail list.");
+        }
+
+        using (JsonDocument doc = JsonDocument.Parse(json))
+        {
+            JsonElement root = doc.RootElement;
+            if (root.GetProperty("kind").GetString() != "intermissionCensus"
+                || !root.GetProperty("isIntermissionActive").GetBoolean()
+                || root.GetProperty("omittedNodeCount").GetInt32() != 36
+                || root.GetProperty("nodeCount").GetInt32() != 64
+                || root.GetProperty("currentStage").GetInt32() != 2
+                || root.GetProperty("currentLevel").GetInt32() != 3
+                || root.GetProperty("nodes").GetArrayLength() != 64)
+            {
+                throw new InvalidOperationException("Intermission census JSON header mismatch.");
+            }
+
+            JsonElement first = root.GetProperty("nodes")[0];
+            if (first.GetProperty("level").GetInt32() != 0 || first.GetProperty("field").GetInt32() != 0
+                || !first.GetProperty("isChoosable").GetBoolean()
+                || first.GetProperty("position").GetString() != "0,0,0")
+            {
+                throw new InvalidOperationException("Intermission census first-row JSON mismatch.");
+            }
+        }
+
+        // Default clamp: non-positive maxRows falls back to 64.
+        IntermissionCensus defaulted = IntermissionCensus.Build(rows, true, 0, 0, 0);
+        if (defaulted.NodeCount != 64 || defaulted.OmittedNodeCount != 36)
+        {
+            throw new InvalidOperationException("Non-positive maxRows must fall back to the 64-row default.");
+        }
+
+        // Null input must not throw and must report an empty, inactive census.
+        string emptyJson = AgentDiagnosticsFormatter.SerializeIntermissionCensus(
+            IntermissionCensus.Build(null, false, 0, 0, 64));
+        using (JsonDocument doc = JsonDocument.Parse(emptyJson))
+        {
+            if (doc.RootElement.GetProperty("nodeCount").GetInt32() != 0
+                || doc.RootElement.GetProperty("nodes").GetArrayLength() != 0)
+            {
+                throw new InvalidOperationException("Null intermission rows must serialize as an empty census.");
+            }
+        }
+    }),
+    ("TryEnterLevelNode fails closed when the level node is unknown", () =>
+    {
+        EnterLevelNodeResult result = RuntimeIntermissionEnter.TryEnterLevelNode(999, 999);
+        if (result.Success || result.Level != 999 || result.Field != 999)
+        {
+            throw new InvalidOperationException("Unknown intermission nodes must fail closed without entering.");
+        }
+
+        if (result.Message.IndexOf("999", StringComparison.Ordinal) < 0)
+        {
+            throw new InvalidOperationException("The unknown-node failure must state the requested level/field.");
+        }
+
+        string json = AgentDiagnosticsFormatter.SerializeEnterLevelNodeResult(result);
+        using (JsonDocument doc = JsonDocument.Parse(json))
+        {
+            if (doc.RootElement.GetProperty("success").GetBoolean()
+                || doc.RootElement.GetProperty("level").GetInt32() != 999
+                || doc.RootElement.GetProperty("field").GetInt32() != 999)
+            {
+                throw new InvalidOperationException("Enter-level unknown-node JSON mismatch.");
+            }
+        }
+    }),
+    ("SetNavigatorPaused fails closed when Navigator is absent", () =>
+    {
+        NavigatorPauseResult result = RuntimeNavigatorState.TrySetPaused(true);
+        if (result.Success)
+        {
+            throw new InvalidOperationException("Pausing without a Navigator must fail closed in the offline harness.");
+        }
+
+        string json = AgentDiagnosticsFormatter.SerializeNavigatorPauseResult(result);
+        using (JsonDocument doc = JsonDocument.Parse(json))
+        {
+            if (doc.RootElement.GetProperty("success").GetBoolean()
+                || !doc.RootElement.GetProperty("isPaused").GetBoolean())
+            {
+                throw new InvalidOperationException("Navigator fail-closed JSON mismatch.");
+            }
+        }
+
+        NavigatorStateSnapshot snapshot = RuntimeNavigatorState.Current();
+        string stateJson = AgentDiagnosticsFormatter.SerializeNavigatorState(snapshot);
+        using (JsonDocument doc = JsonDocument.Parse(stateJson))
+        {
+            JsonElement root = doc.RootElement;
+            if (root.GetProperty("isPaused").GetBoolean()
+                || root.GetProperty("isDebugPaused").GetBoolean())
+            {
+                throw new InvalidOperationException("Navigator state without a Navigator must report unpaused.");
+            }
+        }
+    }),
+    ("intermission and navigator serializers escape strings safely", () =>
+    {
+        string trickyMessage = "node \"quoted\" \\ backslash \n newline \t tab";
+        string json = AgentDiagnosticsFormatter.SerializeEnterLevelNodeResult(
+            new EnterLevelNodeResult(false, trickyMessage, 3, 7));
+        if (json.IndexOf("\"quoted\"", StringComparison.Ordinal) >= 0)
+        {
+            throw new InvalidOperationException("Serializer must escape embedded quotes instead of emitting them raw.");
+        }
+
+        using (JsonDocument doc = JsonDocument.Parse(json))
+        {
+            string parsed = doc.RootElement.GetProperty("message").GetString() ?? string.Empty;
+            if (!string.Equals(parsed, trickyMessage, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Escaped serializer output must round-trip through a JSON parser.");
+            }
+        }
+
+        var rows = new[]
+        {
+            new IntermissionNodeRow(1, 2, true, false, true, "1.5,\"x\",\\3", 42),
+        };
+        string censusJson = AgentDiagnosticsFormatter.SerializeIntermissionCensus(
+            IntermissionCensus.Build(rows, true, 4, 5, 64));
+        using (JsonDocument doc = JsonDocument.Parse(censusJson))
+        {
+            string parsedPosition = doc.RootElement.GetProperty("nodes")[0].GetProperty("position").GetString() ?? string.Empty;
+            if (!string.Equals(parsedPosition, "1.5,\"x\",\\3", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Intermission node position strings must be escaped safely.");
+            }
+        }
+    }),
     };
 
     private sealed class TestCardChangeTarget

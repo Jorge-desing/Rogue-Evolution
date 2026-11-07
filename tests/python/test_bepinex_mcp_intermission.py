@@ -1,0 +1,230 @@
+"""Hermetic contract tests: intermission/navigator diagnostics tools + press-button envelope fix.
+
+No live game: all bridge access is mocked via SERVER._call_http, following the
+fixture style of tests/python/test_bepinex_mcp_diagnostics.py.
+"""
+
+from __future__ import annotations
+
+import json
+import unittest
+from unittest import mock
+
+from tests.python.helpers import load_tool_module
+
+SERVER = load_tool_module("bepinex_mcp_server")
+
+FULL_COMPONENT = "RogueCommandExpansionLoader.Runtime.LoaderDiagnosticsComponent"
+
+
+def _diag_fake_http(calls, payload=None):
+    """Fake bridge for component/call_method diagnostics invocations."""
+
+    def fake_http(endpoint, params=None, **_):
+        params = params or {}
+        assert endpoint == "component/call_method", endpoint
+        method = str(params["methodName"])
+        args = json.loads(str(params.get("args", "[]")))
+        calls.append({"method": method, "args": args, "params": dict(params)})
+        body = payload if payload is not None else {"kind": method, "success": True}
+        return json.dumps(
+            {
+                "status": "ok",
+                "message": f"Called '{method}' with {len(args)} args. ReturnValue: {json.dumps(body)}",
+            }
+        )
+
+    return fake_http
+
+
+class IntermissionDiagnosticsTests(unittest.TestCase):
+    def test_intermission_census_passthrough_with_maxrows(self) -> None:
+        calls = []
+
+        with (
+            mock.patch.object(SERVER, "_DIAGNOSTICS_GO_ID", 73),
+            mock.patch.object(
+                SERVER,
+                "_call_http",
+                side_effect=_diag_fake_http(calls, {"kind": "intermissionCensus", "rows": [1, 2]}),
+            ),
+        ):
+            response = SERVER.execute_tool("diagnostics_get_intermission_census", {"maxRows": 16})
+
+        self.assertFalse(response["isError"])
+        self.assertEqual([{"method": "GetIntermissionCensusJson", "args": [16]}], [
+            {"method": c["method"], "args": c["args"]} for c in calls
+        ])
+        self.assertEqual(73, calls[0]["params"]["id"])
+        self.assertEqual(FULL_COMPONENT, calls[0]["params"]["componentName"])
+        payload = json.loads(response["content"][0]["text"])
+        self.assertEqual({"kind": "intermissionCensus", "rows": [1, 2]}, payload)
+
+    def test_intermission_census_defaults_to_64_rows(self) -> None:
+        calls = []
+
+        with (
+            mock.patch.object(SERVER, "_DIAGNOSTICS_GO_ID", 73),
+            mock.patch.object(SERVER, "_call_http", side_effect=_diag_fake_http(calls)),
+        ):
+            response = SERVER.execute_tool("diagnostics_get_intermission_census", {})
+
+        self.assertFalse(response["isError"])
+        self.assertEqual([64], calls[0]["args"])
+
+    def test_enter_level_forwards_level_and_field(self) -> None:
+        calls = []
+
+        with (
+            mock.patch.object(SERVER, "_DIAGNOSTICS_GO_ID", 73),
+            mock.patch.object(SERVER, "_call_http", side_effect=_diag_fake_http(calls)),
+        ):
+            response = SERVER.execute_tool(
+                "diagnostics_order_enter_level", {"level": "Level3", "field": "Alpha"}
+            )
+
+        self.assertFalse(response["isError"])
+        self.assertEqual(1, len(calls))
+        self.assertEqual("TryEnterLevelNodeJson", calls[0]["method"])
+        self.assertEqual(["Level3", "Alpha"], calls[0]["args"])
+        self.assertEqual(FULL_COMPONENT, calls[0]["params"]["componentName"])
+
+    def test_enter_level_rejects_missing_or_blank_level(self) -> None:
+        calls = []
+
+        with (
+            mock.patch.object(SERVER, "_DIAGNOSTICS_GO_ID", 73),
+            mock.patch.object(SERVER, "_call_http", side_effect=_diag_fake_http(calls)),
+        ):
+            for arguments in ({}, {"level": ""}, {"level": "   "}, {"level": 42}, {"field": "Alpha"}):
+                response = SERVER.execute_tool("diagnostics_order_enter_level", arguments)
+                self.assertTrue(response["isError"], arguments)
+
+        self.assertEqual([], calls)
+
+    def test_navigator_state_getter_passthrough(self) -> None:
+        calls = []
+
+        with (
+            mock.patch.object(SERVER, "_DIAGNOSTICS_GO_ID", 73),
+            mock.patch.object(
+                SERVER,
+                "_call_http",
+                side_effect=_diag_fake_http(calls, {"kind": "navigatorState", "paused": False}),
+            ),
+        ):
+            response = SERVER.execute_tool("diagnostics_get_navigator_state", {})
+
+        self.assertFalse(response["isError"])
+        self.assertEqual([{"method": "GetNavigatorStateJson", "args": []}], [
+            {"method": c["method"], "args": c["args"]} for c in calls
+        ])
+        payload = json.loads(response["content"][0]["text"])
+        self.assertEqual({"kind": "navigatorState", "paused": False}, payload)
+
+    def test_navigator_pause_forwards_boolean(self) -> None:
+        calls = []
+
+        with (
+            mock.patch.object(SERVER, "_DIAGNOSTICS_GO_ID", 73),
+            mock.patch.object(SERVER, "_call_http", side_effect=_diag_fake_http(calls)),
+        ):
+            paused_on = SERVER.execute_tool("diagnostics_order_navigator_pause", {"paused": True})
+            paused_off = SERVER.execute_tool("diagnostics_order_navigator_pause", {"paused": False})
+
+        self.assertFalse(paused_on["isError"])
+        self.assertFalse(paused_off["isError"])
+        self.assertEqual(
+            [
+                {"method": "SetNavigatorPausedJson", "args": [True]},
+                {"method": "SetNavigatorPausedJson", "args": [False]},
+            ],
+            [{"method": c["method"], "args": c["args"]} for c in calls],
+        )
+
+    def test_navigator_pause_rejects_missing_or_non_boolean(self) -> None:
+        calls = []
+
+        with (
+            mock.patch.object(SERVER, "_DIAGNOSTICS_GO_ID", 73),
+            mock.patch.object(SERVER, "_call_http", side_effect=_diag_fake_http(calls)),
+        ):
+            for arguments in ({}, {"paused": "true"}, {"paused": 1}):
+                response = SERVER.execute_tool("diagnostics_order_navigator_pause", arguments)
+                self.assertTrue(response["isError"], arguments)
+
+        self.assertEqual([], calls)
+
+
+class UiPressButtonEnvelopeTests(unittest.TestCase):
+    def _press_with_search_payload(self, search_payload, arguments=None):
+        calls = []
+
+        def fake_http(endpoint, params=None, method="GET", body_str=None, **_):
+            if endpoint == "scene/search_gameobjects":
+                return search_payload if isinstance(search_payload, str) else json.dumps(search_payload)
+            if endpoint == "component/call_method":
+                calls.append({"method": method, "body": body_str})
+                return json.dumps({"status": "ok", "message": "pressed"})
+            self.fail(f"Unexpected bridge endpoint: {endpoint}")
+
+        with mock.patch.object(SERVER, "_call_http", side_effect=fake_http):
+            response = SERVER.execute_tool(
+                "diagnostics_ui_press_button", arguments or {"buttonName": "StartButton"}
+            )
+        return response, calls
+
+    def test_press_button_accepts_items_envelope(self) -> None:
+        response, calls = self._press_with_search_payload(
+            {"items": [{"id": 555, "name": "StartButton"}]}
+        )
+        self.assertFalse(response["isError"])
+        payload = json.loads(response["content"][0]["text"])
+        self.assertTrue(payload["success"])
+        self.assertEqual(555, payload["gameObjectId"])
+        self.assertEqual(1, len(calls))
+
+    def test_press_button_accepts_objects_envelope_no_regression(self) -> None:
+        response, calls = self._press_with_search_payload(
+            {"objects": [{"id": 777, "name": "StartButton"}]}
+        )
+        payload = json.loads(response["content"][0]["text"])
+        self.assertTrue(payload["success"])
+        self.assertEqual(777, payload["gameObjectId"])
+
+    def test_press_button_accepts_results_and_bare_list_envelopes(self) -> None:
+        response, _ = self._press_with_search_payload(
+            {"results": [{"id": 888, "name": "StartButton"}]}
+        )
+        payload = json.loads(response["content"][0]["text"])
+        self.assertEqual(888, payload["gameObjectId"])
+
+        response, _ = self._press_with_search_payload([{"id": 999, "name": "StartButton"}])
+        payload = json.loads(response["content"][0]["text"])
+        self.assertEqual(999, payload["gameObjectId"])
+
+    def test_press_button_direct_gameobject_id_skips_search(self) -> None:
+        searched = []
+
+        def fake_http(endpoint, params=None, method="GET", body_str=None, **_):
+            if endpoint == "scene/search_gameobjects":
+                searched.append(endpoint)
+                return json.dumps({"items": [{"id": 111, "name": "Other"}]})
+            if endpoint == "component/call_method":
+                return json.dumps({"status": "ok", "message": "pressed"})
+            self.fail(f"Unexpected bridge endpoint: {endpoint}")
+
+        with mock.patch.object(SERVER, "_call_http", side_effect=fake_http):
+            response = SERVER.execute_tool(
+                "diagnostics_ui_press_button", {"gameObjectId": 4242}
+            )
+
+        self.assertFalse(response["isError"])
+        payload = json.loads(response["content"][0]["text"])
+        self.assertTrue(payload["success"])
+        self.assertEqual(4242, payload["gameObjectId"])
+        self.assertEqual([], searched)
+
+
+if __name__ == "__main__":
+    unittest.main()

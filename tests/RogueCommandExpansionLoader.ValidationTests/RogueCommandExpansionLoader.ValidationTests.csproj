@@ -20,6 +20,8 @@
              Link="Runtime/IdentifierColorPolicy.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/AgentDiagnosticsFormatter.cs"
              Link="Runtime/AgentDiagnosticsFormatter.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeIntermissionCensus.cs"
+             Link="Runtime/RuntimeIntermissionCensus.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeBattlefieldCensus.cs"
              Link="Runtime/RuntimeBattlefieldCensus.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeEntityBalanceLookup.cs"
