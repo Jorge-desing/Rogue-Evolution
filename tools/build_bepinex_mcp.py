@@ -5,8 +5,12 @@ Updates tools/bepinex_mcp_server.py and generates tool JSON schemas in
 C:/Users/Alex/.gemini/antigravity/mcp/bepinex_mcp/.
 """
 
+from __future__ import annotations
+
+import copy
 import json
 import os
+import re
 from pathlib import Path
 
 MCP_DIR = Path(r"C:\Users\Alex\.gemini\antigravity\mcp\bepinex_mcp")
@@ -1254,6 +1258,92 @@ TOOL_SPECS = [
     {"name": "discover_tools", "description": "Lightweight tool index (name and description only) filtered by query or category. Use before fetching full schemas.", "parameters": {"type": "object", "properties": {"query": {"type": "string"}, "category": {"type": "string"}, "prefix": {"type": "string"}, "includeAliases": {"type": "boolean"}}, "additionalProperties": False}},
     {"name": "describe_tool", "description": "Full input schema for a single tool on demand (lazy schema fetch).", "parameters": {"type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"], "additionalProperties": False}},
 ]
+
+# ---------------------------------------------------------------------------
+# Schema optimisation (wire-size reduction without losing functionality)
+# ---------------------------------------------------------------------------
+# Single source of truth remains TOOL_SPECS above (203 tools). The helpers
+# below produce the optimised view that bepinex_mcp_server and the
+# Antigravity schema files advertise:
+# - Strip redundant LoaderDiagnosticsComponent provenance phrases from tool
+#   descriptions (the tool name already encodes the action; the phrase added
+#   ~132 * 30 bytes of noise and did not differentiate any tool). Distinctive
+#   trailing detail (formations, stances, affixes, waypoints, examples) is
+#   preserved verbatim.
+# - Compact empty parameter schemas from
+#   {"type":"object","properties":{},"additionalProperties":false} to
+#   {"type":"object","additionalProperties":false} (70 tools, strictness kept).
+# - Shorten repeated property descriptions ("GameObject instance ID." ->
+#   "GameObject ID.", etc.) so alias/canonical pairs cannot drift.
+# - Add the runtime-supported optional selector_json to the canonical
+#   scene_resolve_selector, then copy canonical parameters to every alias so
+#   all 19 aliases deep-equal their canonical tool. All 203 names, types,
+#   required lists, enums, and handler endpoints are preserved.
+
+_PROPERTY_DESCRIPTION_SHORTENING: dict[str, str] = {
+    "GameObject instance ID.": "GameObject ID.",
+    "Parent GameObject instance ID.": "Parent GameObject ID.",
+    "Root GameObject instance ID (optional).": "Root GameObject ID (optional).",
+    "Maximum number of units to inspect (default 64).": "Max units (default 64).",
+    "Component type name (e.g. 'LoaderDiagnosticsComponent').": "Component type name.",
+}
+
+_PROVENANCE_PATTERNS: tuple[str, ...] = (
+    r" directly from LoaderDiagnosticsComponent(?: / [A-Za-z]+)?",
+    r" via LoaderDiagnosticsComponent(?: / [A-Za-z]+)?",
+    r" from LoaderDiagnosticsComponent",
+    r" on LoaderDiagnosticsComponent",
+)
+
+
+def _optimise_description(desc: str) -> str:
+    if desc.startswith("Alias for"):
+        return desc
+    out = desc.replace(
+        " via LoaderDiagnosticsComponent and the native EntityBalancingStore pipeline.",
+        " (native balancing pipeline).",
+    )
+    for pattern in _PROVENANCE_PATTERNS:
+        out = re.sub(pattern, "", out)
+    out = re.sub(r"  +", " ", out)
+    out = out.replace(" .", ".").replace(" ,", ",")
+    return out.strip()
+
+
+def _optimise_parameters(name: str, params: dict) -> dict:
+    new = copy.deepcopy(params)
+    if name == "scene_resolve_selector":
+        props = new.setdefault("properties", {})
+        if "selector_json" not in props:
+            props["selector_json"] = {"type": "string", "description": "JSON object string of selector."}
+    props = new.get("properties")
+    if not props:
+        return {"type": "object", "additionalProperties": False}
+    for prop in props.values():
+        d = prop.get("description")
+        if d in _PROPERTY_DESCRIPTION_SHORTENING:
+            prop["description"] = _PROPERTY_DESCRIPTION_SHORTENING[d]
+    return new
+
+
+def _optimise_spec(spec: dict) -> dict:
+    return {
+        "name": spec["name"],
+        "description": _optimise_description(str(spec["description"])),
+        "parameters": _optimise_parameters(str(spec["name"]), dict(spec["parameters"])),
+    }
+
+
+TOOL_SPECS = [_optimise_spec(spec) for spec in TOOL_SPECS]
+
+_BY_NAME: dict[str, dict] = {spec["name"]: spec for spec in TOOL_SPECS}
+for _spec in TOOL_SPECS:
+    if str(_spec["description"]).startswith("Alias for"):
+        _canon = str(_spec["description"])[len("Alias for "):].split(":", 1)[0].strip()
+        if _canon in _BY_NAME:
+            _spec["parameters"] = copy.deepcopy(_BY_NAME[_canon]["parameters"])
+del _BY_NAME
+
 
 def generate_mcp_schema_files():
     MCP_DIR.mkdir(parents=True, exist_ok=True)

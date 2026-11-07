@@ -983,6 +983,171 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
         self.assertTrue(payload["isValid"])
         self.assertEqual(1, payload["totalChangeCount"])
 
+    def _load_tool_specs(self) -> list:
+        from pathlib import Path as _P
+        import importlib.util as _ilu
+        import sys as _sys
+
+        _spec = _ilu.spec_from_file_location(
+            "build_bepinex_mcp_opt",
+            _P(__file__).resolve().parents[2] / "tools" / "build_bepinex_mcp.py",
+        )
+        assert _spec is not None and _spec.loader is not None
+        _mod = _ilu.module_from_spec(_spec)
+        _sys.modules[_spec.name] = _mod
+        _spec.loader.exec_module(_mod)
+        return list(_mod.TOOL_SPECS)
+
+    def test_optimised_schemas_preserve_all_tools_and_reduce_bytes(self) -> None:
+        specs = self._load_tool_specs()
+        names = [s["name"] for s in specs]
+        self.assertEqual(203, len(names))
+        self.assertEqual(len(names), len(set(names)))
+        aliases = [s for s in specs if str(s.get("description", "")).startswith("Alias for")]
+        self.assertEqual(19, len(aliases))
+        self.assertEqual(184, len(specs) - len(aliases))
+        compact = sum(len(json.dumps(s, ensure_ascii=False, separators=(",", ":"))) for s in specs)
+        self.assertLess(compact, 73500, f"optimised schemas too large: {compact} bytes")
+        # Strictness and shape preserved for every tool.
+        for spec in specs:
+            params = spec["parameters"]
+            self.assertEqual("object", params["type"], spec["name"])
+            self.assertIs(False, params["additionalProperties"], spec["name"])
+            required = params.get("required") or []
+            properties = params.get("properties") or {}
+            for req in required:
+                self.assertIn(req, properties, f"{spec['name']} required {req} missing from properties")
+            for pname, pval in properties.items():
+                self.assertIn(pval.get("type"), ("string", "integer", "number", "boolean", "array", "object"), f"{spec['name']}.{pname}")
+        # Enums preserved (no functionality lost via stringly-typed enums).
+        by_name = {s["name"]: s for s in specs}
+        self.assertEqual(
+            ["prefix", "postfix", "transpiler", "finalizer"],
+            by_name["mod_patch_method"]["parameters"]["properties"]["patchType"]["enum"],
+        )
+        self.assertEqual(
+            ["Heal", "RepairArmor", "ChargeShield", "Damage"],
+            by_name["diagnostics_adjust_vitality"]["parameters"]["properties"]["adjustmentType"]["enum"],
+        )
+        self.assertEqual(
+            ["Firestorm", "AcidPool", "EmpField", "CryoMist", "NaniteField"],
+            by_name["diagnostics_order_spawn_hazard_zone"]["parameters"]["properties"]["hazardType"]["enum"],
+        )
+        self.assertEqual(
+            ["Master", "Music", "Gameplay", "UI"],
+            by_name["diagnostics_set_audio_volume"]["parameters"]["properties"]["channel"]["enum"],
+        )
+        self.assertEqual(
+            ["WeaponRecoil", "JamTurret", "UnjamTurret", "OpenBayDoors", "CloseBayDoors", "FootstepPulse"],
+            by_name["diagnostics_order_unit_visual_feedback"]["parameters"]["properties"]["feedbackType"]["enum"],
+        )
+        self.assertEqual(
+            ["Line", "Wedge", "Column", "Box", "Surround"],
+            by_name["diagnostics_run_synthetic_gameplay_scenario"]["parameters"]["properties"]["formationType"]["enum"],
+        )
+        # Required lists unchanged for representative tools.
+        self.assertEqual(["id", "componentName"], by_name["component_get_details"]["parameters"]["required"])
+        self.assertEqual(["componentName"], by_name["scene_find_objects_with_component"]["parameters"]["required"])
+        self.assertEqual(["entityKeyId", "stanceName"], by_name["diagnostics_order_unit_tactical_stance"]["parameters"]["required"])
+        total_props = sum(len(s["parameters"].get("properties") or {}) for s in specs)
+        self.assertEqual(328, total_props)
+
+    def test_empty_schemas_are_compact_but_strict(self) -> None:
+        specs = self._load_tool_specs()
+        empty = [s for s in specs if not s["parameters"].get("properties")]
+        self.assertEqual(70, len(empty))
+        for spec in empty:
+            self.assertEqual(
+                {"type": "object", "additionalProperties": False},
+                spec["parameters"],
+                spec["name"],
+            )
+        payload = json.dumps(empty[0]["parameters"], separators=(",", ":"))
+        self.assertEqual('{"type":"object","additionalProperties":false}', payload)
+
+    def test_descriptions_strip_provenance_boilerplate_and_keep_details(self) -> None:
+        specs = self._load_tool_specs()
+        for spec in specs:
+            desc = str(spec["description"])
+            self.assertNotIn("LoaderDiagnosticsComponent", desc, spec["name"])
+            self.assertNotIn("via LoaderDiagnosticsComponent", desc, spec["name"])
+            self.assertNotIn("from LoaderDiagnosticsComponent", desc, spec["name"])
+        by_desc = {s["name"]: str(s["description"]) for s in specs}
+        self.assertIn("Line, Wedge, Column, Box, Surround", by_desc["diagnostics_order_formation_move"])
+        self.assertIn("parallel X/Z", by_desc["diagnostics_order_unit_patrol"])
+        self.assertIn("by name", by_desc["diagnostics_call_getter"])
+        self.assertIn("GetPlayerRosterJson", by_desc["diagnostics_call_getter"])
+        self.assertIn("'All'", by_desc["diagnostics_order_remove_unit_affix"])
+        self.assertIn("native balancing pipeline", by_desc["diagnostics_apply_card_change"])
+        self.assertIn("Swift", by_desc["diagnostics_order_apply_unit_affix"])
+        self.assertIn("18+", by_desc["diagnostics_get_catalog"])
+        self.assertTrue(by_desc["diagnostics_get_system_health"].startswith("Queries unified live system health"))
+        self.assertNotIn("directly from", by_desc["diagnostics_get_system_health"])
+
+    def test_alias_schemas_match_canonical_and_cover_selector_json(self) -> None:
+        specs = self._load_tool_specs()
+        by_name = {s["name"]: s for s in specs}
+        aliases = [s for s in specs if str(s.get("description", "")).startswith("Alias for")]
+        self.assertEqual(19, len(aliases))
+        for alias in aliases:
+            canon_name = str(alias["description"])[len("Alias for "):].split(":", 1)[0].strip()
+            self.assertIn(canon_name, by_name, alias["name"])
+            self.assertEqual(
+                by_name[canon_name]["parameters"],
+                alias["parameters"],
+                f"alias {alias['name']} drifted from canonical {canon_name}",
+            )
+        self.assertIn("selector_json", by_name["scene_resolve_selector"]["parameters"]["properties"])
+        self.assertIn("selector_json", by_name["resolve_gameobject_selector"]["parameters"]["properties"])
+        self.assertEqual(
+            "Component type name.",
+            by_name["scene_find_objects_with_component"]["parameters"]["properties"]["componentName"]["description"],
+        )
+
+    def test_aliases_route_to_same_endpoint_as_canonical(self) -> None:
+        cases = [
+            ("system_ping", "ping_unity_bridge", "system/ping"),
+            ("system_capabilities", "get_runtime_capabilities", "system/capabilities"),
+            ("scene_search_gameobjects", "search_gameobjects", "scene/search_gameobjects"),
+            ("component_get_details", "get_component_details", "component/get_details"),
+            ("scene_find_objects_with_component", "find_objects_with_component", "scene:find_objects_with_component"),
+        ]
+        for canonical, alias, endpoint in cases:
+            args: dict[str, object] = {}
+            if canonical == "scene_search_gameobjects":
+                args = {"name": "Hero"}
+            elif canonical == "component_get_details":
+                args = {"id": 1, "componentName": "Transform"}
+            elif canonical == "scene_find_objects_with_component":
+                args = {"componentName": "Transform"}
+            with mock.patch.object(SERVER, "_call_http", return_value=json.dumps({"status": "ok"})) as fake:
+                resp = SERVER.execute_tool(canonical, dict(args))
+                self.assertFalse(resp["isError"], canonical)
+                self.assertEqual(endpoint, fake.call_args[0][0], canonical)
+            with mock.patch.object(SERVER, "_call_http", return_value=json.dumps({"status": "ok"})) as fake:
+                resp = SERVER.execute_tool(alias, dict(args))
+                self.assertFalse(resp["isError"], alias)
+                self.assertEqual(endpoint, fake.call_args[0][0], alias)
+
+    def test_property_shortening_preserves_types_and_tools_list_compact(self) -> None:
+        specs = self._load_tool_specs()
+        by_name = {s["name"]: s for s in specs}
+        self.assertEqual(
+            "GameObject ID.",
+            by_name["component_get_details"]["parameters"]["properties"]["id"]["description"],
+        )
+        self.assertEqual(
+            "integer",
+            by_name["component_get_details"]["parameters"]["properties"]["id"]["type"],
+        )
+        blob = json.dumps(specs, ensure_ascii=False)
+        self.assertNotIn("GameObject instance ID.", blob)
+        self.assertNotIn("Parent GameObject instance ID.", blob)
+        resp = SERVER.handle_request({"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}})
+        tools = resp["result"]["tools"]
+        self.assertEqual(203, len(tools))
+        payload = json.dumps(resp["result"], separators=(",", ":"))
+        self.assertLess(len(payload), 74000, f"tools/list payload too large: {len(payload)} bytes")
 
 if __name__ == "__main__":
     unittest.main()
