@@ -1319,3 +1319,13 @@ This is a compact, durable orientation for agents. For the changing checkout sta
 - Validation: no fresh run in this sync. Last documented at `c2c08d0`: Python full suite `152/152`; focused diagnostic tests `3/3`; real local reports passed `--strict` for sample and Tactical bundles. AssetBundle references, native visual preflight, and Steam/Unity gameplay proof not rerun; natural offer->selection->placement->production/render/stat and tactical AI remain unverified.
 - QA/reflection safety: Profile2 is dedicated QA without a tutorial; never ask, inspect, infer, gate, bypass, or switch profiles for tutorial. Check current selector/save safety and preserve saves. Before reflection jointly verify Rogue Command version, Unity `2021.3.45f2`, Assembly-CSharp SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, and MVID `db0e9462-128d-4296-9900-de18b4bd0c00`.
 - Root MEMORY.md, codex memory, antigravity memory, and mem0 synced to HEAD 526d7d5.
+
+## Refresh (2026-11-07, HEAD 9cddfe7 — multi-scale micro-detail refinement + 20 space-military archetypes)
+
+- Repository `C:/Users/Alex/Documents/Mod Rogue Command`, loader `1.19.0`, branch `codex/rogue-unit-balance-20261018`. Local/upstream/origin verified at `9cddfe7` (`feat(pbr): refine multi-scale micro-detail and expand space-military presets to 20 archetypes`).
+- Refined all existing Material Maker presets with explicit multi-scale micro-detail (`warp_amount`, `perlin_scale_x/y`, `micro_relief_amount`, `normal_strength`, `micro_perlin_scale`, `micro_blend_amount`, `micro_roughness_amount`) and edge-emission profiles.
+- Expanded the suite in `tools/Prepare-MaterialMakerTacticalTemplate.py` to 20 high-fidelity space-military archetypes by adding 7 new presets: `beryllium_mirror_hull`, `obsidian_strike_interceptor`, `fusion_reactor_core_plating`, `martian_iron_rust`, `neosteel_command_citadel`, `antimatter_containment_lattice`, and `cryo_glacier_camo`.
+- Runner `tools/Run-MaterialMakerBake.ps1` updated with full `[ValidateSet(...)]`; contract tests in `tests/python/test_material_maker_workflow_config.py` verified; documentation in `.agents/skills/rogue-command-material-maker-texture-authoring/SKILL.md` and `docs/research/AGENT-HANDOFF.md` updated.
+- Headless bake of `beryllium_mirror_hull` at 2048x2048 with Material Maker 1.7 passed strict quality gate with 0 failures.
+- Validation: full Python test suite passed (258/258, 1 skip); C# validation harness passed (504/505, 1 Windows symlink skip); Release build passed with 0 warnings/0 errors. Release DLL deployed to Steam plugins directory with matching hash `0DDE80822E968F929D355B9275AB8931694A4A7BD68A86309A1F1DD8CD223281`.
+- Root MEMORY.md, codex memory, antigravity memory, and mem0 synced to HEAD 9cddfe7.
