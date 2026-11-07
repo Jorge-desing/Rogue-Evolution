@@ -68,7 +68,7 @@ powershell -File tools/Run-MaterialMakerBake.ps1 -Workflow procedural -Preset ol
 
 `-BlenderPreviewModel` is optional for `urp`/`blender` and creates a disposable `.blend` with the four maps bound to Principled BSDF. The `three_d` workflow automatically previews the supplied source `.blend` without modifying it; all preview blends stay under `artifacts/`. Use `-SizePower 11` for the validated 2048×2048 hero path. `-SizePower 12` is allowed only when the quality report confirms a real 4096×4096 export; the runner records requested versus actual resolution and strict mode fails a renderer cap mismatch.
 
-`tools/Prepare-MaterialMakerTacticalTemplate.py` supports a suite of 36 high-fidelity space-military presets (`--preset <name>`):
+`tools/Prepare-MaterialMakerTacticalTemplate.py` supports a suite of 44 high-fidelity space-military presets (`--preset <name>`):
 - **`olive_armor`**: Exo-Atmospheric Tactical Olive Armor (standard ground/orbital assault hull).
 - **`gunmetal_chassis`**: Orbital Dreadnought Gunmetal Hull (slate-gray cold-rolled aerospace steel).
 - **`desert_camo`**: Lunar/Martian Thermal Regolith Plating (high-friction dust-resistant ceramic alloy).
@@ -105,6 +105,14 @@ powershell -File tools/Run-MaterialMakerBake.ps1 -Workflow procedural -Preset ol
 - **`pulsar_magnetic_shield`**: Pulsar Magnetosphere Induction Armor (superconducting flux-compression plates, bronze-beryllium alloy, high-voltage plasma magenta glow).
 - **`exoskeleton_reactive_scale`**: Articulated Combat Walker Reactive Scales (overlapping dynamic chassis scales, matte olive/titanium composite, tactical laser-gold bevels).
 - **`cryogenic_fuel_shroud`**: Cryogenic Liquid Hydrogen Tank Vacuum Shroud (specular multi-layer vacuum insulation panels, aerospace silver mirror finish, cryogenic cyan seams).
+- **`subterranean_mole_borer`**: Planetary Crust Kinetic Tunneling Plating (tungsten-carbide facets, abrasive regolith wear, seismic amber beacon seams).
+- **`longshot_sniper_camo`**: Anti-Materiel Sniper Optical Shroud Plating (anti-glare carbon-fiber shroud, optical sensor housing, ballistic olive/charcoal mitered plates).
+- **`minefield_ordnance_carrier`**: Area-Denial Combat Minelayer ERA Plating (reinforced V-hull blast deflection plates, explosive reactive armor cassettes, hazard amber seams).
+- **`gravitas_singularity_chassis`**: Graviton Singular Flux Distortion Armor (dense singularity gunmetal, graviton flux ring conduits, intense electric violet-amber seams).
+- **`arc_discharge_conduit`**: Directed-Energy High-Voltage Arc Armor (high-conductivity copper-beryllium busbars, ceramic dielectric insulators, cyan Lorentz arc discharge seams).
+- **`combat_medic_bioceramic`**: Autonomous Field Triage Bioceramic Plating (sterile white bioceramic panels, surgical titanium brackets, medical emerald diagnostic beacons).
+- **`salvage_reclamation_ironclad`**: Heavy Battlefield Logistical Recovery Armor (cold-rolled salvage steel, crane counterweight brackets, high-contrast industrial warning seams).
+- **`orbital_phased_array_comm`**: Deep-Space Phased Array EW Superstructure (gold-titanium radar array micro-tiles, high-frequency waveguides, quantum telemetry cyan uplink beacons).
 
 All presets feature laser-cut seams, precision chamfers, isotropic satin grain, a bimodal `colorize_metallic` node, an edge-only `edge_detect_emission` → `colorize_emission` graph, and the `tactical-hd-v2` `micro_perlin` → normal/roughness detail stack connected to the Material Maker emission/material ports with preset-specific sensor/thermal colors. `tools/pack_material_maker_pbr.py` renormalizes tangent-space normal maps per pixel and applies gentle PBR-safe micro-contrast on albedo. `tools/prepare_material_maker_3d_paint.py` builds the disposable single-submesh UV-frozen `<Unit>_PaintProxy.obj` under `artifacts/texture-work/<Unit>/MaterialMaker/` without touching the production FBX, records the source SHA-256, and fails closed when Blender 4.5.14 cannot create a required proxy. `tools/apply_material_maker_to_blender.py` binds the four-map contract to a Principled BSDF node setup in Blender 4.5 preserving sockets and vertex wear. The runner clears stale raw/final outputs and passes the graph/workspace paths to `tools/audit_material_maker_output.py`, which verifies micro-detail, emission, UV-frozen proxy, and source-preservation metrics.
 

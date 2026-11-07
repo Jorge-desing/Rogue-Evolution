@@ -1383,3 +1383,22 @@ This is a compact, durable orientation for agents. For the changing checkout sta
 - Suite de pruebas: Python 264/264 OK (1 skip); harness C# 508/509 OK (1 skip); build Release limpio (0 advertencias, 0 errores).
 - DLL Release desplegada a Steam (`C:\Program Files (x86)\Steam\steamapps\common\Rogue Command\BepInEx\plugins\RogueCommandExpansionLoader.dll`) con hash SHA-256 verificado `8922628CFE689F53F86A98E01B0B3EFDA94333A364A1C1B93E419D960189E25B`.
 - Root MEMORY.md, codex memory, antigravity memory y mem0 sincronizados.
+
+## Refresh (2026-11-07 — refinamiento y expansión a 44 presets militar-espacial grounded en source-art)
+
+- Repository `C:/Users/Alex/Documents/Mod Rogue Command`, loader `1.19.0`, branch `codex/rogue-unit-balance-20261018`.
+- Consultado `memory.csv`, modelos 3D (`content/source-art/`) y unidades de packs (`tactical-operations`, `sample-native-expansion`).
+- Refinados los presets existentes (`tungsten_heavy_flak_plating`, `ion_thruster_titanium_grate`, `solar_flare_radiation_shield`, `dreadnought_adamantine_hull`, `orbital_drop_pod_cermet`, `exoskeleton_reactive_scale`, `stealth_radar_absorbent_ferrite`) con `warp_amount` <= 0.0018, micro-perlin scale 118-136 y biseles de tolerancia estricta.
+- Añadidos 8 nuevos presets grounded en arquetipos reales del juego, expandiendo la suite a 44 arquetipos:
+  - `subterranean_mole_borer`: Planchas cinéticas de perforación de corteza planetaria y tunelado (`subterranean-mole`).
+  - `longshot_sniper_camo`: Blindaje de amortiguación óptica anti-reflejo (`longshot-tankette`).
+  - `minefield_ordnance_carrier`: Blindaje ERA y deflexión de explosión en V (`minefield-sower`).
+  - `gravitas_singularity_chassis`: Aleación de distorsión gravitatoria cuántica (`gravitas-breaker`).
+  - `arc_discharge_conduit`: Blindaje de conducción y descarga Lorentz (`arc-lance-walker`, `surge-arc-tank`).
+  - `combat_medic_bioceramic`: Paneles biocerámicos estériles de triaje (`field-medic-rover`).
+  - `salvage_reclamation_ironclad`: Blindaje de recuperación logística y desguace (`salvage-hauler`, `ironclad-walker`).
+  - `orbital_phased_array_comm`: Superestructura de antenas en fase y guerra electrónica (`sentinel-relay`, `command-relay`).
+- Horneado headless de validación: `subterranean_mole_borer` a 2048×2048 con Material Maker 1.7 superó `--strict` con 0 fallas (error normal medio 0.002071, delta MetallicGloss 0, emisión no nula 0.344).
+- Suite de pruebas: Python 298/298 OK (1 skip); harness C# 512/513 OK (1 skip); build Release limpio (0 advertencias, 0 errores).
+- DLL Release desplegada a Steam con hash SHA-256 verificado `8B1030ADDFAF030025161F0597032282B09A09FB6999952A89558821DD563A35`.
+- Root MEMORY.md, codex memory, antigravity memory y mem0 sincronizados.

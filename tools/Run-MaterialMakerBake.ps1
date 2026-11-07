@@ -41,7 +41,15 @@ param(
         "orbital_drop_pod_cermet",
         "pulsar_magnetic_shield",
         "exoskeleton_reactive_scale",
-        "cryogenic_fuel_shroud"
+        "cryogenic_fuel_shroud",
+        "subterranean_mole_borer",
+        "longshot_sniper_camo",
+        "minefield_ordnance_carrier",
+        "gravitas_singularity_chassis",
+        "arc_discharge_conduit",
+        "combat_medic_bioceramic",
+        "salvage_reclamation_ironclad",
+        "orbital_phased_array_comm"
     )]
     [string]$Preset = "olive_armor",
     [ValidateSet(9, 10, 11, 12)]
