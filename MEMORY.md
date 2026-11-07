@@ -1415,3 +1415,16 @@ This is a compact, durable orientation for agents. For the changing checkout sta
 - Validation (as documented at HEAD f62aea8): Release 0 warnings/0 errors; C# harness 512/513 (1 Windows symlink skip); Python 298/298 (1 skip); MCP 207 schemas; no fresh Steam gameplay proof beyond smoke/mcp-controls getters. Natural offer→selection→placement→production/render/stat and tactical AI unverified.
 - Profile2 dedicated QA without tutorial; protect saves. Before reflection verify Rogue Command 1.0.9, Unity `2021.3.45f2`, Assembly-CSharp SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, MVID `db0e9462-128d-4296-9900-de18b4bd0c00`.
 - Root MEMORY.md, codex memory, antigravity memory, and mem0 synced to HEAD f62aea8.
+
+## Refresh (2026-11-07 — integración completa de los 44 presets PBR militar-espaciales a las unidades de todos los packs)
+
+- Repository `C:/Users/Alex/Documents/Mod Rogue Command`, loader `1.19.0`, branch `codex/rogue-unit-balance-20261018`.
+- Registrado el mapeo temático canónico en `tools/UnitPbrPresetRegistry.py` para las 19 unidades de los 3 content packs (`sample-expansion`, `sample-native-expansion`, `tactical-operations`), conectando cada vehículo a su chasis PBR primario y variantes tácticas especializadas.
+- Cobertura 100%: los 44 presets están mapeados con 0 huérfanos (`verify_all_presets_mapped()`).
+- Herramienta CLI de orquestación `tools/Apply-UnitPbrPresets.py` implementada: auditoría matricial (`--audit`), visualización (`--list`), generación por lote de plantillas `.ptex` para unidades y variantes (`--prepare-templates`), proxies 3D paint (`--prepare-paint`), y exportación de telemetría matricial (`--export-json`).
+- Declaración de `visualVariants` integrada en los manifiestos de todos los packs (`content/packs/*/content.json`), con identificadores `namespacedId` conformes de un solo dos-puntos y tintes de color hexadecimales calibrados.
+- Validación local exhaustiva:
+  - C# harness: 517/518 pasados (1 skip por symlink de Windows).
+  - Python tests: 316/316 pasados (1 skip), incluyendo `tests/python/test_unit_pbr_preset_registry.py` (7/7 pasados).
+  - Compilación Release: 0 advertencias, 0 errores.
+  - Despliegue de plugin verificado a Steam BepInEx con SHA-256 `30DEC3D3A9F1FDCF48FA0509BD0B5B2E1E6D2B8C6FA07C5142E3E604C0644C7F`.

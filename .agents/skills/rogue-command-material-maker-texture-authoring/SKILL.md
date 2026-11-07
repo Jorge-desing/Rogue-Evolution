@@ -116,6 +116,15 @@ powershell -File tools/Run-MaterialMakerBake.ps1 -Workflow procedural -Preset ol
 
 All presets feature laser-cut seams, precision chamfers, isotropic satin grain, a bimodal `colorize_metallic` node, an edge-only `edge_detect_emission` → `colorize_emission` graph, and the `tactical-hd-v2` `micro_perlin` → normal/roughness detail stack connected to the Material Maker emission/material ports with preset-specific sensor/thermal colors. `tools/pack_material_maker_pbr.py` renormalizes tangent-space normal maps per pixel and applies gentle PBR-safe micro-contrast on albedo. `tools/prepare_material_maker_3d_paint.py` builds the disposable single-submesh UV-frozen `<Unit>_PaintProxy.obj` under `artifacts/texture-work/<Unit>/MaterialMaker/` without touching the production FBX, records the source SHA-256, and fails closed when Blender 4.5.14 cannot create a required proxy. `tools/apply_material_maker_to_blender.py` binds the four-map contract to a Principled BSDF node setup in Blender 4.5 preserving sockets and vertex wear. The runner clears stale raw/final outputs and passes the graph/workspace paths to `tools/audit_material_maker_output.py`, which verifies micro-detail, emission, UV-frozen proxy, and source-preservation metrics.
 
+## Unit-to-Preset Integration Across All Content Packs
+
+All 44 presets are mapped and integrated across all 19 units across `sample-expansion`, `sample-native-expansion`, and `tactical-operations` via `tools/UnitPbrPresetRegistry.py` and batch execution tooling `tools/Apply-UnitPbrPresets.py`. Each unit declares its primary battlefield chassis preset and specialized tactical variant presets (`visualVariants`) in `content.json` conforming to `namespacedId` and `unitVisualVariant`:
+
+- **Audit completeness**: `python tools/Apply-UnitPbrPresets.py --audit` asserts that 100% of all 44 presets are mapped to mod units with 0 unmapped presets.
+- **Inspect unit matrix**: `python tools/Apply-UnitPbrPresets.py --list` formats the complete matrix of 19 units, their source art, primary presets, and variants.
+- **Batch template generation**: `python tools/Apply-UnitPbrPresets.py --all --prepare-templates` prepares valid `.ptex` graphs for all units and variants.
+- **Integration manifest**: `python tools/Apply-UnitPbrPresets.py --export-json <path>` emits structured integration telemetry.
+
 All workflows write an `material-maker-workflow.json` manifest beside the output maps. The manifest records the workflow, shader, pipeline, source authority and post-process rule for agent-readable handoff.
 
 ## Pack report and quality gates

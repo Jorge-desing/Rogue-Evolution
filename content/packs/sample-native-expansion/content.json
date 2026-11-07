@@ -259,6 +259,28 @@
       "startingVeterancyRank": 1,
       "startingAffixes": [
         "Swift"
+      ],
+      "visualVariants": [
+        {
+          "id": "sample-native-expansion:scout-tank-olive-armor",
+          "colorTint": "#4d5c43",
+          "scale": 1.0
+        },
+        {
+          "id": "sample-native-expansion:scout-tank-gunmetal-chassis",
+          "colorTint": "#4c555d",
+          "scale": 1.0
+        },
+        {
+          "id": "sample-native-expansion:scout-tank-desert-camo",
+          "colorTint": "#b89f76",
+          "scale": 1.0
+        },
+        {
+          "id": "sample-native-expansion:scout-tank-longshot-sniper-camo",
+          "colorTint": "#36453b",
+          "scale": 1.0
+        }
       ]
     },
     {
@@ -477,6 +499,33 @@
       "startingVeterancyRank": 1,
       "startingAffixes": [
         "Bulwark"
+      ],
+      "visualVariants": [
+        {
+          "id": "sample-native-expansion:heavy-artillery-hypervelocity-railgun-cermet",
+          "colorTint": "#3d444d",
+          "scale": 1.0
+        },
+        {
+          "id": "sample-native-expansion:heavy-artillery-tungsten-heavy-flak-plating",
+          "colorTint": "#464a4e",
+          "scale": 1.0
+        },
+        {
+          "id": "sample-native-expansion:heavy-artillery-subterranean-mole-borer",
+          "colorTint": "#50443a",
+          "scale": 1.0
+        },
+        {
+          "id": "sample-native-expansion:heavy-artillery-martian-iron-rust",
+          "colorTint": "#7a3e26",
+          "scale": 1.0
+        },
+        {
+          "id": "sample-native-expansion:heavy-artillery-battleship-tungsten",
+          "colorTint": "#35393d",
+          "scale": 1.0
+        }
       ]
     },
     {
@@ -692,6 +741,23 @@
       "startingVeterancyRank": 2,
       "startingAffixes": [
         "Juggernaut"
+      ],
+      "visualVariants": [
+        {
+          "id": "sample-native-expansion:assault-walker-exoskeleton-reactive-scale",
+          "colorTint": "#525b63",
+          "scale": 1.0
+        },
+        {
+          "id": "sample-native-expansion:assault-walker-plasma-cinder-ablative",
+          "colorTint": "#2d2826",
+          "scale": 1.0
+        },
+        {
+          "id": "sample-native-expansion:assault-walker-orbital-drop-pod-cermet",
+          "colorTint": "#41474e",
+          "scale": 1.0
+        }
       ]
     },
     {
@@ -909,6 +975,18 @@
       "startingVeterancyRank": 1,
       "startingAffixes": [
         "Bulwark"
+      ],
+      "visualVariants": [
+        {
+          "id": "sample-native-expansion:atlas-crane-mech-hazard-industrial",
+          "colorTint": "#c89228",
+          "scale": 1.0
+        },
+        {
+          "id": "sample-native-expansion:atlas-crane-mech-zero-g-docking-alloy",
+          "colorTint": "#6c7784",
+          "scale": 1.0
+        }
       ]
     },
     {
@@ -1125,6 +1203,23 @@
       "startingVeterancyRank": 2,
       "startingAffixes": [
         "Bulwark"
+      ],
+      "visualVariants": [
+        {
+          "id": "sample-native-expansion:bastion-siege-mech-graphene-ablative-lattice",
+          "colorTint": "#2e343b",
+          "scale": 1.0
+        },
+        {
+          "id": "sample-native-expansion:bastion-siege-mech-stealth-radar-absorbent-ferrite",
+          "colorTint": "#1e2124",
+          "scale": 1.0
+        },
+        {
+          "id": "sample-native-expansion:bastion-siege-mech-cryo-glacier-camo",
+          "colorTint": "#7292a6",
+          "scale": 1.0
+        }
       ]
     },
     {
@@ -1347,6 +1442,23 @@
       "startingVeterancyRank": 1,
       "startingAffixes": [
         "Swift"
+      ],
+      "visualVariants": [
+        {
+          "id": "sample-native-expansion:arachnid-hexapod-void-stalker-metamaterial",
+          "colorTint": "#25292e",
+          "scale": 1.0
+        },
+        {
+          "id": "sample-native-expansion:arachnid-hexapod-pulsar-magnetic-shield",
+          "colorTint": "#1c3247",
+          "scale": 1.0
+        },
+        {
+          "id": "sample-native-expansion:arachnid-hexapod-stealth-void-composite",
+          "colorTint": "#181a1d",
+          "scale": 1.0
+        }
       ]
     },
     {
@@ -1574,6 +1686,18 @@
       "startingVeterancyRank": 3,
       "startingAffixes": [
         "Juggernaut"
+      ],
+      "visualVariants": [
+        {
+          "id": "sample-native-expansion:overlord-command-hq-fusion-reactor-core-plating",
+          "colorTint": "#3a4149",
+          "scale": 1.0
+        },
+        {
+          "id": "sample-native-expansion:overlord-command-hq-solar-gold-radiator",
+          "colorTint": "#d19f32",
+          "scale": 1.0
+        }
       ]
     },
     {
@@ -1789,6 +1913,23 @@
       "startingVeterancyRank": 1,
       "startingAffixes": [
         "Swift"
+      ],
+      "visualVariants": [
+        {
+          "id": "sample-native-expansion:skirmish-bike-obsidian-strike-interceptor",
+          "colorTint": "#1f2226",
+          "scale": 1.0
+        },
+        {
+          "id": "sample-native-expansion:skirmish-bike-cyber-nanoweave",
+          "colorTint": "#151e28",
+          "scale": 1.0
+        },
+        {
+          "id": "sample-native-expansion:skirmish-bike-cerberus-white-ceramic",
+          "colorTint": "#e1e6eb",
+          "scale": 1.0
+        }
       ]
     },
     {
@@ -2016,6 +2157,23 @@
       "startingVeterancyRank": 2,
       "startingAffixes": [
         "Overcharged"
+      ],
+      "visualVariants": [
+        {
+          "id": "sample-native-expansion:surge-tank-arc-discharge-conduit",
+          "colorTint": "#2a333f",
+          "scale": 1.0
+        },
+        {
+          "id": "sample-native-expansion:surge-tank-ion-thruster-titanium-grate",
+          "colorTint": "#425363",
+          "scale": 1.0
+        },
+        {
+          "id": "sample-native-expansion:surge-tank-antimatter-containment-lattice",
+          "colorTint": "#1f182c",
+          "scale": 1.0
+        }
       ]
     }
   ],

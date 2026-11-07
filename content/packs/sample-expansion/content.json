@@ -84,6 +84,23 @@
             }
           ]
         }
+      ],
+      "visualVariants": [
+        {
+          "id": "sample-expansion:scout-tank-gunmetal-chassis",
+          "colorTint": "#565f69",
+          "scale": 1.0
+        },
+        {
+          "id": "sample-expansion:scout-tank-desert-camo",
+          "colorTint": "#c2a278",
+          "scale": 1.0
+        },
+        {
+          "id": "sample-expansion:scout-tank-martian-iron-rust",
+          "colorTint": "#8b4528",
+          "scale": 1.0
+        }
       ]
     }
   ],

@@ -186,7 +186,24 @@
         "experienceAmount": 12,
         "experienceType": "Crystals",
         "bonusMultiplier": 1.25
-      }
+      },
+      "visualVariants": [
+        {
+          "id": "tactical-operations:tidebreaker-skirmisher-anodized-cobalt",
+          "colorTint": "#2c4563",
+          "scale": 1.0
+        },
+        {
+          "id": "tactical-operations:tidebreaker-skirmisher-tachyon-warp-radiator",
+          "colorTint": "#1f334a",
+          "scale": 1.0
+        },
+        {
+          "id": "tactical-operations:tidebreaker-skirmisher-cryo-glacier-camo",
+          "colorTint": "#6c8899",
+          "scale": 1.0
+        }
+      ]
     },
     {
       "id": "tactical-operations:salvage-hauler",
@@ -367,6 +384,23 @@
       "startingVeterancyRank": 1,
       "startingAffixes": [
         "Bulwark"
+      ],
+      "visualVariants": [
+        {
+          "id": "tactical-operations:salvage-hauler-salvage-reclamation-ironclad",
+          "colorTint": "#484e55",
+          "scale": 1.0
+        },
+        {
+          "id": "tactical-operations:salvage-hauler-hazard-industrial",
+          "colorTint": "#c28e2b",
+          "scale": 1.0
+        },
+        {
+          "id": "tactical-operations:salvage-hauler-minefield-ordnance-carrier",
+          "colorTint": "#424b3e",
+          "scale": 1.0
+        }
       ]
     },
     {
@@ -526,6 +560,23 @@
       "startingVeterancyRank": 1,
       "startingAffixes": [
         "Swift"
+      ],
+      "visualVariants": [
+        {
+          "id": "tactical-operations:skyguard-sam-orbital-titanium",
+          "colorTint": "#545f6a",
+          "scale": 1.0
+        },
+        {
+          "id": "tactical-operations:skyguard-sam-solar-flare-radiation-shield",
+          "colorTint": "#6b5832",
+          "scale": 1.0
+        },
+        {
+          "id": "tactical-operations:skyguard-sam-longshot-sniper-camo",
+          "colorTint": "#36453b",
+          "scale": 1.0
+        }
       ]
     },
     {
@@ -707,7 +758,24 @@
         "tauntRadius": 18.0,
         "duration": 3.0,
         "maxTargets": 6
-      }
+      },
+      "visualVariants": [
+        {
+          "id": "tactical-operations:bulwark-siege-tank-dreadnought-adamantine-hull",
+          "colorTint": "#32363b",
+          "scale": 1.0
+        },
+        {
+          "id": "tactical-operations:bulwark-siege-tank-battleship-tungsten",
+          "colorTint": "#464a4f",
+          "scale": 1.0
+        },
+        {
+          "id": "tactical-operations:bulwark-siege-tank-minefield-ordnance-carrier",
+          "colorTint": "#3f473c",
+          "scale": 1.0
+        }
+      ]
     },
     {
       "id": "tactical-operations:arc-lance-walker",
@@ -877,7 +945,19 @@
         "siphonRatio": 0.2,
         "siphonToShield": false,
         "maxSiphonPerHit": 25.0
-      }
+      },
+      "visualVariants": [
+        {
+          "id": "tactical-operations:arc-lance-walker-arc-discharge-conduit",
+          "colorTint": "#232d3a",
+          "scale": 1.0
+        },
+        {
+          "id": "tactical-operations:arc-lance-walker-plasma-arc-containment",
+          "colorTint": "#1c222b",
+          "scale": 1.0
+        }
+      ]
     },
     {
       "id": "tactical-operations:field-medic-rover",
@@ -1071,6 +1151,18 @@
       "startingVeterancyRank": 1,
       "startingAffixes": [
         "Bulwark"
+      ],
+      "visualVariants": [
+        {
+          "id": "tactical-operations:field-medic-rover-combat-medic-bioceramic",
+          "colorTint": "#d4ded8",
+          "scale": 1.0
+        },
+        {
+          "id": "tactical-operations:field-medic-rover-nanite-repair-chitin",
+          "colorTint": "#385247",
+          "scale": 1.0
+        }
       ]
     },
     {
@@ -1093,28 +1185,76 @@
         },
         {
           "language": "es-XL",
-          "name": "Relé Centinela",
-          "description": "Rover de apoyo limitado que restaura escudos, repara aliados cercanos y mantiene vivo a un escuadrón pequeño.",
-          "skillDescription": "Emite un pulso de reparación nanite a su alrededor."
+          "name": "Rel\u00e9 Centinela",
+          "description": "Rover de apoyo limitado que restaura escudos, repara aliados cercanos y mantiene vivo a un escuadr\u00f3n peque\u00f1o.",
+          "skillDescription": "Emite un pulso de reparaci\u00f3n nanite a su alrededor."
         }
       ],
       "balanceOverrides": [
-        { "name": "roles", "value": "Unit, Vehicle, Supporter, Heal" },
-        { "name": "offeredSystemTags", "value": "Vehicle, Heal, Shield" },
-        { "name": "cost", "value": "260" },
-        { "name": "maxHealth", "value": "120" },
-        { "name": "moveSpeed", "value": "10.5" },
-        { "name": "sightRadius", "value": "9" },
-        { "name": "weaponRange", "value": "4.0" },
-        { "name": "attackCooldown", "value": "1.4" },
-        { "name": "rarity", "value": "Rare" },
-        { "name": "neededExperienceLevel", "value": "0" },
-        { "name": "productionDuration", "value": "90" },
-        { "name": "maxCapacity", "value": "4" },
-        { "name": "maxShield", "value": "8" },
-        { "name": "maxMana", "value": "0" },
-        { "name": "maxArmor", "value": "0" },
-        { "name": "armorProtection", "value": "1" }
+        {
+          "name": "roles",
+          "value": "Unit, Vehicle, Supporter, Heal"
+        },
+        {
+          "name": "offeredSystemTags",
+          "value": "Vehicle, Heal, Shield"
+        },
+        {
+          "name": "cost",
+          "value": "260"
+        },
+        {
+          "name": "maxHealth",
+          "value": "120"
+        },
+        {
+          "name": "moveSpeed",
+          "value": "10.5"
+        },
+        {
+          "name": "sightRadius",
+          "value": "9"
+        },
+        {
+          "name": "weaponRange",
+          "value": "4.0"
+        },
+        {
+          "name": "attackCooldown",
+          "value": "1.4"
+        },
+        {
+          "name": "rarity",
+          "value": "Rare"
+        },
+        {
+          "name": "neededExperienceLevel",
+          "value": "0"
+        },
+        {
+          "name": "productionDuration",
+          "value": "90"
+        },
+        {
+          "name": "maxCapacity",
+          "value": "4"
+        },
+        {
+          "name": "maxShield",
+          "value": "8"
+        },
+        {
+          "name": "maxMana",
+          "value": "0"
+        },
+        {
+          "name": "maxArmor",
+          "value": "0"
+        },
+        {
+          "name": "armorProtection",
+          "value": "1"
+        }
       ],
       "customBalance": {
         "Damage1": 2.5
@@ -1145,10 +1285,22 @@
         "nativeTemplateId": "PCXBaseTankFactory",
         "isAllowedAsStartingBlueprint": true,
         "balanceOverrides": [
-          { "name": "cost", "value": "520" },
-          { "name": "maxCapacity", "value": "4" },
-          { "name": "neededExperienceLevel", "value": "0" },
-          { "name": "rarity", "value": "Rare" }
+          {
+            "name": "cost",
+            "value": "520"
+          },
+          {
+            "name": "maxCapacity",
+            "value": "4"
+          },
+          {
+            "name": "neededExperienceLevel",
+            "value": "0"
+          },
+          {
+            "name": "rarity",
+            "value": "Rare"
+          }
         ],
         "localizations": [
           {
@@ -1158,8 +1310,8 @@
           },
           {
             "language": "es-XL",
-            "name": "Bahía del Relé Centinela",
-            "description": "Fabrica rovers de apoyo Relé Centinela."
+            "name": "Bah\u00eda del Rel\u00e9 Centinela",
+            "description": "Fabrica rovers de apoyo Rel\u00e9 Centinela."
           }
         ]
       },
@@ -1213,7 +1365,24 @@
         "combatUnitCap": 0,
         "skillActivationCheckInterval": 2.0,
         "aiTag": "RCL_TacticalSentinelRelay"
-      }
+      },
+      "visualVariants": [
+        {
+          "id": "tactical-operations:sentinel-relay-orbital-phased-array-comm",
+          "colorTint": "#343840",
+          "scale": 1.0
+        },
+        {
+          "id": "tactical-operations:sentinel-relay-stealth-void-composite",
+          "colorTint": "#1b1d21",
+          "scale": 1.0
+        },
+        {
+          "id": "tactical-operations:sentinel-relay-beryllium-mirror-hull",
+          "colorTint": "#848d94",
+          "scale": 1.0
+        }
+      ]
     },
     {
       "id": "tactical-operations:gravitas-breaker",
@@ -1236,27 +1405,75 @@
         {
           "language": "es-XL",
           "name": "Rompegravedad",
-          "description": "Rompedor blindado de primera línea que atrae el fuego hostil y sobrecarga su escudo en combate cercano.",
-          "skillDescription": "Detona una nova de sobrecarga de escudo en el área objetivo."
+          "description": "Rompedor blindado de primera l\u00ednea que atrae el fuego hostil y sobrecarga su escudo en combate cercano.",
+          "skillDescription": "Detona una nova de sobrecarga de escudo en el \u00e1rea objetivo."
         }
       ],
       "balanceOverrides": [
-        { "name": "roles", "value": "Unit, Vehicle, Tank, FrontalAttacker" },
-        { "name": "offeredSystemTags", "value": "Vehicle, Tank, Stun" },
-        { "name": "cost", "value": "420" },
-        { "name": "maxHealth", "value": "220" },
-        { "name": "moveSpeed", "value": "5.2" },
-        { "name": "sightRadius", "value": "11" },
-        { "name": "weaponRange", "value": "9.0" },
-        { "name": "attackCooldown", "value": "4.0" },
-        { "name": "rarity", "value": "Rare" },
-        { "name": "neededExperienceLevel", "value": "0" },
-        { "name": "productionDuration", "value": "65" },
-        { "name": "maxCapacity", "value": "2" },
-        { "name": "maxShield", "value": "4" },
-        { "name": "maxMana", "value": "0" },
-        { "name": "maxArmor", "value": "0" },
-        { "name": "armorProtection", "value": "1" }
+        {
+          "name": "roles",
+          "value": "Unit, Vehicle, Tank, FrontalAttacker"
+        },
+        {
+          "name": "offeredSystemTags",
+          "value": "Vehicle, Tank, Stun"
+        },
+        {
+          "name": "cost",
+          "value": "420"
+        },
+        {
+          "name": "maxHealth",
+          "value": "220"
+        },
+        {
+          "name": "moveSpeed",
+          "value": "5.2"
+        },
+        {
+          "name": "sightRadius",
+          "value": "11"
+        },
+        {
+          "name": "weaponRange",
+          "value": "9.0"
+        },
+        {
+          "name": "attackCooldown",
+          "value": "4.0"
+        },
+        {
+          "name": "rarity",
+          "value": "Rare"
+        },
+        {
+          "name": "neededExperienceLevel",
+          "value": "0"
+        },
+        {
+          "name": "productionDuration",
+          "value": "65"
+        },
+        {
+          "name": "maxCapacity",
+          "value": "2"
+        },
+        {
+          "name": "maxShield",
+          "value": "4"
+        },
+        {
+          "name": "maxMana",
+          "value": "0"
+        },
+        {
+          "name": "maxArmor",
+          "value": "0"
+        },
+        {
+          "name": "armorProtection",
+          "value": "1"
+        }
       ],
       "customBalance": {
         "Damage1": 30.0,
@@ -1288,10 +1505,22 @@
         "nativeTemplateId": "PCXBaseTankFactory",
         "isAllowedAsStartingBlueprint": true,
         "balanceOverrides": [
-          { "name": "cost", "value": "750" },
-          { "name": "maxCapacity", "value": "2" },
-          { "name": "neededExperienceLevel", "value": "0" },
-          { "name": "rarity", "value": "Rare" }
+          {
+            "name": "cost",
+            "value": "750"
+          },
+          {
+            "name": "maxCapacity",
+            "value": "2"
+          },
+          {
+            "name": "neededExperienceLevel",
+            "value": "0"
+          },
+          {
+            "name": "rarity",
+            "value": "Rare"
+          }
         ],
         "localizations": [
           {
@@ -1301,8 +1530,8 @@
           },
           {
             "language": "es-XL",
-            "name": "Fundición Rompegravedad",
-            "description": "Fabrica tanques de primera línea Rompegravedad."
+            "name": "Fundici\u00f3n Rompegravedad",
+            "description": "Fabrica tanques de primera l\u00ednea Rompegravedad."
           }
         ]
       },
@@ -1396,7 +1625,24 @@
         "combatUnitCap": 2,
         "skillActivationCheckInterval": 1.5,
         "aiTag": "RCL_TacticalGravitasBreaker"
-      }
+      },
+      "visualVariants": [
+        {
+          "id": "tactical-operations:gravitas-breaker-gravitas-singularity-chassis",
+          "colorTint": "#2c2f37",
+          "scale": 1.0
+        },
+        {
+          "id": "tactical-operations:gravitas-breaker-quantum-hyperdrive-alloy",
+          "colorTint": "#1c3848",
+          "scale": 1.0
+        },
+        {
+          "id": "tactical-operations:gravitas-breaker-cryogenic-fuel-shroud",
+          "colorTint": "#2b4b5e",
+          "scale": 1.0
+        }
+      ]
     },
     {
       "id": "tactical-operations:command-relay",
@@ -1418,28 +1664,76 @@
         },
         {
           "language": "es-XL",
-          "name": "Relé de Mando",
-          "description": "Vehículo de mando que coordina atacantes cercanos y conserva un papel de combate limitado.",
-          "skillDescription": "Emite una orden de ataque coordinado en la ubicación objetivo."
+          "name": "Rel\u00e9 de Mando",
+          "description": "Veh\u00edculo de mando que coordina atacantes cercanos y conserva un papel de combate limitado.",
+          "skillDescription": "Emite una orden de ataque coordinado en la ubicaci\u00f3n objetivo."
         }
       ],
       "balanceOverrides": [
-        { "name": "roles", "value": "Unit, Vehicle, Supporter, FrontalAttacker" },
-        { "name": "offeredSystemTags", "value": "Vehicle, Heal, Armor" },
-        { "name": "cost", "value": "300" },
-        { "name": "maxHealth", "value": "160" },
-        { "name": "moveSpeed", "value": "9.0" },
-        { "name": "sightRadius", "value": "10" },
-        { "name": "weaponRange", "value": "5.0" },
-        { "name": "attackCooldown", "value": "2.0" },
-        { "name": "rarity", "value": "Rare" },
-        { "name": "neededExperienceLevel", "value": "0" },
-        { "name": "productionDuration", "value": "75" },
-        { "name": "maxCapacity", "value": "4" },
-        { "name": "maxShield", "value": "6" },
-        { "name": "maxMana", "value": "0" },
-        { "name": "maxArmor", "value": "0" },
-        { "name": "armorProtection", "value": "1" }
+        {
+          "name": "roles",
+          "value": "Unit, Vehicle, Supporter, FrontalAttacker"
+        },
+        {
+          "name": "offeredSystemTags",
+          "value": "Vehicle, Heal, Armor"
+        },
+        {
+          "name": "cost",
+          "value": "300"
+        },
+        {
+          "name": "maxHealth",
+          "value": "160"
+        },
+        {
+          "name": "moveSpeed",
+          "value": "9.0"
+        },
+        {
+          "name": "sightRadius",
+          "value": "10"
+        },
+        {
+          "name": "weaponRange",
+          "value": "5.0"
+        },
+        {
+          "name": "attackCooldown",
+          "value": "2.0"
+        },
+        {
+          "name": "rarity",
+          "value": "Rare"
+        },
+        {
+          "name": "neededExperienceLevel",
+          "value": "0"
+        },
+        {
+          "name": "productionDuration",
+          "value": "75"
+        },
+        {
+          "name": "maxCapacity",
+          "value": "4"
+        },
+        {
+          "name": "maxShield",
+          "value": "6"
+        },
+        {
+          "name": "maxMana",
+          "value": "0"
+        },
+        {
+          "name": "maxArmor",
+          "value": "0"
+        },
+        {
+          "name": "armorProtection",
+          "value": "1"
+        }
       ],
       "customBalance": {
         "Damage1": 12.0
@@ -1470,10 +1764,22 @@
         "nativeTemplateId": "PCXBaseTankFactory",
         "isAllowedAsStartingBlueprint": true,
         "balanceOverrides": [
-          { "name": "cost", "value": "620" },
-          { "name": "maxCapacity", "value": "4" },
-          { "name": "neededExperienceLevel", "value": "0" },
-          { "name": "rarity", "value": "Rare" }
+          {
+            "name": "cost",
+            "value": "620"
+          },
+          {
+            "name": "maxCapacity",
+            "value": "4"
+          },
+          {
+            "name": "neededExperienceLevel",
+            "value": "0"
+          },
+          {
+            "name": "rarity",
+            "value": "Rare"
+          }
         ],
         "localizations": [
           {
@@ -1483,8 +1789,8 @@
           },
           {
             "language": "es-XL",
-            "name": "Parque del Relé de Mando",
-            "description": "Fabrica vehículos Relé de Mando."
+            "name": "Parque del Rel\u00e9 de Mando",
+            "description": "Fabrica veh\u00edculos Rel\u00e9 de Mando."
           }
         ]
       },
@@ -1567,7 +1873,24 @@
         "combatUnitCap": 1,
         "skillActivationCheckInterval": 2.5,
         "aiTag": "RCL_TacticalCommandRelay"
-      }
+      },
+      "visualVariants": [
+        {
+          "id": "tactical-operations:command-relay-neosteel-command-citadel",
+          "colorTint": "#3b4047",
+          "scale": 1.0
+        },
+        {
+          "id": "tactical-operations:command-relay-beryllium-mirror-hull",
+          "colorTint": "#828b92",
+          "scale": 1.0
+        },
+        {
+          "id": "tactical-operations:command-relay-cyber-nanoweave",
+          "colorTint": "#1b2129",
+          "scale": 1.0
+        }
+      ]
     }
   ],
   "stages": [
