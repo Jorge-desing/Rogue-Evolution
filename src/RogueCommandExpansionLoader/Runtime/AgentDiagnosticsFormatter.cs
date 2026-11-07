@@ -1037,6 +1037,45 @@ namespace RogueCommandExpansionLoader.Runtime
             return Serialize(view);
         }
 
+        /// <summary>
+        /// Serializes the intermission node-selection result. Status fields come
+        /// before the reason detail so bounded truncation never hides the outcome.
+        /// </summary>
+        public static string SerializeIntermissionSelectionResult(IntermissionNodeSelection result)
+        {
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "intermissionNodeSelection",
+                ["selected"] = result.Selected,
+                ["level"] = result.Level,
+                ["field"] = result.Field,
+                ["instanceId"] = result.InstanceId,
+                ["reason"] = result.Reason ?? string.Empty,
+            };
+            return Serialize(view);
+        }
+
+        /// <summary>
+        /// Serializes the intermission level-entry result. Status counters
+        /// (success/selected/entered) come before the message detail, matching
+        /// the omission-counter-first ordering used by the censuses.
+        /// </summary>
+        public static string SerializeIntermissionLevelEntryResult(IntermissionLevelEntry result)
+        {
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "intermissionLevelEntry",
+                ["success"] = result.Success,
+                ["selected"] = result.Selected,
+                ["entered"] = result.Entered,
+                ["level"] = result.Level,
+                ["field"] = result.Field,
+                ["instanceId"] = result.InstanceId,
+                ["message"] = result.Message ?? string.Empty,
+            };
+            return Serialize(view);
+        }
+
         public static string SerializeNavigatorState(NavigatorStateSnapshot state)
         {
             var view = new Dictionary<string, object>

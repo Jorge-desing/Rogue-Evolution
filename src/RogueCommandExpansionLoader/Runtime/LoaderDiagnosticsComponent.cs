@@ -721,14 +721,37 @@ namespace RogueCommandExpansionLoader.Runtime
         }
 
         /// <summary>
-        /// Enters an intermission level node via its native OnMouseDown handler
-        /// (with the native LoadScene.LoadNextLevel fallback). Never uses
-        /// StageMap.JumpTo and never touches profile/save files.
+        /// Enters an intermission level node via the director entry flow
+        /// (select-then-confirm through the native LoadScene.LoadNextLevel
+        /// corridor). Compat shim kept for existing callers: the result type
+        /// and serializer are unchanged; the body now delegates to
+        /// <see cref="RuntimeIntermissionDirector.TryEnterLevelNodeFlow"/>
+        /// with the same native semantics. Never uses StageMap.JumpTo and
+        /// never touches profile/save files.
         /// </summary>
         public string TryEnterLevelNodeJson(int level, int field)
         {
+            IntermissionLevelEntry entry = RuntimeIntermissionDirector.TryEnterLevelNodeFlow(level, field);
             return AgentDiagnosticsFormatter.SerializeEnterLevelNodeResult(
-                RuntimeIntermissionEnter.TryEnterLevelNode(level, field));
+                new EnterLevelNodeResult(entry.Success, entry.Message, entry.Level, entry.Field));
+        }
+
+        /// <summary>
+        /// Selects an intermission level node without loading (director layer).
+        /// </summary>
+        public string OrderSelectLevelNodeJson(int level, int field)
+        {
+            return AgentDiagnosticsFormatter.SerializeIntermissionSelectionResult(
+                RuntimeIntermissionDirector.TrySelectLevelNode(level, field));
+        }
+
+        /// <summary>
+        /// Enters an intermission level node via the full native director flow.
+        /// </summary>
+        public string OrderEnterLevelNodeJson(int level, int field)
+        {
+            return AgentDiagnosticsFormatter.SerializeIntermissionLevelEntryResult(
+                RuntimeIntermissionDirector.TryEnterLevelNodeFlow(level, field));
         }
 
         /// <summary>

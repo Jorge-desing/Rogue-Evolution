@@ -555,6 +555,7 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
             "diagnostics_ui_press_button",
             "diagnostics_get_intermission_census",
             "diagnostics_order_enter_level",
+            "diagnostics_order_select_level_node",
             "diagnostics_get_navigator_state",
             "diagnostics_order_navigator_pause",
             "diagnostics_fast_snapshot",
@@ -564,12 +565,12 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
             "describe_tool",
         ):
             self.assertIn(expected, names)
-        self.assertEqual(207, len(names))
+        self.assertEqual(208, len(names))
 
     def test_tools_list_default_is_all_and_paginates(self) -> None:
         full = SERVER.handle_request({"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}})
         tools = full["result"]["tools"]
-        self.assertEqual(207, len(tools))
+        self.assertEqual(208, len(tools))
         page = SERVER.handle_request({"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {"limit": 10}})
         self.assertEqual(10, len(page["result"]["tools"]))
         cursor = page["result"]["nextCursor"]
@@ -1007,13 +1008,13 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
     def test_optimised_schemas_preserve_all_tools_and_reduce_bytes(self) -> None:
         specs = self._load_tool_specs()
         names = [s["name"] for s in specs]
-        self.assertEqual(207, len(names))
+        self.assertEqual(208, len(names))
         self.assertEqual(len(names), len(set(names)))
         aliases = [s for s in specs if str(s.get("description", "")).startswith("Alias for")]
         self.assertEqual(19, len(aliases))
-        self.assertEqual(188, len(specs) - len(aliases))
+        self.assertEqual(189, len(specs) - len(aliases))
         compact = sum(len(json.dumps(s, ensure_ascii=False, separators=(",", ":"))) for s in specs)
-        self.assertLess(compact, 73500, f"optimised schemas too large: {compact} bytes")
+        self.assertLess(compact, 74500, f"optimised schemas too large: {compact} bytes")
         # Strictness and shape preserved for every tool.
         for spec in specs:
             params = spec["parameters"]
@@ -1055,8 +1056,15 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
         self.assertEqual(["id", "componentName"], by_name["component_get_details"]["parameters"]["required"])
         self.assertEqual(["componentName"], by_name["scene_find_objects_with_component"]["parameters"]["required"])
         self.assertEqual(["entityKeyId", "stanceName"], by_name["diagnostics_order_unit_tactical_stance"]["parameters"]["required"])
+        for tool in ("diagnostics_order_enter_level", "diagnostics_order_select_level_node"):
+            props = by_name[tool]["parameters"]["properties"]
+            self.assertEqual(["level", "field"], by_name[tool]["parameters"]["required"])
+            self.assertEqual("integer", props["level"]["type"])
+            self.assertEqual("integer", props["field"]["type"])
+            self.assertIn("IntermissionNodeRow", props["level"]["description"])
+        self.assertIn("IntermissionNodeRow", by_name["diagnostics_get_intermission_census"]["description"])
         total_props = sum(len(s["parameters"].get("properties") or {}) for s in specs)
-        self.assertEqual(333, total_props)
+        self.assertEqual(335, total_props)
 
     def test_empty_schemas_are_compact_but_strict(self) -> None:
         specs = self._load_tool_specs()
@@ -1151,9 +1159,9 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
         self.assertNotIn("Parent GameObject instance ID.", blob)
         resp = SERVER.handle_request({"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}})
         tools = resp["result"]["tools"]
-        self.assertEqual(207, len(tools))
+        self.assertEqual(208, len(tools))
         payload = json.dumps(resp["result"], separators=(",", ":"))
-        self.assertLess(len(payload), 74000, f"tools/list payload too large: {len(payload)} bytes")
+        self.assertLess(len(payload), 75500, f"tools/list payload too large: {len(payload)} bytes")
 
 if __name__ == "__main__":
     unittest.main()

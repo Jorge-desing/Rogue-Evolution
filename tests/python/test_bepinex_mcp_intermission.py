@@ -72,7 +72,7 @@ class IntermissionDiagnosticsTests(unittest.TestCase):
         self.assertFalse(response["isError"])
         self.assertEqual([64], calls[0]["args"])
 
-    def test_enter_level_forwards_level_and_field(self) -> None:
+    def test_enter_level_forwards_int_level_and_field(self) -> None:
         calls = []
 
         with (
@@ -80,27 +80,93 @@ class IntermissionDiagnosticsTests(unittest.TestCase):
             mock.patch.object(SERVER, "_call_http", side_effect=_diag_fake_http(calls)),
         ):
             response = SERVER.execute_tool(
-                "diagnostics_order_enter_level", {"level": "Level3", "field": "Alpha"}
+                "diagnostics_order_enter_level", {"level": 3, "field": 1}
             )
 
         self.assertFalse(response["isError"])
         self.assertEqual(1, len(calls))
-        self.assertEqual("TryEnterLevelNodeJson", calls[0]["method"])
-        self.assertEqual(["Level3", "Alpha"], calls[0]["args"])
+        self.assertEqual("OrderEnterLevelNodeJson", calls[0]["method"])
+        self.assertEqual([3, 1], calls[0]["args"])
         self.assertEqual(FULL_COMPONENT, calls[0]["params"]["componentName"])
 
-    def test_enter_level_rejects_missing_or_blank_level(self) -> None:
+    def test_enter_level_casts_numeric_strings_to_int(self) -> None:
         calls = []
 
         with (
             mock.patch.object(SERVER, "_DIAGNOSTICS_GO_ID", 73),
             mock.patch.object(SERVER, "_call_http", side_effect=_diag_fake_http(calls)),
         ):
-            for arguments in ({}, {"level": ""}, {"level": "   "}, {"level": 42}, {"field": "Alpha"}):
+            response = SERVER.execute_tool(
+                "diagnostics_order_enter_level", {"level": "3", "field": "1"}
+            )
+
+        self.assertFalse(response["isError"])
+        self.assertEqual([3, 1], calls[0]["args"])
+
+    def test_enter_level_rejects_missing_or_non_numeric_level(self) -> None:
+        calls = []
+
+        with (
+            mock.patch.object(SERVER, "_DIAGNOSTICS_GO_ID", 73),
+            mock.patch.object(SERVER, "_call_http", side_effect=_diag_fake_http(calls)),
+        ):
+            for arguments in (
+                {},
+                {"field": 1},
+                {"level": "Level3", "field": 1},
+                {"level": "abc", "field": 1},
+                {"level": "", "field": 1},
+                {"level": None, "field": 1},
+                {"level": {}, "field": 1},
+                {"level": 3},
+                {"level": 3, "field": "Alpha"},
+                {"level": 3, "field": None},
+            ):
                 response = SERVER.execute_tool("diagnostics_order_enter_level", arguments)
                 self.assertTrue(response["isError"], arguments)
 
         self.assertEqual([], calls)
+
+    def test_select_level_node_forwards_int_level_and_field(self) -> None:
+        calls = []
+
+        with (
+            mock.patch.object(SERVER, "_DIAGNOSTICS_GO_ID", 73),
+            mock.patch.object(SERVER, "_call_http", side_effect=_diag_fake_http(calls)),
+        ):
+            response = SERVER.execute_tool(
+                "diagnostics_order_select_level_node", {"level": 2, "field": 0}
+            )
+
+        self.assertFalse(response["isError"])
+        self.assertEqual(1, len(calls))
+        self.assertEqual("OrderSelectLevelNodeJson", calls[0]["method"])
+        self.assertEqual([2, 0], calls[0]["args"])
+        self.assertEqual(FULL_COMPONENT, calls[0]["params"]["componentName"])
+
+    def test_select_level_node_rejects_missing_or_non_numeric(self) -> None:
+        calls = []
+
+        with (
+            mock.patch.object(SERVER, "_DIAGNOSTICS_GO_ID", 73),
+            mock.patch.object(SERVER, "_call_http", side_effect=_diag_fake_http(calls)),
+        ):
+            for arguments in (
+                {},
+                {"level": 2},
+                {"field": 0},
+                {"level": "two", "field": 0},
+                {"level": 2, "field": "zero"},
+                {"level": None, "field": 0},
+            ):
+                response = SERVER.execute_tool("diagnostics_order_select_level_node", arguments)
+                self.assertTrue(response["isError"], arguments)
+
+        self.assertEqual([], calls)
+
+    def test_unknown_tool_returns_is_error(self) -> None:
+        response = SERVER.execute_tool("diagnostics_order_select_level_node_typo", {})
+        self.assertTrue(response["isError"])
 
     def test_navigator_state_getter_passthrough(self) -> None:
         calls = []

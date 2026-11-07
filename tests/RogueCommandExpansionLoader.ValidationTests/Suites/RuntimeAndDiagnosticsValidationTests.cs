@@ -9251,9 +9251,223 @@ internal static partial class ValidationTestRunner
             if (!string.Equals(parsedPosition, "1.5,\"x\",\\3", StringComparison.Ordinal))
             {
                 throw new InvalidOperationException("Intermission node position strings must be escaped safely.");
-            }
-        }
-    }),
+                }
+                }
+                }),
+                ("intermission director picks exact choosable node before frontier", () =>
+                {
+                var rows = new List<IntermissionNodeRow>
+                {
+                new IntermissionNodeRow(0, 0, true, true, false, "0,0,0", 101),
+                new IntermissionNodeRow(2, 1, true, false, true, "2,1,0", 202),
+                new IntermissionNodeRow(2, 1, false, true, false, "2,1,0", 303),
+                new IntermissionNodeRow(0, 1, true, false, false, "0,1,0", 404),
+                };
+
+                IntermissionNodeRow picked;
+                if (!RuntimeIntermissionDirector.TryPickNode(rows, 2, 1, out picked)
+                || picked.Level != 2 || picked.Field != 1 || picked.InstanceId != 202 || !picked.IsChoosable)
+                {
+                throw new InvalidOperationException("TryPickNode must prefer the exact choosable match over the frontier candidate.");
+                }
+                }),
+                ("intermission director picks frontier node for wildcard selection", () =>
+                {
+                var rows = new List<IntermissionNodeRow>
+                {
+                new IntermissionNodeRow(3, 0, true, false, false, "3,0,0", 501),
+                new IntermissionNodeRow(1, 5, true, false, false, "1,5,0", 502),
+                new IntermissionNodeRow(2, 1, true, true, false, "2,1,0", 503),
+                new IntermissionNodeRow(0, 0, false, true, false, "0,0,0", 504),
+                };
+
+                IntermissionNodeRow picked;
+                if (!RuntimeIntermissionDirector.TryPickNode(rows, -1, -1, out picked)
+                || picked.InstanceId != 503 || picked.Level != 2)
+                {
+                throw new InvalidOperationException("Wildcard pick must rank current-path nodes first (frontier preference).");
+                }
+
+                IntermissionNodeRow frontier;
+                if (!RuntimeIntermissionDirector.TryPickChoosableFrontier(rows, out frontier)
+                || frontier.InstanceId != 503)
+                {
+                throw new InvalidOperationException("TryPickChoosableFrontier must follow the same frontier ranking.");
+                }
+
+                var noCurrent = new List<IntermissionNodeRow>
+                {
+                new IntermissionNodeRow(4, 1, true, false, false, "4,1,0", 601),
+                new IntermissionNodeRow(1, 9, true, false, false, "1,9,0", 602),
+                new IntermissionNodeRow(1, 2, true, false, false, "1,2,0", 603),
+                };
+                if (!RuntimeIntermissionDirector.TryPickChoosableFrontier(noCurrent, out frontier)
+                || frontier.InstanceId != 603 || frontier.Level != 1 || frontier.Field != 2)
+                {
+                throw new InvalidOperationException("Without a current-path node the frontier must be lowest level then lowest field.");
+                }
+                }),
+                ("intermission director fails closed on empty or unknown census", () =>
+                {
+                IntermissionNodeRow picked;
+                if (RuntimeIntermissionDirector.TryPickNode(null, 0, 0, out picked))
+                {
+                throw new InvalidOperationException("Null census rows must fail closed in TryPickNode.");
+                }
+                if (RuntimeIntermissionDirector.TryPickNode(new List<IntermissionNodeRow>(), 0, 0, out picked))
+                {
+                throw new InvalidOperationException("Empty census rows must fail closed in TryPickNode.");
+                }
+                if (RuntimeIntermissionDirector.TryPickNode(new List<IntermissionNodeRow>(), -1, -1, out picked))
+                {
+                throw new InvalidOperationException("Wildcard pick on empty census must fail closed.");
+                }
+                if (RuntimeIntermissionDirector.TryPickChoosableFrontier(null, out picked)
+                || RuntimeIntermissionDirector.TryPickChoosableFrontier(new List<IntermissionNodeRow>(), out picked))
+                {
+                throw new InvalidOperationException("Frontier pick on null/empty census must fail closed.");
+                }
+
+                var rows = new List<IntermissionNodeRow>
+                {
+                new IntermissionNodeRow(1, 1, true, false, false, "1,1,0", 701),
+                new IntermissionNodeRow(9, 9, false, false, false, "9,9,0", 702),
+                };
+                if (RuntimeIntermissionDirector.TryPickNode(rows, 999, 999, out picked))
+                {
+                throw new InvalidOperationException("Unknown level/field with other choosable nodes must fail closed (exact match required).");
+                }
+                if (RuntimeIntermissionDirector.TryPickNode(rows, 9, 9, out picked))
+                {
+                throw new InvalidOperationException("A non-choosable exact cell must fail closed.");
+                }
+                }),
+                ("intermission director selection fails closed without scene and serializers escape safely", () =>
+                {
+                IntermissionNodeSelection selection = RuntimeIntermissionDirector.TrySelectLevelNode(999, 999);
+                if (selection.Selected || selection.Level != 999 || selection.Field != 999)
+                {
+                throw new InvalidOperationException("TrySelectLevelNode without a live scene must fail closed.");
+                }
+                if (selection.Reason.IndexOf("999", StringComparison.Ordinal) < 0)
+                {
+                throw new InvalidOperationException("Selection fail-closed reason must state the requested level/field.");
+                }
+
+                IntermissionNodeSelection selectionOut;
+                bool selectedOk = RuntimeIntermissionDirector.TrySelectLevelNode(999, 999, out selectionOut);
+                if (selectedOk || selectionOut.Selected)
+                {
+                throw new InvalidOperationException("TrySelectLevelNode out-overload must report false without a scene.");
+                }
+
+                // Harness cannot compile LoaderDiagnosticsComponent (Newtonsoft/MonoBehaviour);
+                // exercise the exact body of OrderSelectLevelNodeJson here: Serialize(TrySelect(...)).
+                string orderSelectJson = AgentDiagnosticsFormatter.SerializeIntermissionSelectionResult(
+                    RuntimeIntermissionDirector.TrySelectLevelNode(999, 999));
+                using (JsonDocument doc = JsonDocument.Parse(orderSelectJson))
+                {
+                    if (doc.RootElement.GetProperty("selected").GetBoolean()
+                        || doc.RootElement.GetProperty("level").GetInt32() != 999
+                        || doc.RootElement.GetProperty("field").GetInt32() != 999)
+                    {
+                        throw new InvalidOperationException("OrderSelectLevelNodeJson body must fail closed without a scene.");
+                    }
+                }
+
+                string trickyReason = "select \"node\" \\ slash\nnewline\t tab";
+                string trickyJson = AgentDiagnosticsFormatter.SerializeIntermissionSelectionResult(
+                new IntermissionNodeSelection(3, 7, 42, false, trickyReason));
+                if (trickyJson.IndexOf("\"node\"", StringComparison.Ordinal) >= 0)
+                {
+                throw new InvalidOperationException("Selection serializer must escape embedded quotes.");
+                }
+                using (JsonDocument doc = JsonDocument.Parse(trickyJson))
+                {
+                string parsed = doc.RootElement.GetProperty("reason").GetString() ?? string.Empty;
+                if (!string.Equals(parsed, trickyReason, StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Selection serializer output must round-trip through a JSON parser.");
+                }
+                if (doc.RootElement.GetProperty("kind").GetString() != "intermissionNodeSelection"
+                    || doc.RootElement.GetProperty("instanceId").GetInt32() != 42)
+                {
+                    throw new InvalidOperationException("Selection serializer header mismatch.");
+                }
+                }
+                }),
+                ("intermission director entry fails closed on unknown node via order wrapper", () =>
+                {
+                IntermissionLevelEntry entry = RuntimeIntermissionDirector.TryEnterLevelNodeFlow(999, 999);
+                if (entry.Success || entry.Entered || entry.Level != 999 || entry.Field != 999)
+                {
+                throw new InvalidOperationException("TryEnterLevelNodeFlow without a scene must fail closed.");
+                }
+                if (entry.Message.IndexOf("999", StringComparison.Ordinal) < 0)
+                {
+                throw new InvalidOperationException("Entry fail-closed message must state the requested level/field.");
+                }
+
+                IntermissionLevelEntry entryOut;
+                bool entryOk = RuntimeIntermissionDirector.TryEnterLevelNodeFlow(999, 999, out entryOut);
+                if (entryOk || entryOut.Success || entryOut.Entered)
+                {
+                throw new InvalidOperationException("TryEnterLevelNodeFlow out-overload must report false without a scene.");
+                }
+
+                // Harness cannot compile LoaderDiagnosticsComponent; exercise the exact
+                // bodies of OrderEnterLevelNodeJson and TryEnterLevelNodeJson delegations.
+                string orderEnterJson = AgentDiagnosticsFormatter.SerializeIntermissionLevelEntryResult(
+                    RuntimeIntermissionDirector.TryEnterLevelNodeFlow(999, 999));
+                using (JsonDocument doc = JsonDocument.Parse(orderEnterJson))
+                {
+                    JsonElement root = doc.RootElement;
+                    if (root.GetProperty("success").GetBoolean()
+                        || root.GetProperty("entered").GetBoolean()
+                        || root.GetProperty("selected").GetBoolean()
+                        || root.GetProperty("level").GetInt32() != 999
+                        || root.GetProperty("field").GetInt32() != 999)
+                    {
+                        throw new InvalidOperationException("OrderEnterLevelNodeJson body must fail closed on an unknown node.");
+                    }
+                    int successIndex = orderEnterJson.IndexOf("\"success\"", StringComparison.Ordinal);
+                    int messageIndex = orderEnterJson.IndexOf("\"message\"", StringComparison.Ordinal);
+                    if (successIndex < 0 || messageIndex < 0 || successIndex > messageIndex)
+                    {
+                        throw new InvalidOperationException("Entry serializer must place status counters before the message detail.");
+                    }
+                }
+
+                string trickyMessage = "enter \"level\" \\ path\nnext";
+                string trickyEntryJson = AgentDiagnosticsFormatter.SerializeIntermissionLevelEntryResult(
+                new IntermissionLevelEntry(4, 5, 77, false, trickyMessage, false, false));
+                using (JsonDocument doc = JsonDocument.Parse(trickyEntryJson))
+                {
+                string parsed = doc.RootElement.GetProperty("message").GetString() ?? string.Empty;
+                if (!string.Equals(parsed, trickyMessage, StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Entry serializer must escape strings safely and round-trip.");
+                }
+                if (doc.RootElement.GetProperty("kind").GetString() != "intermissionLevelEntry"
+                    || doc.RootElement.GetProperty("instanceId").GetInt32() != 77)
+                {
+                    throw new InvalidOperationException("Entry serializer header mismatch.");
+                }
+                }
+
+                // Compat shim: TryEnterLevelNodeJson reimplemented over the director must
+                // stay fail-closed on unknown nodes (same body: director -> EnterLevelNodeResult).
+                IntermissionLevelEntry compatEntry = RuntimeIntermissionDirector.TryEnterLevelNodeFlow(999, 999);
+                string compatJson = AgentDiagnosticsFormatter.SerializeEnterLevelNodeResult(
+                    new EnterLevelNodeResult(compatEntry.Success, compatEntry.Message, compatEntry.Level, compatEntry.Field));
+                using (JsonDocument doc = JsonDocument.Parse(compatJson))
+                {
+                    if (doc.RootElement.GetProperty("success").GetBoolean())
+                    {
+                        throw new InvalidOperationException("TryEnterLevelNodeJson delegation must stay fail-closed.");
+                    }
+                }
+                }),
     };
 
     private sealed class TestCardChangeTarget

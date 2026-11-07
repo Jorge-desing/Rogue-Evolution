@@ -2178,15 +2178,21 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             return _tool_response(res)
 
         elif name == "diagnostics_order_enter_level":
-            level = arguments.get("level")
-            if not isinstance(level, str) or not level.strip():
-                return _tool_response(json.dumps({"error": "level must be a non-empty string"}), is_error=True)
-            field = arguments.get("field", "")
-            if field is None:
-                field = ""
-            if not isinstance(field, str):
-                return _tool_response(json.dumps({"error": "field must be a string"}), is_error=True)
-            res = _call_diagnostics_method("TryEnterLevelNodeJson", [level.strip(), field.strip()])
+            try:
+                level = int(arguments["level"])
+                field = int(arguments["field"])
+            except (KeyError, TypeError, ValueError):
+                return _tool_response(json.dumps({"error": "level and field must be integers"}), is_error=True)
+            res = _call_diagnostics_method("OrderEnterLevelNodeJson", [level, field])
+            return _tool_response(res)
+
+        elif name == "diagnostics_order_select_level_node":
+            try:
+                level = int(arguments["level"])
+                field = int(arguments["field"])
+            except (KeyError, TypeError, ValueError):
+                return _tool_response(json.dumps({"error": "level and field must be integers"}), is_error=True)
+            res = _call_diagnostics_method("OrderSelectLevelNodeJson", [level, field])
             return _tool_response(res)
 
         elif name == "diagnostics_get_navigator_state":
