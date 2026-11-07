@@ -2,6 +2,8 @@
 
 Before changing this repository, read [the agent handoff](docs/research/AGENT-HANDOFF.md), the root [README](README.md), and the content contract in `content/schema/README.md` when the change touches packs.
 
+`memory.csv` (repository root) is the permanent, versioned snapshot of the mem0 memory export for this project and is reference material for all agents. Consult it before relying on prior project context, and refresh it from the memory service only through the normal memory-sync workflow; never hand-edit its rows.
+
 - Treat the game's version, `Assembly-CSharp.dll` SHA-256, and MVID as a single compatibility identity. Recheck all three before relying on reflected game signatures or metadata tokens.
 - Every added unit must declare its own namespaced `productionBuilding`. Register the new building and unit additively, link that building only to its unit, and offer the building's blueprint through the stage's random reward pools. Preserve native factories and products. AI `unitEntries` refers to the produced unit ID.
 - Label findings as static inspection, local build/validation, or in-game runtime evidence. A successful build or AssetBundle import does not prove that the plugin works in a run.
