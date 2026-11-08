@@ -16,7 +16,7 @@ from VisualModelAuthoringSupport import (
 
 
 def refine(builder) -> None:
-    builder.locomotion_only = True  # Solo Walk/Drive; ataque por torreta director
+    builder.locomotion_only = False  # Idle/FireRecoil/Death restaurados (ataque por RCL_Fire)
     """Add protected C2 shelter panels to the Wave 7 relay carrier."""
     p = builder.palette
     for side, tag in ((-1, "L"), (1, "R")):

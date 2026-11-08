@@ -13,7 +13,7 @@ from VisualModelAuthoringSupport import add_box, add_link, run_preset_build
 
 
 def refine(builder) -> None:
-    builder.locomotion_only = True  # Solo Walk/Drive; ataque por torreta director
+    builder.locomotion_only = False  # Idle/FireRecoil/Death restaurados (ataque por RCL_Fire)
     """Add protected overload conduits and cheek armor to the Wave 7 citadel."""
     p = builder.palette
     for side, tag in ((-1, "L"), (1, "R")):
