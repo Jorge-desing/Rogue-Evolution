@@ -789,18 +789,16 @@ namespace RogueCommandExpansionLoader.Runtime
 
         private static GameObject ResolveUiClickTarget(string target, int gameObjectId)
         {
-            if (gameObjectId > 0)
+            if (gameObjectId != 0)
             {
-                foreach (Transform candidate in UnityEngine.Object.FindObjectsOfType<Transform>())
+                GameObject resolved = RuntimeUiClickDirector.ResolveGameObjectByInstanceId(
+                    gameObjectId,
+                    () => UnityEngine.Object.FindObjectsOfType<Component>(),
+                    () => UnityEngine.Object.FindObjectsOfType<Transform>());
+                if (resolved != null)
                 {
-                    if (candidate != null && candidate.gameObject != null
-                        && candidate.gameObject.GetInstanceID() == gameObjectId)
-                    {
-                        return candidate.gameObject;
-                    }
+                    return resolved;
                 }
-
-                return null;
             }
 
             if (!string.IsNullOrEmpty(target))

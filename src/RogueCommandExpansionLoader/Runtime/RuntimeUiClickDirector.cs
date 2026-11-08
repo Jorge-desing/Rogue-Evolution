@@ -260,18 +260,29 @@ namespace RogueCommandExpansionLoader.Runtime
             ExecuteEvents.ExecuteHierarchy(topGameObject, pointer, ExecuteEvents.pointerEnterHandler);
             phases.Add("pointerEnter");
 
-            // Press.
+            // Press, mirroring StandaloneInputModule.ProcessMousePress:
+            // the input module reports the object that handled pointerDown, and
+            // falls back to the click-handler object when there is no down
+            // handler (widgets like Michsky's only implement enter/click).
             pointer.pointerPressRaycast = pointer.pointerCurrentRaycast;
-            pointer.pointerPress = ExecuteEvents.ExecuteHierarchy(topGameObject, pointer, ExecuteEvents.pointerDownHandler);
-            if (pointer.pointerPress == null)
+            pointer.eligibleForClick = true;
+            GameObject downHandler = ExecuteEvents.ExecuteHierarchy(topGameObject, pointer, ExecuteEvents.pointerDownHandler);
+            GameObject clickHandler = ExecuteEvents.GetEventHandler<IPointerClickHandler>(topGameObject);
+            GameObject effectivePress = downHandler ?? clickHandler;
+            if (effectivePress == null)
             {
                 return new UiClickResult(false, ViaEventSystem, targetName, HitName(topGameObject),
                     screenPoint.x, screenPoint.y, phases.ToArray(),
-                    "no IPointerDownHandler on the hit chain of '" + HitName(topGameObject) + "' (stop point: interactivity).");
+                    "no IPointerDownHandler or IPointerClickHandler on the hit chain of '" + HitName(topGameObject) + "' (stop point: interactivity).");
             }
-            phases.Add("pointerDown");
 
-            // Drag initialization, exactly like the input module.
+            pointer.pointerPress = effectivePress;
+            pointer.pointerClick = clickHandler;
+            if (downHandler != null)
+            {
+                phases.Add("pointerDown");
+            }
+
             pointer.pointerDrag = ExecuteEvents.GetEventHandler<IDragHandler>(topGameObject);
             if (pointer.pointerDrag != null)
             {
@@ -279,31 +290,80 @@ namespace RogueCommandExpansionLoader.Runtime
                 phases.Add("initializePotentialDrag");
             }
 
-            // Release.
-            ExecuteEvents.Execute(pointer.pointerPress, pointer, ExecuteEvents.pointerUpHandler);
-            phases.Add("pointerUp");
+            // Release (mirrors StandaloneInputModule.ReleaseMouse): up on the
+            // press handler, then the click, gated on pointerClick == the
+            // chain's click handler and eligibility.
+            if (downHandler != null)
+            {
+                ExecuteEvents.Execute(pointer.pointerPress, pointer, ExecuteEvents.pointerUpHandler);
+                phases.Add("pointerUp");
+            }
 
-            // Click, only when the press handler and the click handler are the same object.
-            GameObject clickHandler = ExecuteEvents.GetEventHandler<IPointerClickHandler>(topGameObject);
-            if (clickHandler == null || clickHandler != pointer.pointerPress)
+            GameObject releaseClickHandler = ExecuteEvents.GetEventHandler<IPointerClickHandler>(topGameObject);
+            if (pointer.pointerClick != null && pointer.pointerClick == releaseClickHandler && pointer.eligibleForClick)
+            {
+                ExecuteEvents.Execute(pointer.pointerClick, pointer, ExecuteEvents.pointerClickHandler);
+                phases.Add("pointerClick");
+            }
+            else
             {
                 return new UiClickResult(false, ViaEventSystem, targetName, HitName(topGameObject),
                     screenPoint.x, screenPoint.y, phases.ToArray(),
-                    "pointer release reached '" + HitName(pointer.pointerPress) + "' but there is no matching IPointerClickHandler on the hit chain (stop point: click delivery).");
+                    "no IPointerClickHandler on the hit chain of '" + HitName(topGameObject) + "' (stop point: click delivery).");
             }
-
-            pointer.pointerClick = clickHandler;
-            pointer.eligibleForClick = true;
-            ExecuteEvents.Execute(clickHandler, pointer, ExecuteEvents.pointerClickHandler);
-            phases.Add("pointerClick");
 
             return new UiClickResult(true, ViaEventSystem, targetName, HitName(topGameObject),
                 screenPoint.x, screenPoint.y, phases.ToArray(),
                 "clicked '" + HitName(topGameObject) + "'" + (targetName.Length > 0 ? " (target '" + targetName + "')" : string.Empty) +
-                " by real coordinates via EventSystem raycast (pointerEnter→pointerDown→pointerUp→pointerClick).");
+                " by real coordinates via EventSystem raycast (pointerEnter→" +
+                (downHandler != null ? "pointerDown→pointerUp→pointerClick" : "pointerClick") + ").");
         }
 
         // ---- Pure seams (testable without a scene) ----
+
+        /// <summary>
+        /// Resolves a GameObject by Unity instance ID across both ID spaces:
+        /// GameObject/Transform IDs and component (e.g. MonoBehaviour) IDs.
+        /// The intermission census stores component IDs, so a GameObject-only
+        /// scan can never resolve census rows.
+        /// </summary>
+        internal static GameObject ResolveGameObjectByInstanceId(
+            int instanceId,
+            Func<IEnumerable<Component>> getAllComponents,
+            Func<IEnumerable<Transform>> getAllTransforms)
+        {
+            if (instanceId == 0)
+            {
+                return null;
+            }
+
+            IEnumerable<Component> components = getAllComponents != null ? getAllComponents() : null;
+            if (components != null)
+            {
+                foreach (Component component in components)
+                {
+                    if (component != null && component.GetInstanceID() == instanceId && component.gameObject != null)
+                    {
+                        return component.gameObject;
+                    }
+                }
+            }
+
+            IEnumerable<Transform> transforms = getAllTransforms != null ? getAllTransforms() : null;
+            if (transforms != null)
+            {
+                foreach (Transform transform in transforms)
+                {
+                    if (transform != null && transform.gameObject != null
+                        && transform.gameObject.GetInstanceID() == instanceId)
+                    {
+                        return transform.gameObject;
+                    }
+                }
+            }
+
+            return null;
+        }
 
         internal static bool IsInHierarchyOrSelf(GameObject candidate, GameObject parent)
         {

@@ -9376,6 +9376,61 @@ internal static partial class ValidationTestRunner
                     }
                     finally { scope.Dispose(); }
                 }),
+                ("click-only widget receives pointerClick through the input-module click-handler fallback", () =>
+                {
+                    EventSystemsHarnessScope scope = EventSystemsHarnessScope.CreateUiClickScene(out GameObject button,
+                        out TestUiClickHandler handler);
+                    // Michsky-style widgets implement only enter + click handlers:
+                    // the input module falls back from the null down handler to
+                    // the IPointerClickHandler object (pointerPress = click handler).
+                    button.DestroyImmediate(handler);
+                    TestUiClickClickOnlyHandler clickOnly = button.AddComponent<TestUiClickClickOnlyHandler>();
+                    try
+                    {
+                        UiClickResult result = RuntimeUiClickDirector.TryClickGameObject(button);
+
+                        if (!result.Clicked)
+                        {
+                            throw new InvalidOperationException("A click-only widget must be clicked via the input-module fallback: " + result.Message);
+                        }
+
+                        if (!string.Join(",", clickOnly.Events).Equals("OnPointerEnter,OnPointerClick", StringComparison.Ordinal))
+                        {
+                            throw new InvalidOperationException("Click-only widget must receive Enter+Click (no Down/Up), got " + string.Join(",", clickOnly.Events) + ".");
+                        }
+
+                        if (!string.Join(",", result.Phases).Equals("pointerEnter,pointerClick", StringComparison.Ordinal))
+                        {
+                            throw new InvalidOperationException("Click-only phases must be pointerEnter,pointerClick, got " + string.Join(",", result.Phases) + ".");
+                        }
+                    }
+                    finally { scope.Dispose(); }
+                }),
+                ("instance-ID resolver covers component IDs (intermission census space)", () =>
+                {
+                    var node = new GameObject("OverWorldMapEnemy(Clone)");
+                    Component behaviour = node.AddComponent<MeshRenderer>();
+                    int componentId = behaviour.GetInstanceID();
+                    int gameObjectId = node.GetInstanceID();
+
+                    GameObject byComponent = RuntimeUiClickDirector.ResolveGameObjectByInstanceId(
+                        componentId,
+                        () => new Component[] { behaviour },
+                        () => new Transform[] { node.transform });
+                    GameObject byTransform = RuntimeUiClickDirector.ResolveGameObjectByInstanceId(
+                        gameObjectId,
+                        () => new Component[] { behaviour },
+                        () => new Transform[] { node.transform });
+                    GameObject missing = RuntimeUiClickDirector.ResolveGameObjectByInstanceId(
+                        -999999,
+                        () => new Component[] { behaviour },
+                        () => new Transform[] { node.transform });
+
+                    if (byComponent != node || byTransform != node || missing != null)
+                    {
+                        throw new InvalidOperationException("The instance-ID resolver must resolve component IDs (census space) and GameObject IDs, and null otherwise.");
+                    }
+                }),
                 ("point click delivers the full sequence to the top element even without an expected target", () =>
                 {
                     EventSystemsHarnessScope scope = EventSystemsHarnessScope.CreateUiClickScene(out GameObject button,
@@ -9827,6 +9882,23 @@ internal static partial class ValidationTestRunner
         public void OnPointerUp(UnityEngine.EventSystems.PointerEventData eventData)
         {
             Events.Add("OnPointerUp");
+        }
+
+        public void OnPointerClick(UnityEngine.EventSystems.PointerEventData eventData)
+        {
+            Events.Add("OnPointerClick");
+        }
+    }
+
+    private sealed class TestUiClickClickOnlyHandler : MonoBehaviour,
+        UnityEngine.EventSystems.IPointerEnterHandler,
+        UnityEngine.EventSystems.IPointerClickHandler
+    {
+        public readonly List<string> Events = new List<string>();
+
+        public void OnPointerEnter(UnityEngine.EventSystems.PointerEventData eventData)
+        {
+            Events.Add("OnPointerEnter");
         }
 
         public void OnPointerClick(UnityEngine.EventSystems.PointerEventData eventData)

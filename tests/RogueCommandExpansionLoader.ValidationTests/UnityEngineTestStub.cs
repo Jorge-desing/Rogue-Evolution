@@ -550,6 +550,14 @@ namespace UnityEngine
 
         public void SendMessage(string message, SendMessageOptions options) => SentMessages.Add(message);
 
+        public void DestroyImmediate(Component component)
+        {
+            if (component != null)
+            {
+                _components.Remove(component);
+            }
+        }
+
         public T GetComponentInChildren<T>(bool includeInactive = false) where T : Component
         {
             T direct = GetComponent<T>();
