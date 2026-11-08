@@ -793,8 +793,8 @@ namespace RogueCommandExpansionLoader.Runtime
             {
                 GameObject resolved = RuntimeUiClickDirector.ResolveGameObjectByInstanceId(
                     gameObjectId,
-                    () => UnityEngine.Object.FindObjectsOfType<Component>(),
-                    () => UnityEngine.Object.FindObjectsOfType<Transform>());
+                    () => UnityEngine.Object.FindObjectsOfType<Component>(true),
+                    () => UnityEngine.Object.FindObjectsOfType<Transform>(true));
                 if (resolved != null)
                 {
                     return resolved;
