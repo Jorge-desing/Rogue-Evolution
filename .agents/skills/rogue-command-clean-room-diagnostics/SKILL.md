@@ -1,7 +1,7 @@
 ---
 name: rogue-command-clean-room-diagnostics
 description: "Clean-room in-game telemetry, diagnostic censuses, runtime gameplay command director, and BepInEx MCP bridge integration for Rogue Command (v1.0.9 / Unity 2021.3.45f2, Mono x64). [Diagnósticos runtime clean-room, censos de telemetría, director de comandos de gameplay y puente BepInEx MCP para Rogue Command]"
-version: 1.8.1
+version: 1.9.0
 license: MIT
 author: Hermes Agent
 metadata:
@@ -76,6 +76,14 @@ All censuses query live game singletons through fail-closed reflection and forma
 - **Particle VFX Census** (`diagnostics_get_particle_vfx_census`): Per-living-unit particle system counts (active vs total), trail and line renderer counts, and particle system names. Omission counter first.
 - **LOD Audit Census** (`diagnostics_get_lod_audit_census`): Per-living-unit LOD group counts, total LOD levels, and renderer names. Omission counter first.
 - **Visual health summary performance contract**: `GetVisualHealthSummaryJson` performs one bounded live-unit sweep instead of invoking four full visual censuses. It deduplicates the player/AI roster, caps rows at 256, caps hierarchy traversal at 4,096 nodes, checks `Material.HasProperty` before texture reads, samples geometry only for loader-owned units (at most 32 meshes per unit), and reports bounded geometry sampling as a quality issue for PBR rows. Native rows retain renderer/material/texture telemetry while avoiding the expensive base-game mesh walk. Runtime validation must record the elapsed direct bridge call and must not claim the old timeout as fixed from local tests alone.
+- **Intermission & Level Progression Telemetry** (`diagnostics_get_intermission_census`, `diagnostics_get_level_map_state`, `diagnostics_get_intermission_node`, `diagnostics_get_intermission_graph`, `diagnostics_get_intermission_reward_state`, `diagnostics_get_navigator_state`):
+  - `diagnostics_get_intermission_census`: Scans both `OverWorldMapEnemy` and `OverWorldMapBoss` (Boss node at `level = LevelCount, field = 0`). Exposes `isIntermissionActive`, `currentStage`, `currentLevel`, `nodes[]` (`level`, `field`, `isChoosable`, `isCurrentNodeOfPath`, `hasCardReward`, `position`, `instanceId`).
+  - `diagnostics_get_level_map_state`: Live `LevelMap` route state (`Game.StageMap.CurrentLevelMap`): CurrentLevel/Field, finished/first/lastBeforeBoss/boss flags, LevelCount, MaxWidth, chosenPath, next field, choosableFieldCount (native `IsChoosable` rule), total fields, boss prefab names.
+  - `diagnostics_get_intermission_node`: In-depth inspection of any node `(level, field)`: `isChoosable`, reward flags (`isRestSite`, `isShop`, `hasCardReward`, `hasUpgradeReward`, `hasRelicReward`, `hasResearchReward`, `hasCoinReward`, `hasStartCrystalReward`, `hasResearchPointsReward`, `hasDropReward`), `blueprintPoolId`, edge connections.
+  - `diagnostics_get_intermission_graph`: Full LevelMap graph snapshot (`nodes` + Boss `4:0`), reward types, and scored forward routes from choosable frontier to Boss based on `preferredRewardType` (e.g. `RelicReward`, `CardReward`, `Shop`, `RestSite`).
+  - `diagnostics_get_intermission_reward_state`: Live intermission sub-screen state: currencies (`currentCoins`, `currentStartCrystals`, `currentDropPodCount`, `currentRerollCount`, `currentResearchPoints`), open reward queues (`OpenEngineerRewards`, `OpenEconomyRewards`, `OpenSpecialistRewards`, `OpenSpecialistRelicRewards`, `OpenCardRewards`, `OpenRelicRewards`, `OpenUpgradeRewards`, `OpenResearchRewards`), live `ChooseCard` offered slots (`CardNew`, `UpgradeCard`, `RelicCard`, `ResearchCard`), sub-screens (`DeckOverview`, `AssignUpgradeToCardView`, `RemoveCardView`), and deck cards with attached upgrades.
+  - `diagnostics_get_navigator_state`: Reads navigator state (current level node, `paused` flag, and simulation status).
+- **AI Architecture Census** (`diagnostics_get_ai_architecture_census`): Real-time telemetry for HUB-D 2.0 (`sample:tactical-director`, `sample:squad-operations-director`), live blackboard metrics (`AlliedDispersionRadius`, centroids, hazard zones), status vulnerabilities (`Stunned`, `Vulnerable`, `Slowed`, `Burning`, `Overclocked`), and elite affix modifiers.
 - **Standalone visual census performance contract**: `RuntimeVisualQualityCensus`, `RuntimeVisualSurfaceCensus`, `RuntimeVisualMaterialCensus`, and `RuntimeSocketAuditCensus` use the shared `RuntimeVisualCensusSupport` pass. Each reads player/AI registries once, deduplicates by entity reference, clamps rows to 256, traverses at most 4,096 hierarchy nodes, caps renderer components at 256, material slots at 512, diagnostic names at 256, mesh color inspections at 32, and color samples at 4,096. Disabled renderers remain counted in `RendererCount` but do not contribute material, texture, or mesh telemetry. Texture reads require `Material.HasProperty`; standalone bridge getters accept `maxTrackedUnits` and forward `[64]` in bounded snapshots. The material census caches binding metadata by material reference for the duration of one sweep, so repeated native shared materials do not repeat shader-keyword/property/texture reflection; non-loader-owned native rows retain renderer/material-slot counts while intentionally omitting detailed binding names/maps and expose partial-coverage flags. Rows expose truncation/sampling flags so partial coverage is not mistaken for a complete audit.
 - **MCP Snapshot Evolution**: `diagnostics_runtime_snapshot` now runs its getters in parallel (ThreadPoolExecutor), emits a `_meta` block (getterCount, successCount, errorCount, elapsedMs, per-getter timingsMs), and accepts `getters`/`exclude` filters. Companion tools: `diagnostics_call_getters` (parallel batch), `diagnostics_runtime_summary` (compact scalars), `diagnostics_list_runtime_getters` (discovery). Snapshot includes `GetVisualSurfaceCensusJson`, `GetVisualMaterialCensusJson`, and `GetGameTimeScaleJson`; `diagnostics_runtime_scalars` exposes 44 scalar properties plus circle point count. New aggregators: `diagnostics_get_visual_health_summary` (C# `GetVisualHealthSummaryJson` consolidating quality/surface/material/socket), `diagnostics_get_combat_health_summary` (11 getters), `diagnostics_get_entity_detail` (single-entity drill-down across 11 sources), `diagnostics_get_agent_lock_status` (lock owner/remaining/session check).
 - **Performance, Frame Timing & Snapshot Diff**: `diagnostics_get_performance_census` (`GetPerformanceCensusJson`) samples live FPS, frame time, time scale, managed memory and a budget verdict (Healthy/Degraded/Critical); `diagnostics_get_frame_timing_census` (`GetFrameTimingCensusJson`) aggregates a windowed frame-timing census (avg/min/max/p95, stutter/hitch counts, Smooth/MinorStutter/MajorStutter); `diagnostics_diff_snapshots` (`GetSnapshotDiffJson`) compares two JSON snapshots at the top level with bounded added/removed/changed rows and omission counters. All three follow the three-part pattern and place omission counters first. Their Unity stubs require `UnityEngine.Time.deltaTime`, `Time.frameCount`, `Time.timeScale`, and `Application.targetFrameRate` (plus `Application.unityVersion`) in `UnityEngineTestStub.cs`; without these the offline harness cannot exercise `RuntimePerformanceCensus.Current()` or `RuntimeFrameTimingCensus.Current()`.
@@ -110,6 +118,19 @@ The `RuntimeGameplayCommandDirector` class dispatches safe in-game actions for a
 - `diagnostics_order_apply_unit_affix`: Grants an elite trait/modifier (`Swift`, `Juggernaut`, `Overcharged`, `Vampiric`, `Bulwark`, `Volatile`) to a unit (`entityKeyId`, `affixName`).
 - `diagnostics_order_remove_unit_affix`: Removes an active elite trait from a unit or clears all (`entityKeyId`, `affixName`).
 - `diagnostics_order_dispatch_ai_assault_wave`: Manually triggers and coordinates an AI assault wave with elevated aggression (`waveNumber`, `aggressionBoost`, `targetBaseIndex`).
+
+### Intermission & Map Navigation Orders
+- `diagnostics_order_select_level_node`: Selects a choosable level node (regular `OverWorldMapEnemy` or `OverWorldMapBoss`) via screen coordinate raycast (`level`, `field`).
+- `diagnostics_order_enter_level`: Full-flow director: selects the choosable node and drives native `LoadScene.LoadLevel()` (`level`, `field`).
+- `diagnostics_order_trigger_load_level`: Direct invocation of `LoadScene.LoadLevel()` for the selected node (or Boss when `IsLastLevelBeforeBoss`).
+- `diagnostics_order_choose_intermission_reward`: Selects an offered reward in `ChooseCard` by `rewardId` or `slotIndex`.
+- `diagnostics_order_skip_intermission_reward`: Clicks `ChooseCard.ClickedOnSkipButton()` when active.
+- `diagnostics_order_reroll_intermission_reward`: Clicks `ChooseCard.ClickedOnRerollButton()` when active and rerolls > 0.
+- `diagnostics_order_assign_intermission_upgrade`: Assigns a pending upgrade in `AssignUpgradeToCardView` to a viable deck card (`entityId`) or cancels.
+- `diagnostics_order_set_deck_overview_open`: Opens or closes the `DeckOverview` screen (`open` boolean).
+- `diagnostics_order_navigator_pause`: Pauses or unpauses the navigator (`paused` boolean).
+- `diagnostics_jump_to_level`: User-authorized synthetic stage jump (`level`, `finished`).
+- `diagnostics_load_next_level`: User-authorized synthetic level load (`LoadScene.LoadNextLevel`).
 
 ### Active Skills, Status Effects & Vitality Adjustments
 - `diagnostics_order_unit_active_skill`: Fires tactical active skills (`entityKeyId`, `targetingMode` `"Self"`/`"TargetUnit"`/`"TargetPosition"`, `targetUnitKeyId`, `targetX`, `targetZ`).
@@ -226,7 +247,7 @@ The BepInEx MCP server is built with universal cross-agent compatibility support
 
 ### 5.1 Hermes Integration (Native Plugin & Skills)
 Hermes agents can communicate with the bridge using three distinct channels:
-1. **Hermes Plugin (`bepinex-mcp`)**: Installed at `C:\Users\Alex\AppData\Local\hermes\plugins\bepinex-mcp/` and enabled in `C:\Users\Alex\AppData\Local\hermes\config.yaml` (`plugins.enabled: [bepinex-mcp]`). All 188 tools are discovered as native MCP tools.
+1. **Hermes Plugin (`bepinex-mcp`)**: Installed at `C:\Users\Alex\AppData\Local\hermes\plugins\bepinex-mcp/` and enabled in `C:\Users\Alex\AppData\Local\hermes\config.yaml` (`plugins.enabled: [bepinex-mcp]`). All 223 tools are discovered as native MCP tools.
 2. **Hermes Skill Catalog**: Registered under `C:\Users\Alex\AppData\Local\hermes\skills\rogue-command\rogue-command-clean-room-diagnostics/`.
 3. **Hermes Direct CLI Execution**: When running in a shell or terminal without an active MCP connection:
    ```bash
@@ -236,7 +257,7 @@ Hermes agents can communicate with the bridge using three distinct channels:
    ```
 
 ### 5.2 Antigravity & Google Gemini CLI
-- Fully registered under `bepinex_mcp` with 188 generated schemas in `C:\Users\Alex\.gemini\antigravity\mcp\bepinex_mcp/`.
+- Fully registered under `bepinex_mcp` with 223 generated schemas in `C:\Users\Alex\.gemini\antigravity\mcp\bepinex_mcp/`.
 - Call eagerly or lazily using `call_mcp_tool(ServerName="bepinex_mcp", ToolName="...", Arguments={...})`.
 
 ### 5.3 Anthropic Claude Desktop

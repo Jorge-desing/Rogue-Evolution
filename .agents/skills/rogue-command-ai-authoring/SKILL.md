@@ -330,6 +330,40 @@ The loader includes 23 compiled AI modules registered in `AiModuleRegistry.Creat
     - Parameters: `baseIndex` (-1–31; default -1), `evalIntervalSeconds` (0.20–10.0; default 0.75), `supportRadius` (5.0–80.0; default 30.0), `counterBatteryMinRangeThreshold` (8.0–50.0; default 14.0), `enableSupportLogistics` (bool; default true), `enableCounterBattery` (bool; default true), `enableTacticalSkills` (bool; default true).
     - Coordinates with `TacticalDirectorAiModule` through shared `AiBattlefieldSnapshot` and hazard-aware safe evacuation vectors.
 
+### HUB-D 2.0 Coordinated Tactical Architecture (Phase 9 & 10)
+
+The Hierarchical Utility-Blackboard Director (HUB-D 2.0) coordinates macro-strategy and squad micro-tactics across `sample:tactical-director` and `sample:squad-operations-director`:
+
+1. **Dynamic Tactical Regroup Geometry (`AiSafeVectorPolicy.ComputeTacticalRetreatDestination`)**:
+   - Computes an 8-ray candidate fan ($0^\circ, 45^\circ, 90^\circ, 135^\circ, 180^\circ, 225^\circ, 270^\circ, 315^\circ$) around the incoming threat vector.
+   - Evaluates terrain traversability, hazard zone clearance, and artillery dead-zone distance.
+   - Biases the selected retreat vector toward:
+     - Friendly defensive structures (`IsBuilding` with attack capability or base HQ).
+     - Allied support/repair units (`IsSupportUnit`).
+     - The allied cluster centroid when units become overly dispersed.
+   - Modulates retreat distance based on `AlliedDispersionRadius` to keep squad cohesion without stacking into lethal area-of-effect hazards.
+
+2. **Battlefield Spatial Blackboard (`AiBattlefieldBlackboard`)**:
+   - `AlliedDispersionRadius`: Root-mean-square distance of living combat units from the group centroid; detects when forces are tightly grouped vs. dangerously strung out.
+   - `FriendlyCentroid` and `HostileCentroid`: Center-of-mass positions driving dual-wing flanking vectors and retreat anchors.
+   - `HazardZones`: Active trigger hazard zones (Firestorm, AcidPool, EmpField, CryoMist, NaniteField) that retreat and kiting vectors must strictly avoid.
+
+3. **Bitmask Status & Affix Telemetry (`AiUnitSnapshot`, `RuntimeAiBattlefieldCollector`)**:
+   - `statusEffectFlags` (`AiCombatStatusFlags` bitmask): `Stunned = 1 << 0`, `Vulnerable = 1 << 1`, `Slowed = 1 << 2`, `Burning = 1 << 3`, `Overclocked = 1 << 4`.
+   - `affixFlags` (`AiAffixFlags` bitmask): `Overcharged = 1 << 0`, `Vampiric = 1 << 1`, `Volatile = 1 << 2`, `Bulwark = 1 << 3`, `Juggernaut = 1 << 4`, `Swift = 1 << 5`.
+   - Extracted during `RuntimeAiBattlefieldCollector` projection with zero heap allocations per tick.
+
+4. **Dynamic Combat Target Utility Scoring (`TacticalUtilityScorer.ScoreCombatTarget`)**:
+   - **Status Vulnerabilities**: Grants heavy focus-fire bonuses against incapacitated or debuffed enemies:
+     - `Stunned`: $+40\%$ utility score (punish immobile targets unable to retaliate).
+     - `Vulnerable`: $+50\%$ utility score (capitalize on increased incoming damage).
+     - `Slowed`: $+20\%$ utility score (kite or collapse on sluggish targets).
+     - `Burning`: $+15\%$ utility score.
+   - **Elite Affix Synergies & Threat Dampening**:
+     - High-priority burst against dangerous offensive modifiers (`Overcharged`, `Vampiric`, `Volatile`).
+     - Dampens priority against defensive tanks (`Bulwark`, `Juggernaut`) while healthy, preventing AI squads from dumping all DPS into damage sponges when squishier priority units are in range.
+   - **Anti-Overkill Damping (`ScoreCombatTargetWithOverkill`)**: Dampens target utility when incoming allied DPS already exceeds the target's remaining effective health (HP + Shields), distributing fire across multiple hostiles.
+
 ### Runtime mechanics profile consumption
 
 - Some module behavior depends on per-unit runtime mechanics (e.g. `aiActivationTrigger` on the first active skill). The trigger lives in content (`unit.activeSkills[0].aiActivationTrigger`) and must be copied by `ContentPackRuntimeLoader` into `UnitRuntimeMechanicsProfile.AiActivationTrigger` when the profile is created; the module then reads it via `RuntimeUnitMechanicsDirector.TryGetProfile(unit.EntityId, out ...)`.

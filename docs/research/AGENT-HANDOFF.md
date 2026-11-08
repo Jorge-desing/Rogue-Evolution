@@ -1,9 +1,28 @@
 # Rogue Command Content Expansion — Agent Handoff & Technical Baseline
 
-**Updated:** 2026-11-05
+**Updated:** 2026-11-08
 **Repository:** Mod Rogue Command (`c:\Users\Alex\Documents\Mod Rogue Command`)
 **Remote:** `origin` points to `https://github.com/Jorge-desing/Rogue-Evolution.git` (branch `codex/rogue-unit-balance-20261018`)
 **Mission:** Create a modular, content-first expansion mod for Rogue Command featuring original playable units, base production buildings, stages, tactical AI profiles, and custom 3D visuals. BepInEx and Harmony provide loader infrastructure; playable content and runtime stability are the mod's deliverables.
+
+---
+
+## 2026-11-08 HUB-D 2.0 Dynamic Tactical Regroup Geometry & Status-Affix Utility Scoring
+
+- **Implementation commit:** `56bc4b5a7f8eaa33b70eb8b0e067c837cf7848ea`, pushed to origin/codex/rogue-unit-balance-20261018.
+- **Dynamic Tactical Retreat & Regroup Geometry (`AiSafeVectorPolicy.cs`, `AiBattlefieldBlackboard.cs`):**
+  - Added `AiSafeVectorPolicy.ComputeTacticalRetreatDestination`: an 8-ray safe vector solver that evaluates terrain and hazard distances while dynamically biasing retreat vectors toward friendly defensive infrastructure (turrets, HQ/factories), support repairers, or the allied cluster centroid.
+  - Added `AlliedDispersionRadius` to `AiBattlefieldBlackboard`: measures the root-mean-square spatial dispersion of allied units around their centroid, allowing tactical directors to differentiate between tight deathballs and scattered formations.
+- **Bitmask Telemetry & Grounding (`AiUnitSnapshot.cs`, `RuntimeAiBattlefieldCollector.cs`):**
+  - Extended `AiUnitSnapshot` with `statusEffectFlags` (`AiCombatStatusFlags`: `Stunned`, `Vulnerable`, `Slowed`, `Burning`, `Overclocked`) and `affixFlags` (`AiAffixFlags`: `Overcharged`, `Vampiric`, `Volatile`, `Bulwark`, `Juggernaut`, `Swift`).
+  - `RuntimeAiBattlefieldCollector` extracts active status effects and elite affixes on both player and AI units with zero allocations during battlefield projection.
+- **Dynamic Combat Target Utility Scoring (`StrategicDoctrineAndUtilityPolicy.cs`):**
+  - Updated `TacticalUtilityScorer.ScoreCombatTarget`:
+    - Incorporates target status vulnerabilities: grants substantial focus-fire bonuses against `Stunned` (+40%) and `Vulnerable` (+50%) targets, and moderate bonuses against `Slowed` or `Burning` targets.
+    - Factors in elite affix synergies and threat dampening: prioritizes dangerous offensive modifiers (`Overcharged`, `Vampiric`, `Volatile`) while de-prioritizing high-health defensive sponges (`Bulwark`, `Juggernaut`) when squishier high-value targets are available.
+- **Runtime Command Dispatch & Local Validation:**
+  - `RuntimeGameplayCommandDirector.TryOrderTacticalRegroup` integrates dynamic destination solving for cohesive regrouping.
+  - C# validation harness: added Phase 9 and Phase 10 regression tests in `AiTacticalModulesValidationTests.cs` (371 lines). Release build passes with 0 warnings/0 errors; full harness passes 540/541 checks (1 Windows symlink skip).
 
 ---
 
