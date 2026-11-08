@@ -1579,3 +1579,41 @@ This is a compact, durable orientation for agents. For the changing checkout sta
 - Profile2 dedicated QA without tutorial; protect saves. Before reflection verify Rogue Command 1.0.9, Unity `2021.3.45f2`, Assembly-CSharp SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, MVID `db0e9462-128d-4296-9900-de18b4bd0c00`.
 
 - Root MEMORY.md, codex memory, antigravity memory, and mem0 synced to HEAD beff577.
+
+## Refresh (2026-11-08, HEAD fd5e0e9 — animation lateral Drive sway + deep live-read passes + skill/docs sync)
+
+- Repository `C:/Users/Alex/Documents/Mod Rogue Command`, loader `1.19.0`, branch `codex/rogue-unit-balance-20261018`. Local/upstream/origin verified at `fd5e0e9748a6fad2e63f8697afb202dbab1d9947` (`docs(runtime): record deep live-read pass on Profile2 intermission map`), nine commits ahead of the prior `beff577` sync: `831b2ff` (docs(memory): refresh validation counts), `cffccc9` (docs(skills): sync animation keyframe contracts), `637e678` (docs(runtime): live-read coverage of existing MCP getters), `bbc1c2f` (docs(skills): synthetic stage seams, level-entry chain, LoadLevel nondeterminism), `5b26870` (docs(runtime): second live-read pass over navigator/census/system-health), `91fc9de` (docs(rules): deduplicate context-consultation rule paragraph), `b4220e0` (feat(animation): add lateral Drive sway and denser biped gait), `06b4275` (docs(runtime): deep live-read pass on Profile2 intermission map), `fd5e0e9` (docs(runtime): deep live-read pass on Profile2 intermission map). Code baseline remains `0bbede6b7beb68f8f50f4ae89f10e83ecb056c0d`; implementation baseline remains `e25c6de`/`d7a3a11b56b58bed6d3f06c47fd40a627c9d1ae3`.
+
+- New committed scope since beff577:
+  - `b4220e0`: animation — added lateral Drive sway and denser biped gait in `RogueModelKit.py` (both `tools/` and skill copy) and regenerated tactical controllers/FBX; updated animation-authoring skill contract.
+  - Skill/docs syncs (`cffccc9`, `bbc1c2f`, `91fc9de`): animation keyframe contracts, synthetic stage seams, level-entry chain and `LoadLevel` nondeterminism documented; context-consultation rule paragraph deduplicated.
+  - Runtime live-read passes (`637e678`, `5b26870`, `06b4275`, `fd5e0e9`): documented coverage of existing MCP getters, navigator/census/system-health, and deep live-read passes over the Profile2 intermission map (census/selection/intermission state). No src/ contract changes; evidence/telemetry only.
+  - `831b2ff`: validation counts refreshed to Python 423/423 (hold/easing test 3/3).
+
+- Working tree: clean at root except nested worktree gitlinks `.worktrees/cargador` @ `11e9968` (dirty) and `.worktrees/task-graph-validation` @ `d1f9045` (dirty), preserved. Do not stage, reset, clean, or overwrite them. No `src/`/`tests/` changes in this sync.
+
+- Validation (no fresh full run in this sync): last documented Release plugin build 0 warnings/0 errors; C# harness `517/518` (1 Windows symlink-privilege skip, 0 failures); Python `423/423` (includes `test_tactical_animation_hold_and_easing.py` 3/3). No fresh Steam/Unity gameplay proof beyond previously recorded evidence. Natural offer→selection→placement→production/render/stat and tactical AI remain unverified.
+
+- QA/reflection safety: Profile2 is dedicated QA without a tutorial; never ask, inspect, infer, gate, bypass, or switch profiles for tutorial. Check current selector/save safety and preserve saves. Before reflection jointly verify Rogue Command version, Unity `2021.3.45f2`, Assembly-CSharp SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, and MVID `db0e9462-128d-4296-9900-de18b4bd0c00`.
+
+- Root MEMORY.md, codex memory, antigravity memory, and mem0 synced to HEAD fd5e0e9.
+
+## Refresh (2026-11-08, HEAD c43195f — HUB-D AI phases + tactical/visual scaffolder refactors + content-loader analysis tools + live-read coverage)
+
+- Repository `C:/Users/Alex/Documents/Mod Rogue Command`, loader `1.19.0`, branch `codex/rogue-unit-balance-20261018`. Local/upstream/origin verified at `c43195f506f28135a201fad34dfe7af20aa3c06d` (`docs(runtime): record first live visual-variant census read on intermission map`), 32 commits ahead of the prior `fd5e0e9` sync entry (still present above).
+
+- New committed scope since fd5e0e9:
+  - HUB-D AI: Phase 1 pure blackboard (`AiBattlefieldBlackboard`, doctrine utility scorer, command arbiter); Phase 2 `RuntimeAiBattlefieldCollector` + `CompositeAiRuntimeBehaviour` coordination; `TacticalDirectorAiModule`/parameters; `RuntimeAiArchitectureCensus`.
+  - Tactical/visual scaffolders: declarative `UnitSpecs` with unified PBR + turret sockets (`f5b6c51`); visual scaffolder delegates vehicle visuals to rigged helper with turret sockets (`fc7b675`); vehicle builder turret sockets + prefab validation logging (`efc49eb`); asset-bundle/preview/sample bundle rebuilds (`8606082`, `c077a47`, `9cedb8e`).
+  - Content-loader: 6 new analysis/validation tools + tests grounded in game code (`6882432`): analyze AI profile coverage, upgrade chains, stage blueprint filters, export unit catalog, validate card changes, diagnostics.
+  - Animation: lateral Drive sway + denser biped gait (`b4220e0`); keyframe contract sync (`cffccc9`).
+  - Runtime live-read/docs: complete 66/66 getter coverage, populated-map coverage, temporal combat reads, no-jump Game entry, synthetic-chain stall samples, director live validation, fail-closed intermission reads, first live visual-variant census read (`35f690f`..`c43195f`).
+  - Skill/docs: synthetic stage seams, level-entry chain, LoadLevel nondeterminism, context-consultation rule dedup (`bbc1c2f`, `91fc9de`, `b6da88a`).
+
+- Working tree: clean at root except nested worktree gitlinks `.worktrees/cargador` @ `11e9968` (dirty) and `.worktrees/task-graph-validation` @ `d1f9045` (dirty), preserved. No `src/`/`tests/` uncommitted changes outside this MEMORY.md update.
+
+- Validation: no fresh full run in this sync. Last documented at `fd5e0e9`: Release plugin build 0 warnings/0 errors; C# harness `517/518` (1 Windows symlink skip); Python `423/423` (includes hold/easing 3/3). New content-loader tests present but not rerun here. No fresh Steam/Unity gameplay proof beyond previously recorded evidence; natural offer→selection→placement→production/render/stat and tactical AI remain unverified.
+
+- QA/reflection safety: Profile2 dedicated QA without tutorial; never ask, inspect, infer, gate, bypass, or switch profiles for tutorial. Check current selector/save safety and preserve saves. Before reflection jointly verify Rogue Command version, Unity `2021.3.45f2`, Assembly-CSharp SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, and MVID `db0e9462-128d-4296-9900-de18b4bd0c00`.
+
+- Root MEMORY.md, codex memory, antigravity memory, and mem0 synced to HEAD c43195f.
