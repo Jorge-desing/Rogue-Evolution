@@ -9392,6 +9392,29 @@ internal static partial class ValidationTestRunner
             }
         }
     }),
+    ("deep intermission already-selected predicate requires the current flag", () =>
+    {
+        var rows = new[]
+        {
+            new IntermissionNodeRow(0, 1, true, true, true, "0,0,0", 42),
+            new IntermissionNodeRow(0, 2, true, false, true, "0,0,0", 43),
+            new IntermissionNodeRow(1, 1, true, false, false, "0,0,0", 44),
+        };
+        if (!RuntimeIntermissionDirector.IsAlreadySelected(rows, 0, 1))
+        {
+            throw new InvalidOperationException("A node marked IsCurrentNodeOfPath must be reported as already selected.");
+        }
+        if (RuntimeIntermissionDirector.IsAlreadySelected(rows, 0, 2))
+        {
+            throw new InvalidOperationException("A choosable node without the current flag must not count as selected.");
+        }
+        if (RuntimeIntermissionDirector.IsAlreadySelected(rows, 1, 1)
+            || RuntimeIntermissionDirector.IsAlreadySelected(rows, 99, 99)
+            || RuntimeIntermissionDirector.IsAlreadySelected(null, 0, 1))
+        {
+            throw new InvalidOperationException("Unknown or null inputs must never count as selected.");
+        }
+    }),
     ("UI click serializer puts the clicked outcome before detail", () =>
                 {
                     string json = AgentDiagnosticsFormatter.SerializeUiClickResult(

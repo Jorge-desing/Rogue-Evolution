@@ -73,6 +73,33 @@ namespace RogueCommandExpansionLoader.Runtime
         // ---- Pure policy helpers ----
 
         /// <summary>
+        /// Pure predicate used by both the idempotent select short-circuit and
+        /// the post-click verification: true when the (level, field) node is
+        /// already observed as <c>IsCurrentNodeOfPath</c> in the census.
+        /// Matching by instance ID wins when available; otherwise the level and
+        /// field coordinates must match exactly.
+        /// </summary>
+        public static bool IsAlreadySelected(
+            IReadOnlyList<IntermissionNodeRow> rows, int level, int field)
+        {
+            if (rows == null)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < rows.Count; i++)
+            {
+                IntermissionNodeRow row = rows[i];
+                if (row.Level == level && row.Field == field && row.IsCurrentNodeOfPath)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
         /// Picks the eligible intermission node for (level, field).
         /// An exact choosable level+field match is preferred over the frontier.
         /// When both coordinates are negative (-1,-1) the wildcard frontier
