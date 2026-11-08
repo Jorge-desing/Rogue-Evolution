@@ -1069,5 +1069,50 @@ internal static partial class ValidationTestRunner
             }
         });
     }),
+    ("RuntimeUnitVariantRegistry and RuntimeUnitVisualVariantRegistry query helpers return sorted variant IDs", () =>
+    {
+        RuntimeUnitVariantRegistry.Clear();
+        RuntimeUnitVisualVariantRegistry.Clear();
+        try
+        {
+            if (RuntimeUnitVariantRegistry.GetVariantIds("sample:scout").Count != 0 ||
+                RuntimeUnitVisualVariantRegistry.GetVisualVariantIds("sample:scout").Count != 0 ||
+                RuntimeUnitVisualVariantRegistry.GetAllVariants("sample:scout").Count != 0)
+            {
+                throw new InvalidOperationException("Variant queries on unknown units must return empty collections.");
+            }
+
+            var variantA = new RuntimeUnitVariant("beta-loadout", "ap", null);
+            var variantB = new RuntimeUnitVariant("alpha-loadout", "he", null);
+            RuntimeUnitVariantRegistry.Register("sample:scout", new[] { variantA, variantB });
+
+            IReadOnlyList<string> variantIds = RuntimeUnitVariantRegistry.GetVariantIds("sample:scout");
+            if (variantIds.Count != 2 || variantIds[0] != "alpha-loadout" || variantIds[1] != "beta-loadout")
+            {
+                throw new InvalidOperationException("GetVariantIds must return alphabetically sorted IDs.");
+            }
+
+            var visualA = new RuntimeUnitVisualVariant("camo-green", "sample:scout", "sample:scout/camo", "#00FF00", 1.0f, "Assets/Scout_Camo.prefab", "VisualRoot", false);
+            var visualB = new RuntimeUnitVisualVariant("arctic-white", "sample:scout", "sample:scout/arctic", "#FFFFFF", 1.0f, "Assets/Scout_Arctic.prefab", "VisualRoot", true);
+            RuntimeUnitVisualVariantRegistry.Register("sample:scout", new[] { visualA, visualB });
+
+            IReadOnlyList<string> visualIds = RuntimeUnitVisualVariantRegistry.GetVisualVariantIds("sample:scout");
+            if (visualIds.Count != 2 || visualIds[0] != "arctic-white" || visualIds[1] != "camo-green")
+            {
+                throw new InvalidOperationException("GetVisualVariantIds must return alphabetically sorted IDs.");
+            }
+
+            IReadOnlyList<RuntimeUnitVisualVariant> allVisuals = RuntimeUnitVisualVariantRegistry.GetAllVariants("sample:scout");
+            if (allVisuals.Count != 2)
+            {
+                throw new InvalidOperationException("GetAllVariants must return all registered visual variants.");
+            }
+        }
+        finally
+        {
+            RuntimeUnitVariantRegistry.Clear();
+            RuntimeUnitVisualVariantRegistry.Clear();
+        }
+    }),
     };
 }

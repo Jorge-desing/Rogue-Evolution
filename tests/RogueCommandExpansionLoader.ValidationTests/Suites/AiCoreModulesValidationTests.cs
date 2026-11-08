@@ -2295,5 +2295,39 @@ internal static partial class ValidationTestRunner
         RuntimeUnitMechanicsDirector.ClearProfiles();
         RuntimeGameplayCommandDirector.ClearTacticalStancesAndAffixes();
     }),
+    ("AiModuleRegistry Active property initializes defaults and ResetActive restores null state", () =>
+    {
+        AiModuleRegistry.ResetActive();
+        try
+        {
+            AiModuleRegistry registry = AiModuleRegistry.Active;
+            if (registry == null)
+            {
+                throw new InvalidOperationException("AiModuleRegistry.Active must not be null.");
+            }
+            if (!registry.RegisteredModuleIds.Contains("sample:flanking-strike"))
+            {
+                throw new InvalidOperationException("Default AiModuleRegistry must contain core modules.");
+            }
+
+            var customRegistry = new AiModuleRegistry();
+            AiModuleRegistry.Active = customRegistry;
+            if (AiModuleRegistry.Active != customRegistry)
+            {
+                throw new InvalidOperationException("AiModuleRegistry.Active must accept custom registry assignment.");
+            }
+
+            AiModuleRegistry.ResetActive();
+            AiModuleRegistry restored = AiModuleRegistry.Active;
+            if (restored == null || restored == customRegistry)
+            {
+                throw new InvalidOperationException("ResetActive must restore default registry creation.");
+            }
+        }
+        finally
+        {
+            AiModuleRegistry.ResetActive();
+        }
+    }),
     };
 }

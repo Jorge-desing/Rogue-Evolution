@@ -9165,6 +9165,26 @@ internal static partial class ValidationTestRunner
             throw new InvalidOperationException("Non-positive maxRows must fall back to the 64-row default.");
         }
 
+        // Verify FindChoosableNodeIndex and TryPickNode integration
+        if (IntermissionCensus.FindChoosableNodeIndex(null, 0, 0) != -1)
+        {
+            throw new InvalidOperationException("FindChoosableNodeIndex must return -1 on null rows.");
+        }
+        int foundIndex = IntermissionCensus.FindChoosableNodeIndex(census.Nodes, 0, 0);
+        if (foundIndex < 0 || census.Nodes[foundIndex].Level != 0 || census.Nodes[foundIndex].Field != 0 || !census.Nodes[foundIndex].IsChoosable)
+        {
+            throw new InvalidOperationException("FindChoosableNodeIndex must locate the choosable node matching level and field.");
+        }
+        if (IntermissionCensus.FindChoosableNodeIndex(census.Nodes, 99, 99) != -1)
+        {
+            throw new InvalidOperationException("FindChoosableNodeIndex must return -1 when no matching choosable node exists.");
+        }
+        IntermissionNodeRow picked;
+        if (!RuntimeIntermissionDirector.TryPickNode(census.Nodes, 0, 0, out picked) || picked.Level != 0 || picked.Field != 0)
+        {
+            throw new InvalidOperationException("TryPickNode must resolve choosable node matching level and field via FindChoosableNodeIndex.");
+        }
+
         // Null input must not throw and must report an empty, inactive census.
         string emptyJson = AgentDiagnosticsFormatter.SerializeIntermissionCensus(
             IntermissionCensus.Build(null, false, 0, 0, 64));
@@ -10094,6 +10114,55 @@ internal static partial class ValidationTestRunner
                     finally
                     {
                         RuntimeUnitVisualVariantRegistry.Clear();
+                    }
+                }),
+                ("RuntimeBridgeArgumentParser parses CSV strings, floats, bounds, and roundtrips with JoinCsv", () =>
+                {
+                    IReadOnlyList<string> strings;
+                    string diag;
+                    if (!RuntimeBridgeArgumentParser.TryParseStringCsv("alpha, beta; gamma", 1, 5, out strings, out diag) || strings.Count != 3)
+                    {
+                        throw new InvalidOperationException("TryParseStringCsv must parse comma and semicolon separated strings.");
+                    }
+                    if (strings[0] != "alpha" || strings[1] != "beta" || strings[2] != "gamma")
+                    {
+                        throw new InvalidOperationException("Parsed strings must be trimmed.");
+                    }
+                    if (RuntimeBridgeArgumentParser.TryParseStringCsv("", 1, 5, out strings, out diag))
+                    {
+                        throw new InvalidOperationException("TryParseStringCsv must reject empty input.");
+                    }
+                    if (RuntimeBridgeArgumentParser.TryParseStringCsv("a, , c", 1, 5, out strings, out diag))
+                    {
+                        throw new InvalidOperationException("TryParseStringCsv must reject empty entries.");
+                    }
+                    if (RuntimeBridgeArgumentParser.TryParseStringCsv("a, b", 3, 5, out strings, out diag))
+                    {
+                        throw new InvalidOperationException("TryParseStringCsv must reject count below minimum.");
+                    }
+
+                    IReadOnlyList<float> floats;
+                    if (!RuntimeBridgeArgumentParser.TryParseFloatCsv("1.5, -2.5; 3.0", 1, 4, out floats, out diag) || floats.Count != 3)
+                    {
+                        throw new InvalidOperationException("TryParseFloatCsv must parse valid float strings.");
+                    }
+                    if (floats[0] != 1.5f || floats[1] != -2.5f || floats[2] != 3.0f)
+                    {
+                        throw new InvalidOperationException("Parsed floats must match input values.");
+                    }
+                    if (RuntimeBridgeArgumentParser.TryParseFloatCsv("1.0, not-a-number", 1, 4, out floats, out diag))
+                    {
+                        throw new InvalidOperationException("TryParseFloatCsv must reject non-numeric values.");
+                    }
+
+                    string joined = RuntimeBridgeArgumentParser.JoinCsv(new[] { "x", " y ", "z" });
+                    if (joined != "x,y,z")
+                    {
+                        throw new InvalidOperationException("JoinCsv must trim and join with comma: " + joined);
+                    }
+                    if (RuntimeBridgeArgumentParser.JoinCsv(null) != string.Empty)
+                    {
+                        throw new InvalidOperationException("JoinCsv must return empty string on null input.");
                     }
                 }),
     };

@@ -94,14 +94,11 @@ namespace RogueCommandExpansionLoader.Runtime
                 return TryPickChoosableFrontier(rows, out row);
             }
 
-            for (int i = 0; i < rows.Count; i++)
+            int index = IntermissionCensus.FindChoosableNodeIndex(rows, level, field);
+            if (index >= 0)
             {
-                IntermissionNodeRow candidate = rows[i];
-                if (candidate.Level == level && candidate.Field == field && candidate.IsChoosable)
-                {
-                    row = candidate;
-                    return true;
-                }
+                row = rows[index];
+                return true;
             }
 
             return false;
@@ -201,6 +198,21 @@ namespace RogueCommandExpansionLoader.Runtime
                         "OverWorldMapEnemy/OverWorldMapBoss types are not available for level " + picked.Level
                         + " field " + picked.Field + " (stop point: type lookup).");
                     return false;
+                }
+
+                // Idempotent short-circuit: a previously clicked node stays
+                // selected (IsCurrentNodeOfPath) while re-projection after the
+                // first click fails (camera moves after selection, so the
+                // secondWorldToScreenPoint can project off-screen). Confirming
+                // the selection from a fresh census avoids the redundant click.
+                IntermissionCensus preClickCensus = RuntimeIntermissionCensus.Current();
+                if (IsSelectedInCensus(preClickCensus, picked))
+                {
+                    selected = new IntermissionNodeSelection(
+                        picked.Level, picked.Field, picked.InstanceId, true,
+                        "Level " + picked.Level + " node field " + picked.Field
+                        + " is already selected (observed IsCurrentNodeOfPath); coordinate click skipped.");
+                    return true;
                 }
 
                 object target = FindLiveNode(nodeType, picked) ?? FindLiveBossNode(bossType, picked);
