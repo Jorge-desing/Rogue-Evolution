@@ -289,6 +289,7 @@ namespace RogueCommandExpansion.Authoring
                 // Existing FBX sockets always win; this search must remain recursive to avoid
                 // duplicate transforms and ambiguous runtime role bindings.
                 EnsureCanonicalVfxSockets(root, modelInstance);
+                EnsureTurretAndRadarSockets(root, modelInstance);
 
                 // Scaffold muzzle-flash particles (FirePoint_0 child 0) and calibrated 3D mono AudioSources.
                 // Damage sockets stay clean: RuntimeVisualDirector spawns smoke/fire dynamically.
@@ -325,6 +326,7 @@ namespace RogueCommandExpansion.Authoring
                 }
 
                 Debug.Log("[VehiclePrefabBuilder] Successfully created prefab: " + targetPrefabPath);
+                ValidateSavedPrefab(targetPrefabPath, unitName);
                 return targetPrefabPath;
             }
             finally
@@ -588,6 +590,71 @@ namespace RogueCommandExpansion.Authoring
             EnsureSocketIfMissing(root.transform, "Socket_EngineAudio", engine);
             EnsureSocketIfMissing(root.transform, "Socket_WeaponAudio", muzzle);
             EnsureSocketIfMissing(root.transform, "Socket_GroundCenter", ground);
+        }
+
+        /// <summary>
+        /// Guarantees turret/radar sockets that EnsureCanonicalVfxSockets does not add.
+        /// Recursive missing-check avoids duplicate transforms (UniqueSocketRoleBinding).
+        /// </summary>
+        private static void EnsureTurretAndRadarSockets(GameObject root, GameObject modelInstance)
+        {
+            if (root == null || modelInstance == null) return;
+            Renderer[] renderers = modelInstance.GetComponentsInChildren<Renderer>(true);
+            if (renderers == null || renderers.Length == 0) return;
+            Bounds worldBounds = renderers[0].bounds;
+            for (int i = 1; i < renderers.Length; i++)
+            {
+                if (renderers[i] != null) worldBounds.Encapsulate(renderers[i].bounds);
+            }
+            Vector3 min = new Vector3(float.PositiveInfinity, float.PositiveInfinity, float.PositiveInfinity);
+            Vector3 max = new Vector3(float.NegativeInfinity, float.NegativeInfinity, float.NegativeInfinity);
+            for (int corner = 0; corner < 8; corner++)
+            {
+                Vector3 worldCorner = new Vector3(
+                    (corner & 1) == 0 ? worldBounds.min.x : worldBounds.max.x,
+                    (corner & 2) == 0 ? worldBounds.min.y : worldBounds.max.y,
+                    (corner & 4) == 0 ? worldBounds.min.z : worldBounds.max.z);
+                Vector3 localCorner = root.transform.InverseTransformPoint(worldCorner);
+                min = Vector3.Min(min, localCorner);
+                max = Vector3.Max(max, localCorner);
+            }
+            Vector3 size = max - min;
+            if (size.sqrMagnitude < 1e-6f) return;
+            Vector3 center = (min + max) * 0.5f;
+            Vector3 turretPivot = new Vector3(center.x, Mathf.Lerp(min.y, max.y, 0.72f), center.z + size.z * 0.10f);
+            EnsureSocketIfMissing(root.transform, "Socket_TurretPivot", turretPivot);
+            Transform pivot = FindTransformRecursive(root.transform, "Socket_TurretPivot");
+            if (pivot != null && FindTransformRecursive(root.transform, "Socket_TurretPitch") == null)
+            {
+                GameObject pitch = new GameObject("Socket_TurretPitch");
+                pitch.transform.SetParent(pivot, false);
+                pitch.transform.localPosition = Vector3.zero;
+                pitch.transform.localRotation = Quaternion.identity;
+                pitch.transform.localScale = Vector3.one;
+            }
+            Vector3 radar = new Vector3(center.x - size.x * 0.22f, Mathf.Lerp(min.y, max.y, 0.85f), min.z + size.z * 0.30f);
+            Vector3 antenna = new Vector3(center.x + size.x * 0.22f, Mathf.Lerp(min.y, max.y, 0.80f), min.z + size.z * 0.30f);
+            EnsureSocketIfMissing(root.transform, "Socket_RadarMast", radar);
+            EnsureSocketIfMissing(root.transform, "Socket_Antenna", antenna);
+        }
+
+        private static void ValidateSavedPrefab(string prefabPath, string unitName)
+        {
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+            if (prefab == null)
+            {
+                Debug.LogWarning("[VehiclePrefabBuilder] Could not reload prefab for validation: " + prefabPath);
+                return;
+            }
+            Renderer[] renderers = prefab.GetComponentsInChildren<Renderer>(true);
+            int enabled = 0;
+            foreach (Renderer r in renderers) if (r != null && r.enabled) enabled++;
+            Animator animator = prefab.GetComponent<Animator>();
+            string animatorState = animator == null ? "none" :
+                ((animator.avatar != null && animator.avatar.isValid) ? "valid" : "invalid") +
+                "/controller " + (animator.runtimeAnimatorController != null ? "present" : "missing");
+            Debug.Log("[VehiclePrefabBuilder] " + unitName + " prefab OK: renderers=" + renderers.Length +
+                " (enabled " + enabled + "), animator=" + animatorState);
         }
 
         private const string VfxMaterialFolder = MaterialFolder + "/VFX";
