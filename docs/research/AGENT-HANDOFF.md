@@ -1087,3 +1087,10 @@ The generated unit models, prefab authoring outputs, compiled visual bundle, and
     - Director en vivo: `diagnostics_order_select_level_node(3,1)` → selected=false con motivo exacto 'No choosable intermission node... (stop point: node pick)'; `diagnostics_order_enter_level(3,1)` → success=false, entered=false, mismo motivo. Fail-closed confirmado con la semántica fiel del juego (IsChoosable=false en todos los nodos de este save).
     - Cierre: `Application.Quit()` inyectado fail-soft, proceso cerrado, `safe_to_finalize=true`, perfiles exact match, selector restaurado a los bytes exactos del checkpoint (3). Evidencia: runtime-evidence-coverage4.json (UNKNOWN por escala de afirmaciones).
     - **Límite de evidencia:** lecturas + director probados en vivo con datos reales; la transición selección→entrada con evidencia sigue pendiente hasta poder atravesar un mapa con frontera elegible (save con choosable poblado).
+
+58. **Primer ejercicio en vivo del censo de variantes visuales (2026-11-08; runtime Steam, mapa de intermission):**
+    - Sesión `artifacts/runtime-smoke/steam-acceptance-20261107/` (variant-census): checkpoint fresco; Continue Run → `IntermissionScreen` (Profile2, stage 0, level 3, 16 nodos).
+    - `diagnostics_get_visual_variant_census` leído EN VIVO por primera vez: kind=visualVariantCensus, omittedUnitCount=0, totalUnits=0, totalVariants=0, systemTier='Two-Level Canonical PBR System (Level 1: Primary Chassis, Level 2: Tactical Variants)'. 0 unidades en mapa de intermission (esperado): el wire path funciona en vivo.
+    - Lecturas repetidas: Navigator (timeScale=1), intermission census (16 nodos, omitted 0), SystemHealth (3 packs activos, 36 unidades, 22 módulos AI).
+    - Cierre: pausa nativa (timeScale=0), `Application.Quit()` inyectado, proceso cerrado, `safe_to_finalize=true`, perfiles exact match. Evidencia: runtime-evidence-variant-census.json (UNKNOWN por escala de afirmaciones).
+    - **Límite de evidencia:** primer getter nuevo ejercitado en vivo; la transición selección→entrada y la variante visual aplicada en unidades reales siguen pendientes (mapa sin frontera elegible).
