@@ -310,6 +310,7 @@
         },
         "customBalance": {
           "type": "object",
+          "description": "Per-unit balance overrides keyed by the 25 row-backed EntityBalancingStore.ChangeableValue members (ManaRechargePerSecond is global-only and excluded). Each key writes the exact EntityBalancingParameters row field read by the pinned native getter: integer-backed keys (Cost, MaxCapacity, MaxHealth, MaxShield, MaxMana, MaxRank, SightRadius, SkillRange) are read by GetOriginalIntValue and capped at 16777216; the other 17 are read by GetOriginalFloatValue. Non-obvious mappings: Attack1Cooldown writes attackCooldown, SpawnTtl writes duration2.",
           "properties": {
             "Cost": {
               "type": "integer",
@@ -374,7 +375,8 @@
             "Attack1Cooldown": {
               "type": "number",
               "minimum": 0,
-              "maximum": 3.4028234663852886e+38
+              "maximum": 3.4028234663852886e+38,
+              "description": "Writes EntityBalancingParameters.attackCooldown (no '1') via GetOriginalFloatValue."
             },
             "Attack2Cooldown": {
               "type": "number",
@@ -424,7 +426,8 @@
             "SpawnTtl": {
               "type": "number",
               "minimum": 0,
-              "maximum": 3.4028234663852886e+38
+              "maximum": 3.4028234663852886e+38,
+              "description": "Writes EntityBalancingParameters.duration2 (no spawnTtl row field exists) via GetOriginalFloatValue."
             },
             "MaxArmor": {
               "type": "number",

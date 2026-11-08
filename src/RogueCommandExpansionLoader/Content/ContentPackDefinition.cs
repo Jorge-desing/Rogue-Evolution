@@ -379,52 +379,109 @@ namespace RogueCommandExpansionLoader.Content
 
     internal readonly struct BalanceParameterDefinition
     {
-        public BalanceParameterDefinition(string rowFieldName, BalanceParameterType storageType)
+        public BalanceParameterDefinition(
+            string changeableValueName,
+            int changeableValueOrdinal,
+            string rowFieldName,
+            BalanceParameterType storageType,
+            string mappingNote = null)
         {
+            ChangeableValueName = changeableValueName;
+            ChangeableValueOrdinal = changeableValueOrdinal;
             RowFieldName = rowFieldName;
             StorageType = storageType;
+            MappingNote = mappingNote;
         }
 
+        /// <summary>Canonical <c>EntityBalancingStore.ChangeableValue</c> member name.</summary>
+        public string ChangeableValueName { get; }
+
+        /// <summary>Ordinal of the member in the pinned 1.0.9 enum declaration order.</summary>
+        public int ChangeableValueOrdinal { get; }
+
+        /// <summary>Exact <c>EntityBalancingParameters</c> field read by the native getter.</summary>
         public string RowFieldName { get; }
+
         public BalanceParameterType StorageType { get; }
+
+        /// <summary>
+        /// Native reader for this member in the pinned assembly: int-backed members are
+        /// read by <c>GetOriginalIntValue</c> and float-backed members by
+        /// <c>GetOriginalFloatValue</c> (the latter also serves the global
+        /// <c>ManaRechargePerSecond</c>, which has no per-unit row field).
+        /// </summary>
+        public string NativeGetter =>
+            StorageType == BalanceParameterType.Int ? "GetOriginalIntValue" : "GetOriginalFloatValue";
+
+        /// <summary>Non-obvious field-name note, when the row field cannot be derived from the enum name.</summary>
+        public string MappingNote { get; }
     }
 
     internal static class UnitBalanceOverrideMapper
     {
         public const int MaximumContiguousSingleExactInteger = 1 << 24;
 
-        // Bind only per-unit ChangeableValue members to the fields read from
-        // EntityBalancingParameters by the pinned EntityBalancingStore. Global-only
-        // values such as ManaRechargePerSecond must not become per-unit row overrides.
-        private static readonly Dictionary<string, BalanceParameterDefinition> BalanceParameters =
-            new Dictionary<string, BalanceParameterDefinition>(StringComparer.Ordinal)
+        // Single source of truth for the 25 per-unit ChangeableValue members, in pinned
+        // enum declaration order (ManaRechargePerSecond, ordinal 23, is global-only and
+        // intentionally absent). Ordinals, row fields, and storage types were verified
+        // against the pinned Assembly-CSharp.dll (1.0.9, SHA-256
+        // d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b, MVID
+        // db0e9462-128d-4296-9900-de18b4bd0c00): GetOriginalIntValue reads Cost,
+        // MaxCapacity, MaxHealth, MaxShield, MaxMana, MaxRank, SightRadius and
+        // SkillRange from their Int32 row fields; GetOriginalFloatValue reads the
+        // remaining 17 from Single row fields. Attack1Cooldown and SpawnTtl are the
+        // two names that must not be derived by casing rules.
+        private static readonly BalanceParameterDefinition[] OrderedParameters =
+        {
+            new BalanceParameterDefinition("Cost", 0, "cost", BalanceParameterType.Int),
+            new BalanceParameterDefinition("ProductionDuration", 1, "productionDuration", BalanceParameterType.Float),
+            new BalanceParameterDefinition("MaxCapacity", 2, "maxCapacity", BalanceParameterType.Int),
+            new BalanceParameterDefinition("MaxHealth", 3, "maxHealth", BalanceParameterType.Int),
+            new BalanceParameterDefinition("MaxShield", 4, "maxShield", BalanceParameterType.Int),
+            new BalanceParameterDefinition("MaxMana", 5, "maxMana", BalanceParameterType.Int),
+            new BalanceParameterDefinition("MaxRank", 6, "maxRank", BalanceParameterType.Int),
+            new BalanceParameterDefinition("MoveSpeed", 7, "moveSpeed", BalanceParameterType.Float),
+            new BalanceParameterDefinition("SightRadius", 8, "sightRadius", BalanceParameterType.Int),
+            new BalanceParameterDefinition("Damage1", 9, "damage1", BalanceParameterType.Float),
+            new BalanceParameterDefinition("Damage2", 10, "damage2", BalanceParameterType.Float),
+            new BalanceParameterDefinition("WeaponRange", 11, "weaponRange", BalanceParameterType.Float),
+            new BalanceParameterDefinition("Attack1Cooldown", 12, "attackCooldown", BalanceParameterType.Float,
+                "Row field is attackCooldown (no '1'); the primary cooldown. Do not derive by casing."),
+            new BalanceParameterDefinition("Attack2Cooldown", 13, "attack2Cooldown", BalanceParameterType.Float),
+            new BalanceParameterDefinition("EffectRadius1", 14, "effectRadius1", BalanceParameterType.Float),
+            new BalanceParameterDefinition("EffectRadius2", 15, "effectRadius2", BalanceParameterType.Float),
+            new BalanceParameterDefinition("SkillRange", 16, "skillRange", BalanceParameterType.Int),
+            new BalanceParameterDefinition("HealAmount1", 17, "healAmount1", BalanceParameterType.Float),
+            new BalanceParameterDefinition("HealAmount2", 18, "healAmount2", BalanceParameterType.Float),
+            new BalanceParameterDefinition("GainCreditsAmount", 19, "gainCreditsAmount", BalanceParameterType.Float),
+            new BalanceParameterDefinition("SkillManaCost", 20, "skillManaCost", BalanceParameterType.Float),
+            new BalanceParameterDefinition("Duration1", 21, "duration1", BalanceParameterType.Float),
+            new BalanceParameterDefinition("SpawnTtl", 22, "duration2", BalanceParameterType.Float,
+                "Row field is duration2 (no spawnTtl field). Do not derive by casing."),
+            new BalanceParameterDefinition("MaxArmor", 24, "maxArmor", BalanceParameterType.Float),
+            new BalanceParameterDefinition("ArmorProtection", 25, "armorProtection", BalanceParameterType.Float)
+        };
+
+        private static readonly Dictionary<string, BalanceParameterDefinition> BalanceParameters;
+        private static readonly Dictionary<string, BalanceParameterDefinition> RowFieldParameters;
+
+        static UnitBalanceOverrideMapper()
+        {
+            BalanceParameters = new Dictionary<string, BalanceParameterDefinition>(
+                OrderedParameters.Length, StringComparer.Ordinal);
+            RowFieldParameters = new Dictionary<string, BalanceParameterDefinition>(
+                OrderedParameters.Length, StringComparer.Ordinal);
+            for (int i = 0; i < OrderedParameters.Length; i++)
             {
-                ["Cost"] = new BalanceParameterDefinition("cost", BalanceParameterType.Int),
-                ["ProductionDuration"] = new BalanceParameterDefinition("productionDuration", BalanceParameterType.Float),
-                ["MaxCapacity"] = new BalanceParameterDefinition("maxCapacity", BalanceParameterType.Int),
-                ["MaxHealth"] = new BalanceParameterDefinition("maxHealth", BalanceParameterType.Int),
-                ["MaxShield"] = new BalanceParameterDefinition("maxShield", BalanceParameterType.Int),
-                ["MaxMana"] = new BalanceParameterDefinition("maxMana", BalanceParameterType.Int),
-                ["MaxRank"] = new BalanceParameterDefinition("maxRank", BalanceParameterType.Int),
-                ["MoveSpeed"] = new BalanceParameterDefinition("moveSpeed", BalanceParameterType.Float),
-                ["SightRadius"] = new BalanceParameterDefinition("sightRadius", BalanceParameterType.Int),
-                ["Damage1"] = new BalanceParameterDefinition("damage1", BalanceParameterType.Float),
-                ["Damage2"] = new BalanceParameterDefinition("damage2", BalanceParameterType.Float),
-                ["WeaponRange"] = new BalanceParameterDefinition("weaponRange", BalanceParameterType.Float),
-                ["Attack1Cooldown"] = new BalanceParameterDefinition("attackCooldown", BalanceParameterType.Float),
-                ["Attack2Cooldown"] = new BalanceParameterDefinition("attack2Cooldown", BalanceParameterType.Float),
-                ["EffectRadius1"] = new BalanceParameterDefinition("effectRadius1", BalanceParameterType.Float),
-                ["EffectRadius2"] = new BalanceParameterDefinition("effectRadius2", BalanceParameterType.Float),
-                ["SkillRange"] = new BalanceParameterDefinition("skillRange", BalanceParameterType.Int),
-                ["HealAmount1"] = new BalanceParameterDefinition("healAmount1", BalanceParameterType.Float),
-                ["HealAmount2"] = new BalanceParameterDefinition("healAmount2", BalanceParameterType.Float),
-                ["GainCreditsAmount"] = new BalanceParameterDefinition("gainCreditsAmount", BalanceParameterType.Float),
-                ["SkillManaCost"] = new BalanceParameterDefinition("skillManaCost", BalanceParameterType.Float),
-                ["Duration1"] = new BalanceParameterDefinition("duration1", BalanceParameterType.Float),
-                ["SpawnTtl"] = new BalanceParameterDefinition("duration2", BalanceParameterType.Float),
-                ["MaxArmor"] = new BalanceParameterDefinition("maxArmor", BalanceParameterType.Float),
-                ["ArmorProtection"] = new BalanceParameterDefinition("armorProtection", BalanceParameterType.Float)
-            };
+                BalanceParameterDefinition definition = OrderedParameters[i];
+                BalanceParameters.Add(definition.ChangeableValueName, definition);
+                RowFieldParameters.Add(definition.RowFieldName, definition);
+            }
+        }
+
+        /// <summary>All 25 per-unit parameters in pinned enum declaration order.</summary>
+        public static IReadOnlyList<BalanceParameterDefinition> AllParameters =>
+            Array.AsReadOnly(OrderedParameters);
 
         public static Dictionary<string, BalanceParameterDefinition> CreateBalanceParameterMap()
         {
@@ -444,23 +501,70 @@ namespace RogueCommandExpansionLoader.Content
             return BalanceParameters.TryGetValue(name, out parameterDefinition);
         }
 
-        public static bool IsNativeIntegerBalanceRowField(string rowFieldName)
+        /// <summary>
+        /// Reverse lookup from an exact native row field name (for example
+        /// <c>attackCooldown</c> or <c>duration2</c>) to its canonical
+        /// <c>ChangeableValue</c> member. Matching is ordinal and exact: aliases
+        /// such as <c>duration</c>, <c>spawnTtl</c>, or <c>MoveSpeed</c> do not resolve.
+        /// </summary>
+        public static bool TryGetByRowFieldName(
+            string rowFieldName,
+            out BalanceParameterDefinition parameterDefinition)
         {
             if (rowFieldName == null)
+            {
+                parameterDefinition = default(BalanceParameterDefinition);
+                return false;
+            }
+
+            return RowFieldParameters.TryGetValue(rowFieldName, out parameterDefinition);
+        }
+
+        public static bool IsNativeIntegerBalanceRowField(string rowFieldName)
+        {
+            return TryGetByRowFieldName(rowFieldName, out BalanceParameterDefinition definition) &&
+                definition.StorageType == BalanceParameterType.Int;
+        }
+
+        /// <summary>
+        /// Shared validation + conversion for a single canonical parameter. This is
+        /// the only place that turns a <c>double</c> manifest value into the boxed
+        /// native <c>int</c>/<c>float</c> row value, so package validation and the
+        /// runtime mutator cannot drift apart.
+        /// </summary>
+        public static bool TryConvertBalanceValue(
+            string name,
+            double value,
+            out object convertedValue,
+            out string diagnostic)
+        {
+            convertedValue = null;
+            if (!TryGetBalanceParameterDefinition(name, out BalanceParameterDefinition definition))
+            {
+                diagnostic = "Custom balance keys must target per-unit ChangeableValue members with a native row field.";
+                return false;
+            }
+
+            return TryConvertBalanceValue(definition, value, out convertedValue, out diagnostic);
+        }
+
+        public static bool TryConvertBalanceValue(
+            BalanceParameterDefinition definition,
+            double value,
+            out object convertedValue,
+            out string diagnostic)
+        {
+            convertedValue = null;
+            if (!TryValidateCustomBalanceValue(definition.ChangeableValueName, value, out diagnostic))
             {
                 return false;
             }
 
-            foreach (BalanceParameterDefinition parameterDefinition in BalanceParameters.Values)
-            {
-                if (parameterDefinition.StorageType == BalanceParameterType.Int &&
-                    String.Equals(parameterDefinition.RowFieldName, rowFieldName, StringComparison.Ordinal))
-                {
-                    return true;
-                }
-            }
-
-            return false;
+            convertedValue = definition.StorageType == BalanceParameterType.Int
+                ? (object)(int)value
+                : (object)(float)value;
+            diagnostic = null;
+            return true;
         }
 
         public static bool TryValidateCustomBalanceValue(string name, double value, out string diagnostic)
@@ -511,8 +615,28 @@ namespace RogueCommandExpansionLoader.Content
                         throw new InvalidOperationException("Unsupported per-unit balance parameter '" +
                             parameter.Key + "'.");
                     }
+                }
 
-                    parameters[parameter.Key] = parameter.Value;
+                // Emit in pinned enum order so diagnostics, overrides, and provider
+                // rows are deterministic regardless of manifest key order. Values
+                // are re-validated here so this mapper never forwards a value that
+                // package validation would have rejected.
+                for (int i = 0; i < OrderedParameters.Length; i++)
+                {
+                    BalanceParameterDefinition definition = OrderedParameters[i];
+                    double value;
+                    if (!unit.customBalance.TryGetValue(definition.ChangeableValueName, out value))
+                    {
+                        continue;
+                    }
+
+                    if (!TryValidateCustomBalanceValue(definition.ChangeableValueName, value, out string diagnostic))
+                    {
+                        throw new InvalidOperationException("Invalid value for per-unit balance parameter '" +
+                            definition.ChangeableValueName + "': " + diagnostic);
+                    }
+
+                    parameters.Add(definition.ChangeableValueName, value);
                 }
             }
 

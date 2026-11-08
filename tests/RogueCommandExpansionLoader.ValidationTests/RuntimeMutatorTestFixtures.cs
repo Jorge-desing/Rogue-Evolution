@@ -15,8 +15,33 @@ public struct EntityBalancingParameters
 {
     public string entityId;
     public NullableString factoryForEntityId;
-    public float moveSpeed;
+    // The 25 per-unit balance row fields, mirroring the pinned
+    // EntityBalancingParameters shape read by EntityBalancingStore.GetOriginal*.
+    public int cost;
+    public float productionDuration;
+    public int maxCapacity;
     public int maxHealth;
+    public int maxShield;
+    public int maxMana;
+    public int maxRank;
+    public float moveSpeed;
+    public int sightRadius;
+    public float damage1;
+    public float damage2;
+    public float weaponRange;
+    public float attackCooldown;
+    public float attack2Cooldown;
+    public float effectRadius1;
+    public float effectRadius2;
+    public int skillRange;
+    public float healAmount1;
+    public float healAmount2;
+    public float gainCreditsAmount;
+    public float skillManaCost;
+    public float duration1;
+    public float duration2;
+    public float maxArmor;
+    public float armorProtection;
     public UnitRole roles;
     public SystemTags offeredSystemTags;
 }

@@ -87,6 +87,70 @@ class ContentPackBalanceSimulationTests(unittest.TestCase):
         self.assertEqual(profile.source, "mod")
         self.assertIsNone(profile.template_id)
 
+    def test_all_25_per_unit_custom_balance_keys_are_preserved(self) -> None:
+        custom_balance = {
+            "Cost": 11,
+            "ProductionDuration": 12.5,
+            "MaxCapacity": 13,
+            "MaxHealth": 14,
+            "MaxShield": 15,
+            "MaxMana": 16,
+            "MaxRank": 17,
+            "MoveSpeed": 18.5,
+            "SightRadius": 19,
+            "Damage1": 20.5,
+            "Damage2": 21.5,
+            "WeaponRange": 22.5,
+            "Attack1Cooldown": 23.5,
+            "Attack2Cooldown": 24.5,
+            "EffectRadius1": 25.5,
+            "EffectRadius2": 26.5,
+            "SkillRange": 27,
+            "HealAmount1": 28.5,
+            "HealAmount2": 29.5,
+            "GainCreditsAmount": 30.5,
+            "SkillManaCost": 31.5,
+            "Duration1": 32.5,
+            "SpawnTtl": 33.5,
+            "MaxArmor": 34.5,
+            "ArmorProtection": 35.5,
+        }
+        profile = self._load_unit({"id": "test:all-balance", "customBalance": custom_balance})
+        expected_fields = {
+            "Cost": "cost",
+            "ProductionDuration": "production_duration",
+            "MaxCapacity": "max_capacity",
+            "MaxHealth": "max_health",
+            "MaxShield": "max_shield",
+            "MaxMana": "max_mana",
+            "MaxRank": "max_rank",
+            "MoveSpeed": "move_speed",
+            "SightRadius": "sight_radius",
+            "Damage1": "damage1",
+            "Damage2": "damage2",
+            "WeaponRange": "weapon_range",
+            "Attack1Cooldown": "attack_cooldown",
+            "Attack2Cooldown": "attack2_cooldown",
+            "EffectRadius1": "effect_radius1",
+            "EffectRadius2": "effect_radius2",
+            "SkillRange": "skill_range",
+            "HealAmount1": "heal_amount1",
+            "HealAmount2": "heal_amount2",
+            "GainCreditsAmount": "gain_credits_amount",
+            "SkillManaCost": "skill_mana_cost",
+            "Duration1": "duration1",
+            "SpawnTtl": "spawn_ttl",
+            "MaxArmor": "max_armor",
+            "ArmorProtection": "armor_protection",
+        }
+        self.assertEqual(25, len(expected_fields))
+        for key, field in expected_fields.items():
+            self.assertTrue(
+                hasattr(profile, field),
+                f"UnitProfile is missing preserved field {field} for {key}",
+            )
+            self.assertAlmostEqual(custom_balance[key], getattr(profile, field), places=6)
+
     def test_rejects_malformed_localizations(self) -> None:
         invalid_values = (None, {}, "bad", [], [None], [[]], [{"language": []}], [{"language": "en-US", "name": None}])
         for localizations in invalid_values:

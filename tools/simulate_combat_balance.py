@@ -60,9 +60,11 @@ CANONICAL_STATS = [
 SIMULATED_CUSTOM_BALANCE_FIELDS: Dict[str, str] = {
     "Cost": "cost",
     "ProductionDuration": "production_duration",
+    "MaxCapacity": "max_capacity",
     "MaxHealth": "max_health",
     "MaxShield": "max_shield",
-    "ArmorProtection": "armor_protection",
+    "MaxMana": "max_mana",
+    "MaxRank": "max_rank",
     "MoveSpeed": "move_speed",
     "SightRadius": "sight_radius",
     "Damage1": "damage1",
@@ -71,6 +73,19 @@ SIMULATED_CUSTOM_BALANCE_FIELDS: Dict[str, str] = {
     "Attack2Cooldown": "attack2_cooldown",
     "WeaponRange": "weapon_range",
     "EffectRadius1": "effect_radius1",
+    # Preserved for reporting/parity only; the duel/CEI model below does not
+    # consume these fields (no invented mechanics). MaxArmor in particular is
+    # not EHP: only ArmorProtection and discrete shield charges mitigate damage.
+    "EffectRadius2": "effect_radius2",
+    "SkillRange": "skill_range",
+    "HealAmount1": "heal_amount1",
+    "HealAmount2": "heal_amount2",
+    "GainCreditsAmount": "gain_credits_amount",
+    "SkillManaCost": "skill_mana_cost",
+    "Duration1": "duration1",
+    "SpawnTtl": "spawn_ttl",
+    "MaxArmor": "max_armor",
+    "ArmorProtection": "armor_protection",
 }
 
 # REA-verified combat model constants (mechanics confirmed via decompiled
@@ -215,8 +230,11 @@ class UnitProfile:
     template_id: Optional[str] = None
     cost: float = 100.0
     production_duration: float = 30.0
+    max_capacity: float = 0.0
     max_health: float = 100.0
     max_shield: float = 0.0  # Discrete shield charges
+    max_mana: float = 0.0
+    max_rank: float = 0.0
     armor_protection: float = 0.0  # Flat reduction
     move_speed: float = 12.0
     sight_radius: float = 6.0
@@ -227,6 +245,17 @@ class UnitProfile:
     attack2_cooldown: float = 0.0
     weapon_range: float = 5.0
     effect_radius1: float = 0.0
+    # Preserved per-unit balance fields (see SIMULATED_CUSTOM_BALANCE_FIELDS):
+    # carried for parity/reporting, not consumed by the duel/CEI model.
+    effect_radius2: float = 0.0
+    skill_range: float = 0.0
+    heal_amount1: float = 0.0
+    heal_amount2: float = 0.0
+    gain_credits_amount: float = 0.0
+    skill_mana_cost: float = 0.0
+    duration1: float = 0.0
+    spawn_ttl: float = 0.0
+    max_armor: float = 0.0  # Repair pool / visual bar only; never EHP.
     attack_type: str = "Unknown"  # AttackType metadata; not currently used by the damage model.
     is_suicide: bool = False
     tags: List[str] = field(default_factory=list)

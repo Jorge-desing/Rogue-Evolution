@@ -38,6 +38,7 @@ namespace RogueCommandExpansionLoader.Runtime
 
         private readonly FieldInfo _entityIdField;
         private readonly FieldInfo _factoryForEntityIdField;
+        private readonly Dictionary<string, FieldInfo> _balanceRowFields;
         private readonly FieldInfo _nullableStringValueField;
         private readonly FieldInfo _nullableStringHasValueField;
         private readonly FieldInfo _entityRowsField;
@@ -125,6 +126,40 @@ namespace RogueCommandExpansionLoader.Runtime
             {
                 throw new InvalidOperationException(
                     "NullableString.value/hasValue do not have the verified string/bool shape.");
+            }
+
+            // Fail fast at construction when the pinned row shape drifts: resolve
+            // every per-unit balance field once, with its exact native type, instead
+            // of discovering a mismatch mid-registration.
+            _balanceRowFields = new Dictionary<string, FieldInfo>(StringComparer.Ordinal);
+            foreach (BalanceParameterDefinition definition in UnitBalanceOverrideMapper.AllParameters)
+            {
+                FieldInfo balanceField;
+                try
+                {
+                    balanceField = RuntimeReflection.FindField(
+                        _entityRowType, definition.RowFieldName, InstanceFields);
+                }
+                catch (Exception exception)
+                {
+                    throw new InvalidOperationException(
+                        "EntityBalancingParameters is missing balance row field '" +
+                        definition.RowFieldName + "' for ChangeableValue '" +
+                        definition.ChangeableValueName + "': " + exception.Message);
+                }
+
+                Type expectedBalanceType = definition.StorageType == BalanceParameterType.Int
+                    ? typeof(int)
+                    : typeof(float);
+                if (balanceField.IsStatic || balanceField.FieldType != expectedBalanceType)
+                {
+                    throw new InvalidOperationException(
+                        "EntityBalancingParameters balance row field '" + definition.RowFieldName +
+                        "' for ChangeableValue '" + definition.ChangeableValueName +
+                        "' is not the verified " + expectedBalanceType.Name + " instance field.");
+                }
+
+                _balanceRowFields.Add(definition.RowFieldName, balanceField);
             }
 
             _entityRowsField = RuntimeReflection.FindField(entityStoreType,
@@ -396,26 +431,15 @@ namespace RogueCommandExpansionLoader.Runtime
                         return false;
                     }
 
-                    Type expectedFieldType = definition.StorageType == BalanceParameterType.Int
-                        ? typeof(int)
-                        : typeof(float);
-                    FieldInfo field;
-                    try
+                    // FieldInfo was resolved and type-checked in the constructor;
+                    // conversion goes through the shared mapper so the mutator and
+                    // package validation cannot drift apart.
+                    FieldInfo field = _balanceRowFields[definition.RowFieldName];
+                    if (!UnitBalanceOverrideMapper.TryConvertBalanceValue(
+                            definition, parameter.Value, out object value, out string diagnostic))
                     {
-                        field = RuntimeReflection.FindField(_entityRowType, definition.RowFieldName, InstanceFields);
-                    }
-                    catch (Exception exception)
-                    {
-                        Log("Could not resolve balance row field '" + definition.RowFieldName + "': " +
-                            exception.Message);
-                        return false;
-                    }
-
-                    if (field.IsStatic || field.FieldType != expectedFieldType ||
-                        !TryConvertBalanceParameter(parameter.Value, definition.StorageType, out object value))
-                    {
-                        Log("Balance parameter '" + parameter.Key + "' does not match the verified row field '" +
-                            definition.RowFieldName + "' or has an invalid value.");
+                        Log("Balance parameter '" + parameter.Key + "' for '" +
+                            balanceOverride.EntityId + "' is invalid: " + diagnostic);
                         return false;
                     }
 
@@ -473,44 +497,6 @@ namespace RogueCommandExpansionLoader.Runtime
                 }
             }
 
-            return true;
-        }
-
-        private static bool TryConvertBalanceParameter(
-            double value,
-            BalanceParameterType parameterType,
-            out object convertedValue)
-        {
-            convertedValue = null;
-            if (Double.IsNaN(value) || Double.IsInfinity(value) || value < 0d)
-            {
-                return false;
-            }
-
-            if (parameterType == BalanceParameterType.Int)
-            {
-                if (Math.Truncate(value) != value ||
-                    value > UnitBalanceOverrideMapper.MaximumContiguousSingleExactInteger)
-                {
-                    return false;
-                }
-
-                convertedValue = (int)value;
-                return true;
-            }
-
-            if (value > Single.MaxValue)
-            {
-                return false;
-            }
-
-            float singleValue = (float)value;
-            if (Single.IsNaN(singleValue) || Single.IsInfinity(singleValue))
-            {
-                return false;
-            }
-
-            convertedValue = singleValue;
             return true;
         }
 

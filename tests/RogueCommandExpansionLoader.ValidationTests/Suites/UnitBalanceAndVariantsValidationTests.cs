@@ -1114,5 +1114,214 @@ internal static partial class ValidationTestRunner
             RuntimeUnitVisualVariantRegistry.Clear();
         }
     }),
+    ("unit balance map exposes complete verified metadata for all 25 per-unit parameters", () =>
+    {
+        IReadOnlyList<BalanceParameterDefinition> parameters =
+            UnitBalanceOverrideMapper.AllParameters;
+        if (parameters.Count != 25)
+        {
+            throw new InvalidOperationException("The canonical per-unit map must contain exactly 25 parameters.");
+        }
+
+        var canonicalNames = new HashSet<string>(StringComparer.Ordinal);
+        var rowFields = new HashSet<string>(StringComparer.Ordinal);
+        var ordinals = new HashSet<int>();
+        int intCount = 0;
+        foreach (BalanceParameterDefinition parameter in parameters)
+        {
+            if (!canonicalNames.Add(parameter.ChangeableValueName) ||
+                !rowFields.Add(parameter.RowFieldName) ||
+                !ordinals.Add(parameter.ChangeableValueOrdinal))
+            {
+                throw new InvalidOperationException("Canonical names, row fields, and enum ordinals must be unique: " +
+                    parameter.ChangeableValueName);
+            }
+
+            string expectedGetter = parameter.StorageType == BalanceParameterType.Int
+                ? "GetOriginalIntValue"
+                : "GetOriginalFloatValue";
+            if (parameter.NativeGetter != expectedGetter)
+            {
+                throw new InvalidOperationException("Native getter for " + parameter.ChangeableValueName +
+                    " must be " + expectedGetter + ".");
+            }
+
+            if (parameter.StorageType == BalanceParameterType.Int)
+            {
+                intCount++;
+            }
+        }
+
+        if (intCount != 8)
+        {
+            throw new InvalidOperationException("Exactly 8 per-unit parameters are read via GetOriginalIntValue.");
+        }
+
+        var expectedOrdinals = new Dictionary<string, int>(StringComparer.Ordinal)
+        {
+            ["Cost"] = 0, ["ProductionDuration"] = 1, ["MaxCapacity"] = 2, ["MaxHealth"] = 3,
+            ["MaxShield"] = 4, ["MaxMana"] = 5, ["MaxRank"] = 6, ["MoveSpeed"] = 7,
+            ["SightRadius"] = 8, ["Damage1"] = 9, ["Damage2"] = 10, ["WeaponRange"] = 11,
+            ["Attack1Cooldown"] = 12, ["Attack2Cooldown"] = 13, ["EffectRadius1"] = 14,
+            ["EffectRadius2"] = 15, ["SkillRange"] = 16, ["HealAmount1"] = 17,
+            ["HealAmount2"] = 18, ["GainCreditsAmount"] = 19, ["SkillManaCost"] = 20,
+            ["Duration1"] = 21, ["SpawnTtl"] = 22, ["MaxArmor"] = 24, ["ArmorProtection"] = 25
+        };
+        foreach (KeyValuePair<string, int> expected in expectedOrdinals)
+        {
+            if (!UnitBalanceOverrideMapper.TryGetBalanceParameterDefinition(expected.Key,
+                    out BalanceParameterDefinition definition) ||
+                definition.ChangeableValueOrdinal != expected.Value)
+            {
+                throw new InvalidOperationException("Enum ordinal mismatch for " + expected.Key + ".");
+            }
+        }
+
+        if (UnitBalanceOverrideMapper.TryGetBalanceParameterDefinition(
+                "ManaRechargePerSecond", out _))
+        {
+            throw new InvalidOperationException("Global-only ManaRechargePerSecond must stay unmapped per-unit.");
+        }
+
+        if (!UnitBalanceOverrideMapper.TryGetBalanceParameterDefinition("Attack1Cooldown",
+                out BalanceParameterDefinition cooldown) ||
+            cooldown.RowFieldName != "attackCooldown" ||
+            !UnitBalanceOverrideMapper.TryGetBalanceParameterDefinition("SpawnTtl",
+                out BalanceParameterDefinition spawnTtl) ||
+            spawnTtl.RowFieldName != "duration2")
+        {
+            throw new InvalidOperationException("Non-obvious mappings Attack1Cooldown->attackCooldown and SpawnTtl->duration2 must be preserved.");
+        }
+    }),
+    ("unit balance map reverse lookup round-trips every raw row field", () =>
+    {
+        foreach (BalanceParameterDefinition parameter in UnitBalanceOverrideMapper.AllParameters)
+        {
+            if (!UnitBalanceOverrideMapper.TryGetByRowFieldName(parameter.RowFieldName,
+                    out BalanceParameterDefinition reverse) ||
+                reverse.ChangeableValueName != parameter.ChangeableValueName ||
+                reverse.RowFieldName != parameter.RowFieldName)
+            {
+                throw new InvalidOperationException("Reverse lookup failed for row field " + parameter.RowFieldName + ".");
+            }
+        }
+
+        if (UnitBalanceOverrideMapper.TryGetByRowFieldName("duration", out _) ||
+            UnitBalanceOverrideMapper.TryGetByRowFieldName("spawnTtl", out _) ||
+            UnitBalanceOverrideMapper.TryGetByRowFieldName("attack1Cooldown", out _) ||
+            UnitBalanceOverrideMapper.TryGetByRowFieldName("MoveSpeed", out _))
+        {
+            throw new InvalidOperationException("Reverse lookup must only accept exact native row field names.");
+        }
+    }),
+    ("unit balance mapper rejects invalid customBalance values at mapping time", () =>
+    {
+        var invalidCases = new Dictionary<string, double>(StringComparer.Ordinal)
+        {
+            ["MoveSpeed"] = -1d,
+            ["MaxHealth"] = 130.5d,
+            ["MaxHealth2"] = 1d,
+            ["Cost"] = 16777217d,
+            ["Damage1"] = Double.MaxValue,
+            ["MoveSpeed2"] = Double.NaN
+        };
+        foreach (KeyValuePair<string, double> invalid in invalidCases)
+        {
+            var unit = new ContentUnitDefinition
+            {
+                id = "sample:invalid-balance",
+                customBalance = new Dictionary<string, double>(StringComparer.Ordinal)
+                {
+                    [invalid.Key] = invalid.Value
+                }
+            };
+            bool rejected = false;
+            try
+            {
+                UnitBalanceOverrideMapper.CreateCustomBalance(unit);
+            }
+            catch (InvalidOperationException)
+            {
+                rejected = true;
+            }
+
+            if (!rejected)
+            {
+                throw new InvalidOperationException("CreateCustomBalance must reject invalid value " +
+                    invalid.Key + "=" + invalid.Value + ".");
+            }
+        }
+    }),
+    ("unit balance mapper emits parameters in canonical enum order", () =>
+    {
+        var unit = new ContentUnitDefinition
+        {
+            id = "sample:ordered-balance",
+            customBalance = new Dictionary<string, double>(StringComparer.Ordinal)
+            {
+                ["ArmorProtection"] = 1d,
+                ["Cost"] = 10d,
+                ["MoveSpeed"] = 3d,
+                ["MaxHealth"] = 100d
+            }
+        };
+        Dictionary<string, double> mapped = UnitBalanceOverrideMapper.CreateCustomBalance(unit);
+        string[] keys = mapped.Keys.ToArray();
+        string[] expected = { "Cost", "MaxHealth", "MoveSpeed", "ArmorProtection" };
+        if (!keys.SequenceEqual(expected))
+        {
+            throw new InvalidOperationException("CreateCustomBalance must emit canonical enum order, got: " +
+                string.Join(",", keys));
+        }
+    }),
+    ("runtime mutator applies all 25 per-unit parameters to the registered row", () =>
+    {
+        EntityBalancingStore.Reset();
+        try
+        {
+            var unit = new ContentUnitDefinition { id = "sample:all-balance" };
+            var parameters = new Dictionary<string, double>(StringComparer.Ordinal);
+            var expected = new Dictionary<string, object>(StringComparer.Ordinal);
+            foreach (BalanceParameterDefinition definition in UnitBalanceOverrideMapper.AllParameters)
+            {
+                double value = definition.StorageType == BalanceParameterType.Int ? 7d : 2.5d;
+                parameters[definition.ChangeableValueName] = value;
+                expected[definition.RowFieldName] = definition.StorageType == BalanceParameterType.Int
+                    ? (object)7
+                    : (object)2.5f;
+            }
+
+            var provider = new RuntimeMutatorTestProvider();
+            provider.EntityRows.Add(RuntimeMutatorTestData.Row(unit.id));
+            provider.BalanceOverrides.Add(new BalanceOverride
+            {
+                EntityId = unit.id,
+                Parameters = parameters
+            });
+            var mutator = new RuntimeContentMutator(
+                typeof(EntityBalancingStore).Assembly, provider, null);
+            if (!mutator.RegisterEntityRows())
+            {
+                throw new InvalidOperationException("Entity registration failed for the full 25-parameter row.");
+            }
+
+            EntityBalancingParameters registered = EntityBalancingStore.EntityBalancingParametersList[0];
+            foreach (BalanceParameterDefinition definition in UnitBalanceOverrideMapper.AllParameters)
+            {
+                FieldInfo? field = typeof(EntityBalancingParameters).GetField(definition.RowFieldName);
+                object? actual = field?.GetValue(registered);
+                if (actual == null || !actual.Equals(expected[definition.RowFieldName]))
+                {
+                    throw new InvalidOperationException("Row field " + definition.RowFieldName +
+                        " for " + definition.ChangeableValueName + " must be " +
+                        expected[definition.RowFieldName] + ", got " + actual + ".");
+                }
+            }
+        }
+        finally
+        {
+            EntityBalancingStore.Reset();
+        }
+    }),
     };
 }

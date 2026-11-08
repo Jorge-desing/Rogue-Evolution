@@ -49,3 +49,43 @@ Consumidores: `ScaleByChangeableValue` (MonoBehaviour que escala objetos en `Upd
 | `combatValue`, `coinsAmount` | — (no son `ChangeableValue`) | Sí (i4) | Sí | No-Go (fuera del enum) |
 
 Sin acción sobre schema, C# ni validación. La cobertura actual 25/26 es completa para el pipeline `customBalance` → fila base.
+
+## Mejora posterior (2026-11-08): mapa canónico enriquecido y paridad
+
+La auditoría anterior cerró el alcance de *claves nuevas* (sigue sin haber candidatos
+verificables). La mejora aplicada después endurece los 25 mapeos existentes sin
+añadir claves:
+
+- **Mapa canónico con metadatos verificados** (`ContentPackDefinition.cs`,
+  `UnitBalanceOverrideMapper`): cada entrada declara ahora nombre canónico, ordinal
+  del enum fijado (0–22, 24, 25; el 23 es el global excluido), campo exacto de
+  `EntityBalancingParameters`, tipo de almacenamiento y lector nativo
+  (`GetOriginalIntValue` para los 8 int; `GetOriginalFloatValue` para los 17
+  float). Los dos mapeos no derivables por capitalización llevan nota explícita
+  (`Attack1Cooldown → attackCooldown`, `SpawnTtl → duration2`).
+- **Búsqueda inversa** `TryGetByRowFieldName` (ordinal y exacta) desde el nombre de
+  campo de fila al miembro canónico; `IsNativeIntegerBalanceRowField` la usa en
+  O(1) en lugar de escanear el diccionario.
+- **Conversión única**: `TryConvertBalanceValue` es la única ruta
+  validación→`int`/`float` compartida por el mapper, la validación de paquete y
+  `RuntimeContentMutator` (antes duplicada en el mutador). `CreateCustomBalance`
+  revalida cada valor, rechaza negativos/no finitos/fraccionarios de campo int
+  fuera de rango y emite los parámetros en orden canónico del enum.
+- **Fail-fast en el mutador**: el constructor resuelve y verifica los 25
+  `FieldInfo` (existencia, no estático, tipo exacto) una sola vez; un cambio de
+  forma en la fila fijada rompe al construir, no a mitad del registro.
+- **Paridad Python**: `tools/validate_balance_overrides.py` corrige su conjunto
+  int-backed (antes incluía `MaxArmor`/`SkillManaCost`/`duration2`/
+  `productionDuration` y omitía `SightRadius`/`SkillRange`), rechaza negativos y
+  fraccionarios en campos int. `tools/simulate_combat_balance.py` preserva los
+  25 campos en `UnitProfile` (la copia de la skill de balance recibe los mismos
+  cambios de mapeo; su deriva preexistente en el modelo de combate crit/shield no
+  forma parte de este cambio). Los 12 campos sin modelo de combate se conservan
+  para reporte/paridad sin inventar efectos (`MaxArmor` nunca cuenta como EHP).
+- **Schema**: `customBalance` describe el contrato (25 claves, lectores, tope
+  2^24 y los dos mapeos no obvios) y las propiedades `Attack1Cooldown`/`SpawnTtl`
+  nombran su campo de fila.
+
+Evidencia: inspección estática + validación local (harness y suites Python).
+No hay evidencia de consumo en partida de los valores no cubiertos por el smoke
+anterior; el límite de la auditoría original se mantiene.

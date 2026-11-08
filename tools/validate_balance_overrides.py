@@ -2,8 +2,8 @@
 """Valida balanceOverrides y customBalance contra los valores nativos.
 
 Fundamentado en REA (Assembly-CSharp.dll, SHA-256 verificado):
-el enum ``ChangeableValue`` (0x02000475) define 26 claves por unidad;
-``ManaRechargePerSecond`` es global y no per-unit. Los valores int están
+el enum ``ChangeableValue`` (0x02000475) define 26 claves, 25 de ellas
+per-unit con campo de fila; ``ManaRechargePerSecond`` es global y no per-unit. Los valores int están
 acotados por el ensanchado a Single (max 16.777.216) y los float por
 Single.MaxValue. La función pura :func:`validate_balance` devuelve errores;
 el CLI imprime errores o JSON.
@@ -50,14 +50,15 @@ RAW_OVERRIDE_NAMES = {
 }
 
 # Validaciones numéricas: int-backed capadas por Single, float por Single.MaxValue.
+# Int-backed = the 8 members read by GetOriginalIntValue in the pinned game
+# (canonical names + their exact raw row-field names).
 _INT_CAP = 16_777_216
 _FLOAT_CAP = 3.4028235e38
 _INT_BACKED = {
     "Cost", "MaxCapacity", "MaxHealth", "MaxShield", "MaxMana", "MaxRank",
-    "MaxArmor", "SkillManaCost", "duration2", "productionDuration",
-    "maxCapacity", "maxHealth", "maxShield", "maxMana", "maxRank",
-    "cost", "maxArmor", "neededExperienceLevel", "duration",
-    "duration1", "duration2", "gridSize", "firePointCount",
+    "SightRadius", "SkillRange",
+    "cost", "maxCapacity", "maxHealth", "maxShield", "maxMana", "maxRank",
+    "sightRadius", "skillRange",
 }
 
 RARITY_VALUES = {"Common", "Rare", "UltraRare", "rarityCommon", "rarityRare", "rarityUltraRare"}
@@ -90,6 +91,13 @@ def _check_numeric(name: str, value: Any, context: str, findings: list[str]) -> 
     if not math.isfinite(num):
         findings.append(f"{context}: '{name}' no finito ({value!r})")
         return
+    if num < 0:
+        findings.append(f"{context}: '{name}' negativo ({value!r})")
+        return
+    if name in _INT_BACKED and num != int(num):
+        findings.append(
+            f"{context}: '{name}' fraccionario para campo int ({value!r})"
+        )
     if name in _INT_BACKED and num > _INT_CAP:
         findings.append(
             f"{context}: '{name}' int excede el máximo 16.777.216 (Single widening)"

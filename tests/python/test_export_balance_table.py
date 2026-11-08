@@ -58,6 +58,25 @@ class ExportBalanceTableTests(unittest.TestCase):
     def test_empty_pack_empty_rows(self) -> None:
         self.assertEqual([], EXPORT.export_balance_table({}))
 
+    def test_all_25_canonical_and_raw_names_have_columns(self) -> None:
+        canonical = {
+            "Cost", "ProductionDuration", "MaxCapacity", "MaxHealth", "MaxShield",
+            "MaxMana", "MaxRank", "MoveSpeed", "SightRadius", "Damage1", "Damage2",
+            "WeaponRange", "Attack1Cooldown", "Attack2Cooldown", "EffectRadius1",
+            "EffectRadius2", "SkillRange", "HealAmount1", "HealAmount2",
+            "GainCreditsAmount", "SkillManaCost", "Duration1", "SpawnTtl",
+            "MaxArmor", "ArmorProtection",
+        }
+        self.assertEqual(canonical, set(EXPORT.CUSTOM_TO_COLUMN.keys()))
+        # Every canonical key must be reachable from its exact raw row field.
+        for key, column in EXPORT.CUSTOM_TO_COLUMN.items():
+            self.assertIn(column, EXPORT.RAW_TO_COLUMN.values(), key)
+        # The two non-obvious raw mappings must stay exact.
+        self.assertEqual("Attack1Cooldown", EXPORT.RAW_TO_COLUMN["attackCooldown"])
+        self.assertEqual("SpawnTtl", EXPORT.RAW_TO_COLUMN["duration2"])
+        self.assertNotIn("ManaRechargePerSecond", EXPORT.CUSTOM_TO_COLUMN)
+        self.assertNotIn("ManaRechargePerSecond", EXPORT.RAW_TO_COLUMN.values())
+
     def test_to_csv_roundtrip(self) -> None:
         pack = _valid_pack()
         rows = EXPORT.export_balance_table(pack)

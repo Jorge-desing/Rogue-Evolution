@@ -46,12 +46,22 @@ class TestLoaderParity(unittest.TestCase):
         self.assertIsNotNone(cb, "missing customBalance in schema")
         schema_keys = set(cb["properties"].keys())
         cs_text = DEFS.read_text(encoding="utf-8")
-        cs_keys = set(re.findall(r'\["(\w+)"\] = new BalanceParameterDefinition', cs_text))
+        entries = re.findall(
+            r'new BalanceParameterDefinition\("(\w+)",\s*(\d+),\s*"(\w+)",\s*BalanceParameterType\.(\w+)(?:,\s*"[^"]*")?\)',
+            cs_text,
+        )
+        cs_keys = {entry[0] for entry in entries}
         self.assertEqual(schema_keys, cs_keys, "ParamMap/schema customBalance drift")
         # Global-only value must stay excluded from per-unit map
         self.assertNotIn("ManaRechargePerSecond", cs_keys)
         self.assertNotIn("ManaRechargePerSecond", schema_keys)
         self.assertEqual(len(cs_keys), 25, "expected 25 per-unit keys")
+        self.assertEqual(len(entries), 25, "expected 25 canonical mapping entries")
+        ordinals = {int(entry[1]) for entry in entries}
+        self.assertEqual(ordinals, set(range(26)) - {23}, "enum ordinals must skip global-only 23")
+        rows = {entry[0]: entry[2] for entry in entries}
+        self.assertEqual(rows["Attack1Cooldown"], "attackCooldown")
+        self.assertEqual(rows["SpawnTtl"], "duration2")
 
     def test_card_model_scaling_bounds(self):
         schema = json.loads(SCHEMA.read_text(encoding="utf-8"))
