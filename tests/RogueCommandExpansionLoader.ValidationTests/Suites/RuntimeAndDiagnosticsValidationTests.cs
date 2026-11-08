@@ -2440,6 +2440,17 @@ internal static partial class ValidationTestRunner
             throw new InvalidOperationException("PrepareContentForRuntime refresh gating did not distinguish ready and pending states.");
         }
     }),
+    ("bundle fallback stays disabled unless an explicit fallback path is configured", () =>
+    {
+        if (BundleFallbackPolicy.ShouldAttemptFallback(true, null) ||
+            BundleFallbackPolicy.ShouldAttemptFallback(true, "") ||
+            BundleFallbackPolicy.ShouldAttemptFallback(true, "   ") ||
+            !BundleFallbackPolicy.ShouldAttemptFallback(true, "C:/fallback.bundle") ||
+            BundleFallbackPolicy.ShouldAttemptFallback(false, "C:/fallback.bundle"))
+        {
+            throw new InvalidOperationException("Bundle fallback must stay fail-closed unless a non-empty fallback path is configured for a missing bundle.");
+        }
+    }),
     ("runtime unit mechanics director executes baseline status effects, combat boosts, veterancy rank-ups, healing, and auras", () =>
     {
         ExistingControllers.Instance.Reset();

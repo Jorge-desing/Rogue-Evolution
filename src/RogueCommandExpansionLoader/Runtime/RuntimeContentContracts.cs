@@ -64,6 +64,20 @@ namespace RogueCommandExpansionLoader.Runtime
         }
     }
 
+    internal static class BundleFallbackPolicy
+    {
+        /// <summary>
+        /// The loader never silently substitutes a different bundle for a declared one unless
+        /// an explicit, non-empty fallback path is configured. The default game/mod
+        /// configuration provides no global fallback, so a missing declared bundle fails closed.
+        /// </summary>
+        public static bool ShouldAttemptFallback(bool bundleFileMissing, string configuredFallbackPath)
+        {
+            return bundleFileMissing && !String.IsNullOrWhiteSpace(configuredFallbackPath);
+        }
+    }
+
+
     /// <summary>Optional bridge for localized ability text on mod units.</summary>
     public interface IUnitSkillLocalizationRuntimeProvider
     {

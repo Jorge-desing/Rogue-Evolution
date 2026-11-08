@@ -3560,13 +3560,17 @@ namespace RogueCommandExpansionLoader.Content
                     FileStream stream;
                     if (!TryOpenContainedFile(packageRoot, fullPath, out stream, out pathFailure))
                     {
-                        _log?.Invoke("Warning: Bundle file missing at '" + fullPath + "'; attempting global fallback if configured.");
-
-                        // Implement global-fallback mechanism
-                        string fallbackPath = GetGlobalFallbackBundlePath();
-                        if (!String.IsNullOrWhiteSpace(fallbackPath) && TryOpenContainedFile(packageRoot, fallbackPath, out stream, out pathFailure))
+                        if (BundleFallbackPolicy.ShouldAttemptFallback(true, GetGlobalFallbackBundlePath()))
                         {
-                            _log?.Invoke("Successfully loaded fallback bundle: " + fallbackPath);
+                            string fallbackPath = GetGlobalFallbackBundlePath();
+                            if (TryOpenContainedFile(packageRoot, fallbackPath, out stream, out pathFailure))
+                            {
+                                _log?.Invoke("Successfully loaded fallback bundle: " + fallbackPath);
+                            }
+                            else
+                            {
+                                throw new InvalidDataException(pathFailure);
+                            }
                         }
                         else
                         {
