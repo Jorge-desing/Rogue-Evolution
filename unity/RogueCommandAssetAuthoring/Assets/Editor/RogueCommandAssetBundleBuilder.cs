@@ -94,7 +94,7 @@ namespace RogueCommandExpansion.Authoring
             {
                 EnsureSafePackageTree(packRoot, outputPath);
                 AssetBundleManifest manifest = BuildPipeline.BuildAssetBundles(outputPath,
-                    BuildAssetBundleOptions.ChunkBasedCompression, BuildTarget.StandaloneWindows64);
+                    BuildAssetBundleOptions.ChunkBasedCompression | BuildAssetBundleOptions.ForceRebuildAssetBundle, BuildTarget.StandaloneWindows64);
                 if (manifest == null)
                 {
                     EditorUtility.DisplayDialog("AssetBundle build failed",
@@ -113,6 +113,8 @@ namespace RogueCommandExpansion.Authoring
                 }
 
                 ValidateBuiltBundleSizes(outputPath, bundleNames, generatedManifestPath);
+
+                ValidateBuiltBundles(outputPath, bundleNames);
 
                 string manifestFileName = pack.assetBundleManifestPath.Substring("bundles/".Length);
                 string manifestDestination = Path.GetFullPath(Path.Combine(outputPath, manifestFileName));
@@ -508,6 +510,40 @@ namespace RogueCommandExpansion.Authoring
                 }
 
                 totalBytes += bundleInfo.Length;
+            }
+        }
+
+        /// <summary>
+        /// Reopens each built bundle and logs asset counts/sizes, rejecting
+        /// bundles that fail to load or contain zero assets. Mirrors the
+        /// post-build validation used by the Tactical/Visual scaffolders.
+        /// </summary>
+        private static void ValidateBuiltBundles(string outputPath, string[] bundleNames)
+        {
+            if (bundleNames == null) return;
+            for (int i = 0; i < bundleNames.Length; i++)
+            {
+                string bundlePath = Path.Combine(outputPath, bundleNames[i]);
+                AssetBundle bundle = AssetBundle.LoadFromFile(bundlePath);
+                if (bundle == null)
+                {
+                    throw new InvalidDataException("Built bundle could not be reopened: " + bundlePath);
+                }
+                try
+                {
+                    string[] assetNames = bundle.GetAllAssetNames();
+                    if (assetNames == null || assetNames.Length == 0)
+                    {
+                        throw new InvalidDataException("Built bundle contains no assets: " + bundleNames[i]);
+                    }
+                    long bytes = new FileInfo(bundlePath).Length;
+                    Debug.Log("[RogueCommandAssetBundleBuilder] Built bundle '" + bundleNames[i] + "' (" +
+                        assetNames.Length + " assets, " + bytes + " bytes).");
+                }
+                finally
+                {
+                    bundle.Unload(true);
+                }
             }
         }
 
