@@ -374,6 +374,36 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
         self.assertIn("GetVisualSurfaceCensusJson", [method for method, _ in calls])
         self.assertIn("GetGameTimeScaleJson", [method for method, _ in calls])
 
+    def test_call_getters_passes_safe_args_to_optional_param_getters(self) -> None:
+        calls: list[tuple[str, list[object]]] = []
+
+        def fake_http(endpoint: str, params: dict[str, object] | None = None, **_: object) -> str:
+            self.assertEqual(endpoint, "component/call_method")
+            params = params or {}
+            method = str(params["methodName"])
+            args = json.loads(str(params.get("args", "[]")))
+            calls.append((method, args))
+            payload = json.dumps({"kind": method})
+            return (
+                '{"status":"ok", "message":"Called '
+                f"'{method}' with {len(args)} args. ReturnValue: {payload}"
+                '"}'
+            )
+
+        with (
+            mock.patch.object(SERVER, "_DIAGNOSTICS_GO_ID", 73),
+            mock.patch.object(SERVER, "_call_http", side_effect=fake_http),
+        ):
+            response = SERVER.execute_tool(
+                "diagnostics_call_getters",
+                {"getters": ["GetRelicCensusJson", "GetUpgradeCensusJson", "GetVisualVariantCensusJson"]},
+            )
+
+        self.assertFalse(response["isError"])
+        self.assertEqual([64], next(args for method, args in calls if method == "GetRelicCensusJson"))
+        self.assertEqual([64], next(args for method, args in calls if method == "GetUpgradeCensusJson"))
+        self.assertEqual([64], next(args for method, args in calls if method == "GetVisualVariantCensusJson"))
+
     def test_agent_coordination_and_locking_tools(self) -> None:
         calls: list[tuple[str, list[object]]] = []
 

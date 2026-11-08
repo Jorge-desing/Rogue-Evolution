@@ -284,6 +284,9 @@ _RUNTIME_SNAPSHOT_GETTER_ARGS: dict[str, list[object]] = {
     "GetVisualMaterialCensusJson": [64],
     "GetSocketAuditCensusJson": [64],
     "GetIntermissionCensusJson": [64],
+    "GetRelicCensusJson": [64],
+    "GetUpgradeCensusJson": [64],
+    "GetVisualVariantCensusJson": [64],
 }
 
 
