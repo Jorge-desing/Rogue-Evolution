@@ -4,8 +4,6 @@ Before changing this repository, read [the agent handoff](docs/research/AGENT-HA
 
 **Always consult context before acting** (start of every task and conversation): query the mem0 memory store for durable user preferences, facts, and decisions; inspect the current checkout state with `git status`, `git log`, and the current HEAD (never trust remembered state alone); and review the handoff, README, and `memory.csv`. Memory and handoff notes may be stale or contradicted by newer commits — verify against the current tree and recent history before relying on them.
 
-**Always consult context before acting** (at the start of every task and conversation): query the mem0 memory store for durable user preferences, facts, and decisions; inspect the current checkout state with `git status`, `git log`, and the current HEAD (never trust remembered state alone); and review the handoff, README, and `memory.csv`. Memory and handoff notes may be stale or contradicted by newer commits — verify against the current tree and recent history before relying on them.
-
 `memory.csv` (repository root) is the permanent, versioned snapshot of the mem0 memory export for this project and is reference material for all agents. Consult it before relying on prior project context, and refresh it from the memory service only through the normal memory-sync workflow; never hand-edit its rows.
 
 - Treat the game's version, `Assembly-CSharp.dll` SHA-256, and MVID as a single compatibility identity. Recheck all three before relying on reflected game signatures or metadata tokens.
