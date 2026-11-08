@@ -1817,12 +1817,15 @@ namespace RogueCommandExpansion.Authoring
                 }
 
                 animator.applyRootMotion = false;
+                VehiclePrefabBuilder.EnsureCanonicalVfxSockets(instance, instance);
+                EnsureTurretAndRadarSockets(instance, instance, requireTurret: true);
                 bool success;
                 PrefabUtility.SaveAsPrefabAsset(instance, prefabPath, out success);
                 if (!success)
                 {
                     throw new InvalidOperationException("Unity could not save refreshed " + prefabPath + ".");
                 }
+                ValidateSavedPrefab(prefabPath, unitName);
                 Debug.Log("[RogueCommandVisualSampleScaffolder] Refreshed body-driven Animator graph for " + unitName + ".");
             }
             finally

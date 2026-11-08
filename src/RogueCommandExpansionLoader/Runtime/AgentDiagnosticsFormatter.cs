@@ -3702,6 +3702,52 @@ new Dictionary<string, object> { ["name"] = "GetVisualSurfaceCensusJson", ["desc
 
         // ---- Minimal dependency-free JSON writer ----
 
+        public static string SerializeAiArchitectureCensus(RogueCommandExpansionLoader.Runtime.Ai.AiArchitectureCensus census)
+        {
+            RogueCommandExpansionLoader.Runtime.Ai.AiArchitectureCensus c =
+                census ?? RogueCommandExpansionLoader.Runtime.Ai.AiArchitectureCensus.Empty;
+
+            var instanceRows = new List<Dictionary<string, object>>();
+            if (c.Instances != null)
+            {
+                for (int i = 0; i < c.Instances.Count; i++)
+                {
+                    RogueCommandExpansionLoader.Runtime.Ai.AiArchitectureInstanceDiagnosticRow row = c.Instances[i];
+
+                    instanceRows.Add(new Dictionary<string, object>
+                    {
+                        ["profileId"] = row.ProfileId,
+                        ["coordinatedModuleCount"] = row.CoordinatedModuleCount,
+                        ["activeDoctrine"] = row.ActiveDoctrine,
+                        ["trackedAiCombatUnits"] = row.TrackedAiCombatUnits,
+                        ["trackedHostileCombatUnits"] = row.TrackedHostileCombatUnits,
+                        ["underHarvesterOrBasePressure"] = row.UnderHarvesterOrBasePressure,
+                        ["approvedOrdersLastTick"] = row.ApprovedOrdersLastTick,
+                        ["conflictsResolvedLastTick"] = row.ConflictsResolvedLastTick,
+                        ["lockoutBlockedLastTick"] = row.LockoutBlockedLastTick,
+                        ["hysteresisBlockedLastTick"] = row.HysteresisBlockedLastTick,
+                        ["budgetOmittedLastTick"] = row.BudgetOmittedLastTick
+                    });
+                }
+            }
+
+            var root = new Dictionary<string, object>
+            {
+                ["omittedInstanceCount"] = c.OmittedInstanceCount,
+                ["kind"] = "aiArchitectureCensus",
+                ["activeCompositeCount"] = c.ActiveCompositeCount,
+                ["totalCoordinatedModuleCount"] = c.TotalCoordinatedModuleCount,
+                ["totalApprovedOrdersLastTick"] = c.TotalApprovedOrdersLastTick,
+                ["totalConflictsResolvedLastTick"] = c.TotalConflictsResolvedLastTick,
+                ["totalLockoutBlockedLastTick"] = c.TotalLockoutBlockedLastTick,
+                ["totalHysteresisBlockedLastTick"] = c.TotalHysteresisBlockedLastTick,
+                ["totalBudgetOmittedLastTick"] = c.TotalBudgetOmittedLastTick,
+                ["instances"] = instanceRows
+            };
+
+            return Serialize(root);
+        }
+
         private static string Serialize(Dictionary<string, object> view)
         {
             var builder = new StringBuilder();

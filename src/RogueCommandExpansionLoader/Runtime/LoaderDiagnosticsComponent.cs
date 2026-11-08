@@ -2245,6 +2245,12 @@ namespace RogueCommandExpansionLoader.Runtime
                 RuntimeAiRosterCensus.Current().AiBuildingCount);
         }
 
+        public string GetAiArchitectureCensusJson()
+        {
+            return AgentDiagnosticsFormatter.SerializeAiArchitectureCensus(
+                RogueCommandExpansionLoader.Runtime.Ai.RuntimeAiArchitectureCensus.Current());
+        }
+
         private LoaderDiagnosticsSnapshot SafeSnapshot()
         {
             if (_provider == null)

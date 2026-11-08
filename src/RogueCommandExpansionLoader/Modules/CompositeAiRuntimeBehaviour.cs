@@ -18,6 +18,10 @@ namespace RogueCommandExpansionLoader.Modules
         public const float DefaultRetargetHysteresisMultiplier = 1.15f;
         public const int DefaultMaxArbitratedDispatchesPerTick = 12;
 
+        private static readonly object _activeCompositesLock = new object();
+        private static readonly List<CompositeAiRuntimeBehaviour> _activeComposites =
+            new List<CompositeAiRuntimeBehaviour>();
+
         private readonly string _profileId;
         private readonly List<string> _moduleIds;
         private readonly List<IRogueCommandAiRuntimeBehaviour> _behaviours;
@@ -27,6 +31,7 @@ namespace RogueCommandExpansionLoader.Modules
         private readonly AiCommandArbiterState _arbiterState;
         private readonly List<AiIntentProposal> _proposalBuffer;
         private AiBattlefieldSnapshot _lastBattlefieldSnapshot = AiBattlefieldSnapshot.Empty;
+        private AiDoctrineWeights _lastDoctrineWeights = AiDoctrineWeights.Skirmish;
         private AiArbitrationResult _lastArbitrationResult;
         private bool _initialized;
         private bool _destroyed;
@@ -116,6 +121,11 @@ namespace RogueCommandExpansionLoader.Modules
                     if (!_destroyed)
                     {
                         _destroyed = true;
+                        lock (_activeCompositesLock)
+                        {
+                            _activeComposites.Remove(this);
+                        }
+
                         for (int cleanupIndex = _behaviours.Count - 1; cleanupIndex >= 0; cleanupIndex--)
                         {
                             Exception cleanupFailure = TryDestroyAt(cleanupIndex, "initialization rollback");
@@ -149,6 +159,88 @@ namespace RogueCommandExpansionLoader.Modules
             }
 
             _initialized = true;
+            lock (_activeCompositesLock)
+            {
+                if (!_activeComposites.Contains(this))
+                {
+                    _activeComposites.Add(this);
+                }
+            }
+        }
+
+        internal static AiArchitectureCensus BuildArchitectureCensus(int maxTrackedInstances)
+        {
+            int cap = Math.Max(1, maxTrackedInstances);
+            lock (_activeCompositesLock)
+            {
+                var rows = new List<AiArchitectureInstanceDiagnosticRow>();
+                int omitted = 0;
+                int activeCount = 0;
+                int totalCoord = 0;
+                int totalApproved = 0;
+                int totalConflicts = 0;
+                int totalLockout = 0;
+                int totalHysteresis = 0;
+                int totalBudgetOmitted = 0;
+
+                for (int i = 0; i < _activeComposites.Count; i++)
+                {
+                    CompositeAiRuntimeBehaviour instance = _activeComposites[i];
+                    if (instance == null || instance._destroyed || !instance._initialized)
+                    {
+                        continue;
+                    }
+
+                    activeCount++;
+                    int coordCount = instance._coordinatedBehaviours.Count;
+                    totalCoord += coordCount;
+
+                    AiBattlefieldSnapshot snap = instance._lastBattlefieldSnapshot ?? AiBattlefieldSnapshot.Empty;
+                    AiArbitrationResult arb = instance._lastArbitrationResult;
+                    int approved = arb != null ? arb.ApprovedOrders.Count : 0;
+                    int conflicts = arb != null ? arb.ConflictsResolvedCount : 0;
+                    int lockout = arb != null ? arb.LockoutBlockedCount : 0;
+                    int hysteresis = arb != null ? arb.HysteresisBlockedCount : 0;
+                    int budgetOmitted = arb != null ? arb.BudgetOmittedCount : 0;
+
+                    totalApproved += approved;
+                    totalConflicts += conflicts;
+                    totalLockout += lockout;
+                    totalHysteresis += hysteresis;
+                    totalBudgetOmitted += budgetOmitted;
+
+                    if (rows.Count < cap)
+                    {
+                        rows.Add(new AiArchitectureInstanceDiagnosticRow(
+                            profileId: instance._profileId,
+                            coordinatedModuleCount: coordCount,
+                            activeDoctrine: instance._lastDoctrineWeights.DoctrineName ?? "Standard",
+                            trackedAiCombatUnits: snap.TotalAiCombatUnits,
+                            trackedHostileCombatUnits: snap.TotalHostileCombatUnits,
+                            underHarvesterOrBasePressure: snap.UnderHarvesterOrBasePressure,
+                            approvedOrdersLastTick: approved,
+                            conflictsResolvedLastTick: conflicts,
+                            lockoutBlockedLastTick: lockout,
+                            hysteresisBlockedLastTick: hysteresis,
+                            budgetOmittedLastTick: budgetOmitted));
+                    }
+                    else
+                    {
+                        omitted++;
+                    }
+                }
+
+                return new AiArchitectureCensus(
+                    omittedInstanceCount: omitted,
+                    activeCompositeCount: activeCount,
+                    totalCoordinatedModuleCount: totalCoord,
+                    totalApprovedOrdersLastTick: totalApproved,
+                    totalConflictsResolvedLastTick: totalConflicts,
+                    totalLockoutBlockedLastTick: totalLockout,
+                    totalHysteresisBlockedLastTick: totalHysteresis,
+                    totalBudgetOmittedLastTick: totalBudgetOmitted,
+                    instances: rows.AsReadOnly());
+            }
         }
 
         public void Tick()
@@ -187,7 +279,7 @@ namespace RogueCommandExpansionLoader.Modules
         {
             _proposalBuffer.Clear();
             _lastBattlefieldSnapshot = _battlefieldCollector.CollectCurrentSnapshot();
-            AiDoctrineWeights doctrineWeights = StrategicDoctrinePolicy.Evaluate(_lastBattlefieldSnapshot);
+            _lastDoctrineWeights = StrategicDoctrinePolicy.Evaluate(_lastBattlefieldSnapshot);
 
             for (int i = 0; i < _coordinatedBehaviours.Count; i++)
             {
@@ -200,7 +292,7 @@ namespace RogueCommandExpansionLoader.Modules
                 {
                     _coordinatedBehaviours[i].CollectProposals(
                         _lastBattlefieldSnapshot,
-                        doctrineWeights,
+                        _lastDoctrineWeights,
                         _proposalBuffer);
                 }
                 catch (Exception exception)
@@ -313,6 +405,11 @@ namespace RogueCommandExpansionLoader.Modules
             }
 
             _destroyed = true;
+            lock (_activeCompositesLock)
+            {
+                _activeComposites.Remove(this);
+            }
+
             _proposalBuffer.Clear();
             _arbiterState.Clear();
             _battlefieldCollector.Reset();

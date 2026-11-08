@@ -3490,6 +3490,208 @@ internal static partial class ValidationTestRunner
             ExistingControllers.Instance.Reset();
         }
     }),
+    ("HUB-D Phase 3: TacticalDirectorParameterParser validates defaults, upper bounds, and rejects invalid/duplicate parameters", () =>
+    {
+        if (!TacticalDirectorParameterParser.TryParse(null, out TacticalDirectorSettings defaults, out string diagnostic) ||
+            diagnostic != null ||
+            defaults.BaseIndex != -1 ||
+            Math.Abs(defaults.EvalIntervalSeconds - 0.5f) > 0.001f ||
+            Math.Abs(defaults.EngagementRadius - 40.0f) > 0.001f ||
+            Math.Abs(defaults.DefenseRadius - 20.0f) > 0.001f ||
+            Math.Abs(defaults.RetreatHealthRatio - 0.30f) > 0.001f ||
+            defaults.MaxProposalsPerUnit != 2 ||
+            !defaults.EnableSurvivalKiting ||
+            !defaults.EnableBaseDefense ||
+            !defaults.EnableFocusTargeting)
+        {
+            throw new InvalidOperationException("TacticalDirectorParameterParser did not return expected defaults.");
+        }
+
+        ContentModuleParameter[] customParams =
+        [
+            new ContentModuleParameter { name = "baseIndex", value = "31" },
+            new ContentModuleParameter { name = "evalIntervalSeconds", value = "10.0" },
+            new ContentModuleParameter { name = "engagementRadius", value = "120.0" },
+            new ContentModuleParameter { name = "defenseRadius", value = "60.0" },
+            new ContentModuleParameter { name = "retreatHealthRatio", value = "0.60" },
+            new ContentModuleParameter { name = "maxProposalsPerUnit", value = "4" },
+            new ContentModuleParameter { name = "enableSurvivalKiting", value = "false" },
+            new ContentModuleParameter { name = "enableBaseDefense", value = "true" },
+            new ContentModuleParameter { name = "enableFocusTargeting", value = "false" }
+        ];
+
+        if (!TacticalDirectorParameterParser.TryParse(customParams, out TacticalDirectorSettings custom, out diagnostic) ||
+            diagnostic != null ||
+            custom.BaseIndex != 31 ||
+            Math.Abs(custom.EvalIntervalSeconds - 10.0f) > 0.001f ||
+            Math.Abs(custom.EngagementRadius - 120.0f) > 0.001f ||
+            Math.Abs(custom.DefenseRadius - 60.0f) > 0.001f ||
+            Math.Abs(custom.RetreatHealthRatio - 0.60f) > 0.001f ||
+            custom.MaxProposalsPerUnit != 4 ||
+            custom.EnableSurvivalKiting ||
+            !custom.EnableBaseDefense ||
+            custom.EnableFocusTargeting)
+        {
+            throw new InvalidOperationException("TacticalDirectorParameterParser rejected valid upper-bound parameters.");
+        }
+
+        string[] invalidPairs =
+        [
+            "baseIndex=32",
+            "evalIntervalSeconds=0.05",
+            "engagementRadius=4.0",
+            "defenseRadius=2.0",
+            "retreatHealthRatio=0.95",
+            "maxProposalsPerUnit=0",
+            "enableSurvivalKiting=invalid",
+            "unknownParam=1"
+        ];
+
+        foreach (string pair in invalidPairs)
+        {
+            string[] kv = pair.Split('=');
+            var bad = new[] { new ContentModuleParameter { name = kv[0], value = kv[1] } };
+            if (TacticalDirectorParameterParser.TryParse(bad, out _, out _))
+            {
+                throw new InvalidOperationException("TacticalDirectorParameterParser accepted invalid parameter: " + pair);
+            }
+        }
+    }),
+    ("HUB-D Phase 3: TacticalDirectorAiModule is registered, coordinates dead-zone kite + combat focus, and populates RuntimeAiArchitectureCensus with omission counters first", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        try
+        {
+            UnityEngine.Time.time = 50.0f;
+
+            AiModuleRegistry registry = AiModuleRegistry.CreateDefault();
+            if (!registry.RegisteredModuleIds.Contains(TacticalDirectorAiModule.ModuleId))
+            {
+                throw new InvalidOperationException("TacticalDirectorAiModule is not registered in AiModuleRegistry.CreateDefault().");
+            }
+
+            RuntimeUnitMechanicsDirector.RegisterProfile(
+                "sample-native:test-artillery",
+                new UnitRuntimeMechanicsProfile
+                {
+                    EntityId = "sample-native:test-artillery",
+                    MinAttackRange = 12f
+                });
+
+            var aiArtillery = new EntityController
+            {
+                UniqueEntityId = 1101,
+                EntityId = "sample-native:test-artillery",
+                IsControlledByAi = true,
+                IsControlledByPlayer = false,
+                IsUnit = true,
+                IsCombatUnit = true,
+                CanAttackAndIsAttackEnabled = true,
+                CanMoveAndMovementIsEnabled = true,
+                aiBaseIndex = 0,
+                CurrentHealth = 100f,
+                MaxHealth = 100f,
+                Damage1 = 45f,
+                Attack1Cooldown = 1.0f,
+                WeaponRange = 30f,
+                MoveSpeed = 9f,
+                Role = UnitRole.Sniper,
+                Position = new Vector3(10f, 0f, 10f)
+            };
+
+            var aiBrawler = new EntityController
+            {
+                UniqueEntityId = 1102,
+                EntityId = "sample-native:scout-tank",
+                IsControlledByAi = true,
+                IsControlledByPlayer = false,
+                IsUnit = true,
+                IsCombatUnit = true,
+                CanAttackAndIsAttackEnabled = true,
+                CanMoveAndMovementIsEnabled = true,
+                aiBaseIndex = 0,
+                CurrentHealth = 120f,
+                MaxHealth = 120f,
+                Damage1 = 25f,
+                Attack1Cooldown = 1.0f,
+                WeaponRange = 14f,
+                MoveSpeed = 10f,
+                Role = UnitRole.Tank,
+                Position = new Vector3(25f, 0f, 10f)
+            };
+
+            var encroachingHostile = new EntityController
+            {
+                UniqueEntityId = 1201,
+                EntityId = "player:raider",
+                IsControlledByPlayer = true,
+                IsControlledByAi = false,
+                IsUnit = true,
+                IsCombatUnit = true,
+                CanAttackAndIsAttackEnabled = true,
+                CurrentHealth = 90f,
+                MaxHealth = 100f,
+                Damage1 = 30f,
+                Attack1Cooldown = 1.0f,
+                WeaponRange = 10f,
+                MoveSpeed = 11f,
+                Role = UnitRole.FrontalAttacker,
+                Position = new Vector3(14f, 0f, 10f)
+            };
+
+            ExistingControllers.Instance.AiUnits().Add(aiArtillery);
+            ExistingControllers.Instance.AiUnits().Add(aiBrawler);
+            ExistingControllers.Instance.PlayerUnits().Add(encroachingHostile);
+
+            var directorModule = new TacticalDirectorAiModule();
+            IRogueCommandAiRuntimeBehaviour directorBehaviour = directorModule.CreateBehaviour(
+                new DefaultAiBehaviour { instanceId = 5001 },
+                null);
+
+            var composite = new CompositeAiRuntimeBehaviour(
+                profileId: "sample-reactive-ai:base-defense",
+                moduleIds: new[] { TacticalDirectorAiModule.ModuleId },
+                behaviours: new[] { directorBehaviour });
+
+            composite.OnInitialized();
+            composite.Tick();
+
+            if (!aiArtillery.LastExecutedCommand.HasValue ||
+                aiArtillery.LastExecutedCommand.Value.command != EntityCommand.Command.Move ||
+                aiArtillery.LastExecutedCommand.Value.destination.x >= 10f)
+            {
+                throw new InvalidOperationException("TacticalDirectorAiModule did not dispatch dead-zone kite Move for artillery unit.");
+            }
+
+            if (!aiBrawler.LastExecutedCommand.HasValue ||
+                aiBrawler.LastExecutedCommand.Value.command != EntityCommand.Command.AttackMoveOnTarget ||
+                aiBrawler.LastExecutedCommand.Value.target != encroachingHostile)
+            {
+                throw new InvalidOperationException("TacticalDirectorAiModule did not dispatch AttackMoveOnTarget for brawler unit.");
+            }
+
+            RogueCommandExpansionLoader.Runtime.Ai.AiArchitectureCensus census =
+                RogueCommandExpansionLoader.Runtime.Ai.RuntimeAiArchitectureCensus.Current();
+            string json = AgentDiagnosticsFormatter.SerializeAiArchitectureCensus(census);
+
+            int omittedIdx = json.IndexOf("\"omittedInstanceCount\"", StringComparison.Ordinal);
+            int rowsIdx = json.IndexOf("\"instances\"", StringComparison.Ordinal);
+            if (census.ActiveCompositeCount < 1 ||
+                census.TotalApprovedOrdersLastTick < 2 ||
+                omittedIdx < 0 ||
+                rowsIdx < 0 ||
+                omittedIdx > rowsIdx)
+            {
+                throw new InvalidOperationException("RuntimeAiArchitectureCensus or JSON serializer did not report active HUB-D state with omission counters first: " + json);
+            }
+
+            composite.OnDestroyed();
+        }
+        finally
+        {
+            ExistingControllers.Instance.Reset();
+        }
+    }),
     };
 
     private sealed class DelegatingTestAiRuntimeBehaviour : IRogueCommandAiRuntimeBehaviour

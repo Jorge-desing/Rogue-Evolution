@@ -54,6 +54,7 @@ namespace RogueCommandExpansionLoader.Modules
             modules.Register(new WaveEscalationAiModule());
             modules.Register(new ThreatPrioritizationAiModule());
             modules.Register(new AdaptiveCommanderAiModule());
+            modules.Register(new TacticalDirectorAiModule());
             return modules;
         }
 

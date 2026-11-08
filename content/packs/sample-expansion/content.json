@@ -102,6 +102,25 @@
           "scale": 1.0
         }
       ],
+      "combatBoosts": [
+        {
+          "id": "rcm:boost",
+          "statName": "Damage1",
+          "multiplier": 1.03,
+          "duration": 15.0
+        }
+      ],
+      "experience": {
+        "experiencePerLevel": 10,
+        "maxLevel": 3,
+        "experienceGainMultiplier": 1,
+        "levelUpBonus": 0.04
+      },
+      "experienceReward": {
+        "experienceAmount": 2,
+        "experienceType": "Combat",
+        "bonusMultiplier": 1
+      },
       "prespawnCount": 2,
       "baselineStatusEffects": [
         "Turbo"

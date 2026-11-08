@@ -247,7 +247,7 @@ Pitfall: keep the resolver pure and free of Unity types so it compiles in the ha
 
 ### Registered AI Modules
 
-The loader includes 20 compiled AI modules registered in `AiModuleRegistry.CreateDefault()` (available for content packs, with a per-profile limit of up to 8 modules):
+The loader includes 22 compiled AI modules registered in `AiModuleRegistry.CreateDefault()` (available for content packs, with a per-profile limit of up to 8 modules):
 
 1. **`sample:trace-default`**:
    - Diagnostic trace module monitoring native AI lifecycle events and logging execution milestones.
@@ -319,6 +319,12 @@ The loader includes 20 compiled AI modules registered in `AiModuleRegistry.Creat
 20. **`sample:patrol-and-intercept`**:
     - Manages tactical perimeter patrol and interception. `AttackMove` remains the default mode.
     - Opt-in native Patrol route motion requires `CurrentPlayerCommandName == DoNothing` AND verified empty private `_commandChain` queue (`LinkedList<EntityCommand>`), failing closed otherwise to preserve queued orders.
+21. **`sample:adaptive-commander`**:
+    - Dynamically shifts AI macro posture and assault wave cadence based on battlefield economy and force ratios.
+22. **`sample:tactical-director`** (HUB-D Coordinated Architecture):
+    - Implements `ICoordinatedAiRuntimeBehaviour` over the 3-layer Hierarchical Utility-Blackboard Director (`AiBattlefieldBlackboard` -> `StrategicDoctrinePolicy` & `TacticalUtilityScorer` -> `AiCommandArbiterPolicy`).
+    - Parameters: `baseIndex` (-1–31; default -1), `engagementRadius` (5–150; default 45), `kiteSpeedThreshold` (1–30; default 8), `lowHealthRetreatRatio` (0.05–0.75; default 0.30), `lockoutDurationSeconds` (0.1–15.0; default 1.5), `maxProposalsPerTick` (1–32; default 12).
+    - Emits prioritized `AiIntentProposal` rows (`SurvivalKite` for artillery `MinAttackRange` dead-zones and damaged skirmishers; `CombatFocus` with role affinity and anti-overkill damping) arbitrated centrally per unit in `CompositeAiRuntimeBehaviour` and surfaced via `RuntimeAiArchitectureCensus` (`GetAiArchitectureCensusJson`, with `omittedInstanceCount` first).
 
 ### Runtime mechanics profile consumption
 

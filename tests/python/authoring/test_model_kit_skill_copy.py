@@ -454,8 +454,11 @@ class TestModelKitSkillCopy(unittest.TestCase):
         """All active builders and the manual bridge consume the shared Wave 3/4 overlay."""
         builder_names = [
             "Build-SampleScoutModel.py",
+            "Build-SampleScoutTankModel.py",
             "Build-ColossusSiegeModel.py",
             "Build-IroncladWalkerModel.py",
+            "Build-AtlasCraneMechModel.py",
+            "Build-BastionSiegeMechModel.py",
             "Build-SkirmishStrikeBikeModel.py",
             "Build-SurgeArcTankModel.py",
             "Build-ArachnidHexapodModel.py",

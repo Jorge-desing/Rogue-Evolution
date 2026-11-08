@@ -307,3 +307,14 @@ Packs can declare advanced, native-grounded runtime mechanics on units (`units[]
 - Entries with a non-empty native `StatusEffect` name and a positive finite duration are applied; other effect-type strings remain valid descriptive metadata and are ignored by this native bridge. The runtime clamps applied durations to `0.05`–`300` seconds and processes at most 16 entries per unit attachment.
 - The loader applies recognized statuses to the unit through `EntityController.SetActiveStatusEffect(..., DurationType.Seconds, duration)` once when the runtime profile attaches. The native controller owns expiration; `magnitude` remains preserved as declarative metadata because the pinned native status API exposes no separate magnitude parameter, so the loader does not invent a stat modifier.
 - When an EntityFactory controller is reused, the loader removes the timed statuses it applied before attaching the next profile, preventing effects from leaking between units. This is compiled loader runtime behavior and still requires a Steam match to prove the effect on a natural production path.
+
+### 6. Hierarchical Utility-Blackboard Director AI (`sample:tactical-director`)
+- A coordinated AI module implementing `ICoordinatedAiRuntimeBehaviour` on top of the HUB-D 3-layer architecture (`AiBattlefieldBlackboard` -> `StrategicDoctrinePolicy` & `TacticalUtilityScorer` -> `AiCommandArbiterPolicy`).
+- **Parameters** (all optional):
+  - `baseIndex` (integer, `-1`–`31`; default `-1` for all AI bases)
+  - `engagementRadius` (finite number, `5`–`150`; default `45`)
+  - `kiteSpeedThreshold` (finite number, `1`–`30`; default `8`)
+  - `lowHealthRetreatRatio` (finite number, `0.05`–`0.75`; default `0.30`)
+  - `lockoutDurationSeconds` (finite number, `0.1`–`15.0`; default `1.5`)
+  - `maxProposalsPerTick` (integer, `1`–`32`; default `12`)
+- **Runtime behavior:** Evaluates Lanchester force balance (`TotalDefense`, `AggressivePush`, `DefensiveSkirmish`, `Standard`), proposes `SurvivalKite` vectors when artillery dead-zones (`minAttackRange > 0`) are breached or fast skirmishers drop below `lowHealthRetreatRatio`, and scores `CombatFocus` targets with role affinity, finisher bonus, and anti-overkill damping before central arbitration in `CompositeAiRuntimeBehaviour`.

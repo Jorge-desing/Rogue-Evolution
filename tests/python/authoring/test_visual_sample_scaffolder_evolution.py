@@ -32,6 +32,15 @@ class TestVisualSampleScaffolderEvolution(unittest.TestCase):
         src = _read()
         self.assertIn("ValidateSavedPrefab", src, "missing post-build prefab validation")
 
+    def test_rigged_pbr_refresher_ensures_turret_sockets_and_validates(self):
+        src = _read()
+        start = src.find("private static void RefreshRiggedPbrPrefabAnimator(")
+        self.assertGreaterEqual(start, 0, "RefreshRiggedPbrPrefabAnimator missing")
+        end = src.find("private static string CreateSampleVisual", start)
+        body = src[start:end] if end > start else src[start:start + 3000]
+        self.assertIn("EnsureTurretAndRadarSockets(instance, instance", body)
+        self.assertIn("ValidateSavedPrefab(prefabPath, unitName)", body)
+
 
 if __name__ == "__main__":
     unittest.main()

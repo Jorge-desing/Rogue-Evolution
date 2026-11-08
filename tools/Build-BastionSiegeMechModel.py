@@ -18,6 +18,7 @@ import bpy
 import RogueModelKit as rmk
 from VisualModelAuthoringSupport import validate_rigid_weights, validate_root_motion
 from mathutils import Vector
+from ActiveUnitVisualEnhancements import apply_wave2_details, apply_wave34_details
 
 UNIT_NAME = "BastionSiegeMech"
 SOURCE_BLEND = REPO_ROOT / "content" / "source-art" / "bastion-siege-mech.blend"
@@ -109,6 +110,16 @@ def build_model() -> None:
             structural_wear_mask=True,
         )
 
+    meshes.extend(apply_wave2_details(
+        UNIT_NAME,
+        objects=meshes,
+        object_prefix="Bastion",
+    ))
+    meshes.extend(apply_wave34_details(
+        UNIT_NAME,
+        objects=meshes,
+        object_prefix="Bastion",
+    ))
     bpy.context.view_layer.update()
     bpy.ops.wm.save_as_mainfile(filepath=str(SOURCE_BLEND))
 
