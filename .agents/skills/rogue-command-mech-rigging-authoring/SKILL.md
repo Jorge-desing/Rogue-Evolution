@@ -61,10 +61,10 @@ Reverse engineering of Rogue Command 1.0.9 (e.g. `GatlingWalker` in `resources.a
 ### Step 4: Animate In-Place Locomotion & Actions
 - **Strict In-Place Invariant:** Root bone `Bone_Root` must have zero position delta across the entire clip ($\Delta X = 0, \Delta Y = 0, \Delta Z = 0$). `EntityFlockingMovement` translates the unit in the game grid.
 - Keyframe the 4 standard actions:
-  - `Action_Idle` (30 frames loop)
+  - `Action_Idle` (30 frames loop): neutral at f1, slow-in/out shoulders at f8/f22 (`-0.004` m non-hover / `-0.005` m hover and `0.20°`), shallow peak at f15 (`-0.010` m non-hover / `-0.014` m hover and `0.55°`), close at f30. Keep `Bone_Root` untouched.
   - `Action_Walk` (40 frames loop, in-place, pelvis dip and foot clearance)
-  - `Action_FireRecoil` (15 frames with body anticipation, impact recoil, follow-through, and recovery; the exact duration may be role-specific)
-  - `Action_Death` (45 frames knee buckle and collapse)
+  - `Action_FireRecoil` (role-specific end frames: light/medium `15`, sam/walker `18`, heavy `21`; monotone phases at f1 neutral, f3 anticipation, f5 impact, f7 follow-through, f11 recovery, f15 neutral/hold)
+  - `Action_Death` (default `35` frames; Bastion verified override `45`): early settle at f8 (`12%` collapse), half collapse at f16, full collapse by f28 and hold to the end. Vehicle collapse `-0.22` m; biped `-0.55` m; quad `-0.28` m; turret pitch droop `-34°` at full collapse.
 - `Action_FireRecoil` must key both the weapon chain (`Bone_BarrelRecoil`, plus `Bone_TurretPitch` when present) and the mass-bearing body (`Bone_Hull` or `Bone_Pelvis`). Use a small local forward brace before impact, a backward body impulse at impact, a short settling overshoot, and neutral keys at the end. Never key `Bone_Root` translation.
 - For every pack, audit the attack clip's actual f-curves: a clip name, Animator state, or barrel curve alone is insufficient evidence that the body moves.
 - Refer to [gait-cycle-and-in-place-locomotion.md](references/gait-cycle-and-in-place-locomotion.md) for keyframe tables.
@@ -101,7 +101,7 @@ Mount empty GameObjects oriented along Unity forward (+Z) and up (+Y):
 For non-walker vehicles (tanks, rovers, hovercraft) that have a turret but no articulated legs, use `leg_type=None` in `generate_procedural_armature`. This creates a hull-based armature (`Bone_Hull` → `Bone_Pelvis` → `Bone_TurretYaw` → `Bone_TurretPitch` → `Bone_BarrelRecoil`) without leg chains or IK.
 
 - **In-place invariant still applies**: `Bone_Root` must have zero translation. For vehicles, the `Walk` action animates `Bone_Hull`, not `Bone_Root`. Root-motion validation must check that any `Bone_Root` location curves present are all zero (not require exactly 3 curves).
-- **Action clips**: `generate_procedural_action_clips` with `leg_type=None` produces Idle, Walk (hull bob), Drive, FireRecoil, and Death clips. The `Walk` clip animates `Bone_Hull` location/rotation.
+- **Action clips**: `generate_procedural_action_clips` with `leg_type=None` produces `Action_Idle`, `Action_Drive` (and an `Action_Walk` alias to the same action), `Action_FireRecoil`, and `Action_Death`. The drive/walk clip animates `Bone_Hull` location/rotation for a 40-frame in-place bob and pitch/roll read at RTS distance; idle and death use the same f8/f22 and f8/f16 easing contracts as walkers.
 - **Rigid weighting**: The same rigid 1.0-per-mesh rule applies. Meshes containing "Barrel", "Muzzle", "Bore", "Recoil", "Nozzle" bind to `Bone_BarrelRecoil`; "Mantlet", "Cradle", "Howitzer", "TurretPitch" bind to `Bone_TurretPitch`; "Turret", "Bustle", "Visor", "Radar" bind to `Bone_TurretYaw`; everything else binds to `Bone_Hull`.
 - **Socket preservation**: Vehicle sources already have canonical sockets (`Socket_MuzzlePrimary`, `Socket_TurretPivot`, etc.) as empties. Reuse them; do not create duplicates.
 - **Unity scaffolder changes needed**:

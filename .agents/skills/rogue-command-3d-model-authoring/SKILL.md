@@ -107,6 +107,10 @@ Use the tested assemblies to establish proportions, mechanical layout, and repea
 
 *See exact arguments and recipes in [blender-procedural-techniques.md](references/blender-procedural-techniques.md).*
 
+### Procedural action clips
+
+`generate_procedural_action_clips` writes the standard exported action set (`Action_Idle`, `Action_Walk`/`Action_Drive`, `Action_FireRecoil`, and `Action_Death`) and `add_armature_rig` passes the builder's `leg_type` and `locomotion_only` into that generator. Keep tactical builders on `locomotion_only=False` unless the user explicitly requests a walk-only strip. Current keyframe contract: `Action_Idle` has f8/f22 slow-in/out shoulders around the f15 peak and never keys `Bone_Root`; `Action_Death` starts with a `12%` settle at f8 before the f16 half collapse and full collapse at f28/hold to the end. Whenever `tools/RogueModelKit.py` changes, copy it byte-for-byte to `.agents/skills/rogue-command-3d-model-authoring/scripts/RogueModelKit.py`, then rerun the affected Blender builders and Unity bundle build; the parity test (`test_model_kit_skill_copy.py`) is part of the animation contract.
+
 ### Draw-Call Optimization via Material Batching & Smart Smoothing
 Kitbashing produces 50–120 individual objects. Unbatched exports can create many Unity renderers and render submissions. Pass compatible geometry through `batch_and_join_by_material(objects, prefix, preserve_names, smooth_by_angle=True, smooth_angle_deg=38.0)` before export:
 - **Material Batching**: Combines compatible meshes by PBR material while preserving essential animated pivots (`TurretBase`, `MainBarrel`). Output mesh groups depend on input materials and preserved objects. This Blender-side step does not establish the final Unity draw-call count.

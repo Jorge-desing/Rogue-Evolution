@@ -25,6 +25,11 @@ Use this skill for Unity Animator/AnimationClip integration and mechanical anima
 - `RuntimeVisualDirector` sets `RCL_IsMoving` from observed entity position changes; it does not drive a speed blend tree. It triggers `RCL_Fire` on detected weapon shots and triggers `RCL_Death` once when the death state is recognized, when those parameters/clips are available.
 - Current builder transitions use 0.12 s for movement-state changes and 0.05 s for Any State fire/death triggers. Fire returns after its exit time; death is not an ordinary looping locomotion transition. Treat these as implementation values, not universal artistic limits.
 - The director's current mechanical feedback is separate from the Animator: radar sweep is configured at 30 RPM (180°/s), turret traverse at 120°/s, recoil is set to 0.22 m on shot with a `Mathf.Lerp` recovery, and the procedural muzzle burst defaults to 0.07 s. Re-read source before relying on these values after a change.
+- `tools/RogueModelKit.py::generate_procedural_action_clips` is authoritative for keyframe shape; do not rely on older prose summaries alone. Current contract:
+  - `Action_Idle`: neutral at f1, slow-in/out shoulders at f8/f22 (`-0.004` m non-hover / `-0.005` m hover, `0.20°`), shallow peak at f15 (`-0.010` m non-hover / `-0.014` m hover, `0.55°`), close at f30. Never key `Bone_Root`.
+  - `Action_FireRecoil`: role-specific ends (light/medium f15, sam/walker f18, heavy f21); monotone phase map at f1 neutral, f3 anticipation, f5 impact, f7 follow-through, f11 recovery, f15 neutral/hold. Never key `Bone_Root`.
+  - `Action_Death`: default end f35, verified override f45 for Bastion; early settle at f8 (`12%` collapse), half collapse at f16, full collapse by f28 and hold to end. Current vehicle collapse is `-0.22` m, biped `-0.55` m, quad `-0.28` m, with turret pitch droop `-34°` at full collapse.
+  - `Action_Walk` and `Action_Drive` remain `40` frames and in-place; wheeled/tracked vehicles intentionally use `Action_Drive`.
 
 ## Attack clip contract: body, weapon, and state graph
 
@@ -36,6 +41,10 @@ When auditing every pack, inspect actual FireRecoil curves for body and weapon c
 
 Relevant implementations:
 
+- `tools/RogueModelKit.py`
+- `tests/python/rigging/test_tactical_animation_hold_and_easing.py`
+- `tests/python/rigging/test_tactical_animation_improvements.py`
+- `tests/python/rigging/test_attack_clip_authoring_contract.py`
 - `src/RogueCommandExpansionLoader/Runtime/Visual/RuntimeVisualDirector.cs`
 - `unity/RogueCommandAssetAuthoring/Assets/Editor/VehiclePrefabBuilder.cs`
 - `unity/RogueCommandAssetAuthoring/Assets/Editor/RogueCommandVisualSampleScaffolder.cs`
@@ -148,6 +157,8 @@ Run from the repository root through `terminal`, using the project Python enviro
 terminal(command="PYTHONPATH=.venv/Lib/site-packages .venv/Scripts/python.exe tools/validate_mech_rigging.py --pack content/packs/sample-native-expansion --json")
 terminal(command="PYTHONPATH=.venv/Lib/site-packages .venv/Scripts/python.exe tools/validate_vfx_assets.py --pack content/packs/sample-native-expansion --json")
 terminal(command="PYTHONPATH=.venv/Lib/site-packages .venv/Scripts/python.exe tools/validate_content_bundle_references.py content/packs/sample-native-expansion")
+terminal(command="PYTHONPATH=.venv/Lib/site-packages .venv/Scripts/python.exe -B -m unittest tests.python.rigging.test_tactical_animation_hold_and_easing tests.python.rigging.test_tactical_animation_improvements tests.python.rigging.test_attack_clip_authoring_contract tests.python.bundles.test_mech_rigging_bundle tests.python.rigging.test_tactical_walker_rigging_contract")
+terminal(command="PYTHONPATH=.venv/Lib/site-packages .venv/Scripts/python.exe tools/validate_content_bundle_references.py content/packs/tactical-operations")
 ```
 
 Inspect `--help` for current options. Use [Steam Runtime Validation](../rogue-command-steam-runtime-validation/SKILL.md) for any in-game acceptance run.
@@ -166,7 +177,8 @@ Do not rotate a model or change yaw correction based only on static evidence. Re
 
 ## Pitfalls and evidence limits
 
-- **Verify before editing.** Animation improvement requests often describe work that is already present in the current HEAD; run `test_tactical_animation_improvements`, `test_attack_clip_authoring_contract`, and `test_mech_rigging_bundle`, and inspect recent animation commits before changing clips, controllers, or builders. Do not duplicate, restore, or strip animations that already satisfy the verified contract.
+- **Verify before editing.** Animation improvement requests often describe work that is already present in the current HEAD; run `test_tactical_animation_hold_and_easing`, `test_tactical_animation_improvements`, `test_attack_clip_authoring_contract`, `test_mech_rigging_bundle`, and `test_tactical_walker_rigging_contract`, and inspect recent animation commits before changing clips, controllers, or builders. Do not duplicate, restore, or strip animations that already satisfy the verified contract.
+- **Do not flatten Idle or Death shaping.** Generated `Action_Idle` needs f8/f22 shoulder keys before the f15 peak, and generated `Action_Death` needs the f8 `12%` early settle before the f16 half collapse. A three-key Idle or a Death that jumps directly to half/full collapse loses the slow in/out envelope and should be treated as an animation regression, not as a simpler equivalent.
 - **Mixed generic and rigged states in an AnimatorController.** A controller can contain both generic states (`Idle`, `Walk`, `Drive`) and rigged states (`<Armature>|..._Action_*`). If a rigged Idle transition points at the generic `Walk`/`Drive` state instead of the rigged action state, the unit enters a state with no deforming clip and appears frozen/non-animated. When editing or auditing a controller, verify every rigged Idle→movement transition targets the rigged action state, and that the rigged movement state has a conditioned return to rigged Idle on `!RCL_IsMoving`. Otherwise the unit enters movement once and never leaves it.
 - **Animator discovery must prefer the modded visual clone.** `GetComponentInChildren<Animator>` on the entity root can resolve a *native* Animator when the native template has one, instead of the modded clone's Animator. In `RuntimeVisualDirector.CacheAnimatorParameters`, search for a child whose name starts with `RCL_Visual_` and use its `GetComponentInChildren<Animator>` first, falling back to the root search only when no modded clone Animator exists.
 - **Generated sockets cannot prove orientation.** When empties are not exported, `VehiclePrefabBuilder` creates sockets from renderer bounds, so muzzle lands at max-Z and rear at min-Z by construction; the yaw-correction heuristic can never detect a reversed model from those sockets. Validate orientation against authored source (Blender front axis, FBX `FrontAxis`, prefab transform) and in-game observation; never treat generated sockets as evidence of correct facing.
