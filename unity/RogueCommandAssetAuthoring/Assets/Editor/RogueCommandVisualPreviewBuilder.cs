@@ -1185,6 +1185,10 @@ namespace RogueCommandExpansion.Authoring
             {
                 ValidateBundledPrefab(bundle, prefabAPath);
                 ValidateBundledPrefab(bundle, prefabBPath);
+                string[] assetNames = bundle.GetAllAssetNames();
+                long bytes = new FileInfo(bundlePath).Length;
+                Debug.Log("[VisualPreviewBuilder] Built bundle '" + BundleFileName + "' (" +
+                    (assetNames != null ? assetNames.Length : 0) + " assets, " + bytes + " bytes).");
             }
             finally
             {
