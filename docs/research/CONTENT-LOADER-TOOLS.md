@@ -23,6 +23,12 @@
 | `tools/validate_ai_modules.py` | `validate_ai_profiles` | vs los 21 módulos de `AiModuleRegistry` + bounds. |
 | `tools/analyze_blueprint_pools.py` | `analyze_stage_pools` | Scoping de pools por etapa, unidades huérfanas de fallback. |
 | `tools/analyze_relic_synergy.py` | `analyze_relic_synergy` | `neededSystemTags` vs `offeredSystemTags`, 26 `ChangeableValue`. |
+| `tools/validate_card_changes.py` | `validate_card_changes` | 26 `ChangeableValue` + operación/side finitos en unidades, reliquias y mejoras. |
+| `tools/analyze_factory_product_parity.py` | `analyze_factory_product_parity` | Mapeo 1:1 fábrica↔producto, rareza/nivel, huérfanas. |
+| `tools/analyze_upgrade_chains.py` | `analyze_upgrade_chains` | targetUnitId, nivel 0–100, costo ≥0, cardChanges válidos. |
+| `tools/analyze_ai_profile_coverage.py` | `analyze_ai_profile_coverage` | unitEntries/productionBuildingEntries, 22 módulos, etapas. |
+| `tools/export_unit_catalog.py` | `export_unit_catalog` | Catálogo compacto de unidades (rol, rareza, tech, costo, HP, velocidad, fábrica, etapas). |
+| `tools/check_stage_blueprint_filters.py` | `check_stage_blueprint_filters` | poolId, unitIds no vacíos/sin duplicados, resolución. |
 | `tools/validate_native_templates.py` | `validate_native_templates` | Allowlists de plantillas nativas (unidades/fábricas/etapas/paisajes/AI). |
 | `tools/export_balance_table.py` | `export_balance_table` | Balance efectivo con precedencia `customBalance` > `balanceOverrides` > estructurados. |
 | `tools/lint_content_pack.py` | `lint_pack` | Avisos: sin es-XL, fábrica en `unitEntries`, `mapSizeMin>Max`. |
