@@ -34,6 +34,34 @@
   method name `JumpTo` was verified from the `.NET metadata strings heap` of
   `Assembly-CSharp.dll` (SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`);
   overloads are probed in order `(bool,int)` then `(int)` and reported in the result.
+- **Second seam** (`diagnostics_load_next_level` → `TryLoadNextLevelJson` →
+  `RuntimeIntermissionSyntheticJump.TryStartNextLevelLoad`): invokes the native
+  `LoadScene.StartCoroutine("LoadNextLevel")` via reflection. Neither `JumpTo(int)`
+  nor this coroutine transitions the scene by themselves (observed ~24s without
+  transition). The load that worked once in live Steam (artifact `c75d54d6`,
+  evidence `artifacts/runtime-smoke/ui-click-20261108g/level4-entry-evidence.json`)
+  is: `component/call_method LoadLevel` on the LoadNextLevel GO (928974) after the
+  jump + coroutine, then the native level opener `LoadingHider` appears and its
+  `INICIAR` Unity UI button (GO `Button` 1008136, NOT the Michsky map LaunchButton)
+  advances to gameplay.
+- **Non-determinism (do not loop)**: identical `Jump → coroutine → LoadLevel` runs
+  transitioned in 1 of ~5 fresh-process attempts; others stall on the loading
+  screen ("Cargando...", empty bar, spinner) with `LoadingHider` never populated and
+  the census stuck at stage=4 level=-1. No error is logged anywhere (BepInEx and
+  Player logs clean). Next diagnosis requires the full precondition matrix
+  (which method reads what state), not blind retries.
+- **MCP tools quirks observed 2026-11-08**: use full component names
+  (`RogueCommandExpansionLoader.Runtime.LoaderDiagnosticsComponent`, not short
+  `LoaderDiagnosticsComponent`) in `component/call_method` (short name → HTTP 500);
+  the `LoaderDiagnostics` GameObject id changes per scene — re-resolve via
+  `find_objects_with_component` after every scene change (`-4880` works in
+  MainMenu, `-67812` in Intermission) or calls return HTTP 500; the diagnostics GO
+  components live on a DontDestroyOnLoad object but under a scene-specific
+  component copy; `arguments` param shape differences include some tools writing
+  `"button has no id"` when the search envelope lacks an id key — resolve the id
+  via `search_gameobjects` first, then `TryUiClickJson("[name, id]")` directly;
+  the bridge takes `args` as a JSON string inside an `args=` query param, not a JSON
+  body.
 
 
 ---

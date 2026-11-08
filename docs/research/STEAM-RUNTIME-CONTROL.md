@@ -189,6 +189,29 @@ Un `ButtonManager` puede tener listeners que abren diálogos o avanzan una secue
 
 No confirmes el diálogo de sobrescritura de una partida guardada. `StartNewRun.OnClick()` comprueba si existe el archivo del perfil; si existe, ofrece sobrescribirlo. Usa solo un perfil QA aislado verificado y sin `savegame.dat`; conserva un inventario previo de QA y hashes de todos los perfiles del usuario. Nunca llames a `Game.Init`, `MetaGame.AddExperiencePoints` ni escribas campos de progresión como atajo para demostrar una recompensa real.
 
+**Avance sintético de estado autorizado (2026-11-08)**: el usuario autorizó explícitamente
+falsificar estado del juego para automatización de validación runtime. Reglas vigentes:
+seams sancionados en el loader, fail-closed, etiquetas `synthetic=true` en cada resultado,
+nunca tocan perfil/save, y solo bajo la disciplina de checkpoint del perfil QA Profile2
+(selector y todos los ficheros hasheados antes de abrir el juego; verificación de match
+exacto al cerrar). La cadena verificada en vivo para entrar al nivel de combate desde el
+mapa de intermission (nodo no choosable, `LaunchButton` Michsky inactivo,
+`IsCurrentLevelFinished=True`): `Continue Run` → `StageMap.JumpTo(4)` (seam
+`diagnostics_jump_to_level`) → corrutina `LoadScene.StartCoroutine("LoadNextLevel")`
+(seam `diagnostics_load_next_level`, sin transición por sí sola) → `LoadScene.LoadLevel()`
+método nativo vía `component/call_method` sobre el GO `LoadNextLevel` → aparece la intro
+`LoadingHider` → botón `INICIAR` (Unity `UI.Button` "Button", **no** el LaunchButton
+Michsky del mapa). Ver evidencia en `artifacts/runtime-smoke/ui-click-20261108g/level4-entry-evidence.json`.
+
+**No-determinismo conocido de `LoadLevel()` (no lazo)**: en 1 de ~5 corridas entre procesos,
+`LoadLevel()` transicionó y se alcanzó el gameplay; en las restantes, el juego entró en la
+pantalla de carga ("Cargando...", barra vacía, spinner) sin poblar nunca `LoadingHider` ni
+dejar error en `BepInEx/LogOutput.log` ni en `Player.log`. Detén los reintentos ciegos: el
+siguiente diagnóstico exige la matriz completa de precondiciones (qué lee `LoadLevel()`
+antes de cargar), no otra cadena idéntica. Nota: los triángulos grandes del mapa
+(`BossTriangle`, MeshFilter/MeshRenderer sin collider ni handlers) son escenario
+decorativo; no son clicables ni el "nodo siguiente".
+
 En una ejecución observada, el botón `Start Run Button` de `RunSetup` abrió `RunOpenerStoryCanvas`; su botón `ConfirmButton` avanzó la secuencia y llevó a `Game`. Ese recorrido terminó en `FirstRun`, nivel de run 4. No asumir que este flujo equivale a una partida normal ni que la pantalla de inicio es una oferta de recompensa.
 
 ## Comprobación de unidades y desbloqueos
