@@ -1520,3 +1520,12 @@ This is a compact, durable orientation for agents. For the changing checkout sta
 - Validation: no fresh run in this sync; last documented Release 0/0, harness 517/518. Live Steam UI-click validation succeeded (session ui-click-20261108b). Natural offer→selection→placement→production/render/stat and tactical AI unverified.
 - Profile2 dedicated QA without tutorial; protect saves. Before reflection verify Rogue Command 1.0.9, Unity `2021.3.45f2`, Assembly-CSharp SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, MVID `db0e9462-128d-4296-9900-de18b4bd0c00`.
 - Root MEMORY.md, codex memory, antigravity memory, and mem0 synced to HEAD b82642e (commit pending).
+
+## Refresh (2026-11-08, HEAD b82642e / sync 713c64d — working-tree refresh + mem0 sync)
+
+- Repository `C:/Users/Alex/Documents/Mod Rogue Command`, loader `1.19.0`, branch `codex/rogue-unit-balance-20261018`. Local/upstream/origin verified at `713c64dad03fe2a7dccf7b8192594834f6aa3f03` (`docs(memory): sync root MEMORY.md to HEAD b82642e + agent memories/mem0`); code HEAD remains `b82642e` (`feat(authoring): add dedicated original scout tank builder with rig and FBX`). No new commits since 713c64d.
+- Uncommitted working tree now present (preserved, not staged): model regeneration pass touching `src/RogueCommandExpansionLoader/Runtime/LoaderDiagnosticsComponent.cs`, `tools/Build-*Model.py`, `content/source-art/*-rigged.blend`, and Unity FBX/texture outputs (BulwarkSiegeTank, SalvageHauler, SkyguardSAM, TidebreakerHovercraft). Nested worktree gitlinks `.worktrees/cargador` (11e9968, dirty) and `.worktrees/task-graph-validation` (d1f9045, dirty) remain dirty and preserved. Do not stage, reset, clean, or overwrite unrelated work.
+- Memory stores: root MEMORY.md and agent memories (codex, antigravity) already at HEAD b82642e; mem0 refreshed in this run to HEAD b82642e/713c64d (previous mem0 snapshot was stale at a917709).
+- Validation unchanged from last documented run (Release 0/0; C# harness 517/518; Python 419 OK at b78b314). No fresh Steam/Unity gameplay proof. Natural offer→selection→placement→production/render/stat and tactical AI remain unverified.
+- Profile2 dedicated QA without tutorial; protect saves. Before reflection verify Rogue Command 1.0.9, Unity `2021.3.45f2`, Assembly-CSharp SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, MVID `db0e9462-128d-4296-9900-de18b4bd0c00`.
+- Root MEMORY.md, codex memory, antigravity memory, and mem0 synced to HEAD b82642e (working-tree refresh).
