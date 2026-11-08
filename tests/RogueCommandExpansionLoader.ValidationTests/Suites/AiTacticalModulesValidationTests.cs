@@ -2922,5 +2922,359 @@ internal static partial class ValidationTestRunner
             DefaultAiBehaviour.ResetRuntimeState();
         }
     }),
+    ("HUB-D Phase 1: AiUnitSnapshot and AiBattlefieldBlackboard compute pure metrics, threat centroids, and omission counters", () =>
+    {
+        var allyA = new RogueCommandExpansionLoader.Runtime.Ai.AiUnitSnapshot(
+            uniqueEntityId: 101,
+            entityId: "sample-native:scout-tank",
+            baseIndex: 0,
+            posX: 10f,
+            posZ: 20f,
+            currentHealth: 40f,
+            maxHealth: 100f,
+            currentShield: 25f,
+            maxShield: 50f,
+            dpsEstimate: 30f,
+            weaponRange: 14f,
+            minAttackRange: 0f,
+            moveSpeed: 12f,
+            roleFlags: (int)UnitRole.Scout,
+            isControlledByAi: true,
+            isControlledByPlayer: false,
+            isCombatUnit: true,
+            isHarvester: false,
+            isBuilding: false,
+            isSupportUnit: false,
+            hasQueuedCommands: false,
+            currentCommandTag: "tag-a",
+            currentTargetId: 201);
+
+        if (Math.Abs(allyA.HealthRatio - 0.4f) > 0.0001f ||
+            Math.Abs(allyA.ShieldRatio - 0.5f) > 0.0001f ||
+            !allyA.IsIdleAndQueueEmpty(false) ||
+            allyA.IsIdleAndQueueEmpty(true))
+        {
+            throw new InvalidOperationException("AiUnitSnapshot ratios or queue check did not match expected pure calculation.");
+        }
+
+        var allyHarvester = new RogueCommandExpansionLoader.Runtime.Ai.AiUnitSnapshot(
+            uniqueEntityId: 102,
+            entityId: "native:harvester",
+            baseIndex: 0,
+            posX: 0f,
+            posZ: 0f,
+            currentHealth: 50f,
+            maxHealth: 100f,
+            currentShield: 0f,
+            maxShield: 0f,
+            dpsEstimate: 0f,
+            weaponRange: 0f,
+            minAttackRange: 0f,
+            moveSpeed: 6f,
+            roleFlags: (int)UnitRole.Harvester,
+            isControlledByAi: true,
+            isControlledByPlayer: false,
+            isCombatUnit: false,
+            isHarvester: true,
+            isBuilding: false,
+            isSupportUnit: false,
+            hasQueuedCommands: false,
+            currentCommandTag: string.Empty,
+            currentTargetId: -1);
+
+        var hostileA = new RogueCommandExpansionLoader.Runtime.Ai.AiUnitSnapshot(
+            uniqueEntityId: 201,
+            entityId: "player:striker",
+            baseIndex: -1,
+            posX: 4f,
+            posZ: 0f,
+            currentHealth: 80f,
+            maxHealth: 100f,
+            currentShield: 0f,
+            maxShield: 0f,
+            dpsEstimate: 45f,
+            weaponRange: 12f,
+            minAttackRange: 0f,
+            moveSpeed: 8f,
+            roleFlags: (int)UnitRole.FrontalAttacker,
+            isControlledByAi: false,
+            isControlledByPlayer: true,
+            isCombatUnit: true,
+            isHarvester: false,
+            isBuilding: false,
+            isSupportUnit: false,
+            hasQueuedCommands: false,
+            currentCommandTag: string.Empty,
+            currentTargetId: 102);
+
+        var hostileB = new RogueCommandExpansionLoader.Runtime.Ai.AiUnitSnapshot(
+            uniqueEntityId: 202,
+            entityId: "player:artillery",
+            baseIndex: -1,
+            posX: 16f,
+            posZ: 0f,
+            currentHealth: 60f,
+            maxHealth: 60f,
+            currentShield: 0f,
+            maxShield: 0f,
+            dpsEstimate: 55f,
+            weaponRange: 28f,
+            minAttackRange: 10f,
+            moveSpeed: 5f,
+            roleFlags: (int)UnitRole.Sniper,
+            isControlledByAi: false,
+            isControlledByPlayer: true,
+            isCombatUnit: true,
+            isHarvester: false,
+            isBuilding: false,
+            isSupportUnit: false,
+            hasQueuedCommands: false,
+            currentCommandTag: string.Empty,
+            currentTargetId: -1);
+
+        var snapshot = RogueCommandExpansionLoader.Runtime.Ai.AiBattlefieldBlackboardBuilder.BuildSnapshot(
+            timestamp: 12.5f,
+            baseIndex: 0,
+            currentWaveNumber: 3,
+            aiUnits: new[] { allyA, allyHarvester },
+            hostileUnits: new[] { hostileA, hostileB },
+            maxTrackedUnitsPerSide: 1);
+
+        if (snapshot.OmittedAiUnitCount != 1 ||
+            snapshot.OmittedHostileUnitCount != 1 ||
+            snapshot.TotalAiCombatUnits != 1 ||
+            snapshot.TotalAiHarvesters != 1 ||
+            snapshot.TotalHostileCombatUnits != 2 ||
+            !snapshot.UnderHarvesterOrBasePressure ||
+            Math.Abs(snapshot.HostileCentroidX - 10f) > 0.01f ||
+            Math.Abs(snapshot.HostileCentroidZ - 0f) > 0.01f)
+        {
+            throw new InvalidOperationException("AiBattlefieldBlackboardBuilder did not compute expected omission counts, centroid, or pressure state.");
+        }
+    }),
+    ("HUB-D Phase 1: StrategicDoctrinePolicy and TacticalUtilityScorer evaluate Lanchester balance, dead-zone kiting, and role affinity", () =>
+    {
+        var pressuredSnapshot = new RogueCommandExpansionLoader.Runtime.Ai.AiBattlefieldSnapshot(
+            timestamp: 20f,
+            baseIndex: 0,
+            currentWaveNumber: 2,
+            omittedAiUnitCount: 0,
+            omittedHostileUnitCount: 0,
+            totalAiCombatUnits: 2,
+            totalAiHarvesters: 1,
+            totalAiBuildings: 2,
+            totalHostileCombatUnits: 5,
+            totalAiCombatPower: 80f,
+            totalHostileCombatPower: 250f,
+            hostileCentroidX: 15f,
+            hostileCentroidZ: 15f,
+            underHarvesterOrBasePressure: true,
+            aiUnits: Array.Empty<RogueCommandExpansionLoader.Runtime.Ai.AiUnitSnapshot>(),
+            hostileUnits: Array.Empty<RogueCommandExpansionLoader.Runtime.Ai.AiUnitSnapshot>());
+
+        RogueCommandExpansionLoader.Runtime.Ai.AiDoctrineWeights fortifyWeights =
+            RogueCommandExpansionLoader.Runtime.Ai.StrategicDoctrinePolicy.Evaluate(pressuredSnapshot);
+
+        if (fortifyWeights.DoctrineName != "Fortify" ||
+            fortifyWeights.SurvivalWeight <= fortifyWeights.AssaultWeight ||
+            fortifyWeights.DefenseWeight <= fortifyWeights.AssaultWeight)
+        {
+            throw new InvalidOperationException("StrategicDoctrinePolicy did not select Fortify when outnumbered and under base/harvester pressure.");
+        }
+
+        var dominantSnapshot = new RogueCommandExpansionLoader.Runtime.Ai.AiBattlefieldSnapshot(
+            timestamp: 60f,
+            baseIndex: 0,
+            currentWaveNumber: 4,
+            omittedAiUnitCount: 0,
+            omittedHostileUnitCount: 0,
+            totalAiCombatUnits: 8,
+            totalAiHarvesters: 2,
+            totalAiBuildings: 4,
+            totalHostileCombatUnits: 2,
+            totalAiCombatPower: 400f,
+            totalHostileCombatPower: 90f,
+            hostileCentroidX: 50f,
+            hostileCentroidZ: 50f,
+            underHarvesterOrBasePressure: false,
+            aiUnits: Array.Empty<RogueCommandExpansionLoader.Runtime.Ai.AiUnitSnapshot>(),
+            hostileUnits: Array.Empty<RogueCommandExpansionLoader.Runtime.Ai.AiUnitSnapshot>());
+
+        RogueCommandExpansionLoader.Runtime.Ai.AiDoctrineWeights assaultWeights =
+            RogueCommandExpansionLoader.Runtime.Ai.StrategicDoctrinePolicy.Evaluate(dominantSnapshot);
+
+        if (assaultWeights.DoctrineName != "Assault" ||
+            assaultWeights.AssaultWeight <= assaultWeights.DefenseWeight)
+        {
+            throw new InvalidOperationException("StrategicDoctrinePolicy did not select Assault when AI forces strongly overmatch hostiles.");
+        }
+
+        var artilleryUnit = new RogueCommandExpansionLoader.Runtime.Ai.AiUnitSnapshot(
+            uniqueEntityId: 301,
+            entityId: "sample-native:mortar-carrier",
+            baseIndex: 0,
+            posX: 0f,
+            posZ: 0f,
+            currentHealth: 100f,
+            maxHealth: 100f,
+            currentShield: 0f,
+            maxShield: 0f,
+            dpsEstimate: 40f,
+            weaponRange: 30f,
+            minAttackRange: 12f,
+            moveSpeed: 8f,
+            roleFlags: (int)UnitRole.Sniper,
+            isControlledByAi: true,
+            isControlledByPlayer: false,
+            isCombatUnit: true,
+            isHarvester: false,
+            isBuilding: false,
+            isSupportUnit: false,
+            hasQueuedCommands: false,
+            currentCommandTag: string.Empty,
+            currentTargetId: -1);
+
+        var encroachingEnemy = new RogueCommandExpansionLoader.Runtime.Ai.AiUnitSnapshot(
+            uniqueEntityId: 401,
+            entityId: "player:brawler",
+            baseIndex: -1,
+            posX: 5f,
+            posZ: 0f,
+            currentHealth: 120f,
+            maxHealth: 120f,
+            currentShield: 0f,
+            maxShield: 0f,
+            dpsEstimate: 35f,
+            weaponRange: 6f,
+            minAttackRange: 0f,
+            moveSpeed: 10f,
+            roleFlags: (int)UnitRole.Melee,
+            isControlledByAi: false,
+            isControlledByPlayer: true,
+            isCombatUnit: true,
+            isHarvester: false,
+            isBuilding: false,
+            isSupportUnit: false,
+            hasQueuedCommands: false,
+            currentCommandTag: string.Empty,
+            currentTargetId: 301);
+
+        float deadZoneKiteScore = RogueCommandExpansionLoader.Runtime.Ai.TacticalUtilityScorer.ScoreSurvivalOrKite(
+            artilleryUnit, encroachingEnemy, fortifyWeights);
+        float standardEngagementScore = RogueCommandExpansionLoader.Runtime.Ai.TacticalUtilityScorer.ScoreCombatTarget(
+            artilleryUnit, encroachingEnemy, fortifyWeights);
+
+        if (deadZoneKiteScore <= standardEngagementScore || deadZoneKiteScore < 100f)
+        {
+            throw new InvalidOperationException("TacticalUtilityScorer did not prioritize dead-zone kiting above standard attack when enemy is inside minAttackRange.");
+        }
+    }),
+    ("HUB-D Phase 1: AiCommandArbiterPolicy enforces per-unit uniqueness, hysteresis, lockout windows, and global tick budget", () =>
+    {
+        var state = new RogueCommandExpansionLoader.Runtime.Ai.AiCommandArbiterState();
+
+        var kiteProposal = new RogueCommandExpansionLoader.Runtime.Ai.AiIntentProposal(
+            moduleId: "sample:skirmish-kiting",
+            commandTag: "tag.kite",
+            unitId: 501,
+            targetEntityId: -1,
+            destX: -10f,
+            destZ: 0f,
+            category: RogueCommandExpansionLoader.Runtime.Ai.AiIntentCategory.SurvivalKite,
+            utilityScore: 140f,
+            lockoutDurationSeconds: 2.0f,
+            requiresEmptyQueue: false);
+
+        var siegeProposal = new RogueCommandExpansionLoader.Runtime.Ai.AiIntentProposal(
+            moduleId: "sample:siege-assault",
+            commandTag: "tag.siege",
+            unitId: 501,
+            targetEntityId: 901,
+            destX: 50f,
+            destZ: 50f,
+            category: RogueCommandExpansionLoader.Runtime.Ai.AiIntentCategory.SiegeAndFormation,
+            utilityScore: 85f,
+            lockoutDurationSeconds: 0.5f,
+            requiresEmptyQueue: false);
+
+        var secondUnitProposal = new RogueCommandExpansionLoader.Runtime.Ai.AiIntentProposal(
+            moduleId: "sample:threat-prioritization",
+            commandTag: "tag.threat",
+            unitId: 502,
+            targetEntityId: 902,
+            destX: 20f,
+            destZ: 20f,
+            category: RogueCommandExpansionLoader.Runtime.Ai.AiIntentCategory.CombatTargeting,
+            utilityScore: 95f,
+            lockoutDurationSeconds: 0.5f,
+            requiresEmptyQueue: false);
+
+        RogueCommandExpansionLoader.Runtime.Ai.AiArbitrationResult tick1 =
+            RogueCommandExpansionLoader.Runtime.Ai.AiCommandArbiterPolicy.Arbitrate(
+                state,
+                now: 10.0f,
+                retargetHysteresisMultiplier: 1.20f,
+                maxDispatchesPerTick: 1,
+                proposals: new[] { siegeProposal, kiteProposal, secondUnitProposal });
+
+        if (tick1.ApprovedOrders.Count != 1 ||
+            tick1.ApprovedOrders[0].UnitId != 501 ||
+            tick1.ApprovedOrders[0].ModuleId != "sample:skirmish-kiting" ||
+            tick1.ConflictsResolvedCount != 1 ||
+            tick1.BudgetOmittedCount != 1)
+        {
+            throw new InvalidOperationException("AiCommandArbiterPolicy Tick 1 did not pick highest utility or enforce global dispatch budget.");
+        }
+
+        var prematureOverrideProposal = new RogueCommandExpansionLoader.Runtime.Ai.AiIntentProposal(
+            moduleId: "sample:threat-prioritization",
+            commandTag: "tag.threat",
+            unitId: 501,
+            targetEntityId: 902,
+            destX: 20f,
+            destZ: 20f,
+            category: RogueCommandExpansionLoader.Runtime.Ai.AiIntentCategory.CombatTargeting,
+            utilityScore: 150f,
+            lockoutDurationSeconds: 0.5f,
+            requiresEmptyQueue: false);
+
+        RogueCommandExpansionLoader.Runtime.Ai.AiArbitrationResult tick2 =
+            RogueCommandExpansionLoader.Runtime.Ai.AiCommandArbiterPolicy.Arbitrate(
+                state,
+                now: 11.0f,
+                retargetHysteresisMultiplier: 1.20f,
+                maxDispatchesPerTick: 4,
+                proposals: new[] { prematureOverrideProposal });
+
+        if (tick2.ApprovedOrders.Count != 0 || tick2.LockoutBlockedCount != 1)
+        {
+            throw new InvalidOperationException("AiCommandArbiterPolicy Tick 2 did not block lower-priority override during active survival lockout window.");
+        }
+
+        var weakRetargetProposal = new RogueCommandExpansionLoader.Runtime.Ai.AiIntentProposal(
+            moduleId: "sample:skirmish-kiting",
+            commandTag: "tag.kite",
+            unitId: 501,
+            targetEntityId: -2,
+            destX: -12f,
+            destZ: 2f,
+            category: RogueCommandExpansionLoader.Runtime.Ai.AiIntentCategory.SurvivalKite,
+            utilityScore: 150f,
+            lockoutDurationSeconds: 1.0f,
+            requiresEmptyQueue: false);
+
+        RogueCommandExpansionLoader.Runtime.Ai.AiArbitrationResult tick3 =
+            RogueCommandExpansionLoader.Runtime.Ai.AiCommandArbiterPolicy.Arbitrate(
+                state,
+                now: 12.5f,
+                retargetHysteresisMultiplier: 1.20f,
+                maxDispatchesPerTick: 4,
+                proposals: new[] { weakRetargetProposal });
+
+        if (tick3.ApprovedOrders.Count != 0 || tick3.HysteresisBlockedCount != 1)
+        {
+            throw new InvalidOperationException("AiCommandArbiterPolicy Tick 3 did not enforce retarget hysteresis threshold.");
+        }
+    }),
     };
 }

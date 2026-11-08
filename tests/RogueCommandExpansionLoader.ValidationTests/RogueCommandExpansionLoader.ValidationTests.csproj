@@ -164,6 +164,14 @@
              Link="Runtime/RuntimeContentContracts.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeUnitAiBehaviorPolicy.cs"
              Link="Runtime/RuntimeUnitAiBehaviorPolicy.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/Ai/AiUnitSnapshot.cs"
+             Link="Runtime/Ai/AiUnitSnapshot.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/Ai/AiBattlefieldBlackboard.cs"
+             Link="Runtime/Ai/AiBattlefieldBlackboard.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/Ai/StrategicDoctrineAndUtilityPolicy.cs"
+             Link="Runtime/Ai/StrategicDoctrineAndUtilityPolicy.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/Ai/AiCommandArbiterPolicy.cs"
+             Link="Runtime/Ai/AiCommandArbiterPolicy.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/BlueprintPoolScopeRegistry.cs"
              Link="Runtime/BlueprintPoolScopeRegistry.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/BlueprintRewardFactoryScope.cs"
