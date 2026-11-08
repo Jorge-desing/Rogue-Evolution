@@ -1626,3 +1626,20 @@ This is a compact, durable orientation for agents. For the changing checkout sta
 - Validation: no fresh full run in this sync. Last documented at `c43195f`: Release plugin build 0 warnings/0 errors; C# harness `517/518` (1 Windows symlink skip); Python `423/423`. New validation tests present but not rerun here. No fresh Steam/Unity gameplay proof beyond previously recorded evidence; natural offer→selection→placement→production/render/stat and tactical AI remain unverified.
 - QA/reflection safety: Profile2 dedicated QA without tutorial; never ask, inspect, infer, gate, bypass, or switch profiles for tutorial. Check current selector/save safety and preserve saves. Before reflection jointly verify Rogue Command version, Unity `2021.3.45f2`, Assembly-CSharp SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, and MVID `db0e9462-128d-4296-9900-de18b4bd0c00`.
 - Root MEMORY.md, codex memory, antigravity memory, and mem0 synced to HEAD 66ac0b9.
+
+## Refresh (2026-11-08, HEAD 4ccb98c — HUB-D 2.0 dynamic flanking geometry, tactical stance modulation, and native pack adoption)
+
+- Repository `C:/Users/Alex/Documents/Mod Rogue Command`, loader `1.19.0`, branch `codex/rogue-unit-balance-20261018`. Local/upstream/origin verified at `4ccb98c` (`feat(ai): implement HUB-D 2.0 dynamic flanking geometry, tactical stance modulation, and native pack adoption`).
+- New committed scope:
+  - `AiBattlefieldBlackboardBuilder` + `AiBattlefieldSnapshot`: friendly combat centroid (`AiCentroidX`, `AiCentroidZ`), battle engagement distance (`EngagementDistance`), and orthogonal dual-wing flanking vector generation (`FlankLeftX/Z`, `FlankRightX/Z`).
+  - `AiCommandArbiterPolicy`: added `AiIntentCategory.FlankingManeuver = 15`.
+  - `CompositeAiRuntimeBehaviour`: dispatches `FlankingManeuver` via `EntityCommand.AttackMoveOnPosition`.
+  - `StrategicDoctrineAndUtilityPolicy`: `TacticalUtilityScorer.ScoreFlankingManeuver` (mobility, assault/skirmish scaling, line-holding prerequisites, fortify suppression) and `EvaluateRecommendedStance` (dynamic Aggressive/Defensive/Kite/HoldGround resolution).
+  - `TacticalDirectorParameters` + `TacticalDirectorAiModule`: added `enableFlanking` and `minFlankSpeed` parameters and proposal emission.
+  - `content/packs/sample-native-expansion/content.json`: wired `sample:tactical-director` into `quick-hunter-extension` (4 modules) and `horde-swarm-assault` (6 modules).
+  - Documentation: updated `content/schema/README.md` and `.agents/skills/rogue-command-ai-authoring/SKILL.md`.
+  - Regression tests: added HUB-D Phase 7 and Phase 8 suites to `AiTacticalModulesValidationTests` (540/541 passed, 1 Windows symlink skip).
+- Fresh validation: Release build 0 warnings/0 errors; C# harness 540/541 passed (1 Windows symlink skip, 0 failures); Python 463/463 passed; `git diff --check` clean. Deployed Release DLL to Steam with matching SHA-256 `014B3D0203138C034DA6F875385DA5F22C38AF55A58EA2805D4B133D248F72EB`.
+- Working tree: clean at root except preserved nested submodules `.worktrees/cargador` and `.worktrees/task-graph-validation`.
+- QA/reflection safety: Profile2 dedicated QA without tutorial; protect saves. Compatibility tuple verified.
+- Root MEMORY.md, codex memory, antigravity memory, and mem0 synced to HEAD 4ccb98c.
