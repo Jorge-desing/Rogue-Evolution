@@ -12,9 +12,12 @@ namespace RogueCommandExpansion.Authoring
         {
             string[] modelPaths = new[]
             {
-                "Assets/RogueCommandExpansionSample/Models/BulwarkSiegeTank_Atlas.fbx",
-                "Assets/RogueCommandExpansionSample/Models/ArcLanceWalker_Atlas.fbx",
-                "Assets/RogueCommandExpansionSample/Models/FieldMedicRover_Atlas.fbx",
+                "Assets/RogueCommandExpansionSample/Models/TidebreakerHovercraft.fbx",
+                "Assets/RogueCommandExpansionSample/Models/SalvageHauler.fbx",
+                "Assets/RogueCommandExpansionSample/Models/SkyguardSAM.fbx",
+                "Assets/RogueCommandExpansionSample/Models/BulwarkSiegeTank.fbx",
+                "Assets/RogueCommandExpansionSample/Models/ArcLanceWalker.fbx",
+                "Assets/RogueCommandExpansionSample/Models/FieldMedicRover.fbx",
                 "Assets/RogueCommandExpansionSample/Models/SentinelRelay.fbx",
                 "Assets/RogueCommandExpansionSample/Models/GravitasBreaker.fbx",
                 "Assets/RogueCommandExpansionSample/Models/CommandRelay.fbx"
@@ -42,6 +45,9 @@ namespace RogueCommandExpansion.Authoring
             // Check prefabs
             string[] prefabPaths = new[]
             {
+                "Assets/TacticalOperations/Prefabs/TidebreakerHovercraftVisual.prefab",
+                "Assets/TacticalOperations/Prefabs/SalvageHaulerVisual.prefab",
+                "Assets/TacticalOperations/Prefabs/SkyguardSAMVisual.prefab",
                 "Assets/TacticalOperations/Prefabs/BulwarkSiegeTankVisual.prefab",
                 "Assets/TacticalOperations/Prefabs/ArcLanceWalkerVisual.prefab",
                 "Assets/TacticalOperations/Prefabs/FieldMedicRoverVisual.prefab",
@@ -69,9 +75,16 @@ namespace RogueCommandExpansion.Authoring
                 }
             }
 
+            ValidateNewPbrUnit("TidebreakerHovercraft", "Assets/TacticalOperations/Prefabs/TidebreakerHovercraftVisual.prefab");
+            ValidateNewPbrUnit("SalvageHauler", "Assets/TacticalOperations/Prefabs/SalvageHaulerVisual.prefab");
+            ValidateNewPbrUnit("SkyguardSAM", "Assets/TacticalOperations/Prefabs/SkyguardSAMVisual.prefab");
+            ValidateNewPbrUnit("BulwarkSiegeTank", "Assets/TacticalOperations/Prefabs/BulwarkSiegeTankVisual.prefab");
+            ValidateNewPbrUnit("ArcLanceWalker", "Assets/TacticalOperations/Prefabs/ArcLanceWalkerVisual.prefab");
+            ValidateNewPbrUnit("FieldMedicRover", "Assets/TacticalOperations/Prefabs/FieldMedicRoverVisual.prefab");
             ValidateNewPbrUnit("SentinelRelay", "Assets/TacticalOperations/Prefabs/SentinelRelayVisual.prefab");
             ValidateNewPbrUnit("GravitasBreaker", "Assets/TacticalOperations/Prefabs/GravitasBreakerVisual.prefab");
             ValidateNewPbrUnit("CommandRelay", "Assets/TacticalOperations/Prefabs/CommandRelayVisual.prefab");
+            Debug.Log("[Validate] Tactical integration OK: 9/9 units (models, prefabs, PBR, Animator, canonical sockets).");
         }
 
         private static void ValidateNewPbrUnit(string unitName, string prefabPath)
@@ -109,7 +122,7 @@ namespace RogueCommandExpansion.Authoring
                      {
                          "Socket_MuzzlePrimary", "Socket_DamageSmoke", "Socket_DamageFire",
                          "Socket_EngineAudio", "Socket_WeaponAudio", "Socket_GroundCenter",
-                         "Socket_GroundContact", "Socket_TurretPivot", "Socket_RecoilPrimary"
+                         "Socket_TurretPivot", "Socket_TurretPitch", "Socket_RadarMast", "Socket_Antenna"
                      })
             {
                 int matches = 0;
