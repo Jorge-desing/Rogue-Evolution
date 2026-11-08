@@ -11147,9 +11147,13 @@ def generate_procedural_action_clips(
         # Left Leg Schedule: Contact -> Down -> Passing -> Push-Off -> Contact
         biped_gait_left = {
             1: (18.0, -10.0, -8.0),
+            5: (13.0, -16.0, -4.0),
             10: (8.0, -22.0, 0.0),
+            15: (-1.0, -13.5, 6.0),
             20: (-10.0, -5.0, 12.0),
+            25: (-15.0, 5.0, 16.0),
             30: (-20.0, 15.0, 20.0),
+            35: (-1.0, 2.5, 6.0),
             40: (18.0, -10.0, -8.0),
         }
         for f, (thigh_rot, shin_rot, foot_rot) in biped_gait_left.items():
@@ -11160,9 +11164,13 @@ def generate_procedural_action_clips(
         # Right Leg Schedule: 180 degrees out of phase (shifted 20 frames)
         biped_gait_right = {
             1: (-10.0, -5.0, 12.0),
+            5: (-15.0, 5.0, 16.0),
             10: (-20.0, 15.0, 20.0),
+            15: (-1.0, 2.5, 6.0),
             20: (18.0, -10.0, -8.0),
+            25: (13.0, -16.0, -4.0),
             30: (8.0, -22.0, 0.0),
+            35: (-1.0, -13.5, 6.0),
             40: (-10.0, -5.0, 12.0),
         }
         for f, (thigh_rot, shin_rot, foot_rot) in biped_gait_right.items():
@@ -11174,14 +11182,22 @@ def generate_procedural_action_clips(
         # returns to the ground plane; stance feet stay at Z=0 so the gait does
         # not slide or penetrate. Mirrors the thigh passing poses above.
         set_bone_key("Bone_Foot_L", "location", 1, (0.0, 0.0, 0.0))
+        set_bone_key("Bone_Foot_L", "location", 5, (0.0, 0.01, 0.02))
         set_bone_key("Bone_Foot_L", "location", 10, (0.0, 0.0, 0.0))
+        set_bone_key("Bone_Foot_L", "location", 15, (0.0, 0.02, 0.045))
         set_bone_key("Bone_Foot_L", "location", 20, (0.0, 0.04, 0.09))
+        set_bone_key("Bone_Foot_L", "location", 25, (0.0, 0.03, 0.07))
         set_bone_key("Bone_Foot_L", "location", 30, (0.0, 0.02, 0.05))
+        set_bone_key("Bone_Foot_L", "location", 35, (0.0, 0.01, 0.025))
         set_bone_key("Bone_Foot_L", "location", 40, (0.0, 0.0, 0.0))
         set_bone_key("Bone_Foot_R", "location", 1, (0.0, 0.02, 0.05))
+        set_bone_key("Bone_Foot_R", "location", 5, (0.0, 0.03, 0.07))
         set_bone_key("Bone_Foot_R", "location", 10, (0.0, 0.04, 0.09))
+        set_bone_key("Bone_Foot_R", "location", 15, (0.0, 0.02, 0.045))
         set_bone_key("Bone_Foot_R", "location", 20, (0.0, 0.0, 0.0))
+        set_bone_key("Bone_Foot_R", "location", 25, (0.0, 0.0, 0.0))
         set_bone_key("Bone_Foot_R", "location", 30, (0.0, 0.0, 0.0))
+        set_bone_key("Bone_Foot_R", "location", 35, (0.0, 0.01, 0.025))
         set_bone_key("Bone_Foot_R", "location", 40, (0.0, 0.02, 0.05))
 
         act_walk.use_fake_user = True
@@ -11252,26 +11268,26 @@ def generate_procedural_action_clips(
         for _root_f in (1, 10, 20, 30, 40):
             set_bone_key("Bone_Root", "location", _root_f, (0.0, 0.0, 0.0))
         if hover:
-            # Hover: 0.035 m float, gentle sway -- still an in-place hull motion.
+            # Hover: 0.040 m float with lateral sway -- still an in-place hull motion.
             set_bone_key("Bone_Hull", "location", 1, (0.0, 0.0, 0.0))
             set_bone_key("Bone_Hull", "rotation_euler", 1, (0.0, 0.0, 0.0))
-            set_bone_key("Bone_Hull", "location", 10, (0.0, 0.0, 0.035))
-            set_bone_key("Bone_Hull", "rotation_euler", 10, (math.radians(-1.2), math.radians(1.0), 0.0))
-            set_bone_key("Bone_Hull", "location", 20, (0.0, 0.0, -0.018))
+            set_bone_key("Bone_Hull", "location", 10, (0.010, 0.0, 0.040))
+            set_bone_key("Bone_Hull", "rotation_euler", 10, (math.radians(-1.3), math.radians(1.1), 0.0))
+            set_bone_key("Bone_Hull", "location", 20, (0.0, 0.0, -0.010))
             set_bone_key("Bone_Hull", "rotation_euler", 20, (math.radians(1.0), math.radians(-0.8), 0.0))
-            set_bone_key("Bone_Hull", "location", 30, (0.0, 0.0, 0.028))
-            set_bone_key("Bone_Hull", "rotation_euler", 30, (math.radians(-0.8), math.radians(0.7), 0.0))
+            set_bone_key("Bone_Hull", "location", 30, (-0.010, 0.0, 0.032))
+            set_bone_key("Bone_Hull", "rotation_euler", 30, (math.radians(-0.9), math.radians(0.8), 0.0))
             set_bone_key("Bone_Hull", "location", 40, (0.0, 0.0, 0.0))
             set_bone_key("Bone_Hull", "rotation_euler", 40, (0.0, 0.0, 0.0))
         else:
             for f in (1, 40):
                 set_bone_key("Bone_Hull", "location", f, (0.0, 0.0, 0.0))
                 set_bone_key("Bone_Hull", "rotation_euler", f, (0.0, 0.0, 0.0))
-            set_bone_key("Bone_Hull", "location", 10, (0.0, 0.0, 0.018))
-            set_bone_key("Bone_Hull", "rotation_euler", 10, (math.radians(-1.4), math.radians(1.2), 0.0))
-            set_bone_key("Bone_Hull", "location", 20, (0.0, 0.0, -0.016))
+            set_bone_key("Bone_Hull", "location", 10, (0.008, 0.0, 0.025))
+            set_bone_key("Bone_Hull", "rotation_euler", 10, (math.radians(-1.6), math.radians(1.4), 0.0))
+            set_bone_key("Bone_Hull", "location", 20, (0.0, 0.0, -0.012))
             set_bone_key("Bone_Hull", "rotation_euler", 20, (math.radians(1.1), math.radians(-0.9), 0.0))
-            set_bone_key("Bone_Hull", "location", 30, (0.0, 0.0, 0.014))
+            set_bone_key("Bone_Hull", "location", 30, (-0.008, 0.0, 0.022))
             set_bone_key("Bone_Hull", "rotation_euler", 30, (math.radians(-0.9), math.radians(0.7), 0.0))
         act_drive.use_fake_user = True
         actions["Drive"] = act_drive

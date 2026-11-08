@@ -100,10 +100,15 @@ class TacticalAnimationImprovementTests(unittest.TestCase):
     # ---------- Drive ----------
     def test_drive_hull_bob_readable_at_rts(self) -> None:
         # El bob legacy es 0.012 máx. Una mejora legible debe superar 0.015.
-        values = [float(x) for x in re.findall(r"0\.0(\d{3})\)", self.drive)]
-        # Más robusto: buscar literales con 0.01x en el bloque Drive
-        lits = re.findall(r"\(0\.0,\s*0\.0,\s*(-?0\.\d+)\)", self.drive)
-        floats = [abs(float(x)) for x in lits]
+        hull_locations = []
+        for match in re.finditer(
+            r'set_bone_key\(\s*"Bone_Hull"\s*,\s*"location"\s*,\s*\d+\s*,\s*\(([^)]+)\)',
+            self.drive,
+        ):
+            values = [float(part.strip()) for part in match.group(1).split(",")]
+            if len(values) == 3:
+                hull_locations.append(values)
+        floats = [abs(location[2]) for location in hull_locations]
         self.assertTrue(floats, "Drive debe keyear el hull en Z")
         self.assertGreaterEqual(max(floats), 0.015, "El bob de Drive debe ser >=0.015 m para leerse a distancia RTS")
 
