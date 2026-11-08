@@ -276,5 +276,86 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
 
             return rawScore * Math.Max(0.5f, doctrine.DefenseWeight);
         }
+
+        /// <summary>
+        /// Scores flanking maneuver utility for mobile combat units during offensive or skirmish postures.
+        /// Rewards bypassing the primary battle line to strike from hostile blind-spots while penalizing slow or support units.
+        /// </summary>
+        public static float ScoreFlankingManeuver(
+            AiUnitSnapshot unit,
+            float flankDestX,
+            float flankDestZ,
+            AiBattlefieldSnapshot snapshot,
+            AiDoctrineWeights doctrine)
+        {
+            if (!unit.IsCombatUnit || ((unit.RoleFlags & (RoleSupporter | RoleHeal)) != 0) || unit.IsBuilding || unit.IsHarvester)
+            {
+                return 0f;
+            }
+
+            // Minimum mobility threshold: slow units (heavy tanks, siege) hold the line or push center; fast units flank
+            if (unit.MoveSpeed < 7.0f)
+            {
+                return 0f;
+            }
+
+            // Needs an established battle line: at least 3 AI combat units and 1 hostile unit
+            if (snapshot == null || snapshot.TotalAiCombatUnits < 3 || snapshot.TotalHostileCombatUnits < 1)
+            {
+                return 0f;
+            }
+
+            // In Fortify doctrine or under heavy base pressure, all units must prioritize defense over flanking
+            if (snapshot.UnderHarvesterOrBasePressure || doctrine.SurvivalWeight >= 1.40f)
+            {
+                return 0f;
+            }
+
+            float dx = unit.PosX - flankDestX;
+            float dz = unit.PosZ - flankDestZ;
+            float distToFlank = (float)Math.Sqrt(Math.Max(0f, dx * dx + dz * dz));
+
+            // If unit is already at the flank destination (within 4 cells), no need to re-issue flank move
+            if (distToFlank < 4.0f)
+            {
+                return 10f * doctrine.AssaultWeight;
+            }
+
+            // Scout / fast role receives an additional mobility bonus
+            float roleBonus = (((unit.RoleFlags & (RoleScout | RoleSniper)) != 0) || unit.MoveSpeed >= 10.0f) ? 1.30f : 1.0f;
+
+            // Flanking utility scales with AssaultWeight and distance feasibility
+            float baseFlankUtility = Math.Max(15.0f, 75.0f - (distToFlank * 0.75f));
+            return baseFlankUtility * roleBonus * Math.Max(0.5f, doctrine.AssaultWeight);
+        }
+
+        /// <summary>
+        /// Resolves the recommended tactical stance for a unit based on the active strategic doctrine and unit role.
+        /// </summary>
+        public static string EvaluateRecommendedStance(AiDoctrineWeights doctrine, AiUnitSnapshot unit)
+        {
+            if (unit.IsBuilding || unit.IsHarvester)
+            {
+                return "HoldGround";
+            }
+
+            if (unit.IsSupportUnit)
+            {
+                return "Defensive";
+            }
+
+            if (string.Equals(doctrine.DoctrineName, "Fortify", StringComparison.OrdinalIgnoreCase))
+            {
+                return (unit.MoveSpeed >= 8.0f && unit.WeaponRange >= 10.0f) ? "Kite" : "Defensive";
+            }
+
+            if (string.Equals(doctrine.DoctrineName, "Assault", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Aggressive";
+            }
+
+            // Skirmish default
+            return (unit.MoveSpeed >= 7.5f && unit.WeaponRange >= 8.0f) ? "Kite" : "Aggressive";
+        }
     }
 }

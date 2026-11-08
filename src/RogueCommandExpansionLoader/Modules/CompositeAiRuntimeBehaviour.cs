@@ -378,6 +378,13 @@ namespace RogueCommandExpansionLoader.Modules
                         command = EntityCommand.ActiveSkillWithoutTarget();
                     }
                 }
+                else if (proposal.Category == AiIntentCategory.FlankingManeuver)
+                {
+                    command = EntityCommand.AttackMoveOnPosition(
+                        new Vector3(proposal.DestX, unit.Position.y, proposal.DestZ),
+                        EntityCommand.Role.ThisCommandWantsPathToBeCleared,
+                        proposal.ModuleId);
+                }
                 else if (proposal.TargetEntityId >= 0 &&
                          _battlefieldCollector.TryResolveHostileEntity(proposal.TargetEntityId, out EntityController hostileTarget) &&
                          hostileTarget != null)

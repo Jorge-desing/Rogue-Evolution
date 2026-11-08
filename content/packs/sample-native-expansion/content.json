@@ -2551,6 +2551,31 @@
               "value": "0"
             }
           ]
+        },
+        {
+          "moduleId": "sample:tactical-director",
+          "parameters": [
+            {
+              "name": "baseIndex",
+              "value": "0"
+            },
+            {
+              "name": "evalIntervalSeconds",
+              "value": "0.5"
+            },
+            {
+              "name": "engagementRadius",
+              "value": "45.0"
+            },
+            {
+              "name": "enableFlanking",
+              "value": "true"
+            },
+            {
+              "name": "minFlankSpeed",
+              "value": "7.5"
+            }
+          ]
         }
       ],
       "productionBuildingEntries": [
@@ -2683,6 +2708,31 @@
             {
               "name": "maxWaves",
               "value": "6"
+            }
+          ]
+        },
+        {
+          "moduleId": "sample:tactical-director",
+          "parameters": [
+            {
+              "name": "baseIndex",
+              "value": "0"
+            },
+            {
+              "name": "evalIntervalSeconds",
+              "value": "0.5"
+            },
+            {
+              "name": "engagementRadius",
+              "value": "40.0"
+            },
+            {
+              "name": "enableFlanking",
+              "value": "true"
+            },
+            {
+              "name": "minFlankSpeed",
+              "value": "7.5"
             }
           ]
         }

@@ -242,7 +242,44 @@ namespace RogueCommandExpansionLoader.Modules
                         emittedForUnit++;
                     }
 
-                    // 4. Focus combat targeting proposal with anti-overkill tracking
+                    // 4. Dynamic Flanking Maneuver for fast combat units during offensive or skirmish doctrine
+                    if (_settings.EnableFlanking && emittedForUnit < _settings.MaxProposalsPerUnit &&
+                        unit.MoveSpeed >= _settings.MinFlankSpeed && snapshot.TotalAiCombatUnits >= 3 &&
+                        snapshot.TotalHostileCombatUnits >= 1 && !snapshot.UnderHarvesterOrBasePressure)
+                    {
+                        float dLeftSq = (unit.PosX - snapshot.FlankLeftX) * (unit.PosX - snapshot.FlankLeftX) +
+                                        (unit.PosZ - snapshot.FlankLeftZ) * (unit.PosZ - snapshot.FlankLeftZ);
+                        float dRightSq = (unit.PosX - snapshot.FlankRightX) * (unit.PosX - snapshot.FlankRightX) +
+                                         (unit.PosZ - snapshot.FlankRightZ) * (unit.PosZ - snapshot.FlankRightZ);
+
+                        float chosenFlankX = dLeftSq <= dRightSq ? snapshot.FlankLeftX : snapshot.FlankRightX;
+                        float chosenFlankZ = dLeftSq <= dRightSq ? snapshot.FlankLeftZ : snapshot.FlankRightZ;
+
+                        float flankScore = TacticalUtilityScorer.ScoreFlankingManeuver(
+                            unit,
+                            chosenFlankX,
+                            chosenFlankZ,
+                            snapshot,
+                            doctrineWeights);
+
+                        if (flankScore > 0f)
+                        {
+                            proposals.Add(new AiIntentProposal(
+                                moduleId: ModuleId,
+                                commandTag: _commandTag + ".flank",
+                                unitId: unit.UniqueEntityId,
+                                targetEntityId: -1,
+                                destX: chosenFlankX,
+                                destZ: chosenFlankZ,
+                                category: AiIntentCategory.FlankingManeuver,
+                                utilityScore: flankScore,
+                                lockoutDurationSeconds: 1.50f,
+                                requiresEmptyQueue: false));
+                            emittedForUnit++;
+                        }
+                    }
+
+                    // 5. Focus combat targeting proposal with anti-overkill tracking
                     if (_settings.EnableFocusTargeting && hasBestTarget &&
                         emittedForUnit < _settings.MaxProposalsPerUnit)
                     {

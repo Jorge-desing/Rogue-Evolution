@@ -312,12 +312,17 @@ Packs can declare advanced, native-grounded runtime mechanics on units (`units[]
 - A coordinated AI module implementing `ICoordinatedAiRuntimeBehaviour` on top of the HUB-D 3-layer architecture (`AiBattlefieldBlackboard` -> `StrategicDoctrinePolicy` & `TacticalUtilityScorer` -> `AiCommandArbiterPolicy`).
 - **Parameters** (all optional):
   - `baseIndex` (integer, `-1`–`31`; default `-1` for all AI bases)
-  - `engagementRadius` (finite number, `5`–`150`; default `45`)
-  - `kiteSpeedThreshold` (finite number, `1`–`30`; default `8`)
-  - `lowHealthRetreatRatio` (finite number, `0.05`–`0.75`; default `0.30`)
-  - `lockoutDurationSeconds` (finite number, `0.1`–`15.0`; default `1.5`)
-  - `maxProposalsPerTick` (integer, `1`–`32`; default `12`)
-- **Runtime behavior:** Evaluates Lanchester force balance (`TotalDefense`, `AggressivePush`, `DefensiveSkirmish`, `Standard`), proposes `SurvivalKite` vectors via 8-ray `AiSafeVectorPolicy` when units are inside environmental hazard zones (`Firestorm`, `AcidPool`, `EmpField`, `CryoMist`), artillery dead-zones (`minAttackRange > 0`) are breached, or fast skirmishers drop below `retreatHealthRatio`, triggers ready active tactical skills (`TacticalSkill`), and scores `CombatTargeting` targets with role affinity, finisher bonus, and anti-overkill damping (`ScoreCombatTargetWithOverkill`) before central arbitration in `CompositeAiRuntimeBehaviour`.
+  - `evalIntervalSeconds` (finite number, `0.1`–`10.0`; default `0.5`)
+  - `engagementRadius` (finite number, `5.0`–`120.0`; default `40.0`)
+  - `defenseRadius` (finite number, `5.0`–`60.0`; default `20.0`)
+  - `retreatHealthRatio` (finite number, `0.05`–`0.80`; default `0.30`)
+  - `maxProposalsPerUnit` (integer, `1`–`4`; default `2`)
+  - `enableSurvivalKiting` (boolean; default `true`)
+  - `enableBaseDefense` (boolean; default `true`)
+  - `enableFocusTargeting` (boolean; default `true`)
+  - `enableFlanking` (boolean; default `true`)
+  - `minFlankSpeed` (finite number, `3.0`–`25.0`; default `7.5`)
+- **Runtime behavior:** Evaluates Lanchester force balance (`Fortify`, `Assault`, `Skirmish`), proposes `SurvivalKite` vectors via 8-ray `AiSafeVectorPolicy` when units are inside environmental hazard zones or artillery dead-zones, coordinates dynamic dual-wing `FlankingManeuver` strikes for mobile combat units around hostile centroids, triggers ready active tactical skills (`TacticalSkill`), and scores `CombatTargeting` targets with role affinity, finisher bonus, and anti-overkill damping (`ScoreCombatTargetWithOverkill`) before central arbitration in `CompositeAiRuntimeBehaviour`.
 
 ### 7. Squad Operations Director AI (`sample:squad-operations-director`)
 - Specialist HUB-D 2.0 coordinated AI module implementing `ICoordinatedAiRuntimeBehaviour` for support/repair logistics, counter-battery interception, and specialist active skills.

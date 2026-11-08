@@ -4052,6 +4052,345 @@ internal static partial class ValidationTestRunner
             ExistingControllers.Instance.Reset();
         }
     }),
+    ("HUB-D Phase 7: AiBattlefieldBlackboardBuilder computes friendly centroid, engagement distance, and dual-wing flanking vectors", () =>
+    {
+        var ai1 = new RogueCommandExpansionLoader.Runtime.Ai.AiUnitSnapshot(
+            uniqueEntityId: 101,
+            entityId: "mod:fast-scout",
+            baseIndex: 0,
+            posX: -5f,
+            posZ: 0f,
+            currentHealth: 100f,
+            maxHealth: 100f,
+            currentShield: 0f,
+            maxShield: 0f,
+            dpsEstimate: 20f,
+            weaponRange: 15f,
+            minAttackRange: 0f,
+            moveSpeed: 10f,
+            roleFlags: 1 << 7,
+            isControlledByAi: true,
+            isControlledByPlayer: false,
+            isCombatUnit: true,
+            isHarvester: false,
+            isBuilding: false,
+            isSupportUnit: false,
+            hasQueuedCommands: false,
+            currentCommandTag: "",
+            currentTargetId: -1,
+            hasReadyActiveSkill: false,
+            activeSkillTargetsSelf: false,
+            activeSkillRange: 0f);
+
+        var ai2 = new RogueCommandExpansionLoader.Runtime.Ai.AiUnitSnapshot(
+            uniqueEntityId: 102,
+            entityId: "mod:tank",
+            baseIndex: 0,
+            posX: 5f,
+            posZ: 0f,
+            currentHealth: 200f,
+            maxHealth: 200f,
+            currentShield: 50f,
+            maxShield: 50f,
+            dpsEstimate: 30f,
+            weaponRange: 12f,
+            minAttackRange: 0f,
+            moveSpeed: 6f,
+            roleFlags: 1 << 1,
+            isControlledByAi: true,
+            isControlledByPlayer: false,
+            isCombatUnit: true,
+            isHarvester: false,
+            isBuilding: false,
+            isSupportUnit: false,
+            hasQueuedCommands: false,
+            currentCommandTag: "",
+            currentTargetId: -1,
+            hasReadyActiveSkill: false,
+            activeSkillTargetsSelf: false,
+            activeSkillRange: 0f);
+
+        var hostile1 = new RogueCommandExpansionLoader.Runtime.Ai.AiUnitSnapshot(
+            uniqueEntityId: 201,
+            entityId: "enemy:bunker",
+            baseIndex: -1,
+            posX: 0f,
+            posZ: 20f,
+            currentHealth: 300f,
+            maxHealth: 300f,
+            currentShield: 0f,
+            maxShield: 0f,
+            dpsEstimate: 25f,
+            weaponRange: 10f,
+            minAttackRange: 0f,
+            moveSpeed: 0f,
+            roleFlags: 1 << 1,
+            isControlledByAi: false,
+            isControlledByPlayer: true,
+            isCombatUnit: true,
+            isHarvester: false,
+            isBuilding: false,
+            isSupportUnit: false,
+            hasQueuedCommands: false,
+            currentCommandTag: "",
+            currentTargetId: -1,
+            hasReadyActiveSkill: false,
+            activeSkillTargetsSelf: false,
+            activeSkillRange: 0f);
+
+        RogueCommandExpansionLoader.Runtime.Ai.AiBattlefieldSnapshot snapshot =
+            RogueCommandExpansionLoader.Runtime.Ai.AiBattlefieldBlackboardBuilder.BuildSnapshot(
+                timestamp: 10f,
+                baseIndex: 0,
+                currentWaveNumber: 1,
+                aiUnits: new[] { ai1, ai2 },
+                hostileUnits: new[] { hostile1 });
+
+        // Friendly centroid: (-5 + 5)/2 = 0, (0 + 0)/2 = 0
+        if (Math.Abs(snapshot.AiCentroidX) > 0.001f || Math.Abs(snapshot.AiCentroidZ) > 0.001f)
+        {
+            throw new InvalidOperationException("AiBattlefieldBlackboardBuilder did not compute correct AiCentroid.");
+        }
+
+        // Hostile centroid: (0, 20)
+        if (Math.Abs(snapshot.HostileCentroidX) > 0.001f || Math.Abs(snapshot.HostileCentroidZ - 20f) > 0.001f)
+        {
+            throw new InvalidOperationException("AiBattlefieldBlackboardBuilder did not compute correct HostileCentroid.");
+        }
+
+        // Engagement distance: 20
+        if (Math.Abs(snapshot.EngagementDistance - 20f) > 0.001f)
+        {
+            throw new InvalidOperationException("AiBattlefieldBlackboardBuilder did not compute correct EngagementDistance: " + snapshot.EngagementDistance);
+        }
+
+        // FlankLeftX should be negative (left side of hostile), FlankRightX should be positive (right side of hostile)
+        if (snapshot.FlankLeftX >= 0f || snapshot.FlankRightX <= 0f)
+        {
+            throw new InvalidOperationException("Flanking vectors are not correctly positioned on left and right wings.");
+        }
+
+        // Depth of flanks should match hostile depth
+        if (Math.Abs(snapshot.FlankLeftZ - 20f) > 0.001f || Math.Abs(snapshot.FlankRightZ - 20f) > 0.001f)
+        {
+            throw new InvalidOperationException("Flanking vectors Z coordinates do not align with hostile depth.");
+        }
+    }),
+    ("HUB-D Phase 8: TacticalUtilityScorer and TacticalDirectorAiModule coordinate dynamic flanking maneuvers and recommended stances", () =>
+    {
+        var fastScout = new RogueCommandExpansionLoader.Runtime.Ai.AiUnitSnapshot(
+            uniqueEntityId: 301,
+            entityId: "mod:fast-scout",
+            baseIndex: 0,
+            posX: -6f,
+            posZ: 2f,
+            currentHealth: 100f,
+            maxHealth: 100f,
+            currentShield: 0f,
+            maxShield: 0f,
+            dpsEstimate: 25f,
+            weaponRange: 14f,
+            minAttackRange: 0f,
+            moveSpeed: 11f,
+            roleFlags: 1 << 7, // Scout
+            isControlledByAi: true,
+            isControlledByPlayer: false,
+            isCombatUnit: true,
+            isHarvester: false,
+            isBuilding: false,
+            isSupportUnit: false,
+            hasQueuedCommands: false,
+            currentCommandTag: "",
+            currentTargetId: -1,
+            hasReadyActiveSkill: false,
+            activeSkillTargetsSelf: false,
+            activeSkillRange: 0f);
+
+        var heavyTank = new RogueCommandExpansionLoader.Runtime.Ai.AiUnitSnapshot(
+            uniqueEntityId: 302,
+            entityId: "mod:heavy-tank",
+            baseIndex: 0,
+            posX: 0f,
+            posZ: 0f,
+            currentHealth: 300f,
+            maxHealth: 300f,
+            currentShield: 0f,
+            maxShield: 0f,
+            dpsEstimate: 40f,
+            weaponRange: 12f,
+            minAttackRange: 0f,
+            moveSpeed: 5.5f, // Slow
+            roleFlags: 1 << 1, // Tank
+            isControlledByAi: true,
+            isControlledByPlayer: false,
+            isCombatUnit: true,
+            isHarvester: false,
+            isBuilding: false,
+            isSupportUnit: false,
+            hasQueuedCommands: false,
+            currentCommandTag: "",
+            currentTargetId: -1,
+            hasReadyActiveSkill: false,
+            activeSkillTargetsSelf: false,
+            activeSkillRange: 0f);
+
+        var thirdAlliedUnit = new RogueCommandExpansionLoader.Runtime.Ai.AiUnitSnapshot(
+            uniqueEntityId: 303,
+            entityId: "mod:line-infantry",
+            baseIndex: 0,
+            posX: 3f,
+            posZ: 0f,
+            currentHealth: 150f,
+            maxHealth: 150f,
+            currentShield: 0f,
+            maxShield: 0f,
+            dpsEstimate: 20f,
+            weaponRange: 10f,
+            minAttackRange: 0f,
+            moveSpeed: 7.0f,
+            roleFlags: 1 << 0,
+            isControlledByAi: true,
+            isControlledByPlayer: false,
+            isCombatUnit: true,
+            isHarvester: false,
+            isBuilding: false,
+            isSupportUnit: false,
+            hasQueuedCommands: false,
+            currentCommandTag: "",
+            currentTargetId: -1,
+            hasReadyActiveSkill: false,
+            activeSkillTargetsSelf: false,
+            activeSkillRange: 0f);
+
+        var supportUnit = new RogueCommandExpansionLoader.Runtime.Ai.AiUnitSnapshot(
+            uniqueEntityId: 304,
+            entityId: "mod:repair-rover",
+            baseIndex: 0,
+            posX: 0f,
+            posZ: -3f,
+            currentHealth: 80f,
+            maxHealth: 80f,
+            currentShield: 0f,
+            maxShield: 0f,
+            dpsEstimate: 0f,
+            weaponRange: 0f,
+            minAttackRange: 0f,
+            moveSpeed: 10f,
+            roleFlags: 1 << 6, // Supporter
+            isControlledByAi: true,
+            isControlledByPlayer: false,
+            isCombatUnit: false,
+            isHarvester: false,
+            isBuilding: false,
+            isSupportUnit: true,
+            hasQueuedCommands: false,
+            currentCommandTag: "",
+            currentTargetId: -1,
+            hasReadyActiveSkill: false,
+            activeSkillTargetsSelf: false,
+            activeSkillRange: 0f);
+
+        var hostileTarget = new RogueCommandExpansionLoader.Runtime.Ai.AiUnitSnapshot(
+            uniqueEntityId: 401,
+            entityId: "player:defense-tower",
+            baseIndex: -1,
+            posX: 0f,
+            posZ: 22f,
+            currentHealth: 400f,
+            maxHealth: 400f,
+            currentShield: 0f,
+            maxShield: 0f,
+            dpsEstimate: 30f,
+            weaponRange: 12f,
+            minAttackRange: 0f,
+            moveSpeed: 0f,
+            roleFlags: 1 << 1,
+            isControlledByAi: false,
+            isControlledByPlayer: true,
+            isCombatUnit: true,
+            isHarvester: false,
+            isBuilding: false,
+            isSupportUnit: false,
+            hasQueuedCommands: false,
+            currentCommandTag: "",
+            currentTargetId: -1,
+            hasReadyActiveSkill: false,
+            activeSkillTargetsSelf: false,
+            activeSkillRange: 0f);
+
+        RogueCommandExpansionLoader.Runtime.Ai.AiBattlefieldSnapshot snapshot =
+            RogueCommandExpansionLoader.Runtime.Ai.AiBattlefieldBlackboardBuilder.BuildSnapshot(
+                timestamp: 15f,
+                baseIndex: 0,
+                currentWaveNumber: 1,
+                aiUnits: new[] { fastScout, heavyTank, thirdAlliedUnit, supportUnit },
+                hostileUnits: new[] { hostileTarget });
+
+        var assaultDoctrine = RogueCommandExpansionLoader.Runtime.Ai.AiDoctrineWeights.Assault;
+        var fortifyDoctrine = RogueCommandExpansionLoader.Runtime.Ai.AiDoctrineWeights.Fortify;
+
+        // 1. Mobile scout in assault doctrine should score positive flanking utility
+        float scoutFlankScore = RogueCommandExpansionLoader.Runtime.Ai.TacticalUtilityScorer.ScoreFlankingManeuver(
+            fastScout,
+            snapshot.FlankLeftX,
+            snapshot.FlankLeftZ,
+            snapshot,
+            assaultDoctrine);
+
+        if (scoutFlankScore <= 0f)
+        {
+            throw new InvalidOperationException("TacticalUtilityScorer did not score positive flanking utility for fast scout in Assault doctrine.");
+        }
+
+        // 2. Slow heavy tank should score 0 flanking utility
+        float slowTankFlankScore = RogueCommandExpansionLoader.Runtime.Ai.TacticalUtilityScorer.ScoreFlankingManeuver(
+            heavyTank,
+            snapshot.FlankLeftX,
+            snapshot.FlankLeftZ,
+            snapshot,
+            assaultDoctrine);
+
+        if (slowTankFlankScore > 0f)
+        {
+            throw new InvalidOperationException("TacticalUtilityScorer assigned positive flanking utility to a slow tank.");
+        }
+
+        // 3. Support unit should score 0 flanking utility
+        float supportFlankScore = RogueCommandExpansionLoader.Runtime.Ai.TacticalUtilityScorer.ScoreFlankingManeuver(
+            supportUnit,
+            snapshot.FlankLeftX,
+            snapshot.FlankLeftZ,
+            snapshot,
+            assaultDoctrine);
+
+        if (supportFlankScore > 0f)
+        {
+            throw new InvalidOperationException("TacticalUtilityScorer assigned positive flanking utility to a support unit.");
+        }
+
+        // 4. In Fortify doctrine, flanking utility must be 0
+        float fortifyFlankScore = RogueCommandExpansionLoader.Runtime.Ai.TacticalUtilityScorer.ScoreFlankingManeuver(
+            fastScout,
+            snapshot.FlankLeftX,
+            snapshot.FlankLeftZ,
+            snapshot,
+            fortifyDoctrine);
+
+        if (fortifyFlankScore > 0f)
+        {
+            throw new InvalidOperationException("TacticalUtilityScorer assigned positive flanking utility under Fortify doctrine.");
+        }
+
+        // 5. Recommended stance evaluation
+        string assaultStance = RogueCommandExpansionLoader.Runtime.Ai.TacticalUtilityScorer.EvaluateRecommendedStance(assaultDoctrine, fastScout);
+        string fortifyStance = RogueCommandExpansionLoader.Runtime.Ai.TacticalUtilityScorer.EvaluateRecommendedStance(fortifyDoctrine, heavyTank);
+        string supportStance = RogueCommandExpansionLoader.Runtime.Ai.TacticalUtilityScorer.EvaluateRecommendedStance(assaultDoctrine, supportUnit);
+
+        if (assaultStance != "Aggressive" || fortifyStance != "Defensive" || supportStance != "Defensive")
+        {
+            throw new InvalidOperationException($"Unexpected recommended stances: assault={assaultStance}, fortify={fortifyStance}, support={supportStance}");
+        }
+    }),
     };
 
     private sealed class DelegatingTestAiRuntimeBehaviour : IRogueCommandAiRuntimeBehaviour

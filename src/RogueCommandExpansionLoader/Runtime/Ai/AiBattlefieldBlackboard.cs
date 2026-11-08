@@ -24,6 +24,13 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
         public float TotalHostileCombatPower { get; }
         public float HostileCentroidX { get; }
         public float HostileCentroidZ { get; }
+        public float AiCentroidX { get; }
+        public float AiCentroidZ { get; }
+        public float EngagementDistance { get; }
+        public float FlankLeftX { get; }
+        public float FlankLeftZ { get; }
+        public float FlankRightX { get; }
+        public float FlankRightZ { get; }
         public bool UnderHarvesterOrBasePressure { get; }
         public IReadOnlyList<AiUnitSnapshot> AiUnits { get; }
         public IReadOnlyList<AiUnitSnapshot> HostileUnits { get; }
@@ -48,7 +55,14 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
             IReadOnlyList<AiUnitSnapshot> hostileUnits,
             int omittedHazardZoneCount = 0,
             int totalHarmfulHazardZones = 0,
-            IReadOnlyList<AiHazardZoneSnapshot> hazardZones = null)
+            IReadOnlyList<AiHazardZoneSnapshot> hazardZones = null,
+            float aiCentroidX = 0f,
+            float aiCentroidZ = 0f,
+            float engagementDistance = 0f,
+            float flankLeftX = 0f,
+            float flankLeftZ = 0f,
+            float flankRightX = 0f,
+            float flankRightZ = 0f)
         {
             OmittedAiUnitCount = Math.Max(0, omittedAiUnitCount);
             OmittedHostileUnitCount = Math.Max(0, omittedHostileUnitCount);
@@ -65,6 +79,13 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
             TotalHostileCombatPower = Math.Max(0f, totalHostileCombatPower);
             HostileCentroidX = float.IsNaN(hostileCentroidX) || float.IsInfinity(hostileCentroidX) ? 0f : hostileCentroidX;
             HostileCentroidZ = float.IsNaN(hostileCentroidZ) || float.IsInfinity(hostileCentroidZ) ? 0f : hostileCentroidZ;
+            AiCentroidX = float.IsNaN(aiCentroidX) || float.IsInfinity(aiCentroidX) ? 0f : aiCentroidX;
+            AiCentroidZ = float.IsNaN(aiCentroidZ) || float.IsInfinity(aiCentroidZ) ? 0f : aiCentroidZ;
+            EngagementDistance = float.IsNaN(engagementDistance) || float.IsInfinity(engagementDistance) ? 0f : Math.Max(0f, engagementDistance);
+            FlankLeftX = float.IsNaN(flankLeftX) || float.IsInfinity(flankLeftX) ? 0f : flankLeftX;
+            FlankLeftZ = float.IsNaN(flankLeftZ) || float.IsInfinity(flankLeftZ) ? 0f : flankLeftZ;
+            FlankRightX = float.IsNaN(flankRightX) || float.IsInfinity(flankRightX) ? 0f : flankRightX;
+            FlankRightZ = float.IsNaN(flankRightZ) || float.IsInfinity(flankRightZ) ? 0f : flankRightZ;
             UnderHarvesterOrBasePressure = underHarvesterOrBasePressure;
             AiUnits = aiUnits ?? Array.Empty<AiUnitSnapshot>();
             HostileUnits = hostileUnits ?? Array.Empty<AiUnitSnapshot>();
@@ -90,7 +111,14 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
             hostileUnits: Array.Empty<AiUnitSnapshot>(),
             omittedHazardZoneCount: 0,
             totalHarmfulHazardZones: 0,
-            hazardZones: Array.Empty<AiHazardZoneSnapshot>());
+            hazardZones: Array.Empty<AiHazardZoneSnapshot>(),
+            aiCentroidX: 0f,
+            aiCentroidZ: 0f,
+            engagementDistance: 0f,
+            flankLeftX: 0f,
+            flankLeftZ: 0f,
+            flankRightX: 0f,
+            flankRightZ: 0f);
     }
 
     /// <summary>
@@ -146,6 +174,9 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
             int totalAiHarvesters = 0;
             int totalAiBuildings = 0;
             float totalAiPower = 0f;
+            float sumAiCombatX = 0f;
+            float sumAiCombatZ = 0f;
+            int aiCombatCentroidCount = 0;
 
             if (aiUnits != null)
             {
@@ -161,6 +192,9 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
                     {
                         totalAiCombat++;
                         totalAiPower += unit.CombinedCombatPower;
+                        sumAiCombatX += unit.PosX;
+                        sumAiCombatZ += unit.PosZ;
+                        aiCombatCentroidCount++;
                     }
 
                     if (unit.IsHarvester)
@@ -268,6 +302,43 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
 
             float centroidX = centroidCount > 0 ? sumHostileX / centroidCount : 0f;
             float centroidZ = centroidCount > 0 ? sumHostileZ / centroidCount : 0f;
+            float aiCentroidX = aiCombatCentroidCount > 0 ? sumAiCombatX / aiCombatCentroidCount : 0f;
+            float aiCentroidZ = aiCombatCentroidCount > 0 ? sumAiCombatZ / aiCombatCentroidCount : 0f;
+
+            float engagementDist = 0f;
+            float flankLeftX = 0f;
+            float flankLeftZ = 0f;
+            float flankRightX = 0f;
+            float flankRightZ = 0f;
+
+            if (aiCombatCentroidCount > 0 && centroidCount > 0)
+            {
+                float dx = centroidX - aiCentroidX;
+                float dz = centroidZ - aiCentroidZ;
+                float distSq = dx * dx + dz * dz;
+                engagementDist = (float)Math.Sqrt(Math.Max(0f, distSq));
+
+                if (engagementDist > 0.01f)
+                {
+                    float dirX = dx / engagementDist;
+                    float dirZ = dz / engagementDist;
+
+                    float flankOffset = Math.Max(8.0f, Math.Min(28.0f, engagementDist * 0.45f));
+
+                    flankLeftX = centroidX + (-dirZ * flankOffset);
+                    flankLeftZ = centroidZ + (dirX * flankOffset);
+
+                    flankRightX = centroidX + (dirZ * flankOffset);
+                    flankRightZ = centroidZ + (-dirX * flankOffset);
+                }
+                else
+                {
+                    flankLeftX = centroidX - 10.0f;
+                    flankLeftZ = centroidZ;
+                    flankRightX = centroidX + 10.0f;
+                    flankRightZ = centroidZ;
+                }
+            }
 
             return new AiBattlefieldSnapshot(
                 timestamp: timestamp,
@@ -288,7 +359,14 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
                 hostileUnits: boundedHostiles.AsReadOnly(),
                 omittedHazardZoneCount: omittedHazards,
                 totalHarmfulHazardZones: totalHarmfulHazards,
-                hazardZones: boundedHazards.AsReadOnly());
+                hazardZones: boundedHazards.AsReadOnly(),
+                aiCentroidX: aiCentroidX,
+                aiCentroidZ: aiCentroidZ,
+                engagementDistance: engagementDist,
+                flankLeftX: flankLeftX,
+                flankLeftZ: flankLeftZ,
+                flankRightX: flankRightX,
+                flankRightZ: flankRightZ);
         }
     }
 }

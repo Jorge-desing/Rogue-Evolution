@@ -10,6 +10,7 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
     public enum AiIntentCategory
     {
         SiegeAndFormation = 10,
+        FlankingManeuver = 15,
         CombatTargeting = 20,
         BaseAndHarvesterDefense = 30,
         TacticalSkill = 40,

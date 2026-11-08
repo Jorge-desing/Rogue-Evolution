@@ -16,6 +16,8 @@ namespace RogueCommandExpansionLoader.Modules
         public bool EnableSurvivalKiting;
         public bool EnableBaseDefense;
         public bool EnableFocusTargeting;
+        public bool EnableFlanking;
+        public float MinFlankSpeed;
     }
 
     /// <summary>
@@ -36,6 +38,8 @@ namespace RogueCommandExpansionLoader.Modules
         private const bool DefaultEnableSurvivalKiting = true;
         private const bool DefaultEnableBaseDefense = true;
         private const bool DefaultEnableFocusTargeting = true;
+        private const bool DefaultEnableFlanking = true;
+        private const float DefaultMinFlankSpeed = 7.5f;
 
         public static bool TryParse(
             ContentModuleParameter[] parameters,
@@ -63,7 +67,9 @@ namespace RogueCommandExpansionLoader.Modules
                     parameter.name != "maxProposalsPerUnit" &&
                     parameter.name != "enableSurvivalKiting" &&
                     parameter.name != "enableBaseDefense" &&
-                    parameter.name != "enableFocusTargeting")
+                    parameter.name != "enableFocusTargeting" &&
+                    parameter.name != "enableFlanking" &&
+                    parameter.name != "minFlankSpeed")
                 {
                     diagnostic = "Unknown parameter '" + parameter.name + "' for module " + ModuleId + ".";
                     return false;
@@ -141,6 +147,20 @@ namespace RogueCommandExpansionLoader.Modules
                 return false;
             }
 
+            bool enableFlanking;
+            if (!TryGetBool(values, "enableFlanking", DefaultEnableFlanking, out enableFlanking))
+            {
+                diagnostic = "enableFlanking must be 'true' or 'false'.";
+                return false;
+            }
+
+            float minFlankSpeed;
+            if (!TryGetFloat(values, "minFlankSpeed", DefaultMinFlankSpeed, 3.0f, 25.0f, out minFlankSpeed))
+            {
+                diagnostic = "minFlankSpeed must be a finite number between 3 and 25.";
+                return false;
+            }
+
             settings = new TacticalDirectorSettings
             {
                 BaseIndex = baseIndex,
@@ -151,7 +171,9 @@ namespace RogueCommandExpansionLoader.Modules
                 MaxProposalsPerUnit = maxProposalsPerUnit,
                 EnableSurvivalKiting = enableSurvivalKiting,
                 EnableBaseDefense = enableBaseDefense,
-                EnableFocusTargeting = enableFocusTargeting
+                EnableFocusTargeting = enableFocusTargeting,
+                EnableFlanking = enableFlanking,
+                MinFlankSpeed = minFlankSpeed
             };
             diagnostic = null;
             return true;
