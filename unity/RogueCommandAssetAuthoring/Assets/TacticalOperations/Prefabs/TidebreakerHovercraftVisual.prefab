@@ -4938,6 +4938,37 @@ Animator:
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorStateOnDisable: 0
   m_WriteDefaultValuesOnDisable: 0
+--- !u!1 &6302160492177854353
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 7791342547140097961}
+  m_Layer: 0
+  m_Name: Socket_TurretPitch
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &7791342547140097961
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6302160492177854353}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 8410841938940211266}
+  m_RootOrder: 0
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &5627448088632363349
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -4992,15 +5023,15 @@ PrefabInstance:
     - target: {fileID: -4499456243391444762, guid: 0b52e5f65bf21fa44bdc963627842b57, type: 3}
       propertyPath: m_Materials.Array.data[0]
       value: 
-      objectReference: {fileID: 2100000, guid: 09970c7185807034fa9e561fdd108233, type: 2}
+      objectReference: {fileID: 2100000, guid: a6ce3a411b1517c4995cc268ff43cde6, type: 2}
     - target: {fileID: -3376719208198878944, guid: 0b52e5f65bf21fa44bdc963627842b57, type: 3}
       propertyPath: m_Materials.Array.data[0]
       value: 
-      objectReference: {fileID: 2100000, guid: 09970c7185807034fa9e561fdd108233, type: 2}
+      objectReference: {fileID: 2100000, guid: a6ce3a411b1517c4995cc268ff43cde6, type: 2}
     - target: {fileID: -2308438278919398353, guid: 0b52e5f65bf21fa44bdc963627842b57, type: 3}
       propertyPath: m_Materials.Array.data[0]
       value: 
-      objectReference: {fileID: 2100000, guid: 09970c7185807034fa9e561fdd108233, type: 2}
+      objectReference: {fileID: 2100000, guid: a6ce3a411b1517c4995cc268ff43cde6, type: 2}
     - target: {fileID: 919132149155446097, guid: 0b52e5f65bf21fa44bdc963627842b57, type: 3}
       propertyPath: m_Name
       value: TidebreakerHovercraftModel
@@ -5008,15 +5039,15 @@ PrefabInstance:
     - target: {fileID: 3087866999669435477, guid: 0b52e5f65bf21fa44bdc963627842b57, type: 3}
       propertyPath: m_Materials.Array.data[0]
       value: 
-      objectReference: {fileID: 2100000, guid: 09970c7185807034fa9e561fdd108233, type: 2}
+      objectReference: {fileID: 2100000, guid: a6ce3a411b1517c4995cc268ff43cde6, type: 2}
     - target: {fileID: 4184101738915223751, guid: 0b52e5f65bf21fa44bdc963627842b57, type: 3}
       propertyPath: m_Materials.Array.data[0]
       value: 
-      objectReference: {fileID: 2100000, guid: 09970c7185807034fa9e561fdd108233, type: 2}
+      objectReference: {fileID: 2100000, guid: a6ce3a411b1517c4995cc268ff43cde6, type: 2}
     - target: {fileID: 7087874468034185957, guid: 0b52e5f65bf21fa44bdc963627842b57, type: 3}
       propertyPath: m_Materials.Array.data[0]
       value: 
-      objectReference: {fileID: 2100000, guid: 09970c7185807034fa9e561fdd108233, type: 2}
+      objectReference: {fileID: 2100000, guid: a6ce3a411b1517c4995cc268ff43cde6, type: 2}
     m_RemovedComponents:
     - {fileID: 5866666021909216657, guid: 0b52e5f65bf21fa44bdc963627842b57, type: 3}
   m_SourcePrefab: {fileID: 100100000, guid: 0b52e5f65bf21fa44bdc963627842b57, type: 3}
@@ -5129,6 +5160,11 @@ AudioSource:
 --- !u!4 &6597529491006478689 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -7667496952053313484, guid: 0b52e5f65bf21fa44bdc963627842b57, type: 3}
+  m_PrefabInstance: {fileID: 5627448088632363349}
+  m_PrefabAsset: {fileID: 0}
+--- !u!4 &8410841938940211266 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 4224910911013337367, guid: 0b52e5f65bf21fa44bdc963627842b57, type: 3}
   m_PrefabInstance: {fileID: 5627448088632363349}
   m_PrefabAsset: {fileID: 0}
 --- !u!1 &8530272213207282667 stripped

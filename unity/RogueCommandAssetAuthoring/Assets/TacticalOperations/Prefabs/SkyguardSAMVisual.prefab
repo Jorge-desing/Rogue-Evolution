@@ -1,5 +1,36 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
+--- !u!1 &1372969237022847404
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 3037784195837814142}
+  m_Layer: 0
+  m_Name: Socket_TurretPitch
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &3037784195837814142
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1372969237022847404}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 7458176189617865259}
+  m_RootOrder: 0
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1995386746761538311
 GameObject:
   m_ObjectHideFlags: 0
@@ -4992,11 +5023,11 @@ PrefabInstance:
     - target: {fileID: -4345587358174522949, guid: 0655a999c79eb79418affcca4f4dcc80, type: 3}
       propertyPath: m_Materials.Array.data[0]
       value: 
-      objectReference: {fileID: 2100000, guid: c1c7de11376bc4e43949a319f6fbf0bd, type: 2}
+      objectReference: {fileID: 2100000, guid: dc9f8f954d3c21f4e82502323e49fe81, type: 2}
     - target: {fileID: -2750464523836890156, guid: 0655a999c79eb79418affcca4f4dcc80, type: 3}
       propertyPath: m_Materials.Array.data[0]
       value: 
-      objectReference: {fileID: 2100000, guid: caf257d96e0932242a0c2daf61ce8a4d, type: 2}
+      objectReference: {fileID: 2100000, guid: dc9f8f954d3c21f4e82502323e49fe81, type: 2}
     - target: {fileID: 919132149155446097, guid: 0655a999c79eb79418affcca4f4dcc80, type: 3}
       propertyPath: m_Name
       value: SkyguardSAMModel
@@ -5004,23 +5035,23 @@ PrefabInstance:
     - target: {fileID: 2475935497551666656, guid: 0655a999c79eb79418affcca4f4dcc80, type: 3}
       propertyPath: m_Materials.Array.data[0]
       value: 
-      objectReference: {fileID: 2100000, guid: 900a60516da4e504aa914f1c585b233b, type: 2}
+      objectReference: {fileID: 2100000, guid: dc9f8f954d3c21f4e82502323e49fe81, type: 2}
     - target: {fileID: 4415747563989211870, guid: 0655a999c79eb79418affcca4f4dcc80, type: 3}
       propertyPath: m_Materials.Array.data[0]
       value: 
-      objectReference: {fileID: 2100000, guid: 93ee827df03dcb1479573f0c68801406, type: 2}
+      objectReference: {fileID: 2100000, guid: dc9f8f954d3c21f4e82502323e49fe81, type: 2}
     - target: {fileID: 5054790750085907711, guid: 0655a999c79eb79418affcca4f4dcc80, type: 3}
       propertyPath: m_Materials.Array.data[0]
       value: 
-      objectReference: {fileID: 2100000, guid: 789232b22882a9247a4c0e142f5894ba, type: 2}
+      objectReference: {fileID: 2100000, guid: dc9f8f954d3c21f4e82502323e49fe81, type: 2}
     - target: {fileID: 5275888214215399643, guid: 0655a999c79eb79418affcca4f4dcc80, type: 3}
       propertyPath: m_Materials.Array.data[0]
       value: 
-      objectReference: {fileID: 2100000, guid: 4a48cf3f0fb0be4499ff0394d0ef52f1, type: 2}
+      objectReference: {fileID: 2100000, guid: dc9f8f954d3c21f4e82502323e49fe81, type: 2}
     - target: {fileID: 9076996625524057723, guid: 0655a999c79eb79418affcca4f4dcc80, type: 3}
       propertyPath: m_Materials.Array.data[0]
       value: 
-      objectReference: {fileID: 2100000, guid: 01f4cfaf6339fe24ba31ccf56cbbba03, type: 2}
+      objectReference: {fileID: 2100000, guid: dc9f8f954d3c21f4e82502323e49fe81, type: 2}
     m_RemovedComponents:
     - {fileID: 5866666021909216657, guid: 0655a999c79eb79418affcca4f4dcc80, type: 3}
   m_SourcePrefab: {fileID: 100100000, guid: 0655a999c79eb79418affcca4f4dcc80, type: 3}
@@ -5236,3 +5267,8 @@ AudioSource:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
+--- !u!4 &7458176189617865259 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 4224910911013337367, guid: 0655a999c79eb79418affcca4f4dcc80, type: 3}
+  m_PrefabInstance: {fileID: 6710686342519208764}
+  m_PrefabAsset: {fileID: 0}

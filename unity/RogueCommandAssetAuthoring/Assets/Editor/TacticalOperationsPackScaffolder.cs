@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Text;
+using System.Text.RegularExpressions;
 using UnityEditor;
 using UnityEngine;
 
@@ -47,6 +49,135 @@ namespace RogueCommandExpansion.Authoring
 
         public const string BundleName = "tactical-operations.bundle";
 
+        /// <summary>
+        /// Declarative specification for one Tactical Operations visual.
+        /// Unifies the previous per-unit hardcoded creation methods (Atlas for
+        /// Tidebreaker, multi-material prefix lookup for Salvage/Skyguard, PBR
+        /// for the rest) into a single code path with per-unit flags.
+        /// All nine current units share the VehiclePBR_VertexWear PBR source
+        /// texture set (Albedo/MetallicGloss/Normal/Emission) under
+        /// Assets/RogueCommandExpansionSample/Models/Textures/.
+        /// </summary>
+        private sealed class TacticalUnitSpec
+        {
+            public string UnitName;
+            public string ModelPath;
+            public string PrefabPath;
+            public string CardPath;
+            /// <summary>True for bipedal walkers that need canonical walker sockets + foot contact.</summary>
+            public bool IsWalker;
+            /// <summary>True when the unit has a turret/radar mast/antenna that must be guaranteed.</summary>
+            public bool HasTurretOrRadar;
+            /// <summary>Prefer Action_Walk over Action_Drive for locomotion (walkers/hover).</summary>
+            public bool PreferWalkForMovement;
+            /// <summary>Throw when the final Animator/Avatar/Controller is invalid.</summary>
+            public bool RequireValidAnimator;
+            public string GameplayJsonPath;
+        }
+
+        private static readonly TacticalUnitSpec[] UnitSpecs = new[]
+        {
+            new TacticalUnitSpec
+            {
+                UnitName = "TidebreakerHovercraft",
+                ModelPath = TidebreakerModelPath,
+                PrefabPath = TidebreakerPrefabPath,
+                CardPath = TidebreakerCardPath,
+                IsWalker = false,
+                HasTurretOrRadar = true,
+                PreferWalkForMovement = true,
+                RequireValidAnimator = false,
+            },
+            new TacticalUnitSpec
+            {
+                UnitName = "SalvageHauler",
+                ModelPath = SalvageHaulerModelPath,
+                PrefabPath = SalvageHaulerPrefabPath,
+                CardPath = SalvageHaulerCardPath,
+                IsWalker = false,
+                HasTurretOrRadar = true,
+                PreferWalkForMovement = true,
+                RequireValidAnimator = false,
+            },
+            new TacticalUnitSpec
+            {
+                UnitName = "SkyguardSAM",
+                ModelPath = SkyguardSAMModelPath,
+                PrefabPath = SkyguardSAMPrefabPath,
+                CardPath = SkyguardSAMCardPath,
+                IsWalker = false,
+                HasTurretOrRadar = true,
+                PreferWalkForMovement = true,
+                RequireValidAnimator = false,
+            },
+            new TacticalUnitSpec
+            {
+                UnitName = "BulwarkSiegeTank",
+                ModelPath = BulwarkSiegeTankModelPath,
+                PrefabPath = BulwarkSiegeTankPrefabPath,
+                CardPath = BulwarkSiegeTankCardPath,
+                IsWalker = false,
+                HasTurretOrRadar = true,
+                PreferWalkForMovement = true,
+                RequireValidAnimator = false,
+            },
+            new TacticalUnitSpec
+            {
+                UnitName = "ArcLanceWalker",
+                ModelPath = ArcLanceWalkerModelPath,
+                PrefabPath = ArcLanceWalkerPrefabPath,
+                CardPath = ArcLanceWalkerCardPath,
+                IsWalker = true,
+                HasTurretOrRadar = false,
+                PreferWalkForMovement = true,
+                RequireValidAnimator = true,
+            },
+            new TacticalUnitSpec
+            {
+                UnitName = "FieldMedicRover",
+                ModelPath = FieldMedicRoverModelPath,
+                PrefabPath = FieldMedicRoverPrefabPath,
+                CardPath = FieldMedicRoverCardPath,
+                IsWalker = false,
+                HasTurretOrRadar = false,
+                PreferWalkForMovement = true,
+                RequireValidAnimator = false,
+            },
+            new TacticalUnitSpec
+            {
+                UnitName = "SentinelRelay",
+                ModelPath = SentinelRelayModelPath,
+                PrefabPath = SentinelRelayPrefabPath,
+                CardPath = SentinelRelayCardPath,
+                IsWalker = false,
+                HasTurretOrRadar = true,
+                PreferWalkForMovement = true,
+                RequireValidAnimator = false,
+            },
+            new TacticalUnitSpec
+            {
+                UnitName = "GravitasBreaker",
+                ModelPath = GravitasBreakerModelPath,
+                PrefabPath = GravitasBreakerPrefabPath,
+                CardPath = GravitasBreakerCardPath,
+                IsWalker = false,
+                HasTurretOrRadar = true,
+                PreferWalkForMovement = true,
+                RequireValidAnimator = false,
+            },
+            new TacticalUnitSpec
+            {
+                UnitName = "CommandRelay",
+                ModelPath = CommandRelayModelPath,
+                PrefabPath = CommandRelayPrefabPath,
+                CardPath = CommandRelayCardPath,
+                IsWalker = false,
+                HasTurretOrRadar = true,
+                PreferWalkForMovement = true,
+                RequireValidAnimator = false,
+            },
+        };
+
         [MenuItem("Rogue Command/Tactical Operations/Build Tactical Operations Pack Assets and Bundle")]
         public static void BuildTacticalOperationsPack()
         {
@@ -60,37 +191,27 @@ namespace RogueCommandExpansion.Authoring
                 Directory.CreateDirectory(Path.Combine(Application.dataPath, "TacticalOperations/Prefabs"));
                 Directory.CreateDirectory(Path.Combine(Application.dataPath, "TacticalOperations/Materials"));
                 AssetDatabase.Refresh();
-                ConfigureRiggedWalkerModel(ArcLanceWalkerModelPath);
-                ConfigureRiggedWalkerModel(BulwarkSiegeTankModelPath);
-                ConfigureRiggedWalkerModel(FieldMedicRoverModelPath);
-                ConfigureRiggedWalkerModel(TidebreakerModelPath);
-                ConfigureRiggedWalkerModel(SalvageHaulerModelPath);
-                ConfigureRiggedWalkerModel(SkyguardSAMModelPath);
-                ConfigureRiggedWalkerModel(SentinelRelayModelPath);
-                ConfigureRiggedWalkerModel(GravitasBreakerModelPath);
-                ConfigureRiggedWalkerModel(CommandRelayModelPath);
 
-                // 1. Configure and import card sprites
-                ConfigureCardSprite(TidebreakerCardPath);
-                ConfigureCardSprite(SalvageHaulerCardPath);
-                ConfigureCardSprite(SkyguardSAMCardPath);
-                ConfigureCardSprite(BulwarkSiegeTankCardPath);
-                ConfigureCardSprite(ArcLanceWalkerCardPath);
-                ConfigureCardSprite(FieldMedicRoverCardPath);
-                ConfigureCardSprite(SentinelRelayCardPath);
-                ConfigureCardSprite(GravitasBreakerCardPath);
-                ConfigureCardSprite(CommandRelayCardPath);
+                // 1. Configure importers for all models and cards via declarative specs.
+                foreach (TacticalUnitSpec spec in UnitSpecs)
+                {
+                    string effectiveModelPath = ResolveEffectiveModelPath(spec);
+                    ConfigureRiggedWalkerModel(effectiveModelPath, spec.IsWalker);
+                    ConfigureCardSprite(spec.CardPath);
+                }
 
-                // 2. Build Prefabs
-                string p1 = CreateTidebreakerHovercraftVisual();
-                string p2 = CreateSalvageHaulerVisual();
-                string p3 = CreateSkyguardSAMVisual();
-                string p4 = CreateBulwarkSiegeTankVisual();
-                string p5 = CreateArcLanceWalkerVisual();
-                string p6 = CreateFieldMedicRoverVisual();
-                string p7 = CreatePbrVisual("SentinelRelay", SentinelRelayModelPath, SentinelRelayPrefabPath);
-                string p8 = CreatePbrVisual("GravitasBreaker", GravitasBreakerModelPath, GravitasBreakerPrefabPath);
-                string p9 = CreatePbrVisual("CommandRelay", CommandRelayModelPath, CommandRelayPrefabPath);
+                // 2. Build prefabs from specs (single unified PBR path).
+                var builtPrefabs = new List<string>();
+                var builtAssets = new List<string>();
+                foreach (TacticalUnitSpec spec in UnitSpecs)
+                {
+                    string effectiveModelPath = ResolveEffectiveModelPath(spec);
+                    string prefabPath = CreateVisualFromSpec(spec, effectiveModelPath);
+                    builtPrefabs.Add(prefabPath);
+                    builtAssets.Add(prefabPath);
+                    builtAssets.Add(spec.CardPath);
+                    builtAssets.Add(MaterialsFolder + "/" + spec.UnitName + "_PBR.mat");
+                }
 
                 AssetDatabase.SaveAssets();
                 AssetDatabase.Refresh();
@@ -103,24 +224,7 @@ namespace RogueCommandExpansion.Authoring
                 var build = new AssetBundleBuild
                 {
                     assetBundleName = BundleName,
-                    assetNames = new[]
-                    {
-                        p1, TidebreakerCardPath,
-                        p2, SalvageHaulerCardPath,
-                        p3, SkyguardSAMCardPath,
-                        p4, BulwarkSiegeTankCardPath,
-                        p5, ArcLanceWalkerCardPath,
-                        p6, FieldMedicRoverCardPath,
-                        p7, SentinelRelayCardPath,
-                        p8, GravitasBreakerCardPath,
-                        p9, CommandRelayCardPath,
-                        MaterialsFolder + "/BulwarkSiegeTank_PBR.mat",
-                        MaterialsFolder + "/ArcLanceWalker_PBR.mat",
-                        MaterialsFolder + "/FieldMedicRover_PBR.mat",
-                        MaterialsFolder + "/SentinelRelay_PBR.mat",
-                        MaterialsFolder + "/GravitasBreaker_PBR.mat",
-                        MaterialsFolder + "/CommandRelay_PBR.mat"
-                    }
+                    assetNames = builtAssets.ToArray()
                 };
 
                 Debug.Log("[TacticalOperationsScaffolder] Compiling StandaloneWindows64 bundle to " + packBundlesDir);
@@ -155,7 +259,7 @@ namespace RogueCommandExpansion.Authoring
                     throw new FileNotFoundException("Built manifest bundle is missing or empty: " + targetManifestBundle);
                 }
 
-                Debug.Log($"[TacticalOperationsScaffolder] SUCCESS! Built {BundleName} ({new FileInfo(bundleFilePath).Length} bytes) and assetbundle-manifest.bundle ({new FileInfo(targetManifestBundle).Length} bytes).");
+                Debug.Log($"[TacticalOperationsScaffolder] SUCCESS! Built {BundleName} ({new FileInfo(bundleFilePath).Length} bytes) and assetbundle-manifest.bundle ({new FileInfo(targetManifestBundle).Length} bytes). Built {builtPrefabs.Count} prefabs.");
             }
             catch (Exception ex)
             {
@@ -164,7 +268,41 @@ namespace RogueCommandExpansion.Authoring
             }
         }
 
-        private static void ConfigureRiggedWalkerModel(string modelPath)
+        /// <summary>
+        /// Resolve the effective FBX to use for a spec, prioritizing _LODs over _Atlas
+        /// per AGENTS.md to preserve LODGroup generation, while keeping the animated
+        /// primary FBX when it carries the required Action_* clips.
+        /// Falls back to AssetDatabase.FindAssets when the primary path is missing.
+        /// </summary>
+        private static string ResolveEffectiveModelPath(TacticalUnitSpec spec)
+        {
+            if (AssetDatabase.LoadAssetAtPath<GameObject>(spec.ModelPath) != null)
+                return spec.ModelPath;
+
+            string[] guids = AssetDatabase.FindAssets(spec.UnitName + " t:Model", new[] { "Assets/RogueCommandExpansionSample/Models" });
+            if (guids != null)
+            {
+                string lodPath = null;
+                string basePath = null;
+                foreach (string guid in guids)
+                {
+                    string path = AssetDatabase.GUIDToAssetPath(guid);
+                    if (path.EndsWith("_LODs.fbx", StringComparison.OrdinalIgnoreCase))
+                        lodPath = path;
+                    else if (string.Equals(Path.GetFileNameWithoutExtension(path), spec.UnitName, StringComparison.OrdinalIgnoreCase))
+                        basePath = path;
+                }
+                if (lodPath != null && basePath == null)
+                    return lodPath;
+                if (basePath != null)
+                    return basePath;
+                if (lodPath != null)
+                    return lodPath;
+            }
+            return spec.ModelPath;
+        }
+
+        private static void ConfigureRiggedWalkerModel(string modelPath, bool isWalker = true, bool enforceIdleFireDeath = false)
         {
             ModelImporter importer = AssetImporter.GetAtPath(modelPath) as ModelImporter;
             if (importer == null)
@@ -174,7 +312,7 @@ namespace RogueCommandExpansion.Authoring
             }
             if (importer == null)
             {
-                throw new InvalidOperationException("Arc Lance Walker source must be a ModelImporter: " + modelPath);
+                throw new InvalidOperationException("Tactical source must be a ModelImporter: " + modelPath);
             }
 
             bool changed = false;
@@ -205,6 +343,10 @@ namespace RogueCommandExpansion.Authoring
                 clips = importer.defaultClipAnimations;
             }
             bool hasClipSettings = false;
+            bool hasIdle = false;
+            bool hasMove = false;
+            bool hasFire = false;
+            bool hasDeath = false;
             if (clips != null)
             {
                 foreach (ModelImporterClipAnimation clip in clips)
@@ -237,11 +379,36 @@ namespace RogueCommandExpansion.Authoring
                         changed = true;
                     }
                     hasClipSettings = true;
+                    if (actionToken.Equals("Idle", StringComparison.OrdinalIgnoreCase)) hasIdle = true;
+                    if (actionToken.Equals("Walk", StringComparison.OrdinalIgnoreCase) ||
+                        actionToken.Equals("Drive", StringComparison.OrdinalIgnoreCase)) hasMove = true;
+                    if (actionToken.Equals("FireRecoil", StringComparison.OrdinalIgnoreCase) ||
+                        actionToken.Equals("Fire", StringComparison.OrdinalIgnoreCase)) hasFire = true;
+                    if (actionToken.Equals("Death", StringComparison.OrdinalIgnoreCase)) hasDeath = true;
                 }
             }
             if (hasClipSettings)
             {
                 importer.clipAnimations = clips;
+            }
+            if (enforceIdleFireDeath && isWalker)
+            {
+                var missing = new List<string>();
+                if (!hasIdle) missing.Add("Action_Idle");
+                if (!hasMove) missing.Add("Action_Walk/Action_Drive");
+                if (!hasFire) missing.Add("Action_FireRecoil");
+                if (!hasDeath) missing.Add("Action_Death");
+                if (missing.Count > 0)
+                {
+                    Debug.LogWarning("[TacticalOperationsScaffolder] Model " + modelPath +
+                        " missing required clips for walker contract: " + string.Join(", ", missing.ToArray()) +
+                        ". Set enforceIdleFireDeath=false to allow stripped rigs.");
+                }
+            }
+            else if (isWalker && hasClipSettings && (!hasIdle || !hasMove))
+            {
+                Debug.LogWarning("[TacticalOperationsScaffolder] Walker model " + modelPath +
+                    " has incomplete locomotion clips (Idle=" + hasIdle + ", Move=" + hasMove + ").");
             }
             if (changed)
             {
@@ -270,501 +437,123 @@ namespace RogueCommandExpansion.Authoring
             importer.SaveAndReimport();
         }
 
-        private static string CreateTidebreakerHovercraftVisual()
+        private static string CreateVisualFromSpec(TacticalUnitSpec spec, string effectiveModelPath)
         {
-            GameObject modelAsset = AssetDatabase.LoadAssetAtPath<GameObject>(TidebreakerModelPath);
-            if (modelAsset == null) throw new FileNotFoundException("Model not found: " + TidebreakerModelPath);
+            Material pbrMat = CreatePbrMaterial(spec.UnitName);
 
-            Material atlasMat = AssetDatabase.LoadAssetAtPath<Material>(MaterialsFolder + "/TidebreakerHovercraft_Atlas.mat");
-            if (atlasMat == null)
-            {
-                atlasMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/RogueCommandExpansionSample/VisualOnly/Materials/TidebreakerHovercraft_Atlas.mat");
-            }
+            GameObject modelAsset = AssetDatabase.LoadAssetAtPath<GameObject>(effectiveModelPath);
+            if (modelAsset == null) throw new FileNotFoundException("Model not found: " + effectiveModelPath + " (spec " + spec.UnitName + ")");
 
-            var root = new GameObject("TidebreakerHovercraftVisual");
+            var root = new GameObject(spec.UnitName + "Visual");
             try
             {
                 GameObject modelInstance = PrefabUtility.InstantiatePrefab(modelAsset) as GameObject;
                 if (modelInstance == null) modelInstance = UnityEngine.Object.Instantiate(modelAsset);
-                modelInstance.name = "TidebreakerHovercraftModel";
+                if (modelInstance == null) throw new InvalidOperationException(spec.UnitName + " model instance is null after instantiation");
+                modelInstance.name = spec.UnitName + "Model";
                 modelInstance.transform.SetParent(root.transform, false);
                 modelInstance.transform.localPosition = Vector3.zero;
                 modelInstance.transform.localRotation = Quaternion.identity;
                 modelInstance.transform.localScale = Vector3.one;
 
-                if (atlasMat != null)
-                {
-                    Renderer[] renderers = modelInstance.GetComponentsInChildren<Renderer>(true);
-                    foreach (Renderer r in renderers)
-                    {
-                        int count = r.sharedMaterials != null && r.sharedMaterials.Length > 0 ? r.sharedMaterials.Length : 1;
-                        var mats = new Material[count];
-                        for (int i = 0; i < count; i++) mats[i] = atlasMat;
-                        r.sharedMaterials = mats;
-                    }
-                }
+                if (pbrMat == null) throw new InvalidOperationException(spec.UnitName + " PBR material is null");
 
-                FitBoxCollider(root, modelInstance);
-                VehiclePrefabBuilder.EnsureCanonicalVfxSockets(root, modelInstance);
-                VehiclePrefabBuilder.EnsureCanonicalVfxAndAudioComponents(root);
-                Animator[] importedModelAnimators = modelInstance.GetComponentsInChildren<Animator>(true);
-                for (int i = 0; i < importedModelAnimators.Length; i++)
-                {
-                    if (importedModelAnimators[i] != null)
-                    {
-                        UnityEngine.Object.DestroyImmediate(importedModelAnimators[i]);
-                    }
-                }
-                VehiclePrefabBuilder.SetupAnimatorIfAvailable(
-                    root, modelInstance, modelAsset, "TidebreakerHovercraft", preferWalkForMovement: true);
-                Animator tidebreakerAnimator = root.GetComponent<Animator>();
-                if (tidebreakerAnimator != null && tidebreakerAnimator.avatar != null && tidebreakerAnimator.avatar.isValid &&
-                    tidebreakerAnimator.runtimeAnimatorController != null)
-                {
-                    tidebreakerAnimator.applyRootMotion = false;
-                }
-
-                bool success;
-                PrefabUtility.SaveAsPrefabAsset(root, TidebreakerPrefabPath, out success);
-                if (!success) throw new InvalidOperationException("Could not save prefab to " + TidebreakerPrefabPath);
-                return TidebreakerPrefabPath;
-            }
-            finally
-            {
-                UnityEngine.Object.DestroyImmediate(root);
-            }
-        }
-
-        private static string CreateSalvageHaulerVisual()
-        {
-            GameObject modelAsset = AssetDatabase.LoadAssetAtPath<GameObject>(SalvageHaulerModelPath);
-            if (modelAsset == null) throw new FileNotFoundException("Model not found: " + SalvageHaulerModelPath);
-
-            var root = new GameObject("SalvageHaulerVisual");
-            try
-            {
-                GameObject modelInstance = PrefabUtility.InstantiatePrefab(modelAsset) as GameObject;
-                if (modelInstance == null) modelInstance = UnityEngine.Object.Instantiate(modelAsset);
-                modelInstance.name = "SalvageHaulerModel";
-                modelInstance.transform.SetParent(root.transform, false);
-                modelInstance.transform.localPosition = Vector3.zero;
-                modelInstance.transform.localRotation = Quaternion.identity;
-                modelInstance.transform.localScale = Vector3.one;
-
-                Dictionary<string, Material> mats = LoadMaterialsByPrefix("SalvageHauler_");
-                AssignMaterials(modelInstance, mats);
-
-                FitBoxCollider(root, modelInstance);
-                VehiclePrefabBuilder.EnsureCanonicalVfxSockets(root, modelInstance);
-                VehiclePrefabBuilder.EnsureCanonicalVfxAndAudioComponents(root);
-                Animator[] importedModelAnimators = modelInstance.GetComponentsInChildren<Animator>(true);
-                for (int i = 0; i < importedModelAnimators.Length; i++)
-                {
-                    if (importedModelAnimators[i] != null)
-                    {
-                        UnityEngine.Object.DestroyImmediate(importedModelAnimators[i]);
-                    }
-                }
-                VehiclePrefabBuilder.SetupAnimatorIfAvailable(
-                    root, modelInstance, modelAsset, "SalvageHauler", preferWalkForMovement: true);
-                Animator salvageAnimator = root.GetComponent<Animator>();
-                if (salvageAnimator != null && salvageAnimator.avatar != null && salvageAnimator.avatar.isValid &&
-                    salvageAnimator.runtimeAnimatorController != null)
-                {
-                    salvageAnimator.applyRootMotion = false;
-                }
-
-                bool success;
-                PrefabUtility.SaveAsPrefabAsset(root, SalvageHaulerPrefabPath, out success);
-                if (!success) throw new InvalidOperationException("Could not save prefab to " + SalvageHaulerPrefabPath);
-                return SalvageHaulerPrefabPath;
-            }
-            finally
-            {
-                UnityEngine.Object.DestroyImmediate(root);
-            }
-        }
-
-        private static string CreateSkyguardSAMVisual()
-        {
-            GameObject modelAsset = AssetDatabase.LoadAssetAtPath<GameObject>(SkyguardSAMModelPath);
-            if (modelAsset == null) throw new FileNotFoundException("Model not found: " + SkyguardSAMModelPath);
-
-            var root = new GameObject("SkyguardSAMVisual");
-            try
-            {
-                GameObject modelInstance = PrefabUtility.InstantiatePrefab(modelAsset) as GameObject;
-                if (modelInstance == null) modelInstance = UnityEngine.Object.Instantiate(modelAsset);
-                modelInstance.name = "SkyguardSAMModel";
-                modelInstance.transform.SetParent(root.transform, false);
-                modelInstance.transform.localPosition = Vector3.zero;
-                modelInstance.transform.localRotation = Quaternion.identity;
-                modelInstance.transform.localScale = Vector3.one;
-
-                Dictionary<string, Material> mats = LoadMaterialsByPrefix("SkyguardSAM_");
-                AssignMaterials(modelInstance, mats);
-
-                FitBoxCollider(root, modelInstance);
-                VehiclePrefabBuilder.EnsureCanonicalVfxSockets(root, modelInstance);
-                VehiclePrefabBuilder.EnsureCanonicalVfxAndAudioComponents(root);
-                Animator[] importedModelAnimators = modelInstance.GetComponentsInChildren<Animator>(true);
-                for (int i = 0; i < importedModelAnimators.Length; i++)
-                {
-                    if (importedModelAnimators[i] != null)
-                    {
-                        UnityEngine.Object.DestroyImmediate(importedModelAnimators[i]);
-                    }
-                }
-                VehiclePrefabBuilder.SetupAnimatorIfAvailable(
-                    root, modelInstance, modelAsset, "SkyguardSAM", preferWalkForMovement: true);
-                Animator skyguardAnimator = root.GetComponent<Animator>();
-                if (skyguardAnimator != null && skyguardAnimator.avatar != null && skyguardAnimator.avatar.isValid &&
-                    skyguardAnimator.runtimeAnimatorController != null)
-                {
-                    skyguardAnimator.applyRootMotion = false;
-                }
-
-                bool success;
-                PrefabUtility.SaveAsPrefabAsset(root, SkyguardSAMPrefabPath, out success);
-                if (!success) throw new InvalidOperationException("Could not save prefab to " + SkyguardSAMPrefabPath);
-                return SkyguardSAMPrefabPath;
-            }
-            finally
-            {
-                UnityEngine.Object.DestroyImmediate(root);
-            }
-        }
-
-        private static string CreateBulwarkSiegeTankVisual()
-        {
-            Material pbrMat = CreatePbrMaterial("BulwarkSiegeTank");
-
-            GameObject modelAsset = AssetDatabase.LoadAssetAtPath<GameObject>(BulwarkSiegeTankModelPath);
-            if (modelAsset == null) throw new FileNotFoundException("Model not found: " + BulwarkSiegeTankModelPath);
-
-            var root = new GameObject("BulwarkSiegeTankVisual");
-            try
-            {
-                GameObject modelInstance = PrefabUtility.InstantiatePrefab(modelAsset) as GameObject;
-                if (modelInstance == null) modelInstance = UnityEngine.Object.Instantiate(modelAsset);
-                if (modelInstance == null) throw new InvalidOperationException("BulwarkSiegeTank model instance is null after instantiation");
-                modelInstance.name = "BulwarkSiegeTankModel";
-                modelInstance.transform.SetParent(root.transform, false);
-                modelInstance.transform.localPosition = Vector3.zero;
-                modelInstance.transform.localRotation = Quaternion.identity;
-                modelInstance.transform.localScale = Vector3.one;
-
-                if (pbrMat == null) throw new InvalidOperationException("BulwarkSiegeTank PBR material is null");
-
-                Renderer[] __bulwarkRenderers = modelInstance.GetComponentsInChildren<Renderer>(true);
-                bool __bulwarkHasMesh = false;
-                foreach (Renderer __r in __bulwarkRenderers)
-                {
-                    if (__r is MeshRenderer __mr)
-                    {
-                        MeshFilter __mf = __mr.GetComponent<MeshFilter>();
-                        if (__mf != null && __mf.sharedMesh != null) { __bulwarkHasMesh = true; break; }
-                    }
-                    else if (__r is SkinnedMeshRenderer __smr && __smr.sharedMesh != null)
-                    {
-                        __bulwarkHasMesh = true; break;
-                    }
-                }
-                if (!__bulwarkHasMesh) throw new InvalidOperationException("BulwarkSiegeTank model has no mesh-bearing renderers");
-
-                if (pbrMat != null)
-                {
-                    Renderer[] allRenderers = modelInstance.GetComponentsInChildren<Renderer>(true);
-                    foreach (Renderer r in allRenderers)
-                    {
-                        // Only assign PBR material to mesh renderers, preserve VFX/particle materials
-                        if (r is MeshRenderer || r is SkinnedMeshRenderer)
-                        {
-                            int count = r.sharedMaterials != null && r.sharedMaterials.Length > 0 ? r.sharedMaterials.Length : 1;
-                            var mats = new Material[count];
-                            for (int i = 0; i < count; i++) mats[i] = pbrMat;
-                            r.sharedMaterials = mats;
-                        }
-                    }
-                }
-
-                FitBoxCollider(root, modelInstance);
-                VehiclePrefabBuilder.EnsureCanonicalVfxSockets(root, modelInstance);
-                VehiclePrefabBuilder.EnsureCanonicalVfxAndAudioComponents(root);
-                Animator[] importedModelAnimators = modelInstance.GetComponentsInChildren<Animator>(true);
-                for (int i = 0; i < importedModelAnimators.Length; i++)
-                {
-                    if (importedModelAnimators[i] != null)
-                    {
-                        UnityEngine.Object.DestroyImmediate(importedModelAnimators[i]);
-                    }
-                }
-                VehiclePrefabBuilder.SetupAnimatorIfAvailable(
-                    root, modelInstance, modelAsset, "BulwarkSiegeTank", preferWalkForMovement: true);
-                Animator bulwarkAnimator = root.GetComponent<Animator>();
-                if (bulwarkAnimator != null && bulwarkAnimator.avatar != null && bulwarkAnimator.avatar.isValid &&
-                    bulwarkAnimator.runtimeAnimatorController != null)
-                {
-                    bulwarkAnimator.applyRootMotion = false;
-                }
-
-                bool success;
-                PrefabUtility.SaveAsPrefabAsset(root, BulwarkSiegeTankPrefabPath, out success);
-                if (!success) throw new InvalidOperationException("Could not save prefab to " + BulwarkSiegeTankPrefabPath);
-                return BulwarkSiegeTankPrefabPath;
-            }
-            finally
-            {
-                UnityEngine.Object.DestroyImmediate(root);
-            }
-        }
-
-        private static string CreateArcLanceWalkerVisual()
-        {
-            Material pbrMat = CreatePbrMaterial("ArcLanceWalker");
-
-            GameObject modelAsset = AssetDatabase.LoadAssetAtPath<GameObject>(ArcLanceWalkerModelPath);
-            if (modelAsset == null) throw new FileNotFoundException("Model not found: " + ArcLanceWalkerModelPath);
-
-            var root = new GameObject("ArcLanceWalkerVisual");
-            try
-            {
-                GameObject modelInstance = PrefabUtility.InstantiatePrefab(modelAsset) as GameObject;
-                if (modelInstance == null) modelInstance = UnityEngine.Object.Instantiate(modelAsset);
-                if (modelInstance == null) throw new InvalidOperationException("ArcLanceWalker model instance is null after instantiation");
-                modelInstance.name = "ArcLanceWalkerModel";
-                modelInstance.transform.SetParent(root.transform, false);
-                modelInstance.transform.localPosition = Vector3.zero;
-                modelInstance.transform.localRotation = Quaternion.identity;
-                modelInstance.transform.localScale = Vector3.one;
-
-                if (pbrMat == null) throw new InvalidOperationException("ArcLanceWalker PBR material is null");
-
-                Renderer[] __arcRenderers = modelInstance.GetComponentsInChildren<Renderer>(true);
-                bool __arcHasMesh = false;
-                foreach (Renderer __r in __arcRenderers)
-                {
-                    if (__r is MeshRenderer __mr)
-                    {
-                        MeshFilter __mf = __mr.GetComponent<MeshFilter>();
-                        if (__mf != null && __mf.sharedMesh != null) { __arcHasMesh = true; break; }
-                    }
-                    else if (__r is SkinnedMeshRenderer __smr && __smr.sharedMesh != null)
-                    {
-                        __arcHasMesh = true; break;
-                    }
-                }
-                if (!__arcHasMesh) throw new InvalidOperationException("ArcLanceWalker model has no mesh-bearing renderers");
-
-                if (pbrMat != null)
-                {
-                    Renderer[] allRenderers = modelInstance.GetComponentsInChildren<Renderer>(true);
-                    foreach (Renderer r in allRenderers)
-                    {
-                        // Only assign PBR material to mesh renderers, preserve VFX/particle materials
-                        if (r is MeshRenderer || r is SkinnedMeshRenderer)
-                        {
-                            int count = r.sharedMaterials != null && r.sharedMaterials.Length > 0 ? r.sharedMaterials.Length : 1;
-                            var mats = new Material[count];
-                            for (int i = 0; i < count; i++) mats[i] = pbrMat;
-                            r.sharedMaterials = mats;
-                        }
-                    }
-                }
-
-                FitBoxCollider(root, modelInstance);
-                VehiclePrefabBuilder.EnsureCanonicalVfxSockets(root, modelInstance);
-                RogueCommandVisualSampleScaffolder.EnsureCanonicalWalkerSockets(root, modelInstance, false);
-                VehiclePrefabBuilder.EnsureCanonicalVfxAndAudioComponents(root);
-                Animator[] importedModelAnimators = modelInstance.GetComponentsInChildren<Animator>(true);
-                for (int i = 0; i < importedModelAnimators.Length; i++)
-                {
-                    if (importedModelAnimators[i] != null)
-                    {
-                        UnityEngine.Object.DestroyImmediate(importedModelAnimators[i]);
-                    }
-                }
-                VehiclePrefabBuilder.SetupAnimatorIfAvailable(
-                    root, modelInstance, modelAsset, "ArcLanceWalker", preferWalkForMovement: true);
-                Animator walkerAnimator = root.GetComponent<Animator>();
-                if (walkerAnimator == null || walkerAnimator.avatar == null || !walkerAnimator.avatar.isValid ||
-                    walkerAnimator.runtimeAnimatorController == null)
-                {
-                    throw new InvalidOperationException("ArcLanceWalker rig must produce a valid Generic Avatar and AnimatorController");
-                }
-                walkerAnimator.applyRootMotion = false;
-
-                bool success;
-                PrefabUtility.SaveAsPrefabAsset(root, ArcLanceWalkerPrefabPath, out success);
-                if (!success) throw new InvalidOperationException("Could not save prefab to " + ArcLanceWalkerPrefabPath);
-                return ArcLanceWalkerPrefabPath;
-            }
-            finally
-            {
-                UnityEngine.Object.DestroyImmediate(root);
-            }
-        }
-
-        private static string CreateFieldMedicRoverVisual()
-        {
-            Material pbrMat = CreatePbrMaterial("FieldMedicRover");
-
-            GameObject modelAsset = AssetDatabase.LoadAssetAtPath<GameObject>(FieldMedicRoverModelPath);
-            if (modelAsset == null) throw new FileNotFoundException("Model not found: " + FieldMedicRoverModelPath);
-
-            var root = new GameObject("FieldMedicRoverVisual");
-            try
-            {
-                GameObject modelInstance = PrefabUtility.InstantiatePrefab(modelAsset) as GameObject;
-                if (modelInstance == null) modelInstance = UnityEngine.Object.Instantiate(modelAsset);
-                if (modelInstance == null) throw new InvalidOperationException("FieldMedicRover model instance is null after instantiation");
-                modelInstance.name = "FieldMedicRoverModel";
-                modelInstance.transform.SetParent(root.transform, false);
-                modelInstance.transform.localPosition = Vector3.zero;
-                modelInstance.transform.localRotation = Quaternion.identity;
-                modelInstance.transform.localScale = Vector3.one;
-
-                if (pbrMat == null) throw new InvalidOperationException("FieldMedicRover PBR material is null");
-
-                Renderer[] __medicRenderers = modelInstance.GetComponentsInChildren<Renderer>(true);
-                bool __medicHasMesh = false;
-                foreach (Renderer __r in __medicRenderers)
-                {
-                    if (__r is MeshRenderer __mr)
-                    {
-                        MeshFilter __mf = __mr.GetComponent<MeshFilter>();
-                        if (__mf != null && __mf.sharedMesh != null) { __medicHasMesh = true; break; }
-                    }
-                    else if (__r is SkinnedMeshRenderer __smr && __smr.sharedMesh != null)
-                    {
-                        __medicHasMesh = true; break;
-                    }
-                }
-                if (!__medicHasMesh) throw new InvalidOperationException("FieldMedicRover model has no mesh-bearing renderers");
-
-                if (pbrMat != null)
-                {
-                    Renderer[] allRenderers = modelInstance.GetComponentsInChildren<Renderer>(true);
-                    foreach (Renderer r in allRenderers)
-                    {
-                        // Only assign PBR material to mesh renderers, preserve VFX/particle materials
-                        if (r is MeshRenderer || r is SkinnedMeshRenderer)
-                        {
-                            int count = r.sharedMaterials != null && r.sharedMaterials.Length > 0 ? r.sharedMaterials.Length : 1;
-                            var mats = new Material[count];
-                            for (int i = 0; i < count; i++) mats[i] = pbrMat;
-                            r.sharedMaterials = mats;
-                        }
-                    }
-                }
-
-                FitBoxCollider(root, modelInstance);
-                VehiclePrefabBuilder.EnsureCanonicalVfxSockets(root, modelInstance);
-                VehiclePrefabBuilder.EnsureCanonicalVfxAndAudioComponents(root);
-                Animator[] importedModelAnimators = modelInstance.GetComponentsInChildren<Animator>(true);
-                for (int i = 0; i < importedModelAnimators.Length; i++)
-                {
-                    if (importedModelAnimators[i] != null)
-                    {
-                        UnityEngine.Object.DestroyImmediate(importedModelAnimators[i]);
-                    }
-                }
-                VehiclePrefabBuilder.SetupAnimatorIfAvailable(
-                    root, modelInstance, modelAsset, "FieldMedicRover", preferWalkForMovement: true);
-                Animator medicAnimator = root.GetComponent<Animator>();
-                if (medicAnimator != null && medicAnimator.avatar != null && medicAnimator.avatar.isValid &&
-                    medicAnimator.runtimeAnimatorController != null)
-                {
-                    medicAnimator.applyRootMotion = false;
-                }
-
-                bool success;
-                PrefabUtility.SaveAsPrefabAsset(root, FieldMedicRoverPrefabPath, out success);
-                if (!success) throw new InvalidOperationException("Could not save prefab to " + FieldMedicRoverPrefabPath);
-                return FieldMedicRoverPrefabPath;
-            }
-            finally
-            {
-                UnityEngine.Object.DestroyImmediate(root);
-            }
-        }
-
-        private static string CreatePbrVisual(string unitName, string modelPath, string prefabPath)
-        {
-            Material pbrMat = CreatePbrMaterial(unitName);
-            GameObject modelAsset = AssetDatabase.LoadAssetAtPath<GameObject>(modelPath);
-            if (modelAsset == null) throw new FileNotFoundException("Model not found: " + modelPath);
-            if (pbrMat == null) throw new InvalidOperationException(unitName + " PBR material is null");
-
-            var root = new GameObject(unitName + "Visual");
-            try
-            {
-                GameObject modelInstance = PrefabUtility.InstantiatePrefab(modelAsset) as GameObject;
-                if (modelInstance == null) modelInstance = UnityEngine.Object.Instantiate(modelAsset);
-                if (modelInstance == null)
-                    throw new InvalidOperationException(unitName + " model instance is null after instantiation");
-
-                modelInstance.name = unitName + "Model";
-                modelInstance.transform.SetParent(root.transform, false);
-                modelInstance.transform.localPosition = Vector3.zero;
-                modelInstance.transform.localRotation = Quaternion.identity;
-                modelInstance.transform.localScale = Vector3.one;
-
-                Renderer[] renderers = modelInstance.GetComponentsInChildren<Renderer>(true);
+                Renderer[] initialRenderers = modelInstance.GetComponentsInChildren<Renderer>(true);
                 bool hasMesh = false;
-                foreach (Renderer renderer in renderers)
+                foreach (Renderer renderer in initialRenderers)
                 {
                     if (renderer is MeshRenderer meshRenderer)
                     {
                         MeshFilter meshFilter = meshRenderer.GetComponent<MeshFilter>();
-                        hasMesh |= meshFilter != null && meshFilter.sharedMesh != null;
+                        if (meshFilter != null && meshFilter.sharedMesh != null) { hasMesh = true; break; }
                     }
-                    else if (renderer is SkinnedMeshRenderer skinnedRenderer)
+                    else if (renderer is SkinnedMeshRenderer skinnedRenderer && skinnedRenderer.sharedMesh != null)
                     {
-                        hasMesh |= skinnedRenderer.sharedMesh != null;
+                        hasMesh = true; break;
                     }
+                }
+                if (!hasMesh) throw new InvalidOperationException(spec.UnitName + " model has no mesh-bearing renderers");
 
-                    if (renderer is MeshRenderer || renderer is SkinnedMeshRenderer)
+                // Unified collider handling: convert _COLLIDER hull meshes into BoxColliders and hide renderers.
+                int converted = 0;
+                foreach (Renderer renderer in initialRenderers)
+                {
+                    if (renderer.name.IndexOf("_COLLIDER", StringComparison.OrdinalIgnoreCase) >= 0)
                     {
-                        if (renderer.name.IndexOf("_COLLIDER", StringComparison.OrdinalIgnoreCase) >= 0)
+                        renderer.enabled = false;
+                        MeshFilter mf = renderer.GetComponent<MeshFilter>();
+                        if (mf != null && mf.sharedMesh != null)
                         {
-                            renderer.enabled = false;
-                            continue;
+                            BoxCollider bc = renderer.GetComponent<BoxCollider>();
+                            if (bc == null) bc = renderer.gameObject.AddComponent<BoxCollider>();
+                            bc.center = mf.sharedMesh.bounds.center;
+                            bc.size = mf.sharedMesh.bounds.size;
+                            EditorUtility.SetDirty(renderer.gameObject);
+                            converted++;
                         }
-                        int count = renderer.sharedMaterials != null && renderer.sharedMaterials.Length > 0
-                            ? renderer.sharedMaterials.Length
-                            : 1;
-                        var materials = new Material[count];
-                        for (int i = 0; i < count; i++) materials[i] = pbrMat;
-                        renderer.sharedMaterials = materials;
                     }
                 }
 
-                if (!hasMesh) throw new InvalidOperationException(unitName + " model has no mesh-bearing renderers");
+                Renderer[] allRenderers = modelInstance.GetComponentsInChildren<Renderer>(true);
+                foreach (Renderer r in allRenderers)
+                {
+                    if (r is MeshRenderer || r is SkinnedMeshRenderer)
+                    {
+                        int count = r.sharedMaterials != null && r.sharedMaterials.Length > 0 ? r.sharedMaterials.Length : 1;
+                        var mats = new Material[count];
+                        for (int i = 0; i < count; i++) mats[i] = pbrMat;
+                        r.sharedMaterials = mats;
+                    }
+                }
 
-                FitBoxCollider(root, modelInstance);
+                if (converted == 0)
+                {
+                    FitBoxCollider(root, modelInstance);
+                }
+
                 VehiclePrefabBuilder.EnsureCanonicalVfxSockets(root, modelInstance);
+                EnsureAdditionalTacticalSockets(root, modelInstance, spec);
+                if (spec.IsWalker)
+                {
+                    RogueCommandVisualSampleScaffolder.EnsureCanonicalWalkerSockets(root, modelInstance, false);
+                }
                 VehiclePrefabBuilder.EnsureCanonicalVfxAndAudioComponents(root);
 
-                Animator[] importedAnimators = modelInstance.GetComponentsInChildren<Animator>(true);
-                for (int i = 0; i < importedAnimators.Length; i++)
+                Animator[] importedModelAnimators = modelInstance.GetComponentsInChildren<Animator>(true);
+                for (int i = 0; i < importedModelAnimators.Length; i++)
                 {
-                    if (importedAnimators[i] != null) UnityEngine.Object.DestroyImmediate(importedAnimators[i]);
+                    if (importedModelAnimators[i] != null)
+                    {
+                        UnityEngine.Object.DestroyImmediate(importedModelAnimators[i]);
+                    }
                 }
-
                 VehiclePrefabBuilder.SetupAnimatorIfAvailable(
-                    root, modelInstance, modelAsset, unitName, preferWalkForMovement: true);
+                    root, modelInstance, modelAsset, spec.UnitName, preferWalkForMovement: spec.PreferWalkForMovement);
                 Animator animator = root.GetComponent<Animator>();
-                if (animator != null && animator.avatar != null && animator.avatar.isValid &&
-                    animator.runtimeAnimatorController != null)
+                bool animatorValid = animator != null && animator.avatar != null && animator.avatar.isValid &&
+                    animator.runtimeAnimatorController != null;
+                if (spec.RequireValidAnimator && !animatorValid)
+                {
+                    throw new InvalidOperationException(spec.UnitName + " rig must produce a valid Generic Avatar and AnimatorController");
+                }
+                if (animatorValid)
                 {
                     animator.applyRootMotion = false;
                 }
+                else if (animator != null)
+                {
+                    Debug.LogWarning("[TacticalOperationsScaffolder] " + spec.UnitName +
+                        " Animator present but invalid (avatar=" + (animator.avatar != null ? animator.avatar.isValid.ToString() : "null") +
+                        ", controller=" + (animator.runtimeAnimatorController != null ? "present" : "missing") + ").");
+                }
 
                 bool success;
-                PrefabUtility.SaveAsPrefabAsset(root, prefabPath, out success);
-                if (!success) throw new InvalidOperationException("Could not save prefab to " + prefabPath);
-                return prefabPath;
+                PrefabUtility.SaveAsPrefabAsset(root, spec.PrefabPath, out success);
+                if (!success) throw new InvalidOperationException("Could not save prefab to " + spec.PrefabPath);
+
+                NormalizeEmptyUnityYamlStrings(spec.PrefabPath);
+                ValidateSavedPrefab(spec.PrefabPath, spec.UnitName);
+                return spec.PrefabPath;
             }
             finally
             {
@@ -772,39 +561,199 @@ namespace RogueCommandExpansion.Authoring
             }
         }
 
-        private static Dictionary<string, Material> LoadMaterialsByPrefix(string prefix)
+        /// <summary>
+        /// Additional canonical tactical sockets (turret pivot, radar, antenna, foot contact)
+        /// that VehiclePrefabBuilder.EnsureCanonicalVfxSockets does not guarantee.
+        /// </summary>
+        private static void EnsureAdditionalTacticalSockets(GameObject root, GameObject modelInstance, TacticalUnitSpec spec)
         {
-            var dict = new Dictionary<string, Material>(StringComparer.OrdinalIgnoreCase);
-            string[] guids = AssetDatabase.FindAssets("t:Material", new[] { MaterialsFolder });
-            foreach (string guid in guids)
+            if (root == null || modelInstance == null) return;
+            Renderer[] renderers = modelInstance.GetComponentsInChildren<Renderer>(true);
+            if (renderers == null || renderers.Length == 0) return;
+            Bounds bounds = GetLocalBounds(root, modelInstance);
+            if (bounds.size.sqrMagnitude < 1e-6f) return;
+            Vector3 center = bounds.center;
+            Vector3 min = bounds.min;
+            Vector3 max = bounds.max;
+            Vector3 size = bounds.size;
+            if (spec.HasTurretOrRadar)
             {
-                string path = AssetDatabase.GUIDToAssetPath(guid);
-                string name = Path.GetFileNameWithoutExtension(path);
-                if (name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                Vector3 turretPivot = new Vector3(center.x, Mathf.Lerp(min.y, max.y, 0.72f), center.z + size.z * 0.10f);
+                EnsureSocketIfMissing(root.transform, "Socket_TurretPivot", turretPivot);
+                Transform pivot = FindTransformRecursive(root.transform, "Socket_TurretPivot");
+                if (pivot != null)
                 {
-                    Material mat = AssetDatabase.LoadAssetAtPath<Material>(path);
-                    if (mat != null) dict[name] = mat;
+                    EnsureSocketIfMissing(pivot, "Socket_TurretPitch", Vector3.zero);
                 }
             }
-            return dict;
+            if (spec.HasTurretOrRadar)
+            {
+                Vector3 radar = new Vector3(center.x - size.x * 0.22f, Mathf.Lerp(min.y, max.y, 0.85f), min.z + size.z * 0.30f);
+                Vector3 antenna = new Vector3(center.x + size.x * 0.22f, Mathf.Lerp(min.y, max.y, 0.80f), min.z + size.z * 0.30f);
+                EnsureSocketIfMissing(root.transform, "Socket_RadarMast", radar);
+                EnsureSocketIfMissing(root.transform, "Socket_Antenna", antenna);
+            }
+            if (spec.IsWalker)
+            {
+                float half = Mathf.Max(size.x * 0.22f, 0.12f);
+                EnsureSocketIfMissing(root.transform, "Socket_FootContact_L", new Vector3(center.x - half, min.y, center.z));
+                EnsureSocketIfMissing(root.transform, "Socket_FootContact_R", new Vector3(center.x + half, min.y, center.z));
+            }
+            EnsureSocketIfMissing(root.transform, "Socket_DamageSmoke", new Vector3(center.x, Mathf.Lerp(min.y, max.y, 0.82f), min.z + size.z * 0.20f));
+            EnsureSocketIfMissing(root.transform, "Socket_DamageFire", new Vector3(center.x + size.x * 0.12f, Mathf.Lerp(min.y, max.y, 0.55f), center.z));
         }
 
-        private static void AssignMaterials(GameObject model, Dictionary<string, Material> mats)
+        private static Transform FindTransformRecursive(Transform parent, string name)
+        {
+            if (parent == null) return null;
+            if (string.Equals(parent.name, name, StringComparison.OrdinalIgnoreCase)) return parent;
+            foreach (Transform child in parent.GetComponentsInChildren<Transform>(true))
+            {
+                if (string.Equals(child.name, name, StringComparison.OrdinalIgnoreCase))
+                {
+                    return child;
+                }
+            }
+            return null;
+        }
+
+        private static void EnsureSocketIfMissing(Transform parent, string socketName, Vector3 localPosition)
+        {
+            if (FindTransformRecursive(parent, socketName) != null) return;
+            var socket = new GameObject(socketName);
+            socket.transform.SetParent(parent, false);
+            socket.transform.localPosition = localPosition;
+            socket.transform.localRotation = Quaternion.identity;
+            socket.transform.localScale = Vector3.one;
+        }
+
+        private static Bounds GetLocalBounds(GameObject root, GameObject model)
         {
             Renderer[] renderers = model.GetComponentsInChildren<Renderer>(true);
-            foreach (Renderer r in renderers)
+            if (renderers == null || renderers.Length == 0) return new Bounds(Vector3.zero, Vector3.one);
+            Bounds world = renderers[0].bounds;
+            for (int i = 1; i < renderers.Length; i++)
             {
-                Material[] shared = r.sharedMaterials;
-                if (shared == null || shared.Length == 0) continue;
-                for (int i = 0; i < shared.Length; i++)
-                {
-                    if (shared[i] != null && mats.TryGetValue(shared[i].name, out Material match))
-                    {
-                        shared[i] = match;
-                    }
-                }
-                r.sharedMaterials = shared;
+                if (renderers[i] != null) world.Encapsulate(renderers[i].bounds);
             }
+            Vector3 min = new Vector3(float.PositiveInfinity, float.PositiveInfinity, float.PositiveInfinity);
+            Vector3 max = new Vector3(float.NegativeInfinity, float.NegativeInfinity, float.NegativeInfinity);
+            for (int corner = 0; corner < 8; corner++)
+            {
+                Vector3 worldCorner = new Vector3(
+                    (corner & 1) == 0 ? world.min.x : world.max.x,
+                    (corner & 2) == 0 ? world.min.y : world.max.y,
+                    (corner & 4) == 0 ? world.min.z : world.max.z);
+                Vector3 localCorner = root.transform.InverseTransformPoint(worldCorner);
+                min = Vector3.Min(min, localCorner);
+                max = Vector3.Max(max, localCorner);
+            }
+            return new Bounds((min + max) * 0.5f, max - min);
+        }
+
+        private static void ValidateSavedPrefab(string prefabPath, string unitName)
+        {
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+            if (prefab == null)
+            {
+                Debug.LogWarning("[TacticalOperationsScaffolder] Could not reload prefab for validation: " + prefabPath);
+                return;
+            }
+            Renderer[] renderers = prefab.GetComponentsInChildren<Renderer>(true);
+            int enabledRenderers = 0;
+            foreach (Renderer r in renderers) if (r != null && r.enabled) enabledRenderers++;
+            Animator animator = prefab.GetComponent<Animator>();
+            string animatorState = animator == null ? "none" :
+                ((animator.avatar != null && animator.avatar.isValid) ? "valid" : "invalid") +
+                "/controller " + (animator.runtimeAnimatorController != null ? "present" : "missing");
+            string[] canonicalSockets = new[]
+            {
+                "Socket_MuzzlePrimary","Socket_EngineAudio","Socket_WeaponAudio",
+                "Socket_DamageSmoke","Socket_DamageFire"
+            };
+            var duplicateWarnings = new List<string>();
+            foreach (string socketName in canonicalSockets)
+            {
+                int count = 0;
+                foreach (Transform t in prefab.GetComponentsInChildren<Transform>(true))
+                {
+                    if (t != null && string.Equals(t.name, socketName, StringComparison.OrdinalIgnoreCase)) count++;
+                }
+                if (count > 1) duplicateWarnings.Add(socketName + " x" + count);
+            }
+            Debug.Log("[TacticalOperationsScaffolder] " + unitName + " prefab OK: renderers=" + renderers.Length +
+                " (enabled " + enabledRenderers + "), animator=" + animatorState +
+                (duplicateWarnings.Count > 0 ? ", DUPLICATE SOCKETS: " + string.Join(", ", duplicateWarnings.ToArray()) : ""));
+        }
+
+        private static void NormalizeEmptyUnityYamlStrings(string assetRelativePath)
+        {
+            string projectRoot = Directory.GetParent(Application.dataPath).FullName;
+            string absolutePath = Path.GetFullPath(Path.Combine(projectRoot, assetRelativePath));
+            if (!File.Exists(absolutePath)) return;
+            string contents = File.ReadAllText(absolutePath);
+            string normalized = contents;
+            if (string.Equals(Path.GetExtension(absolutePath), ".meta", StringComparison.OrdinalIgnoreCase))
+            {
+                normalized = Regex.Replace(normalized, @"(?m)[ \t]+(?=
+?$)", string.Empty);
+            }
+            normalized = Regex.Replace(normalized,
+                @"(?m)^([ \t]*(?:value|userData|assetBundleName|assetBundleVariant|motionNodeName|" +
+                @"rigImportErrors|rigImportWarnings|animationImportErrors|animationImportWarnings|" +
+                @"animationRetargetingWarnings|rootMotionBoneName):)[ \t]*(
+?)$",
+                "$1 \"\"$2");
+            if (!string.Equals(contents, normalized, StringComparison.Ordinal))
+            {
+                File.WriteAllText(absolutePath, normalized, new UTF8Encoding(false));
+            }
+        }
+
+        // ---------------------------------------------------------------------------
+        // Legacy per-unit entry points kept for compatibility. Each delegates to spec.
+        // ---------------------------------------------------------------------------
+
+        private static string CreateTidebreakerHovercraftVisual()
+        {
+            return CreateVisualFromSpec(UnitSpecs[0], ResolveEffectiveModelPath(UnitSpecs[0]));
+        }
+
+        private static string CreateSalvageHaulerVisual()
+        {
+            return CreateVisualFromSpec(UnitSpecs[1], ResolveEffectiveModelPath(UnitSpecs[1]));
+        }
+
+        private static string CreateSkyguardSAMVisual()
+        {
+            return CreateVisualFromSpec(UnitSpecs[2], ResolveEffectiveModelPath(UnitSpecs[2]));
+        }
+
+        private static string CreateBulwarkSiegeTankVisual()
+        {
+            return CreateVisualFromSpec(UnitSpecs[3], ResolveEffectiveModelPath(UnitSpecs[3]));
+        }
+
+        private static string CreateArcLanceWalkerVisual()
+        {
+            return CreateVisualFromSpec(UnitSpecs[4], ResolveEffectiveModelPath(UnitSpecs[4]));
+        }
+
+        private static string CreateFieldMedicRoverVisual()
+        {
+            return CreateVisualFromSpec(UnitSpecs[5], ResolveEffectiveModelPath(UnitSpecs[5]));
+        }
+
+        private static string CreatePbrVisual(string unitName, string modelPath, string prefabPath)
+        {
+            foreach (TacticalUnitSpec spec in UnitSpecs)
+            {
+                if (string.Equals(spec.UnitName, unitName, StringComparison.OrdinalIgnoreCase))
+                {
+                    return CreateVisualFromSpec(spec, ResolveEffectiveModelPath(spec));
+                }
+            }
+            throw new InvalidOperationException("Unknown tactical unit spec: " + unitName + " (" + modelPath + " -> " + prefabPath + ")");
         }
 
         private static Material CreatePbrMaterial(string unitName)
@@ -911,13 +860,22 @@ namespace RogueCommandExpansion.Authoring
 
         private static void FitBoxCollider(GameObject root, GameObject model)
         {
-            Renderer[] renderers = model.GetComponentsInChildren<Renderer>(true);
-            if (renderers == null || renderers.Length == 0) return;
+            Renderer[] allRenderers = model.GetComponentsInChildren<Renderer>(true);
+            if (allRenderers == null) return;
+
+            var renderers = new List<Renderer>();
+            foreach (Renderer r in allRenderers)
+            {
+                if (r == null || !r.enabled) continue;
+                if (r.name.IndexOf("_COLLIDER", StringComparison.OrdinalIgnoreCase) >= 0) continue;
+                renderers.Add(r);
+            }
+            if (renderers.Count == 0) return;
 
             Bounds bounds = renderers[0].bounds;
-            for (int i = 1; i < renderers.Length; i++)
+            for (int i = 1; i < renderers.Count; i++)
             {
-                if (renderers[i] != null) bounds.Encapsulate(renderers[i].bounds);
+                bounds.Encapsulate(renderers[i].bounds);
             }
 
             BoxCollider collider = root.GetComponent<BoxCollider>();

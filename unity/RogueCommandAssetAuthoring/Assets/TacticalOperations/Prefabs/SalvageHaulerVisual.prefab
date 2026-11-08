@@ -4938,6 +4938,37 @@ Animator:
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorStateOnDisable: 0
   m_WriteDefaultValuesOnDisable: 0
+--- !u!1 &4985105049041917258
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 6920925495985274397}
+  m_Layer: 0
+  m_Name: Socket_TurretPitch
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &6920925495985274397
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4985105049041917258}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 6200146208182130570}
+  m_RootOrder: 0
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &7830280044171849373
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -4992,23 +5023,23 @@ PrefabInstance:
     - target: {fileID: -8217211468183207887, guid: afc779ea43be6a6488ba53377562306f, type: 3}
       propertyPath: m_Materials.Array.data[0]
       value: 
-      objectReference: {fileID: 2100000, guid: a0c7acd8aff2f074aa39eb84a1072e16, type: 2}
+      objectReference: {fileID: 2100000, guid: 2385bdacbc572b24abc0a1cbd19e48cb, type: 2}
     - target: {fileID: -5079980855914428683, guid: afc779ea43be6a6488ba53377562306f, type: 3}
       propertyPath: m_Materials.Array.data[0]
       value: 
-      objectReference: {fileID: 2100000, guid: 1db71096125401f4ab3e26828469e47c, type: 2}
+      objectReference: {fileID: 2100000, guid: 2385bdacbc572b24abc0a1cbd19e48cb, type: 2}
     - target: {fileID: -2162817129294977249, guid: afc779ea43be6a6488ba53377562306f, type: 3}
       propertyPath: m_Materials.Array.data[0]
       value: 
-      objectReference: {fileID: 2100000, guid: 0d11ed22699d01c4d93c08962d412413, type: 2}
+      objectReference: {fileID: 2100000, guid: 2385bdacbc572b24abc0a1cbd19e48cb, type: 2}
     - target: {fileID: -608236834025885560, guid: afc779ea43be6a6488ba53377562306f, type: 3}
       propertyPath: m_Materials.Array.data[0]
       value: 
-      objectReference: {fileID: 2100000, guid: 4d7151437743e014b8b5c54b95111a29, type: 2}
+      objectReference: {fileID: 2100000, guid: 2385bdacbc572b24abc0a1cbd19e48cb, type: 2}
     - target: {fileID: 225051261108618250, guid: afc779ea43be6a6488ba53377562306f, type: 3}
       propertyPath: m_Materials.Array.data[0]
       value: 
-      objectReference: {fileID: 2100000, guid: 8430ea394f6538a4f85125a21dbe64cb, type: 2}
+      objectReference: {fileID: 2100000, guid: 2385bdacbc572b24abc0a1cbd19e48cb, type: 2}
     - target: {fileID: 919132149155446097, guid: afc779ea43be6a6488ba53377562306f, type: 3}
       propertyPath: m_Name
       value: SalvageHaulerModel
@@ -5016,15 +5047,15 @@ PrefabInstance:
     - target: {fileID: 2450726245599397533, guid: afc779ea43be6a6488ba53377562306f, type: 3}
       propertyPath: m_Materials.Array.data[0]
       value: 
-      objectReference: {fileID: 2100000, guid: 932b3b1a35e75164e902bfcf6838af92, type: 2}
+      objectReference: {fileID: 2100000, guid: 2385bdacbc572b24abc0a1cbd19e48cb, type: 2}
     - target: {fileID: 4615239144737482629, guid: afc779ea43be6a6488ba53377562306f, type: 3}
       propertyPath: m_Materials.Array.data[0]
       value: 
-      objectReference: {fileID: 2100000, guid: e5bfafe1d2b030a4c80bc0431aa8f372, type: 2}
+      objectReference: {fileID: 2100000, guid: 2385bdacbc572b24abc0a1cbd19e48cb, type: 2}
     - target: {fileID: 5536719011281872514, guid: afc779ea43be6a6488ba53377562306f, type: 3}
       propertyPath: m_Materials.Array.data[0]
       value: 
-      objectReference: {fileID: 2100000, guid: 8faa647582272564e893b2925fa903b8, type: 2}
+      objectReference: {fileID: 2100000, guid: 2385bdacbc572b24abc0a1cbd19e48cb, type: 2}
     m_RemovedComponents:
     - {fileID: 5866666021909216657, guid: afc779ea43be6a6488ba53377562306f, type: 3}
   m_SourcePrefab: {fileID: 100100000, guid: afc779ea43be6a6488ba53377562306f, type: 3}
@@ -5129,6 +5160,11 @@ AudioSource:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
+--- !u!4 &6200146208182130570 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 4224910911013337367, guid: afc779ea43be6a6488ba53377562306f, type: 3}
+  m_PrefabInstance: {fileID: 7830280044171849373}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &7544030163007013857 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: -8927408519667454596, guid: afc779ea43be6a6488ba53377562306f, type: 3}
