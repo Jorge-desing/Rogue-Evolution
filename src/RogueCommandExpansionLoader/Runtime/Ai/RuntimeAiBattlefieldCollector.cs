@@ -6,13 +6,14 @@ using UnityEngine;
 namespace RogueCommandExpansionLoader.Runtime.Ai
 {
     /// <summary>
-    /// Collects live battlefield state from <see cref="ExistingControllers"/> once per amortized window
-    /// and projects it into an immutable <see cref="AiBattlefieldSnapshot"/>.
+    /// Collects live battlefield state from <see cref="ExistingControllers"/> and <see cref="RuntimeHazardManager"/>
+    /// once per amortized window and projects it into an immutable <see cref="AiBattlefieldSnapshot"/>.
     /// Never mutates <c>IsControlledByPlayer</c> or <c>IsControlledByAi</c>.
     /// </summary>
     public sealed class RuntimeAiBattlefieldCollector
     {
         public const float DefaultRefreshIntervalSeconds = 0.20f;
+        private const float LowHealthSkillTriggerThreshold = 0.50f;
 
         private static readonly FieldInfo NativeCommandChainField = ResolveNativeCommandChainField();
 
@@ -49,17 +50,17 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
         public bool TryResolveAiEntity(int uniqueEntityId, out EntityController entity)
         {
             return _aiEntityById.TryGetValue(uniqueEntityId, out entity) &&
-                   entity != null &&
-                   !entity.IsDestroyed &&
-                   !entity.DestroyHasBeenStarted;
+                    entity != null &&
+                    !entity.IsDestroyed &&
+                    !entity.DestroyHasBeenStarted;
         }
 
         public bool TryResolveHostileEntity(int uniqueEntityId, out EntityController entity)
         {
             return _hostileEntityById.TryGetValue(uniqueEntityId, out entity) &&
-                   entity != null &&
-                   !entity.IsDestroyed &&
-                   !entity.DestroyHasBeenStarted;
+                    entity != null &&
+                    !entity.IsDestroyed &&
+                    !entity.DestroyHasBeenStarted;
         }
 
         public AiBattlefieldSnapshot CollectCurrentSnapshot(bool forceRefresh = false)
@@ -165,13 +166,43 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
                     }
                 }
 
+                var hazardSnapshots = new List<AiHazardZoneSnapshot>();
+                try
+                {
+                    IReadOnlyList<HazardZoneDiagnosticRow> activeHazards =
+                        RuntimeHazardManager.GetActiveHazardRows(AiBattlefieldBlackboardBuilder.DefaultMaxTrackedHazardZones * 2, out _);
+                    if (activeHazards != null)
+                    {
+                        for (int i = 0; i < activeHazards.Count; i++)
+                        {
+                            HazardZoneDiagnosticRow hz = activeHazards[i];
+                            bool beneficial = string.Equals(hz.HazardType, "NaniteField", StringComparison.OrdinalIgnoreCase);
+                            // Note: in RuntimeHazardManager, NaniteField heals player entities only (!IsControlledByAi),
+                            // while offensive hazards damage AI entities. Thus all default hazards are harmful or neutral to AI.
+                            hazardSnapshots.Add(new AiHazardZoneSnapshot(
+                                zoneId: hz.ZoneId,
+                                hazardType: hz.HazardType,
+                                centerX: hz.CenterX,
+                                centerZ: hz.CenterZ,
+                                radius: hz.Radius,
+                                tickDamage: hz.TickDamage,
+                                isBeneficialToAi: beneficial));
+                        }
+                    }
+                }
+                catch
+                {
+                    // Fail-closed if hazard census is unavailable
+                }
+
                 int waveNumber = RuntimeAiDirectorCensus.Current().CurrentAttackWaveNumber;
                 _lastSnapshot = AiBattlefieldBlackboardBuilder.BuildSnapshot(
                     timestamp: now,
                     baseIndex: _baseIndex,
                     currentWaveNumber: waveNumber,
                     aiUnits: aiSnapshots,
-                    hostileUnits: hostileSnapshots);
+                    hostileUnits: hostileSnapshots,
+                    hazardZones: hazardSnapshots);
                 return _lastSnapshot;
             }
             catch
@@ -184,10 +215,10 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
         private static bool IsValidAiEntity(EntityController entity)
         {
             return entity != null &&
-                   !entity.IsDestroyed &&
-                   !entity.DestroyHasBeenStarted &&
-                   entity.IsControlledByAi &&
-                   !entity.doNotRegisterGlobally;
+                    !entity.IsDestroyed &&
+                    !entity.DestroyHasBeenStarted &&
+                    entity.IsControlledByAi &&
+                    !entity.doNotRegisterGlobally;
         }
 
         private static bool IsValidHostileCandidate(EntityController candidate, EntityController referenceAiUnit)
@@ -247,13 +278,47 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
             }
 
             float minAttackRange = 0f;
+            string activationTrigger = "EnemiesInRange";
             if (!string.IsNullOrWhiteSpace(entity.EntityId) &&
                 RuntimeUnitMechanicsDirector.TryGetProfile(entity.EntityId, out UnitRuntimeMechanicsProfile profile) &&
-                profile != null &&
-                profile.MinAttackRange.HasValue &&
-                profile.MinAttackRange.Value > 0f)
+                profile != null)
             {
-                minAttackRange = profile.MinAttackRange.Value;
+                if (profile.MinAttackRange.HasValue && profile.MinAttackRange.Value > 0f)
+                {
+                    minAttackRange = profile.MinAttackRange.Value;
+                }
+
+                if (!string.IsNullOrWhiteSpace(profile.AiActivationTrigger))
+                {
+                    activationTrigger = profile.AiActivationTrigger;
+                }
+            }
+
+            bool hasReadySkill = false;
+            bool skillTargetsSelf = false;
+            float skillRange = 15f;
+            try
+            {
+                SkillInfo skillInfo = entity.SkillInfo;
+                if (skillInfo != null &&
+                    !entity.HasSkillActivationInCommandChain &&
+                    entity.CurrentMana >= skillInfo.manaCost)
+                {
+                    bool lowHealthTrigger = string.Equals(activationTrigger, "LowHealth", StringComparison.OrdinalIgnoreCase);
+                    bool healthGateOk = !lowHealthTrigger ||
+                        (entity.MaxHealth > 0f && (entity.CurrentHealth / entity.MaxHealth) <= LowHealthSkillTriggerThreshold);
+
+                    if (healthGateOk)
+                    {
+                        hasReadySkill = true;
+                        skillTargetsSelf = skillInfo.targetOrigin == TargetOrigin.Self;
+                        skillRange = Math.Max(6f, entity.WeaponRange > 0f ? entity.WeaponRange : 15f);
+                    }
+                }
+            }
+            catch
+            {
+                hasReadySkill = false;
             }
 
             bool isHarvester = entity.HasRole(UnitRole.Harvester);
@@ -285,7 +350,10 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
                 isSupportUnit: isSupport,
                 hasQueuedCommands: hasQueued,
                 currentCommandTag: string.Empty,
-                currentTargetId: targetId);
+                currentTargetId: targetId,
+                hasReadyActiveSkill: hasReadySkill,
+                activeSkillTargetsSelf: skillTargetsSelf,
+                activeSkillRange: skillRange);
         }
 
         private static bool HasQueuedCommands(EntityController entity)
@@ -310,16 +378,9 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
         {
             try
             {
-                FieldInfo field = typeof(EntityController).GetField(
+                return typeof(EntityController).GetField(
                     "_commandChain",
-                    BindingFlags.Instance | BindingFlags.NonPublic);
-                return field != null &&
-                       field.DeclaringType == typeof(EntityController) &&
-                       field.IsPrivate &&
-                       !field.IsStatic &&
-                       field.FieldType == typeof(LinkedList<EntityCommand>)
-                    ? field
-                    : null;
+                    BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
             }
             catch
             {

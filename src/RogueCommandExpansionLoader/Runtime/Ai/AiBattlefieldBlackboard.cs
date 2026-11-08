@@ -11,6 +11,7 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
     {
         public int OmittedAiUnitCount { get; }
         public int OmittedHostileUnitCount { get; }
+        public int OmittedHazardZoneCount { get; }
         public float Timestamp { get; }
         public int BaseIndex { get; }
         public int CurrentWaveNumber { get; }
@@ -18,6 +19,7 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
         public int TotalAiHarvesters { get; }
         public int TotalAiBuildings { get; }
         public int TotalHostileCombatUnits { get; }
+        public int TotalHarmfulHazardZones { get; }
         public float TotalAiCombatPower { get; }
         public float TotalHostileCombatPower { get; }
         public float HostileCentroidX { get; }
@@ -25,6 +27,7 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
         public bool UnderHarvesterOrBasePressure { get; }
         public IReadOnlyList<AiUnitSnapshot> AiUnits { get; }
         public IReadOnlyList<AiUnitSnapshot> HostileUnits { get; }
+        public IReadOnlyList<AiHazardZoneSnapshot> HazardZones { get; }
 
         public AiBattlefieldSnapshot(
             float timestamp,
@@ -42,10 +45,14 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
             float hostileCentroidZ,
             bool underHarvesterOrBasePressure,
             IReadOnlyList<AiUnitSnapshot> aiUnits,
-            IReadOnlyList<AiUnitSnapshot> hostileUnits)
+            IReadOnlyList<AiUnitSnapshot> hostileUnits,
+            int omittedHazardZoneCount = 0,
+            int totalHarmfulHazardZones = 0,
+            IReadOnlyList<AiHazardZoneSnapshot> hazardZones = null)
         {
             OmittedAiUnitCount = Math.Max(0, omittedAiUnitCount);
             OmittedHostileUnitCount = Math.Max(0, omittedHostileUnitCount);
+            OmittedHazardZoneCount = Math.Max(0, omittedHazardZoneCount);
             Timestamp = float.IsNaN(timestamp) || float.IsInfinity(timestamp) ? 0f : timestamp;
             BaseIndex = baseIndex;
             CurrentWaveNumber = Math.Max(0, currentWaveNumber);
@@ -53,6 +60,7 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
             TotalAiHarvesters = Math.Max(0, totalAiHarvesters);
             TotalAiBuildings = Math.Max(0, totalAiBuildings);
             TotalHostileCombatUnits = Math.Max(0, totalHostileCombatUnits);
+            TotalHarmfulHazardZones = Math.Max(0, totalHarmfulHazardZones);
             TotalAiCombatPower = Math.Max(0f, totalAiCombatPower);
             TotalHostileCombatPower = Math.Max(0f, totalHostileCombatPower);
             HostileCentroidX = float.IsNaN(hostileCentroidX) || float.IsInfinity(hostileCentroidX) ? 0f : hostileCentroidX;
@@ -60,6 +68,7 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
             UnderHarvesterOrBasePressure = underHarvesterOrBasePressure;
             AiUnits = aiUnits ?? Array.Empty<AiUnitSnapshot>();
             HostileUnits = hostileUnits ?? Array.Empty<AiUnitSnapshot>();
+            HazardZones = hazardZones ?? Array.Empty<AiHazardZoneSnapshot>();
         }
 
         public static AiBattlefieldSnapshot Empty { get; } = new AiBattlefieldSnapshot(
@@ -78,16 +87,20 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
             hostileCentroidZ: 0f,
             underHarvesterOrBasePressure: false,
             aiUnits: Array.Empty<AiUnitSnapshot>(),
-            hostileUnits: Array.Empty<AiUnitSnapshot>());
+            hostileUnits: Array.Empty<AiUnitSnapshot>(),
+            omittedHazardZoneCount: 0,
+            totalHarmfulHazardZones: 0,
+            hazardZones: Array.Empty<AiHazardZoneSnapshot>());
     }
 
     /// <summary>
-    /// Pure builder that aggregates pre-filtered AI and hostile entity snapshots into a single
+    /// Pure builder that aggregates pre-filtered AI, hostile, and hazard snapshots into a single
     /// <see cref="AiBattlefieldSnapshot"/> with bounded list caps and threat vector metrics.
     /// </summary>
     public static class AiBattlefieldBlackboardBuilder
     {
         public const int DefaultMaxTrackedUnitsPerSide = 64;
+        public const int DefaultMaxTrackedHazardZones = 16;
         public const float DefaultPressureRadiusSquared = 18f * 18f;
 
         public static AiBattlefieldSnapshot BuildSnapshot(
@@ -98,10 +111,33 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
             IReadOnlyList<AiUnitSnapshot> hostileUnits,
             int maxTrackedUnitsPerSide = DefaultMaxTrackedUnitsPerSide)
         {
+            return BuildSnapshot(
+                timestamp: timestamp,
+                baseIndex: baseIndex,
+                currentWaveNumber: currentWaveNumber,
+                aiUnits: aiUnits,
+                hostileUnits: hostileUnits,
+                hazardZones: null,
+                maxTrackedUnitsPerSide: maxTrackedUnitsPerSide,
+                maxTrackedHazardZones: DefaultMaxTrackedHazardZones);
+        }
+
+        public static AiBattlefieldSnapshot BuildSnapshot(
+            float timestamp,
+            int baseIndex,
+            int currentWaveNumber,
+            IReadOnlyList<AiUnitSnapshot> aiUnits,
+            IReadOnlyList<AiUnitSnapshot> hostileUnits,
+            IReadOnlyList<AiHazardZoneSnapshot> hazardZones,
+            int maxTrackedUnitsPerSide = DefaultMaxTrackedUnitsPerSide,
+            int maxTrackedHazardZones = DefaultMaxTrackedHazardZones)
+        {
             int cap = Math.Max(1, maxTrackedUnitsPerSide);
+            int hazardCap = Math.Max(1, maxTrackedHazardZones);
 
             var boundedAi = new List<AiUnitSnapshot>();
             var boundedHostiles = new List<AiUnitSnapshot>();
+            var boundedHazards = new List<AiHazardZoneSnapshot>();
             var protectedIds = new HashSet<int>();
             var protectedPositions = new List<(float X, float Z)>();
 
@@ -207,6 +243,29 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
                 }
             }
 
+            int omittedHazards = 0;
+            int totalHarmfulHazards = 0;
+            if (hazardZones != null)
+            {
+                for (int i = 0; i < hazardZones.Count; i++)
+                {
+                    AiHazardZoneSnapshot hz = hazardZones[i];
+                    if (!hz.IsBeneficialToAi)
+                    {
+                        totalHarmfulHazards++;
+                    }
+
+                    if (boundedHazards.Count < hazardCap)
+                    {
+                        boundedHazards.Add(hz);
+                    }
+                    else
+                    {
+                        omittedHazards++;
+                    }
+                }
+            }
+
             float centroidX = centroidCount > 0 ? sumHostileX / centroidCount : 0f;
             float centroidZ = centroidCount > 0 ? sumHostileZ / centroidCount : 0f;
 
@@ -226,7 +285,10 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
                 hostileCentroidZ: centroidZ,
                 underHarvesterOrBasePressure: underPressure,
                 aiUnits: boundedAi.AsReadOnly(),
-                hostileUnits: boundedHostiles.AsReadOnly());
+                hostileUnits: boundedHostiles.AsReadOnly(),
+                omittedHazardZoneCount: omittedHazards,
+                totalHarmfulHazardZones: totalHarmfulHazards,
+                hazardZones: boundedHazards.AsReadOnly());
         }
     }
 }

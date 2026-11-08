@@ -177,6 +177,7 @@ namespace RogueCommandExpansionLoader.Modules
                 int omitted = 0;
                 int activeCount = 0;
                 int totalCoord = 0;
+                int totalHazards = 0;
                 int totalApproved = 0;
                 int totalConflicts = 0;
                 int totalLockout = 0;
@@ -196,6 +197,9 @@ namespace RogueCommandExpansionLoader.Modules
                     totalCoord += coordCount;
 
                     AiBattlefieldSnapshot snap = instance._lastBattlefieldSnapshot ?? AiBattlefieldSnapshot.Empty;
+                    int hazardCount = snap.HazardZones != null ? snap.HazardZones.Count : 0;
+                    totalHazards += hazardCount;
+
                     AiArbitrationResult arb = instance._lastArbitrationResult;
                     int approved = arb != null ? arb.ApprovedOrders.Count : 0;
                     int conflicts = arb != null ? arb.ConflictsResolvedCount : 0;
@@ -222,7 +226,8 @@ namespace RogueCommandExpansionLoader.Modules
                             conflictsResolvedLastTick: conflicts,
                             lockoutBlockedLastTick: lockout,
                             hysteresisBlockedLastTick: hysteresis,
-                            budgetOmittedLastTick: budgetOmitted));
+                            budgetOmittedLastTick: budgetOmitted,
+                            trackedHazardZones: hazardCount));
                     }
                     else
                     {
@@ -239,7 +244,8 @@ namespace RogueCommandExpansionLoader.Modules
                     totalLockoutBlockedLastTick: totalLockout,
                     totalHysteresisBlockedLastTick: totalHysteresis,
                     totalBudgetOmittedLastTick: totalBudgetOmitted,
-                    instances: rows.AsReadOnly());
+                    instances: rows.AsReadOnly(),
+                    totalTrackedHazardZones: totalHazards);
             }
         }
 

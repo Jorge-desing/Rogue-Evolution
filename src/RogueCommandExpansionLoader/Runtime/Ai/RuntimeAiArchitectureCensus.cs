@@ -5,7 +5,8 @@ using RogueCommandExpansionLoader.Modules;
 namespace RogueCommandExpansionLoader.Runtime.Ai
 {
     /// <summary>
-    /// Pure diagnostic row for a single active HUB-D <see cref="CompositeAiRuntimeBehaviour"/> instance.
+    /// Pure diagnostic telemetry row for a single active <see cref="CompositeAiRuntimeBehaviour"/>
+    /// instance participating in the HUB-D architecture.
     /// </summary>
     public readonly struct AiArchitectureInstanceDiagnosticRow
     {
@@ -14,6 +15,7 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
         public string ActiveDoctrine { get; }
         public int TrackedAiCombatUnits { get; }
         public int TrackedHostileCombatUnits { get; }
+        public int TrackedHazardZones { get; }
         public bool UnderHarvesterOrBasePressure { get; }
         public int ApprovedOrdersLastTick { get; }
         public int ConflictsResolvedLastTick { get; }
@@ -32,13 +34,15 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
             int conflictsResolvedLastTick,
             int lockoutBlockedLastTick,
             int hysteresisBlockedLastTick,
-            int budgetOmittedLastTick)
+            int budgetOmittedLastTick,
+            int trackedHazardZones = 0)
         {
             ProfileId = profileId ?? string.Empty;
             CoordinatedModuleCount = Math.Max(0, coordinatedModuleCount);
             ActiveDoctrine = activeDoctrine ?? "Standard";
             TrackedAiCombatUnits = Math.Max(0, trackedAiCombatUnits);
             TrackedHostileCombatUnits = Math.Max(0, trackedHostileCombatUnits);
+            TrackedHazardZones = Math.Max(0, trackedHazardZones);
             UnderHarvesterOrBasePressure = underHarvesterOrBasePressure;
             ApprovedOrdersLastTick = Math.Max(0, approvedOrdersLastTick);
             ConflictsResolvedLastTick = Math.Max(0, conflictsResolvedLastTick);
@@ -49,14 +53,16 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
     }
 
     /// <summary>
-    /// Clean-room telemetry snapshot of the HUB-D AI architecture across active composite instances.
-    /// Omission counters are placed strictly first to respect bounded trace formatting rules.
+    /// Pure diagnostic snapshot of the HUB-D AI architecture across all active AI instances.
+    /// Omission counter (<see cref="OmittedInstanceCount"/>) is placed strictly first to respect
+    /// bounded telemetry trace rules.
     /// </summary>
     public sealed class AiArchitectureCensus
     {
         public int OmittedInstanceCount { get; }
         public int ActiveCompositeCount { get; }
         public int TotalCoordinatedModuleCount { get; }
+        public int TotalTrackedHazardZones { get; }
         public int TotalApprovedOrdersLastTick { get; }
         public int TotalConflictsResolvedLastTick { get; }
         public int TotalLockoutBlockedLastTick { get; }
@@ -73,11 +79,13 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
             int totalLockoutBlockedLastTick,
             int totalHysteresisBlockedLastTick,
             int totalBudgetOmittedLastTick,
-            IReadOnlyList<AiArchitectureInstanceDiagnosticRow> instances)
+            IReadOnlyList<AiArchitectureInstanceDiagnosticRow> instances,
+            int totalTrackedHazardZones = 0)
         {
             OmittedInstanceCount = Math.Max(0, omittedInstanceCount);
             ActiveCompositeCount = Math.Max(0, activeCompositeCount);
             TotalCoordinatedModuleCount = Math.Max(0, totalCoordinatedModuleCount);
+            TotalTrackedHazardZones = Math.Max(0, totalTrackedHazardZones);
             TotalApprovedOrdersLastTick = Math.Max(0, totalApprovedOrdersLastTick);
             TotalConflictsResolvedLastTick = Math.Max(0, totalConflictsResolvedLastTick);
             TotalLockoutBlockedLastTick = Math.Max(0, totalLockoutBlockedLastTick);
@@ -95,11 +103,12 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
             totalLockoutBlockedLastTick: 0,
             totalHysteresisBlockedLastTick: 0,
             totalBudgetOmittedLastTick: 0,
-            instances: Array.Empty<AiArchitectureInstanceDiagnosticRow>());
+            instances: Array.Empty<AiArchitectureInstanceDiagnosticRow>(),
+            totalTrackedHazardZones: 0);
     }
 
     /// <summary>
-    /// Collects live HUB-D arbitration and blackboard metrics from active <see cref="CompositeAiRuntimeBehaviour"/> instances.
+    /// Collects live HUB-D AI architecture telemetry across active <see cref="CompositeAiRuntimeBehaviour"/> instances.
     /// </summary>
     public static class RuntimeAiArchitectureCensus
     {
@@ -107,14 +116,7 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
 
         public static AiArchitectureCensus Current(int maxTrackedInstances = DefaultMaxTrackedInstances)
         {
-            try
-            {
-                return CompositeAiRuntimeBehaviour.BuildArchitectureCensus(maxTrackedInstances);
-            }
-            catch
-            {
-                return AiArchitectureCensus.Empty;
-            }
+            return CompositeAiRuntimeBehaviour.BuildArchitectureCensus(maxTrackedInstances);
         }
     }
 }

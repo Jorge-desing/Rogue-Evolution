@@ -166,6 +166,10 @@
              Link="Runtime/RuntimeUnitAiBehaviorPolicy.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/Ai/AiUnitSnapshot.cs"
              Link="Runtime/Ai/AiUnitSnapshot.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/Ai/AiHazardZoneSnapshot.cs"
+             Link="Runtime/Ai/AiHazardZoneSnapshot.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/Ai/AiSafeVectorPolicy.cs"
+             Link="Runtime/Ai/AiSafeVectorPolicy.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/Ai/AiBattlefieldBlackboard.cs"
              Link="Runtime/Ai/AiBattlefieldBlackboard.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/Ai/StrategicDoctrineAndUtilityPolicy.cs"
@@ -297,6 +301,10 @@
              Link="Modules/TacticalDirectorParameters.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Modules/TacticalDirectorAiModule.cs"
              Link="Modules/TacticalDirectorAiModule.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Modules/SquadOperationsDirectorParameters.cs"
+             Link="Modules/SquadOperationsDirectorParameters.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Modules/SquadOperationsDirectorAiModule.cs"
+             Link="Modules/SquadOperationsDirectorAiModule.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Contracts/IRogueCommandAiModule.cs"
              Link="Contracts/IRogueCommandAiModule.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Modules/TraceDefaultAiModule.cs"

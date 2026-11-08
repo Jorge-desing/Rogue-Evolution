@@ -10,8 +10,8 @@ namespace RogueCommandExpansionLoader.Modules
     /// <summary>
     /// HUB-D unified meta-module (<c>sample:tactical-director</c>) that consumes the shared
     /// <see cref="AiBattlefieldSnapshot"/> and emits utility-scored <see cref="AiIntentProposal"/>
-    /// intents for survival/dead-zone kiting, base/harvester defense, and role-aware focus targeting.
-    /// Consolidates multiple tactical behaviors into a single profile module slot.
+    /// intents for hazard evacuation, safe 8-ray dead-zone kiting, tactical skills, base/harvester defense,
+    /// and anti-overkill role-aware focus targeting.
     /// </summary>
     public sealed class TacticalDirectorAiModule : IRogueCommandAiModule
     {
@@ -50,6 +50,7 @@ namespace RogueCommandExpansionLoader.Modules
             private readonly DefaultAiBehaviour _gameBehaviour;
             private readonly TacticalDirectorSettings _settings;
             private readonly string _commandTag;
+            private readonly Dictionary<int, float> _committedDamageByTarget = new Dictionary<int, float>();
             private float _nextEvalAt;
             private bool _stopped;
 
@@ -94,13 +95,16 @@ namespace RogueCommandExpansionLoader.Modules
 
                 IReadOnlyList<AiUnitSnapshot> aiUnits = snapshot.AiUnits;
                 IReadOnlyList<AiUnitSnapshot> hostiles = snapshot.HostileUnits;
-                if (aiUnits == null || aiUnits.Count == 0 || hostiles == null || hostiles.Count == 0)
+                IReadOnlyList<AiHazardZoneSnapshot> hazards = snapshot.HazardZones;
+                if (aiUnits == null || aiUnits.Count == 0)
                 {
                     return;
                 }
 
+                bool hasHostiles = hostiles != null && hostiles.Count > 0;
                 float engagementRadiusSq = _settings.EngagementRadius * _settings.EngagementRadius;
                 float defenseRadiusSq = _settings.DefenseRadius * _settings.DefenseRadius;
+                _committedDamageByTarget.Clear();
 
                 for (int i = 0; i < aiUnits.Count; i++)
                 {
@@ -117,7 +121,6 @@ namespace RogueCommandExpansionLoader.Modules
 
                     int emittedForUnit = 0;
 
-                    // Find nearest hostile and best combat target
                     AiUnitSnapshot nearestHostile = default(AiUnitSnapshot);
                     float nearestDistSq = float.MaxValue;
                     bool hasNearest = false;
@@ -126,71 +129,100 @@ namespace RogueCommandExpansionLoader.Modules
                     float bestTargetScore = 0f;
                     bool hasBestTarget = false;
 
-                    for (int h = 0; h < hostiles.Count; h++)
+                    if (hasHostiles)
                     {
-                        AiUnitSnapshot hostile = hostiles[h];
-                        float distSq = unit.DistanceSquaredTo(hostile);
-                        if (distSq < nearestDistSq)
+                        for (int h = 0; h < hostiles.Count; h++)
                         {
-                            nearestDistSq = distSq;
-                            nearestHostile = hostile;
-                            hasNearest = true;
-                        }
-
-                        if (_settings.EnableFocusTargeting && distSq <= engagementRadiusSq)
-                        {
-                            float targetScore = TacticalUtilityScorer.ScoreCombatTarget(unit, hostile, doctrineWeights);
-                            if (targetScore > bestTargetScore)
+                            AiUnitSnapshot hostile = hostiles[h];
+                            float distSq = unit.DistanceSquaredTo(hostile);
+                            if (distSq < nearestDistSq)
                             {
-                                bestTargetScore = targetScore;
-                                bestTarget = hostile;
-                                hasBestTarget = true;
+                                nearestDistSq = distSq;
+                                nearestHostile = hostile;
+                                hasNearest = true;
+                            }
+
+                            if (_settings.EnableFocusTargeting && distSq <= engagementRadiusSq)
+                            {
+                                _committedDamageByTarget.TryGetValue(hostile.UniqueEntityId, out float committedDmg);
+                                float targetScore = TacticalUtilityScorer.ScoreCombatTargetWithOverkill(
+                                    unit,
+                                    hostile,
+                                    doctrineWeights,
+                                    committedDmg);
+                                if (targetScore > bestTargetScore)
+                                {
+                                    bestTargetScore = targetScore;
+                                    bestTarget = hostile;
+                                    hasBestTarget = true;
+                                }
                             }
                         }
                     }
 
-                    // 1. Survival / Dead-zone kiting proposal
-                    if (_settings.EnableSurvivalKiting && hasNearest && emittedForUnit < _settings.MaxProposalsPerUnit)
+                    // 1. Survival / Hazard Evacuation / Safe 8-ray Dead-zone Kiting proposal
+                    if (_settings.EnableSurvivalKiting && emittedForUnit < _settings.MaxProposalsPerUnit)
                     {
-                        float kiteScore = TacticalUtilityScorer.ScoreSurvivalOrKite(unit, nearestHostile, doctrineWeights);
-                        if (unit.HealthRatio <= _settings.RetreatHealthRatio && kiteScore < 120f)
+                        float hazardScore = TacticalUtilityScorer.ScoreHazardEvacuation(unit, hazards, doctrineWeights);
+                        float kiteScore = hasNearest
+                            ? TacticalUtilityScorer.ScoreSurvivalOrKite(unit, nearestHostile, doctrineWeights)
+                            : 0f;
+
+                        if (hasNearest && unit.HealthRatio <= _settings.RetreatHealthRatio && kiteScore < 120f)
                         {
                             kiteScore = 120f * doctrineWeights.SurvivalWeight;
                         }
 
-                        if (kiteScore > 0f)
+                        float combinedSurvivalScore = Math.Max(hazardScore, kiteScore);
+                        if (combinedSurvivalScore > 0f)
                         {
-                            float dx = unit.PosX - nearestHostile.PosX;
-                            float dz = unit.PosZ - nearestHostile.PosZ;
-                            float len = (float)Math.Sqrt(dx * dx + dz * dz);
-                            if (len < 0.01f)
-                            {
-                                dx = -1f;
-                                dz = 0f;
-                            }
-                            else
-                            {
-                                dx /= len;
-                                dz /= len;
-                            }
+                            float retreatDistance = Math.Max(9.0f, unit.MinAttackRange > 0f ? unit.MinAttackRange + 4.0f : 10.0f);
+                            (float safeX, float safeZ) = AiSafeVectorPolicy.ComputeSafeRetreatDestination(
+                                unit,
+                                nearestHostile,
+                                snapshot,
+                                retreatDistance);
 
-                            float retreatDistance = Math.Max(8.0f, unit.MinAttackRange > 0f ? unit.MinAttackRange + 4.0f : 10.0f);
                             proposals.Add(new AiIntentProposal(
                                 moduleId: ModuleId,
                                 commandTag: _commandTag + ".kite",
                                 unitId: unit.UniqueEntityId,
                                 targetEntityId: -1,
-                                destX: unit.PosX + dx * retreatDistance,
-                                destZ: unit.PosZ + dz * retreatDistance,
+                                destX: safeX,
+                                destZ: safeZ,
                                 category: AiIntentCategory.SurvivalKite,
-                                utilityScore: kiteScore,
+                                utilityScore: combinedSurvivalScore,
                                 lockoutDurationSeconds: 1.25f,
                                 requiresEmptyQueue: false));
                             emittedForUnit++;
                         }
                     }
 
-                    // 2. Base & Harvester defense proposal when under pressure
+                    // 2. Tactical Skill proposal when ready
+                    if (unit.HasReadyActiveSkill && emittedForUnit < _settings.MaxProposalsPerUnit)
+                    {
+                        float skillRangeSq = unit.ActiveSkillRange * unit.ActiveSkillRange;
+                        bool hostileInSkillRange = hasNearest && nearestDistSq <= skillRangeSq;
+                        float skillScore = TacticalUtilityScorer.ScoreTacticalSkill(unit, hostileInSkillRange, doctrineWeights);
+                        if (skillScore > 0f)
+                        {
+                            int skillTargetId = (!unit.ActiveSkillTargetsSelf && hasNearest) ? nearestHostile.UniqueEntityId : -1;
+                            proposals.Add(new AiIntentProposal(
+                                moduleId: ModuleId,
+                                commandTag: _commandTag + ".skill",
+                                unitId: unit.UniqueEntityId,
+                                targetEntityId: skillTargetId,
+                                destX: hasNearest ? nearestHostile.PosX : unit.PosX,
+                                destZ: hasNearest ? nearestHostile.PosZ : unit.PosZ,
+                                category: AiIntentCategory.TacticalSkill,
+                                utilityScore: skillScore,
+                                lockoutDurationSeconds: 1.0f,
+                                requiresEmptyQueue: false));
+                            emittedForUnit++;
+                        }
+                    }
+
+                    // 3. Base & Harvester defense proposal when under pressure
                     if (_settings.EnableBaseDefense && snapshot.UnderHarvesterOrBasePressure &&
                         hasNearest && nearestDistSq <= defenseRadiusSq &&
                         emittedForUnit < _settings.MaxProposalsPerUnit)
@@ -210,10 +242,13 @@ namespace RogueCommandExpansionLoader.Modules
                         emittedForUnit++;
                     }
 
-                    // 3. Focus combat targeting proposal
+                    // 4. Focus combat targeting proposal with anti-overkill tracking
                     if (_settings.EnableFocusTargeting && hasBestTarget &&
                         emittedForUnit < _settings.MaxProposalsPerUnit)
                     {
+                        _committedDamageByTarget.TryGetValue(bestTarget.UniqueEntityId, out float currentCommitted);
+                        _committedDamageByTarget[bestTarget.UniqueEntityId] = currentCommitted + (unit.DpsEstimate * 2.0f);
+
                         proposals.Add(new AiIntentProposal(
                             moduleId: ModuleId,
                             commandTag: _commandTag + ".focus",
@@ -233,6 +268,7 @@ namespace RogueCommandExpansionLoader.Modules
             public void OnDestroyed()
             {
                 _stopped = true;
+                _committedDamageByTarget.Clear();
             }
         }
     }

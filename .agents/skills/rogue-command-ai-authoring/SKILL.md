@@ -247,7 +247,7 @@ Pitfall: keep the resolver pure and free of Unity types so it compiles in the ha
 
 ### Registered AI Modules
 
-The loader includes 22 compiled AI modules registered in `AiModuleRegistry.CreateDefault()` (available for content packs, with a per-profile limit of up to 8 modules):
+The loader includes 23 compiled AI modules registered in `AiModuleRegistry.CreateDefault()` (available for content packs, with a per-profile limit of up to 8 modules):
 
 1. **`sample:trace-default`**:
    - Diagnostic trace module monitoring native AI lifecycle events and logging execution milestones.
@@ -324,7 +324,14 @@ The loader includes 22 compiled AI modules registered in `AiModuleRegistry.Creat
 22. **`sample:tactical-director`** (HUB-D Coordinated Architecture):
     - Implements `ICoordinatedAiRuntimeBehaviour` over the 3-layer Hierarchical Utility-Blackboard Director (`AiBattlefieldBlackboard` -> `StrategicDoctrinePolicy` & `TacticalUtilityScorer` -> `AiCommandArbiterPolicy`).
     - Parameters: `baseIndex` (-1–31; default -1), `engagementRadius` (5–150; default 45), `kiteSpeedThreshold` (1–30; default 8), `lowHealthRetreatRatio` (0.05–0.75; default 0.30), `lockoutDurationSeconds` (0.1–15.0; default 1.5), `maxProposalsPerTick` (1–32; default 12).
-    - Emits prioritized `AiIntentProposal` rows (`SurvivalKite` for artillery `MinAttackRange` dead-zones and damaged skirmishers; `CombatFocus` with role affinity and anti-overkill damping) arbitrated centrally per unit in `CompositeAiRuntimeBehaviour` and surfaced via `RuntimeAiArchitectureCensus` (`GetAiArchitectureCensusJson`, with `omittedInstanceCount` first).
+    - Emits prioritized `AiIntentProposal` rows (`SurvivalKite` via 8-ray `AiSafeVectorPolicy` for hazard zone evacuation, artillery `MinAttackRange` dead-zones, and damaged skirmishers; `TacticalSkill` for ready skills; `CombatTargeting` with role affinity and `ScoreCombatTargetWithOverkill` anti-overkill damping) arbitrated centrally per unit in `CompositeAiRuntimeBehaviour` and surfaced via `RuntimeAiArchitectureCensus` (`GetAiArchitectureCensusJson`, with `omittedInstanceCount` first).
+23. **`sample:squad-operations-director`** (HUB-D 2.0 Specialist Coordinated Module):
+    - Implements `ICoordinatedAiRuntimeBehaviour` for support/engineer repair logistics (`ScoreSupportOrRepair`), fast counter-battery interception (`MoveSpeed >= 9.0` against hostile artillery), hazard evacuation for support units, and specialist tactical skills.
+    - Parameters: `baseIndex` (-1–31; default -1), `evalIntervalSeconds` (0.20–10.0; default 0.75), `supportRadius` (5.0–80.0; default 30.0), `counterBatteryMinRangeThreshold` (8.0–50.0; default 14.0), `enableSupportLogistics` (bool; default true), `enableCounterBattery` (bool; default true), `enableTacticalSkills` (bool; default true).
+23. **`sample:squad-operations-director`** (HUB-D Squad Operations & Support):
+    - Implements `ICoordinatedAiRuntimeBehaviour` for specialized support operations, field repair, harvester escort, and tactical ability activations.
+    - Parameters: `baseIndex` (-1–31; default -1), `repairHealthThreshold` (0.1–0.9; default 0.65), `maxProposalsPerTick` (1–32; default 12).
+    - Coordinates with `TacticalDirectorAiModule` through shared `AiBattlefieldSnapshot` and hazard-aware safe evacuation vectors.
 
 ### Runtime mechanics profile consumption
 

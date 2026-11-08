@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace RogueCommandExpansionLoader.Runtime.Ai
 {
@@ -73,8 +74,9 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
     }
 
     /// <summary>
-    /// Pure utility functions for scoring tactical unit actions (survival/kiting, combat targeting,
-    /// base defense) without touching Unity or Assembly-CSharp types.
+    /// Pure utility functions for scoring tactical unit actions (survival/kiting, hazard evacuation,
+    /// anti-overkill combat targeting, tactical skills, and support/repair logistics)
+    /// without touching Unity or Assembly-CSharp types.
     /// </summary>
     public static class TacticalUtilityScorer
     {
@@ -131,6 +133,41 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
         }
 
         /// <summary>
+        /// Scores emergency evacuation when a unit is standing inside a harmful environmental hazard zone.
+        /// </summary>
+        public static float ScoreHazardEvacuation(
+            AiUnitSnapshot unit,
+            IReadOnlyList<AiHazardZoneSnapshot> hazards,
+            AiDoctrineWeights doctrine)
+        {
+            if (hazards == null || hazards.Count == 0 || unit.IsBuilding)
+            {
+                return 0f;
+            }
+
+            float maxUrgency = 0f;
+            for (int i = 0; i < hazards.Count; i++)
+            {
+                AiHazardZoneSnapshot hz = hazards[i];
+                if (hz.IsBeneficialToAi)
+                {
+                    continue;
+                }
+
+                if (hz.ContainsPoint(unit.PosX, unit.PosZ, margin: 0.5f))
+                {
+                    float urgency = 135.0f + (hz.TickDamage * 2.5f);
+                    if (urgency > maxUrgency)
+                    {
+                        maxUrgency = urgency;
+                    }
+                }
+            }
+
+            return maxUrgency * Math.Max(0.5f, doctrine.SurvivalWeight);
+        }
+
+        /// <summary>
         /// Scores engaging a hostile target, penalizing distance and dead-zone violations.
         /// </summary>
         public static float ScoreCombatTarget(
@@ -158,6 +195,86 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
             float rawScore = Math.Max(1f, threatValue - distPenalty);
 
             return rawScore * Math.Max(0.5f, doctrine.AssaultWeight);
+        }
+
+        /// <summary>
+        /// Scores engaging a hostile target while applying anti-overkill damping when
+        /// <paramref name="alreadyCommittedDamage"/> exceeds 115% of the candidate's remaining vitality.
+        /// </summary>
+        public static float ScoreCombatTargetWithOverkill(
+            AiUnitSnapshot unit,
+            AiUnitSnapshot candidate,
+            AiDoctrineWeights doctrine,
+            float alreadyCommittedDamage)
+        {
+            float baseScore = ScoreCombatTarget(unit, candidate, doctrine);
+            if (baseScore <= 0f)
+            {
+                return 0f;
+            }
+
+            float safeCommitted = float.IsNaN(alreadyCommittedDamage) || float.IsInfinity(alreadyCommittedDamage)
+                ? 0f
+                : Math.Max(0f, alreadyCommittedDamage);
+            float remainingVitality = Math.Max(1f, candidate.CurrentHealth + candidate.CurrentShield);
+
+            if (safeCommitted >= remainingVitality * 1.15f)
+            {
+                return baseScore * 0.25f;
+            }
+
+            return baseScore;
+        }
+
+        /// <summary>
+        /// Scores firing a ready active tactical skill.
+        /// </summary>
+        public static float ScoreTacticalSkill(
+            AiUnitSnapshot unit,
+            bool hasHostileInRange,
+            AiDoctrineWeights doctrine)
+        {
+            if (!unit.HasReadyActiveSkill)
+            {
+                return 0f;
+            }
+
+            if (!unit.ActiveSkillTargetsSelf && !hasHostileInRange)
+            {
+                return 0f;
+            }
+
+            float baseScore = unit.HealthRatio <= 0.50f ? 115f : 95f;
+            return baseScore * Math.Max(0.5f, doctrine.SkirmishWeight);
+        }
+
+        /// <summary>
+        /// Scores dispatching a support/engineer unit to repair or assist a damaged friendly entity.
+        /// Prioritizes harvesters and high-value frontline units.
+        /// </summary>
+        public static float ScoreSupportOrRepair(
+            AiUnitSnapshot supportUnit,
+            AiUnitSnapshot damagedAlly,
+            AiDoctrineWeights doctrine)
+        {
+            if (!supportUnit.IsSupportUnit || supportUnit.UniqueEntityId == damagedAlly.UniqueEntityId)
+            {
+                return 0f;
+            }
+
+            if (damagedAlly.HealthRatio >= 0.90f)
+            {
+                return 0f;
+            }
+
+            float distSq = supportUnit.DistanceSquaredTo(damagedAlly);
+            float dist = (float)Math.Sqrt(Math.Max(0f, distSq));
+
+            float missingHealthUrgency = (1.0f - damagedAlly.HealthRatio) * 80.0f;
+            float priorityBonus = damagedAlly.IsHarvester ? 45.0f : (damagedAlly.IsBuilding ? 30.0f : 20.0f);
+            float rawScore = Math.Max(5.0f, missingHealthUrgency + priorityBonus - (dist * 0.8f));
+
+            return rawScore * Math.Max(0.5f, doctrine.DefenseWeight);
         }
     }
 }

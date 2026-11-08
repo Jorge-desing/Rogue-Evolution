@@ -32,6 +32,9 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
         public bool HasQueuedCommands { get; }
         public string CurrentCommandTag { get; }
         public int CurrentTargetId { get; }
+        public bool HasReadyActiveSkill { get; }
+        public bool ActiveSkillTargetsSelf { get; }
+        public float ActiveSkillRange { get; }
 
         public AiUnitSnapshot(
             int uniqueEntityId,
@@ -56,7 +59,10 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
             bool isSupportUnit,
             bool hasQueuedCommands,
             string currentCommandTag,
-            int currentTargetId)
+            int currentTargetId,
+            bool hasReadyActiveSkill = false,
+            bool activeSkillTargetsSelf = false,
+            float activeSkillRange = 0f)
         {
             UniqueEntityId = uniqueEntityId;
             EntityId = entityId ?? string.Empty;
@@ -81,6 +87,9 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
             HasQueuedCommands = hasQueuedCommands;
             CurrentCommandTag = currentCommandTag ?? string.Empty;
             CurrentTargetId = currentTargetId;
+            HasReadyActiveSkill = hasReadyActiveSkill;
+            ActiveSkillTargetsSelf = activeSkillTargetsSelf;
+            ActiveSkillRange = Math.Max(0f, SanitizeFloat(activeSkillRange, 0f));
         }
 
         public float HealthRatio

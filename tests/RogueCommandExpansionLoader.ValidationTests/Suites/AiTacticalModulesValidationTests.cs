@@ -3692,6 +3692,366 @@ internal static partial class ValidationTestRunner
             ExistingControllers.Instance.Reset();
         }
     }),
+    ("HUB-D Phase 4: AiHazardZoneSnapshot, AiUnitSnapshot skill readiness, and AiBattlefieldBlackboardBuilder project hazard zones with omission counters first", () =>
+    {
+        var hazardA = new RogueCommandExpansionLoader.Runtime.Ai.AiHazardZoneSnapshot(
+            zoneId: "hazard_1",
+            hazardType: "Firestorm",
+            centerX: 10f,
+            centerZ: 10f,
+            radius: 6f,
+            tickDamage: 25f,
+            isBeneficialToAi: false);
+
+        var hazardB = new RogueCommandExpansionLoader.Runtime.Ai.AiHazardZoneSnapshot(
+            zoneId: "hazard_2",
+            hazardType: "AcidPool",
+            centerX: 30f,
+            centerZ: 30f,
+            radius: 5f,
+            tickDamage: 18f,
+            isBeneficialToAi: false);
+
+        if (!hazardA.ContainsPoint(12f, 10f) ||
+            hazardA.ContainsPoint(20f, 10f) ||
+            hazardA.DistanceToPerimeter(10f, 10f) >= 0f)
+        {
+            throw new InvalidOperationException("AiHazardZoneSnapshot geometry checks failed.");
+        }
+
+        var skillUnit = new RogueCommandExpansionLoader.Runtime.Ai.AiUnitSnapshot(
+            uniqueEntityId: 401,
+            entityId: "sample-native:skill-caster",
+            baseIndex: 0,
+            posX: 10f,
+            posZ: 10f,
+            currentHealth: 90f,
+            maxHealth: 100f,
+            currentShield: 0f,
+            maxShield: 0f,
+            dpsEstimate: 30f,
+            weaponRange: 14f,
+            minAttackRange: 0f,
+            moveSpeed: 9f,
+            roleFlags: (int)UnitRole.FrontalAttacker,
+            isControlledByAi: true,
+            isControlledByPlayer: false,
+            isCombatUnit: true,
+            isHarvester: false,
+            isBuilding: false,
+            isSupportUnit: false,
+            hasQueuedCommands: false,
+            currentCommandTag: string.Empty,
+            currentTargetId: -1,
+            hasReadyActiveSkill: true,
+            activeSkillTargetsSelf: false,
+            activeSkillRange: 16f);
+
+        if (!skillUnit.HasReadyActiveSkill ||
+            skillUnit.ActiveSkillTargetsSelf ||
+            Math.Abs(skillUnit.ActiveSkillRange - 16f) > 0.01f)
+        {
+            throw new InvalidOperationException("AiUnitSnapshot did not preserve active skill readiness properties.");
+        }
+
+        var snap = RogueCommandExpansionLoader.Runtime.Ai.AiBattlefieldBlackboardBuilder.BuildSnapshot(
+            timestamp: 15f,
+            baseIndex: 0,
+            currentWaveNumber: 2,
+            aiUnits: new[] { skillUnit },
+            hostileUnits: Array.Empty<RogueCommandExpansionLoader.Runtime.Ai.AiUnitSnapshot>(),
+            hazardZones: new[] { hazardA, hazardB },
+            maxTrackedUnitsPerSide: 8,
+            maxTrackedHazardZones: 1);
+
+        if (snap.OmittedHazardZoneCount != 1 ||
+            snap.TotalHarmfulHazardZones != 2 ||
+            snap.HazardZones.Count != 1 ||
+            snap.HazardZones[0].ZoneId != "hazard_1")
+        {
+            throw new InvalidOperationException("AiBattlefieldBlackboardBuilder did not cap and count hazard zones with OmittedHazardZoneCount.");
+        }
+    }),
+    ("HUB-D Phase 5: AiSafeVectorPolicy avoids hazard zones during retreat and TacticalUtilityScorer dampens overkill and scores skills/support", () =>
+    {
+        var unit = new RogueCommandExpansionLoader.Runtime.Ai.AiUnitSnapshot(
+            uniqueEntityId: 501,
+            entityId: "sample-native:mortar",
+            baseIndex: 0,
+            posX: 10f,
+            posZ: 10f,
+            currentHealth: 85f,
+            maxHealth: 100f,
+            currentShield: 0f,
+            maxShield: 0f,
+            dpsEstimate: 40f,
+            weaponRange: 26f,
+            minAttackRange: 10f,
+            moveSpeed: 9f,
+            roleFlags: (int)UnitRole.Sniper,
+            isControlledByAi: true,
+            isControlledByPlayer: false,
+            isCombatUnit: true,
+            isHarvester: false,
+            isBuilding: false,
+            isSupportUnit: false,
+            hasQueuedCommands: false,
+            currentCommandTag: string.Empty,
+            currentTargetId: -1,
+            hasReadyActiveSkill: true,
+            activeSkillTargetsSelf: false,
+            activeSkillRange: 18f);
+
+        var threatEast = new RogueCommandExpansionLoader.Runtime.Ai.AiUnitSnapshot(
+            uniqueEntityId: 601,
+            entityId: "player:raider",
+            baseIndex: -1,
+            posX: 14f,
+            posZ: 10f,
+            currentHealth: 40f,
+            maxHealth: 100f,
+            currentShield: 0f,
+            maxShield: 0f,
+            dpsEstimate: 35f,
+            weaponRange: 10f,
+            minAttackRange: 0f,
+            moveSpeed: 10f,
+            roleFlags: (int)UnitRole.FrontalAttacker,
+            isControlledByAi: false,
+            isControlledByPlayer: true,
+            isCombatUnit: true,
+            isHarvester: false,
+            isBuilding: false,
+            isSupportUnit: false,
+            hasQueuedCommands: false,
+            currentCommandTag: string.Empty,
+            currentTargetId: 501);
+
+        var blockingHazardWest = new RogueCommandExpansionLoader.Runtime.Ai.AiHazardZoneSnapshot(
+            zoneId: "hazard_west",
+            hazardType: "Firestorm",
+            centerX: 0f,
+            centerZ: 10f,
+            radius: 7f,
+            tickDamage: 40f,
+            isBeneficialToAi: false);
+
+        var snapshot = RogueCommandExpansionLoader.Runtime.Ai.AiBattlefieldBlackboardBuilder.BuildSnapshot(
+            timestamp: 30f,
+            baseIndex: 0,
+            currentWaveNumber: 3,
+            aiUnits: new[] { unit },
+            hostileUnits: new[] { threatEast },
+            hazardZones: new[] { blockingHazardWest });
+
+        (float safeX, float safeZ) = RogueCommandExpansionLoader.Runtime.Ai.AiSafeVectorPolicy.ComputeSafeRetreatDestination(
+            unit,
+            threatEast,
+            snapshot,
+            desiredDistance: 10f);
+
+        if (blockingHazardWest.ContainsPoint(safeX, safeZ, margin: 1.0f))
+        {
+            throw new InvalidOperationException($"AiSafeVectorPolicy routed unit into blocking Firestorm hazard at ({safeX}, {safeZ}).");
+        }
+
+        var brawler = new RogueCommandExpansionLoader.Runtime.Ai.AiUnitSnapshot(
+            uniqueEntityId: 502,
+            entityId: "sample-native:brawler",
+            baseIndex: 0,
+            posX: 12f,
+            posZ: 12f,
+            currentHealth: 100f,
+            maxHealth: 100f,
+            currentShield: 0f,
+            maxShield: 0f,
+            dpsEstimate: 35f,
+            weaponRange: 14f,
+            minAttackRange: 0f,
+            moveSpeed: 8f,
+            roleFlags: (int)UnitRole.Tank,
+            isControlledByAi: true,
+            isControlledByPlayer: false,
+            isCombatUnit: true,
+            isHarvester: false,
+            isBuilding: false,
+            isSupportUnit: false,
+            hasQueuedCommands: false,
+            currentCommandTag: string.Empty,
+            currentTargetId: -1);
+
+        float freshScore = RogueCommandExpansionLoader.Runtime.Ai.TacticalUtilityScorer.ScoreCombatTargetWithOverkill(
+            brawler,
+            threatEast,
+            RogueCommandExpansionLoader.Runtime.Ai.AiDoctrineWeights.Assault,
+            alreadyCommittedDamage: 0f);
+        float overkillScore = RogueCommandExpansionLoader.Runtime.Ai.TacticalUtilityScorer.ScoreCombatTargetWithOverkill(
+            brawler,
+            threatEast,
+            RogueCommandExpansionLoader.Runtime.Ai.AiDoctrineWeights.Assault,
+            alreadyCommittedDamage: 80f);
+
+        if (overkillScore >= freshScore * 0.5f)
+        {
+            throw new InvalidOperationException("ScoreCombatTargetWithOverkill did not dampen score when committed damage exceeds target vitality.");
+        }
+    }),
+    ("HUB-D Phase 6: SquadOperationsDirectorAiModule validates parameters and cooperates with TacticalDirectorAiModule on hazard evacuation, skills, and support", () =>
+    {
+        if (!SquadOperationsDirectorParameterParser.TryParse(null, out SquadOperationsDirectorSettings defaults, out string diag) ||
+            diag != null ||
+            defaults.BaseIndex != -1 ||
+            !defaults.EnableSupportLogistics ||
+            !defaults.EnableCounterBattery ||
+            !defaults.EnableTacticalSkills)
+        {
+            throw new InvalidOperationException("SquadOperationsDirectorParameterParser failed default validation.");
+        }
+
+        if (SquadOperationsDirectorParameterParser.TryParse(
+                new[] { new ContentModuleParameter { name = "supportRadius", value = "999" } },
+                out _,
+                out _))
+        {
+            throw new InvalidOperationException("SquadOperationsDirectorParameterParser accepted out-of-range supportRadius.");
+        }
+
+        ExistingControllers.Instance.Reset();
+        RuntimeHazardManager.ClearAll();
+        try
+        {
+            UnityEngine.Time.time = 80.0f;
+
+            AiModuleRegistry registry = AiModuleRegistry.CreateDefault();
+            if (!registry.RegisteredModuleIds.Contains(SquadOperationsDirectorAiModule.ModuleId))
+            {
+                throw new InvalidOperationException("SquadOperationsDirectorAiModule is not registered in AiModuleRegistry.CreateDefault().");
+            }
+
+            RuntimeHazardManager.TrySpawnHazardZone("AcidPool", 10f, 10f, 6f, 30f, 25f, out _);
+
+            var aiTrappedInHazard = new EntityController
+            {
+                UniqueEntityId = 2101,
+                EntityId = "sample-native:scout-tank",
+                IsControlledByAi = true,
+                IsControlledByPlayer = false,
+                IsUnit = true,
+                IsCombatUnit = true,
+                CanAttackAndIsAttackEnabled = true,
+                CanMoveAndMovementIsEnabled = true,
+                aiBaseIndex = 0,
+                CurrentHealth = 95f,
+                MaxHealth = 100f,
+                Damage1 = 20f,
+                Attack1Cooldown = 1.0f,
+                WeaponRange = 14f,
+                MoveSpeed = 10f,
+                Role = UnitRole.Tank,
+                Position = new Vector3(11f, 0f, 10f)
+            };
+
+            var aiEngineer = new EntityController
+            {
+                UniqueEntityId = 2102,
+                EntityId = "sample-native:support-rig",
+                IsControlledByAi = true,
+                IsControlledByPlayer = false,
+                IsUnit = true,
+                IsCombatUnit = false,
+                IsEngineer = true,
+                CanMoveAndMovementIsEnabled = true,
+                aiBaseIndex = 0,
+                CurrentHealth = 100f,
+                MaxHealth = 100f,
+                MoveSpeed = 9f,
+                Role = UnitRole.Supporter,
+                Position = new Vector3(30f, 0f, 30f)
+            };
+
+            var damagedHarvester = new EntityController
+            {
+                UniqueEntityId = 2103,
+                EntityId = "sample-native:harvester",
+                IsControlledByAi = true,
+                IsControlledByPlayer = false,
+                IsUnit = true,
+                IsCombatUnit = false,
+                CanMoveAndMovementIsEnabled = true,
+                aiBaseIndex = 0,
+                CurrentHealth = 35f,
+                MaxHealth = 100f,
+                MoveSpeed = 6f,
+                Role = UnitRole.Harvester,
+                Position = new Vector3(38f, 0f, 30f)
+            };
+
+            var distantHostile = new EntityController
+            {
+                UniqueEntityId = 2201,
+                EntityId = "player:sniper",
+                IsControlledByPlayer = true,
+                IsControlledByAi = false,
+                IsUnit = true,
+                IsCombatUnit = true,
+                CanAttackAndIsAttackEnabled = true,
+                CurrentHealth = 80f,
+                MaxHealth = 80f,
+                Damage1 = 30f,
+                Attack1Cooldown = 1.0f,
+                WeaponRange = 22f,
+                MoveSpeed = 7f,
+                Role = UnitRole.Sniper,
+                Position = new Vector3(28f, 0f, 10f)
+            };
+
+            ExistingControllers.Instance.AiUnits().Add(aiTrappedInHazard);
+            ExistingControllers.Instance.AiUnits().Add(aiEngineer);
+            ExistingControllers.Instance.AiUnits().Add(damagedHarvester);
+            ExistingControllers.Instance.PlayerUnits().Add(distantHostile);
+
+            var tacticalDirector = new TacticalDirectorAiModule().CreateBehaviour(
+                new DefaultAiBehaviour { instanceId = 6001 },
+                null);
+            var squadDirector = new SquadOperationsDirectorAiModule().CreateBehaviour(
+                new DefaultAiBehaviour { instanceId = 6001 },
+                null);
+
+            var composite = new CompositeAiRuntimeBehaviour(
+                profileId: "sample-reactive-ai:combined-hubd2",
+                moduleIds: new[] { TacticalDirectorAiModule.ModuleId, SquadOperationsDirectorAiModule.ModuleId },
+                behaviours: new[] { tacticalDirector, squadDirector });
+
+            composite.OnInitialized();
+            composite.Tick();
+
+            if (!aiTrappedInHazard.LastExecutedCommand.HasValue ||
+                aiTrappedInHazard.LastExecutedCommand.Value.command != EntityCommand.Command.Move)
+            {
+                throw new InvalidOperationException("TacticalDirectorAiModule did not evacuate unit trapped inside AcidPool hazard.");
+            }
+
+            if (!aiEngineer.LastExecutedCommand.HasValue ||
+                aiEngineer.LastExecutedCommand.Value.command != EntityCommand.Command.Move)
+            {
+                throw new InvalidOperationException("SquadOperationsDirectorAiModule did not dispatch support engineer to damaged harvester.");
+            }
+
+            RogueCommandExpansionLoader.Runtime.Ai.AiArchitectureCensus census =
+                RogueCommandExpansionLoader.Runtime.Ai.RuntimeAiArchitectureCensus.Current();
+            if (census.TotalTrackedHazardZones < 1)
+            {
+                throw new InvalidOperationException("RuntimeAiArchitectureCensus did not report TrackedHazardZones.");
+            }
+
+            composite.OnDestroyed();
+        }
+        finally
+        {
+            RuntimeHazardManager.ClearAll();
+            ExistingControllers.Instance.Reset();
+        }
+    }),
     };
 
     private sealed class DelegatingTestAiRuntimeBehaviour : IRogueCommandAiRuntimeBehaviour

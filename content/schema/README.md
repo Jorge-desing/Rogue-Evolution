@@ -317,4 +317,16 @@ Packs can declare advanced, native-grounded runtime mechanics on units (`units[]
   - `lowHealthRetreatRatio` (finite number, `0.05`–`0.75`; default `0.30`)
   - `lockoutDurationSeconds` (finite number, `0.1`–`15.0`; default `1.5`)
   - `maxProposalsPerTick` (integer, `1`–`32`; default `12`)
-- **Runtime behavior:** Evaluates Lanchester force balance (`TotalDefense`, `AggressivePush`, `DefensiveSkirmish`, `Standard`), proposes `SurvivalKite` vectors when artillery dead-zones (`minAttackRange > 0`) are breached or fast skirmishers drop below `lowHealthRetreatRatio`, and scores `CombatFocus` targets with role affinity, finisher bonus, and anti-overkill damping before central arbitration in `CompositeAiRuntimeBehaviour`.
+- **Runtime behavior:** Evaluates Lanchester force balance (`TotalDefense`, `AggressivePush`, `DefensiveSkirmish`, `Standard`), proposes `SurvivalKite` vectors via 8-ray `AiSafeVectorPolicy` when units are inside environmental hazard zones (`Firestorm`, `AcidPool`, `EmpField`, `CryoMist`), artillery dead-zones (`minAttackRange > 0`) are breached, or fast skirmishers drop below `retreatHealthRatio`, triggers ready active tactical skills (`TacticalSkill`), and scores `CombatTargeting` targets with role affinity, finisher bonus, and anti-overkill damping (`ScoreCombatTargetWithOverkill`) before central arbitration in `CompositeAiRuntimeBehaviour`.
+
+### 7. Squad Operations Director AI (`sample:squad-operations-director`)
+- Specialist HUB-D 2.0 coordinated AI module implementing `ICoordinatedAiRuntimeBehaviour` for support/repair logistics, counter-battery interception, and specialist active skills.
+- **Parameters** (all optional):
+  - `baseIndex` (integer, `-1`–`31`; default `-1`)
+  - `evalIntervalSeconds` (finite number, `0.20`–`10.0`; default `0.75`)
+  - `supportRadius` (finite number, `5.0`–`80.0`; default `30.0`)
+  - `counterBatteryMinRangeThreshold` (finite number, `8.0`–`50.0`; default `14.0`)
+  - `enableSupportLogistics` (boolean; default `true`)
+  - `enableCounterBattery` (boolean; default `true`)
+  - `enableTacticalSkills` (boolean; default `true`)
+- **Runtime behavior:** Directs support/engineer units out of harmful hazard zones and toward damaged friendly harvesters, buildings, and frontline units (`ScoreSupportOrRepair`), dispatches fast interceptors (`MoveSpeed >= 9.0`) against long-range enemy artillery, and triggers specialist tactical skills through the shared `AiCommandArbiterPolicy`.
