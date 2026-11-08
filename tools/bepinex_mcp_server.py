@@ -508,7 +508,7 @@ def _call_diagnostics_method(method_name: str, args: list | None = None) -> str:
             "args": args_json,
         })
         # If cached go_id became stale, retry once after discovery
-        if "Missing or invalid 'id'" in raw or "not found" in raw.lower() or "GameObject" in raw:
+        if "Missing or invalid 'id'" in raw or "not found" in raw.lower() or "GameObject" in raw or "500" in raw or "HTTP Error" in raw:
             _DIAGNOSTICS_GO_ID = None
             go_id = _get_diagnostics_go_id()
             raw = _call_http("component/call_method", params={

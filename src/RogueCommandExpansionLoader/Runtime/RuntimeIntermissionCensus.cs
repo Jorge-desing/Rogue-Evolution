@@ -508,6 +508,34 @@ namespace RogueCommandExpansionLoader.Runtime
             return 0;
         }
 
+        internal static bool IsNextLevelLoading()
+        {
+            try
+            {
+                Type loadSceneType = FindGameType("LoadScene");
+                if (loadSceneType == null)
+                {
+                    return false;
+                }
+
+                MethodInfo nextLevelLoadingMethod = loadSceneType.GetMethod(
+                    "NextLevelIsLoading_Static", BindingFlags.Public | BindingFlags.Static);
+                if (nextLevelLoadingMethod != null)
+                {
+                    object val = nextLevelLoadingMethod.Invoke(null, null);
+                    if (val is bool b)
+                    {
+                        return b;
+                    }
+                }
+            }
+            catch
+            {
+            }
+
+            return false;
+        }
+
         internal static int ReadIntField(object target, string fieldName, int fallback)
         {
             try
@@ -850,7 +878,8 @@ namespace RogueCommandExpansionLoader.Runtime
 
                 string afterScene = RuntimeIntermissionCensus.SafeActiveSceneName();
                 int afterLevel = RuntimeIntermissionCensus.SafeCurrentLevel();
-                if (HasTransitioned(beforeScene, beforeLevel, afterScene, afterLevel))
+                bool nextLevelLoading = RuntimeIntermissionCensus.IsNextLevelLoading();
+                if (HasTransitioned(beforeScene, beforeLevel, afterScene, afterLevel) || nextLevelLoading)
                 {
                     return new EnterLevelNodeResult(true,
                         "OnMouseDown entered level " + level + " node field " + field

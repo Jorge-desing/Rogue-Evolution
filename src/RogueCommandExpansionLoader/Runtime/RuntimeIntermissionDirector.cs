@@ -363,7 +363,8 @@ namespace RogueCommandExpansionLoader.Runtime
                  string afterScene = RuntimeIntermissionCensus.SafeActiveSceneName();
                 int afterLevel = RuntimeIntermissionCensus.SafeCurrentLevel();
                 bool hasOpenRewards = ReadPlayerHasOpenRewards();
-                if (HasTransitioned(beforeScene, beforeLevel, afterScene, afterLevel) || hasOpenRewards)
+                bool nextLevelLoading = RuntimeIntermissionCensus.IsNextLevelLoading();
+                if (HasTransitioned(beforeScene, beforeLevel, afterScene, afterLevel) || hasOpenRewards || nextLevelLoading)
                 {
                     result = new IntermissionLevelEntry(
                         picked.Level, picked.Field, picked.InstanceId, true,
@@ -431,18 +432,21 @@ namespace RogueCommandExpansionLoader.Runtime
                     return false;
                 }
 
-                try
+                if (!RuntimeIntermissionCensus.IsNextLevelLoading())
                 {
-                    startCoroutine.Invoke(loadSceneInstance, new object[] { "LoadNextLevel" });
-                }
-                catch (Exception ex)
-                {
-                    result = new IntermissionLevelEntry(
-                        picked.Level, picked.Field, picked.InstanceId, false,
-                        "LoadNextLevel corridor threw: " + ex.Message
-                        + " (stop point: corridor missing).",
-                        true, false);
-                    return false;
+                    try
+                    {
+                        startCoroutine.Invoke(loadSceneInstance, new object[] { "LoadNextLevel" });
+                    }
+                    catch (Exception ex)
+                    {
+                        result = new IntermissionLevelEntry(
+                            picked.Level, picked.Field, picked.InstanceId, false,
+                            "LoadNextLevel corridor threw: " + ex.Message
+                            + " (stop point: corridor missing).",
+                            true, false);
+                        return false;
+                    }
                 }
 
                 afterScene = RuntimeIntermissionCensus.SafeActiveSceneName();
