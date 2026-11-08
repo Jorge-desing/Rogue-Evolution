@@ -3276,5 +3276,251 @@ internal static partial class ValidationTestRunner
             throw new InvalidOperationException("AiCommandArbiterPolicy Tick 3 did not enforce retarget hysteresis threshold.");
         }
     }),
+    ("HUB-D Phase 2: RuntimeAiBattlefieldCollector projects live ExistingControllers into AiBattlefieldSnapshot without mutating control flags", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        try
+        {
+            UnityEngine.Time.time = 25.0f;
+
+            var aiCombat = new EntityController
+            {
+                UniqueEntityId = 701,
+                EntityId = "sample-native:scout-tank",
+                IsControlledByAi = true,
+                IsControlledByPlayer = false,
+                IsUnit = true,
+                IsCombatUnit = true,
+                CanAttackAndIsAttackEnabled = true,
+                CanMoveAndMovementIsEnabled = true,
+                aiBaseIndex = 0,
+                CurrentHealth = 75f,
+                MaxHealth = 100f,
+                CurrentShield = 10f,
+                MaxShield = 20f,
+                Damage1 = 20f,
+                Attack1Cooldown = 1.0f,
+                WeaponRange = 16f,
+                MoveSpeed = 11f,
+                Role = UnitRole.Scout,
+                Position = new Vector3(12f, 0f, 8f)
+            };
+            aiCombat.CommandChainForTest.AddLast(new EntityCommand { command = EntityCommand.Command.Move });
+
+            var aiHarvester = new EntityController
+            {
+                UniqueEntityId = 702,
+                EntityId = "native:harvester",
+                IsControlledByAi = true,
+                IsControlledByPlayer = false,
+                IsUnit = true,
+                Role = UnitRole.Harvester,
+                aiBaseIndex = 0,
+                CurrentHealth = 90f,
+                MaxHealth = 100f,
+                Position = new Vector3(0f, 0f, 0f)
+            };
+
+            var playerAttacker = new EntityController
+            {
+                UniqueEntityId = 801,
+                EntityId = "player:tank",
+                IsControlledByPlayer = true,
+                IsControlledByAi = false,
+                IsUnit = true,
+                IsCombatUnit = true,
+                CanAttackAndIsAttackEnabled = true,
+                CurrentHealth = 100f,
+                MaxHealth = 100f,
+                Damage1 = 30f,
+                Attack1Cooldown = 1.0f,
+                WeaponRange = 14f,
+                MoveSpeed = 9f,
+                Role = UnitRole.Tank,
+                CurrentAttackTarget = aiHarvester,
+                Position = new Vector3(5f, 0f, 0f)
+            };
+
+            ExistingControllers.Instance.AiUnits().Add(aiCombat);
+            ExistingControllers.Instance.AiUnits().Add(aiHarvester);
+            ExistingControllers.Instance.PlayerUnits().Add(playerAttacker);
+
+            var collector = new RogueCommandExpansionLoader.Runtime.Ai.RuntimeAiBattlefieldCollector(baseIndex: 0);
+            RogueCommandExpansionLoader.Runtime.Ai.AiBattlefieldSnapshot snapshot = collector.CollectCurrentSnapshot();
+
+            if (snapshot.TotalAiCombatUnits != 1 ||
+                snapshot.TotalAiHarvesters != 1 ||
+                snapshot.TotalHostileCombatUnits != 1 ||
+                !snapshot.UnderHarvesterOrBasePressure ||
+                !collector.TryResolveAiEntity(701, out EntityController resolvedAi) ||
+                resolvedAi != aiCombat ||
+                !collector.TryResolveHostileEntity(801, out EntityController resolvedHostile) ||
+                resolvedHostile != playerAttacker)
+            {
+                throw new InvalidOperationException("RuntimeAiBattlefieldCollector failed to project live entities or resolve lookup handles.");
+            }
+
+            RogueCommandExpansionLoader.Runtime.Ai.AiUnitSnapshot capturedCombat =
+                snapshot.AiUnits.Single(u => u.UniqueEntityId == 701);
+            if (!capturedCombat.HasQueuedCommands ||
+                Math.Abs(capturedCombat.HealthRatio - 0.75f) > 0.001f ||
+                !aiCombat.IsControlledByAi || aiCombat.IsControlledByPlayer ||
+                !playerAttacker.IsControlledByPlayer || playerAttacker.IsControlledByAi)
+            {
+                throw new InvalidOperationException("RuntimeAiBattlefieldCollector did not read private _commandChain queue or mutated control flags.");
+            }
+        }
+        finally
+        {
+            ExistingControllers.Instance.Reset();
+        }
+    }),
+    ("HUB-D Phase 2: CompositeAiRuntimeBehaviour coordinates ICoordinatedAiRuntimeBehaviour modules through shared blackboard and arbiter while preserving legacy modules", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        try
+        {
+            UnityEngine.Time.time = 30.0f;
+
+            var aiUnit = new EntityController
+            {
+                UniqueEntityId = 950,
+                EntityId = "sample-native:skirmish-bike",
+                IsControlledByAi = true,
+                IsControlledByPlayer = false,
+                IsUnit = true,
+                IsCombatUnit = true,
+                CanAttackAndIsAttackEnabled = true,
+                CanMoveAndMovementIsEnabled = true,
+                aiBaseIndex = 0,
+                CurrentHealth = 30f,
+                MaxHealth = 100f,
+                Damage1 = 15f,
+                Attack1Cooldown = 1.0f,
+                WeaponRange = 14f,
+                MoveSpeed = 14f,
+                Role = UnitRole.Scout,
+                CurrentPlayerCommandName = EntityCommand.Command.DoNothing,
+                Position = new Vector3(10f, 0f, 10f)
+            };
+
+            var hostileUnit = new EntityController
+            {
+                UniqueEntityId = 960,
+                EntityId = "player:heavy",
+                IsControlledByPlayer = true,
+                IsControlledByAi = false,
+                IsUnit = true,
+                IsCombatUnit = true,
+                CanAttackAndIsAttackEnabled = true,
+                CurrentHealth = 150f,
+                MaxHealth = 150f,
+                Damage1 = 40f,
+                Attack1Cooldown = 1.0f,
+                WeaponRange = 12f,
+                MoveSpeed = 7f,
+                Role = UnitRole.Tank,
+                Position = new Vector3(12f, 0f, 10f)
+            };
+
+            ExistingControllers.Instance.AiUnits().Add(aiUnit);
+            ExistingControllers.Instance.PlayerUnits().Add(hostileUnit);
+
+            int legacyTickCount = 0;
+            var legacyModule = new DelegatingTestAiRuntimeBehaviour(() => legacyTickCount++);
+
+            // Module 1 proposes lower-priority CombatTargeting (score 75) onto hostile 960
+            var combatModule = new CoordinatedTestAiRuntimeBehaviour((snapshot, weights, proposals) =>
+            {
+                proposals.Add(new RogueCommandExpansionLoader.Runtime.Ai.AiIntentProposal(
+                    moduleId: "sample:threat-prioritization",
+                    commandTag: "tag.combat",
+                    unitId: 950,
+                    targetEntityId: 960,
+                    destX: hostileUnit.Position.x,
+                    destZ: hostileUnit.Position.z,
+                    category: RogueCommandExpansionLoader.Runtime.Ai.AiIntentCategory.CombatTargeting,
+                    utilityScore: 75f,
+                    lockoutDurationSeconds: 0.5f,
+                    requiresEmptyQueue: false));
+            });
+
+            // Module 2 proposes higher-priority SurvivalKite (score 160) away from hostile to (0, 10)
+            var kiteModule = new CoordinatedTestAiRuntimeBehaviour((snapshot, weights, proposals) =>
+            {
+                proposals.Add(new RogueCommandExpansionLoader.Runtime.Ai.AiIntentProposal(
+                    moduleId: "sample:skirmish-kiting",
+                    commandTag: "tag.kite",
+                    unitId: 950,
+                    targetEntityId: -1,
+                    destX: 0f,
+                    destZ: 10f,
+                    category: RogueCommandExpansionLoader.Runtime.Ai.AiIntentCategory.SurvivalKite,
+                    utilityScore: 160f,
+                    lockoutDurationSeconds: 2.0f,
+                    requiresEmptyQueue: false));
+            });
+
+            var composite = new CompositeAiRuntimeBehaviour(
+                profileId: "test:hub-d-profile",
+                moduleIds: new[] { "sample:trace-default", "sample:threat-prioritization", "sample:skirmish-kiting" },
+                behaviours: new IRogueCommandAiRuntimeBehaviour[] { legacyModule, combatModule, kiteModule });
+
+            composite.OnInitialized();
+            composite.Tick();
+
+            // Verify legacy module ticked AND only the winning coordinated proposal (kite move to 0,10) executed on aiUnit
+            if (legacyTickCount != 1 ||
+                aiUnit.ExecuteCommandCallCount != 1 ||
+                !aiUnit.LastExecutedCommand.HasValue ||
+                aiUnit.LastExecutedCommand.Value.command != EntityCommand.Command.Move ||
+                Math.Abs(aiUnit.LastExecutedCommand.Value.destination.x - 0f) > 0.01f ||
+                aiUnit.CurrentCommandTag != "tag.kite" ||
+                composite.LastArbitrationResult == null ||
+                composite.LastArbitrationResult.ConflictsResolvedCount != 1 ||
+                composite.LastArbitrationResult.ApprovedOrders.Count != 1)
+            {
+                throw new InvalidOperationException("CompositeAiRuntimeBehaviour did not arbitrate coordinated modules into a single winning native command.");
+            }
+
+            composite.OnDestroyed();
+        }
+        finally
+        {
+            ExistingControllers.Instance.Reset();
+        }
+    }),
     };
+
+    private sealed class DelegatingTestAiRuntimeBehaviour : IRogueCommandAiRuntimeBehaviour
+    {
+        private readonly Action _onTick;
+        public DelegatingTestAiRuntimeBehaviour(Action onTick) => _onTick = onTick;
+        public void OnInitialized() { }
+        public void Tick() => _onTick();
+        public void OnDestroyed() { }
+    }
+
+    private sealed class CoordinatedTestAiRuntimeBehaviour : RogueCommandExpansionLoader.Contracts.ICoordinatedAiRuntimeBehaviour
+    {
+        private readonly Action<RogueCommandExpansionLoader.Runtime.Ai.AiBattlefieldSnapshot, RogueCommandExpansionLoader.Runtime.Ai.AiDoctrineWeights, IList<RogueCommandExpansionLoader.Runtime.Ai.AiIntentProposal>> _propose;
+
+        public CoordinatedTestAiRuntimeBehaviour(
+            Action<RogueCommandExpansionLoader.Runtime.Ai.AiBattlefieldSnapshot, RogueCommandExpansionLoader.Runtime.Ai.AiDoctrineWeights, IList<RogueCommandExpansionLoader.Runtime.Ai.AiIntentProposal>> propose)
+        {
+            _propose = propose;
+        }
+
+        public void OnInitialized() { }
+        public void Tick() { }
+        public void OnDestroyed() { }
+
+        public void CollectProposals(
+            RogueCommandExpansionLoader.Runtime.Ai.AiBattlefieldSnapshot snapshot,
+            RogueCommandExpansionLoader.Runtime.Ai.AiDoctrineWeights doctrineWeights,
+            IList<RogueCommandExpansionLoader.Runtime.Ai.AiIntentProposal> proposals)
+        {
+            _propose(snapshot, doctrineWeights, proposals);
+        }
+    }
 }

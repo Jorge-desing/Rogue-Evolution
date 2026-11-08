@@ -172,6 +172,8 @@
              Link="Runtime/Ai/StrategicDoctrineAndUtilityPolicy.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/Ai/AiCommandArbiterPolicy.cs"
              Link="Runtime/Ai/AiCommandArbiterPolicy.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/Ai/RuntimeAiBattlefieldCollector.cs"
+             Link="Runtime/Ai/RuntimeAiBattlefieldCollector.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/BlueprintPoolScopeRegistry.cs"
              Link="Runtime/BlueprintPoolScopeRegistry.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/BlueprintRewardFactoryScope.cs"
