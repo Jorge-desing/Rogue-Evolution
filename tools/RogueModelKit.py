@@ -11024,6 +11024,8 @@ def generate_procedural_action_clips(
     leg_type: str | None = None,
     fire_profile: str | None = None,
     hover: bool | None = None,
+    fire_end_frame: int | None = None,
+    death_end_frame: int | None = None,
 ) -> dict[str, bpy.types.Action]:
     """Generates baked NLA animation clips (Idle, Walk/Drive, FireRecoil, Death) on the armature.
 
@@ -11038,6 +11040,10 @@ def generate_procedural_action_clips(
     braces the legs. ``None`` auto-resolves from ``prefix``/``leg_type`` so all
     nine tactical builders keep working without a call-site change. ``hover``
     raises the Drive bob for hovercraft (auto when the prefix suggests it).
+    ``fire_end_frame``/``death_end_frame`` override the authored clip end for
+    units with a verified frame contract (BastionSiegeMech validates
+    FireRecoil 15 frames and Death 45 frames in Unity); ``None`` keeps the
+    profile default (FireRecoil 15/18/21, Death 35).
     """
     if not armature_obj.animation_data:
         armature_obj.animation_data_create()
@@ -11064,6 +11070,17 @@ def generate_procedural_action_clips(
         )
     if hover is None:
         hover = "hovercraft" in _prefix_lower or "tidebreaker" in _prefix_lower
+    # Frame-contract overrides (Bastion 15/45); defaults keep current behavior.
+    if fire_end_frame is not None:
+        if not 12 <= fire_end_frame <= 24:
+            raise ValueError(
+                f"fire_end_frame must be 12..24, got {fire_end_frame}"
+            )
+    if death_end_frame is not None:
+        if not 30 <= death_end_frame <= 60:
+            raise ValueError(
+                f"death_end_frame must be 30..60, got {death_end_frame}"
+            )
 
     actions = {}
 
@@ -11274,6 +11291,9 @@ def generate_procedural_action_clips(
     _body_impulse_y, _body_pitch_deg, _barrel_impulse_y, _pitch_deg, _fire_end_frame = _fire_impulse[
         _resolved_fire_profile
     ]
+    # Verified frame contract override (Bastion 15); otherwise keep profile end.
+    if fire_end_frame is not None:
+        _fire_end_frame = fire_end_frame
     # Anticipation brace is proportional to the impact (forward + up), so light
     # guns brace less and heavy siege braces more -- anticipation precedes impact.
     _brace_body_y = round(-_body_impulse_y * 0.33, 4)
@@ -11335,10 +11355,10 @@ def generate_procedural_action_clips(
         set_bone_key("Bone_Thigh_R", "rotation_euler", 13, (math.radians(2.0), 0.0, math.radians(1.0)))
         set_bone_key("Bone_Shin_L", "rotation_euler", 13, (math.radians(-4.0), 0.0, 0.0))
         set_bone_key("Bone_Shin_R", "rotation_euler", 13, (math.radians(-4.0), 0.0, 0.0))
-        set_bone_key("Bone_Thigh_L", "rotation_euler", 18, (0.0, 0.0, 0.0))
-        set_bone_key("Bone_Thigh_R", "rotation_euler", 18, (0.0, 0.0, 0.0))
-        set_bone_key("Bone_Shin_L", "rotation_euler", 18, (0.0, 0.0, 0.0))
-        set_bone_key("Bone_Shin_R", "rotation_euler", 18, (0.0, 0.0, 0.0))
+        set_bone_key("Bone_Thigh_L", "rotation_euler", _fire_end_frame, (0.0, 0.0, 0.0))
+        set_bone_key("Bone_Thigh_R", "rotation_euler", _fire_end_frame, (0.0, 0.0, 0.0))
+        set_bone_key("Bone_Shin_L", "rotation_euler", _fire_end_frame, (0.0, 0.0, 0.0))
+        set_bone_key("Bone_Shin_R", "rotation_euler", _fire_end_frame, (0.0, 0.0, 0.0))
     act_fire.use_fake_user = True
     actions["FireRecoil"] = act_fire
 
@@ -11351,8 +11371,10 @@ def generate_procedural_action_clips(
     # Vehicle collapse must read at RTS distance: -0.22 m (legacy -0.12 was a
     # near-invisible settle). Biped/quad keep their deeper drops.
     collapse_z = -0.55 if leg_type == "biped" else (-0.28 if leg_type == "quad" else -0.22)
-    # Slow in/out: frame 16 is half-collapse, 28-35 is the final rest pose.
-    for f in (16, 28, 35):
+    # Slow in/out: frame 16 is half-collapse, then the rest pose holds to the
+    # end (35 by default; Bastion validates Death at 45 frames in Unity).
+    _death_end_frame = death_end_frame if death_end_frame is not None else 35
+    for f in (16, 28, _death_end_frame):
         _collapse_factor = 0.5 if f == 16 else 1.0
         set_bone_key(body_bone, "location", f, (0.0, 0.0, collapse_z * _collapse_factor))
         set_bone_key(body_bone, "rotation_euler", f, (math.radians(7.0 * _collapse_factor), math.radians(-9.0 * _collapse_factor), math.radians(3.5 * _collapse_factor)))

@@ -178,6 +178,20 @@ class TacticalAnimationImprovementTests(unittest.TestCase):
         # Debe haber un frame intermedio entre 10 y 25 además de 28/35
         self.assertTrue(any(10 <= f <= 25 for f in all_frames), "Death debe tener un frame de medio colapso (slow in/out), no salto directo a f28")
 
+    def test_frame_end_overrides_exist(self) -> None:
+        # BastionSiegeMech valida en Unity FireRecoil 15 frames y Death 45 frames
+        # (RogueCommandVisualSampleScaffolder.ValidateRiggedWalkerSources).
+        # El generador debe permitir overrides sin romper el default actual.
+        args = [a.arg for a in self.fn.args.args]
+        self.assertIn("fire_end_frame", args)
+        self.assertIn("death_end_frame", args)
+        self.assertIn("fire_end_frame", self.fire)
+        self.assertIn("death_end_frame", self.death)
+
+    def test_death_defaults_hold_to_35(self) -> None:
+        # Sin override, Death termina en 35 (default actual preservado).
+        self.assertRegex(self.death, r"death_end_frame|35", "Death debe tener default 35")
+
     def test_death_turret_droop_strong(self) -> None:
         # Solo la línea de la torreta, no saltar a la pierna (-35 shin).
         for line in self.death.splitlines():
