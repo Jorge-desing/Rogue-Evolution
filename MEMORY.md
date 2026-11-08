@@ -1510,3 +1510,13 @@ This is a compact, durable orientation for agents. For the changing checkout sta
 - Validation (as documented): Release plugin 0 warnings/errors; C# harness 517/518 (1 Windows symlink skip); Python not rerun in this sync. Live Steam runtime validation for UI click succeeded (session ui-click-20261108b). No fresh natural offer→selection→placement→production/render/stat or tactical AI proof; those remain unverified.
 - Profile2 dedicated QA without tutorial; protect saves. Before reflection verify Rogue Command 1.0.9, Unity `2021.3.45f2`, Assembly-CSharp SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, MVID `db0e9462-128d-4296-9900-de18b4bd0c00`.
 - Root MEMORY.md, codex memory, antigravity memory, and mem0 synced to HEAD 558404c (commit 58c5f1d).
+
+## Refresh (2026-11-08, HEAD b82642e — original scout tank builder with rig and FBX)
+
+- Repository `C:/Users/Alex/Documents/Mod Rogue Command`, loader `1.19.0`, branch `codex/rogue-unit-balance-20261018`. Local/upstream/origin verified at `be030cfd9568e9306e499538ec3eb5cb2103dc1f` (this memory sync commit), after `b82642e` (`feat(authoring): add dedicated original scout tank builder with rig and FBX`), following `558404c`.
+- New committed scope since 558404c:
+  - `b82642e`: dedicated original scout tank builder (`tools/Build-SampleScoutTankModel.py`, +135) with rig and FBX; ScoutTank.fbx, ScoutTank_Atlas.fbx, and PBR textures (Albedo/Emission/MetallicGloss/Normal) generated.
+- Working tree clean at root except nested worktree gitlinks `.worktrees/cargador` (11e9968, dirty) and `.worktrees/task-graph-validation` (d1f9045, dirty) preserved.
+- Validation: no fresh run in this sync; last documented Release 0/0, harness 517/518. Live Steam UI-click validation succeeded (session ui-click-20261108b). Natural offer→selection→placement→production/render/stat and tactical AI unverified.
+- Profile2 dedicated QA without tutorial; protect saves. Before reflection verify Rogue Command 1.0.9, Unity `2021.3.45f2`, Assembly-CSharp SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, MVID `db0e9462-128d-4296-9900-de18b4bd0c00`.
+- Root MEMORY.md, codex memory, antigravity memory, and mem0 synced to HEAD b82642e (commit pending).
