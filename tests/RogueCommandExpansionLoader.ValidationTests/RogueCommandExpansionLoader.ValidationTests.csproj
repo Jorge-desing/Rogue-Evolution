@@ -22,6 +22,8 @@
              Link="Runtime/AgentDiagnosticsFormatter.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeIntermissionCensus.cs"
              Link="Runtime/RuntimeIntermissionCensus.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeIntermissionDeepReads.cs"
+             Link="Runtime/RuntimeIntermissionDeepReads.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeIntermissionDirector.cs"
              Link="Runtime/RuntimeIntermissionDirector.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeIntermissionSyntheticJump.cs"

@@ -2227,6 +2227,19 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             res = _call_diagnostics_method("OrderSelectLevelNodeJson", [level, field])
             return _tool_response(res)
 
+        elif name == "diagnostics_get_level_map_state":
+            res = _call_diagnostics_method("GetLevelMapStateJson")
+            return _tool_response(res)
+
+        elif name == "diagnostics_get_intermission_node":
+            try:
+                level = int(arguments["level"])
+                field = int(arguments["field"])
+            except (KeyError, TypeError, ValueError):
+                return _tool_response(json.dumps({"error": "level and field must be integers"}), is_error=True)
+            res = _call_diagnostics_method("GetIntermissionNodeJson", [level, field])
+            return _tool_response(res)
+
         elif name == "diagnostics_get_navigator_state":
             res = _call_diagnostics_method("GetNavigatorStateJson")
             return _tool_response(res)

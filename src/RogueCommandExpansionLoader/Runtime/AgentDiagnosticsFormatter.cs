@@ -1146,6 +1146,68 @@ namespace RogueCommandExpansionLoader.Runtime
         }
 
         /// <summary>
+        /// Serializes the deep LevelMap route state. The route scalars come
+        /// before the boss detail so bounded diagnostic truncation can never
+        /// suppress the choosable frontier signal.
+        /// </summary>
+        public static string SerializeLevelMapRouteState(IntermissionRouteState state)
+        {
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "levelMapRouteState",
+                ["isRouteAvailable"] = state.IsRouteAvailable,
+                ["currentLevel"] = state.CurrentLevel,
+                ["currentField"] = state.CurrentField,
+                ["choosableFieldCount"] = state.ChoosableFieldCount,
+                ["totalFieldCount"] = state.TotalFieldCount,
+                ["chosenPathCount"] = state.ChosenPathCount,
+                ["isCurrentLevelFinished"] = state.IsCurrentLevelFinished,
+                ["isFirstLevel"] = state.IsFirstLevel,
+                ["isLastLevelBeforeBoss"] = state.IsLastLevelBeforeBoss,
+                ["isBoss"] = state.IsBoss,
+                ["levelCount"] = state.LevelCount,
+                ["maxWidth"] = state.MaxWidth,
+                ["firstPossibleNextField"] = state.FirstPossibleNextField,
+                ["bossAiPrefabName"] = state.BossAiPrefabName ?? string.Empty,
+                ["bossWorldPrefabName"] = state.BossWorldPrefabName ?? string.Empty,
+                ["bossMapName"] = state.BossMapName ?? string.Empty,
+            };
+            return Serialize(view);
+        }
+
+        /// <summary>
+        /// Serializes a single intermission node inspection. The found /
+        /// choosable flags come before the reward detail for the same
+        /// truncation-safety reason as the other intermission views.
+        /// </summary>
+        public static string SerializeIntermissionNodeDetail(IntermissionNodeDetail detail)
+        {
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "intermissionNodeDetail",
+                ["found"] = detail.Found,
+                ["level"] = detail.Level,
+                ["field"] = detail.Field,
+                ["isChoosable"] = detail.IsChoosable,
+                ["isRestSite"] = detail.IsRestSite,
+                ["isShop"] = detail.IsShop,
+                ["hasCardReward"] = detail.HasCardReward,
+                ["hasUpgradeReward"] = detail.HasUpgradeReward,
+                ["hasRelicReward"] = detail.HasRelicReward,
+                ["hasResearchReward"] = detail.HasResearchReward,
+                ["hasCoinReward"] = detail.HasCoinReward,
+                ["hasStartCrystalReward"] = detail.HasStartCrystalReward,
+                ["hasResearchPointsReward"] = detail.HasResearchPointsReward,
+                ["hasDropReward"] = detail.HasDropReward,
+                ["blueprintPoolId"] = detail.BlueprintPoolId ?? string.Empty,
+                ["outgoingConnectionCount"] = detail.OutgoingConnectionCount,
+                ["incomingConnectionCount"] = detail.IncomingConnectionCount,
+                ["fieldCountInLevel"] = detail.FieldCountInLevel,
+            };
+            return Serialize(view);
+        }
+
+        /// <summary>
         /// Serializes the result of an in-game credit grant command.
         /// </summary>
         public static string SerializeCreditGrantResult(CreditGrantResult result)

@@ -755,6 +755,26 @@ namespace RogueCommandExpansionLoader.Runtime
         }
 
         /// <summary>
+        /// Deep read of the live LevelMap route state behind the intermission
+        /// map (LevelMap via Game.StageMap.CurrentLevelMap).
+        /// </summary>
+        public string GetLevelMapStateJson()
+        {
+            return AgentDiagnosticsFormatter.SerializeLevelMapRouteState(
+                RuntimeIntermissionDeepReads.CurrentRouteState());
+        }
+
+        /// <summary>
+        /// Deep inspect of one intermission node (level, field): reward
+        /// metadata and edge counts from the live LevelMap.
+        /// </summary>
+        public string GetIntermissionNodeJson(int level, int field)
+        {
+            return AgentDiagnosticsFormatter.SerializeIntermissionNodeDetail(
+                RuntimeIntermissionDeepReads.InspectNode(level, field));
+        }
+
+        /// <summary>
         /// User-authorized synthetic level load: starts the native
         /// LoadScene.LoadNextLevel corridor on the live LoadScene instance
         /// (the same coroutine the intermission director starts after a node

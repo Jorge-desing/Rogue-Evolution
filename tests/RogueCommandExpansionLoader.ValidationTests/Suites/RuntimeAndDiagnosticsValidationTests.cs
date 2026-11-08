@@ -9254,7 +9254,99 @@ internal static partial class ValidationTestRunner
                 }
                 }
                 }),
-                ("UI click serializer puts the clicked outcome before detail", () =>
+                ("deep intermission choosable-field count mirrors LevelMap.IsChoosable", () =>
+    {
+        // Fresh run: CurrentLevel == -1 -> every field of level 0 is choosable.
+        int fresh = RuntimeIntermissionDeepReads.CountChoosableFields(
+            -1, 0, new[] { 1, 2, 3 }, 0, new List<(int, int)>());
+        if (fresh != 3)
+        {
+            throw new InvalidOperationException("CountChoosableFields must mark every level-0 field choosable on a fresh run.");
+        }
+
+        // Mid-map: only (CurrentField, field) pairs in Connections(next) count.
+        var fields = new[] { 1, 2, 3 };
+        var connections = new List<(int, int)> { (1, 2), (1, 3), (2, 1), (2, 3) };
+        int atField1 = RuntimeIntermissionDeepReads.CountChoosableFields(3, 4, fields, 1, connections);
+        if (atField1 != 2)
+        {
+            throw new InvalidOperationException("CountChoosableFields must count only edges out of CurrentField.");
+        }
+
+        // Wrong level: nothing is choosable.
+        int wrongLevel = RuntimeIntermissionDeepReads.CountChoosableFields(3, 2, fields, 1, connections);
+        if (wrongLevel != 0)
+        {
+            throw new InvalidOperationException("CountChoosableFields must return 0 outside CurrentLevel+1.");
+        }
+
+        // Empty inputs are safe.
+        if (RuntimeIntermissionDeepReads.CountChoosableFields(-1, 0, null, 0, null) != 0)
+        {
+            throw new InvalidOperationException("CountChoosableFields must return 0 for null fields.");
+        }
+    }),
+    ("deep intermission route and node detail serializers emit ordered fields", () =>
+    {
+        var state = new IntermissionRouteState(
+            true, 3, 1, true, false, true, false, 4, 5, 1, 1, 0, 16, "BossAi", "BossWorld", "BossMap");
+        string stateJson = AgentDiagnosticsFormatter.SerializeLevelMapRouteState(state);
+        using (JsonDocument doc = JsonDocument.Parse(stateJson))
+        {
+            JsonElement root = doc.RootElement;
+            if (root.GetProperty("kind").GetString() != "levelMapRouteState"
+                || !root.GetProperty("isRouteAvailable").GetBoolean()
+                || root.GetProperty("currentLevel").GetInt32() != 3
+                || root.GetProperty("currentField").GetInt32() != 1
+                || root.GetProperty("choosableFieldCount").GetInt32() != 0
+                || !root.GetProperty("isLastLevelBeforeBoss").GetBoolean()
+                || root.GetProperty("bossAiPrefabName").GetString() != "BossAi")
+            {
+                throw new InvalidOperationException("Route state serializer mismatch: " + stateJson);
+            }
+        }
+
+        string unavailableJson = AgentDiagnosticsFormatter.SerializeLevelMapRouteState(IntermissionRouteState.Unavailable);
+        using (JsonDocument doc = JsonDocument.Parse(unavailableJson))
+        {
+            if (doc.RootElement.GetProperty("isRouteAvailable").GetBoolean()
+                || doc.RootElement.GetProperty("currentLevel").GetInt32() != -1)
+            {
+                throw new InvalidOperationException("Unavailable route state must emit neutral defaults.");
+            }
+        }
+
+        var detail = new IntermissionNodeDetail(
+            true, 3, 1, false, true, false, true, false, true, false, true, false, false, true,
+            "pool:bs", 2, 1, 4);
+        string detailJson = AgentDiagnosticsFormatter.SerializeIntermissionNodeDetail(detail);
+        using (JsonDocument doc = JsonDocument.Parse(detailJson))
+        {
+            JsonElement root = doc.RootElement;
+            if (root.GetProperty("kind").GetString() != "intermissionNodeDetail"
+                || !root.GetProperty("found").GetBoolean()
+                || root.GetProperty("isChoosable").GetBoolean()
+                || !root.GetProperty("hasCardReward").GetBoolean()
+                || !root.GetProperty("hasRelicReward").GetBoolean()
+                || root.GetProperty("blueprintPoolId").GetString() != "pool:bs"
+                || root.GetProperty("outgoingConnectionCount").GetInt32() != 2
+                || root.GetProperty("incomingConnectionCount").GetInt32() != 1)
+            {
+                throw new InvalidOperationException("Node detail serializer mismatch: " + detailJson);
+            }
+        }
+
+        string notFoundJson = AgentDiagnosticsFormatter.SerializeIntermissionNodeDetail(
+            IntermissionNodeDetail.NotFound(3, 1));
+        using (JsonDocument doc = JsonDocument.Parse(notFoundJson))
+        {
+            if (doc.RootElement.GetProperty("found").GetBoolean())
+            {
+                throw new InvalidOperationException("NotFound node detail must report found=false.");
+            }
+        }
+    }),
+    ("UI click serializer puts the clicked outcome before detail", () =>
                 {
                     string json = AgentDiagnosticsFormatter.SerializeUiClickResult(
                         new UiClickResult(true, RuntimeUiClickDirector.ViaEventSystem, "StartButton", "StartButton",
