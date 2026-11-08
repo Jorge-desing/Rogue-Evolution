@@ -1566,3 +1566,17 @@ This is a compact, durable orientation for agents. For the changing checkout sta
 - Validation: unchanged (last documented Release plugin 0 warnings/0 errors; C# harness 517/518 (1 Windows symlink-privilege skip, 0 failures); Python 419 OK at b78b314). No fresh Steam/Unity gameplay proof beyond previously recorded evidence.
 - Profile2 dedicated QA without tutorial; protect saves. Before reflection verify Rogue Command 1.0.9, Unity `2021.3.45f2`, Assembly-CSharp SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, MVID `db0e9462-128d-4296-9900-de18b4bd0c00`.
 - Root MEMORY.md, codex memory, antigravity memory, and mem0 synced to HEAD a140104.
+
+## Refresh (2026-11-08, HEAD beff577 — soften tactical Idle and Death easing)
+
+- Repository `C:/Users/Alex/Documents/Mod Rogue Command`, loader `1.19.0`, branch `codex/rogue-unit-balance-20261018`. Local/upstream/origin verified at `beff577edbcb4b46cf9358e1d95c5ea0a818f3b6` (`feat(animation): soften tactical Idle and Death easing`), after `974404c` (`docs(memory): sync root MEMORY.md to HEAD a140104 + agent memories/mem0`) and `a140104` (`docs(animation-skill): verify current HEAD before editing animation clips`). Code baseline remains `0bbede6b7beb68f8f50f4ae89f10e83ecb056c0d`; implementation baseline remains `e25c6de`/`d7a3a11b56b58bed6d3f06c47fd40a627c9d1ae3`.
+
+- New committed scope (beff577, code + assets + tests): softens tactical Idle and Death easing in `RogueModelKit.py` (both `.agents/skills/rogue-command-3d-model-authoring/scripts/` and `tools/`): Idle now uses a slow in/out envelope (keys at f8/f22 around the central f15 breath) for a settled mechanical idle at RTS camera distance; Death gains an early 12% settle key at frame 8 before the half-collapse at f16 and full collapse. Regenerates tactical-operations controllers, FBX, Blender sources, and bundle (36,891,941 -> 36,897,324 bytes). Adds `tests/python/rigging/test_tactical_animation_hold_and_easing.py` (+66).
+
+- Working tree (preserved, not staged): modified `.agents/skills/rogue-command-steam-runtime-validation/SKILL.md` (+3 bullets: diagnostics_ui_press_button name-search fragility, LoaderDiagnostics identity changes across scenes, loading-transition non-determinism); dirty nested worktree gitlinks `.worktrees/cargador` (11e9968) and `.worktrees/task-graph-validation` (d1f9045) preserved. Do not stage, reset, clean, or overwrite unrelated work.
+
+- Validation: no fresh full run in this sync. Last documented at b78b314/1b9e57a: Release plugin 0 warnings/0 errors; C# harness 517/518 (1 Windows symlink-privilege skip, 0 failures); Python 419 OK. The new hold/easing test not yet executed. No fresh Steam/Unity gameplay proof beyond previously recorded evidence. Natural offer→selection→placement→production/render/stat and tactical AI remain unverified.
+
+- Profile2 dedicated QA without tutorial; protect saves. Before reflection verify Rogue Command 1.0.9, Unity `2021.3.45f2`, Assembly-CSharp SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, MVID `db0e9462-128d-4296-9900-de18b4bd0c00`.
+
+- Root MEMORY.md, codex memory, antigravity memory, and mem0 synced to HEAD beff577.
