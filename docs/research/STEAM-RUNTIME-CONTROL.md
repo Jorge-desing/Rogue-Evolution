@@ -196,19 +196,26 @@ nunca tocan perfil/save, y solo bajo la disciplina de checkpoint del perfil QA P
 (selector y todos los ficheros hasheados antes de abrir el juego; verificación de match
 exacto al cerrar). La cadena verificada en vivo para entrar al nivel de combate desde el
 mapa de intermission (nodo no choosable, `LaunchButton` Michsky inactivo,
-`IsCurrentLevelFinished=True`): `Continue Run` → `StageMap.JumpTo(4)` (seam
-`diagnostics_jump_to_level`) → corrutina `LoadScene.StartCoroutine("LoadNextLevel")`
-(seam `diagnostics_load_next_level`, sin transición por sí sola) → `LoadScene.LoadLevel()`
-método nativo vía `component/call_method` sobre el GO `LoadNextLevel` → aparece la intro
-`LoadingHider` → botón `INICIAR` (Unity `UI.Button` "Button", **no** el LaunchButton
-Michsky del mapa). Ver evidencia en `artifacts/runtime-smoke/ui-click-20261108g/level4-entry-evidence.json`.
+`IsCurrentLevelFinished=True`) es ahora, en orden de preferencia: vía natural del director
+(`TryEnterLevelNodeWorkflow`) → **una sola llamada nativa `LoadScene.LoadLevel()`** sobre el
+GO `LoadNextLevel` **sin jump previo** en el mapa conservado (el mundo de la etapa actual ya
+está generado y `InitMap.MapIsReady` es verdadero) → aparece la intro `LoadingHider` → botón
+`INICIAR` (Unity `UI.Button` "Button", **no** el LaunchButton Michsky del mapa) → gameplay con
+`timeScale=1`. Verificado el 2026-11-08 (`artifacts/runtime-smoke/live-reads-20261108-nojump/`):
+Intermission stage 0/nivel 3 → un `LoadLevel()` → censo stage 0/nivel 4 con `LoadingHider`
+GO 1008320 activo → `Button` GO 1008136 clic real en 960/322.3 → snapshot 46/46 con 14
+entidades en campo. La cadena histórica con jump (`StageMap.JumpTo(4)` + corrutina + `LoadLevel()`)
+queda como último recurso sintético para etapas sin generar (evidencia antigua en
+`artifacts/runtime-smoke/ui-click-20261108g/level4-entry-evidence.json`).
 
-**No-determinismo conocido de `LoadLevel()` (no lazo)**: en 1 de ~5 corridas entre procesos,
-`LoadLevel()` transicionó y se alcanzó el gameplay; en las restantes, el juego entró en la
-pantalla de carga ("Cargando...", barra vacía, spinner) sin poblar nunca `LoadingHider` ni
-dejar error en `BepInEx/LogOutput.log` ni en `Player.log`. Detén los reintentos ciegos: el
-siguiente diagnóstico exige la matriz completa de precondiciones (qué lee `LoadLevel()`
-antes de cargar), no otra cadena idéntica. Nota: los triángulos grandes del mapa
+**Por qué el jump se cuelga (causa raíz estática, no reintentar)**: tras `JumpTo` + `Reset`,
+`LoadNextLevel` espera sin timeout a `InitMap.MapIsReady_Static()`, y la única generación de
+mapa conocida (`LevelProgression.InitMapIfBossComesNext`, solo boss) no se dispara — ver
+`docs/research/LOADLEVEL-PRECONDITIONS.md`. En 1 de ~5 corridas entre procesos transicionó
+(excepción que confiaba en un mundo ya listo); en las restantes, pantalla de carga
+("Cargando...", barra vacía, spinner) sin poblar `LoadingHider` ni dejar error en
+`BepInEx/LogOutput.log` ni en `Player.log`. Detén los reintentos ciegos: usa la matriz de
+precondiciones antes de cualquier reintento. Nota: los triángulos grandes del mapa
 (`BossTriangle`, MeshFilter/MeshRenderer sin collider ni handlers) son escenario
 decorativo; no son clicables ni el "nodo siguiente".
 
