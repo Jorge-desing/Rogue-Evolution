@@ -775,6 +775,78 @@ namespace RogueCommandExpansionLoader.Runtime
         }
 
         /// <summary>
+        /// Full intermission LevelMap graph and forward route planner to the stage Boss node.
+        /// </summary>
+        public string GetIntermissionGraphJson(string preferredRewardType = "", int maxRoutes = 8, int maxNodes = 64)
+        {
+            return AgentDiagnosticsFormatter.SerializeIntermissionGraph(
+                RuntimeIntermissionDeepReads.CurrentGraph(preferredRewardType, maxRoutes, maxNodes));
+        }
+
+        /// <summary>
+        /// Live intermission reward, currency, deck, and sub-screen state (ChooseCard, DeckOverview, AssignUpgradeToCardView, RemoveCardView).
+        /// </summary>
+        public string GetIntermissionRewardStateJson(int maxCards = 32)
+        {
+            return AgentDiagnosticsFormatter.SerializeIntermissionRewardState(
+                RuntimeIntermissionRewards.GetState(maxCards));
+        }
+
+        /// <summary>
+        /// Triggers the native LoadScene.LoadLevel() flow when a node or boss is selected on CurrentLevelMap.
+        /// </summary>
+        public string OrderTriggerLoadLevelJson()
+        {
+            return AgentDiagnosticsFormatter.SerializeIntermissionActionResult(
+                RuntimeIntermissionRewards.TryTriggerLoadLevel());
+        }
+
+        /// <summary>
+        /// Selects an offered reward card in ChooseCard by rewardId or slotIndex.
+        /// </summary>
+        public string OrderChooseIntermissionRewardJson(string rewardId = "", int slotIndex = -1)
+        {
+            return AgentDiagnosticsFormatter.SerializeIntermissionActionResult(
+                RuntimeIntermissionRewards.TryChooseReward(rewardId, slotIndex));
+        }
+
+        /// <summary>
+        /// Skips the active reward in ChooseCard via ClickedOnSkipButton().
+        /// </summary>
+        public string OrderSkipIntermissionRewardJson()
+        {
+            return AgentDiagnosticsFormatter.SerializeIntermissionActionResult(
+                RuntimeIntermissionRewards.TrySkipReward());
+        }
+
+        /// <summary>
+        /// Rerolls the active reward offer in ChooseCard via ClickedOnRerollButton().
+        /// </summary>
+        public string OrderRerollIntermissionRewardJson()
+        {
+            return AgentDiagnosticsFormatter.SerializeIntermissionActionResult(
+                RuntimeIntermissionRewards.TryRerollReward());
+        }
+
+        /// <summary>
+        /// Assigns the pending upgrade in AssignUpgradeToCardView to a viable deck card, or cancels.
+        /// </summary>
+        public string OrderAssignIntermissionUpgradeJson(string entityId = "", bool cancel = false)
+        {
+            return AgentDiagnosticsFormatter.SerializeIntermissionActionResult(
+                RuntimeIntermissionRewards.TryAssignUpgradeToCard(entityId, cancel));
+        }
+
+        /// <summary>
+        /// Opens or closes the native DeckOverview screen.
+        /// </summary>
+        public string OrderSetDeckOverviewOpenJson(bool open)
+        {
+            return AgentDiagnosticsFormatter.SerializeIntermissionActionResult(
+                RuntimeIntermissionRewards.TrySetDeckOverviewOpen(open));
+        }
+
+        /// <summary>
         /// User-authorized synthetic level load: starts the native
         /// LoadScene.LoadNextLevel corridor on the live LoadScene instance
         /// (the same coroutine the intermission director starts after a node

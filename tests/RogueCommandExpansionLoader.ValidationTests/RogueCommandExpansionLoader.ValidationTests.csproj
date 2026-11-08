@@ -26,6 +26,8 @@
              Link="Runtime/RuntimeIntermissionDeepReads.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeIntermissionDirector.cs"
              Link="Runtime/RuntimeIntermissionDirector.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeIntermissionRewards.cs"
+             Link="Runtime/RuntimeIntermissionRewards.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeIntermissionSyntheticJump.cs"
              Link="Runtime/RuntimeIntermissionSyntheticJump.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeUiClickDirector.cs"

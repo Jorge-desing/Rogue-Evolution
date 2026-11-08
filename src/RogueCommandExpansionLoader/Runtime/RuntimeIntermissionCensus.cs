@@ -234,6 +234,39 @@ namespace RogueCommandExpansionLoader.Runtime
                                 hasCardReward, position, instanceId));
                         }
                     }
+
+                    Type bossType = FindGameType("OverWorldMapBoss");
+                    if (bossType != null)
+                    {
+                        foreach (object boss in ReadNodeObjects(bossType))
+                        {
+                            if (boss == null)
+                            {
+                                continue;
+                            }
+
+                            bool isInitialized = ReadBoolField(boss, "_isInitialized", false);
+                            object levelMap = ReadObjectField(boss, "_levelMap");
+                            if (!isInitialized && levelMap == null)
+                            {
+                                continue;
+                            }
+
+                            int bossLevel = ReadBossLevel(levelMap);
+                            if (bossLevel <= 0)
+                            {
+                                continue;
+                            }
+
+                            bool isChoosable = ReadBoolField(boss, "_isChoosable", false);
+                            bool isCurrentNodeOfPath = ReadBossCurrentNodeOfPath(levelMap);
+                            string position = ReadPosition(boss);
+                            int instanceId = ReadInstanceId(boss);
+                            rows.Add(new IntermissionNodeRow(
+                                bossLevel, 0, isChoosable, isCurrentNodeOfPath,
+                                false, position, instanceId));
+                        }
+                    }
                 }
                 catch
                 {
@@ -494,6 +527,63 @@ namespace RogueCommandExpansionLoader.Runtime
             }
 
             return fallback;
+        }
+
+        internal static object ReadObjectField(object target, string fieldName)
+        {
+            if (target == null)
+            {
+                return null;
+            }
+
+            try
+            {
+                FieldInfo field = target.GetType().GetField(fieldName, InstanceMembers);
+                return field != null ? field.GetValue(target) : null;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        internal static int ReadBossLevel(object levelMap)
+        {
+            if (levelMap == null)
+            {
+                levelMap = RuntimeIntermissionDeepReads.ResolveCurrentLevelMap();
+            }
+
+            if (levelMap == null)
+            {
+                return 0;
+            }
+
+            int levelCount = ReadIntField(levelMap, "LevelCount", 0);
+            return levelCount > 0 ? levelCount : 0;
+        }
+
+        internal static bool ReadBossCurrentNodeOfPath(object levelMap)
+        {
+            if (levelMap == null)
+            {
+                levelMap = RuntimeIntermissionDeepReads.ResolveCurrentLevelMap();
+            }
+
+            if (levelMap == null)
+            {
+                return false;
+            }
+
+            bool isBoss = ReadBoolProperty(levelMap, "IsBoss", false);
+            if (isBoss)
+            {
+                return true;
+            }
+
+            bool isLastBeforeBoss = ReadBoolProperty(levelMap, "IsLastLevelBeforeBoss", false);
+            int chosenField = ReadIntField(levelMap, "ChosenField", -1);
+            return isLastBeforeBoss && chosenField == 0;
         }
 
         internal static bool ReadBoolField(object target, string fieldName, bool fallback)

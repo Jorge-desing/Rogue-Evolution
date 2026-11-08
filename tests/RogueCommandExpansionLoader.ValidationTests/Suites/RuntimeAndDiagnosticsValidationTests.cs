@@ -9825,6 +9825,155 @@ internal static partial class ValidationTestRunner
                         throw new InvalidOperationException("TryEnterLevelNodeJson delegation must stay fail-closed.");
                     }
                 }
+
+                // Intermission graph & forward route planner:
+                if (RuntimeIntermissionDeepReads.ClassifyPrimaryRewardType(
+                        true, false, false, false, false, false, false, false, false, false, false) != "Boss"
+                    || RuntimeIntermissionDeepReads.ClassifyPrimaryRewardType(
+                        false, true, false, false, false, false, false, false, false, false, false) != "RestSite"
+                    || RuntimeIntermissionDeepReads.ClassifyPrimaryRewardType(
+                        false, false, true, false, false, false, false, false, false, false, false) != "Shop"
+                    || RuntimeIntermissionDeepReads.ClassifyPrimaryRewardType(
+                        false, false, false, true, false, false, false, false, false, false, false) != "CardReward"
+                    || RuntimeIntermissionDeepReads.ClassifyPrimaryRewardType(
+                        false, false, false, false, false, true, false, false, false, false, false) != "RelicReward")
+                {
+                    throw new InvalidOperationException("ClassifyPrimaryRewardType priority mismatch.");
+                }
+
+                var graphNodes = new List<IntermissionGraphNode>
+                {
+                    new IntermissionGraphNode(0, 0, "CardReward", "Pool_0_0", true, false, new[] { 0, 1 }),
+                    new IntermissionGraphNode(0, 1, "RelicReward", "Pool_0_1", true, false, new[] { 1 }),
+                    new IntermissionGraphNode(1, 0, "Shop", "Pool_1_0", false, false, new[] { 0 }),
+                    new IntermissionGraphNode(1, 1, "RelicReward", "Pool_1_1", false, false, new[] { 0 }),
+                    new IntermissionGraphNode(2, 0, "Boss", "Boss", false, false, Array.Empty<int>()),
+                };
+                IntermissionGraphSnapshot graphSnap = RuntimeIntermissionDeepReads.BuildIntermissionGraph(
+                    -1, -1, 2, graphNodes, "RelicReward", maxRoutes: 2, maxNodes: 3);
+                if (!graphSnap.IsAvailable || graphSnap.NodeCount != 3 || graphSnap.OmittedNodeCount != 2)
+                {
+                    throw new InvalidOperationException("BuildIntermissionGraph must clamp nodes and track omittedNodeCount.");
+                }
+                if (graphSnap.RouteCount != 2 || graphSnap.OmittedRouteCount != 1)
+                {
+                    throw new InvalidOperationException("BuildIntermissionGraph must enumerate 3 routes and clamp to maxRoutes=2.");
+                }
+                if (graphSnap.Routes[0].MatchedPreferredCount != 2
+                    || graphSnap.Routes[0].Steps[0] != "0:1"
+                    || graphSnap.Routes[0].Steps[1] != "1:1"
+                    || graphSnap.Routes[0].Steps[2] != "2:0")
+                {
+                    throw new InvalidOperationException("Top route for RelicReward preference should be 0:1 -> 1:1 -> 2:0.");
+                }
+
+                string graphJson = AgentDiagnosticsFormatter.SerializeIntermissionGraph(graphSnap);
+                using (JsonDocument doc = JsonDocument.Parse(graphJson))
+                {
+                    JsonElement root = doc.RootElement;
+                    if (root.GetProperty("kind").GetString() != "intermissionGraph"
+                        || !root.GetProperty("isAvailable").GetBoolean()
+                        || root.GetProperty("omittedNodeCount").GetInt32() != 2
+                        || root.GetProperty("omittedRouteCount").GetInt32() != 1
+                        || root.GetProperty("nodes").GetArrayLength() != 3
+                        || root.GetProperty("routes").GetArrayLength() != 2)
+                    {
+                        throw new InvalidOperationException("SerializeIntermissionGraph contract mismatch.");
+                    }
+                    int omittedNodeIdx = graphJson.IndexOf("\"omittedNodeCount\"", StringComparison.Ordinal);
+                    int omittedRouteIdx = graphJson.IndexOf("\"omittedRouteCount\"", StringComparison.Ordinal);
+                    int nodesIdx = graphJson.IndexOf("\"nodes\"", StringComparison.Ordinal);
+                    int routesIdx = graphJson.IndexOf("\"routes\"", StringComparison.Ordinal);
+                    if (omittedNodeIdx < 0 || omittedRouteIdx < 0 || nodesIdx < 0 || routesIdx < 0
+                        || omittedNodeIdx > nodesIdx || omittedRouteIdx > routesIdx)
+                    {
+                        throw new InvalidOperationException("SerializeIntermissionGraph must place omission counters before detail arrays.");
+                    }
+                }
+
+                // Intermission rewards & sub-screens:
+                if (RuntimeIntermissionRewards.ResolveActiveRewardCategory(false, 1, 0, 0, 0, 2, 1, 0, 0) != "Engineer"
+                    || RuntimeIntermissionRewards.ResolveActiveRewardCategory(false, 0, 0, 0, 0, 2, 1, 0, 0) != "Card"
+                    || RuntimeIntermissionRewards.ResolveActiveRewardCategory(true, 0, 0, 0, 0, 2, 1, 0, 0) != "Relic"
+                    || RuntimeIntermissionRewards.ResolveActiveRewardCategory(false, 0, 0, 0, 0, 0, 0, 1, 1) != "Upgrade"
+                    || RuntimeIntermissionRewards.ResolveActiveRewardCategory(false, 0, 0, 0, 0, 0, 0, 0, 1) != "Research"
+                    || RuntimeIntermissionRewards.ResolveActiveRewardCategory(false, 0, 0, 0, 0, 0, 0, 0, 0) != "None")
+                {
+                    throw new InvalidOperationException("ResolveActiveRewardCategory priority mismatch.");
+                }
+
+                var sampleOffered = new List<IntermissionOfferedCardRow>
+                {
+                    new IntermissionOfferedCardRow(0, "Card", "Factory_Tank", "Unit_Tank", "Heavy Tank", 101),
+                    new IntermissionOfferedCardRow(1, "Card", "Factory_Bot", "Unit_Bot", "Scout Bot", 102),
+                };
+                var sampleDeck = new List<IntermissionDeckCardRow>
+                {
+                    new IntermissionDeckCardRow("Factory_Tank", "Unit_Tank", 1, new[] { "Upg_Armor" }, true),
+                    new IntermissionDeckCardRow("Factory_Arty", "Unit_Arty", 0, Array.Empty<string>(), false),
+                };
+                IntermissionRewardState rewardState = IntermissionRewardState.Build(
+                    true, "Intermission", "ChooseCard", true,
+                    150, 200, 1, 2, 3, 5,
+                    0, 0, 0, 0, 1, 0, 0, 0,
+                    true, "Card", true, true, true,
+                    false, false, string.Empty, false, 75,
+                    sampleOffered, sampleDeck, maxCards: 1);
+                string rewardJson = AgentDiagnosticsFormatter.SerializeIntermissionRewardState(rewardState);
+                using (JsonDocument doc = JsonDocument.Parse(rewardJson))
+                {
+                    JsonElement root = doc.RootElement;
+                    if (root.GetProperty("kind").GetString() != "intermissionRewardState"
+                        || !root.GetProperty("isAvailable").GetBoolean()
+                        || root.GetProperty("omittedOfferedCardCount").GetInt32() != 1
+                        || root.GetProperty("omittedDeckCardCount").GetInt32() != 1
+                        || root.GetProperty("offeredCards").GetArrayLength() != 1
+                        || root.GetProperty("deckCards").GetArrayLength() != 1)
+                    {
+                        throw new InvalidOperationException("SerializeIntermissionRewardState contract mismatch.");
+                    }
+                    int omittedOfferedIdx = rewardJson.IndexOf("\"omittedOfferedCardCount\"", StringComparison.Ordinal);
+                    int omittedDeckIdx = rewardJson.IndexOf("\"omittedDeckCardCount\"", StringComparison.Ordinal);
+                    int offeredIdx = rewardJson.IndexOf("\"offeredCards\"", StringComparison.Ordinal);
+                    int deckIdx = rewardJson.IndexOf("\"deckCards\"", StringComparison.Ordinal);
+                    if (omittedOfferedIdx < 0 || omittedDeckIdx < 0 || offeredIdx < 0 || deckIdx < 0
+                        || omittedOfferedIdx > offeredIdx || omittedDeckIdx > deckIdx)
+                    {
+                        throw new InvalidOperationException("SerializeIntermissionRewardState must place omission counters before detail arrays.");
+                    }
+                }
+
+                // Offline fail-closed checks for live intermission reward/action directors:
+                if (RuntimeIntermissionDeepReads.CurrentGraph().IsAvailable
+                    || RuntimeIntermissionRewards.GetState().IsAvailable
+                    || RuntimeIntermissionRewards.TryTriggerLoadLevel().Success
+                    || RuntimeIntermissionRewards.TryChooseReward("Factory_Tank", 0).Success
+                    || RuntimeIntermissionRewards.TrySkipReward().Success
+                    || RuntimeIntermissionRewards.TryRerollReward().Success
+                    || RuntimeIntermissionRewards.TryAssignUpgradeToCard("Unit_Tank", false).Success
+                    || RuntimeIntermissionRewards.TrySetDeckOverviewOpen(true).Success)
+                {
+                    throw new InvalidOperationException("Intermission graph/reward readers and actions must fail closed when game singletons are absent.");
+                }
+
+                string actionJson = AgentDiagnosticsFormatter.SerializeIntermissionActionResult(
+                    RuntimeIntermissionRewards.TryChooseReward("Factory_Tank", 0));
+                using (JsonDocument doc = JsonDocument.Parse(actionJson))
+                {
+                    JsonElement root = doc.RootElement;
+                    if (root.GetProperty("kind").GetString() != "intermissionActionResult"
+                        || root.GetProperty("success").GetBoolean()
+                        || !string.Equals(root.GetProperty("action").GetString(), "ChooseReward", StringComparison.OrdinalIgnoreCase))
+                    {
+                        throw new InvalidOperationException("SerializeIntermissionActionResult header mismatch.");
+                    }
+                    int sIdx = actionJson.IndexOf("\"success\"", StringComparison.Ordinal);
+                    int mIdx = actionJson.IndexOf("\"message\"", StringComparison.Ordinal);
+                    if (sIdx < 0 || mIdx < 0 || sIdx > mIdx)
+                    {
+                        throw new InvalidOperationException("SerializeIntermissionActionResult must place success before message.");
+                    }
+                }
                 }),
                 ("two-level visual variant registry and director lifecycle handles primary and tactical variants", () =>
                 {

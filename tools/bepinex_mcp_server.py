@@ -2240,6 +2240,52 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             res = _call_diagnostics_method("GetIntermissionNodeJson", [level, field])
             return _tool_response(res)
 
+        elif name == "diagnostics_get_intermission_graph":
+            pref = str(arguments.get("preferredRewardType", "") or "")
+            max_routes = int(arguments.get("maxRoutes", 8))
+            max_nodes = int(arguments.get("maxNodes", 64))
+            res = _call_diagnostics_method("GetIntermissionGraphJson", [pref, max_routes, max_nodes])
+            return _tool_response(res)
+
+        elif name == "diagnostics_get_intermission_reward_state":
+            max_cards = int(arguments.get("maxCards", 32))
+            res = _call_diagnostics_method("GetIntermissionRewardStateJson", [max_cards])
+            return _tool_response(res)
+
+        elif name == "diagnostics_order_trigger_load_level":
+            res = _call_diagnostics_method("OrderTriggerLoadLevelJson", [])
+            return _tool_response(res)
+
+        elif name == "diagnostics_order_choose_intermission_reward":
+            reward_id = str(arguments.get("rewardId", "") or "")
+            raw_slot = arguments.get("slotIndex", -1)
+            try:
+                slot_index = -1 if raw_slot is None else int(raw_slot)
+            except (TypeError, ValueError):
+                return _tool_response(json.dumps({"error": "slotIndex must be an integer"}), is_error=True)
+            res = _call_diagnostics_method("OrderChooseIntermissionRewardJson", [reward_id, slot_index])
+            return _tool_response(res)
+
+        elif name == "diagnostics_order_skip_intermission_reward":
+            res = _call_diagnostics_method("OrderSkipIntermissionRewardJson", [])
+            return _tool_response(res)
+
+        elif name == "diagnostics_order_reroll_intermission_reward":
+            res = _call_diagnostics_method("OrderRerollIntermissionRewardJson", [])
+            return _tool_response(res)
+
+        elif name == "diagnostics_order_assign_intermission_upgrade":
+            entity_id = str(arguments.get("entityId", "") or "")
+            cancel = bool(arguments.get("cancel", False))
+            res = _call_diagnostics_method("OrderAssignIntermissionUpgradeJson", [entity_id, cancel])
+            return _tool_response(res)
+
+        elif name == "diagnostics_order_set_deck_overview_open":
+            if "open" not in arguments or not isinstance(arguments.get("open"), bool):
+                return _tool_response(json.dumps({"error": "open must be a boolean"}), is_error=True)
+            res = _call_diagnostics_method("OrderSetDeckOverviewOpenJson", [arguments["open"]])
+            return _tool_response(res)
+
         elif name == "diagnostics_get_navigator_state":
             res = _call_diagnostics_method("GetNavigatorStateJson")
             return _tool_response(res)

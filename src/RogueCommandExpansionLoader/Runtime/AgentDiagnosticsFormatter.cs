@@ -1208,6 +1208,171 @@ namespace RogueCommandExpansionLoader.Runtime
         }
 
         /// <summary>
+        /// Serializes the full intermission LevelMap graph and forward route planner.
+        /// Omission counters precede detail collections by contract.
+        /// </summary>
+        public static string SerializeIntermissionGraph(IntermissionGraphSnapshot graph)
+        {
+            IntermissionGraphSnapshot g = graph ?? IntermissionGraphSnapshot.Unavailable;
+            var nodeRows = new List<Dictionary<string, object>>();
+            if (g.Nodes != null)
+            {
+                for (int i = 0; i < g.Nodes.Count; i++)
+                {
+                    IntermissionGraphNode n = g.Nodes[i];
+                    nodeRows.Add(new Dictionary<string, object>
+                    {
+                        ["level"] = n.Level,
+                        ["field"] = n.Field,
+                        ["rewardType"] = n.RewardType ?? "Combat",
+                        ["blueprintPoolId"] = n.BlueprintPoolId ?? string.Empty,
+                        ["isChoosable"] = n.IsChoosable,
+                        ["isVisited"] = n.IsVisited,
+                        ["toFields"] = n.ToFields != null ? (object)n.ToFields : Array.Empty<int>(),
+                    });
+                }
+            }
+
+            var routeRows = new List<Dictionary<string, object>>();
+            if (g.Routes != null)
+            {
+                for (int i = 0; i < g.Routes.Count; i++)
+                {
+                    IntermissionRouteOption r = g.Routes[i];
+                    routeRows.Add(new Dictionary<string, object>
+                    {
+                        ["rank"] = r.Rank,
+                        ["score"] = r.Score,
+                        ["matchedPreferredCount"] = r.MatchedPreferredCount,
+                        ["totalRewardNodeCount"] = r.TotalRewardNodeCount,
+                        ["steps"] = r.Steps != null ? (object)r.Steps : Array.Empty<string>(),
+                        ["rewardTypes"] = r.RewardTypes != null ? (object)r.RewardTypes : Array.Empty<string>(),
+                    });
+                }
+            }
+
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "intermissionGraph",
+                ["isAvailable"] = g.IsAvailable,
+                ["omittedNodeCount"] = g.OmittedNodeCount,
+                ["omittedRouteCount"] = g.OmittedRouteCount,
+                ["currentLevel"] = g.CurrentLevel,
+                ["currentField"] = g.CurrentField,
+                ["levelCount"] = g.LevelCount,
+                ["isLastLevelBeforeBoss"] = g.IsLastLevelBeforeBoss,
+                ["preferredRewardType"] = g.PreferredRewardType ?? string.Empty,
+                ["nodeCount"] = g.NodeCount,
+                ["routeCount"] = g.RouteCount,
+                ["nodes"] = nodeRows,
+                ["routes"] = routeRows,
+            };
+            return Serialize(view);
+        }
+
+        /// <summary>
+        /// Serializes the intermission reward, currency, deck, and sub-screen state.
+        /// Omission counters precede detail collections by contract.
+        /// </summary>
+        public static string SerializeIntermissionRewardState(IntermissionRewardState state)
+        {
+            IntermissionRewardState s = state ?? IntermissionRewardState.Unavailable;
+            var offeredRows = new List<Dictionary<string, object>>();
+            if (s.OfferedCards != null)
+            {
+                for (int i = 0; i < s.OfferedCards.Count; i++)
+                {
+                    IntermissionOfferedCardRow c = s.OfferedCards[i];
+                    offeredRows.Add(new Dictionary<string, object>
+                    {
+                        ["slotIndex"] = c.SlotIndex,
+                        ["cardKind"] = c.CardKind ?? string.Empty,
+                        ["id"] = c.Id ?? string.Empty,
+                        ["productId"] = c.ProductId ?? string.Empty,
+                        ["name"] = c.Name ?? string.Empty,
+                        ["instanceId"] = c.InstanceId,
+                    });
+                }
+            }
+
+            var deckRows = new List<Dictionary<string, object>>();
+            if (s.DeckCards != null)
+            {
+                for (int i = 0; i < s.DeckCards.Count; i++)
+                {
+                    IntermissionDeckCardRow d = s.DeckCards[i];
+                    deckRows.Add(new Dictionary<string, object>
+                    {
+                        ["cardId"] = d.CardId ?? string.Empty,
+                        ["productId"] = d.ProductId ?? string.Empty,
+                        ["upgradeCount"] = d.UpgradeCount,
+                        ["isViableForCurrentUpgrade"] = d.IsViableForCurrentUpgrade,
+                        ["upgrades"] = d.Upgrades != null ? (object)d.Upgrades : Array.Empty<string>(),
+                    });
+                }
+            }
+
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "intermissionRewardState",
+                ["isAvailable"] = s.IsAvailable,
+                ["omittedOfferedCardCount"] = s.OmittedOfferedCardCount,
+                ["omittedDeckCardCount"] = s.OmittedDeckCardCount,
+                ["activeSceneName"] = s.ActiveSceneName ?? string.Empty,
+                ["navigatorSceneState"] = s.NavigatorSceneState ?? string.Empty,
+                ["playerHasOpenRewards"] = s.PlayerHasOpenRewards,
+                ["currentCoins"] = s.CurrentCoins,
+                ["currentStartCrystals"] = s.CurrentStartCrystals,
+                ["currentDropPodCount"] = s.CurrentDropPodCount,
+                ["currentRerollCount"] = s.CurrentRerollCount,
+                ["currentResearchPoints"] = s.CurrentResearchPoints,
+                ["maxResearchPoints"] = s.MaxResearchPoints,
+                ["openEngineerRewardCount"] = s.OpenEngineerRewardCount,
+                ["openEconomyRewardCount"] = s.OpenEconomyRewardCount,
+                ["openSpecialistRewardCount"] = s.OpenSpecialistRewardCount,
+                ["openSpecialistRelicRewardCount"] = s.OpenSpecialistRelicRewardCount,
+                ["openCardRewardCount"] = s.OpenCardRewardCount,
+                ["openRelicRewardCount"] = s.OpenRelicRewardCount,
+                ["openUpgradeRewardCount"] = s.OpenUpgradeRewardCount,
+                ["openResearchRewardCount"] = s.OpenResearchRewardCount,
+                ["isChooseCardActive"] = s.IsChooseCardActive,
+                ["activeRewardCategory"] = s.ActiveRewardCategory ?? "None",
+                ["isClickableNow"] = s.IsClickableNow,
+                ["canSkip"] = s.CanSkip,
+                ["canReroll"] = s.CanReroll,
+                ["isDeckOverviewOpen"] = s.IsDeckOverviewOpen,
+                ["isAssignUpgradeActive"] = s.IsAssignUpgradeActive,
+                ["currentUpgradeId"] = s.CurrentUpgradeId ?? string.Empty,
+                ["isRemoveCardActive"] = s.IsRemoveCardActive,
+                ["removeCardCoinCompensation"] = s.RemoveCardCoinCompensation,
+                ["offeredCardCount"] = s.OfferedCardCount,
+                ["deckCardCount"] = s.DeckCardCount,
+                ["offeredCards"] = offeredRows,
+                ["deckCards"] = deckRows,
+            };
+            return Serialize(view);
+        }
+
+        /// <summary>
+        /// Serializes an intermission sub-screen or LoadLevel action result with status flags first.
+        /// </summary>
+        public static string SerializeIntermissionActionResult(IntermissionActionResult result)
+        {
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "intermissionActionResult",
+                ["success"] = result.Success,
+                ["action"] = result.Action ?? string.Empty,
+                ["targetId"] = result.TargetId ?? string.Empty,
+                ["slotIndex"] = result.SlotIndex,
+                ["navigatorSceneState"] = result.NavigatorSceneState ?? string.Empty,
+                ["playerHasOpenRewards"] = result.PlayerHasOpenRewards,
+                ["message"] = result.Message ?? string.Empty,
+            };
+            return Serialize(view);
+        }
+
+        /// <summary>
         /// Serializes the result of an in-game credit grant command.
         /// </summary>
         public static string SerializeCreditGrantResult(CreditGrantResult result)

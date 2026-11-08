@@ -485,6 +485,99 @@ class JumpToLevelTests(unittest.TestCase):
         self.assertEqual("TryLoadNextLevelJson", calls[0]["params"]["methodName"])
         self.assertEqual([], json.loads(calls[0]["params"]["args"]))
 
+    def test_level_map_state_and_node_inspect_passthrough(self) -> None:
+        calls = []
+        with (
+            mock.patch.object(SERVER, "_DIAGNOSTICS_GO_ID", 77),
+            mock.patch.object(SERVER, "_call_http", side_effect=_diag_fake_http(calls)),
+        ):
+            r1 = SERVER.execute_tool("diagnostics_get_level_map_state", {})
+            r2 = SERVER.execute_tool("diagnostics_get_intermission_node", {"level": 2, "field": 1})
+            r3 = SERVER.execute_tool("diagnostics_get_intermission_node", {"level": "bad", "field": 1})
+
+        self.assertFalse(r1["isError"])
+        self.assertFalse(r2["isError"])
+        self.assertTrue(r3["isError"])
+        self.assertEqual(
+            [
+                {"method": "GetLevelMapStateJson", "args": []},
+                {"method": "GetIntermissionNodeJson", "args": [2, 1]},
+            ],
+            [{"method": c["method"], "args": c["args"]} for c in calls],
+        )
+
+    def test_intermission_graph_and_reward_state_passthrough(self) -> None:
+        calls = []
+        with (
+            mock.patch.object(SERVER, "_DIAGNOSTICS_GO_ID", 77),
+            mock.patch.object(SERVER, "_call_http", side_effect=_diag_fake_http(calls)),
+        ):
+            r_graph_default = SERVER.execute_tool("diagnostics_get_intermission_graph", {})
+            r_graph_custom = SERVER.execute_tool(
+                "diagnostics_get_intermission_graph",
+                {"preferredRewardType": "RelicReward", "maxRoutes": 4, "maxNodes": 20},
+            )
+            r_reward_default = SERVER.execute_tool("diagnostics_get_intermission_reward_state", {})
+            r_reward_custom = SERVER.execute_tool("diagnostics_get_intermission_reward_state", {"maxCards": 12})
+
+        self.assertFalse(r_graph_default["isError"])
+        self.assertFalse(r_graph_custom["isError"])
+        self.assertFalse(r_reward_default["isError"])
+        self.assertFalse(r_reward_custom["isError"])
+        self.assertEqual(
+            [
+                {"method": "GetIntermissionGraphJson", "args": ["", 8, 64]},
+                {"method": "GetIntermissionGraphJson", "args": ["RelicReward", 4, 20]},
+                {"method": "GetIntermissionRewardStateJson", "args": [32]},
+                {"method": "GetIntermissionRewardStateJson", "args": [12]},
+            ],
+            [{"method": c["method"], "args": c["args"]} for c in calls],
+        )
+
+    def test_intermission_action_tools_passthrough_and_validation(self) -> None:
+        calls = []
+        with (
+            mock.patch.object(SERVER, "_DIAGNOSTICS_GO_ID", 77),
+            mock.patch.object(SERVER, "_call_http", side_effect=_diag_fake_http(calls)),
+        ):
+            r_load = SERVER.execute_tool("diagnostics_order_trigger_load_level", {})
+            r_choose = SERVER.execute_tool(
+                "diagnostics_order_choose_intermission_reward",
+                {"rewardId": "Factory_Tank", "slotIndex": 1},
+            )
+            r_choose_bad = SERVER.execute_tool(
+                "diagnostics_order_choose_intermission_reward",
+                {"slotIndex": "bad"},
+            )
+            r_skip = SERVER.execute_tool("diagnostics_order_skip_intermission_reward", {})
+            r_reroll = SERVER.execute_tool("diagnostics_order_reroll_intermission_reward", {})
+            r_upg = SERVER.execute_tool(
+                "diagnostics_order_assign_intermission_upgrade",
+                {"entityId": "Unit_Tank", "cancel": False},
+            )
+            r_deck_open = SERVER.execute_tool("diagnostics_order_set_deck_overview_open", {"open": True})
+            r_deck_bad = SERVER.execute_tool("diagnostics_order_set_deck_overview_open", {"open": "yes"})
+
+        self.assertFalse(r_load["isError"])
+        self.assertFalse(r_choose["isError"])
+        self.assertTrue(r_choose_bad["isError"])
+        self.assertFalse(r_skip["isError"])
+        self.assertFalse(r_reroll["isError"])
+        self.assertFalse(r_upg["isError"])
+        self.assertFalse(r_deck_open["isError"])
+        self.assertTrue(r_deck_bad["isError"])
+        self.assertEqual(
+            [
+                {"method": "OrderTriggerLoadLevelJson", "args": []},
+                {"method": "OrderChooseIntermissionRewardJson", "args": ["Factory_Tank", 1]},
+                {"method": "OrderSkipIntermissionRewardJson", "args": []},
+                {"method": "OrderRerollIntermissionRewardJson", "args": []},
+                {"method": "OrderAssignIntermissionUpgradeJson", "args": ["Unit_Tank", False]},
+                {"method": "OrderSetDeckOverviewOpenJson", "args": [True]},
+            ],
+            [{"method": c["method"], "args": c["args"]} for c in calls],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

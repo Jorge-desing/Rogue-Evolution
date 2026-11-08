@@ -193,16 +193,17 @@ namespace RogueCommandExpansionLoader.Runtime
                 }
 
                 Type nodeType = RuntimeIntermissionCensus.FindGameType("OverWorldMapEnemy");
-                if (nodeType == null)
+                Type bossType = RuntimeIntermissionCensus.FindGameType("OverWorldMapBoss");
+                if (nodeType == null && bossType == null)
                 {
                     selected = new IntermissionNodeSelection(
                         picked.Level, picked.Field, picked.InstanceId, false,
-                        "OverWorldMapEnemy type is not available for level " + picked.Level
+                        "OverWorldMapEnemy/OverWorldMapBoss types are not available for level " + picked.Level
                         + " field " + picked.Field + " (stop point: type lookup).");
                     return false;
                 }
 
-                object target = FindLiveNode(nodeType, picked);
+                object target = FindLiveNode(nodeType, picked) ?? FindLiveBossNode(bossType, picked);
                 if (target == null)
                 {
                     selected = new IntermissionNodeSelection(
@@ -320,6 +321,21 @@ namespace RogueCommandExpansionLoader.Runtime
                     return false;
                 }
 
+                 string afterScene = RuntimeIntermissionCensus.SafeActiveSceneName();
+                int afterLevel = RuntimeIntermissionCensus.SafeCurrentLevel();
+                bool hasOpenRewards = ReadPlayerHasOpenRewards();
+                if (HasTransitioned(beforeScene, beforeLevel, afterScene, afterLevel) || hasOpenRewards)
+                {
+                    result = new IntermissionLevelEntry(
+                        picked.Level, picked.Field, picked.InstanceId, true,
+                        "Level " + picked.Level + " node field " + picked.Field
+                        + " entered via coordinate click / LoadLevel"
+                        + " (scene '" + beforeScene + "' -> '" + afterScene
+                        + "', level " + beforeLevel + " -> " + afterLevel + ").",
+                        true, true);
+                    return true;
+                }
+
                 Type loadSceneType = RuntimeIntermissionCensus.FindGameType("LoadScene");
                 object loadSceneInstance = loadSceneType == null
                     ? null
@@ -333,6 +349,35 @@ namespace RogueCommandExpansionLoader.Runtime
                         + " (stop point: corridor missing).",
                         true, false);
                     return false;
+                }
+
+                MethodInfo loadLevelMethod = loadSceneInstance.GetType().GetMethod(
+                    "LoadLevel", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+                    null, Type.EmptyTypes, null);
+                if (loadLevelMethod != null)
+                {
+                    try
+                    {
+                        loadLevelMethod.Invoke(loadSceneInstance, null);
+                    }
+                    catch
+                    {
+                    }
+
+                    afterScene = RuntimeIntermissionCensus.SafeActiveSceneName();
+                    afterLevel = RuntimeIntermissionCensus.SafeCurrentLevel();
+                    hasOpenRewards = ReadPlayerHasOpenRewards();
+                    if (HasTransitioned(beforeScene, beforeLevel, afterScene, afterLevel) || hasOpenRewards)
+                    {
+                        result = new IntermissionLevelEntry(
+                            picked.Level, picked.Field, picked.InstanceId, true,
+                            "Level " + picked.Level + " node field " + picked.Field
+                            + " entered via LoadScene.LoadLevel"
+                            + " (scene '" + beforeScene + "' -> '" + afterScene
+                            + "', level " + beforeLevel + " -> " + afterLevel + ").",
+                            true, true);
+                        return true;
+                    }
                 }
 
                 MethodInfo startCoroutine = loadSceneInstance.GetType().GetMethod(
@@ -361,8 +406,8 @@ namespace RogueCommandExpansionLoader.Runtime
                     return false;
                 }
 
-                string afterScene = RuntimeIntermissionCensus.SafeActiveSceneName();
-                int afterLevel = RuntimeIntermissionCensus.SafeCurrentLevel();
+                afterScene = RuntimeIntermissionCensus.SafeActiveSceneName();
+                afterLevel = RuntimeIntermissionCensus.SafeCurrentLevel();
                 if (HasTransitioned(beforeScene, beforeLevel, afterScene, afterLevel))
                 {
                     result = new IntermissionLevelEntry(
@@ -397,6 +442,11 @@ namespace RogueCommandExpansionLoader.Runtime
 
         private static object FindLiveNode(Type nodeType, IntermissionNodeRow picked)
         {
+            if (nodeType == null)
+            {
+                return null;
+            }
+
             foreach (object node in RuntimeIntermissionCensus.ReadNodeObjects(nodeType))
             {
                 if (node == null)
@@ -426,6 +476,68 @@ namespace RogueCommandExpansionLoader.Runtime
             }
 
             return null;
+        }
+
+        private static object FindLiveBossNode(Type bossType, IntermissionNodeRow picked)
+        {
+            if (bossType == null)
+            {
+                return null;
+            }
+
+            foreach (object boss in RuntimeIntermissionCensus.ReadNodeObjects(bossType))
+            {
+                if (boss == null)
+                {
+                    continue;
+                }
+
+                if (picked.InstanceId != 0)
+                {
+                    int instanceId = RuntimeIntermissionCensus.ReadInstanceId(boss);
+                    if (instanceId == picked.InstanceId)
+                    {
+                        return boss;
+                    }
+                }
+
+                object levelMap = RuntimeIntermissionCensus.ReadObjectField(boss, "_levelMap");
+                int bossLevel = RuntimeIntermissionCensus.ReadBossLevel(levelMap);
+                if (bossLevel > 0 && picked.Level == bossLevel && picked.Field == 0)
+                {
+                    bool isChoosable = RuntimeIntermissionCensus.ReadBoolField(boss, "_isChoosable", false);
+                    if (isChoosable)
+                    {
+                        return boss;
+                    }
+                }
+            }
+
+            return null;
+        }
+
+        private static bool ReadPlayerHasOpenRewards()
+        {
+            try
+            {
+                Type gameType = RuntimeIntermissionCensus.FindGameType("Game");
+                if (gameType == null)
+                {
+                    return false;
+                }
+
+                PropertyInfo prop = gameType.GetProperty(
+                    "PlayerHasOpenRewards", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+                if (prop != null && prop.CanRead && prop.PropertyType == typeof(bool))
+                {
+                    return (bool)prop.GetValue(null, null);
+                }
+            }
+            catch
+            {
+            }
+
+            return false;
         }
 
         private static bool IsSelectedInCensus(IntermissionCensus census, IntermissionNodeRow picked)

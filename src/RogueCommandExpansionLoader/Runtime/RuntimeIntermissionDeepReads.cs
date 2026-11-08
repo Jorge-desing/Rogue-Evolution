@@ -145,6 +145,121 @@ namespace RogueCommandExpansionLoader.Runtime
     }
 
     /// <summary>
+    /// One node in the complete intermission LevelMap graph (regular levels 0..LevelCount-1 plus the Boss node at LevelCount).
+    /// </summary>
+    public readonly struct IntermissionGraphNode
+    {
+        public IntermissionGraphNode(
+            int level,
+            int field,
+            string rewardType,
+            string blueprintPoolId,
+            bool isChoosable,
+            bool isVisited,
+            IReadOnlyList<int> toFields)
+        {
+            Level = level;
+            Field = field;
+            RewardType = rewardType ?? "Combat";
+            BlueprintPoolId = blueprintPoolId ?? string.Empty;
+            IsChoosable = isChoosable;
+            IsVisited = isVisited;
+            ToFields = toFields ?? Array.Empty<int>();
+        }
+
+        public int Level { get; }
+        public int Field { get; }
+        public string RewardType { get; }
+        public string BlueprintPoolId { get; }
+        public bool IsChoosable { get; }
+        public bool IsVisited { get; }
+        public IReadOnlyList<int> ToFields { get; }
+    }
+
+    /// <summary>
+    /// One forward path from the current choosable frontier to the stage Boss node.
+    /// </summary>
+    public readonly struct IntermissionRouteOption
+    {
+        public IntermissionRouteOption(
+            int rank,
+            int score,
+            int matchedPreferredCount,
+            int totalRewardNodeCount,
+            IReadOnlyList<string> steps,
+            IReadOnlyList<string> rewardTypes)
+        {
+            Rank = rank;
+            Score = score;
+            MatchedPreferredCount = matchedPreferredCount;
+            TotalRewardNodeCount = totalRewardNodeCount;
+            Steps = steps ?? Array.Empty<string>();
+            RewardTypes = rewardTypes ?? Array.Empty<string>();
+        }
+
+        public int Rank { get; }
+        public int Score { get; }
+        public int MatchedPreferredCount { get; }
+        public int TotalRewardNodeCount { get; }
+        public IReadOnlyList<string> Steps { get; }
+        public IReadOnlyList<string> RewardTypes { get; }
+    }
+
+    /// <summary>
+    /// Bounded snapshot of the full LevelMap graph and scored forward routes to the Boss node.
+    /// Omission counters precede detail collections by contract.
+    /// </summary>
+    public sealed class IntermissionGraphSnapshot
+    {
+        public IntermissionGraphSnapshot(
+            bool isAvailable,
+            int omittedNodeCount,
+            int omittedRouteCount,
+            int currentLevel,
+            int currentField,
+            int levelCount,
+            bool isLastLevelBeforeBoss,
+            string preferredRewardType,
+            int nodeCount,
+            int routeCount,
+            IReadOnlyList<IntermissionGraphNode> nodes,
+            IReadOnlyList<IntermissionRouteOption> routes)
+        {
+            IsAvailable = isAvailable;
+            OmittedNodeCount = omittedNodeCount;
+            OmittedRouteCount = omittedRouteCount;
+            CurrentLevel = currentLevel;
+            CurrentField = currentField;
+            LevelCount = levelCount;
+            IsLastLevelBeforeBoss = isLastLevelBeforeBoss;
+            PreferredRewardType = preferredRewardType ?? string.Empty;
+            NodeCount = nodeCount;
+            RouteCount = routeCount;
+            Nodes = nodes ?? Array.Empty<IntermissionGraphNode>();
+            Routes = routes ?? Array.Empty<IntermissionRouteOption>();
+        }
+
+        public bool IsAvailable { get; }
+        public int OmittedNodeCount { get; }
+        public int OmittedRouteCount { get; }
+        public int CurrentLevel { get; }
+        public int CurrentField { get; }
+        public int LevelCount { get; }
+        public bool IsLastLevelBeforeBoss { get; }
+        public string PreferredRewardType { get; }
+        public int NodeCount { get; }
+        public int RouteCount { get; }
+        public IReadOnlyList<IntermissionGraphNode> Nodes { get; }
+        public IReadOnlyList<IntermissionRouteOption> Routes { get; }
+
+        public static IntermissionGraphSnapshot Unavailable { get; } =
+            new IntermissionGraphSnapshot(
+                false, 0, 0, -1, -1, 0, false, string.Empty, 0, 0,
+                Array.Empty<IntermissionGraphNode>(),
+                Array.Empty<IntermissionRouteOption>());
+    }
+
+    /// <summary>
     /// Read-only deep reads over the live <c>LevelMap</c> for the intermission
     /// map. Reflection-only over the pinned getter
     /// <c>Game.StageMap.CurrentLevelMap</c> (from pinned decompiled
@@ -302,6 +417,284 @@ namespace RogueCommandExpansionLoader.Runtime
             }
         }
 
+        public static string ClassifyPrimaryRewardType(
+            bool isBoss,
+            bool isRestSite,
+            bool isShop,
+            bool hasCardReward,
+            bool hasUpgradeReward,
+            bool hasRelicReward,
+            bool hasResearchReward,
+            bool hasCoinReward,
+            bool hasStartCrystalReward,
+            bool hasResearchPointsReward,
+            bool hasDropReward)
+        {
+            if (isBoss) return "Boss";
+            if (isRestSite) return "RestSite";
+            if (isShop) return "Shop";
+            if (hasCardReward) return "CardReward";
+            if (hasUpgradeReward) return "UpgradeReward";
+            if (hasRelicReward) return "RelicReward";
+            if (hasResearchReward) return "ResearchReward";
+            if (hasDropReward) return "DropReward";
+            if (hasCoinReward) return "CoinReward";
+            if (hasStartCrystalReward) return "StartCrystalReward";
+            if (hasResearchPointsReward) return "ResearchPointsReward";
+            return "Combat";
+        }
+
+        public static IntermissionGraphSnapshot BuildIntermissionGraph(
+            int currentLevel,
+            int currentField,
+            int levelCount,
+            IReadOnlyList<IntermissionGraphNode> allNodes,
+            string preferredRewardType = "",
+            int maxRoutes = 8,
+            int maxNodes = 64)
+        {
+            if (levelCount <= 0 || allNodes == null || allNodes.Count == 0)
+            {
+                return IntermissionGraphSnapshot.Unavailable;
+            }
+
+            string preferred = (preferredRewardType ?? string.Empty).Trim();
+            int clampedMaxNodes = maxNodes <= 0 ? 64 : maxNodes;
+            int clampedMaxRoutes = maxRoutes <= 0 ? 8 : maxRoutes;
+            bool isLastBeforeBoss = currentLevel == levelCount - 1;
+
+            var sortedNodes = new List<IntermissionGraphNode>(allNodes);
+            sortedNodes.Sort((a, b) =>
+            {
+                int byLevel = a.Level.CompareTo(b.Level);
+                return byLevel != 0 ? byLevel : a.Field.CompareTo(b.Field);
+            });
+
+            var nodeMap = new Dictionary<(int Level, int Field), IntermissionGraphNode>();
+            for (int i = 0; i < sortedNodes.Count; i++)
+            {
+                IntermissionGraphNode node = sortedNodes[i];
+                nodeMap[(node.Level, node.Field)] = node;
+            }
+
+            var rawPaths = new List<List<IntermissionGraphNode>>();
+            var currentPath = new List<IntermissionGraphNode>();
+            const int maxRawPaths = 256;
+
+            for (int i = 0; i < sortedNodes.Count; i++)
+            {
+                IntermissionGraphNode startNode = sortedNodes[i];
+                if (!startNode.IsChoosable)
+                {
+                    continue;
+                }
+
+                currentPath.Clear();
+                currentPath.Add(startNode);
+                ExpandForwardPaths(startNode, levelCount, nodeMap, currentPath, rawPaths, maxRawPaths);
+            }
+
+            var scoredRoutes = new List<IntermissionRouteOption>();
+            for (int i = 0; i < rawPaths.Count; i++)
+            {
+                List<IntermissionGraphNode> path = rawPaths[i];
+                int matched = 0;
+                int totalRewards = 0;
+                var steps = new List<string>(path.Count);
+                var rewards = new List<string>(path.Count);
+                for (int j = 0; j < path.Count; j++)
+                {
+                    IntermissionGraphNode step = path[j];
+                    steps.Add(step.Level.ToString(CultureInfo.InvariantCulture)
+                        + ":" + step.Field.ToString(CultureInfo.InvariantCulture));
+                    rewards.Add(step.RewardType);
+                    bool isNonBossReward = !string.Equals(step.RewardType, "Boss", StringComparison.OrdinalIgnoreCase)
+                        && !string.Equals(step.RewardType, "Combat", StringComparison.OrdinalIgnoreCase);
+                    if (isNonBossReward)
+                    {
+                        totalRewards++;
+                    }
+
+                    if (!string.IsNullOrEmpty(preferred)
+                        && (string.Equals(step.RewardType, preferred, StringComparison.OrdinalIgnoreCase)
+                            || (!string.IsNullOrEmpty(step.BlueprintPoolId)
+                                && string.Equals(step.BlueprintPoolId, preferred, StringComparison.OrdinalIgnoreCase))))
+                    {
+                        matched++;
+                    }
+                }
+
+                int score = matched * 100 + totalRewards * 10;
+                scoredRoutes.Add(new IntermissionRouteOption(
+                    0, score, matched, totalRewards, steps.AsReadOnly(), rewards.AsReadOnly()));
+            }
+
+            scoredRoutes.Sort((a, b) =>
+            {
+                int byScore = b.Score.CompareTo(a.Score);
+                if (byScore != 0)
+                {
+                    return byScore;
+                }
+
+                string aSteps = string.Join(",", a.Steps);
+                string bSteps = string.Join(",", b.Steps);
+                return string.CompareOrdinal(aSteps, bSteps);
+            });
+
+            int keptRouteCount = scoredRoutes.Count <= clampedMaxRoutes ? scoredRoutes.Count : clampedMaxRoutes;
+            int omittedRoutes = scoredRoutes.Count - keptRouteCount;
+            var keptRoutes = new List<IntermissionRouteOption>(keptRouteCount);
+            for (int i = 0; i < keptRouteCount; i++)
+            {
+                IntermissionRouteOption r = scoredRoutes[i];
+                keptRoutes.Add(new IntermissionRouteOption(
+                    i + 1, r.Score, r.MatchedPreferredCount, r.TotalRewardNodeCount, r.Steps, r.RewardTypes));
+            }
+
+            int keptNodeCount = sortedNodes.Count <= clampedMaxNodes ? sortedNodes.Count : clampedMaxNodes;
+            int omittedNodes = sortedNodes.Count - keptNodeCount;
+            var keptNodes = sortedNodes.GetRange(0, keptNodeCount).AsReadOnly();
+
+            return new IntermissionGraphSnapshot(
+                true,
+                omittedNodes,
+                omittedRoutes,
+                currentLevel,
+                currentField,
+                levelCount,
+                isLastBeforeBoss,
+                preferred,
+                keptNodeCount,
+                keptRouteCount,
+                keptNodes,
+                keptRoutes.AsReadOnly());
+        }
+
+        private static void ExpandForwardPaths(
+            IntermissionGraphNode current,
+            int bossLevel,
+            Dictionary<(int Level, int Field), IntermissionGraphNode> nodeMap,
+            List<IntermissionGraphNode> currentPath,
+            List<List<IntermissionGraphNode>> results,
+            int maxPaths)
+        {
+            if (results.Count >= maxPaths)
+            {
+                return;
+            }
+
+            if (current.Level >= bossLevel || current.ToFields == null || current.ToFields.Count == 0)
+            {
+                results.Add(new List<IntermissionGraphNode>(currentPath));
+                return;
+            }
+
+            int nextLevel = current.Level + 1;
+            for (int i = 0; i < current.ToFields.Count; i++)
+            {
+                if (results.Count >= maxPaths)
+                {
+                    return;
+                }
+
+                int nextField = current.ToFields[i];
+                IntermissionGraphNode nextNode;
+                if (!nodeMap.TryGetValue((nextLevel, nextField), out nextNode))
+                {
+                    continue;
+                }
+
+                currentPath.Add(nextNode);
+                ExpandForwardPaths(nextNode, bossLevel, nodeMap, currentPath, results, maxPaths);
+                currentPath.RemoveAt(currentPath.Count - 1);
+            }
+        }
+
+        public static IntermissionGraphSnapshot CurrentGraph(
+            string preferredRewardType = "", int maxRoutes = 8, int maxNodes = 64)
+        {
+            try
+            {
+                object levelMap = ResolveCurrentLevelMap();
+                if (levelMap == null)
+                {
+                    return IntermissionGraphSnapshot.Unavailable;
+                }
+
+                Type type = levelMap.GetType();
+                int currentLevel = ReadIntProperty(type, levelMap, "CurrentLevel", -1);
+                int currentField = ReadIntProperty(type, levelMap, "CurrentField", -1);
+                bool lastBeforeBoss = ReadBoolProperty(type, levelMap, "IsLastLevelBeforeBoss", false);
+                bool isBoss = ReadBoolProperty(type, levelMap, "IsBoss", false);
+                int levelCount = ReadIntField(type, levelMap, "LevelCount", 0);
+                if (levelCount <= 0)
+                {
+                    return IntermissionGraphSnapshot.Unavailable;
+                }
+
+                List<int> chosenPath = ReadIntList(type, levelMap, "ChosenPath");
+                var nodes = new List<IntermissionGraphNode>();
+                for (int level = 0; level < levelCount; level++)
+                {
+                    List<int> fields = ReadFields(levelMap, level);
+                    List<(int, int)> nextConnections = level + 1 < levelCount
+                        ? ReadConnections(levelMap, level + 1)
+                        : new List<(int, int)>();
+                    for (int f = 0; f < fields.Count; f++)
+                    {
+                        int field = fields[f];
+                        bool isChoosable = InvokeBoolMethod(type, levelMap, "IsChoosable", level, field, false);
+                        bool rest = InvokeBoolMethod(type, levelMap, "IsRestSite", level, field, false);
+                        bool shop = InvokeBoolMethod(type, levelMap, "IsShop", level, field, false);
+                        bool card = InvokeBoolMethod(type, levelMap, "IsCardReward", level, field, false);
+                        bool upgrade = InvokeBoolMethod(type, levelMap, "IsUpgradeReward", level, field, false);
+                        bool relic = InvokeBoolMethod(type, levelMap, "IsRelicReward", level, field, false);
+                        bool research = InvokeBoolMethod(type, levelMap, "IsResearchReward", level, field, false);
+                        bool coin = InvokeBoolMethod(type, levelMap, "IsCoinReward", level, field, false);
+                        bool crystal = InvokeBoolMethod(type, levelMap, "IsStartCrystalReward", level, field, false);
+                        bool points = InvokeBoolMethod(type, levelMap, "IsResearchPointsReward", level, field, false);
+                        bool drop = InvokeBoolMethod(type, levelMap, "IsDropReward", level, field, false);
+                        string poolId = InvokeStringMethod(type, levelMap, "BlueprintPoolId", level, field);
+                        string rewardType = ClassifyPrimaryRewardType(
+                            false, rest, shop, card, upgrade, relic, research, coin, crystal, points, drop);
+
+                        var toFields = new List<int>();
+                        if (level == levelCount - 1)
+                        {
+                            toFields.Add(0);
+                        }
+                        else
+                        {
+                            for (int c = 0; c < nextConnections.Count; c++)
+                            {
+                                if (nextConnections[c].Item1 == field && !toFields.Contains(nextConnections[c].Item2))
+                                {
+                                    toFields.Add(nextConnections[c].Item2);
+                                }
+                            }
+
+                            toFields.Sort();
+                        }
+
+                        bool isVisited = level < chosenPath.Count && chosenPath[level] == field;
+                        nodes.Add(new IntermissionGraphNode(
+                            level, field, rewardType, poolId, isChoosable, isVisited, toFields.AsReadOnly()));
+                    }
+                }
+
+                nodes.Add(new IntermissionGraphNode(
+                    levelCount, 0, "Boss", string.Empty, lastBeforeBoss, isBoss, Array.Empty<int>()));
+
+                return BuildIntermissionGraph(
+                    currentLevel, currentField, levelCount, nodes, preferredRewardType, maxRoutes, maxNodes);
+            }
+            catch
+            {
+                return IntermissionGraphSnapshot.Unavailable;
+            }
+        }
+
         private static bool HasField(Type type, object instance, int level)
         {
             try
@@ -449,6 +842,31 @@ namespace RogueCommandExpansionLoader.Runtime
             }
 
             return 0;
+        }
+
+        private static List<int> ReadIntList(Type type, object instance, string name)
+        {
+            var result = new List<int>();
+            try
+            {
+                FieldInfo field = type.GetField(name, InstanceMembers);
+                object value = field != null ? field.GetValue(instance) : null;
+                if (value is System.Collections.IEnumerable enumerable)
+                {
+                    foreach (object item in enumerable)
+                    {
+                        if (item is int intValue)
+                        {
+                            result.Add(intValue);
+                        }
+                    }
+                }
+            }
+            catch
+            {
+            }
+
+            return result;
         }
 
         private static object InvokeOneArg(Type type, object instance, string name, int arg)
