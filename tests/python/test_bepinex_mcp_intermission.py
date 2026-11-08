@@ -386,5 +386,105 @@ class UiClickTests(unittest.TestCase):
         self.assertIn("buttonName", payload["message"])
 
 
+class JumpToLevelTests(unittest.TestCase):
+    """diagnostics_jump_to_level delegates to TryJumpToLevelJson with the
+    (level, finished) pair; the in-game result is labeled synthetic."""
+
+    def test_jump_to_level_passes_level_and_finished(self) -> None:
+        calls = []
+
+        def fake_http(endpoint, params=None, **_):
+            self.assertEqual("component/call_method", endpoint)
+            calls.append({"params": dict(params or {})})
+            return json.dumps(
+                {
+                    "status": "ok",
+                    "message": "Called 'TryJumpToLevelJson' with 2 args. "
+                    'ReturnValue: {"kind": "syntheticJumpResult", "success": true, '
+                    '"synthetic": true, "method": "JumpTo(bool,int)", "level": 4, "finished": false}',
+                }
+            )
+
+        with (
+            mock.patch.object(SERVER, "_DIAGNOSTICS_GO_ID", 77),
+            mock.patch.object(SERVER, "_call_http", side_effect=fake_http),
+        ):
+            response = SERVER.execute_tool(
+                "diagnostics_jump_to_level", {"level": 4}
+            )
+
+        self.assertFalse(response["isError"])
+        payload = json.loads(response["content"][0]["text"])
+        self.assertTrue(payload["success"])
+        self.assertTrue(payload["synthetic"])
+        self.assertEqual("syntheticJumpResult", payload["kind"])
+        self.assertEqual("JumpTo(bool,int)", payload["method"])
+        self.assertEqual(4, payload["level"])
+        self.assertFalse(payload["finished"])
+        self.assertEqual("TryJumpToLevelJson", calls[0]["params"]["methodName"])
+        self.assertEqual([4, False], json.loads(calls[0]["params"]["args"]))
+
+    def test_jump_to_level_finished_passthrough(self) -> None:
+        calls = []
+
+        def fake_http(endpoint, params=None, **_):
+            self.assertEqual("component/call_method", endpoint)
+            calls.append({"params": dict(params or {})})
+            return json.dumps(
+                {
+                    "status": "ok",
+                    "message": "Called 'TryJumpToLevelJson' with 2 args. "
+                    'ReturnValue: {"kind": "syntheticJumpResult", "success": true, '
+                    '"synthetic": true, "level": 3, "finished": true}',
+                }
+            )
+
+        with (
+            mock.patch.object(SERVER, "_DIAGNOSTICS_GO_ID", 77),
+            mock.patch.object(SERVER, "_call_http", side_effect=fake_http),
+        ):
+            response = SERVER.execute_tool(
+                "diagnostics_jump_to_level", {"level": 3, "finished": True}
+            )
+
+        self.assertFalse(response["isError"])
+        self.assertEqual([3, True], json.loads(calls[0]["params"]["args"]))
+
+    def test_jump_to_level_requires_integer_level(self) -> None:
+        response = SERVER.execute_tool("diagnostics_jump_to_level", {})
+        self.assertTrue(response["isError"])
+        payload = json.loads(response["content"][0]["text"])
+        self.assertIn("level", payload["error"])
+
+    def test_load_next_level_delegates_with_no_args(self) -> None:
+        calls = []
+
+        def fake_http(endpoint, params=None, **_):
+            self.assertEqual("component/call_method", endpoint)
+            calls.append({"params": dict(params or {})})
+            return json.dumps(
+                {
+                    "status": "ok",
+                    "message": "Called 'TryLoadNextLevelJson' with 0 args. "
+                    'ReturnValue: {"kind": "syntheticJumpResult", "success": true, '
+                    '"synthetic": true, "method": "LoadScene.LoadNextLevel", "level": -1}',
+                }
+            )
+
+        with (
+            mock.patch.object(SERVER, "_DIAGNOSTICS_GO_ID", 77),
+            mock.patch.object(SERVER, "_call_http", side_effect=fake_http),
+        ):
+            response = SERVER.execute_tool("diagnostics_load_next_level", {})
+
+        self.assertFalse(response["isError"])
+        payload = json.loads(response["content"][0]["text"])
+        self.assertTrue(payload["success"])
+        self.assertTrue(payload["synthetic"])
+        self.assertEqual("LoadScene.LoadNextLevel", payload["method"])
+        self.assertEqual("TryLoadNextLevelJson", calls[0]["params"]["methodName"])
+        self.assertEqual([], json.loads(calls[0]["params"]["args"]))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -755,6 +755,33 @@ namespace RogueCommandExpansionLoader.Runtime
         }
 
         /// <summary>
+        /// User-authorized synthetic level load: starts the native
+        /// LoadScene.LoadNextLevel corridor on the live LoadScene instance
+        /// (the same coroutine the intermission director starts after a node
+        /// selection). Fail-closed when the corridor is unavailable. The
+        /// result is labeled synthetic: it can never be read as natural
+        /// progression evidence. Never touches profile/save files.
+        /// </summary>
+        public string TryLoadNextLevelJson()
+        {
+            return AgentDiagnosticsFormatter.SerializeSyntheticJumpResult(
+                RuntimeIntermissionSyntheticJump.TryStartNextLevelLoad());
+        }
+
+        /// <summary>
+        /// User-authorized synthetic stage jump for runtime-validation
+        /// automation. Invokes StageMap.JumpTo(level[, finished]) via
+        /// reflection and fails closed when the method is absent. The result
+        /// is labeled synthetic: it can never be read as natural progression
+        /// evidence. Never touches profile/save files.
+        /// </summary>
+        public string TryJumpToLevelJson(int level, bool finished = false)
+        {
+            return AgentDiagnosticsFormatter.SerializeSyntheticJumpResult(
+                RuntimeIntermissionSyntheticJump.TryJumpToLevel(level, finished));
+        }
+
+        /// <summary>
         /// Clicks a UI element or a 3D world object by real screen coordinates
         /// (RectTransform projection → EventSystem raycast → input-module
         /// pointer sequence replay; or camera projection → physics raycast →

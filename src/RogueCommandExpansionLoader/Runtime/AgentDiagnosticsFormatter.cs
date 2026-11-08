@@ -1038,6 +1038,30 @@ namespace RogueCommandExpansionLoader.Runtime
         }
 
         /// <summary>
+        /// Serializes the synthetic stage-jump result. The synthetic outcome
+        /// comes first and is always labeled, so the result can never be read
+        /// as natural progression evidence.
+        /// </summary>
+        public static string SerializeSyntheticJumpResult(SyntheticJumpResult result)
+        {
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "syntheticJumpResult",
+                ["success"] = result.Success,
+                ["synthetic"] = result.Synthetic,
+                ["method"] = result.Method ?? string.Empty,
+                ["level"] = result.Level,
+                ["finished"] = result.Finished,
+                ["beforeStage"] = result.BeforeStage,
+                ["beforeLevel"] = result.BeforeLevel,
+                ["afterStage"] = result.AfterStage,
+                ["afterLevel"] = result.AfterLevel,
+                ["message"] = result.Message ?? string.Empty,
+            };
+            return Serialize(view);
+        }
+
+        /// <summary>
         /// Serializes the coordinate-click result. The clicked outcome comes
         /// before detail so bounded truncation never hides it.
         /// </summary>

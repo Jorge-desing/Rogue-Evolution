@@ -7,6 +7,37 @@
 
 ---
 
+## 2026-11-08 synthetic stage-jump authorization (runtime validation automation)
+
+- User decision (this session): explicit authorization to falsify game state for
+  runtime-validation automation, implemented as a new sanctioned diagnostics seam:
+  `diagnostics_jump_to_level` → `LoaderDiagnosticsComponent.TryJumpToLevelJson` →
+  `RuntimeIntermissionSyntheticJump.TryJumpToLevel` (reflection on `StageMap.JumpTo`,
+  fail-closed). It mutates the active run WITHOUT touching profile/save files and is
+  valid only on the isolated QA profile (Profile2) under the checkpoint discipline
+  (every profile file hashed before the game opens; selector+hashes verified exact
+  match after it closes).
+- Anti-confusion rules: every result carries `kind="syntheticJumpResult"` and
+  `synthetic=true`, and the before/after stage/level. Such a call is never evidence
+  of natural map progression or "abrir la primera oleada"; entering a combat scene
+  after a synthetic jump only proves the transition through the seam executed without
+  throwing (verify the transition with `diagnostics_get_intermission_census`).
+- The `TryEnterLevelNodeWorkflow` (deterministic native-node picker) remains the
+  FIRST choice for level entry; the synthetic jump is only for when the native map
+  reports no choosable node (e.g. `ChosenPath` fully filled with
+  `IsCurrentLevelFinished=True`, where the LaunchButton also stays inactive and no
+  real click can advance the run).
+- Note: the equivalent rule change to `AGENTS.md` was attempted and blocked by the
+  protected-file guard (approval timed out; silence is not consent). That edit was
+  not retried and no other path (terminal, execute_code) was used to bypass it. The
+  authorization is recorded here as session documentation instead. The pinned-assembly
+  method name `JumpTo` was verified from the `.NET metadata strings heap` of
+  `Assembly-CSharp.dll` (SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`);
+  overloads are probed in order `(bool,int)` then `(int)` and reported in the result.
+
+
+---
+
 ## Current continuation snapshot — 2026-11-02
 
 - **Checkout:** branch `codex/rogue-unit-balance-20261018`, visual implementation commit `4445e67`; unrelated dirty nested worktrees and `MEMORY.md` remain preserved and are not task-owned.

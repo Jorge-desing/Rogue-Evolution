@@ -2197,6 +2197,24 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             res = _call_diagnostics_method("OrderEnterLevelNodeJson", [level, field])
             return _tool_response(res)
 
+        elif name == "diagnostics_jump_to_level":
+            # User-authorized synthetic stage jump (StageMap.JumpTo via
+            # reflection). The result is labeled synthetic and can never be
+            # read as natural progression evidence.
+            try:
+                level = int(arguments["level"])
+            except (KeyError, TypeError, ValueError):
+                return _tool_response(json.dumps({"error": "level must be an integer"}), is_error=True)
+            finished = bool(arguments.get("finished", False))
+            res = _call_diagnostics_method("TryJumpToLevelJson", [level, finished])
+            return _tool_response(res)
+
+        elif name == "diagnostics_load_next_level":
+            # User-authorized synthetic level load: starts the native
+            # LoadScene.LoadNextLevel corridor after a synthetic stage jump.
+            res = _call_diagnostics_method("TryLoadNextLevelJson", [])
+            return _tool_response(res)
+
         elif name == "diagnostics_order_select_level_node":
             try:
                 level = int(arguments["level"])
