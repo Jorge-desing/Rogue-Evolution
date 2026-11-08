@@ -178,6 +178,10 @@ class TacticalAnimationImprovementTests(unittest.TestCase):
         # Debe haber un frame intermedio entre 10 y 25 además de 28/35
         self.assertTrue(any(10 <= f <= 25 for f in all_frames), "Death debe tener un frame de medio colapso (slow in/out), no salto directo a f28")
 
+    def test_locomotion_only_flag_exists(self) -> None:
+        args = [a.arg for a in self.fn.args.args]
+        self.assertIn("locomotion_only", args)
+
     def test_frame_end_overrides_exist(self) -> None:
         # BastionSiegeMech valida en Unity FireRecoil 15 frames y Death 45 frames
         # (RogueCommandVisualSampleScaffolder.ValidateRiggedWalkerSources).

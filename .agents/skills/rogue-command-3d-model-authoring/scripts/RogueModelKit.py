@@ -11026,6 +11026,7 @@ def generate_procedural_action_clips(
     hover: bool | None = None,
     fire_end_frame: int | None = None,
     death_end_frame: int | None = None,
+    locomotion_only: bool = False,
 ) -> dict[str, bpy.types.Action]:
     """Generates baked NLA animation clips (Idle, Walk/Drive, FireRecoil, Death) on the armature.
 
@@ -11043,7 +11044,9 @@ def generate_procedural_action_clips(
     ``fire_end_frame``/``death_end_frame`` override the authored clip end for
     units with a verified frame contract (BastionSiegeMech validates
     FireRecoil 15 frames and Death 45 frames in Unity); ``None`` keeps the
-    profile default (FireRecoil 15/18/21, Death 35).
+    profile default (FireRecoil 15/18/21, Death 35). ``locomotion_only=True``
+    deletes Idle/FireRecoil/Death so the rig exports only Walk/Drive;
+    attack feedback then comes from the runtime turret director + muzzle VFX.
     """
     if not armature_obj.animation_data:
         armature_obj.animation_data_create()
@@ -11387,6 +11390,20 @@ def generate_procedural_action_clips(
 
     act_death.use_fake_user = True
     actions["Death"] = act_death
+
+    # Tactical locomotion-only: remove non-movement clips; the turret director
+    # plus muzzle VFX provide attack feedback trained on attack cooldown.
+    if locomotion_only:
+        for _key in ("Idle", "FireRecoil", "Death"):
+            _act = actions.pop(_key, None)
+            if _act is not None:
+                try:
+                    bpy.data.actions.remove(_act)
+                except ReferenceError:
+                    pass
+        _locomotion = actions.get("Walk") or actions.get("Drive")
+        if _locomotion is not None:
+            armature_obj.animation_data.action = _locomotion
 
     # Push actions to NLA tracks for complete FBX export
     for name, act in actions.items():
@@ -12683,6 +12700,7 @@ class RogueVehicleBuilder:
                 self.armature_object,
                 prefix=self.name,
                 leg_type=self.leg_type,
+                locomotion_only=getattr(self, "locomotion_only", False),
             )
         return self
 

@@ -65,7 +65,7 @@ def build_field_medic_rover_model() -> None:
         leg_type=None,
         with_ik=False,
     )
-    actions = rmk.generate_procedural_action_clips(armature, prefix=UNIT_NAME, leg_type=None)
+    actions = rmk.generate_procedural_action_clips(armature, prefix=UNIT_NAME, leg_type=None, locomotion_only=True)
     _validate_root_motion(armature, actions["Walk"])
     _validate_rigid_weights(meshes, armature)
 

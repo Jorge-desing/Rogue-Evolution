@@ -20,6 +20,7 @@ from VisualModelAuthoringSupport import (
 
 
 def refine(builder) -> None:
+    builder.locomotion_only = True  # Solo Walk/Drive; ataque por torreta director
     """Add a readable relay mast and shield-service hardware to the support chassis."""
     p = builder.palette
     mast_x, mast_y = 0.0, -0.72

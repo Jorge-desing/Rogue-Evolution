@@ -71,7 +71,7 @@ def build_arc_lance_walker_model() -> None:
         foot_loc_r=Vector((0.52, 0.18, 0.0)),
         with_ik=False,
     )
-    actions = rmk.generate_procedural_action_clips(armature, prefix=UNIT_NAME, leg_type="biped")
+    actions = rmk.generate_procedural_action_clips(armature, prefix=UNIT_NAME, leg_type="biped", locomotion_only=True)
     _validate_root_motion(armature, actions["Walk"])
     _validate_rigid_weights(meshes, armature)
 
