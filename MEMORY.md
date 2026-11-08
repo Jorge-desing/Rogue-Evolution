@@ -1529,3 +1529,15 @@ This is a compact, durable orientation for agents. For the changing checkout sta
 - Validation unchanged from last documented run (Release 0/0; C# harness 517/518; Python 419 OK at b78b314). No fresh Steam/Unity gameplay proof. Natural offer→selection→placement→production/render/stat and tactical AI remain unverified.
 - Profile2 dedicated QA without tutorial; protect saves. Before reflection verify Rogue Command 1.0.9, Unity `2021.3.45f2`, Assembly-CSharp SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, MVID `db0e9462-128d-4296-9900-de18b4bd0c00`.
 - Root MEMORY.md, codex memory, antigravity memory, and mem0 synced to HEAD b82642e (working-tree refresh).
+
+## Refresh (2026-11-08, HEAD 1b9e57a — UI-click inactive ID resolver + tactical animation locomotion/turret + restore Idle/FireRecoil/Death)
+
+- Repository `C:/Users/Alex/Documents/Mod Rogue Command`, loader `1.19.0`, branch `codex/rogue-unit-balance-20261018`. Local/upstream/origin verified at `1b9e57aa08ab716607649c7d38e543cfae0dc5fa` (`feat(animation): restore Idle/FireRecoil/Death on tactical-operations pack (FireRecoil by attack cooldown)`), after `8308847` (docs(memory): sync root MEMORY.md to HEAD b82642e + agent memories/mem0 working-tree refresh), `67e3227` (`fix(ui-click): ID resolver must include inactive objects`), `26eff09` (`feat(animation): tactical-only locomotion clips; attack via turret director (Walk/Drive)`), and `713c64d`/`be030cf` (memory syncs), following `b82642e`.
+- New committed scope since b82642e:
+  - `67e3227`: `LoaderDiagnosticsComponent` ID resolver now scans both Component and Transform instance-ID spaces (including inactive objects), so UI-click census resolution succeeds for inactive GameObjects.
+  - `26eff09`: tactical-operations pack animation reduced to tactical-only locomotion clips (Walk/Drive); attack is driven by the turret director; controllers/FBX were regenerated smaller; `RogueModelKit.py` updated.
+  - `1b9e57a`: restored Idle/FireRecoil/Death on the tactical-operations pack (FireRecoil keyed to attack cooldown); controllers/FBX restored to the prior full clip set; bundle size returned to ~36.89 MB.
+- Working tree clean at root except nested worktree gitlinks `.worktrees/cargador` (11e9968, dirty) and `.worktrees/task-graph-validation` (d1f9045, dirty), preserved. Do not stage, reset, or clean them.
+- Validation: no fresh full run in this sync. Last documented: Release plugin 0 warnings/0 errors; C# harness 517/518 (1 Windows symlink-privilege skip, 0 failures); Python 419 OK at b78b314. Live Steam UI-click validation succeeded (session ui-click-20261108b/c). Natural offer→selection→placement→production/render/stat and tactical AI remain unverified.
+- Profile2 dedicated QA without tutorial; protect saves. Before reflection verify Rogue Command 1.0.9, Unity `2021.3.45f2`, Assembly-CSharp SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, MVID `db0e9462-128d-4296-9900-de18b4bd0c00`.
+- Root MEMORY.md, codex memory, antigravity memory, and mem0 synced to HEAD 1b9e57a.
