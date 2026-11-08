@@ -4391,6 +4391,377 @@ internal static partial class ValidationTestRunner
             throw new InvalidOperationException($"Unexpected recommended stances: assault={assaultStance}, fortify={fortifyStance}, support={supportStance}");
         }
     }),
+    ("HUB-D Phase 9: AiSafeVectorPolicy calculates dynamic tactical retreat toward rally structures/support and AiBattlefieldBlackboardBuilder tracks dispersion", () =>
+    {
+        // 1. Dispersion tracking
+        var combatA = new RogueCommandExpansionLoader.Runtime.Ai.AiUnitSnapshot(
+            uniqueEntityId: 101,
+            entityId: "mod:fighter-a",
+            baseIndex: 0,
+            posX: -10f,
+            posZ: 0f,
+            currentHealth: 150f,
+            maxHealth: 150f,
+            currentShield: 0f,
+            maxShield: 0f,
+            dpsEstimate: 20f,
+            weaponRange: 12f,
+            minAttackRange: 0f,
+            moveSpeed: 8f,
+            roleFlags: 1 << 1,
+            isControlledByAi: true,
+            isControlledByPlayer: false,
+            isCombatUnit: true,
+            isHarvester: false,
+            isBuilding: false,
+            isSupportUnit: false,
+            hasQueuedCommands: false,
+            currentCommandTag: "",
+            currentTargetId: -1,
+            hasReadyActiveSkill: false,
+            activeSkillTargetsSelf: false,
+            activeSkillRange: 0f);
+
+        var combatB = new RogueCommandExpansionLoader.Runtime.Ai.AiUnitSnapshot(
+            uniqueEntityId: 102,
+            entityId: "mod:fighter-b",
+            baseIndex: 0,
+            posX: 10f,
+            posZ: 0f,
+            currentHealth: 150f,
+            maxHealth: 150f,
+            currentShield: 0f,
+            maxShield: 0f,
+            dpsEstimate: 20f,
+            weaponRange: 12f,
+            minAttackRange: 0f,
+            moveSpeed: 8f,
+            roleFlags: 1 << 1,
+            isControlledByAi: true,
+            isControlledByPlayer: false,
+            isCombatUnit: true,
+            isHarvester: false,
+            isBuilding: false,
+            isSupportUnit: false,
+            hasQueuedCommands: false,
+            currentCommandTag: "",
+            currentTargetId: -1,
+            hasReadyActiveSkill: false,
+            activeSkillTargetsSelf: false,
+            activeSkillRange: 0f);
+
+        var hostileThreat = new RogueCommandExpansionLoader.Runtime.Ai.AiUnitSnapshot(
+            uniqueEntityId: 201,
+            entityId: "enemy:brawler",
+            baseIndex: -1,
+            posX: 0f,
+            posZ: 25f,
+            currentHealth: 250f,
+            maxHealth: 250f,
+            currentShield: 0f,
+            maxShield: 0f,
+            dpsEstimate: 25f,
+            weaponRange: 10f,
+            minAttackRange: 0f,
+            moveSpeed: 7f,
+            roleFlags: 1 << 1,
+            isControlledByAi: false,
+            isControlledByPlayer: true,
+            isCombatUnit: true,
+            isHarvester: false,
+            isBuilding: false,
+            isSupportUnit: false,
+            hasQueuedCommands: false,
+            currentCommandTag: "",
+            currentTargetId: -1,
+            hasReadyActiveSkill: false,
+            activeSkillTargetsSelf: false,
+            activeSkillRange: 0f);
+
+        var baseHq = new RogueCommandExpansionLoader.Runtime.Ai.AiUnitSnapshot(
+            uniqueEntityId: 103,
+            entityId: "mod:ai-hq",
+            baseIndex: 0,
+            posX: 0f,
+            posZ: -30f,
+            currentHealth: 2000f,
+            maxHealth: 2000f,
+            currentShield: 0f,
+            maxShield: 0f,
+            dpsEstimate: 0f,
+            weaponRange: 0f,
+            minAttackRange: 0f,
+            moveSpeed: 0f,
+            roleFlags: 0,
+            isControlledByAi: true,
+            isControlledByPlayer: false,
+            isCombatUnit: false,
+            isHarvester: false,
+            isBuilding: true,
+            isSupportUnit: false,
+            hasQueuedCommands: false,
+            currentCommandTag: "",
+            currentTargetId: -1,
+            hasReadyActiveSkill: false,
+            activeSkillTargetsSelf: false,
+            activeSkillRange: 0f);
+
+        var supportRepairer = new RogueCommandExpansionLoader.Runtime.Ai.AiUnitSnapshot(
+            uniqueEntityId: 104,
+            entityId: "mod:support-drone",
+            baseIndex: 0,
+            posX: -25f,
+            posZ: 5f,
+            currentHealth: 100f,
+            maxHealth: 100f,
+            currentShield: 0f,
+            maxShield: 0f,
+            dpsEstimate: 0f,
+            weaponRange: 0f,
+            minAttackRange: 0f,
+            moveSpeed: 9f,
+            roleFlags: 1 << 6,
+            isControlledByAi: true,
+            isControlledByPlayer: false,
+            isCombatUnit: false,
+            isHarvester: false,
+            isBuilding: false,
+            isSupportUnit: true,
+            hasQueuedCommands: false,
+            currentCommandTag: "",
+            currentTargetId: -1,
+            hasReadyActiveSkill: false,
+            activeSkillTargetsSelf: false,
+            activeSkillRange: 0f);
+
+        RogueCommandExpansionLoader.Runtime.Ai.AiBattlefieldSnapshot snapshot =
+            RogueCommandExpansionLoader.Runtime.Ai.AiBattlefieldBlackboardBuilder.BuildSnapshot(
+                timestamp: 10f,
+                baseIndex: 0,
+                currentWaveNumber: 1,
+                aiUnits: new[] { combatA, combatB, baseHq, supportRepairer },
+                hostileUnits: new[] { hostileThreat });
+
+        // Mean dispersion: |(-10,0) - (0,0)| = 10, |(10,0) - (0,0)| = 10 -> (10 + 10) / 2 = 10.0f
+        if (Math.Abs(snapshot.AlliedDispersionRadius - 10.0f) > 0.1f)
+        {
+            throw new InvalidOperationException($"Expected AlliedDispersionRadius ~10.0f, got {snapshot.AlliedDispersionRadius}");
+        }
+
+        // 2. Tactical retreat toward friendly building / rally anchor
+        // Unit at (0, 5) with hostile at (0, 20) and base HQ at (0, -30)
+        var retreatingUnit = new RogueCommandExpansionLoader.Runtime.Ai.AiUnitSnapshot(
+            uniqueEntityId: 105,
+            entityId: "mod:damaged-skirmisher",
+            baseIndex: 0,
+            posX: 0f,
+            posZ: 5f,
+            currentHealth: 30f,
+            maxHealth: 100f,
+            currentShield: 0f,
+            maxShield: 0f,
+            dpsEstimate: 15f,
+            weaponRange: 12f,
+            minAttackRange: 0f,
+            moveSpeed: 10f,
+            roleFlags: 1 << 7,
+            isControlledByAi: true,
+            isControlledByPlayer: false,
+            isCombatUnit: true,
+            isHarvester: false,
+            isBuilding: false,
+            isSupportUnit: false,
+            hasQueuedCommands: false,
+            currentCommandTag: "",
+            currentTargetId: -1,
+            hasReadyActiveSkill: false,
+            activeSkillTargetsSelf: false,
+            activeSkillRange: 0f);
+
+        (float destX, float destZ) = RogueCommandExpansionLoader.Runtime.Ai.AiSafeVectorPolicy.ComputeTacticalRetreatDestination(
+            retreatingUnit,
+            hostileThreat,
+            snapshot,
+            desiredDistance: 12.0f);
+
+        // Vector should pull south toward friendly base at Z=-30 (away from threat at Z=25)
+        if (destZ >= retreatingUnit.PosZ)
+        {
+            throw new InvalidOperationException($"Tactical retreat did not pull southward toward friendly base: destZ={destZ}, unitZ={retreatingUnit.PosZ}");
+        }
+    }),
+    ("HUB-D Phase 10: TacticalUtilityScorer evaluates status effect vulnerabilities and affix synergies", () =>
+    {
+        var attacker = new RogueCommandExpansionLoader.Runtime.Ai.AiUnitSnapshot(
+            uniqueEntityId: 101,
+            entityId: "mod:assault-tank",
+            baseIndex: 0,
+            posX: 0f,
+            posZ: 0f,
+            currentHealth: 300f,
+            maxHealth: 300f,
+            currentShield: 0f,
+            maxShield: 0f,
+            dpsEstimate: 35f,
+            weaponRange: 15f,
+            minAttackRange: 0f,
+            moveSpeed: 7f,
+            roleFlags: 1 << 1,
+            isControlledByAi: true,
+            isControlledByPlayer: false,
+            isCombatUnit: true,
+            isHarvester: false,
+            isBuilding: false,
+            isSupportUnit: false,
+            hasQueuedCommands: false,
+            currentCommandTag: "",
+            currentTargetId: -1,
+            hasReadyActiveSkill: false,
+            activeSkillTargetsSelf: false,
+            activeSkillRange: 0f);
+
+        var baselineEnemy = new RogueCommandExpansionLoader.Runtime.Ai.AiUnitSnapshot(
+            uniqueEntityId: 201,
+            entityId: "enemy:fighter",
+            baseIndex: -1,
+            posX: 0f,
+            posZ: 10f,
+            currentHealth: 200f,
+            maxHealth: 200f,
+            currentShield: 0f,
+            maxShield: 0f,
+            dpsEstimate: 20f,
+            weaponRange: 12f,
+            minAttackRange: 0f,
+            moveSpeed: 8f,
+            roleFlags: 1 << 1,
+            isControlledByAi: false,
+            isControlledByPlayer: true,
+            isCombatUnit: true,
+            isHarvester: false,
+            isBuilding: false,
+            isSupportUnit: false,
+            hasQueuedCommands: false,
+            currentCommandTag: "",
+            currentTargetId: -1,
+            hasReadyActiveSkill: false,
+            activeSkillTargetsSelf: false,
+            activeSkillRange: 0f,
+            statusEffectFlags: 0,
+            affixFlags: 0);
+
+        var stunnedEnemy = new RogueCommandExpansionLoader.Runtime.Ai.AiUnitSnapshot(
+            uniqueEntityId: 202,
+            entityId: "enemy:stunned-fighter",
+            baseIndex: -1,
+            posX: 0f,
+            posZ: 10f,
+            currentHealth: 200f,
+            maxHealth: 200f,
+            currentShield: 0f,
+            maxShield: 0f,
+            dpsEstimate: 20f,
+            weaponRange: 12f,
+            minAttackRange: 0f,
+            moveSpeed: 8f,
+            roleFlags: 1 << 1,
+            isControlledByAi: false,
+            isControlledByPlayer: true,
+            isCombatUnit: true,
+            isHarvester: false,
+            isBuilding: false,
+            isSupportUnit: false,
+            hasQueuedCommands: false,
+            currentCommandTag: "",
+            currentTargetId: -1,
+            hasReadyActiveSkill: false,
+            activeSkillTargetsSelf: false,
+            activeSkillRange: 0f,
+            statusEffectFlags: (int)RogueCommandExpansionLoader.Runtime.Ai.AiCombatStatusFlags.Stunned,
+            affixFlags: 0);
+
+        var vulnerableEnemy = new RogueCommandExpansionLoader.Runtime.Ai.AiUnitSnapshot(
+            uniqueEntityId: 203,
+            entityId: "enemy:marked-fighter",
+            baseIndex: -1,
+            posX: 0f,
+            posZ: 10f,
+            currentHealth: 200f,
+            maxHealth: 200f,
+            currentShield: 0f,
+            maxShield: 0f,
+            dpsEstimate: 20f,
+            weaponRange: 12f,
+            minAttackRange: 0f,
+            moveSpeed: 8f,
+            roleFlags: 1 << 1,
+            isControlledByAi: false,
+            isControlledByPlayer: true,
+            isCombatUnit: true,
+            isHarvester: false,
+            isBuilding: false,
+            isSupportUnit: false,
+            hasQueuedCommands: false,
+            currentCommandTag: "",
+            currentTargetId: -1,
+            hasReadyActiveSkill: false,
+            activeSkillTargetsSelf: false,
+            activeSkillRange: 0f,
+            statusEffectFlags: (int)RogueCommandExpansionLoader.Runtime.Ai.AiCombatStatusFlags.Vulnerable,
+            affixFlags: 0);
+
+        var bulwarkEnemy = new RogueCommandExpansionLoader.Runtime.Ai.AiUnitSnapshot(
+            uniqueEntityId: 204,
+            entityId: "enemy:bulwark-sponge",
+            baseIndex: -1,
+            posX: 0f,
+            posZ: 10f,
+            currentHealth: 500f,
+            maxHealth: 500f,
+            currentShield: 0f,
+            maxShield: 0f,
+            dpsEstimate: 20f,
+            weaponRange: 12f,
+            minAttackRange: 0f,
+            moveSpeed: 6f,
+            roleFlags: 1 << 1,
+            isControlledByAi: false,
+            isControlledByPlayer: true,
+            isCombatUnit: true,
+            isHarvester: false,
+            isBuilding: false,
+            isSupportUnit: false,
+            hasQueuedCommands: false,
+            currentCommandTag: "",
+            currentTargetId: -1,
+            hasReadyActiveSkill: false,
+            activeSkillTargetsSelf: false,
+            activeSkillRange: 0f,
+            statusEffectFlags: 0,
+            affixFlags: (int)RogueCommandExpansionLoader.Runtime.Ai.AiAffixFlags.Bulwark);
+
+        var doctrine = RogueCommandExpansionLoader.Runtime.Ai.AiDoctrineWeights.Assault;
+
+        float scoreBase = RogueCommandExpansionLoader.Runtime.Ai.TacticalUtilityScorer.ScoreCombatTarget(attacker, baselineEnemy, doctrine);
+        float scoreStun = RogueCommandExpansionLoader.Runtime.Ai.TacticalUtilityScorer.ScoreCombatTarget(attacker, stunnedEnemy, doctrine);
+        float scoreVuln = RogueCommandExpansionLoader.Runtime.Ai.TacticalUtilityScorer.ScoreCombatTarget(attacker, vulnerableEnemy, doctrine);
+        float scoreBulwark = RogueCommandExpansionLoader.Runtime.Ai.TacticalUtilityScorer.ScoreCombatTarget(attacker, bulwarkEnemy, doctrine);
+
+        if (scoreStun <= scoreBase)
+        {
+            throw new InvalidOperationException($"Stunned target did not receive vulnerability priority bonus: stun={scoreStun}, base={scoreBase}");
+        }
+
+        if (scoreVuln <= scoreBase)
+        {
+            throw new InvalidOperationException($"Vulnerable target did not receive focus priority bonus: vuln={scoreVuln}, base={scoreBase}");
+        }
+
+        if (scoreBulwark >= scoreBase)
+        {
+            throw new InvalidOperationException($"Healthy Bulwark sponge was not de-prioritized relative to baseline: bulwark={scoreBulwark}, base={scoreBase}");
+        }
+    }),
     };
 
     private sealed class DelegatingTestAiRuntimeBehaviour : IRogueCommandAiRuntimeBehaviour

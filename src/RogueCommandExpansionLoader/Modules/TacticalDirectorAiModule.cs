@@ -177,7 +177,7 @@ namespace RogueCommandExpansionLoader.Modules
                         if (combinedSurvivalScore > 0f)
                         {
                             float retreatDistance = Math.Max(9.0f, unit.MinAttackRange > 0f ? unit.MinAttackRange + 4.0f : 10.0f);
-                            (float safeX, float safeZ) = AiSafeVectorPolicy.ComputeSafeRetreatDestination(
+                            (float safeX, float safeZ) = AiSafeVectorPolicy.ComputeTacticalRetreatDestination(
                                 unit,
                                 nearestHostile,
                                 snapshot,

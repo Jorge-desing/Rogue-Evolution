@@ -3,6 +3,39 @@ using System;
 namespace RogueCommandExpansionLoader.Runtime.Ai
 {
     /// <summary>
+    /// Bitmask flags for active combat status effects projected onto <see cref="AiUnitSnapshot"/>.
+    /// Free of Unity and Assembly-CSharp types.
+    /// </summary>
+    [Flags]
+    public enum AiCombatStatusFlags
+    {
+        None = 0,
+        Slowed = 1 << 0,       // CryoSlow / SlowedDown
+        Stunned = 1 << 1,      // EmpStun / Stun / Hack / Electrified
+        Burning = 1 << 2,      // Burn / OnFire
+        Vulnerable = 1 << 3,   // Corrosion / Marked
+        Overclocked = 1 << 4,  // Turbo / Overclocked / CombatBoost
+        Shielded = 1 << 5      // Defender / SquadEffect / Robust / Armored
+    }
+
+    /// <summary>
+    /// Bitmask flags for active unit affixes projected onto <see cref="AiUnitSnapshot"/>.
+    /// Free of Unity and Assembly-CSharp types.
+    /// </summary>
+    [Flags]
+    public enum AiAffixFlags
+    {
+        None = 0,
+        Swift = 1 << 0,
+        Bulwark = 1 << 1,
+        Juggernaut = 1 << 2,
+        Overcharged = 1 << 3,
+        Vampiric = 1 << 4,
+        Volatile = 1 << 5,
+        Shielded = 1 << 6
+    }
+
+    /// <summary>
     /// Pure, immutable snapshot of an entity on the battlefield for HUB-D AI perception.
     /// Free of Unity and Assembly-CSharp types so it can be evaluated in offline validation tests.
     /// Never mutates or replaces native control/hostility flags.
@@ -35,6 +68,8 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
         public bool HasReadyActiveSkill { get; }
         public bool ActiveSkillTargetsSelf { get; }
         public float ActiveSkillRange { get; }
+        public int StatusEffectFlags { get; }
+        public int AffixFlags { get; }
 
         public AiUnitSnapshot(
             int uniqueEntityId,
@@ -62,7 +97,9 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
             int currentTargetId,
             bool hasReadyActiveSkill = false,
             bool activeSkillTargetsSelf = false,
-            float activeSkillRange = 0f)
+            float activeSkillRange = 0f,
+            int statusEffectFlags = 0,
+            int affixFlags = 0)
         {
             UniqueEntityId = uniqueEntityId;
             EntityId = entityId ?? string.Empty;
@@ -90,6 +127,18 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
             HasReadyActiveSkill = hasReadyActiveSkill;
             ActiveSkillTargetsSelf = activeSkillTargetsSelf;
             ActiveSkillRange = Math.Max(0f, SanitizeFloat(activeSkillRange, 0f));
+            StatusEffectFlags = statusEffectFlags;
+            AffixFlags = affixFlags;
+        }
+
+        public bool HasStatusEffect(AiCombatStatusFlags flag)
+        {
+            return (StatusEffectFlags & (int)flag) != 0;
+        }
+
+        public bool HasAffix(AiAffixFlags flag)
+        {
+            return (AffixFlags & (int)flag) != 0;
         }
 
         public float HealthRatio

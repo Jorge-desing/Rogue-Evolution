@@ -168,7 +168,8 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
         }
 
         /// <summary>
-        /// Scores engaging a hostile target, penalizing distance and dead-zone violations.
+        /// Scores engaging a hostile target, penalizing distance and dead-zone violations,
+        /// while factoring in active status effects (vulnerability, stun, burn, slow) and elite affixes.
         /// </summary>
         public static float ScoreCombatTarget(
             AiUnitSnapshot unit,
@@ -191,6 +192,66 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
 
             float missingHealthBonus = (1.0f - candidate.HealthRatio) * 35f;
             float threatValue = (candidate.DpsEstimate * 1.6f) + missingHealthBonus + 25f;
+
+            // Status effect vulnerability and focus modifiers
+            if (candidate.HasStatusEffect(AiCombatStatusFlags.Stunned))
+            {
+                // Helpless / immobilized target: prime opportunity for takedown
+                threatValue += 30f;
+            }
+            if (candidate.HasStatusEffect(AiCombatStatusFlags.Vulnerable))
+            {
+                // Marked / armor compromised: amplified damage priority
+                threatValue += 25f;
+            }
+            if (candidate.HasStatusEffect(AiCombatStatusFlags.Slowed))
+            {
+                // Cryo slow: reduced evasion
+                threatValue += 15f;
+            }
+            if (candidate.HasStatusEffect(AiCombatStatusFlags.Burning))
+            {
+                // Burning: ticking damage, easier to finish
+                threatValue += 10f;
+            }
+            if (candidate.HasStatusEffect(AiCombatStatusFlags.Overclocked))
+            {
+                // High active DPS threat: urgent suppression priority
+                threatValue += 20f;
+            }
+
+            // Affix synergy / counters
+            if (candidate.HasAffix(AiAffixFlags.Overcharged) || candidate.HasAffix(AiAffixFlags.Vampiric))
+            {
+                // Dangerous compounding threat, eliminate early
+                threatValue += 20f;
+            }
+            if (candidate.HasAffix(AiAffixFlags.Volatile))
+            {
+                // Explodes on death: reward ranged elimination, penalize point-blank
+                if (dist >= 10.0f)
+                {
+                    threatValue += 20f;
+                }
+                else if (dist < 4.0f)
+                {
+                    threatValue -= 15f;
+                }
+            }
+            if (candidate.HasAffix(AiAffixFlags.Bulwark) || candidate.HasAffix(AiAffixFlags.Juggernaut) || candidate.HasAffix(AiAffixFlags.Shielded))
+            {
+                // Armored damage sponge: de-prioritize if healthy to avoid wasting focus fire
+                if (candidate.HealthRatio > 0.30f)
+                {
+                    threatValue -= 20f;
+                }
+            }
+            if (candidate.HasAffix(AiAffixFlags.Swift))
+            {
+                // Fast elusive threat
+                threatValue += 10f;
+            }
+
             float distPenalty = dist * 1.25f;
             float rawScore = Math.Max(1f, threatValue - distPenalty);
 

@@ -143,7 +143,7 @@ namespace RogueCommandExpansionLoader.Modules
                         float hazardUrgency = TacticalUtilityScorer.ScoreHazardEvacuation(unit, hazards, doctrineWeights);
                         if (hazardUrgency > 0f)
                         {
-                            (float safeX, float safeZ) = AiSafeVectorPolicy.ComputeSafeRetreatDestination(
+                            (float safeX, float safeZ) = AiSafeVectorPolicy.ComputeTacticalRetreatDestination(
                                 unit,
                                 default(AiUnitSnapshot),
                                 snapshot,

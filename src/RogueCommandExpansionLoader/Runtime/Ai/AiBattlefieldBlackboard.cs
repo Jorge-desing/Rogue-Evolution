@@ -27,6 +27,7 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
         public float AiCentroidX { get; }
         public float AiCentroidZ { get; }
         public float EngagementDistance { get; }
+        public float AlliedDispersionRadius { get; }
         public float FlankLeftX { get; }
         public float FlankLeftZ { get; }
         public float FlankRightX { get; }
@@ -62,7 +63,8 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
             float flankLeftX = 0f,
             float flankLeftZ = 0f,
             float flankRightX = 0f,
-            float flankRightZ = 0f)
+            float flankRightZ = 0f,
+            float alliedDispersionRadius = 0f)
         {
             OmittedAiUnitCount = Math.Max(0, omittedAiUnitCount);
             OmittedHostileUnitCount = Math.Max(0, omittedHostileUnitCount);
@@ -82,6 +84,7 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
             AiCentroidX = float.IsNaN(aiCentroidX) || float.IsInfinity(aiCentroidX) ? 0f : aiCentroidX;
             AiCentroidZ = float.IsNaN(aiCentroidZ) || float.IsInfinity(aiCentroidZ) ? 0f : aiCentroidZ;
             EngagementDistance = float.IsNaN(engagementDistance) || float.IsInfinity(engagementDistance) ? 0f : Math.Max(0f, engagementDistance);
+            AlliedDispersionRadius = float.IsNaN(alliedDispersionRadius) || float.IsInfinity(alliedDispersionRadius) ? 0f : Math.Max(0f, alliedDispersionRadius);
             FlankLeftX = float.IsNaN(flankLeftX) || float.IsInfinity(flankLeftX) ? 0f : flankLeftX;
             FlankLeftZ = float.IsNaN(flankLeftZ) || float.IsInfinity(flankLeftZ) ? 0f : flankLeftZ;
             FlankRightX = float.IsNaN(flankRightX) || float.IsInfinity(flankRightX) ? 0f : flankRightX;
@@ -118,7 +121,8 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
             flankLeftX: 0f,
             flankLeftZ: 0f,
             flankRightX: 0f,
-            flankRightZ: 0f);
+            flankRightZ: 0f,
+            alliedDispersionRadius: 0f);
     }
 
     /// <summary>
@@ -305,6 +309,23 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
             float aiCentroidX = aiCombatCentroidCount > 0 ? sumAiCombatX / aiCombatCentroidCount : 0f;
             float aiCentroidZ = aiCombatCentroidCount > 0 ? sumAiCombatZ / aiCombatCentroidCount : 0f;
 
+            float alliedDispersion = 0f;
+            if (aiCombatCentroidCount > 0)
+            {
+                float sumDispersion = 0f;
+                for (int i = 0; i < boundedAi.Count; i++)
+                {
+                    AiUnitSnapshot u = boundedAi[i];
+                    if (u.IsCombatUnit && (baseIndex < 0 || u.BaseIndex < 0 || u.BaseIndex == baseIndex))
+                    {
+                        float ddx = u.PosX - aiCentroidX;
+                        float ddz = u.PosZ - aiCentroidZ;
+                        sumDispersion += (float)Math.Sqrt(Math.Max(0f, ddx * ddx + ddz * ddz));
+                    }
+                }
+                alliedDispersion = sumDispersion / aiCombatCentroidCount;
+            }
+
             float engagementDist = 0f;
             float flankLeftX = 0f;
             float flankLeftZ = 0f;
@@ -366,7 +387,8 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
                 flankLeftX: flankLeftX,
                 flankLeftZ: flankLeftZ,
                 flankRightX: flankRightX,
-                flankRightZ: flankRightZ);
+                flankRightZ: flankRightZ,
+                alliedDispersionRadius: alliedDispersion);
         }
     }
 }

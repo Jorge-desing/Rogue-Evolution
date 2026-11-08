@@ -6968,6 +6968,31 @@ namespace RogueCommandExpansionLoader.Runtime
         }
 
         /// <summary>
+        /// Attempts to retrieve active unit affixes for the specified unit key in a thread-safe manner.
+        /// </summary>
+        public static bool TryGetActiveAffixes(string unitKey, out IReadOnlyList<string> affixes)
+        {
+            if (string.IsNullOrWhiteSpace(unitKey))
+            {
+                affixes = null;
+                return false;
+            }
+
+            lock (_activeUnitAffixes)
+            {
+                List<string> list;
+                if (_activeUnitAffixes.TryGetValue(unitKey.Trim(), out list) && list != null && list.Count > 0)
+                {
+                    affixes = list.AsReadOnly();
+                    return true;
+                }
+            }
+
+            affixes = null;
+            return false;
+        }
+
+        /// <summary>
         /// Manually triggers and coordinates an AI assault wave with elevated aggression.
         /// Advances the attack wave counter and orders living AI combat units to attack-move towards player HQ.
         /// </summary>

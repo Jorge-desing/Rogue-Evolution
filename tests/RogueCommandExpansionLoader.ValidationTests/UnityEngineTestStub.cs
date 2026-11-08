@@ -477,6 +477,7 @@ namespace UnityEngine
         public string name { get; set; } = string.Empty;
         public string tag { get; set; } = "Enemy";
         public bool activeInHierarchy { get; set; } = true;
+        public bool activeSelf { get; set; } = true;
         public Transform transform { get; }
         public UnityEngine.SceneManagement.Scene scene { get; set; }
 
@@ -616,6 +617,7 @@ namespace UnityEngine
     {
         public static float time { get; set; }
         public static float unscaledTime { get; set; }
+        public static float realtimeSinceStartup => unscaledTime;
         public static float timeScale { get; set; } = 1.0f;
         public static float deltaTime { get; set; }
         public static int frameCount { get; set; }

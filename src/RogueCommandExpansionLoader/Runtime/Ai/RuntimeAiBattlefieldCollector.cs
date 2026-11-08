@@ -326,6 +326,46 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
             bool hasQueued = HasQueuedCommands(entity);
             int targetId = entity.CurrentAttackTarget != null ? entity.CurrentAttackTarget.UniqueEntityId : -1;
 
+            int statusFlags = 0;
+            try
+            {
+                if (entity.HasActiveStatusEffect(StatusEffect.SlowedDown)) statusFlags |= (int)AiCombatStatusFlags.Slowed;
+                if (entity.HasActiveStatusEffect(StatusEffect.Stun)) statusFlags |= (int)AiCombatStatusFlags.Stunned;
+                if (entity.HasActiveStatusEffect(StatusEffect.OnFire)) statusFlags |= (int)AiCombatStatusFlags.Burning;
+                if (entity.HasActiveStatusEffect(StatusEffect.Marked)) statusFlags |= (int)AiCombatStatusFlags.Vulnerable;
+                if (entity.HasActiveStatusEffect(StatusEffect.Overclocked) || entity.HasActiveStatusEffect(StatusEffect.Turbo) || entity.HasActiveStatusEffect(StatusEffect.CombatBoost)) statusFlags |= (int)AiCombatStatusFlags.Overclocked;
+                if (entity.HasActiveStatusEffect(StatusEffect.Defender) || entity.HasActiveStatusEffect(StatusEffect.Robust) || entity.HasActiveStatusEffect(StatusEffect.Armored) || entity.HasActiveStatusEffect(StatusEffect.SquadEffect)) statusFlags |= (int)AiCombatStatusFlags.Shielded;
+            }
+            catch
+            {
+                statusFlags = 0;
+            }
+
+            int affixFlags = 0;
+            try
+            {
+                string entityKey = entity.UniqueEntityId.ToString();
+                IReadOnlyList<string> activeAffixes;
+                if (RuntimeGameplayCommandDirector.TryGetActiveAffixes(entityKey, out activeAffixes) && activeAffixes != null)
+                {
+                    for (int a = 0; a < activeAffixes.Count; a++)
+                    {
+                        string affix = activeAffixes[a];
+                        if (string.Equals(affix, "Swift", StringComparison.OrdinalIgnoreCase)) affixFlags |= (int)AiAffixFlags.Swift;
+                        else if (string.Equals(affix, "Bulwark", StringComparison.OrdinalIgnoreCase)) affixFlags |= (int)AiAffixFlags.Bulwark;
+                        else if (string.Equals(affix, "Juggernaut", StringComparison.OrdinalIgnoreCase)) affixFlags |= (int)AiAffixFlags.Juggernaut;
+                        else if (string.Equals(affix, "Overcharged", StringComparison.OrdinalIgnoreCase)) affixFlags |= (int)AiAffixFlags.Overcharged;
+                        else if (string.Equals(affix, "Vampiric", StringComparison.OrdinalIgnoreCase)) affixFlags |= (int)AiAffixFlags.Vampiric;
+                        else if (string.Equals(affix, "Volatile", StringComparison.OrdinalIgnoreCase)) affixFlags |= (int)AiAffixFlags.Volatile;
+                        else if (string.Equals(affix, "Shielded", StringComparison.OrdinalIgnoreCase)) affixFlags |= (int)AiAffixFlags.Shielded;
+                    }
+                }
+            }
+            catch
+            {
+                affixFlags = 0;
+            }
+
             Vector3 pos = entity.Position;
             return new AiUnitSnapshot(
                 uniqueEntityId: entity.UniqueEntityId,
@@ -353,7 +393,9 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
                 currentTargetId: targetId,
                 hasReadyActiveSkill: hasReadySkill,
                 activeSkillTargetsSelf: skillTargetsSelf,
-                activeSkillRange: skillRange);
+                activeSkillRange: skillRange,
+                statusEffectFlags: statusFlags,
+                affixFlags: affixFlags);
         }
 
         private static bool HasQueuedCommands(EntityController entity)
