@@ -292,6 +292,19 @@ namespace RogueCommandExpansionLoader.Runtime
                 ["installedHookCount"] = installedHookCount,
                 ["harmonyOwnerId"] = harmonyOwnerId ?? string.Empty,
                 ["registeredCombatXpCount"] = registeredCombatXpCount,
+                ["unitCreationHookCount"] = RuntimeHooks.UnitCreationHookCount,
+                ["unitReuseHookCount"] = RuntimeHooks.UnitReuseHookCount,
+                ["placementGhostHookCount"] = RuntimeHooks.PlacementGhostHookCount,
+                ["factoryProduceHookCount"] = RuntimeHooks.FactoryProduceHookCount,
+                ["entityRegistryResetCount"] = RuntimeHooks.EntityRegistryResetCount,
+                ["entityRegisteredCount"] = RuntimeHooks.EntityRegisteredCount,
+                ["entityUnregisteredCount"] = RuntimeHooks.EntityUnregisteredCount,
+                ["activeRegisteredEntityCount"] = RuntimeHooks.ActiveRegisteredEntityCount,
+                ["commandExecutedCount"] = RuntimeHooks.CommandExecutedCount,
+                ["commandNextStepCount"] = RuntimeHooks.CommandNextStepCount,
+                ["commandResetCount"] = RuntimeHooks.CommandResetCount,
+                ["commandChainDeletedCount"] = RuntimeHooks.CommandChainDeletedCount,
+                ["lastExecutedCommandKind"] = RuntimeHooks.LastExecutedCommandKind,
             };
             return Serialize(view);
         }

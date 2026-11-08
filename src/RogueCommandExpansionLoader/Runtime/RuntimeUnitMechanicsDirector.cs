@@ -1262,6 +1262,48 @@ namespace RogueCommandExpansionLoader.Runtime
             return parts.Count > 0 ? string.Join(" • ", parts) : null;
         }
 
+        internal static int GetEntityTrackingKey(object entityObj)
+        {
+            return GetCombatExperienceKey(entityObj);
+        }
+
+        public static void OnBattlefieldRegistryReset()
+        {
+            lock (_entityCombatXp)
+            {
+                _entityCombatXp.Clear();
+            }
+
+            lock (_nativeAiSkillLogicalLastChecks)
+            {
+                _nativeAiSkillLogicalLastChecks.Clear();
+            }
+
+            lock (_activeDynamicCommandAuras)
+            {
+                foreach (DynamicCommandAuraState state in _activeDynamicCommandAuras.Values)
+                {
+                    ReleaseCommandAuraFollowerLinks(state);
+                }
+                _activeDynamicCommandAuras.Clear();
+            }
+
+            lock (_appliedCardChangeBoostKeys)
+            {
+                _appliedCardChangeBoostKeys.Clear();
+            }
+
+            lock (_appliedBaselineEffects)
+            {
+                _appliedBaselineEffects.Clear();
+            }
+
+            lock (_appliedTimedStatusEffects)
+            {
+                _appliedTimedStatusEffects.Clear();
+            }
+        }
+
         private static int GetCombatExperienceKey(object entityObj)
         {
             if (entityObj == null)

@@ -1313,7 +1313,22 @@ internal static partial class ValidationTestRunner
             "EntityControllerDestroyPostfix",
             "EntityControllerDiePostfix",
             "EntityControllerHealPostfix",
-            "EntityControllerRepairArmorPostfix"
+            "EntityControllerRepairArmorPostfix",
+            "CreateBuildingPlacementGhostPrefix",
+            "CreateBuildingPlacementGhostPostfix",
+            "InitEntityControllerPrefix",
+            "InitEntityControllerPostfix",
+            "EntityControllerResetAndInitForReusePrefix",
+            "EntityControllerOnHasBeenInstantiatedForReusePostfix",
+            "EntityControllerProducePrefix",
+            "EntityControllerProducePostfix",
+            "ExistingControllersInitPostfix",
+            "ExistingControllersOnEntityCreatedPostfix",
+            "ExistingControllersOnEntityWillBeDestroyedPostfix",
+            "EntityControllerExecuteCommandPostfix",
+            "EntityControllerExecuteNextCommandPostfix",
+            "EntityControllerResetCurrentCommandPostfix",
+            "EntityControllerDeleteCommandChainPostfix"
         ];
 
         foreach (string hookName in hookNames)
@@ -10163,6 +10178,222 @@ internal static partial class ValidationTestRunner
                     if (RuntimeBridgeArgumentParser.JoinCsv(null) != string.Empty)
                     {
                         throw new InvalidOperationException("JoinCsv must return empty string on null input.");
+                    }
+                }),
+                ("core Harmony hooks for unit creation, pool reuse, battlefield registration, and command loop execute and serialize cleanly", () =>
+                {
+                    ExistingControllers.Instance.Reset();
+                    RuntimeUnitMechanicsDirector.ClearProfiles();
+                    RuntimeGameplayCommandDirector.ClearTacticalStancesAndAffixes();
+                    RuntimeHooks.ResetCoreHookTelemetry();
+
+                    try
+                    {
+                        RuntimeUnitMechanicsDirector.RegisterProfile("test:core-hook-unit", new UnitRuntimeMechanicsProfile
+                        {
+                            EntityId = "test:core-hook-unit",
+                            BaselineStatusEffects = new[] { "Robust" },
+                            DefaultTacticalStance = "Defensive",
+                            StartingAffixes = new[] { "Swift" },
+                            Experience = new ContentUnitExperienceDefinition
+                            {
+                                experiencePerLevel = 1,
+                                maxLevel = 3,
+                                experienceGainMultiplier = 1f
+                            },
+                            ShieldRegen = new ContentUnitShieldRegenDefinition
+                            {
+                                rechargeRate = 2f,
+                                rechargeDelay = 1f
+                            }
+                        });
+
+                        // 1. Placement Ghost hook & InitEntityController hook
+                        var ghostGo = new GameObject("PlacementGhost");
+                        RuntimeHarmonyPatches.CreateBuildingPlacementGhostPrefix();
+                        RuntimeHarmonyPatches.CreateBuildingPlacementGhostPostfix("test:core-hook-factory", ghostGo);
+                        if (RuntimeHooks.PlacementGhostHookCount != 1)
+                        {
+                            throw new InvalidOperationException("Expected PlacementGhostHookCount == 1.");
+                        }
+
+                        var unit = new EntityController
+                        {
+                            entityId = "test:core-hook-unit",
+                            UniqueEntityId = 8801,
+                            IsControlledByPlayer = true,
+                            IsUnit = true,
+                            CurrentRank = 0,
+                            MaxRank = 3
+                        };
+                        var enemy = new EntityController
+                        {
+                            entityId = "test:core-hook-enemy",
+                            UniqueEntityId = 8802,
+                            IsControlledByAi = true,
+                            IsUnit = true,
+                            CurrentHealth = 100f,
+                            MaxHealth = 100f
+                        };
+                        var factory = new EntityController
+                        {
+                            entityId = "test:core-hook-factory",
+                            UniqueEntityId = 8803,
+                            IsControlledByPlayer = true,
+                            IsBuilding = true,
+                            IsFactory = true
+                        };
+
+                        RuntimeHarmonyPatches.InitEntityControllerPrefix();
+                        RuntimeHarmonyPatches.InitEntityControllerPostfix(unit);
+                        if (RuntimeHooks.UnitCreationHookCount != 1)
+                        {
+                            throw new InvalidOperationException("Expected UnitCreationHookCount == 1 after InitEntityControllerPostfix.");
+                        }
+
+                        var mechDir = unit.gameObject.GetComponent<RuntimeUnitMechanicsDirector>();
+                        if (mechDir == null || !unit.HasActiveStatusEffect(StatusEffect.Robust))
+                        {
+                            throw new InvalidOperationException("InitEntityControllerPostfix must attach RuntimeUnitMechanicsDirector and baseline status effects.");
+                        }
+
+                        // 2. Battlefield Registration hooks (ExistingControllers)
+                        ExistingControllers.Instance.PlayerUnits().Add(unit);
+                        ExistingControllers.Instance.PlayerBuildings().Add(factory);
+                        ExistingControllers.Instance.AiUnits().Add(enemy);
+                        RuntimeHarmonyPatches.ExistingControllersOnEntityCreatedPostfix(unit, false);
+                        RuntimeHarmonyPatches.ExistingControllersOnEntityCreatedPostfix(factory, false);
+                        if (RuntimeHooks.EntityRegisteredCount != 2 || RuntimeHooks.ActiveRegisteredEntityCount != 2 ||
+                            !RuntimeHooks.IsEntityRegisteredInBattlefield(unit))
+                        {
+                            throw new InvalidOperationException("ExistingControllersOnEntityCreatedPostfix must track registered battlefield entities.");
+                        }
+
+                        mechDir.TickMechanics();
+                        if (RuntimeGameplayCommandDirector.GetUnitTacticalStance("8801") != "Defensive")
+                        {
+                            throw new InvalidOperationException("InitEntityControllerPostfix + TickMechanics must apply default Defensive stance.");
+                        }
+
+                        // Factory production hook
+                        RuntimeHarmonyPatches.EntityControllerProducePrefix();
+                        RuntimeHarmonyPatches.EntityControllerProducePostfix(factory, false, false, false);
+                        if (RuntimeHooks.FactoryProduceHookCount != 1 ||
+                            RuntimeGameplayCommandDirector.GetFactoryProducedCount("8803") != 1)
+                        {
+                            throw new InvalidOperationException("EntityControllerProducePostfix must record factory production telemetry.");
+                        }
+
+                        // 3. Command Loop hooks (ExecuteCommand, ExecuteNextCommand, ResetCurrentCommand, DeleteCommandChain)
+                        var moveCmd = EntityCommand.Move(new Vector3(24f, 0f, 36f));
+                        RuntimeHarmonyPatches.EntityControllerExecuteCommandPostfix(
+                            unit,
+                            new object[] { moveCmd, EntityController.CommandProcessingType.ExecuteAndCancelCurrentCommand });
+                        if (RuntimeHooks.CommandExecutedCount != 1 ||
+                            RuntimeHooks.LastExecutedCommandKind != "Move" ||
+                            RuntimeGameplayCommandDirector.GetLastUnitCommandKind("8801") != "Move" ||
+                            RuntimeGameplayCommandDirector.GetLastUnitCommandProcessingType("8801") != "ExecuteAndCancelCurrentCommand")
+                        {
+                            throw new InvalidOperationException("EntityControllerExecuteCommandPostfix must record command kind and processing type.");
+                        }
+
+                        RuntimeHarmonyPatches.EntityControllerExecuteNextCommandPostfix(unit);
+                        if (RuntimeHooks.CommandNextStepCount != 1 ||
+                            RuntimeGameplayCommandDirector.GetUnitCommandStepCount("8801") != 1)
+                        {
+                            throw new InvalidOperationException("EntityControllerExecuteNextCommandPostfix must increment unit command step count.");
+                        }
+
+                        RuntimeHarmonyPatches.EntityControllerResetCurrentCommandPostfix(unit);
+                        if (RuntimeHooks.CommandResetCount != 1 ||
+                            RuntimeGameplayCommandDirector.GetLastUnitCommandKind("8801") != "DoNothing")
+                        {
+                            throw new InvalidOperationException("EntityControllerResetCurrentCommandPostfix must reset command kind to DoNothing.");
+                        }
+
+                        var attackCmd = EntityCommand.Attack(enemy);
+                        RuntimeHarmonyPatches.EntityControllerExecuteCommandPostfix(
+                            unit,
+                            new object[] { attackCmd, EntityController.CommandProcessingType.AppendToCommandChain });
+                        if (RuntimeHooks.LastExecutedCommandKind != "Attack")
+                        {
+                            throw new InvalidOperationException("Expected LastExecutedCommandKind == Attack.");
+                        }
+
+                        RuntimeHarmonyPatches.EntityControllerDeleteCommandChainPostfix(unit);
+                        if (RuntimeHooks.CommandChainDeletedCount != 1 ||
+                            RuntimeGameplayCommandDirector.GetLastUnitCommandKind("8801") != "DoNothing" ||
+                            RuntimeGameplayCommandDirector.GetLastUnitCommandProcessingType("8801") != "Cleared")
+                        {
+                            throw new InvalidOperationException("EntityControllerDeleteCommandChainPostfix must mark command chain cleared.");
+                        }
+
+                        // 4. Pool Reuse hooks (ResetAndInitForReuse -> OnHasBeenInstantiatedForReuse)
+                        RuntimeUnitMechanicsDirector.OnEntityDealtDamage(enemy, 10f, unit);
+                        if (RuntimeUnitMechanicsDirector.GetCombatXpForEntity(unit) <= 0)
+                        {
+                            throw new InvalidOperationException("Expected unit to accumulate combat XP before pool reuse.");
+                        }
+
+                        RuntimeHarmonyPatches.EntityControllerResetAndInitForReusePrefix(unit);
+                        if (RuntimeHooks.UnitReuseHookCount != 1 ||
+                            RuntimeUnitMechanicsDirector.GetCombatXpForEntity(unit) != 0 ||
+                            unit.HasActiveStatusEffect(StatusEffect.Robust))
+                        {
+                            throw new InvalidOperationException("EntityControllerResetAndInitForReusePrefix must scrub stale XP and baseline effects before reuse.");
+                        }
+
+                        RuntimeHarmonyPatches.EntityControllerOnHasBeenInstantiatedForReusePostfix(unit);
+                        if (RuntimeHooks.UnitCreationHookCount != 2 || !unit.HasActiveStatusEffect(StatusEffect.Robust))
+                        {
+                            throw new InvalidOperationException("EntityControllerOnHasBeenInstantiatedForReusePostfix must re-initialize pooled entity mechanics.");
+                        }
+
+                        // 5. Unregistration & Registry Reset hooks
+                        RuntimeHarmonyPatches.ExistingControllersOnEntityWillBeDestroyedPostfix(unit, enemy);
+                        if (RuntimeHooks.EntityUnregisteredCount != 1 ||
+                            RuntimeHooks.ActiveRegisteredEntityCount != 1 ||
+                            RuntimeHooks.IsEntityRegisteredInBattlefield(unit))
+                        {
+                            throw new InvalidOperationException("ExistingControllersOnEntityWillBeDestroyedPostfix must unregister destroyed entity.");
+                        }
+
+                        string hooksJson = AgentDiagnosticsFormatter.SerializeRuntimeHooksState(
+                            true, 53, "RogueCommand.ExpansionLoader.Runtime", RuntimeUnitMechanicsDirector.RegisteredCombatXpCount);
+                        using (JsonDocument doc = JsonDocument.Parse(hooksJson))
+                        {
+                            JsonElement root = doc.RootElement;
+                            if (!root.GetProperty("hooksInstalled").GetBoolean() ||
+                                root.GetProperty("unitCreationHookCount").GetInt32() != 2 ||
+                                root.GetProperty("unitReuseHookCount").GetInt32() != 1 ||
+                                root.GetProperty("placementGhostHookCount").GetInt32() != 1 ||
+                                root.GetProperty("factoryProduceHookCount").GetInt32() != 1 ||
+                                root.GetProperty("entityRegisteredCount").GetInt32() != 2 ||
+                                root.GetProperty("entityUnregisteredCount").GetInt32() != 1 ||
+                                root.GetProperty("activeRegisteredEntityCount").GetInt32() != 1 ||
+                                root.GetProperty("commandExecutedCount").GetInt32() != 2 ||
+                                root.GetProperty("commandNextStepCount").GetInt32() != 1 ||
+                                root.GetProperty("commandResetCount").GetInt32() != 1 ||
+                                root.GetProperty("commandChainDeletedCount").GetInt32() != 1 ||
+                                root.GetProperty("lastExecutedCommandKind").GetString() != "Attack")
+                            {
+                                throw new InvalidOperationException("SerializeRuntimeHooksState JSON mismatch: " + hooksJson);
+                            }
+                        }
+
+                        RuntimeHarmonyPatches.ExistingControllersInitPostfix(ExistingControllers.Instance);
+                        if (RuntimeHooks.EntityRegistryResetCount != 1 || RuntimeHooks.ActiveRegisteredEntityCount != 0 ||
+                            RuntimeGameplayCommandDirector.GetFactoryProducedCount("8803") != 0)
+                        {
+                            throw new InvalidOperationException("ExistingControllersInitPostfix must clear active battlefield registration and per-match counters.");
+                        }
+                    }
+                    finally
+                    {
+                        RuntimeHooks.ResetCoreHookTelemetry();
+                        RuntimeUnitMechanicsDirector.ClearProfiles();
+                        RuntimeGameplayCommandDirector.ClearTacticalStancesAndAffixes();
+                        ExistingControllers.Instance.Reset();
                     }
                 }),
     };

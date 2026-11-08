@@ -225,6 +225,7 @@ namespace RogueCommandExpansionLoader.Runtime
                 gameAssembly, "PresentCardAsRewardEvent");
             Type entityAttack = RuntimeReflection.FindUniqueType(gameAssembly, "EntityAttack");
             Type entityController = RuntimeReflection.FindUniqueType(gameAssembly, "EntityController");
+            Type existingControllers = RuntimeReflection.FindUniqueType(gameAssembly, "ExistingControllers");
 
             MethodInfo init = RuntimeReflection.FindUniqueMethod(entityStore, "Init",
                 delegate(MethodInfo method) { return method.GetParameters().Length == 0; });
@@ -426,6 +427,125 @@ namespace RogueCommandExpansionLoader.Runtime
                     return parameters.Length >= 1 && parameters[0].ParameterType == typeof(float);
                 });
             MethodInfo entityRepairArmorPostfix = entityRepairArmor == null ? null : Hook("EntityControllerRepairArmorPostfix");
+
+            // Core Pillar 1: Unit Creation, Pooling/Reuse, Placement Ghosts & Factory Production
+            MethodInfo createBuildingPlacementGhost = TryFindUniqueMethod(entityFactory, "CreateBuildingPlacementGhost",
+                delegate(MethodInfo method)
+                {
+                    ParameterInfo[] parameters = method.GetParameters();
+                    return method.IsStatic && parameters.Length == 2 &&
+                        parameters[0].ParameterType == typeof(string) &&
+                        parameters[1].ParameterType == typeof(bool) &&
+                        method.ReturnType.FullName == "UnityEngine.GameObject";
+                });
+            MethodInfo createBuildingPlacementGhostPrefix = createBuildingPlacementGhost == null ? null : Hook("CreateBuildingPlacementGhostPrefix");
+            MethodInfo createBuildingPlacementGhostPostfix = createBuildingPlacementGhost == null ? null : Hook("CreateBuildingPlacementGhostPostfix");
+
+            MethodInfo initEntityController = TryFindUniqueMethod(entityFactory, "InitEntityController",
+                delegate(MethodInfo method)
+                {
+                    ParameterInfo[] parameters = method.GetParameters();
+                    return method.IsStatic && parameters.Length == 2 &&
+                        parameters[0].ParameterType.FullName == "UnityEngine.GameObject" &&
+                        parameters[1].ParameterType == entityController &&
+                        method.ReturnType == entityController;
+                });
+            MethodInfo initEntityControllerPrefix = initEntityController == null ? null : Hook("InitEntityControllerPrefix");
+            MethodInfo initEntityControllerPostfix = initEntityController == null ? null : Hook("InitEntityControllerPostfix");
+
+            MethodInfo entityResetAndInitForReuse = TryFindUniqueMethod(entityController, "ResetAndInitForReuse",
+                delegate(MethodInfo method)
+                {
+                    ParameterInfo[] parameters = method.GetParameters();
+                    return !method.IsStatic && method.ReturnType == typeof(void) && parameters.Length == 5 &&
+                        parameters[0].ParameterType == typeof(Transform) &&
+                        parameters[1].ParameterType == entityController &&
+                        parameters[2].ParameterType.FullName == "UnityEngine.Vector3" &&
+                        parameters[3].ParameterType == typeof(string) &&
+                        parameters[4].ParameterType == typeof(string);
+                });
+            MethodInfo entityResetAndInitForReusePrefix = entityResetAndInitForReuse == null ? null : Hook("EntityControllerResetAndInitForReusePrefix");
+
+            MethodInfo entityOnInstantiatedForReuse = TryFindUniqueMethod(entityController, "OnHasBeenInstantiatedForReuse",
+                delegate(MethodInfo method)
+                {
+                    ParameterInfo[] parameters = method.GetParameters();
+                    return !method.IsStatic && method.ReturnType == typeof(void) && parameters.Length == 1 &&
+                        parameters[0].ParameterType == typeof(bool);
+                });
+            MethodInfo entityOnInstantiatedForReusePostfix = entityOnInstantiatedForReuse == null ? null : Hook("EntityControllerOnHasBeenInstantiatedForReusePostfix");
+
+            MethodInfo entityProduce = TryFindUniqueMethod(entityController, "Produce",
+                delegate(MethodInfo method)
+                {
+                    ParameterInfo[] parameters = method.GetParameters();
+                    return !method.IsStatic && method.ReturnType == typeof(void) && parameters.Length == 3 &&
+                        parameters[0].ParameterType == typeof(bool) &&
+                        parameters[1].ParameterType == typeof(bool) &&
+                        parameters[2].ParameterType == typeof(bool);
+                });
+            MethodInfo entityProducePrefix = entityProduce == null ? null : Hook("EntityControllerProducePrefix");
+            MethodInfo entityProducePostfix = entityProduce == null ? null : Hook("EntityControllerProducePostfix");
+
+            // Core Pillar 2: Unit Registration & Battlefield Lifecycle (ExistingControllers)
+            MethodInfo existingControllersInit = TryFindUniqueMethod(existingControllers, "Init",
+                delegate(MethodInfo method)
+                {
+                    return !method.IsStatic && method.ReturnType == typeof(void) && method.GetParameters().Length == 0;
+                });
+            MethodInfo existingControllersInitPostfix = existingControllersInit == null ? null : Hook("ExistingControllersInitPostfix");
+
+            MethodInfo existingControllersOnEntityCreated = TryFindUniqueMethod(existingControllers, "OnEntityHasBeenCreated",
+                delegate(MethodInfo method)
+                {
+                    ParameterInfo[] parameters = method.GetParameters();
+                    return !method.IsStatic && method.ReturnType == typeof(void) && parameters.Length == 2 &&
+                        parameters[0].ParameterType == entityController &&
+                        parameters[1].ParameterType == typeof(bool);
+                });
+            MethodInfo existingControllersOnEntityCreatedPostfix = existingControllersOnEntityCreated == null ? null : Hook("ExistingControllersOnEntityCreatedPostfix");
+
+            MethodInfo existingControllersOnEntityWillBeDestroyed = TryFindUniqueMethod(existingControllers, "OnEntityWillBeDestroyed",
+                delegate(MethodInfo method)
+                {
+                    ParameterInfo[] parameters = method.GetParameters();
+                    return !method.IsStatic && method.ReturnType == typeof(void) && parameters.Length == 2 &&
+                        parameters[0].ParameterType == entityController &&
+                        parameters[1].ParameterType == entityController;
+                });
+            MethodInfo existingControllersOnEntityWillBeDestroyedPostfix = existingControllersOnEntityWillBeDestroyed == null ? null : Hook("ExistingControllersOnEntityWillBeDestroyedPostfix");
+
+            // Core Pillar 3: Command Loop (ExecuteCommand, ExecuteNextCommand, ResetCurrentCommand, DeleteCommandChain)
+            MethodInfo entityExecuteCommand = TryFindUniqueMethod(entityController, "ExecuteCommand",
+                delegate(MethodInfo method)
+                {
+                    ParameterInfo[] parameters = method.GetParameters();
+                    return !method.IsStatic && method.ReturnType == typeof(void) && parameters.Length == 2 &&
+                        RuntimeReflection.HasSimpleName(parameters[0].ParameterType, "EntityCommand") &&
+                        parameters[1].ParameterType.IsEnum;
+                });
+            MethodInfo entityExecuteCommandPostfix = entityExecuteCommand == null ? null : Hook("EntityControllerExecuteCommandPostfix");
+
+            MethodInfo entityExecuteNextCommand = TryFindUniqueMethod(entityController, "ExecuteNextCommand",
+                delegate(MethodInfo method)
+                {
+                    return !method.IsStatic && method.ReturnType == typeof(void) && method.GetParameters().Length == 0;
+                });
+            MethodInfo entityExecuteNextCommandPostfix = entityExecuteNextCommand == null ? null : Hook("EntityControllerExecuteNextCommandPostfix");
+
+            MethodInfo entityResetCurrentCommand = TryFindUniqueMethod(entityController, "ResetCurrentCommand",
+                delegate(MethodInfo method)
+                {
+                    return !method.IsStatic && method.ReturnType == typeof(void) && method.GetParameters().Length == 0;
+                });
+            MethodInfo entityResetCurrentCommandPostfix = entityResetCurrentCommand == null ? null : Hook("EntityControllerResetCurrentCommandPostfix");
+
+            MethodInfo entityDeleteCommandChain = TryFindUniqueMethod(entityController, "DeleteCommandChain",
+                delegate(MethodInfo method)
+                {
+                    return !method.IsStatic && method.ReturnType == typeof(void) && method.GetParameters().Length == 0;
+                });
+            MethodInfo entityDeleteCommandChainPostfix = entityDeleteCommandChain == null ? null : Hook("EntityControllerDeleteCommandChainPostfix");
             MethodInfo loadPrefix = typeof(UnityResourcesLoadTypedPatch).GetMethod("Prefix",
                 BindingFlags.Public | BindingFlags.Static);
             if (loadPrefix == null)
@@ -495,6 +615,54 @@ namespace RogueCommandExpansionLoader.Runtime
             if (entityRepairArmor != null && entityRepairArmorPostfix != null)
             {
                 plan.Add(new PatchPlan(entityRepairArmor, null, entityRepairArmorPostfix));
+            }
+            if (createBuildingPlacementGhost != null && (createBuildingPlacementGhostPrefix != null || createBuildingPlacementGhostPostfix != null))
+            {
+                plan.Add(new PatchPlan(createBuildingPlacementGhost, createBuildingPlacementGhostPrefix, createBuildingPlacementGhostPostfix));
+            }
+            if (initEntityController != null && (initEntityControllerPrefix != null || initEntityControllerPostfix != null))
+            {
+                plan.Add(new PatchPlan(initEntityController, initEntityControllerPrefix, initEntityControllerPostfix));
+            }
+            if (entityResetAndInitForReuse != null && entityResetAndInitForReusePrefix != null)
+            {
+                plan.Add(new PatchPlan(entityResetAndInitForReuse, entityResetAndInitForReusePrefix, null));
+            }
+            if (entityOnInstantiatedForReuse != null && entityOnInstantiatedForReusePostfix != null)
+            {
+                plan.Add(new PatchPlan(entityOnInstantiatedForReuse, null, entityOnInstantiatedForReusePostfix));
+            }
+            if (entityProduce != null && (entityProducePrefix != null || entityProducePostfix != null))
+            {
+                plan.Add(new PatchPlan(entityProduce, entityProducePrefix, entityProducePostfix));
+            }
+            if (existingControllersInit != null && existingControllersInitPostfix != null)
+            {
+                plan.Add(new PatchPlan(existingControllersInit, null, existingControllersInitPostfix));
+            }
+            if (existingControllersOnEntityCreated != null && existingControllersOnEntityCreatedPostfix != null)
+            {
+                plan.Add(new PatchPlan(existingControllersOnEntityCreated, null, existingControllersOnEntityCreatedPostfix));
+            }
+            if (existingControllersOnEntityWillBeDestroyed != null && existingControllersOnEntityWillBeDestroyedPostfix != null)
+            {
+                plan.Add(new PatchPlan(existingControllersOnEntityWillBeDestroyed, null, existingControllersOnEntityWillBeDestroyedPostfix));
+            }
+            if (entityExecuteCommand != null && entityExecuteCommandPostfix != null)
+            {
+                plan.Add(new PatchPlan(entityExecuteCommand, null, entityExecuteCommandPostfix));
+            }
+            if (entityExecuteNextCommand != null && entityExecuteNextCommandPostfix != null)
+            {
+                plan.Add(new PatchPlan(entityExecuteNextCommand, null, entityExecuteNextCommandPostfix));
+            }
+            if (entityResetCurrentCommand != null && entityResetCurrentCommandPostfix != null)
+            {
+                plan.Add(new PatchPlan(entityResetCurrentCommand, null, entityResetCurrentCommandPostfix));
+            }
+            if (entityDeleteCommandChain != null && entityDeleteCommandChainPostfix != null)
+            {
+                plan.Add(new PatchPlan(entityDeleteCommandChain, null, entityDeleteCommandChainPostfix));
             }
             return plan;
         }

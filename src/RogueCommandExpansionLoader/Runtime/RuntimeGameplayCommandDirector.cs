@@ -1326,6 +1326,11 @@ namespace RogueCommandExpansionLoader.Runtime
         private static readonly List<AiDeckEntryDiagnosticRow> _injectedAiDeckEntries = new List<AiDeckEntryDiagnosticRow>();
         private static readonly Dictionary<string, string> _activeTacticalStances = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         private static readonly Dictionary<string, List<string>> _activeUnitAffixes = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+        private static readonly Dictionary<string, string> _lastUnitCommandKind = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        private static readonly Dictionary<string, string> _lastUnitCommandProcessingType = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        private static readonly Dictionary<string, int> _unitCommandStepCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        private static readonly Dictionary<string, int> _factoryProductionCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        private static readonly object _commandLoopGate = new object();
 
         private static string ResolveEntityIdString(EntityController unit)
         {
@@ -7721,7 +7726,38 @@ namespace RogueCommandExpansionLoader.Runtime
             {
                 _activeUnitAffixes.Clear();
             }
+            lock (_commandLoopGate)
+            {
+                _lastUnitCommandKind.Clear();
+                _lastUnitCommandProcessingType.Clear();
+                _unitCommandStepCounts.Clear();
+                _factoryProductionCounts.Clear();
+            }
             ClearAiProfileUnitDefaults();
+        }
+
+        public static void OnBattlefieldRegistryReset()
+        {
+            lock (_activeTacticalStances)
+            {
+                _activeTacticalStances.Clear();
+            }
+            lock (_activeUnitAffixes)
+            {
+                _activeUnitAffixes.Clear();
+            }
+            lock (_activeUnitVariants)
+            {
+                _activeUnitVariants.Clear();
+                _activeUnitLoadoutStats.Clear();
+            }
+            lock (_commandLoopGate)
+            {
+                _lastUnitCommandKind.Clear();
+                _lastUnitCommandProcessingType.Clear();
+                _unitCommandStepCounts.Clear();
+                _factoryProductionCounts.Clear();
+            }
         }
 
         public static void OnEntityDestroyed(string entityKeyId)
@@ -7740,6 +7776,119 @@ namespace RogueCommandExpansionLoader.Runtime
             {
                 _activeUnitVariants.Remove(key);
                 _activeUnitLoadoutStats.Remove(key);
+            }
+            lock (_commandLoopGate)
+            {
+                _lastUnitCommandKind.Remove(key);
+                _lastUnitCommandProcessingType.Remove(key);
+                _unitCommandStepCounts.Remove(key);
+                _factoryProductionCounts.Remove(key);
+            }
+        }
+
+        public static void OnFactoryProduced(object factoryObj, bool instantProduction, bool forFree, bool doNotTriggerEvent)
+        {
+            if (factoryObj == null) return;
+            int keyInt = RuntimeUnitMechanicsDirector.GetEntityTrackingKey(factoryObj);
+            if (keyInt == 0) return;
+            string key = keyInt.ToString();
+            lock (_commandLoopGate)
+            {
+                int current;
+                _factoryProductionCounts.TryGetValue(key, out current);
+                _factoryProductionCounts[key] = current + 1;
+            }
+        }
+
+        public static int GetFactoryProducedCount(string entityKeyId)
+        {
+            if (string.IsNullOrWhiteSpace(entityKeyId)) return 0;
+            lock (_commandLoopGate)
+            {
+                int count;
+                return _factoryProductionCounts.TryGetValue(entityKeyId.Trim(), out count) ? count : 0;
+            }
+        }
+
+        public static void OnEntityCommandExecuted(object entityObj, string commandKind, string processingType)
+        {
+            if (entityObj == null) return;
+            int keyInt = RuntimeUnitMechanicsDirector.GetEntityTrackingKey(entityObj);
+            if (keyInt == 0) return;
+            string key = keyInt.ToString();
+            lock (_commandLoopGate)
+            {
+                _lastUnitCommandKind[key] = string.IsNullOrWhiteSpace(commandKind) ? "Unknown" : commandKind.Trim();
+                _lastUnitCommandProcessingType[key] = string.IsNullOrWhiteSpace(processingType) ? "ExecuteAndCancelCurrentCommand" : processingType.Trim();
+            }
+        }
+
+        public static void OnEntityCommandChainStep(object entityObj)
+        {
+            if (entityObj == null) return;
+            int keyInt = RuntimeUnitMechanicsDirector.GetEntityTrackingKey(entityObj);
+            if (keyInt == 0) return;
+            string key = keyInt.ToString();
+            lock (_commandLoopGate)
+            {
+                int steps;
+                _unitCommandStepCounts.TryGetValue(key, out steps);
+                _unitCommandStepCounts[key] = steps + 1;
+            }
+        }
+
+        public static void OnEntityCommandReset(object entityObj)
+        {
+            if (entityObj == null) return;
+            int keyInt = RuntimeUnitMechanicsDirector.GetEntityTrackingKey(entityObj);
+            if (keyInt == 0) return;
+            string key = keyInt.ToString();
+            lock (_commandLoopGate)
+            {
+                _lastUnitCommandKind[key] = "DoNothing";
+            }
+        }
+
+        public static void OnEntityCommandChainDeleted(object entityObj)
+        {
+            if (entityObj == null) return;
+            int keyInt = RuntimeUnitMechanicsDirector.GetEntityTrackingKey(entityObj);
+            if (keyInt == 0) return;
+            string key = keyInt.ToString();
+            lock (_commandLoopGate)
+            {
+                _lastUnitCommandKind[key] = "DoNothing";
+                _lastUnitCommandProcessingType[key] = "Cleared";
+            }
+        }
+
+        public static string GetLastUnitCommandKind(string entityKeyId)
+        {
+            if (string.IsNullOrWhiteSpace(entityKeyId)) return string.Empty;
+            lock (_commandLoopGate)
+            {
+                string kind;
+                return _lastUnitCommandKind.TryGetValue(entityKeyId.Trim(), out kind) ? kind : string.Empty;
+            }
+        }
+
+        public static string GetLastUnitCommandProcessingType(string entityKeyId)
+        {
+            if (string.IsNullOrWhiteSpace(entityKeyId)) return string.Empty;
+            lock (_commandLoopGate)
+            {
+                string proc;
+                return _lastUnitCommandProcessingType.TryGetValue(entityKeyId.Trim(), out proc) ? proc : string.Empty;
+            }
+        }
+
+        public static int GetUnitCommandStepCount(string entityKeyId)
+        {
+            if (string.IsNullOrWhiteSpace(entityKeyId)) return 0;
+            lock (_commandLoopGate)
+            {
+                int steps;
+                return _unitCommandStepCounts.TryGetValue(entityKeyId.Trim(), out steps) ? steps : 0;
             }
         }
 

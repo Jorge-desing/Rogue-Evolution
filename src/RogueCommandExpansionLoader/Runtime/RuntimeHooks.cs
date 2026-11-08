@@ -32,6 +32,97 @@ namespace RogueCommandExpansionLoader.Runtime
         private static BlueprintRewardScopeFrame _blueprintRewardScope;
         public static Action<object> OnEntityInstantiated;
 
+        private static int _unitCreationHookCount;
+        private static int _unitReuseHookCount;
+        private static int _placementGhostHookCount;
+        private static int _factoryProduceHookCount;
+        private static int _entityRegistryResetCount;
+        private static int _entityRegisteredCount;
+        private static int _entityUnregisteredCount;
+        private static int _commandExecutedCount;
+        private static int _commandNextStepCount;
+        private static int _commandResetCount;
+        private static int _commandChainDeletedCount;
+        private static string _lastExecutedCommandKind = string.Empty;
+        private static readonly HashSet<int> _activeRegisteredEntities = new HashSet<int>();
+        private static FieldInfo _cachedCommandKindField;
+
+        public static int UnitCreationHookCount => System.Threading.Interlocked.CompareExchange(ref _unitCreationHookCount, 0, 0);
+        public static int UnitReuseHookCount => System.Threading.Interlocked.CompareExchange(ref _unitReuseHookCount, 0, 0);
+        public static int PlacementGhostHookCount => System.Threading.Interlocked.CompareExchange(ref _placementGhostHookCount, 0, 0);
+        public static int FactoryProduceHookCount => System.Threading.Interlocked.CompareExchange(ref _factoryProduceHookCount, 0, 0);
+        public static int EntityRegistryResetCount => System.Threading.Interlocked.CompareExchange(ref _entityRegistryResetCount, 0, 0);
+        public static int EntityRegisteredCount => System.Threading.Interlocked.CompareExchange(ref _entityRegisteredCount, 0, 0);
+        public static int EntityUnregisteredCount => System.Threading.Interlocked.CompareExchange(ref _entityUnregisteredCount, 0, 0);
+        public static int CommandExecutedCount => System.Threading.Interlocked.CompareExchange(ref _commandExecutedCount, 0, 0);
+        public static int CommandNextStepCount => System.Threading.Interlocked.CompareExchange(ref _commandNextStepCount, 0, 0);
+        public static int CommandResetCount => System.Threading.Interlocked.CompareExchange(ref _commandResetCount, 0, 0);
+        public static int CommandChainDeletedCount => System.Threading.Interlocked.CompareExchange(ref _commandChainDeletedCount, 0, 0);
+
+        public static string LastExecutedCommandKind
+        {
+            get
+            {
+                lock (Gate)
+                {
+                    return _lastExecutedCommandKind ?? string.Empty;
+                }
+            }
+        }
+
+        public static int ActiveRegisteredEntityCount
+        {
+            get
+            {
+                lock (_activeRegisteredEntities)
+                {
+                    return _activeRegisteredEntities.Count;
+                }
+            }
+        }
+
+        public static bool IsEntityRegisteredInBattlefield(object entityObj)
+        {
+            if (entityObj == null)
+            {
+                return false;
+            }
+
+            int key = RuntimeUnitMechanicsDirector.GetEntityTrackingKey(entityObj);
+            if (key == 0)
+            {
+                return false;
+            }
+
+            lock (_activeRegisteredEntities)
+            {
+                return _activeRegisteredEntities.Contains(key);
+            }
+        }
+
+        public static void ResetCoreHookTelemetry()
+        {
+            System.Threading.Interlocked.Exchange(ref _unitCreationHookCount, 0);
+            System.Threading.Interlocked.Exchange(ref _unitReuseHookCount, 0);
+            System.Threading.Interlocked.Exchange(ref _placementGhostHookCount, 0);
+            System.Threading.Interlocked.Exchange(ref _factoryProduceHookCount, 0);
+            System.Threading.Interlocked.Exchange(ref _entityRegistryResetCount, 0);
+            System.Threading.Interlocked.Exchange(ref _entityRegisteredCount, 0);
+            System.Threading.Interlocked.Exchange(ref _entityUnregisteredCount, 0);
+            System.Threading.Interlocked.Exchange(ref _commandExecutedCount, 0);
+            System.Threading.Interlocked.Exchange(ref _commandNextStepCount, 0);
+            System.Threading.Interlocked.Exchange(ref _commandResetCount, 0);
+            System.Threading.Interlocked.Exchange(ref _commandChainDeletedCount, 0);
+            lock (Gate)
+            {
+                _lastExecutedCommandKind = string.Empty;
+            }
+            lock (_activeRegisteredEntities)
+            {
+                _activeRegisteredEntities.Clear();
+            }
+        }
+
         public static void Bind(
             RuntimeContentMutator mutator,
             IRuntimeContentProvider provider,
@@ -1540,6 +1631,8 @@ namespace RogueCommandExpansionLoader.Runtime
                 return;
             }
 
+            System.Threading.Interlocked.Increment(ref _unitCreationHookCount);
+
             Action<object> callback;
             lock (Gate)
             {
@@ -1550,6 +1643,224 @@ namespace RogueCommandExpansionLoader.Runtime
             {
                 SafeCall(delegate { callback(result); });
             }
+            else
+            {
+                SafeCall(delegate
+                {
+                    Visual.RuntimeVisualDirector.AttachIfApplicable(result);
+                    RuntimeUnitMechanicsDirector.AttachIfApplicable(result);
+                    RuntimeGameplayCommandDirector.ApplyAiProfileUnitDefaultsToEntity(result);
+                });
+            }
+        }
+
+        public static void AfterCreateBuildingPlacementGhost(string entityId, GameObject ghost)
+        {
+            System.Threading.Interlocked.Increment(ref _placementGhostHookCount);
+            if (ghost == null)
+            {
+                return;
+            }
+
+            SafeCall(delegate
+            {
+                Visual.RuntimeVisualDirector.AttachIfApplicable(ghost);
+            });
+        }
+
+        public static void BeforeEntityResetForReuse(object entityObj)
+        {
+            if (entityObj == null)
+            {
+                return;
+            }
+
+            System.Threading.Interlocked.Increment(ref _unitReuseHookCount);
+            SafeCall(delegate
+            {
+                RuntimeUnitMechanicsDirector.OnEntityDied(entityObj);
+            });
+        }
+
+        public static void AfterEntityReused(object entityObj)
+        {
+            if (entityObj == null)
+            {
+                return;
+            }
+
+            AfterInstantiateEntity(entityObj);
+        }
+
+        public static void AfterEntityProduce(object factoryObj, bool instantProduction, bool forFree, bool doNotTriggerEvent)
+        {
+            if (factoryObj == null)
+            {
+                return;
+            }
+
+            System.Threading.Interlocked.Increment(ref _factoryProduceHookCount);
+            SafeCall(delegate
+            {
+                RuntimeGameplayCommandDirector.OnFactoryProduced(factoryObj, instantProduction, forFree, doNotTriggerEvent);
+            });
+        }
+
+        public static void OnEntityRegistryReset(object existingControllersObj)
+        {
+            System.Threading.Interlocked.Increment(ref _entityRegistryResetCount);
+            lock (_activeRegisteredEntities)
+            {
+                _activeRegisteredEntities.Clear();
+            }
+
+            SafeCall(delegate
+            {
+                RuntimeUnitMechanicsDirector.OnBattlefieldRegistryReset();
+                RuntimeGameplayCommandDirector.OnBattlefieldRegistryReset();
+            });
+        }
+
+        public static void OnEntityRegistered(object entityObj, bool hasBeenCalledFromAbove)
+        {
+            if (entityObj == null)
+            {
+                return;
+            }
+
+            System.Threading.Interlocked.Increment(ref _entityRegisteredCount);
+            SafeCall(delegate
+            {
+                int key = RuntimeUnitMechanicsDirector.GetEntityTrackingKey(entityObj);
+                if (key != 0)
+                {
+                    lock (_activeRegisteredEntities)
+                    {
+                        _activeRegisteredEntities.Add(key);
+                    }
+                }
+
+                Visual.RuntimeVisualDirector.AttachIfApplicable(entityObj);
+                RuntimeUnitMechanicsDirector.AttachIfApplicable(entityObj);
+                RuntimeGameplayCommandDirector.ApplyAiProfileUnitDefaultsToEntity(entityObj);
+            });
+        }
+
+        public static void OnEntityUnregistered(object entityObj, object originatorObj)
+        {
+            if (entityObj == null)
+            {
+                return;
+            }
+
+            System.Threading.Interlocked.Increment(ref _entityUnregisteredCount);
+            SafeCall(delegate
+            {
+                int key = RuntimeUnitMechanicsDirector.GetEntityTrackingKey(entityObj);
+                if (key != 0)
+                {
+                    lock (_activeRegisteredEntities)
+                    {
+                        _activeRegisteredEntities.Remove(key);
+                    }
+                }
+
+                RuntimeUnitMechanicsDirector.OnEntityDestroyed(entityObj);
+            });
+        }
+
+        public static void OnEntityExecuteCommand(object entityObj, object[] args)
+        {
+            if (entityObj == null)
+            {
+                return;
+            }
+
+            System.Threading.Interlocked.Increment(ref _commandExecutedCount);
+            SafeCall(delegate
+            {
+                string commandKind = "Unknown";
+                string processingType = "ExecuteAndCancelCurrentCommand";
+
+                if (args != null && args.Length > 0 && args[0] != null)
+                {
+                    object cmdObj = args[0];
+                    Type cmdType = cmdObj.GetType();
+                    FieldInfo cmdField = _cachedCommandKindField;
+                    if (cmdField == null || cmdField.DeclaringType != cmdType)
+                    {
+                        cmdField = cmdType.GetField("command", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                        _cachedCommandKindField = cmdField;
+                    }
+
+                    if (cmdField != null)
+                    {
+                        object val = cmdField.GetValue(cmdObj);
+                        if (val != null)
+                        {
+                            commandKind = val.ToString();
+                        }
+                    }
+                    else
+                    {
+                        commandKind = cmdObj.ToString();
+                    }
+                }
+
+                if (args != null && args.Length > 1 && args[1] != null)
+                {
+                    processingType = args[1].ToString();
+                }
+
+                lock (Gate)
+                {
+                    _lastExecutedCommandKind = commandKind ?? "Unknown";
+                }
+
+                RuntimeGameplayCommandDirector.OnEntityCommandExecuted(entityObj, commandKind, processingType);
+            });
+        }
+
+        public static void OnEntityExecuteNextCommand(object entityObj)
+        {
+            if (entityObj == null)
+            {
+                return;
+            }
+
+            System.Threading.Interlocked.Increment(ref _commandNextStepCount);
+            SafeCall(delegate
+            {
+                RuntimeGameplayCommandDirector.OnEntityCommandChainStep(entityObj);
+            });
+        }
+
+        public static void OnEntityResetCurrentCommand(object entityObj)
+        {
+            if (entityObj == null)
+            {
+                return;
+            }
+
+            System.Threading.Interlocked.Increment(ref _commandResetCount);
+            SafeCall(delegate
+            {
+                RuntimeGameplayCommandDirector.OnEntityCommandReset(entityObj);
+            });
+        }
+
+        public static void OnEntityDeleteCommandChain(object entityObj)
+        {
+            if (entityObj == null)
+            {
+                return;
+            }
+
+            System.Threading.Interlocked.Increment(ref _commandChainDeletedCount);
+            SafeCall(delegate
+            {
+                RuntimeGameplayCommandDirector.OnEntityCommandChainDeleted(entityObj);
+            });
         }
     }
 
@@ -1789,6 +2100,81 @@ namespace RogueCommandExpansionLoader.Runtime
         public static void EntityTakeDamagePostfix(object __instance, float __0, object __1)
         {
             RuntimeHooks.EntityTakeDamagePostfix(__instance, __0, __1);
+        }
+
+        public static void CreateBuildingPlacementGhostPrefix()
+        {
+            RuntimeHooks.BeforeEntityFactory();
+        }
+
+        public static void CreateBuildingPlacementGhostPostfix(string __0, GameObject __result)
+        {
+            RuntimeHooks.AfterCreateBuildingPlacementGhost(__0, __result);
+        }
+
+        public static void InitEntityControllerPrefix()
+        {
+            RuntimeHooks.BeforeEntityFactory();
+        }
+
+        public static void InitEntityControllerPostfix(object __result)
+        {
+            RuntimeHooks.AfterInstantiateEntity(__result);
+        }
+
+        public static void EntityControllerResetAndInitForReusePrefix(object __instance)
+        {
+            RuntimeHooks.BeforeEntityResetForReuse(__instance);
+        }
+
+        public static void EntityControllerOnHasBeenInstantiatedForReusePostfix(object __instance)
+        {
+            RuntimeHooks.AfterEntityReused(__instance);
+        }
+
+        public static void EntityControllerProducePrefix()
+        {
+            RuntimeHooks.BeforeEntityFactory();
+        }
+
+        public static void EntityControllerProducePostfix(object __instance, bool __0, bool __1, bool __2)
+        {
+            RuntimeHooks.AfterEntityProduce(__instance, __0, __1, __2);
+        }
+
+        public static void ExistingControllersInitPostfix(object __instance)
+        {
+            RuntimeHooks.OnEntityRegistryReset(__instance);
+        }
+
+        public static void ExistingControllersOnEntityCreatedPostfix(object __0, bool __1)
+        {
+            RuntimeHooks.OnEntityRegistered(__0, __1);
+        }
+
+        public static void ExistingControllersOnEntityWillBeDestroyedPostfix(object __0, object __1)
+        {
+            RuntimeHooks.OnEntityUnregistered(__0, __1);
+        }
+
+        public static void EntityControllerExecuteCommandPostfix(object __instance, object[] __args)
+        {
+            RuntimeHooks.OnEntityExecuteCommand(__instance, __args);
+        }
+
+        public static void EntityControllerExecuteNextCommandPostfix(object __instance)
+        {
+            RuntimeHooks.OnEntityExecuteNextCommand(__instance);
+        }
+
+        public static void EntityControllerResetCurrentCommandPostfix(object __instance)
+        {
+            RuntimeHooks.OnEntityResetCurrentCommand(__instance);
+        }
+
+        public static void EntityControllerDeleteCommandChainPostfix(object __instance)
+        {
+            RuntimeHooks.OnEntityDeleteCommandChain(__instance);
         }
     }
 
