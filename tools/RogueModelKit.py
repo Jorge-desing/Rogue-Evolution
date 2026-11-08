@@ -11107,11 +11107,20 @@ def generate_procedural_action_clips(
         set_bone_key(base_body, "location", f, (0.0, 0.0, 0.0))
         set_bone_key(base_body, "rotation_euler", f, (0.0, 0.0, 0.0))
     # RTS-legible breathing: a touch deeper than the legacy 0.006/0.35°, still subtle.
+    # The f8/f22 shoulders form a slow in/out envelope around the central f15
+    # breath instead of a single trapezoidal key, so the stance reads as a
+    # settled mechanical idle at RTS camera distance.
     if hover:
+        set_bone_key(base_body, "location", 8, (0.0, 0.0, -0.005))
         set_bone_key(base_body, "location", 15, (0.0, 0.0, -0.014))
+        set_bone_key(base_body, "location", 22, (0.0, 0.0, -0.005))
     else:
+        set_bone_key(base_body, "location", 8, (0.0, 0.0, -0.004))
         set_bone_key(base_body, "location", 15, (0.0, 0.0, -0.010))
+        set_bone_key(base_body, "location", 22, (0.0, 0.0, -0.004))
+    set_bone_key(base_body, "rotation_euler", 8, (math.radians(0.20), 0.0, 0.0))
     set_bone_key(base_body, "rotation_euler", 15, (math.radians(0.55), 0.0, 0.0))
+    set_bone_key(base_body, "rotation_euler", 22, (math.radians(0.20), 0.0, 0.0))
     act_idle.use_fake_user = True
     actions["Idle"] = act_idle
 
@@ -11374,11 +11383,12 @@ def generate_procedural_action_clips(
     # Vehicle collapse must read at RTS distance: -0.22 m (legacy -0.12 was a
     # near-invisible settle). Biped/quad keep their deeper drops.
     collapse_z = -0.55 if leg_type == "biped" else (-0.28 if leg_type == "quad" else -0.22)
-    # Slow in/out: frame 16 is half-collapse, then the rest pose holds to the
-    # end (35 by default; Bastion validates Death at 45 frames in Unity).
+    # Slow in/out: frame 8 is an early 12% settle, frame 16 is half-collapse,
+    # then the rest pose holds to the end (35 by default; Bastion validates
+    # Death at 45 frames in Unity).
     _death_end_frame = death_end_frame if death_end_frame is not None else 35
-    for f in (16, 28, _death_end_frame):
-        _collapse_factor = 0.5 if f == 16 else 1.0
+    for f in (8, 16, 28, _death_end_frame):
+        _collapse_factor = 0.12 if f == 8 else (0.5 if f == 16 else 1.0)
         set_bone_key(body_bone, "location", f, (0.0, 0.0, collapse_z * _collapse_factor))
         set_bone_key(body_bone, "rotation_euler", f, (math.radians(7.0 * _collapse_factor), math.radians(-9.0 * _collapse_factor), math.radians(3.5 * _collapse_factor)))
         set_bone_key("Bone_TurretPitch", "rotation_euler", f, (math.radians(-34.0 * _collapse_factor), 0.0, 0.0))
