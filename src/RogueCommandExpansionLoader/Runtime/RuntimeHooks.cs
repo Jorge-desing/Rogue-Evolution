@@ -43,6 +43,10 @@ namespace RogueCommandExpansionLoader.Runtime
         private static int _commandNextStepCount;
         private static int _commandResetCount;
         private static int _commandChainDeletedCount;
+        private static int _unitCreationTranspilerCount;
+        private static int _entityRegisteredTranspilerCount;
+        private static int _entityUnregisteredTranspilerCount;
+        private static int _unitReuseTranspilerCount;
         private static string _lastExecutedCommandKind = string.Empty;
         private static readonly HashSet<int> _activeRegisteredEntities = new HashSet<int>();
         private static FieldInfo _cachedCommandKindField;
@@ -59,6 +63,10 @@ namespace RogueCommandExpansionLoader.Runtime
         public static int CommandNextStepCount => System.Threading.Interlocked.CompareExchange(ref _commandNextStepCount, 0, 0);
         public static int CommandResetCount => System.Threading.Interlocked.CompareExchange(ref _commandResetCount, 0, 0);
         public static int CommandChainDeletedCount => System.Threading.Interlocked.CompareExchange(ref _commandChainDeletedCount, 0, 0);
+        public static int UnitCreationTranspilerCount => System.Threading.Interlocked.CompareExchange(ref _unitCreationTranspilerCount, 0, 0);
+        public static int EntityRegisteredTranspilerCount => System.Threading.Interlocked.CompareExchange(ref _entityRegisteredTranspilerCount, 0, 0);
+        public static int EntityUnregisteredTranspilerCount => System.Threading.Interlocked.CompareExchange(ref _entityUnregisteredTranspilerCount, 0, 0);
+        public static int UnitReuseTranspilerCount => System.Threading.Interlocked.CompareExchange(ref _unitReuseTranspilerCount, 0, 0);
 
         public static string LastExecutedCommandKind
         {
@@ -114,6 +122,10 @@ namespace RogueCommandExpansionLoader.Runtime
             System.Threading.Interlocked.Exchange(ref _commandNextStepCount, 0);
             System.Threading.Interlocked.Exchange(ref _commandResetCount, 0);
             System.Threading.Interlocked.Exchange(ref _commandChainDeletedCount, 0);
+            System.Threading.Interlocked.Exchange(ref _unitCreationTranspilerCount, 0);
+            System.Threading.Interlocked.Exchange(ref _entityRegisteredTranspilerCount, 0);
+            System.Threading.Interlocked.Exchange(ref _entityUnregisteredTranspilerCount, 0);
+            System.Threading.Interlocked.Exchange(ref _unitReuseTranspilerCount, 0);
             lock (Gate)
             {
                 _lastExecutedCommandKind = string.Empty;
@@ -1780,6 +1792,93 @@ namespace RogueCommandExpansionLoader.Runtime
             });
         }
 
+        public static void OnEntityInstantiatedTranspiler(object entityObj, bool hasBeenCalledFromAbove)
+        {
+            if (entityObj == null)
+            {
+                return;
+            }
+
+            System.Threading.Interlocked.Increment(ref _unitCreationTranspilerCount);
+            SafeCall(delegate
+            {
+                Visual.RuntimeVisualDirector.AttachIfApplicable(entityObj);
+                RuntimeUnitMechanicsDirector.AttachIfApplicable(entityObj);
+                RuntimeGameplayCommandDirector.ApplyAiProfileUnitDefaultsToEntity(entityObj);
+            });
+        }
+
+        public static void OnEntityRegisteredTranspiler(object existingControllersObj, object entityObj, bool hasBeenCalledFromAbove)
+        {
+            if (entityObj == null)
+            {
+                return;
+            }
+
+            System.Threading.Interlocked.Increment(ref _entityRegisteredTranspilerCount);
+            SafeCall(delegate
+            {
+                int key = RuntimeUnitMechanicsDirector.GetEntityTrackingKey(entityObj);
+                if (key != 0)
+                {
+                    lock (_activeRegisteredEntities)
+                    {
+                        _activeRegisteredEntities.Add(key);
+                    }
+                }
+
+                Visual.RuntimeVisualDirector.AttachIfApplicable(entityObj);
+                RuntimeUnitMechanicsDirector.AttachIfApplicable(entityObj);
+                RuntimeGameplayCommandDirector.ApplyAiProfileUnitDefaultsToEntity(entityObj);
+            });
+        }
+
+        public static void OnEntityWillBeDestroyedTranspiler(object existingControllersObj, object entityObj, object originatorObj)
+        {
+            if (entityObj == null)
+            {
+                return;
+            }
+
+            System.Threading.Interlocked.Increment(ref _entityUnregisteredTranspilerCount);
+            SafeCall(delegate
+            {
+                int key = RuntimeUnitMechanicsDirector.GetEntityTrackingKey(entityObj);
+                if (key != 0)
+                {
+                    lock (_activeRegisteredEntities)
+                    {
+                        _activeRegisteredEntities.Remove(key);
+                    }
+                }
+
+                RuntimeUnitMechanicsDirector.OnEntityDestroyed(entityObj);
+            });
+        }
+
+        public static void OnEntityResetForReuseTranspiler(object entityObj)
+        {
+            if (entityObj == null)
+            {
+                return;
+            }
+
+            System.Threading.Interlocked.Increment(ref _unitReuseTranspilerCount);
+            SafeCall(delegate
+            {
+                int key = RuntimeUnitMechanicsDirector.GetEntityTrackingKey(entityObj);
+                if (key != 0)
+                {
+                    lock (_activeRegisteredEntities)
+                    {
+                        _activeRegisteredEntities.Remove(key);
+                    }
+                }
+
+                RuntimeUnitMechanicsDirector.OnEntityDied(entityObj);
+            });
+        }
+
         public static void OnEntityExecuteCommand(object entityObj, object[] args)
         {
             if (entityObj == null)
@@ -1892,7 +1991,7 @@ namespace RogueCommandExpansionLoader.Runtime
         }
     }
 
-    internal static class RuntimeHarmonyPatches
+    public static class RuntimeHarmonyPatches
     {
         public static void PresentCardsToChoosePrefix(out object __state)
         {
@@ -2203,6 +2302,26 @@ namespace RogueCommandExpansionLoader.Runtime
         public static void EntityControllerDeleteCommandChainPostfix(object __instance)
         {
             RuntimeHooks.OnEntityDeleteCommandChain(__instance);
+        }
+
+        public static void OnEntityInstantiatedTranspilerHook(object entity, bool hasBeenCalledFromAbove)
+        {
+            RuntimeHooks.OnEntityInstantiatedTranspiler(entity, hasBeenCalledFromAbove);
+        }
+
+        public static void OnEntityRegisteredTranspilerHook(object existingControllers, object entity, bool hasBeenCalledFromAbove)
+        {
+            RuntimeHooks.OnEntityRegisteredTranspiler(existingControllers, entity, hasBeenCalledFromAbove);
+        }
+
+        public static void OnEntityWillBeDestroyedTranspilerHook(object existingControllers, object entity, object originator)
+        {
+            RuntimeHooks.OnEntityWillBeDestroyedTranspiler(existingControllers, entity, originator);
+        }
+
+        public static void OnEntityResetForReuseTranspilerHook(object entity)
+        {
+            RuntimeHooks.OnEntityResetForReuseTranspiler(entity);
         }
     }
 

@@ -305,6 +305,10 @@ namespace RogueCommandExpansionLoader.Runtime
                 ["commandResetCount"] = RuntimeHooks.CommandResetCount,
                 ["commandChainDeletedCount"] = RuntimeHooks.CommandChainDeletedCount,
                 ["lastExecutedCommandKind"] = RuntimeHooks.LastExecutedCommandKind,
+                ["unitCreationTranspilerCount"] = RuntimeHooks.UnitCreationTranspilerCount,
+                ["entityRegisteredTranspilerCount"] = RuntimeHooks.EntityRegisteredTranspilerCount,
+                ["entityUnregisteredTranspilerCount"] = RuntimeHooks.EntityUnregisteredTranspilerCount,
+                ["unitReuseTranspilerCount"] = RuntimeHooks.UnitReuseTranspilerCount,
             };
             return Serialize(view);
         }

@@ -10430,6 +10430,96 @@ internal static partial class ValidationTestRunner
                         ExistingControllers.Instance.Reset();
                     }
                 }),
+        ("RuntimeHooks.CoreTranspilerExecutionAndTelemetryLifecycle", () =>
+        {
+            try
+            {
+                RuntimeHooks.ResetCoreHookTelemetry();
+                RuntimeUnitMechanicsDirector.ClearProfiles();
+                RuntimeGameplayCommandDirector.ClearTacticalStancesAndAffixes();
+                ExistingControllers.Instance.Reset();
+
+                if (RuntimeHooks.UnitCreationTranspilerCount != 0 ||
+                    RuntimeHooks.EntityRegisteredTranspilerCount != 0 ||
+                    RuntimeHooks.EntityUnregisteredTranspilerCount != 0 ||
+                    RuntimeHooks.UnitReuseTranspilerCount != 0)
+                {
+                    throw new InvalidOperationException("Initial transpiler telemetry counters must be 0 after reset.");
+                }
+
+                var unit = new EntityController
+                {
+                    entityId = "test:transpiler-unit",
+                    UniqueEntityId = 9901,
+                    IsControlledByPlayer = true,
+                    CurrentHealth = 150f,
+                    MaxHealth = 150f
+                };
+
+                // 1. Unit Creation Transpiler Hook
+                RuntimeHarmonyPatches.OnEntityInstantiatedTranspilerHook(unit, false);
+                if (RuntimeHooks.UnitCreationTranspilerCount != 1)
+                {
+                    throw new InvalidOperationException("OnEntityInstantiatedTranspilerHook must increment UnitCreationTranspilerCount.");
+                }
+
+                // 2. Entity Registered Transpiler Hook
+                ExistingControllers.Instance.PlayerUnits().Add(unit);
+                RuntimeHarmonyPatches.OnEntityRegisteredTranspilerHook(ExistingControllers.Instance, unit, false);
+                if (RuntimeHooks.EntityRegisteredTranspilerCount != 1 ||
+                    !RuntimeHooks.IsEntityRegisteredInBattlefield(unit))
+                {
+                    throw new InvalidOperationException("OnEntityRegisteredTranspilerHook must increment EntityRegisteredTranspilerCount and track active entity.");
+                }
+
+                // 3. Entity Reset For Reuse Transpiler Hook
+                RuntimeHarmonyPatches.OnEntityResetForReuseTranspilerHook(unit);
+                if (RuntimeHooks.UnitReuseTranspilerCount != 1 ||
+                    RuntimeHooks.IsEntityRegisteredInBattlefield(unit))
+                {
+                    throw new InvalidOperationException("OnEntityResetForReuseTranspilerHook must increment UnitReuseTranspilerCount and remove entity from tracking.");
+                }
+
+                // 4. Entity Will Be Destroyed Transpiler Hook
+                RuntimeHarmonyPatches.OnEntityWillBeDestroyedTranspilerHook(ExistingControllers.Instance, unit, null);
+                if (RuntimeHooks.EntityUnregisteredTranspilerCount != 1)
+                {
+                    throw new InvalidOperationException("OnEntityWillBeDestroyedTranspilerHook must increment EntityUnregisteredTranspilerCount.");
+                }
+
+                // 5. Diagnostics JSON serialization verification
+                string json = AgentDiagnosticsFormatter.SerializeRuntimeHooksState(
+                    true, 53, "RogueCommand.ExpansionLoader.Runtime", 0);
+                using (JsonDocument doc = JsonDocument.Parse(json))
+                {
+                    JsonElement root = doc.RootElement;
+                    if (root.GetProperty("unitCreationTranspilerCount").GetInt32() != 1 ||
+                        root.GetProperty("entityRegisteredTranspilerCount").GetInt32() != 1 ||
+                        root.GetProperty("entityUnregisteredTranspilerCount").GetInt32() != 1 ||
+                        root.GetProperty("unitReuseTranspilerCount").GetInt32() != 1)
+                    {
+                        throw new InvalidOperationException("SerializeRuntimeHooksState must serialize transpiler counters correctly: " + json);
+                    }
+                }
+
+                // 6. Reset telemetry verification
+                RuntimeHooks.ResetCoreHookTelemetry();
+                if (RuntimeHooks.UnitCreationTranspilerCount != 0 ||
+                    RuntimeHooks.EntityRegisteredTranspilerCount != 0 ||
+                    RuntimeHooks.EntityUnregisteredTranspilerCount != 0 ||
+                    RuntimeHooks.UnitReuseTranspilerCount != 0)
+                {
+                    throw new InvalidOperationException("ResetCoreHookTelemetry must reset all transpiler counters to 0.");
+                }
+            }
+            finally
+            {
+                RuntimeHooks.ResetCoreHookTelemetry();
+                RuntimeUnitMechanicsDirector.ClearProfiles();
+                RuntimeGameplayCommandDirector.ClearTacticalStancesAndAffixes();
+                ExistingControllers.Instance.Reset();
+            }
+        }),
         ("RuntimeHooks.AiCommandArbiterAndLifecycleSynchronization", () =>
         {
             try
