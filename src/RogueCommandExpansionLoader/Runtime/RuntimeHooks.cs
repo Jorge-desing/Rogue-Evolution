@@ -46,6 +46,7 @@ namespace RogueCommandExpansionLoader.Runtime
         private static string _lastExecutedCommandKind = string.Empty;
         private static readonly HashSet<int> _activeRegisteredEntities = new HashSet<int>();
         private static FieldInfo _cachedCommandKindField;
+        private static FieldInfo _cachedCommandTagField;
 
         public static int UnitCreationHookCount => System.Threading.Interlocked.CompareExchange(ref _unitCreationHookCount, 0, 0);
         public static int UnitReuseHookCount => System.Threading.Interlocked.CompareExchange(ref _unitReuseHookCount, 0, 0);
@@ -1665,6 +1666,7 @@ namespace RogueCommandExpansionLoader.Runtime
             SafeCall(delegate
             {
                 Visual.RuntimeVisualDirector.AttachIfApplicable(ghost);
+                RuntimeGameplayCommandDirector.OnPlacementGhostCreated(entityId, ghost);
             });
         }
 
@@ -1678,6 +1680,15 @@ namespace RogueCommandExpansionLoader.Runtime
             System.Threading.Interlocked.Increment(ref _unitReuseHookCount);
             SafeCall(delegate
             {
+                int key = RuntimeUnitMechanicsDirector.GetEntityTrackingKey(entityObj);
+                if (key != 0)
+                {
+                    lock (_activeRegisteredEntities)
+                    {
+                        _activeRegisteredEntities.Remove(key);
+                    }
+                }
+
                 RuntimeUnitMechanicsDirector.OnEntityDied(entityObj);
             });
         }
@@ -1781,6 +1792,7 @@ namespace RogueCommandExpansionLoader.Runtime
             {
                 string commandKind = "Unknown";
                 string processingType = "ExecuteAndCancelCurrentCommand";
+                string commandTag = string.Empty;
 
                 if (args != null && args.Length > 0 && args[0] != null)
                 {
@@ -1805,6 +1817,22 @@ namespace RogueCommandExpansionLoader.Runtime
                     {
                         commandKind = cmdObj.ToString();
                     }
+
+                    FieldInfo tagField = _cachedCommandTagField;
+                    if (tagField == null || tagField.DeclaringType != cmdType)
+                    {
+                        tagField = cmdType.GetField("tag", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                        _cachedCommandTagField = tagField;
+                    }
+
+                    if (tagField != null)
+                    {
+                        object tagVal = tagField.GetValue(cmdObj);
+                        if (tagVal != null)
+                        {
+                            commandTag = tagVal.ToString();
+                        }
+                    }
                 }
 
                 if (args != null && args.Length > 1 && args[1] != null)
@@ -1817,7 +1845,7 @@ namespace RogueCommandExpansionLoader.Runtime
                     _lastExecutedCommandKind = commandKind ?? "Unknown";
                 }
 
-                RuntimeGameplayCommandDirector.OnEntityCommandExecuted(entityObj, commandKind, processingType);
+                RuntimeGameplayCommandDirector.OnEntityCommandExecuted(entityObj, commandKind, processingType, commandTag);
             });
         }
 

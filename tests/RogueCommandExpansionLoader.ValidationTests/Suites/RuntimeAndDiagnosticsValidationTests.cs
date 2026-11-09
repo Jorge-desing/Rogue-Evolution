@@ -10,6 +10,7 @@ using RogueCommandExpansionLoader.Content;
 using RogueCommandExpansionLoader.Contracts;
 using RogueCommandExpansionLoader.Modules;
 using RogueCommandExpansionLoader.Runtime;
+using RogueCommandExpansionLoader.Runtime.Ai;
 using RogueCommandExpansionLoader.Runtime.Visual;
 
 internal static partial class ValidationTestRunner
@@ -10235,9 +10236,10 @@ internal static partial class ValidationTestRunner
                         var ghostGo = new GameObject("PlacementGhost");
                         RuntimeHarmonyPatches.CreateBuildingPlacementGhostPrefix();
                         RuntimeHarmonyPatches.CreateBuildingPlacementGhostPostfix("test:core-hook-factory", ghostGo);
-                        if (RuntimeHooks.PlacementGhostHookCount != 1)
+                        if (RuntimeHooks.PlacementGhostHookCount != 1 ||
+                            RuntimeGameplayCommandDirector.GetLastPlacementGhostEntityId() != "test:core-hook-factory")
                         {
-                            throw new InvalidOperationException("Expected PlacementGhostHookCount == 1.");
+                            throw new InvalidOperationException("Expected PlacementGhostHookCount == 1 and GetLastPlacementGhostEntityId == test:core-hook-factory.");
                         }
 
                         var unit = new EntityController
@@ -10299,25 +10301,29 @@ internal static partial class ValidationTestRunner
                         }
 
                         // Factory production hook
+                        factory.ProductionInfo = new ProductionInfo { entityId = "unit:produced-tank" };
                         RuntimeHarmonyPatches.EntityControllerProducePrefix();
                         RuntimeHarmonyPatches.EntityControllerProducePostfix(factory, false, false, false);
                         if (RuntimeHooks.FactoryProduceHookCount != 1 ||
-                            RuntimeGameplayCommandDirector.GetFactoryProducedCount("8803") != 1)
+                            RuntimeGameplayCommandDirector.GetFactoryProducedCount("8803") != 1 ||
+                            RuntimeGameplayCommandDirector.GetFactoryProducedCountByEntityId("test:core-hook-factory") != 1)
                         {
-                            throw new InvalidOperationException("EntityControllerProducePostfix must record factory production telemetry.");
+                            throw new InvalidOperationException("EntityControllerProducePostfix must record factory production telemetry and entityId count.");
                         }
 
                         // 3. Command Loop hooks (ExecuteCommand, ExecuteNextCommand, ResetCurrentCommand, DeleteCommandChain)
                         var moveCmd = EntityCommand.Move(new Vector3(24f, 0f, 36f));
+                        moveCmd.tag = "director.tactical-move";
                         RuntimeHarmonyPatches.EntityControllerExecuteCommandPostfix(
                             unit,
                             new object[] { moveCmd, EntityController.CommandProcessingType.ExecuteAndCancelCurrentCommand });
                         if (RuntimeHooks.CommandExecutedCount != 1 ||
                             RuntimeHooks.LastExecutedCommandKind != "Move" ||
                             RuntimeGameplayCommandDirector.GetLastUnitCommandKind("8801") != "Move" ||
+                            RuntimeGameplayCommandDirector.GetLastUnitCommandTag("8801") != "director.tactical-move" ||
                             RuntimeGameplayCommandDirector.GetLastUnitCommandProcessingType("8801") != "ExecuteAndCancelCurrentCommand")
                         {
-                            throw new InvalidOperationException("EntityControllerExecuteCommandPostfix must record command kind and processing type.");
+                            throw new InvalidOperationException("EntityControllerExecuteCommandPostfix must record command kind, tag, and processing type.");
                         }
 
                         RuntimeHarmonyPatches.EntityControllerExecuteNextCommandPostfix(unit);
@@ -10329,26 +10335,30 @@ internal static partial class ValidationTestRunner
 
                         RuntimeHarmonyPatches.EntityControllerResetCurrentCommandPostfix(unit);
                         if (RuntimeHooks.CommandResetCount != 1 ||
-                            RuntimeGameplayCommandDirector.GetLastUnitCommandKind("8801") != "DoNothing")
+                            RuntimeGameplayCommandDirector.GetLastUnitCommandKind("8801") != "DoNothing" ||
+                            !string.IsNullOrEmpty(RuntimeGameplayCommandDirector.GetLastUnitCommandTag("8801")))
                         {
-                            throw new InvalidOperationException("EntityControllerResetCurrentCommandPostfix must reset command kind to DoNothing.");
+                            throw new InvalidOperationException("EntityControllerResetCurrentCommandPostfix must reset command kind to DoNothing and clear tag.");
                         }
 
                         var attackCmd = EntityCommand.Attack(enemy);
+                        attackCmd.tag = "director.tactical-attack";
                         RuntimeHarmonyPatches.EntityControllerExecuteCommandPostfix(
                             unit,
                             new object[] { attackCmd, EntityController.CommandProcessingType.AppendToCommandChain });
-                        if (RuntimeHooks.LastExecutedCommandKind != "Attack")
+                        if (RuntimeHooks.LastExecutedCommandKind != "Attack" ||
+                            RuntimeGameplayCommandDirector.GetLastUnitCommandTag("8801") != "director.tactical-attack")
                         {
-                            throw new InvalidOperationException("Expected LastExecutedCommandKind == Attack.");
+                            throw new InvalidOperationException("Expected LastExecutedCommandKind == Attack and command tag director.tactical-attack.");
                         }
 
                         RuntimeHarmonyPatches.EntityControllerDeleteCommandChainPostfix(unit);
                         if (RuntimeHooks.CommandChainDeletedCount != 1 ||
                             RuntimeGameplayCommandDirector.GetLastUnitCommandKind("8801") != "DoNothing" ||
+                            !string.IsNullOrEmpty(RuntimeGameplayCommandDirector.GetLastUnitCommandTag("8801")) ||
                             RuntimeGameplayCommandDirector.GetLastUnitCommandProcessingType("8801") != "Cleared")
                         {
-                            throw new InvalidOperationException("EntityControllerDeleteCommandChainPostfix must mark command chain cleared.");
+                            throw new InvalidOperationException("EntityControllerDeleteCommandChainPostfix must mark command chain cleared and clear tag.");
                         }
 
                         // 4. Pool Reuse hooks (ResetAndInitForReuse -> OnHasBeenInstantiatedForReuse)
@@ -10406,7 +10416,8 @@ internal static partial class ValidationTestRunner
 
                         RuntimeHarmonyPatches.ExistingControllersInitPostfix(ExistingControllers.Instance);
                         if (RuntimeHooks.EntityRegistryResetCount != 1 || RuntimeHooks.ActiveRegisteredEntityCount != 0 ||
-                            RuntimeGameplayCommandDirector.GetFactoryProducedCount("8803") != 0)
+                            RuntimeGameplayCommandDirector.GetFactoryProducedCount("8803") != 0 ||
+                            RuntimeGameplayCommandDirector.GetFactoryProducedCountByEntityId("test:core-hook-factory") != 0)
                         {
                             throw new InvalidOperationException("ExistingControllersInitPostfix must clear active battlefield registration and per-match counters.");
                         }
@@ -10419,6 +10430,175 @@ internal static partial class ValidationTestRunner
                         ExistingControllers.Instance.Reset();
                     }
                 }),
+        ("RuntimeHooks.AiCommandArbiterAndLifecycleSynchronization", () =>
+        {
+            try
+            {
+                // 1. AiCommandArbiterState lease lifecycle and tag comparison
+                var state = new AiCommandArbiterState();
+                state.SetLease(901, new AiCommandArbiterState.UnitLease
+                {
+                    ModuleId = "sample:skirmish-kiting",
+                    CommandTag = "kite.tactical-run",
+                    TargetEntityId = 902,
+                    Category = AiIntentCategory.SurvivalKite,
+                    LastApprovedScore = 100f,
+                    LockoutExpiresAt = 50f
+                });
+
+                if (state.ActiveLeaseCount != 1)
+                {
+                    throw new InvalidOperationException("Expected ActiveLeaseCount == 1.");
+                }
+
+                // Same tag: lease must NOT be released
+                if (state.ReleaseLeaseIfTagDiffers(901, "kite.tactical-run"))
+                {
+                    throw new InvalidOperationException("ReleaseLeaseIfTagDiffers must return false when commandTag matches.");
+                }
+                if (state.ActiveLeaseCount != 1)
+                {
+                    throw new InvalidOperationException("Active lease should be retained when tag matches.");
+                }
+
+                // Different tag: lease MUST be released
+                if (!state.ReleaseLeaseIfTagDiffers(901, "player.manual-move"))
+                {
+                    throw new InvalidOperationException("ReleaseLeaseIfTagDiffers must return true when commandTag differs.");
+                }
+                if (state.ActiveLeaseCount != 0)
+                {
+                    throw new InvalidOperationException("Active lease should be removed when tag differs.");
+                }
+
+                // Re-set lease and test ReleaseLease
+                state.SetLease(901, new AiCommandArbiterState.UnitLease
+                {
+                    ModuleId = "sample:skirmish-kiting",
+                    CommandTag = "kite.tactical-run",
+                    Category = AiIntentCategory.SurvivalKite,
+                    LockoutExpiresAt = 50f
+                });
+                if (!state.ReleaseLease(901) || state.ActiveLeaseCount != 0)
+                {
+                    throw new InvalidOperationException("ReleaseLease must remove active lease.");
+                }
+
+                // 2. CompositeAiRuntimeBehaviour notify methods with active composite
+                var events = new List<string>();
+                var recordingBehaviour = new RecordingAiRuntimeBehaviour(events, "test:recording");
+                var composite = new CompositeAiRuntimeBehaviour(
+                    "test:composite-profile",
+                    new[] { "test:recording" },
+                    new IRogueCommandAiRuntimeBehaviour[] { recordingBehaviour });
+                composite.OnInitialized();
+
+                // Seed lease in composite arbiter state
+                composite.ArbiterState.SetLease(903, new AiCommandArbiterState.UnitLease
+                {
+                    ModuleId = "test:recording",
+                    CommandTag = "dummy.hold",
+                    Category = AiIntentCategory.CombatTargeting,
+                    LockoutExpiresAt = 100f
+                });
+
+                if (composite.ArbiterState.ActiveLeaseCount != 1)
+                {
+                    throw new InvalidOperationException("Expected composite arbiter state to have 1 lease.");
+                }
+
+                // NotifyUnitCommandExecuted with same tag -> lease kept
+                CompositeAiRuntimeBehaviour.NotifyUnitCommandExecuted(903, "dummy.hold");
+                if (composite.ArbiterState.ActiveLeaseCount != 1)
+                {
+                    throw new InvalidOperationException("NotifyUnitCommandExecuted with same tag must retain lease.");
+                }
+
+                // NotifyUnitCommandExecuted with different tag -> lease released
+                CompositeAiRuntimeBehaviour.NotifyUnitCommandExecuted(903, "external.override");
+                if (composite.ArbiterState.ActiveLeaseCount != 0)
+                {
+                    throw new InvalidOperationException("NotifyUnitCommandExecuted with different tag must invalidate lease.");
+                }
+
+                // Seed again, test NotifyUnitLeaseInvalidated
+                composite.ArbiterState.SetLease(903, new AiCommandArbiterState.UnitLease
+                {
+                    ModuleId = "test:recording",
+                    CommandTag = "dummy.hold",
+                    Category = AiIntentCategory.CombatTargeting,
+                    LockoutExpiresAt = 100f
+                });
+                CompositeAiRuntimeBehaviour.NotifyUnitLeaseInvalidated(903);
+                if (composite.ArbiterState.ActiveLeaseCount != 0)
+                {
+                    throw new InvalidOperationException("NotifyUnitLeaseInvalidated must remove unit lease.");
+                }
+
+                // Test NotifyBattlefieldRegistryReset
+                composite.ArbiterState.SetLease(904, new AiCommandArbiterState.UnitLease
+                {
+                    ModuleId = "test:recording",
+                    CommandTag = "dummy.hold",
+                    Category = AiIntentCategory.CombatTargeting,
+                    LockoutExpiresAt = 100f
+                });
+                CompositeAiRuntimeBehaviour.NotifyBattlefieldRegistryReset();
+                if (composite.ArbiterState.ActiveLeaseCount != 0)
+                {
+                    throw new InvalidOperationException("NotifyBattlefieldRegistryReset must clear all leases in active composites.");
+                }
+
+                composite.OnDestroyed();
+
+                // 3. Dynamic Command Aura cleanup on entity death/destruction
+                var captain = new EntityController
+                {
+                    entityId = "unit:aura-captain",
+                    UniqueEntityId = 905,
+                    IsControlledByPlayer = true,
+                    IsUnit = true,
+                    Position = new Vector3(10f, 0f, 10f)
+                };
+                var follower = new EntityController
+                {
+                    entityId = "unit:aura-follower",
+                    UniqueEntityId = 906,
+                    IsControlledByPlayer = true,
+                    IsUnit = true,
+                    Position = new Vector3(12f, 0f, 10f)
+                };
+                ExistingControllers.Instance.PlayerUnits().Add(captain);
+                ExistingControllers.Instance.PlayerUnits().Add(follower);
+
+                CommandAuraResult pulseRes = RuntimeGameplayCommandDirector.TryDispatchCommandAuraPulse(
+                    "905", "Leadership", 15.0f, 30.0f);
+                if (!pulseRes.Success || follower.CaptainOfThisEntity != captain)
+                {
+                    throw new InvalidOperationException("TryDispatchCommandAuraPulse must establish follower link.");
+                }
+
+                // Destroying or killing the captain must release follower link and aura state
+                RuntimeUnitMechanicsDirector.OnEntityDestroyed(captain);
+                if (follower.CaptainOfThisEntity != null)
+                {
+                    throw new InvalidOperationException("OnEntityDestroyed on captain must unlink follower.");
+                }
+
+                CommandAuraCensus auraCensus = RuntimeCommandAuraCensus.Current();
+                if (auraCensus.TotalActiveAurasCount != 0)
+                {
+                    throw new InvalidOperationException("OnEntityDestroyed must clear captain's active dynamic command aura.");
+                }
+            }
+            finally
+            {
+                RuntimeHooks.ResetCoreHookTelemetry();
+                RuntimeUnitMechanicsDirector.ClearProfiles();
+                RuntimeGameplayCommandDirector.ClearTacticalStancesAndAffixes();
+                ExistingControllers.Instance.Reset();
+            }
+        }),
     };
 
     private sealed class TestCardChangeTarget

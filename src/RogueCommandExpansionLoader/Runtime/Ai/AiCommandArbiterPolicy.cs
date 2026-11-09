@@ -96,6 +96,26 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
         {
             _leases[unitId] = lease;
         }
+
+        public bool ReleaseLease(int unitId)
+        {
+            return _leases.Remove(unitId);
+        }
+
+        public bool ReleaseLeaseIfTagDiffers(int unitId, string executedCommandTag)
+        {
+            if (!_leases.TryGetValue(unitId, out UnitLease activeLease))
+            {
+                return false;
+            }
+
+            if (string.Equals(activeLease.CommandTag, executedCommandTag ?? string.Empty, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            return _leases.Remove(unitId);
+        }
     }
 
     /// <summary>

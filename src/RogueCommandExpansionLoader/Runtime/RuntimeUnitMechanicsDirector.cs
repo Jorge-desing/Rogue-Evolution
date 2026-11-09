@@ -1363,10 +1363,36 @@ namespace RogueCommandExpansionLoader.Runtime
             }
         }
 
+        private static void RemoveDynamicCommandAuraForEntity(object entityObj)
+        {
+            if (entityObj == null)
+            {
+                return;
+            }
+            try
+            {
+                EnsureReflection(entityObj.GetType());
+                string captainKeyId = ReadIntProperty(_uniqueEntityIdProperty, entityObj, -1).ToString();
+                lock (_activeDynamicCommandAuras)
+                {
+                    if (_activeDynamicCommandAuras.TryGetValue(captainKeyId, out DynamicCommandAuraState state))
+                    {
+                        ReleaseCommandAuraFollowerLinks(state);
+                        _activeDynamicCommandAuras.Remove(captainKeyId);
+                    }
+                }
+            }
+            catch
+            {
+            }
+        }
+
         public static void OnEntityDestroyed(object entityObj)
         {
             RemoveCombatExperience(entityObj);
             RemoveAppliedCardChangeBoostKeys(entityObj);
+            ClearRuntimeMechanicsByObject(entityObj);
+            RemoveDynamicCommandAuraForEntity(entityObj);
             try
             {
                 int key = GetCombatExperienceKey(entityObj);
@@ -1397,6 +1423,7 @@ namespace RogueCommandExpansionLoader.Runtime
                 RemoveCombatExperience(entityObj);
                 RemoveAppliedCardChangeBoostKeys(entityObj);
                 ClearRuntimeMechanicsByObject(entityObj);
+                RemoveDynamicCommandAuraForEntity(entityObj);
                 int key = GetCombatExperienceKey(entityObj);
                 lock (_nativeAiSkillLogicalLastChecks)
                 {

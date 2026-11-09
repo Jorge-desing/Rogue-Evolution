@@ -92,6 +92,11 @@ namespace RogueCommandExpansionLoader.Modules
             get { return _lastArbitrationResult; }
         }
 
+        internal AiCommandArbiterState ArbiterState
+        {
+            get { return _arbiterState; }
+        }
+
         public void OnInitialized()
         {
             if (_destroyed)
@@ -164,6 +169,70 @@ namespace RogueCommandExpansionLoader.Modules
                 if (!_activeComposites.Contains(this))
                 {
                     _activeComposites.Add(this);
+                }
+            }
+        }
+
+        internal static void NotifyBattlefieldRegistryReset()
+        {
+            lock (_activeCompositesLock)
+            {
+                for (int i = 0; i < _activeComposites.Count; i++)
+                {
+                    CompositeAiRuntimeBehaviour instance = _activeComposites[i];
+                    if (instance == null || instance._destroyed)
+                    {
+                        continue;
+                    }
+
+                    instance._arbiterState.Clear();
+                    instance._battlefieldCollector.Reset();
+                    instance._lastBattlefieldSnapshot = AiBattlefieldSnapshot.Empty;
+                    instance._lastArbitrationResult = null;
+                }
+            }
+        }
+
+        internal static void NotifyUnitLeaseInvalidated(int unitId)
+        {
+            if (unitId <= 0)
+            {
+                return;
+            }
+
+            lock (_activeCompositesLock)
+            {
+                for (int i = 0; i < _activeComposites.Count; i++)
+                {
+                    CompositeAiRuntimeBehaviour instance = _activeComposites[i];
+                    if (instance == null || instance._destroyed)
+                    {
+                        continue;
+                    }
+
+                    instance._arbiterState.ReleaseLease(unitId);
+                }
+            }
+        }
+
+        internal static void NotifyUnitCommandExecuted(int unitId, string commandTag)
+        {
+            if (unitId <= 0)
+            {
+                return;
+            }
+
+            lock (_activeCompositesLock)
+            {
+                for (int i = 0; i < _activeComposites.Count; i++)
+                {
+                    CompositeAiRuntimeBehaviour instance = _activeComposites[i];
+                    if (instance == null || instance._destroyed)
+                    {
+                        continue;
+                    }
+
+                    instance._arbiterState.ReleaseLeaseIfTagDiffers(unitId, commandTag);
                 }
             }
         }

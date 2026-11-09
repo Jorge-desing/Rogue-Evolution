@@ -1328,8 +1328,10 @@ namespace RogueCommandExpansionLoader.Runtime
         private static readonly Dictionary<string, List<string>> _activeUnitAffixes = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
         private static readonly Dictionary<string, string> _lastUnitCommandKind = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         private static readonly Dictionary<string, string> _lastUnitCommandProcessingType = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        private static readonly Dictionary<string, string> _lastUnitCommandTag = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         private static readonly Dictionary<string, int> _unitCommandStepCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         private static readonly Dictionary<string, int> _factoryProductionCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        private static string _lastPlacementGhostEntityId = string.Empty;
         private static readonly object _commandLoopGate = new object();
 
         private static string ResolveEntityIdString(EntityController unit)
@@ -7730,8 +7732,10 @@ namespace RogueCommandExpansionLoader.Runtime
             {
                 _lastUnitCommandKind.Clear();
                 _lastUnitCommandProcessingType.Clear();
+                _lastUnitCommandTag.Clear();
                 _unitCommandStepCounts.Clear();
                 _factoryProductionCounts.Clear();
+                _lastPlacementGhostEntityId = string.Empty;
             }
             ClearAiProfileUnitDefaults();
         }
@@ -7755,9 +7759,12 @@ namespace RogueCommandExpansionLoader.Runtime
             {
                 _lastUnitCommandKind.Clear();
                 _lastUnitCommandProcessingType.Clear();
+                _lastUnitCommandTag.Clear();
                 _unitCommandStepCounts.Clear();
                 _factoryProductionCounts.Clear();
+                _lastPlacementGhostEntityId = string.Empty;
             }
+            Modules.CompositeAiRuntimeBehaviour.NotifyBattlefieldRegistryReset();
         }
 
         public static void OnEntityDestroyed(string entityKeyId)
@@ -7781,8 +7788,30 @@ namespace RogueCommandExpansionLoader.Runtime
             {
                 _lastUnitCommandKind.Remove(key);
                 _lastUnitCommandProcessingType.Remove(key);
+                _lastUnitCommandTag.Remove(key);
                 _unitCommandStepCounts.Remove(key);
                 _factoryProductionCounts.Remove(key);
+            }
+            int parsedKey;
+            if (int.TryParse(key, out parsedKey) && parsedKey > 0)
+            {
+                Modules.CompositeAiRuntimeBehaviour.NotifyUnitLeaseInvalidated(parsedKey);
+            }
+        }
+
+        public static void OnPlacementGhostCreated(string entityId, GameObject ghost)
+        {
+            lock (_commandLoopGate)
+            {
+                _lastPlacementGhostEntityId = string.IsNullOrWhiteSpace(entityId) ? string.Empty : entityId.Trim();
+            }
+        }
+
+        public static string GetLastPlacementGhostEntityId()
+        {
+            lock (_commandLoopGate)
+            {
+                return _lastPlacementGhostEntityId ?? string.Empty;
             }
         }
 
@@ -7790,13 +7819,39 @@ namespace RogueCommandExpansionLoader.Runtime
         {
             if (factoryObj == null) return;
             int keyInt = RuntimeUnitMechanicsDirector.GetEntityTrackingKey(factoryObj);
-            if (keyInt == 0) return;
-            string key = keyInt.ToString();
+            string factoryId = string.Empty;
+            try
+            {
+                PropertyInfo prop = factoryObj.GetType().GetProperty("EntityId") ?? factoryObj.GetType().GetProperty("entityId");
+                if (prop != null) factoryId = prop.GetValue(factoryObj, null) as string ?? string.Empty;
+                if (string.IsNullOrWhiteSpace(factoryId))
+                {
+                    FieldInfo field = factoryObj.GetType().GetField("entityId") ?? factoryObj.GetType().GetField("EntityId");
+                    if (field != null) factoryId = field.GetValue(factoryObj) as string ?? string.Empty;
+                }
+            }
+            catch { }
+
             lock (_commandLoopGate)
             {
-                int current;
-                _factoryProductionCounts.TryGetValue(key, out current);
-                _factoryProductionCounts[key] = current + 1;
+                if (keyInt != 0)
+                {
+                    string key = keyInt.ToString();
+                    int current;
+                    _factoryProductionCounts.TryGetValue(key, out current);
+                    _factoryProductionCounts[key] = current + 1;
+                }
+
+                if (!string.IsNullOrWhiteSpace(factoryId))
+                {
+                    string fKey = factoryId.Trim();
+                    if (keyInt == 0 || !string.Equals(fKey, keyInt.ToString(), StringComparison.OrdinalIgnoreCase))
+                    {
+                        int currentById;
+                        _factoryProductionCounts.TryGetValue(fKey, out currentById);
+                        _factoryProductionCounts[fKey] = currentById + 1;
+                    }
+                }
             }
         }
 
@@ -7810,17 +7865,25 @@ namespace RogueCommandExpansionLoader.Runtime
             }
         }
 
-        public static void OnEntityCommandExecuted(object entityObj, string commandKind, string processingType)
+        public static int GetFactoryProducedCountByEntityId(string entityId)
+        {
+            return GetFactoryProducedCount(entityId);
+        }
+
+        public static void OnEntityCommandExecuted(object entityObj, string commandKind, string processingType, string commandTag = "")
         {
             if (entityObj == null) return;
             int keyInt = RuntimeUnitMechanicsDirector.GetEntityTrackingKey(entityObj);
             if (keyInt == 0) return;
             string key = keyInt.ToString();
+            string cleanTag = string.IsNullOrWhiteSpace(commandTag) ? string.Empty : commandTag.Trim();
             lock (_commandLoopGate)
             {
                 _lastUnitCommandKind[key] = string.IsNullOrWhiteSpace(commandKind) ? "Unknown" : commandKind.Trim();
                 _lastUnitCommandProcessingType[key] = string.IsNullOrWhiteSpace(processingType) ? "ExecuteAndCancelCurrentCommand" : processingType.Trim();
+                _lastUnitCommandTag[key] = cleanTag;
             }
+            Modules.CompositeAiRuntimeBehaviour.NotifyUnitCommandExecuted(keyInt, cleanTag);
         }
 
         public static void OnEntityCommandChainStep(object entityObj)
@@ -7846,7 +7909,9 @@ namespace RogueCommandExpansionLoader.Runtime
             lock (_commandLoopGate)
             {
                 _lastUnitCommandKind[key] = "DoNothing";
+                _lastUnitCommandTag.Remove(key);
             }
+            Modules.CompositeAiRuntimeBehaviour.NotifyUnitLeaseInvalidated(keyInt);
         }
 
         public static void OnEntityCommandChainDeleted(object entityObj)
@@ -7859,7 +7924,9 @@ namespace RogueCommandExpansionLoader.Runtime
             {
                 _lastUnitCommandKind[key] = "DoNothing";
                 _lastUnitCommandProcessingType[key] = "Cleared";
+                _lastUnitCommandTag.Remove(key);
             }
+            Modules.CompositeAiRuntimeBehaviour.NotifyUnitLeaseInvalidated(keyInt);
         }
 
         public static string GetLastUnitCommandKind(string entityKeyId)
@@ -7879,6 +7946,16 @@ namespace RogueCommandExpansionLoader.Runtime
             {
                 string proc;
                 return _lastUnitCommandProcessingType.TryGetValue(entityKeyId.Trim(), out proc) ? proc : string.Empty;
+            }
+        }
+
+        public static string GetLastUnitCommandTag(string entityKeyId)
+        {
+            if (string.IsNullOrWhiteSpace(entityKeyId)) return string.Empty;
+            lock (_commandLoopGate)
+            {
+                string tag;
+                return _lastUnitCommandTag.TryGetValue(entityKeyId.Trim(), out tag) ? tag : string.Empty;
             }
         }
 

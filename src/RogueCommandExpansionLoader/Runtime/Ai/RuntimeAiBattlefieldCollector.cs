@@ -342,6 +342,7 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
             }
 
             int affixFlags = 0;
+            string currentCommandTag = string.Empty;
             try
             {
                 string entityKey = entity.UniqueEntityId.ToString();
@@ -359,6 +360,12 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
                         else if (string.Equals(affix, "Volatile", StringComparison.OrdinalIgnoreCase)) affixFlags |= (int)AiAffixFlags.Volatile;
                         else if (string.Equals(affix, "Shielded", StringComparison.OrdinalIgnoreCase)) affixFlags |= (int)AiAffixFlags.Shielded;
                     }
+                }
+
+                currentCommandTag = RuntimeGameplayCommandDirector.GetLastUnitCommandTag(entityKey);
+                if (string.IsNullOrWhiteSpace(currentCommandTag))
+                {
+                    currentCommandTag = RuntimeGameplayCommandDirector.GetLastUnitCommandKind(entityKey);
                 }
             }
             catch
@@ -389,7 +396,7 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
                 isBuilding: entity.IsBuilding,
                 isSupportUnit: isSupport,
                 hasQueuedCommands: hasQueued,
-                currentCommandTag: string.Empty,
+                currentCommandTag: currentCommandTag ?? string.Empty,
                 currentTargetId: targetId,
                 hasReadyActiveSkill: hasReadySkill,
                 activeSkillTargetsSelf: skillTargetsSelf,
